@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -578,14 +579,25 @@ class _DisplayData:
         return self.texts[index]
 
 
+def _unescaped(xml: str) -> str:
+    # Farm run 20261009T200747541Z: GetSymbolXml reads a letter's symbol code
+    # back unescaped, "<DatumLetter>B<MOD-TRANS2></DatumLetter>".
+    return xml.replace("&lt;", "<").replace("&gt;", ">")
+
+
 def _translated_frame(
-    monkeypatch: pytest.MonkeyPatch, prints: Any, *, accepts: Any = lambda _xml: True
+    monkeypatch: pytest.MonkeyPatch,
+    prints: Any,
+    *,
+    accepts: Any = lambda _xml: True,
+    reads_back: Any = _unescaped,
 ) -> tuple[Any, list[str]]:
     """add_feature_control_frame on a fake seat for the slot frame C|B▷.
 
     ``prints(xml)`` is the frame's printed text for its current XML;
-    ``accepts(xml)`` is SetSymbolXml's answer.  Returns the gtol and every
-    XML SOLIDWORKS was handed.
+    ``accepts(xml)`` is SetSymbolXml's answer; ``reads_back(xml)`` is what
+    GetSymbolXml returns for it.  Returns the gtol and every XML SOLIDWORKS
+    was handed.
     """
     handed: list[str] = []
 
@@ -600,7 +612,7 @@ def _translated_frame(
             return False
 
         def GetSymbolXml(self) -> str:
-            return self.xml
+            return reads_back(self.xml)
 
     frame = _XmlFrame()
 
@@ -667,15 +679,22 @@ def test_translated_frame_prints_the_inline_glyph_first(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize(
-    ("accepts", "inline_prints"),
+    ("accepts", "inline_prints", "reads_back"),
     (
-        # SOLIDWORKS refuses the inline letter, or takes it and prints it wrong.
-        (lambda xml: "&lt;" not in xml, _INLINE),
-        (lambda _xml: True, ["<GTOL-POSI>", "0.05", "C", "B"]),
+        # SOLIDWORKS refuses the inline letter, takes it and prints it wrong,
+        # or reads back XML that does not parse.
+        (lambda xml: "&lt;" not in xml, _INLINE, _unescaped),
+        (lambda _xml: True, ["<GTOL-POSI>", "0.05", "C", "B"], _unescaped),
+        (
+            lambda _xml: True,
+            _INLINE,
+            lambda xml: xml.replace("</DatumLetter>", "") if "&lt;" in xml else xml,
+        ),
     ),
+    ids=("refused", "glyph-less", "unreadable"),
 )
 def test_translated_frame_falls_back_to_the_flag_and_its_zero_vector(
-    monkeypatch, accepts: Any, inline_prints: list[str]
+    monkeypatch, accepts: Any, inline_prints: list[str], reads_back: Any
 ) -> None:
     # User ruling: the native flag is the last form, its "[0,0,0]" accepted
     # (farm runs 20261009T174542021Z / 20261009T182549169Z printed it).
@@ -683,6 +702,7 @@ def test_translated_frame_falls_back_to_the_flag_and_its_zero_vector(
         monkeypatch,
         lambda xml: inline_prints if "&lt;MOD-TRANS2&gt;" in xml else _VECTOR,
         accepts=accepts,
+        reads_back=reads_back,
     )
     assert [_gtol_form(xml) for xml in handed] == ["inline", "flag"]
     assert _gtol_form(gtol.GetFrame(1).GetSymbolXml()) == "flag"
@@ -706,7 +726,7 @@ def test_translated_frame_fails_closed_when_the_flag_prints_another_vector(
 
 
 def _gtol_form(xml: str) -> str:
-    if "&lt;MOD-TRANS2&gt;" in xml:
+    if "<MOD-TRANS2>" in _unescaped(xml):
         return "inline"
     if "<Translation>true</Translation>" in xml:
         return "flag"
@@ -723,12 +743,23 @@ def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
     )
     front = _View(("A",), (_FrameGtol("DetailItem355", ("A", "B")),))
     top = _View((), (_FrameGtol("DetailItem356", ("A",)), _FrameGtol("DetailItem358", ("A", "B"))))
+    # Farm run 20261009T200747541Z: a composite frame's lower tier read back
+    # with one empty <ToleranceSymbol> (the tiers share the symbol cell); its
+    # datums still count.
+    composite = _FrameGtol("DetailItem357", ("A",))
+    lower = _FrameXml(("A", "C"))
+    lower.xml = re.sub(
+        r"<ToleranceSymbol>[^<]*</ToleranceSymbol>", "<ToleranceSymbol />", lower.xml
+    )
+    composite.frames.append(lower)
+    top.frames = (*top.frames, composite)
     with pytest.raises(
         RuntimeError,
-        match=r"reference datum\(s\) no tag prints: B by \['DetailItem355', 'DetailItem358'\]; tags print \['A'\]",
+        match=r"reference datum\(s\) no tag prints: B by \['DetailItem355', 'DetailItem358'\], "
+        r"C by \['DetailItem357'\]; tags print \['A'\]",
     ):
         _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
-    top.tags = [_DatumTag("B")]
+    top.tags = [_DatumTag("B"), _DatumTag("C")]
     _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
 
 

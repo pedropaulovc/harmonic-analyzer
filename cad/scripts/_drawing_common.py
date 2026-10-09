@@ -1058,11 +1058,13 @@ def add_feature_control_frame(
             applied = str(frame.GetSymbolXml() or "")
             if _GTOL_SYMBOLS[characteristic] not in applied or tolerance not in applied:
                 raise RuntimeError(f"feature-control frame did not persist ({label})")
-            if not translated or (
-                _gtol_frame_signature(applied).translated == tuple(translated)
-            ):
+            try:
+                read_back = _gtol_frame_signature(applied).translated if translated else ()
+            except ValueError as exc:
+                read_back = (f"unreadable: {exc}",)
+            if read_back == tuple(translated):
                 return True
-            rejected.append(f"{form}: translation not read back from {applied!r}")
+            rejected.append(f"{form}: translation {read_back!r} read back from {applied!r}")
         else:
             rejected.append(f"{form}: SetSymbolXml rejected")
         _telemetry.event("gtol.translation_form", label=label, form=form, outcome=rejected[-1])
@@ -1297,7 +1299,10 @@ def add_frame_datum_feature(
     Then the printed letter (display-data text position, the ink the layout
     audit reads) is compared with where ``symbol_xy`` puts it, and the
     position is moved, in the space ``GetPosition`` reports, by the miss: up
-    to ``_FRAME_DATUM_CORRECTIONS`` times.  Each step emits
+    to ``_FRAME_DATUM_CORRECTIONS`` times.  On run 20261009T200747541Z the
+    first set, below the frame, printed 7.0 mm low (one tag box: a tag hung
+    below a frame takes y at its box's top) and one correction printed the
+    letter 0.40 mm from its place.  Each step emits
     ``datum.frame_placement``.  The letter must end within
     ``position_tolerance_m`` of its place, or the sheet fails.
     """
@@ -1428,7 +1433,7 @@ def assert_frame_datums_defined(views: Sequence[Any], *, label: str) -> None:
     ⌖Ø0.20|A|B on the knife mount with no B on the sheet, because the
     identifier its readback proved does not print.
     """
-    from _gtol_spec import gtol_frame_signature
+    from _gtol_spec import gtol_frame_datums
 
     defined: set[str] = set()
     referenced: dict[str, list[str]] = {}
@@ -1443,7 +1448,7 @@ def assert_frame_datums_defined(views: Sequence[Any], *, label: str) -> None:
                 frame = _sw_type_info.early_bound_or_flag(
                     gtol.GetFrame(index), "IGtolFrame", "GetSymbolXml"
                 )
-                for letter in gtol_frame_signature(str(frame.GetSymbolXml() or "")).datums:
+                for letter in gtol_frame_datums(str(frame.GetSymbolXml() or "")):
                     referenced.setdefault(letter, []).append(name)
     missing = {letter: frames for letter, frames in referenced.items() if letter not in defined}
     if missing:

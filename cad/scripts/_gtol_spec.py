@@ -136,10 +136,7 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
     it misses datum order and diametral-zone state.  This normalized signature
     compares every production field this repository authors.
     """
-    try:
-        root = ElementTree.fromstring(xml)
-    except ElementTree.ParseError as exc:
-        raise ValueError(f"invalid feature-control-frame XML: {exc}") from exc
+    root = _frame_root(xml)
 
     def texts(local_name: str) -> list[str]:
         return [
@@ -159,10 +156,50 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
     if any(value != "phi" for value in range_symbols) or len(range_symbols) > 1:
         raise ValueError(f"unsupported primary range symbols: {range_symbols!r}")
     tolerance_zone: ToleranceZone = "diametral" if range_symbols else "linear"
-    # A letter carries the modifier inline ("C<MOD-TRANS2>") or its
-    # compartment carries the <Translation> flag; either way the datum is C.
+    datums, translated = _datum_references(root)
+    return GtolFrameSignature(
+        characteristic_symbol=symbols[0],
+        tolerance=tolerances[0],
+        datums=datums,
+        tolerance_zone=tolerance_zone,
+        translated=translated,
+    )
+
+
+def gtol_frame_datums(xml: str) -> tuple[str, ...]:
+    """The datum letters one frame XML references, in order.
+
+    Unlike ``gtol_frame_signature`` this needs no characteristic: a composite
+    frame's lower tier shares the upper tier's symbol cell, and SOLIDWORKS
+    read its XML back with one empty ``<ToleranceSymbol>`` (knife mount, farm
+    run 20261009T200747541Z) while it still names its datums.
+    """
+    return _datum_references(_frame_root(xml))[0]
+
+
+def _frame_root(xml: str) -> ElementTree.Element:
+    # SOLIDWORKS reads a letter's symbol code back unescaped:
+    # IGtolFrame.GetSymbolXml returned "<DatumLetter>C<MOD-TRANS2></DatumLetter>"
+    # for the authored "C&lt;MOD-TRANS2&gt;" (farm run 20261009T200747541Z:
+    # "mismatched tag", fr-top-frame slot frames).  The schema has no
+    # element named for a symbol code, so such a tag is the code as text.
+    xml = re.sub(r"<((?:MOD|GTOL)-[A-Z0-9]+)>", r"&lt;\1&gt;", xml)
+    try:
+        return ElementTree.fromstring(xml)
+    except ElementTree.ParseError as exc:
+        raise ValueError(f"invalid feature-control-frame XML: {exc}") from exc
+
+
+def _datum_references(
+    root: ElementTree.Element,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(datum letters, translated letters) of a parsed frame XML.
+
+    A letter carries the modifier inline ("C<MOD-TRANS2>") or its
+    compartment carries the <Translation> flag; either way the datum is C.
+    """
     datums: list[str] = []
-    translated_letters: list[str] = []
+    translated: list[str] = []
     for compartment in root.iter():
         if compartment.tag.rsplit("}", 1)[-1] != "DatumCompartment":
             continue
@@ -178,15 +215,8 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
             name = re.sub(rf"<{_TRANSLATION_MODIFIER}\d*>", "", text)
             datums.append(name)
             if flagged or name != text:
-                translated_letters.append(name)
-    translated = tuple(translated_letters)
-    return GtolFrameSignature(
-        characteristic_symbol=symbols[0],
-        tolerance=tolerances[0],
-        datums=tuple(datums),
-        tolerance_zone=tolerance_zone,
-        translated=translated,
-    )
+                translated.append(name)
+    return tuple(datums), tuple(translated)
 
 
 def translation_print_problem(

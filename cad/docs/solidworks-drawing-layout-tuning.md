@@ -401,7 +401,10 @@ coordinates: on runs 20261009T182549169Z and 20261009T185542819Z,
 at (0.160, 0.413), 0.2 m above the frame's bottom edge and held to its
 mid-width. Set y as the offset from the frame's bottom edge, then correct by
 the printed letter's miss (display-data text position) in the space
-`GetPosition` reports, and prove the final print. Also end the sheet with
+`GetPosition` reports, and prove the final print (run 20261009T200747541Z:
+the first set printed 7.0 mm low, one correction landed it 0.40 mm off).
+Read a composite frame's lower tier for its datums only
+(`gtol_frame_datums`): it reads back with an empty `<ToleranceSymbol>`. Also end the sheet with
 `assert_frame_datums_defined`, which fails when any frame names a datum that
 no `IView::GetDatumTags` label prints.
 
@@ -423,6 +426,11 @@ letter (`<DatumLetter>C&lt;MOD-TRANS2&gt;</DatumLetter>`, no flag), which
 must print the glyph after the letter and no brackets, then the native flag,
 which is accepted with exactly one "[0,0,0]" after the glyph. It logs
 `gtol.translation_form`. Once a leaf proves one, keep that one alone.
+SOLIDWORKS took the inline letter (run 20261009T200747541Z) but
+`GetSymbolXml` read its symbol code back unescaped,
+`<DatumLetter>C<MOD-TRANS2></DatumLetter>`, which is not well-formed XML;
+the frame-XML parser escapes `<MOD-…>`/`<GTOL-…>` codes before parsing,
+and an unreadable readback rejects the form rather than ending the sheet.
 
 ## The sheet-split rule
 

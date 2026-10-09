@@ -15,12 +15,42 @@ from _gtol_spec import (
     TRANSLATION_GLYPH,
     SphereFace,
     TorusFace,
+    gtol_frame_datums,
     gtol_frame_signature,
     gtol_frame_xml,
     translation_print_problem,
     validate_part_pmi,
 )
 from _part_pmi import _FaceGeometry, _face_matches
+
+
+
+def test_frame_datums_read_a_composite_lower_tier_without_its_symbol() -> None:
+    # Farm run 20261009T200747541Z: the knife mount's composite lower tier
+    # read back one empty <ToleranceSymbol>; the full signature refuses it,
+    # its datum references do not need it.
+    lower = gtol_frame_xml(
+        "position", "0.05", datums=("A", "B", "C"), translated=("C",), diameter=True
+    ).replace("<ToleranceSymbol>GTOL-POSI</ToleranceSymbol>", "<ToleranceSymbol />")
+    assert "<ToleranceSymbol />" in lower
+    with pytest.raises(ValueError, match="frame XML has 1 tolerance symbols"):
+        gtol_frame_signature(lower)
+    assert gtol_frame_datums(lower) == ("A", "B", "C")
+    with pytest.raises(ValueError, match="invalid feature-control-frame XML"):
+        gtol_frame_datums("<GtolFrame>")
+
+
+def test_frame_signature_reads_the_symbol_code_solidworks_unescapes() -> None:
+    # Farm run 20261009T200747541Z: SetSymbolXml took "C&lt;MOD-TRANS2&gt;"
+    # and GetSymbolXml read it back as "C<MOD-TRANS2>" ("mismatched tag").
+    authored = gtol_frame_xml(
+        "position", "0.05", datums=("B", "C"), translated=("C",), translation_form="inline"
+    )
+    applied = authored.replace("&lt;", "<").replace("&gt;", ">")
+    assert "<DatumLetter>C<MOD-TRANS2></DatumLetter>" in applied
+    assert gtol_frame_signature(applied) == gtol_frame_signature(authored)
+    assert gtol_frame_signature(applied).translated == ("C",)
+    assert gtol_frame_datums(applied) == ("B", "C")
 
 
 def test_frame_signature_preserves_every_authored_semantic() -> None:
