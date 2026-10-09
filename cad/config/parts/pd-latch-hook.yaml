@@ -3,7 +3,7 @@ pd-latch-hook:
   number: MHA-PD-014
   # pd_latch_hook_spec.MATERIAL_TITLE: the title block's MATERIAL cell.
   material: "0.8 (0.032) 1095 spring steel"
-  material_specification: "1095 spring steel sheet 0.032 in (0.8) +/-0.03, annealed"
+  material_specification: "1095 spring steel sheet 0.032 in (0.8 mm) +/-0.03 mm, annealed"
   finish: hardened and tempered blue, 44-50 HRC
   quantity: 1
   tolerance_class: machined_block
