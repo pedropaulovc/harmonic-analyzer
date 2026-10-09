@@ -508,7 +508,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.120)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.185)
-    add_property_linked_note(adapter, "Bracket Receiver Note", 0.020, 0.095)
 
     if not drawing.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate bracket receiver sheet")
