@@ -132,8 +132,10 @@ git submodule update --init --recursive
 Except for the narrowly generated-only post-release PR defined below, a PR is
 not mergeable until ALL THREE hold — no partial credit:
 
-1. **Build green** — the full `uv run python -m doit -n 4` pipeline (every
-   part, assembly and gate) passes on the PR's head. **One** successful build
+1. **Build green** — the full `build` pipeline (every part, assembly and gate)
+   passes on the PR's head. On the farm, run it through the supervised launcher
+   with **no `-n`**: `build.py --executor farm` keeps 8 leaves in flight, while a
+   hand-passed `-n 4` leaves the fifth worker idle. **One** successful build
    is the bar.
 2. **Remote reviewer approved** — Codex or CodeRabbit approved the latest push
    (no findings, or its findings were addressed and re-reviewed clean).
@@ -160,8 +162,8 @@ deleting a parent branch auto-closes the children still targeting it.
 
 **Rebase on `main` proactively, not reactively.** Check the branch against
 `origin/main` (`git fetch origin main && git status`/`git log HEAD..origin/main`)
-before starting new work on it, and always before kicking off a full
-`uv run python -m doit -n 4` build — a stale branch risks a green build that
+before starting new work on it, and always before kicking off a full `build`
+— a stale branch risks a green build that
 still conflicts or drifts (config/digest/cache-key changes on `main` invalidate
 what you just built). Rebase (`git pull --rebase origin main`) as soon as you
 find `main` has moved, rather than waiting for a merge conflict or a failed
@@ -208,7 +210,8 @@ the COM tasks):
 
 ```
 uv run python -m doit             # = `build`: everything + every gate
-uv run python -m doit -n 4        # same, check:* fanned out in parallel
+uv run python -m doit -n 4        # local seat only: check:* fanned out in parallel
+                                  # (farm: pass no -n; build.py defaults to 8)
 uv run python -m doit build_bare  # quick: parts + assemblies only
 uv run python -m doit check:math  # one SolidWorks-free gate (no SW needed)
 uv run python build.py --help     # the wrapper's options (--executor, --leaf-timeout,
