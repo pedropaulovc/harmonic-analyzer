@@ -615,18 +615,16 @@ build):
   Retrieve the decision and fragments remotely, for example:
 
   ```kusto
-  union
-      (customEvents
-       | where name in ("cache.miss", "cache.hit", "cache.store")
-       | extend record_name=name),
-      (traces
-       | where message == "cache.provenance"
-       | extend record_name=message)
+  traces
+  | where message in ("cache.miss", "cache.hit", "cache.store", "cache.provenance")
+  | extend record_name=message
   | where tostring(customDimensions["label"]) == "part:vn_counter_spring"
   | project timestamp, operation_Id, record_name,
       label=tostring(customDimensions["label"]),
       key_full=tostring(customDimensions["key_full"]),
       manifest_id=tostring(customDimensions["manifest_id"]),
+      schema=toint(customDimensions["manifest_schema"]),
+      transport=tostring(customDimensions["manifest_transport"]),
       complete=tobool(customDimensions["manifest_complete"]),
       chunks=toint(customDimensions["manifest_chunk_count"]),
       emitted=toint(customDimensions["manifest_emitted_chunks"]),
@@ -637,6 +635,11 @@ build):
   | order by timestamp asc, manifest_id asc, chunk_index asc
   ```
 
+  First require all mandatory decision metadata, with the expected types:
+  full key, manifest identity/schema/transport, completeness, character count,
+  required/planned chunk counts, and input count. Missing metadata means
+  incomplete evidence, even if the remaining `complete` flag is true.
+  Require each matching fragment to have a valid integer index and string chunk.
   Reassemble by manifest identity (and operation when inspecting one decision).
   Deduplicate identical fragments by zero-based index; reject conflicting
   duplicates. Require `complete=true`, planned count equal to required count,
@@ -652,8 +655,8 @@ build):
 
 **Vendor-part builds are actionable.** An actual `part:vn_*` build emits a
 `!!` / OTel `WARN` immediately before its COM execution, with structured `label`
-and the full `cache.key` for provenance correlation (the console shows its
-12-character prefix).
+and `cache.key` (the 12-character prefix shared with phase spans and the console),
+plus the full `key_full` for correlation with cache events and recipe manifests.
 This happens on a local seat or the farm worker, not on the submitter's dispatch,
 a cache probe, a miss that becomes a hit while waiting for the seat, or
 `drawing:vn_*`. Vendor-part rebuilds should be rare: compare the recorded cache

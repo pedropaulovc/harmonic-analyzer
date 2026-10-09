@@ -1697,7 +1697,8 @@ def test_vendor_part_warning_only_at_actual_build(
         assert len(warnings) == 1
         record = warnings[0]
         assert record.severity_number == SeverityNumber.WARN
-        assert record.attributes["cache.key"] == key
+        assert record.attributes["cache.key"] == key[:12]
+        assert record.attributes["key_full"] == key
         assert record.trace_id and record.span_id
         assert "!!" in console and label in console and key[:12] in console
         assert events == ["execute"]

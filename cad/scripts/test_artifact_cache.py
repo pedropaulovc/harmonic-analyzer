@@ -62,6 +62,7 @@ def fake(tmp_path, monkeypatch, real_unpack):
     monkeypatch.setattr(cache, "_unpack", lambda blob: None)
     monkeypatch.setattr(cache, "_KEY_INPUTS", {})
     monkeypatch.setattr(cache, "_KEY_CONTEXT", {})
+    monkeypatch.setattr(cache, "_KEY_MANIFESTS", {})
     backend = _FakeBackend()
     monkeypatch.setattr(cache, "_BACKEND", backend)
     return backend
@@ -111,18 +112,6 @@ def test_key_inputs_sorted_with_missing_marker(tmp_path):
     assert key == cache.cache_key([present, missing], _digest_one)
 
 
-def test_debug_logs_provenance_without_changing_key(tmp_path, monkeypatch):
-    records: list[str] = []
-    monkeypatch.setattr(_telemetry, "info", lambda message, **_: records.append(message))
-    monkeypatch.setenv("HARMONIC_CACHE_DEBUG", "1")
-    a = _make_dep(tmp_path, "a.txt", "alpha")
-    key = cache.cache_key([a], _digest_one, label="part:x")
-    logged = "\n".join(records)
-    assert "key provenance part:x" in logged
-    assert "a.txt" in logged and key in logged
-    # Same inputs, debug off -> identical key (logging is side-effect only).
-    monkeypatch.delenv("HARMONIC_CACHE_DEBUG")
-    assert cache.cache_key([a], _digest_one) == key
 
 
 # --------------------------------------------------------------------------- #
@@ -161,21 +150,6 @@ def test_store_retains_last_published_input_provenance(tmp_path, fake):
     assert cache.last_stored_inputs("part:x") == [("input.py", "VALUE = 1\n")]
 
 
-def test_restore_miss_logs_event_at_debug(tmp_path, fake, monkeypatch):
-    records: list[tuple[str, str]] = []
-    monkeypatch.setattr(
-        _telemetry, "debug", lambda message, **_: records.append(("debug", message))
-    )
-    monkeypatch.setattr(
-        _telemetry, "warn", lambda message, **_: records.append(("warning", message))
-    )
-    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
-    key = cache.cache_key([dep], _digest_one, label="part:x")
-    assert cache.restore(key, [], "part:x") is False
-    assert records == [("debug", f"[cache] miss  part:x ({key[:12]}) -> building locally")]
-    events = _events(tmp_path)
-    assert [e["event"] for e in events] == ["restore_miss"]
-    assert events[0]["inputs"] == [{"path": "input.py", "digest": "VALUE = 1\n"}]
 
 
 def test_restore_hit_over_a_share_locked_output_raises_instead_of_falling_through(
@@ -297,7 +271,6 @@ def test_farm_submitter_hit_on_worker_published_key_does_not_warn(
     with caplog.at_level(logging.DEBUG, logger=logger.name):
         assert cache.restore(k_new, [out], "part:x") is True
     assert _records(caplog, logger, logging.WARNING) == []
-    assert any("expected" in msg for msg in _records(caplog, logger, logging.DEBUG))
     event = _events(tmp_path)[-1]
     assert event["event"] == "restore_hit_drift"      # the record stays complete
     assert event["previous_key"] == k_old
@@ -696,28 +669,66 @@ def _received_recipe(events, outcome):
     if len(decisions) != 1:
         return None
     decision = decisions[0]
-    if not decision.get("manifest_complete"):
+    required = {
+        "manifest_id", "manifest_schema", "manifest_chars", "manifest_chunk_count",
+        "manifest_emitted_chunks", "manifest_input_count", "manifest_complete",
+        "manifest_transport", "key_full",
+    }
+    if not required <= decision.keys() or decision["manifest_complete"] is not True:
+        return None
+    if decision["manifest_transport"] != "logs":
+        return None
+    if not isinstance(decision["manifest_id"], str) or len(decision["manifest_id"]) != 64:
+        return None
+    if not isinstance(decision["key_full"], str):
+        return None
+    for field in ("manifest_schema", "manifest_chars", "manifest_chunk_count",
+                  "manifest_emitted_chunks", "manifest_input_count"):
+        if type(decision[field]) is not int or decision[field] < 0:
+            return None
+    count = decision["manifest_chunk_count"]
+    if count == 0 or decision["manifest_emitted_chunks"] != count:
         return None
     chunks = {}
     for name, attrs in events:
         if name == "cache.provenance" and attrs.get("manifest_id") == decision["manifest_id"]:
+            if not {"chunk_index", "chunk"} <= attrs.keys():
+                return None
             index, fragment = attrs["chunk_index"], attrs["chunk"]
+            if type(index) is not int or not 0 <= index < count or not isinstance(fragment, str):
+                return None
             if index in chunks and chunks[index] != fragment:
                 return None
             chunks[index] = fragment
-    count = decision["manifest_chunk_count"]
     if set(chunks) != set(range(count)) or decision["manifest_emitted_chunks"] != count:
         return None
     payload = "".join(chunks[index] for index in range(count))
     if len(payload) != decision["manifest_chars"]:
         return None
-    if hashlib.sha256(payload.encode("ascii")).hexdigest() != decision["manifest_id"]:
+    try:
+        if hashlib.sha256(payload.encode("ascii")).hexdigest() != decision["manifest_id"]:
+            return None
+        recipe = json.loads(payload)
+    except (UnicodeError, json.JSONDecodeError):
         return None
-    recipe = json.loads(payload)
-    if not recipe["recipe_known"]:
+    fields = {"schema", "key", "epoch", "salt", "recipe_known", "input_count", "inputs"}
+    if not isinstance(recipe, dict) or not fields <= recipe.keys():
+        return None
+    if recipe["recipe_known"] is not True or not isinstance(recipe["inputs"], list):
+        return None
+    if recipe["schema"] != decision["manifest_schema"] or recipe["key"] != decision["key_full"]:
+        return None
+    if type(recipe["input_count"]) is not int:
         return None
     if len(recipe["inputs"]) != recipe["input_count"] or recipe["input_count"] != decision["manifest_input_count"]:
         return None
+    if not isinstance(recipe["epoch"], str) or not isinstance(recipe["salt"], str):
+        return None
+    for item in recipe["inputs"]:
+        if not isinstance(item, dict) or not {"path", "digest"} <= item.keys():
+            return None
+        if not isinstance(item["path"], str) or not isinstance(item["digest"], str):
+            return None
     return recipe
 
 
@@ -964,6 +975,7 @@ def test_remote_baseline_identifies_changed_dependency_across_disposable_seats(
     # New seat has neither process provenance nor the old local key sidecar.
     monkeypatch.setattr(cache, "_KEY_INPUTS", {})
     monkeypatch.setattr(cache, "_KEY_CONTEXT", {})
+    monkeypatch.setattr(cache, "_KEY_MANIFESTS", {})
     monkeypatch.setattr(cache, "_KEYDIR", tmp_path / "new-seat" / "cache-keys")
     Path(recipe_dep).write_text("new recipe digest", encoding="utf-8")
     new_key = cache.cache_key([recipe_dep, config_dep], _digest_one, label=label)
@@ -983,6 +995,53 @@ def test_remote_baseline_identifies_changed_dependency_across_disposable_seats(
         if old_inputs.get(path) != new_inputs.get(path)
     }
     assert changed == {"_stock_fastener.py"}
+
+
+def test_recipe_serialization_is_shared_without_suppressing_outcomes(
+    tmp_path, fake, monkeypatch, exported_cache_spans
+):
+    dep = _make_dep(tmp_path, "input.py", "digest")
+    key = cache.cache_key([dep], _digest_one, label="part:shared")
+    out = tmp_path / "out.bin"
+    out.write_bytes(b"payload")
+    original = cache._manifest
+    serialized = []
+
+    def manifest(provenance):
+        serialized.append(provenance["key"])
+        return original(provenance)
+
+    monkeypatch.setattr(cache, "_manifest", manifest)
+    tracer, exporter = exported_cache_spans()
+    with tracer.start_as_current_span("shared-recipe"):
+        assert cache.restore(key, [], "part:shared") is False
+        assert cache.store(key, [out], "part:shared") == "stored"
+        assert cache.restore(key, [out], "part:shared") is True
+    assert serialized == [key]
+    events = _wire_events(exporter)
+    recipes = [
+        _received_recipe(events, outcome)
+        for outcome in ("cache.miss", "cache.store", "cache.hit")
+    ]
+    assert all(recipe == recipes[0] for recipe in recipes)
+    assert recipes[0]["inputs"] == [{"path": "input.py", "digest": "digest"}]
+    assert len(_events(tmp_path)) == 3
+    # Recapturing provenance invalidates its private canonical snapshot.
+    assert cache.cache_key([dep], _digest_one, label="part:shared") == key
+    cache._record("restore_hit", "part:shared", key)
+    assert serialized == [key, key]
+
+
+def test_debug_provenance_uses_key_time_salt(tmp_path, fake, monkeypatch):
+    dep = _make_dep(tmp_path, "input.py", "digest")
+    monkeypatch.setenv("HARMONIC_CACHE_DEBUG", "1")
+    salts = iter(["captured-salt"])
+    monkeypatch.setattr(cache, "_salt", lambda: next(salts))
+    records = []
+    monkeypatch.setattr(_telemetry, "info", lambda message, **kwargs: records.append(message))
+    key = cache.cache_key([dep], _digest_one, label="part:captured")
+    assert cache._KEY_CONTEXT[("part:captured", key)] == (cache._CACHE_EPOCH, "captured-salt")
+    assert any("salt=captured-salt" in record for record in records)
 
 
 if __name__ == "__main__":

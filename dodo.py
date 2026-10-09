@@ -2409,7 +2409,8 @@ def _cached_part_action(stem: str, script: Path) -> None:
                     "vendor-part rebuilds should be rare: investigate the cache "
                     "provenance and refactor dependencies that cause unnecessary rebuilds.",
                     label=label,
-                    **{"cache.key": key},
+                    key_full=key,
+                    **{"cache.key": key[:12]},
                 )
             _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)

@@ -163,6 +163,8 @@ _KEYDIR = _REPORTS / "cache-keys"
 # current doit process and avoids threading a second return value through dodo.
 _KEY_INPUTS: dict[tuple[str, str], list[tuple[str, str]]] = {}
 _KEY_CONTEXT: dict[tuple[str, str], tuple[str, str]] = {}
+# Canonical snapshots are private/read-only and shared by telemetry + cache.jsonl.
+_KEY_MANIFESTS: dict[tuple[str, str], tuple[dict, str, dict]] = {}
 
 # Azure customDimensions values allow 8192 characters. ASCII JSON fragments keep
 # both the character and UTF-8 byte size below that limit, including escaped paths.
@@ -204,6 +206,20 @@ def _manifest(provenance: dict) -> tuple[str, dict]:
     }
 
 
+def _recipe_manifest(label: str, key: str) -> tuple[dict, str, dict]:
+    """Serialize/hash each captured recipe once, without deduplicating signals."""
+    identity = (label, key)
+    saved = _KEY_MANIFESTS.get(identity)
+    if saved is not None:
+        return saved
+    provenance = _provenance(label, key)
+    payload, metadata = _manifest(provenance)
+    saved = (provenance, payload, metadata)
+    if provenance["recipe_known"]:
+        _KEY_MANIFESTS[identity] = saved
+    return saved
+
+
 def _log(msg: str) -> None:
     with contextlib.suppress(Exception):
         import _telemetry  # cache remains usable even if telemetry is absent
@@ -239,8 +255,7 @@ def _event(name: str, label: str, key: str, **extra) -> None:
         if name not in ("cache.miss", "cache.hit", "cache.store"):
             _telemetry.event(name, label=label, key=key[:12], **extra)
             return
-        provenance = _provenance(label, key)
-        payload, metadata = _manifest(provenance)
+        provenance, payload, metadata = _recipe_manifest(label, key)
         _telemetry.event(
             name, label=label, key=key[:12], key_full=key,
             epoch=provenance["epoch"], salt=provenance["salt"], **metadata, **extra,
@@ -325,9 +340,10 @@ def cache_key(file_deps: list[str], digest_one, label: str | None = None) -> str
     if label:
         _KEY_INPUTS[(label, key)] = pairs
         _KEY_CONTEXT[(label, key)] = (_CACHE_EPOCH, salt)
+        _KEY_MANIFESTS.pop((label, key), None)
     if _debug():
         head = label or "?"
-        _log(f"key provenance {head} (epoch={_CACHE_EPOCH} salt={_salt()}):")
+        _log(f"key provenance {head} (epoch={_CACHE_EPOCH} salt={salt}):")
         for rel, content in pairs:
             _log(f"    {content}  {rel}")
         _log(f"  => {head} key {key}")
@@ -555,8 +571,7 @@ def _record(event: str, label: str, key: str, **extra) -> None:
     lands here in full, carrying why it was demoted."""
     try:
         _REPORTS.mkdir(parents=True, exist_ok=True)
-        provenance = _provenance(label, key)
-        _, metadata = _manifest(provenance)
+        provenance, _, metadata = _recipe_manifest(label, key)
         rec = {"ts": round(time.time(), 3), "event": event, "label": label,
                **provenance, **metadata}
         if event in ("restore_miss", "restore_hit_drift"):
