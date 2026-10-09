@@ -342,7 +342,10 @@ def _command(
 
 @pytest.mark.parametrize(
     "label",
-    [None, "", " \t", "x" * 161, "a\tb", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb"],
+    [None, "", " \t", "x" * 161,
+     pytest.param("\U0001f680" * 161, id="supplementary161"),
+     pytest.param("\u03a9" * 80 + "\U0001f680" * 81, id="mixed161"),
+     "a\tb", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb"],
 )
 def test_launch_requires_valid_display_name_before_creating_records(tmp_path, label):
     fixture = _launcher_fixture(tmp_path)
@@ -361,7 +364,10 @@ def test_launch_requires_valid_display_name_before_creating_records(tmp_path, la
     assert not log_directory.exists() or list(log_directory.iterdir()) == []
 
 
-@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor", "-DisplayName"])
+@pytest.mark.parametrize("label", ["x", "x" * 160,
+    pytest.param("\U0001f680" * 160, id="supplementary160"),
+    pytest.param("\u03a9" * 80 + "\U0001f680" * 80, id="mixed160"),
+    "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor", "-DisplayName"])
 def test_launch_preserves_boundary_display_names_and_overrides_environment(tmp_path, label):
     fixture = _launcher_fixture(tmp_path)
     environment = dict(fixture["environment"])

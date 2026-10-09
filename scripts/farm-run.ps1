@@ -38,7 +38,7 @@ param(
 
     [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [ValidateScript({
-        if ([string]::IsNullOrWhiteSpace($_) -or $_.Length -gt 160 -or
+        if ([string]::IsNullOrWhiteSpace($_) -or
             $_ -match '[\p{Cc}\p{Zl}\p{Zp}\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]') {
             throw 'DisplayName must be nonblank, single-line, free of control characters, and at most 160 characters'
         }
@@ -47,6 +47,14 @@ param(
         }
         catch [System.Text.EncoderFallbackException] {
             throw 'DisplayName must contain valid Unicode'
+        }
+        # Count Unicode scalars, matching Python len(), not UTF-16 code units.
+        $scalarCount = 0
+        foreach ($rune in $_.EnumerateRunes()) {
+            $scalarCount++
+            if ($scalarCount -gt 160) {
+                throw 'DisplayName must be at most 160 characters'
+            }
         }
         $true
     })]

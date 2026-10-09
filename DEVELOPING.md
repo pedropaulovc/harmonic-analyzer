@@ -88,6 +88,9 @@ UTF-8; malformed surrogate text, Unicode control characters (`Cc`) and
 line/paragraph separators (`Zl`, `Zp`) are rejected. Unicode `Bidi_Control`
 characters are also refused so a label cannot spoof adjacent dashboard text.
 Ordinary Arabic/Hebrew text and valid emoji, including joiners, are allowed.
+The 160-character limit counts Unicode scalar values (code points), not
+UTF-16 code units or grapheme clusters: each supplementary-plane emoji counts
+once, while each combining mark and joiner counts separately.
 Invalid labels are refused before contacting the farm, after doit has rejected
 any invalid task selection.
 For a direct label beginning with `-`, use `--display-name="-Owner - Reason"`

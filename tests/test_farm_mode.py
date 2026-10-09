@@ -610,7 +610,10 @@ def _install_real_doit(monkeypatch, namespace=None):
     return seen, executed
 
 
-@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb", "a\ud800b", "a\udfffb"])
+@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161,
+    pytest.param("\U0001f680" * 161, id="supplementary161"),
+    pytest.param("\u03a9" * 80 + "\U0001f680" * 81, id="mixed161"),
+    "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb", "a\ud800b", "a\udfffb"])
 @pytest.mark.parametrize("command", [["part:x"], ["run", "part:x"], ["strace", "part:x"]])
 def test_farm_execution_requires_a_valid_display_name(label, command, monkeypatch, capsys):
     if label is None:
@@ -649,7 +652,10 @@ def test_explicit_untransportable_display_name_is_rejected_before_actions(
 
 
 @pytest.mark.parametrize("flag", [None, "--display-name", "-DisplayName"])
-@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor", "-DisplayName"])
+@pytest.mark.parametrize("label", ["x", "x" * 160,
+    pytest.param("\U0001f680" * 160, id="supplementary160"),
+    pytest.param("\u03a9" * 80 + "\U0001f680" * 80, id="mixed160"),
+    "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor", "-DisplayName"])
 def test_display_name_reaches_the_task_boundary(flag, label, monkeypatch):
     _preflight_fakes(monkeypatch)
     monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label if flag is None else "Inherited label")
@@ -1763,7 +1769,10 @@ def test_a_launcher_run_is_stamped_as_the_creator_memo(temporal_boundary, monkey
     }
 
 
-@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb", "a\ud800b", "a\udfffb"])
+@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161,
+    pytest.param("\U0001f680" * 161, id="supplementary161"),
+    pytest.param("\u03a9" * 80 + "\U0001f680" * 81, id="mixed161"),
+    "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb", "a\ud800b", "a\udfffb"])
 def test_invalid_dispatch_display_name_has_no_side_effects(
     temporal_boundary, tmp_path, monkeypatch, label
 ):
@@ -1786,7 +1795,10 @@ def test_invalid_dispatch_display_name_has_no_side_effects(
     assert list(requests.iterdir()) == []
 
 
-@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor"])
+@pytest.mark.parametrize("label", ["x", "x" * 160,
+    pytest.param("\U0001f680" * 160, id="supplementary160"),
+    pytest.param("\u03a9" * 80 + "\U0001f680" * 80, id="mixed160"),
+    "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor"])
 def test_dispatch_preserves_valid_display_name(temporal_boundary, monkeypatch, label):
     calls, resolve = temporal_boundary
     resolve(_leaf_result())
