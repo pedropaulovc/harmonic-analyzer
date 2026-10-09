@@ -60,6 +60,10 @@ explicit way to stop a run, `-Cancel` (see
   snapshots, shared environments and outputs. The launcher enables
   `core.longpaths=true` only for itself and its child processes, without
   changing the user's Git configuration.
+  A snapshot inside some worktree would show up there as an untracked nested
+  checkout, so a `-LogDirectory` inside any Git work tree is refused before
+  anything is created. A new path under the drive root, such as
+  `C:/farm-runs/knife-hanger`, is valid even if only `C:/` exists yet.
 
 ### Parameters
 

@@ -180,6 +180,10 @@ function Resolve-PhysicalDirectory {
 
     $root = [System.IO.Path]::GetPathRoot($fullPath)
     $relative = [System.IO.Path]::GetRelativePath($root, $fullPath)
+    # A root has no components; ResolveLinkTarget rejects the synthetic C:\.
+    if ($relative -eq '.') {
+        return $root
+    }
     $current = $root
     $separators = [char[]]@(
         [System.IO.Path]::DirectorySeparatorChar,
