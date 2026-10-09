@@ -530,6 +530,93 @@ def test_an_inner_view_wider_than_measured_steps_down_to_1_3() -> None:
     assert drawing.inner_view_scale(iso, wider, (2.0, 3.0)) == (1.0, 3.0)
 
 
+# The v40 sheet 2 (the same layout code as 594749aec) printed the views'
+# outlines, read from the PDF's view images: the transgear isometric at 2:3
+# and the inner view at 1:3. The farm run of 9055bc155 refused the one-piece
+# hook's isometric. That isometric's left edge and top come from its message
+# (rings at 261.5 and 265.8). Its right edge and bottom are v40's, because
+# the hook only grows the view up and left. The run's inner view at 1:2 was
+# 46.5 mm wide (ring 181.0 to 261.5). Its height is v40's 1:3 height
+# scaled, since the run reported no y.
+ISO_OUTLINE_V40 = (0.2853, 0.1112, 0.3966, 0.2448)
+INNER_OUTLINE_V40_AT_1_3 = (0.2073, 0.1612, 0.2418, 0.1948)
+ISO_OUTLINE_ONE_PIECE_HOOK = (0.2785, 0.1112, 0.3966, 0.2488)
+INNER_OUTLINE_ONE_PIECE_HOOK_AT_1_2 = (0.2000, 0.1528, 0.2465, 0.2032)
+# v40's printed 1:3 inner view, as placed at 1:2 (1.5 times about its centre).
+INNER_OUTLINE_V40_AT_1_2 = (
+    0.224550 - 0.0258750,
+    0.178000 - 0.0252000,
+    0.224550 + 0.0258750,
+    0.178000 + 0.0252000,
+)
+
+
+def _moved(
+    outline: tuple[float, float, float, float], shift: tuple[float, float]
+) -> tuple[float, float, float, float]:
+    dx, dy = shift
+    return (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy)
+
+
+def test_the_one_piece_hook_isometric_as_placed_is_refused_as_on_the_farm() -> None:
+    """The farm refusal of 9055bc155, word for word: placed at
+    TRANSGEAR_VIEW_CENTER, the grown isometric's ring tops the field at
+    every inner-view scale."""
+    with pytest.raises(ValueError) as refused:
+        drawing.inner_view_scale(
+            ISO_OUTLINE_ONE_PIECE_HOOK, INNER_OUTLINE_ONE_PIECE_HOOK_AT_1_2, (1.0, 2.0)
+        )
+    assert str(refused.value) == (
+        "no inner-view scale fits sheet 2 (1:2: sheet 2 balloon rings do not fit: "
+        "isometric ring top 265.8 mm past 262.0 mm; inner view ring left 181.0 mm "
+        "past 185.0 mm; inner view ring right 261.5 mm within 4 mm of the "
+        "isometric ring (261.5 mm) | 1:3: sheet 2 balloon rings do not fit: "
+        "isometric ring top 265.8 mm past 262.0 mm)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("iso_outline", "inner_at_placed"),
+    [
+        (ISO_OUTLINE_ONE_PIECE_HOOK, INNER_OUTLINE_ONE_PIECE_HOOK_AT_1_2),
+        (ISO_OUTLINE_V40, INNER_OUTLINE_V40_AT_1_2),
+    ],
+    ids=["one-piece-hook", "v40"],
+)
+def test_the_centred_isometric_leaves_the_inner_view_room_at_1_3(
+    iso_outline: tuple[float, float, float, float],
+    inner_at_placed: tuple[float, float, float, float],
+) -> None:
+    """Centred vertically and unmoved along x, the isometric's ring fits the
+    field. The inner view then steps down to 1:3, and the outline of 1:3 as
+    printed (with its padding) fits beside it."""
+    shift = drawing.transgear_view_shift(iso_outline)
+    assert shift[0] == 0.0
+    iso = _moved(iso_outline, shift)
+    reach = drawing.BALLOON_RING_REACH
+    left, bottom, right, top = drawing.SHEET_TWO_RING_LIMITS
+    assert (iso[1] - reach - bottom) == pytest.approx(top - (iso[3] + reach))
+    assert iso[1] - reach >= bottom and iso[3] + reach <= top
+    assert drawing.inner_view_scale(iso, inner_at_placed, (1.0, 2.0)) == (1.0, 3.0)
+    dx, dy = drawing.inner_view_shift(iso, INNER_OUTLINE_V40_AT_1_3)
+    inner = _moved(INNER_OUTLINE_V40_AT_1_3, (dx, dy))
+    assert inner[0] - reach >= left
+    assert inner[2] + reach <= iso[0] - reach - drawing.SHEET_TWO_RING_GAP
+
+
+def test_the_one_piece_hook_isometric_moves_down_4_0_mm() -> None:
+    dx, dy = drawing.transgear_view_shift(ISO_OUTLINE_ONE_PIECE_HOOK)
+    assert (dx, dy) == (0.0, pytest.approx(-0.0040))
+
+
+def test_an_isometric_taller_than_the_field_is_refused() -> None:
+    x0, y0, x1, _y1 = ISO_OUTLINE_ONE_PIECE_HOOK
+    with pytest.raises(
+        ValueError, match=r"isometric ring height 173\.0 mm > room 172\.0 mm"
+    ):
+        drawing.transgear_view_shift((x0, y0, x1, y0 + 0.139))
+
+
 def test_no_sheet_prints_a_forbidden_word() -> None:
     texts = (*drawing.SHEET_TEXTS, *drawing.BOM_DESCRIPTIONS.values())
     for text in texts:

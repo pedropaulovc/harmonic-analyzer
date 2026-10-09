@@ -166,9 +166,15 @@ BOM_REFERENCE_CAPTION = (
 SHEET_INNER_BORDER_BOTTOM = 0.0127
 BOM_BORDER_CLEARANCE = 0.003
 # The transgear alone at 2:3, right of the inner view's ring and above the
-# title block. Native run 20261001T062924323Z read its outline at x 295.3 to
-# 404.8 mm centred at x 355; here it spans 286.3 to 395.8, its ring 269.3 to
-# 412.8, 2.2 mm inside the 415 limit (inner_view_shift).
+# title block. The v40 sheet 2 (594749aec's layout) printed its outline at
+# x 285.3 to 396.6, y 111.2 to 244.8 mm: a ring top of 261.8 in the 262.0
+# limit. The one-piece MHA-PD-014 hook's ear stands at machine x 77.6, 17.6
+# further +X than the bracket's flap. The isometric looks along (-1, +1, -1),
+# so sheet up is 0.408 x and sheet right -0.707 x, and the outline grew to
+# x 278.5 and y 248.8 (farm run of 9055bc155: ring top 265.8). The view is
+# 137.6 mm tall, so its ring of 171.6 fits the field's 172.0 only when it is
+# centred: transgear_view_shift moves it down before the inner view is
+# fitted beside it.
 TRANSGEAR_VIEW_SCALE = (2.0, 3.0)
 TRANSGEAR_VIEW_CENTER = (0.346, 0.170)
 BALLOON_MARGIN = 0.012
@@ -177,8 +183,8 @@ TRANSGEAR_CAPTION_XY = (0.222, 0.082)
 # sheet x is machine +Z, sheet y is +Y) with every other part hidden in that
 # view only. The largest ladder scale whose ring fits beside the isometric's
 # (inner_view_scale): the same run read the view 57.3 mm wide at 2:3, a 91.3
-# mm ring in the 76.3 mm left of the isometric's ring at x 355; at 1:2 it is
-# about 43.0 wide, a 77.0 ring in the 80.3 left here. Every ladder scale is
+# mm ring in the 76.3 mm left of the isometric's ring at x 355; the v40 sheet
+# 2 printed it at 1:3, 34.5 mm wide. Every ladder scale is
 # at most 1:2, so the view references the simplified configuration whichever
 # it takes (apply_view_configuration), and no rescale switches it.
 INNER_VIEW_ORIENTATION = "*Right"
@@ -795,6 +801,24 @@ def _native_outline_at(
         return _view_outline(view)
 
     return outline_at
+
+
+def transgear_view_shift(iso_outline: Box) -> tuple[float, float]:
+    """Shift that centres the transgear isometric's balloon ring in sheet 2's
+    field vertically. It does not move along x, so the room left of it for the
+    inner view stays the same.
+
+    The outline is in sheet metres (left, bottom, right, top). Raises if the
+    ring is taller than the field.
+    """
+    _left, bottom, _right, top = SHEET_TWO_RING_LIMITS
+    ring = _grown(iso_outline, BALLOON_RING_REACH)
+    if ring[3] - ring[1] > top - bottom:
+        raise ValueError(
+            f"sheet 2 isometric ring height {(ring[3] - ring[1]) * 1000:.1f} mm > "
+            f"room {(top - bottom) * 1000:.1f} mm"
+        )
+    return (0.0, (bottom + top - ring[1] - ring[3]) / 2.0)
 
 
 def inner_view_shift(iso_outline: Box, inner_outline: Box) -> tuple[float, float]:
@@ -1821,8 +1845,12 @@ def _place_bom_sheet(
     _activate_sheet(adapter, SHEET_NAMES[5])
     pieces = _split_bom(adapter, table)
     _activate_sheet(adapter, SHEET_NAMES[1])
-    # Both rings fit before any balloon exists; only the inner view moves.
-    # Every ladder scale keeps the configuration just applied.
+    # Both rings fit before any balloon exists. The isometric is centred in
+    # the field's height, then the inner view is fitted beside it. Every
+    # ladder scale keeps the configuration just applied.
+    _shift_view(
+        adapter, view, transgear_view_shift(_view_outline(view)), label=f"{label} ring fit"
+    )
     iso_outline = _view_outline(view)
     scale = inner_view_scale(iso_outline, _view_outline(inner), placed)
     if scale != placed:
