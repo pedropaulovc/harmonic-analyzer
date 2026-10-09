@@ -545,8 +545,8 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "ForkSlotProfile", "SlotWidth", *deviations(FORK_SLOT_BAND)
     )
-    # The reamed press hole's band rides natively on its diameter; the sheet
-    # states it in note 5 (the hole is dimensioned in the notes).
+    # The reamed press hole's band rides natively on its diameter, which the
+    # front view imports at three places (DRAWING_PRECISION).
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
     )

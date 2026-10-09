@@ -168,9 +168,9 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
 
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = ch_connecting_rod_notes.DRAWING_NOTES
-    # The reamed pin hole is dimensioned in note 5 (the amplitude bar's
-    # pattern), the bore rides its imported model tolerance and the fork its
-    # 3-place model bands; notes never repeat a sheet dimension.
+    # The reamed pin hole prints from its native PinHoleDia dimension, the
+    # bore rides its imported model tolerance and the fork its 3-place model
+    # bands; notes never repeat a sheet dimension.
     assert "#47" not in notes
     assert "3.00" not in notes and "2.50" not in notes
     assert "0.10 MIN CLR/SIDE" in notes
@@ -178,9 +178,18 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "SLOT CENTRED; TINES EQUAL WITHIN 0.10" in notes
     assert f"{ch_connecting_rod_spec.FORK_TINE_MATCH:.2f}" in notes
     # The press fit (user ruling 2026-10-09, PR #1292 review F1) names its
-    # pin; the reamed band is the model's, native on PinHoleDia.
-    assert "5. PIN HOLE \u00d81.968 +0.010/0 REAM THRU" in notes
-    assert "BOTH TINES; PRESS FIT PIN MHA-CH-010." in notes
+    # pin; the hole's size and band are the model's PinHoleDia (rules 2 and 6,
+    # PR #1292 review N1), so no limit of it may ride the note text.
+    assert "5. PRESS FIT PIN MHA-CH-010 INTO THE" in notes
+    assert "   REAMED PIN HOLE, BOTH TINES." in notes
+    for limit in (
+        f"{ch_connecting_rod_spec.PIN_HOLE_DIA:.3f}",
+        f"{ch_connecting_rod_spec.PIN_HOLE_DIA:.2f}",
+        f"+{ch_connecting_rod_spec.PIN_HOLE_BAND[0]:.3f}",
+        "\u00d8",
+        "REAM THRU",
+    ):
+        assert limit not in notes, limit
     assert "PEEN" not in notes and "CSK" not in notes and "#746" not in notes
     assert "HEAD" not in notes
     assert "DRAFT" not in notes  # machined from plate, not cast
@@ -215,8 +224,8 @@ def test_native_gdt_and_finish_present() -> None:
     assert '"StrapBoreDia": "BORE"' in source
     assert "+0.10/0" not in source
     assert "add_surface_finish(" in source
-    # The reamed hole is dimensioned in note 5, so no hole callout prints it
-    # twice; the position FCF anchors the hole's 3-o'clock rim.
+    # The reamed hole prints its native Ø and band with descriptive text, not
+    # a Hole Wizard callout; the position FCF anchors the hole's 3-o'clock rim.
     assert "add_native_hole_callout(" not in source
     assert source.count("edge_xy=pin_fcf_rim") == 1
     assert "SetText(4" not in source
@@ -266,12 +275,50 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
     assert ch_connecting_rod_notes.DRAWING_PRECISION == {
         "ForkBoss": {"ForkThick": 3},
         "ForkSlotProfile": {"SlotWidth": 3},
+        "PinHoleProfile": {"PinHoleDia": 3},
     }
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
     assert 'name_dimensions(adapter,"ForkBoss",["ForkThick"])' in build
     assert "fork_lower,fork_upper=deviations(FORK_THICKNESS_BAND)" in build
     assert "(fork_thickness_dim[0],'\"ForkThickness\"')" in build
     assert "apply_drawing_precision(adapter,DRAWING_PRECISION)" in build
+
+
+def test_reamed_pin_hole_is_a_native_three_place_dimension() -> None:
+    """PR #1292 review N1 (policy rules 2 and 6): the press hole's Ø1.968
+    +0.010/0 is the PinHoleDia model dimension -- marked, authored at three
+    places with its native band -- imported into the front view with the
+    process beneath it, never general-note text."""
+    spec = ch_connecting_rod_spec
+    assert ch_connecting_rod_notes.DRAWING_DIMENSIONS["PinHoleProfile"] == {
+        "PinHoleDia"
+    }
+    assert ch_connecting_rod_notes.DRAWING_PRECISION["PinHoleProfile"] == {
+        "PinHoleDia": 3
+    }
+    # The band is written at three places, as the precision prints it.
+    assert all(round(d, 3) == d for d in spec.PIN_HOLE_BAND)
+    assert model_toleranced_dimensions(rod)[("PinHoleProfile", "PinHoleDia")] == (
+        "*deviations(PIN_HOLE_BAND)"
+    )
+    assert "PinHoleDia" in drawing.FRONT_KEEP
+    assert drawing.FRONT_CALLOUTS["PinHoleDia"] == "THRU - REAM"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        "set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)" in source
+    )
+    assert (
+        "assert_imported_precision(\n"
+        '        adapter, front_annotations, DRAWING_PRECISION["PinHoleProfile"]\n'
+        "    )" in source
+    )
+    # The Ø text stands up and right of the fork, clear of the FCF frame below
+    # it and the notes column.
+    hole_x, hole_y = drawing._sheet_xy(0.0, spec.CENTER_DISTANCE)
+    text_x, text_y = drawing.FRONT_KEEP["PinHoleDia"]
+    assert text_x > hole_x + 0.040 and text_y > hole_y + 0.010
+    assert text_y > drawing.NOTES_XY[1] + 0.040
+    assert text_y < 0.267
 
 
 def test_model_bands_are_owned_by_named_model_dimensions() -> None:

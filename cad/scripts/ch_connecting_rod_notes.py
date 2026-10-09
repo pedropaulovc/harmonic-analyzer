@@ -12,8 +12,6 @@ part + drawing and leaves the assembly to its cheap token refresh.
 from __future__ import annotations
 
 from ch_connecting_rod_spec import (
-    PIN_HOLE_BAND,
-    PIN_HOLE_DIA,
     RING_SLOT_SYMMETRY,
     RING_THICKNESS,
     SHANK_THICKNESS,
@@ -21,10 +19,11 @@ from ch_connecting_rod_spec import (
 
 # The strap-bore fit rides the Ø30.80 dimension callout (+0.10/0); the ring
 # centre-to-pin distance is a BASIC sheet dimension; the fork thickness and
-# slot carry their 3-place model bands.  The reamed pin hole is dimensioned in
-# note 5 with its band (the model's, native on PinHoleDia), as the amplitude
-# bar's top pin hole is (ch_amplitude_bar_notes).  Notes carry only what the
-# sheet does not dimension natively, so no number appears in both places.  The
+# slot carry their 3-place model bands; the reamed pin hole prints its size
+# and band from the PinHoleDia model dimension at three places (policy rules
+# 2 and 6, PR #1292 review N1), so note 5 names only the press and its pin.
+# Notes carry only what the sheet does not dimension natively, so no number
+# appears in both places.  The
 # material (1018 plate) and the black finish are title-block rows, never
 # restated here (simplicity policy rule 1).  Lines stay within 40 characters:
 # the block sits in the column between the front view's pin annotations and
@@ -38,21 +37,21 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ForkProfile": {"ForkWidthDim"},
     "ForkBoss": {"ForkThick"},
     "ForkSlotProfile": {"SlotWidth", "SlotDepth", "ForkBossLength"},
+    "PinHoleProfile": {"PinHoleDia"},
 }
 
 # The fork's outer thickness and slot hold the inter-arm gap (each gap holds
 # one tine of each neighbouring rod): three places, as their bands are written.
+# The reamed press hole's band is written at three places too.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ForkBoss": {"ForkThick": 3},
     "ForkSlotProfile": {"SlotWidth": 3},
+    "PinHoleProfile": {"PinHoleDia": 3},
 }
 
 # The pin pressed into the reamed fork pin hole (test_ch_connecting_rod_drawing
 # pins it to the part registry).
 PIN_NUMBER = "MHA-CH-010"
-_HOLE_UPPER, _HOLE_LOWER = PIN_HOLE_BAND
-if _HOLE_LOWER != 0.0:
-    raise AssertionError("note 5 prints the reamed band as +upper/0")
 # Note 2 prints the one plate thickness ring to shank, at the title block's
 # three places (#948 ruling R, PR #1292).
 if SHANK_THICKNESS != RING_THICKNESS:
@@ -66,8 +65,8 @@ DRAWING_NOTES = "\n".join(
         f"   SYMMETRIC TO SLOT WITHIN {RING_SLOT_SYMMETRY:.2f}.",
         "3. RING WALL 4.50 MIN AFTER BORING.",
         "4. SLOT CENTRED; TINES EQUAL WITHIN 0.10",
-        f"5. PIN HOLE \u00d8{PIN_HOLE_DIA:.3f} +{_HOLE_UPPER:.3f}/0 REAM THRU",
-        f"   BOTH TINES; PRESS FIT PIN {PIN_NUMBER}.",
+        f"5. PRESS FIT PIN {PIN_NUMBER} INTO THE",
+        "   REAMED PIN HOLE, BOTH TINES.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

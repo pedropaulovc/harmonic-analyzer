@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the connecting rod.
 
 The SLDPRT remains authoritative.  This recipe supplies only the connecting-rod
-views, dimension layout, and manufacturing notes; every shared
+views, dimension layout, callout text, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
@@ -30,6 +30,7 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -42,7 +43,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from ch_connecting_rod_notes import DRAWING_DIMENSIONS
+from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
     FORK_BASE_Y,
@@ -110,6 +111,18 @@ FRONT_KEEP = {
     "StrapBoreDia": (0.190, 0.052),
     "ShankWidthDim": (0.180, 0.150),
     "ForkWidthDim": _sheet_xy(0.0, FORK_TOP_Y + 8.0),
+    # The reamed pin hole's Ø and band leave the hole for the lane above the
+    # crown, right of the fork; the position FCF attaches at the 3-o'clock rim
+    # with a level leader below that lane, so the two leaders cannot cross.
+    "PinHoleDia": (0.240, 0.243),
+}
+# Descriptive text beneath each native value/band: the strap bore; the fork's
+# crown, a full round on the pin tangent to its sides; the reamed press hole
+# (policy rule 7: the decimal Ø and the process).
+FRONT_CALLOUTS = {
+    "StrapBoreDia": "BORE",
+    "ForkWidthDim": "FULL R",
+    "PinHoleDia": "THRU - REAM",
 }
 # The fork's 3-place thickness and slot stack above the crown; the slot depth
 # and the boss length run from the tine tops down the right-hand side.
@@ -200,17 +213,13 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="left",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The strap-bore tolerance imports with its named model dimension.  The
-    # drawing owns only this descriptive text beneath the native value/band;
-    # the fork's crown is a full round on the pin, tangent to its sides.
-    set_dimension_callouts(
-        adapter,
-        front_annotations,
-        {
-            "StrapBoreDia": "BORE",
-            "ForkWidthDim": "FULL R",
-        },
+    # The strap-bore and reamed pin-hole bands import with their named model
+    # dimensions, at the part's places; the drawing owns only the callout
+    # text beneath them.
+    assert_imported_precision(
+        adapter, front_annotations, DRAWING_PRECISION["PinHoleProfile"]
     )
+    set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -274,8 +283,8 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
         label="strap bore finish",
     )
-    # The reamed pin hole is dimensioned in note 5; the FCF attaches at its
-    # 3-o'clock rim with a level leader.
+    # The position FCF attaches at the reamed pin hole's 3-o'clock rim with a
+    # level leader, below the Ø callout's lane.
     pin_fcf_rim = _sheet_xy(_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     add_feature_control_frame(
         adapter,
