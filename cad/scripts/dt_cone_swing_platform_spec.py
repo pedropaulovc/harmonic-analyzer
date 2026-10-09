@@ -7,6 +7,10 @@ hold-down hole and the surface-finish controls.  The print-only data
 the plan outline in ``dt_cone_swing_platform_geometry``, so the harmonic base and
 the drive train, which read this module and the geometry, do not re-key when
 the print changes.
+
+The engaged swing angle is set at assembly (tightest cone against a
+feeler/backlash, then lock the cone-lock-knob); the swing stop screw only
+limits the disengaged swing.
 """
 
 from __future__ import annotations

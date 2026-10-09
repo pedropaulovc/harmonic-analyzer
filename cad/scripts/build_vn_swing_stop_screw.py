@@ -1,4 +1,7 @@
-"""Build the swing-stop screw from shared McMaster 90280A108 stock."""
+"""Build the swing-stop screw from shared McMaster 90280A108 stock.
+
+The stop only limits the disengaged swing; it plays no part in meshing.
+"""
 
 from __future__ import annotations
 

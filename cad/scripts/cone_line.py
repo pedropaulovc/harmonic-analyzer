@@ -61,6 +61,8 @@ DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
 # material. Actual 120T/32T tooth-tip caps and physical envelopes come from
 # dt_cylinder_gear_spec / dt_alignment_pinion_spec and their stock-form profiles.
 DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0
+# Nominal CAD placement only: at assembly the swing platform is swung in until
+# the tightest cone meets a feeler/backlash and the cone-lock-knob is locked.
 PEN_EDGE_SLACK = _config.fit(
     "cone_drum_oblique_mesh", "edge_slack_mm"
 )  # cad/config/tolerances.yaml

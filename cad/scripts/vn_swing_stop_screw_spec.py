@@ -4,8 +4,10 @@ This module owns the one authoritative fillister row in mm; the shared
 native ``diagnostics/diag_mcmaster_fillister.py`` recipe consumes it, as do
 the same-SKU foot and latch-hook bracket specs. No native recipe is imported.
 
-The stop seats fully home on the base top and the platform edge bears on
-its head. HEAD_DIA/HEAD_H remain the harvested model nominals. Separate
+The stop seats fully home on the base top; the platform edge bears on its
+head only when DISENGAGED. It limits the disengage swing and plays no part
+in meshing: the cone-lock-knob sets and locks the engaged mesh at assembly.
+HEAD_DIA/HEAD_H remain the harvested model nominals. Separate
 ASME B18.6.3 stock limits below are qualified by the live SKU's declared
 standard and corroborated for the slotted fillister form; they are not
 manufactured title-block grades. They bound head size, slot depth, length,

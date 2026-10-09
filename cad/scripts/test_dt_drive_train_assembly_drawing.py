@@ -363,12 +363,14 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
-    """MHA-VN-015 bounds the DISENGAGE swing; engaged, the plate stands off it."""
+    """MHA-VN-015 bounds the DISENGAGE swing; the engaged mesh is set at
+    assembly on a feeler and locked by MHA-VN-013, never by the stop."""
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     order = [
         check.index("TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012"),
-        check.index("SWING IT BACK"),
-        check.index("RE-ENGAGE"),
+        check.index("SWING IT BACK IN"),
+        check.index("TIGHTEST OF THE"),
+        check.index("CLOSES ON A FEELER"),
         check.index("TIGHTEN MHA-VN-013"),
     ]
     assert order == sorted(order), check

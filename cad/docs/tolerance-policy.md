@@ -485,7 +485,10 @@ The build scripts already assert clearance margins analytically (and raise on vi
 are the concrete realizations of the classes above, being lifted into `tolerances.yaml`:
 
 - spring-eye threading margins into the lever hole / under the tab;
-- oblique cone↔drum mesh penetration guard (edge slack);
+- oblique cone↔drum mesh penetration guard (edge slack). The engaged cone centre is set at
+  assembly, not fixed: swing the platform in, set the tightest cone against a feeler/backlash,
+  lock the cone-lock-knob (MHA-VN-013). The swing stop screw (MHA-VN-015) only limits the
+  disengaged swing. The booked edge slack/opening still treat the centre as fixed (pending ruling);
 - rack–pinion backlash;
 - bushing clearance under the amplitude-bar foot.
 

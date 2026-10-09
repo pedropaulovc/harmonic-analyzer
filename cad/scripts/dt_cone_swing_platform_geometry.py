@@ -176,7 +176,9 @@ if min(HOLDDOWN_WEBS.values()) < 2.0:
 # through the plate's WEST edge. The cone-lock-knob stud is fixed to the base;
 # on disengage the plate swings until its edge passes the stud and head.
 # Tightened with no plate under it, the head fences the mouth and locks the
-# plate disengaged; tightened on the plate it clamps the engaged pose.
+# plate disengaged; tightened on the plate it clamps the engaged pose, which
+# is SET AT ASSEMBLY: swing in until the tightest cone meets a feeler/backlash,
+# then tighten. The knob clamps by friction anywhere along the notch.
 # The notch runs along the swing arc's CHORD: at R~192 over ~3 deg to the
 # mouth the sagitta is ~0.07, absorbed by the O6.35-stud-in-8.0 clearance.
 #

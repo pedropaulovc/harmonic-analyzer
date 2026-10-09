@@ -10,6 +10,10 @@ the cylinder set (video 4/4, engage/disengage stills). Swing separation
 grows with distance from the pivot, so pivoting at the TIP gives the
 big-end gears the largest throw.
 
+The platform is ADJUSTABLE: at assembly swing it in until the tightest cone
+meets a feeler/backlash, then lock the cone-lock-knob. The swing stop screw
+only limits the disengaged swing and plays no part in meshing.
+
 Plan shape is the p.18 wedge, ASYMMETRIC about the shaft line: the east
 side tapers 16 -> 24 half-width, the west side flares 8 -> 37 so the
 run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe

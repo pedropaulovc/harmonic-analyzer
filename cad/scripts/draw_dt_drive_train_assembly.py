@@ -914,12 +914,13 @@ CHECKS = _note_text(
         # The same bound the MHA-DT-012 print states (cylinder_gear_notes).
         f"   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO {RING_OVERHANG_TEXT} (AT LEAST",
         f"   {RING_ON_CAM_PERCENT}% OF THE RING WIDTH STAYS ON THE CAM).",
-        # MHA-VN-015 is the DISENGAGED stop (build_cone_swing_platform
+        # MHA-VN-015 is the DISENGAGED stop only (build_cone_swing_platform
         # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
-        # it, so the cone set comes back on its meshes, not on the stop.
+        # it. The engaged mesh is SET here with MHA-VN-013, not by the stop.
         "4. CONE SWING (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON MHA-VN-014 TO",
-        "   THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. SWING IT BACK UNTIL ALL",
-        "   {cone_gears} MESHES RE-ENGAGE; TIGHTEN MHA-VN-013.",
+        "   THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. SWING IT BACK IN UNTIL",
+        "   THE TIGHTEST OF THE {cone_gears} MESHES CLOSES ON A FEELER (OR SHOWS",
+        "   JUST-POSITIVE BACKLASH); HOLD IT THERE AND TIGHTEN MHA-VN-013.",
         "   VERIFY MHA-VN-014 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; SHOULDER FULLY SEATED.",
         "   VERIFY MHA-VN-015 FULL-FORM THREAD ENGAGEMENT "

@@ -5,7 +5,9 @@ Every value comes from the part specs and config:
 * cone T006..T120 against the 120T drum: cone_line places each cone's pitch
   section ``edge_slack_mm`` clear of the drum's pitch circle at mid-face, so
   the nominal centre is the standard (N + 120) * m / 2 plus that slack, and
-  ``centre_opening_mm`` is the total booked opening (runout and bearings);
+  ``centre_opening_mm`` is the total booked opening (runout and bearings).
+  The real engaged centre is set at assembly (swing in, tightest cone against
+  a feeler/backlash, lock the cone-lock-knob); these bands still book it fixed;
 * the 32T alignment pinion against the drum at its configured engaged centre
   plus/minus its configured radial stack.
 
