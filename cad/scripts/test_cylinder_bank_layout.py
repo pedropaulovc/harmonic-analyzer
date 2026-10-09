@@ -9,6 +9,7 @@ import pytest
 import dt_arbor_pedestal_spec
 
 import _config
+import cam_plane
 import ch_connecting_rod_spec as rod
 import cylinder_bank_layout as bank
 import dt_cylinder_gear_spec as gear
@@ -160,7 +161,7 @@ def test_stations_close_up_against_the_datum() -> None:
     assert bank.FRONT_WASHER_Z[0] - bank.FRONT_STRAP_INNER_Z == pytest.approx(
         bank.BANK_SPRING_SET
     )
-    assert bank.CAM_MID_DZ == pytest.approx(-gear.OVERALL_THICKNESS / 2.0)
+    assert cam_plane.CAM_MID_DZ == pytest.approx(-gear.OVERALL_THICKNESS / 2.0)
 
 
 def test_layout_stays_geometry_only() -> None:

@@ -10,7 +10,7 @@ import _config
 import build_ch_channel_assembly as channel
 import channel_kinematics
 import ch_connecting_rod_spec
-import cylinder_bank_layout
+import cam_plane
 import ch_fulcrum_shaft_spec
 import rocker_bank_layout
 from _assembly import _seed_flip, activate_assembly_contract
@@ -24,7 +24,7 @@ def test_machine_config_and_channel_interface_share_one_installation_contract() 
     assert math.isclose(channel.Z0, CHANNEL_Z0, abs_tol=1e-12)
     assert channel.X_DRUM == DRUM_X
     # #743 solid stack: the ring rides the middle of its closed cam slot.
-    assert channel.CAM_DZ == pytest.approx(cylinder_bank_layout.CAM_MID_DZ)
+    assert channel.CAM_DZ == pytest.approx(cam_plane.CAM_MID_DZ)
     assert channel.CAM_DZ == pytest.approx(-7.0565 / 2.0)
 
     phase = math.radians(channel.GEAR_PHASE_DEG)

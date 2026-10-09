@@ -3,12 +3,13 @@ pivot shaft (issue #743 PR2) -- one source for the channel assembly, the
 pivot shaft and the bracket stations.
 
 GEOMETRY ONLY, like ``cylinder_bank_layout``: no drawing notes, no drawing
-specs, no title-block reads. It reads the channel stations and ONE datum
-from the cylinder bank: the arm plane IS the cam plane
-(``cylinder_bank_layout.CAM_MID_DZ``), because each connecting rod is flat --
-its ring rides the cam and its fork straddles the arm in that one plane. So a
-cam-plane change re-keys the pivot parts; nothing else from the gear train
-reaches them.
+specs, no title-block reads. It reads the channel stations and ONE datum it
+shares with the cylinder bank: the arm plane IS the cam plane
+(``cam_plane.CAM_MID_DZ``), because each connecting rod is flat -- its ring
+rides the cam and its fork straddles the arm in that one plane. That leaf
+reads only the MHA-DT-012 gear spec (and the gear-train config it reads), so
+a cylinder-gear spec change re-keys the pivot parts; the cylinder bank's
+pedestals, arbor, washers, spring and bank pitch do not reach them.
 
 The bank is a SOLID STACK: each MHA-CH-006 arm's integral hub is one station
 pitch long, and neighbouring hubs bear face on face. #948 ruling R (PR #1292)
@@ -39,7 +40,7 @@ from __future__ import annotations
 import math
 
 import _config
-from cylinder_bank_layout import CAM_MID_DZ
+from cam_plane import CAM_MID_DZ
 import ch_amplitude_bar_spec as _bar
 import ch_pivot_bracket_spec as _bracket
 import ch_pivot_shaft_spec as _shaft

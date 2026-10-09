@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 
 import _config
+import cam_plane
 import build_ch_rod_pivot_pin as pin_build
 from _hole_spec import blind_cut_dia_mm
 import ch_amplitude_bar_spec as bar
@@ -25,7 +26,6 @@ import ch_connecting_rod_spec as rod
 import ch_rocker_arm_notes as arm_notes
 import ch_rocker_arm_spec as arm
 import ch_rod_pivot_pin_spec as pin
-import cylinder_bank_layout as drum_bank
 import dt_cylinder_gear_spec as gear
 import rocker_bank_layout as bank
 
@@ -43,8 +43,8 @@ def test_restated_floors_are_their_sources() -> None:
 
 
 def test_the_rod_arm_and_cam_share_one_plane() -> None:
-    assert bank.ARM_MID_DZ == drum_bank.CAM_MID_DZ
-    assert drum_bank.CAM_MID_DZ == pytest.approx(
+    assert bank.ARM_MID_DZ == cam_plane.CAM_MID_DZ
+    assert cam_plane.CAM_MID_DZ == pytest.approx(
         -(gear.FACE_WIDTH + gear.CAM_THICKNESS) / 2.0
     )
     # The pin is centred on the fork, which is centred on the rod plane.

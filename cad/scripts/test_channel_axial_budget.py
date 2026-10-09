@@ -2,7 +2,7 @@
 join cam and rocker without binding (#743 L20 d', #948 ruling R).
 
 The rod is flat: its ring rides the cam and its fork straddles the arm in one
-plane (rocker_bank_layout.ARM_MID_DZ is cylinder_bank_layout.CAM_MID_DZ), so a
+plane (rocker_bank_layout.ARM_MID_DZ is cam_plane.CAM_MID_DZ), so a
 rigid rod held at both ends tolerates only the ring's float in the cam slot
 plus the fork's side clearance on the arm. The banks' build-up deviations
 are laid out by separate modules; only a test sees both, so the cross-bank
@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 
 import _config
+import cam_plane
 import ch_connecting_rod_spec as rod
 import ch_rod_pivot_pin_spec as pin
 import cylinder_bank_layout as bank
@@ -41,7 +42,7 @@ def _clear_window() -> tuple[float, float]:
     floats in the thinnest slot, its fork in the least side clearance on the
     thickest arm, less what the rod's tine match and the two symmetry
     controls (ring/shank to slot, strap to hub) may offset the mid-planes."""
-    assert rocker.ARM_MID_DZ == bank.CAM_MID_DZ  # one nominal plane
+    assert rocker.ARM_MID_DZ == cam_plane.CAM_MID_DZ  # one nominal plane
     thickest = max(
         rod.RING_THICKNESS + rod.RING_THICKNESS_BAND[0],
         rod.SHANK_THICKNESS + rod.SHANK_THICKNESS_BAND[0],

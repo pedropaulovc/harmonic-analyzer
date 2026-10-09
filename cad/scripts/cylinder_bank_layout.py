@@ -182,9 +182,6 @@ FRONT_STRAP_INNER_Z = FRONT_WASHER_Z[0] - BANK_SPRING_SET
 # The spring's installed envelope, front strap to front washer.
 BANK_SPRING_Z = (FRONT_STRAP_INNER_Z, FRONT_WASHER_Z[0])
 STRAP_INNER_SPAN = BACK_STRAP_INNER_Z - FRONT_STRAP_INNER_Z
-# Cam / connecting-rod ring mid-plane relative to its gear's station: the cam
-# spans FACE_WIDTH/2 .. FACE_WIDTH/2 + CAM_THICKNESS south of it.
-CAM_MID_DZ = -(FACE_WIDTH + CAM_THICKNESS) / 2.0
 
 # --- pedestals, arbor and set screws (nominal, bank pushed back) ------------
 # Each MHA-DT-002 stands on its strap INNER face (U34 row 5): the front one as
@@ -308,7 +305,6 @@ __all__ = [
     "BANK_SPRING_SET_BAND",
     "BANK_SPRING_Z",
     "BANK_PITCH",
-    "CAM_MID_DZ",
     "CAM_THICKNESS",
     "COUNT",
     "DATUM_CHAIN_STACK",

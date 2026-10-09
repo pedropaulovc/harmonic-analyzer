@@ -71,7 +71,7 @@ HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
 # The spring stations sit on the channel arm plane, the cam plane
-# (rocker_bank_layout.ARM_MID_DZ = cylinder_bank_layout.CAM_MID_DZ). Restated,
+# (rocker_bank_layout.ARM_MID_DZ = cam_plane.CAM_MID_DZ). Restated,
 # like CHANNEL_Z0/CHANNEL_PITCH, not imported: this spec is read by
 # _interference_contracts, so an import would put the gear-train and channel
 # config into every assembly's closure. test_sm_summing_lever_drawing pins it.

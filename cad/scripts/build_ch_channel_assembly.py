@@ -266,7 +266,7 @@ from rocker_bank_layout import ARM_MID_DZ  # noqa: E402  (cam/rod/arm/bar/lever 
 CAM_DZ = -(CYL_FACE_WIDTH + CYL_CAM_THICKNESS) / 2.0
 # The rod is flat (ring, shank and fork share one mid-plane) and its fork
 # straddles the arm, so the cam plane IS the arm plane: the rocker bank sits on
-# cylinder_bank_layout.CAM_MID_DZ. The J2 axial mate is a coincident mid-plane
+# cam_plane.CAM_MID_DZ. The J2 axial mate is a coincident mid-plane
 # mate only because of this.
 if abs(CAM_DZ - ARM_MID_DZ) > 1e-9:
     raise AssertionError(

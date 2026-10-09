@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import _config
+import cam_plane
 import ch_amplitude_bar_spec as bar
 import channel_frame_geom as frame
 import channel_kinematics as ck
@@ -41,9 +42,9 @@ def test_hub_length_is_the_station_pitch_and_only_comes_out_long() -> None:
 
 
 def test_preload_rule_is_the_cylinder_bank_rule() -> None:
-    """The rocker layout imports ONE datum from cylinder_bank_layout (the cam
-    plane, its arm plane) but restates the set-blade, preload and fit-up
-    compensation rules, because it has its own spring and datum ear; this
+    """The rocker layout shares ONE datum with cylinder_bank_layout (the cam
+    plane, its arm plane, from the cam_plane leaf) but restates the set-blade,
+    preload and fit-up compensation rules, because it has its own spring and datum ear; this
     pins the two in lockstep."""
     assert bank.MARGIN_SPARE == drum_bank.MARGIN_SPARE
     assert bank.FEELER_STEP == drum_bank.FEELER_STEP
@@ -84,10 +85,10 @@ def test_hub_mid_planes_are_the_channel_arm_planes() -> None:
     z0 = _config.machine("channels", "station_z0_mm")
     pitch = _config.machine("channels", "station_pitch_mm")
     # Option A (rod fork joint): the arm plane IS the cam plane.
-    assert bank.ARM_MID_DZ == drum_bank.CAM_MID_DZ
+    assert bank.ARM_MID_DZ == cam_plane.CAM_MID_DZ
     assert bank.ARM_MID_DZ == pytest.approx(-3.52825)
     for j in (0, 7, 19):
-        assert bank.hub_mid_z(j) == pytest.approx(z0 + pitch * j + drum_bank.CAM_MID_DZ)
+        assert bank.hub_mid_z(j) == pytest.approx(z0 + pitch * j + cam_plane.CAM_MID_DZ)
     assert bank.STACK_MID_Z == pytest.approx(
         (bank.hub_mid_z(0) + bank.hub_mid_z(19)) / 2
     )
@@ -318,15 +319,18 @@ def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(
 
 def test_layout_reads_only_the_channel_stations_and_the_cam_plane() -> None:
     """The rocker bank reads the channel stations and, for CAM_MID_DZ alone,
-    cylinder_bank_layout (whose bank pitch reads gear_train/cone_incline):
-    the arm plane is the cam plane. No builder or notes module joins it."""
+    the cam_plane leaf over the cylinder gear spec: the arm plane is the cam
+    plane. Not the whole cylinder_bank_layout closure (whose bank pitch reads
+    gear_train/cone_incline; PR #1292 review F3), and no builder or notes
+    module joins it."""
     assert config_files_of(Path(bank.__file__)) == config_files_of(
-        SCRIPTS / "cylinder_bank_layout.py"
+        SCRIPTS / "cam_plane.py"
     ) | {"machine/channels.yaml"}
     deps = {Path(p).name for p in module_deps_of(Path(bank.__file__))}
-    assert "cylinder_bank_layout.py" in deps
+    assert "cam_plane.py" in deps
     assert deps.isdisjoint(
         {
+            "cylinder_bank_layout.py",
             "build_ch_pivot_bracket.py",
             "build_ch_pivot_shaft.py",
             "ch_rocker_arm_notes.py",
