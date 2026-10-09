@@ -17,7 +17,8 @@ for anything proud (issue #1038). Press-fit retention is the user's choice
 bar's 1.575 cheeks leave no bearing land under a countersink, and a pressed
 pin drives out with a punch.
 
-Frame (part): pin axis = part Z, axial mid-plane = Front Plane (z = 0); the
+Frame (part): pin axis = part X (Top ∩ Front, named Axis1), axial mid-plane =
+Right Plane (x = 0), as build_ch_bar_pivot_pin revolves it; the
 model is the INSTALLED pin -- a Ø PIN_DIA cylinder BAR_WIDTH long, flush with
 both bar faces. The shop cuts the blank PIN_BLANK_LENGTH long; the drawing
 states that.
