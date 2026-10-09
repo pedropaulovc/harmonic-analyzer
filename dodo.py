@@ -746,7 +746,13 @@ _COM_RETRY_BACKOFF_S: tuple[int, ...] = (60, 120, 240)
 # ISldWorks.StartupProcessCompleted (_seat_forensics' connect-time gate) -- all
 # four recover by kill + relaunch + retry locally; a farm leaf (autostart off)
 # recovers none of them and re-runs only 89, once, on the untouched seat.
-_WATCHDOG_EXIT_CODES = frozenset({86, 87, 88, 89})
+_WATCHDOG_REASONS = {
+    86: "watchdog_crash",
+    87: "watchdog_op_timeout",
+    88: "watchdog_modal",
+    89: "watchdog_seat_not_ready",
+}
+_WATCHDOG_EXIT_CODES = frozenset(_WATCHDOG_REASONS)
 # _watchdog.EXIT_SEAT_NOT_READY: the connect-time startup gate's exit, restated
 # like the codes above (dodo never imports the per-subprocess _watchdog) and
 # pinned equal by test_seat_startup_gate.
@@ -887,7 +893,12 @@ def _sw_preflight() -> None:
         _telemetry.event(
             "sw.memory_restart", commit_gb=round(commit, 1), budget_gb=budget
         )
-        state = _sw_lifecycle.force_recover()
+        state = _sw_lifecycle.force_recover(
+            "memory",
+            caller="memory_preflight",
+            commit_gb=round(commit, 1),
+            budget_gb=budget,
+        )
         if state != _sw_lifecycle.CONNECTED_STATE:
             state = _sw_lifecycle.wait_until_ready()
         span.set_attribute("final_state", state)
@@ -962,19 +973,22 @@ def _exec_com(
         rc = _run_subprocess(cmd, label, log_stem, task=task)
         if rc == 0:
             return
-        sw_broke = rc in _WATCHDOG_EXIT_CODES or not _sw_lifecycle.is_connected()
-        if not sw_broke or attempt == last:
+        reason = _recover_reason(rc)
+        if reason is None or attempt == last:
             _fail_task(label, rc, started=started)
         delay = backoff[attempt]
         _telemetry.warn(
-            f"[sw] {label} failed (exit {rc}) with SolidWorks unhealthy; backoff "
-            f"{delay}s then force-recover + retry {attempt + 1}/{last}",
+            f"[sw] {label} failed (exit {rc}) with SolidWorks unhealthy ({reason}); "
+            f"backoff {delay}s then force-recover + retry {attempt + 1}/{last}",
             exit_code=rc,
             attempt=attempt + 1,
             backoff_s=delay,
+            reason=reason,
         )
         time.sleep(delay)
-        state = _sw_lifecycle.force_recover()
+        state = _sw_lifecycle.force_recover(
+            reason, caller="exec_com", label=label, exit_code=rc, attempt=attempt + 1
+        )
         # A recovery that ends anywhere but CONNECTED means SolidWorks is still
         # coming up, and the retry we are about to release would spend its whole
         # 60 s COM-attach window on a process that cannot answer yet -- a retry
@@ -996,6 +1010,20 @@ def _exec_com(
                 "sw.cold_start_wait", label=label, state=state, attempt=attempt + 1
             )
             _sw_lifecycle.wait_until_ready()
+
+
+def _recover_reason(rc: int) -> str | None:
+    """Name a watchdog exit or unhealthy seat; healthy ordinary failures fail.
+
+    Watchdog exits short-circuit the state probe, as before. A probe failure on
+    an ordinary exit propagates rather than changing the retry decision.
+    """
+    if rc in _WATCHDOG_REASONS:
+        return _WATCHDOG_REASONS[rc]
+    state = _sw_lifecycle.current_state()
+    if state == _sw_lifecycle.CONNECTED_STATE:
+        return None
+    return f"seat_{state}"
 
 
 def _run(
@@ -2962,6 +2990,8 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        # Recovery telemetry uses only fake seats and a fake clock.
+        SCRIPTS_DIR / "test_sw_lifecycle.py",
         # Per-assembly contracts stay per-assembly (no stem-keyed tables in
         # _assembly.py; each recipe carries its own contract only).
         SCRIPTS_DIR / "test_assembly_contract.py",

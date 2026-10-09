@@ -2554,7 +2554,7 @@ def test_retry_waits_out_a_cold_start_instead_of_spending_an_attempt(monkeypatch
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: (calls.append("recover"), "starting")[1],
+        lambda reason, **context: (calls.append("recover"), "starting")[1],
     )
     monkeypatch.setattr(
         dodo._sw_lifecycle,
@@ -2582,7 +2582,7 @@ def test_retry_does_not_wait_when_recovery_came_back_connected(monkeypatch):
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: (calls.append("recover"), "connected")[1],
+        lambda reason, **context: (calls.append("recover"), "connected")[1],
     )
     monkeypatch.setattr(
         dodo._sw_lifecycle,
@@ -2614,7 +2614,10 @@ def test_post_recovery_grace_is_bounded_not_a_second_full_budget(monkeypatch):
     lifecycle = dodo._sw_lifecycle
     waited = []
     monkeypatch.setattr(lifecycle, "_wait", lambda _r, t: waited.append(t))
-    monkeypatch.setattr(lifecycle, "_state_value", lambda _r: "starting")
+    from solidworks_mcp.adapters import sw_recovery
+    from solidworks_mcp.adapters.sw_recovery import SolidWorksState
+
+    monkeypatch.setattr(sw_recovery, "detect_state", lambda: SolidWorksState.STARTING)
     monkeypatch.delenv("HARMONIC_SW_CONNECT_TIMEOUT", raising=False)
 
     lifecycle.wait_until_ready()
@@ -2628,7 +2631,7 @@ def test_post_recovery_grace_is_bounded_not_a_second_full_budget(monkeypatch):
 def test_a_state_probe_failure_cannot_abort_the_retry_path(monkeypatch):
     """force_recover returns "error" exactly when detect_state() raised.
 
-    Re-probing with is_connected() would re-run that same failing call and let
+    Re-probing with current_state() would re-run that same failing call and let
     the exception escape _exec_com, aborting the task instead of retrying --
     the opposite of the best-effort contract. The decision reads the returned
     state instead, so a lifecycle that is itself broken still gets its retry.
@@ -2649,9 +2652,9 @@ def test_a_state_probe_failure_cannot_abort_the_retry_path(monkeypatch):
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: (calls.append("recover"), "error")[1],
+        lambda reason, **context: (calls.append("recover"), "error")[1],
     )
-    monkeypatch.setattr(dodo._sw_lifecycle, "is_connected", boom)
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", boom)
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "wait_until_ready",
@@ -2678,7 +2681,10 @@ def test_abandoning_the_grace_is_recorded_on_the_span(monkeypatch):
         raise RuntimeError("connector never answered")
 
     monkeypatch.setattr(lifecycle, "_wait", blow_up)
-    monkeypatch.setattr(lifecycle, "_state_value", lambda _r: "starting")
+    from solidworks_mcp.adapters import sw_recovery
+    from solidworks_mcp.adapters.sw_recovery import SolidWorksState
+
+    monkeypatch.setattr(sw_recovery, "detect_state", lambda: SolidWorksState.STARTING)
     monkeypatch.setattr(
         lifecycle._telemetry,
         "event",
@@ -2704,7 +2710,7 @@ def test_sw_preflight_restarts_only_past_the_commit_budget(monkeypatch):
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: calls.append("recover") or "connected",
+        lambda reason, **context: calls.append("recover") or "connected",
     )
     monkeypatch.setattr(
         dodo._sw_lifecycle,
@@ -2739,7 +2745,7 @@ def test_sw_preflight_waits_out_a_slow_cold_start(monkeypatch):
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: calls.append("recover") or "starting",
+        lambda reason, **context: calls.append("recover") or "starting",
     )
     monkeypatch.setattr(
         dodo._sw_lifecycle,
@@ -3152,3 +3158,86 @@ def test_feature_cache_and_status_share_the_parsed_yaml_key(tmp_path, monkeypatc
     assert probes == [before, unchanged, changed]
     assert f"MISS {before[:12]}  {label}" in messages
     assert f"MISS {changed[:12]}  {label}" in messages
+
+
+@pytest.mark.parametrize(
+    ("rc", "reason"),
+    [
+        (86, "watchdog_crash"),
+        (87, "watchdog_op_timeout"),
+        (88, "watchdog_modal"),
+        (89, "watchdog_seat_not_ready"),
+    ],
+)
+def test_recover_reason_names_every_watchdog_exit_without_probing(monkeypatch, rc, reason):
+    dodo = _load_dodo()
+    monkeypatch.setattr(
+        dodo._sw_lifecycle, "current_state",
+        lambda: pytest.fail("watchdog recovery must not re-probe the seat"),
+    )
+    assert dodo._recover_reason(rc) == reason
+
+
+@pytest.mark.parametrize(
+    "state", ["starting", "not_running", "running_disconnected", "dotnet_splash_wedge"]
+)
+def test_recover_reason_names_the_unhealthy_seat(monkeypatch, state):
+    dodo = _load_dodo()
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", lambda: state)
+    assert dodo._recover_reason(1) == f"seat_{state}"
+
+
+def test_recover_reason_preserves_healthy_failure_and_probe_failure(monkeypatch):
+    dodo = _load_dodo()
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", lambda: "connected")
+    assert dodo._recover_reason(1) is None
+
+    def boom():
+        raise RuntimeError("probe failed")
+
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", boom)
+    with pytest.raises(RuntimeError, match="probe failed"):
+        dodo._recover_reason(1)
+
+
+@pytest.mark.parametrize(
+    ("rc", "state", "reason"),
+    [
+        (86, "connected", "watchdog_crash"),
+        (87, "connected", "watchdog_op_timeout"),
+        (88, "connected", "watchdog_modal"),
+        (89, "connected", "watchdog_seat_not_ready"),
+        (1, "running_disconnected", "seat_running_disconnected"),
+    ],
+)
+def test_exec_com_hands_the_trigger_to_force_recover(monkeypatch, rc, state, reason):
+    dodo = _load_dodo()
+    recovered = []
+    runs = iter([rc, 0])
+    monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: True)
+    monkeypatch.setattr(dodo, "_com_retry_backoff", lambda: (0,))
+    monkeypatch.setattr(dodo, "_run_subprocess", lambda *_a, **_kw: next(runs))
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", lambda: state)
+    monkeypatch.setattr(
+        dodo._sw_lifecycle, "force_recover",
+        lambda reason, **context: recovered.append((reason, context)) or "connected",
+    )
+    dodo._exec_com(["x"], "part:thing")
+    assert recovered == [
+        (reason, {"caller": "exec_com", "label": "part:thing", "exit_code": rc, "attempt": 1})
+    ]
+
+
+def test_memory_preflight_names_itself_as_the_trigger(monkeypatch):
+    dodo = _load_dodo()
+    recovered = []
+    monkeypatch.setattr(
+        dodo._sw_lifecycle, "force_recover",
+        lambda reason, **context: recovered.append((reason, context)) or "connected",
+    )
+    monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "40")
+    monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: 66.3)
+    dodo._sw_preflight()
+    assert recovered == [
+        ("memory", {"caller": "memory_preflight", "commit_gb": 66.3, "budget_gb": 40.0})
+    ]

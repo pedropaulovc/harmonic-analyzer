@@ -39,7 +39,7 @@ and [[drawing-spec-purity]].
 SolidWorks twice in one session; on a freshly launched SolidWorks the EXACT
 original form (no DatumLength, same part/selector/VARIANT array) passes. Do
 not fix call shapes for it — treat a recurrence as session health:
-`_sw_lifecycle.force_recover()`. Classic [[negative-result-positive-control]]
+`_sw_lifecycle.force_recover("manual")`. Classic [[negative-result-positive-control]]
 and [[no-untested-failure-assumptions]] material: two self-authored failures
 proved that session failed, not the API.
 
