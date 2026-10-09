@@ -177,11 +177,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         back,
         edge=rims[0].edge,
-        # Above-right of the attached hole (263.6, 96.3 mm): clear of the
-        # right view (y >= 175 mm), the isometric (y <= 135 mm) and the
-        # MountingX dimension text (x <= 242 mm). (0.205, 0.064) printed over
-        # the title block; (0.150, 0.150) led through the 17.70 text.
-        callout_xy=(0.270, 0.155),
+        # AddHoleCallout2 centres the ~120 mm-wide text on x and the leader
+        # lands on the text end nearer the hole (263.6, 96.3 mm). Centred at
+        # 330 mm the near end sits right of the hole, so the leader rises
+        # almost vertically, clear of every back-view dimension text
+        # (x <= 242 mm); the text sits above the isometric (y <= 142 mm) and
+        # below the right view (y >= 173 mm). (0.205, 0.064) printed over
+        # the title block; x = 0.150 and 0.270 both led through '17.70'.
+        callout_xy=(0.330, 0.160),
         label="two bracket counterbores",
         process="DRILL / COUNTERBORE",
     )

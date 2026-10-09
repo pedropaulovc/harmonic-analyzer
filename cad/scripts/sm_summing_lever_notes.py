@@ -33,8 +33,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # repeat those numbers.  The boss HEIGHT is not a sketch dimension, so it is
 # stated here -- it is the engagement the purchased counter anchor's shank is
 # cut to.  Note 5 lists the machined features explicitly -- the sheet also
-# carries the 20X controlled anchor-tap pattern, so "only knife edges and
-# anchor bore" would contradict it (codex #354).  Notes 6-7 carry the no-nut
+# carries the 20X controlled anchor-tap pattern and the two magnifying-bracket
+# receiver taps, so "only knife edges and anchor bore" would contradict it
+# (codex #354; receiver taps per the #1287 review).  Notes 6-7 carry the no-nut
 # rule: both lower spring anchors are purchased eyebolts that thread straight
 # into this casting, so the casting is their nut and the eye clocking and
 # threadlocker are the print's business, not an assembly aside.
@@ -48,8 +49,8 @@ DRAWING_NOTES = "\n".join(
         f"4. ANCHOR BOSS {ANCHOR_H:.2f} HIGH.",
         "5. CAST PART: UNDIMENSIONED CONTOURS",
         "   PER SUPPLIED MODEL/PATTERN.",
-        "   MACHINE KNIFE EDGES AND TAP",
-        "   SPRING ANCHOR SEATS ONLY.",
+        "   MACHINE KNIFE EDGES AND TAP SPRING",
+        "   ANCHOR AND BRACKET SEATS ONLY.",
         "6. PURCHASED SPRING EYEBOLTS THREAD",
         "   DIRECTLY INTO THIS PART; NO NUTS.",
         "   TAP FULL DEPTH THROUGH PLATE",
