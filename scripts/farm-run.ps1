@@ -39,7 +39,7 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [ValidateScript({
         if ([string]::IsNullOrWhiteSpace($_) -or $_.Length -gt 160 -or
-            $_ -match '[\p{Cc}\p{Zl}\p{Zp}]') {
+            $_ -match '[\p{Cc}\p{Zl}\p{Zp}\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]') {
             throw 'DisplayName must be nonblank, single-line, free of control characters, and at most 160 characters'
         }
         try {

@@ -376,14 +376,19 @@ def _record_request(task: str, wf_id: str) -> None:
     os.replace(staging, path)
 
 
-def _display_name() -> str:
+def _display_name(label: str | None = None) -> str:
     """Validate human metadata before any farm side effect; preserve its text."""
-    label = os.environ.get("HARMONIC_FARM_DISPLAY_NAME")
+    if label is None:
+        label = os.environ.get("HARMONIC_FARM_DISPLAY_NAME")
     if (
         label is None
         or not label.strip()
         or len(label) > 160
-        or any(unicodedata.category(char) in {"Cc", "Zl", "Zp"} for char in label)
+        or any(
+            unicodedata.category(char) in {"Cc", "Zl", "Zp"}
+            or char in "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+            for char in label
+        )
     ):
         raise RuntimeError(
             "--display-name / HARMONIC_FARM_DISPLAY_NAME must be nonblank, "

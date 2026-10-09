@@ -610,7 +610,7 @@ def _install_real_doit(monkeypatch, namespace=None):
     return seen, executed
 
 
-@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\ud800b", "a\udfffb"])
+@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb", "a\ud800b", "a\udfffb"])
 @pytest.mark.parametrize("command", [["part:x"], ["run", "part:x"], ["strace", "part:x"]])
 def test_farm_execution_requires_a_valid_display_name(label, command, monkeypatch, capsys):
     if label is None:
@@ -630,8 +630,26 @@ def test_farm_execution_requires_a_valid_display_name(label, command, monkeypatc
     assert "--display-name" in captured.out + captured.err
 
 
+@pytest.mark.parametrize("label", ["a\0b", "a\ud800b", "a\udfffb"])
+@pytest.mark.parametrize("command", [["part:x"], ["run", "part:x"], ["strace", "part:x"]])
+def test_explicit_untransportable_display_name_is_rejected_before_actions(
+    label, command, monkeypatch, capsys
+):
+    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
+    monkeypatch.setattr(
+        build, "_farm_preflight", lambda: pytest.fail("preflight before valid label")
+    )
+    _seen, executed = _install_real_doit(monkeypatch)
+
+    assert build.main(["--executor", "farm", f"--display-name={label}", *command]) == 2
+    assert executed == []
+    assert os.environ["HARMONIC_FARM_DISPLAY_NAME"] == DISPLAY_NAME
+    captured = capsys.readouterr()
+    assert "--display-name" in captured.out + captured.err
+
+
 @pytest.mark.parametrize("flag", [None, "--display-name", "-DisplayName"])
-@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "-review", "--executor", "-DisplayName"])
+@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor", "-DisplayName"])
 def test_display_name_reaches_the_task_boundary(flag, label, monkeypatch):
     _preflight_fakes(monkeypatch)
     monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label if flag is None else "Inherited label")
@@ -646,22 +664,6 @@ def test_display_name_reaches_the_task_boundary(flag, label, monkeypatch):
     assert build.main(["--executor", "farm", *options, "part"]) == 0
     assert seen == [["-n", "8", "part"]]
     assert observed == [label]
-
-
-@pytest.mark.parametrize("option", ["--display", "--display-n"])
-def test_display_name_abbreviations_are_not_consumed(option, monkeypatch):
-    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
-    seen = []
-
-    class RecordingDoit:
-        def run(self, args):
-            seen.append(list(args))
-            return 3
-
-    monkeypatch.setattr(build, "_FarmDoitMain", RecordingDoit)
-    assert build.main(["--executor", "farm", f"{option}=other", "part:x"]) == 3
-    assert seen == [["-n", "8", f"{option}=other", "part:x"]]
-    assert os.environ["HARMONIC_FARM_DISPLAY_NAME"] == DISPLAY_NAME
 
 
 @pytest.mark.parametrize("option", ["--display", "--display-n"])
@@ -1265,6 +1267,28 @@ def test_invalid_farm_selection_stops_before_preflight_or_actions(
     assert len(closes) == 1
 
 
+@pytest.mark.parametrize("label", ["", "invalid\nlabel", "a\0b", "a\ud800b", "a\udfffb"])
+@pytest.mark.parametrize("command", [[], ["run"], ["strace"]])
+def test_invalid_selection_precedes_explicit_display_name_validation(
+    label, command, monkeypatch, capsys
+):
+    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
+    monkeypatch.setattr(
+        build, "_farm_preflight", lambda: pytest.fail("preflight before valid selection")
+    )
+    _seen, executed = _install_real_doit(monkeypatch)
+
+    assert build.main([
+        "--executor", "farm", f"--display-name={label}",
+        *command, "part:arbor-pedestal",
+    ]) == 3
+    assert executed == []
+    assert os.environ["HARMONIC_FARM_DISPLAY_NAME"] == DISPLAY_NAME
+    error = capsys.readouterr().err
+    assert "part:arbor-pedestal" in error
+    assert "--display-name" not in error
+
+
 def test_selection_validation_preserves_named_defaults_and_positional_args(
     monkeypatch
 ):
@@ -1739,7 +1763,7 @@ def test_a_launcher_run_is_stamped_as_the_creator_memo(temporal_boundary, monkey
     }
 
 
-@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\ud800b", "a\udfffb"])
+@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb", "a\ud800b", "a\udfffb"])
 def test_invalid_dispatch_display_name_has_no_side_effects(
     temporal_boundary, tmp_path, monkeypatch, label
 ):
@@ -1762,7 +1786,7 @@ def test_invalid_dispatch_display_name_has_no_side_effects(
     assert list(requests.iterdir()) == []
 
 
-@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "-review", "--executor"])
+@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor"])
 def test_dispatch_preserves_valid_display_name(temporal_boundary, monkeypatch, label):
     calls, resolve = temporal_boundary
     resolve(_leaf_result())

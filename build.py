@@ -126,7 +126,6 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--display-name", "-DisplayName",
-        default=os.environ.get("HARMONIC_FARM_DISPLAY_NAME"),
         metavar="LABEL",
         help="required for farm builds: short owner/session plus reason, nonblank "
         "single-line, at most 160 characters (sets HARMONIC_FARM_DISPLAY_NAME)",
@@ -161,14 +160,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     os.environ["HARMONIC_EXECUTOR"] = options.executor
 
     doit = _FarmDoitMain() if options.executor == "farm" else DoitMain()
+    if options.executor == "farm":
+        doit.display_name = options.display_name
     executing = _executing_command(doit_args, doit)
     refusal = _release_refusal(doit_args, executing)
     if refusal:
         print(f"release: {refusal}", file=sys.stderr)
         return 2
     if options.executor == "farm" and executing is not None:
-        if options.display_name is not None:
-            os.environ["HARMONIC_FARM_DISPLAY_NAME"] = options.display_name
         doit_args = _with_farm_parallelism(doit_args, *executing)
     return doit.run(doit_args)
 
@@ -235,7 +234,7 @@ def _validate_farm_selection(
     control.process(selection)
 
 
-def _farm_command(command_class):
+def _farm_command(command_class, display_name: str | None = None):
     """Wrap one native task-executing command at its loaded-graph boundary."""
 
     class FarmCommand(command_class):
@@ -253,9 +252,11 @@ def _farm_command(command_class):
                 import _farm
 
                 try:
-                    _farm._display_name()
+                    label = _farm._display_name(display_name)
                 except RuntimeError as exc:
                     raise FarmPreflightError(str(exc)) from None
+                if display_name is not None:
+                    os.environ["HARMONIC_FARM_DISPLAY_NAME"] = label
                 _farm_preflight()
                 print(
                     "farm: every SolidWorks task runs on the farm (parts, "
@@ -276,12 +277,14 @@ def _farm_command(command_class):
 class _FarmDoitMain(DoitMain):
     """Doit with preflight wrappers around native action-executing commands."""
 
+    display_name: str | None = None
+
     def get_cmds(self):
         commands = super().get_cmds()
         for name in commands:
             command_class = commands.get_plugin(name)
             if getattr(command_class, "execute_tasks", False):
-                commands[name] = _farm_command(command_class)
+                commands[name] = _farm_command(command_class, self.display_name)
         return commands
 
 
