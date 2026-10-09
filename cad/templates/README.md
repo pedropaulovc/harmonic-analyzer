@@ -88,12 +88,6 @@ the status-bar unit picker: MMGS displays `mm`, and IPS displays `in`. The
 pipeline configures dimensions in millimeters today. No custom UNIT property
 is stamped.
 
-Both drawing templates own the native dynamic sheet counter:
-`SHEET $PRP:"SW-Current Sheet" OF $PRP:"SW-Total Sheets"`. SolidWorks updates
-these drawing-document fields for each sheet as the package changes. Drawing
-recipes must not add their own current/total sheet-number notes; semantic
-cross-references to other sheets remain recipe-owned.
-
 ### The "For Personal Use Only" watermark
 
 Sheets rendered on a **SolidWorks Maker / Student** seat carry a non-removable
