@@ -6,6 +6,7 @@ import ast
 import itertools
 import math
 import re
+import runpy
 from fractions import Fraction
 from pathlib import Path
 
@@ -16,6 +17,7 @@ import build_pd_transgear_arm as part
 import draw_pd_transgear_arm as drawing
 import pd_latch_hook_geometry as hook
 import pd_latch_hook_spec as hook_spec
+import pd_rack_pinion_spec as disc
 import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as geometry
 import pd_transgear_arm_spec as spec
@@ -41,7 +43,8 @@ def test_required_drawing_paths() -> None:
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    views = (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.END_KEEP)
+    views = (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.LOCATOR_SECTION_KEEP,
+             drawing.REAR_TEXT_MODEL_MM, drawing.END_KEEP)
     assert set().union(*views) == marked
     assert sum(len(view) for view in views) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -57,6 +60,104 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
 
 
+def test_rear_locator_text_projects_model_mm_to_canonical_sheet_pairs(monkeypatch) -> None:
+    """The failed leaf passed model XYZ triples to curate's ``x, y`` unpack."""
+    adapter, rear = object(), object()
+    calls = []
+
+    def project(actual_adapter, actual_view, points, *, names, label):
+        assert actual_adapter is adapter and actual_view is rear
+        calls.append((points, names, label))
+        # Bounded back-view fake: reflected X, actual 1:1 scale and centre.
+        return [
+            (
+                drawing.REAR_CENTER[0] - (xyz[0] - drawing._BBOX_CENTER_X / 1000.0),
+                drawing.REAR_CENTER[1] + xyz[1],
+            )
+            for xyz in points
+        ]
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    keep = drawing._rear_dimension_positions(adapter, rear)
+    assert set(keep) == set(drawing.REAR_TEXT_MODEL_MM)
+    assert len(calls) == 1
+    points, names, _label = calls[0]
+    assert names == tuple(drawing.REAR_TEXT_MODEL_MM)
+    for name, xyz in zip(names, points, strict=True):
+        assert xyz == pytest.approx(
+            tuple(value / 1000.0 for value in drawing.REAR_TEXT_MODEL_MM[name])
+        )
+        assert xyz[2] == pytest.approx(geometry.THICKNESS / 1000.0)
+        x, y = keep[name]  # The real curate_dimensions contract, not XYZ.
+        assert x == pytest.approx(
+            drawing.REAR_CENTER[0] - xyz[0] + drawing._BBOX_CENTER_X / 1000.0
+        )
+        assert y == pytest.approx(drawing.REAR_CENTER[1] + xyz[1])
+    # The actual caller uses the projection, not the unchanged model triples.
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    imports = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "curate_view_dimensions"
+    ]
+    assert len(imports) == 5
+    keep_sources = [
+        ast.unparse(next(keyword.value for keyword in call.keywords if keyword.arg == "keep"))
+        for call in imports
+    ]
+    assert keep_sources.count("_rear_dimension_positions(adapter, rear)") == 1
+    assert set(keep_sources) == {
+        "FRONT_KEEP", "SECTION_KEEP", "LOCATOR_SECTION_KEEP", "END_KEEP",
+        "_rear_dimension_positions(adapter, rear)",
+    }
+    for view_keep in (
+        drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.LOCATOR_SECTION_KEEP, drawing.END_KEEP,
+    ):
+        assert all(len(xy) == 2 for xy in view_keep.values())
+
+
+def test_plate_tap_stations_follow_the_current_reducer_bore() -> None:
+    """The pivot and pressed pin stay fixed; the knob bore and plate taps
+    follow the live reducer centre distance in the arm's local frame."""
+    theta = math.radians(disc.MESH_ANGLE_DEG) - math.radians(geometry.ARM_ANGLE_DEG)
+    bore_station = geometry.PIN_STATION + disc.CENTRE_DISTANCE * math.cos(theta)
+    bore_offset = disc.CENTRE_DISTANCE * math.sin(theta)
+    assert geometry.KNOB_BORE_STATION == pytest.approx(bore_station)
+    assert geometry.KNOB_BORE_OFFSET == pytest.approx(bore_offset)
+    midpoint = bore_station + geometry.PLATE_CENTRELINE_OFFSET
+    stations = tuple(
+        midpoint + side * geometry.PLATE_SCREW_PITCH / 2.0 for side in (-1.0, 1.0)
+    )
+    assert geometry.PLATE_TAP_STATIONS == pytest.approx(stations)
+    assert part.PLATE_TAP_STATIONS == pytest.approx(stations)
+    for index, station in enumerate(stations, start=1):
+        name = f"PlateTapStation{index}"
+        assert name in spec.DRAWING_DIMENSIONS["StationReference"]
+        assert drawing.FRONT_KEEP[name][0] == pytest.approx(
+            drawing._front_x(station / 2.0)
+        )
+    assert drawing.TAP_CALLOUTS[0][1] == pytest.approx(stations[0])
+
+
+@pytest.mark.parametrize("centre_change", (-0.5, 0.5))
+def test_physical_centre_moves_the_bearing_not_the_pivot_latch_fixture(
+    monkeypatch: pytest.MonkeyPatch, centre_change: float
+) -> None:
+    # This is a source-mutation control, not an admitted manufacturing grade.
+    monkeypatch.setattr(disc, "CENTRE_DISTANCE", disc.CENTRE_DISTANCE + centre_change)
+    fresh = runpy.run_path(geometry.__file__)
+    theta = math.radians(disc.MESH_ANGLE_DEG) - math.radians(geometry.ARM_ANGLE_DEG)
+    assert fresh["KNOB_BORE_STATION"] == pytest.approx(
+        geometry.KNOB_BORE_STATION + centre_change * math.cos(theta)
+    )
+    assert fresh["KNOB_BORE_OFFSET"] == pytest.approx(
+        geometry.KNOB_BORE_OFFSET + centre_change * math.sin(theta)
+    )
+    for name in ("PIN_STATION", "TIP_STATION", "PIN_MACHINE_Z", "ARM_U", "ARM_N"):
+        assert fresh[name] == getattr(geometry, name)
+    assert fresh["PLATE_TAP_STATIONS"] != geometry.PLATE_TAP_STATIONS
+
+
 def test_the_walls_were_judged_at_no_less_than_the_printed_title_block_band() -> None:
     """The geometry module's wall and fit arithmetic uses rounded bands; each
     must cover the title-block row the printed places actually invoke."""
@@ -65,7 +166,6 @@ def test_the_walls_were_judged_at_no_less_than_the_printed_title_block_band() ->
     precision = spec.DRAWING_PRECISION_BY_NAME
     for name, judged in (
         ("TipStation", geometry.TIP_STATION_BAND),
-        ("PivotBoreDia", geometry.PIVOT_BORE_DIA_BAND),
         ("PinHoleDepth", geometry.PIN_HOLE_DEPTH_BAND),
     ):
         assert judged >= _band(precision[name]), name
@@ -101,11 +201,12 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 
 
 # The worst far-face margin this test's restatement finds at the printed
-# rows, and the retired 3/4 pin's: in the 6.05 hole it barely clears with the
-# hook's screw holes at ±0.05; 0.05 deeper it stops short of the face.
-_PINNED_FAR_FACE_MARGIN = 0.741
-_PINNED_OLD_PIN_MARGIN = 0.016
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.034
+# rows, and the retired 3/4 pin's: with the latch hole's height at ±0.065
+# (LATCH_PIN_HEIGHT_BAND) it barely clears in a 6.10 hole; 0.05 deeper it
+# stops short of the face.
+_PINNED_FAR_FACE_MARGIN = 0.811
+_PINNED_OLD_PIN_MARGIN = 0.036
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.014
 
 
 def _worst_far_face_margin(
@@ -134,12 +235,7 @@ def _worst_far_face_margin(
         hook.PIN_AXIS_XY[0] - pivot[0], hook.PIN_AXIS_XY[1] - pivot[1]
     )
     face0 = station + hook.SHEET_T / 2.0  # along u0 from the pivot
-    bore_float = (
-        geometry.PIVOT_BORE_DIA
-        + geometry.PIVOT_BORE_DIA_BAND
-        - pivot_screw.SHOULDER_DIA
-        - min(pivot_screw.SHOULDER_DIA_LIMITS)
-    ) / 2.0
+    bore_float = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE[1] / 2.0
     hinge = (hook.X_B, hook.BAR_BACK_FACE_Z)  # the bend line, in machine (x, z)
     radii = [(pin.DIA + band) / 2.0 for band in pin.DIA_BAND]
     signs = (-1.0, 1.0)
@@ -167,7 +263,7 @@ def _worst_far_face_margin(
         # The crowned end's full-diameter circle, the pin off the arm's
         # centreline by its position band, at the pin's machine z.
         full = geometry.TIP_STATION + tip * tip_band + proud - pin.CROWN_R
-        side = lateral * geometry.HOLE_POSITION_BAND
+        side = lateral * geometry.LATCH_PIN_HEIGHT_BAND
         centre = (px + full * ux - uy * side, py + full * uy + ux * side)
         # Into the unbent hook: turn the pin by -bend about the bend line.
         c, s = math.cos(bend), math.sin(bend)
@@ -208,13 +304,13 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     # The screws' float turns the hook about the pin as well as sliding it,
     # so the drift along U at the hole exceeds the pure slide.
     assert joints.HOOK_DRIFT_ALONG_U > joints.HOOK_SCREW_SHIFT
-    # Negative control: the 3/4 pin barely clears in the 6.05 hole and stops
+    # Negative control: the 3/4 pin barely clears in a 6.10 hole and stops
     # short 0.05 deeper with the bends and the grade; without them it cleared.
-    old = _printed_proud_range(0.75 * 25.4, 6.05)
+    old = _printed_proud_range(0.75 * 25.4, 6.10)
     assert _worst_far_face_margin(printed, old) == pytest.approx(
         _PINNED_OLD_PIN_MARGIN, abs=1e-3
     )
-    deeper = _printed_proud_range(0.75 * 25.4, 6.10)
+    deeper = _printed_proud_range(0.75 * 25.4, 6.15)
     assert _worst_far_face_margin(printed, deeper) == pytest.approx(
         _PINNED_DEEPER_OLD_PIN_MARGIN, abs=1e-3
     )
@@ -226,10 +322,9 @@ def test_the_explicit_bands_are_the_spot_face_pin_ream_and_hole_positions() -> N
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("StationReference", "PinStation"): "HOLE_POSITION_TOLERANCE",
-        ("StationReference", "PlateTapStation1"): "HOLE_POSITION_TOLERANCE",
-        ("StationReference", "PlateTapStation2"): "HOLE_POSITION_TOLERANCE",
-        ("PinHoleProfile", "PinHoleZ"): "HOLE_POSITION_TOLERANCE",
+        ("LocatorHoles", "LocatorDepth"): "LOCATOR_BLIND_DEPTH_BAND_MM",
+        ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_BAND_MM)",
+        ("PinHoleProfile", "PinHoleZ"): "LATCH_PIN_HEIGHT_TOLERANCE",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
     }
@@ -327,12 +422,80 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
 
 
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
-    """Review of 19e33c6c2: the Ø4.900 named no operation.  At the smallest
-    bore its band accepts, the MHA-VN-041 shoulder keeps less radial air than a
-    drill's oversize, so the bore is a fit bore and the callout names REAM."""
-    drilled_growth = _config.title_block("drilled_hole")["plus_mm"]
-    assert 0.0 < joints.SHOULDER_RADIAL_CLEARANCE < drilled_growth / 2.0
-    assert spec.PIVOT_BORE_CALLOUT.split()[0] == "REAM"
+    """A model reference cannot masquerade as a universal ±.130 bore zone."""
+    lower, upper = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
+    assert (lower, upper) == pytest.approx((0.132, 0.152))
+    assert geometry.PIVOT_BORE_DIA == pytest.approx(pivot_screw.SHOULDER_DIA + (lower + upper) / 2.0)
+    assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
+    assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
+    assert spec.PIVOT_BORE_CALLOUT.splitlines()[0] == "REAM TO MEASURED VN041"
+    assert "SHOULDER +0.132/+0.152 DIA" in spec.PIVOT_BORE_CALLOUT
+    assert "MATCHED SET; NOT INTERCHANGEABLE" in spec.PIVOT_BORE_CALLOUT
+    assert "0.001 mm RESOLUTION" in spec.PIVOT_FIT_INSPECTION_NOTE
+    assert "RECORD PAIRED SHAFT OD, BORE ID AND PART IDS" in spec.PIVOT_FIT_INSPECTION_NOTE
+    assert "Pivot Fit Inspection" in part._SAVED_DRAWING_PROPERTIES
+    assert "BORE AXIS 90° TO FRONT FACE" in spec.PIVOT_BORE_CALLOUT
+    assert geometry.PIVOT_AXIS_BINDING_SWEEP_MAX < lower
+    assert lower - geometry.PIVOT_AXIS_BINDING_SWEEP_MAX >= 0.004
+
+
+def test_pivot_fit_pays_the_real_general_angle_before_reducing_loaded_play(monkeypatch) -> None:
+    # No hidden zero-angle assumption, and no stock shoulder variation added
+    # twice to an acceptance fitted to the measured shaft.
+    original = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
+    monkeypatch.setattr(geometry, "PIVOT_AXIS_BINDING_SWEEP_MAX",
+                        geometry.PIVOT_AXIS_BINDING_SWEEP_MAX + 0.01)
+    wider = geometry.pivot_running_clearance_mm()
+    assert wider[0] > original[0]
+    assert wider[1] - wider[0] == pytest.approx(original[1] - original[0])
+
+
+@pytest.mark.parametrize("stock_deviation", pivot_screw.SHOULDER_DIA_LIMITS)
+def test_matched_pivot_acceptance_follows_each_measured_stock_shoulder(stock_deviation) -> None:
+    shaft = pivot_screw.SHOULDER_DIA + stock_deviation
+    lower, upper = geometry.pivot_bore_limits_mm(shaft)
+    clearance = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
+    assert (lower - shaft, upper - shaft) == pytest.approx(clearance)
+    assert geometry.require_pivot_running_fit(lower, shaft) == pytest.approx(clearance[0])
+    assert geometry.require_pivot_running_fit(upper, shaft) == pytest.approx(clearance[1])
+    for rejected in (lower - 0.001, upper + 0.001):
+        with pytest.raises(ValueError, match="measured-shoulder running clearance"):
+            geometry.require_pivot_running_fit(rejected, shaft)
+
+
+def test_replacement_stock_shoulder_needs_its_own_paired_fit_check() -> None:
+    smallest = pivot_screw.SHOULDER_DIA + min(pivot_screw.SHOULDER_DIA_LIMITS)
+    largest = pivot_screw.SHOULDER_DIA + max(pivot_screw.SHOULDER_DIA_LIMITS)
+    bore = geometry.pivot_bore_limits_mm(smallest)[0]
+    with pytest.raises(ValueError, match="measured-shoulder running clearance"):
+        geometry.require_pivot_running_fit(bore, largest)
+    with pytest.raises(ValueError, match="as-supplied stock limits"):
+        geometry.pivot_bore_limits_mm(smallest - 0.001)
+
+
+@pytest.mark.parametrize("persist", (False, True))
+def test_native_pivot_ref_and_conditional_callout_check_void_side_effect(monkeypatch, persist) -> None:
+    class NativeDisplay:
+        def __init__(self):
+            self.text = {}
+
+        def SetText(self, channel, text):
+            if persist:
+                self.text[channel] = text
+            return None  # IDisplayDimension::SetText is VT_VOID.
+
+        def GetText(self, channel):
+            return self.text.get(channel, "")
+
+    display = NativeDisplay()
+    monkeypatch.setattr(part, "_named_dimension", lambda *_: (display, object()))
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+    if not persist:
+        with pytest.raises(RuntimeError, match="did not persist"):
+            part._author_pivot_fit_annotation(object())
+        return
+    part._author_pivot_fit_annotation(object())
+    assert display.text == {1: "(<MOD-DIAM>", 2: ")", 4: spec.PIVOT_BORE_CALLOUT}
 
 
 # Default-format text, measured on r743-rocker-fix3's render (as

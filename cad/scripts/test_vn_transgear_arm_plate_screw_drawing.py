@@ -22,7 +22,7 @@ import transgear_hanger_joints as joints
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_fastener import STOCK_RECIPES
-from diagnostics import diag_build_91790A196 as entry
+from diagnostics import diag_build_91790A199 as entry
 from diagnostics import diag_mcmaster_lib
 from diagnostics import diag_mcmaster_oval as recipe
 
@@ -30,15 +30,17 @@ IN = 25.4
 
 
 def test_spec_is_the_catalogue_screw() -> None:
-    """91790A196 ([INFERENCE] SKU; the series per mcmaster.com, 2026-09-30):
-    8-32 x 5/8 from the top of the bevel, 82 deg oval head Ø0.312 x 0.152
-    total, crown 0.052, the B18.6.3 length band +0/-0.03 in."""
-    assert screw.SKU == "91790A196"
+    """Verified 91790A199: 8-32 x 1 inch from the bevel top, standard oval.
+
+    Catalogue head height 0.152 and crown 0.052 are reference dimensions,
+    not supplied head/length tolerance bands or actual receipt readings.
+    """
+    assert screw.SKU == "91790A199"
+    assert entry.PART_NO == screw.SKU
     assert screw.THREAD == "#8-32"
     assert screw.THREAD_MAJOR == pytest.approx(0.164 * IN)
     assert screw.PITCH == pytest.approx(IN / 32.0)
-    assert screw.STOCK_LENGTH == pytest.approx(0.625 * IN)
-    assert screw.STOCK_LENGTH_BAND == pytest.approx((0.0, 0.03 * IN))
+    assert screw.STOCK_LENGTH == pytest.approx(IN)
     assert screw.HEAD_DIA == pytest.approx(0.312 * IN)
     assert screw.HEAD_H == pytest.approx(0.152 * IN)
     assert screw.CROWN_H == pytest.approx(0.052 * IN)
@@ -60,10 +62,9 @@ def test_the_cut_is_flush_with_the_arm_front_face() -> None:
     assert screw.CUT_LENGTH == pytest.approx(plate.THICKNESS_OVER_ARM + arm.THICKNESS)
     assert screw.LENGTH == screw.CUT_LENGTH
     assert screw.CUT_END_BREAK_MAX == pytest.approx(0.1)
-    # Even the shortest in-band screw is cut on full thread, below its
-    # factory tip.
-    shortest = screw.STOCK_LENGTH - screw.STOCK_LENGTH_BAND[1]
-    assert shortest - recipe.TIP_CHAMFER_PER_PITCH * screw.PITCH > screw.CUT_LENGTH
+    assert joints.PLATE_SCREW_STOCK_LEAD_MARGIN_MM > 0.0
+
+
 
 
 class _Recorder:
@@ -178,7 +179,7 @@ def _record(monkeypatch, *, supplied: bool = False) -> list[tuple]:
         return {}
 
     if supplied:
-        asyncio.run(entry.build_91790A196(adapter))
+        asyncio.run(entry.build_91790A199(adapter))
     else:
         monkeypatch.setattr(part, "build_stock_fastener", stock_build)
         asyncio.run(part.build(adapter))
@@ -344,7 +345,7 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
 ) -> None:
     metadata = STOCK_RECIPES[screw.SKU]
     assert metadata.module == entry.__name__
-    assert metadata.callable_name == entry.build_91790A196.__name__
+    assert metadata.callable_name == entry.build_91790A199.__name__
     assert metadata.threaded
     assert FASTENERS[part.PART_NAME] is part.SPEC
     assert part.SPEC.skus == (screw.SKU,)
@@ -354,6 +355,8 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     assert int(row["quantity"]) == 2
     assert row["supplier_skus"] == [screw.SKU]
     assert row["stock_name"] == part.SPEC.stock_name
+    assert screw.SKU in row["material_specification"]
+    assert f"{screw.STOCK_LENGTH:.2f}" in row["material_specification"]
 
     seen: dict = {}
 
@@ -365,7 +368,7 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     asyncio.run(part.build(None))
     (component,) = seen["components"]
     assert component.sku == screw.SKU
-    assert component.author is entry.build_91790A196
+    assert component.author is entry.build_91790A199
     assert component.transform.translation_mm == (0.0, 0.0, 0.0)
     assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
     assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
@@ -384,7 +387,7 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch) -> None:
 
     monkeypatch.setattr(entry, "catalog_run", fake_catalog_run)
     asyncio.run(entry.build_catalog(None))
-    assert seen == [(screw.SKU, entry.build_91790A196)]
+    assert seen == [(screw.SKU, entry.build_91790A199)]
 
 
 def test_no_vendor_model_of_the_new_hardware_is_tracked() -> None:
@@ -398,23 +401,23 @@ _SIZE = re.compile(r"#\d|\d+/\d+|\d\s*(?:mm|in\b|\")|\d\s*[xX]\s*\d|°")
 
 
 def test_sheet_states_the_cut_and_no_size_in_the_registry_names() -> None:
-    """The purchased sheet prints the registry's stock name, supplier and
-    SKU besides its fixed footer, so none of those may carry a size; the
-    installation note states the cut to fit (the joint's proud allowance,
-    as the paper-drive assembly step prints it) and the cut end's break."""
+    """The ordinary purchased reference sheet carries the actual stock identity
+    and off-mechanism cut instruction, not a commodity receiving procedure."""
     row = _config.parts(part.PART_NAME)
     for field in ("title", "stock_name", "supplier", "finish", "material"):
         assert not _SIZE.search(str(row[field])), (field, row[field])
+    assert row["installation_notes"] == screw.PURCHASED_STOCK_NOTE
     lines = row["installation_notes"].splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines), lines
-    flat = " ".join(lines)
+    assert "1 IN" in screw.PURCHASED_STOCK_NOTE
+    assert f"{screw.STOCK_LENGTH:.2f}" in screw.PURCHASED_STOCK_NOTE
+    assert "CUT TO FIT" in screw.PURCHASED_STOCK_NOTE
+    flat = " ".join(screw.PURCHASED_STOCK_NOTE.splitlines())
     proud = joints.PLATE_SCREW_CUT_PROUD_MAX
-    assert (
-        f"CUT EACH TIP FLUSH TO {proud:.2f} PROUD OF THE MHA-PD-018 ARM FRONT FACE "
-        "AT ASSEMBLY;"
-    ) in flat
-    assert f"BREAK THE CUT END {screw.CUT_END_BREAK_MAX:.1f} MAX." in flat
+    assert f"FLUSH OR PROUD {proud:g} MAX" in flat
+    assert f"CUT-END BREAK {screw.CUT_END_BREAK_TEXT}" in flat
+    assert "CUT OFF MECHANISM BEFORE GUIDE-LOCK SWEEP" in flat
 
 
 def test_drawing_is_the_purchased_reference_sheet() -> None:
@@ -425,3 +428,18 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     assert (
         drawing.build.__code__.co_names.count("build_purchased_fastener_drawing") == 1
     )
+
+
+def test_drawing_uses_only_the_ordinary_purchased_reference_api(monkeypatch) -> None:
+    seen: dict = {}
+
+    async def reference_sheet(adapter, spec, **kwargs):
+        assert spec is drawing.SPEC
+        seen.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(
+        drawing, "build_purchased_fastener_drawing", reference_sheet
+    )
+    asyncio.run(drawing.build(None))
+    assert seen == {}

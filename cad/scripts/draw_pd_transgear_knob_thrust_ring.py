@@ -6,7 +6,7 @@ face (on the 12T) on the left, the rear face (on the plate hub) on the
 right, each with its running finish, the length between them under its
 explicit band and the O.D. beside it.  The face view is the ``*Bottom``
 orientation -- exactly the third-angle LEFT view of that rotated profile --
-so it sits on the profile's axis to its left and carries the bore's callout.
+so it sits on the profile's axis to its left and carries the source drill band.
 """
 
 from __future__ import annotations

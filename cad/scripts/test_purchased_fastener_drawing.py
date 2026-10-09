@@ -6,6 +6,8 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import _purchased_fastener_drawing as purchased
 from _drawing_registry import DrawingLayout
 
@@ -154,11 +156,13 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     monkeypatch.setattr(purchased._config, "parts", lambda _name: registry)
     monkeypatch.setattr(purchased, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(purchased, "check", lambda _label, result: result)
-    monkeypatch.setattr(
-        purchased,
-        "read_required_properties",
-        lambda _model, _names, *, required: properties,
-    )
+
+    def required_properties(_model, names, *, required):
+        assert tuple(names) == tuple(purchased._PROPERTIES)
+        assert tuple(required) == tuple(names)
+        return properties
+
+    monkeypatch.setattr(purchased, "read_required_properties", required_properties)
 
     def new_project_drawing(_adapter, *, layout):
         calls.append(("new", layout))
@@ -173,7 +177,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     )
     monkeypatch.setattr(purchased, "double_array", tuple)
 
-    centers = {name: center for name, center, _cell in purchased._VIEW_CELLS}
+    cells = purchased._VIEW_CELLS
+    centers = {name: center for name, center, _cell in cells}
 
     def place_view(_adapter, path, orientation, _x, _y, *, scale):
         assert Path(path) == source
@@ -198,6 +203,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     monkeypatch.setattr(purchased, "assert_asme_b_sheet", assert_sheet)
 
     def literal_note(_adapter, text: str, x: float, y: float):
+        calls.append(("note", text, x, y))
         return _Note(text, text, x, y)
 
     def linked_note(_adapter, name: str, x: float, y: float, *, char_height: float):
@@ -223,9 +229,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "finalize_drawing", finalize)
 
-    result = asyncio.run(
-        purchased.build_purchased_fastener_drawing(_Adapter(source), spec)
-    )
+    result = asyncio.run(purchased.build_purchased_fastener_drawing(_Adapter(source), spec))
 
     assert result == {"pdf": str(outputs["pdf"])}
     assert ("new", layout) in calls
@@ -237,6 +241,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         "Test Fastener — Purchased Part Reference Drawing",
         (1, 1),
     ) in calls
+
+
 
 
 def test_scale_fitting_does_not_scale_fixed_native_padding(monkeypatch, tmp_path):

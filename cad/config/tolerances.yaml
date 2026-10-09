@@ -30,6 +30,35 @@ fits:
     contact_critical_band_mm: [0.0, -0.02]
     note: "Functional fit/process tip grades, not AGMA accuracy classes or an ideal-CR allocation. Contact-critical retains the 0.02 mm diametral grade for 32T alignment and 120T cylinder tips. Finite stock support pays both printed tip and retained thickness/depth limits. Alignment is a fit-up mesh: actual supported-union continuity, positive backlash and root air must pass the whole booked centre stack; smooth-flank span is reported, not gated at >1.1. Operating meshes and absolute zero TE have separate source-owned gates. See tolerance-policy.md."
 
+  stock_form_quality:
+    toothspace_runout_tir_mm: 0.005
+    reducer_position_diameter_mm: 0.050
+    shaft_turned_runout_mm: 0.050
+    reducer_axis_projected_zone_diameter_mm: 0.010
+    arm_opposite_face_parallelism_mm: 0.005
+    recording_paper_width_deviation_mm: 0.100
+    recording_paper_left_inset_deviation_mm: 0.100
+    recording_pen_x_deviation_mm: 0.100
+    rack_pitch_index_deviation_mm: 0.010
+    rack_flank_constraint_deviation_mm: 0.025
+    # Source closing/projection outer gives0.2724567 mm native root air.
+    # Keep the0.25 mm floor: this inclusive MAX pays indicator U0.002;
+    # reject measured intrusion above0.018. Conditional, not supplier accuracy.
+    rack_root_material_intrusion_mm: 0.020
+    rack_working_side_angle_deviation_deg: 2.0
+    rack_flank_secant_minimum_height_mm: 0.800
+    purchased_rack_working_side_form_model_premise: PURCHASED_RACK_32DP_PA20_STRAIGHT_SMOOTH_WORKING_SIDE_FORM
+    pinion_pitch_index_deviation_mm: 0.010
+    rack_face_lead_deviation_mm: 0.010
+    pitch_index_measurement_uncertainty_mm: 0.002
+    wire_measurement_uncertainty_mm: 0.005
+    feed_loaded_travel_height_deviation_mm: 0.010
+    rack_face_width_max_mm: 4.800
+    rack_stock_height_max_mm: 4.800
+    reducer_setup_clock_deviation_mm: 0.010
+    receiving_allocation_status: provisional
+    note: "Conditional inspection/rejection controls, not supplier accuracy, an AGMA class or hardware qualification. Receiving-allocation release is the explicit receiving_allocation_status field. Pay actual calibration, common datum, wire geometry, orientation and thermal uncertainty in addition to the source micrometer/indicator floors. Full rack material still uses both signed X-intercepts, all usable gaps and the whole face in one independent material/end XY datum; complete point/root envelopes require justified whole-material process or functional evidence. The named standard-manufactured straight/smooth WORKING-SIDE form is a MODEL premise at the native-gear form level, not a local-normal certificate inferred from samples. Back its angle control with the SAME physical wire and diameter at both measured heights: the common radius offset cancels under that premise. Pay both centre-coordinate readings and require the entire secant-angle enclosure inside the source band. Crest, root and birth/edge cones are not made working sides and remain independently enclosed. Root intrusion is subtracted from actual root air, never from its required floor. Incoming intrinsic lead belongs to rack form; separate lead controls assembled rigid face/axis misalignment. Tooth-space TIR refers to the running journal/bore; indicate and lock the disc as a matched cluster against the feed running bore. Coupled reamed dowels locate the plate; screws clamp only. Position is diametral; retain actual projected gear/wheel planes and opposite-arm-face payment. Rack/support asset height uses one captured loaded axis datum; later pivot/journal motion, tilted sections and service cock are separately paid. Stock height/face width and paper/media/nib bands remain independent. Introduced paper error after ONE held initial zero is a NAMED DETERMINISTIC term in the total coefficient-error budget, never operator-index credit. Knob transfer alone is not crank qualification. Only unchanged chain polygon/link pitch is inherited; introduced geometry/gravity/slack/fit-induced chain phase remains paid."
+
   cone_drum_oblique_mesh:  # the inclined cone partial engagement
     # The engaged centre is SET AT ASSEMBLY (user ruling 2026-10-10): pedestal screws
     #   snug-loose, swing in on shims at T012 and T120 so the arbor aligns to the cone

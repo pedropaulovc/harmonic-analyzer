@@ -14,7 +14,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_fastener import RigidTransform, STOCK_RECIPES
 from diagnostics import diag_build_91794A077 as recipe
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from vn_fillister_screw_spec import FILLISTER_SIZES
 
 STEM = "vn-magnifying-bracket-screw"
 

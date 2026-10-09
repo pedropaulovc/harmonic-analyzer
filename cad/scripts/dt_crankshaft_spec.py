@@ -20,6 +20,7 @@ from dt_cone_pivot_post_spec import CRANK_BORE_DIA as JOURNAL_BORE_DIA
 from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as JOURNAL_BORE_BAND
 import dt_crank_pinion_spec
 import vn_crank_seat_drive_pin_spec
+import vn_transgear_latch_pin_spec
 import pd_transgear_removable_spec
 from dt_crank_hub_geometry import (
     CRANK_FACE_SHIFT,
@@ -303,11 +304,11 @@ SEAT_COLLAR_BAND = (
     SHAFT_LENGTH_BAND[1] - COLLAR_STATION_TOL,
 )
 # Reamed for a light press of the stock hardened 3/32 dowel (its catalogue
-# diameter tolerance is vn_crank_seat_drive_pin_spec.DIA_BAND_IN).
+# diameter tolerance is vn_transgear_latch_pin_spec.DIA_BAND_IN).
 DRIVE_PIN_HOLE_BAND = (0.000, -0.010)
 _DOWEL_OD = tuple(
-    vn_crank_seat_drive_pin_spec.DIA + inch * vn_crank_seat_drive_pin_spec.MM_PER_IN
-    for inch in vn_crank_seat_drive_pin_spec.DIA_BAND_IN
+    vn_crank_seat_drive_pin_spec.DIA + inch * vn_transgear_latch_pin_spec.MM_PER_IN
+    for inch in vn_transgear_latch_pin_spec.DIA_BAND_IN
 )
 # The stock dowel's length grade, +/-0.010 in (the knob shaft's MHA-VN-038 is the
 # same 98381A family and reads it here too).

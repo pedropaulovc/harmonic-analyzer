@@ -16,7 +16,6 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_fastener import STOCK_RECIPES
 from diagnostics import diag_build_98381A474 as recipe
-from diagnostics.diag_mcmaster_dowel import MM_PER_IN
 
 STEM = "vn-transgear-latch-pin"
 
@@ -63,7 +62,7 @@ def test_recipe_is_the_size_the_registry_names() -> None:
     text = _config.parts(STEM)["material_specification"]
     match = re.search(r"(\d+/\d+) x (\d+/\d+)", text)
     assert match, text
-    dia, length = (float(Fraction(size)) * MM_PER_IN for size in match.groups())
+    dia, length = (float(Fraction(size)) * spec.MM_PER_IN for size in match.groups())
     assert spec.DIA == pytest.approx(dia)
     assert spec.LENGTH == pytest.approx(length)
 
@@ -75,9 +74,7 @@ def test_pressed_and_proud_lengths_are_the_whole_pin() -> None:
 
 
 def test_the_chamfered_end_is_the_pressed_end() -> None:
-    from diagnostics.diag_mcmaster_dowel import dowel_section
-
-    section = dowel_section(spec.SKU)
+    section = spec.dowel_section(spec.SKU)
     pressed_face = max(rad for rad, y in section if y == 0.0)
     lead_face = max(rad for rad, y in section if y == spec.LENGTH)
     assert pressed_face == pytest.approx(spec.ENDS.point_dia / 2.0)

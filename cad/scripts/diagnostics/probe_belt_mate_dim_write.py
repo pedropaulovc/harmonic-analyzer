@@ -76,13 +76,13 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open paper-drive", await adapter.open_model(str(asm)))
     try:
         roles = _removables_by_role(adapter)
-        t12, t24 = roles["T12"], roles["T24"]
-        log(f"sprockets: T12={t12} T24={t24}")
+        crank_wheel, knob_wheel = roles["crank"], roles["knob"]
+        log(f"sprockets: crank={crank_wheel} knob={knob_wheel}")
 
         dims = _write_mate_dims(adapter)
         info(f"mate dims written: {dims}")
 
-        ratio = await _measure_ratio(adapter, t12, t24, "D-mate-dims")
+        ratio = await _measure_ratio(adapter, crank_wheel, knob_wheel, "D-mate-dims")
         if abs(ratio - 0.5) <= 0.01:
             success(f"RATIO FIXED via mate dimensions -- {ratio:+.4f} (same-sense)"
                     if ratio > 0 else f"ratio magnitude OK but sense flipped: {ratio:+.4f}")

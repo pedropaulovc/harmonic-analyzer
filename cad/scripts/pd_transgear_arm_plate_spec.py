@@ -22,9 +22,10 @@ station (``KINK``, read off the book's notch crop) and the rear boss
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_spec import ConeFace, CylinderFace, GeometricControl, PartDatum, PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-import pd_transgear_arm_plate_geometry as geometry
+import pd_transgear_arm_plate_geometry as PLATE
+import paper_drive_arm_registration as REGISTRATION
 from pd_transgear_arm_plate_geometry import (
     BAND_X,
     BAND_XX,
@@ -34,7 +35,11 @@ from pd_transgear_arm_plate_geometry import (
     BOSS_FACE_Z,
     CSK_ANGLE_DEG,
     CSK_DIA_BAND,
-    HOLE_POSITION_BAND,
+    REDUCER_POSITION_DIAMETER,
+    REDUCER_POSITION_RADIUS,
+    EDGE_PLUS_X,
+    SCREW_HOLE_DIA,
+    THICKNESS_OVER_ARM,
     HUB_FACE_TO_MOUNTING,
     HUB_TO_BOSS_BAND,
     NOTCH_BAND,
@@ -47,36 +52,35 @@ BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
 
 # Places each printed dimension carries (contract §12):
 # the outline (end radius, bar width, top corners, kink), the boss Ø, the
-# notch face's corner heights (it only clears the arm's edge) and the
-# countersink Ø (the cut-to-fit screw's seat, CSK_DIA_BAND) are routine .X;
-# the thickness over the arm is .XX (at .X the shortest stock MHA-VN-040 no
-# longer stands past its cut and the land under the cone thins below the
-# wall target), as is the hub Ø (wall) and the notch's depth, the arm's stock
+# notch face's corner heights (it only clears the arm's edge) are routine .X.
+# The over-arm thickness retains .XX for the real cone floor and standard-
+# stock full-thread margin. The enlarged clearance permits an ordinary .X CSK.
+# The hub Ø and notch depth retain .XX; the arm's stock
 # thickness it takes (7.94; R9-26; at .X the lower section's front face
 # enters the guide-lock screw heads' sweep); the hub face's station from the
 # mounting face is .XXX (the chain plane, contract §13: the disc-to-platen air
 # closes at .XX); the hub-to-boss length prints .XXX under its explicit
 # knob-float band; the bore is a .XXX running fit under its explicit band;
-# the screw-hole positions are .XXX under the explicit ±HOLE_POSITION_BAND the
-# arm's taps share (the two shanks' float over the plate-to-arm pitch); the
+# the screw-hole positions are BASIC under the same circular position source
+# as the arm taps, relative to the ACTUAL running bore and clocking edge;
 # drilled clearance holes print .X under the title block's drilled-hole row
 # (R9-13).
 OUTLINE_PLACES = 1
 BOSS_DIA_PLACES = 1
 NOTCH_DEPTH_PLACES = 2
-THICKNESS_PLACES = 2
+THICKNESS_PLACES = PLATE.THICKNESS_OVER_ARM_PLACES
 HUB_DIA_PLACES = 2
 NOTCH_PLACES = 1
 SCREW_HOLE_PLACES = 1
 HUB_TO_BOSS_PLACES = 3
 BORE_PLACES = 3
 HOLE_POSITION_PLACES = 3
-CSK_DIA_PLACES = 1
+CSK_DIA_PLACES = PLATE.CSK_DIA_PLACES
 
 # The places must claim the bands the geometry module's walls and the hanger
 # joints were judged at.
 for _label, _places, _band in (
-    ("thickness over the arm", THICKNESS_PLACES, BAND_XX),
+    ("thickness over the arm", THICKNESS_PLACES, PLATE.THICKNESS_OVER_ARM_BAND),
     ("hub", HUB_DIA_PLACES, BAND_XX),
     ("notch face", NOTCH_PLACES, NOTCH_BAND),
     ("boss", BOSS_DIA_PLACES, BAND_X),
@@ -90,16 +94,76 @@ for _label, _places, _band in (
         )
 
 # Explicit model bands, (upper, lower) deviations where one-sided.
-# The running bore on the knob shaft's Ø8.5 journal.
+# The H7 running bore on the knob shaft's sourced g6 journal.
 BORE_BAND = (BORE_DIA_LIMITS[1], BORE_DIA_LIMITS[0])
 # The knob's end float between the thrust ring on the hub face and the cup
 # behind the boss face.
 HUB_TO_BOSS_TOLERANCE = HUB_TO_BOSS_BAND
-# The screw-hole positions from the bore, the band the arm's taps carry.
-HOLE_POSITION_TOLERANCE = HOLE_POSITION_BAND
+BASIC_REDUCER_DIMENSIONS = (
+    ("ScrewHoleProfile", "ScrewHoleX1"),
+    ("ScrewHoleProfile", "ScrewHoleX2"),
+    ("ScrewHoleProfile", "ScrewHoleY"),
+)
+BASIC_REDUCER_DIMENSIONS += tuple(
+    ("LocatorProfile", name) for name in ("LocatorX1", "LocatorY1", "LocatorX2", "LocatorY2")
+)
+PART_DATUMS = (
+    PartDatum("A", PlanarFace((0.0, 0.0, -1.0), 0.0)),
+    PartDatum("B", CylinderFace(BORE_DIA)),
+    PartDatum(
+        "C", PlanarFace(
+            (1.0, 0.0, 0.0), EDGE_PLUS_X,
+            contains_z_mm=THICKNESS_OVER_ARM / 2.0,
+        ),
+    ),
+)
+GEOMETRIC_CONTROLS = tuple(
+    GeometricControl(
+        f"plate_hole_{index}_position", "position",
+        f"{REDUCER_POSITION_DIAMETER:.3f}",
+        CylinderFace(
+            SCREW_HOLE_DIA, contains_x_mm=x, contains_y_mm=y,
+            contains_z_mm=THICKNESS_OVER_ARM / 2.0,
+        ),
+        ("A", "B", "C"), "diametral",
+        projected_zone_height_mm=PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM,
+    )
+    for index, (x, y) in enumerate(SCREW_HOLES, 1)
+)
+GEOMETRIC_CONTROLS += (
+    *(
+        GeometricControl(
+            f"plate_countersink_{index}_position", "position",
+            f"{REDUCER_POSITION_DIAMETER:.3f}",
+            ConeFace(CSK_ANGLE_DEG / 2.0, contains_x_mm=x),
+            ("A", "B", "C"), "diametral",
+            projected_zone_height_mm=PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM,
+        ) for index, (x, _y) in enumerate(SCREW_HOLES, 1)
+    ),
+    GeometricControl(
+        "knob_projected_axis", "perpendicularity",
+        f"{REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM:.3f}",
+        CylinderFace(BORE_DIA), ("A",), "diametral",
+        projected_zone_height_mm=REGISTRATION.K_PROJECTED_HEIGHT_MM,
+    ),
+    *(
+        GeometricControl(
+            f"plate_locator_{index}_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",
+            CylinderFace(
+                PLATE.LOCATOR_HOLE_DIA_MM, contains_x_mm=x, contains_y_mm=y,
+                contains_z_mm=THICKNESS_OVER_ARM / 2.0,
+            ),
+            ("A", "B", "C"), "diametral",
+        ) for index, (x, y) in enumerate(PLATE.LOCATOR_SITES_MM, 1)
+    ),
+)
+REDUCER_POSITION_INSPECTION_NOTE = REGISTRATION.MATCHED_REGISTRATION_NOTE
+ARM_PLATE_NORMAL_INSPECTION_NOTE = REGISTRATION.NORMAL_INSPECTION_NOTE
+CLAMP_AXIS_INSPECTION_NOTE = REGISTRATION.CLAMP_AXIS_INSPECTION_NOTE
+LOCATOR_CALLOUT = "2X REAM SLIP BORES THROUGH\nMOUTH BREAK 0.05 AXIAL/RADIAL MAX\nMATCHED PAIR TO MHA-PD-018; SCREWS CLAMP ONLY"
 
 # The bore is the knob shaft's running surface (policy rule 5): MACHINED, on
-# the exact native Ø8.5 face the part build resolves.  The hub face and the
+# the exact native bore face the part build resolves. The hub face and the
 # boss face are the knob stack's running thrust faces (the MHA-PD-015 thrust
 # ring and the MHA-PD-016 cup), MACHINED as the crankshaft journals are (R9-13).
 SURFACE_FINISHES = (
@@ -117,7 +181,7 @@ SURFACE_FINISHES = (
 # --- Printed text -------------------------------------------------------------
 # The bore is a fit: REAM is the requirement (policy rule 7).  The screw
 # holes are clearance, drilled; both countersinks take the oval heads.
-BORE_CALLOUT = "REAM THRU"
+BORE_CALLOUT = "REAM THRU; PROJECTED AXIS PER NATIVE CONTROL"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
 CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK"
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
@@ -141,6 +205,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
     "ScrewHoleProfile": {"ScrewHoleX1", "ScrewHoleX2", "ScrewHoleY", "ScrewHoleDia"},
     "CountersinkReference": {"CskDia"},
+    "LocatorProfile": {"LocatorX1", "LocatorY1", "LocatorY2", "LocatorDia1"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateOutline": {
@@ -156,7 +221,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BearingProfile": {
         "HubDia": HUB_DIA_PLACES,
         "BossDia": BOSS_DIA_PLACES,
-        "HubFaceToMounting": geometry.HUB_STATION_PLACES,
+        "HubFaceToMounting": PLATE.HUB_STATION_PLACES,
         "HubToBoss": HUB_TO_BOSS_PLACES,
     },
     "BoreProfile": {"BoreDia": BORE_PLACES},
@@ -167,6 +232,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ScrewHoleDia": SCREW_HOLE_PLACES,
     },
     "CountersinkReference": {"CskDia": CSK_DIA_PLACES},
+    "LocatorProfile": {
+        "LocatorX1": 3, "LocatorY1": 3, "LocatorY2": 3, "LocatorDia1": 3,
+    },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

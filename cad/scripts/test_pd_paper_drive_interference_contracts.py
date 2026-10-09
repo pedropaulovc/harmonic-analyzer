@@ -22,7 +22,6 @@ import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
 import vn_transgear_arm_plate_screw_spec as plate_screw
-import vn_transgear_collar_cross_pin_spec as cross_pin
 import pd_transgear_disc_hub_spec as hub
 import vn_transgear_disc_screw_spec as disc_screw
 import transgear_hanger_joints as joints
@@ -159,12 +158,13 @@ def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     assert allowed[pair] == pytest.approx(1.10 * (tube - in_journal), rel=1e-4)
     assert not any("knob-retaining-screw" in name for p in allowed for name in p)
 
-    # Stud tip less the nut's seat (collar set + the fitted pilot, R9-70), at
-    # the nominal, all on the thread blank (its full-thread end lies behind
-    # the seat).
+    # Stud tip less the nut's pilot seat at the nominal fitted body length.
+    # The collar's rear face reacts directly on F, so no gap or transverse
+    # pin supplies axial capture; the nominal overlap is all on the blank.
     collar = _collar()
-    nut_engaged = shaft.TIP_STATION - collar.SET_NOMINAL - collar.PILOT_LENGTH
+    nut_engaged = shaft.TIP_STATION - collar.LENGTH - collar.PILOT_LENGTH
     assert collar.PILOT_LENGTH == pytest.approx(removable.PLATE + collar.PILOT_PROUD)
+    assert collar.BODY_REAR_FACE_FROM_F == 0.0
     assert shaft.TIP_STATION - nut_engaged > shaft.PLAIN_CORE
     assert allowed[_pair("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")] == (
         pytest.approx(
@@ -172,15 +172,7 @@ def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
         )
     )
 
-    tube = _holes.cross_hole_volume_mm3(
-        cross_pin.PIN_DIA, shaft.CORE_DIA
-    ) - _holes.cross_hole_volume_mm3(
-        cross_pin.PIN_DIA - 2.0 * cross_pin.WALL_T, shaft.CORE_DIA
-    )
-    # The pin spans the core, so the bound is its whole diametral chord.
-    assert cross_pin.PIN_LEN > shaft.CORE_DIA
-    pair = _pair("vn-transgear-collar-cross-pin-1", "pd-transgear-knob-shaft-1")
-    assert allowed[pair] == pytest.approx(1.10 * tube)
+    assert not any("collar-cross-pin" in name for p in allowed for name in p)
 
 
 def test_head_seat_rows_admit_less_than_a_micron_of_sink() -> None:
@@ -229,6 +221,7 @@ def test_retired_parts_have_no_rows() -> None:
         "bracket-screw",
         "pd-latch-hook-bracket",
         "vn-latch-hook-rivet",
+        "vn-transgear-collar-cross-pin",
     )
     named = {name.rsplit("-", 1)[0] for pair in _allowed() for name in pair}
     assert not named & set(retired)

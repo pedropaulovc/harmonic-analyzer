@@ -19,7 +19,7 @@ import vn_transgear_disc_screw_spec as screw
 from _fastener_catalog import FASTENERS
 from _stock_fastener import STOCK_RECIPES
 from diagnostics import diag_build_91794A055 as entry
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from vn_fillister_screw_spec import FILLISTER_SIZES
 
 IN = 25.4
 

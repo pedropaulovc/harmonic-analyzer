@@ -9,7 +9,7 @@ import pytest
 
 import _config
 import ch_fulcrum_keeper_spec as keeper
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from vn_fillister_screw_spec import FILLISTER_SIZES
 import build_fr_top_frame as part
 import draw_fr_top_frame as drawing
 from fr_frame_attachment_spec import (

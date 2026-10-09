@@ -14,24 +14,36 @@ tangent edge; +Z through the thickness to the REAR face (z = THICKNESS).
 from __future__ import annotations
 
 import math
+from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _hole_spec import blind_cut_dia_mm
 
 import vn_transgear_latch_pin_spec as LATCH_PIN
+import pd_transgear_arm_geometry as ARM
+import paper_drive_arm_registration as REGISTRATION
 import pd_transgear_pin_spec as PIN
 from pd_transgear_arm_geometry import (
     BAND_X,
     BAND_XX,
     BAND_XXX,
-    HOLE_POSITION_BAND,
+    LATCH_PIN_HEIGHT_BAND,
+    REDUCER_POSITION_DIAMETER,
+    REDUCER_POSITION_RADIUS,
+    PIN_BORE_DIA,
+    PIN_STATION,
+    PIVOT_BORE_DIA,
+    PLATE_TAP_SPEC,
+    PLATE_TAP_STATIONS,
+    THICKNESS,
     PIN_HOLE_DEPTH_BAND,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
-    PIVOT_BORE_DIA_BAND,
+    PIVOT_BORE_DIAMETRAL_CLEARANCE,
+    PIVOT_BORE_TO_FRONT_FACE_ANGLE_DEG,
+    PIVOT_FIT_CLEARANCE_PLACES,
     PIVOT_END_R,
-    PLATE_TAP_CSK_DIA,
     SPOT_FACE_DIA_GROWTH,
     SPOT_FACE_FLOOR_BAND,
     STOCK_THICKNESS_IN,
-    TAP_CSK_ANGLE_DEG,
     TIP_STATION,
     TIP_STATION_BAND,
 )
@@ -45,10 +57,11 @@ BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
 # .XX (R9-23: at .X the latch pin's full diameter can stop inside the hook
 # strip, see ``pd_transgear_arm_geometry.TIP_STATION``); the thickness is the
 # ground stock's, printed to two places as a reference (the stock band
-# governs it, ``STOCK_TEXT_PREFIX``); the pivot bore is a .XXX fit; the
-# latch-pin hole and the pin bore print .XXX under their explicit ream
-# bands; the hole stations and the pin height are .XXX positions under the
-# explicit ±HOLE_POSITION_BAND; the spot face prints its explicit bands; the
+# governs it, ``STOCK_TEXT_PREFIX``); the pivot bore's .XXX model size is REF,
+# with acceptance matched to the measured shoulder; the latch-pin hole and
+# pin bore print .XXX under their explicit ream
+# bands; the reducer stations are BASIC under circular position controls;
+# only the end-face latch-hole height retains its ordinary ± height band.
 # pin-hole depth is .XX, the band the pin's grip and proud range are judged
 # at (``PIN_HOLE_DEPTH_BAND``).
 OUTLINE_PLACES = 1
@@ -66,7 +79,6 @@ PIN_HOLE_DEPTH_PLACES = 2
 # hanger joints were judged at.
 for _label, _places, _band in (
     ("tip station", TIP_STATION_PLACES, TIP_STATION_BAND),
-    ("pivot bore", PIVOT_BORE_PLACES, PIVOT_BORE_DIA_BAND),
     ("latch-pin hole depth", PIN_HOLE_DEPTH_PLACES, PIN_HOLE_DEPTH_BAND),
 ):
     if abs(BAND_BY_PLACES[_places] - _band) > 1e-9:
@@ -80,8 +92,77 @@ for _label, _places, _band in (
 SPOT_FACE_DIA_BAND = (SPOT_FACE_DIA_GROWTH, 0.0)
 # Floor from the FRONT face: the MHA-VN-049 spring's room under the head (R9-71).
 SPOT_FACE_FLOOR_TOLERANCE = SPOT_FACE_FLOOR_BAND
-# Pin, plate-tap and latch-pin positions (contract §12 row 457).
-HOLE_POSITION_TOLERANCE = HOLE_POSITION_BAND
+# The blind end-face latch hole is not a reducer locating-hole control.
+LATCH_PIN_HEIGHT_TOLERANCE = LATCH_PIN_HEIGHT_BAND
+
+BASIC_REDUCER_DIMENSIONS = (
+    ("StationReference", "PinStation"),
+    ("StationReference", "PlateTapStation1"),
+    ("StationReference", "PlateTapStation2"),
+)
+BASIC_REDUCER_DIMENSIONS += (
+    ("StationReference", "ReducerDeltaX"), ("StationReference", "ReducerDeltaY"),
+)
+BASIC_REDUCER_DIMENSIONS += tuple(
+    ("LocatorProfile", name) for name in ("LocatorX1", "LocatorY1", "LocatorX2", "LocatorY2")
+)
+PART_DATUMS = (
+    PartDatum("A", PlanarFace((0.0, 0.0, -1.0), 0.0)),
+    PartDatum("B", CylinderFace(PIVOT_BORE_DIA)),
+    PartDatum("C", CylinderFace(PIN_BORE_DIA, contains_x_mm=PIN_STATION)),
+)
+GEOMETRIC_CONTROLS = (
+    GeometricControl(
+        "feed_stud_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",
+        CylinderFace(PIN_BORE_DIA, contains_x_mm=PIN_STATION),
+        ("A", "B"), "diametral",
+    ),
+    *(
+        GeometricControl(
+            f"plate_tap_{index}_position", "position",
+            f"{REDUCER_POSITION_DIAMETER:.3f}",
+            CylinderFace(
+                blind_cut_dia_mm(PLATE_TAP_SPEC), contains_x_mm=station,
+                contains_z_mm=THICKNESS / 2.0,
+            ),
+            ("A", "B", "C"), "diametral",
+            projected_zone_height_mm=ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM,
+        )
+        for index, station in enumerate(PLATE_TAP_STATIONS, 1)
+    ),
+)
+GEOMETRIC_CONTROLS += (
+    GeometricControl(
+        "feed_stud_projected_axis", "perpendicularity",
+        f"{REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM:.3f}",
+        CylinderFace(PIN_BORE_DIA, contains_x_mm=PIN_STATION),
+        ("A",), "diametral",
+        projected_zone_height_mm=REGISTRATION.S_PROJECTED_HEIGHT_MM,
+    ),
+    GeometricControl(
+        "arm_rear_parallel", "parallelism",
+        f"{REGISTRATION.ARM_OPPOSITE_FACE_PARALLELISM_MM:.3f}",
+        PlanarFace((0.0, 0.0, 1.0), THICKNESS), ("A",),
+    ),
+    *(
+        GeometricControl(
+            f"arm_locator_{index}_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",
+            CylinderFace(
+                ARM.LOCATOR_HOLE_DIA_MM, contains_x_mm=x, contains_y_mm=y,
+                contains_z_mm=THICKNESS - ARM.LOCATOR_BLIND_DEPTH_MM / 2.0,
+            ),
+            ("A", "B", "C"), "diametral",
+        ) for index, (x, y) in enumerate(ARM.LOCATOR_SITES_MM, 1)
+    ),
+)
+REDUCER_POSITION_INSPECTION_NOTE = REGISTRATION.MATCHED_REGISTRATION_NOTE
+ARM_PLATE_NORMAL_INSPECTION_NOTE = REGISTRATION.NORMAL_INSPECTION_NOTE
+CLAMP_AXIS_INSPECTION_NOTE = REGISTRATION.CLAMP_AXIS_INSPECTION_NOTE
+LOCATOR_CALLOUT = (
+    "2X REAM PRESS BORES; FLAT BOTTOM\n"
+    f"PRESS MHA-VN-051 {ARM.LOCATOR_PROUD_MM:.2f} +/-{ARM.LOCATOR_PROUD_BAND_MM:.2f} PROUD\n"
+    f"MOUTH BREAK {ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} AXIAL/RADIAL MAX; DO NOT BOTTOM"
+)
 
 # --- Printed text -------------------------------------------------------------
 # The thickness is the stock's: it prints "5/16 (7.94) GROUND STOCK", prefix
@@ -89,14 +170,29 @@ HOLE_POSITION_TOLERANCE = HOLE_POSITION_BAND
 # reference, so the title block's .XX band never applies to it.
 STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} ("
 STOCK_TEXT_SUFFIX = ") GROUND STOCK"
-_CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK \u00d8"
-PLATE_TAP_CSK_CALLOUT = f"{_CSK}{PLATE_TAP_CSK_DIA:.1f} MAX BOTH SIDES"
+PLATE_TAP_EDGE_BREAK_CALLOUT = (
+    f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES"
+)
 SPOT_FACE_CALLOUT = "COUNTERBORE, REAR FACE"
 # Two short lines: the text stands under the section's pivot end, inside the
 # left border.
 FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE"
-# The bore runs on the MHA-VN-041 shoulder: a fit bore, so it is reamed.
-PIVOT_BORE_CALLOUT = "REAM THRU"
+# Conditional measured-shaft clearance with ordinary squareness paid; not an
+# absolute H7/g6 bore zone. The stated 90-degree angle takes the angular row.
+PIVOT_BORE_CALLOUT = "\n".join((
+    "REAM TO MEASURED VN041",
+    f"SHOULDER +{PIVOT_BORE_DIAMETRAL_CLEARANCE[0]:.{PIVOT_FIT_CLEARANCE_PLACES}f}"
+    f"/+{PIVOT_BORE_DIAMETRAL_CLEARANCE[1]:.{PIVOT_FIT_CLEARANCE_PLACES}f} DIA",
+    "MATCHED SET; NOT INTERCHANGEABLE",
+    f"BORE AXIS {PIVOT_BORE_TO_FRONT_FACE_ANGLE_DEG:.0f}° TO FRONT FACE",
+))
+PIVOT_FIT_INSPECTION_NOTE = "\n".join((
+    "PIVOT: FINAL REAM AFTER FINISH.",
+    "MEASURE VN041 STRAIGHT SHOULDER, CLEAR OF RADII.",
+    "MICROMETER + BORE/PIN GAUGE, 0.001 mm RESOLUTION.",
+    "RECORD PAIRED SHAFT OD, BORE ID AND PART IDS.",
+    "REPLACEMENT VN041 REQUIRES NEW PAIRED FIT CHECK.",
+))
 
 # --- The MHA-PD-023 pin's press in the reamed bore at S (R9-68) -----------------
 # The pin spec owns the press (it imports the arm geometry, so the geometry
@@ -178,9 +274,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PivotBoreProfile": {"PivotBoreDia"},
     "PinBoreProfile": {"PinBoreDia"},
     "SpotFaceProfile": {"SpotFaceDia", "FloorDepth"},
-    "StationReference": {"PinStation", "PlateTapStation1", "PlateTapStation2"},
+    "StationReference": {"PinStation", "PlateTapStation1", "PlateTapStation2", "ReducerDeltaX", "ReducerDeltaY"},
     "PinHoleProfile": {"PinHoleDia", "PinHoleZ"},
     "PinHole": {"PinHoleDepth"},
+    "LocatorProfile": {"LocatorX1", "LocatorY1", "LocatorY2", "LocatorDia1"},
+    "LocatorHoles": {"LocatorDepth"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ArmOutline": {
@@ -199,12 +297,18 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PinStation": STATION_PLACES,
         "PlateTapStation1": STATION_PLACES,
         "PlateTapStation2": STATION_PLACES,
+        "ReducerDeltaX": 6,
+        "ReducerDeltaY": 6,
     },
     "PinHoleProfile": {
         "PinHoleDia": PIN_HOLE_DIA_PLACES,
         "PinHoleZ": STATION_PLACES,
     },
     "PinHole": {"PinHoleDepth": PIN_HOLE_DEPTH_PLACES},
+    "LocatorProfile": {
+        "LocatorX1": 3, "LocatorY1": 3, "LocatorY2": 3, "LocatorDia1": 3,
+    },
+    "LocatorHoles": {"LocatorDepth": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

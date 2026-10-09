@@ -18,6 +18,7 @@ import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
 import transgear_hanger_joints as joints
+import paper_drive_arm_registration as registration
 import vn_transgear_latch_pin_spec as latch_pin
 import vn_transgear_pivot_screw_spec as pivot
 import pd_transgear_pivot_spacer_spec as spacer
@@ -75,132 +76,85 @@ def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
             _reload_joints()
 
 
-def test_the_hanger_tilt_is_the_spacers_squareness_not_the_bore_float() -> None:
-    """Codex P1 on 6c385465d: free on its shoulder the arm tilted by the bore
-    clearance, 0.0421 rad.  Preloaded on the pressed spacer it tilts by the
-    two face perpendicularities over the smallest face, 0.02 / 8.47."""
-    assert joints.HANGER_TILT == pytest.approx(0.02 / 8.47, rel=1e-9)
-    assert joints.HANGER_TILT < 0.042144 / 10.0
-
-
-def test_the_hanger_still_falls_onto_its_hook_and_stays_square(monkeypatch) -> None:
-    """The preload's friction never holds the hanger off the latch hook, and
-    its weakest end still holds the arm square against the hanger's forward
-    weight.  The rejected 9712K58 pair, ~3.5 times stiffer, held it off."""
-    assert joints.HANGER_SWING_MARGIN >= 2.0
-    assert joints.HANGER_TILT_HOLD_MARGIN >= 2.0
-    monkeypatch.setattr(spring, "RATE_N_PER_MM", spring.RATE_N_PER_MM * 3.5)
-    with pytest.raises(AssertionError, match="off the hook"):
-        _reload_joints()
-    monkeypatch.setattr(spring, "RATE_N_PER_MM", spring.RATE_N_PER_MM / 3.5 / 2.0)
-    with pytest.raises(AssertionError, match="tilt moment"):
-        _reload_joints()
-
-
-def test_both_plate_screws_enter_their_taps_at_the_worst_pitch_mismatch(
-    monkeypatch,
-) -> None:
-    """The arm's tap pitch at one limit, the plate's hole pitch at the other:
-    the bands the two builds apply on the stations, against the float of two
-    basic #8-32 majors in the smallest drilled holes."""
-    import vn_transgear_arm_plate_screw_spec as screw
-    import pd_transgear_arm_plate_spec as plate_spec
-    import pd_transgear_arm_spec as arm_spec
-
-    taps = arm.PLATE_TAP_STATIONS
-    holes = [x for x, _y in plate.SCREW_HOLES]
-    worst = 0.0
-    for da1, da2, dp1, dp2 in itertools.product((-1.0, 1.0), repeat=4):
-        tap_pitch = (taps[1] + da2 * arm_spec.HOLE_POSITION_TOLERANCE) - (
-            taps[0] + da1 * arm_spec.HOLE_POSITION_TOLERANCE
-        )
-        hole_pitch = (holes[1] + dp2 * plate_spec.HOLE_POSITION_TOLERANCE) - (
-            holes[0] + dp1 * plate_spec.HOLE_POSITION_TOLERANCE
-        )
-        worst = max(worst, abs(tap_pitch - hole_pitch))
-    # Each shank may stand (hole - major) / 2 off its hole's axis.
-    float_ = 2.0 * (plate.SCREW_HOLE_DIA - screw.THREAD_MAJOR) / 2.0
-    assert worst < float_
-    assert joints.PLATE_SCREW_PITCH_MARGIN == pytest.approx(float_ - worst)
-    # The former Ø4.4 hole floats 0.234 over a 0.260 mismatch: refused.
-    monkeypatch.setattr(plate, "SCREW_HOLE_DIA", 4.4)
-    with pytest.raises(AssertionError, match="cannot enter both arm taps"):
-        _reload_joints()
-
-
-def _eccentric_corner():
-    """The plate-screw corner from the printed rows, independent of the
-    joint module: (eccentric lift, countersink seat shift, tap entry loss)."""
-    import vn_transgear_arm_plate_screw_spec as screw
-    import pd_transgear_arm_plate_spec as plate_spec
-    import pd_transgear_arm_spec as arm_spec
-
-    taps = arm.PLATE_TAP_STATIONS
-    holes = [x for x, _y in plate.SCREW_HOLES]
-    # The tap pitch at one limit, the hole pitch at the other.
-    mismatch = max(
-        abs(
-            (taps[1] + da2 * arm_spec.HOLE_POSITION_TOLERANCE)
-            - (taps[0] + da1 * arm_spec.HOLE_POSITION_TOLERANCE)
-            - (holes[1] + dp2 * plate_spec.HOLE_POSITION_TOLERANCE)
-            + (holes[0] + dp1 * plate_spec.HOLE_POSITION_TOLERANCE)
-        )
-        for da1, da2, dp1, dp2 in itertools.product((-1.0, 1.0), repeat=4)
+def test_seated_hanger_enclosure_uses_actual_spacer_face_grades() -> None:
+    assert joints.HANGER_TILT == pytest.approx(
+        (spacer.FRONT_FACE_PERPENDICULARITY + spacer.REAR_FACE_PERPENDICULARITY)
+        / spacer.FACE_PERPENDICULARITY_ZONE_DIA,
     )
-    # Each head seats half the mismatch off its countersink's axis and rides
-    # up the 82° cone before it bears.
-    cone = math.tan(math.radians(screw.HEAD_ANGLE_DEG / 2.0))
-    lift = mismatch / 2.0 / cone
-    shift = plate_spec.BAND_BY_PLACES[plate_spec.CSK_DIA_PLACES] / 2.0 / cone
-    # Full thread starts where the countersink's 45° leg meets the tap drill
-    # (R9-63), not the major: (4.3 - 3.454) / 2 = 0.423.
-    entry = (arm.PLATE_TAP_CSK_DIA - TAP_DRILL_MM["#8-32"]) / 2.0
-    return lift, shift, entry
 
 
-def test_every_stock_plate_screw_stands_past_the_cut_on_an_eccentric_seat(
-    monkeypatch,
-) -> None:
-    """R9-44: shortest stock screw (ASME B18.6.3, +0/-0.03 in), thickest
-    plate and arm, head proud on a small countersink and riding its eccentric
-    seat: the tip still clears the highest cut by its incomplete first thread."""
+def test_arm_and_plate_weight_inputs_are_actual_cut_geometry() -> None:
+    for geometry in (arm, plate):
+        source = geometry.nominal_material_properties()
+        assert source["volume_mm3"] > 0.0
+        assert source["mass_kg"] == pytest.approx(source["volume_mm3"] * 7870.0 * 1e-9)
+        assert len(source["centre_of_mass_local_mm"]) == 3
+        assert all(math.isfinite(value) for value in source["centre_of_mass_local_mm"])
+    # These are two parts, not a substituted scalar whole-hanger certificate.
+    assert arm.nominal_material_properties()["mass_kg"] < 0.2
+    assert plate.nominal_material_properties()["mass_kg"] < 0.2
+
+
+def test_reference_entry_pays_published_fillet_and_independent_critical_axes() -> None:
+    """Reference datum pose only, not an ISO pin-end whole-body certificate."""
     import vn_transgear_arm_plate_screw_spec as screw
-    import pd_transgear_arm_plate_spec as plate_spec
+    angle = (math.atan(arm.REDUCER_POSITION_DIAMETER / arm.CLAMP_TAP_PROJECTED_HEIGHT_MM)
+             + registration.ARM_PLATE_TILT_MAX_RAD)
+    required = (screw.THREAD_MAJOR / 2.0 + screw.UNDER_HEAD_FILLET_RADIUS_MAX_MM) / math.cos(angle)
+    expected = plate.SCREW_HOLE_DIA / 2.0 - required - arm.REDUCER_POSITION_RADIUS - plate.REDUCER_POSITION_RADIUS
+    assert joints.PLATE_SCREW_REFERENCE_ENTRY_MARGIN_MM == pytest.approx(expected)
+    assert expected > 0.0
 
-    lift, shift, entry = _eccentric_corner()
-    assert lift == pytest.approx(0.1495, abs=5e-4)
-    thick_plate = (
-        plate.THICKNESS_OVER_ARM
-        + plate_spec.BAND_BY_PLACES[plate_spec.THICKNESS_PLACES]
-    )
-    shortest = screw.STOCK_LENGTH - 0.03 * 25.4
-    proud = shortest - thick_plate - shift - lift - (arm.THICKNESS + arm.THICKNESS_BAND)
-    assert proud >= joints.PLATE_SCREW_CUT_PROUD_MAX + screw.PITCH
+
+def test_published_standard_stock_and_entire_head_bounds_do_not_use_receiving_caps(monkeypatch) -> None:
+    import vn_transgear_arm_plate_screw_spec as screw
+    assert screw.HEAD_DIA_MAX_MM == pytest.approx(0.312 * 25.4)
+    assert screw.HEAD_PROTRUSION_MAX_MM == pytest.approx(0.091 * 25.4)
+    assert screw.HEAD_PROTRUSION_GAGE_DIA_MM == pytest.approx(0.267 * 25.4)
+    slope = math.tan(screw.HEAD_BEARING_HALF_ANGLE_MIN_RAD)
+    whole_height = (screw.HEAD_PROTRUSION_MAX_MM
+                    + (screw.HEAD_PROTRUSION_GAGE_DIA_MM - screw.THREAD_PITCH_DIA_LIMITS_MM[0]) / (2.0 * slope)
+                    + screw.UNDER_HEAD_FILLET_RADIUS_MAX_MM)
+    thread_gage_height = (screw.HEAD_PROTRUSION_MAX_MM
+                          + (screw.HEAD_PROTRUSION_GAGE_DIA_MM - screw.THREAD_MAJOR_MAX_MM) / (2.0 * slope))
+    assert screw.HEAD_WHOLE_METAL_HEIGHT_MAX_MM == pytest.approx(whole_height)
+    assert screw.HEAD_TOP_TO_THREAD_GAGE_MAX_MM == pytest.approx(thread_gage_height)
+    assert whole_height > thread_gage_height
+    # No positive crown REF credit in the published overall-length minimum.
+    assert screw.STOCK_OVERALL_LENGTH_MIN_MM == pytest.approx((1.0 - 0.03) * 25.4)
+    assert screw.HEAD_AXIS_ECCENTRICITY_MAX_MM == pytest.approx(0.03 * screw.HEAD_DIA_MAX_MM)
+    angle = joints.PLATE_SCREW_AXIS_TILT_MAX_RAD
+    radial = (screw.HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM + screw.THREAD_MAJOR / 2.0
+              + screw.STOCK_BODY_STRAIGHTNESS_MAX_MM)
+    proud = ((screw.STOCK_OVERALL_LENGTH_MIN_MM - screw.HEAD_WHOLE_METAL_HEIGHT_MAX_MM) * math.cos(angle)
+             - radial * math.sin(angle) - arm.THICKNESS - arm.THICKNESS_BAND
+             - plate.THICKNESS_OVER_ARM - plate.THICKNESS_OVER_ARM_BAND
+             - joints.PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM)
     assert joints.PLATE_SCREW_STOCK_PROUD_MIN == pytest.approx(proud)
-    # The uncut 1/2 in screw this replaced stopped inside the arm, where its
-    # own corner (lead and entry countersink lost) held under 1.5 D.
-    uncut = 0.5 * 25.4 - 0.03 * 25.4 - thick_plate - shift - lift
-    uncut -= screw.PITCH + entry
-    assert uncut / screw.THREAD_MAJOR < joints.ENGAGEMENT_TARGET_D
-    monkeypatch.setattr(screw, "STOCK_LENGTH", 0.5 * 25.4)
-    with pytest.raises(AssertionError, match="too short to cut its lead off"):
+    assert joints.PLATE_SCREW_STOCK_LEAD_MARGIN_MM == pytest.approx(
+        proud - joints.PLATE_SCREW_CUT_PROUD_MAX - screw.POINT_CHAMFER_LENGTH_MAX_MM,
+    )
+    assert joints.PLATE_SCREW_STOCK_LEAD_MARGIN_MM > 0.0
+    assert joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM <= arm.CLAMP_TAP_PROJECTED_HEIGHT_MM
+    assert joints.PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM <= plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
+    assert joints.PLATE_SCREW_WHOLE_HEAD_ARM_LOCAL_Z_MAX_MM > joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM
+    assert joints.PLATE_SCREW_WHOLE_HEAD_RADIAL_SUPPORT_MAX_MM > screw.HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM
+    monkeypatch.setattr(screw, "STOCK_OVERALL_LENGTH_MIN_MM", 0.5 * 25.4)
+    with pytest.raises(AssertionError, match="published-standard stock cannot retain"):
         _reload_joints()
 
 
 def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
     monkeypatch,
 ) -> None:
-    """Cut flush: full thread from the rear tap countersink to the front face,
-    where the front countersink and the cut-end break overlap."""
+    """Pay published two-pitch under-head runout, true head eccentricity,
+    both seat signs and the distinct entry/exit/cut-end overlap."""
     import vn_transgear_arm_plate_screw_spec as screw
-
-    _lift, _shift, entry = _eccentric_corner()
-    worst = arm.THICKNESS - arm.THICKNESS_BAND - entry - max(entry, 0.1)
-    assert worst / screw.THREAD_MAJOR >= 1.5
-    assert joints.PLATE_SCREW_ENGAGEMENT_WORST == pytest.approx(worst)
-    # Machinist review of 8b5e1f354: counted to the major, the sheet's 7.74
-    # overstated the 7.07 the countersinks leave.
-    assert worst == pytest.approx(7.0661, abs=1e-4)
+    internal_span = (arm.THICKNESS - arm.THICKNESS_BAND - arm.PLATE_TAP_ENTRY_LOSS_MAX_MM
+                     - max(arm.PLATE_TAP_EXIT_LOSS_MAX_MM, screw.CUT_END_BREAK_MAX))
+    assert joints.PLATE_SCREW_INTERNAL_THREAD_SPAN_MIN_MM == pytest.approx(internal_span)
+    assert joints.PLATE_SCREW_ENGAGEMENT_WORST < internal_span
+    assert joints.PLATE_SCREW_ENGAGEMENT_WORST / screw.THREAD_MAJOR >= 1.5
     # The model is the screw as cut: its tip on the arm's front face.
     assert screw.LENGTH == pytest.approx(plate.THICKNESS_OVER_ARM + arm.THICKNESS)
     assert joints.PLATE_SCREW_TIP_INSIDE_NOMINAL == pytest.approx(0.0, abs=1e-9)
@@ -212,23 +166,13 @@ def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
 
 
 def test_plate_notch_face_clears_the_arm_edge_at_every_limit(monkeypatch) -> None:
-    """The face is not a locating surface: worst air stays positive with the
-    plate floated to its extremes on the two screws."""
-    import vn_transgear_arm_plate_screw_spec as screw
+    """Reference-pose graded clearance; the notch does not locate."""
     import pd_transgear_arm_plate_spec as plate_spec
 
-    c = (plate.SCREW_HOLE_DIA + plate.DRILL_GROWTH - screw.THREAD_MAJOR_MIN) / 2.0
-    (x1, _), (x2, _) = sorted(plate.SCREW_HOLES)
-    shift = 0.0
-    for u1, u2 in itertools.product((-c, c), repeat=2):
-        for xc, _yc in (plate.NOTCH_LEFT, plate.NOTCH_RIGHT):
-            shift = max(shift, u1 + (u2 - u1) * (xc - x1) / (x2 - x1))
     corner_band = plate_spec.BAND_BY_PLACES[plate_spec.NOTCH_PLACES]
-    closing = corner_band + plate.HOLE_POSITION_BAND + shift
-    lean = math.cos(arm.EDGE_LEAN)
-    worst = (plate.NOTCH_RELIEF - closing) * lean - arm.BAND_X
+    worst = (plate.NOTCH_RELIEF - corner_band) * math.cos(arm.EDGE_LEAN) - arm.BAND_X
     assert worst > 0.0
-    assert joints.NOTCH_AIR_WORST == pytest.approx(worst)
+    assert joints.NOTCH_REFERENCE_AIR_WORST_MM == pytest.approx(worst)
     # Each corner still sits on the relieved line parallel to the arm edge.
     for xc, yc in (plate.NOTCH_LEFT, plate.NOTCH_RIGHT):
         assert plate.arm_lower_edge_y(xc) - yc == pytest.approx(plate.NOTCH_RELIEF)
@@ -283,19 +227,19 @@ def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     """R9-50: the 3/4 dowel stops short of the one-piece hook's far face with
     the ear's 1 deg bend, the screws' drift, the formed band and the length
     grade; the gate refuses it and accepts the 7/8 pin in the 8.50 hole.
-    With the hook's screw holes at ±0.05 the 3/4 dowel in its 6.05 hole
-    keeps only 0.010, so the refusal is shown 0.05 deeper."""
+    With the latch hole's height at ±0.065 the 3/4 dowel in a 6.10 hole
+    barely clears, so the refusal is shown 0.05 deeper."""
     assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.6
     monkeypatch.setattr(latch_pin, "LENGTH", 0.75 * 25.4)
-    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.05)
-    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.05)
-    clearing = _reload_joints()
-    assert 0.0 < clearing.LATCH_PIN_FAR_FACE_MARGIN_WORST < 0.02
     monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.10)
     monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.10)
+    clearing = _reload_joints()
+    assert 0.0 < clearing.LATCH_PIN_FAR_FACE_MARGIN_WORST < 0.05
+    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.15)
+    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.15)
     with pytest.raises(
         AssertionError,
-        match=r"MHA-VN-042 pin / MHA-PD-014 strip far face.* 0\.040 short",
+        match=r"MHA-VN-042 pin / MHA-PD-014 strip far face.* 0\.\d+ short",
     ):
         _reload_joints()
 

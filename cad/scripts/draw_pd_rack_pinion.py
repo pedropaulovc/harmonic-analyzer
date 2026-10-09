@@ -1,13 +1,13 @@
 r"""Create the curated manufacturing drawing for the rack-pinion reduction disc (MHA-PD-006).
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
-the 120T disc is large and thin.  The face view (``*Front``, the rear face)
-prints the bore with its reamed limits and the fit note naming the MHA-PD-017
-hub's spigot, and the native #0-80 tap callout with its mouth-break and
-assembly-transfer lines (no bolt-circle position: the taps are spotted
-through the MHA-PD-017 flange at assembly); the edge view prints the disc
-thickness, the front (clamped) face as datum B and the rear face's
-parallelism to it.
+the 120 physical teeth use the finite 48DP stock #2/reference-55 master.
+The face view (``*Front``, the rear face) prints the controlling native
+13-tooth actual-flank span, supported blank and bore with its reamed limits.
+The fit note names the MHA-PD-017 hub's spigot, and the native #0-80 tap
+callout carries its unchanged mouth-break and assembly-transfer lines (no
+bolt-circle position). The edge view prints the disc thickness, the front
+(clamped) face as datum B and the rear face's parallelism to it.
 """
 
 from __future__ import annotations
@@ -39,19 +39,29 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
 from _rack_bore_finish import add_rack_bore_finish
+from paper_drive_stock_drawing import add_toothspace_callout
 from pd_rack_pinion_spec import (
     BORE_CALLOUT,
     BORE_FIT_CALLOUT,
     BORE_DIA,
+    CUTTER_NUMBER,
+    CUTTER_REFERENCE_TEETH,
+    DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     FRONT_FACE_DATUM,
     GEOMETRIC_TOLERANCES_MM,
     OUTSIDE_DIA,
+    PRESSURE_ANGLE_DEG,
+    STOCK_PROFILE,
     TAP_CALLOUT_QUALIFIER,
     TAP_CENTRES,
     TAP_DRILL_DIA,
+    TEETH,
+    TOOTH_SPACE_GAUGE_PIN_DIA_MM,
+    TOOTH_SPACE_CALLOUT,
+    TOOTH_SPACE_CALLOUT_PROPERTY,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -80,6 +90,12 @@ ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
 # Ra 1.6 into it): the leader rises to the bore's 0° rim point under the
 # 0° tap, right of the tap callout's leader.
 BORE_FINISH_POSITION = (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] - 0.082)
+GEAR_DATA_XY = (0.018, 0.262)
+GEAR_DATA_CHAR_HEIGHT = 0.0022
+# Four rows use the clear upper-right lane, above all physical gear views.
+TOOTH_SPACE_CALLOUT_XY = (0.230, 0.260)
+TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035  # standard note font; four control rows
+TOOTH_SPACE_GAP_INDEX = 18  # actual upper-right flank under the control-note lane
 
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
@@ -95,6 +111,9 @@ PARALLELISM_FRAME = (REAR_FACE_X + 0.012, RIGHT_CENTER[1] - HALF_OD * 0.45 - 0.0
 FRONT_KEEP = {
     # Approach from upper-left, clear of native datum A below-left.
     "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] + 0.038),
+    "OutsideDia": (FRONT_CENTER[0] + 0.060, FRONT_CENTER[1] + 0.035),
+    "ToothSpan": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.050),
+    "RootEnvelope": (FRONT_CENTER[0] + 0.050, FRONT_CENTER[1] - 0.028),
 }
 # Below the edge-on disc, clear of datum B above and the frame to the right.
 RIGHT_KEEP = {
@@ -172,7 +191,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open rack-pinion source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -183,6 +202,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
+            TOOTH_SPACE_CALLOUT_PROPERTY,
+            "Tooth Cut Features",
         ),
         required=(
             "Number",
@@ -191,8 +212,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
+            TOOTH_SPACE_CALLOUT_PROPERTY,
+            "Tooth Cut Features",
         ),
     )
+    if properties[TOOTH_SPACE_CALLOUT_PROPERTY] != TOOTH_SPACE_CALLOUT:
+        raise RuntimeError("rack-pinion source tooth-space control differs from current specification")
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -203,7 +228,10 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rack-Pinion Disc Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "rack pinion; reduction disc; brass; 120T",
+            3: (
+                f"reducer disc; brass; {TEETH} physical teeth; {DIAMETRAL_PITCH:g}DP "
+                f"PA{PRESSURE_ANGLE_DEG:g}; stock #{CUTTER_NUMBER}/ref{CUTTER_REFERENCE_TEETH}"
+            ),
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -254,9 +282,23 @@ async def build(adapter: Any) -> dict[str, str]:
         source_path=SOURCE,
         radius_m=BORE_DIA / 2000.0,
         datum="A",
-        label="rack pinion bore axis",
+        label="disc locating pilot bore axis",
         shoulder=True,
         stability_tolerance_m=0.0001,
+    )
+    # Part datum A above remains the 13.1 pilot. The feature-local inspection
+    # property explicitly names the ASSEMBLED feed pinion's running bore;
+    # no fake local axis carrier or tooth-tip runout frame substitutes for it.
+    add_toothspace_callout(
+        adapter,
+        front,
+        profile=STOCK_PROFILE,
+        actual_pin_diameter_mm=TOOTH_SPACE_GAUGE_PIN_DIA_MM,
+        rotate_rad=math.pi / TEETH + TOOTH_SPACE_GAP_INDEX * 2.0 * math.pi / TEETH,
+        axial_stations_mm=(FACE_WIDTH, 0.0),
+        tooth_features=tuple(properties["Tooth Cut Features"].splitlines()),
+        property_name=TOOTH_SPACE_CALLOUT_PROPERTY,
+        note_xy=TOOTH_SPACE_CALLOUT_XY,
     )
     # Datum B: a vertical edge with no neighbour inside the pick radius at
     # this height (the rear face stands 3 mm off), so the hit-test form.
@@ -293,7 +335,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_tap_callout_text(tap_callout)
 
-    add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
+    add_property_linked_note(
+        adapter, "Gear Data", *GEAR_DATA_XY, char_height=GEAR_DATA_CHAR_HEIGHT
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)
     return await finalize_drawing(
         adapter,

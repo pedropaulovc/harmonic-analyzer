@@ -24,8 +24,9 @@ the vendor Plane1's three roles: split plane, helix seed, runout).
 
 Per-part entry points: ``diag_build_90280A*.py``, ``diag_build_40923906.py``.
 
-The 90280A108 stock row is owned by pure ``vn_swing_stop_screw_spec``;
-this native recipe reads it without duplicating its supplier dimensions.
+The catalogue table is owned by pure ``vn_fillister_screw_spec``; its
+SKU-specific rows retain their existing pure authorities. This native recipe
+consumes the canonical table without duplicating supplier dimensions.
 """
 
 from __future__ import annotations
@@ -48,46 +49,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     insert_helix,
     thread_sweep_cut,
 )
-from vn_frame_cross_screw_spec import HEAD_DIA, HEAD_H, PITCH, SHANK_DIA, SHANK_LEN
-import vn_slotted_screw_spec as block_screw
-from vn_swing_stop_screw_spec import FILLISTER_SIZE as stop_screw_size
-
-FILLISTER_SIZES = {
-    # part:        (major dia, length, head height, head dia, pitch)
-    "90280A108": stop_screw_size,
-    "90280A194": (4.1656, 12.7, 3.9624, 6.858, 0.79375),
-    "90280A197": (4.1656, 19.05, 3.9624, 6.858, 0.79375),
-    "90280A199": (4.1656, 25.4, 3.9624, 6.858, 0.79375),
-    "90280A201": (4.1656, 31.75, 3.9624, 6.858, 0.79375),
-    # Live McMaster product table, 2026-10-08: #8-32 x 1-1/2, same head.
-    "90280A203": (
-        block_screw.SHANK_DIA,
-        block_screw.SHANK_LEN,
-        block_screw.HEAD_H,
-        block_screw.HEAD_DIA,
-        block_screw.PITCH,
-    ),
-    "90280A837": (SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, PITCH),
-    # 18-8 stainless fillister, the same 0.183 x 0.107 #4-40 head (McMaster
-    # 91794A product table, read 2026-09-25).
-    "91794A112": (2.8448, 15.875, 2.7178, 4.6482, 0.635),
-    # 18-8 stainless #2-56 x 1/4, live product page and technical drawing
-    # read 2026-10-08. Derived family details are not vendor-verified.
-    "91794A077": (2.1844, 6.35, 2.1082, 3.556, 25.4 / 56.0),
-    # 18-8 stainless fillister, 0-80 x 1/4, high narrow head 0.096 x 0.055,
-    # fully threaded (McMaster 91794A055 product page, read 2026-09-30).
-    # Sizes only: its vendor model is a different tree (drafted head, neck,
-    # tip-seeded thread), so diag_build_91794A055 builds it, not
-    # build_fillister.
-    "91794A055": (1.524, 6.35, 1.397, 2.4384, 25.4 / 80.0),
-    # Value Collection MSC 40923906, 1/4-20 x 4 in slotted fillister,
-    # SAE J82 steel, zinc.  Catalog-only ideal model: the existing ASME
-    # B18.6.3 1/4 maxima (A 0.414, O 0.237) and family geometry laws, not
-    # vendor CAD or a measured replica.  The full-shank modeled thread does
-    # not verify the supplier's threaded length.  MHA-VN-031 cuts the
-    # supplied 4 in stock to fit; never change this row to its cut length.
-    "40923906": (6.35, 4.0 * 25.4, 0.237 * 25.4, 0.414 * 25.4, 25.4 / 20.0),
-}
+import vn_fillister_screw_spec
 
 
 async def build_fillister(adapter, part_no: str):
@@ -95,7 +57,7 @@ async def build_fillister(adapter, part_no: str):
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
 
-    major_d, length, hh, hd, pitch = FILLISTER_SIZES[part_no]
+    major_d, length, hh, hd, pitch = vn_fillister_screw_spec.FILLISTER_SIZES[part_no]
     major_r = major_d / 2.0
     head_r = hd / 2.0
     band = hh * 0.8  # head cylinder height

@@ -1,7 +1,7 @@
 r"""MHA-PD-015 transgear-knob-thrust-ring: the loose brass ring in front of the plate hub.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  The ring rides the knob shaft's (MHA-PD-008) Ø8.5 journal between the
+closure.  The ring rides the knob shaft's (MHA-PD-008) Ø6 g6 journal between the
 12T's rear face and the arm plate's front hub face (contract §1.7, round 6
 K5: the journal runs straight in the steel plate, no bushing).  It is loose:
 located by the journal, it rotates with the shaft or not.  Its length is the
@@ -23,7 +23,7 @@ from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 OD = 13.6
-ID = 8.6
+ID = 6.1
 # Clears the journal; drilled, never under size (drilled-hole class).
 ID_BAND = (0.10, 0.0)  # (upper, lower) deviations
 LENGTH = 5.2

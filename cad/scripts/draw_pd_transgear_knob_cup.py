@@ -1,7 +1,7 @@
 r"""Create the manufacturing drawing for the transgear knob cup (MHA-PD-016).
 
 The face view is the ``*Top`` orientation, looking into the ring from the
-rear: it carries the reamed bore with its process and the note that the
+rear: it carries the source six-millimetre H7 bore and the note that the
 MHA-VN-048 pin hole is drilled at assembly (through cup and journal together,
 so it is not dimensioned here).  Section A-A cuts it on the cup axis through
 the Front plane, the plane of the turned profile, so the O.D. and the length
@@ -79,13 +79,15 @@ SECTION_LINE = (
 
 DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
 
+# 4e9a4df's assembly-pin line spanned x 5 .. 75 mm at the old x 40 mm
+# anchor, across the 12.7 mm border. Move the whole model-linked bore callout.
 FACE_KEEP = {
-    "BoreDia": (0.040, 0.225),
+    "BoreDia": (0.060, 0.225),
 }
-# The section spans sheet y 0.154 .. 0.186: the O.D. below it, the length
-# outboard on the right.
+# The section spans y 154 .. 186 mm. Its native SECTION / SCALE caption
+# occupies the old OD lane at y 130 mm; put the OD below the intact caption.
 SECTION_KEEP = {
-    "CupDia": (0.200, 0.130),
+    "CupDia": (0.200, 0.115),
     "CupLength": (0.255, SECTION_CENTER[1]),
 }
 

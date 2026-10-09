@@ -1,26 +1,23 @@
 r"""Shared recipe for the McMaster 91790A* 18-8 stainless steel slotted 82 deg
 oval head screws (catalog-only: no vendor model is downloaded or committed).
 
-Live-page facts (``transgear-evidence/mcmaster-skus.md``, R3 and the round-7
-family check, verified 2026-09-30 on the series' 3/8 in and 1/2 in lengths;
-the 5/8 in 91790A196 row is [INFERENCE], not yet read live): 18-8
-stainless, bright, slotted oval head, standard profile, 82 deg, head
-Ø0.312 in, total head height 0.152 in of which the oval top (crown) is
-0.052 in, 8-32 UNC class 2A, fully threaded, ASME B18.6.3; the length is
-measured from the TOP OF THE BEVEL, the plane that sits flush in the
-countersink (not from the crown, not from under the head).
+Live-page facts for https://www.mcmaster.com/91790A199/, read2026-10-09:
+18-8 stainless, slotted oval head, standard profile, nominal82deg,
+headØ.312in, headheight.152in, ovaltop.052in, #8-32 UNC class2A,
+fully threaded, ASME B18.6.3, 1in stock. Length is measured from the
+TOP OF THE BEVEL, not crown or underhead. H/C/O in ASME2013 Table7
+are reference dimensions; native construction is not a tolerance limit.
 
-The page gives no slot, tip or crown-radius figure, so everything past those
-facts is [INFERENCE]:
+The page gives no slot dimensions, tip-chamfer or crown-radius figure, nor
+dimensional tolerance bands.  The remaining shape laws are [INFERENCE]:
 
 - crown = spherical cap (centre on the axis) of height ``crown_h`` above the
   top of the bevel through the Ø``head_dia`` rim, R = (r^2 + h^2) / (2h);
 - bevel = the 82 deg cone from the rim at y = 0 down to where it meets the
-  thread major diameter (``cone_depth``, 2.162 mm for the #8 head).  The
-  catalog's 0.100 in bevel (0.152 total less the 0.052 crown) runs to the
-  theoretical sharp of the cone, which below the thread major would be
-  inside the shank, so the modelled head is 3.483 mm high overall, not the
-  catalog's 3.861 (0.152 in);
+  thread major diameter (``cone_depth``, 2.162 mm for the #8 head).  With
+  the crown the modelled head is about 3.483 mm overall, independently
+  derived from diameter, angle and crown, not forced from either published
+  head-height value;
 - slot laws from the 90280A narrow fillister family
   (``diag_mcmaster_fillister.py``): width = HeadDia*0.135, depth =
   width*1.5 from the crown apex;
@@ -33,9 +30,11 @@ facts is [INFERENCE]:
   taper (one revolved feature here, since the junction is below the Top
   Plane), junction fillet r = P/10.
 
-Class 2A is not modelled (nominal UN cutter).  There is no replica gate: the
-standalone run is catalog-only (``catalog_run``), building the recipe,
-checking the solid and saving it under cad/out/reference for inspection.
+Class 2A is not modelled (nominal UN cutter).  Native/source qualification
+is conditional on the printed incoming controls; it does not admit actual
+bought screws or manufacture inspection readings.  There is no replica
+gate: the standalone run is catalog-only (``catalog_run``), building the
+recipe, checking the solid and saving it under cad/out/reference for inspection.
 
 Frame: axis +Y, head UP, the top of the bevel at y = 0 (Top Plane); the
 crown rises to y = crown_h, the tip is at y = -length.
@@ -83,9 +82,8 @@ from vn_transgear_arm_plate_screw_spec import (  # noqa: E402
 OVAL_SIZES = {
     # part: (major dia, length from the top of the bevel, head dia at the top
     #        of the bevel, crown height, head angle deg, pitch)
-    # 8-32 x 5/8, fully threaded (MHA-VN-040, the transgear arm-plate screws,
-    # supplied; the part cuts them to fit).
-    "91790A196": (
+    # #8-32 x1in, fully threaded, quantity2; installed part cuts to the same fit.
+    "91790A199": (
         THREAD_MAJOR,
         STOCK_LENGTH,
         HEAD_DIA,

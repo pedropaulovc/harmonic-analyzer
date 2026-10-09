@@ -234,9 +234,10 @@ def _purchased_title_block(
 
 
 async def build_purchased_fastener_drawing(
-    adapter: Any, spec: DrawingSpec
+    adapter: Any,
+    spec: DrawingSpec,
 ) -> dict[str, str]:
-    """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI."""
+    """Export catalogue reference views linked to their native source."""
     stock = fastener(spec.artifact_stem)
     source = spec.source
 
@@ -472,7 +473,7 @@ async def _build_reference_sheet(
                 (
                     i
                     for i, line in enumerate(lines)
-                    if line.startswith(("SET QC:", "SETUP:"))
+                    if line.startswith("SET QC:")
                 ),
                 len(lines),
             )

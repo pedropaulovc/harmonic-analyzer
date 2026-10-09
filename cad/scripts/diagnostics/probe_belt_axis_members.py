@@ -76,7 +76,7 @@ def _read_path_radii(adapter: Any) -> list[float]:
     return result.data if result and result.data else []
 
 
-def _recreate_belt_axis_members(adapter: Any, t12: str, t24: str) -> str | None:
+def _recreate_belt_axis_members(adapter: Any, crank_wheel: str, knob_wheel: str) -> str | None:
     """Delete Belt1; create a belt whose pulley members are the sprockets'
     Axis1 datum-axis features, with explicit PulleyDiameters."""
     from solidworks_mcp.adapters import sw_type_info
@@ -104,7 +104,7 @@ def _recreate_belt_axis_members(adapter: Any, t12: str, t24: str) -> str | None:
             info(f"deleted Belt1: {ok}")
         # 2. resolve each sprocket's Axis1 datum-axis entity
         axes = []
-        for comp in (t12, t24):
+        for comp in (crank_wheel, knob_wheel):
             adapter._attempt(lambda: model.ClearSelection2(True), default=None)
             sel = adapter._attempt(
                 lambda c=comp: ext.SelectByID2(f"Axis1@{c}@pd-paper-drive", "AXIS",
@@ -159,13 +159,13 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open paper-drive", await adapter.open_model(str(asm)))
     try:
         roles = _removables_by_role(adapter)
-        t12, t24 = roles["T12"], roles["T24"]
-        log(f"sprockets: T12={t12} T24={t24}")
+        crank_wheel, knob_wheel = roles["crank"], roles["knob"]
+        log(f"sprockets: crank={crank_wheel} knob={knob_wheel}")
 
         radii = _read_path_radii(adapter)
         info(f"Belt1 path sketch radii (m): {radii}")
 
-        name = _recreate_belt_axis_members(adapter, t12, t24)
+        name = _recreate_belt_axis_members(adapter, crank_wheel, knob_wheel)
         if not name:
             warn("axis-member belt NOT created (CreateFeature null) -- SW rejects "
                  "datum-axis pulley members")
@@ -174,7 +174,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
         radii2 = _read_path_radii(adapter)
         info(f"new belt path sketch radii (m): {radii2}")
-        ratio = await _measure_ratio(adapter, t12, t24, "E-axis-members")
+        ratio = await _measure_ratio(adapter, crank_wheel, knob_wheel, "E-axis-members")
         if abs(ratio - 0.5) <= 0.01:
             success(f"AXIS-MEMBER BELT COUPLES AT PITCH -- ratio {ratio:+.4f}")
         else:

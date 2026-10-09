@@ -140,9 +140,6 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "91882A221": RecipeMetadata(
             "diagnostics.diag_build_91882A221", "build_91882A221", threaded=True
         ),
-        "98296A026": RecipeMetadata(
-            "diagnostics.diag_build_98296A026", "build_98296A026", threaded=False
-        ),
         "98296A027": RecipeMetadata(
             "diagnostics.diag_build_98296A027", "build_98296A027", threaded=False
         ),
@@ -164,14 +161,17 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "98381A434": RecipeMetadata(
             "diagnostics.diag_build_98381A434", "build_98381A434", threaded=False
         ),
+        "93600A189": RecipeMetadata(
+            "diagnostics.diag_build_93600A189", "build_93600A189", threaded=False
+        ),
         "98381A474": RecipeMetadata(
             "diagnostics.diag_build_98381A474", "build_98381A474", threaded=False
         ),
         "91794A055": RecipeMetadata(
             "diagnostics.diag_build_91794A055", "build_91794A055", threaded=True
         ),
-        "91790A196": RecipeMetadata(
-            "diagnostics.diag_build_91790A196", "build_91790A196", threaded=True
+        "91790A199": RecipeMetadata(
+            "diagnostics.diag_build_91790A199", "build_91790A199", threaded=True
         ),
         "97431A260": RecipeMetadata(
             "diagnostics.diag_build_97431A260", "build_97431A260", threaded=False
@@ -613,14 +613,12 @@ async def build_stock_fastener(
     if color is not None:
         await apply_color(adapter, color)
     stock = fastener(part_name)
-    apply_custom_properties(
-        adapter,
-        {
-            "Stock Name": stock.stock_name,
-            "Supplier": stock.supplier,
-            "Supplier SKUs": ", ".join(stock.skus),
-        },
-    )
+    properties = {
+        "Stock Name": stock.stock_name,
+        "Supplier": stock.supplier,
+        "Supplier SKUs": ", ".join(stock.skus),
+    }
+    apply_custom_properties(adapter, properties)
     await report_mass_properties(adapter)
     return await _save_stock_part(adapter, part_name, threaded=threaded)
 

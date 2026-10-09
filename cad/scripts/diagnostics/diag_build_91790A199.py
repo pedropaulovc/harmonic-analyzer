@@ -1,9 +1,9 @@
-r"""McMaster 91790A196 -- 18-8 stainless steel slotted 82 deg oval head screw,
-8-32 x 5/8 from the top of the bevel, fully threaded.
+r"""McMaster 91790A199 -- 18-8 stainless steel slotted82deg oval head screw,
+8-32 x1in from the top of the bevel, fully threaded.
 
-The SKU is [INFERENCE]: the 5/8 in length of the 91790A series by the 90280A
-numbering (194 = 1/2 in, 197 = 3/4 in), not yet read live; the vendor check
-is pending (``transgear_arm_plate_screw_spec``).
+The chosen SKU was read live at https://www.mcmaster.com/91790A199/ on
+2026-10-09; ``vn_transgear_arm_plate_screw_spec`` owns catalogue dimensions
+and published standard bounds, not a commodity receiving procedure.
 
 Built by the shared 91790A oval recipe in ``diag_mcmaster_oval.py`` (see its
 docstring for the live-page facts and the [INFERENCE] head, slot and thread
@@ -14,7 +14,7 @@ catalog-only (the supplied screw).
 
 Run standalone (SolidWorks open)::
 
-    uv run python cad\scripts\diagnostics\diag_build_91790A196.py
+    uv run python cad\scripts\diagnostics\diag_build_91790A199.py
 """
 
 from __future__ import annotations
@@ -26,10 +26,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from diagnostics.diag_mcmaster_oval import build_oval, catalog_run  # noqa: E402
 
-PART_NO = "91790A196"
+PART_NO = "91790A199"
 
 
-async def build_91790A196(
+async def build_91790A199(
     adapter,
     truth=None,
     *,
@@ -42,7 +42,7 @@ async def build_91790A196(
 
 
 async def build_catalog(adapter) -> dict[str, str]:
-    return await catalog_run(adapter, PART_NO, build_91790A196)
+    return await catalog_run(adapter, PART_NO, build_91790A199)
 
 
 if __name__ == "__main__":

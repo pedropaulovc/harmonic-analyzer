@@ -138,10 +138,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
         "names of the formed dimensions the contact corners perturb, not a band"
     ),
-    ("vn_transgear_arm_plate_screw_spec", "STOCK_LENGTH_BAND"): (
-        "the oval-head screw's B18.6.3 length tolerance (plus, minus): indexed "
-        "for the shortest stock left proud of the arm before its cut"
-    ),
     ("vn_transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
         "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the stock's reach past the disc's rear face before its cut"
@@ -213,13 +209,9 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
         "sets it natively on PivotDia"
     ),
-    ("vn_transgear_collar_cross_pin_spec", "HOLE_BAND"): (
-        "the spring pin's drilled cross hole (functional, R9-11): indexed for "
-        "HOLE_MAX against the B18.8.2 window and the fit-up step's limits"
-    ),
     ("vn_transgear_knob_cup_pin_spec", "HOLE_BAND"): (
-        "MHA-VN-037's cross-hole band reused for the hole match-drilled through "
-        "cup and journal: indexed for HOLE_MAX against the B18.8.2 window"
+        "the retained cup pin's hole match-drilled through cup and journal: "
+        "indexed for HOLE_MAX against the B18.8.2 catalogue window"
     ),
     ("vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "

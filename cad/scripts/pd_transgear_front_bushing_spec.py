@@ -62,7 +62,7 @@ if RING.OD >= OD - printed_band_mm(OD_PLACES) - 2.0 * FRONT_CHAMFER:
 HUB_FACE_OVERLAP_MIN = 1.0
 HUB_FACE_OVERLAP_WORST = (OD - printed_band_mm(OD_PLACES)) / 2.0 - (
     HUB.BORE_DIA + HUB.BORE_BAND[0]
-) / 2.0  # 1.0925
+) / 2.0
 if HUB_FACE_OVERLAP_WORST < HUB_FACE_OVERLAP_MIN:
     raise AssertionError(
         f"MHA-PD-025 covers the MHA-PD-017 front face by {HUB_FACE_OVERLAP_WORST:.3f} "

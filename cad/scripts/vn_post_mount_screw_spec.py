@@ -28,7 +28,7 @@ import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
 import dt_post_mount_stack as mount_stack
 from _fit_limits import deviations
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from vn_fillister_screw_spec import FILLISTER_SIZES
 
 SKU = str(_config.parts("vn-post-mount-screw")["supplier_skus"][0])
 THREAD = platform.POST_MOUNT_SPEC.size

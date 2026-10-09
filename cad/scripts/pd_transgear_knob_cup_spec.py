@@ -36,10 +36,10 @@ from pd_transgear_knob_shaft_spec import (
 
 OD = 19.0
 LENGTH = 8.0
-BORE_DIA = JOURNAL_DIA  # 8.5
-# Reamed to the arm plate bore's native band (the same journal runs in both):
-# a slide over the journal's running fit, 0.028 .. 0.075 diametral.
-BORE_BAND = (max(PLATE_BORE_LIMITS), min(PLATE_BORE_LIMITS))  # (+0.040, +0.015)
+BORE_DIA = JOURNAL_DIA  # 6.0 g6 shaft
+# Reamed to the plate's H7 limits; the same journal runs/slides in both.
+# ISO over 3 THROUGH 6 mm: 0.004..0.024 diametral clearance.
+BORE_BAND = (max(PLATE_BORE_LIMITS), min(PLATE_BORE_LIMITS))
 
 # Places each printed dimension carries (policy rule 12): the O.D. and the
 # length are routine at .X -- the walls and the pin hold at that row; the bore
@@ -54,7 +54,7 @@ _OD_LO, _ = printed_deviations(OD, OD_PLACES)
 _LENGTH_LO, _ = printed_deviations(LENGTH, LENGTH_PLACES)
 OD_MIN = OD + _OD_LO  # 18.2
 LENGTH_MIN = LENGTH + _LENGTH_LO  # 7.2
-BORE_MAX = BORE_DIA + max(BORE_BAND)  # 8.540
+BORE_MAX = BORE_DIA + max(BORE_BAND)
 
 BORE_JOURNAL_CLEARANCE = (
     BORE_DIA + min(BORE_BAND) - (JOURNAL_DIA + max(JOURNAL_DIA_BAND)),
@@ -71,7 +71,7 @@ PIN_HOLE_STATION_TOL = 0.10
 _PIN_HOLE_R_MAX = PIN_HOLE_MAX / 2.0  # 0.825
 
 # --- Walls at the printed worst case (contract §8, policy rule 12) -------------
-# Journal beside the hole: (8.465 - 1.65) / 2 = 3.41.
+# Journal beside the hole: (5.988 - 1.65) / 2 = 2.169.
 JOURNAL_PIN_WALL = (JOURNAL_DIA - PIN_HOLE_MAX) / 2.0
 JOURNAL_PIN_WALL_WORST = (JOURNAL_DIA_MIN - PIN_HOLE_MAX) / 2.0
 # Cup front face to the hole's edge: 3.0 - 0.825 = 2.18 nominal; less the
@@ -89,7 +89,7 @@ END_PIN_WALL_WORST = (
     - PIN_HOLE_STATION_TOL
     - _PIN_HOLE_R_MAX
 )
-# Cup ring around the bore at the hole: (18.2 - 8.54) / 2 = 4.83.
+# Cup ring around the bore at the hole: (18.2 - 6.012) / 2 = 6.094.
 RADIAL_WALL = (OD - BORE_DIA) / 2.0
 RADIAL_WALL_WORST = (OD_MIN - BORE_MAX) / 2.0
 # Hole to the cup's rear face, the shortest cup: 7.2 - 3.10 - 0.825 = 3.28.

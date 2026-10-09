@@ -75,14 +75,19 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_basic_tolerance,
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
+from _native_projected_zone import require_saved_projected_gtols
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_arm_plate_geometry import (
+    LOCATOR_SITES_MM,
+    LOCATOR_HOLE_DIA_MM,
+    LOCATOR_HOLE_BAND_MM,
     BORE_DIA,
     BOSS_DIA,
     BOSS_FACE_Z,
@@ -112,9 +117,14 @@ from pd_transgear_arm_plate_geometry import (
 )
 from pd_transgear_arm_plate_spec import (
     BORE_BAND,
+    BASIC_REDUCER_DIMENSIONS,
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
+    REDUCER_POSITION_INSPECTION_NOTE,
+    ARM_PLATE_NORMAL_INSPECTION_NOTE,
+    CLAMP_AXIS_INSPECTION_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    HOLE_POSITION_TOLERANCE,
     HUB_TO_BOSS_TOLERANCE,
     ISOMETRIC_VIEW_NOTE,
     SURFACE_FINISHES,
@@ -128,6 +138,9 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Isometric View Note",
+    "Reducer Position Inspection",
+    "Arm Plate Normal Inspection",
+    "Clamp Axis Inspection",
 )
 
 THROUGH_CUT_DEPTH = 4.0 * HUB_TO_BOSS  # mid-plane total; > the plate's depth
@@ -370,6 +383,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ("ScrewHoleY", SCREW_HOLE_Y),
         ("ScrewHoleDia", SCREW_HOLE_DIA),
         ("CskDia", CSK_DIA),
+        ("LocatorX", abs(LOCATOR_SITES_MM[0][0])),
+        ("LocatorY1", abs(LOCATOR_SITES_MM[0][1])),
+        ("LocatorY2", abs(LOCATOR_SITES_MM[1][1])),
+        ("LocatorDia", LOCATOR_HOLE_DIA_MM),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -657,6 +674,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("BossFace", "Front Plane", BOSS_FACE_Z, '"HubToBoss" - "HubFaceToMounting"'),
         ("HubFace", "Front Plane", HUB_FACE_Z, '"HubFaceToMounting"'),
         ("ScrewHolePlane", "Top Plane", SCREW_HOLE_Y, '"ScrewHoleY"'),
+        ("LocatorClock", "Right Plane", LOCATOR_SITES_MM[0][0], '"LocatorX"'),
     ):
         check(
             f"create_plane {plane}",
@@ -675,6 +693,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("BossFace", "PLANE"),
             ("HubFace", "PLANE"),
             ("ScrewHolePlane", "PLANE"),
+            ("LocatorClock", "PLANE"),
         ),
     )
 
@@ -848,6 +867,38 @@ async def build(adapter: Any) -> dict[str, str]:
         if named != want:
             raise RuntimeError(f"{label} came back {named!r}, not {want}")
 
+
+    # The female sockets are THROUGH: separately finished while the datum
+    # carriers retain the common pilot setup; never slip-ream the arm.
+    locators = SketchDims()
+    check("create_sketch locating bores", await adapter.create_sketch("Front"))
+    for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
+        await define_circle(
+            adapter, x, y, LOCATOR_HOLE_DIA_MM / 2.0, f"locator {index}",
+            dims=locators,
+            names=(f"LocatorX{index}", f"LocatorY{index}", f"LocatorDia{index}"),
+            drives=('"LocatorX"', f'"LocatorY{index}"', '"LocatorDia"'),
+        )
+    await ensure_fully_defined(adapter, "matched locating bore sketch")
+    check("exit_sketch locating bores", await adapter.exit_sketch())
+    name_last_feature(adapter, "LocatorProfile")
+    drive_jobs += locators.apply(adapter, "LocatorProfile")
+    check(
+        "cut through locating bores",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "LocatorHoles")
+    expected -= len(LOCATOR_SITES_MM) * math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * THICKNESS_OVER_ARM
+    await volume_check(adapter, "matched through locating bores", expected, 0.001 * expected)
+    for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
+        axis = await name_bore_axis(
+            adapter, "Top Plane", y, "Right Plane", x, f"locator {index}",
+            drive_a=f'"LocatorY{index}"', drive_b='"LocatorX"', drive_jobs=drive_jobs,
+        )
+        if axis != f"Axis{index + 3}":
+            raise RuntimeError(f"locator {index} native axis is {axis!r}")
     # Deferred drive equations; each evaluates to the value just built.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
@@ -858,24 +909,20 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     await bbox_extent_check(adapter, "bar width", "x", WIDTH)
 
-    # Manufacturing drawing support: the bore's running fit, the knob-float
-    # length and the screw-hole positions carry explicit bands; everything
-    # else is governed by its places (policy rule 2).
+    # Size/axial fit bands are separate from the locating-hole circular
+    # position controls. Their coordinates are BASIC, never +/- substitutes.
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND)
     )
     set_dimension_symmetric_tolerance(
         adapter, "BearingProfile", "HubToBoss", HUB_TO_BOSS_TOLERANCE
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewHoleProfile", "ScrewHoleX1", HOLE_POSITION_TOLERANCE
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewHoleProfile", "ScrewHoleX2", HOLE_POSITION_TOLERANCE
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewHoleProfile", "ScrewHoleY", HOLE_POSITION_TOLERANCE
-    )
+    for index in (1, 2):
+        set_dimension_bilateral_tolerance(
+            adapter, "LocatorProfile", f"LocatorDia{index}", *deviations(LOCATOR_HOLE_BAND_MM)
+        )
+    for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
+        set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -884,20 +931,29 @@ async def build(adapter: Any) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    # The Ø8.5 running bore and the hub and boss thrust faces, each resolved
+    # The sourced H7 running bore and the hub and boss thrust faces, resolved
     # on its exact native face (HubFace z -20.5375 and BossFace z 8.5 are
     # unique).
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    author_part_pmi(
+        adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS,
+        surface_finishes=SURFACE_FINISHES,
+    )
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Reducer Position Inspection": REDUCER_POSITION_INSPECTION_NOTE,
+            "Arm Plate Normal Inspection": ARM_PLATE_NORMAL_INSPECTION_NOTE,
+            "Clamp Axis Inspection": CLAMP_AXIS_INSPECTION_NOTE,
         },
     )
     blank_reference_sketches(adapter, ("CountersinkReference",))
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    require_saved_projected_gtols(
+        adapter, artefacts["part"], GEOMETRIC_CONTROLS, label="saved transgear arm plate projected axes",
+    )
     return artefacts
 
 

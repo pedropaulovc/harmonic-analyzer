@@ -6,4 +6,4 @@ pd-transgear-drive-collar:
   finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block
-  process: "turned from bar (brass): face both ends, turn the pilot, ream the bore and the two drive-pin holes through, mill the rear slot"
+  process: "turned from bar (brass): turn the body and pilot from blanks with the specified facing allowance; drill undersize and finish the true D-bore, retaining its separately limited flat; ream the two drive-pin holes through; face the rear to fit directly on the knob gear front F, finish the final rear D-bore entry at 45 degrees with the specified equal-leg limits, and face the pilot to the specified sprocket proudness at assembly"

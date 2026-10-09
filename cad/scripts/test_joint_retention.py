@@ -238,6 +238,10 @@ def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> N
 
     joint_id = "pd-paper-drive/thumbnut-on-knob-shaft"
     (row,) = [j for j in jr.JOINTS if j.id == joint_id]
+    assert row.thread == "#8-32 UNC"
+    assert row.installed_at == "collar-shoulder-seated"
+    assert "D-flat -> shaft" in row.exposure_reason
+    assert "actual F" in row.axial_capture
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.NONE
     assert jr.RULINGS[row.exception].joint == joint_id
