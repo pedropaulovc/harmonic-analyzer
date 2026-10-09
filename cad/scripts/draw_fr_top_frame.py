@@ -444,13 +444,15 @@ def hanger_datum_pick(
     return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
 HANGER_SLOT_FRAME_XY = {"front": (0.078, 0.185), "rear": (0.116, 0.2075)}
 # Each slot frame's printed text box and outline from its frame_xy (sheet m),
-# as farm runs measured them with the translation vector printed (the widest
-# the frame has printed): text [78.9, 179.1]..[128.6, 184.2] mm from (78, 185)
-# (20261009T171439353Z), outline 52.7 x 7.0 mm (DetailItem507,
-# 20261009T174542021Z).  Its leader leaves the outline's left end at mid
-# height on a 6.35 mm shoulder.
-HANGER_SLOT_FRAME_TEXT_BOX = (0.0009, -0.0059, 0.0506, -0.0008)
-HANGER_SLOT_FRAME_OUTLINE = (0.0, -0.0070, 0.0527, 0.0)
+# as farm run 20261009T204136744Z measured them with the translation modifier
+# inline (no vector): rear DetailItem507 at (116, 207.5) mm printed its text
+# [116.9, 202.2]..[148.5, 206.7] mm and a 39.1 x 7.0 mm outline.  The front
+# DetailItem506 prints the same outline and the same first and last text
+# items (only its middle divider sits 1.1 mm left, B being narrower than C),
+# so the same boxes.  Its leader
+# leaves the outline's left end at mid height on a 6.35 mm shoulder.
+HANGER_SLOT_FRAME_TEXT_BOX = (0.0009, -0.0053, 0.0325, -0.0008)
+HANGER_SLOT_FRAME_OUTLINE = (0.0, -0.0070, 0.0391, 0.0)
 HANGER_SLOT_FRAME_SHOULDER = 0.00635
 HANGER_SLOT_WIDTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[0] + (BAR_X0 - 24.0) * _HUB_BOTTOM_M_PER_MM,

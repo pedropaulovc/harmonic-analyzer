@@ -871,7 +871,7 @@ def test_hanger_datum_leaders_run_clear_of_the_slot_frames() -> None:
     }
     front = frames["front"]
     assert (front.xmin, front.ymin, front.xmax, front.ymax) == pytest.approx(
-        (0.0789, 0.1791, 0.1286, 0.1842)
+        (0.0789, 0.1797, 0.1105, 0.1842)
     )
     centre = drawing.HUB_BOTTOM_CENTER
     m_per_mm = drawing._HUB_BOTTOM_M_PER_MM
@@ -952,7 +952,7 @@ def test_rear_slot_frame_stands_clear_of_section_f_f() -> None:
             for run in leader:
                 assert _segments_apart(run, ink), name
     # The frame stays in the window right of the crossbar, its leader's knee
-    # right of the crossbar's edge, and its widest print inside the rail.
+    # right of the crossbar's edge, and its print inside the rail.
     bar_right = centre[0] + part.BAR_X1 * m_per_mm
     assert knee[0] > bar_right
     assert outline.xmax < centre[0] + part.INNER_X * m_per_mm

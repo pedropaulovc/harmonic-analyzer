@@ -36,25 +36,17 @@ GTOL_SYMBOLS = {
 }
 
 ToleranceZone = Literal["linear", "diametral"]
-# How a translated compartment is serialized, in the order a leaf tries them
-# (the printed text decides, ``translation_print_problem``):
-#   "inline" -- no flag; the modifier's symbol code follows the letter in the
-#               DatumLetter text (the schema's "string value for datum letter
-#               displayed in the edit box"), spelt as SOLIDWORKS printed it;
-#   "flag"   -- the compartment's ``<Translation>`` flag (Gtol Frame XML
-#               Schema, the Datum dialog's triangle).  It prints "C ▷ [0,0,0]":
-#               SOLIDWORKS adds the dialog's i, j, k translation vector at its
-#               zero default.  Empty i, j, k, "false" ones (printed verbatim,
-#               "[false,false,false]") and the flag after the letter (rewritten
-#               to empty i, j, k) all printed a vector on farm runs
-#               20261009T174542021Z and 20261009T182549169Z.  By the user's
-#               ruling it is the fallback, its "[0,0,0]" accepted.
-TranslationForm = Literal["inline", "flag"]
-TRANSLATION_FORMS: tuple[TranslationForm, ...] = ("inline", "flag")
-# The modifier's symbol code: farm run 20261009T174542021Z's display text.
+# The translation modifier is its symbol code after the letter in the
+# DatumLetter text (the schema's "string value for datum letter displayed in
+# the edit box"), spelt as SOLIDWORKS prints it: farm run 20261009T204136744Z
+# printed "<GTOL-POSI> | 0.05 | C | B | <MOD-TRANS2>", the triangle in B's
+# compartment and no vector.  The compartment's ``<Translation>`` flag (Gtol
+# Frame XML Schema, the Datum dialog's triangle) is not used: with i, j, k
+# absent, empty, "false" or after the letter it printed the dialog's
+# translation vector, "[0,0,0]" or "[false,false,false]", beside the triangle
+# (farm runs 20261009T174542021Z, 20261009T182549169Z).
 TRANSLATION_GLYPH = "<MOD-TRANS2>"
 _TRANSLATION_MODIFIER = "MOD-TRANS"
-_ZERO_VECTOR = "[0,0,0]"
 _PMI_NAME_PREFIX = "HARMONIC_PMI_"
 
 
@@ -75,13 +67,12 @@ def gtol_frame_xml(
     datums: Sequence[str] = (),
     diameter: bool = False,
     translated: Sequence[str] = (),
-    translation_form: TranslationForm = "inline",
 ) -> str:
     """Build the SOLIDWORKS-2022+ feature-control-frame XML payload.
 
     ``translated`` names the datum references that carry the ASME Y14.5-2018
-    translation modifier (the open triangle after the letter), serialized
-    per ``translation_form`` (``TRANSLATION_FORMS``).  A clocking
+    translation modifier (the open triangle after the letter,
+    ``TRANSLATION_GLYPH``).  A clocking
     datum feature of size at a basic distance from the primary takes it, so
     its simulator may slide along that distance and only orients.
     """
@@ -105,14 +96,9 @@ def gtol_frame_xml(
         ElementTree.SubElement(range_info, "PrimaryRangeSymbol").text = "phi"
     for datum in datums:
         compartment = ElementTree.SubElement(root, "DatumCompartment")
-        moved = datum in translated
-        if moved and translation_form == "flag":
-            ElementTree.SubElement(compartment, "Translation").text = "true"
         detail = ElementTree.SubElement(compartment, "DatumDetail")
         ElementTree.SubElement(detail, "DatumLetter").text = (
-            f"{datum}{TRANSLATION_GLYPH}"
-            if moved and translation_form == "inline"
-            else datum
+            f"{datum}{TRANSLATION_GLYPH}" if datum in translated else datum
         )
     return ElementTree.tostring(root, encoding="unicode", short_empty_elements=True)
 
@@ -195,33 +181,23 @@ def _datum_references(
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """(datum letters, translated letters) of a parsed frame XML.
 
-    A letter carries the modifier inline ("C<MOD-TRANS2>") or its
-    compartment carries the <Translation> flag; either way the datum is C.
+    A translated letter carries the modifier's symbol code ("C<MOD-TRANS2>");
+    its datum is still C.
     """
     datums: list[str] = []
     translated: list[str] = []
-    for compartment in root.iter():
-        if compartment.tag.rsplit("}", 1)[-1] != "DatumCompartment":
+    for letter in root.iter():
+        if letter.tag.rsplit("}", 1)[-1] != "DatumLetter":
             continue
-        flagged = any(
-            child.tag.rsplit("}", 1)[-1] == "Translation"
-            and (child.text or "").strip().lower() == "true"
-            for child in compartment
-        )
-        for letter in compartment.iter():
-            if letter.tag.rsplit("}", 1)[-1] != "DatumLetter":
-                continue
-            text = str(letter.text or "")
-            name = re.sub(rf"<{_TRANSLATION_MODIFIER}\d*>", "", text)
-            datums.append(name)
-            if flagged or name != text:
-                translated.append(name)
+        text = str(letter.text or "")
+        name = re.sub(rf"<{_TRANSLATION_MODIFIER}\d*>", "", text)
+        datums.append(name)
+        if name != text:
+            translated.append(name)
     return tuple(datums), tuple(translated)
 
 
-def translation_print_problem(
-    texts: Sequence[str], translated: Sequence[str], *, zero_vector: bool = False
-) -> str:
+def translation_print_problem(texts: Sequence[str], translated: Sequence[str]) -> str:
     """Why a frame's printed text items misstate its translation modifiers,
     or "" when they print exactly as ASME Y14.5-2018 writes them.
 
@@ -229,24 +205,12 @@ def translation_print_problem(
     (``IDisplayData.GetTextAtIndex``).  Each translated datum's letter must be
     followed directly by one modifier glyph (``<MOD-TRANS...>``), and nothing
     may print a bracketed vector: farm run 20261009T174542021Z printed
-    "C", "B", "<MOD-TRANS2>", "[0,0,0]" for the frame C|B▷.  ``zero_vector``
-    (the ruled "flag" fallback) admits exactly that "[0,0,0]" right after
-    each modifier, and nothing else in brackets.
+    "C", "B", "<MOD-TRANS2>", "[0,0,0]" for the frame C|B▷.
     """
     items = [str(text).strip() for text in texts]
-    vectors = [i for i, text in enumerate(items) if "[" in text or "]" in text]
-    admitted = [
-        i
-        for i in vectors
-        if zero_vector
-        and items[i] == _ZERO_VECTOR
-        and i > 0
-        and _TRANSLATION_MODIFIER in items[i - 1]
-    ]
-    if vectors != admitted:
-        return (
-            f"prints a translation vector {[items[i] for i in vectors]!r} in {items!r}"
-        )
+    vectors = [text for text in items if "[" in text or "]" in text]
+    if vectors:
+        return f"prints a translation vector {vectors!r} in {items!r}"
     modifiers = [i for i, text in enumerate(items) if _TRANSLATION_MODIFIER in text]
     if len(modifiers) != len(translated):
         return (

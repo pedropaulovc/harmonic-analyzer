@@ -401,12 +401,14 @@ coordinates: on runs 20261009T182549169Z and 20261009T185542819Z,
 at (0.160, 0.413), 0.2 m above the frame's bottom edge and held to its
 mid-width. Set y as the offset from the frame's bottom edge, then correct by
 the printed letter's miss (display-data text position) in the space
-`GetPosition` reports, and prove the final print (run 20261009T200747541Z:
-the first set printed 7.0 mm low, one correction landed it 0.40 mm off).
-Read a composite frame's lower tier for its datums only
-(`gtol_frame_datums`): it reads back with an empty `<ToleranceSymbol>`. Also end the sheet with
-`assert_frame_datums_defined`, which fails when any frame names a datum that
-no `IView::GetDatumTags` label prints.
+`GetPosition` reports, and prove the final print. On runs
+20261009T200747541Z and 20261009T204136744Z the first set printed 7.0 mm
+low and one correction landed the letter 0.40 mm off; the sheet passed with
+B under the ⌖Ø0.13|A frame. Read a composite frame's lower tier for its
+datums only (`gtol_frame_datums`): it reads back with an empty
+`<ToleranceSymbol>`. Also end the sheet with `assert_frame_datums_defined`,
+which fails when any frame names a datum that no `IView::GetDatumTags`
+label prints.
 
 **m. A translation modifier proved by its XML alone.**
 Don't: take `<Translation>true</Translation>` read back from
@@ -415,22 +417,21 @@ frame's slot frames (farm run 20261009T174542021Z) that flag printed
 "B", "<MOD-TRANS2>", "[0,0,0]": SOLIDWORKS also prints the Datum dialog's
 translation vector (`<TranslationValueI/J/K>`) at its zero default, 13.6 mm
 of text that ASME Y14.5-2018 does not write.
-Do: read the frame's printed text items (`IAnnotation::GetDisplayData`) and
-reject any bracketed vector the form does not admit (`_gtol_spec.translation_print_problem`).
-On farm run 20261009T182549169Z every flag form printed a vector: empty i,
-j, k printed "[0,0,0]", "false" values printed "[false,false,false]" (the
-values print verbatim), and SOLIDWORKS rewrote the flag-after-letter form to
-the empty-vector XML. By user ruling, `add_feature_control_frame` now tries
-`TRANSLATION_FORMS` in order: the modifier's symbol code inline in the
-letter (`<DatumLetter>C&lt;MOD-TRANS2&gt;</DatumLetter>`, no flag), which
-must print the glyph after the letter and no brackets, then the native flag,
-which is accepted with exactly one "[0,0,0]" after the glyph. It logs
-`gtol.translation_form`. Once a leaf proves one, keep that one alone.
-SOLIDWORKS took the inline letter (run 20261009T200747541Z) but
-`GetSymbolXml` read its symbol code back unescaped,
-`<DatumLetter>C<MOD-TRANS2></DatumLetter>`, which is not well-formed XML;
-the frame-XML parser escapes `<MOD-…>`/`<GTOL-…>` codes before parsing,
-and an unreadable readback rejects the form rather than ending the sheet.
+Do: write the modifier as its symbol code after the letter,
+`<DatumLetter>C&lt;MOD-TRANS2&gt;</DatumLetter>`, with no flag
+(`_gtol_spec.TRANSLATION_GLYPH`). On farm run 20261009T204136744Z both slot
+frames printed "<GTOL-POSI> | 0.05 | C | B | <MOD-TRANS2>", the triangle in
+the datum's compartment and no vector. Every flag form tried printed a
+vector (run 20261009T182549169Z): empty i, j, k printed "[0,0,0]", "false"
+values printed "[false,false,false]", and SOLIDWORKS rewrote the flag after
+the letter to the empty-vector XML. `add_feature_control_frame` still reads
+the printed text items (`IAnnotation::GetDisplayData`) and fails on any
+bracket or a missing or misplaced glyph
+(`_gtol_spec.translation_print_problem`), logging `gtol.translation_print`.
+`GetSymbolXml` reads the symbol code back unescaped,
+`<DatumLetter>C<MOD-TRANS2></DatumLetter>`, which is not well-formed XML
+(run 20261009T200747541Z); the frame-XML parser escapes `<MOD-…>`/`<GTOL-…>`
+codes before parsing.
 
 ## The sheet-split rule
 

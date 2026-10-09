@@ -666,71 +666,51 @@ def _translated_frame(
     return gtol, handed
 
 
-_VECTOR = ["<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[0,0,0]"]
-_INLINE = ["<GTOL-POSI>", "0.05", "C", "B<MOD-TRANS2>"]
+# Farm run 20261009T204136744Z, rear slot frame DetailItem507.
+_PRINTED = ["<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>"]
 
 
-def test_translated_frame_prints_the_inline_glyph_first(monkeypatch) -> None:
-    gtol, handed = _translated_frame(
-        monkeypatch, lambda xml: _INLINE if "&lt;MOD-TRANS2&gt;" in xml else _VECTOR
-    )
-    assert [_gtol_form(xml) for xml in handed] == ["inline"]
-    assert _gtol_form(gtol.GetFrame(1).GetSymbolXml()) == "inline"
+def test_translated_frame_prints_its_glyph_after_the_letter(monkeypatch) -> None:
+    gtol, handed = _translated_frame(monkeypatch, lambda _xml: _PRINTED)
+    assert len(handed) == 1
+    assert "<DatumLetter>B&lt;MOD-TRANS2&gt;</DatumLetter>" in handed[0]
+    assert "Translation" not in handed[0]
+    # SOLIDWORKS reads the symbol code back unescaped (run 20261009T200747541Z).
+    assert "<DatumLetter>B<MOD-TRANS2></DatumLetter>" in gtol.GetFrame(1).GetSymbolXml()
 
 
 @pytest.mark.parametrize(
-    ("accepts", "inline_prints", "reads_back"),
+    ("accepts", "prints", "reads_back", "match"),
     (
-        # SOLIDWORKS refuses the inline letter, takes it and prints it wrong,
-        # or reads back XML that does not parse.
-        (lambda xml: "&lt;" not in xml, _INLINE, _unescaped),
-        (lambda _xml: True, ["<GTOL-POSI>", "0.05", "C", "B"], _unescaped),
+        (lambda _xml: False, _PRINTED, _unescaped, r"rejected feature-control frame XML"),
         (
             lambda _xml: True,
-            _INLINE,
-            lambda xml: xml.replace("</DatumLetter>", "") if "&lt;" in xml else xml,
+            _PRINTED,
+            lambda xml: xml.replace("&lt;MOD-TRANS2&gt;", ""),
+            r"lost its translation modifier",
+        ),
+        (
+            lambda _xml: True,
+            [*_PRINTED, "[0,0,0]"],
+            _unescaped,
+            r"misprints .*prints a translation vector \['\[0,0,0\]'\]",
+        ),
+        (
+            lambda _xml: True,
+            ["<GTOL-POSI>", "0.05", "C", "B"],
+            _unescaped,
+            r"misprints .*prints 0 translation modifier",
         ),
     ),
-    ids=("refused", "glyph-less", "unreadable"),
+    ids=("refused", "dropped", "vector", "glyph-less"),
 )
-def test_translated_frame_falls_back_to_the_flag_and_its_zero_vector(
-    monkeypatch, accepts: Any, inline_prints: list[str], reads_back: Any
+def test_translated_frame_fails_closed_unless_it_prints_the_glyph_alone(
+    monkeypatch, accepts: Any, prints: list[str], reads_back: Any, match: str
 ) -> None:
-    # User ruling: the native flag is the last form, its "[0,0,0]" accepted
-    # (farm runs 20261009T174542021Z / 20261009T182549169Z printed it).
-    gtol, handed = _translated_frame(
-        monkeypatch,
-        lambda xml: inline_prints if "&lt;MOD-TRANS2&gt;" in xml else _VECTOR,
-        accepts=accepts,
-        reads_back=reads_back,
-    )
-    assert [_gtol_form(xml) for xml in handed] == ["inline", "flag"]
-    assert _gtol_form(gtol.GetFrame(1).GetSymbolXml()) == "flag"
-
-
-def test_translated_frame_fails_closed_when_the_flag_prints_another_vector(
-    monkeypatch,
-) -> None:
-    with pytest.raises(
-        RuntimeError,
-        match=r"no translation-modifier form prints as ruled .*"
-        r"inline: prints 0 translation modifier.*flag: prints a translation vector "
-        r"\['\[false,false,false\]'\]",
-    ):
+    with pytest.raises(RuntimeError, match=match):
         _translated_frame(
-            monkeypatch,
-            lambda xml: ["<GTOL-POSI>", "0.05", "C", "B"]
-            if "&lt;" in xml
-            else ["<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[false,false,false]"],
+            monkeypatch, lambda _xml: prints, accepts=accepts, reads_back=reads_back
         )
-
-
-def _gtol_form(xml: str) -> str:
-    if "<MOD-TRANS2>" in _unescaped(xml):
-        return "inline"
-    if "<Translation>true</Translation>" in xml:
-        return "flag"
-    return "plain"
 
 
 def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:

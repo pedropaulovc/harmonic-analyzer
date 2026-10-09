@@ -35,7 +35,6 @@ from _common import (
     apply_custom_properties,
 )
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
-from _gtol_spec import TRANSLATION_FORMS as _TRANSLATION_FORMS
 from _gtol_spec import gtol_frame_signature as _gtol_frame_signature
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
 from _gtol_spec import translation_print_problem as _translation_print_problem
@@ -1041,39 +1040,18 @@ def add_feature_control_frame(
         frame, "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
     )
     # A migrated frame was seeded through the old setters, which carry no
-    # translation modifier; the current-format XML then states it.  A
-    # translated frame tries the modifier inline in the letter first, then
-    # (user ruling) the <Translation> flag with its "[0,0,0]" accepted
-    # (_gtol_spec.TRANSLATION_FORMS): the first one accepted here and, after
-    # the rebuild below, printed as its guard requires is kept.
-    forms = iter(_TRANSLATION_FORMS if translated else ("inline",))
-    rejected: list[str] = []
-
-    def _author(form: str) -> bool:
-        xml = _gtol_frame_xml(
-            characteristic, tolerance, datums=datums, diameter=diameter,
-            translated=translated, translation_form=form,
-        )
-        if (migrated and not translated) or frame.SetSymbolXml(xml):
-            applied = str(frame.GetSymbolXml() or "")
-            if _GTOL_SYMBOLS[characteristic] not in applied or tolerance not in applied:
-                raise RuntimeError(f"feature-control frame did not persist ({label})")
-            try:
-                read_back = _gtol_frame_signature(applied).translated if translated else ()
-            except ValueError as exc:
-                read_back = (f"unreadable: {exc}",)
-            if read_back == tuple(translated):
-                return True
-            rejected.append(f"{form}: translation {read_back!r} read back from {applied!r}")
-        else:
-            rejected.append(f"{form}: SetSymbolXml rejected")
-        _telemetry.event("gtol.translation_form", label=label, form=form, outcome=rejected[-1])
-        return False
-
-    form = next((form for form in forms if _author(form)), None)
-    if form is None:
+    # translation modifier; the current-format XML then states it.
+    xml = _gtol_frame_xml(
+        characteristic, tolerance, datums=datums, diameter=diameter, translated=translated
+    )
+    if (not migrated or translated) and not frame.SetSymbolXml(xml):
+        raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
+    applied = str(frame.GetSymbolXml() or "")
+    if _GTOL_SYMBOLS[characteristic] not in applied or tolerance not in applied:
+        raise RuntimeError(f"feature-control frame did not persist ({label})")
+    if translated and _gtol_frame_signature(applied).translated != tuple(translated):
         raise RuntimeError(
-            f"SOLIDWORKS rejected feature-control frame XML ({label}): {rejected}"
+            f"feature-control frame lost its translation modifier ({label}): {applied!r}"
         )
     if int(gtol.GetFormat()) != 2:  # swGtolFormatType_e.GTOL_SW2022 (current)
         raise RuntimeError(f"feature-control frame remained in old format ({label})")
@@ -1150,39 +1128,23 @@ def add_feature_control_frame(
         label=label,
     )
     if translated:
-        # The XML reads back the modifier on either form; only the print
-        # shows the letter, the glyph and any translation vector beside it.
-        while True:
-            texts = _annotation_texts(annotation)
-            problem = _translation_print_problem(
-                texts, translated, zero_vector=form == "flag"
-            )
-            _telemetry.event(
-                "gtol.translation_form",
-                label=label,
-                form=form,
-                outcome=problem or "prints",
-                texts=" | ".join(texts),
-                xml=str(frame.GetSymbolXml() or ""),
-            )
-            if not problem:
-                break
-            rejected.append(f"{form}: {problem}")
-            form = next((form for form in forms if _author(form)), None)
-            if form is None:
-                raise RuntimeError(
-                    f"no translation-modifier form prints as ruled ({label}): "
-                    f"{rejected}"
-                )
-            rebuild_drawing(adapter, label="add_feature_control_frame translation")
-        _assert_attached_to(
-            adapter,
-            annotation,
-            edge,
-            entity_type=entity_type,
-            what="feature-control frame",
+        # The XML reading back the modifier does not show what prints: the
+        # <Translation> flag read back too, and printed a translation vector
+        # (farm runs 20261009T174542021Z, 20261009T182549169Z).  The printed
+        # text items must show each letter with its glyph and no brackets.
+        texts = _annotation_texts(annotation)
+        problem = _translation_print_problem(texts, translated)
+        _telemetry.event(
+            "gtol.translation_print",
             label=label,
+            outcome=problem or "prints",
+            texts=" | ".join(texts),
+            xml=str(frame.GetSymbolXml() or ""),
         )
+        if problem:
+            raise RuntimeError(
+                f"feature-control frame translation modifier misprints ({label}): {problem}"
+            )
     if leader_attach_xy is not None:
         _assert_leader_lands(
             annotation, leader_attach_xy, what="feature-control frame", label=label
