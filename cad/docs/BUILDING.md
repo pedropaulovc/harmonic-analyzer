@@ -63,7 +63,7 @@ glance:
 | `build_bare` | yes | either executor | parts + assemblies only — a quick rebuild |
 
 These examples run on a **local seat**. For the farm, replace
-`uv run python -m doit` with `build.py --executor farm` and follow
+`uv run python -m doit` with `uv run python build.py --executor farm --display-name "Owner/session - Reason"` and follow
 [supervised farm launches](../../DEVELOPING.md#supervised-farm-launches) —
 the same task names select the same closure.
 

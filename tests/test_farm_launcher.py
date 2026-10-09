@@ -19,6 +19,7 @@ pytestmark = pytest.mark.skipif(
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = REPO_ROOT / "scripts" / "farm-run.ps1"
+DISPLAY_NAME = "Fixture build: pen and drawing"
 
 # A hang guard, never a correctness budget. Every wait below ends on the event
 # it is waiting for (the launcher exits, a record appears, a line reaches the
@@ -98,6 +99,11 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+# Keep redirected Python output UTF-8 rather than inheriting Windows'
+# legacy Python pipe encoding.
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
 
 farm = next((i for i, arg in enumerate(sys.argv) if arg.endswith("farm.py")), None)
 if farm is not None:
@@ -208,6 +214,7 @@ def record(**late):
                     "SOLIDWORKS_POOL_HOME": os.environ.get("SOLIDWORKS_POOL_HOME"),
                     "HARMONIC_REMOTE_CACHE_MODE": os.environ.get("HARMONIC_REMOTE_CACHE_MODE"),
                     "PYTHONUNBUFFERED": os.environ.get("PYTHONUNBUFFERED"),
+                    "HARMONIC_FARM_DISPLAY_NAME": os.environ.get("HARMONIC_FARM_DISPLAY_NAME"),
                     "VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV"),
                 },
                 "submodule_files": {
@@ -307,7 +314,8 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
 
 
 def _command(
-    fixture: dict[str, object], targets: str, *, tag: str = "test"
+    fixture: dict[str, object], targets: str, *, tag: str = "test",
+    display_name: str = DISPLAY_NAME,
 ) -> list[str]:
     return [
         str(fixture["pwsh"]),
@@ -327,7 +335,83 @@ def _command(
         "90",
         "-Tag",
         tag,
+        *([f"-DisplayName:{display_name}"] if display_name.startswith("-")
+          else ["-DisplayName", display_name]),
     ]
+
+
+@pytest.mark.parametrize(
+    "label",
+    [None, "", " \t", "x" * 161,
+     pytest.param("\U0001f680" * 161, id="supplementary161"),
+     pytest.param("\u03a9" * 80 + "\U0001f680" * 81, id="mixed161"),
+     "a\tb", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb"],
+)
+def test_launch_requires_valid_display_name_before_creating_records(tmp_path, label):
+    fixture = _launcher_fixture(tmp_path)
+    command = _command(fixture, "part:pen_rod")
+    if label is None:
+        command = command[:-2]
+    else:
+        command[-1] = label
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_FARM_DISPLAY_NAME"] = "Inherited label is not a launcher argument"
+    result = _run_launcher(fixture, command, environment)
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert "DisplayName" in result.stdout + result.stderr
+    assert not Path(fixture["invocation"]).exists()
+    log_directory = Path(fixture["log_directory"])
+    assert not log_directory.exists() or list(log_directory.iterdir()) == []
+
+
+@pytest.mark.parametrize("label", ["x", "x" * 160,
+    pytest.param("\U0001f680" * 160, id="supplementary160"),
+    pytest.param("\u03a9" * 80 + "\U0001f680" * 80, id="mixed160"),
+    "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor", "-DisplayName"])
+def test_launch_preserves_boundary_display_names_and_overrides_environment(tmp_path, label):
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_FARM_DISPLAY_NAME"] = "Inherited label"
+    result = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod", display_name=label), environment,
+        creationflags=subprocess.CREATE_NO_WINDOW if not label.isascii() else 0,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    record = _record(_only(Path(fixture["log_directory"]), "*.run.json"))
+    finished = _record(Path(record["done"]))
+    invocation = json.loads(Path(fixture["invocation"]).read_text(encoding="utf-8"))
+    assert record["display_name"] == finished["display_name"] == label
+    assert invocation["environment"]["HARMONIC_FARM_DISPLAY_NAME"] == label
+    assert invocation["argv"].count(f"--display-name={label}") == 1
+    assert "--display-name" not in invocation["argv"]
+
+
+@pytest.mark.parametrize("codepoint", [0, 0xD800, 0xDFFF])
+def test_launch_rejects_untransportable_display_name_before_creating_records(tmp_path, codepoint):
+    fixture = _launcher_fixture(tmp_path)
+    # Construct NUL and lone surrogates within PowerShell rather than relying
+    # on native argv encoding to carry them to the script's validator.
+    command = _command(fixture, "part:pen_rod")
+    parameters = "; ".join(
+        name.removeprefix("-") + " = '" + value.replace("'", "''") + "'"
+        for name, value in zip(command[5:-2:2], command[6:-2:2])
+    )
+    script = (
+        "$ErrorActionPreference = 'Stop'; $parameters = @{ "
+        + parameters
+        + f"; DisplayName = ('a' + [char]{codepoint} + 'b')"
+        + " }; try { & '"
+        + str(LAUNCHER).replace("'", "''")
+        + "' @parameters } catch { Write-Error $_ -ErrorAction Continue; exit 2 }"
+    )
+    result = _run_launcher(
+        fixture, [*command[:3], "-Command", script], fixture["environment"]
+    )
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert "DisplayName" in result.stdout + result.stderr
+    assert not Path(fixture["invocation"]).exists()
+    log_directory = Path(fixture["log_directory"])
+    assert not log_directory.exists() or list(log_directory.iterdir()) == []
 
 
 def _only(path: Path, pattern: str) -> Path:
@@ -344,7 +428,8 @@ def _observed(log_directory: Path) -> str:
 
 
 def _run_launcher(
-    fixture: dict[str, object], command: list[str], environment: dict[str, str]
+    fixture: dict[str, object], command: list[str], environment: dict[str, str],
+    *, creationflags: int = 0,
 ) -> subprocess.CompletedProcess[str]:
     """Run the launcher to exit; only the hang guard can end the wait early."""
     try:
@@ -352,8 +437,10 @@ def _run_launcher(
             command,
             env=environment,
             text=True,
+            encoding="utf-8",
             capture_output=True,
             timeout=HANG_GUARD_S,
+            creationflags=creationflags,
         )
     except subprocess.TimeoutExpired as expired:
         raise AssertionError(
@@ -503,6 +590,8 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     assert finished["exit_code"] == 0
     assert finished["targets"] == ["part:pen_rod", "drawing:pen"]
     assert finished["tag"] == "spaces-ok"
+    assert running["display_name"] == DISPLAY_NAME
+    assert finished["display_name"] == DISPLAY_NAME
     assert finished["leaf_timeout_minutes"] == 90
     assert Path(finished["worktree"]) == Path(fixture["worktree"]).resolve()
     assert Path(finished["pool_home"]) == Path(fixture["pool"]).resolve()
@@ -524,6 +613,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
         "build.py",
         "--executor",
         "farm",
+        f"--display-name={DISPLAY_NAME}",
         "--leaf-timeout",
         "90",
         "--verbosity",
@@ -538,6 +628,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     assert invocation["environment"] == {
         "SOLIDWORKS_POOL_HOME": str(Path(fixture["pool"]).resolve()),
         "HARMONIC_REMOTE_CACHE_MODE": "rw",
+        "HARMONIC_FARM_DISPLAY_NAME": DISPLAY_NAME,
         "PYTHONUNBUFFERED": "1",
         "VIRTUAL_ENV": running["environment"],
     }
@@ -1290,11 +1381,15 @@ def test_status_and_watch_follow_a_live_run_to_its_outcome(tmp_path: Path) -> No
         # Before .done the outputs are still in the snapshot.
         assert Path(report["outputs"]) == Path(running["snapshot"]) / "cad" / "out"
 
+        # Tracking is not a launch: neither an argument nor a valid inherited
+        # label is needed to watch the already-recorded run.
+        watch_environment = dict(fixture["environment"])
+        watch_environment["HARMONIC_FARM_DISPLAY_NAME"] = "invalid\ninherited label"
         watch = subprocess.Popen(
             _tracking(
                 fixture, "-Watch", "-RunId", running["run_id"], "-PollSeconds", "1"
             ),
-            env=fixture["environment"],
+            env=watch_environment,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

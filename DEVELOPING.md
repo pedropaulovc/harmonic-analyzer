@@ -68,6 +68,7 @@ explicit way to stop a run, `-Cancel` (see
 | `-LogDirectory` | no | optional absolute path for run files and outputs; defaults under the agent scratchpad and must resolve outside every Git worktree |
 | `-Targets` | yes | doit task names as ONE comma-separated string (`part:pn_pen_rod,part:dt_cone_gear`) |
 | `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
+| `-DisplayName` | yes, Launch only | short owner/session plus reason; nonblank, single-line, no control characters, at most 160 characters; tracking commands such as `-Watch` do not require it |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
 
 When `HARMONIC_AGENT_SCRATCHPAD` is set, it names the scratchpad root and the
@@ -75,6 +76,36 @@ launcher creates an application subdirectory beneath it. Otherwise, the
 default root is `%LOCALAPPDATA%\ha-farm`, which
 survives automatic temporary-file cleanup. Pass its resulting absolute path
 when handing a run to an agent on another host.
+
+For example, use `-DisplayName 'InchPD - Add new drawing detail view to pd_transgear_stub v3'`.
+The launcher records it as `display_name`, passes one `--display-name=<label>` argument,
+and exports `HARMONIC_FARM_DISPLAY_NAME` to the build. An attended direct farm
+build must supply `--display-name` (also accepted as `-DisplayName`) or that
+environment variable; local builds and non-executing commands such as `--help`
+and `list` do not need it. An explicit option overrides the inherited value.
+Labels retain surrounding whitespace and must be valid Unicode encodable as
+UTF-8; malformed surrogate text, Unicode control characters (`Cc`) and
+line/paragraph separators (`Zl`, `Zp`) are rejected. Unicode `Bidi_Control`
+characters are also refused so a label cannot spoof adjacent dashboard text.
+Ordinary Arabic/Hebrew text and valid emoji, including joiners, are allowed.
+The 160-character limit counts Unicode scalar values (code points), not
+UTF-16 code units or grapheme clusters: each supplementary-plane emoji counts
+once, while each combining mark and joiner counts separately.
+Invalid labels are refused before contacting the farm, after doit has rejected
+any invalid task selection.
+For a direct label beginning with `-`, use `--display-name="-Owner - Reason"`
+so it is not parsed as an option. Wrapper options are never abbreviated.
+For the native `pwsh -File` launcher, attach a dash-leading label with a colon,
+for example `-DisplayName:'-DisplayName'`; a separate value matching a known
+PowerShell parameter name would otherwise be parsed as another parameter.
+Launcher stdout JSON and its logs use UTF-8, including detached Windows launches.
+
+Every new leaf execution has Temporal memo `display_name`, separate from the
+optional launcher ownership memo `farm_run`. Neither label enters `LeafRequest`,
+the workflow ID or the cache key. If another session requests an already-running
+leaf, `USE_EXISTING` attaches to it without replacing either creator memo:
+the queued/running display label continues to identify the creator, not the
+latest attaching session.
 
 Targets are *selections*, not variables, and they arrive as one string. `pwsh
 -File` binds a single token per parameter, so a repeated `-Targets` or a
@@ -96,7 +127,8 @@ snapshot:
 
 ```
 uv run --frozen --no-sync --active python build.py --executor farm \
-  --leaf-timeout <minutes> --verbosity info --continue <targets...>
+  --display-name "InchPD - Build pen rod" --leaf-timeout <minutes> \
+  --verbosity info --continue <targets...>
 ```
 
 The launcher passes no `-n`, so `build.py` inserts `-n 8`
@@ -209,6 +241,7 @@ would lose live monitoring, so it is not used.
     "-PoolHome", "C:/src/solidworks-pool",
     "-Targets", "part:pn_pen_rod",
     "-LeafTimeout", "90",
+    "-DisplayName", "InchPD - Build pen rod",
     "-Tag", "smoke"
   ],
   "pty": false,
@@ -251,7 +284,7 @@ no `.done`.
 - **`-Status`** prints one JSON object: `state`, `exit_code`, `launcher`
   (`pid`, `alive`, and for a dead launcher the `orphaned_processes` it left —
   a build child outlives a killed launcher and keeps dispatching), `commit`,
-  `targets`, `leaf_timeout_minutes`, `cache_environment`, `counts` (cache
+  `targets`, `leaf_timeout_minutes`, `display_name`, `cache_environment`, `counts` (cache
   `hits`, farm leaves `requested`/`succeeded`/`failed`/`in_flight`), every farm
   leaf with its `workflow_id` and state, `in_flight_workflows`,
   `unsettled_workflows` (every leaf with a workflow id and no result: the
@@ -275,7 +308,8 @@ no `.done`.
   (`LAUNCHER DIED` on the summary line), **22** cancelled. Run it under the
   same kind of persistent supervisor as the launch, with `progress: "wake"`.
 - **`-List`** prints one JSON line per run, newest first, filtered by `-Tag`,
-  `-State` and `-MaxAgeHours`.
+  `-State` and `-MaxAgeHours`. Both `-Status` and `-List` report `display_name`
+  as `null` for historical runs recorded before labels were required.
 - **`-Cancel -Why <reason>`** stops the launcher and every process it started,
   including a build a dead launcher left behind. The launcher joins a named
   Windows job object (`job` in the run record) before it starts anything, so
@@ -357,6 +391,7 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
   "commit": "4101ff0fa54988a9f1464a9a0c5833b79a918975",
   "targets": ["part:pen_rod"],
   "leaf_timeout_minutes": 90,
+  "display_name": "InchPD - Build pen rod",
   "started_at": "2026-09-20T17:30:11.4820000Z",
   "pid": 24680,
   "log": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.log",
@@ -368,7 +403,8 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
   },
   "tag": "smoke",
   "argv": ["uv", "run", "--frozen", "--no-sync", "--active", "python", "build.py",
-           "--executor", "farm", "--leaf-timeout", "90", "--verbosity", "info",
+           "--executor", "farm", "--display-name=InchPD - Build pen rod",
+           "--leaf-timeout", "90", "--verbosity", "info",
            "--continue", "part:pen_rod"],
   "snapshot": "C:\\src\\dt-logs\\farm-runs\\snapshots\\3f7b1c9a2d5e",
   "outputs": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.out",
@@ -467,7 +503,10 @@ again with exactly those — `-Worktree` pointed at a clean checkout whose HEAD
 is `commit` (the kept snapshot itself, or a fresh
 `git worktree add --detach <path> <commit>`), `-Targets` and `-LeafTimeout`
 from the record, and `HARMONIC_CACHE_ACCOUNT`/`CONTAINER`/`SALT` set (or unset)
-to match `cache_environment`. Same commit, cache environment and budget give
+to match `cache_environment`. Supply `-DisplayName` with the recovering session's
+owner and reason; historical records may have no label. This metadata does not
+change identity, and a rejoined workflow still retains its creator's label.
+Same commit, cache environment and budget give
 the same keys and workflow IDs, so every finished leaf restores from the cache
 and a running one is rejoined rather than duplicated. The leaf budget is part
 of the workflow ID, so changing it during recovery creates a different

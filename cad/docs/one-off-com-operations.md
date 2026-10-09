@@ -30,7 +30,7 @@ If it needs a seat, pick ONE of four:
 
 | route | when | how |
 |---|---|---|
-| **A — dispatch the existing task** | the thing you want IS a doit task, or its artefact is a task's output | `.\build.cmd <task>` (`./build` on a POSIX shell) = `uv run python build.py --executor farm <task>` |
+| **A — dispatch the existing task** | the thing you want IS a doit task, or its artefact is a task's output | `.\build.cmd --display-name "Owner/session - Reason" <task>` (`./build` on a POSIX shell) = `uv run python build.py --executor farm --display-name "Owner/session - Reason" <task>` |
 | **B — throwaway-branch leaf** | you need ad-hoc COM code, not an existing task | add ONE `_cached_com_action` task on a throwaway branch, push it, dispatch it as in A |
 | **C — attach-only diagnostics probe** | interactive investigation on a machine that HAS a licensed running seat | `dodo._com_seat` + `run_owned_diagnostic` ([`../scripts/diagnostics/_owned_native_session.py`](../scripts/diagnostics/_owned_native_session.py)) |
 | **D — don't** | you only want to *look* at a model or drawing | audit the artefact offline; never launch a build to inspect one |
@@ -57,8 +57,8 @@ errors and exits 0/20/21/22 for succeeded/failed/launcher-died/cancelled.
 
 ```powershell
 .\build.cmd --help                    # wrapper options + farm defaults, then doit's commands
-.\build.cmd part:dt_cone_gear            # one leaf on the farm
-.\build.cmd --leaf-timeout 90 build   # whole closure, 90 min per attempt
+.\build.cmd --display-name "InchPD - Build cone gear" part:dt_cone_gear
+.\build.cmd --display-name "InchPD - Full build" --leaf-timeout 90 build
 ```
 
 Nothing reaches the fleet until the requested task names are known-good.
@@ -133,7 +133,7 @@ throw away afterwards. Non-negotiable shape:
    that stamp IS the cached artefact. A leaf that stores nothing under its key
    fails `cache_missing` even when the COM work succeeded.
 5. Commit, push the commit to the approved repository, dispatch it the same way
-   as route A (`./build <your:task>` at an attended terminal, the supervised
+   as route A (`./build --display-name "Owner/session - Reason" <your:task>` at an attended terminal, the supervised
    launcher from an agent), then delete the branch. A fixup means a new commit;
    every worker fetches exactly the SHA the new leaf request names.
 

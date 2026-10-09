@@ -36,6 +36,30 @@ param(
     [ValidateRange(1, 180)]
     [int]$LeafTimeout,
 
+    [Parameter(Mandatory, ParameterSetName = 'Launch')]
+    [ValidateScript({
+        if ([string]::IsNullOrWhiteSpace($_) -or
+            $_ -match '[\p{Cc}\p{Zl}\p{Zp}\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]') {
+            throw 'DisplayName must be nonblank, single-line, free of control characters, and at most 160 characters'
+        }
+        try {
+            [void][System.Text.UTF8Encoding]::new($false, $true).GetByteCount($_)
+        }
+        catch [System.Text.EncoderFallbackException] {
+            throw 'DisplayName must contain valid Unicode'
+        }
+        # Count Unicode scalars, matching Python len(), not UTF-16 code units.
+        $scalarCount = 0
+        foreach ($rune in $_.EnumerateRunes()) {
+            $scalarCount++
+            if ($scalarCount -gt 160) {
+                throw 'DisplayName must be at most 160 characters'
+            }
+        }
+        $true
+    })]
+    [string]$DisplayName,
+
     # Launch: the label recorded with the run. Status/Watch/Cancel: select the
     # newest run carrying it. List: filter by it.
     [ValidatePattern('\A[A-Za-z0-9_-]+\z')]
@@ -85,6 +109,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:PSNativeCommandUseErrorActionPreference = $false
+# Detached Windows launches otherwise emit JSON labels in the OEM code page
+# (for example, Omega becomes byte 0xEA in CP437), not the capture's UTF-8.
+[System.Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 # A snapshot rooted under an agent scratchpad can exceed Windows MAX_PATH.
 # Scope core.longpaths to this process tree and preserve any Git environment
@@ -839,6 +866,7 @@ function Get-RunStatus {
         commit = $record['commit']
         targets = @($record['targets'])
         leaf_timeout_minutes = $record['leaf_timeout_minutes']
+        display_name = $record['display_name']
         cache_environment = $record['cache_environment']
         started_at = $record['started_at']
         finished_at = if ($null -ne $done) { $done['finished_at'] } else { $null }
@@ -1113,6 +1141,7 @@ function Invoke-RunList {
         Write-Output ([ordered]@{
                 run_id = $record['run_id']
                 tag = $record['tag']
+                display_name = $record['display_name']
                 state = $runState
                 exit_code = if ($null -ne $done) { $done['exit_code'] } else { $null }
                 started_at = $record['started_at']
@@ -1748,6 +1777,7 @@ try {
     $buildArgs = @(
         'run', '--frozen', '--no-sync', '--active', 'python', 'build.py',
         '--executor', 'farm',
+        ('--display-name=' + $DisplayName),
         '--leaf-timeout', [string]$LeafTimeout,
         '--verbosity', 'info',
         '--continue'
@@ -1794,6 +1824,7 @@ try {
         commit = $commit
         targets = @($normalizedTargets)
         leaf_timeout_minutes = $LeafTimeout
+        display_name = $DisplayName
         started_at = $startedAt.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
         pid = $PID
         log = [System.IO.Path]::GetFullPath($logPath)
@@ -1844,6 +1875,7 @@ try {
     # _farm._dispatch stamps this on every leaf it creates, so -Cancel can tell
     # a leaf this run created from one it attached to.
     $env:HARMONIC_FARM_RUN = $runId
+    $env:HARMONIC_FARM_DISPLAY_NAME = $DisplayName
     # _farm._dispatch names each workflow here before it can exist: -Cancel
     # stops this process, whose copy of the build's output can then miss the
     # last `Farm workflow requested` lines.

@@ -4,10 +4,11 @@ Examples:
     uv run python build.py --help
     uv run python build.py --verbosity warning -n 4
     uv run python build.py --verbosity debug check:math
-    uv run python build.py --executor farm --leaf-timeout 90 assembly:ha_harmonic_analyzer
+    uv run python build.py --executor farm --display-name "InchPD - Check assembly" --leaf-timeout 90 assembly:ha_harmonic_analyzer
 
-The wrapper consumes ``--verbosity``, ``--executor`` and ``--leaf-timeout``; every
-other argument is passed to ``doit`` unchanged. A leading ``--help``/``-h`` (after
+The wrapper consumes ``--verbosity``, ``--executor``, ``--display-name`` and
+``--leaf-timeout``; every other argument is passed to ``doit`` unchanged.
+A leading ``--help``/``-h`` (after
 doit's loader options, as ``DoitMain.run`` reads them) prints the wrapper's own
 options and farm defaults and then doit's command list, whose ``build.py help
 <command>``/``build.py help <task>`` lines are the route to doit's own help.
@@ -67,7 +68,7 @@ _HELP = ("--help", "-h")
 
 _USAGE = (
     "build.py [--verbosity LEVEL] [--executor {local,farm}] "
-    "[--leaf-timeout MINUTES] [doit arguments ...]"
+    "[--display-name LABEL] [--leaf-timeout MINUTES] [doit arguments ...]"
 )
 _DESCRIPTION = """\
 Run the doit graph (dodo.py). Only the options below belong to the wrapper; every
@@ -75,6 +76,9 @@ other argument goes to doit unchanged, so `build.py part:dt_cone_gear`, `build.p
 -n 4`, `build.py list` and `build.py help run` mean what they mean under `doit`."""
 _EPILOG = f"""\
 farm defaults (--executor farm; `build` / `build.cmd` pass it for you):
+  display name  --display-name (alias -DisplayName) or HARMONIC_FARM_DISPLAY_NAME:
+                required before executing farm tasks; owner/session plus reason,
+                nonblank single-line label, at most 160 characters
   parallelism   -n {_DEFAULT_FARM_PARALLELISM} unless you pass -n/--process or set HARMONIC_FARM_PARALLELISM
   leaf timeout  15 min per attempt (the control plane's default) unless you pass
                 --leaf-timeout or HARMONIC_FARM_LEAF_TIMEOUT_S (seconds) is
@@ -101,6 +105,7 @@ def _parser() -> argparse.ArgumentParser:
         epilog=_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False,
+        allow_abbrev=False,
     )
     parser.add_argument(
         "--verbosity",
@@ -118,6 +123,12 @@ def _parser() -> argparse.ArgumentParser:
         help="where cache-missing SolidWorks tasks build: local = a seat on this "
         "machine, farm = the SolidWorks build farm (default: HARMONIC_EXECUTOR "
         "if set, else local)",
+    )
+    parser.add_argument(
+        "--display-name", "-DisplayName",
+        metavar="LABEL",
+        help="required for farm builds: short owner/session plus reason, nonblank "
+        "single-line, at most 160 characters (sets HARMONIC_FARM_DISPLAY_NAME)",
     )
     # A cold leaf (source sync plus a cold SOLIDWORKS start) measured 61.5 min on
     # the farm, well past the control plane's 15 min default, so a run that knows
@@ -149,6 +160,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     os.environ["HARMONIC_EXECUTOR"] = options.executor
 
     doit = _FarmDoitMain() if options.executor == "farm" else DoitMain()
+    if options.executor == "farm":
+        doit.display_name = options.display_name
     executing = _executing_command(doit_args, doit)
     refusal = _release_refusal(doit_args, executing)
     if refusal:
@@ -221,7 +234,7 @@ def _validate_farm_selection(
     control.process(selection)
 
 
-def _farm_command(command_class):
+def _farm_command(command_class, display_name: str | None = None):
     """Wrap one native task-executing command at its loaded-graph boundary."""
 
     class FarmCommand(command_class):
@@ -235,6 +248,15 @@ def _farm_command(command_class):
                     self.sel_tasks,
                     auto_delayed_regex=kwargs.get("auto_delayed_regex", False),
                 )
+                sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
+                import _farm
+
+                try:
+                    label = _farm._display_name(display_name)
+                except RuntimeError as exc:
+                    raise FarmPreflightError(str(exc)) from None
+                if display_name is not None:
+                    os.environ["HARMONIC_FARM_DISPLAY_NAME"] = label
                 _farm_preflight()
                 print(
                     "farm: every SolidWorks task runs on the farm (parts, "
@@ -255,12 +277,14 @@ def _farm_command(command_class):
 class _FarmDoitMain(DoitMain):
     """Doit with preflight wrappers around native action-executing commands."""
 
+    display_name: str | None = None
+
     def get_cmds(self):
         commands = super().get_cmds()
         for name in commands:
             command_class = commands.get_plugin(name)
             if getattr(command_class, "execute_tasks", False):
-                commands[name] = _farm_command(command_class)
+                commands[name] = _farm_command(command_class, self.display_name)
         return commands
 
 

@@ -21,6 +21,7 @@ import json
 import os
 import socket
 import subprocess
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -375,7 +376,35 @@ def _record_request(task: str, wf_id: str) -> None:
     os.replace(staging, path)
 
 
+def _display_name(label: str | None = None) -> str:
+    """Validate human metadata before any farm side effect; preserve its text."""
+    if label is None:
+        label = os.environ.get("HARMONIC_FARM_DISPLAY_NAME")
+    if (
+        label is None
+        or not label.strip()
+        or len(label) > 160
+        or any(
+            unicodedata.category(char) in {"Cc", "Zl", "Zp"}
+            or char in "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+            for char in label
+        )
+    ):
+        raise RuntimeError(
+            "--display-name / HARMONIC_FARM_DISPLAY_NAME must be nonblank, "
+            "single-line, free of control characters, and at most 160 characters"
+        )
+    try:
+        label.encode("utf-8")
+    except UnicodeEncodeError:
+        raise RuntimeError(
+            "--display-name / HARMONIC_FARM_DISPLAY_NAME must contain valid Unicode"
+        ) from None
+    return label
+
+
 async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
+    display_name = _display_name()
     # temporalio loads a Rust bridge; import it only when a leaf is dispatched so
     # local builds and the offline check:* workers never pay for it.
     from temporalio.client import Client, WorkflowFailureError
@@ -407,8 +436,12 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
     # A memo is written only by the start that creates the execution; an
     # attach (USE_EXISTING) leaves the creator's. The request records above say
     # this run asked for the leaf; only the memo says its own run created it
-    # (farm.py status --json reports it as farm_run).
+    # (farm.py status --json reports it as farm_run). The display label likewise
+    # remains the creator's when another session attaches to this shared ID.
     farm_run = os.environ.get("HARMONIC_FARM_RUN")
+    memo = {"display_name": display_name}
+    if farm_run:
+        memo["farm_run"] = farm_run
     handle = await client.start_workflow(
         WORKFLOW_BUILD_LEAF,
         request,
@@ -417,7 +450,7 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         result_type=LeafResult,
         id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
         execution_timeout=EXECUTION_TIMEOUT,
-        memo={"farm_run": farm_run} if farm_run else None,
+        memo=memo,
     )
     _telemetry.info(
         f"Farm workflow attached: {wf_id}",
