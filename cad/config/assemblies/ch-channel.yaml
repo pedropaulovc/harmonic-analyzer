@@ -53,7 +53,7 @@ allowed_free_stems:
   - ch-connecting-rod
   - ch-amplitude-bar
   - ch-channel-lever
-  # The peened rod-pivot pin is lock-mated to its free rod (retained in the
+  # The pressed rod-pivot pin is lock-mated to its free rod (pressed in the
   # fork tines) and reads under-constrained with it; it adds no DOF.
   - ch-rod-pivot-pin
   # The MHA-CH-011 bar pivot pin is lock-mated to its bar, so it rides the

@@ -1,6 +1,8 @@
 """Offline contract: the rod fork straddles its rocker arm in one plane, and
-the peened MHA-CH-010 pin runs in the arm and is retained in the fork, with
-every fit held at the worst case of its printed bands (policy rule 12).
+the MHA-CH-010 pin is pressed into the fork's reamed tines and runs in the
+arm, with every fit held at the worst case of its printed bands (policy rule
+12). Press fit, ends dressed flush: the user's ruling (2026-10-09, PR #1292
+review F1), the MHA-CH-011 bar pin's joint (``test_ch_bar_pivot_fit``).
 
 ``ch_rod_pivot_pin_spec`` reads only the two parts it joins; the restated
 floors and the swing it designs for are pinned to their sources here.
@@ -16,9 +18,8 @@ import pytest
 
 import _config
 import cam_plane
-import build_ch_rod_pivot_pin as pin_build
-from _hole_spec import blind_cut_dia_mm
 import ch_amplitude_bar_spec as bar
+import ch_bar_pivot_pin_spec as bar_pin
 import channel_frame_geom as frame
 import channel_kinematics as ck
 import ch_connecting_rod_notes as rod_notes
@@ -28,6 +29,7 @@ import ch_rocker_arm_spec as arm
 import ch_rod_pivot_pin_spec as pin
 import dt_cylinder_gear_spec as gear
 import rocker_bank_layout as bank
+from _hole_spec import NUMBER_DRILL_MM
 
 
 def test_restated_floors_are_their_sources() -> None:
@@ -40,6 +42,9 @@ def test_restated_floors_are_their_sources() -> None:
     )
     # The hubs set the pitch the neighbour stack is judged at.
     assert arm.HUB_LENGTH == bank.PITCH and arm.HUB_LENGTH_BAND[1] == 0.0
+    # FN2's 0.85 thou cap, as the bar pin's press.
+    assert pin.PRESS_INTERFERENCE_MAX == pytest.approx(0.0215900, abs=1e-9)
+    assert pin.PRESS_INTERFERENCE_MAX == bar_pin.PRESS_INTERFERENCE_MAX
 
 
 def test_the_rod_arm_and_cam_share_one_plane() -> None:
@@ -49,103 +54,158 @@ def test_the_rod_arm_and_cam_share_one_plane() -> None:
     )
     # The pin is centred on the fork, which is centred on the rod plane.
     assert pin.PIN_INSTALLED_LENGTH == rod.FORK_THICKNESS
-    assert pin.PIN_CSK_DIA == rod.PIN_HOLE_CSK_DIA
-    assert rod.PIN_HOLE_SPEC == arm.ROD_HOLE_SPEC
 
 
-# The #47 the Hole Wizard cuts in the rod's tines (and the arm): the ANSI-inch
-# table's 0.0785 in, which _hole_spec.NUMBER_DRILL_MM rounds to 1.994.
-_WIZARD_47_DRILL = 0.0785 * 25.4
-_TABLE_47_DRILL = blind_cut_dia_mm(rod.PIN_HOLE_SPEC)
-_TINE_DEPTHS = np.linspace(0.0, rod.FORK_TINE_THICKNESS, 20001)
-
-
-def _tine_cavity_r(drill: float, leg: float) -> np.ndarray:
-    """Radius of the tine's drill + 90-degree countersink (an equal-leg
-    chamfer on the drill mouth) at each depth below the tine's outer face."""
-    return np.maximum(drill / 2.0, drill / 2.0 + leg - _TINE_DEPTHS)
-
-
-def _installed_pin_r() -> np.ndarray:
-    """Radius of the installed pin at each depth below its dressed end: the
-    45-degree flare from the Ø CskDia rim down to the journal."""
-    return np.maximum(pin_build.PIN_R, pin_build.CSK_R - _TINE_DEPTHS)
-
-
-def _sliver_mm3(drill: float, leg: float) -> float:
-    """Volume of the installed pin proud of one tine's drill + countersink."""
-    proud = np.maximum(_installed_pin_r(), _tine_cavity_r(drill, leg))
-    ring = math.pi * (proud**2 - _tine_cavity_r(drill, leg) ** 2)
-    return float(np.trapezoid(ring, _TINE_DEPTHS))
-
-
-def test_installed_pin_sits_inside_the_tine_hole_and_countersinks() -> None:
-    """The native interference gate counts ANY positive pin-rod volume, so the
-    installed pin's flare may meet the countersink but never stand proud of it.
-    The build cuts the chamfer leg from the drill the wizard reports, which
-    puts the countersink rim on PinCskDia whatever the drill's last decimal."""
-    # The pin's dressed ends are the tine faces; its flare is the 90-degree
-    # countersink's cone from the same Ø rim.
-    assert pin_build.HALF_LEN == rod.FORK_THICKNESS / 2.0
-    assert pin_build.CSK_R == rod.PIN_HOLE_CSK_DIA / 2.0
-    assert pin_build.CSK_DEPTH == pytest.approx(pin_build.CSK_R - pin_build.PIN_R)
-    assert pin.PIN_CSK_ANGLE_DEG == 90.0
-    for drill in (
-        _TABLE_47_DRILL - 0.0005,
-        _WIZARD_47_DRILL,
-        _TABLE_47_DRILL,
-        _TABLE_47_DRILL + 0.0005,
-    ):
-        leg = (rod.PIN_HOLE_CSK_DIA - drill) / 2.0
-        proud = _installed_pin_r() - _tine_cavity_r(drill, leg)
-        assert proud.max() <= 1e-12, drill
-        assert _sliver_mm3(drill, leg) <= 1e-15, drill
-    # The journal runs free in the arm's #47 between the tines.
-    assert pin_build.PIN_R < _WIZARD_47_DRILL / 2.0
-
-
-def test_a_table_drill_leg_leaves_the_pin_flare_proud() -> None:
-    """Regression (farm build at 71a6e3107, assembly:ch_channel): the leg
-    taken from the table's 1.994 on the 0.0785 in drill the wizard cut left
-    the rim Ø3.1999 and every pin's flare 0.05 um proud of it -- the reported
-    0.000245865 mm^3 per pin end."""
-    table_leg = (rod.PIN_HOLE_CSK_DIA - _TABLE_47_DRILL) / 2.0
-    proud = _installed_pin_r() - _tine_cavity_r(_WIZARD_47_DRILL, table_leg)
-    assert proud.max() == pytest.approx((_TABLE_47_DRILL - _WIZARD_47_DRILL) / 2.0)
-    assert _sliver_mm3(_WIZARD_47_DRILL, table_leg) == pytest.approx(
-        0.000245865, rel=2e-3
-    )
+def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
+    """The bar pin's joint: the same drill rod pressed into the same Ø1.968
+    +0.010/0 ream, running in a drilled #47 in the moving member."""
+    assert pin.PIN_DIA == bar_pin.PIN_DIA
+    assert pin.PIN_DIA_TOLERANCE == bar_pin.PIN_DIA_TOLERANCE
+    assert pin.ROD_HOLE_DIA == rod.PIN_HOLE_DIA == bar.TOP_PIN_HOLE_DIA
+    assert pin.ROD_HOLE_BAND == rod.PIN_HOLE_BAND == bar.TOP_PIN_HOLE_BAND
+    assert arm.ROD_HOLE_SPEC.kind == "drilled_number"
+    assert arm.ROD_HOLE_SPEC.size == "#47"
+    assert pin.PIN_END_PROUD_MAX == 0.0
+    # Nothing is sunk into the tines and nothing is upset (the peened design).
+    for gone in ("PIN_HOLE_SPEC", "PIN_HOLE_CSK_DIA", "PIN_HOLE_CSK_BAND"):
+        assert not hasattr(rod, gone)
+    for gone in ("PIN_CSK_DIA", "RETENTION_OVERLAP_MIN"):
+        assert not hasattr(pin, gone)
 
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
+    # The press, at the pin's +/-0.005 against the ream's +0.010/0.
+    assert b["interference_min"] == pytest.approx(0.001375, abs=1e-6)
+    assert b["interference_max"] == pytest.approx(0.021375, abs=1e-6)
+    assert 0.0 < b["interference_min"] <= b["interference_max"]
+    assert b["interference_max"] <= pin.PRESS_INTERFERENCE_MAX
+    # The run, in the arm's #47 (1.994 +0.10/0).
+    assert b["running_clearance_min"] == pytest.approx(0.004625, abs=1e-6)
+    assert b["running_clearance_max"] == pytest.approx(0.114625, abs=1e-6)
     assert b["side_clearance_min"] == pytest.approx(0.100, abs=1e-6)
     assert b["side_clearance_max"] == pytest.approx(0.277, abs=1e-6)
-    assert b["neighbour_clearance_min"] == pytest.approx(0.3545, abs=1e-6)
+    assert b["neighbour_clearance_min"] == pytest.approx(0.4545, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.NEIGHBOUR_CLEARANCE_MIN
     assert b["tine_min"] == pytest.approx(1.5865, abs=1e-6)
-    assert b["tine_min"] >= pin.RULE12_WALL_FLOOR
-    assert b["running_clearance_min"] > 0.0
-    assert b["retention_overlap_min"] >= pin.RETENTION_OVERLAP_MIN
-    assert b["upset_projection_min"] >= b["upset_needed_max"]
-    assert b["crown_wall_min"] >= 2.0
-    assert b["crotch_clearance_min"] == pytest.approx(1.1524, abs=1e-4)
+    assert b["tine_bearing_land_min"] == b["tine_min"]
+    assert b["tine_bearing_land_min"] >= pin.RULE12_WALL_FLOOR
+    assert b["crown_wall_min"] >= pin.RULE12_WALL_TARGET
+    assert b["crotch_clearance_min"] == pytest.approx(1.2098, abs=1e-4)
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
     assert b["bridge_min"] == pytest.approx(2.234, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET
+    # Dressing stock: the shortest blank still covers the thickest fork.
+    assert b["blank_excess_min"] == pytest.approx(0.145, abs=1e-6)
+    assert b["blank_excess_max"] == pytest.approx(0.505, abs=1e-6)
+    assert not any(key.startswith(("upset", "retention")) for key in b)
+
+
+def test_the_pin_bears_on_the_whole_tine() -> None:
+    """PR #1292 review F1: the land the pin bears on in each tine is the
+    thinnest tine itself, built here from the fork's printed bands, and it
+    holds rule 12's 1.5 floor. Positive control: the withdrawn 90-degree
+    Ø3.2 countersink sunk into each tine mouth, on the #47's largest drill,
+    left under that floor."""
+    w_min = rod.FORK_THICKNESS + rod.FORK_THICKNESS_BAND[1]
+    s_max = rod.FORK_SLOT_WIDTH + rod.FORK_SLOT_BAND[0]
+    tine = (w_min - s_max) / 2.0 - rod.FORK_TINE_MATCH / 2.0
+    assert pin.BUDGET["tine_bearing_land_min"] == pytest.approx(tine, abs=1e-12)
+    assert tine >= pin.RULE12_WALL_FLOOR
+    withdrawn_leg = (3.2 - NUMBER_DRILL_MM["#47"]) / 2.0
+    assert tine - withdrawn_leg < pin.RULE12_WALL_FLOOR
 
 
 def test_neighbour_stack_fills_the_inter_arm_gap_exactly() -> None:
     """The gap (pitch less the thickest arm) holds both side clearances,
-    both outer tines, both proud ends and the neighbour clearance: the
-    stack closes with nothing left out."""
+    both outer tines' slot offsets, the two straps' offsets from their hubs
+    and the neighbour clearance: the stack closes with nothing left out. The
+    dressed ends are flush, so no pin end stands in it."""
     b = pin.BUDGET
     w_max = rod.FORK_THICKNESS + rod.FORK_THICKNESS_BAND[0]
     off = rod.FORK_TINE_MATCH / 2.0
     float_total = b["side_clearance_max"]
     assert bank.PITCH - (
-        w_max + float_total + 2.0 * off + 2.0 * pin.PIN_END_PROUD_MAX
+        w_max + float_total + 2.0 * off + arm.STRAP_HUB_SYMMETRY
     ) == pytest.approx(b["neighbour_clearance_min"])
+
+
+def _corner_gap(proud: float, strap_offsets: tuple[float, ...]) -> float:
+    """Least axial gap between rod j's north-most point and rod j + 1's
+    south-most, over every corner of the bands both rods and both arms are
+    printed to, built as positions: hub j's mid-plane at 0 and hub j + 1's
+    half the two hub lengths north; each strap's mid-plane off its hub's
+    by one of ``strap_offsets``; each fork's slot anywhere it still clears
+    its strap; each fork's mid-plane off its slot's by half the tine match;
+    each dressed pin end ``proud`` of its fork face."""
+    t_band = [arm.ARM_THICKNESS + d for d in arm.ARM_THICKNESS_BAND]
+    w_band = [rod.FORK_THICKNESS + d for d in rod.FORK_THICKNESS_BAND]
+    s_band = [rod.FORK_SLOT_WIDTH + d for d in rod.FORK_SLOT_BAND]
+    hubs = [arm.HUB_LENGTH + d for d in arm.HUB_LENGTH_BAND]
+    match = (-rod.FORK_TINE_MATCH / 2.0, rod.FORK_TINE_MATCH / 2.0)
+
+    def reach(sign: int) -> list[float]:
+        """Offsets of a rod's outer face (pin end included) from its own
+        hub's mid-plane, toward the neighbour (+1 north, -1 south)."""
+        out = []
+        for e, t, w, s, m, side in itertools.product(
+            strap_offsets, t_band, w_band, s_band, match, (-1.0, 1.0)
+        ):
+            slot_centre = e + side * (s - t) / 2.0
+            fork_centre = slot_centre + m
+            out.append(sign * (fork_centre + sign * (w / 2.0 + proud)))
+        return out
+
+    north_j = max(reach(+1))  # rod j's north-most point
+    south_next = max(reach(-1))  # how far rod j + 1 reaches south
+    pitch = min((a + b) / 2.0 for a, b in itertools.product(hubs, hubs))
+    return pitch - north_j - south_next
+
+
+def test_opposed_neighbour_forks_clear_at_every_band_corner() -> None:
+    """PR #1292 review F2: an independent construction of the neighbour
+    clearance, rod by rod from positions, not the spec's closed form. Rod j
+    leans north on a strap set north of its hub, rod j + 1 south on one set
+    south; the budget is exactly that corner."""
+    half_zone = arm.STRAP_HUB_SYMMETRY / 2.0
+    gap = _corner_gap(pin.PIN_END_PROUD_MAX, (-half_zone, half_zone))
+    assert gap == pytest.approx(pin.BUDGET["neighbour_clearance_min"], abs=1e-9)
+    assert gap == pytest.approx(0.4545, abs=1e-9)
+    assert gap >= pin.NEIGHBOUR_CLEARANCE_MIN
+    # Positive controls: the strap symmetry is in the corner (centred straps
+    # gain its whole zone), and the withdrawn peened pin (0.10 proud each
+    # end) on these straps would have broken the 0.35 floor the earlier
+    # budget claimed it held.
+    centred = _corner_gap(pin.PIN_END_PROUD_MAX, (0.0,))
+    assert centred - gap == pytest.approx(arm.STRAP_HUB_SYMMETRY, abs=1e-9)
+    assert _corner_gap(0.10, (-half_zone, half_zone)) < pin.NEIGHBOUR_CLEARANCE_MIN
+
+
+def test_the_assembly_press_allowance_is_this_joint() -> None:
+    """_interference_contracts restates the modelled press as literals (every
+    assembly imports it); they must be the nominal pin, the fork's reamed
+    hole and the two tines, and name channel j's pin with channel j's rod
+    only. The channel's only other press pairs are the bar pins'."""
+    import _interference_contracts as ic
+
+    pin_dia, hole_dia, engaged = ic.ROD_PIVOT_PIN_PRESS
+    assert pin_dia == pytest.approx(pin.PIN_DIA, abs=1e-9)
+    assert hole_dia == rod.PIN_HOLE_DIA
+    assert engaged == pytest.approx(rod.FORK_THICKNESS - rod.FORK_SLOT_WIDTH, abs=1e-9)
+    pairs = ic.allowed_interference_pairs("ch-channel")
+    rod_pairs = {
+        frozenset((f"ch-rod-pivot-pin-{n}", f"ch-connecting-rod-{n}"))
+        for n in range(1, 21)
+    }
+    bar_pairs = {
+        frozenset((f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}"))
+        for n in range(1, 21)
+    }
+    assert set(pairs) == rod_pairs | bar_pairs
+    nominal = math.pi / 4.0 * (pin_dia**2 - hole_dia**2) * engaged
+    assert all(pairs[pair] == pytest.approx(1.10 * nominal) for pair in rod_pairs)
+    # The arm the pin runs in is never a press pair.
+    assert not any("rocker-arm" in name for pair in pairs for name in pair)
 
 
 def _relative_swing_deg() -> list[float]:
@@ -200,7 +260,8 @@ def test_crotch_clears_the_arm_through_the_whole_swing() -> None:
     """Every printed-band corner of the arm's curved lower outline and the
     fork's slot floor, at every solved pose of one cam turn: the floor stays
     CROTCH_CLEARANCE_MIN below the arm with both pin holes wandered and the
-    pin dropped in its clearances."""
+    arm dropped on the pin by its running clearance (the pin is pressed in
+    the tines, so it does not drop in them)."""
     two_place = arm.LINEAR_2PL
     # The bands the sweep reads are the ones the sheets print.
     assert "SlotDepth" not in rod_notes.DRAWING_PRECISION.get("ForkSlotProfile", {})
@@ -234,7 +295,7 @@ def test_crotch_clears_the_arm_through_the_whole_swing() -> None:
         float(rod.GEOMETRIC_TOLERANCES_MM["rocker pin hole position"])
         + float(arm.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
     ) / 2.0
-    pin_drop = (b["running_clearance_max"] + b["tine_hole_clearance_max"]) / 2.0
+    pin_drop = b["running_clearance_max"] / 2.0
     clearance = worst - hole_wander - pin_drop
     assert clearance >= pin.CROTCH_CLEARANCE_MIN
     # The spec's closed-form budget is the same envelope, on its restated swing.

@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the connecting rod.
 
 The SLDPRT remains authoritative.  This recipe supplies only the connecting-rod
-views, dimension layout, hole callouts, and manufacturing notes; every shared
+views, dimension layout, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
@@ -21,7 +21,6 @@ from typing import Any
 
 from ch_connecting_rod_spec import GEOMETRIC_TOLERANCES_MM
 
-import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -29,10 +28,8 @@ from _drawing_common import (
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
-    add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
-    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -43,21 +40,15 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
-from _gear_drawing_entities import visible_circle_edge
-from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from ch_connecting_rod_notes import (
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION,
-    PIN_CSK_CALLOUT,
-)
+from ch_connecting_rod_notes import DRAWING_DIMENSIONS
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
     FORK_BASE_Y,
     FORK_CROTCH_Y,
     FORK_TOP_Y,
-    PIN_HOLE_SPEC,
+    PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
     SURFACE_FINISHES,
@@ -79,7 +70,7 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
-_PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
+_PIN_HOLE_DIA = PIN_HOLE_DIA
 
 SHEET_SCALE = (1.0, 1.0)  # 1:1
 
@@ -119,9 +110,6 @@ FRONT_KEEP = {
     "StrapBoreDia": (0.190, 0.052),
     "ShankWidthDim": (0.180, 0.150),
     "ForkWidthDim": _sheet_xy(0.0, FORK_TOP_Y + 8.0),
-    # The countersink Ø (its reference sketch, shown in this view only) reads
-    # below and right of the fork, clear of the FCF and the notes column.
-    "PinCskDia": (0.205, 0.200),
 }
 # The fork's 3-place thickness and slot stack above the crown; the slot depth
 # and the boss length run from the tine tops down the right-hand side.
@@ -198,10 +186,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    # The countersink Ø lives in a reference sketch the part saves hidden, so
-    # the front view curates through _drawing_hidden_sketches, which shows it
-    # in this view only.
-    front_annotations = hidden_sketches.curate_view_dimensions(
+    front_annotations = curate_view_dimensions(
         adapter,
         front,
         keep=FRONT_KEEP,
@@ -215,20 +200,15 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="left",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    assert_imported_precision(
-        adapter, front_annotations, DRAWING_PRECISION["CountersinkReference"]
-    )
-    # The strap-bore tolerance and the countersink band import with their
-    # named model dimensions.  The drawing owns only this descriptive text
-    # beneath the native value/band; the fork's crown is a full round on the
-    # pin, tangent to its sides.
+    # The strap-bore tolerance imports with its named model dimension.  The
+    # drawing owns only this descriptive text beneath the native value/band;
+    # the fork's crown is a full round on the pin, tangent to its sides.
     set_dimension_callouts(
         adapter,
         front_annotations,
         {
             "StrapBoreDia": "BORE",
             "ForkWidthDim": "FULL R",
-            "PinCskDia": PIN_CSK_CALLOUT,
         },
     )
 
@@ -239,8 +219,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # dimensions circle edges centre-to-centre); box it BASIC.  Pick each bore's
     # LEFT rim -- the pin bore is tiny and sits inside the fork crown, so a TOP
     # pick snapped to the crown arc (read 145.07); the left rim is on the pin
-    # circle, clear of the wider crown.  The countersink rims beside it are
-    # concentric, so either pick dimensions centre to centre.
+    # circle, clear of the wider crown.
     ring_rim = _sheet_xy(-RING_BORE_DIA / 2.0, 0.0)
     pin_rim = _sheet_xy(-_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     centre_distance = add_edge_dimension(
@@ -252,17 +231,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod centre distance",
     )
     set_basic_dimension(adapter, centre_distance, label="rod centre distance")
-
-    # Pivot pin hole native callout, on the drill's own circle: a rim pick now
-    # lands 0.6 mm from the countersink rim, which is a chamfer edge the Hole
-    # Wizard callout cannot carry.  The countersink Ø is its own dimension.
-    add_native_hole_callout(
-        adapter,
-        front,
-        edge=visible_circle_edge(adapter, front, _PIN_HOLE_DIA),
-        callout_xy=(0.240, 0.243),
-        label="rocker pin hole",
-    )
 
     # Datum A on the strap bore axis (picked at 9 o'clock so the tag stands off
     # to the LEFT), Ra on the bore at 6 o'clock, and a position FCF tying the
@@ -306,9 +274,8 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
         label="strap bore finish",
     )
-    # The hole callout leaves the drill circle for the lane above the crown;
-    # the FCF attaches at the 3-o'clock rim with a level leader below that
-    # lane, so the two leaders cannot cross.
+    # The reamed pin hole is dimensioned in note 5; the FCF attaches at its
+    # 3-o'clock rim with a level leader.
     pin_fcf_rim = _sheet_xy(_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     add_feature_control_frame(
         adapter,

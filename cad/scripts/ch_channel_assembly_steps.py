@@ -19,7 +19,7 @@ NORTH_BRACKET_SET_KEY = "north-pivot-bracket-set"
 NORTH_BRACKET_SET_REF = dt_drive_train_steps.step_ref(NORTH_BRACKET_SET_KEY)
 # Each rod's ring is captured in its closed cam slot as the cylinder stack goes
 # together (MHA-DT-000 BANK_STEPS), and the rod's fork is pinned to its arm with
-# a pin peened at the bench, so the rod + arm pair must be pinned BEFORE that
+# a pin pressed at the bench, so the rod + arm pair must be pinned BEFORE that
 # step: the pinning step points there by key, and that drive-train step points
 # back at the pinning step (RODS_PINNED_KEY). The hub stack is proved on the
 # shaft first, while the arms are still loose.

@@ -10,7 +10,6 @@ is the drift alarm the offline test enforces.
 
 from __future__ import annotations
 
-from _hole_spec import HoleSpec
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -58,17 +57,19 @@ FORK_TINE_MATCH = 0.10
 # The flat slot floor (the crotch) below the pin centre. The arm's curved
 # bottom edge dips into the slot as the arm turns on the pin; the floor clears
 # it by 1.0 MIN at the printed worst case of both parts through the solved
-# swing (ch_rod_pivot_pin_spec.BUDGET: 1.15 worst, 3.30 nominal).
+# swing (ch_rod_pivot_pin_spec.BUDGET: 1.21 worst, 3.30 nominal).
 FORK_CROTCH_BELOW_PIN = 9.75
 # The fork boss's root step onto the shank. The bridge below the slot floor
 # (ForkBossLength less SlotDepth, both .XX from the crown top) keeps 2.0 MIN.
 FORK_BASE_BELOW_PIN = 13.0
-PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
-# 90-degree countersink on both tine outer faces: the peened pin ends fill
-# them (ch_rod_pivot_pin_spec). Printed 3-place: the fill volume is the
-# pin blank's upset allowance.
-PIN_HOLE_CSK_DIA = 3.2
-PIN_HOLE_CSK_BAND = (0.127, -0.127)  # (upper, lower) deviations
+# The MHA-CH-010 rod pivot pin presses into this hole through both tines and
+# runs in the arm's #47 rod hole (user ruling 2026-10-09, PR #1292 review F1,
+# press fit as the bar pin; ch_rod_pivot_pin_spec holds the fit budget).
+# Reamed to H7 under the 5/64 drill rod: the 0.0775 in stock reamer cuts
+# inside the band. No countersink: the reamed hole runs straight through each
+# tine, so the tine's whole thickness is the pin's land.
+PIN_HOLE_DIA = 1.968
+PIN_HOLE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed; native
 
 # --- Derived spans (mirror build_ch_connecting_rod). ---
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4

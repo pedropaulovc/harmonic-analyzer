@@ -13,7 +13,6 @@ import draw_ch_connecting_rod as drawing
 import build_ch_connecting_rod as rod
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _hole_spec import blind_cut_dia_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -76,39 +75,79 @@ def test_fork_reference_lengths_run_from_the_crown_top() -> None:
 
 def test_analytic_volumes_follow_the_fork_geometry() -> None:
     spec = ch_connecting_rod_spec
-    drill = blind_cut_dia_mm(spec.PIN_HOLE_SPEC)
-    assert rod.PIN_DRILL_DIA == drill
-    # A 90-degree countersink is an equal-leg chamfer from the drill to its
-    # diameter, and it must stay inside the tine.
-    assert rod.PIN_CSK_LEG == pytest.approx((spec.PIN_HOLE_CSK_DIA - drill) / 2.0)
-    assert 0.0 < rod.PIN_CSK_LEG < spec.FORK_TINE_THICKNESS
+    hole = spec.PIN_HOLE_DIA
     crown = math.pi * spec.FORK_CROWN_RADIUS**2 / 2.0
     fork_area = spec.FORK_WIDTH * spec.FORK_BASE_BELOW_PIN + crown
     assert rod.fork_outline_area(spec.FORK_BASE_Y) == pytest.approx(fork_area)
     slot_area = spec.FORK_WIDTH * spec.FORK_CROTCH_BELOW_PIN + crown
     assert rod.slot_volume() == pytest.approx(slot_area * spec.FORK_SLOT_WIDTH)
-    # The drill crosses the slot: it cuts only the two tines.
+    # The reamed hole crosses the slot: it cuts only the two tines.
     assert rod.pin_hole_volume() == pytest.approx(
-        math.pi * (drill / 2.0) ** 2 * 2.0 * spec.FORK_TINE_THICKNESS
+        math.pi * (hole / 2.0) ** 2 * 2.0 * spec.FORK_TINE_THICKNESS
     )
     assert rod.finished_volume() == pytest.approx(
         rod.boss_volume()
         - rod.slot_volume()
         - rod.strap_bore_volume()
         - rod.pin_hole_volume()
-        - rod.pin_countersink_volume()
     )
     assert 0.0 < rod.finished_volume() < rod.boss_volume()
 
 
-def test_pin_hole_is_part_owned_and_drawing_geometry_is_derived() -> None:
-    assert rod.PIN_HOLE_SPEC is ch_connecting_rod_spec.PIN_HOLE_SPEC
-    assert drawing.PIN_HOLE_SPEC is ch_connecting_rod_spec.PIN_HOLE_SPEC
-    assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(ch_connecting_rod_spec.PIN_HOLE_SPEC)
+def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
+    """User ruling 2026-10-09 (PR #1292 review F1): the MHA-CH-010 pin is
+    pressed into both tines as the bar pin is into the amplitude bar
+    (ch_rod_pivot_pin_spec holds the fit), so the hole is reamed to a band of
+    its own, native on PinHoleDia, not a #47 drill."""
+    import _config
+
+    spec = ch_connecting_rod_spec
+    assert rod.PIN_HOLE_DIA is spec.PIN_HOLE_DIA
+    assert rod.PIN_HOLE_BAND is spec.PIN_HOLE_BAND
+    assert drawing._PIN_HOLE_DIA is spec.PIN_HOLE_DIA
+    assert spec.PIN_HOLE_DIA == 1.968
+    assert spec.PIN_HOLE_BAND == (0.010, 0.0)
+    assert not hasattr(spec, "PIN_HOLE_SPEC")
+    assert model_toleranced_dimensions(rod)[("PinHoleProfile", "PinHoleDia")] == (
+        "*deviations(PIN_HOLE_BAND)"
+    )
+    build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
+    assert 'set_global(adapter,"PinHoleDia",f"{PIN_HOLE_DIA}mm")' in build
+    assert 'names=(None,"PinHoleY","PinHoleDia")' in build
+    assert "drives=(None,'\"CenterDistance\"','\"PinHoleDia\"')" in build
+    assert 'name_last_feature(adapter,"PinHoleProfile")' in build
+    assert 'name_last_feature(adapter,"PinHole")' in build
+    assert (
+        ch_connecting_rod_notes.PIN_NUMBER
+        == _config.parts("ch-rod-pivot-pin")["number"]
+    )
+
+
+def test_the_pin_bears_on_the_whole_tine() -> None:
+    """PR #1292 review F1 regression: a 90-degree Ø3.2 countersink sunk into
+    each tine for a peened end left 0.92 of land under the pin, under rule
+    12's 1.5 floor, while the budget only checked the tine. Built
+    independently of the joint budget: the build removes nothing at the pin
+    but one straight cylinder through both tines (no chamfer, no second cut
+    sunk into a tine face), so the pin's land in each tine is the thinnest
+    tine the fork and slot bands leave."""
+    spec = ch_connecting_rod_spec
     source = Path(rod.__file__).read_text(encoding="utf-8")
-    assert "HoleSpec(" not in source
-    assert "\n        PIN_HOLE_SPEC," in source
-    assert "expect_dia_mm=blind_cut_dia_mm(PIN_HOLE_SPEC)" in source
+    assert "add_chamfer(" not in source
+    assert "wizard_holes(" not in source
+    assert source.count("create_cut_extrude(") == 3  # slot, strap bore, pin hole
+    assert not [name for name in dir(rod) if "countersink" in name.lower()]
+    assert not [name for name in dir(spec) if "CSK" in name]
+    thinnest_tine = (
+        spec.FORK_THICKNESS
+        + spec.FORK_THICKNESS_BAND[1]
+        - (spec.FORK_SLOT_WIDTH + spec.FORK_SLOT_BAND[0])
+    ) / 2.0 - spec.FORK_TINE_MATCH / 2.0
+    assert thinnest_tine == pytest.approx(1.5865)
+    assert thinnest_tine >= 1.5  # drawing-simplicity rule 12 floor
+    # Positive control: the countersink this replaced fails the same check.
+    old_csk_depth = (3.2 + 0.127 - 1.994) / 2.0  # 90-degree: depth = radial step
+    assert thinnest_tine - old_csk_depth < 1.5
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
@@ -129,21 +168,20 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
 
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = ch_connecting_rod_notes.DRAWING_NOTES
-    # The pin hole rides its native Ø1.99 THRU ALL callout, its countersink Ø
-    # imports from the model, the bore its imported model tolerance and the
-    # fork its 3-place model bands; notes never repeat a sheet dimension.
+    # The reamed pin hole is dimensioned in note 5 (the amplitude bar's
+    # pattern), the bore rides its imported model tolerance and the fork its
+    # 3-place model bands; notes never repeat a sheet dimension.
     assert "#47" not in notes
-    # #948 ruling R: one 2.200 plate at three places (title block linear_3pl).
-    assert "2. RING AND SHANK 2.200 THICK;" in notes
-    assert "SYMMETRIC TO SLOT WITHIN 0.10." in notes
     assert "3.00" not in notes and "2.50" not in notes
     assert "0.10 MIN CLR/SIDE" in notes
     assert "RING WALL 4.50 MIN AFTER BORING" in notes
     assert "SLOT CENTRED; TINES EQUAL WITHIN 0.10" in notes
     assert f"{ch_connecting_rod_spec.FORK_TINE_MATCH:.2f}" in notes
-    # Peening is a reconstruction choice (issue #746), and the notes say so.
-    assert "PEEN PIN MHA-CH-010 INTO BOTH CSKS" in notes
-    assert "RECONSTRUCTION CHOICE #746" in notes
+    # The press fit (user ruling 2026-10-09, PR #1292 review F1) names its
+    # pin; the reamed band is the model's, native on PinHoleDia.
+    assert "5. PIN HOLE \u00d81.968 +0.010/0 REAM THRU" in notes
+    assert "BOTH TINES; PRESS FIT PIN MHA-CH-010." in notes
+    assert "PEEN" not in notes and "CSK" not in notes and "#746" not in notes
     assert "HEAD" not in notes
     assert "DRAFT" not in notes  # machined from plate, not cast
     assert "HANGS PLUMB" not in notes  # not an inspectable requirement
@@ -158,7 +196,6 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     for fork_dimension in (
         ch_connecting_rod_spec.FORK_THICKNESS,
         ch_connecting_rod_spec.FORK_SLOT_WIDTH,
-        ch_connecting_rod_spec.PIN_HOLE_CSK_DIA,
     ):
         assert f"{fork_dimension:.2f}" not in notes
     assert max(len(line) for line in notes.splitlines()) <= 40
@@ -178,15 +215,12 @@ def test_native_gdt_and_finish_present() -> None:
     assert '"StrapBoreDia": "BORE"' in source
     assert "+0.10/0" not in source
     assert "add_surface_finish(" in source
-    assert "add_native_hole_callout(" in source
-    # The callout takes the drill's own circle (a rim pick lands next to the
-    # countersink's chamfer edge); the position FCF anchors the 3-o'clock rim.
-    assert "edge=visible_circle_edge(adapter, front, _PIN_HOLE_DIA)" in source
+    # The reamed hole is dimensioned in note 5, so no hole callout prints it
+    # twice; the position FCF anchors the hole's 3-o'clock rim.
+    assert "add_native_hole_callout(" not in source
     assert source.count("edge_xy=pin_fcf_rim") == 1
-    # The countersink Ø is a model dimension with its band, never typed text.
-    assert "_add_countersink_line" not in source
     assert "SetText(4" not in source
-    assert not hasattr(ch_connecting_rod_notes, "PIN_CSK_QUALIFIER")
+    assert not hasattr(ch_connecting_rod_notes, "PIN_CSK_CALLOUT")
 
 
 def test_datum_b_leader_clears_the_shank_width_text() -> None:
@@ -206,33 +240,21 @@ def test_datum_b_leader_clears_the_shank_width_text() -> None:
     assert ring_top < leader_y < fork_root
 
 
-def test_countersink_diameter_is_model_owned() -> None:
-    """The Ø3.200 +/-0.127 countersink prints from a blanked reference sketch
-    whose dimension and the chamfer's unprinted leg share one knob."""
-    marked = ch_connecting_rod_notes.DRAWING_DIMENSIONS
-    assert marked["CountersinkReference"] == {"PinCskDia"}
-    assert ch_connecting_rod_notes.DRAWING_PRECISION["CountersinkReference"] == {
-        "PinCskDia": 3
-    }
-    assert "PinCskDia" in drawing.FRONT_KEEP
-    build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
-    assert 'set_global(adapter,"PinCskDia",f"{PIN_HOLE_CSK_DIA}mm")' in build
-    assert 'name_dimensions(adapter,"PinCountersinks",["PinCskLeg"])' in build
-    # The leg runs from the drill the wizard cut, so the rim lands on PinCskDia
-    # exactly (test_ch_rod_pivot_fit: the installed pin's flare fills it).
-    assert 'drill_cut=f"{pin_cut.hole_dia_mm:.9g}"' in build
-    assert "(csk_leg_dim[0],f'(\"PinCskDia\"-{drill_cut}mm)/2')" in build
-    assert "(PIN_HOLE_CSK_DIA-float(drill_cut))/2.0," in build
-    assert 'names=(None,"PinCskRefY","PinCskDia")' in build
-    assert 'blank_reference_sketches(adapter,("CountersinkReference",))' in build
-    # The chamfer leg's drive evaluates to the leg the build cuts.
-    assert rod.PIN_CSK_LEG == pytest.approx(
-        (ch_connecting_rod_spec.PIN_HOLE_CSK_DIA - rod.PIN_DRILL_DIA) / 2.0
-    )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "hidden_sketches.curate_view_dimensions(" in source
-    assert '"PinCskDia": PIN_CSK_CALLOUT' in source
-    assert ch_connecting_rod_notes.PIN_CSK_CALLOUT == "90\u00b0 CSK BOTH SIDES"
+def test_ring_and_shank_note_is_the_spec_s_plate() -> None:
+    """PR #1292 review F4: note 2 prints the one plate thickness and its
+    symmetry zone from the spec, so a spec edit can never leave the print
+    stating the old plate (#948 ruling R: 2.200 at three places, the title
+    block's linear_3pl band, which the spec's band restates)."""
+    import _config
+
+    spec = ch_connecting_rod_spec
+    lines = ch_connecting_rod_notes.DRAWING_NOTES.splitlines()
+    assert lines[2] == f"2. RING AND SHANK {spec.RING_THICKNESS:.3f} THICK;"
+    assert lines[3] == f"   SYMMETRIC TO SLOT WITHIN {spec.RING_SLOT_SYMMETRY:.2f}."
+    assert spec.SHANK_THICKNESS == spec.RING_THICKNESS
+    assert spec.SHANK_THICKNESS_BAND == spec.RING_THICKNESS_BAND
+    linear_3pl = _config.title_block("linear_3pl")["value_in"] * 25.4
+    assert spec.RING_THICKNESS_BAND == pytest.approx((linear_3pl, -linear_3pl))
 
 
 def test_fork_print_is_three_place_and_model_owned() -> None:
@@ -244,7 +266,6 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
     assert ch_connecting_rod_notes.DRAWING_PRECISION == {
         "ForkBoss": {"ForkThick": 3},
         "ForkSlotProfile": {"SlotWidth": 3},
-        "CountersinkReference": {"PinCskDia": 3},
     }
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
     assert 'name_dimensions(adapter,"ForkBoss",["ForkThick"])' in build
@@ -261,7 +282,7 @@ def test_model_bands_are_owned_by_named_model_dimensions() -> None:
         ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)",
         ("ForkBoss", "ForkThick"): "fork_upper",
         ("ForkSlotProfile", "SlotWidth"): "*deviations(FORK_SLOT_BAND)",
-        ("CountersinkReference", "PinCskDia"): "csk_upper",
+        ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
     }
 
 

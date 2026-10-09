@@ -29,7 +29,6 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from ch_pivot_shaft_spec import DOME_HEIGHT
-from ch_rod_pivot_pin_spec import PIN_END_PROUD_MAX
 from rocker_bank_layout import (
     COUNT,
     PLAIN_END_CUT_BAND,
@@ -88,8 +87,8 @@ def _fitup_steps() -> str:
     cut_low, cut_high = (DOME_HEIGHT + band for band in reversed(PLAIN_END_CUT_BAND))
     text = {
         # The rings are captured in the closed cam slots as the cylinder stack
-        # goes together, and the peened pin needs a bucking bar on its far end,
-        # so each rod + arm pair is pinned at the bench before that step -- and
+        # goes together, and the pressed pin needs its far tine backed on the
+        # press, so each rod + arm pair is pinned at the bench before that step -- and
         # after the hub stack is proved on the shaft, while the arms are loose.
         "rocker-stack-accepted": (
             f"STACK THE {COUNT} {arm} ROCKERS ON THE {shaft} SHAFT, HUB {last} "
@@ -99,9 +98,8 @@ def _fitup_steps() -> str:
         ),
         "rod-forks-pinned": (
             f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH: PIN EACH {rod} "
-            f"ROD FORK TO ITS {arm} ARM WITH ONE {pin}. PEEN BOTH ENDS INTO "
-            f"THE COUNTERSINKS; DRESS TO {PIN_END_PROUD_MAX:.2f} PROUD MAX. "
-            "ACCEPT IF THE ARM SWINGS FREE UNDER ITS OWN WEIGHT."
+            f"ROD FORK TO ITS {arm} ARM WITH ONE {pin}. PRESS IT IN, FAR TINE "
+            "BACKED; DRESS BOTH ENDS FLUSH. DRIVE OUT WITH A PUNCH. ACCEPT IF THE ARM SWINGS FREE UNDER ITS OWN WEIGHT."
         ),
         "north-ear-datum": (
             f"BASE ON THE MILL, DRO ZEROED, NORTH {bracket} LIFTED "

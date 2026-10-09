@@ -4,7 +4,7 @@ Black rod machined from 1018 low-carbon steel plate, converting each cam's
 rotation into the rocker arm's see-saw: a full ring (strap) riding the Ø30.6
 eccentric cam (cast integral with each cylinder gear), a thin flat shank, and a
 U-shaped FORK (clevis; the Y-shaped upper end of the ch14 fan photo) whose two
-tines straddle the rocker arm's 2.500 strap and carry the peened pivot pin
+tines straddle the rocker arm's 2.500 strap and carry the pressed pivot pin
 (MHA-CH-010, ch_rod_pivot_pin_spec) through the arm's rod-pin hole near its
 rod-side tip. Centre distance 163.10103: the rod hangs PLUMB with the arm
 LEVEL after the fixed-post photos show every rod dropping vertically from the
@@ -18,9 +18,11 @@ plane and the arm plane (rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ), so the
 arm runs centred in the fork slot. The fork is 10 wide with a full-round
 crown on the pin, 6.075 +/-0.05 over the tines with a 2.625 +0.127/0 slot
 (Main ruling 2026-10, option b): each inter-arm gap holds one tine of each
-neighbouring rod, so both are 3-place model bands. Peening the pin into
-countersinks on both tine faces is a RECONSTRUCTION choice (issue #746): the
-photos show two rod cheeks round each rocker, not the original fastener.
+neighbouring rod, so both are 3-place model bands. The pin is pressed into a
+hole reamed through both tines and dressed flush (user ruling 2026-10-09, PR
+#1292 review F1, reversing the #746 reconstruction choice of peening it into
+countersinks): the photos show two rod cheeks round each rocker, not the
+original fastener.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 13" rod rows - centre distance
 derived (high), ring bore derived from the cam OD + confirmed on the p.25
@@ -32,10 +34,6 @@ Layout: ring centre at the origin, shank rising +Y to the fork; thicknesses
 extruded mid-plane in Z. Build order matters: ring disc, shank and fork are
 bossed first, the slot is cut through the fork, then the bore is cut so the
 strap opening also trims the shank sliver that dips into it.
-
-``CountersinkReference`` (blanked, on the Front plane, round the pin hole):
-the printed countersink Ø and its band; the chamfer that cuts it carries only
-an unprinted leg, driven from the same knob.
 
 Run (SolidWorks already open)::
 
@@ -52,7 +50,6 @@ from _common import (
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
-    blank_reference_sketches,
     check,
     define_circle,
     define_rectilinear_chain,
@@ -70,8 +67,6 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _hole_spec import blind_cut_dia_mm
-from _holes import wizard_holes
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -98,9 +93,8 @@ from ch_connecting_rod_spec import (
     FORK_THICKNESS_BAND,
     FORK_TOP_Y,
     FORK_WIDTH,
-    PIN_HOLE_CSK_BAND,
-    PIN_HOLE_CSK_DIA,
-    PIN_HOLE_SPEC,
+    PIN_HOLE_BAND,
+    PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BORE_DIA_BAND,
     RING_OUTER_RADIUS,
@@ -130,23 +124,18 @@ MATERIAL = "Plain Carbon Steel"
 # ch_connecting_rod_spec so the part, channel and drawing move as one recipe.
 # The fork (the "Y" upper end of the ch14 fan photo, read as two cheeks round
 # each rocker): a U-shaped clevis whose tines straddle the rocker strap and
-# retain the peened pivot pin. Its proportions live in ch_connecting_rod_spec;
+# hold the pressed pivot pin. Its proportions live in ch_connecting_rod_spec;
 # the slot cut runs out SLOT_RUNOUT above the crown so the crown alone shapes
 # the tine tops.
 SLOT_RUNOUT = 1.0  # unprinted
-# The rocker pivot pin hole is a native Hole Wizard number-drill feature; its
-# identity lives in ch_connecting_rod_spec.
+# The rocker pivot pin hole is a reamed press hole; its size and band live in
+# ch_connecting_rod_spec.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness or width
 
 SHANK_START_Y = RING_BORE_DIA / 2.0 - 0.5  # overlaps the strap annulus
 FORK_BOSS_LENGTH = FORK_TOP_Y - FORK_BASE_Y  # crown top -> root step (18.0)
 SLOT_DEPTH = FORK_TOP_Y - FORK_CROTCH_Y  # crown top -> slot floor (14.75)
 SLOT_CUT_HEIGHT = SLOT_DEPTH + SLOT_RUNOUT
-PIN_DRILL_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
-# 90-degree countersink = an equal-distance chamfer whose leg is the radial
-# step from the drill to the countersink diameter (the analytic volumes; the
-# build cuts the leg from the drill the wizard reports, see PinCountersinks).
-PIN_CSK_LEG = (PIN_HOLE_CSK_DIA - PIN_DRILL_DIA) / 2.0
 
 
 def _circle_cap_area(radius: float, half_width: float) -> float:
@@ -186,23 +175,12 @@ def strap_bore_volume() -> float:
 
 
 def pin_hole_volume() -> float:
-    """The drill crosses the slot, so it only cuts the two tines."""
-    return math.pi * (PIN_DRILL_DIA / 2.0) ** 2 * (FORK_THICKNESS - FORK_SLOT_WIDTH)
-
-
-def pin_countersink_volume() -> float:
-    """Two 90-degree chamfer rings on the drill mouths."""
-    return 2.0 * math.pi * PIN_CSK_LEG**2 * (PIN_DRILL_DIA / 2.0 + PIN_CSK_LEG / 3.0)
+    """The reamed hole crosses the slot, so it only cuts the two tines."""
+    return math.pi * (PIN_HOLE_DIA / 2.0) ** 2 * (FORK_THICKNESS - FORK_SLOT_WIDTH)
 
 
 def finished_volume() -> float:
-    return (
-        boss_volume()
-        - slot_volume()
-        - strap_bore_volume()
-        - pin_hole_volume()
-        - pin_countersink_volume()
-    )
+    return boss_volume() - slot_volume() - strap_bore_volume() - pin_hole_volume()
 
 
 async def build(adapter) -> dict[str, str]:
@@ -228,9 +206,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ForkCrotchBelowPin", f"{FORK_CROTCH_BELOW_PIN}mm")
     await set_global(adapter, "ForkBaseBelowPin", f"{FORK_BASE_BELOW_PIN}mm")
     await set_global(adapter, "SlotRunout", f"{SLOT_RUNOUT}mm")
-    await set_global(adapter, "PinCskDia", f"{PIN_HOLE_CSK_DIA}mm")
-    # (The old PinHoleDia knob is gone: the rocker pin hole is now a native Hole
-    # Wizard feature whose standard diameter is part-owned.)
+    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
     await set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
     await set_global(adapter, "ShankStartY", '"RingBoreDia" / 2 - 0.5mm')
     await set_global(adapter, "ForkBaseY", '"CenterDistance" - "ForkBaseBelowPin"')
@@ -494,69 +470,38 @@ async def build(adapter) -> dict[str, str]:
     v_expected -= strap_bore_volume()
     await volume_check(adapter, "strap bore", v_expected, 0.002 * v_expected)
 
-    # Pivot pin hole on the rod axis, drilled +Z from the front tine's outer
-    # face through both tines (the slot between them is air). The pin RUNS in
-    # the arm's #47 hole and is RETAINED here, peened into the countersinks.
-    pin_cut = wizard_holes(
-        adapter,
-        PIN_HOLE_SPEC,
-        [[0.0, CENTER_DISTANCE, FORK_THICKNESS / 2.0]],
-        (0.0, 0.0, 1.0),
-        "rocker pin hole",
-        name="PinHole",
-        placement_dims=[((None, None), ("PinCz", '"CenterDistance"'))],
-        expect_dia_mm=blind_cut_dia_mm(PIN_HOLE_SPEC),
-    )
-    drive_jobs += pin_cut.placement_drive_jobs
-    v_pin = pin_hole_volume()
-    v_expected -= v_pin
-    await volume_check(adapter, "pin hole through both tines", v_expected, 0.03 * v_pin + 0.05)
-    # 90-degree countersinks on both tine outer faces: the peened pin ends
-    # upset into them (ch_rod_pivot_pin_spec). Edge picks sit on the drill
-    # mouths' +X rims; the chamfer's leg is unprinted, driven from the
-    # countersink Ø the reference sketch below prints. The leg runs from the
-    # drill the wizard CUT (#47 = 0.0785 in = 1.9939), not the 3-place table's
-    # 1.994: a table leg leaves the rim Ø3.1999, 0.05 um radially inside the
-    # installed pin's Ø3.200 flare -- a sliver interference at every pin.
-    drill_cut = f"{pin_cut.hole_dia_mm:.9g}"
-    pin_r = float(drill_cut) / 2.0
-    check(
-        "countersink pin hole mouths",
-        await adapter.add_chamfer(
-            (PIN_HOLE_CSK_DIA - float(drill_cut)) / 2.0,
-            [
-                [pin_r, CENTER_DISTANCE, z_face]
-                for z_face in (-FORK_THICKNESS / 2.0, FORK_THICKNESS / 2.0)
-            ],
-        ),
-    )
-    name_last_feature(adapter, "PinCountersinks")
-    csk_leg_dim = name_dimensions(adapter, "PinCountersinks", ["PinCskLeg"])
-    drive_jobs.append((csk_leg_dim[0], f'("PinCskDia" - {drill_cut}mm) / 2'))
-    v_csk = pin_countersink_volume()
-    v_expected -= v_csk
-    v_built = await volume_check(
-        adapter, "pin-hole countersinks", v_expected, 0.03 * v_csk + 0.05
-    )
-
-    # REFERENCE sketch: the printed countersink Ø, round the pin hole on the
-    # mid-plane (the front view projects it onto the tine faces' rims).
-    csk_ref = SketchDims()
-    check("create_sketch countersink reference", await adapter.create_sketch("Front"))
+    # Pivot pin hole on the rod axis, reamed through both tines (the slot
+    # between them is air). The pin RUNS in the arm's #47 hole and is PRESSED
+    # here, its ends dressed flush (ch_rod_pivot_pin_spec). No countersink: the
+    # hole runs straight through each tine, so the pin bears on the whole tine.
+    pin_hole = SketchDims()
+    check("create_sketch rocker pin hole", await adapter.create_sketch("Front"))
     await define_circle(
         adapter,
         0.0,
         CENTER_DISTANCE,
-        PIN_HOLE_CSK_DIA / 2.0,
-        "countersink reference",
-        dims=csk_ref,
-        names=(None, "PinCskRefY", "PinCskDia"),
-        drives=(None, '"CenterDistance"', '"PinCskDia"'),
+        PIN_HOLE_DIA / 2.0,
+        "rocker pin hole",
+        dims=pin_hole,
+        names=(None, "PinHoleY", "PinHoleDia"),
+        drives=(None, '"CenterDistance"', '"PinHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "countersink reference sketch")
-    check("exit_sketch countersink reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "CountersinkReference")
-    drive_jobs += csk_ref.apply(adapter, "CountersinkReference")
+    await ensure_fully_defined(adapter, "rocker pin hole sketch")
+    check("exit_sketch rocker pin hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinHoleProfile")
+    drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
+    check(
+        "cut rocker pin hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "PinHole")
+    v_pin = pin_hole_volume()
+    v_expected -= v_pin
+    v_built = await volume_check(
+        adapter, "pin hole through both tines", v_expected, 0.03 * v_pin + 0.05
+    )
 
     # Named bore axes for assembly mates (view-independent name selection):
     # Axis1 = strap bore on the cam (origin), Axis2 = pivot pin bore (0, CD).
@@ -600,14 +545,10 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "ForkSlotProfile", "SlotWidth", *deviations(FORK_SLOT_BAND)
     )
-    # The countersink Ø is the peened ends' fill volume: three places, +/-.
-    csk_lower, csk_upper = deviations(PIN_HOLE_CSK_BAND)
-    if csk_lower != -csk_upper:
-        raise AssertionError(
-            "ch_connecting_rod_spec.PIN_HOLE_CSK_BAND must be symmetric"
-        )
-    set_dimension_symmetric_tolerance(
-        adapter, "CountersinkReference", "PinCskDia", csk_upper
+    # The reamed press hole's band rides natively on its diameter; the sheet
+    # states it in note 5 (the hole is dimensioned in the notes).
+    set_dimension_bilateral_tolerance(
+        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
@@ -628,7 +569,6 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    blank_reference_sketches(adapter, ("CountersinkReference",))
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,

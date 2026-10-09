@@ -13,9 +13,10 @@ cheeks and the lever's #47 bar-pin hole. The pin RUNS in the lever (the one
 moving member) and is PRESSED into holes reamed through both cheeks, its ends
 dressed flush with the bar's faces: the bar-to-bar side gap leaves no room
 for anything proud (issue #1038). Press-fit retention is the user's choice
-(2026-10): the #746 rod-fork joint peens its pin into countersinks, but the
-bar's 1.575 cheeks leave no bearing land under a countersink, and a pressed
-pin drives out with a punch.
+(2026-10): the bar's 1.575 cheeks leave no bearing land under a countersink,
+and a pressed pin drives out with a punch. The MHA-CH-010 rod-fork pin
+(``ch_rod_pivot_pin_spec``) follows it (user ruling 2026-10-09, PR #1292
+review F1).
 
 Frame (part): pin axis = part X (Top ∩ Front, named Axis1), axial mid-plane =
 Right Plane (x = 0), as build_ch_bar_pivot_pin revolves it; the

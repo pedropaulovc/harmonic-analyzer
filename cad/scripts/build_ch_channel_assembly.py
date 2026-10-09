@@ -33,8 +33,9 @@ the M6.8 mirror layer is gone).
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),
-  rod-pivot-pin x20 (MHA-CH-010, one peened 5/64 drill-rod pin through each
-  rod's fork and its arm's rod hole, lock-mated to the rod),
+  rod-pivot-pin x20 (MHA-CH-010, one 5/64 drill-rod pin pressed through
+  each rod's fork tines and running in its arm's #47 rod hole, lock-mated to
+  the rod),
   bar-pivot-pin x20 (MHA-CH-011, one 5/64 drill-rod pin pressed through
   each bar's top-notch cheeks and running in its lever's #47 bar-pin hole,
   lock-mated to the bar),
@@ -1785,14 +1786,22 @@ async def build(adapter) -> dict[str, str]:
     # Rod-pivot pins (MHA-CH-010): one per channel, OUTSIDE the CopyWithMates
     # slice, so the pinned slice contract (SLICE_MATES / SLICE_EXTERNAL / the
     # per-part mate counts above) never sees them. Each pin is modelled
-    # installed -- peened flush into the fork's countersinks, its axis the
+    # installed -- pressed through the fork's reamed tines and dressed flush
+    # with both (user ruling 2026-10-09, PR #1292 review F1), its axis the
     # rod's pin axis (Axis2@rod), its axial mid-plane the rod's Front plane --
     # so it is inserted at the rod's SOLVED pose and locked to the rod: it is
-    # retained in the fork tines and runs in the arm's #47 hole with the rod,
+    # pressed in the fork tines and runs in the arm's #47 hole with the rod,
     # adding no DOF. It reads under-constrained with its free rod
-    # (ch-channel.yaml allowed_free_stems).
+    # (ch-channel.yaml allowed_free_stems). Channel j's pin is the (j + 1)th
+    # instance, like its rod, so _interference_contracts can name each
+    # modelled press pair exactly.
     for j in range(CHANNELS):
         rod = rod_by_channel[j]
+        if rod != f"ch-connecting-rod-{j + 1}":
+            raise RuntimeError(
+                f"ch{j:02d} rod is {rod!r}, not ch-connecting-rod-{j + 1} -- the"
+                " press-fit interference contract would name the wrong pair"
+            )
         a = component_transform(adapter, rod)
         pin_rows = [list(a[0:3]), list(a[3:6]), list(a[6:9])]
         pin_at = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
@@ -1814,8 +1823,13 @@ async def build(adapter) -> dict[str, str]:
             euler_from_rows(pin_rows),
             pin_rows,
             ground=False,
-            label=f"rod-pivot-pin ch{j:02d} installed",
+            label=f"rod-pivot-pin ch{j:02d} pressed",
         )
+        if pin != f"ch-rod-pivot-pin-{j + 1}":
+            raise RuntimeError(
+                f"ch{j:02d} pin is {pin!r}, not ch-rod-pivot-pin-{j + 1} -- the"
+                " press-fit interference contract would name the wrong pair"
+            )
         await lock_mate(
             adapter,
             named_ref(f"Front Plane@{pin}", "PLANE"),

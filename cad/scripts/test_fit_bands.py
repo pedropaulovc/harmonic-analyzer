@@ -175,6 +175,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the drill-rod blank's cut-length deviations: indexed into the blank "
         "note and the dressing-stock stack (blank_excess_min/max)"
     ),
+    ("ch_rod_pivot_pin_spec", "PIN_BLANK_LENGTH_BAND"): (
+        "the drill-rod blank's cut-length deviations, as the bar pin's: indexed "
+        "into the blank note and the dressing-stock stack (blank_excess_min/max)"
+    ),
     ("ch_connecting_rod_spec", "SHANK_THICKNESS_BAND"): (
         "same 2.200 plate as the ring (note 2), indexed by cylinder_bank_layout "
         "for the thickest shank its cam slot holds"

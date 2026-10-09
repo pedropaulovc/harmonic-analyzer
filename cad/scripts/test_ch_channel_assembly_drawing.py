@@ -195,9 +195,11 @@ def test_the_step_block_fits_the_field_right_of_the_isometric() -> None:
 
 def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
     """The rod ring is captured in its closed cam slot during the cylinder
-    stack, and a peened pin needs a bucking bar on its far end, so the
+    stack, and a pressed pin needs its far tine backed on the press, so the
     MHA-CH-010 pin goes in at the bench, before that drive-train step -- after
-    the hub stack is proved on the shaft and the rockers come off in order."""
+    the hub stack is proved on the shaft and the rockers come off in order.
+    User ruling 2026-10-09 (PR #1292 review F1): pressed, ends dressed flush,
+    removable with a punch, as the MHA-CH-011 bar pin."""
     from ch_rod_pivot_pin_spec import PIN_END_PROUD_MAX
 
     assert steps.SEQUENCE[:2] == ("rocker-stack-accepted", steps.RODS_PINNED_KEY)
@@ -209,13 +211,16 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
     pin = _config.parts("ch-rod-pivot-pin")["number"]
     assert f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH:" in body
     assert f"EACH {rod} ROD FORK TO ITS {arm} ARM WITH ONE {pin}." in body
-    assert "PEEN BOTH ENDS INTO THE COUNTERSINKS" in body
-    assert f"{PIN_END_PROUD_MAX:.2f} PROUD MAX" in body
+    assert "PRESS IT IN, FAR TINE BACKED; DRESS BOTH ENDS FLUSH." in body
+    assert PIN_END_PROUD_MAX == 0.0  # what "FLUSH" states
+    assert "DRIVE OUT WITH A PUNCH." in body
     assert "SWINGS FREE UNDER ITS OWN WEIGHT" in body
-    # Positive control: no other step pins or peens.
+    assert "PEEN" not in drawing.FITUP_STEPS
+    assert "COUNTERSINK" not in drawing.FITUP_STEPS
+    # Positive control: no other step pins or presses.
     for key in steps.SEQUENCE:
         if key != steps.RODS_PINNED_KEY:
-            assert pin not in _step_body(key) and "PEEN" not in _step_body(key)
+            assert pin not in _step_body(key) and "PRESS" not in _step_body(key)
 
 
 

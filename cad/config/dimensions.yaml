@@ -696,7 +696,7 @@ sections:
       - - Ring / shank / fork thickness
         - 2.200 ±0.127 / 2.200 ±0.127 / 6.075 ±0.05 mm, one mid-plane (the cam plane = the arm plane)
         - —
-        - 'flat rod: ring, shank and fork share the cam plane, and the rocker bank sits on it (`rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ`), so the arm runs centred in the fork slot. Ring and shank 2.200 at three places, symmetric to the slot within 0.10 (#948 ruling R, PR #1292; was 3 / 2.5 at two places): the thinnest cam slot then floats the ring ±0.83, which with the fork''s side clearance holds every station''s cam-vs-arm offset (`test_channel_axial_budget.py`). Fork over the tines 6.075 ±0.05 and slot 2.625 +0.127/0 (Main ruling 2026-10, option b): each inter-arm gap (pitch 7.0565 − arm 2.500) holds one tine of each neighbouring rod, tine 1.59 MIN, 0.35 MIN to the neighbouring fork (`ch_rod_pivot_pin_spec.BUDGET`)'
+        - 'flat rod: ring, shank and fork share the cam plane, and the rocker bank sits on it (`rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ`), so the arm runs centred in the fork slot. Ring and shank 2.200 at three places, symmetric to the slot within 0.10 (#948 ruling R, PR #1292; was 3 / 2.5 at two places): the thinnest cam slot then floats the ring ±0.83, which with the fork''s side clearance holds every station''s cam-vs-arm offset (`test_channel_axial_budget.py`). Fork over the tines 6.075 ±0.05 and slot 2.625 +0.127/0 (Main ruling 2026-10, option b): each inter-arm gap (pitch 7.0565 − arm 2.500) holds one tine of each neighbouring rod, tine 1.59 MIN, 0.45 MIN to the neighbouring fork with both straps off their hubs and both pin ends flush (0.35 floor; `ch_rod_pivot_pin_spec.BUDGET`)'
         - derived
         - med
       - - Shank width
@@ -706,9 +706,9 @@ sections:
         - scaled
         - low
       - - Fork (Y-shaped upper end)
-        - 10 wide, full-round crown R5 on the pin, root step 13 below the pin; slot 2.625 +0.127/0 with its floor 9.75 below the pin; #47 pin hole through both tines, 90° CSK Ø3.2 both faces
+        - 10 wide, full-round crown R5 on the pin, root step 13 below the pin; slot 2.625 +0.127/0 with its floor 9.75 below the pin; Ø1.968 +0.010/0 pin hole reamed through both tines
         - —
-        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): two rod cheeks round each rocker, width ≈10, crown below the arm top edge. The slot floor clears the arm''s curved bottom edge by 1.15 at the print-worst case of both parts (3.30 nominal) through the solved −8.60..+1.01° arm-to-rod swing, with a 2.23 MIN bridge under the floor. Pin MHA-CH-010 (5/64 drill rod) runs in the rocker''s #47 rod-pin hole at +127.37 from the pivot and is peened into both countersinks: a RECONSTRUCTION choice (issue #746), not the original fastener. Supersedes the 2.5-thick tombstone head pinned beside the arm'
+        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): two rod cheeks round each rocker, width ≈10, crown below the arm top edge. The slot floor clears the arm''s curved bottom edge by 1.21 at the print-worst case of both parts (3.30 nominal) through the solved −8.60..+1.01° arm-to-rod swing, with a 2.23 MIN bridge under the floor. Pin MHA-CH-010 (5/64 drill rod) runs in the rocker''s #47 rod-pin hole at +127.37 from the pivot and is pressed into both reamed tines, ends dressed flush, as the MHA-CH-011 bar pin (user ruling 2026-10-09, PR #1292 review F1: a countersink for a peened end left 0.92 of tine land, under the rule-12 1.5 floor; reverses the issue #746 peening choice): a RECONSTRUCTION choice, not the original fastener. Supersedes the 2.5-thick tombstone head pinned beside the arm'
         - measured/derived
         - med
   - prose: |2

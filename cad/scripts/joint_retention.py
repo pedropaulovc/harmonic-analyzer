@@ -628,7 +628,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "sh_column_clamp_front",  # #8 CLEARANCE ear holes only; clamped in the screw stack
         "dt_cone_gear",  # slides on the MHA-DT-004 D-flat, no thread
         "dt_cone_pivot_post",  # clamped part: counterbored clearance for MHA-VN-031; journals only
-        "ch_connecting_rod",  # strap bore on cam + #47 pin hole
+        "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-CH-010 pin)
         "vn_counter_spring",  # 1330K524 extension spring: eyes hook the gooseneck screw shank and the boss-hook eye, no thread
         "dt_crank_drive_gear",  # slides on the MHA-DT-004 D-flat against its collar, no thread
         "dt_crank_handle",  # oak handle, runs on the MHA-DT-032 shoulder
@@ -682,7 +682,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_platen_paper",  # paper sheet, no thread
         "pd_platen_rack",  # soft-soldered to the platen back (A06 rack-soldered); no holes, no thread
         "ch_rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
-        "ch_rod_pivot_pin",  # MHA-CH-010 5/64 drill-rod pin, peened into the fork's countersinks (rod-forks-pinned); no thread
+        "ch_rod_pivot_pin",  # MHA-CH-010 5/64 drill-rod pin, pressed into the fork's reamed tines, ends dressed flush (rod-forks-pinned); no thread
         "ch_rocker_thrust_washer",  # 1/16 sheet washer, plain bore
         "pd_transgear_arm_plate",  # MHA-PD-019: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
         "vn_transgear_collar_cross_pin",  # MHA-VN-037 1/16 slotted spring pin through the drive collar slot and shaft core
