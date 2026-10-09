@@ -33,6 +33,10 @@ extruded mid-plane in Z. Build order matters: ring disc, shank and fork are
 bossed first, the slot is cut through the fork, then the bore is cut so the
 strap opening also trims the shank sliver that dips into it.
 
+``CountersinkReference`` (blanked, on the Front plane, round the pin hole):
+the printed countersink Ø and its band; the chamfer that cuts it carries only
+an unprinted leg, driven from the same knob.
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_ch_connecting_rod.py
@@ -48,6 +52,7 @@ from _common import (
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
+    blank_reference_sketches,
     check,
     define_circle,
     define_rectilinear_chain,
@@ -93,6 +98,7 @@ from ch_connecting_rod_spec import (
     FORK_THICKNESS_BAND,
     FORK_TOP_Y,
     FORK_WIDTH,
+    PIN_HOLE_CSK_BAND,
     PIN_HOLE_CSK_DIA,
     PIN_HOLE_SPEC,
     RING_BORE_DIA,
@@ -221,6 +227,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ForkCrotchBelowPin", f"{FORK_CROTCH_BELOW_PIN}mm")
     await set_global(adapter, "ForkBaseBelowPin", f"{FORK_BASE_BELOW_PIN}mm")
     await set_global(adapter, "SlotRunout", f"{SLOT_RUNOUT}mm")
+    await set_global(adapter, "PinCskDia", f"{PIN_HOLE_CSK_DIA}mm")
     # (The old PinHoleDia knob is gone: the rocker pin hole is now a native Hole
     # Wizard feature whose standard diameter is part-owned.)
     await set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
@@ -505,8 +512,8 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "pin hole through both tines", v_expected, 0.03 * v_pin + 0.05)
     # 90-degree countersinks on both tine outer faces: the peened pin ends
     # upset into them (ch_rod_pivot_pin_spec). Edge picks sit on the drill
-    # mouths' +X rims; the chamfer leg is unprinted (the hole callout carries
-    # the countersink diameter).
+    # mouths' +X rims; the chamfer's leg is unprinted, driven from the
+    # countersink Ø the reference sketch below prints.
     pin_r = PIN_DRILL_DIA / 2.0
     check(
         "countersink pin hole mouths",
@@ -519,11 +526,32 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PinCountersinks")
+    csk_leg_dim = name_dimensions(adapter, "PinCountersinks", ["PinCskLeg"])
+    drive_jobs.append((csk_leg_dim[0], f'("PinCskDia" - {PIN_DRILL_DIA}mm) / 2'))
     v_csk = pin_countersink_volume()
     v_expected -= v_csk
     v_built = await volume_check(
         adapter, "pin-hole countersinks", v_expected, 0.03 * v_csk + 0.05
     )
+
+    # REFERENCE sketch: the printed countersink Ø, round the pin hole on the
+    # mid-plane (the front view projects it onto the tine faces' rims).
+    csk_ref = SketchDims()
+    check("create_sketch countersink reference", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter,
+        0.0,
+        CENTER_DISTANCE,
+        PIN_HOLE_CSK_DIA / 2.0,
+        "countersink reference",
+        dims=csk_ref,
+        names=(None, "PinCskRefY", "PinCskDia"),
+        drives=(None, '"CenterDistance"', '"PinCskDia"'),
+    )
+    await ensure_fully_defined(adapter, "countersink reference sketch")
+    check("exit_sketch countersink reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CountersinkReference")
+    drive_jobs += csk_ref.apply(adapter, "CountersinkReference")
 
     # Named bore axes for assembly mates (view-independent name selection):
     # Axis1 = strap bore on the cam (origin), Axis2 = pivot pin bore (0, CD).
@@ -567,6 +595,15 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "ForkSlotProfile", "SlotWidth", *deviations(FORK_SLOT_BAND)
     )
+    # The countersink Ø is the peened ends' fill volume: three places, +/-.
+    csk_lower, csk_upper = deviations(PIN_HOLE_CSK_BAND)
+    if csk_lower != -csk_upper:
+        raise AssertionError(
+            "ch_connecting_rod_spec.PIN_HOLE_CSK_BAND must be symmetric"
+        )
+    set_dimension_symmetric_tolerance(
+        adapter, "CountersinkReference", "PinCskDia", csk_upper
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
     await apply_material(adapter, MATERIAL)
@@ -586,6 +623,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    blank_reference_sketches(adapter, ("CountersinkReference",))
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,

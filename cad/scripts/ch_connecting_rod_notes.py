@@ -11,17 +11,15 @@ part + drawing and leaves the assembly to its cheap token refresh.
 
 from __future__ import annotations
 
-from _fit_limits import deviations
-from ch_connecting_rod_spec import PIN_HOLE_CSK_BAND, PIN_HOLE_CSK_DIA
-
 # The strap-bore fit rides the Ø30.80 dimension callout (+0.10/0); the ring
 # centre-to-pin distance is a BASIC sheet dimension; the fork thickness and
-# slot carry their 3-place model bands; the pin hole's countersinks ride its
-# hole callout.  Notes carry only what the sheet does not dimension natively,
-# so no number appears in both places.  The material (1018 plate) and the
-# black finish are title-block rows, never restated here (simplicity policy
-# rule 1).  Lines stay within 40 characters: the block sits in the column
-# between the front view's pin annotations and the isometric view.
+# slot carry their 3-place model bands; the pin hole's countersink Ø imports
+# from its reference sketch with its band.  Notes carry only what the sheet
+# does not dimension natively, so no number appears in both places.  The
+# material (1018 plate) and the black finish are title-block rows, never
+# restated here (simplicity policy rule 1).  Lines stay within 40 characters:
+# the block sits in the column between the front view's pin annotations and
+# the isometric view.
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_ch_connecting_rod marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -31,13 +29,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ForkProfile": {"ForkWidthDim"},
     "ForkBoss": {"ForkThick"},
     "ForkSlotProfile": {"SlotWidth", "SlotDepth", "ForkBossLength"},
+    "CountersinkReference": {"PinCskDia"},
 }
 
 # The fork's outer thickness and slot hold the inter-arm gap (each gap holds
 # one tine of each neighbouring rod): three places, as their bands are written.
+# The countersink Ø is the peened pin's fill volume, hence three places too.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ForkBoss": {"ForkThick": 3},
     "ForkSlotProfile": {"SlotWidth": 3},
+    "CountersinkReference": {"PinCskDia": 3},
 }
 
 DRAWING_NOTES = "\n".join(
@@ -54,13 +55,7 @@ DRAWING_NOTES = "\n".join(
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
-# The countersink row under the pin hole's native drill callout: one chamfer
-# feature sinks both tine faces, so the hole reads in one place.  The band
-# renders from the spec constant (no typed tolerance); the CSK diameter is the
-# peened pin's fill volume, hence three places.
-_CSK_LOWER, _CSK_UPPER = deviations(PIN_HOLE_CSK_BAND)
-if _CSK_LOWER != -_CSK_UPPER:
-    raise AssertionError("ch_connecting_rod_spec.PIN_HOLE_CSK_BAND must be symmetric")
-PIN_CSK_QUALIFIER = (
-    f"90\u00b0 CSK \u00d8{PIN_HOLE_CSK_DIA:.3f} \u00b1{_CSK_UPPER:.3f} BOTH SIDES"
-)
+# Descriptive text beneath the imported countersink Ø: the chamfer is
+# equal-legged, so its included angle is 90 degrees; one feature sinks both
+# tine faces.
+PIN_CSK_CALLOUT = "90\u00b0 CSK BOTH SIDES"

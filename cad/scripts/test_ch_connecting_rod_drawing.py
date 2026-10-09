@@ -129,9 +129,9 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
 
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = ch_connecting_rod_notes.DRAWING_NOTES
-    # The pin hole rides its native Ø1.99 THRU ALL callout (with the
-    # countersink line), the bore its imported model tolerance and the fork
-    # its 3-place model bands; notes never repeat a sheet dimension.
+    # The pin hole rides its native Ø1.99 THRU ALL callout, its countersink Ø
+    # imports from the model, the bore its imported model tolerance and the
+    # fork its 3-place model bands; notes never repeat a sheet dimension.
     assert "#47" not in notes
     assert "RING 3.00, SHANK 2.50 THICK" in notes
     assert "SHANK AND FORK ON ONE MIDPLANE" in notes
@@ -181,11 +181,35 @@ def test_native_gdt_and_finish_present() -> None:
     # countersink's chamfer edge); the position FCF anchors the 3-o'clock rim.
     assert "edge=visible_circle_edge(adapter, front, _PIN_HOLE_DIA)" in source
     assert source.count("edge_xy=pin_fcf_rim") == 1
-    assert "_add_countersink_line(pin_callout)" in source
-    assert drawing.PIN_CSK_QUALIFIER is ch_connecting_rod_notes.PIN_CSK_QUALIFIER
-    assert ch_connecting_rod_notes.PIN_CSK_QUALIFIER == (
-        "90\u00b0 CSK \u00d83.200 \u00b10.127 BOTH SIDES"
+    # The countersink Ø is a model dimension with its band, never typed text.
+    assert "_add_countersink_line" not in source
+    assert "SetText(4" not in source
+    assert not hasattr(ch_connecting_rod_notes, "PIN_CSK_QUALIFIER")
+
+
+def test_countersink_diameter_is_model_owned() -> None:
+    """The Ø3.200 +/-0.127 countersink prints from a blanked reference sketch
+    whose dimension and the chamfer's unprinted leg share one knob."""
+    marked = ch_connecting_rod_notes.DRAWING_DIMENSIONS
+    assert marked["CountersinkReference"] == {"PinCskDia"}
+    assert ch_connecting_rod_notes.DRAWING_PRECISION["CountersinkReference"] == {
+        "PinCskDia": 3
+    }
+    assert "PinCskDia" in drawing.FRONT_KEEP
+    build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
+    assert 'set_global(adapter,"PinCskDia",f"{PIN_HOLE_CSK_DIA}mm")' in build
+    assert 'name_dimensions(adapter,"PinCountersinks",["PinCskLeg"])' in build
+    assert "(csk_leg_dim[0],f'(\"PinCskDia\"-{PIN_DRILL_DIA}mm)/2')" in build
+    assert 'names=(None,"PinCskRefY","PinCskDia")' in build
+    assert 'blank_reference_sketches(adapter,("CountersinkReference",))' in build
+    # The chamfer leg's drive evaluates to the leg the build cuts.
+    assert rod.PIN_CSK_LEG == pytest.approx(
+        (ch_connecting_rod_spec.PIN_HOLE_CSK_DIA - rod.PIN_DRILL_DIA) / 2.0
     )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "hidden_sketches.curate_view_dimensions(" in source
+    assert '"PinCskDia": PIN_CSK_CALLOUT' in source
+    assert ch_connecting_rod_notes.PIN_CSK_CALLOUT == "90\u00b0 CSK BOTH SIDES"
 
 
 def test_fork_print_is_three_place_and_model_owned() -> None:
@@ -197,6 +221,7 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
     assert ch_connecting_rod_notes.DRAWING_PRECISION == {
         "ForkBoss": {"ForkThick": 3},
         "ForkSlotProfile": {"SlotWidth": 3},
+        "CountersinkReference": {"PinCskDia": 3},
     }
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
     assert 'name_dimensions(adapter,"ForkBoss",["ForkThick"])' in build
@@ -213,6 +238,7 @@ def test_model_bands_are_owned_by_named_model_dimensions() -> None:
         ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)",
         ("ForkBoss", "ForkThick"): "fork_upper",
         ("ForkSlotProfile", "SlotWidth"): "*deviations(FORK_SLOT_BAND)",
+        ("CountersinkReference", "PinCskDia"): "csk_upper",
     }
 
 

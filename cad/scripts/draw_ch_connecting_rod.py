@@ -21,7 +21,7 @@ from typing import Any
 
 from ch_connecting_rod_spec import GEOMETRIC_TOLERANCES_MM
 
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -32,6 +32,7 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -46,7 +47,11 @@ from _gear_drawing_entities import visible_circle_edge
 from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from ch_connecting_rod_notes import DRAWING_DIMENSIONS, PIN_CSK_QUALIFIER
+from ch_connecting_rod_notes import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    PIN_CSK_CALLOUT,
+)
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
     FORK_BASE_Y,
@@ -114,6 +119,9 @@ FRONT_KEEP = {
     "StrapBoreDia": (0.190, 0.052),
     "ShankWidthDim": (0.180, 0.150),
     "ForkWidthDim": _sheet_xy(0.0, FORK_TOP_Y + 8.0),
+    # The countersink Ø (its reference sketch, shown in this view only) reads
+    # below and right of the fork, clear of the FCF and the notes column.
+    "PinCskDia": (0.205, 0.200),
 }
 # The fork's 3-place thickness and slot stack above the crown; the slot depth
 # and the boss length run from the tine tops down the right-hand side.
@@ -127,30 +135,6 @@ TOP_KEEP: dict[str, tuple[float, float]] = {}
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)
-
-
-def _add_countersink_line(display: Any) -> None:
-    """Add the countersink row under the pin hole's native drill callout.
-
-    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
-    swDimensionTextCalloutBelow (4); the native size and depth rows stay
-    untouched, so their Hole Wizard variables stay associative
-    (draw_ch_rocker_arm_tl_profile_fixture._locate_pivot_tap_depths)."""
-    display = _sw_type_info.early_bound_or_flag(
-        display, "IDisplayDimension", "SetText", "GetText"
-    )
-    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    _telemetry.info(f"pin hole callout definitions before: {definitions!r}")
-    below = definitions[8].rstrip()
-    updated = f"{below}\n{PIN_CSK_QUALIFIER}" if below else PIN_CSK_QUALIFIER
-    display.SetText(4, updated)
-    if str(display.GetText(8) or "") != updated or any(
-        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
-    ):
-        raise RuntimeError(
-            "pin hole countersink line or untouched native definitions did not "
-            f"persist: {[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
-        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -206,7 +190,10 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    front_annotations = curate_view_dimensions(
+    # The countersink Ø lives in a reference sketch the part saves hidden, so
+    # the front view curates through _drawing_hidden_sketches, which shows it
+    # in this view only.
+    front_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         front,
         keep=FRONT_KEEP,
@@ -220,11 +207,21 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="left",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The strap-bore tolerance imports with the named model dimension.  The
-    # drawing owns only this descriptive text beneath the native value/band;
-    # the fork's crown is a full round on the pin, tangent to its sides.
+    assert_imported_precision(
+        adapter, front_annotations, DRAWING_PRECISION["CountersinkReference"]
+    )
+    # The strap-bore tolerance and the countersink band import with their
+    # named model dimensions.  The drawing owns only this descriptive text
+    # beneath the native value/band; the fork's crown is a full round on the
+    # pin, tangent to its sides.
     set_dimension_callouts(
-        adapter, front_annotations, {"StrapBoreDia": "BORE", "ForkWidthDim": "FULL R"}
+        adapter,
+        front_annotations,
+        {
+            "StrapBoreDia": "BORE",
+            "ForkWidthDim": "FULL R",
+            "PinCskDia": PIN_CSK_CALLOUT,
+        },
     )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
@@ -250,15 +247,14 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Pivot pin hole native callout, on the drill's own circle: a rim pick now
     # lands 0.6 mm from the countersink rim, which is a chamfer edge the Hole
-    # Wizard callout cannot carry.  The countersink line rides beneath it.
-    pin_callout = add_native_hole_callout(
+    # Wizard callout cannot carry.  The countersink Ø is its own dimension.
+    add_native_hole_callout(
         adapter,
         front,
         edge=visible_circle_edge(adapter, front, _PIN_HOLE_DIA),
         callout_xy=(0.240, 0.243),
         label="rocker pin hole",
     )
-    _add_countersink_line(pin_callout)
 
     # Datum A on the strap bore axis (picked at 9 o'clock so the tag stands off
     # to the LEFT), Ra on the bore at 6 o'clock, and a position FCF tying the
