@@ -42,8 +42,8 @@ never authored.
   the mounted T24 removable CHAIN-WRAPPED at the z -155.7 chain plane, and the
   knurled thumbnut on the shaft's front thread, seated on the collar's pilot,
   retains it free (ch23 p.58/59; R9-70).
-* Latch hook: the curved spring-steel strip riveted to the hook bracket's flap
-  on the bar's back face; the arm's latch pin rides in its hole.
+* Latch hook: one formed spring-steel piece screwed to the bar's back face;
+  the arm's latch pin rides in the round hole in its strip.
 * The ANSI #25 roller chain loops both removables (native connected-linkage
   chain component pattern); the 2.8 sprocket plate fits BETWEEN the chain's
   inner plates, so only the roller<->tooth seating is intended contact.
@@ -137,7 +137,6 @@ from _transforms import (  # noqa: E402
     ROT_X_NEG90,
     ROT_X_POS90,
     ROT_Y_POS90,
-    euler_from_rows,
     rot_z_rows,
 )
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
@@ -151,7 +150,6 @@ ROT_Y_180 = [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]]
 ROT_X_180 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 
 # --- machine anchors ---------------------------------------------------------
-import pd_latch_hook_bracket_geometry as HOOK_BRACKET  # noqa: E402
 import pd_latch_hook_geometry as HOOK  # noqa: E402
 import pd_support_bar_spec as BAR  # noqa: E402
 import pd_transgear_arm_geometry as ARM  # noqa: E402
@@ -339,15 +337,14 @@ import vn_transgear_pivot_spring_spec as PIVOT_SPRING  # noqa: E402
 import pd_transgear_rear_bushing_spec as REAR_BUSHING  # noqa: E402
 import vn_transgear_retaining_ring_spec as E_RING  # noqa: E402
 import vn_latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
-import pd_latch_hook_bracket_spec as HOOK_BRACKET_SPEC  # noqa: E402
-import vn_latch_hook_rivet_spec as HOOK_RIVET  # noqa: E402
 import pd_latch_hook_spec as HOOK_SPEC  # noqa: E402
 
 FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
 # Centre extension of the feed-pinion/rack mesh (R9-62): 0.55, contact ratio
-# 1.25, the hook's +/-0.25 set reach centred on it. The sleeve's teeth are cut
-# to the 1.25/P root (root relief), so the rack crests clear the gap floors;
-# the bound is the rack's tip corners on the form-cut flank, clear from e 0.52
+# 1.25; the hook's pin hole is match-drilled at the mesh the fit-up sets. The
+# sleeve's teeth are cut to the 1.25/P root (root relief), so the rack crests
+# clear the gap floors; the bound is the rack's tip corners on the form-cut
+# flank, clear from e 0.52
 # (pd_paper_drive_assembly_steps.feed_mesh_penetration, R9-62a).
 RACK_MESH_EXT = 0.55
 # The stud S sits on machine x 0; its y is the feed pinion's mesh line under
@@ -420,15 +417,31 @@ LATCH_PIN_POS = (
     *_on_arm(ARM.TIP_STATION - ARM.PIN_HOLE_DEPTH),
     ARM.PIN_MACHINE_Z,
 )  # (45.543, 237.121, -120.431)
-# The pin's axis crosses the latch hook's plane inside the hook's pin hole.
-_PIN_AT_HOOK = (sum(HOOK.PLANE_X) / 2.0 - PIVOT_XY[0]) / ARM_U[0]
-_pin_hole_offset = math.hypot(
-    PIVOT_XY[1] + _PIN_AT_HOOK * ARM_U[1] - HOOK.PIN_HOLE_YZ[0],
-    ARM.PIN_MACHINE_Z - HOOK.PIN_HOLE_YZ[1],
-)
-if _pin_hole_offset + LATCH_PIN.DIA / 2.0 >= HOOK.PIN_HOLE_DIA / 2.0:
+# The hook's arm lies square to the hanger's latched direction, its strip's
+# mid-plane crossing the pin's axis at PIN_AXIS_XY, HOLE_STATION from P.
+if abs(HOOK.ARM_ANGLE_DEG - ARM_ANGLE_DEG) > 1e-9:
+    raise AssertionError("the latch hook is formed to another hanger angle")
+if math.dist(HOOK.PIN_AXIS_XY, _on_arm(HOOK.HOLE_STATION)) > 1e-9:
+    raise AssertionError("the latch hook's pin crossing is off the arm's line")
+# The pin's axis passes inside the hook's round pin hole (square to it, so
+# the pin's section is a circle on the hole's), and the largest pin bears on
+# the hole's lower (-N) edge: the latched hanger rests there with the feed
+# pinion in the rack.
+_pin_hole_offset = math.dist(HOOK.PIN_AXIS_XY, HOOK.PIN_HOLE_XY)
+if abs(HOOK.PIN_HOLE_Z - ARM.PIN_MACHINE_Z) > 1e-9:
+    raise AssertionError("the latch hook's pin hole is off the pin's height")
+if _pin_hole_offset + LATCH_PIN.DIA_MAX / 2.0 > HOOK.PIN_HOLE_DIA / 2.0 + 1e-9:
     raise AssertionError(
         f"latch pin axis is {_pin_hole_offset:.3f} off the hook's pin hole centre"
+    )
+_pin_hole_n = (HOOK.PIN_HOLE_XY[0] - HOOK.PIN_AXIS_XY[0]) * ARM_N[0] + (
+    HOOK.PIN_HOLE_XY[1] - HOOK.PIN_AXIS_XY[1]
+) * ARM_N[1]
+if abs(_pin_hole_n - _pin_hole_offset) > 1e-9 or (
+    abs(_pin_hole_n + LATCH_PIN.DIA_MAX / 2.0 - HOOK.PIN_HOLE_DIA / 2.0) > 1e-6
+):
+    raise AssertionError(
+        "the largest latch pin does not bear on the hook hole's lower edge"
     )
 
 # Disc cluster on the pin MHA-PD-023 at S (R9-68).  The pin is pressed into the
@@ -774,42 +787,39 @@ CHAIN_FRONT_Z_WORST = REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT  # -16
 if max(THUMBNUT_HEAD_DIA, THUMBNUT_FLANGE_DIA) / 2.0 > T24_CHAIN_INNER_R:
     raise AssertionError("thumbnut reaches the bought chain's inner plate edge")
 
-# Latch hook MHA-PD-014 (contract §4.4): the 10 x 0.6 strip curved edgewise in
-# the machine YZ plane, riveted to the inside (-X) face of the MHA-PD-021
-# bracket's flap, which stands rearward from the bar's back face. The part
-# frame's local X/Y/Z run along machine Y/Z/X (pd_latch_hook_geometry's
-# LOCAL_TO_MACHINE, whose transpose is the Transform2 rows).
+# Latch hook MHA-PD-014 (contract §4.4): one formed 0.8 spring-steel piece,
+# its base on the bar's back face under two MHA-VN-043 screws, its ear bent
+# rearward at the base's +X end and its arm hanging from the ear to the pin.
+# The part frame's axes are the machine's (pd_latch_hook_geometry's
+# LOCAL_TO_MACHINE): the assembly places it by translation only.
 LATCH_HOOK_POS = list(HOOK.PART_ORIGIN_MACHINE)
-LATCH_HOOK_ROWS = [list(axis) for axis in zip(*HOOK.LOCAL_TO_MACHINE, strict=True)]
-LATCH_HOOK_EULER = euler_from_rows(LATCH_HOOK_ROWS)
-_FLAP_INSIDE_X = HOOK_BRACKET.MACHINE_ORIGIN[0] - HOOK_BRACKET.SHEET_T
-if abs(HOOK.PLANE_X[1] - _FLAP_INSIDE_X) > 1e-9:
-    raise AssertionError("the latch hook's face is off the bracket flap's inside face")
-# Machine z band of the strip (local y runs along machine z).
-LATCH_HOOK_Z_SPAN = (HOOK.TOP_Z + HOOK.LOCAL_Y_MIN, HOOK.TOP_Z + HOOK.LOCAL_Y_MAX)
-if LATCH_HOOK_Z_SPAN[0] <= BAR_BACK_Z:
+if [list(row) for row in HOOK.LOCAL_TO_MACHINE] != IDENTITY:
+    raise AssertionError("the latch hook's frame is not the machine's")
+if abs(HOOK.BAR_BACK_FACE_Z - BAR_BACK_Z) > 1e-9 or abs(
+    HOOK.BAR_CENTRE_Y - BAR_CY
+) > 1e-9:
+    raise AssertionError("the latch hook's bar anchors are off the support bar")
+if HOOK.BBOX_Z[0] < BAR_BACK_Z - 1e-9:
     raise AssertionError(
-        f"latch hook reaches z {LATCH_HOOK_Z_SPAN[0]:.2f}, bar back face {BAR_BACK_Z}"
+        f"latch hook reaches z {HOOK.BBOX_Z[0]:.2f}, bar back face {BAR_BACK_Z}"
     )
 
-# MHA-PD-021 bracket by translation on the bar's back face; its two MHA-VN-043
-# #4-40 screws (Rx+90: shanks to -Z) bear on the base's top face and run into
-# the bar's through taps; the hook's two rivets (rows Rz(90): heads on
-# the hook's -X face, shanks +X through the strip and the flap).
+# The hook's two MHA-VN-043 #4-40 screws (Rx+90: shanks to -Z) bear on the
+# base's top face and run into the bar's through taps.
 HOOK_BRACKET_SCREW_POS = tuple(
-    (x, BAR_CY + HOOK_BRACKET.HANGER_TAP_Y, BAR_BACK_Z + HOOK_BRACKET.SHEET_T)
-    for x in HOOK_BRACKET.BRACKET_TAP_X
-)  # (47.5 / 54.5, 303.234, -128.4)
-for _screw, _hole_x in zip(
-    HOOK_BRACKET_SCREW_POS, HOOK_BRACKET.SCREW_HOLE_X, strict=True
+    (x, HOOK.SCREW_Y, BAR_BACK_Z + HOOK.SHEET_T) for x in HOOK.SCREW_X
+)  # (65.0 / 72.0, 303.234, -129.1)
+# The part's hole positions are rounded to 1e-6 (pd_latch_hook_geometry).
+for _screw, _tap_x, _hole_x in zip(
+    HOOK_BRACKET_SCREW_POS, BAR.BRACKET_TAP_X, HOOK.SCREW_HOLE_X, strict=True
 ):
     if (
-        abs(HOOK_BRACKET.MACHINE_ORIGIN[0] + _hole_x - _screw[0]) > 1e-9
-        or abs(HOOK_BRACKET.MACHINE_ORIGIN[1] + HOOK_BRACKET.SCREW_HOLE_Y - _screw[1])
-        > 1e-9
+        abs(_screw[0] - _tap_x) > 1e-9
+        or abs(_screw[1] - (BAR_CY + BAR.HANGER_TAP_Y)) > 1e-9
+        or abs(HOOK.PART_ORIGIN_MACHINE[0] + _hole_x - _screw[0]) > 1e-6
+        or abs(HOOK.PART_ORIGIN_MACHINE[1] + HOOK.SCREW_HOLE_Y - _screw[1]) > 1e-6
     ):
-        raise AssertionError("a hook-bracket hole is off its tap in the bar")
-HOOK_RIVET_POS = tuple((HOOK.PLANE_X[0], y, z) for y, z in HOOK.RIVET_YZ)
+        raise AssertionError("a latch-hook screw hole is off its tap in the bar")
 
 # Mesh phasing. build_fixed_gear seeds the disc with a TOOTH centred on local
 # +X, and its teeth repeat every 3 deg: MESH_ANGLE is a multiple of that, so
@@ -1182,15 +1192,15 @@ def _assert_fastener_stacks() -> None:
         low <= latch_pin_proud <= high
     ):
         raise AssertionError(f"latch pin stands {latch_pin_proud:.3f} proud of the arm")
-    bracket_engagement = HOOK_BRACKET_SCREW.LENGTH - HOOK_BRACKET.SHEET_T
+    hook_screw_engagement = HOOK_BRACKET_SCREW.LENGTH - HOOK.SHEET_T
     valid_engagement(
-        "hook-bracket #4-40 engagement",
-        bracket_engagement,
+        "latch-hook #4-40 engagement",
+        hook_screw_engagement,
         HOOK_BRACKET_SCREW.MAJOR_DIA,
     )
     for x, y, z in HOOK_BRACKET_SCREW_POS:
         nonnegative(
-            f"hook-bracket screw tip x{x:.1f} inside the bar front",
+            f"latch-hook screw tip x{x:.1f} inside the bar front",
             z - HOOK_BRACKET_SCREW.LENGTH - BAR_FRONT_Z,
         )
 
@@ -1241,23 +1251,102 @@ def _section_gap(
     return max(dy, dz)
 
 
-def _latch_hook_sections(step: float = 0.05) -> list[tuple[float, float, float, float]]:
-    """The latch hook's machine (y, z) section as thin vertical slices of the
-    edgewise-curved strip, plus the round tip's bounding square."""
-    end_y, end_z = HOOK.END_YZ
-    sections = [
-        (end_y - HOOK.TIP_R, end_y + HOOK.TIP_R, end_z - HOOK.TIP_R, end_z + HOOK.TIP_R)
+def _hook_arm_x_min(y: float) -> float:
+    """The hook arm's least machine x at machine ``y``: the strip's inner
+    face down the vertical and round the R80 roll, then the part's -X extent
+    below the roll (a bound)."""
+    if y >= HOOK.ROLL_START[1]:
+        return HOOK.X_B - HOOK.SHEET_T
+    if y >= HOOK.ROLL_END[1]:
+        inner_r = HOOK.ROLL_R - HOOK.HALF_T
+        return HOOK.ROLL_C[0] + math.sqrt(inner_r**2 - (y - HOOK.ROLL_C[1]) ** 2)
+    return HOOK.BBOX_X[0]
+
+
+def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]]:
+    """The latch hook's machine (y, z) sections at the printed worst case:
+    the base and ear as one block and the arm as thin slices
+    (``HOOK.arm_sections``), with the hook's screw heads.
+
+    The hook stands on the bar's back face (its z datum) and is located in
+    y by its two screws: each screw's tap, the hook's printed hole position
+    and the head's float, the latched pin holding the hook's pin hole
+    (transgear_hanger_joints.hook_screw_drift).  The hook turns as well as
+    slides, so its drift along y depends on x alone and is convex in it:
+    over a section's x span its ends bound it, and between two
+    half-millimetre stations the stations do.
+    The base's width grows its far (+y) edge from the datum edge; the ear's
+    height and the arm's front edges grow at their printed rows; the formed
+    arm lies within FORMED_BAND of the model; and the ear's bend at the
+    sheet's angular row leans the ear and arm about the base, moving each
+    slice in z by its x off the bend times sin(bend error)."""
+    drifts: dict[float, float] = {}
+
+    def drift_y(x0: float) -> float:
+        """The largest y drift over x0..X_B."""
+        stations = (math.floor(2.0 * x0) / 2.0, math.ceil(2.0 * x0) / 2.0, HOOK.X_B)
+        for x in stations:
+            if x not in drifts:
+                drifts[x] = HANGER.hook_screw_drift((x, HOOK.SCREW_Y), (0.0, 1.0))
+        return max(drifts[x] for x in stations)
+
+    width_dev = printed_deviations(
+        HOOK.WIDTH, HOOK_SPEC.WIDTH_PLACES, (-HOOK_SPEC.WIDTH_TOL, HOOK_SPEC.WIDTH_TOL)
+    )
+    ear_rear = printed_deviations(HOOK.EAR_HEIGHT, HOOK_SPEC.EAR_HEIGHT_PLACES)[1]
+    arm_forward = max(
+        -printed_deviations(HOOK.z_local(z), HOOK_SPEC.ARM_BAND_PLACES)[0]
+        for z in (HOOK.Z_FRONT, HOOK.Z_FRONT_LOW)
+    )
+    bend = math.radians(HOOK_SPEC.BEND_TOL_DEG)
+    ear_lift = HOOK.EAR_HEIGHT * (1.0 - math.cos(bend))
+    sections: list[tuple[str, tuple[float, float, float, float]]] = [
+        (
+            "latch hook base and ear",
+            _grown(
+                (
+                    HOOK.BASE_Y[0],
+                    HOOK.BASE_Y[1] + width_dev[1],
+                    BAR_BACK_Z,
+                    HOOK.Z_REAR + ear_rear,
+                ),
+                drift_y(HOOK.BASE_X0),
+                0.0,
+                ear_lift + HOOK.SHEET_T * math.sin(bend),
+            ),
+        ),
+        (
+            "latch hook screw heads",
+            _grown(
+                (
+                    HOOK.SCREW_Y - HOOK_BRACKET_SCREW.HEAD_DIA / 2.0,
+                    HOOK.SCREW_Y + HOOK_BRACKET_SCREW.HEAD_DIA / 2.0,
+                    BAR_BACK_Z + HOOK.SHEET_T + HOOK.SHEET_T_PLUS,
+                    BAR_BACK_Z
+                    + HOOK.SHEET_T
+                    + HOOK.SHEET_T_PLUS
+                    + HOOK_BRACKET_SCREW.HEAD_H,
+                ),
+                BAR.HOLE_POSITION_BAND,
+                0.0,
+                0.0,
+            ),
+        ),
     ]
-    count = math.ceil((HOOK.TOP_Y - end_y) / step)
-    for i in range(count + 1):
-        y = end_y + (HOOK.TOP_Y - end_y) * i / count
-        centre, radius = (
-            (HOOK.C1, HOOK.R1) if y >= HOOK.JUNCTION[0] else (HOOK.C2, HOOK.R2)
+    for y0, y1, z0, z1 in HOOK.arm_sections():
+        x_min = min(_hook_arm_x_min(y0), _hook_arm_x_min(y1))
+        lean = (HOOK.X_B - x_min) * math.sin(bend) + ear_lift
+        sections.append(
+            (
+                "latch hook arm",
+                _grown(
+                    (y0, y1, z0, z1),
+                    drift_y(x_min) + HOOK_SPEC.FORMED_BAND,
+                    arm_forward + lean,
+                    ear_rear + lean,
+                ),
+            )
         )
-        cos_slope = math.sqrt(radius**2 - (y - centre[0]) ** 2) / radius
-        half = HOOK.HALF_W / cos_slope
-        z = HOOK.centreline_z(y)
-        sections.append((y, y, z - half, z + half))
     return sections
 
 
@@ -1292,14 +1381,6 @@ _NOTCH_DEPTH_DEV = printed_deviations(
 )
 _PLATE_OUTLINE_BAND = ARM_PLATE_SPEC.BAND_BY_PLACES[ARM_PLATE_SPEC.OUTLINE_PLACES]
 _HUB_DIA_DEV = printed_deviations(ARM_PLATE.HUB_DIA, ARM_PLATE_SPEC.HUB_DIA_PLACES)
-_BRACKET_WIDTH_DEV = printed_deviations(
-    HOOK_BRACKET.WIDTH,
-    HOOK_BRACKET_SPEC.WIDTH_PLACES,
-    (-HOOK_BRACKET_SPEC.WIDTH_TOL, HOOK_BRACKET_SPEC.WIDTH_TOL),
-)
-_BRACKET_FLAP_DEV = printed_deviations(
-    HOOK_BRACKET.FLAP_HEIGHT, HOOK_BRACKET_SPEC.FLAP_HEIGHT_PLACES
-)
 
 
 def _grown(
@@ -1390,28 +1471,10 @@ def _assert_lock_station_sweep() -> None:
     # largest O.D. stands on the screw axis.
     pivot_tap = BAR.HOLE_POSITION_BAND
     spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0
-    bracket_y = HOOK_BRACKET.MACHINE_ORIGIN[1]
-    bracket_screw_z = BAR_BACK_Z + HOOK_BRACKET.SHEET_T + HOOK_BRACKET.SHEET_T_PLUS
     # The arm's front face on the shortest spacer; its plate's lower section
     # stands proud of it by the deepest notch on the thinnest arm stock.
     arm_forward = -_SPACER_LENGTH_DEV[0]
     plate_forward = arm_forward + ARM.THICKNESS_BAND + _NOTCH_DEPTH_DEV[1]
-    # The hook is set at fit-up on its front rivet hole, measured from the
-    # MHA-PD-021 datums (HOOK_SET_YZ as printed, ±HOOK_SET_RANGE), before the
-    # flap is match-drilled through it. The upper hole is a printed pitch
-    # further; the outline is off the holes by the hook's printed rivet run
-    # (y) and, across the strip (z), the pair's centring, half the stock's
-    # width band and half the pitch band.
-    hook_set_y = max(map(abs, HOOK_BRACKET_SPEC.HOOK_SET_Y_DEV))
-    hook_set_forward = -HOOK_BRACKET_SPEC.HOOK_SET_Z_DEV[0]
-    hook_set_rear = HOOK_BRACKET_SPEC.HOOK_SET_Z_DEV[1]
-    hook_pitch = max(
-        map(abs, printed_deviations(HOOK.RIVET_PITCH, HOOK_SPEC.RIVET_PLACES))
-    )
-    hook_run = max(map(abs, printed_deviations(HOOK.RIVET_RUN, HOOK_SPEC.RIVET_PLACES)))
-    hook_across = (
-        HOOK_SPEC.CENTRING_BAND + HOOK_SPEC.STOCK_WIDTH_TOL / 2.0 + hook_pitch / 2.0
-    )
     fixed: list[tuple[str, tuple[float, float, float, float]]] = [
         (
             "arm",
@@ -1501,56 +1564,13 @@ def _assert_lock_station_sweep() -> None:
                 0.0,
             ),
         ),
-        (
-            # y = 0 is the base's datum edge: the width band grows the far one.
-            "latch-hook bracket",
-            (
-                bracket_y,
-                bracket_y + HOOK_BRACKET.WIDTH + _BRACKET_WIDTH_DEV[1],
-                BAR_BACK_Z,
-                BAR_BACK_Z + HOOK_BRACKET.FLAP_HEIGHT + _BRACKET_FLAP_DEV[1],
-            ),
-        ),
-        (
-            "latch-hook bracket screw heads",
-            (
-                HOOK_BRACKET_SCREW_POS[0][1] - HOOK_BRACKET_SCREW.HEAD_DIA / 2.0,
-                HOOK_BRACKET_SCREW_POS[0][1] + HOOK_BRACKET_SCREW.HEAD_DIA / 2.0,
-                bracket_screw_z,
-                bracket_screw_z + HOOK_BRACKET_SCREW.HEAD_H,
-            ),
-        ),
-        # Either end of the rivet: the dome, the tail past the flap, or the
-        # widest shop head.
-        *(
-            (
-                "latch-hook rivet",
-                _grown(
-                    (
-                        y - HOOK_RIVET.ENVELOPE_DIA / 2.0,
-                        y + HOOK_RIVET.ENVELOPE_DIA / 2.0,
-                        z - HOOK_RIVET.ENVELOPE_DIA / 2.0,
-                        z + HOOK_RIVET.ENVELOPE_DIA / 2.0,
-                    ),
-                    hook_set_y,
-                    hook_set_forward + hook_pitch,
-                    hook_set_rear + hook_pitch,
-                ),
-            )
-            for _, y, z in HOOK_RIVET_POS
-        ),
-        *(
-            (
-                "latch hook",
-                _grown(
-                    section,
-                    hook_set_y + hook_run,
-                    hook_set_forward + hook_across,
-                    hook_set_rear + hook_across,
-                ),
-            )
-            for section in _latch_hook_sections()
-        ),
+        # The one-piece hook: refitted after hardening with its match-drilled
+        # hole on the pin, it may sit anywhere its two screws' float allows
+        # (tap, printed hole position, head float), turning about the pin as
+        # well as sliding, so its y drift grows with its x off the screws (up
+        # to ~0.54 at the base, ~0.70 at the tab); the base's +y edge also
+        # takes the printed width band (HOOK_SPEC.WIDTH_TOL).
+        *_latch_hook_sections(),
     ]
     minima: dict[str, float] = {}
     for fixed_label, fixed_section in fixed:
@@ -2124,7 +2144,7 @@ async def build(adapter) -> dict[str, str]:
     # --- support bar + two-piece clamps ---------------------------------------
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
     # Its body is symmetric about machine x=0; the hanger's pivot tap and the
-    # latch-hook bracket's taps are not (see pd_support_bar_spec.py).
+    # latch hook's screw taps are not (see pd_support_bar_spec.py).
     support_bar = await place_component(
         adapter,
         "pd-support-bar",
@@ -2533,15 +2553,16 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, ARM_ANGLE_DEG - 90.0],
         rot_z_rows(ARM_ANGLE_DEG - 90.0),
     )
-    # Latch hook MHA-PD-014 on the MHA-PD-021 bracket's flap behind the bar: the
-    # bracket by translation, its two screws into the bar, the hook's +X face
-    # on the flap's inside face, held by two rivets.
+    # Latch hook MHA-PD-014 behind the bar: the one-piece hook by translation,
+    # its base on the bar's back face, its two screws through the base into
+    # the bar's taps.
     await place_component(
         adapter,
-        "pd-latch-hook-bracket",
-        list(HOOK_BRACKET.MACHINE_ORIGIN),
+        "pd-latch-hook",
+        LATCH_HOOK_POS,
         [0.0, 0.0, 0.0],
         IDENTITY,
+        label="latch-hook (spring latch of the swing cluster)",
     )
     for x, y, z in HOOK_BRACKET_SCREW_POS:
         await place_component(
@@ -2552,28 +2573,13 @@ async def build(adapter) -> dict[str, str]:
             ROT_X_POS90,
             label=f"latch-hook-bracket-screw (x{x:.1f})",
         )
-    await place_component(
-        adapter,
-        "pd-latch-hook",
-        LATCH_HOOK_POS,
-        LATCH_HOOK_EULER,
-        LATCH_HOOK_ROWS,
-        label="latch-hook (spring latch of the swing cluster)",
-    )
-    for x, y, z in HOOK_RIVET_POS:
-        await place_component(
-            adapter,
-            "vn-latch-hook-rivet",
-            [x, y, z],
-            [0.0, 0.0, 90.0],
-            rot_z_rows(90.0),
-            label=f"latch-hook-rivet (z{z:.2f})",
-        )
     log(
-        f"latch hook in the plane x {HOOK.PLANE_X[0]}..{HOOK.PLANE_X[1]}, y"
-        f" {HOOK.TOP_Y + HOOK.LOCAL_X_MIN:.2f}..{HOOK.TOP_Y + HOOK.LOCAL_X_MAX:.2f},"
-        f" z {LATCH_HOOK_Z_SPAN[0]:.2f}..{LATCH_HOOK_Z_SPAN[1]:.2f}"
-        f" ({LATCH_HOOK_Z_SPAN[0] - BAR_BACK_Z:.2f} behind the bar's back face)"
+        f"latch hook x {HOOK.BBOX_X[0]:.2f}..{HOOK.BBOX_X[1]:.2f},"
+        f" y {HOOK.BBOX_Y[0]:.2f}..{HOOK.BBOX_Y[1]:.2f},"
+        f" z {HOOK.BBOX_Z[0]:.2f}..{HOOK.BBOX_Z[1]:.2f}"
+        f" (base on the bar's back face, ear x {HOOK.X_B - HOOK.SHEET_T:.2f}"
+        f"..{HOOK.X_B:.2f}, pin hole at x {HOOK.PIN_HOLE_XY[0]:.2f}"
+        f" y {HOOK.PIN_HOLE_XY[1]:.2f})"
     )
 
     # --- disc cluster on the pin S ----------------------------------------------

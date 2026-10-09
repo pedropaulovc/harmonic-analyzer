@@ -26,7 +26,6 @@ from typing import Any, Callable, Iterable, Sequence
 import _chain as chain
 import _config
 import _telemetry
-import pd_latch_hook_bracket_geometry as bracket_geometry
 import pd_latch_hook_geometry as hook_geometry
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
@@ -167,9 +166,15 @@ BOM_REFERENCE_CAPTION = (
 SHEET_INNER_BORDER_BOTTOM = 0.0127
 BOM_BORDER_CLEARANCE = 0.003
 # The transgear alone at 2:3, right of the inner view's ring and above the
-# title block. Native run 20261001T062924323Z read its outline at x 295.3 to
-# 404.8 mm centred at x 355; here it spans 286.3 to 395.8, its ring 269.3 to
-# 412.8, 2.2 mm inside the 415 limit (inner_view_shift).
+# title block. The v40 sheet 2 (594749aec's layout) printed its outline at
+# x 285.3 to 396.6, y 111.2 to 244.8 mm: a ring top of 261.8 in the 262.0
+# limit. The one-piece MHA-PD-014 hook's ear stands at machine x 77.6, 17.6
+# further +X than the bracket's flap. The isometric looks along (-1, +1, -1),
+# so sheet up is 0.408 x and sheet right -0.707 x, and the outline grew to
+# x 278.5 and y 248.8 (farm run of 9055bc155: ring top 265.8). The view is
+# 137.6 mm tall, so its ring of 171.6 fits the field's 172.0 only when it is
+# centred: transgear_view_shift moves it down before the inner view is
+# fitted beside it.
 TRANSGEAR_VIEW_SCALE = (2.0, 3.0)
 TRANSGEAR_VIEW_CENTER = (0.346, 0.170)
 BALLOON_MARGIN = 0.012
@@ -178,8 +183,8 @@ TRANSGEAR_CAPTION_XY = (0.222, 0.082)
 # sheet x is machine +Z, sheet y is +Y) with every other part hidden in that
 # view only. The largest ladder scale whose ring fits beside the isometric's
 # (inner_view_scale): the same run read the view 57.3 mm wide at 2:3, a 91.3
-# mm ring in the 76.3 mm left of the isometric's ring at x 355; at 1:2 it is
-# about 43.0 wide, a 77.0 ring in the 80.3 left here. Every ladder scale is
+# mm ring in the 76.3 mm left of the isometric's ring at x 355; the v40 sheet
+# 2 printed it at 1:3, 34.5 mm wide. Every ladder scale is
 # at most 1:2, so the view references the simplified configuration whichever
 # it takes (apply_view_configuration), and no rescale switches it.
 INNER_VIEW_ORIENTATION = "*Right"
@@ -273,10 +278,8 @@ BOM_PART_NUMBERS = {
     "vn-transgear-pivot-screw": _config.parts("vn-transgear-pivot-screw")["number"],
     "vn-transgear-pivot-spring": _config.parts("vn-transgear-pivot-spring")["number"],
     "vn-transgear-latch-pin": _config.parts("vn-transgear-latch-pin")["number"],
-    "pd-latch-hook-bracket": _config.parts("pd-latch-hook-bracket")["number"],
     "vn-latch-hook-bracket-screw": _config.parts("vn-latch-hook-bracket-screw")["number"],
     "pd-latch-hook": _config.parts("pd-latch-hook")["number"],
-    "vn-latch-hook-rivet": _config.parts("vn-latch-hook-rivet")["number"],
     "pd-transgear-pin": _config.parts("pd-transgear-pin")["number"],
     "pd-transgear-rear-bushing": _config.parts("pd-transgear-rear-bushing")["number"],
     "pd-transgear-feed-pinion": _config.parts("pd-transgear-feed-pinion")["number"],
@@ -310,7 +313,6 @@ _SKU = {
     "vn-latch-hook-bracket-screw": _config.parts("vn-latch-hook-bracket-screw")[
         "supplier_skus"
     ][0],
-    "vn-latch-hook-rivet": _config.parts("vn-latch-hook-rivet")["supplier_skus"][0],
     "vn-transgear-disc-screw": _config.parts("vn-transgear-disc-screw")["supplier_skus"][0],
     "vn-transgear-retaining-ring": _config.parts("vn-transgear-retaining-ring")[
         "supplier_skus"
@@ -358,12 +360,10 @@ BOM_DESCRIPTIONS = {
         f"CURVED DISC SPRING, MCMASTER {_SKU['vn-transgear-pivot-spring']}"
     ),
     "vn-transgear-latch-pin": f"DOWEL PIN, MCMASTER {_SKU['vn-transgear-latch-pin']}",
-    "pd-latch-hook-bracket": "LATCH HOOK BRACKET",
     "vn-latch-hook-bracket-screw": (
         f"FILLISTER SCREW, MCMASTER {_SKU['vn-latch-hook-bracket-screw']}"
     ),
     "pd-latch-hook": "LATCH HOOK",
-    "vn-latch-hook-rivet": f"DOMED SOLID RIVET, MCMASTER {_SKU['vn-latch-hook-rivet']}",
     "pd-transgear-pin": "TRANSGEAR PIN",
     "pd-transgear-rear-bushing": "TRANSGEAR REAR BUSHING",
     "pd-transgear-feed-pinion": "TRANSGEAR FEED PINION SLEEVE",
@@ -415,10 +415,8 @@ TRANSGEAR_QUANTITIES = {
     "vn-transgear-pivot-screw": 1,
     "vn-transgear-pivot-spring": spring.COUNT,
     "vn-transgear-latch-pin": 1,
-    "pd-latch-hook-bracket": 1,
-    "vn-latch-hook-bracket-screw": len(bracket_geometry.SCREW_HOLE_X),
+    "vn-latch-hook-bracket-screw": len(hook_geometry.SCREW_X),
     "pd-latch-hook": 1,
-    "vn-latch-hook-rivet": len(hook_geometry.RIVET_YZ),
     "pd-transgear-pin": 1,
     "pd-transgear-rear-bushing": 1,
     "pd-transgear-feed-pinion": 1,
@@ -511,7 +509,7 @@ TRANSGEAR_BALLOON_ANCHORS = {
 #   its 12T and threads are past the edge fallback too;
 # * the MHA-VN-048 cup pin's end, across the journal inside the knob cup and
 #   nearer the eye than the journal, the arm-plate screws' heads on the
-#   plate's rear face, the latch pin in the arm behind the latch bracket;
+#   plate's rear face, the latch pin in the arm's tip through the latch hook;
 # * the rear bushing (Ø9, z -130.4 to -124.4) behind the Ø81.5 disc: its
 #   front rim's ray leaves the disc's rear face at radius
 #   4.5 + (144.65 - 130.4) * sqrt(2) = 24.7 < 40.75.
@@ -805,6 +803,24 @@ def _native_outline_at(
     return outline_at
 
 
+def transgear_view_shift(iso_outline: Box) -> tuple[float, float]:
+    """Shift that centres the transgear isometric's balloon ring in sheet 2's
+    field vertically. It does not move along x, so the room left of it for the
+    inner view stays the same.
+
+    The outline is in sheet metres (left, bottom, right, top). Raises if the
+    ring is taller than the field.
+    """
+    _left, bottom, _right, top = SHEET_TWO_RING_LIMITS
+    ring = _grown(iso_outline, BALLOON_RING_REACH)
+    if ring[3] - ring[1] > top - bottom:
+        raise ValueError(
+            f"sheet 2 isometric ring height {(ring[3] - ring[1]) * 1000:.1f} mm > "
+            f"room {(top - bottom) * 1000:.1f} mm"
+        )
+    return (0.0, (bottom + top - ring[1] - ring[3]) / 2.0)
+
+
 def inner_view_shift(iso_outline: Box, inner_outline: Box) -> tuple[float, float]:
     """Shift that centres the inner view's balloon ring between the BOM and
     the isometric's ring, level with the isometric.
@@ -1045,10 +1061,11 @@ def _step_text() -> dict[str, str]:
             f"{knob_cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT; PRESS THE PIN "
             "IN, CENTRED. COLLAR ON THE CORE UNPINNED, PINS FORWARD."
         ),
-        "latch-bracket-fitted": (
-            f"SCREW THE {_N['pd-latch-hook-bracket']} BRACKET TO THE BAR WITH "
-            f"{TRANSGEAR_QUANTITIES['vn-latch-hook-bracket-screw']} "
-            f"{_N['vn-latch-hook-bracket-screw']} SCREWS."
+        "latch-hook-fitted": (
+            f"SCREW THE {_N['pd-latch-hook']} HOOK'S BASE TO THE BAR'S BACK FACE "
+            f"WITH {TRANSGEAR_QUANTITIES['vn-latch-hook-bracket-screw']} "
+            f"{_N['vn-latch-hook-bracket-screw']} SCREWS, ARM HANGING DOWN; ITS "
+            "PIN HOLE IS NOT YET DRILLED."
         ),
         "hanger-meshed": (
             f"SWING THE HANGER UP TILL THE {_N['pd-transgear-feed-pinion']} TEETH "
@@ -1057,18 +1074,18 @@ def _step_text() -> dict[str, str]:
             "EDGE); CLAMP THE ARM TO THE BAR. RUN THE FULL TRAVEL: NO TIGHT SPOT, "
             "SHAKE AT EVERY TOOTH."
         ),
-        # Machinist review of 0316d0951: the set is measured on the hook's
-        # rivet holes from the MHA-PD-021 datums, the flap's lower edge and the
-        # bar's back face under its base (latch_hook_bracket_spec.HOOK_SET_YZ).
-        "hook-set-and-riveted": (
-            f"HOLDING THAT MESH, SET THE {_N['pd-latch-hook']} HOOK ON THE BRACKET "
-            f"FLAP, ITS HOLE'S LOWER EDGE ON THE {_N['vn-transgear-latch-pin']} PIN, "
-            f"ITS RIVET HOLES {steps.HOOK_SET_Y_TEXT} ABOVE THE FLAP'S LOWER EDGE, "
-            f"THE FRONT ONE {steps.HOOK_SET_Z_TEXT} REAR OF THE BAR, "
-            f"{steps.HOOK_SET_TEXT}, ELSE REPORT; CLAMP. DRILL THE FLAP THROUGH "
-            f"THEM PER {_N['pd-latch-hook-bracket']}; SET "
-            f"{TRANSGEAR_QUANTITIES['vn-latch-hook-rivet']} "
-            f"{_N['vn-latch-hook-rivet']} RIVETS. UNCLAMP, LATCH, RE-RUN THE TRAVEL."
+        # The hook's Ø3.3 pin hole is match-drilled from the pin at that mesh,
+        # then the hook is hardened and refitted with the hole's lower edge on
+        # the pin before its screws are tightened, so the unclamped arm has no
+        # room to fall and open the mesh (steps.LATCH_SLACK_ALONG; Codex P1 on
+        # b2eb9a0e1).
+        "hook-pin-hole-match-drilled": (
+            f"HOLDING THAT MESH, MARK THE {_N['vn-transgear-latch-pin']} PIN'S "
+            f"AXIS WHERE ITS END BEARS ON THE {_N['pd-latch-hook']} HOOK'S "
+            "STRAIGHT RUN. REMOVE THE HOOK; DRILL ITS PIN HOLE AT THE MARK PER "
+            f"{_N['pd-latch-hook']}; HARDEN AND TEMPER BLUE. REFIT, ITS HOLE'S "
+            f"LOWER EDGE ON THE {_N['vn-transgear-latch-pin']} PIN, THEN TIGHTEN "
+            "THE SCREWS. UNCLAMP, LATCH, RE-RUN THE TRAVEL."
         ),
         "fitup-pose-set": (
             "HANGER LATCHED. PULL THE CRANK SHAFT FORWARD; PUSH THE KNOB SHAFT "
@@ -1828,8 +1845,12 @@ def _place_bom_sheet(
     _activate_sheet(adapter, SHEET_NAMES[5])
     pieces = _split_bom(adapter, table)
     _activate_sheet(adapter, SHEET_NAMES[1])
-    # Both rings fit before any balloon exists; only the inner view moves.
-    # Every ladder scale keeps the configuration just applied.
+    # Both rings fit before any balloon exists. The isometric is centred in
+    # the field's height, then the inner view is fitted beside it. Every
+    # ladder scale keeps the configuration just applied.
+    _shift_view(
+        adapter, view, transgear_view_shift(_view_outline(view)), label=f"{label} ring fit"
+    )
     iso_outline = _view_outline(view)
     scale = inner_view_scale(iso_outline, _view_outline(inner), placed)
     if scale != placed:

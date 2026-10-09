@@ -29,7 +29,6 @@ _EXPECTED = {
     "vn-knife-hanger-stud": (("91247A720",), "MHA-VN-024", 2),
     "vn-latch-hook-bracket-screw": (("90280A108",), "MHA-VN-043", 2),
     "vn-magnifying-bracket-screw": (("91794A077",), "MHA-VN-050", 2),
-    "vn-latch-hook-rivet": (("97482A015",), "MHA-VN-045", 2),
     "vn-lag-screw": (("92240A540",), "MHA-VN-009", 4),
     "vn-pedestal-hold-down-screw": (("90280A197",), "MHA-VN-032", 6),
     "vn-pen-set-screw": (("99607A213",), "MHA-VN-010", 1),
@@ -101,7 +100,7 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
     # Rule 12 (E10): the four pinion-block screws moved from the #8-32 x 1 to
     # the clamp screws' #8-32 x 1-1/4; the swing stop then left the x 1 for
     # the foot screw's #4-40 x 3/8 (2026-09-29), retiring 90280A199; the
-    # paper drive's latch-hook bracket takes two more (MHA-VN-043, ruling 2),
+    # paper drive's latch hook takes two more (MHA-VN-043, ruling 2),
     # while the magnifying bracket takes two #2-56 x 1/4 (MHA-VN-050).
     assert fleet_quantity("90280A199") == 0
     assert fleet_quantity("90280A108") == 4

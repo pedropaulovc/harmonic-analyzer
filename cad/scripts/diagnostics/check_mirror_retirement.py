@@ -953,30 +953,15 @@ expect(
     p.rot_z_rows(p.ARM_ANGLE_DEG - 90.0),
     "latch pin",
 )
-# Latch hook on its bracket.
-expect(
-    PD,
-    "pd-latch-hook-bracket-1",
-    list(p.HOOK_BRACKET.MACHINE_ORIGIN),
-    IDENTITY,
-    "latch-hook bracket",
-)
+# Latch hook by translation, its screws through its base into the bar.
+expect(PD, "pd-latch-hook-1", list(p.LATCH_HOOK_POS), IDENTITY, "latch hook")
 for i, pos in enumerate(p.HOOK_BRACKET_SCREW_POS):
     expect(
         PD,
         f"vn-latch-hook-bracket-screw-{i + 1}",
         list(pos),
         p.ROT_X_POS90,
-        f"latch-hook bracket screw {i + 1}",
-    )
-expect(PD, "pd-latch-hook-1", list(p.LATCH_HOOK_POS), p.LATCH_HOOK_ROWS, "latch hook")
-for i, pos in enumerate(p.HOOK_RIVET_POS):
-    expect(
-        PD,
-        f"vn-latch-hook-rivet-{i + 1}",
-        list(pos),
-        p.rot_z_rows(90.0),
-        f"latch-hook rivet {i + 1}",
+        f"latch-hook screw {i + 1}",
     )
 # Disc cluster on the MHA-PD-023 pin at S: pin and both bushings Ry(180), the
 # MHA-VN-047 ring in the pin's groove.

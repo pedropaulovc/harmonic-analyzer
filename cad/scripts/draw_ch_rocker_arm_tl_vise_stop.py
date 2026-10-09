@@ -1,6 +1,6 @@
 r"""Create the drawing for the rocker arm's vise blank-end stop (MHA-CH-006-TL-01).
 
-Third-angle at 1:1, the latch-hook-bracket layout for a Z-up part:
+Third-angle at 1:1, laid out for a Z-up part:
 
 * the elevation is ``*Bottom`` (looking +Y, X right, Z up): the lug at the
   seat face, the arm over the step and the taller finger at its left end; it

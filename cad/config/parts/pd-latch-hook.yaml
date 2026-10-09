@@ -2,9 +2,9 @@ pd-latch-hook:
   title: Latch Hook
   number: MHA-PD-014
   # pd_latch_hook_spec.MATERIAL_TITLE: the title block's MATERIAL cell.
-  material: "Dead-soft steel strip 10 x 0.6"
-  material_specification: bright low-carbon steel strip 10 x 0.6, dead soft
-  finish: bright, as supplied; lightly oiled
+  material: "0.8 (0.032) 1095 spring steel"
+  material_specification: "1095 spring steel sheet 0.032 in (0.8 mm) +/-0.03 mm, annealed"
+  finish: hardened and tempered blue, 44-50 HRC
   quantity: 1
-  tolerance_class: plate_profile
-  process: "10 x 0.6 dead-soft strip: bend edgewise over a template of the inner edge, cut the top end square, radius the free end full round, drill all holes after bending"
+  tolerance_class: machined_block
+  process: "0.8 annealed 1095 sheet: cut the blank to the flat pattern, bend the ear 90 degrees, drill the screw holes from the formed ear, roll the arm R80 and form the tab R10 annealed; fit to the support bar, clamp the hanger at full feed mesh and match-drill the pin hole from the latch pin; remove, harden and temper blue, reinstall"

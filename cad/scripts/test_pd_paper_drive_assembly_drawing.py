@@ -64,10 +64,8 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "vn-transgear-pivot-screw": 1,
     "vn-transgear-pivot-spring": 1,
     "vn-transgear-latch-pin": 1,
-    "pd-latch-hook-bracket": 1,
     "vn-latch-hook-bracket-screw": 2,
     "pd-latch-hook": 1,
-    "vn-latch-hook-rivet": 2,
     "pd-transgear-pin": 1,
     "pd-transgear-rear-bushing": 1,
     "pd-transgear-feed-pinion": 1,
@@ -91,6 +89,8 @@ RETIRED_FAMILIES = {
     "transgear-pinion",
     "transgear-bracket",
     "bracket-screw",
+    "pd-latch-hook-bracket",
+    "vn-latch-hook-rivet",
 }
 
 
@@ -530,6 +530,93 @@ def test_an_inner_view_wider_than_measured_steps_down_to_1_3() -> None:
     assert drawing.inner_view_scale(iso, wider, (2.0, 3.0)) == (1.0, 3.0)
 
 
+# The v40 sheet 2 (the same layout code as 594749aec) printed the views'
+# outlines, read from the PDF's view images: the transgear isometric at 2:3
+# and the inner view at 1:3. The farm run of 9055bc155 refused the one-piece
+# hook's isometric. That isometric's left edge and top come from its message
+# (rings at 261.5 and 265.8). Its right edge and bottom are v40's, because
+# the hook only grows the view up and left. The run's inner view at 1:2 was
+# 46.5 mm wide (ring 181.0 to 261.5). Its height is v40's 1:3 height
+# scaled, since the run reported no y.
+ISO_OUTLINE_V40 = (0.2853, 0.1112, 0.3966, 0.2448)
+INNER_OUTLINE_V40_AT_1_3 = (0.2073, 0.1612, 0.2418, 0.1948)
+ISO_OUTLINE_ONE_PIECE_HOOK = (0.2785, 0.1112, 0.3966, 0.2488)
+INNER_OUTLINE_ONE_PIECE_HOOK_AT_1_2 = (0.2000, 0.1528, 0.2465, 0.2032)
+# v40's printed 1:3 inner view, as placed at 1:2 (1.5 times about its centre).
+INNER_OUTLINE_V40_AT_1_2 = (
+    0.224550 - 0.0258750,
+    0.178000 - 0.0252000,
+    0.224550 + 0.0258750,
+    0.178000 + 0.0252000,
+)
+
+
+def _moved(
+    outline: tuple[float, float, float, float], shift: tuple[float, float]
+) -> tuple[float, float, float, float]:
+    dx, dy = shift
+    return (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy)
+
+
+def test_the_one_piece_hook_isometric_as_placed_is_refused_as_on_the_farm() -> None:
+    """The farm refusal of 9055bc155, word for word: placed at
+    TRANSGEAR_VIEW_CENTER, the grown isometric's ring tops the field at
+    every inner-view scale."""
+    with pytest.raises(ValueError) as refused:
+        drawing.inner_view_scale(
+            ISO_OUTLINE_ONE_PIECE_HOOK, INNER_OUTLINE_ONE_PIECE_HOOK_AT_1_2, (1.0, 2.0)
+        )
+    assert str(refused.value) == (
+        "no inner-view scale fits sheet 2 (1:2: sheet 2 balloon rings do not fit: "
+        "isometric ring top 265.8 mm past 262.0 mm; inner view ring left 181.0 mm "
+        "past 185.0 mm; inner view ring right 261.5 mm within 4 mm of the "
+        "isometric ring (261.5 mm) | 1:3: sheet 2 balloon rings do not fit: "
+        "isometric ring top 265.8 mm past 262.0 mm)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("iso_outline", "inner_at_placed"),
+    [
+        (ISO_OUTLINE_ONE_PIECE_HOOK, INNER_OUTLINE_ONE_PIECE_HOOK_AT_1_2),
+        (ISO_OUTLINE_V40, INNER_OUTLINE_V40_AT_1_2),
+    ],
+    ids=["one-piece-hook", "v40"],
+)
+def test_the_centred_isometric_leaves_the_inner_view_room_at_1_3(
+    iso_outline: tuple[float, float, float, float],
+    inner_at_placed: tuple[float, float, float, float],
+) -> None:
+    """Centred vertically and unmoved along x, the isometric's ring fits the
+    field. The inner view then steps down to 1:3, and the outline of 1:3 as
+    printed (with its padding) fits beside it."""
+    shift = drawing.transgear_view_shift(iso_outline)
+    assert shift[0] == 0.0
+    iso = _moved(iso_outline, shift)
+    reach = drawing.BALLOON_RING_REACH
+    left, bottom, right, top = drawing.SHEET_TWO_RING_LIMITS
+    assert (iso[1] - reach - bottom) == pytest.approx(top - (iso[3] + reach))
+    assert iso[1] - reach >= bottom and iso[3] + reach <= top
+    assert drawing.inner_view_scale(iso, inner_at_placed, (1.0, 2.0)) == (1.0, 3.0)
+    dx, dy = drawing.inner_view_shift(iso, INNER_OUTLINE_V40_AT_1_3)
+    inner = _moved(INNER_OUTLINE_V40_AT_1_3, (dx, dy))
+    assert inner[0] - reach >= left
+    assert inner[2] + reach <= iso[0] - reach - drawing.SHEET_TWO_RING_GAP
+
+
+def test_the_one_piece_hook_isometric_moves_down_4_0_mm() -> None:
+    dx, dy = drawing.transgear_view_shift(ISO_OUTLINE_ONE_PIECE_HOOK)
+    assert (dx, dy) == (0.0, pytest.approx(-0.0040))
+
+
+def test_an_isometric_taller_than_the_field_is_refused() -> None:
+    x0, y0, x1, _y1 = ISO_OUTLINE_ONE_PIECE_HOOK
+    with pytest.raises(
+        ValueError, match=r"isometric ring height 173\.0 mm > room 172\.0 mm"
+    ):
+        drawing.transgear_view_shift((x0, y0, x1, y0 + 0.139))
+
+
 def test_no_sheet_prints_a_forbidden_word() -> None:
     texts = (*drawing.SHEET_TEXTS, *drawing.BOM_DESCRIPTIONS.values())
     for text in texts:
@@ -651,7 +738,7 @@ def test_the_fitup_steps_and_the_collar_note_print_one_setting_drill_and_cut() -
 
 def test_the_collar_is_pinned_before_the_stud_is_cut_and_the_stack_accepted() -> None:
     order = [
-        "hook-set-and-riveted",
+        "hook-pin-hole-match-drilled",
         "fitup-pose-set",
         "collar-gap-measured",
         "collar-pinned",
@@ -1095,58 +1182,49 @@ def test_the_exploded_view_steps_down_on_its_native_outline() -> None:
 def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     """Codex (8b5e1f354) / R9-62: the hook was match-drilled with the hanger
     "latched" but the pinion-in-rack mesh never set nor the platen run."""
-    meshed, hooked = (
-        steps.step_number(key) for key in ("hanger-meshed", "hook-set-and-riveted")
-    )
-    assert hooked == meshed + 1
+    keys = ("latch-hook-fitted", "hanger-meshed", "hook-pin-hole-match-drilled")
+    fitted, meshed, drilled = (steps.step_number(key) for key in keys)
+    assert meshed == fitted + 1 and drilled == meshed + 1
     text = drawing._step_text()
+    fit = " ".join(text["latch-hook-fitted"].split())
+    assert "ITS PIN HOLE IS NOT YET DRILLED" in fit
     mesh = " ".join(text["hanger-meshed"].split())
     assert f"SET {steps.MESH_BACKLASH_TEXT} PLATEN SHAKE ALONG THE RACK" in mesh
     assert "FULL TRAVEL: NO TIGHT SPOT, SHAKE AT EVERY TOOTH" in mesh
-    hook = " ".join(text["hook-set-and-riveted"].split())
+    hook = " ".join(text["hook-pin-hole-match-drilled"].split())
     assert hook.startswith("HOLDING THAT MESH")
     # Codex P1 on b2eb9a0e1: set clear of the pin, the unclamped arm fell
     # through the hole's clearance and opened the feed mesh.
     pin = drawing._N["vn-transgear-latch-pin"]
     assert f"ITS HOLE'S LOWER EDGE ON THE {pin} PIN" in hook
     assert "CLEAR" not in hook
-    # Machinist review of 0316d0951: "its drawn place" had no dimension a
-    # fitter could measure. The step locates the hook's rivet holes from the
-    # MHA-PD-021 datums: the flap's lower edge and the bar's back face, on which
-    # the bracket's base sits.
+    # The one-piece hook's pin hole is drilled from the pin at the set mesh,
+    # then the part is hardened: no fitter-measured set position remains.
     assert "DRAWN PLACE" not in hook
-    flap_edge_y = assembly.HOOK_BRACKET.MACHINE_ORIGIN[1]
-    (_, front_y, front_z), _upper = sorted(
-        assembly.HOOK_RIVET_POS, key=lambda pos: pos[2]
-    )
-    above = f"{front_y - flap_edge_y:.2f}"
-    rear = f"{front_z - assembly.BAR_BACK_Z:.2f}"
-    assert (above, rear) == ("3.80", "11.30")
-    assert (
-        f"ITS RIVET HOLES {above} ABOVE THE FLAP'S LOWER EDGE, THE FRONT ONE "
-        f"{rear} REAR OF THE BAR, {steps.HOOK_SET_TEXT}, ELSE REPORT; CLAMP."
-    ) in hook
-    assert steps.HOOK_SET_TEXT == "\u00b10.51"
+    assert "HARDEN AND TEMPER BLUE" in hook
     assert hook.endswith("UNCLAMP, LATCH, RE-RUN THE TRAVEL.")
 
 
 def test_the_feed_mesh_sits_mid_reach_with_a_working_contact_ratio() -> None:
     """R9-62: at the 2.00 crest drop the nominal mesh ran at e 0.80, contact
     ratio 0.86; the rack set 2.25 down puts it at 0.55, and the backlash band
-    the fit-up accepts stays inside what the hook's set range can hold."""
+    the fit-up accepts keeps the match-drilled pin hole, with its wall, on the
+    hook's straight run."""
     assert assembly.RACK_MESH_EXT == pytest.approx(0.55)
     assembly._assert_rack_mesh()
-    # The hook's set range moves the pin by the pivot-to-pin over the
-    # pivot-to-latch lever.
-    lever = (assembly.STUD_X - assembly.BAR.PIVOT_TAP_X) / (
-        sum(assembly.HOOK.PLANE_X) / 2.0 - assembly.BAR.PIVOT_TAP_X
-    )
-    reach = assembly.HOOK_BRACKET_SPEC.HOOK_SET_RANGE * lever
     low, high = (steps.mesh_extension(b) for b in steps.MESH_BACKLASH_RANGE)
     assert low < assembly.RACK_MESH_EXT < high
-    assert assembly.RACK_MESH_EXT - reach <= low and high <= (
-        assembly.RACK_MESH_EXT + reach
+    # A mesh change at the stud turns the hanger about P: the pin crosses the
+    # strip (along N, the run's length) by the change over the stud's lever.
+    hook_geometry = assembly.HOOK
+    lever = hook_geometry.HOLE_STATION / (
+        assembly.ARM.PIN_STATION * math.cos(math.radians(assembly.ARM_ANGLE_DEG))
     )
+    room = hook_geometry.PIN_HOLE_DIA / 2.0 + assembly.HOOK_SPEC.WALL_TARGET
+    for extension in (low, high):
+        shift = abs(extension - assembly.RACK_MESH_EXT) * lever
+        assert shift + room < hook_geometry.RUN_ABOVE_HOLE
+        assert shift + room < hook_geometry.RUN_BELOW_HOLE
     # A 0.80 extension (the 2.00 drop) runs under one tooth in contact.
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(assembly, "RACK_MESH_EXT", 0.80)

@@ -16,9 +16,7 @@ import pytest
 import _holes
 import _interference_contracts
 import vn_latch_hook_bracket_screw_spec as bracket_screw
-import pd_latch_hook_bracket_spec as hook_bracket
-import vn_latch_hook_rivet_spec as rivet
-import pd_latch_hook_spec as hook
+import pd_latch_hook_geometry as hook
 import pd_rack_pinion_spec as disc
 import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
@@ -218,8 +216,8 @@ def test_pressed_and_slip_joints_without_a_row_do_not_overlap() -> None:
     one into a press needs a row here."""
     assert shaft.CORE_DIA <= _collar().BORE_DIA
     assert latch_pin.DIA <= arm.PIN_HOLE_DIA
-    assert rivet.DIA <= hook.RIVET_HOLE_DIA
-    assert rivet.DIA <= hook_bracket.RIVET_HOLE_DIA
+    # The modelled pin stands on the hook hole's axis offset by the bearing lift.
+    assert hook.PIN_BEARING_LIFT + latch_pin.DIA / 2.0 <= hook.PIN_HOLE_DIA / 2.0
     assert drive_pin.DIA <= removable.PIN_HOLE_DIA
 
 
@@ -229,6 +227,8 @@ def test_retired_parts_have_no_rows() -> None:
         "transgear-pinion",
         "transgear-bracket",
         "bracket-screw",
+        "pd-latch-hook-bracket",
+        "vn-latch-hook-rivet",
     )
     named = {name.rsplit("-", 1)[0] for pair in _allowed() for name in pair}
     assert not named & set(retired)
