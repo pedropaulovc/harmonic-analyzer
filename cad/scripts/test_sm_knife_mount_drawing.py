@@ -44,11 +44,15 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     )
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    # Every marked dowel-hole dimension carries part-authored places.
+    # Every marked dowel-hole dimension carries part-authored places; the
+    # pair's span is sheet-added between the two axes, its places the spec's.
     assert set(sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME) == {
         "PinHoleDia",
-        "PinHoleX",
         "PinHoleDepth",
+    }
+    assert sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION == {
+        "dowel hole span": 3,
+        "knife-bore centre from top seat": 2,
     }
     for feature, names in sm_knife_mount_spec.DRAWING_PRECISION.items():
         assert set(names) <= sm_knife_mount_spec.DRAWING_DIMENSIONS[feature]
@@ -57,7 +61,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> None:
     # Policy rule 7: the blind dowel hole's floor is a hidden edge in the
     # front view, so its depth rides section A-A, cut on z = 0 through the
-    # tap axis (the origin) and the dowel axis, and only there.
+    # tap axis (the origin) and both dowel axes, and only there.
     assert set(drawing.SECTION_KEEP) == {"PinHoleDepth"}
     assert "PinHoleDepth" not in drawing.FRONT_KEEP
     assert "PinHoleDepth" not in drawing.TOP_KEEP
@@ -65,7 +69,7 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert start[2] == end[2] == 0.0
     assert start[0] < -sm_knife_mount_spec.BLK_HALF_X
     assert end[0] > sm_knife_mount_spec.BLK_HALF_X
-    assert start[0] < 0.0 < sm_knife_mount_spec.PIN_HOLE_X < end[0]
+    assert start[0] < -sm_knife_mount_spec.PIN_HOLE_X < 0.0 < sm_knife_mount_spec.PIN_HOLE_X < end[0]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("create_section_view(") == 1
     assert "_look_section_along_minus_z(adapter, section)" in source
@@ -184,19 +188,23 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert not hasattr(part, "STUD_TAP_DEPTH")
     assert part.STUD_TAP_SPEC is sm_knife_mount_spec.STUD_TAP_SPEC
     assert part.STUD_TAP_DIA == sm_knife_mount_spec.STUD_TAP_DIA
-    # Dowel hole: printed places and the volume the build's gate expects.
+    # Dowel holes: one each side of the tap at +/-6.350 (the printed span
+    # 12.700 .XXX), printed places and the volume the build's gate expects.
     assert sm_knife_mount_spec.PIN_HOLE_X == 6.350
+    assert sm_knife_mount_spec.PIN_HOLE_XS == (-6.350, 6.350)
+    assert sm_knife_mount_spec.PIN_HOLE_SPAN == 12.700
     assert sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME == {
         "PinHoleDia": 3,
-        "PinHoleX": 3,
         "PinHoleDepth": 1,
     }
     import math
 
     assert abs(part.V_PIN - math.pi * (3.175 / 2.0) ** 2 * 9.5) < 1e-9
+    assert part.V_PINS == 2 * part.V_PIN
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH)" in source
-    assert '"PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)' in source
+    assert 'for pin_dia_name in ("PinHoleDia", "PinHole2Dia"):' in source
+    assert '"PinHoleProfile", pin_dia_name, *deviations(PIN_HOLE_DIA_BAND)' in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
@@ -213,7 +221,9 @@ def test_the_sheet_carries_no_notes_block() -> None:
     assert "Manufacturing Notes" not in drawing_source
     assert drawing_source.count("add_property_linked_note(") == 1
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in drawing_source
-    # The dowel hole's press rides the Ø callout (MHA-PD-018 precedent).
+    # The dowel holes' count rides above their Ø (datum B shares the
+    # dimension) and the press below it (MHA-PD-018 precedent).
+    assert drawing.CALLOUTS_ABOVE == {"PinHoleDia": "2X"}
     assert sm_knife_mount_spec.PIN_HOLE_CALLOUT.splitlines() == [
         "BLIND FLAT-BOTTOM REAM",
         "PRESS MHA-VN-051 DOWEL TO FLOOR",
@@ -223,12 +233,26 @@ def test_the_sheet_carries_no_notes_block() -> None:
 
 def test_native_gdt_and_bore_geometry() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # Datum A the top seat; datum B the dowel pair, on its 2X Ø.
     assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'characteristic="position"' in source
-    # The block depth is the one sheet-added dimension; the dowel hole's Ø,
-    # station and depth are marked model dimensions (DRAWING_DIMENSIONS).
-    assert source.count("add_edge_dimension(") == 1
+    assert source.count("add_dimension_datum_feature(") == 1
+    assert 'datum="A"' in source and 'datum="B"' in source
+    # The bore's composite frame and the tap's frame, both to A|B.
+    assert source.count("add_feature_control_frame(") == 2
+    assert source.count('characteristic="position"') == 2
+    assert source.count('datums=("A", "B")') == 2
+    assert source.count("composite_lower=(") == 1
+    assert sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM == {
+        "knife-bore position": "0.20",
+        "knife-bore orientation refinement": "0.05",
+        "knife-hanger tap position": "0.10",
+    }
+    # Sheet-added: the block depth, the dowel span and the bore centre's
+    # BASIC height under A (14.87 + 5.75); the dowel holes' Ø and depth are
+    # marked model dimensions (DRAWING_DIMENSIONS).
+    assert source.count("add_edge_dimension(") == 3
+    assert source.count("set_basic_dimension(") == 1
+    assert abs(sm_knife_mount_spec.BORE_CENTRE_DEPTH - 20.62) < 1e-9
 
 
 def test_part_stamps_make_critical_properties() -> None:

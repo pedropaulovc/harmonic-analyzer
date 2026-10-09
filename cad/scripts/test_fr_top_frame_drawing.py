@@ -698,8 +698,8 @@ def test_dowel_slip_hole_contract() -> None:
     assert spec.HANGER_PIN_SLIP_CLEARANCE_MIN == pytest.approx(0.02738)
     assert spec.HANGER_PIN_SLIP_CLEARANCE_MAX == pytest.approx(0.09246)
     assert 0.02 <= spec.HANGER_PIN_SLIP_CLEARANCE_MIN < spec.HANGER_PIN_SLIP_CLEARANCE_MAX <= 0.10
-    # Rule 12 walls and floor, print-worst.
-    assert part.PIN_HOLE_BAR_WALL == pytest.approx(3.015)
+    # Rule 12 walls and floor, print-worst (the station at its .XXX limit).
+    assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.885)
     assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.376)
     assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(18.0)
     assert spec.HANGER_PIN_HOLE_DEPTH < spec.HANGER_GRIP
@@ -709,6 +709,56 @@ def test_dowel_slip_hole_contract() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["HangerPinHoleDia"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["HangerPinHoleDepth"] == 1
     assert set(drawing.HANGER_SECTION_KEEP) == {"HangerPinHoleDia", "HangerPinHoleDepth"}
+
+
+def test_dowel_slot_contract() -> None:
+    # The slot stands -X of each screw axis, the round hole +X: the knife
+    # mount's two dowels at +/-6.350.
+    assert part.SLOT_X == pytest.approx(-21.35)
+    assert part.SLOT_X - part.HANGER_X == pytest.approx(spec.HANGER_SLOT_X)
+    assert spec.HANGER_SLOT_X == -6.35
+    assert spec.HANGER_PIN_XS == (spec.HANGER_SLOT_X, spec.HANGER_ROUND_X)
+    # Slip width = the round hole's ream; length .XXX; floor = the hole's.
+    assert (spec.HANGER_SLOT_WIDTH, spec.HANGER_SLOT_WIDTH_BAND) == (3.24, (0.03, -0.03))
+    assert (spec.HANGER_SLOT_LENGTH, spec.HANGER_SLOT_LENGTH_TOL) == (4.60, 0.13)
+    assert spec.HANGER_SLOT_DEPTH == spec.HANGER_PIN_HOLE_DEPTH
+    assert part.SLOT_FLAT == pytest.approx(1.36)
+    # Rule 12 walls and floor, print-worst.
+    assert part.SLOT_BAR_WALL == pytest.approx(2.155)
+    assert part.SLOT_SCREW_WALL == pytest.approx(1.646)
+    assert part.SLOT_FLOOR_MARGIN == pytest.approx(18.0)
+    # The model owns the width and its band (front slot, on the underside
+    # locator); F-F derives the stations and the length.
+    assert spec.DRAWING_DIMENSIONS["HangerSlotProfile"] == {"HangerSlotWidth"}
+    assert spec.DRAWING_PRECISION_BY_NAME["HangerSlotWidth"] == 3
+    assert spec.DRAWING_REFERENCE_PRECISION["dowel slot from hanger axis"] == 3
+    assert spec.DRAWING_REFERENCE_PRECISION["dowel slot length"] == 3
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'for slot_width_name in ("HangerSlotWidth", "HangerSlot1Width"):' in source
+    assert 'prefix = "HangerSlot" if station == "Front" else "HangerSlot1"' in source
+
+
+def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
+    # Policy rule 3 (knife-edge system): datum B the front round hole, C the
+    # rear; each slot 0.05 to its own station's hole, the other translated.
+    assert spec.GEOMETRIC_TOLERANCES_MM == {"knife-hanger slot position": "0.05"}
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    underside = source[source.index('ddoc.ActivateSheet("UNDERSIDE")') :]
+    assert underside.count("add_datum_feature(") == 1
+    assert '(("B", STUD_Z_FRONT), ("C", STUD_Z_REAR))' in underside
+    assert underside.count("add_feature_control_frame(") == 1
+    assert '("front", STUD_Z_FRONT, ("B", "C"))' in underside
+    assert '("rear", STUD_Z_REAR, ("C", "B"))' in underside
+    assert "translated=datums[1:]" in underside
+    assert 'GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"]' in underside
+    assert '"HangerSlotWidth": HANGER_SLOT_WIDTH_TEXT_XY' in underside
+    for name, (x, y) in {
+        **drawing.HANGER_DATUM_SYMBOL_XY,
+        **drawing.HANGER_SLOT_FRAME_XY,
+        "slot width": drawing.HANGER_SLOT_WIDTH_TEXT_XY,
+        "slot width offset": drawing.HANGER_SLOT_WIDTH_OFFSET_XY,
+    }.items():
+        assert 0.013 < x < TITLE_BLOCK[0] and 0.125 < y < 0.270, name
 
 
 def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
@@ -740,6 +790,10 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
         "floor offset": drawing.HANGER_FLOOR_OFFSET_XY,
         "station": drawing.PIN_STATION_TEXT_XY,
         "station offset": drawing.PIN_STATION_OFFSET_XY,
+        "slot station": drawing.SLOT_STATION_TEXT_XY,
+        "slot station offset": drawing.SLOT_STATION_OFFSET_XY,
+        "slot length": drawing.SLOT_LENGTH_TEXT_XY,
+        "slot length offset": drawing.SLOT_LENGTH_OFFSET_XY,
         "caption": drawing.HANGER_SECTION_CAPTION_XY,
         "slip-hole callout": drawing.HANGER_PIN_DIA_OFFSET_XY,
         **drawing.HANGER_SECTION_KEEP,

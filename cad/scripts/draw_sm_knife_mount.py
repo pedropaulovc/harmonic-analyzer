@@ -6,11 +6,14 @@ trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
 and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
-depth added across the right-view section.  The MHA-VN-051 dowel hole prints
-its reamed Ø (with its band and press callout) and its station from the tap
-axis in the top view, and its flat-floor depth in section A-A, cut from the
-top view through the tap and dowel axes (policy rule 7: the floor is hidden in
-the front view, so it is dimensioned where the cut shows it).
+depth added across the right-view section.  The two MHA-VN-051 dowel holes
+print their 2X reamed Ø (with its band and press callout; the pair is datum
+B) and their .XXX span in the top view, and their flat-floor depth in section
+A-A, cut from the top view through the tap and dowel axes (policy rule 7: the
+floor is hidden in the front view, so it is dimensioned where the cut shows
+it).  The bore carries a composite position frame to the top seat (datum A)
+and the dowel pattern, its centre a BASIC height under A; the #6-32 tap a
+position frame to the same A|B.
 
 Run with SolidWorks open::
 
@@ -24,13 +27,14 @@ import math
 import sys
 from typing import Any
 
-from sm_knife_mount_spec import GEOMETRIC_TOLERANCES_MM
+from sm_knife_mount_spec import DRAWING_REFERENCE_PRECISION, GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
+    add_dimension_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
@@ -44,6 +48,8 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    set_arc_endpoints_to_center,
+    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -56,11 +62,15 @@ from sm_knife_mount_spec import (
     BLK_BOT,
     BLK_HALF_X,
     BLK_TOP,
+    BORE_CENTRE_DEPTH,
     BORE_CY,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_HOLE_CALLOUT,
+    PIN_HOLE_PAIR_CALLOUT,
     PIN_HOLE_DEPTH,
+    PIN_HOLE_DIA,
+    PIN_HOLE_SPAN,
     PIN_HOLE_X,
     R_BORE,
     STUD_TAP_DIA,
@@ -157,10 +167,9 @@ PIN_CALLOUT_HALF_WIDTH = 0.04225
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
 PIN_CALLOUT_SHOULDER_DROP = 0.01286
 PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.006, TOP_CENTER[1] - 0.010)
+# The pair's 12.700 span runs above the top view, between the hole axes.
+PIN_SPAN_TEXT_XY = (TOP_CENTER[0], TOP_CENTER[1] + TOP_HALF_Z + 0.010)
 TOP_KEEP = {
-    # The 6.350 station from the tap axis (the origin's projection) runs
-    # above the top view.
-    "PinHoleX": (_sheet_x(PIN_HOLE_X / 2.0), TOP_CENTER[1] + TOP_HALF_Z + 0.010),
     "PinHoleDia": (
         PIN_CALLOUT_SHOULDER_START[0]
         + PIN_CALLOUT_SHOULDER_OVERHANG
@@ -172,6 +181,10 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
+# The pair's count rides ABOVE its Ø: datum B is attached to the same
+# dimension, and SOLIDWORKS seats that symbol between the value and the
+# below lane (the pd-latch-hook-bracket PAIR_CALLOUT precedent).
+CALLOUTS_ABOVE = {"PinHoleDia": PIN_HOLE_PAIR_CALLOUT}
 # The #6-32 bottoming tap is stated once, on its Hole Wizard callout in the
 # top view (fr-top-frame's KEEPER TAP precedent), not in a note.  The
 # process rides its own row over the native drill and thread rows: three
@@ -185,9 +198,42 @@ TAP_CALLOUT_PROCESS = "BOTTOMING TAP\n"
 TAP_CALLOUT_HALF_WIDTH = 0.026
 TAP_CALLOUT_HALF_HEIGHT = 0.0065
 TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.022, TOP_CENTER[1] - TOP_HALF_Z - 0.014)
+# The tap's position frame hangs under its callout block, on its own leader
+# to the same rim.
+TAP_FRAME_XY = (TAP_CALLOUT_XY[0], TAP_CALLOUT_XY[1] - TAP_CALLOUT_HALF_HEIGHT - 0.007)
+# The bore's two-tier frame stands above the block's upper-right corner,
+# right of the datum-A tag; its BASIC height under A runs down the block's
+# right side.
+BORE_FRAME_XY = (FRONT_CENTER[0] + 0.035, _front_y(BLK_TOP) + 0.019)
+BORE_BASIC_TEXT_XY = (
+    _sheet_x(BLK_HALF_X) + 0.012,
+    _front_y(BLK_TOP - BORE_CENTRE_DEPTH / 2.0),
+)
 
 RIGHT_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 RIGHT_HALF_Y = (BLK_TOP - BLK_BOT) / 2.0 * SHEET_SCALE[0] / 1000.0
+
+
+def _set_sheet_precision(display: Any, *, label: str) -> None:
+    """Give one sheet-added dimension the places the part's spec owns
+    (``DRAWING_REFERENCE_PRECISION``, the draw_fr_top_frame precedent)."""
+    places = DRAWING_REFERENCE_PRECISION[label]
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    applied = int(display.GetPrimaryPrecision2())
+    if applied != places:
+        raise RuntimeError(
+            f"{label}: asked for {places} decimal places, dimension reads {applied}"
+        )
+
+
+def _sheet_dimension_mm(display: Any) -> float:
+    """The value a sheet-added dimension measures, mm."""
+    native = _early_bound(display, "IDisplayDimension")
+    return (
+        abs(float(_early_bound(native.GetDimension2(0), "IDimension").SystemValue))
+        * 1000.0
+    )
 
 
 def _look_section_along_minus_z(adapter: Any, section: Any) -> None:
@@ -332,6 +378,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     # SolidWorks pins its own raw "#6-32 Tapped Hole" note to a view that
     # imports from the tapped part (the dda9a33a8 render put it on the top
     # view, through the dowel callout).  The tap is stated once, on its hole
@@ -391,10 +438,50 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block-depth overall",
     )
 
+    # The dowel pair's span: hole axis to hole axis, picked on each hole's
+    # outer rim at 45 deg, clear of the bore's hidden lines at x +/-6.
+    pin_rim_mm = PIN_HOLE_DIA / 2.0 / math.sqrt(2.0)
+    span_picks = [
+        max(
+            (
+                model_point_in_view(
+                    adapter,
+                    top,
+                    (
+                        side * (PIN_HOLE_X + pin_rim_mm) / 1000.0,
+                        BLK_TOP / 1000.0,
+                        z_side * pin_rim_mm / 1000.0,
+                    ),
+                    label=f"dowel hole rim x{side:+.0f} z{z_side:+.0f}",
+                )
+                for z_side in (1.0, -1.0)
+            ),
+            key=lambda point: point[1],
+        )
+        for side in (-1.0, 1.0)
+    ]
+    span = add_edge_dimension(
+        adapter,
+        top,
+        p0=span_picks[0],
+        p1=span_picks[1],
+        text_xy=PIN_SPAN_TEXT_XY,
+        label="dowel hole span",
+        orientation="horizontal",
+    )
+    set_arc_endpoints_to_center(adapter, span, label="dowel hole span")
+    if abs(_sheet_dimension_mm(span) - PIN_HOLE_SPAN) > 1e-5:
+        raise RuntimeError(
+            f"dowel hole span measures {_sheet_dimension_mm(span):g}, "
+            f"expected {PIN_HOLE_SPAN:g} mm"
+        )
+    _set_sheet_precision(span, label="dowel hole span")
+
     # Datum A = the block top seat (clamped to the top-frame casting underside;
-    # carries the #6-32 knife-hanger-screw tap and the MHA-VN-051 dowel hole);
-    # Ra 1.6 (MACHINED_UM) on the bore's working upper wall, tagged on the
-    # bore rim (a real circular edge).
+    # carries the #6-32 knife-hanger-screw tap and the MHA-VN-051 dowel
+    # holes); datum B = the dowel pair, its symbol on their 2X Ø.  Ra 1.6
+    # (MACHINED_UM) on the bore's working upper wall, tagged on the bore rim
+    # (a real circular edge).
     add_datum_feature(
         adapter,
         front,
@@ -403,16 +490,65 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="block top seat",
     )
+    pin_dia = [a for a in annotations if dimension_name(adapter, a) == "PinHoleDia"]
+    if len(pin_dia) != 1:
+        raise RuntimeError(f"expected one PinHoleDia dimension, found {len(pin_dia)}")
+    add_dimension_datum_feature(
+        adapter,
+        top,
+        dimension=_early_bound(pin_dia[0], "IAnnotation").GetSpecificAnnotation(),
+        datum="B",
+        label="dowel hole pattern",
+    )
+    # The bore: Ø0.20 located to A|B, its orientation refined to Ø0.05 to
+    # the same A|B (composite; tolerance-gdt-assessment §5.4).  Its centre
+    # is BASIC under A; across, it sits on the pattern's centre plane.
     add_feature_control_frame(
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0),
-        frame_xy=(FRONT_CENTER[0] + 0.032, _front_y(BORE_CY) + 0.040),
+        frame_xy=BORE_FRAME_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["knife-bore position"],
-        datums=("A",),
+        datums=("A", "B"),
         diameter=True,
         label="knife-bore position",
+        composite_lower=(
+            GEOMETRIC_TOLERANCES_MM["knife-bore orientation refinement"],
+            ("A", "B"),
+        ),
+    )
+    bore_basic = add_edge_dimension(
+        adapter,
+        front,
+        p0=(_sheet_x(0.6 * BLK_HALF_X), _front_y(BLK_TOP)),
+        p1=(_sheet_x(R_BORE), _front_y(BORE_CY)),
+        text_xy=BORE_BASIC_TEXT_XY,
+        label="knife-bore centre from top seat",
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_center(
+        adapter, bore_basic, label="knife-bore centre from top seat"
+    )
+    if abs(_sheet_dimension_mm(bore_basic) - BORE_CENTRE_DEPTH) > 1e-5:
+        raise RuntimeError(
+            f"knife-bore centre measures {_sheet_dimension_mm(bore_basic):g} under "
+            f"the top seat, expected {BORE_CENTRE_DEPTH:g} mm"
+        )
+    _set_sheet_precision(bore_basic, label="knife-bore centre from top seat")
+    set_basic_dimension(adapter, bore_basic, label="knife-bore centre from top seat")
+    # The #6-32 tap: Ø0.10 to A|B, the screw axis the crossbar's clearance
+    # hole floats round (build_sm_summing_assembly's knife-hanger stack).
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=tap_rim,
+        frame_xy=TAP_FRAME_XY,
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"],
+        datums=("A", "B"),
+        diameter=True,
+        label="knife-hanger tap position",
     )
     add_surface_finish(
         adapter,
