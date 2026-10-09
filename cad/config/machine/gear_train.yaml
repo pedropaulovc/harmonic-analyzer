@@ -12,7 +12,7 @@ gear_train:
   crank_drive_normal_module_mm: 1.0583333333333333 # standard normal 24DP; transverse pitch and helix follow the cone incline
   crank_drive_pressure_angle_deg: 20.0            # standard normal-plane cutter pressure angle
   crank_axis_height_mm: 81.19564350289599          # common Y raise; crossed-mesh bore spacing unchanged
-  crank_mesh_phase_offset_deg: null              # publish only from current-source all-corner whole-period qualification
+  crank_mesh_phase_offset_deg: 0.0               # offset from the standard tooth-in-gap seed at the contact azimuth
   source: "48DP PA20 cone train and normal-24DP PA20 crossed-crank design; DIMENSIONS.md ch13/ch29/ch8 for historical counts and gear law"
   confidence: high                 # selected tooth systems; historical scale measurements remain low confidence
   notes: >-

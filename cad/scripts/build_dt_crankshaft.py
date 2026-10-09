@@ -62,9 +62,9 @@ from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
-from crank_mesh_stack import require_selected_pin_clocking
 from dt_crank_pinion_spec import (
     CRANKSHAFT_PIN_HOLE_PROCESS,
+    PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
     PIN_DIA as PINION_PIN_DIA,
     PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC,
 )
@@ -373,8 +373,6 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    pinion_pin_clocking_deg = require_selected_pin_clocking()
-
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
@@ -711,14 +709,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PinionPinStationPlane", ["PinionPinStation"]
     )
     drive_jobs += [(pinion_station_dim[0], '"PinionPinStation"')]
-    clocking = math.radians(pinion_pin_clocking_deg)
+    clocking = math.radians(PINION_PIN_CLOCKING_DEG)
     entry_dir = (-math.cos(clocking), 0.0, -math.sin(clocking))
     await _angled_plane_containing(
         adapter,
         "PinionPinClockingPlane",
         base_plane="Front Plane",
         pivot_axis=shaft_axis,
-        angle_deg=pinion_pin_clocking_deg,
+        angle_deg=PINION_PIN_CLOCKING_DEG,
         direction=entry_dir,
     )
     wizard_hole_on_cylinder(

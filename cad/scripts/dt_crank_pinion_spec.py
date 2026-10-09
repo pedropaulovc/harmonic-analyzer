@@ -406,9 +406,8 @@ if PIN_AXIAL_LIGAMENT_WORST < PIN_AXIAL_LIGAMENT_FLOOR_MM:
     raise AssertionError("match-drilled pin breaks through the boss end at print-worst")
 if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
     raise AssertionError("the pinion boss needs a positive printed shaft-recess range")
-# The datum geometry is available to pure design readers before qualification.
-# The physical offset has ONE source cell in gear_train; there is no retained
-# ideal-profile phase or import-time fallback retention-hole angle.
+# Tooth-in-gap datum at the contact azimuth, from the placement geometry.
+# gear_train.crank_mesh_phase_offset_deg is the one configured offset from it.
 _GEAR64_CENTRE_STATION = (
     dt_crank_drive_gear_spec.LAYOUT_CENTRE_STATION
     + dt_cone_pivot_post_installation.GEAR_AXIS_SHIFT
@@ -426,6 +425,11 @@ _PINION_DATUM_CLOCK_DEG = (
     - _DELTA64 * (dt_crank_drive_gear_spec.TEETH / TEETH)
     - 360.0 / TEETH / 2.0
 ) % (360.0 / TEETH)
+PIN_CLOCKING_DEG = _PINION_DATUM_CLOCK_DEG + float(
+    _config.machine("gear_train", "crank_mesh_phase_offset_deg")
+)
+if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / TEETH:
+    raise AssertionError("pinion retention-hole clocking must lie within one tooth pitch")
 
 
 # The matched-hole callout on both part records identifies both seated parts,
