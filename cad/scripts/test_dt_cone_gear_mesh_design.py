@@ -1,338 +1,198 @@
-"""Re-derive the deepened cone/drum mesh (U38 option 1b) from its printed values.
+"""Re-derive the cutter-native cone design from config, actual forms and settings.
 
-``cone_gear_spec.DEEPENED_MESH_MM`` prints each gear's tip diameter and thick
-tooth limit.  These tests rebuild the planar involute mesh at the deep edge of
-each drum face -- the slice that carries the load -- from the assembly pose and
-the printed bands, and check the design rules the table was sized to:
-
-* tightest case (thickest tooth, runouts closing): backlash >= BL_MIN;
-* loosest case (thinnest tooth, runouts and journal float opening): backlash
-  inside the printed acceptance, whose upper is that limit;
-* thinnest tooth at the largest tip: tip land >= 0.10;
-* largest tip, runouts closing: cone tip >= 0.10 off the drum's chord floor,
-  and the drum tip clear of the printed cone floor (0.30 where it is raised);
-* one fly cutter at least 0.43 wide fits every gap at the thickest tooth;
-* least engagement (smallest tips, all float opening): contact ratio >= 1.1
-  except on the named book-fidelity exception gears;
-* each printed value is the limit, not an arbitrary point inside it.
-
-Planar, rigid: the U38 slice sweep found the 3-D stretch costs at most
-0.005 of backlash, which is why BL_MIN is 0.06 and not 0.05.
+Supported branch-existence coverage is deliberately NOT a true contact ratio.
+Its retained named floors are separate from full-period carrying contact and
+continuous handover. Actual process/tip/thickness corners and numerical bounds
+are paid by the design solver. The three-dimensional oblique contact/TE study
+is an additional acceptance, never substituted by this deep planar screen.
 """
 
 from __future__ import annotations
 
 import math
 
-import numpy as np
 import pytest
 
 import _config
-import build_dt_drive_train_assembly as assembly
-import dt_cone_gear_shaft_spec
+import cone_line
 import dt_cone_gear_spec as spec
-import dt_cone_gear_stack
-import cone_shaft_land_bands
-import cone_stack_end_play
 import dt_cylinder_gear_spec as drum
+from diagnostics import solve_stock_form_cones as solve
+from stock_form_cutter import translation_for_pitch_tooth_thickness
 
 
-M = spec.MODULE_MM
-PRESSURE_ANGLE = math.radians(spec.PRESSURE_ANGLE_DEG)
-DRUM_PITCH_R = drum.TEETH * M / 2.0
-DRUM_BASE_R = DRUM_PITCH_R * math.cos(PRESSURE_ANGLE)
-DRUM_TIP_R = drum.OUTSIDE_DIA / 2.0
-DRUM_THICKNESS = spec.STANDARD_TOOTH_THICKNESS  # "FULL STANDARD THICKNESS"
-DRUM_OD_LOWER = 0.10  # MHA-DT-012 prints its tip +0/-0.10
-DRUM_FLOOR_R = drum.ROOT_DIA / 2.0
-BASE_PITCH = math.pi * M * math.cos(PRESSURE_ANGLE)
-
-# Radial play.  Runouts turn with their gear, so they close the mesh at some
-# angle; float can open it.  Every gear slides onto its D-flat land
-# (gear_seat_fit), so the cone runout is half the loosest printed slip fit:
-# the bore's upper limit over the gear-seat land's lower limit.
-CONE_RUNOUT = (spec.BORE_DIA_BAND[0] - cone_shaft_land_bands.GEAR_SEAT_BAND[1]) / 2.0
-DRUM_RUNOUT = drum.BORE_DIAMETRAL_CLEARANCE_MM[1] / 2.0
-_JOURNAL = max(_config.fit("shaft_in_bushing")["diametral_clearance_mm"]) / 2.0
-RUNOUT = CONE_RUNOUT + DRUM_RUNOUT
-# Cone-shaft journal in its post, and the drum arbor in its pedestal.
-FLOAT = RUNOUT + 2.0 * _JOURNAL
-
-LAND_MIN = 0.10
-DRUM_FLOOR_MIN = 0.10
-CR_EXCEPTION = 1.1
-CR_TARGET = 1.20
+@pytest.fixture(scope="module")
+def inputs() -> solve.DesignInputs:
+    return solve.configured_inputs()
 
 
-def _inv(angle: float) -> float:
-    return math.tan(angle) - angle
-
-
-def _interleave(teeth: int) -> float:
-    """Standard-tip interleave at the deep edge of the drum face, as posed.
-
-    The assembly places a standard ``(N + 2) / DP`` tip circle; its nearest
-    reach to the drum axis inside the drum face band sets the operating centre
-    distance of the deep transverse slice.
-    """
-    j = (120 - teeth) // 6
-    axis = np.array([assembly.SIN_I, 0.0, assembly.COS_I])
-    e1 = np.cross(axis, [0.0, 1.0, 0.0])
-    e1 /= np.linalg.norm(e1)
-    e2 = np.cross(axis, e1)
-    centre = np.array(
-        assembly.cone_station(
-            assembly.SHAFT_T120_STATION
-            + assembly.GEAR_AXIS_SHIFT
-            + (assembly.CONE_FACE_STATION_REFERENCE - assembly.CONE_FACE) / 2.0
-            + j * assembly.SEAT_PITCH
-        )
-    )
-    z0 = assembly.Z_DRUM0 + assembly.Z_PITCH * j
-    tip_r = teeth * M / 2.0 + M
-    theta = np.radians(np.linspace(0.0, 360.0, 36001))
-    ring = centre + tip_r * (
-        np.cos(theta)[:, None] * e1 + np.sin(theta)[:, None] * e2
-    )
-    # Along the gear axis a point is ring + a * axis.  Its z is linear in a,
-    # so the drum face band and the cone face bound a to one interval, and
-    # its squared distance from the drum axis is a quadratic in a: the exact
-    # minimum is the vertex clipped to that interval.
-    half_band = assembly.DRUM_FACE / 2.0
-    a_lo = np.maximum(-assembly.CONE_FACE / 2.0, (z0 - half_band - ring[:, 2]) / axis[2])
-    a_hi = np.minimum(assembly.CONE_FACE / 2.0, (z0 + half_band - ring[:, 2]) / axis[2])
-    dx = ring[:, 0] - assembly.X_DRUM
-    dy = ring[:, 1] - assembly.Y_DRIVE
-    slope = axis[0] ** 2 + axis[1] ** 2
-    vertex = -(dx * axis[0] + dy * axis[1]) / slope
-    along = np.clip(vertex, a_lo, a_hi)
-    rho = np.hypot(dx + along * axis[0], dy + along * axis[1])
-    return DRUM_TIP_R - float(rho[a_lo <= a_hi].min())
-
-
-INTERLEAVE = {teeth: _interleave(teeth) for teeth in spec.CONFIGURATION_TEETH}
-
-
-def _centre(teeth: int) -> float:
-    """Nominal operating centre distance of the deep transverse slice."""
-    return teeth * M / 2.0 + M + DRUM_TIP_R - INTERLEAVE[teeth]
-
-
-def _backlash(teeth: int, thickness: float, centre: float) -> float:
-    """Exact planar circumferential backlash at the operating pitch circles."""
-    r1 = teeth * M / 2.0
-    working = math.acos((r1 + DRUM_PITCH_R) * math.cos(PRESSURE_ANGLE) / centre)
-    r1w = centre * r1 / (r1 + DRUM_PITCH_R)
-    r2w = centre * DRUM_PITCH_R / (r1 + DRUM_PITCH_R)
-    delta = _inv(PRESSURE_ANGLE) - _inv(working)
-    s1w = 2.0 * r1w * (thickness / (2.0 * r1) + delta)
-    s2w = 2.0 * r2w * (DRUM_THICKNESS / (2.0 * DRUM_PITCH_R) + delta)
-    return 2.0 * math.pi * r1w / teeth - s1w - s2w
-
-
-def _tip_land(teeth: int, thickness: float, tip_r: float) -> float:
-    r1 = teeth * M / 2.0
-    tip_angle = math.acos(r1 * math.cos(PRESSURE_ANGLE) / tip_r)
-    return 2.0 * tip_r * (
-        thickness / (2.0 * r1) + _inv(PRESSURE_ANGLE) - _inv(tip_angle)
-    )
-
-
-def _contact_ratio(teeth: int, tip_r: float, drum_tip_r: float, centre: float) -> float:
-    """Transverse CR with both base-circle interference limits."""
-    base_r = teeth * M / 2.0 * math.cos(PRESSURE_ANGLE)
-    working = math.acos((base_r + DRUM_BASE_R) / centre)
-    line = centre * math.sin(working)
-    start = max(line - math.sqrt(drum_tip_r**2 - DRUM_BASE_R**2), 0.0)
-    end = min(math.sqrt(tip_r**2 - base_r**2), line)
-    return (end - start) / BASE_PITCH
-
-
-def _worst(teeth: int, tip_dia: float, thickest: float) -> dict[str, float]:
-    thinnest = thickest - (spec.TOOTH_THICKNESS_BAND[0] - spec.TOOTH_THICKNESS_BAND[1])
-    od_upper, od_lower = spec.BLANK_DIA_BAND
-    nominal = _centre(teeth)
-    closing = nominal - RUNOUT
-    return {
-        "tight_backlash": _backlash(teeth, thickest, closing),
-        "loose_backlash": _backlash(teeth, thinnest, nominal + FLOAT),
-        "tip_land": _tip_land(teeth, thinnest, (tip_dia + od_upper) / 2.0),
-        "drum_floor": closing - (tip_dia + od_upper) / 2.0 - DRUM_FLOOR_R,
-        "cone_floor": closing
-        - DRUM_TIP_R
-        - spec.floor_radius_mm(teeth),
-        "contact_ratio": _contact_ratio(
-            teeth,
-            (tip_dia + od_lower) / 2.0,
-            DRUM_TIP_R - DRUM_OD_LOWER / 2.0,
-            nominal + FLOAT,
-        ),
-    }
-
-
-def test_inputs_match_experimental_standard() -> None:
-    assert drum.DIAMETRAL_PITCH == spec.DIAMETRAL_PITCH == 48.0
-    assert drum.PRESSURE_ANGLE_DEG == spec.PRESSURE_ANGLE_DEG == 20.0
-    assert spec.BLANK_DIA_BAND == (0.10, -0.10)
-    assert set(spec.DEEPENED_MESH_MM) == set(spec.CONFIGURATION_TEETH)
-    # Every station retains the configured common deep-edge interleave.
-    assert max(INTERLEAVE.values()) - min(INTERLEAVE.values()) < 0.001
-    edge_slack = _config.fit("cone_drum_oblique_mesh", "edge_slack_mm")
-    assert edge_slack == 0.25
-    assert INTERLEAVE[60] == pytest.approx(2 * M - edge_slack, abs=0.001)
+def test_inputs_match_the_configured_train(inputs: solve.DesignInputs) -> None:
+    assert drum.DIAMETRAL_PITCH == spec.DIAMETRAL_PITCH == inputs.diametral_pitch
+    assert drum.PRESSURE_ANGLE_DEG == spec.PRESSURE_ANGLE_DEG == inputs.pressure_angle_deg
+    assert spec.MODULE_MM == pytest.approx(25.4 / inputs.diametral_pitch)
+    assert drum.TEETH == int(_config.machine("gear_train", "cylinder_teeth"))
+    assert spec.CONFIGURATION_TEETH == tuple(range(6, int(_config.machine("gear_train", "fundamental_cone_teeth")) + 1, 6))
+    assert spec.BLANK_DIA_BAND == solve.BLANK_DIA_BAND == (0.10, -0.10)
+    assert spec.TOOTH_THICKNESS_BAND == solve.TOOTH_THICKNESS_BAND == (0.075, -0.075)
+    assert spec.BACKLASH_ACCEPTANCE_MM == solve.BACKLASH_ACCEPTANCE_MM == (0.06, 0.41)
+    assert inputs.maximum_bore_mm(6) == pytest.approx(0.849)
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
-    tip_dia, thickest = spec.DEEPENED_MESH_MM[teeth]
-    worst = _worst(teeth, tip_dia, thickest)
-    assert worst["tight_backlash"] >= spec.MESH_BACKLASH_MIN_MM, worst
-    assert worst["tip_land"] >= LAND_MIN, worst
-    assert worst["drum_floor"] >= DRUM_FLOOR_MIN, worst
-    # The drum tip still clears the (risen) chord floor with every runout
-    # closing; +0.030 at T006 is the tightest running clearance.
-    assert worst["cone_floor"] > 0.0, worst
-    low, high = spec.BACKLASH_ACCEPTANCE_MM
-    assert low == spec.MESH_BACKLASH_MIN_MM
-    assert worst["loose_backlash"] <= high, worst
-    if teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH:
-        assert worst["contact_ratio"] < CR_EXCEPTION, worst
-        # Preserve or improve the old small-cone exceptions; no new low-CR count.
-        baseline = {6: 0.179, 12: 0.430, 18: 0.606, 24: 0.747, 30: 0.864, 36: 0.966}
-        assert worst["contact_ratio"] >= baseline[teeth], worst
+def test_every_count_is_selected_or_explicitly_refused(teeth: int) -> None:
+    data = spec.stock_form_mesh_data(teeth)
+    assert data["qualification"] in {"qualified", "refused"}
+    if data["qualification"] == "refused":
+        assert data["refusal"]
+        with pytest.raises(ValueError, match="refused"):
+            spec.stock_form_profile(teeth)
     else:
-        assert worst["contact_ratio"] >= CR_EXCEPTION, worst
-    # Deeper than today everywhere: a standard tip and tooth at the same
-    # stack.
-    standard = _worst(teeth, (teeth + 2) * M, spec.STANDARD_TOOTH_THICKNESS)
-    if teeth != 6:  # the standard6T tip points at the retained thickness bands
-        assert worst["contact_ratio"] > standard["contact_ratio"]
+        assert not data["refusal"]
+        assert spec.stock_form_profile(teeth).teeth == teeth
 
 
-def test_backlash_acceptance_upper_is_the_loosest_printed_mesh() -> None:
-    # The separating tooth load takes up both journal clearances while the
-    # mesh is rocked, so the loosest reading includes FLOAT, not only RUNOUT.
-    loosest = max(
-        _worst(teeth, *spec.DEEPENED_MESH_MM[teeth])["loose_backlash"]
-        for teeth in spec.CONFIGURATION_TEETH
+@pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
+def test_printed_setting_is_actual_and_quantized(teeth: int) -> None:
+    profile = spec.stock_form_profile(teeth)
+    outside = spec.outside_dia_mm(teeth)
+    thickness = spec.tooth_thickness_mm(teeth)
+    assert outside == round(outside, 2)
+    assert thickness == round(thickness, 3)
+    assert profile.blank_radius_mm == pytest.approx(outside / 2.0)
+    assert profile.pitch_tooth_thickness_mm == pytest.approx(thickness, abs=1e-9)
+    assert profile.radial_translation_mm == pytest.approx(
+        translation_for_pitch_tooth_thickness(teeth, profile.template, thickness), abs=1e-9,
     )
-    high = spec.BACKLASH_ACCEPTANCE_MM[1]
-    assert high == math.ceil(loosest * 100.0) / 100.0, loosest
+    if teeth == 6:
+        assert profile.template.name == "DT6-FORM1"
+        assert profile.template.cutter_number is None
+        assert profile.template.reference_teeth == 6
+        assert profile.template.source
+    else:
+        assert profile.template.reference_teeth == profile.template.teeth_range[0]
+        assert profile.template.cutter_number is not None
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_printed_values_are_the_limits(teeth: int) -> None:
-    tip_dia, thickest = spec.DEEPENED_MESH_MM[teeth]
-    thicker = _worst(teeth, tip_dia, thickest + 0.001)
-    assert thicker["tight_backlash"] < spec.MESH_BACKLASH_MIN_MM
-    worst = _worst(teeth, tip_dia, thickest)
-    if worst["contact_ratio"] >= CR_TARGET:
-        # Smallest tip reaching the target: one step less misses it.
-        smaller = _worst(teeth, tip_dia - 0.01, thickest)
-        assert smaller["contact_ratio"] < CR_TARGET
-        return
-    # Otherwise the largest tip the land and drum floor allow.
-    larger = _worst(teeth, tip_dia + 0.01, thickest)
-    assert larger["tip_land"] < LAND_MIN or larger["drum_floor"] < DRUM_FLOOR_MIN
+def test_printed_mesh_meets_its_actual_design_rules(teeth: int, inputs: solve.DesignInputs) -> None:
+    """Refused designs fail the production gate rather than gaining a fallback."""
+    from diagnostics import oblique_cone_mesh_study as study
 
-
-def _floor_width(teeth: int, thickest: float) -> float:
-    """Gap width at the flank feet for the thickest tooth: the widest fly
-    cutter tip that fits every gear cut to the printed thickness band."""
-    r1 = teeth * M / 2.0
-    tmin = spec.floor_tmin(teeth)
-    foot_r = r1 * math.cos(PRESSURE_ANGLE) * math.hypot(1.0, tmin)
-    roll = tmin - math.atan(tmin)
-    half_tooth = thickest / (2.0 * r1) + _inv(PRESSURE_ANGLE) - roll
-    return 2.0 * foot_r * math.sin(math.pi / teeth - half_tooth)
+    profile = spec.stock_form_profile(teeth)
+    domain = solve._translation_domain(teeth, profile.template, inputs)
+    translations = solve._corner_translations(teeth, profile.template, spec.tooth_thickness_mm(teeth), domain)
+    geometry_margins = solve.geometry_margins(
+        teeth, spec.outside_dia_mm(teeth), translations, profile.template, inputs,
+    )
+    assert min(geometry_margins.values()) >= 0.0
+    geometry, home = solve.oblique_section_geometry(teeth), solve.home_clocking_rad(teeth)
+    pair = study.ContactPair(
+        f"cone T{teeth:03d} acceptance", profile, inputs.drum_nominal,
+        study.placement_from_geometry(geometry, home),
+    )
+    cone_corners = spec.manufacturing_corner_profiles(teeth)
+    pose_domain = study.configured_pose_domain(
+        teeth, inputs, cone_radius_upper_mm=max(corner.blank_radius_mm for corner in cone_corners),
+    )
+    ball = (
+        study.profile_motion_ball(profile, cone_corners)
+        + study.profile_motion_ball(inputs.drum_nominal, inputs.drum_corners)
+    )
+    radial, axial = study.complete_pose_errors(pair, pose_domain, profile_motion_mm=ball)
+    cam_clearance = study.configured_cam_exclusion(
+        pair, radial_error_mm=radial, profile_motion_mm=ball,
+    )
+    assert cam_clearance["qualified"], cam_clearance
+    actual = study.qualify_actual_pair(
+        pair, pose_ball_mm=ball, phases=129, maximum_error_mm=inputs.maximum_error_mm,
+        radial_error_mm=radial, axial_error_mm=axial,
+        read_phases_rad=tuple(-k * math.pi for k in range(21)),
+        planar_centre_mm=inputs.centre_mm(teeth), home=home,
+    )
+    assert actual["qualification"] == "qualified", actual
+    assert min(actual["margins"].values()) >= 0.0, actual
+    assert actual["margins"]["cone_root_air_mm"] >= 0.0, actual
+    assert actual["margins"]["drum_root_air_mm"] >= 0.0, actual
+    # Main's final gate is ALL-count actual 3D branch UNION, including real
+    # finite corners/edges. The old small-count FF/CR floors are comparisons.
+    required = solve.UNION_COVERAGE_MIN
+    frozen = spec.stock_form_mesh_data(teeth)
+    coverage_min = actual["all_corner_actual3d"]["stock_form_coverage_lower"]
+    assert coverage_min >= required, actual
+    assert frozen["coverage_min"] == pytest.approx(coverage_min, abs=1e-9)
+    assert frozen["oblique_phase_bound_rad"] == pytest.approx(actual["oblique_phase_bound_rad"], abs=1e-9)
+    assert frozen["phase_reserve_rad"] >= 0.0
+    assert frozen["noncarrying_gap_mm"] >= 0.0
+    assert frozen["te_bound_rad"] >= 0.0
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
-    tip_dia, thickest = spec.DEEPENED_MESH_MM[teeth]
-    clearance = _worst(teeth, tip_dia, thickest)["cone_floor"]
-    # Main: one fly cutter at least 0.43 wide fits every gap.
-    assert _floor_width(teeth, thickest) >= 0.32
-    # Every floor is two-sided (Main, 2026-09-26: the #834 machinist review
-    # found sheets 3-20 printed MIN only).  MAX is the shallowest floor keeping
-    # 0.02 of drum-tip clearance with every runout closing (a shallow plunge
-    # would rub), floored to three places; MIN is the modelled floor, floored
-    # to three places too (bands round outward).
+def test_actual_tool_corners_pay_support_land_floor_and_web(teeth: int, inputs: solve.DesignInputs) -> None:
+    profiles = spec.manufacturing_corner_profiles(teeth)
+    assert len(profiles) == 4
     minimum, maximum = spec.floor_limits_mm(teeth)
-    drum_path = _centre(teeth) - RUNOUT - DRUM_TIP_R
-    assert drum_path - maximum / 2.0 >= 0.02
-    assert drum_path - (maximum + 0.001) / 2.0 < 0.02
-    # Main: T006's window must be at least 0.04 on diameter; every other
-    # gear's is wider.
-    assert maximum - minimum >= 0.04
-    modelled = 2.0 * spec.floor_radius_mm(teeth)
-    assert modelled - 0.001 < minimum <= modelled
-    if teeth in spec.DIPPED_FLOOR_MIN_MM:
-        assert clearance > 0.04  # +0.045 at T006, +0.076 at T012
-        return
-    if spec.floor_tmin(teeth) == 0.0:
-        assert clearance >= 0.10
-        return
-    # Raised floors sit exactly as high as a 0.30 worst-case clearance allows.
-    assert clearance >= 0.30
-    higher = spec.chord_floor_radius_mm(
-        teeth,
-        thickness_mm=spec.tooth_thickness_mm(teeth),
-        tmin=spec.floor_tmin(teeth) + 0.0005,
+    assert maximum - minimum >= 0.04 - 1e-9
+    closing = inputs.centre_mm(teeth) - inputs.runout_mm
+    assert closing - max(gear.blank_radius_mm for gear in inputs.drum_corners) - maximum / 2.0 >= 0.02 - 1e-9
+    assert closing - max(gear.blank_radius_mm for gear in inputs.drum_corners) - (maximum + 0.001) / 2.0 < 0.02 + 1e-9
+    for profile in profiles:
+        assert profile.blank_radius_mm <= profile.support_radius_max_mm
+        assert profile.tip_land_mm >= max(0.10, 0.25 * spec.MODULE_MM)
+        assert profile.root_radius_min_mm * 2.0 >= minimum - 1e-9
+        assert profile.root_radius_max_mm * 2.0 <= maximum + 1e-9
+        assert profile.root_radius_min_mm - inputs.maximum_bore_mm(teeth) / 2.0 >= inputs.web_min_mm(teeth) - 1e-9
+    if teeth == 6:
+        assert min(profile.root_radius_min_mm for profile in profiles) >= 1.173 - 1e-9
+
+
+def test_fixed_drum_uses_real_finite_process_corners() -> None:
+    assert drum.STOCK_FORM.teeth == drum.TEETH
+    assert drum.STOCK_FORM.template.reference_teeth == 55
+    assert drum.STOCK_FORM.radial_translation_mm == pytest.approx(
+        drum.PITCH_DIA / 2.0 - drum.CUTTER_TEMPLATE.pitch_radius_mm,
     )
-    assert _centre(teeth) - RUNOUT - DRUM_TIP_R - higher < 0.30
+    assert drum.OUTSIDE_DIA_BAND == (0.0, -0.02)
+    assert drum.WHOLE_DEPTH_BAND == (0.05, 0.0)
+    for profile in drum.manufacturing_corner_profiles():
+        assert profile.blank_radius_mm <= profile.support_radius_max_mm
+        assert profile.radial_translation_mm == pytest.approx(
+            profile.blank_radius_mm - profile.template.root_radius_mm - profile.plunge_mm,
+        )
+
+
+@pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
+def test_frozen_planar_centre_and_physical_zero_follow_source(teeth: int, inputs: solve.DesignInputs) -> None:
+    data = spec.stock_form_mesh_data(teeth)
+    assert data["centre_mm"] == pytest.approx(inputs.centre_mm(teeth))
+    assert data["home_clocking_rad"] == pytest.approx(solve.home_clocking_rad(teeth))
+    assert solve.home_clocking_rad(teeth)[0] == pytest.approx(math.pi / teeth)
+    assert solve.home_clocking_rad(teeth)[1] == pytest.approx(-math.radians(_config.machine("gear_train", "cylinder_lock_phase_deg")))
 
 
 def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:
-    # Codex (#834): the T120/16T scan kept the standard pitch radius +
-    # addendum (Ø62.20) after the long-addendum blank grew the printed tip to
-    # Ø62.93.  Every cone-tip clearance check reads the printed OD at its
-    # upper limit, and the 16T's full-OD shoulder keeps its 0.25 axial air.
-    assert assembly._TIP120 == pytest.approx(
-        (spec.outside_dia_mm(120) + spec.BLANK_DIA_BAND[0]) / 2.0
-    )
+    # Native source consumers remain a separate retained assembly acceptance.
+    import build_dt_drive_train_assembly as assembly
+
+    assert assembly._TIP120 == pytest.approx((spec.outside_dia_mm(120) + spec.BLANK_DIA_BAND[0]) / 2.0)
     for teeth in spec.CONFIGURATION_TEETH:
-        assert assembly._cone_tip_radius_max(teeth) == pytest.approx(
-            (spec.outside_dia_mm(teeth) + spec.BLANK_DIA_BAND[0]) / 2.0
-        )
+        assert assembly._cone_tip_radius_max(teeth) == pytest.approx((spec.outside_dia_mm(teeth) + spec.BLANK_DIA_BAND[0]) / 2.0)
     assert assembly.PINION_T120_CONCENTRIC["shoulder air"] >= 0.25
 
 
-# Face-width lower limit against the axial stacks the gear sits in.  The
-# drum's engaged zone was [-0.75, +1.35] about the 6.0 gear's centre, 0.25
-# north of the 6.5 reference centre every station is laid out on; the solid
-# stack's gear grew SOUTH to the seat pitch, so its centre is
-# (reference - face)/2 south of that reference and the zone moves north
-# about it by the difference.
-# * The drum side keeps the in-service cone/drum stack retention743 re-derived
-#   for R1 on 2026-09-26: +0.55 north, -1.10 south.
-# * The cone side is the solid stack: any face's station band
-#   (cone_gear_stack.STATION_BAND, 64T included), the collar web's printed
-#   band it stands on, and in service the stack's float north off the collar
-#   (cone_stack_end_play.STACK_FLOAT).  Since the MHA-VN-016 collar that bounds
-#   that float rides the shaft (user ruling 2026-09-29), MHA-DT-004's own end
-#   play (cone_stack_end_play.SHAFT_END_PLAY) adds to it.
-# Both margins keep the fleet's MARGIN_SPARE.
-_OLD_CENTRE_NORTH = (assembly.CONE_FACE_STATION_REFERENCE - 6.0) / 2.0
-_NEW_CENTRE_NORTH = (assembly.CONE_FACE_STATION_REFERENCE - spec.FACE_WIDTH) / 2.0
-ENGAGED_ZONE = tuple(
-    edge + _OLD_CENTRE_NORTH - _NEW_CENTRE_NORTH for edge in (-0.75, 1.35)
-)
-CONE_DRUM_Z_STACK = (-1.10, 0.55)
-
-
 def test_face_width_band_holds_the_drum_engaged_zone() -> None:
+    import cone_stack_end_play
+    import dt_cone_gear_shaft_spec
+    import dt_cone_gear_stack
+
+    old_centre_north = (cone_line.CONE_FACE_STATION_REFERENCE - 6.0) / 2.0
+    new_centre_north = (cone_line.CONE_FACE_STATION_REFERENCE - spec.FACE_WIDTH) / 2.0
+    engaged_zone = tuple(edge + old_centre_north - new_centre_north for edge in (-0.75, 1.35))
+    cone_drum_z_stack = (-1.10, 0.55)
     lower = spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[1]
     station_upper, station_lower = dt_cone_gear_stack.STATION_BAND
     collar = dt_cone_gear_shaft_spec.printed_band("CollarWidth")
-    cone_north = (
-        station_upper
-        + collar
-        + cone_stack_end_play.STACK_FLOAT[1]
-        + cone_stack_end_play.SHAFT_END_PLAY[1]
-    )
+    cone_north = station_upper + collar + cone_stack_end_play.STACK_FLOAT[1] + cone_stack_end_play.SHAFT_END_PLAY[1]
     cone_south = -station_lower + collar
-    # A cone gear south of nominal moves the zone north on its face.
-    north = lower / 2.0 - ENGAGED_ZONE[1] - CONE_DRUM_Z_STACK[1] - cone_south
-    south = lower / 2.0 + ENGAGED_ZONE[0] + CONE_DRUM_Z_STACK[0] - cone_north
+    north = lower / 2.0 - engaged_zone[1] - cone_drum_z_stack[1] - cone_south
+    south = lower / 2.0 + engaged_zone[0] - cone_drum_z_stack[0] - cone_north
     assert min(north, south) >= cone_stack_end_play.MARGIN_SPARE

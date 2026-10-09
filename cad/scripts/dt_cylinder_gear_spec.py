@@ -12,22 +12,60 @@ import math
 import _config
 import dt_cylinder_gear_shaft_spec as arbor
 
+from _fit_limits import deviations, gear_tip_band_mm
+from _printed_tolerance import printed_deviations
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from stock_form_cutter import CutterTemplate, StockFormProfile
 
 
 MM_PER_IN = 25.4
 
 # --- gear tooth system (build_dt_cylinder_gear.py / gear_train.yaml) ------------
-TEETH = 120
+TEETH = int(_config.machine("gear_train", "cylinder_teeth"))
 DIAMETRAL_PITCH = _config.machine("gear_train", "diametral_pitch")
 PRESSURE_ANGLE_DEG = float(_config.machine("gear_train", "pressure_angle_deg"))
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH * MODULE_MM
-OUTSIDE_DIA = (TEETH + 2) * MODULE_MM
-DEDENDUM_FACTOR = 1.25
-ROOT_DIA = PITCH_DIA - 2.0 * DEDENDUM_FACTOR * MODULE_MM
-WHOLE_DEPTH = (1.0 + DEDENDUM_FACTOR) * MODULE_MM
+OUTSIDE_DIA_BAND = gear_tip_band_mm("contact_critical")
+DEDENDUM_FACTOR = 1.25  # reference cutter root, not a gear-axis circular floor
+CUTTER_NUMBER = 2
+CUTTER_TEETH_RANGE = (55, 134)
+CUTTER_REFERENCE_TEETH = CUTTER_TEETH_RANGE[0]
+CUTTER_TEMPLATE = CutterTemplate(
+    CUTTER_REFERENCE_TEETH, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG
+)
+CUTTER_RADIAL_TRANSLATION_MM = PITCH_DIA / 2.0 - CUTTER_TEMPLATE.pitch_radius_mm
+_SUPPORT_PROFILE = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, CUTTER_RADIAL_TRANSLATION_MM
+)
+SUPPORT_OUTSIDE_DIA_MM = 2.0 * _SUPPORT_PROFILE.support_radius_max_mm
+WHOLE_DEPTH_PLACES = 3
+WHOLE_DEPTH_BAND = (0.05, 0.0)  # retained (upper, lower) plunge requirement
+# A printed plunge can round upward by half its final decimal.  Pay that
+# plus the full depth band before choosing the native two-place blank.
+_DEPTH_SUPPORT_PROFILE = StockFormProfile(
+    TEETH,
+    CUTTER_TEMPLATE,
+    PITCH_DIA / 2.0,
+    CUTTER_RADIAL_TRANSLATION_MM
+    - WHOLE_DEPTH_BAND[0]
+    - 0.5 * 10.0**-WHOLE_DEPTH_PLACES,
+)
+MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM = 2.0 * _DEPTH_SUPPORT_PROFILE.support_radius_max_mm
+OUTSIDE_DIA = math.floor(
+    (MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM - OUTSIDE_DIA_BAND[0]) * 100.0
+) / 100.0
+STOCK_FORM = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, CUTTER_RADIAL_TRANSLATION_MM
+)
+ROOT_ENVELOPE_DIA_MM = (
+    2.0 * STOCK_FORM.root_radius_min_mm,
+    2.0 * STOCK_FORM.root_radius_max_mm,
+)
+WHOLE_DEPTH = STOCK_FORM.plunge_mm
+MAX_CUT_DEPTH_MM = STOCK_FORM.blank_radius_mm - STOCK_FORM.root_radius_min_mm
+PITCH_TOOTH_THICKNESS_MM = STOCK_FORM.pitch_tooth_thickness_mm
 
 # --- machinable blank (build_dt_cylinder_gear.py) ------------------------------
 BORE_DIAMETRAL_CLEARANCE_MM = (0.030, 0.070)  # (minimum, maximum), matched fit
@@ -52,6 +90,9 @@ OVERALL_THICKNESS = 7.0565
 OVERALL_THICKNESS_BAND = (0.025, -0.025)  # (upper, lower) deviations
 CAM_THICKNESS = OVERALL_THICKNESS - FACE_WIDTH  # reference: the closed rod slot
 ECCENTRICITY = 8.64  # cam axis offset from the bore axis
+# The cam must merge wholly into the actual uncut web, not a fictitious
+# actual-N circular root blank.  The native builder checks this same margin.
+CAM_ROOT_WEB_MIN_MM = STOCK_FORM.root_radius_min_mm - (CAM_DIA / 2.0 + ECCENTRICITY)
 ECCENTRICITY_TOLERANCE_MM = 0.025
 SET_ECCENTRICITY_RANGE_MM = 0.025
 # Cam-lobe direction vs the alignment-notch centreline (the channel's phase
@@ -86,6 +127,7 @@ SURFACE_FINISHES = (
 # kerf. Bore diameter is a reference nominal with a finished-fit callout.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
+    "GearBlankProfile": {"OutsideDia"},
     "BoreProfile": {"BoreDia"},
     "CamProfile": {"CamDia", "CamCy"},
     "CamBoss": {"OverallThickness"},
@@ -102,6 +144,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # to the tenth of a degree.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": 2},
+    "GearBlankProfile": {"OutsideDia": 2},
     "BoreProfile": {"BoreDia": 3},
     "CamProfile": {"CamDia": 2, "CamCy": 3},
     # Four places: 7.0565 is the station pitch, exact only at four (user
@@ -142,3 +185,34 @@ def matched_bore_limits(finished_shaft_dia_mm: float) -> tuple[float, float]:
     """Return finished bore MIN/MAX for the measured mating MHA-DT-013 arbor."""
     minimum, maximum = BORE_DIAMETRAL_CLEARANCE_MM
     return finished_shaft_dia_mm + minimum, finished_shaft_dia_mm + maximum
+
+
+def outside_dia_limits_mm() -> tuple[float, float]:
+    """Accepted tooth-tip MIN/MAX; includes the printed nominal's rounding."""
+    lower, upper = printed_deviations(
+        OUTSIDE_DIA,
+        DRAWING_PRECISION_BY_NAME["OutsideDia"],
+        deviations(OUTSIDE_DIA_BAND),
+    )
+    return round(OUTSIDE_DIA + lower, 12), round(OUTSIDE_DIA + upper, 12)
+
+
+def whole_depth_limits_mm() -> tuple[float, float]:
+    """Accepted cutter plunge MIN/MAX from the actual printed process row."""
+    nominal = round(WHOLE_DEPTH, WHOLE_DEPTH_PLACES)
+    upper, lower = WHOLE_DEPTH_BAND
+    return round(nominal + lower, 12), round(nominal + upper, 12)
+
+
+def manufacturing_corner_profiles() -> tuple[StockFormProfile, ...]:
+    """Four finite profiles paying both printed tip and plunge limits."""
+    return tuple(
+        StockFormProfile(
+            TEETH,
+            CUTTER_TEMPLATE,
+            tip / 2.0,
+            tip / 2.0 - CUTTER_TEMPLATE.root_radius_mm - depth,
+        )
+        for tip in outside_dia_limits_mm()
+        for depth in whole_depth_limits_mm()
+    )

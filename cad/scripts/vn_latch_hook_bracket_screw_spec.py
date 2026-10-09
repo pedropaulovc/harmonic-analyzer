@@ -17,11 +17,11 @@ head and its stock band are the hook's (``pd_latch_hook_geometry``).
 
 from __future__ import annotations
 
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from vn_swing_stop_screw_spec import FILLISTER_SIZE
 from pd_latch_hook_geometry import SHEET_T, SHEET_T_MINUS, SHEET_T_PLUS
 
 SKU = "90280A108"
-MAJOR_DIA, LENGTH, HEAD_H, HEAD_DIA, _SLOT_W = FILLISTER_SIZES[SKU]
+MAJOR_DIA, LENGTH, HEAD_H, HEAD_DIA, _SLOT_W = FILLISTER_SIZE
 # #4-40 UNC-2A major limits, ASME B1.1: 0.1112 / 0.1061 in.
 MAJOR_DIA_MIN = 0.1061 * 25.4
 PITCH = 25.4 / 40.0  # #4-40 UNC

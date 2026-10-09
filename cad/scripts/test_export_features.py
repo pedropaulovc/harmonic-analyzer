@@ -14,6 +14,7 @@ import yaml
 from prechips.model import Features
 
 import export_features as exporter
+import _config
 from _export_feature_faces import FeatureFaceError, face_name
 from _part_pmi import _FaceGeometry, _face_matches
 
@@ -121,28 +122,55 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     manifest = exporter.requirement_manifest("dt_cone_pivot_post")
     features = manifest["features"]
     crank = features["crank_bore"]
-    assert crank["dia"] == [11.413, 11.443]
-    assert features["journal_bore"]["dia"] == [12.2558, 12.2858]
-    assert features["journal_bore"]["height"] == [33.118, 33.618]
+    bore_upper, bore_lower = cone.RUNNING_BORE_BAND
+    for feature, nominal in (
+        (crank, cone.CRANK_BORE_DIA),
+        (features["journal_bore"], cone.BORE_DIA),
+    ):
+        assert feature["dia"] == pytest.approx(
+            [nominal + bore_lower, nominal + bore_upper], rel=0.0, abs=1e-12
+        )
+    height_band = cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
+    assert features["journal_bore"]["height"] == pytest.approx(
+        [cone.BORE_HEIGHT - height_band, cone.BORE_HEIGHT + height_band],
+        rel=0.0,
+        abs=1e-12,
+    )
+    assert features["journal_bore"]["at"] == pytest.approx([0.0, cone.BORE_HEIGHT, 0.0])
+    assert features["journal_bore"]["precision"]["height"] == (
+        cone.DRAWING_PRECISION_BY_NAME["JournalAxisY"]
+    )
     assert cone.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
     upper, lower = cone.CRANK_ABOVE_CONE_BAND
     assert crank["separation"] == pytest.approx(
         [cone.CRANK_ABOVE_CONE + lower, cone.CRANK_ABOVE_CONE + upper],
-        rel=0.0, abs=1e-12,
+        rel=0.0,
+        abs=1e-12,
     )
     assert crank["height_from"] == "journal_bore"
     assert crank["height_nominal"] == pytest.approx(cone.CRANK_BORE_HEIGHT)
     assert crank["at"] == pytest.approx([0.0, cone.CRANK_BORE_HEIGHT, 0.0])
-    assert crank["angularity_dia"] == 0.10
-    assert crank["angularity_datums"] == ["A", "B"]
+    angularity = cone.GEOMETRIC_CONTROLS[0]
+    assert crank["angularity_dia"] == float(angularity.tolerance)
+    assert crank["angularity_datums"] == list(angularity.datums)
     assert "angularity_dia" in crank["requirements"]
     assert "angle_tol_deg" not in crank["requirements"]
     assert "position_dia" not in crank
     assert "height" not in crank["requirements"]
     assert "unknown" in features["journal_bore"]["requirements"]
-    assert features["mount_west"]["dia"] == [7.14248, 7.24248]
-    assert features["mount_west"]["nominal_dia"] == 7.14248
-    assert features["mount_west"]["precision"]["dia"] == 2
+    drilled = _config.title_block("drilled_hole")
+    assert features["mount_west"]["dia"] == pytest.approx(
+        [
+            cone.ATTACHMENT_THRU_DIA - float(drilled["minus_mm"]),
+            cone.ATTACHMENT_THRU_DIA + float(drilled["plus_mm"]),
+        ],
+        rel=0.0,
+        abs=1e-12,
+    )
+    assert features["mount_west"]["nominal_dia"] == cone.ATTACHMENT_THRU_DIA
+    assert features["mount_west"]["precision"]["dia"] == (
+        cone.DRAWING_PRECISION_BY_NAME["MountWestX"]
+    )
     selectors = exporter.feature_selectors("dt_cone_pivot_post")
     for datum in exporter.cone.PART_DATUMS:
         assert selectors[manifest["datums"][datum.letter]["feature"]] == (datum.face,)
@@ -411,7 +439,9 @@ class _GearProfileAdapter:
 
     async def add_sketch_dimension(self, first, second, kind, value):
         assert (first, second, kind) == (
-            "Line1.start", "Line1.end", "vertical_distance"
+            "Line1.start",
+            "Line1.end",
+            "vertical_distance",
         )
         assert value == self.path_length
         return self._result("D1@ToothPath")
@@ -445,7 +475,8 @@ def gear_profile_adapter(monkeypatch):
 
     adapter = _GearProfileAdapter()
     monkeypatch.setattr(
-        _gear, "name_last_feature",
+        _gear,
+        "name_last_feature",
         lambda seat, name: seat.name_last_feature(name),
     )
     return adapter
@@ -486,10 +517,10 @@ def _profile_points(curves, walk, *, samples=64, radial_clip=None):
 
 
 def _polygon_area(points):
-    return abs(sum(
-        x1 * y2 - x2 * y1
-        for (x1, y1), (x2, y2) in zip(points, points[1:])
-    )) / 2.0
+    return (
+        abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(points, points[1:])))
+        / 2.0
+    )
 
 
 def _assert_simple_profile(points):
@@ -519,62 +550,58 @@ def _assert_simple_profile(points):
 _TOOTH_WALK = ((0, False), (1, False), (2, True), (3, False), (4, False), (5, False))
 
 
-def _crank_gear_profile():
-    import cone_line
-    from dt_crank_drive_gear_spec import (
-        BACKLASH_MM, CUTTER_DIAMETRAL_PITCH, DEDENDUM_FACTOR,
-        DIAMETRAL_PITCH, FACE_WIDTH, HELIX_ANGLE_DEG, LONG_ADDENDUM_MM,
-        PRESSURE_ANGLE_DEG, ROOT_DIA, TEETH,
-    )
+def _above_base_helical_regression_profile():
+    """Independent sample for the retained ideal-involute helper algorithms.
+
+    This is not the physical 64T stock-form crank gear: that uses the finite
+    cutter's translated root envelope, printed tangent span and corner set,
+    qualified in the native crank/core tests. Keep these endpoint/area controls
+    independent of its specification so they cannot claim native qualification.
+    """
     from involute_gear import gear_facts
 
-    assert TEETH == 64
-    assert CUTTER_DIAMETRAL_PITCH == pytest.approx(24.0, abs=1e-10)
-    assert DEDENDUM_FACTOR == 1.25
-    assert LONG_ADDENDUM_MM == 0.0
-    assert FACE_WIDTH == 7.2244
-    assert HELIX_ANGLE_DEG == pytest.approx(cone_line.INCLINE_DEG, abs=1e-10)
-    assert DIAMETRAL_PITCH == pytest.approx(
-        CUTTER_DIAMETRAL_PITCH * math.cos(math.radians(HELIX_ANGLE_DEG)),
-        abs=1e-10,
-    )
-    normal_pa = math.degrees(math.atan(
-        math.tan(math.radians(PRESSURE_ANGLE_DEG))
-        * math.cos(math.radians(HELIX_ANGLE_DEG))
-    ))
-    assert normal_pa == pytest.approx(20.0, abs=1e-10)
-
-    extra = 1.0 / CUTTER_DIAMETRAL_PITCH - 1.0 / DIAMETRAL_PITCH + LONG_ADDENDUM_MM / 25.4
-    facts = gear_facts(
-        TEETH, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG, addendum_extra_in=extra
-    )
-    pitch_r = TEETH / (2.0 * DIAMETRAL_PITCH)
-    root = pitch_r - DEDENDUM_FACTOR / CUTTER_DIAMETRAL_PITCH
-    assert root * 50.8 == pytest.approx(ROOT_DIA)
-    eps = BACKLASH_MM / (2.0 * pitch_r * 25.4)
-    twist = FACE_WIDTH * math.tan(math.radians(HELIX_ANGLE_DEG)) / (pitch_r * 25.4)
-    return facts, root, eps, twist, FACE_WIDTH, extra, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG
+    teeth, normal_dp, normal_pa = 64, 24.0, 20.0
+    helix = math.radians(13.0)
+    face = 7.0
+    dp = normal_dp * math.cos(helix)
+    pa = math.degrees(math.atan(math.tan(math.radians(normal_pa)) / math.cos(helix)))
+    extra = 1.0 / normal_dp - 1.0 / dp
+    facts = gear_facts(teeth, dp, pa, addendum_extra_in=extra)
+    pitch_r = teeth / (2.0 * dp)
+    root = pitch_r - 1.25 / normal_dp
+    eps = 0.001  # algorithmic flank rotation, not an assembled backlash claim
+    twist = face * math.tan(helix) / (pitch_r * 25.4)
+    return facts, root, eps, twist, face, extra, dp, pa
 
 
-def test_normal24_pa20_swept_profile_starts_at_root_and_never_crosses(gear_profile_adapter):
+def test_above_base_helical_regression_starts_at_root_and_never_crosses(
+    gear_profile_adapter,
+):
     import _gear
     from involute_gear import involute_point
 
-    facts, root, eps, twist, face, extra, dp, pa = _crank_gear_profile()
+    facts, root, eps, twist, face, extra, dp, pa = _above_base_helical_regression_profile()
     assert root > facts["Rb"]
     assert root - _gear._TOOTH_EMBED_MM / 25.4 > facts["Rb"]
     rho = -twist / 2.0
-    name = asyncio.run(_gear.boss_tooth_swept(
-        gear_profile_adapter, facts, face, twist_deg=math.degrees(twist),
-        rotate_rad=rho, widen_rad=eps, root_r_in=root,
-    ))
+    name = asyncio.run(
+        _gear.boss_tooth_swept(
+            gear_profile_adapter,
+            facts,
+            face,
+            twist_deg=math.degrees(twist),
+            rotate_rad=rho,
+            widen_rad=eps,
+            root_r_in=root,
+        )
+    )
     assert name == "ToothSweep"
     assert gear_profile_adapter.sweep.twist_angle == pytest.approx(math.degrees(twist))
     curves = gear_profile_adapter.curves
     points = _profile_points(curves, _TOOTH_WALK)
     _assert_simple_profile(points)
 
-    u0 = math.sqrt((root / facts["Rb"])**2 - 1.0)
+    u0 = math.sqrt((root / facts["Rb"]) ** 2 - 1.0)
     assert _gear._root_start_parameter(facts["Rb"], root) == pytest.approx(u0)
     inv0 = u0 - math.atan(u0)
     foot_angles = (
@@ -619,21 +646,27 @@ def test_normal24_pa20_swept_profile_starts_at_root_and_never_crosses(gear_profi
     physical = _profile_points(
         curves, _TOOTH_WALK, samples=2000, radial_clip=(root, facts["Ra"])
     )
-    gap = _gear.gap_area_in_disc_ext(
-        64, dp, pa, eps, root, addendum_extra_in=extra
-    )
-    tooth = math.pi * (facts["Ra"]**2 - root**2) / 64.0 - gap
+    gap = _gear.gap_area_in_disc_ext(64, dp, pa, eps, root, addendum_extra_in=extra)
+    tooth = math.pi * (facts["Ra"] ** 2 - root**2) / 64.0 - gap
     assert _polygon_area(physical) == pytest.approx(tooth, rel=0.0, abs=2e-9)
 
 
-def test_normal24_pa20_gap_clips_to_same_root_and_volume_oracle(gear_profile_adapter):
+def test_above_base_helical_regression_gap_matches_root_and_volume_oracle(
+    gear_profile_adapter,
+):
     import _gear
 
-    facts, root, eps, twist, face, extra, dp, pa = _crank_gear_profile()
-    asyncio.run(_gear.cut_tooth_gap(
-        gear_profile_adapter, facts, face + 1.0,
-        rotate_rad=-twist / 2.0, widen_rad=eps, root_r_in=root,
-    ))
+    facts, root, eps, twist, face, extra, dp, pa = _above_base_helical_regression_profile()
+    asyncio.run(
+        _gear.cut_tooth_gap(
+            gear_profile_adapter,
+            facts,
+            face + 1.0,
+            rotate_rad=-twist / 2.0,
+            widen_rad=eps,
+            root_r_in=root,
+        )
+    )
     curves = gear_profile_adapter.curves
     assert len(curves) == 6  # no zero-length or outward base-to-root extensions
     walk = ((0, False), (2, False), (3, False), (4, False), (1, True), (5, False))
@@ -649,18 +682,23 @@ def test_normal24_pa20_gap_clips_to_same_root_and_volume_oracle(gear_profile_ada
         64, dp, pa, eps, root, addendum_extra_in=extra
     )
     assert _polygon_area(clipped) == pytest.approx(expected, rel=0.0, abs=2e-10)
-    u0 = math.sqrt((root / facts["Rb"])**2 - 1.0)
+    u0 = math.sqrt((root / facts["Rb"]) ** 2 - 1.0)
     inv0 = u0 - math.atan(u0)
     root_span = facts["Gamma"] - 2.0 * facts["Delta"] + 2.0 * eps + 2.0 * inv0
     tip_span = facts["ThetaU"] - facts["ThetaL"] + 2.0 * eps
     exact = (
-        facts["Ra"]**2 * tip_span - root**2 * root_span
-        - 2.0 * facts["Rb"]**2 * (facts["Tmax"]**3 - u0**3) / 3.0
+        facts["Ra"] ** 2 * tip_span
+        - root**2 * root_span
+        - 2.0 * facts["Rb"] ** 2 * (facts["Tmax"] ** 3 - u0**3) / 3.0
     ) / 2.0
     assert expected == pytest.approx(exact, rel=0.0, abs=2e-9)
 
 
-@pytest.mark.parametrize("teeth,dp,pa", ((16, 24.0, 20.0), (64, 24.74, 14.5), (12, 12.7, 14.5)))
+# Independent algorithm regression samples, not production gear selections.
+# These retain the below-base sweep branch alongside the above-base control.
+@pytest.mark.parametrize(
+    "teeth,dp,pa", ((16, 24.0, 20.0), (64, 24.74, 14.5), (12, 12.7, 14.5))
+)
 def test_below_base_sweep_keeps_original_profile(gear_profile_adapter, teeth, dp, pa):
     import _gear
     from involute_gear import gear_facts
@@ -670,10 +708,17 @@ def test_below_base_sweep_keeps_original_profile(gear_profile_adapter, teeth, dp
     assert 0.0 < root < facts["Rb"]
     assert _gear._root_start_parameter(facts["Rb"], root) == 0.0
     eps, rho = 0.001, -0.012
-    asyncio.run(_gear.boss_tooth_swept(
-        gear_profile_adapter, facts, 7.2244, twist_deg=2.0,
-        rotate_rad=rho, widen_rad=eps, root_r_in=root,
-    ))
+    asyncio.run(
+        _gear.boss_tooth_swept(
+            gear_profile_adapter,
+            facts,
+            7.2244,
+            twist_deg=2.0,
+            rotate_rad=rho,
+            widen_rad=eps,
+            root_r_in=root,
+        )
+    )
     rb, ra = facts["Rb"], facts["Ra"]
     embed = root - _gear._TOOTH_EMBED_MM / 25.4
     a_lo = facts["Gamma"] - facts["Delta"] + eps + rho
@@ -682,24 +727,41 @@ def test_below_base_sweep_keeps_original_profile(gear_profile_adapter, teeth, dp
         t = i / 16.0
         u = facts["Tmax"] * t
         ph_a, ph_b = u + a_lo, u - a_hi
-        tip = facts["ThetaU"] + eps + rho + t * (
-            facts["Gamma"] + facts["ThetaL"] - facts["ThetaU"] - 2.0 * eps
+        tip = (
+            facts["ThetaU"]
+            + eps
+            + rho
+            + t * (facts["Gamma"] + facts["ThetaL"] - facts["ThetaU"] - 2.0 * eps)
         )
         arc = a_hi + t * (a_lo - a_hi)
         reference = (
-            (rb * (math.cos(ph_a) + u * math.sin(ph_a)), rb * (math.sin(ph_a) - u * math.cos(ph_a))),
+            (
+                rb * (math.cos(ph_a) + u * math.sin(ph_a)),
+                rb * (math.sin(ph_a) - u * math.cos(ph_a)),
+            ),
             (ra * math.cos(tip), ra * math.sin(tip)),
-            (rb * (math.cos(ph_b) + u * math.sin(ph_b)), rb * (u * math.cos(ph_b) - math.sin(ph_b))),
-            ((rb + t * (embed - rb)) * math.cos(a_hi), (rb + t * (embed - rb)) * math.sin(a_hi)),
+            (
+                rb * (math.cos(ph_b) + u * math.sin(ph_b)),
+                rb * (u * math.cos(ph_b) - math.sin(ph_b)),
+            ),
+            (
+                (rb + t * (embed - rb)) * math.cos(a_hi),
+                (rb + t * (embed - rb)) * math.sin(a_hi),
+            ),
             (embed * math.cos(arc), embed * math.sin(arc)),
-            ((embed + t * (rb - embed)) * math.cos(a_lo), (embed + t * (rb - embed)) * math.sin(a_lo)),
+            (
+                (embed + t * (rb - embed)) * math.cos(a_lo),
+                (embed + t * (rb - embed)) * math.sin(a_lo),
+            ),
         )
         for curve, point in zip(gear_profile_adapter.curves, reference, strict=True):
             assert _curve_point(curve, t) == pytest.approx(point, rel=0.0, abs=3e-11)
 
 
 @pytest.mark.parametrize("root_kind", ("chord", "below", "base"))
-def test_below_base_gap_keeps_floor_and_involute_endpoints(gear_profile_adapter, root_kind):
+def test_below_base_gap_keeps_floor_and_involute_endpoints(
+    gear_profile_adapter, root_kind
+):
     import _gear
     from involute_gear import gap_area_in_disc, gear_facts, involute_point
 
@@ -714,44 +776,71 @@ def test_below_base_gap_keeps_floor_and_involute_endpoints(gear_profile_adapter,
         for index, upper in ((0, False), (1, True)):
             assert _curve_point(curves[index], t) == pytest.approx(
                 involute_point(facts, facts["Tmax"] * t, upper=upper),
-                rel=0.0, abs=3e-11,
+                rel=0.0,
+                abs=3e-11,
             )
-    floor_walk = ((5, False), (6, False), (7, False)) if root_kind == "below" else ((5, False),)
+    floor_walk = (
+        ((5, False), (6, False), (7, False)) if root_kind == "below" else ((5, False),)
+    )
     walk = ((0, False), (2, False), (3, False), (4, False), (1, True), *floor_walk)
     _assert_simple_profile(_profile_points(curves, walk))
     area = _gear.gap_area_in_disc_ext(16, 24.0, 20.0, root_r_in=root)
     if root_kind == "chord":
-        assert area == pytest.approx(gap_area_in_disc(16, dp=24.0, pa_deg=20.0), abs=1e-12)
+        assert area == pytest.approx(
+            gap_area_in_disc(16, dp=24.0, pa_deg=20.0), abs=1e-12
+        )
     clipped = _profile_points(
         curves, walk, samples=2000, radial_clip=(0.0, facts["Ra"])
     )
     assert _polygon_area(clipped) == pytest.approx(area, rel=0.0, abs=2e-10)
 
 
-@pytest.mark.parametrize("root_kind", ("negative", "zero", "tip", "above_tip", "embed_zero"))
+@pytest.mark.parametrize(
+    "root_kind", ("negative", "zero", "tip", "above_tip", "embed_zero")
+)
 def test_invalid_root_is_refused_before_sweep_profile(gear_profile_adapter, root_kind):
     import _gear
 
-    facts, _, eps, twist, face, extra, dp, pa = _crank_gear_profile()
+    facts, _, eps, twist, face, extra, dp, pa = _above_base_helical_regression_profile()
     root = {
-        "negative": -1.0, "zero": 0.0, "tip": facts["Ra"],
-        "above_tip": facts["Ra"] + 0.01, "embed_zero": _gear._TOOTH_EMBED_MM / 25.4,
+        "negative": -1.0,
+        "zero": 0.0,
+        "tip": facts["Ra"],
+        "above_tip": facts["Ra"] + 0.01,
+        "embed_zero": _gear._TOOTH_EMBED_MM / 25.4,
     }[root_kind]
     with pytest.raises(ValueError, match="root"):
-        asyncio.run(_gear.boss_tooth_swept(
-            gear_profile_adapter, facts, face, twist_deg=math.degrees(twist),
-            rotate_rad=0.0, widen_rad=eps, root_r_in=root,
-        ))
+        asyncio.run(
+            _gear.boss_tooth_swept(
+                gear_profile_adapter,
+                facts,
+                face,
+                twist_deg=math.degrees(twist),
+                rotate_rad=0.0,
+                widen_rad=eps,
+                root_r_in=root,
+            )
+        )
     assert not gear_profile_adapter.curves
     assert not gear_profile_adapter.planes
     if root_kind != "embed_zero":
         with pytest.raises(ValueError, match="root"):
-            asyncio.run(_gear.cut_tooth_gap(
-                gear_profile_adapter, facts, face, root_r_in=root,
-            ))
+            asyncio.run(
+                _gear.cut_tooth_gap(
+                    gear_profile_adapter,
+                    facts,
+                    face,
+                    root_r_in=root,
+                )
+            )
         with pytest.raises(ValueError, match="root"):
             _gear.gap_area_in_disc_ext(
-                64, dp, pa, eps, root, addendum_extra_in=extra,
+                64,
+                dp,
+                pa,
+                eps,
+                root,
+                addendum_extra_in=extra,
             )
 
 
@@ -766,7 +855,9 @@ def test_canonical_root_start_selects_physical_involute_domain(root, expected):
     assert _gear._root_start_parameter(0.25, root) == pytest.approx(expected)
 
 
-@pytest.mark.parametrize("root", (-1.0, 0.0, math.inf, math.nan), ids=("negative", "zero", "infinite", "nan"))
+@pytest.mark.parametrize(
+    "root", (-1.0, 0.0, math.inf, math.nan), ids=("negative", "zero", "infinite", "nan")
+)
 def test_canonical_root_start_rejects_nonphysical_radii(root):
     import _gear
 

@@ -21,6 +21,21 @@ _HOLE_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 _WEB_TARGET = 2.0  # U27: machined webs >= 2.0 at the printed worst case
 
 
+def test_spring_contact_rises_with_pivot_while_foot_stays_on_base() -> None:
+    from dt_pinion_pivot_block_geometry import BORE_UP
+    from pinion_rig_park_geometry import STRAP_LEAN_DEG
+
+    assert geometry.PIVOT_LY == BORE_UP
+    assert geometry.STRAP_LEAN_DEG == STRAP_LEAN_DEG
+    assert geometry.FOOT_Y == geometry.THICK
+    crest = (
+        geometry.CREST[0] - geometry.PIVOT_LX,
+        geometry.CREST[1] - geometry.PIVOT_LY,
+    )
+    station = sum(a * b for a, b in zip(crest, geometry.STRAP_U, strict=True))
+    assert station == pytest.approx(geometry.CONTACT_T)
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/dt-pinion-spring.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/dt-pinion-spring.pdf")

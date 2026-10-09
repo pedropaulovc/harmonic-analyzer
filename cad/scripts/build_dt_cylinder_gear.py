@@ -2,25 +2,22 @@ r"""Reproduction script: cylinder gear with integral eccentric cam (book ch. 13)
 
 All 20 cylinder gears are identical (DIMENSIONS.md ch. 13: 120 teeth each,
 derived from the k/80 gear law), so this is a single non-configured part (no
-configurations). The involute tooth-gap profile reuses the cone gear's
-live-validated ``CreateEquationSpline2`` technique (see ``build_dt_cone_gear.py``)
-with literal numeric expressions (document units = inches, trig in radians
-inside curve expressions) -- that geometry is MESH-CRITICAL (it must conjugate
-the mating gear) and is therefore kept fully literal: no equation-manager
-globals, no recorded/driven sketch dims on the toothed blank or tooth-gap
-sketches. The ORDINARY auxiliary features (cam disc, alignment notch, shaft
-bore) DO carry self-naming + editable globals + deferred driving, like the
-other parametric parts.
+configurations). Its finite stock #2 tooth-space is the 55T reference,
+translated radially to the physical 120T pitch radius at standard cutter
+depth, not a conjugate N120 involute. ``build_stock_form_gear`` authors the
+core's exact supported flank/root equations and volume oracle. The real
+blank diameter and face width carry named native dimensions and neutral
+drive equations; cam, alignment notch and bore are parametric too.
 
 Features, in order:
 
-1. Gear blank: disc at tip radius ``Ra`` (OD 2.449" = 62.2 mm), face width 3 mm,
+1. Gear blank: disc at the finite-support-derived tip radius, face width 3 mm,
    extruded z = 0..3 from the Front plane. The face width comes from the
    M6 axial-budget resolution (Appendix C #6): face/pitch = 0.38 measured
    on the p.22 stack macro x the 7.5 mm axial pitch.
-2. One tooth gap (six equation curves: two involute flanks, base chord, two
-   radial extensions, outer clearance arc) cut through, then circular-
-   patterned 120x about the gear axis (reference axis Top x Right = Z).
+2. One finite stock tooth gap, with translated reference involute flanks
+   and an off-centre root arc, cut through and circular-patterned at the
+   PHYSICAL 120 teeth. No unsupported upper-flank continuation.
 3. Integral eccentric cam (book ch. 13, pp. 22-25): one of the 20 cams that
    convert each gear's rotation into the near-sinusoidal reciprocation of its
    connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 30.6 mm,
@@ -52,12 +49,9 @@ Features, in order:
    they run free on a stationary arbor (DIMENSIONS.md ch. 13, "M6.2 keyway
    refutation"). The legacy keyway was fiction and was removed in M6.2.
 
-Every feature's volume delta is asserted against an analytic expectation
-(same DP 49.82 / PA 14.5 deg tooth profile as the cone set, narrower face).
-The notch delta integrates the
-exact involute solid-fraction over the notch window (the notch floor sits
-below the base circle, so part of the window is full annulus and part is
-tooth-fraction fill).
+Every feature's volume delta is asserted against its actual geometry oracle.
+The gear uses the core's translated-template gap area, and the notch delta
+integrates material classified by that same finite repeated-tooth profile.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
@@ -75,9 +69,9 @@ import math
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     _flag,
+    _early_bound,
     _feature_by_name,
     _read_member,
     add_line_chain,
@@ -90,6 +84,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    feature_name_by_type,
     name_bore_axis,
     name_last_feature,
     name_dimensions,
@@ -110,9 +105,8 @@ from _drawing_marks import (
 )
 from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
-from _gear import build_fixed_gear, volume_check
+from _gear import build_stock_form_gear, volume_check
 from _part_pmi import author_part_pmi
-from involute_gear import gear_facts
 from dt_cylinder_gear_notes import DRAWING_NOTES, GEAR_DATA
 from dt_cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
@@ -120,8 +114,7 @@ from dt_cylinder_gear_spec import (
     CAM_DIA_BAND,
     CAM_PHASE_TOLERANCE_DEG,
     CAM_THICKNESS,
-    DEDENDUM_FACTOR,
-    DIAMETRAL_PITCH as DP,
+    CAM_ROOT_WEB_MIN_MM,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ECCENTRICITY,
@@ -137,10 +130,10 @@ from dt_cylinder_gear_spec import (
     NOTCH_WIDTH,
     NOTCH_WIDTH_BAND,
     OUTSIDE_DIA,
+    OUTSIDE_DIA_BAND,
     OVERALL_THICKNESS,
     OVERALL_THICKNESS_BAND,
-    PRESSURE_ANGLE_DEG,
-    ROOT_DIA,
+    STOCK_FORM,
     SURFACE_FINISHES,
     TEETH,
 )
@@ -155,10 +148,7 @@ NOTCH_CLEARANCE = 1.5  # kerf overshoot past the OD so the cut always opens (geo
 
 BORE_RADIUS = BORE_DIAMETER / 2.0
 
-FACTS = gear_facts(TEETH, DP, PRESSURE_ANGLE_DEG)
 RA_MM = OUTSIDE_DIA / 2.0
-RB_MM = FACTS["Rb"] * IN
-RF_MM = ROOT_DIA / 2.0
 NOTCH_FLOOR = NOTCH_FLOOR_RADIUS
 NOTCH_OUTER = RA_MM + NOTCH_CLEARANCE  # clearance past the OD so the cut always opens
 # +Y is a tooth crest.  The spec owns the first-root-CCW kerf centre so the
@@ -169,27 +159,16 @@ THROUGH_ALL = OVERALL_THICKNESS + 2.0  # bore cut depth
 
 
 def is_solid(x: float, y: float) -> bool:
-    """Exact solid test for the standard-root tooth cross-section, in mm."""
-    r = math.hypot(x, y)
-    if r > RA_MM:
-        return False
-    if r <= RF_MM:
-        return True
-    gamma, delta = FACTS["Gamma"], FACTS["Delta"]
-    psi = math.atan2(y, x) % gamma
-    if r >= RB_MM:
-        t = math.sqrt((r / RB_MM) ** 2 - 1.0)
-        inv = t - math.atan(t)
-        return not (delta - inv < psi < gamma - delta + inv)
-    return not (delta < psi < gamma - delta)
+    """Material in the same finite stock-form profile the native gap uses."""
+    return STOCK_FORM.contains_material(x, y, rotate_rad=math.pi / TEETH)
 
 
 def notch_solid_area(step: float = 0.004) -> float:
     """Solid area (mm^2) of the toothed disc inside the kerf window.
 
     The kerf is the vertical slot ``x in [NOTCH_X +- W/2], y in [floor, outer]``
-    seated in the +Y valley; most of the window is empty gap, so the removed
-    solid is small (~0.60 mm^2) -- the kerf only bites the root web, not teeth.
+    seated in the +Y valley.  Count only material in the actual repeated
+    stock-form profile; no ideal-root or fixed removed-area shortcut is used.
     """
     nx = max(2, round(NOTCH_WIDTH / step))
     ny = max(2, round((NOTCH_OUTER - NOTCH_FLOOR) / step))
@@ -210,7 +189,7 @@ def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
     model = adapter.currentModel
     feat = _read_member(model, "FirstFeature")
     for _ in range(50000):
-        if not feat:
+        if feat is None:
             return None
         _flag(feat, "IFeature")
         if str(_read_member(feat, "Name")) == axis_name:
@@ -262,14 +241,12 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations) for the ORDINARY auxiliary features --
-    # the cam disc, the alignment notch and the shaft bore. The toothed blank and
-    # its 120x tooth-gap pattern are NOT exposed here: that geometry is
-    # mesh-critical (it must conjugate the mating gear), so build_fixed_gear keeps
-    # it literal and no sketch dim on it is recorded or driven. The mm suffix is
-    # load-bearing -- this is an INCH document and the equation manager reads BARE
-    # numbers in document units (an unsuffixed 30.6 would be read as 30.6 in).
+    # Editable blank diameter/width and auxiliary features; the tooth-gap
+    # curves remain literal and use the actual finite stock-form gap volume.
+    # Each deferred equation is neutral at the as-built value.  The mm suffix
+    # is load-bearing in this INCH document.
     await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    await set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
     await set_global(adapter, "CamDiameter", f"{CAM_DIAMETER}mm")
     await set_global(adapter, "OverallThickness", f"{OVERALL_THICKNESS}mm")
     await set_global(adapter, "Eccentricity", f"{ECCENTRICITY}mm")
@@ -283,33 +260,43 @@ async def build(adapter) -> dict[str, str]:
     # finished model, after a rebuild).
     drive_jobs: list[tuple[str, str]] = []
 
-    # Toothed disc (blank + gap + 120x pattern, z = 0..FACE_WIDTH).  The shared
-    # helper intentionally leaves gear geometry literal, but this part's released
-    # print needs the original ±0.05 blank width.  Give the first extrusion and
-    # its depth stable semantic names, then drive and tolerance that real model
-    # dimension.
-    disc = await build_fixed_gear(
-        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PRESSURE_ANGLE_DEG,
-        root_relief=True, dedendum=DEDENDUM_FACTOR,
-    )
+    # The native equations and volume oracle both come from the actual finite
+    # translated 55-reference stock profile, patterned at the physical 120T.
+    disc = await build_stock_form_gear(adapter, STOCK_FORM, FACE_WIDTH)
     v_teeth = disc.volume
-    _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
-    _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")
+    blank_name = feature_name_by_type(adapter, "Extrusion")
+    if not blank_name:
+        raise RuntimeError("cylinder-gear blank extrusion is missing")
+    blank = _early_bound(_feature_by_name(adapter, blank_name), "IFeature")
+    raw_profile = _read_member(blank, "GetFirstSubFeature")
+    if raw_profile is None:
+        raise RuntimeError("cylinder-gear blank profile is missing")
+    profile = _early_bound(raw_profile, "IFeature")
+    blank.Name = "GearBlank"
+    profile.Name = "GearBlankProfile"
+    if str(blank.Name) != "GearBlank" or str(profile.Name) != "GearBlankProfile":
+        raise RuntimeError("cylinder-gear blank feature names did not persist")
     gear_depth = name_dimensions(adapter, "GearBlank", ["FaceWidth"])
-    drive_jobs += [(gear_depth[0], '"FaceWidth"')]
+    gear_diameter = name_dimensions(adapter, "GearBlankProfile", ["OutsideDia"])
+    drive_jobs += [
+        (gear_depth[0], '"FaceWidth"'),
+        (gear_diameter[0], '"OutsideDia"'),
+    ]
     volume = v_teeth
 
     # ------------------------------------------------------------------
     # Integral cam on the far gear face (z = 3..OVERALL), lobe +Y (notch side).
     # It is extruded from the Front plane THROUGH the blank so its one depth
     # dimension is the overall thickness -- the station pitch the solid bank
-    # stacks on (#743), carrying the print band.  The cam disc (radius <= 23.94)
-    # lies wholly inside the blank's solid web (root radius 30.0), so the part
-    # inside z = 0..FACE_WIDTH merges without changing the blank.
+    # stacks on (#743), carrying the print band.  The cam lies wholly inside
+    # the core's actual minimum root web, proved before creating its profile.
+    # Its material inside z = 0..FACE_WIDTH merges into the uncut web.
     # ------------------------------------------------------------------
     # Cam disc: ordinary auxiliary circle, centred +Y from the bore.  On the
     # Front plane the on-axis x coordinate drops; record what is emitted and
     # mark only the Y offset and diameter for the drawing.
+    if CAM_ROOT_WEB_MIN_MM <= 0.0:
+        raise ValueError("eccentric cam must remain inside the stock-form root web")
     cam = SketchDims()
     check("create_sketch cam on Front", await adapter.create_sketch("Front"))
     await define_circle(
@@ -575,6 +562,9 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(
                 f"{name}@NotchProfile readback {actual!r}, expected {expected:g} mm"
             )
+    set_dimension_bilateral_tolerance(
+        adapter, "GearBlankProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND)
+    )
     set_dimension_symmetric_tolerance(
         adapter,
         "GearBlank",

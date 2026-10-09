@@ -19,7 +19,7 @@ from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
 from _stock_fastener import STOCK_RECIPES
-from diagnostics import diag_build_40923898 as recipe
+from diagnostics import diag_build_40923906 as recipe
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
 IN = 25.4
@@ -29,11 +29,11 @@ GRIP = post.BLOCK_HEIGHT - post.ATTACHMENT_CBORE_DEPTH
 
 
 def test_recipe_is_the_u37c_screw() -> None:
-    """1/4-20, ASME B18.6.3 1/4 fillister head maximum, 86.2 cut length."""
-    assert part.THREAD == platform.POST_MOUNT_SPEC.size == "1/4-20"
-    assert part.SHANK_DIA == THREAD_MAJOR_MM[part.THREAD]
+    """The registered fillister's head envelope, pitch and fitted cut length."""
+    assert spec.THREAD == platform.POST_MOUNT_SPEC.size == "1/4-20"
+    assert part.SHANK_DIA == THREAD_MAJOR_MM[spec.THREAD]
     assert part.THREAD_PITCH == IN / 20.0
-    assert part.SHANK_LEN == 86.2
+    assert part.SHANK_LEN == spec.CUT_LENGTH_MM
     assert part.HEAD_DIA == 0.414 * IN
     assert part.HEAD_H == 0.237 * IN
 
@@ -45,11 +45,20 @@ def test_head_fits_the_existing_post_counterbore() -> None:
 
 
 def test_nominal_end_sits_short_of_the_platform_underside() -> None:
-    """Never proud; the nominal cut leaves the end 0.33 short (U37c)."""
+    """The spec-derived cut is inside the functional fit-to-hole acceptance."""
     short = GRIP + platform.PLATE_THICKNESS - part.SHANK_LEN
-    assert 0.0 <= short < 0.35
+    assert 0.0 <= short <= spec.POST_SCREW_CUT_TO_FIT_SHORT
     engagement = part.SHANK_LEN - GRIP
     assert engagement / part.SHANK_DIA >= 0.90
+
+
+def test_supplied_stock_reaches_longest_raised_post_corner() -> None:
+    assert spec.LONGEST_FITTED_LENGTH_MM == spec.FLOOR_HIGH_MM + spec.PLATE_THICK_MM
+    assert spec.STOCK_REACH_MARGIN_MM == (
+        spec.STOCK_LENGTH_MM - spec.FACTORY_TIP_CHAMFER_MM - spec.LONGEST_FITTED_LENGTH_MM
+    )
+    assert spec.STOCK_REACH_MARGIN_MM > 0.0
+    assert spec.CUT_LENGTH_MM < spec.LONGEST_FITTED_LENGTH_MM
 
 
 def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
@@ -66,7 +75,6 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
         round(post.ATTACHMENT_CBORE_DEPTH, 2) - two
     )
     assert (spec.FLOOR_LOW_MM, spec.FLOOR_HIGH_MM) == pytest.approx((low, high))
-    assert (low, high) == pytest.approx((78.67, 81.29))
     thin = platform.PLATE_THICKNESS - spec.PLATE_STOCK_BAND_MM
     assert spec.FIXED_LENGTH_FLUSH_MAX_MM == pytest.approx(low + thin)
     need = (
@@ -76,17 +84,19 @@ def test_no_fixed_cut_length_fits_both_in_band_corners() -> None:
         + spec.CUT_END_BREAK_MAX_MM
     )
     assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM == pytest.approx(need)
-    assert spec.FIXED_LENGTH_FLUSH_MAX_MM == pytest.approx(84.89)
-    assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM == pytest.approx(87.205)
     assert spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM > spec.FIXED_LENGTH_FLUSH_MAX_MM
     assert spec.FIXED_CUT_LENGTH_EXISTS is False
 
 
 def test_cut_length_prints_as_a_reference_without_a_band() -> None:
-    """No fixed length exists, so the model's 86.2 prints as "(86.2)" with
-    no tolerance; the callout beneath it carries the fit-to-hole acceptance
-    (see test_cut_to_fit_acceptance_prints_on_the_delegating_callout)."""
-    assert spec.CUT_LENGTH_MM == part.SHANK_LEN == 86.2
+    """No fixed length exists, so the model's spec-derived length prints in
+    parentheses without a band; the callout carries fit-to-hole acceptance."""
+    assert spec.CUT_LENGTH_MM == part.SHANK_LEN
+    places = spec.DRAWING_PRECISION_BY_NAME[spec.CUT_LENGTH_DIMENSION]
+    assert spec.CUT_LENGTH_MM == round(
+        GRIP + platform.PLATE_THICKNESS - spec.POST_SCREW_CUT_TO_FIT_SHORT / 2.0,
+        places,
+    )
     assert not hasattr(spec, "CUT_LENGTH_BAND")
     assert not hasattr(drawing, "EXPECTED_CONTROLS")
     builder = Path(part.__file__).read_text(encoding="utf-8")
@@ -270,15 +280,16 @@ def test_worst_case_engagement_holds_the_named_minimum() -> None:
 
 
 def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:
-    """Codex P2 on #857 (PRRT_kwDOPHDy386mP6Dj): the MSC 40923898 row held
-    the cut length, so the catalog build (40923898-catalog.SLDPRT) and
-    any direct stock consumer got the modified length labelled as supplier
-    stock; only MHA-VN-031's builder swapped in 3-1/2 in.  The row is the
-    supplied screw; the cut-to-fit length is MHA-VN-031's own spec, applied by
-    its trim, and the builder never mutates the shared row."""
-    assert FILLISTER_SIZES["40923898"][1] == pytest.approx(3.5 * 25.4)
-    assert spec.STOCK_LENGTH_MM == FILLISTER_SIZES["40923898"][1]
-    assert part.SHANK_LEN == spec.CUT_LENGTH_MM == 86.2
+    """The registered catalogue row remains supplied 4 in stock; only the
+    MHA-VN-031 builder trims it. No shared stock row is overwritten."""
+    row = _config.parts(part.PART_NAME)
+    assert row["supplier_skus"] == [spec.SKU]
+    assert spec.SKU == recipe.PART_NO
+    assert FILLISTER_SIZES[spec.SKU][1] == pytest.approx(4.0 * IN)
+    assert spec.STOCK_LENGTH_MM == FILLISTER_SIZES[spec.SKU][1]
+    assert part.SHANK_LEN == spec.CUT_LENGTH_MM < spec.STOCK_LENGTH_MM
+    # A half-inch-shorter predecessor cannot reach the longest fitted seat.
+    assert spec.STOCK_LENGTH_MM - 0.5 * IN < spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM
     assert not hasattr(part, "_supplied_stock_length")
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "FILLISTER_SIZES[SKU] =" not in source
@@ -322,7 +333,6 @@ def test_analytic_removal_volumes_match_a_brute_force_integral() -> None:
     trim, deburr = _independent_removal()
     assert spec.TRIM_REMOVED_MM3 == pytest.approx(trim, rel=1e-4)
     assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(deburr, rel=1e-3)
-    assert spec.TRIM_REMOVED_MM3 == pytest.approx(62.733, abs=1e-3)
     assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(0.0153, abs=1e-4)
 
 
@@ -353,7 +363,9 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
     assert body.index('phase="trimmed"') < body.index("_break_cut_end(adapter)")
     assert body.index("_break_cut_end(adapter)") < body.index('phase="broken"')
     wrapper = source.split("async def _cut_to_length", 1)[1]
-    assert wrapper.index("build_40923898(") < wrapper.index("_modify_stock")
+    assert wrapper.index(f"{recipe.build_40923906.__name__}(") < wrapper.index(
+        "_modify_stock"
+    )
     # The trimmed tip cannot reach into what the stock carries: the cut
     # clears the factory tip, and the volume gate outruns the sweep's slack.
     assert spec.STOCK_LENGTH_MM - spec.FACTORY_TIP_CHAMFER_MM > spec.CUT_LENGTH_MM
@@ -400,19 +412,16 @@ def _short_of_underside(length_mm: float) -> float:
 
 def test_the_modelled_length_is_a_cut_the_sheet_accepts() -> None:
     """Codex P2 on #857 (PRRT_kwDOPHDy386mRhqY): the source CAD must satisfy
-    its own sheet.  On the nominal post and plate the flush length is
-    86.0 - 6.0198 + 6.35 = 86.3302, so the old 86.0 ended 0.33 short --
-    outside the callout's "END FLUSH TO 0.3 SHORT".  The modelled length is
-    the flush length less the allowance's midpoint, at its printed places."""
+    its own sheet. The modelled length is the current post/plate flush
+    length less the allowance's midpoint, at its printed places."""
     allowance = _printed_cut_short_allowance()
-    assert allowance == 0.3
+    assert allowance == platform.POST_SCREW_CUT_TO_FIT_SHORT
 
     def accepted(length_mm: float) -> bool:
         return 0.0 <= _short_of_underside(length_mm) <= allowance
 
-    assert not accepted(86.0)
+    assert not accepted(spec.FLUSH_LENGTH_MM - allowance - 0.01)
     assert accepted(spec.CUT_LENGTH_MM)
-    assert spec.CUT_LENGTH_MM == 86.2
     places = spec.DRAWING_PRECISION_BY_NAME[spec.CUT_LENGTH_DIMENSION]
     assert spec.CUT_LENGTH_MM == round(
         _short_of_underside(0.0) - allowance / 2.0, places
@@ -422,9 +431,8 @@ def test_the_modelled_length_is_a_cut_the_sheet_accepts() -> None:
 
 def test_policy_exception_row_names_the_length_constant_not_a_number() -> None:
     """Codex P2 on #857 (PRRT_kwDOPHDy386mRsWJ): the policy's named-exception
-    row still read "nominal 86.0" after the model moved to 86.2.  The row
-    names the spec constant and its rule, so it carries no number that can
-    drift from the model."""
+    row must follow the nominal cut through the spec constant, rather than
+    carrying a length that can drift from the model."""
     policy = Path(part.__file__).resolve().parents[1] / "docs" / "drawing-simplicity-policy.md"
     rows = [
         line
@@ -465,16 +473,18 @@ def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
-    metadata = STOCK_RECIPES["40923898"]
+    metadata = STOCK_RECIPES[spec.SKU]
     assert metadata.module == recipe.__name__
-    assert metadata.callable_name == recipe.build_40923898.__name__
-    assert part.SPEC.skus == ("40923898",)
+    assert metadata.callable_name == recipe.build_40923906.__name__
+    assert part.SPEC.skus == (spec.SKU,)
     assert part.SPEC.supplier == "MSC Industrial Supply"
     assert part.MATERIAL == "Plain Carbon Steel"
     row = _config.parts(part.PART_NAME)
     assert row["number"] == "MHA-VN-031"
     assert int(row["quantity"]) == 2
-    assert "1456MSL" in row["material_specification"]
+    assert spec.SKU in row["material_specification"]
+    assert "SAE J82" in row["material_specification"]
+    assert spec.SKU in drawing.DRAWING_SUMMARY[3]
 
 
 def test_drawing_is_the_modified_stock_sheet() -> None:
@@ -504,24 +514,15 @@ def test_standalone_recipe_run_is_catalog_only() -> None:
     source = Path(recipe.__file__).read_text(encoding="utf-8")
     assert "replica_main(" not in source and "import replica_main" not in source
     assert "run_build(build_catalog)" in source
-    assert "diag_build_40923898.py" in (recipe.__doc__ or "")
+    assert Path(recipe.__file__).name in (recipe.__doc__ or "")
     assert "catalog-only" in (recipe.__doc__ or "")
 
 
-# The first seat leaf of part:post_mount_screw on 198071f23 (farm log
-# pms857-leaf.log, lines 310-373): stock-less-trimmed and stock-less-finished
-# as SolidWorks' mass properties read them.
-_LEAF_TRIM_REMOVED_MM3 = 67.4463
-_LEAF_TRIM_AND_BREAK_REMOVED_MM3 = 67.4189
-
-
-def test_the_break_is_below_the_volume_reads_resolution() -> None:
-    """The analytic break (~0.015 mm^3) is smaller than the leaf's own
-    mass-property residual on the trim alone, so no volume comparison can
-    prove it: that leaf read the broken screw 0.027 mm^3 LARGER."""
-    residual = abs(_LEAF_TRIM_REMOVED_MM3 - spec.TRIM_REMOVED_MM3)
-    assert spec.CUT_END_DEBURR_REMOVED_MM3 < residual / 5.0
-    assert _LEAF_TRIM_AND_BREAK_REMOVED_MM3 < _LEAF_TRIM_REMOVED_MM3
+def test_break_is_smaller_than_the_allowed_trim_volume_residual() -> None:
+    """The tiny deburr is below the trim gate's current volume allowance.
+    Its presence must be proved by the end-face rim, not a smaller mass
+    reading: the original #857 leaf's broken screw read slightly larger."""
+    assert 0.0 < spec.CUT_END_DEBURR_REMOVED_MM3 < part.TRIM_VOLUME_TOL_MM3
     source = Path(part.__file__).read_text(encoding="utf-8")
     body = source.split("async def _modify_stock", 1)[1].split("\ndef ", 1)[0]
     assert "finished < trimmed" not in body

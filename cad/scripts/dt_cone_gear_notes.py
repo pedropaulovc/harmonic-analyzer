@@ -1,123 +1,131 @@
-"""Drawing-only text for the cone-gear configuration sheets.
+"""Model-stamped cutting and inspection data from the finite cutter authority.
 
-This module deliberately performs no ``_config`` reads because the cone-gear
-constants are imported by assemblies.  Every configuration sheet receives its
-own native dimensions and a tooth-system block for that configuration.
+Nonconjugate meshes print STOCK-FORM COVERAGE, never an ideal contact ratio.
+The pure specification owns qualification and numerical bounds; this text layer
+neither recomputes the mesh nor approves a refused configured member.
 """
 
 from __future__ import annotations
 
 import math
+import re
+import textwrap
+from dataclasses import replace
 
 import dt_cone_gear_spec as spec
 
-
 CYLINDER_MATE_NUMBER = "MHA-DT-012"
-
-
-# The U42 gears' worst-case transverse contact ratio with MHA-DT-012, rounded
-# DOWN to two places so no sheet claims more than the part has.  Sheet text, so it lives here and not in
-# cone_gear_spec (which the drive-train imports);
-# test_cone_gear_mesh_design re-derives every value from the drive-train pose
-# and the printed bands, over exactly spec.CONTACT_RATIO_EXCEPTION_TEETH.
-WORST_CONTACT_RATIO: dict[int, float] = {
-    6: 0.17,
-    12: 0.42,
-    18: 0.60,
-    24: 0.74,
-    30: 0.86,
-    36: 0.96,
-    42: 1.05,
-}
+CUTTER_DETAIL_SHEET = "DT6-FORM1"
+CUTTER_DETAIL_LINE_CHARS = 108
 
 
 def root_to_bore_web_min_mm(teeth: int) -> float:
-    """Return the thinnest root-to-bore web the printed limits allow."""
-    floor_min, _floor_max = spec.floor_limits_mm(teeth)
-    return (floor_min - (spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[0])) / 2.0
+    """Print-worst radial ligament; the fitted D-flat only leaves more metal."""
+    minimum, _maximum = spec.floor_limits_mm(teeth)
+    return (minimum - (spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[0])) / 2.0
 
 
-# The named shortfalls print as plain facts on the sheets they affect, so a
-# blind reviewer reads them off the package; the governance lives in the
-# policy's Named exceptions table and in these tags, never on the sheet.  The
-# row says HOLE, not BORE: the bore is a native dimension, and GEAR DATA
-# carries no parallel BORE row.
-# Named exception: MHA-DT-003 web (drawing-simplicity-policy.md, "Named exceptions").
-def web_row(teeth: int) -> tuple[str, str]:
-    """Return the GEAR DATA row stating one gear's thinnest web as a MIN."""
-    # rounded DOWN: the sheet never states more web than the limits give
-    web = math.floor(root_to_bore_web_min_mm(teeth) * 100.0) / 100.0
-    return ("WEB, GAP FLOOR TO HOLE (mm, REF)", f"{web:.2f} MIN")
-
-
-# Named exception: MHA-DT-003 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
-def contact_ratio_row(teeth: int) -> tuple[str, str]:
-    """Return the GEAR DATA row stating one gear's worst-case contact ratio."""
-    return (
-        f"CONTACT RATIO WITH {CYLINDER_MATE_NUMBER}, WORST CASE (REF)",
-        f"{WORST_CONTACT_RATIO[teeth]:.2f}",
-    )
+def cutter_description(teeth: int) -> str:
+    template = spec.stock_form_profile(teeth).template
+    if template.cutter_number is None:
+        return f"{template.name}; CUSTOM TEMPLATE {template.reference_teeth}T; NOT STOCK"
+    minimum, maximum = template.teeth_range
+    upper = "UP" if maximum is None else str(maximum)
+    return f"#{template.cutter_number} {minimum}-{upper}T; TEMPLATE {template.reference_teeth}T"
 
 
 def gear_data(teeth: int) -> str:
-    """Return the complete tooth-system block for one configuration sheet."""
-    if teeth not in spec.CONFIGURATION_TEETH:
-        raise ValueError(f"unsupported cone-gear tooth count {teeth}")
+    """One compact physical recipe, including actual carrying-contact bounds."""
+    profile = spec.stock_form_profile(teeth)
+    mesh = spec.stock_form_mesh_data(teeth)
+    if mesh["qualification"] != "qualified":
+        raise ValueError(f"T{teeth:03d}: cutter mesh is not qualified: {mesh['refusal']}")
     minimum, maximum = spec.BACKLASH_ACCEPTANCE_MM
-    pitch_dia = teeth * spec.MODULE_MM
+    # Conservative reference reporting: round coverage/reserve/web down and
+    # error/gap bounds up. These rows do not replace native toleranced sizes.
+    coverage = math.floor(mesh["coverage_min"] * 100.0) / 100.0
+    reserve = math.floor(mesh["phase_reserve_rad"] * 1e6) / 1e6
+    gap = math.ceil(mesh["noncarrying_gap_mm"] * 1e4) / 1e4
+    te = math.ceil(mesh["te_bound_rad"] * 1e6) / 1e6
+    web = math.floor(root_to_bore_web_min_mm(teeth) * 100.0) / 100.0
     rows = (
-        ("CONFIGURATION", f"T{teeth:03d}"),
-        ("NUMBER OF TEETH", f"{teeth}"),
-        ("DIAMETRAL PITCH", f"{spec.DIAMETRAL_PITCH:.2f} (NONSTANDARD)"),
-        ("MODULE (mm, REF)", f"{spec.MODULE_MM:.3f}"),
-        ("PRESSURE ANGLE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{pitch_dia:.2f}"),
-        # The gap floor's MIN/MAX prints on the front view as the native
-        # FloorDia limit dimension (#834), not as a row here.
-        ("TOOTH FORM", spec.TOOTH_FORM),
-        (
-            "MATES WITH",
-            f"CYLINDER GEAR {CYLINDER_MATE_NUMBER}, 120T,\n"
-            "  FULL STANDARD THICKNESS",
-        ),
-        # The drive-train cone is backed off its drum on inclined axes, so the
-        # 120T tips never reach the reference-centre-distance depth; the cone
-        # reaches deeper through its own oversize blank and thickened tooth
-        # (U38 option 1b).  Say so where the mate is named, so a blind review
-        # does not read the tip or the thickness as an error.
-        ("OPERATING MESH", "LONG ADDENDUM, PARTIAL DEPTH ON INCLINED AXES"),
-        (
-            f"BACKLASH WITH {CYLINDER_MATE_NUMBER}, ACCEPT AT ASSEMBLY (mm)",
-            f"{minimum:.2f} TO {maximum:.2f}",
-        ),
-        # Rule 6: the sheet states results, never how to cut them.  TOOTH
-        # FORM (floor any shape, not below the floor diameter), the floor
-        # limits, the tooth-thickness band and the assembly backlash are the
-        # whole acceptance for the thickened tooth's narrow gap.
-        ("TOOTH THICKNESS IN VIEW", "ARC LENGTH AT PITCH DIAMETER"),
+        ("CONFIGURATION / TEETH", f"T{teeth:03d} / {teeth}"),
+        ("DIAMETRAL PITCH / PRESSURE ANGLE", f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
+        ("CUTTER", cutter_description(teeth)),
+        ("TOOL T / PLUNGE (mm, REF)", f"{profile.radial_translation_mm:.4f} / {profile.plunge_mm:.4f}"),
+        ("WHOLE DEPTH MAX / ROOT ARC R (mm, REF)", f"{profile.blank_radius_mm - profile.root_radius_min_mm:.4f} / {profile.template.root_radius_mm:.4f}"),
+        ("TOOTH FORM", "FINITE INVOLUTE; RADIAL BELOW BASE" if profile.template.root_radius_mm < profile.template.base_radius_mm else "FINITE INVOLUTE; ABOVE-BASE ROOT ARC"),
+        ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T; INCLINED AXES"),
+        ("BACKLASH AT ASSEMBLY (mm)", f"{minimum:.2f} TO {maximum:.2f}"),
+        ("PLANAR STOCK-FORM COVERAGE MIN (REF)", f"{coverage:.2f}"),
+        ("PHASE RESERVE (rad, REF)", f"{reserve:.6f}"),
+        ("NONCARRYING GAP MAX (mm, REF)", f"{gap:.4f}"),
+        ("SIGNED TE PLANAR @ ALIGNMENT ZERO (+/-rad, REF)", f"{te:.6f}"),
+        ("ROOT RADIAL MIN/MAX (mm, REF)", f"{profile.root_radius_min_mm:.3f} / {profile.root_radius_max_mm:.3f}"),
+        ("WEB MIN (mm, REF)", f"{web:.2f}"),
     )
-    if teeth in spec.WEB_EXCEPTIONS_MM:
-        rows += (web_row(teeth),)
-    if teeth in WORST_CONTACT_RATIO:
-        rows += (contact_ratio_row(teeth),)
-    return "\n".join(["GEAR DATA", *(f"{label}:  {value}" for label, value in rows)])
+    return "\n".join(("GEAR DATA", *(f"{label}:  {value}" for label, value in rows)))
 
 
-# The named shortfalls (user rulings U42 and U40, 2026-09-23) print once each,
-# as GEAR DATA rows (web_row, contact_ratio_row), never again in these notes.
-# Which gears carry them stays in cone_gear_spec (CONTACT_RATIO_EXCEPTION_TEETH,
-# WEB_EXCEPTIONS_MM); each printed value is pinned to its derivation by
-# test_cone_gear_mesh_design and test_cone_gear_drawing.
-DRAWING_NOTES = "\n".join(
-    (
-        "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
-        "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
-    )
-)
+def custom_cutter_detail() -> str:
+    """Complete finite DT6-FORM1 grinding profile, stamped into the native model.
+
+    Coordinates are the uninstalled normal tool plane, not a guessed ideal-N
+    or extrapolated profile. Each equation is copied verbatim from the same
+    core descriptors used by the native cut, at T=0 and finite tool-tip support.
+    Only the outside-blank sketch-closing rays/arc are omitted from the grind.
+    """
+    installed = spec.stock_form_profile(6)
+    template = installed.template
+    if template.cutter_number is not None or template.name != CUTTER_DETAIL_SHEET:
+        raise ValueError("T006 must use the specified DT6-FORM1 custom cutter")
+    tool = replace(installed, blank_radius_mm=template.tip_radius_mm, radial_translation_mm=0.0)
+    lines = [
+        "DT6-FORM1 - FINITE CUSTOM GROUND FORM",
+        "NORMAL TOOL PLANE; GAP BISECTOR +X; X,Y IN mm",
+        "t=0..1 ON EACH SEGMENT; NO UPPER CONTINUATION",
+        "TRIGONOMETRIC ARGUMENTS IN RADIANS",
+        f"DP={template.diametral_pitch:.17g}; PA={template.pressure_angle_deg:.17g} DEG",
+        f"N={template.reference_teeth}; ROOT R={template.root_radius_mm:.17g}",
+        f"BASE R={template.base_radius_mm:.17g}; FINITE TIP R={template.tip_radius_mm:.17g}",
+        f"TOOL PITCH TOOTH THICKNESS={tool.pitch_tooth_thickness_mm:.17g}",
+        "RAISED ROOT; RADIAL ROOT-TO-BASE; N6 WORKING INVOLUTE",
+        "LOWER FLANK MIRRORS UPPER; ALL SEGMENTS REQUIRED",
+    ]
+    for segment in tool.native_segments(unit_scale=1.0, clearance_radius_mm=template.tip_radius_mm + 1.0):
+        if segment.kind not in {"root_arc", "radial", "flank"}:
+            continue
+        lines.append(f"{segment.name} ({segment.kind})")
+        for coordinate, equation in (("X", segment.x), ("Y", segment.y)):
+            # Break only between tokens: never split a numeric literal or an
+            # exponent. Removing whitespace recovers the exact core expression.
+            tokens = re.findall(
+                r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_]\w*|[^\s]",
+                equation,
+            )
+            lines.extend(textwrap.wrap(
+                f"{coordinate}(t)= " + " ".join(tokens),
+                width=CUTTER_DETAIL_LINE_CHARS, subsequent_indent="  ",
+                break_long_words=False, break_on_hyphens=False,
+            ))
+    lines.extend((
+        "INSTALLED T, PLUNGE, BLANK OD AND GRADES: SHEET T006",
+        "INDEX GAP BY pi/6 FROM D-FLAT NORMAL (+X TOOTH ZERO)",
+    ))
+    lines.extend(textwrap.wrap(
+        f"PROFILE SOURCE: {template.source}", width=CUTTER_DETAIL_LINE_CHARS,
+        subsequent_indent="  ", break_long_words=False, break_on_hyphens=False,
+    ))
+    return "\n".join(lines)
+
+
+DRAWING_NOTES = "\n".join((
+    "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
+    "MAKE ONE GEAR FROM EACH T-CONFIGURATION SHEET.",
+))
 
 
 def drawing_notes(teeth: int) -> str:
-    """Return one configuration sheet's manufacturing notes."""
     if teeth not in spec.CONFIGURATION_TEETH:
         raise ValueError(f"unsupported cone-gear tooth count {teeth}")
     return DRAWING_NOTES

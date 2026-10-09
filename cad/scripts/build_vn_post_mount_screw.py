@@ -13,8 +13,8 @@ plate (``vn_post_mount_screw_spec``'s U27 check), so the sheet prints it as a
 reference and each screw is cut to its own hole at assembly.  The build
 proves the dimension and the solid's cut end agree.
 
-A second hidden sketch carries the cut end's deburr break, 0.1 +0/-0.1
-(Main's engagement ruling), the thread the 0.90D worst case counts on.
+The deburr cutter's own profile carries the cut-end break as a native
+MAX-limit dimension; the retained 0.90D engagement stack spends that maximum.
 
 The solid carries the modification too (Main's ruling on the cut end):
 cutting to fit removes the factory-chamfered tip, so the break is this
@@ -80,7 +80,6 @@ from vn_post_mount_screw_spec import (
     MANUFACTURING_NOTES,
     SKU,
     STOCK_LENGTH_MM,
-    THREAD,
     TRIM_REMOVED_MM3,
 )
 
@@ -543,7 +542,7 @@ async def build(adapter) -> dict[str, str]:
         part_name=PART_NAME,
         components=(
             StockComponent(
-                sku="40923906",
+                sku=SKU,
                 author=_cut_to_length,
                 transform=RigidTransform(),
             ),

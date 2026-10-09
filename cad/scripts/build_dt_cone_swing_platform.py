@@ -22,11 +22,11 @@ round-ended about the pivot and open through the north edge (rule-12 W18),
 reduces only the local bearing thickness to 6.10, preserving 0.25 running
 axial clearance without lowering the plate or its mounted hardware.
 
-The shortened envelope and paired 1/4-20 post mounts are the direct platform
-cascade from ``cone-pivot-post-v2.SLDPRT``.  Its 42.011 mm casting foot is
-centred at cone station -39.9014; the post's world-X hole pair is transformed
-into this plate's engaged local frame so the two native tapped holes remain
-coaxial after Ry(+12.5182 deg) placement.
+The platform envelope and paired 1/4-20 post mounts follow the post spec.
+The post's world-X hole pair is transformed into this plate's engaged local
+frame so the native tapped holes remain coaxial after the configured incline
+rotation. The crank geometry is raised above the unrelieved top face; no
+crank-gear pocket is cut into the platform.
 
 The asymmetric flare keeps the part CHIRAL; the assembly places it at
 Ry(+INCLINE), under which part-local +x tips machine WEST at the engaged
@@ -99,6 +99,7 @@ from dt_cone_swing_platform_crank_axis import (
     CRANK_SEAT_ANCHOR,
 )
 from dt_cone_swing_platform_geometry import (
+    PLATE_CORNERS,
     EAST_HALF_S,
     HALF_WIDTH_N,
     NORTH_OVERHANG,
@@ -122,11 +123,7 @@ from dt_cone_swing_platform_geometry import (
     WEST_HALF_S,
 )
 from dt_cone_swing_platform_spec import (
-    CRANK_GEAR_RELIEF_DEPTH,
-    CRANK_GEAR_RELIEF_LENGTH,
-    CRANK_GEAR_RELIEF_LOCAL_X,
-    CRANK_GEAR_RELIEF_LOCAL_Z,
-    CRANK_GEAR_RELIEF_WIDTH,
+    crank_gear_platform_clearance,
     HOLDDOWN_CBORE_DEPTH,
     HOLDDOWN_CBORE_DIA,
     HOLDDOWN_CLEARANCE_DIA,
@@ -315,8 +312,8 @@ def _north_fillet_relief_overlap(label: str, r: float) -> float:
     is the north edge (horizontal), so the fillet circle is tangent to it at
     ``x_t`` and the removed wedge above the arc spans ``x_t`` to the corner.
     """
-    idx = [c[0] for c in _CORNERS].index(label)
-    x, z = _CORNERS[idx][1], _CORNERS[idx][2]
+    idx = [c[0] for c in PLATE_CORNERS].index(label)
+    x, z = PLATE_CORNERS[idx][1], PLATE_CORNERS[idx][2]
     if abs(z - NORTH_OVERHANG) > 1e-9:
         return 0.0
     tangent = r / math.tan(_corner_theta(label) / 2.0)
@@ -330,24 +327,12 @@ def _north_fillet_relief_overlap(label: str, r: float) -> float:
     )
 
 
-# --- rounded plan corners (item: they echo the neighbouring hardware) --------
-# (authored x, local z, radius): north pair ~ the pivot screw head, south-east
-# ~ the green column foot.  The south-west fillet is reduced around the
-# relocated lock notch so the corner round and the closed seat do not overlap.
-_CORNERS = (
-    ("NE", -HALF_WIDTH_N, NORTH_OVERHANG, 10.0),
-    ("NW", WEST_HALF_N, NORTH_OVERHANG, 8.0),
-    ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 5.0),
-    ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 12.0),
-)
-
-
 def _corner_theta(label: str) -> float:
     """Interior angle of the named sharp plan corner, radians."""
-    idx = [c[0] for c in _CORNERS].index(label)
-    x, z = _CORNERS[idx][1], _CORNERS[idx][2]
-    xp, zp = _CORNERS[idx - 1][1], _CORNERS[idx - 1][2]
-    xn, zn = _CORNERS[(idx + 1) % 4][1], _CORNERS[(idx + 1) % 4][2]
+    idx = [c[0] for c in PLATE_CORNERS].index(label)
+    x, z = PLATE_CORNERS[idx][1], PLATE_CORNERS[idx][2]
+    xp, zp = PLATE_CORNERS[idx - 1][1], PLATE_CORNERS[idx - 1][2]
+    xn, zn = PLATE_CORNERS[(idx + 1) % 4][1], PLATE_CORNERS[(idx + 1) % 4][2]
     v1 = (xp - x, zp - z)
     v2 = (xn - x, zn - z)
     dot = v1[0] * v2[0] + v1[1] * v2[1]
@@ -372,7 +357,17 @@ if not _CRANK_AXIS_FEATURES.isdisjoint(DRAWING_DIMENSIONS):
     )
 
 
+def require_crank_gear_platform_clearance() -> None:
+    """Bound the complete rotating tip cylinder above the unrelieved plate."""
+    air = crank_gear_platform_clearance()
+    if air < 0.5:
+        raise AssertionError(
+            f"64T unrelieved platform air {air:.6f} mm is below 0.5 mm"
+        )
+
+
 async def build(adapter) -> dict[str, str]:
+    require_crank_gear_platform_clearance()
     from solidworks_mcp.adapters.base import (
         CreateAxisParameters,
         CreatePlaneParameters,
@@ -560,45 +555,6 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "pivot bearing relief", volume - v_relief, 0.01 * v_relief
     )
-    # Top sketch (x, y) maps to part (X, -Z). The relief follows the
-    # physical 64T row without moving its axis or the 48DP solid stack.
-    relief_x = CRANK_GEAR_RELIEF_LOCAL_X
-    relief_y = -CRANK_GEAR_RELIEF_LOCAL_Z
-    relief_half_width = CRANK_GEAR_RELIEF_WIDTH / 2.0
-    relief_half_length = CRANK_GEAR_RELIEF_LENGTH / 2.0
-    gear_relief_pts = [
-        (relief_x - relief_half_width, relief_y - relief_half_length),
-        (relief_x + relief_half_width, relief_y - relief_half_length),
-        (relief_x + relief_half_width, relief_y + relief_half_length),
-        (relief_x - relief_half_width, relief_y + relief_half_length),
-    ]
-    check(
-        "create_sketch crank gear relief",
-        await adapter.create_sketch("PivotBearingTop"),
-    )
-    set_sketch_direct_db(adapter, True)
-    gear_relief_lines = await add_line_chain(adapter, gear_relief_pts)
-    set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(
-        adapter, gear_relief_lines, gear_relief_pts, label="crank gear relief"
-    )
-    await ensure_fully_defined(adapter, "crank gear relief sketch")
-    check("exit_sketch crank gear relief", await adapter.exit_sketch())
-    name_last_feature(adapter, "CrankGearReliefProfile")
-    check(
-        "cut crank gear relief",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=CRANK_GEAR_RELIEF_DEPTH)
-        ),
-    )
-    name_last_feature(adapter, "CrankGearRelief")
-    v_gear_relief = (
-        CRANK_GEAR_RELIEF_WIDTH * CRANK_GEAR_RELIEF_LENGTH * CRANK_GEAR_RELIEF_DEPTH
-    )
-    volume = await volume_check(
-        adapter, "crank gear relief", volume - v_gear_relief, 0.01 * v_gear_relief
-    )
-
 
     # The v2 casting's two Fillister-head attachment bores land on matching
     # native 1/4-20 UNC-2B through taps in the platform.  One Hole Wizard
@@ -833,7 +789,7 @@ async def build(adapter) -> dict[str, str]:
     # Rounded plan corners LAST (they consume the sharp corner edges; the
     # notch-mouth edges and the axis construction are already in place).
     v_fillets = 0.0
-    for lbl, cx_a, cz_l, r in _CORNERS:
+    for lbl, cx_a, cz_l, r in PLATE_CORNERS:
         check(
             f"fillet corner {lbl}",
             await adapter.add_fillet(r, [[cx_a, PLATE_T / 2.0, cz_l]]),

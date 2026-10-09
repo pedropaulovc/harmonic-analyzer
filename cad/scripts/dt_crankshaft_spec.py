@@ -81,6 +81,7 @@ JOURNAL_CLEARANCE = JOURNAL_BORE_DIA - JOURNAL_DIA
 JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
 _JOURNAL_CLEARANCE_LOW = JOURNAL_BORE_BAND[1] - JOURNAL_DIA_BAND[0] + JOURNAL_CLEARANCE
 _JOURNAL_CLEARANCE_HIGH = JOURNAL_BORE_BAND[0] - JOURNAL_DIA_BAND[1] + JOURNAL_CLEARANCE
+JOURNAL_DIAMETRAL_CLEARANCE_MM = (_JOURNAL_CLEARANCE_LOW, _JOURNAL_CLEARANCE_HIGH)
 if not (
     _RUNNING_CLEARANCE[0] - 1e-9
     <= _JOURNAL_CLEARANCE_LOW
@@ -148,6 +149,13 @@ JOURNAL_LANDS_WORST = (
     SHAFT_LENGTH - JOURNAL_START + _OUTBOARD_START_LOWER
     - RELIEF_OUTBOARD_STATION - STATION_ROW,
     RELIEF_INBOARD_STATION - JOURNAL_INBOARD_STATION - 2.0 * STATION_ROW,
+)
+# Extreme retained contact stations, not the full post bore or the relieved
+# middle. Both stations share the shaft's far-end datum, so its overall-length
+# variation cancels from their separation. Used by local mesh and global pose.
+JOURNAL_SUPPORT_SPAN_MIN_MM = (
+    round(SHAFT_LENGTH - JOURNAL_START, STATION_PLACES)
+    - JOURNAL_INBOARD_STATION - 2.0 * STATION_ROW
 )
 if STEP_WEB_WORST < WEB_TARGET_MM:
     raise AssertionError("journal-to-pinion-seat web falls below its printed worst-case floor")

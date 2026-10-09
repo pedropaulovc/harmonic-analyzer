@@ -27,13 +27,19 @@ GEAR_DATA = "\n".join(
     (
         "GEAR DATA",
         f"NUMBER OF TEETH:  {spec.TEETH}",
-        f"DIAMETRAL PITCH:  {spec.DIAMETRAL_PITCH:.2f} (NONSTANDARD)",
+        f"DIAMETRAL PITCH:  {spec.DIAMETRAL_PITCH:.2f}",
         f"MODULE (mm, REF):  {spec.MODULE_MM:.3f}",
         f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
         f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
-        f"OUTSIDE DIAMETER (mm):  {spec.OUTSIDE_DIA:.2f} +0/-0.10",
-        f"WHOLE DEPTH (mm):  {spec.WHOLE_DEPTH:.2f} +0.05/0",
-        "TOOTH FORM:  INVOLUTE, FULL DEPTH",
+        f"ROOT ENVELOPE DIAMETER (mm, REF):  "
+        f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
+        f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.{spec.WHOLE_DEPTH_PLACES}f} "
+        f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}",
+        f"FORM CUTTER (REF):  #{spec.CUTTER_NUMBER}, "
+        f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
+        f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
+        f"PITCH TOOTH THICKNESS (mm, REF):  {spec.PITCH_TOOTH_THICKNESS_MM:.3f}",
+        "TOOTH FORM:  TRANSLATED STOCK FORM; FINITE FLANKS AND OFF-CENTRE ROOT ARC",
     )
 )
 DRAWING_NOTES = "\n".join(

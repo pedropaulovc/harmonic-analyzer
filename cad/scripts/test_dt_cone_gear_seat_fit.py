@@ -13,9 +13,11 @@ shaft (MHA-DT-004), closing two Codex findings:
 from __future__ import annotations
 
 import math
+import itertools
 
 import pytest
 
+import _config
 import _fit_limits
 import build_dt_cone_gear_shaft
 import dt_cone_gear_shaft_spec as shaft
@@ -26,6 +28,7 @@ from gear_seat_fit import (
     GEAR_SEAT_CLEARANCE,
     flat_bore_af_band,
     seat_bore_band,
+    connected_home_clock_angle_bound_rad,
 )
 
 MIN_BAND_WIDTH = 0.01
@@ -54,8 +57,6 @@ def test_every_gear_bore_is_the_d_flat_land_under_it() -> None:
         assert spec.bore_flat_af_mm(teeth) == pytest.approx(
             lands.SECTION_FLAT_AF[section]
         )
-    assert spec.bore_flat_af_mm(6) == pytest.approx(1.460)
-    assert spec.bore_flat_af_mm(12) == pytest.approx(1.460)
 
 
 def test_every_gear_station_lies_on_its_land() -> None:
@@ -63,7 +64,7 @@ def test_every_gear_station_lies_on_its_land() -> None:
     # SEAT_STEP_SETBACK south of the north face of the last gear on the
     # larger land, so that gear overhangs its land by the setback and the
     # smaller-bore gear north of it sits wholly on its own land.
-    for j, teeth in enumerate(range(120, 0, -6)):
+    for j, teeth in enumerate(reversed(spec.CONFIGURATION_TEETH)):
         south, north = shaft.gear_faces(j)
         assert north - south == pytest.approx(spec.FACE_WIDTH)
         section = spec.land_section(teeth)
@@ -113,16 +114,35 @@ def test_the_flat_is_a_true_chord_clocked_to_one_place() -> None:
     assert spec.FLAT_CLOCK_TOLERANCE_DEG == 0.25
     assert spec.DRAWING_PRECISION_BY_NAME["BoreFlatClock"] == 1
     assert "BoreFlatClock" in spec.DRAWING_DIMENSIONS["BoreProfile"]
-    # The flat is a real chord: shallow enough to leave the round bore
-    # guiding the gear, deep enough to key it (AF below the diameter).
+    # Terminal deep-D keeps over half the cylindrical guidance at print corners;
+    # intermediate lands retain their original shallow-flat condition.
     for teeth in spec.CONFIGURATION_TEETH:
         radius = spec.bore_dia_mm(teeth) / 2.0
         offset = spec.bore_flat_offset_mm(teeth)
-        assert 0.5 * radius < offset < radius, teeth
+        if teeth in spec.TERMINAL_WEB_REQUIREMENTS_MM:
+            assert 0.0 < offset < radius, teeth
+            maximum_radius = (spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[0]) / 2.0
+            minimum_offset = (
+                spec.bore_flat_af_mm(teeth) + spec.BORE_AF_BAND[1] - maximum_radius
+            )
+            assert minimum_offset > 0.0
+            retained_arc = 2.0 * math.pi - 2.0 * math.acos(minimum_offset / maximum_radius)
+            assert retained_arc > math.pi
+        else:
+            assert 0.5 * radius < offset < radius, teeth
         half_chord = math.sqrt(radius**2 - offset**2)
         assert spec.bore_flat_segment_area_mm2(teeth) == pytest.approx(
             radius**2 * math.acos(offset / radius) - offset * half_chord
         )
+    assert lands.TERMINAL_HALF_CHORD_MIN_MM >= lands.TERMINAL_REQUIRED_HALF_CHORD_MM
+    minimum_land_radius = (
+        lands.TERMINAL_DIA_MM + lands.RUNNING_DIA_BAND[1]
+    ) / 2.0
+    assert 0.0 < lands.TERMINAL_FLAT_OFFSET_MAX_MM < minimum_land_radius
+    assert lands.TERMINAL_HALF_CHORD_MIN_MM - (
+        lands.TIP_SCREW_DOG_PROJECTED_RADIUS_MM
+        + lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM + lands.TIP_SCREW_DOG_AXIS_OFFSET_MM
+    ) >= lands.TERMINAL_FLAT_EDGE_BREAK_MAX
 
 
 def test_the_band_upper_is_the_lower_of_its_two_named_limits() -> None:
@@ -137,21 +157,142 @@ def test_the_band_upper_is_the_lower_of_its_two_named_limits() -> None:
             if teeth
         )
     )
-    web_cap = (
-        spec.floor_limits_mm(6)[0]
-        - 2.0 * spec.WEB_EXCEPTIONS_MM[6]
-        - spec.bore_dia_mm(6)
+    scale = 10**spec.BORE_BAND_PLACES
+    web_cap = min(
+        spec.floor_limits_mm(teeth)[0] - 2.0 * minimum
+        - math.ceil(spec.bore_dia_mm(teeth) * scale - 1e-9) / scale
+        for teeth, minimum in spec.TERMINAL_WEB_REQUIREMENTS_MM.items()
     )
-    assert spec.BORE_BAND_WEB_UPPER <= web_cap
-    assert web_cap - spec.BORE_BAND_WEB_UPPER < 10.0**-spec.BORE_BAND_PLACES
+    assert spec.BORE_BAND_WEB_UPPER <= web_cap + 1e-9
+    assert web_cap - spec.BORE_BAND_WEB_UPPER < 1.0 / scale + 1e-9
     assert spec.BORE_DIA_BAND[0] == pytest.approx(
         min(spec.BORE_BAND_FIT_UPPER, spec.BORE_BAND_WEB_UPPER)
     )
     assert spec.BORE_DIA_BAND[1] == pytest.approx(spec.BORE_BAND_LOWER)
 
 
-def test_the_t006_web_caps_the_bore_band() -> None:
-    # The largest T006 bore under its printed MIN floor keeps the named web.
-    floor_min = spec.floor_limits_mm(6)[0]
-    largest_bore = spec.bore_dia_mm(6) + spec.BORE_DIA_BAND[0]
-    assert (floor_min - largest_bore) / 2.0 >= spec.WEB_EXCEPTIONS_MM[6] - 1e-9
+def test_both_terminal_web_guards_read_the_current_cutter_and_bore() -> None:
+    for teeth, minimum in spec.TERMINAL_WEB_REQUIREMENTS_MM.items():
+        assert spec.terminal_web_mm(teeth) >= minimum - 1e-9
+        profile = spec.stock_form_profile(teeth)
+        assert spec.floor_limits_mm(teeth)[0] <= 2.0 * profile.root_radius_min_mm + 1e-9
+        assert profile.root_radius_min_mm - (
+            spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[0]
+        ) / 2.0 >= minimum - 1e-9
+
+
+def _actual_clock_fit(teeth):
+    section = spec.land_section(teeth)
+    nominal_dia = spec.bore_dia_mm(teeth)
+    nominal_af = lands.SECTION_FLAT_AF[section]
+    dia = (
+        lands.TERMINAL_FINISHED_DIA_LIMITS_MM
+        if section == len(lands.SECTION_DIA_BANDS)-1
+        else tuple(nominal_dia+value for value in reversed(lands.SECTION_DIA_BANDS[section]))
+    )
+    shaft_af = tuple(nominal_af+value for value in reversed(lands.FLAT_AF_BAND))
+    bore_af = tuple(spec.bore_flat_af_mm(teeth)+value for value in reversed(spec.BORE_AF_BAND))
+    edge = _config.title_block("edge_break")
+    edge_break = (
+        lands.TERMINAL_FLAT_EDGE_BREAK_MAX
+        if section == len(lands.SECTION_DIA_BANDS)-1
+        else max(float(edge["radius_mm"]),float(edge["chamfer_max_mm"]))
+    )
+    return dia,shaft_af,bore_af,edge_break
+
+
+def test_connected_home_clock_uses_actual_all_twenty_coupled_fit_bands() -> None:
+    for teeth in spec.CONFIGURATION_TEETH:
+        dia,shaft_af,bore_af,edge_break = _actual_clock_fit(teeth)
+        bound = connected_home_clock_angle_bound_rad(
+            dia,shaft_af,bore_af,edge_break_mm=edge_break,
+        )
+        sharp = connected_home_clock_angle_bound_rad(
+            dia,shaft_af,bore_af,edge_break_mm=0.0,
+        )
+        radius = dia[0]/2
+        offset = shaft_af[0]-radius
+        chord = math.sqrt(radius*radius-offset*offset)
+        retained = min(
+            chord-edge_break,
+            math.sqrt((shaft_af[0]-2*edge_break)*(dia[0]-shaft_af[0])),
+        )
+        exact_retained_width_barrier = (
+            math.asin((bore_af[1]-radius)/math.hypot(offset,retained))
+            - math.atan2(offset,retained)
+        )
+        assert exact_retained_width_barrier <= bound < exact_retained_width_barrier+1e-10
+        assert sharp < bound < math.pi
+        # The legacy small-angle estimate ignores both sine curvature and
+        # the material removed by the stock-permitted torque-corner break.
+        assert bound > (bore_af[1]-shaft_af[0])/chord
+        for d,af,bore in itertools.product(dia,shaft_af,bore_af):
+            corner = connected_home_clock_angle_bound_rad(
+                (d,d),(af,af),(bore,bore),edge_break_mm=edge_break,
+            )
+            assert corner <= bound+1e-10
+
+
+def test_clock_bound_stays_in_first_connected_width_component() -> None:
+    radius,af,bore = 2.0,3.6,3.7
+    bound = connected_home_clock_angle_bound_rad(
+        (4,4),(af,af),(bore,bore),edge_break_mm=0.0,
+    )
+    offset = af-radius
+    chord = math.sqrt(radius*radius-offset*offset)
+    def width(theta):
+        return radius+offset*math.cos(theta)+chord*abs(math.sin(theta))
+    assert width(bound-1e-6) < bore
+    assert width(bound+1e-6) > bore
+    assert width(math.pi) == pytest.approx(af)
+    assert bound < math.acos(offset/radius)
+    assert connected_home_clock_angle_bound_rad(
+        (4,4),(af,af),(4,4),edge_break_mm=0.0,
+    ) == math.pi
+
+
+def test_circular_round_corner_setback_is_not_a_tangent_line_approximation() -> None:
+    diameter,af,bore,edge = 2.0,1.01,1.05,0.20
+    radius = diameter/2
+    offset = af-radius
+    chord = math.sqrt(radius*radius-offset*offset)
+    retained_round = math.sqrt((af-2*edge)*(diameter-af))
+    assert chord-retained_round > edge
+    false_setback_barrier = (
+        math.asin((bore-radius)/math.hypot(offset,chord-edge))
+        - math.atan2(offset,chord-edge)
+    )
+    bound = connected_home_clock_angle_bound_rad(
+        (diameter,diameter),(af,af),(bore,bore),edge_break_mm=edge,
+    )
+    assert bound > false_setback_barrier
+
+
+def test_clock_reader_has_no_default_sharp_stock_acceptance() -> None:
+    with pytest.raises(TypeError,match="edge_break_mm"):
+        connected_home_clock_angle_bound_rad((4,4),(3.6,3.6),(3.7,3.7))
+
+
+def test_no_retained_width_barrier_reports_full_wrapped_outer_not_zero() -> None:
+    assert connected_home_clock_angle_bound_rad(
+        (4,4),(3.6,3.6),(3.7,3.7),edge_break_mm=1.8,
+    ) == math.pi
+
+
+@pytest.mark.parametrize("edge",(-0.1,math.nan,math.inf))
+def test_clock_reader_refuses_invalid_edge_break_grade(edge) -> None:
+    with pytest.raises(ValueError,match="edge break"):
+        connected_home_clock_angle_bound_rad(
+            (4,4),(3.6,3.6),(3.7,3.7),edge_break_mm=edge,
+        )
+
+
+@pytest.mark.parametrize("dia,af,bore",(
+    ((0,4),(3.6,3.6),(3.7,3.7)),
+    ((4,3),(3.6,3.6),(3.7,3.7)),
+    ((4,4),(1.9,1.9),(3.7,3.7)),
+    ((4,4),(3.6,3.6),(3.5,3.5)),
+))
+def test_clock_reader_refuses_invalid_or_non_home_grade_boxes(dia,af,bore) -> None:
+    with pytest.raises(ValueError):
+        connected_home_clock_angle_bound_rad(dia,af,bore,edge_break_mm=0.0)

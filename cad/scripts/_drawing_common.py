@@ -35,7 +35,9 @@ from _common import (
     apply_custom_properties,
 )
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
+from _gtol_spec import gtol_frame_signature as _gtol_frame_signature
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
+from _native_projected_zone import capture_projected_gtol
 from _surface_finish import SurfaceFinishControl
 from _drawing_simplified import simplified_name
 from _drawing_layout_check import (
@@ -917,6 +919,7 @@ def add_feature_control_frame(
     tolerance: str,
     datums: Sequence[str] = (),
     diameter: bool = False,
+    projected_zone_height_mm: float | None = None,
     quantity: str = "",
     all_around: bool = False,
     label: str,
@@ -946,6 +949,14 @@ def add_feature_control_frame(
         raise ValueError(
             f"feature-control frame cannot attach to a {entity_type} ({label})"
         )
+    xml = _gtol_frame_xml(
+        characteristic,
+        tolerance,
+        datums=datums,
+        diameter=diameter,
+        projected_zone_height_mm=projected_zone_height_mm,
+    )
+    expected_signature = _gtol_frame_signature(xml)
     edge = _select_annotation_entity(
         adapter,
         view,
@@ -979,7 +990,7 @@ def add_feature_control_frame(
     )
     frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count == 0:
-        if not gtol.AddFrame():
+        if gtol.AddFrame() is not True:
             raise RuntimeError(f"failed to create feature-control frame ({label})")
         frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count < 1:
@@ -1004,11 +1015,11 @@ def add_feature_control_frame(
             "",
             "",
         )
-        if not gtol.SetFrameValues2(1, tolerance, "", *datum_values):
+        if gtol.SetFrameValues2(1, tolerance, "", *datum_values) is not True:
             raise RuntimeError(
                 f"failed to seed feature-control frame for migration ({label})"
             )
-        if not gtol.CanConvertFormat():
+        if gtol.CanConvertFormat() is not True:
             raise RuntimeError(
                 f"feature-control frame cannot migrate to current format ({label})"
             )
@@ -1026,11 +1037,21 @@ def add_feature_control_frame(
     frame = _sw_type_info.early_bound_or_flag(
         frame, "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
     )
-    xml = _gtol_frame_xml(characteristic, tolerance, datums=datums, diameter=diameter)
-    if not migrated and not frame.SetSymbolXml(xml):
-        raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
-    applied = str(frame.GetSymbolXml() or "")
-    if _GTOL_SYMBOLS[characteristic] not in applied or tolerance not in applied:
+    # The legacy seed preserves ordinary migration. Projection must be applied
+    # through current-frame XML even when the frame was just converted.
+    if not migrated or projected_zone_height_mm is not None:
+        if frame.SetSymbolXml(xml) is not True:
+            raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
+    applied = frame.GetSymbolXml()
+    if type(applied) is not str:
+        raise RuntimeError(f"feature-control frame XML readback is not a string ({label})")
+    try:
+        applied_signature = _gtol_frame_signature(applied)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"invalid feature-control frame XML readback ({label}): {exc}"
+        ) from exc
+    if applied_signature != expected_signature:
         raise RuntimeError(f"feature-control frame did not persist ({label})")
     if int(gtol.GetFormat()) != 2:  # swGtolFormatType_e.GTOL_SW2022 (current)
         raise RuntimeError(f"feature-control frame remained in old format ({label})")
@@ -1074,6 +1095,25 @@ def add_feature_control_frame(
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     rebuild_drawing(adapter, label="add_feature_control_frame")
+    frame = gtol.GetFrame(1)
+    if frame is None:
+        raise RuntimeError(f"feature-control frame disappeared after rebuild ({label})")
+    frame = _sw_type_info.early_bound_or_flag(
+        frame, "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
+    )
+    applied = frame.GetSymbolXml()
+    if type(applied) is not str:
+        raise RuntimeError(f"feature-control frame XML readback is not a string ({label})")
+    try:
+        applied_signature = _gtol_frame_signature(applied)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"invalid feature-control frame XML readback after rebuild ({label}): {exc}"
+        ) from exc
+    if applied_signature != expected_signature:
+        raise RuntimeError(
+            f"feature-control frame changed semantics after rebuild ({label})"
+        )
     # IGtol.IsAttached reads True on a detached frame (run 20260928T080412049Z
     # above), so the attached entity is what proves the attachment.
     _assert_attached_to(
@@ -1087,6 +1127,11 @@ def add_feature_control_frame(
     if leader_attach_xy is not None:
         _assert_leader_lands(
             annotation, leader_attach_xy, what="feature-control frame", label=label
+        )
+    if projected_zone_height_mm is not None:
+        capture_projected_gtol(
+            draw, gtol, expected_xml=xml, key=label,
+            phase="drawing_after_rebuild", migrated=migrated,
         )
     draw.ClearSelection2(True)
     return gtol
@@ -1164,13 +1209,23 @@ def project_part_pmi(
             tolerance=control.tolerance,
             datums=control.datums,
             diameter=control.tolerance_zone == "diametral",
+            projected_zone_height_mm=control.projected_zone_height_mm,
             label=f"{label} {control.key}",
             entity_type=placement.attachment_type,
             entity=placement.entity,
             leader_attach_xy=placement.leader_attachment_xy,
         )
         frame = _early_bound(gtol.GetFrame(1), "IGtolFrame")
-        if gtol_frame_signature(str(frame.GetSymbolXml() or "")) != (
+        applied = frame.GetSymbolXml()
+        if type(applied) is not str:
+            raise RuntimeError(f"{label}: projected gtol {control.key} XML is not a string")
+        try:
+            applied_signature = gtol_frame_signature(applied)
+        except ValueError as exc:
+            raise RuntimeError(
+                f"{label}: projected gtol {control.key} invalid frame XML readback: {exc}"
+            ) from exc
+        if applied_signature != (
             gtol_frame_signature(control.frame_xml)
         ):
             raise RuntimeError(

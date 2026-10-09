@@ -31,7 +31,12 @@ import pytest
 
 import _common
 
-CONE_FAULTS = (("ToothGapCut", 1, False), ("ToothGapPattern", 1, False))
+def cone_faults(configuration: str) -> tuple[tuple[str, int, bool], ...]:
+    """Current native row names, unlike the historical incident names above."""
+    return (
+        (f"ToothGapCut{configuration}", 1, False),
+        (f"ToothGapPattern{configuration}", 1, False),
+    )
 
 
 class _Config:
@@ -64,7 +69,7 @@ class _Extension:
     def GetWhatsWrong(self):  # noqa: N802
         faults = self.part.faults
         if self.part.active in self.part.bad:
-            faults = (*faults, *CONE_FAULTS)
+            faults = (*faults, *cone_faults(self.part.active))
         names, codes, warnings = zip(*faults) if faults else ((), (), ())
         return True, [_Feature(name) for name in names], list(codes), list(warnings)
 
@@ -272,8 +277,8 @@ def test_an_inactive_configuration_still_faulted_while_active_stops_the_save(
     with pytest.raises(
         RuntimeError,
         match=r"cone-gear: stale inactive configurations did not rebuild clean while "
-        r"active: T060: \['ToothGapCut \(unknown-error\)', "
-        r"'ToothGapPattern \(unknown-error\)'\]$",
+        r"active: T060: \['ToothGapCutT060 \(unknown-error\)', "
+        r"'ToothGapPatternT060 \(unknown-error\)'\]$",
     ):
         _common.rebuild_stale_configurations(adapter, "dt-cone-gear")
     assert part.active == "T120"
@@ -319,7 +324,11 @@ def test_edit_rebuild_all_alone_leaves_the_cg_fx1_caches_that_fail_the_reopen(
     # Every faulted configuration remains diagnosable; prose and formatting
     # are not part of the regeneration contract.
     assert all(name in message for name in SWAPPED)
-    assert all(feature in message for feature in ("ToothGapCut", "ToothGapPattern"))
+    assert all(
+        feature in message
+        for configuration in SWAPPED
+        for feature, _code, _warning in cone_faults(configuration)
+    )
     assert "T120:" not in message and "Default:" not in message
     assert not any(entry.startswith("force") for entry in part.log)
     assert part.bad == set(SWAPPED)

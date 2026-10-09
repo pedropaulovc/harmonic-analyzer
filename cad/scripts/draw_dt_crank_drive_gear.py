@@ -16,8 +16,7 @@ peaks too. The decimal places are the PART's
 (``crank_drive_gear_spec.DRAWING_PRECISION``, applied natively by
 ``build_crank_drive_gear``); this script only reads them back off the sheet.
 
-Drawn 3:2 -- at 1:1 a 65 mm disc left two thirds of a B sheet empty, and the
-face view's 64 teeth need the size to read as teeth.
+Drawn 3:2 so the face view's 64 teeth read as teeth on the B sheet.
 """
 
 from __future__ import annotations
@@ -105,10 +104,10 @@ MANUFACTURING_NOTES_POS = (0.016, 0.042)
 # Half the printed tooth-tip circle, in sheet metres: the face view's silhouette
 # radius and the section's half-height, which every dimension is placed clear
 # of.
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.0489
+HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 # Half the printed face width: the section's half-WIDTH, so the three views
 # can be proven not to overlap offline.
-FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.0054
+FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 
 # End view: round diameter on the lower left, AF in the lane right of the
 # tooth tips and tip diameter above. Dimension text centres on its keep
@@ -117,11 +116,9 @@ FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.005
 # which start on the axis, meet it. The flat itself appears on local +X in
 # the face view.
 #
-# The tip diameter's text shares the upper-left corner with the gear-data
-# block, so it hangs a fixed air gap under the block's LAST row: a row added
-# to GEAR_DATA moves it down instead of under that row (R9-56's contact-ratio
-# row printed through "Ø65.21 ±0.1" when it sat at a fixed 16 mm above the
-# tips). Its ink stands 3.9 mm tall ("Ø65.21 ±0.1", same run).
+# The tip text hangs under the complete gear-data block. Its left-offset lane
+# also pays the larger finite-supported tip circle when stock-form inspection
+# and assembly-requirement rows grow the block. Native layout remains the gate.
 TIP_DIA_TEXT_HALF_HEIGHT = 0.002
 TIP_DIA_TEXT_GAP = 0.004
 # The full mate Number makes the AF block 70.8 mm wide at the calibrated
@@ -130,11 +127,11 @@ TIP_DIA_TEXT_GAP = 0.004
 # model anchors or the chamfer below it.
 FRONT_KEEP = {
     "OutsideDia": (
-        FRONT_CENTER[0] - 0.035,
+        FRONT_CENTER[0] - 0.055,
         GEAR_DATA_BOTTOM - TIP_DIA_TEXT_GAP - TIP_DIA_TEXT_HALF_HEIGHT,
     ),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
-    "BoreAF": (FRONT_CENTER[0] + 0.094, FRONT_CENTER[1] + 0.028),
+    "BoreAF": (FRONT_CENTER[0] + 0.099, FRONT_CENTER[1] + 0.028),
 }
 # Longitudinal centre section A-A instead of a plain side view: the south
 # bore chamfer is internal, and a targeted import delivers the chamfer's
@@ -150,7 +147,7 @@ FRONT_KEEP = {
 # the face view, and the +Z (north) face on the right.
 SECTION_LINE_OVERRUN = 0.005
 # The native caption's top centre, under the section and above the title block.
-SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.090)
+SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.085)
 # Face width above the section; the chamfer's leg dimension runs left off the
 # south face into the lane under the AF callout, as RimChamferSize does.
 SECTION_KEEP = {

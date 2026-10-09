@@ -26,18 +26,19 @@ import math
 import _config
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
+import dt_post_mount_stack as mount_stack
 from _fit_limits import deviations
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
-SKU = "40923906"
-THREAD = "1/4-20"
+SKU = str(_config.parts("vn-post-mount-screw")["supplier_skus"][0])
+THREAD = platform.POST_MOUNT_SPEC.size
 THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
 
 # Head seated on the MHA-DT-005 counterbore floor: the under-head face to the
 # plate's top face, at the model's nominal post.
-GRIP_MM = post.BLOCK_HEIGHT - post.ATTACHMENT_CBORE_DEPTH
+GRIP_MM = mount_stack.GRIP_MM
 # The longest cut whose end is flush with the MHA-DT-020 underside.
-FLUSH_LENGTH_MM = GRIP_MM + platform.PLATE_THICKNESS
+FLUSH_LENGTH_MM = mount_stack.FLUSH_LENGTH_MM
 
 # Model-owned drawing controls.  The cut length lives on a hidden reference
 # sketch with ONE driving dimension (under-head face to cut end).  The cut
@@ -66,7 +67,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION: 1},
+    CUT_LENGTH_SKETCH: {CUT_LENGTH_DIMENSION: mount_stack.CUT_LENGTH_PLACES},
     CUT_END_BREAK_SKETCH: {CUT_END_BREAK_DIMENSION: 1},
 }
 DRAWING_PRECISION_BY_NAME = {
@@ -88,20 +89,15 @@ _GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip
 _GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
 _POST_HEIGHT_PRINTED = round(post.BLOCK_HEIGHT, 1)
 _CBORE_DEPTH_PRINTED = round(post.ATTACHMENT_CBORE_DEPTH, 2)
-# U41: 1/4 plate as supplied.  Integ carries the same mill band as
-# dt_cone_swing_platform_spec.PLATE_STOCK_BAND; this branch predates it.
-PLATE_STOCK_BAND_MM = 0.13
-# Two breaks eat thread, both held to a deburr, not the title block's 0.25
-# (Main's engagement ruling on #857):
-# - the MHA-DT-020 tap's entry: deburr only, 0.1 max.  Integ carries this as
-#   dt_cone_swing_platform_spec.POST_MOUNT_TAP_EDGE_BREAK (the platform's local
-#   override); this branch predates it, and integ dedupes it to one copy.
+# Stock thickness and tap-entry breaks are owned by the mating platform.
+PLATE_STOCK_BAND_MM = platform.PLATE_STOCK_BAND
+# Two breaks eat thread, both held to a deburr, not the title block's 0.25:
 # - the screw's cut end: a deburr (the shop hacksaws and files the burr),
 #   0.1 max.  The model holds 0.1 as the nominal of its band; the sheet
 #   prints the single limit "0.1 MAX" in a cropped 10:1 view of the tip, because
 #   a 0.1 dimension at 1:1 is illegible and a printed +0/-0.1 band reads as
 #   permitting no break at all (Main's MHA-VN-031 eye pass on #857).
-POST_MOUNT_TAP_EDGE_BREAK = 0.1
+POST_MOUNT_TAP_EDGE_BREAK = platform.POST_MOUNT_TAP_EDGE_BREAK
 CUT_END_BREAK_MM = 0.1
 CUT_END_BREAK_BAND = (0.0, -0.1)  # (upper, lower), the _fit_limits convention
 _break_lower, _break_upper = deviations(CUT_END_BREAK_BAND)
@@ -170,19 +166,19 @@ if FIXED_CUT_LENGTH_EXISTS:
 # flush with its own MHA-DT-020 underside and this much short of it, never proud.
 # A band on the cut end's position relative to that underside, in the
 # (upper, lower) _fit_limits convention: upper 0 IS "never proud", lower is
-# the most it may be cut short.  POST_SCREW_CUT_TO_FIT_SHORT is the one copy
-# of the allowance: integ's platform engagement stack imports it, and the
-# worst-case engagement below spends all of it.
-POST_SCREW_CUT_TO_FIT_BAND = (0.0, -0.3)
+# the most it may be cut short. The import-free mount stack owns the allowance;
+# both part owners' printed-band engagement stacks spend all of it.
+POST_SCREW_CUT_TO_FIT_BAND = (0.0, -platform.POST_SCREW_CUT_TO_FIT_SHORT)
 _fit_lower, _fit_upper = deviations(POST_SCREW_CUT_TO_FIT_BAND)
 if _fit_upper != 0.0:
     raise ValueError("the cut-to-fit band must top out flush: never proud")
 POST_SCREW_CUT_TO_FIT_SHORT = -_fit_lower
-# No MHA-DT-000 procedure sheet exists, so the acceptance prints where the part
-# sheet delegates the cut: the CutLength dimension's callout (Codex P1 on
-# #857).  The number is the band's, at the cut length's own places; a band
-# the places would round is refused rather than printed wrong.
+# The acceptance prints where the part sheet delegates the cut: the CutLength
+# callout, as well as the drive-train assembly step. The number is the band's,
+# at the cut length's own places; a band the places would round is refused.
 _FIT_PLACES = DRAWING_PRECISION[CUT_LENGTH_SKETCH][CUT_LENGTH_DIMENSION]
+if _FIT_PLACES != mount_stack.CUT_LENGTH_PLACES:
+    raise ValueError("post screw cut-length precision diverges from its nominal stack")
 if round(POST_SCREW_CUT_TO_FIT_SHORT, _FIT_PLACES) != POST_SCREW_CUT_TO_FIT_SHORT:
     raise ValueError("the cut-to-fit allowance does not print at the cut length's places")
 
@@ -191,7 +187,7 @@ if round(POST_SCREW_CUT_TO_FIT_SHORT, _FIT_PLACES) != POST_SCREW_CUT_TO_FIT_SHOR
 # plate's flush length less the middle of the fit-to-hole allowance, at the
 # length's printed places, so the model is itself a cut the sheet accepts
 # (Codex P2 on #857: a typed 86.0 ended 0.33 short, outside 0.3).
-CUT_LENGTH_MM = round(FLUSH_LENGTH_MM - POST_SCREW_CUT_TO_FIT_SHORT / 2.0, _FIT_PLACES)
+CUT_LENGTH_MM = mount_stack.CUT_LENGTH_MM
 CUT_SHORT_NOMINAL_MM = FLUSH_LENGTH_MM - CUT_LENGTH_MM
 if not 0.0 <= CUT_SHORT_NOMINAL_MM <= POST_SCREW_CUT_TO_FIT_SHORT:
     raise ValueError(
@@ -203,8 +199,8 @@ if not 0.0 <= CUT_SHORT_NOMINAL_MM <= POST_SCREW_CUT_TO_FIT_SHORT:
 # The named exception's worst case, cut to fit: unlike the fixed-length
 # corner above, the floor drops out (each screw is cut to its own hole), so
 # the plate limits it -- the thinnest stock, the full fit-to-hole allowance,
-# and both breaks at their maximum.  Mirrors integ's
-# dt_cone_swing_platform_spec.POST_MOUNT_ENGAGEMENT_WORST, which dedupes to this.
+# and both breaks at their maximum. The platform's tap-exit deburr and this
+# screw's cut-end break spend the same maximum in their respective stacks.
 POST_MOUNT_ENGAGEMENT_WORST = round(
     platform.PLATE_THICKNESS
     - PLATE_STOCK_BAND_MM
@@ -262,6 +258,14 @@ if abs(STOCK_LENGTH_MM - 4.0 * 25.4) > 1e-9:
     raise ValueError("the MSC 40923906 row is not the supplied 4 in screw")
 # The family's factory tip: 45 deg x 0.7P (diag_mcmaster_fillister's law).
 FACTORY_TIP_CHAMFER_MM = 0.7 * _PITCH
+# Longest in-band seated assembly, cut flush, must still remove the supplied
+# factory tip. This is stricter than checking the reference cut length alone.
+LONGEST_FITTED_LENGTH_MM = FLOOR_HIGH_MM + PLATE_THICK_MM
+STOCK_REACH_MARGIN_MM = (
+    STOCK_LENGTH_MM - FACTORY_TIP_CHAMFER_MM - LONGEST_FITTED_LENGTH_MM
+)
+if STOCK_REACH_MARGIN_MM <= 0.0:
+    raise ValueError("MSC 40923906 cannot reach every printed post/plate corner")
 MAJOR_RADIUS_MM = THREAD_DIA_MM / 2.0
 # The family's thread groove (same module): root flat P/8 at the major radius
 # less 0.75 of the sharp-V height, 30 deg flanks.  At radius r the groove's

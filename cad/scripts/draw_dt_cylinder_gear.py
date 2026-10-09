@@ -70,9 +70,9 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Portrait makes the 62.2 mm gear materially larger than the old landscape
-# 1:1 layout.  The cam-side front view exposes every radial feature, so a
-# redundant opposite face view would only consume the exterior dimension lanes.
+# Portrait keeps the configured drum readable without crowding the views.
+# The cam-side front view exposes every radial feature, so a redundant
+# opposite face view would only consume the exterior dimension lanes.
 SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = (3, 2)
 FRONT_CENTER = (0.105, 0.270)
@@ -104,6 +104,7 @@ FRONT_KEEP = {
     "NotchPhase": (0.152, 0.334),
 }
 RIGHT_KEEP = {
+    "OutsideDia": (0.248, RIGHT_CENTER[1]),
     "FaceWidth": (0.205, 0.220),
     "OverallThickness": (0.205, 0.360),
 }

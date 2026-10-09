@@ -1,15 +1,14 @@
 r"""Reproduction script: harmonic analyzer base (book ch. 6 / legacy part).
 
-Two-plate welded construction based on the legacy 18.0 x 11.0 x 0.5 in
-flange and 17.5 x 10.5 x 1.5 in pad. The v2 post/carrier fit preserves their
-both plates remain on the legacy centred footprint; the v2 post/carrier fit is
-handled by the mechanism installation contracts.
+The native part is the stepped, raised-rim gray-iron base defined by
+``fr_harmonic_base_spec``. Its flange, pad and deck share centred X/Z axes;
+the column sockets set the pad width and its finished deck lands.
 
-Top-face seats: the cone-swing pivot/stop taps, the pinion-rig block/foot
-taps, and (2026-09-02) the four blind #4-40 taps under the maker's nameplate's
-corner screws -- stations derived from the plate's own hole pattern through
-its mount transform (``fr_nameplate_spec``), so the plate, the base and the
-frame's screws can never drift apart.
+Top-face seats include the cone-swing pivot/lock/stop taps, the parked
+pinion-rig block and spring-foot taps, the fitted arbor-pedestal seats,
+and the maker's nameplate taps. The live cone line, parked rig, cylinder
+bank and plate mount transform own those stations: no former gear-train
+world coordinates are copied into the native Hole Wizard cuts.
 
 Finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes): C3.18
 x 45 breaks on the eight vertical plan corners, C1.59 x 45 breaks on both
@@ -129,7 +128,11 @@ from vn_slotted_screw_spec import SHANK_LEN as BLOCK_SCREW_LEN
 from vn_foot_screw_spec import SHANK_LEN as FOOT_SCREW_LEN
 from vn_fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_LEN
 from vn_swing_stop_screw_spec import EMBED_LEN as STOP_ENGAGEMENT
-from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT, SCREW_HALF_SPACING
+from dt_pinion_pivot_block_geometry import (
+    BLOCK_HEIGHT,
+    BLOCK_HEIGHT_BAND,
+    SCREW_HALF_SPACING,
+)
 from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_PAD_Z
 from pinion_rig_park_geometry import PIVOT_X as PINION_PIVOT_X
 from dt_pinion_spring_section import (
@@ -145,22 +148,17 @@ from fr_rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
 from fr_harmonic_base_fasteners import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
-    HOLD_DOWN_BEARING_OFFSET,
     HOLD_DOWN_DRILL_DEPTH,
     HOLD_DOWN_ENGAGEMENT,
-    HOLD_DOWN_PITCH,
     HOLD_DOWN_SEAT_SPEC,
     HOLD_DOWN_TAP_DRILL_DIA,
     HOLD_DOWN_THREAD,
-    HOLD_DOWN_THREAD_DEPTH,
     NAMEPLATE_SCREW_DRILL_DEPTH,
     NAMEPLATE_SCREW_HOLE_DEPTH,
     NAMEPLATE_SCREW_XZ,
     PEDESTAL_SCREW_ENGAGEMENT,
     SEAT_DEPTH_BAND,
-    SEAT_DEPTH_STEP,
     SEAT_TIP_RESERVE,
-    SUPPORT_FOOT_THICKNESS,
     seat_drill_depth,
     seat_thread_depth,
     title_block_band_mm,
@@ -349,13 +347,11 @@ BLOCK_SCREW_XZ = tuple(
     for z in BLOCK_SEAT_Z
     for dx in (-SCREW_HALF_SPACING, SCREW_HALF_SPACING)
 )
-# Rule 12 (audit E10): stock 31.75-mm (#8-32 x 1-1/4) slotted screws penetrate
-# 11.25 mm below each 20.5-mm block -- 10.74 = 2.58D at the BlockHeight .XX
-# band.  The full-thread depth keeps the screw off the bottom at the worst
-# case (12.75 - 0.8 .X depth band >= 11.25 + 0.51 block band, 0.19 spare).
-BLOCK_SCREW_HOLE_DEPTH = 12.75
-# The drill keeps the bottoming tap's two #8-32 pitches (1.5875 mm) past the
-# deepest printed thread; 15.0 left 1.23 at the .XX worst case.
+# The raised block uses the real #8-32 x 1-1/2 stock screw. Size the
+# full-thread depth for the shortest printed grip, not the nominal block;
+# the ordinary seat law keeps the tip reserve and bottoming-tap lead.
+BLOCK_SCREW_MAX_INSERTION = BLOCK_SCREW_LEN - BLOCK_HEIGHT + BLOCK_HEIGHT_BAND
+BLOCK_SCREW_HOLE_DEPTH = seat_thread_depth(BLOCK_SCREW_MAX_INSERTION)
 BLOCK_SCREW_DRILL_DEPTH = seat_drill_depth(
     BLOCK_SCREW_HOLE_DEPTH, "#8-32", "tapped_bottoming"
 )
@@ -684,7 +680,7 @@ for _label, _seat, _engagement in (
     ("cone pivot", PIVOT_SEAT_SPEC, PIVOT_THREAD_ENGAGEMENT),
     ("cone lock", LOCK_SEAT_SPEC, LOCK_STUD_LEN),
     ("swing stop", STOP_SEAT_SPEC, STOP_ENGAGEMENT),
-    ("pinion block", BLOCK_SEAT_SPEC, BLOCK_SCREW_LEN - BLOCK_HEIGHT),
+    ("pinion block", BLOCK_SEAT_SPEC, BLOCK_SCREW_MAX_INSERTION),
     ("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_LEN - SPRING_THICKNESS_MIN),
     (
         "pedestal hold-down",

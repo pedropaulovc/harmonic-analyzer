@@ -18,11 +18,15 @@ geometry.
 
 from __future__ import annotations
 
+import json
 import math
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
+
+import _telemetry
 
 from _common import (
     IN,
+    _early_bound,
     check,
     define_circle,
     dimension_between,
@@ -33,9 +37,14 @@ from _common import (
 from _visibility import blank_reference_geometry
 from involute_gear import PA_DEG, gear_facts
 
+if TYPE_CHECKING:
+    from stock_form_cutter import StockFormProfile
+
 __all__ = [
     "ToothedDisc",
+    "assert_stock_screw_sweep_phase",
     "build_fixed_gear",
+    "build_stock_form_gear",
     "cut_tooth_gap",
     "gap_area_in_disc_ext",
     "pattern_about_z",
@@ -174,25 +183,31 @@ async def cut_tooth_gap(
     else:
         rr = fmt(root_r_in)
         if root_r_in < facts["Rb"]:
-            gap_curves.append(await equation_curve(
+            gap_curves.append(
+                await equation_curve(
+                    adapter,
+                    "upper root extension A2->A2r",
+                    f"({rb} + t * ({rr} - {rb})) * {fmt(math.cos(a2))}",
+                    f"({rb} + t * ({rr} - {rb})) * {fmt(math.sin(a2))}",
+                )
+            )
+        gap_curves.append(
+            await equation_curve(
                 adapter,
-                "upper root extension A2->A2r",
-                f"({rb} + t * ({rr} - {rb})) * {fmt(math.cos(a2))}",
-                f"({rb} + t * ({rr} - {rb})) * {fmt(math.sin(a2))}",
-            ))
-        gap_curves.append(await equation_curve(
-            adapter,
-            "root arc A2r->A1r",
-            f"{rr} * cos({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
-            f"{rr} * sin({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
-        ))
+                "root arc A2r->A1r",
+                f"{rr} * cos({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
+                f"{rr} * sin({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
+            )
+        )
         if root_r_in < facts["Rb"]:
-            gap_curves.append(await equation_curve(
-                adapter,
-                "lower root extension A1r->A1",
-                f"({rr} + t * ({rb} - {rr})) * {fmt(math.cos(a1))}",
-                f"({rr} + t * ({rb} - {rr})) * {fmt(math.sin(a1))}",
-            ))
+            gap_curves.append(
+                await equation_curve(
+                    adapter,
+                    "lower root extension A1r->A1",
+                    f"({rr} + t * ({rb} - {rr})) * {fmt(math.cos(a1))}",
+                    f"({rr} + t * ({rb} - {rr})) * {fmt(math.sin(a1))}",
+                )
+            )
     # Equation-driven curves are the whitelist class for fix (no free
     # endpoints to dimension); B3 attempts a semantic scheme before keeping
     # this escalation (cad/FIX_MIGRATION.md).
@@ -314,9 +329,9 @@ def gap_area_in_disc_ext(
     return abs(area) / 2.0
 
 
-# Import-time tripwire: at defaults the extended area must reduce to the cone
-# gear's exact expectation (same boundary, different code path) -- a drifted
-# copy would silently skew every _gear volume gate.
+# Import-time tripwire: with no extensions, the two independent area paths
+# must agree. These arbitrary tooth-count/pitch samples exercise the generic
+# identity, not the configured cone or crank tooth systems.
 from involute_gear import gap_area_in_disc as _gap_area_plain  # noqa: E402
 
 for _t, _dp in ((16, 24.74), (64, 24.74), (12, 12.7)):
@@ -362,8 +377,6 @@ async def boss_tooth_swept(
     azimuth; ``widen_rad`` thins each flank by the backlash angle (the same
     +-eps the gap curves widen by).
     """
-    from solidworks_mcp.adapters.base import SweepParameters
-
     rho, eps = rotate_rad, widen_rad
     rb, ra = fmt(facts["Rb"]), fmt(facts["Ra"])
     tmin = _root_start_parameter(facts["Rb"], root_r_in)
@@ -426,6 +439,15 @@ async def boss_tooth_swept(
         adapter, "tooth sketch", fix_entities=tooth_curves, allow_fix_escalation=True
     )
     check("exit_sketch tooth", await adapter.exit_sketch())
+    return await _sweep_tooth_sketch(adapter, face_width, twist_deg=twist_deg)
+
+
+async def _sweep_tooth_sketch(
+    adapter: Any, face_width: float, *, twist_deg: float
+) -> str:
+    """Sweep the current closed tooth sketch along the existing +Z axis path."""
+    from solidworks_mcp.adapters.base import SweepParameters
+
 
     # Path: a fully-defined line up the gear axis (origin coincidence +
     # vertical + one length dim -- the build_vn_boss_hook recipe).
@@ -586,3 +608,252 @@ async def build_fixed_gear(
     pattern = await pattern_about_z(adapter, seeds, teeth, ra_mm, face_width / 2.0)
     volume = await volume_check(adapter, "toothed disc", v_gear, 0.01 * v_gear)
     return ToothedDisc(volume, (*seeds, str(pattern.name)))
+
+
+async def build_stock_form_gear(
+    adapter: Any,
+    profile: StockFormProfile,
+    face_width: float,
+    *,
+    rotate_rad: float | None = None,
+) -> ToothedDisc:
+    """Author a disc from its actual finite translated stock-tool profile.
+
+    Spur profiles cut one gap through the blank. Helical profiles sweep the
+    complete material sector, including the translated root-floor lobes.
+    Both routes pattern the physical count and consume the core area oracle.
+    ``rotate_rad`` locates the gap bisector at mid-face; its default pi/N
+    retains a tooth centred on +X. This is the nominal normal-section screw
+    sweep, not a claim about the envelope of a finite disc cutter.
+    """
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    if profile.helix_angle_deg:
+        return await _build_helical_stock_form_gear(
+            adapter, profile, face_width, rotate_rad=rotate_rad
+        )
+    if not math.isfinite(face_width) or face_width <= 0.0:
+        raise ValueError("stock-form gear face width must be positive and finite")
+    rotation = math.pi / profile.teeth if rotate_rad is None else rotate_rad
+    cosine, sine = fmt(math.cos(rotation)), fmt(math.sin(rotation))
+    radius = profile.blank_radius_mm
+    clearance = max(R_CLEAR_IN * IN, radius + 1.0)
+    segments = profile.native_segments(
+        unit_scale=1.0 / IN, clearance_radius_mm=clearance
+    )
+    gap_area = profile.gap_area_mm2
+    blank_area = math.pi * radius**2
+    if not 0.0 < profile.teeth * gap_area < blank_area:
+        raise ValueError("stock-form gaps must leave positive toothed-disc material")
+
+    check("create_sketch stock blank", await adapter.create_sketch("Front"))
+    await define_circle(adapter, 0.0, 0.0, radius, "gear blank")
+    await ensure_fully_defined(adapter, "blank sketch")
+    check("exit_sketch stock blank", await adapter.exit_sketch())
+    check(
+        "extrude stock blank",
+        await adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
+    )
+    blank_volume = blank_area * face_width
+    await volume_check(adapter, "blank", blank_volume, 0.005 * blank_volume)
+
+    check("create_sketch stock gap", await adapter.create_sketch("Front"))
+    gap_curves = []
+    for segment in segments:
+        gap_curves.append(
+            await equation_curve(
+                adapter,
+                segment.name,
+                f"({segment.x}) * {cosine} - ({segment.y}) * {sine}",
+                f"({segment.x}) * {sine} + ({segment.y}) * {cosine}",
+            )
+        )
+    await ensure_fully_defined(
+        adapter, "stock gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
+    )
+    check("exit_sketch stock gap", await adapter.exit_sketch())
+    seed = check(
+        "cut stock tooth gap",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=face_width + 1.0)),
+    )
+    seeded_volume = blank_volume - gap_area * face_width
+    expected_volume = blank_volume - profile.teeth * gap_area * face_width
+    await volume_check(adapter, "seeded tooth/gap", seeded_volume, 1.0)
+    pattern = await pattern_about_z(
+        adapter, seed.name, profile.teeth, radius, face_width / 2.0
+    )
+    volume = await volume_check(
+        adapter, "toothed disc", expected_volume, 0.01 * expected_volume
+    )
+    return ToothedDisc(volume, (seed.name, str(pattern.name)))
+
+
+async def _build_helical_stock_form_gear(
+    adapter: Any,
+    profile: StockFormProfile,
+    face_width: float,
+    *,
+    rotate_rad: float | None,
+) -> ToothedDisc:
+    """Sweep the core's complete physical-pitch material sector, never an ideal tooth."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    if not math.isfinite(face_width) or face_width <= 0.0:
+        raise ValueError("stock-form gear face width must be positive and finite")
+    base_radius = profile.root_radius_min_mm - _TOOTH_EMBED_MM
+    if not math.isfinite(base_radius) or base_radius <= 0.0:
+        raise ValueError("stock-form embedded base radius must be positive and finite")
+    gap_area = profile.gap_area_mm2
+    blank_area = math.pi * profile.blank_radius_mm**2
+    base_area = math.pi * base_radius**2
+    sector_area = (blank_area - base_area) / profile.teeth - gap_area
+    if not math.isfinite(sector_area) or sector_area <= 0.0:
+        raise ValueError("stock-form material sector must leave positive tooth material")
+    twist_rad = (
+        face_width * math.tan(math.radians(profile.helix_angle_deg))
+        / profile.pitch_radius_mm
+    )
+    midface_phase = (
+        0.0 if rotate_rad is None else rotate_rad - math.pi / profile.teeth
+    )
+    segments = profile.material_sector_segments(
+        unit_scale=1.0 / IN,
+        embed_radius_mm=base_radius,
+        rotate_rad=midface_phase - twist_rad / 2.0,
+    )
+    check("create_sketch stock base", await adapter.create_sketch("Front"))
+    await define_circle(adapter, 0.0, 0.0, base_radius, "gear blank")
+    await ensure_fully_defined(adapter, "blank sketch")
+    check("exit_sketch stock base", await adapter.exit_sketch())
+    check(
+        "extrude stock base",
+        await adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
+    )
+    base_volume = base_area * face_width
+    await volume_check(adapter, "blank", base_volume, 0.005 * base_volume)
+
+    check("create_sketch stock material sector", await adapter.create_sketch("Front"))
+    curves = [
+        await equation_curve(adapter, segment.name, segment.x, segment.y)
+        for segment in segments
+    ]
+    await ensure_fully_defined(
+        adapter, "stock material sector", fix_entities=curves, allow_fix_escalation=True
+    )
+    check("exit_sketch stock material sector", await adapter.exit_sketch())
+    name_last_feature(adapter, "StockToothProfile")
+    seed = await _sweep_tooth_sketch(
+        adapter, face_width, twist_deg=math.degrees(twist_rad)
+    )
+    seeded_volume = base_volume + sector_area * face_width
+    await volume_check(adapter, "seeded tooth/gap", seeded_volume, 1.0)
+    assert_stock_screw_sweep_phase(
+        adapter, profile, face_width, midface_tooth_phase_rad=midface_phase
+    )
+    pattern = await pattern_about_z(
+        adapter, seed, profile.teeth, profile.blank_radius_mm, face_width / 2.0
+    )
+    expected_volume = (blank_area - profile.teeth * gap_area) * face_width
+    volume = await volume_check(
+        adapter, "toothed disc", expected_volume, 0.01 * expected_volume
+    )
+    return ToothedDisc(volume, (seed, str(pattern.name)))
+
+
+def _stock_flank_samples(profile: Any) -> tuple[tuple[int, float, tuple[float, float]], ...]:
+    """Sample the core's actual blank-clipped finite flank, never extrapolate it."""
+    low = profile.flank_parameter_min
+    high = profile.flank_parameter_max
+    if high <= low:
+        raise ValueError("stock screw sweep has no active finite flank interval")
+    return tuple(
+        (side, parameter, profile.flank_point(parameter, side=side))
+        for side in (-1, 1)
+        for parameter in (
+            low + (high - low) / 4.0,
+            low + 3.0 * (high - low) / 4.0,
+        )
+    )
+
+
+def assert_stock_screw_sweep_phase(
+    adapter: Any,
+    profile: Any,
+    face_width: float,
+    *,
+    midface_tooth_phase_rad: float = 0.0,
+) -> None:
+    """Measure actual solid flank points at quarter/mid-face stations.
+
+    Volume cannot distinguish the wrong hand, no twist, or a wrong phase.
+    Query trimmed native faces, not the input sketch or sweep's option bag.
+    The 1 um comparison is a native geometry fidelity gate, not a machining band.
+    """
+    tolerance_mm = 1e-3
+    if not math.isfinite(face_width) or face_width <= 0.0:
+        raise ValueError("stock screw-sweep face width must be positive and finite")
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    bodies = tuple(part.GetBodies2(0, False) or ())
+    if len(bodies) != 1:
+        raise RuntimeError(f"stock screw sweep requires one solid body, found {len(bodies)}")
+    body = _early_bound(bodies[0], "IBody2")
+    faces = tuple(_early_bound(face, "IFace2") for face in (body.GetFaces() or ()))
+    if not faces:
+        raise RuntimeError("stock screw sweep has no native faces")
+    twist_per_mm = (
+        math.tan(math.radians(profile.helix_angle_deg)) / profile.pitch_radius_mm
+    )
+    samples = _stock_flank_samples(profile)
+    records = []
+    mismatches = []
+    for fraction in (0.25, 0.5, 0.75):
+        z = face_width * fraction
+        phase = midface_tooth_phase_rad + (z - face_width / 2.0) * twist_per_mm
+        for side, parameter, (x, y) in samples:
+            # A seed tooth lies between two gaps: its lower flank is the
+            # upper flank of gap -pi/N, and conversely for its upper flank.
+            angle = phase - side * math.pi / profile.teeth
+            cosine, sine = math.cos(angle), math.sin(angle)
+            expected = (x * cosine - y * sine, x * sine + y * cosine, z)
+            nearest = None
+            distance = math.inf
+            for face in faces:
+                raw = face.GetClosestPointOn(*(value / 1000.0 for value in expected))
+                if raw is None or len(raw) != 5:
+                    raise RuntimeError("stock screw-sweep native closest-point query failed")
+                candidate = tuple(float(value) * 1000.0 for value in raw[:3])
+                if not all(math.isfinite(value) for value in candidate):
+                    raise RuntimeError("stock screw-sweep native closest point is nonfinite")
+                candidate_distance = math.dist(expected, candidate)
+                if candidate_distance < distance:
+                    distance, nearest = candidate_distance, candidate
+            records.append(
+                {
+                    "face_fraction": fraction,
+                    "flank_side": side,
+                    "flank_parameter": parameter,
+                    "expected_xyz_mm": expected,
+                    "native_xyz_mm": nearest,
+                    "distance_mm": distance,
+                }
+            )
+            if distance > tolerance_mm:
+                mismatches.append(
+                    f"z/face={fraction:g}, side={side}, u={parameter:.9g}: "
+                    f"native flank distance {distance:.9g} mm"
+                )
+    _telemetry.info(
+        "crank.stock_screw_sweep_phase "
+        + json.dumps(
+            {
+                "physical_teeth": profile.teeth,
+                "reference_teeth": profile.template.reference_teeth,
+                "helix_angle_deg": profile.helix_angle_deg,
+                "tolerance_mm": tolerance_mm,
+                "points": records,
+            },
+            sort_keys=True,
+        )
+    )
+    if mismatches:
+        raise RuntimeError("stock screw-sweep phase mismatch: " + "; ".join(mismatches))

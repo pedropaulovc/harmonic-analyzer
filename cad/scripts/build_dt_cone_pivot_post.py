@@ -8,7 +8,7 @@ head and boss proportions otherwise retain the harvested feature geometry.
 
 The v2 coordinate frame is also authoritative: the body stands on Top at y=0,
 the crank bore runs straight along +Z, and the cone journal itself is yawed
-12.5182 degrees about the vertical body axis.  That is the PART feature frame;
+by the configured cone-line incline about the vertical body axis. That is the PART feature frame;
 installation turns the casting exactly Ry(180), mapping its long +Z crank boss
 to machine -Z as shown by ch30 p004.  Stable semantic references are emitted
 for downstream mates: ``ConeShaftNormal``, ``journal axis``, ``swing pivot``,
@@ -329,7 +329,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 base_plane="Front Plane",
                 # The harvested v2 plane reports ReverseDirection=true.  The
                 # signed helper maps the negative angle to that alternate
-                # solution while retaining the positive 12.5182° magnitude.
+                # solution while retaining the configured positive magnitude.
                 angle=-INCLINE_DEG,
                 pivot_axis="swing pivot",
             )
@@ -612,8 +612,8 @@ async def build(adapter: Any) -> dict[str, str]:
     volume -= ATTACHMENT_HOLES_MM3
     await volume_check(adapter, "v2 mounting holes", volume, 0.001 * volume)
 
-    # 6. Journal-plan reference sketch.  The 12.5182 deg plan angle between the
-    # crank axis and the cone-journal axis is the casting's defining
+    # 6. Journal-plan reference sketch.  The configured plan angle between
+    # the crank axis and the cone-journal axis is the casting's defining
     # relationship, but it lives in ConeShaftNormal's plane angle and no FACE
     # projects it into a view.  Two Top-plane construction centrelines carry
     # the two axis directions and a driving angular dimension reports the

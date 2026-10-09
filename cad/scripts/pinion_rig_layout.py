@@ -116,7 +116,6 @@ def leaf_pair(setting: float) -> tuple[float, ...]:
 DRUM_LEN = 143.2
 DRUM_LEN_PLACES = 1  # FaceWidth prints .X (dt_alignment_pinion_spec)
 DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES)  # 0.8
-DRUM_OD_PLACES = 2  # OutsideDia prints .XX (dt_alignment_pinion_spec)
 
 # The rig's axial datum (user ruling, 2026-09-25, P1-2): the base seats are
 # transferred from the blocks, so nothing in the frame fixes the rig along z

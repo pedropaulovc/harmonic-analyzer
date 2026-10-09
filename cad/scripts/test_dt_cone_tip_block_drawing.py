@@ -161,7 +161,9 @@ def test_block_stands_on_the_platform_and_keeps_every_axis_relation() -> None:
     """2026-09-29: the foot sits straight on the platform, so the adjuster
     axis is the cone axis's height above the platform top."""
     spec = dt_cone_tip_block_spec
-    assert spec.ADJUSTER_AXIS_HEIGHT == 33.368
+    from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM
+
+    assert spec.ADJUSTER_AXIS_HEIGHT == CONE_AXIS_HEIGHT_MM
     assert abs(spec.SLIT_FLOOR - (spec.ADJUSTER_AXIS_HEIGHT - 0.65)) < 1e-12
     assert abs(spec.PINCH_HEIGHT - spec.ADJUSTER_AXIS_HEIGHT - spec.PINCH_RISE) < 1e-12
     assert spec.DRAWING_DIMENSIONS["AxisHeightReference"] == {"AxisHeight"}

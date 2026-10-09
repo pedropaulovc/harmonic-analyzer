@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 
 import _config
-from cone_line import SEAT_PITCH
+from cone_pitch import SEAT_PITCH
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from cone_shaft_land_bands import (
@@ -26,6 +26,7 @@ from cone_shaft_land_bands import (
     SECTION_CONE_GEAR_TEETH,
     SECTION_DIA_BANDS,
     SECTION_FLAT_AF,
+    TERMINAL_DIA_MM,
 )
 from gear_seat_fit import flat_bore_af_band, seat_bore_band
 
@@ -39,8 +40,8 @@ _MFG = _config.parts("dt-cone-gear")
 BODY_MATERIAL_SPEC = str(_MFG["material_specification"])
 TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
-TEETH = 120  # default/fundamental configuration
-CONFIGURATION_TEETH = tuple(range(6, 121, 6))
+TEETH = int(_config.machine("gear_train", "fundamental_cone_teeth"))
+CONFIGURATION_TEETH = tuple(range(6, TEETH + 1, 6))
 DIAMETRAL_PITCH = _config.machine("gear_train", "diametral_pitch")
 PRESSURE_ANGLE_DEG = _config.machine("gear_train", "pressure_angle_deg")
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
@@ -50,26 +51,20 @@ STANDARD_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 
 # --- Deepened mesh (U38 option 1b, user ruling U42, 2026-09-23) ---------------
 #
-# The cone axis stays where it is; each gear reaches deeper into its 120T drum
-# (MHA-DT-012, cut standard) through a long addendum -- an oversize blank -- and a
-# tooth thickened so the tightest printed case still keeps
-# ``MESH_BACKLASH_MIN_MM``.  Tightest case: thickest tooth with the cone
-# bore-on-land and drum bore-on-arbor runouts closing the deep-edge centre
-# distance at the as-posed interleave.  The cone runout is sized for the
-# 0/-0.05 shaft seat lands under this +0.05/0 bore: 0.05 radial.
-# Least engagement adds the journal and arbor float opening.  Each OD is the
-# smallest that reaches worst-case CR 1.20 (T060+), else the largest
-# that keeps the tip land >= 0.10 at the thinnest tooth and largest OD and the
-# cone tip >= 0.10 off the drum's chord floor (T006-T054).  ODs print two
-# places and are floored to them; thicknesses print three places, floored
-# toward more backlash.  ``test_dt_cone_gear_mesh_design`` re-derives every
-# constraint from these printed values.
+# The cone axis stays where it is.  Each custom tip/thickness pair controls
+# engagement with the standard 120T drum (MHA-DT-012); the six-tooth special
+# has a truncated standard tip, while the other blanks have long addenda.
+# The tight corner must retain ``MESH_BACKLASH_MIN_MM`` with the thickest tooth
+# and bore-on-land/drum-on-arbor runouts closing the deep transverse slice.
+# Least engagement adds the journal and arbor float opening.  The configured
+# PA20 family balances contact ratio against the smallest tip land and the
+# standard drum root clearance.  Tips print at two places and thicknesses at
+# three; ``test_dt_cone_gear_mesh_design`` reconstructs the retained backlash,
+# tip-land, floor-air and contact-ratio guards.
 #
-# Contact ratio stays below 1.1 at the worst case of the printed bands on
-# T006-T042: the tooth comes to a point before it reaches deeper.  The user
-# accepted that as a named book-fidelity exception (U42): it costs wear on the
-# tooth-tip corners, not position error (rigid transmission error at most
-# 0.023 mm at the drum pitch line, on T006; <= 0.004 on the rest).
+# T006-T036 remain below 1.1 at the worst opening corner.  The shortfall set
+# records the inherited small-cone contact-ratio screen, not stock-cutter
+# approval or a continuous loaded-contact certificate.
 MESH_BACKLASH_MIN_MM = 0.06
 # (upper, lower) about the modelled mid thickness.  The 0.15 window is the
 # configured cone<->cylinder backlash window (tolerances.yaml gear_mesh
@@ -80,8 +75,8 @@ TOOTH_THICKNESS_BAND = (0.075, -0.075)
 # stop set.  The acceptance is that measurement's worst case and nothing more:
 # thickest tooth with both runouts closing, to thinnest tooth with both runouts
 # and both journal floats opening (rocking takes up the cone-shaft journal and
-# drum-arbor clearances).  The upper, 0.374 on T006, is rounded up to two
-# places.
+# drum-arbor clearances).  The upper limit is the loosest modeled printed
+# corner, rounded up to the assembly acceptance's two places.
 BACKLASH_ACCEPTANCE_MM = (0.06, 0.41)
 CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36)
 # teeth: (tip diameter, thickest circular tooth thickness at the standard
@@ -177,21 +172,18 @@ def chord_floor_radius_mm(
 
 # --- Gap floor (U38/U40, Main + user rulings 2026-09-23) ----------------------
 #
-# The floor is cut to depth and printed as a MIN diameter; the tooth reaches
-# its thickness by widening the gap with an indexing offset, never by sinking
-# the cutter, so the floor does not move with the tooth band.  Three
-# constructions, all one six-entity gap sketch:
+# The floor prints as native MIN/MAX limits independent of tooth thickness.
+# A cutter's stamped count range does not prove that its actual profile can
+# meet those limits and the required flanks, thickness and backlash together.
+# Three constructions retain the same six-entity gap sketch:
 #
-# * T006, T012: the thicker tooth's chord would sit in the drum tip's path
-#   (+0.030 at T006), so the floor bows below the feet chord to the printed
-#   MIN.  MIN is the web limit: T006 keeps the 0.621 web the user ruled on as
-#   its named exception (U40); T012 trades its web from 2.12 down to 2.05,
-#   still over the 2.0 target, for a 0.25 window instead of 0.11.
-# * T018-T042: the chord between the flank feet on the base circle.
-# * T048-T120: the flanks start at ``GAP_FLOOR_TMIN`` above the base circle,
-#   which raises the floor until the drum tip clears it by 0.30 at the worst
-#   case.  The gap is then shallower and wider at the floor, so one fly
-#   cutter at least 0.43 wide fits every gear.
+# * T006-T024: the floor bows below the thickened tooth's base chord to the
+#   configured dipped MIN.  T006's reduced root-to-bore web is experimental;
+#   production approval requires a new ruling, not the historical U40 value.
+# * T030-T036: the chord between the flank feet on the base circle.
+# * T042-T120: ``GAP_FLOOR_TMIN`` starts the flanks above the base circle.
+#   The retained raised-floor air and gap-foot width are checked independently
+#   of any stock form cutter's profile/root compatibility.
 #
 # Every gear also prints a MAX (Main, 2026-09-23 for T006/T012; 2026-09-26
 # for the rest, after the #834 machinist review found sheets 3-20 left the
@@ -278,11 +270,10 @@ def floor_dip_mm(teeth: int) -> float:
 def bore_dia_mm(teeth: int) -> float:
     """Return the configured bore that fits the matching stepped-shaft land."""
     _require_member(teeth)
-    # T006 and T012 share the 1/16 in terminal land (24.7 long after E1).
-    # U40 S1: T012 1/16, T018 1/8 and T024 1/4 in, one land down each, so
-    # their webs meet the U27 target.
+    # T006/T012 share the actual terminal reader. Their strength acceptance
+    # is rederived below from the current cutter-owned printed floor MINs.
     if teeth <= 12:
-        return 0.0625 * MM_PER_IN
+        return TERMINAL_DIA_MM
     if teeth == 18:
         return 0.125 * MM_PER_IN
     if teeth == 24:
@@ -298,16 +289,16 @@ def material_specification(teeth: int) -> str:
 
 FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 
-# Policy rule 12: machined webs target >= 2.0 mm with a hard floor of 1.5 mm,
-# between the printed MIN floor diameter and the maximum bore.  The D-flat
-# only adds material inside the round bore, so the thinnest web stays on the
-# round side and these values are the round bore's.  U40 (user, 2026-09-23):
-# T012, T018 and T024 each drop one shaft land so their webs meet the target;
-# T006 has no compliant construction (its floor sits at r 1.44) and its web
-# is the one named exception (book fidelity).
+# Worst web uses the CURRENT cutter-owned printed MIN and maximum fit bore.
+# The sole special web is the user's T006 >=0.62 ruling; T012 must achieve
+# the ordinary 2.0 target, not merely the 1.5 hard floor.
 MACHINED_WEB_FLOOR_MM = 1.5
 MACHINED_WEB_TARGET_MM = 2.0
-WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.354}  # experimental special; not production-approved
+WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.62}
+TERMINAL_WEB_REQUIREMENTS_MM = {
+    6: WEB_EXCEPTIONS_MM[6],
+    12: MACHINED_WEB_TARGET_MM,
+}
 
 # Printed places of the bore band (model-owned, DRAWING_PRECISION).
 BORE_BAND_PLACES = 3
@@ -316,10 +307,8 @@ BORE_BAND_PLACES = 3
 # The band is UNIFORM, not per land, for two reasons.  BoreCutDia is one model
 # dimension across all 20 configurations, and SOLIDWORKS 2026 rejects the
 # per-configuration IDimensionTolerance.SetValues2 on some dimension types
-# (_drawing_marks).  And T006's named web (U40) caps the largest bore under its
-# printed MIN floor: a per-land +0.085 would cut that web to 0.604.  So the one
-# band is the intersection of the gear seat fit over every land that carries a
-# gear, with its upper limit the lower of two named limits.
+# (_drawing_marks). The one band is the intersection of the retained seat
+# fit and BOTH terminal-web guards, using current cutter floor readers.
 def _seat_fit_band() -> tuple[float, float]:
     """(upper, lower): the round seat fit that holds on every gear land."""
     carried = [
@@ -330,17 +319,21 @@ def _seat_fit_band() -> tuple[float, float]:
     return (min(band[0] for band in carried), max(band[1] for band in carried))
 
 
-def _t006_web_upper() -> float:
-    """Largest bore deviation that leaves T006 its named web, to print places."""
-    web_cap = floor_limits_mm(6)[0] - 2.0 * WEB_EXCEPTIONS_MM[6] - bore_dia_mm(6)
+def _terminal_web_upper() -> float:
+    """Largest bore deviation satisfying both current terminal floor MINs."""
     scale = 10**BORE_BAND_PLACES
-    return math.floor(web_cap * scale + 1e-9) / scale
+    cap = min(
+        floor_limits_mm(teeth)[0] - 2.0 * minimum
+        - math.ceil(bore_dia_mm(teeth) * scale - 1e-9) / scale
+        for teeth, minimum in TERMINAL_WEB_REQUIREMENTS_MM.items()
+    )
+    return math.floor(cap * scale + 1e-9) / scale
 
 
-BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = _seat_fit_band()  # +0.055, +0.025
-BORE_BAND_WEB_UPPER = _t006_web_upper()  # +0.050 (0.0505 floored)
-# (upper, lower): +0.050/+0.025.  Round clearance 0.025-0.100 on the seat
-# lands, 0.025-0.070 on the running terminal land: inside 0.025-0.105.
+BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = _seat_fit_band()
+BORE_BAND_WEB_UPPER = _terminal_web_upper()
+# No named fit changes: the current floor cap may permit a looser bore, but
+# it can never exceed the retained gear-seat clearance class.
 BORE_DIA_BAND = (
     round(min(BORE_BAND_FIT_UPPER, BORE_BAND_WEB_UPPER), BORE_BAND_PLACES),
     round(BORE_BAND_LOWER, BORE_BAND_PLACES),
@@ -350,6 +343,20 @@ if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < 0.02 - 1e-9:
         f"cone-gear seat bore band {BORE_DIA_BAND[0]:+.3f}/"
         f"{BORE_DIA_BAND[1]:+.3f} is under 0.02 wide"
     )
+
+
+def terminal_web_mm(teeth: int) -> float:
+    """Print-worst radial ligament, read from the actual cutter and fit."""
+    if teeth not in TERMINAL_WEB_REQUIREMENTS_MM:
+        raise ValueError(f"T{teeth:03d} is not carried by the terminal land")
+    scale = 10**BORE_BAND_PLACES
+    maximum_bore = math.ceil((bore_dia_mm(teeth) + BORE_DIA_BAND[0]) * scale - 1e-9) / scale
+    return (floor_limits_mm(teeth)[0] - maximum_bore) / 2.0
+
+
+for _teeth, _minimum in TERMINAL_WEB_REQUIREMENTS_MM.items():
+    if terminal_web_mm(_teeth) < _minimum - 1e-9:
+        raise AssertionError(f"T{_teeth:03d} current cutter floor misses its web guard")
 
 
 # --- D-bore (user ruling 2026-09-28) -----------------------------------------
@@ -446,16 +453,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     GAP_FLOOR_SKETCH: {"FloorDia"},
 }
 
-# Tip-diameter band, (upper, lower) deviations.  The tip sets how deep the
-# cone teeth reach into the 120T drum on the backed-off oblique mesh, so the
-# title-block .XX +/-0.51 (a whole addendum) is too loose: at -0.51 the
-# nominal 0.459 mm interleave halves (Fable review, 2026-09-23).  Main ruled
-# the band by contact ratio (U27: the looser +/-0.25 only if it keeps CR >= 1.1
-# at the worst case).  Worst case of every printed band -- this band, drum OD
-# +0/-0.10, bore-on-land, journal, drum-bore and arbor float -- leaves CR
-# 0.09/0.42/0.46 (T006/T060/T120) at +/-0.10 and 0.01/0.28/0.30 at +/-0.25,
-# with the drum floor still clear (+0.83 / +0.75), so +/-0.10 prints: turning
-# the blank OD to a micrometer before cutting teeth is a novice-holdable step.
+# The long-addendum oblique mesh requires a controlled cone tip to retain
+# engagement at the worst opening corner.  The existing tip band is unchanged;
+# tests reconstruct its contact ratio, tip land and standard drum-root air.
 BLANK_DIA_BAND = (0.10, -0.10)
 
 
@@ -471,8 +471,8 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
 # Policy rule 2: places and bands are model properties.  Three places belong
-# on the fit dimensions (the bore, its across-flat and circular tooth
-# thickness) and on the gap-floor limits, whose T006 window is 0.049 wide.
+# on the fitted bore, across-flat, tooth thickness and gap-floor limits, so
+# both ends of each narrow floor window print without rounding inward.
 # Tip diameter prints two places with its own BLANK_DIA_BAND (below); face
 # width prints four, like the cylinder gear's OverallThickness under the same
 # rule: three would round one limit of the +/-0.025 band inward.  The flat

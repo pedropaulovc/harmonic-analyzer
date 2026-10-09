@@ -116,7 +116,7 @@ ISO_SCALE = (1, 2)
 
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
-# y < ~0.066).  The 201.64 mm shaft at 1:1 spans 0.0510..0.2526, leaving the
+# y < ~0.066).  The spec-derived shaft at 1:1 ends at BIG_END_X, leaving the
 # right third for the pictorial (top) over the four D sections; the tip
 # detail fills the field above the side view (codex review, #1128: with the
 # sections in one row the drawing sat in the lower half, the upper field
@@ -157,7 +157,7 @@ SIDE_KEEP = {
     "Sec2End": (0.1464, 0.1195),
     "Sec3End": (0.1429, 0.1115),
     "Sec4End": (0.1314, 0.1035),
-    "ShoulderR": (0.1000, 0.1640),
+    "ShoulderR": (BIG_END_X - SECTION_ENDS[1] / 1000.0 + 0.010, 0.1640),
 }
 OVERALL_REFERENCE_TEXT_XY = (0.1515, 0.0795)
 # Sheet width of one length digit or point at the dimension font (the 916a
@@ -168,10 +168,9 @@ STATION_TEXT_CLEARANCE = 0.002
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
 # of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
-# land it measures (the big end is at sheet x 0.2526; land 1 spans
-# 0.0900..0.2096, land 2 0.0831..0.0900, land 3 0.0762..0.0831, land 4
-# 0.0510..0.0762); Ø12.231 stands just off the faced end.  Lands 2 and 3 are
-# only 6.9 mm long, so a tip-end text spans its right-hand neighbours'
+# land it measures; the short lands' lines follow their current end stations,
+# one third of a land length back from each small end.  Ø12.231 stands just
+# off the faced end.  A tip-end text spans its right-hand neighbours'
 # lines: the tip's text sits highest and each neighbour to the right steps
 # down, so no line rises through a text (codex, 18395f30).  Lands 2 and 3
 # carry their lines mid-land; the tip's line stays 1.7 mm in from the tip
@@ -180,8 +179,8 @@ STATION_TEXT_CLEARANCE = 0.002
 SIDE_DIAMETERS = {
     "Sec0Dia": (0.2700, 0.1620),
     "Sec1Dia": (0.1400, 0.1730),
-    "Sec2Dia": (0.0853, 0.1760),
-    "Sec3Dia": (0.0785, 0.1880),
+    "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1760),
+    "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1880),
     "Sec4Dia": (TIP_END_X + 0.0017, 0.2000),
     # #914: the collar ring is 3.181 wide, too narrow for a dimension line
     # and two arrows inside it, so the collar alone takes the near-side
@@ -244,7 +243,7 @@ class DSection(NamedTuple):
     scale: tuple[int, int]
 
 
-# The stepped tip (lands 2..4, 6.9, 6.9 and 22.9 mm long) is too short at 1:1
+# The stepped tip (lands 2..4) is too short at 1:1
 # for three cutting lines: an arrow is 12 mm long and its letter stands 14..21
 # mm past the line, so B, C and D piled onto each other, onto the tip's
 # diameter lines and onto R0.10 3X (codex review, #1128).  They are cut on
@@ -252,17 +251,17 @@ class DSection(NamedTuple):
 # where their lines stand 27 and 28 mm apart.  The detail carries no dimension:
 # DragModelDimension refuses to re-home a model dimension into a detail view,
 # so every diameter and station stays on the side view.  The circle on the
-# side view (stations 165.6..183.6) spans lands 2..4 only, 3 mm short of the
-# R0.10 leader at the Ø6.350 to Ø9.525 step; the detail draws no boundary
+# side view spans lands 2..4 only, clear of
+# the R0.10 leader at the Ø6.350 to Ø9.525 step; the detail draws no boundary
 # round its clipped geometry.
 TIP_DETAIL_LABEL = "E"
 TIP_DETAIL_SCALE = (4, 1)
-TIP_DETAIL_STATION_MM = 174.6
+TIP_DETAIL_STATION_MM = SECTION_ENDS[3] - 1.8
 TIP_DETAIL_RADIUS = 0.009
 TIP_DETAIL_CENTER = (0.100, 0.236)
 # The circle's letter on the side view: up-left of the circle (x 0.069..0.087,
-# y 0.141..0.159), between the Ø1.588 and Ø3.175 dimension lines (x 0.055 and
-# 0.0785) and under their texts, 2 mm off the circle whichever corner of the
+# y 0.141..0.159), between the terminal and Ø3.175 dimension lines,
+# under their texts, 2 mm off the circle whichever corner of the
 # letter SolidWorks anchors.
 TIP_DETAIL_LETTER_XY = (0.064, 0.164)
 CUT_PARENT_SCALE = {CutParent.SIDE: SIDE_SCALE, CutParent.TIP_DETAIL: TIP_DETAIL_SCALE}
@@ -277,8 +276,8 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # the shaft's +X).  The side view looks straight at the flats, so their size
 # is only readable end-on: each land is cut across and shown cut-only
 # (nothing beyond the plane prints), each enlarged to about 16..19 mm across
-# so the smallest AF, 1.460 on the Ø1.588, reads with its band.  A-A cuts land
-# 1 on the side view, left of the Ø9.525 line.  Its lower letter's top stands
+# so the reader-owned smallest AF reads with its band. A-A cuts land
+# 1 on the side view, left of the Ø9.525 line. Its lower letter's top stands
 # 4.8..6.3 mm above the line's end, by seat (6.3 on swmaker00000a in the
 # 19e33c6c2 build, where a 12.5 mm reach left it 1.4 mm under land 1); the
 # 15 mm reach leaves the worst 3.9 mm under the land.  B, C and D cut the
@@ -301,16 +300,43 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
-    DSection(1, "A", 137.6, CutParent.SIDE, 0.0150, (0.337, 0.165), (2, 1)),
-    DSection(2, "B", 168.9, CutParent.TIP_DETAIL, 0.0210, (0.393, 0.165), (3, 1)),
-    DSection(3, "C", 175.6, CutParent.TIP_DETAIL, 0.0210, (0.337, 0.100), (5, 1)),
-    DSection(4, "D", 182.6, CutParent.TIP_DETAIL, 0.0155, (0.393, 0.100), (10, 1)),
+    DSection(
+        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.337, 0.165), (2, 1)
+    ),
+    DSection(
+        2,
+        "B",
+        SECTION_ENDS[2] - 0.6,
+        CutParent.TIP_DETAIL,
+        0.0210,
+        (0.393, 0.165),
+        (3, 1),
+    ),
+    DSection(
+        3,
+        "C",
+        SECTION_ENDS[3] - 0.8,
+        CutParent.TIP_DETAIL,
+        0.0210,
+        (0.337, 0.100),
+        (5, 1),
+    ),
+    DSection(
+        4,
+        "D",
+        TIP_DETAIL_STATION_MM + 8.0,
+        CutParent.TIP_DETAIL,
+        0.0155,
+        (0.393, 0.100),
+        (20, 1),
+    ),
 )
 # Each across-flat's text, centred over its section.
 D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
+D_SECTION_KEEP["TerminalTorqueEdge"] = (0.380, 0.140)
 # A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf
 # for c8b0aad); each is hung SECTION_CAPTION_GAP under its section's ink.
 SECTION_CAPTION_SIZE = (0.046, 0.017)
@@ -676,6 +702,7 @@ class PlacedSection(NamedTuple):
     across_flat: Any
     caption: Box
     centre_marks: dict[str, Box]
+    torque_edge: Any | None = None
 
 
 def _axis_sign(adapter: Any, side: Any) -> int:
@@ -1006,13 +1033,19 @@ def _add_d_sections(
         )
         _prepare_d_section(adapter, view, section)
         name = f"Sec{section.land}AF"
-        (across_flat,) = curate_view_dimensions(
+        keep = {name: D_SECTION_KEEP[name]}
+        if section.land == max(FLAT_LANDS):
+            keep["TerminalTorqueEdge"] = D_SECTION_KEEP["TerminalTorqueEdge"]
+        dimensions = curate_view_dimensions(
             adapter,
             view,
-            keep={name: D_SECTION_KEEP[name]},
+            keep=keep,
             view_label=f"section {section.label}",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+        by_name = {dimension_name(adapter, dimension): dimension for dimension in dimensions}
+        across_flat = by_name[name]
+        torque_edge = by_name.get("TerminalTorqueEdge")
         centre_marks = _trim_centre_mark(adapter, view, section)
         face = _section_face(adapter, view, section, sign)
         caption = _place_view_caption(
@@ -1023,7 +1056,7 @@ def _add_d_sections(
             label=f"section {section.label} caption",
         )
         placed.append(
-            PlacedSection(section, view, face, across_flat, caption, centre_marks)
+            PlacedSection(section, view, face, across_flat, caption, centre_marks, torque_edge)
         )
     return placed
 
@@ -1202,6 +1235,10 @@ def _prove_section_layout(
             f"{label} caption": placed.caption,
             **placed.centre_marks,
         }
+        if placed.torque_edge is not None:
+            cell[f"{label} terminal torque-edge MAX"] = _dimension_text_box(
+                placed.torque_edge, f"{label} terminal torque-edge MAX",
+            )
         require_clear(
             f"{label} caption",
             placed.caption,
@@ -1382,12 +1419,12 @@ async def build(adapter: Any) -> dict[str, str]:
         )
 
     # Leader anchors for the two lands that RUN (sheet metres).  The tip
-    # symbol stands above the tip with its glyph LEFT of the Ø1.588 dimension
-    # line and its text ABOVE the Ø1.588 text, well inside the left border
+    # symbol stands above the tip with its glyph LEFT of the terminal diameter
+    # line and its text ABOVE that native diameter text, inside the left border
     # (x 0.012; a glyph at 0.016 poked through it, codex c4720c62); the
     # leader drops onto the tip's top flank inside the first 2 mm of the land.
     # No length extension line runs up there (they all hang from the bottom
-    # flank) and no diameter line stands left of the Ø1.588 one.
+    # flank) and no diameter line stands left of the terminal diameter's.
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
     tip_top = (

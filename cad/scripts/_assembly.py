@@ -130,19 +130,96 @@ def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bo
     return True
 
 
-# The sprockets the chain seats on (the mounted T24 + crank T12 removables).
-# A chain link touching one of these is intended MESH, not a fault: the chain
-# rides the pitch circle so the links overlap the teeth in the shared z-plane
-# (a coplanar single-plane stand-in). Whitelisted like link<->link contact in
-# check_no_interference. Defined here (not in _common) so it stays off every
-# part's recipe digest -- only the assemblies that read it rebuild on a change.
+# Chain mesh is an assembly-only policy: a configuration identifies a tooth
+# count, not a mounted wheel. A loose spare can have the SAME configuration as
+# either active wheel, so only the authored mount's root-world pose and selected
+# configuration qualify. Keep the lazy centre authority below off leaf recipes.
 _CHAIN_SPROCKET_PREFIXES = ("pd-transgear-removable",)
-# Only the sprockets the roller chain actually WRAPS mesh it: the T12 crank wheel
-# and the T24 knob wheel. The loose T18 spare (same "transgear-removable" stem, a
-# different config) rests off the loop, so a chain-link overlap with IT is a real
-# collision, NOT intended mesh -- discriminate by referenced configuration so the
-# mesh whitelist below never masks a spare-part clash (codex #189 round-5).
-_CHAIN_SPROCKET_CONFIGS = ("T12", "T24")
+# COM readback tolerances, NOT manufacturing allowances: 0.00001 mm for the
+# authored centre/band, 0.00000001 for a rigid unit-scale rotation.
+_CHAIN_MOUNT_READBACK_MM = 1e-5
+_CHAIN_MOUNT_READBACK_UNIT = 1e-8
+
+
+def _chain_component_family(name: str, families: tuple[str, ...]) -> bool:
+    """Match the actual leaf family, including qualified nested ``Name2``."""
+    stem, separator, instance = name.rsplit("/", 1)[-1].rpartition("-")
+    return (
+        bool(separator)
+        and stem in families
+        and re.fullmatch(r"[1-9][0-9]*", instance) is not None
+    )
+
+
+def _mounted_chain_sprocket(component: Any, configuration: str) -> bool:
+    """Prove one selected crank/knob mount, never infer a role from its suffix.
+
+    ``component`` comes directly from the active root assembly's interference
+    manager, not from a separately opened subassembly document. Its collapsed
+    total transform therefore includes any nesting in HA; do not compose a
+    parent again or fall back to a relative/identity transform on missing data.
+    """
+    import _chain
+    import pd_transgear_removable_spec as removable
+
+    try:
+        removable.configuration_teeth(configuration)
+        transform = _early_bound(component, "IComponent2").GetTotalTransform(False)
+        if transform is None:
+            return False
+        values = tuple(
+            float(value)
+            for value in _early_bound(transform, "IMathTransform").ArrayData
+        )
+    except Exception:
+        # An unmeasured pose is an unexpected contact, never intended mesh.
+        return False
+    if len(values) != 16 or not all(math.isfinite(value) for value in values):
+        return False
+
+    unit_tol = _CHAIN_MOUNT_READBACK_UNIT
+    if abs(values[12] - 1.0) > unit_tol:
+        return False
+    rows = (values[0:3], values[3:6], values[6:9])
+    for i in range(3):
+        for j in range(i, 3):
+            dot = sum(a * b for a, b in zip(rows[i], rows[j]))
+            if abs(dot - (1.0 if i == j else 0.0)) > unit_tol:
+                return False
+    determinant = (
+        values[0] * (values[4] * values[8] - values[5] * values[7])
+        - values[1] * (values[3] * values[8] - values[5] * values[6])
+        + values[2] * (values[3] * values[7] - values[4] * values[6])
+    )
+    if abs(determinant - 1.0) > unit_tol:
+        return False
+    if abs(values[6]) > unit_tol or abs(values[7]) > unit_tol:
+        return False
+
+    x, y, z = (value * 1000.0 for value in values[9:12])
+    # The part's plate is local z=0..PLATE. Authored mounts place that origin
+    # on the front face, with the rear face on the seat; Z spin is free, tilt
+    # or reversal is not the same axial band (the stored spare is Rx(-90)).
+    mm_tol = _CHAIN_MOUNT_READBACK_MM
+    if (
+        abs(z - removable.BAND_FRONT_Z) > mm_tol
+        or abs(z + values[8] * removable.PLATE - removable.SEAT_FACE_Z) > mm_tol
+    ):
+        return False
+    roles = (
+        (_chain.CRANK_CENTRE, removable.CRANK_CONFIG),
+        (_chain.KNOB_CENTRE, removable.KNOB_CONFIG),
+    )
+    mounted = [
+        selected
+        for centre, selected in roles
+        if all(math.isfinite(value) for value in centre)
+        and abs(x + centre[0]) <= mm_tol
+        and abs(y - centre[1]) <= mm_tol
+    ]
+    # Check physical ambiguity BEFORE selection: even unequal selections must
+    # not choose a role when the two centre readback windows coincide.
+    return len(mounted) == 1 and configuration == mounted[0]
 
 
 def insert_sketch_text(
@@ -1943,8 +2020,9 @@ def check_no_interference(
     is allowed and reported separately, not raised: a chain is an articulating
     connected mechanism whose links are in contact at every joint, so on the
     tight wraps the rigid links unavoidably touch their neighbours (the same
-    way the gate already tolerates face-flush and tangent contacts). Any link
-    touching a NON-link part is still a hard fault.
+    way the gate already tolerates face-flush and tangent contacts). Link contact
+    with a selected, physically mounted removable is intended chain mesh; any
+    other link/non-link overlap, including a same-configuration spare, is a fault.
     """
     asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
     with _telemetry.span("gate.interference") as isp:
@@ -1966,7 +2044,8 @@ def check_no_interference(
             interference = _early_bound(interference, "IInterference")
             names = []
             configs = []
-            for comp in list(_read_member(interference, "Components") or []):
+            components = list(_read_member(interference, "Components") or [])
+            for comp in components:
                 # No flag: Name2 / ReferencedConfiguration are property reads (issue #87).
                 names.append(str(_read_member(comp, "Name2")))
                 configs.append(str(_read_member(comp, "ReferencedConfiguration") or ""))
@@ -1981,20 +2060,27 @@ def check_no_interference(
             ):
                 chain_contacts.append(volume_mm3)
                 continue
-            # Chain link <-> sprocket: intended mesh. The chain seats on the
-            # pitch circle so its links overlap the removables' teeth in the
-            # shared z-plane (a coplanar single-plane stand-in). Whitelisted
-            # like the link<->link contact above -- but ONLY for a sprocket the
-            # chain actually wraps (config T12/T24); a link overlapping the loose
-            # T18 spare is a real clash and must NOT be whitelisted (codex #189).
-            links = [n for n in names if n.startswith(_CHAIN_LINK_PREFIXES)]
-            sprockets = [
-                n
-                for n, cfg in zip(names, configs)
-                if n.startswith(_CHAIN_SPROCKET_PREFIXES)
-                and cfg in _CHAIN_SPROCKET_CONFIGS
+            # Tooth selection alone cannot distinguish an active wheel from a
+            # loose spare. Match the real leaf families, then prove exactly one
+            # authored mounted role from the raw component's root-world pose.
+            links = [
+                i
+                for i, name in enumerate(names)
+                if _chain_component_family(name, _CHAIN_LINK_PREFIXES)
             ]
-            if len(names) == 2 and len(links) == 1 and len(sprockets) == 1:
+            sprockets = [
+                i
+                for i, name in enumerate(names)
+                if _chain_component_family(name, _CHAIN_SPROCKET_PREFIXES)
+            ]
+            if (
+                len(names) == 2
+                and len(links) == 1
+                and len(sprockets) == 1
+                and _mounted_chain_sprocket(
+                    components[sprockets[0]], configs[sprockets[0]]
+                )
+            ):
                 chain_mesh_contacts.append(volume_mm3)
                 continue
             _telemetry.event(

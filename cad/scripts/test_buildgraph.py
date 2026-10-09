@@ -1448,9 +1448,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_dt_drive_train_assembly.py", "build_dt_cone_pivot_post"): (
         "dtrefactor: reads BLOCK_DIA, BORE_HEIGHT, CONE_BOSS_LENGTH, CRANK_BORE_HEIGHT, CRANK_BOSS_LENGTH, CRANK_BOSS_START_Z"
     ),
-    ("build_dt_drive_train_assembly.py", "build_vn_cone_tip_adjuster"): (
-        "dtrefactor: reads BODY_LEN, CUP_DEPTH, CUP_DIA, THREAD"
-    ),
     ("build_dt_drive_train_assembly.py", "build_vn_cone_tip_pinch_screw"): (
         "dtrefactor: reads SHANK_LEN, THREAD"
     ),
@@ -1727,19 +1724,34 @@ def test_config_files_no_part_reads_dimensions():
 
 
 def test_config_files_track_real_reads():
-    """The read-set follows the actual _config calls, at SUB-FILE granularity:
-    a gear reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY, so a
-    machine channels.active_count edit (machine/channels.yaml) skips it -- the
-    original problem. The channel/drive-train assemblies read channels.yaml
-    (amplitudes/cone_teeth); every part needs the parts registry via _common."""
+    """Track actual reads at sub-file granularity, without inheriting world
+    placement for a part-local pitch. Cone face width needs gear_train and
+    cone_incline; its stamped mesh screen also needs tolerances. Neither needs
+    channels.active_count or station_z0. Assemblies that place channel stations
+    do read that grid; every part also needs its registry via _common."""
     cone = config_files_of(SCRIPTS_DIR / "build_dt_cone_gear.py")
     assert "machine/gear_train.yaml" in cone
+    assert "machine/cone_incline.yaml" in cone, "face width follows the cone seat pitch"
+    assert "tolerances.yaml" in cone, (
+        "stamped mesh screen uses edge slack/journal float"
+    )
     assert "machine/channels.yaml" not in cone, (
         "gear must NOT depend on active_count's file"
     )
     assert "parts/*" in cone, "stamps its own properties -> parts registry token"
     assert "channels.yaml" in config_files_of(script_for("dt_drive_train"))
     assert "channels.yaml" in config_files_of(script_for("ch_channel"))
+    assert config_files_of(SCRIPTS_DIR / "cone_pitch.py") == frozenset(
+        {"machine/gear_train.yaml", "machine/cone_incline.yaml"}
+    )
+    cone_modules = {
+        Path(path).name
+        for path in module_deps_of(SCRIPTS_DIR / "build_dt_cone_gear.py")
+    }
+    assert "cone_pitch.py" in cone_modules
+    assert "cone_line.py" not in cone_modules, (
+        "part-local data must not import world datums"
+    )
 
 
 def test_config_files_subset_of_known_tokens():

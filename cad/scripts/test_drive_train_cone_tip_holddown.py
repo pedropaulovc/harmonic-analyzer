@@ -263,7 +263,9 @@ def test_west_edge_is_proven_over_the_whole_swing() -> None:
     import build_dt_drive_train_assembly as bdt
 
     assert bdt.SWING_ANGLES[0] == 0.0
-    assert bdt.SWING_ANGLES[-1] == pytest.approx(bdt.DISENGAGE_DEG)
+    assert bdt.SWING_ANGLES[-1] == pytest.approx(bdt.P1_SWEEP_DEG[1])
+    assert bdt.P1_SWEEP_DEG[1] > bdt.DISENGAGE_DEG
+    assert min(bdt.P1_STOP_ENCLOSURE["unbroken_fence_margins_mm"].values()) > 0.0
     sweep = bdt.SWING_SWEEP
     assert sweep["south arbor pedestal"] >= 2.0
     assert sweep["north arbor pedestal"] >= 0.25

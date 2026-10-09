@@ -4,8 +4,8 @@ Same vendor recipe as 94025A150 (see ``diag_build_94025A150.py``):
 through-axis revolve profile (tip cone + 45 deg cup cone + 55 deg slot-end
 chamfer) -> slot Cut-Extrude (ThroughAllBoth) -> helix (seeded at the slot
 face, height L+P = 13 revs, start angle 90 deg) -> thread Cut-Sweep (UN
-cutter capped at 15P/16, centred 7P/16 past the face).  Every constant
-below is read off ``cad/out/reports/mcmaster-94025A164-dump.json``.
+cutter capped at 15P/16, centred 7P/16 past the face). Raw nominal source
+scalars live in ``vn_cone_tip_adjuster_spec``; this native recipe reads them.
 
 Cup depth (c10 for the cone-tip adjuster): Sketch2 Line7 runs from the cup
 rim (r 1.2065 at the end face) to the apex on the axis 1.2065 inside it.
@@ -39,35 +39,30 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     replica_main,
     thread_sweep_cut_modern,
 )
+from vn_cone_tip_adjuster_spec import (  # noqa: E402
+    SS_CHAM_H,
+    SS_CHAM_R,
+    SS_CONE_Y,
+    SS_CUT_CY,
+    SS_CUT_ROOT_R,
+    SS_CUT_ROOT_W,
+    SS_CUT_TOP_R,
+    SS_CUT_TOP_W,
+    SS_HALF,
+    SS_LEN,
+    SS_MAJOR_R,
+    SS_PITCH,
+    SS_REVS,
+    SS_SLOT_D,
+    SS_SLOT_W,
+    SS_TIP_R,
+)
 
 
 def _strip_area(r: float, w: float) -> float:
     """Plan area of a width-w strip across a radius-r circle (exact)."""
     h = w / 2.0
     return 2.0 * (h * math.sqrt(r * r - h * h) + r * r * math.asin(h / r))
-
-
-SS_MAJOR_R = 2.413        # Screw Size Decimal Equivalent@Sketch1 / 2
-SS_LEN = 9.525            # Length@Sketch1 (full, slot face to cup rim)
-SS_HALF = SS_LEN / 2.0    # vendor origin sits mid-length; mine too
-SS_PITCH = 0.79375        # Pitch@Sketch1 (#10-32: 25.4/32)
-SS_REVS = 14.0            # vendor 13 from the face; +1 lead-in rev in air
-SS_CHAM_R = 2.155222      # slot-end rim chamfer inner radius (Sketch2 Line1)
-SS_CHAM_H = 4.7625 - 4.582002  # its axial extent (0.180498)
-SS_TIP_R = 1.2065         # tip cone end radius = cup rim radius (Sketch2)
-SS_CONE_Y = 3.556         # tip cone start / cup apex |y| (Sketch2 Line7)
-SS_SLOT_W = 0.804333      # D3@Sketch1 (slot width = major / 6)
-SS_SLOT_D = 0.79375       # Drive Depth@Sketch1 (slot depth = P)
-# Thread cutter (vendor Sketch7, exact): UN V capped at 15P/16, root flat
-# P/8, centred 7P/16 past the slot-end face in air.
-SS_CUT_TOP_R = 2.455963
-SS_CUT_TOP_W = 0.744141   # 15P/16
-SS_CUT_ROOT_R = 1.897444  # major_r - 0.75 * (P*sqrt(3)/2)
-SS_CUT_ROOT_W = 0.099219  # P/8
-SS_CUT_CY = SS_HALF + SS_PITCH + 7.0 * SS_PITCH / 16.0  # 7P/16 past the raised start
-# The cone-tip adjuster's cup depth: apex to rim, 45 deg.
-SS_CUP_DEPTH = SS_HALF - SS_CONE_Y
-assert abs(SS_CUP_DEPTH - SS_TIP_R) < 1e-9
 
 
 async def build_94025A164(adapter, truth=None):

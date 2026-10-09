@@ -4,20 +4,20 @@ The long brass pinion used to set the machine to sines or cosines: with
 the cone set swung clear, a lever engages this drum with the cylinder
 train so turning it "moves all the cylinder gears as one" (p. 66). The
 user-authoritative 32 teeth are cut at the SAME diametral pitch as the
-cylinder gears they must mesh with -- the train DP from machine.yaml
-(49.82 since the OD-62.2 re-anchor; ch25's book-era DP 30 predates that
-rescale and is not the mating train pitch) -- and the drum is long enough
-to span all 20 stations at once.
+cylinder gears they must mesh with -- the configured 48DP PA20 train. The
+finite stock #4 gap is the radially translated 26T reference with its actual
+off-centre root arc, patterned at 32 physical teeth, not an ideal N32 form.
+The drum spans all 20 stations at once.
 PR7 (review item 14): ONLY the drum is brass -- the integral
 Ø6.35 stubs are retired for a separate thicker STEEL arbor
-(build_dt_pinion_arbor.py, Ø8) pressed through the drum's new through-bore;
+(build_dt_pinion_arbor.py, Ø8) bonded in the drum's slip-fit through-bore;
 the arbor rides the swing brackets' top bores and carries its integral turned
 grip head plus the separate MHA-DT-015 crossrod. The knurled end collars are simplified
 away.
 
 Layout: axis Z, drum z 0..143.2, Ø8 through-bore on the axis.
 The ch30/M6.8 model carries it in the DISENGAGED rest state (p. 68
-"gap"), so no tooth-phase seed is needed.
+"gap"). The native gap's half-pitch rotation keeps +X at a tooth crest.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25"; tooth count from
 cad/config/machine/alignment_pinion.yaml.
@@ -59,13 +59,11 @@ from _drawing_marks import (
 )
 from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
-from _gear import build_fixed_gear
+from _gear import build_stock_form_gear
 from _part_pmi import author_part_pmi
 from dt_alignment_pinion_spec import (
     ARBOR_BORE_BAND,
     BORE_DIA,
-    DEDENDUM_FACTOR,
-    DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -73,9 +71,9 @@ from dt_alignment_pinion_spec import (
     GEAR_DATA,
     ISOMETRIC_VIEW_NOTE,
     OUTSIDE_DIA,
-    PRESSURE_ANGLE_DEG,
+    OUTSIDE_DIA_BAND,
+    STOCK_FORM,
     SURFACE_FINISHES,
-    TEETH,
 )
 
 PART_NAME = "dt-alignment-pinion"
@@ -102,10 +100,7 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    disc = await build_fixed_gear(
-        adapter, TEETH, FACE_WIDTH, dp=DIAMETRAL_PITCH,
-        pa_deg=PRESSURE_ANGLE_DEG, root_relief=True, dedendum=DEDENDUM_FACTOR,
-    )
+    disc = await build_stock_form_gear(adapter, STOCK_FORM, FACE_WIDTH)
     v_gear = disc.volume
     blank_name = feature_name_by_type(adapter, "Extrusion")
     if not blank_name:
@@ -130,8 +125,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     ]
 
-    # Arbor through-bore (PR7): the steel Ø8 arbor (build_dt_pinion_arbor.py)
-    # presses through -- on-axis circle, mid-plane cut spanning the drum.
+    # Arbor through-bore: the separate steel Ø8 arbor slides through by hand
+    # for the assembly bond; on-axis circle, mid-plane cut spanning the drum.
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     bore = SketchDims()
@@ -155,9 +150,9 @@ async def build(adapter) -> dict[str, str]:
     v_bore = math.pi * BORE_R**2 * FACE_WIDTH
     expected = v_gear - v_bore
     await volume_check(adapter, "arbor bore", expected, 0.02 * v_bore)
-    # The gear's central reference axis (Axis1@alignment-pinion, Top∩Right from
-    # build_fixed_gear) is the pinion spin/lock axis used by the p2 swing group
-    # in build_drive_train -- same convention as the cone gears.
+    # The stock-form gear's central reference axis (Axis1@alignment-pinion,
+    # Top∩Right) is the pinion spin/lock axis used by the p2 swing group in
+    # build_dt_drive_train_assembly -- same convention as the cone gears.
 
     # Deferred drive equations, then re-check neutrality
     # (each evaluates to the as-built value, so the geometry must not move).
@@ -167,6 +162,9 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(
         adapter, "driven alignment pinion (equations neutral)", expected, 0.02 * v_bore
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "GearBlankProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter,

@@ -187,6 +187,54 @@ def test_display_precision_times_each_com_step_on_its_own_span(
     assert all(value >= 0 for value in timings.values())
 
 
+@pytest.mark.parametrize(
+    ("write_result", "readback", "error"),
+    [
+        (True, 1, None),
+        (False, 1, "SetToleranceType rejected BASIC"),
+        (None, 1, "SetToleranceType rejected BASIC"),
+        (1, 1, "SetToleranceType rejected BASIC"),
+        (True, 0, "BASIC tolerance type did not persist"),
+        (True, 2, "BASIC tolerance type did not persist"),
+    ],
+)
+def test_basic_tolerance_requires_native_boolean_and_persisted_type(
+    monkeypatch: pytest.MonkeyPatch,
+    write_result: bool | int | None,
+    readback: int,
+    error: str | None,
+) -> None:
+    class Dimension:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, int | None]] = []
+
+        def __bool__(self) -> bool:
+            raise AssertionError("native dimension must not be truth-tested")
+
+        def SetToleranceType(self, tolerance_type: int) -> bool | int | None:
+            self.calls.append(("write", tolerance_type))
+            return write_result
+
+        def GetToleranceType(self) -> int:
+            self.calls.append(("read", None))
+            return readback
+
+    dimension = Dimension()
+    monkeypatch.setattr(
+        _drawing_marks, "_named_dimension", lambda *_args: (object(), dimension)
+    )
+    if error is None:
+        _drawing_marks.set_dimension_basic_tolerance(object(), "HoleLocations", "PinX")
+    else:
+        with pytest.raises(RuntimeError, match=error):
+            _drawing_marks.set_dimension_basic_tolerance(
+                object(), "HoleLocations", "PinX"
+            )
+    assert dimension.calls == (
+        [("write", 1), ("read", None)] if write_result is True else [("write", 1)]
+    )
+
+
 def test_bilateral_tolerance_sets_and_verifies_display_precision(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

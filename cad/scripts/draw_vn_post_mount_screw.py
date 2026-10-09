@@ -1,15 +1,15 @@
 r"""Create the modified-stock drawing for the MHA-VN-031 cone pivot post mount screw.
 
-MSC 40923898 is bought by SKU and cut to length, so the sheet is a
+MSC 40923906 is bought as 4 in stock and cut to length, so the sheet is a
 modified-purchased-part drawing (the boss hook's pattern), not the purchased
 reference sheet: a Front view carrying the cut length -- the part's hidden
 reference-sketch dimension, imported at its model-owned places -- and an
-isometric, both 1:1.  No single length suits every in-band post and plate
-(post_mount_screw_spec's U27 check), so the length prints as a REFERENCE,
-"(86.2)", with no band and the cut-to-fit acceptance beneath it: cut at
-assembly, end flush to the spec band's allowance short of the MHA-DT-020
-underside, never proud (post_mount_screw_spec.CUT_TO_FIT_CALLOUT -- no MHA-DT-000
-procedure sheet exists to carry it, Codex P1 on #857).  The cut end's break
+isometric, both 1:1. No single length suits every in-band post and plate
+(vn_post_mount_screw_spec's U27 check), so the length prints as a REFERENCE
+at CUT_LENGTH_MM, with no band and the cut-to-fit acceptance beneath it:
+cut at assembly, end flush to the spec band's allowance short of the MHA-DT-020
+underside, never proud (vn_post_mount_screw_spec.CUT_TO_FIT_CALLOUT).
+The cut end's break
 is a deburr (Main's MHA-VN-031 eye pass on #857): a 0.1 dimension at 1:1 is
 illegible and its printed +0/-0.1 band read as allowing no break at all, so
 the Front view carries no break dimension.  A 10:1 view of the tip carries
@@ -76,6 +76,7 @@ from vn_post_mount_screw_spec import (
     DRAWING_PRECISION_BY_NAME,
     FRONT_VIEW_DIMENSIONS,
     HEAD_H_MM,
+    SKU,
     THREAD_DIA_MM,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -90,7 +91,7 @@ DRAWING_SUMMARY = {
     0: TITLE,
     1: "Manufacturing controls for modified purchased stock",
     2: "Harmonic Analyzer Project",
-    3: "MHA-VN-031; MSC Industrial Supply 40923898",
+    3: f"MHA-VN-031; MSC Industrial Supply {SKU}",
     4: "Native dimension-driven cut length",
 }
 

@@ -92,6 +92,16 @@ NECK_RELIEF_DIA = COLLAR_DIA + 1.5  # annular cut's outer circle, clear of the c
 FLAT_REACH = 1.2  # flat-cut rectangle width beyond the flat, clear of the land
 FLAT_SPAN = 3.0  # flat-cut rectangle height, clear of the land
 
+# Native bands consumed below; keep the production values visible offline.
+DRAWING_BANDS = {
+    ("LandProfile", "LandDia"): LAND_BAND,
+    ("Flats", "LandHeight"): LAND_HEIGHT_BAND,
+    ("ShankProfile", "ShankDia"): SHANK_BAND,
+    ("NeckProfile", "NeckDia"): NECK_BAND,
+    ("ReamProfile", "ReamDia"): REAM_BAND,
+    ("Collar", "CollarEnd"): COLLAR_END_BAND,
+}
+
 
 def _area(dia: float) -> float:
     return math.pi * (dia / 2.0) ** 2
@@ -395,14 +405,7 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    for feature, dimension, band in (
-        ("LandProfile", "LandDia", LAND_BAND),
-        ("Flats", "LandHeight", LAND_HEIGHT_BAND),
-        ("ShankProfile", "ShankDia", SHANK_BAND),
-        ("NeckProfile", "NeckDia", NECK_BAND),
-        ("ReamProfile", "ReamDia", REAM_BAND),
-        ("Collar", "CollarEnd", COLLAR_END_BAND),
-    ):
+    for (feature, dimension), band in DRAWING_BANDS.items():
         set_dimension_bilateral_tolerance(
             adapter, feature, dimension, *deviations(band)
         )

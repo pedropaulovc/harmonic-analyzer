@@ -282,10 +282,8 @@ GEAR_PHASE_DEG = CYLINDER_LOCK_PHASE_DEG
 RING_CENTER = (
     X_DRUM + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
     Y_DRIVE + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # The drum sits at machine X_DRUM (crank side -X); y is the v2 casting's
-# drive height 90.518 (gear_train.drive_axis_y_mm; build_dt_drive_train_assembly
-# derives and asserts it).
-# ROD_C2C (imported from ch_connecting_rod_spec.CENTER_DISTANCE, 163.1010):
+)  # Shared cone-line height; the rod length follows this phased cam centre.
+# ROD_C2C is imported from ch_connecting_rod_spec.CENTER_DISTANCE:
 # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
 # its cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits
 # directly above the phased cam centre WITH THE ARM LEVEL (arm tilt 0: the ch14

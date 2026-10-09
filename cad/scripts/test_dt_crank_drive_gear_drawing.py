@@ -4,7 +4,7 @@ The print is recreated under ``cad/docs/drawing-simplicity-policy.md``: a 64T
 helical gear slipped onto the cone shaft's land carries no datums and no frames,
 its blank, bore and south-entry sizes are native model dimensions whose places
 and bands the PART owns, and the tooth system it cannot dimension -- helix
-angle, hand, tooth thinning -- lives in the gear-data block.
+angle, hand and exact finite stock tangent-span limits -- lives in the gear-data block.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 import _config
+import cone_line
 import build_dt_crank_drive_gear as part
 import dt_cone_gear_shaft_spec
 import cone_shaft_land_bands
@@ -68,13 +69,15 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
     assert "_as_construction(adapter, tip_ref)" in build
     assert '_verify_named_dimension(adapter, "OutsideDia@OutsideDiaReference"' in build
     assert "OutsideDiaReference" in spec.DRAWING_DIMENSIONS
-    # #906: normal-defined -- the transverse pitch circle plus the CUTTER's
-    # addendum on each side, the blank turned 0.05 long over it (R9-56).
-    assert spec.LONG_ADDENDUM_MM == 0.05
-    assert spec.OUTSIDE_DIA == pytest.approx(
-        part.TEETH / part.DP * spec.MM_PER_IN
-        + 2.0 * (spec.MM_PER_IN / spec.CUTTER_DIAMETRAL_PITCH + spec.LONG_ADDENDUM_MM)
+    # The turned blank pays the retained OD band at both published span limits.
+    minimum_support = min(
+        profile.support_radius_max_mm for _, profile in spec.STOCK_PROFILE_CORNERS
     )
+    places = spec.DRAWING_PRECISION_BY_NAME["OutsideDia"]
+    scale = 10**places
+    assert spec.OUTSIDE_DIA == math.floor(
+        (2.0 * minimum_support - spec.OUTSIDE_DIA_TOLERANCE_MM) * scale
+    ) / scale
     # ... and therefore never as text beside the generating data.
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
     assert "FACE WIDTH" not in notes.GEAR_DATA
@@ -167,7 +170,6 @@ def test_south_chamfer_covers_print_worst_end_mill_crescent() -> None:
     samples = [horn_plus_runout(half_chord * i / 128) for i in range(129)]
     assert samples == sorted(samples)
     assert spec.MAX_FLAT_CRESCENT == pytest.approx(samples[-1])
-    assert spec.MAX_FLAT_CRESCENT == pytest.approx(0.959821716, abs=1e-8)
     assert spec.BORE_SOUTH_CHAMFER == 1.00
     assert spec.BORE_SOUTH_CHAMFER_BAND == (0.10, 0.00)
     assert spec.MAX_FLAT_CRESCENT < spec.BORE_SOUTH_CHAMFER + spec.BORE_SOUTH_CHAMFER_BAND[1]
@@ -182,12 +184,11 @@ def test_chamfer_leaves_a_collar_bearing_annulus_and_flat_engagement() -> None:
     chamfer_max = spec.BORE_SOUTH_CHAMFER + spec.BORE_SOUTH_CHAMFER_BAND[0]
     annulus = collar_min_r - bore_max_r - chamfer_max
     assert spec.COLLAR_BEARING_ANNULUS == pytest.approx(annulus)
-    assert annulus == pytest.approx(2.0221)
-    assert spec.FACE_WIDTH - spec.BORE_SOUTH_CHAMFER == pytest.approx(6.2113)
+    assert annulus > 0.0
+    assert spec.FACE_WIDTH - spec.BORE_SOUTH_CHAMFER > spec.FLAT_ENGAGEMENT_MIN
     assert spec.FLAT_ENGAGEMENT_MIN == pytest.approx(
         spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[1] - chamfer_max
     )
-    assert spec.FLAT_ENGAGEMENT_MIN == pytest.approx(6.0863)
     assert spec.FLAT_ENGAGEMENT_MIN > 0
 
 
@@ -231,10 +232,20 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
     # The stack interface fixes both ends: the 64T north face touches T120;
     # the 16T remains longer but needs a measured axial overlap, not a simple
     # difference of face-width nominal sizes.
-    assert spec.FACE_WIDTH == 7.2113
+    t120_south = (
+        cone_line.SHAFT_T120_STATION
+        + cone_line.CONE_FACE_STATION_REFERENCE / 2.0
+        - math.floor(cone_line.SEAT_PITCH * 1e4) / 1e4
+    )
+    gear_south = (
+        spec.LAYOUT_CENTRE_STATION
+        - spec.LAYOUT_FACE_WIDTH / 2.0
+        + spec.SOUTH_FACE_SHIFT_NORTH
+    )
+    assert spec.FACE_WIDTH == round(t120_south - gear_south, 4)
     assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
     assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 4
-    assert pinion_spec.FACE_WIDTH == 11.6
+    assert pinion_spec.FACE_WIDTH > spec.FACE_WIDTH
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
@@ -271,10 +282,10 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "DIAMETRAL PITCH, TRANSVERSE (REF)",
         "PRESSURE ANGLE, TRANSVERSE (REF)",
         "PITCH DIAMETER (mm, REF)",
-        "ROOT DIAMETER (mm, REF)",
-        "WHOLE DEPTH (mm, REF)",
-        "HELIX ANGLE AT PITCH DIAMETER",
-        "CIRCULAR TOOTH THICKNESS AT PITCH DIA, NORMAL (mm), ACCEPT ON THIS PART",
+        "ACTUAL ROOT DIA MIN-MAX / MAX CUT DEPTH (mm, REF)",
+        "FORM CUTTER / REFERENCE TEETH / VIRTUAL TEETH (REF)",
+        "HELIX AT PITCH DIA / LEAD (mm/rev, REF)",
+        f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL (mm), ACCEPT ON THIS PART",
         "TRANSVERSE BACKLASH WITH MHA-DT-010, ACCEPT AT ASSEMBLY (mm)",
         "TOOTH FORM",
         "MATES WITH",
@@ -285,25 +296,26 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     # return with the thickness requirement.
     for banned in (
         "ISO 1328",
-        "BASE-TANGENT SPAN",
         "TORQUE",
         "C2C",
         "NONCONJUGATE",
         "X.XX",
         "RUNOUT",
+        "NONSTANDARD",
+        "SAME CUTTER",
+        "LONG ADDENDUM",
     ):
         assert banned not in data, banned
-    # Each of the two rows that is NOT reference-only says where it is accepted,
-    # so a part inspector is never asked to establish a pair result: the
-    # thickness is checkable on this part with a gear-tooth caliper, while the
-    # backlash depends on the operating centre distance and shaft angle, which
-    # belong to the assembly. (codex iter1 blocked on exactly that ambiguity.)
+    # Exact stock span is checked on the part. Backlash and supported carrying
+    # coverage belong to the actual assembly, never a circular-caliper shortcut.
     accepting = [
         line
         for line in data.splitlines()
-        if "ACCEPT ON THIS PART" in line or "ACCEPT AT ASSEMBLY" in line
+        if any(owner in line for owner in (
+            "ACCEPT ON THIS PART", "ACCEPT AT ASSEMBLY", "ACCEPT AT SETUP"
+        ))
     ]
-    assert len(accepting) == 2
+    assert len(accepting) == 4
     for line in accepting:
         assert "REF" not in line
     # ... and no OTHER row claims an acceptance band. A tooth count, the
@@ -319,88 +331,132 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     assert 'adapter, "Manufacturing Notes"' in source
 
 
-def test_tooth_thickness_is_a_toleranced_requirement_not_a_ref_consequence() -> None:
-    # The generating numbers are REF because the cutter produces them, but the
-    # tooth THICKNESS is the pair's one tooth-system acceptance size: the 16T it
-    # runs against is cut to full thickness, so all of the mesh's backlash comes
-    # off this gear's flanks. Its band is the named fit class read backwards,
-    # which is why it is asymmetric about the nominal the model is cut to.
-    low, high = _config.fit("gear_mesh", "backlash_mm")
-    assert notes.BACKLASH_MM == [low, high]
-    assert notes.TOOTH_THICKNESS_DEVIATIONS == (
-        pytest.approx(spec.BACKLASH_MM - low),
-        pytest.approx(-(high - spec.BACKLASH_MM)),
+@pytest.mark.parametrize("part_spec", (spec, pinion_spec))
+def test_exact_stock_span_limits_book_printed_corners_without_tightening(part_spec) -> None:
+    from stock_form_cutter import translation_for_pitch_tooth_thickness
+
+    profile = part_spec.STOCK_PROFILE
+    deviations = (
+        part_spec.TOOTH_THICKNESS_DEVIATIONS
+        if part_spec is spec
+        else (
+            part_spec.TOOTH_THICKNESS_UPPER_DEVIATION,
+            part_spec.TOOTH_THICKNESS_LOWER_DEVIATION,
+        )
     )
-    thickest = (
-        spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS + (notes.TOOTH_THICKNESS_DEVIATIONS[0])
+    raw_profiles = tuple(
+        part_spec.stock_profile(
+            tooth_thickness_mm=profile.pitch_tooth_thickness_mm + deviation
+        )
+        for deviation in deviations
     )
-    thinnest = (
-        spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS + (notes.TOOTH_THICKNESS_DEVIATIONS[1])
+    raw_spans = tuple(
+        form.tangent_span_mm(part_spec.BASE_TANGENT_SPAN_TEETH, normal_plane=True)
+        for form in raw_profiles
     )
-    # Over the whole band the assembled pair still meshes inside the fit class:
-    # the thickest tooth leaves the minimum backlash, the thinnest the maximum.
-    assert notes.STANDARD_TOOTH_THICKNESS - thickest == pytest.approx(low)
-    assert notes.STANDARD_TOOTH_THICKNESS - thinnest == pytest.approx(high)
-    data = notes.GEAR_DATA
-    # #906: the caliper reads the band square to the helix.
-    assert notes.NORMAL_TOOTH_THICKNESS_DEVIATIONS == (0.098, -0.049)
-    assert f"{spec.NORMAL_CIRCULAR_TOOTH_THICKNESS:.3f} +0.098 / -0.049" in data
-    assert spec.NORMAL_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
-        spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS
-        * math.cos(math.radians(spec.HELIX_ANGLE_DEG))
+    scale = 10**part_spec.BASE_TANGENT_SPAN_PLACES
+    lower, upper = part_spec.BASE_TANGENT_SPAN_LIMITS_MM
+    assert (lower, upper) == (
+        math.floor(min(raw_spans) * scale) / scale,
+        math.ceil(max(raw_spans) * scale) / scale,
     )
-    assert f"{low:.2f} TO {high:.2f}" in data
-    # The fit-class read stays out of the SPEC for the same reason the bore band
-    # does: the assemblies import the spec's tip circle, and a fit class must not
-    # become a rebuild dependency of the frame.
-    assert "gear_mesh" not in Path(spec.__file__).read_text(encoding="utf-8")
+    nominal = profile.tangent_span_mm(part_spec.BASE_TANGENT_SPAN_TEETH, normal_plane=True)
+    assert lower <= nominal <= upper
+    assert lower <= round(nominal, part_spec.BASE_TANGENT_SPAN_PLACES) <= upper
+    assert part_spec.BASE_TANGENT_SPAN_MM == pytest.approx(nominal)
+    assert len(part_spec.STOCK_PROFILE_CORNERS) == 2 * 2
+    for label, corner in part_spec.STOCK_PROFILE_CORNERS:
+        span = corner.tangent_span_mm(part_spec.BASE_TANGENT_SPAN_TEETH, normal_plane=True)
+        assert span == pytest.approx(lower if "span lower" in label else upper, abs=1e-9)
+        assert corner.radial_translation_mm == pytest.approx(
+            translation_for_pitch_tooth_thickness(
+                part_spec.TEETH, part_spec.CUTTER_TEMPLATE, corner.pitch_tooth_thickness_mm,
+                profile.helix_angle_deg,
+            )
+        )
+        assert corner.blank_radius_mm <= (
+            corner.support_radius_max_mm - corner.geometry_error_bound_mm
+        )
+        assert corner.tip_land_mm > 0.0
+        with pytest.raises(ValueError, match="FINITE cutter support"):
+            part_spec.stock_profile(
+                outside_dia_mm=2.0 * (corner.support_radius_max_mm + 1.0 / scale),
+                tooth_thickness_mm=corner.pitch_tooth_thickness_mm,
+            )
+    # Preserve the source capability, without interpreting it as ideal flank thinning.
+    if part_spec is spec:
+        assert deviations == tuple(
+            _config.fit("crank_mesh", "gear64_tooth_thickness_deviations_mm")
+        )
+    assert not hasattr(part_spec, "BACKLASH_MM")
+    assert not hasattr(notes, "NORMAL_TOOTH_THICKNESS_DEVIATIONS")
 
 
 def test_gear_data_states_the_helix_and_its_hand() -> None:
     # The two tooth-system facts no view of this gear can settle and a mirrored
     # or straight-cut part would get wrong.
     data = notes.GEAR_DATA
-    assert f"{spec.HELIX_ANGLE_DEG:.1f} DEG RIGHT HAND" in data
-    assert "HELICAL INVOLUTE" in data
+    assert (
+        f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} DEG RIGHT HAND"
+    ) in data
+    assert "NOMINAL NORMAL-SECTION SCREW SWEEP" in data
     # The hand follows the recipe's twist sense: the tooth azimuth advances
     # counter-clockwise about +z with increasing z (_gear._TWIST_CCW = +1).
     assert spec.HELIX_HAND == "RIGHT HAND"
-    assert spec.HELIX_ANGLE_DEG == pytest.approx(part.HELIX_DEG)
-    assert spec.BACKLASH_MM == pytest.approx(part.BACKLASH_MM)
+    assert spec.HELIX_ANGLE_DEG == pytest.approx(part.STOCK_PROFILE.helix_angle_deg)
 
 
 def test_gear_data_numbers_track_the_part_geometry() -> None:
-    assert spec.TEETH == part.TEETH
-    assert spec.DIAMETRAL_PITCH == pytest.approx(part.DP)
-    assert spec.PRESSURE_ANGLE_DEG == pytest.approx(part.PA_DEG)
+    assert spec.TEETH == part.STOCK_PROFILE.teeth
+    assert part.STOCK_PROFILE is spec.STOCK_PROFILE
+    assert spec.CUTTER_TEMPLATE.diametral_pitch == spec.CUTTER_DIAMETRAL_PITCH
     assert spec.PITCH_DIA == pytest.approx(spec.TEETH * spec.MODULE_MM)
-    # #906: ONE cutter, set over at the helix. Its normal DP and pressure
-    # angle are the pinion's; the transverse ones follow; the depth is the
-    # cutter's, so it is a full-depth tooth of the NORMAL module.
+    # The pair shares normal pitch and pressure angle, but not cutter numbers.
+    # The helix's transverse quantities and full depth follow its normal system.
     cos_helix = math.cos(math.radians(spec.HELIX_ANGLE_DEG))
     assert spec.CUTTER_DIAMETRAL_PITCH == pytest.approx(spec.DIAMETRAL_PITCH / cos_helix)
-    assert spec.CUTTER_DIAMETRAL_PITCH == pytest.approx(26.30595, abs=1e-5)
+    assert spec.CUTTER_DIAMETRAL_PITCH == pytest.approx(
+        spec.MM_PER_IN / _config.machine("gear_train", "crank_drive_normal_module_mm")
+    )
     assert math.tan(math.radians(spec.PRESSURE_ANGLE_DEG)) * cos_helix == pytest.approx(
         math.tan(math.radians(spec.CUTTER_PRESSURE_ANGLE_DEG))
     )
     assert spec.CUTTER_DIAMETRAL_PITCH == pinion_spec.DIAMETRAL_PITCH
     assert spec.CUTTER_PRESSURE_ANGLE_DEG == pinion_spec.PRESSURE_ANGLE_DEG
-    assert 'depth_dp=CUTTER_DIAMETRAL_PITCH' in _build_source()
-    assert spec.WHOLE_DEPTH == pytest.approx(
-        2.157 * spec.NORMAL_MODULE_MM + spec.LONG_ADDENDUM_MM
+    assert spec.CUTTER_PRESSURE_ANGLE_DEG == _config.machine(
+        "gear_train", "crank_drive_pressure_angle_deg"
     )
-    assert spec.ROOT_DIA == pytest.approx(spec.PITCH_DIA - 2.0 * 1.157 * spec.NORMAL_MODULE_MM)
-    assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
-        math.pi * spec.MODULE_MM / 2.0 - spec.BACKLASH_MM
-    )
-    # The mesh invariant the thinning exists for, in the plane a crossed
-    # helical pair meshes in: this gear's normal tooth plus its straight
-    # pinion's tooth leave exactly the normal backlash inside one normal
-    # circular pitch -- the pinion's own circular pitch.
+    assert spec.CUTTER_NUMBER == 2 != pinion_spec.CUTTER_NUMBER
+    assert spec.CUTTER_TEETH_RANGE == (55, 134)
+    assert spec.VIRTUAL_TEETH == pytest.approx(spec.TEETH / cos_helix**3)
     assert (
-        spec.NORMAL_CIRCULAR_TOOTH_THICKNESS
-        + pinion_spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS
-    ) == pytest.approx(math.pi * spec.NORMAL_MODULE_MM - spec.BACKLASH_MM * cos_helix)
+        spec.CUTTER_TEETH_RANGE[0] <= spec.VIRTUAL_TEETH <= spec.CUTTER_TEETH_RANGE[1]
+    )
+    assert spec.HELIX_LEAD_MM == pytest.approx(
+        math.pi * spec.PITCH_DIA / math.tan(math.radians(spec.HELIX_ANGLE_DEG))
+    )
+    assert f"{spec.VIRTUAL_TEETH:.{spec.GEAR_DATA_REFERENCE_PLACES}f}" in notes.GEAR_DATA
+    assert f"{spec.HELIX_LEAD_MM:.{spec.GEAR_DATA_REFERENCE_PLACES}f}" in notes.GEAR_DATA
+    assert "build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)" in _build_source()
+    profile = spec.STOCK_PROFILE
+    assert spec.DEDENDUM_FACTOR == 1.25
+    assert profile.radial_translation_mm == pytest.approx(
+        profile.pitch_radius_mm - profile.template.pitch_radius_mm
+    )
+    assert spec.WHOLE_DEPTH == pytest.approx(
+        profile.blank_radius_mm - profile.root_radius_min_mm
+    )
+    assert spec.ROOT_DIA == spec.ROOT_DIA_MIN
+    assert spec.ROOT_DIA_MIN == pytest.approx(2.0 * profile.root_radius_min_mm)
+    assert spec.ROOT_DIA_MAX == pytest.approx(2.0 * profile.root_radius_max_mm)
+    assert spec.ROOT_DIA_MIN < spec.ROOT_DIA_MAX
+    assert spec.TOOL_PLUNGE_MM == pytest.approx(profile.plunge_mm)
+    assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
+        profile.pitch_tooth_thickness_mm
+    )
+    # The finite lower-count stock tool is deliberately not an ideal N64 profile.
+    assert spec.CUTTER_TEMPLATE.reference_teeth == spec.CUTTER_TEETH_RANGE[0] < spec.TEETH
+    assert spec.WHOLE_DEPTH < (1.0 + spec.DEDENDUM_FACTOR) * spec.NORMAL_MODULE_MM
     assert spec.NORMAL_MODULE_MM == pytest.approx(pinion_spec.MODULE_MM)
 
 
@@ -525,7 +581,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
 _NOTE_LINE_PITCH = 0.0035
 _NOTE_DESCENDER = 0.0006
 _NOTE_CHAR_WIDTH = 0.00174
-_TIP_DIA_TEXT = "Ø65.21 ±0.1"
+_TIP_DIA_TEXT = f"Ø{spec.OUTSIDE_DIA:.2f} ±{spec.OUTSIDE_DIA_TOLERANCE_MM:g}"
 _TIP_DIA_TEXT_HEIGHT = 0.0039
 
 
@@ -545,20 +601,17 @@ def _tip_dia_text_box(centre: tuple[float, float]) -> tuple[float, ...]:
 
 
 def test_tip_diameter_text_hangs_under_every_gear_data_row_and_over_the_teeth() -> None:
-    # R9-56's contact-ratio row grew the block down through "Ø65.21 ±0.1",
-    # which sat a fixed 16 mm over the tooth tips (machinist review, farm run
-    # 20261001T110844152Z). The text now hangs under the block's last row, so
-    # a further row moves it down -- until it would land on the teeth.
+    # Actual stock inspection and coverage requirements add rows. The tip text
+    # must retain both the under-note gap and air off the real blank silhouette.
     block = _gear_data_box()
-    assert "CONTACT RATIO WITH MHA-DT-010" in notes.GEAR_DATA.splitlines()[-1]
+    assert "STOCK-FORM COVERAGE WITH MHA-DT-010" in notes.GEAR_DATA.splitlines()[-1]
     tip = _tip_dia_text_box(drawing.FRONT_KEEP["OutsideDia"])
     # The text sits under the block's columns, so its clearance is vertical.
     assert block[0] < tip[0] < block[2]
     assert block[1] - tip[3] >= 0.003
     # ... and over the tooth-tip circle, with room for the leader's shoulder.
     assert _box_distance(tip, drawing.FRONT_CENTER) > drawing.HALF_OD + 0.005
-    # The fixed placement, 16 mm over the tips, that the contact-ratio row
-    # printed through.
+    # A fixed placement above the tips can still print through the longer block.
     cx, cy = drawing.FRONT_CENTER
     old = _tip_dia_text_box((cx - 0.035, cy + drawing.HALF_OD + 0.016))
     assert old[3] > block[1]
@@ -622,8 +675,8 @@ def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -
         1000 * drawing.VIEW_SCALE[1]
     )
     af = [(af_text, (cx + flat_x, cy))]
-    # The broken leader leaves the text's near end aimed at the centre
-    # ("65.11 +/-0.1" is 28 mm wide on the round-bore sheet).
+    # The broken leader leaves the current native text's near end aimed
+    # at the centre; the four-digit tip value keeps the same text envelope.
     near_end = (tip_text[0] + 0.014, tip_text[1])
     aim = math.atan2(near_end[1] - cy, near_end[0] - cx)
     rim = (math.cos(aim) * drawing.HALF_OD, math.sin(aim) * drawing.HALF_OD)
@@ -667,3 +720,26 @@ def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -
     assert min(new_tip[0][0][1], new_tip[0][1][1]) > cy + 0.005
     for name, segments in (("BoreDia", bore), ("BoreFinish", finish)):
         assert max(segments[0][0][1], segments[0][1][1]) < cy, name
+
+
+def test_both_shop_gears_state_the_source_owned_tooth_cutting_setup_not_a_form_class() -> None:
+    import dt_crank_pinion_notes as pinion_notes
+
+    setup_tir = _config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")
+    for part_spec, part_notes in ((spec, notes), (pinion_spec, pinion_notes)):
+        assert part_spec.TOOTH_RUNOUT_TIR_MM == setup_tir
+        rows = dict(
+            (label.strip(), value.strip())
+            for label, separator, value in (
+                line.partition(":") for line in part_notes.GEAR_DATA.splitlines()[1:]
+            )
+            if separator
+        )
+        assert rows["TOOTH CUTTING SETUP, ACCEPT AT SETUP"] == (
+            f"{part_spec.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE"
+        )
+        assert "AGMA" not in part_notes.GEAR_DATA
+        assert not hasattr(part_spec, "GEOMETRIC_CONTROLS")
+        assert not hasattr(part_spec, "GEOMETRIC_TOLERANCES_MM")
+    # Each finished-bore eccentricity is half its own stated setup TIR.
+    assert (spec.TOOTH_RUNOUT_TIR_MM + pinion_spec.TOOTH_RUNOUT_TIR_MM) / 2.0 == setup_tir

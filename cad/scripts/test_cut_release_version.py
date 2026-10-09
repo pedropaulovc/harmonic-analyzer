@@ -167,6 +167,7 @@ def readout_report(
     error-budget tests own the report's numerical correctness.
     """
     import error_budget
+    import numpy as np
 
     budget = error_budget.load_budget()
     nom = error_budget.nominal()
@@ -201,6 +202,16 @@ def readout_report(
         "cam_home_phase": {"deg": nom.cam_home_deg},
         "cam_home_phase_waived": False,
         "closure": {"nominal_residual_mae": 0.01},
+        # the renderer reads the stock-form phase's numbers; their values are
+        # error_budget's to prove (it refuses the procedure without them)
+        "stock_phase": error_budget.StockPhase(
+            advance_rad=np.full((error_budget.N_ELEMENTS, error_budget.K_MAX + 1), 1e-4),
+            bound_rad=np.full((error_budget.N_ELEMENTS, error_budget.K_MAX + 1), 2e-5),
+            nominal_pose_bound_rad=np.full((error_budget.N_ELEMENTS, error_budget.K_MAX + 1), 1e-5),
+            shaft_home_lag_rad=3e-4,
+            cone_shaft_sense=1,
+            crank_geometry_sha256="0" * 64,
+        ).as_report(),
     }
     monkeypatch.setattr(error_budget, "build_report", lambda: report)
     return report

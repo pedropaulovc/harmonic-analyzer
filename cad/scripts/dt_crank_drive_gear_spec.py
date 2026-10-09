@@ -27,6 +27,12 @@ import cone_shaft_land_bands
 import gear_seat_fit
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from stock_form_cutter import (
+    StockFormProfile,
+    template_for_teeth,
+    translation_for_pitch_tooth_thickness,
+    translation_for_tangent_span,
+)
 
 
 MM_PER_IN = 25.4
@@ -36,7 +42,6 @@ TEETH = 64
 # The 64T's right-hand helix follows the actual cone-shaft incline; its
 # straight 16T mate shares the configured normal-pitch cutter system.
 HELIX_ANGLE_DEG = cone_line.INCLINE_DEG
-BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 
 # Face width.  The v36 MHA-DT-005 casting is restored: its crank boss's north
 # face is the collar's tangent plane again, so the 64T's SOUTH face -- seated
@@ -56,7 +61,8 @@ LAYOUT_CENTRE_STATION = (
 LAYOUT_FACE_WIDTH = 8.0
 SOUTH_FACE_SHIFT_NORTH = 1.5
 FACE_WIDTH = round(
-    cone_line.SHAFT_T120_STATION + cone_line.CONE_FACE_STATION_REFERENCE / 2.0
+    cone_line.SHAFT_T120_STATION
+    + cone_line.CONE_FACE_STATION_REFERENCE / 2.0
     - math.floor(cone_line.SEAT_PITCH * 1e4) / 1e4
     - (LAYOUT_CENTRE_STATION - LAYOUT_FACE_WIDTH / 2.0 + SOUTH_FACE_SHIFT_NORTH),
     4,
@@ -76,28 +82,36 @@ if not LAYOUT_FACE_WIDTH - SOUTH_FACE_SHIFT_NORTH < FACE_WIDTH < LAYOUT_FACE_WID
 NORMAL_MODULE_MM = _config.machine("gear_train", "crank_drive_normal_module_mm")
 _COS_HELIX = math.cos(math.radians(HELIX_ANGLE_DEG))
 CUTTER_DIAMETRAL_PITCH = MM_PER_IN / NORMAL_MODULE_MM
-CUTTER_PRESSURE_ANGLE_DEG = _config.machine("gear_train", "crank_drive_pressure_angle_deg")
+CUTTER_PRESSURE_ANGLE_DEG = _config.machine(
+    "gear_train", "crank_drive_pressure_angle_deg"
+)
 DIAMETRAL_PITCH = CUTTER_DIAMETRAL_PITCH * _COS_HELIX
 PRESSURE_ANGLE_DEG = math.degrees(
     math.atan(math.tan(math.radians(CUTTER_PRESSURE_ANGLE_DEG)) / _COS_HELIX)
 )
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH  # transverse
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
-# Standard normal full depth: one module of addendum and 1.25 of dedendum.
+# The finite #2 master retains standard normal root placement. The actual
+# blank is turned down to support every published manufacturing corner.
 DEDENDUM_FACTOR = 1.25
-LONG_ADDENDUM_MM = 0.0
-OUTSIDE_DIA = PITCH_DIA + 2.0 * NORMAL_MODULE_MM
-WHOLE_DEPTH = (1.0 + DEDENDUM_FACTOR) * NORMAL_MODULE_MM
-ROOT_DIA = PITCH_DIA - 2.0 * DEDENDUM_FACTOR * NORMAL_MODULE_MM
 
 # Hand: the tooth azimuth advances counter-clockwise about +z as z increases
 # (``_gear._TWIST_CCW``), which is a RIGHT-hand helix. It is the one tooth-system
 # fact a mirrored part would get wrong and no view can settle, so the data block
 # states it in words.
 HELIX_HAND = "RIGHT HAND"
-TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0 - BACKLASH_MM
-# What a gear-tooth caliper set square to the helix reads.
-NORMAL_CIRCULAR_TOOTH_THICKNESS = TRANSVERSE_CIRCULAR_TOOTH_THICKNESS * _COS_HELIX
+
+# Form-cutter selection uses the helix's equivalent normal-section tooth count,
+# not its physical count. Lead is the axial travel for one right-hand turn.
+CUTTER_TEMPLATE = template_for_teeth(
+    TEETH / _COS_HELIX**3, CUTTER_DIAMETRAL_PITCH, CUTTER_PRESSURE_ANGLE_DEG
+)
+CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
+CUTTER_TEETH_RANGE = CUTTER_TEMPLATE.teeth_range
+VIRTUAL_TEETH = TEETH / _COS_HELIX**3
+HELIX_LEAD_MM = math.pi * PITCH_DIA / math.tan(math.radians(HELIX_ANGLE_DEG))
+GEAR_DATA_HELIX_PLACES = 4
+GEAR_DATA_REFERENCE_PLACES = 3
 
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
@@ -108,6 +122,102 @@ NORMAL_CIRCULAR_TOOTH_THICKNESS = TRANSVERSE_CIRCULAR_TOOTH_THICKNESS * _COS_HEL
 # term of its closing corner (TIP_ROOT_BAND_RADIAL), and crank_boss_rim grows
 # the tip by half of it toward MHA-DT-005.
 OUTSIDE_DIA_TOLERANCE_MM = 0.10
+# Critical tooth-cutting setup, indicated to the finished bore. This process
+# limit is shared by both shop gears; it is not an AGMA/form accuracy class.
+TOOTH_RUNOUT_TIR_MM = _config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")
+
+# Geometry selection is finite-support-qualified, not a crossed-mesh certificate.
+TOOTH_THICKNESS_DEVIATIONS = tuple(
+    _config.fit("crank_mesh", "gear64_tooth_thickness_deviations_mm")
+)
+STOCK_TOOL_TRANSLATION_MM = PITCH_DIA / 2.0 - CUTTER_TEMPLATE.pitch_radius_mm
+_PITCH_PROBE = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, HELIX_ANGLE_DEG
+)
+TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = _PITCH_PROBE.pitch_tooth_thickness_mm
+BASE_TANGENT_SPAN_TEETH = math.floor(TEETH * CUTTER_PRESSURE_ANGLE_DEG / 180.0 + 0.5)
+BASE_TANGENT_SPAN_PLACES = 4
+_SPAN_SCALE = 10**BASE_TANGENT_SPAN_PLACES
+_RAW_TRANSLATIONS = tuple(
+    translation_for_pitch_tooth_thickness(
+        TEETH, CUTTER_TEMPLATE, TRANSVERSE_CIRCULAR_TOOTH_THICKNESS + deviation,
+        HELIX_ANGLE_DEG,
+    )
+    for deviation in reversed(TOOTH_THICKNESS_DEVIATIONS)
+)
+_RAW_SPANS = tuple(
+    StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, HELIX_ANGLE_DEG)
+    .tangent_span_mm(BASE_TANGENT_SPAN_TEETH, normal_plane=True)
+    for value in _RAW_TRANSLATIONS
+)
+BASE_TANGENT_SPAN_MM = _PITCH_PROBE.tangent_span_mm(
+    BASE_TANGENT_SPAN_TEETH, normal_plane=True
+)
+BASE_TANGENT_SPAN_LIMITS_MM = (
+    math.floor(min(_RAW_SPANS) * _SPAN_SCALE) / _SPAN_SCALE,
+    math.ceil(max(_RAW_SPANS) * _SPAN_SCALE) / _SPAN_SCALE,
+)
+# The extra search bracket is numerical only; the printed span endpoints,
+# not this bracket, define the actual accepted tool-translation interval.
+_INVERSE_BRACKET = (
+    min(_RAW_TRANSLATIONS) - NORMAL_MODULE_MM / 100.0,
+    max(_RAW_TRANSLATIONS) + NORMAL_MODULE_MM / 100.0,
+)
+STOCK_TOOL_TRANSLATION_LIMITS_MM = tuple(
+    translation_for_tangent_span(
+        TEETH, CUTTER_TEMPLATE, span, BASE_TANGENT_SPAN_TEETH, HELIX_ANGLE_DEG,
+        translation_bounds_mm=_INVERSE_BRACKET,
+    )
+    for span in BASE_TANGENT_SPAN_LIMITS_MM
+)
+_CORNER_PROBES = tuple(
+    StockFormProfile(TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, value, HELIX_ANGLE_DEG)
+    for value in STOCK_TOOL_TRANSLATION_LIMITS_MM
+)
+OUTSIDE_DIA = math.floor(
+    (2.0 * min(profile.support_radius_max_mm for profile in _CORNER_PROBES)
+     - OUTSIDE_DIA_TOLERANCE_MM) * 100.0
+) / 100.0
+STOCK_PROFILE = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, HELIX_ANGLE_DEG
+)
+ROOT_DIA_MIN = 2.0 * STOCK_PROFILE.root_radius_min_mm
+ROOT_DIA_MAX = 2.0 * STOCK_PROFILE.root_radius_max_mm
+ROOT_DIA = ROOT_DIA_MIN
+WHOLE_DEPTH = STOCK_PROFILE.blank_radius_mm - STOCK_PROFILE.root_radius_min_mm
+TOOL_PLUNGE_MM = STOCK_PROFILE.plunge_mm
+
+
+def stock_profile(
+    *, outside_dia_mm: float | None = None, tooth_thickness_mm: float | None = None
+) -> StockFormProfile:
+    """Actual finite normal-tool form; thickness selects total radial translation."""
+    translation = (
+        STOCK_TOOL_TRANSLATION_MM if tooth_thickness_mm is None
+        else translation_for_pitch_tooth_thickness(
+            TEETH, CUTTER_TEMPLATE, tooth_thickness_mm, HELIX_ANGLE_DEG
+        )
+    )
+    return StockFormProfile(
+        TEETH, CUTTER_TEMPLATE,
+        (OUTSIDE_DIA if outside_dia_mm is None else outside_dia_mm) / 2.0,
+        translation, HELIX_ANGLE_DEG,
+    )
+
+
+STOCK_PROFILE_CORNERS = tuple(
+    (
+        f"span {span_side}, outside diameter {od_side}",
+        StockFormProfile(
+            TEETH, CUTTER_TEMPLATE, (OUTSIDE_DIA + od_deviation) / 2.0,
+            translation, HELIX_ANGLE_DEG,
+        ),
+    )
+    for span_side, translation in zip(("lower", "upper"), STOCK_TOOL_TRANSLATION_LIMITS_MM)
+    for od_side, od_deviation in (
+        ("lower", -OUTSIDE_DIA_TOLERANCE_MM), ("upper", OUTSIDE_DIA_TOLERANCE_MM)
+    )
+)
 
 # The Ø9.525 round portion of MHA-DT-004's Sec1 gear seat. The round-bore
 # clearance is paired with the published shaft diameter band in the part

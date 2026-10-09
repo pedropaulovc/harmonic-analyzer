@@ -186,10 +186,38 @@ drawing.add_feature_control_frame(
     ]
 
 
+def test_detector_finds_drawing_owned_projected_zone_heights() -> None:
+    source = """
+from _drawing_common import add_feature_control_frame as fcf
+import _drawing_common as drawing
+from dt_pinion_lever_spec import HUB_RUNOUT_TOLERANCE
+
+LOCAL_HEIGHT = 31.3
+fcf(adapter, view, frame_xy=(0.1, 0.2), characteristic="position",
+    tolerance=HUB_RUNOUT_TOLERANCE, projected_zone_height_mm=39.2375,
+    label="literal")
+drawing.add_feature_control_frame(
+    adapter, view, frame_xy=(0.1, 0.2), characteristic="perpendicularity",
+    tolerance=HUB_RUNOUT_TOLERANCE, projected_zone_height_mm=LOCAL_HEIGHT,
+    label="local alias")
+"""
+    violations = drawing_specification_violations(source)
+    assert [item.rule for item in violations] == [
+        "drawing-gdt-provenance",
+        "drawing-gdt-provenance",
+    ]
+    assert [item.evidence for item in violations] == [
+        "projected_zone_height_mm=39.2375 is not part-spec-sourced",
+        "projected_zone_height_mm=LOCAL_HEIGHT is not part-spec-sourced",
+    ]
+
+
 def test_detector_allows_feature_control_frame_values_from_part_contracts() -> None:
     source = """
 from _drawing_common import add_feature_control_frame
-from dt_pinion_lever_spec import GEOMETRIC_CONTROLS, HUB_RUNOUT_TOLERANCE
+from dt_pinion_lever_spec import (
+    GEOMETRIC_CONTROLS, HUB_RUNOUT_TOLERANCE, PROJECTED_ZONE_HEIGHT_MM,
+)
 import dt_pinion_lever_spec as lever_spec
 
 FIRST_CONTROL = GEOMETRIC_CONTROLS[0]
@@ -198,16 +226,22 @@ SELECTED_CONTROL = next(
 )
 add_feature_control_frame(
     adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
-    tolerance=HUB_RUNOUT_TOLERANCE, label="direct")
+    tolerance=HUB_RUNOUT_TOLERANCE,
+    projected_zone_height_mm=PROJECTED_ZONE_HEIGHT_MM, label="direct")
 add_feature_control_frame(
     adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
-    tolerance=lever_spec.FLAT_END_TOLERANCE, label="module")
+    tolerance=lever_spec.FLAT_END_TOLERANCE,
+    projected_zone_height_mm=lever_spec.PROJECTED_ZONE_HEIGHT_MM, label="module")
 add_feature_control_frame(
     adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
-    tolerance=FIRST_CONTROL.tolerance, label="indexed control")
+    tolerance=FIRST_CONTROL.tolerance,
+    projected_zone_height_mm=FIRST_CONTROL.projected_zone_height_mm,
+    label="indexed control")
 add_feature_control_frame(
     adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
-    tolerance=SELECTED_CONTROL.tolerance, label="selected control")
+    tolerance=SELECTED_CONTROL.tolerance,
+    projected_zone_height_mm=SELECTED_CONTROL.projected_zone_height_mm,
+    label="selected control")
 """
     assert drawing_specification_violations(source) == ()
 

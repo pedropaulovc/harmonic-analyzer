@@ -198,8 +198,8 @@ SIDE_KEEP = {
     "CollarRearStation": ((COLLAR_REAR_X + FAR_END_X) / 2.0, _ROW_Y[5]),
     "CollarSeatStation": ((COLLAR_SEAT_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[6]),
     "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[7]),
-    # Its "0.0 / 135.4" block sits right of the overall's "(137.4) / OVERALL"
-    # on the next row down, not over it: the two rows are 9.5 mm apart.
+    # The shaft length's native unilateral block sits right of the reference
+    # overall on the next row down, not over it.
     "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0 + 0.035, _ROW_Y[8]),
     "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[9]),
     # Above the dome, between the +Z drive-pin location's text and the

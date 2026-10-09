@@ -242,6 +242,28 @@ def apply_drawing_precision(
             )
 
 
+def set_dimension_basic_tolerance(
+    adapter: Any,
+    feature_name: str,
+    dimension_name: str,
+) -> None:
+    """Make a frame-controlled locator BASIC on its source-model dimension.
+
+    BASIC defines the nominal locator; it must not inherit a title-block
+    size or angle tolerance. The owning spec supplies its surviving frame.
+    """
+    _display, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    if dimension.SetToleranceType(1) is not True:  # swTolType_e.swTolBASIC
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: SetToleranceType rejected BASIC"
+        )
+    if int(dimension.GetToleranceType()) != 1:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: BASIC tolerance type did not persist"
+        )
+    _telemetry.success(f"toleranced {dimension_name}@{feature_name}: BASIC")
+
+
 def set_dimension_symmetric_tolerance(
     adapter: Any,
     feature_name: str,

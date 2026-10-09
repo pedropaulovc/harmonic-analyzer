@@ -40,8 +40,10 @@ from vn_frame_cross_screw_spec import SHANK_DIA as _FRAME_CROSS_DIA
 from vn_frame_cross_screw_spec import SHANK_LEN as _FRAME_CROSS_LENGTH
 from vn_frame_cross_screw_spec import THREAD as _FRAME_CROSS_THREAD
 from _hole_spec import TAP_DRILL_MM
-from vn_post_mount_screw_spec import CUT_LENGTH_MM as _POST_SCREW_CUT_LENGTH
-from vn_post_mount_screw_spec import GRIP_MM as _POST_SCREW_GRIP
+
+# Only nominal penetration is shared across assemblies, not the part's full
+# drawing/placement recipe (which depends on the cone/channel station grid).
+from dt_post_mount_stack import POST_SCREW_ENGAGEMENT_NOMINAL as _POST_SCREW_ENGAGEMENT
 from vn_arbor_set_screw_spec import LENGTH as _ARBOR_SET_SCREW_LENGTH
 from vn_arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
 from vn_swing_stop_screw_spec import EMBED_LEN as _STOP_EMBED_LEN
@@ -56,6 +58,10 @@ from magnifying_bracket_joint_layout import (
     SCREW_MAJOR_DIA as _BRACKET_SCREW_MAJOR_DIA,
     TAP_DRILL_DIA as _BRACKET_TAP_DRILL_DIA,
 )
+from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT as _PINION_BLOCK_HEIGHT
+from vn_slotted_screw_spec import SHANK_DIA as _BLOCK_SCREW_DIA
+from vn_slotted_screw_spec import SHANK_LEN as _BLOCK_SCREW_LENGTH
+from vn_slotted_screw_spec import THREAD as _BLOCK_SCREW_THREAD
 
 
 def _smooth_annulus_limit_mm3(
@@ -182,7 +188,7 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(
         ("vn-cone-tip-adjuster-1", "dt-cone-gear-shaft-1")
     ): _ADJUSTER_THRUST_GATE_LIMIT_MM3,
-    # U30 (I22): each MHA-VN-031 (1/4-20 MSC 40923898, major 6.35) in its #7
+    # U30 (I22): each MHA-VN-031 (1/4-20 MSC 40923906, major 6.35) in its #7
     # (5.105) MHA-DT-020 tap, as deep as the cut length runs past the post's
     # grip (the counterbore floor).  The smooth-annulus upper bound until the
     # first drive-train build observes the helical overlap.
@@ -190,9 +196,7 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
         "vn-post-mount-screw",
         (1, 2),
         "dt-cone-swing-platform",
-        _smooth_annulus_limit_mm3(
-            6.35, 5.105, _POST_SCREW_CUT_LENGTH - _POST_SCREW_GRIP
-        ),
+        _smooth_annulus_limit_mm3(6.35, 5.105, _POST_SCREW_ENGAGEMENT),
     ),
     # #743 Q3: the MHA-VN-034 #4-40 apex set screw in each pedestal's crown tap,
     # bounded over its whole length (the crown holds a little less: the cup
@@ -570,13 +574,16 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
             _STOP_SHANK_DIA, TAP_DRILL_MM[_STOP_THREAD], _STOP_EMBED_LEN
         ),
     ),
-    # Rule 12 (audit E10): the 31.75 #8-32 x 1-1/4 block screws pass the
-    # 20.5 pinion block and engage 11.25 of the base seat.
+    # Bound only the threaded material actually inside the base seat.
     **_numbered_pairs(
         "dt-drive-train-1/vn-slotted-screw",
         range(1, 5),
         "fr-frame-1/fr-harmonic-base",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 31.75 - 20.5),
+        _smooth_annulus_limit_mm3(
+            _BLOCK_SCREW_DIA,
+            TAP_DRILL_MM[_BLOCK_SCREW_THREAD],
+            _BLOCK_SCREW_LENGTH - _PINION_BLOCK_HEIGHT,
+        ),
     ),
     **_numbered_pairs(
         "dt-drive-train-1/vn-foot-screw",

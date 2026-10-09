@@ -3055,6 +3055,7 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_specification_purity.py",
         SCRIPTS_DIR / "test_drawing_surface_finish_validation.py",
         SCRIPTS_DIR / "test_gtol_spec.py",
+        SCRIPTS_DIR / "test_native_projected_zone.py",
         SCRIPTS_DIR / "test_part_owned_geometric_tolerances.py",
         SCRIPTS_DIR / "test_probe_surface_finish_pmi_telemetry.py",
         SCRIPTS_DIR / "test_surface_finish.py",
@@ -3071,9 +3072,14 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # Intended chain mesh follows the actual mounted instance pose, not
+        # configuration labels that may also name the loose spare.
+        SCRIPTS_DIR / "test_assembly_chain_mesh.py",
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_dt_drive_train_support_layout.py",
+        # Native-STL gravity seam welding remains strict about holes and winding.
+        SCRIPTS_DIR / "test_dt_swing_gravity_collector.py",
         # The cone tip block's hold-down, embed-window and collar-air contracts
         # (I20/I22/I24/I31; prism ruling 2026-09-29) that
         # build_drive_train_assembly asserts at import.
@@ -3097,9 +3103,22 @@ def task_check():
         # Integ-branch tests that guard caught un-enrolled at #877 round 4.
         SCRIPTS_DIR / "test_dt_cone_gear_mesh_design.py",
         SCRIPTS_DIR / "test_dt_cone_gear_seat_fit.py",
+        # Finite stock-cutter geometry, actual contact and the printed cone
+        # sizing lattice are production design contracts, not native probes.
+        SCRIPTS_DIR / "test_stock_form_cutter.py",
+        SCRIPTS_DIR / "test_stock_form_mesh.py",
+        SCRIPTS_DIR / "test_solve_stock_form_cones.py",
+        # Oblique finite-ground contact and signed readout bounds stay offline.
+        SCRIPTS_DIR / "test_oblique_cone_mesh_study.py",
+        # Exact translated root material is a collision domain, never coverage.
+        SCRIPTS_DIR / "test_stock_form_root_sweep.py",
+        SCRIPTS_DIR / "test_stock_form_contact_continuation.py",
+        SCRIPTS_DIR / "test_dt_cone_support_pose.py",
         SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
+        # Supplier pose facts must stay independent of native replica recipes.
+        SCRIPTS_DIR / "test_vn_cone_pose_specs.py",
         SCRIPTS_DIR / "test_fit_bands.py",
         SCRIPTS_DIR / "test_printed_text_rulings.py",
         # ... and the #857 re-merge: its leader-geometry and replica-driver pins.

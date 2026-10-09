@@ -44,6 +44,25 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert ch_connecting_rod_spec.HEAD_THICKNESS == rod.HEAD_THICKNESS
 
 
+def test_rod_length_closes_the_raised_cam_to_the_level_rocker() -> None:
+    import math
+
+    import channel_frame_geom as frame
+    import ch_rocker_arm_spec as rocker
+    import dt_cylinder_gear_spec as cylinder
+
+    pin = (
+        frame.ROCKER_PIVOT_XY[0] - rocker.ROD_HOLE_X,
+        frame.ROCKER_PIVOT_XY[1] + rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y,
+    )
+    phase = math.radians(frame.CYLINDER_LOCK_PHASE_DEG)
+    cam = (
+        frame.CAM_SHAFT_XY[0] + cylinder.ECCENTRICITY * math.sin(phase),
+        frame.CAM_SHAFT_XY[1] + cylinder.ECCENTRICITY * math.cos(phase),
+    )
+    assert abs(rod.CENTER_DISTANCE - math.dist(pin, cam)) < 1e-9
+
+
 def test_pin_hole_is_part_owned_and_drawing_geometry_is_derived() -> None:
     assert rod.PIN_HOLE_SPEC is ch_connecting_rod_spec.PIN_HOLE_SPEC
     assert drawing.PIN_HOLE_SPEC is ch_connecting_rod_spec.PIN_HOLE_SPEC

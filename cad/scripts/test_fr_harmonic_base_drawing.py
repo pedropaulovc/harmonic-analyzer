@@ -12,11 +12,8 @@ import build_fr_harmonic_base as part
 import dt_cone_swing_platform_geometry as platform
 import dt_cone_pivot_post_installation
 import cone_line
+import fr_harmonic_base_fasteners
 import fr_harmonic_base_spec
-from dt_cone_pivot_post_installation import (
-    MECHANISM_X_SHIFT,
-    MECHANISM_Z_SHIFT,
-)
 from vn_cone_lock_knob_spec import HEAD_DIA as KNOB_HEAD_DIA
 from vn_swing_stop_screw_spec import CONTACT_DIA as STOP_CONTACT_DIA
 
@@ -37,7 +34,7 @@ from vn_swing_stop_screw_spec import CONTACT_DIA as STOP_CONTACT_DIA
         (
             "pinion block",
             part.BLOCK_SEAT_SPEC,
-            part.BLOCK_SCREW_LEN - part.BLOCK_HEIGHT,
+            part.BLOCK_SCREW_MAX_INSERTION,
             "tapped_bottoming",
             2,
         ),
@@ -269,15 +266,11 @@ def test_nameplate_seats_are_derived_from_the_plate_mount() -> None:
 
 
 def test_pivot_seat_reads_the_cone_line_pivot() -> None:
-    """The seat is the cone line's pivot, bit-for-bit the former hand-shifted sum.
-
-    The value reaches the part as a ``set_global`` string, so byte-identical
-    geometry needs the exact repr, not a tolerance.
-    """
+    """The native seat follows the live configured cone line, without a
+    frozen former-world station or a separately applied installation shift."""
     assert part.PIVOT_SCREW_XZ is cone_line.PIVOT_XZ
-    assert repr(part.PIVOT_SCREW_XZ) == repr(
-        (-89.16663981674521 + 1.484, 60.60437088764276 + 35.415)
-    )
+    pivot = cone_line.cone_station(cone_line.PIVOT_STATION)
+    assert part.PIVOT_SCREW_XZ == (pivot[0], pivot[2])
     assert not hasattr(dt_cone_pivot_post_installation, "POST_X_SHIFT")
     assert not hasattr(dt_cone_pivot_post_installation, "POST_Z_SHIFT")
 
@@ -287,7 +280,7 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     pivot_x, pivot_z = part.PIVOT_SCREW_XZ
     assert part.STOP_SCREW_XZ == part.SWING_HARDWARE_GEOMETRY.stop_xz
     east_slope = (platform.EAST_HALF_S - platform.HALF_WIDTH_N) / platform.PLATE_LEN
-    stop_local_z = -105.0
+    stop_local_z = platform.STOP_LOCAL_Z
     stop_local_x = -(
         platform.HALF_WIDTH_N + east_slope * (platform.NORTH_OVERHANG - stop_local_z)
     )
@@ -342,51 +335,36 @@ def pinion_pivot_block_depth() -> float:
     return BLOCK_DEPTH
 
 
-def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
-    # The 32T coherent-placement cutover shifts the block screws and spring
-    # foot with the pinion rig while the arbor-pedestal seats stay on the
-    # unchanged cylinder-drum axis.  U28 (2026-09-23): 2.2425 park-out, screws
-    # +-8.5 about the pivot bore, block mid-depth 5.125 in from each outer face.
-    # Ruling (c) (user, 2026-09-24): the block and spring-foot z stations come
-    # from pinion_rig_layout -- the back block keeps its released seat, the
-    # front block stands one feeler off the front strap, the spring rides with
-    # the back strap.  The spring foot's seat is 20.0 east of the pivot bore
-    # (the 2026-09-24 re-derive: outboard of the back strap, not west of it).
+def test_structural_holes_follow_the_live_parked_rig_and_bank() -> None:
+    """Native base seats are the real parked block/foot and fitted pedestal
+    stations, not a translated copy of the former gear-train geometry."""
+    import cylinder_bank_layout as bank
+    import dt_arbor_pedestal_spec as pedestal
     import pinion_rig_layout as rig
+    import pinion_rig_park_geometry as park
+    from dt_pinion_pivot_block_geometry import SCREW_HALF_SPACING
+    from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT
 
-    former_block_x = (-17.226441649810653, -0.22644164981065273)
-    former_pivot_x = former_block_x[0] + 8.5
-    former_feet = ((former_pivot_x - 20.0, rig.SPRING_PAD_Z - MECHANISM_Z_SHIFT),)
-    assert part.BLOCK_SCREW_XZ == tuple(
-        (x + MECHANISM_X_SHIFT, z) for z in rig.BLOCK_SEAT_Z for x in former_block_x
+    expected_blocks = tuple(
+        (park.PIVOT_X + dx, z)
+        for z in rig.BLOCK_SEAT_Z
+        for dx in (-SCREW_HALF_SPACING, SCREW_HALF_SPACING)
     )
-    # Option E-a deepened the blocks outward from the back stop (10.25 ->
-    # 10.5 -> 11.0), so the back seats moved 0.375 aft of the released
-    # 82.875, and RIG_AFT_SHIFT (Main, #858: j = 19's full face) moved the
-    # rig 1.25 aft.
+    assert part.BLOCK_SCREW_XZ == expected_blocks
     assert rig.BLOCK_SEAT_Z[1] == pytest.approx(
-        83.25 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+        rig.BACK_BLOCK_Z0 + pinion_pivot_block_depth() / 2.0, abs=1e-9
     )
-    # Codex #854 P1: the front seats are cut at the fit-up station -- one
-    # block, the solid stack and one feeler off the back seats -- not at a
-    # pose carrying extra air (-86.237 before the fix).
     assert rig.BLOCK_SEAT_Z[1] - rig.BLOCK_SEAT_Z[0] == pytest.approx(
         pinion_pivot_block_depth() + rig.INNER_SPAN, abs=1e-9
     )
-    # Ruling 3's 0.45 drum shim puts the front seats that much forward, and
-    # the 11.0 block half its extra depth.
-    assert rig.BLOCK_SEAT_Z[0] == pytest.approx(
-        -89.65 + rig.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT
+    assert part.FOOT_SCREW_XZ == (
+        (park.PIVOT_X - SCREW_EAST_OF_PIVOT, rig.SPRING_PAD_Z),
     )
-    assert part.FOOT_SCREW_XZ == tuple(
-        (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
+    ledge_offset = pedestal.STRAP_INNER_Z - pedestal.SCREW_Z
+    assert part.PEDESTAL_SCREW_XZ == (
+        (cone_line.X_DRUM, bank.FRONT_STRAP_INNER_Z - ledge_offset),
+        (cone_line.X_DRUM, bank.BACK_STRAP_INNER_Z + ledge_offset),
     )
-    # U34c: the arbor pedestals left the #4-40 foot group for their own #8-32
-    # seats, 19.0 outboard of each strap inner face on the unshifted drum axis;
-    # #743's solid bank puts those faces at -71.519 / +73.062.
-    expected = ((-54.7 + MECHANISM_X_SHIFT, -90.519), (-54.7 + MECHANISM_X_SHIFT, 92.062))
-    for actual, wanted in zip(part.PEDESTAL_SCREW_XZ, expected, strict=True):
-        assert actual == pytest.approx(wanted, abs=5e-4)
 
 
 def _socket_bore_geometry(x_mm: float, z_mm: float):
@@ -1368,7 +1346,9 @@ _PRE_BAND_SEATS = (
         part.HOLD_DOWN_SEAT_SPEC,
         part.HOLD_DOWN_ENGAGEMENT,
         part.HOLD_DOWN_ENGAGEMENT + 0.25,
-        part.HOLD_DOWN_ENGAGEMENT + 0.25 + 5.0 * part.HOLD_DOWN_PITCH,
+        part.HOLD_DOWN_ENGAGEMENT
+        + 0.25
+        + 5.0 * fr_harmonic_base_fasteners.HOLD_DOWN_PITCH,
     ),
     ("cone pivot", part.PIVOT_SEAT_SPEC, part.PIVOT_THREAD_ENGAGEMENT, 9.775, 12.0),
     ("cone lock", part.LOCK_SEAT_SPEC, part.LOCK_STUD_LEN, 19.3, 25.65),
@@ -1406,17 +1386,17 @@ def test_pre_band_seat_depths_fail_at_the_printed_low_limit(
 def test_seat_depths_derive_from_engagement_band_and_tap_lead() -> None:
     band = part.SEAT_DEPTH_BAND
     assert band == pytest.approx(0.51)  # the title block's .XX row
-    assert part.HOLD_DOWN_THREAD_DEPTH == pytest.approx(13.20)
+    assert fr_harmonic_base_fasteners.HOLD_DOWN_THREAD_DEPTH == pytest.approx(13.20)
     assert part.HOLD_DOWN_DRILL_DEPTH == pytest.approx(20.60)
     for engagement, thread in (
-        (part.HOLD_DOWN_ENGAGEMENT, part.HOLD_DOWN_THREAD_DEPTH),
+        (part.HOLD_DOWN_ENGAGEMENT, fr_harmonic_base_fasteners.HOLD_DOWN_THREAD_DEPTH),
         (part.PIVOT_THREAD_ENGAGEMENT, part.PIVOT_SCREW_HOLE_DEPTH),
         (part.LOCK_STUD_LEN, part.LOCK_SCREW_HOLE_DEPTH),
         (part.STOP_ENGAGEMENT, part.STOP_SCREW_HOLE_DEPTH),
         (part.FOOT_SCREW_LEN - part.SPRING_THICKNESS, part.FOOT_SCREW_HOLE_DEPTH),
     ):
         needed = engagement + part.SEAT_TIP_RESERVE + band
-        assert needed <= thread < needed + part.SEAT_DEPTH_STEP
+        assert needed <= thread < needed + fr_harmonic_base_fasteners.SEAT_DEPTH_STEP
 
 
 def test_no_seat_engages_under_one_and_a_half_d() -> None:
@@ -1438,7 +1418,11 @@ def test_specified_hold_down_screw_fits_a_derived_seat_without_the_blocker() -> 
 
     length, _replay = screw.REPLAYS[screw.SPECIFIED_SKU]
     assert length == 19.05  # 3/4 in under the head
-    engagement = length - part.SUPPORT_FOOT_THICKNESS - part.HOLD_DOWN_BEARING_OFFSET
+    engagement = (
+        length
+        - fr_harmonic_base_fasteners.SUPPORT_FOOT_THICKNESS
+        - fr_harmonic_base_fasteners.HOLD_DOWN_BEARING_OFFSET
+    )
     diameter = part.THREAD_MAJOR_MM[part.HOLD_DOWN_THREAD]
     assert engagement >= 1.5 * diameter
     thread = part.seat_thread_depth(engagement)

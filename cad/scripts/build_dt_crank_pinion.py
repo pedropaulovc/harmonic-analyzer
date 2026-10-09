@@ -3,8 +3,8 @@ r"""Reproduction script: crank pinion (book ch. 11/12, pp. 16, 19, 20).
 The pinion on the crankshaft that meshes the dark steel crank-drive gear
 at the cone set's large end (`build_dt_crank_drive_gear.py`), implementing
 the book-stated 4:1 crank-to-cone reduction (p. 16). The straight 16T uses
-the pair's standard normal 24DP PA20 cutter system with a root-relieved
-full-depth floor; the crossed-axis accommodation lives on the 64T.
+the pair's normal 24DP PA20 system with the finite stock #7/14T master,
+including its actual translated root floor; the helix lives on the 64T.
 A plain hub boss at the tooth root (ch12 p.19 page002_img02 / img06)
 carries the 1/8 in retention pin that keys the pinion to the crankshaft
 through a match-drilled radial cross-hole (dt_crank_pinion_spec).
@@ -31,7 +31,6 @@ import sys
 
 import _telemetry
 from _common import (
-    IN,
     SketchDims,
     _feature_by_name,
     _early_bound,
@@ -64,45 +63,40 @@ from _drawing_marks import (
 )
 from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
-from _gear import build_fixed_gear, volume_check
+from _gear import build_stock_form_gear, volume_check
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _gtol_spec import CylinderFace
 from _part_pmi import _resolve_faces, author_part_pmi
 from _visibility import blank_reference_geometry
+from dt_crank_pinion_notes import GEAR_DATA
 from dt_crank_pinion_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
     BOSS_DIA,
     BOSS_LENGTH,
-    DEDENDUM_FACTOR,
-    DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
     FACE_WIDTH_LIMITS,
-    GEAR_DATA,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
     OVERALL_LENGTH,
     PIN_DIA,
     PIN_HOLE_SPEC,
     PIN_STATION,
-    PRESSURE_ANGLE_DEG,
     SHOULDER_LENGTH,
     SHOULDER_LENGTH_LIMITS,
     SURFACE_FINISHES,
+    STOCK_PROFILE,
+    stock_profile,
     TURNED_DIA,
     TURNED_DIA_TOLERANCE_MM,
 )
-from involute_gear import gear_facts
 
 PART_NAME = "dt-crank-pinion"
 MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 
-TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
-DP = DIAMETRAL_PITCH  # the 64T's normal-plane cutter, cut square (dt_crank_pinion_spec)
-PA_DEG = PRESSURE_ANGLE_DEG
 # FACE_WIDTH (the whole tooth length), SHOULDER_LENGTH, TURNED_DIA and
 # BOSS_LENGTH are in dt_crank_pinion_spec. build_dt_drive_train_assembly checks the
 # installed south face, the T120 clearances and the 64T row overlap.
@@ -111,10 +105,9 @@ BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø9.0 pinion seat (dt_crank_pinion_
 # The hub boss as the runtime gate reads it (#906 diag v3, d6ca08eb7): a boss
 # revolve coincident with the gap floors' root arcs vanished on a
 # regeneration with the rebuild reporting success and What's Wrong empty, so
-# the gate reads the solid itself.  The station sits in the outboard stub,
-# clear of the teeth, so only the boss can reach it; the relieved gap floors
-# share its radius over the toothed length alone.  Tolerances are 1 um: the
-# gate must see a dropped boss, not re-prove the dimensions.
+# the gate reads the solid itself. The station sits in the outboard stub,
+# clear of every stock-form tooth and floor; only the boss can reach it.
+# The 1 um tolerance is a native-presence check, not a machining grade.
 BOSS_GATE_TOL_MM = 1e-3
 BOSS_GATE_FACE = CylinderFace(
     BOSS_DIA,
@@ -124,22 +117,19 @@ BOSS_GATE_FACE = CylinderFace(
 
 
 def turned_band_volume_mm3() -> float:
-    """Tooth material the TurnedBand cut removes: every tooth's cross-section
-    between the turned radius and the tip, over the turned length. The tooth
-    half-angle at radius r is Delta - inv(acos(Rb / r)) (the involute the gap
-    cut leaves; gear_facts, inches)."""
-    facts = gear_facts(TEETH, DP, PA_DEG)
-    rb, ra, delta = facts["Rb"], facts["Ra"], facts["Delta"]
-    rt = TURNED_DIA / 2.0 / IN
-    if not rb < rt < ra:
-        raise AssertionError("the turned diameter must cut the involute flanks")
-    samples = 2000
-    area_in2 = 0.0
-    for i in range(samples):
-        r = rt + (ra - rt) * (i + 0.5) / samples
-        phi = math.acos(rb / r)
-        area_in2 += 2.0 * (delta - (math.tan(phi) - phi)) * r * (ra - rt) / samples
-    return TEETH * area_in2 * IN**2 * (FACE_WIDTH - SHOULDER_LENGTH)
+    """Exact stock-form material removed between the turned circle and blank tip."""
+    turned_profile = stock_profile(outside_dia_mm=TURNED_DIA)
+    outer_area = (
+        math.pi * STOCK_PROFILE.blank_radius_mm**2
+        - STOCK_PROFILE.teeth * STOCK_PROFILE.gap_area_mm2
+    )
+    turned_area = (
+        math.pi * turned_profile.blank_radius_mm**2
+        - turned_profile.teeth * turned_profile.gap_area_mm2
+    )
+    if turned_area >= outer_area:
+        raise AssertionError("the turned diameter must remove actual stock tooth material")
+    return (outer_area - turned_area) * (FACE_WIDTH - SHOULDER_LENGTH)
 
 
 async def assert_boss_present(adapter, label: str) -> None:
@@ -167,9 +157,8 @@ async def build(adapter) -> dict[str, str]:
     # mm suffix (INCH document; the equation manager reads bare numbers in
     # document units, so an unsuffixed length blows the part up 25.4x).
     # FaceWidth drives the gear blank's extrude depth, OutsideDia its tip
-    # circle: both are printed dimensions, so both are knobs. TEETH/DP stay
-    # module constants -- the tooth gap and pattern are built by
-    # build_fixed_gear with literal numerics, off this self-naming path.
+    # circle: both are printed dimensions, so both are knobs. The physical
+    # tooth count and actual finite cutter form are owned by STOCK_PROFILE.
     await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
     await set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
@@ -180,20 +169,13 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Root-relieved standard dedendum keeps the mating tips off an artificial
-    # base-chord floor. The profile and volume oracle use the same 1.25-module
-    # depth as the physical root-circle boss.
-    # The pinion stays a plain straight spur otherwise -- the book's
-    # removable "gear on the crankshaft can be changed" stock member; the
-    # crossing accommodation (helix + backlash) lives on the 64T.
-    disc = await build_fixed_gear(
-        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG, root_relief=True,
-        dedendum=DEDENDUM_FACTOR,
-    )
+    # Cut the declared finite #7/14T stock form; no actual-N involute fallback,
+    # artificial root-circle closure, or independent angular tooth widening.
+    disc = await build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)
     volume = disc.volume
 
-    # build_fixed_gear is shared by five recipes, so it leaves the blank under
-    # the adapter's default names. Name the blank extrude and its absorbed
+    # The shared stock-form helper leaves the blank under adapter default names.
+    # Name the blank extrude and its absorbed
     # profile sketch here: the two sizes the turner sets before a cutter
     # touches the part -- face width and outside diameter -- print as NATIVE
     # model dimensions (drawing-simplicity-policy.md rule 1), which means they

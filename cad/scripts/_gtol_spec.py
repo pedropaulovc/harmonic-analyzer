@@ -16,7 +16,10 @@ model-authored one, and the part tier may not import a drawing module.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
+from math import isfinite
 from typing import Literal, Sequence, Union
 from xml.etree import ElementTree
 
@@ -54,8 +57,14 @@ def gtol_frame_xml(
     *,
     datums: Sequence[str] = (),
     diameter: bool = False,
+    projected_zone_height_mm: float | None = None,
 ) -> str:
-    """Build the SOLIDWORKS-2022+ feature-control-frame XML payload."""
+    """Build 2022+ frame XML using the repository's mm annotation convention.
+
+    Projected-zone nodes and their ordering come from the installed
+    ``swGtolFrameXmlSchema-public-2.xsd`` (``FeatureInfoType``), not from
+    legacy ``IGtol.SetPTZHeight2`` or text appended to the tolerance.
+    """
     symbol = GTOL_SYMBOLS.get(characteristic)
     if symbol is None:
         raise ValueError(f"unsupported geometric characteristic: {characteristic!r}")
@@ -63,12 +72,26 @@ def gtol_frame_xml(
         raise ValueError("feature-control-frame tolerance cannot be blank")
     if len(datums) > 3 or any(not d or len(d) > 2 for d in datums):
         raise ValueError(f"invalid datum reference sequence: {tuple(datums)!r}")
+    if projected_zone_height_mm is not None and (
+        isinstance(projected_zone_height_mm, bool)
+        or not isinstance(projected_zone_height_mm, (int, float))
+        or not isfinite(projected_zone_height_mm)
+        or projected_zone_height_mm <= 0.0
+    ):
+        raise ValueError("projected zone height must be finite and positive in mm")
     root = ElementTree.Element("GtolFrame")
     ElementTree.SubElement(root, "ToleranceSymbol").text = symbol
     range_info = ElementTree.SubElement(root, "ToleranceRangeInfo")
     ElementTree.SubElement(range_info, "PrimaryToleranceValue").text = tolerance
     if diameter:
         ElementTree.SubElement(range_info, "PrimaryRangeSymbol").text = "phi"
+    if projected_zone_height_mm is not None:
+        feature_info = ElementTree.SubElement(root, "FeatureInfo")
+        ElementTree.SubElement(feature_info, "ProjectedToleranceZone").text = "true"
+        # The native XSD uses xs:decimal, whose lexical form excludes exponents.
+        ElementTree.SubElement(feature_info, "Projection").text = format(
+            Decimal(str(projected_zone_height_mm)), "f"
+        )
     for datum in datums:
         compartment = ElementTree.SubElement(root, "DatumCompartment")
         detail = ElementTree.SubElement(compartment, "DatumDetail")
@@ -84,6 +107,7 @@ class GtolFrameSignature:
     tolerance: str
     datums: tuple[str, ...]
     tolerance_zone: ToleranceZone
+    projected_zone_height_mm: float | None = None
 
 
 def gtol_frame_signature(xml: str) -> GtolFrameSignature:
@@ -98,6 +122,8 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
         root = ElementTree.fromstring(xml)
     except ElementTree.ParseError as exc:
         raise ValueError(f"invalid feature-control-frame XML: {exc}") from exc
+    if root.tag.rsplit("}", 1)[-1] != "GtolFrame":
+        raise ValueError("feature-control-frame XML root must be GtolFrame")
 
     def texts(local_name: str) -> list[str]:
         return [
@@ -112,16 +138,67 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
         raise ValueError(f"frame XML has {len(symbols)} tolerance symbols")
     if len(tolerances) != 1 or not tolerances[0]:
         raise ValueError(f"frame XML has {len(tolerances)} primary tolerances")
+    try:
+        tolerance_value = Decimal(tolerances[0])
+    except InvalidOperation as exc:
+        raise ValueError("frame XML primary tolerance is not numeric") from exc
+    if not tolerance_value.is_finite():
+        raise ValueError("frame XML primary tolerance is not finite")
+    # Conversion/readback may serialize ".010" instead of "0.010".
+    tolerance = format(tolerance_value, "f")
+    if "." in tolerance:
+        tolerance = tolerance.rstrip("0").rstrip(".")
 
     range_symbols = [value for value in texts("PrimaryRangeSymbol") if value]
     if any(value != "phi" for value in range_symbols) or len(range_symbols) > 1:
         raise ValueError(f"unsupported primary range symbols: {range_symbols!r}")
     tolerance_zone: ToleranceZone = "diametral" if range_symbols else "linear"
+
+    def children(parent: ElementTree.Element, name: str) -> list[ElementTree.Element]:
+        return [child for child in parent if child.tag.rsplit("}", 1)[-1] == name]
+
+    feature_infos = children(root, "FeatureInfo")
+    if len(feature_infos) > 1:
+        raise ValueError("frame XML has multiple FeatureInfo elements")
+    projected_zone_height_mm = None
+    projected_flags: list[ElementTree.Element] = []
+    if feature_infos:
+        feature_info = feature_infos[0]
+        projected_flags = children(feature_info, "ProjectedToleranceZone")
+        projections = children(feature_info, "Projection")
+        ranges = children(feature_info, "ProjectionRange")
+        if any(len(values) > 1 for values in (projected_flags, projections, ranges)):
+            raise ValueError("frame XML has duplicate projected zone fields")
+        flag = (projected_flags[0].text or "").strip() if projected_flags else "false"
+        if flag not in ("true", "false", "1", "0"):
+            raise ValueError(f"invalid projected zone flag: {flag!r}")
+
+        def decimal_value(element: ElementTree.Element) -> Decimal:
+            value = (element.text or "").strip()
+            if re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)", value) is None:
+                raise ValueError(f"invalid projected zone decimal: {value!r}")
+            try:
+                return Decimal(value)
+            except InvalidOperation as exc:
+                raise ValueError(f"invalid projected zone decimal: {value!r}") from exc
+
+        if ranges and decimal_value(ranges[0]) != 0:
+            raise ValueError("unsupported projected zone range")
+        projection = decimal_value(projections[0]) if projections else Decimal(0)
+        if flag in ("true", "1"):
+            projected_zone_height_mm = float(projection)
+            if not isfinite(projected_zone_height_mm) or projected_zone_height_mm <= 0:
+                raise ValueError("projected zone height must be finite and positive in mm")
+        elif projection != 0:
+            raise ValueError("projected zone height is present without its enabled symbol")
+    if len(texts("ProjectedToleranceZone")) != len(projected_flags):
+        raise ValueError("projected zone symbol must be a child of FeatureInfo")
     return GtolFrameSignature(
         characteristic_symbol=symbols[0],
-        tolerance=tolerances[0],
+        tolerance=tolerance,
         datums=tuple(texts("DatumLetter")),
         tolerance_zone=tolerance_zone,
+        projected_zone_height_mm=projected_zone_height_mm,
     )
 
 
@@ -266,6 +343,7 @@ class GeometricControl:
     face: FaceSpec
     datums: tuple[str, ...] = ()
     tolerance_zone: ToleranceZone = "linear"
+    projected_zone_height_mm: float | None = None
 
     def __post_init__(self) -> None:
         if self.characteristic not in GTOL_SYMBOLS:
@@ -294,6 +372,7 @@ class GeometricControl:
             self.tolerance,
             datums=self.datums,
             diameter=self.tolerance_zone == "diametral",
+            projected_zone_height_mm=self.projected_zone_height_mm,
         )
 
 

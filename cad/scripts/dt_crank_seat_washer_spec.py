@@ -23,6 +23,8 @@ Part frame: axis local +Y through the origin (``Axis1``); faces at y = 0
 from __future__ import annotations
 import math
 
+import _config
+
 import dt_cone_pivot_post_spec
 import dt_crank_pinion_spec
 import dt_crankshaft_spec
@@ -35,7 +37,7 @@ OD = COLLAR_DIA  # the collar body's Ø20.6
 ID = 11.6
 # Slips over the journal land, never under the bore: an Ø11.60 jobber drill
 # through the blank, so the band is the title block's DRILLED HOLES row.
-ID_BAND = (0.10, 0.0)  # (upper, lower) deviations
+ID_BAND = (float(_config.title_block("drilled_hole")["plus_mm"]), 0.0)
 BORE_CALLOUT = "DRILL THRU"
 
 # The smallest bore still passes the largest journal land on the way on.
@@ -129,7 +131,14 @@ check_fit_up(GAP_MIN, GAP_MAX, BLANK_THICKNESS_MIN)
 # The sheet: the modelled thickness prints as a REFERENCE; the callout under
 # it is the requirement, and the blank is the make-to size.  The MHA-DT-000 step
 # pointer is appended by the drawing (a part never reads the step registry).
-THICKNESS_CALLOUT = f"SET AT ASSEMBLY {GAP_MIN:.2f}-{GAP_MAX:.2f}\nFACED TO FIT"
+THICKNESS_CALLOUT = "\n".join(
+    (
+        "FACED TO FIT MHA-DT-011 COLLAR",
+        "TO MHA-DT-005 BOSS, NO AXIAL GAP",
+        "WITH MHA-DT-010 ON ITS SEAT FEELER",
+        f"SET AT ASSEMBLY {GAP_MIN:.2f}-{GAP_MAX:.2f}",
+    )
+)
 DRAWING_NOTES = "\n".join(
     (
         f"SUPPLY {BLANK_THICKNESS_MIN:.2f} MIN THICK.",
@@ -156,3 +165,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RingProfile": {"DiscDia": 1, "BoreDia": 2},
     "Disc": {"DiscThick": 1},
 }
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+REFERENCE_DIMENSIONS = frozenset({"DiscThick"})

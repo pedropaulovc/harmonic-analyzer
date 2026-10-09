@@ -12,7 +12,7 @@ from _gtol_spec import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-from dt_cone_gear_spec import DEEPENED_MESH_MM, FACE_WIDTH as CONE_GEAR_FACE_WIDTH, SEAT_PITCH
+from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH, SEAT_PITCH, outside_dia_mm
 from dt_cone_gear_stack import PITCH_LOCKSTEP_TOLERANCE, face_band
 from dt_cone_pivot_post_installation import GEAR_AXIS_SHIFT
 from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as POST_JOURNAL_BORE_BAND
@@ -22,9 +22,13 @@ from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft bui
     RUNNING_DIA_BAND,
     SECTION_DIA_BANDS,
     SECTION_FLAT_AF,
+    TERMINAL_DIA_IN,
+    TERMINAL_DIA_PLACES,
+    TERMINAL_FLAT_EDGE_BREAK_MAX,
 )
 from cone_stack_end_play import COLLAR_FEELER, MARGIN_SPARE
 from vn_cone_tip_collar_spec import WIDTH as TIP_COLLAR_WIDTH
+from vn_cone_tip_adjuster_spec import CUP_DEPTH
 from dt_crank_drive_gear_spec import CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_NORTH
 from dt_crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 from dt_crank_drive_gear_spec import LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE_WIDTH
@@ -42,15 +46,21 @@ MM_PER_IN = 25.4
 JOURNAL_BORE_DIA = dt_cone_pivot_post_spec.BORE_DIA
 JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
+# Actual limits for this post/shaft pair, not an intended common clearance.
+JOURNAL_DIAMETRAL_CLEARANCE_MM = (
+    JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[1] - JOURNAL_DIA - RUNNING_DIA_BAND[0],
+    JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[0] - JOURNAL_DIA - RUNNING_DIA_BAND[1],
+)
 JOURNAL_PROUD = 1.0
 JOURNAL_END = dt_cone_pivot_post_spec.CONE_BOSS_LENGTH + JOURNAL_PROUD
 
-# The final coupled-layout post centre is cone station -39.90136099793.  Its
-# 42.011 mm axial body therefore has its front face at -60.9068609979; another
-# 1.0 mm makes the shaft end proud at -61.9068609979.  The part origin is that front end and all
-# stations below are measured from it.
+# The post's cone station and boss length locate its front face.  The shaft
+# end is JOURNAL_PROUD south of that face; the part origin is that end.
+# All local stations below follow the same cone-line/post geometry.
 FRONT_STUB = (
-    -cone_line.POST_STATION + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0 + JOURNAL_PROUD
+    -cone_line.POST_STATION
+    + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0
+    + JOURNAL_PROUD
 )
 
 # Axial capture (#914, user ruling 2026-09-25).  The tip adjuster pushes the
@@ -69,10 +79,14 @@ FRONT_STUB = (
 # centre is the drive-train's physical 64T station (the shaft tests pin the
 # two equal).
 GEAR64_SOUTH_FACE_STATION = (
-    GEAR64_LAYOUT_CENTRE_STATION + GEAR_AXIS_SHIFT
-    - GEAR64_LAYOUT_FACE_WIDTH / 2.0 + GEAR64_SOUTH_FACE_SHIFT_NORTH
+    GEAR64_LAYOUT_CENTRE_STATION
+    + GEAR_AXIS_SHIFT
+    - GEAR64_LAYOUT_FACE_WIDTH / 2.0
+    + GEAR64_SOUTH_FACE_SHIFT_NORTH
 )
-GEAR64_CENTER_STATION = GEAR64_LAYOUT_CENTRE_STATION + GEAR_AXIS_SHIFT + GEAR64_CENTRE_SHIFT_NORTH
+GEAR64_CENTER_STATION = (
+    GEAR64_LAYOUT_CENTRE_STATION + GEAR_AXIS_SHIFT + GEAR64_CENTRE_SHIFT_NORTH
+)
 GEAR64_NORTH_FACE_STATION = GEAR64_SOUTH_FACE_STATION + GEAR64_FACE_WIDTH
 COLLAR_START_STATION = JOURNAL_END
 COLLAR_END_STATION = FRONT_STUB + GEAR64_SOUTH_FACE_STATION
@@ -164,8 +178,8 @@ if not (
         f"{gear_faces(0)[0]:.6f} within 0..{PITCH_LOCKSTEP_TOLERANCE}"
     )
 
-# The tip end (user ruling 2026-09-29).  The MHA-VN-016 stack collar (McMaster
-# 9414T1) is set one COLLAR_FEELER north of T006's face and locked on the
+# The tip end: the custom MHA-VN-016 stack collar is set one COLLAR_FEELER
+# north of T006's face and locked on the
 # Sec4 D-flat.  The MHA-DT-021 tip block is a straight prism fixed by its
 # hold-down: its north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of
 # the pivot, itself PIVOT_FROM_T006_NORTH_FACE north of T006's face
@@ -185,8 +199,7 @@ TIP_BLOCK_NORTH_FACE_STATION = cone_line.TIP_BLOCK_NORTH_FACE
 TIP_BLOCK_SOUTH_FACE_STATION = TIP_BLOCK_NORTH_FACE_STATION - TIP_BLOCK_LENGTH
 ADJUSTER_EMBED = dt_cone_tip_block_spec.ADJUSTER_EMBED
 ADJUSTER_CUP_RIM_STATION = TIP_BLOCK_NORTH_FACE_STATION - ADJUSTER_EMBED
-MCM_94025A164_CUP_DEPTH = 1.2065
-T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + MCM_94025A164_CUP_DEPTH
+T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + CUP_DEPTH
 
 # Land steps (user ruling 2026-09-28).  The touching gears leave no air gap
 # to step in, so each step sits SEAT_STEP_SETBACK SOUTH of the interface where
@@ -204,58 +217,42 @@ def seat_step_station(j: int) -> float:
     return gear_faces(j)[1] - SEAT_STEP_SETBACK
 
 
-# U40 (option S1, 2026-09-23): every small-shaft land moves one gear station
-# toward the big end, so the 1/16 in terminal land now starts under T018
-# (j = 17), one setback behind its north face.  One constant feeds both the
-# 1/8 in section end and the tip stub start, so they cannot drift apart.
+# U40 moved the terminal land start under T018. The cutter-native redesign
+# keeps that station and substitutes the authoritative 1/32 in terminal
+# diameter, shared by T012, T006 and the stack collar.
 TIP_LAND_START_STATION = seat_step_station(17)
 TIP_STUB_START_STATION = TIP_LAND_START_STATION
 TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 
 # (diameter in inches, section end station in mm from the front stub end).
-# Diameters are typed here in inches and must agree with
-# build_dt_cone_gear.bore_dia_in (the gear seats), which U40 moved one station
-# toward the big end together with this shaft: 3/8 in T030..T120, 1/4 in
-# T024, 1/8 in T018, 1/16 in T012 and T006.  Each step sits one setback behind
-# the north face of the last gear on the larger land (seat_step_station).
-#
-# The terminal land is 1/16 in, not the 1/32 in a literal "bore = shaft
-# section at the seat" first produced.  At DP 49.82 / PA 14.5 a 6-tooth gear
-# is cut as involute flanks closed by a chord on the base circle -- the
-# project's own DXF profile, cut with a self-made form cutter.  T006's gap
-# floor is printed at 2.880 mm MIN diameter (U40), so a 1/16 in bore leaves a
-# 0.646 mm nominal web, 0.621 mm at maximum bore -- the one named web
-# exception (dt_cone_gear_spec.WEB_EXCEPTIONS_MM) -- on a near-torque-free gear.
-# Since U40 the land carries T012 as well, so it runs from the T018 step to
-# the E11 cup apex, at L/D 15.9 since the 2026-09-29 prism tip block.  A
-# manual lathe turns that only with the tip held on a tailstock centre --
-# unsupported, it whips off the tool -- which is why the tailstock note below
-# is a requirement (U40), not a method.
-# The shaft still decreases monotonically toward the tip: the cone is
-# assembled tip-first, and every gear's tip diameter exceeds the next inboard
-# gear's bore (T006 4.28 > T012 bore 1.5875; T012 7.55 > T018 3.175; T018
-# 10.74 > T024 6.35; T024 13.90 > T030 9.525; asserted below from
-# dt_cone_gear_spec.DEEPENED_MESH_MM), so no single gear can be made integral
-# with the shaft unless all twenty are.
+# Intermediate seats keep the retained sizes and fit classes. The terminal
+# size lives in cone_shaft_land_bands and the gear family checks its web
+# against the current cutter-owned printed MIN floors, not an old snapshot.
+# Tailstock support remains required for the now more slender terminal land.
+# Diameters decrease toward the tip for tip-first assembly.
 SECTIONS: tuple[tuple[float, float], ...] = (
     (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral v2-post bearing journal
     (0.375, FRONT_STUB + seat_step_station(15)),  # 64T + T120..T030 seats
     (0.25, FRONT_STUB + seat_step_station(16)),  # T024 seat
     (0.125, FRONT_STUB + TIP_LAND_START_STATION),  # T018 seat
-    (0.0625, FRONT_STUB + T006_TIP_STATION),  # T012 + T006 seats, stack collar, tip
+    (TERMINAL_DIA_IN, FRONT_STUB + T006_TIP_STATION),  # T012/T006, collar, tip
 )
 
 SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
 SECTION_ENDS = tuple(end for _dia_in, end in SECTIONS)
 SHAFT_LENGTH = SECTION_ENDS[-1]
-# Tip-first assembly: each small gear passes over no land it cannot clear.
-# T006..T024 sit on SECTIONS[4..2] (T006/T012 share the terminal land); the
-# next inboard gear's bore is the land under it.
-for _teeth, _next_bore in ((6, 4), (12, 3), (18, 2), (24, 1)):
-    if DEEPENED_MESH_MM[_teeth][0] <= SECTION_DIAS[_next_bore]:
-        raise AssertionError(
-            f"T{_teeth:03d} tip diameter does not exceed the next inboard bore"
-        )
+def validate_gear_loading_clearances() -> None:
+    """Require accepted physical tips before a native shaft build starts.
+
+    Pure layout/fit readers remain importable when a cutter family is refused;
+    the accepted outside-dia reader must still refuse at this runtime boundary.
+    Tip-first assembly: each small gear passes over no land it cannot clear.
+    """
+    for teeth, next_bore in ((6, 4), (12, 3), (18, 2), (24, 1)):
+        if outside_dia_mm(teeth) <= SECTION_DIAS[next_bore]:
+            raise AssertionError(
+                f"T{teeth:03d} tip diameter does not exceed the next inboard bore"
+            )
 
 # D-flats (user ruling 2026-09-28): every gear land carries one flat with its
 # outward normal on the shaft's local +X (the Right plane's normal), across
@@ -360,8 +357,8 @@ SURFACE_FINISHES = (
 # no digits but the mates' numbers, no method words but one.  Lines stay
 # short: the note block starts 58 mm in and the title block begins at 216 mm.
 # The tailstock line is that one process word, by user ruling (U40,
-# 2026-09-23): the Ø1.588 terminal land (L/D 15.9) cannot be turned
-# unsupported, so the support IS the requirement (rule 6's exception), not a
+# 2026-09-23): the slender terminal land cannot be turned unsupported,
+# so the support IS the requirement (rule 6's exception), not a
 # method preference.  The parallel line is the flats' relative clock (codex,
 # fca59e2b): each land's flat turns every gear on it, so the four must share
 # one clock.  No dimension can say it -- the flats stand in four separate
@@ -373,6 +370,7 @@ DRAWING_NOTES = "\n".join(
         "GEAR SEATS AND FLATS MATE MHA-DT-003 AND MHA-DT-007 BORES.",
         "ALL FLATS PARALLEL.",
         "TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
+        "TERMINAL MAX BREAK: LONG TORQUE CORNERS ONLY.",
     )
 )
 
@@ -391,6 +389,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec2FlatProfile": {"Sec2AF"},
     "Sec3FlatProfile": {"Sec3AF"},
     "Sec4FlatProfile": {"Sec4AF"},
+    "TerminalFlatEdgeBreak": {"TerminalTorqueEdge"},
     "ShoulderFillets": {"ShoulderR"},
     "CollarProfile": {"CollarDia"},
     "Collar": {"CollarWidth"},
@@ -431,7 +430,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec1Profile": {"Sec1Dia": 3},
     "Sec2Profile": {"Sec2Dia": 3},
     "Sec3Profile": {"Sec3Dia": 3},
-    "Sec4Profile": {"Sec4Dia": 3},
+    "Sec4Profile": {"Sec4Dia": TERMINAL_DIA_PLACES},
     "Sec0": {"Sec0End": 1},
     "Sec1": {"Sec1End": 3},
     "Sec2": {"Sec2End": 3},
@@ -441,6 +440,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec2FlatProfile": {"Sec2AF": 3},
     "Sec3FlatProfile": {"Sec3AF": 3},
     "Sec4FlatProfile": {"Sec4AF": 3},
+    "TerminalFlatEdgeBreak": {"TerminalTorqueEdge": 3},
     "ShoulderFillets": {"ShoulderR": 2},
     "CollarProfile": {"CollarDia": 2},
     "Collar": {"CollarWidth": 3},
@@ -468,6 +468,22 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 def printed_band(name: str) -> float:
     """The title-block band a marked length prints at its own places."""
     return printed_band_mm(DRAWING_PRECISION_BY_NAME[name])
+
+
+# Guaranteed cylindrical support, with the integral collar seated on the
+# actual post north face. Neither a full boss nor the shaft's proud end is a
+# bearing contact. Both bore rims and the ordinary free shaft-end break remove
+# support; the shorter of the two COMPLETE overlaps controls running cock.
+JOURNAL_FREE_END_BREAK_MAX_MM = 0.25
+JOURNAL_SUPPORT_SPAN_MIN_MM = min(
+    dt_cone_pivot_post_spec.CONE_BOSS_LENGTH
+    - printed_band_mm(dt_cone_pivot_post_spec.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
+    - 2.0 * THRUST_EDGE_BREAK_MAX,
+    JOURNAL_END - printed_band("Sec0End")
+    - JOURNAL_FREE_END_BREAK_MAX_MM - THRUST_EDGE_BREAK_MAX,
+)
+if JOURNAL_SUPPORT_SPAN_MIN_MM <= 0.0:
+    raise AssertionError("post/shaft pair has no guaranteed cylindrical bearing span")
 
 
 # The setback proof (user ruling 2026-09-28).  Each step and its root fillet

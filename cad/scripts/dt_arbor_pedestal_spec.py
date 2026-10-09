@@ -10,6 +10,7 @@ from math import sqrt
 from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 
 
 MM_PER_IN = 25.4
@@ -39,7 +40,7 @@ LEDGE_DEPTH = FOOT_DEPTH - STRAP_T  # exposed hold-down ledge, 18
 TOP_RADIUS = 11.0
 BORE_DIA = 9.55  # finished running bore for the 3/8 in cylinder-arbor journal
 BORE_DIA_BAND = (0.03, 0.0)  # 9.550–9.580 mm running-bore limits
-BORE_HEIGHT = 39.718  # v2 post journal axis: 6.35 platform + 33.368 boss height
+BORE_HEIGHT = PLATFORM_THICKNESS_MM + CONE_AXIS_HEIGHT_MM
 _ROOT_HALF_WIDTH = FOOT_WIDTH / 2.0
 _CENTER_RISE = BORE_HEIGHT - FOOT_HEIGHT
 _TANGENT_DISC = sqrt(_ROOT_HALF_WIDTH**2 + _CENTER_RISE**2 - TOP_RADIUS**2)

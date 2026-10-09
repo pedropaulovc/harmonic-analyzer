@@ -119,3 +119,5 @@ def assert_signed_circle_center(
                 )
     if mismatches:
         raise RuntimeError(f"{label}: rebuilt signed position mismatch: " + "; ".join(mismatches))
+
+

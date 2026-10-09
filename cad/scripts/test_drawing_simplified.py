@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
@@ -871,3 +872,368 @@ def test_a_simplified_child_of_an_unnamed_configuration_is_an_orphan() -> None:
         _drawing_simplified.assert_simplified_configurations(
             adapter, "dt-cone-gear", TEETH, ["T006", "T120"]
         )
+
+
+LOCAL_TEETH = {
+    parent: (f"ToothGapCut{parent}", f"ToothGapPattern{parent}")
+    for parent in ("T006", "T120")
+}
+
+
+class FakeProperties:
+    def __init__(self, values=None):
+        self.values = dict(values or {})
+
+    def GetNames(self):
+        return list(self.values)
+
+    def Get6(self, name, _cached):
+        return (0, self.values[name][1], "", False, False)
+
+    def GetType2(self, name):
+        return self.values[name][0]
+
+    def Add3(self, name, kind, value, _options):
+        self.values[name] = (kind, value)
+        return 0
+
+
+class FakeLocalToothPart(FakePart):
+    """Two disjoint native triples plus the blank; no global active tooth set."""
+
+    def __init__(self):
+        super().__init__(("Default", *LOCAL_TEETH), active="T120")
+        self.features = {}
+        for parent, names in LOCAL_TEETH.items():
+            for name in (f"ToothGapProfile{parent}", *names):
+                self.features[name] = FakeFeature(
+                    name, self, set(self.configurations) - {parent}
+                )
+        self.properties = {}
+        for name, configuration in self.configurations.items():
+            configuration.NeedsRebuild = False
+            configuration.BOMPartNoSource = CONFIGURATION
+            configuration.Description = f"Detailed {name}"
+            configuration.UseDescriptionInBOM = True
+            self.properties[name] = FakeProperties({"Number": (30, f"part-{name}")})
+        self.Extension.CustomPropertyManager = self._properties
+        self.mutations = []
+        self.refuse = None
+
+    def _properties(self, name):
+        return self.properties.setdefault(name, FakeProperties())
+
+    def _add(self, *args):
+        self.mutations.append(("add", args[0]))
+        configuration = super()._add(*args)
+        configuration.NeedsRebuild = False
+        return configuration
+
+    def ShowConfiguration2(self, name):
+        self.mutations.append(("activate", name))
+        return False if self.refuse == "activate" else super().ShowConfiguration2(name)
+
+    def ForceRebuild3(self, _top_only):
+        self.mutations.append(("rebuild", self.ConfigurationManager.ActiveConfiguration.Name))
+        return self.refuse != "rebuild"
+
+    def GetTitle(self):
+        return "local-teeth.SLDPRT"
+
+    def detailed_state(self):
+        return (
+            self.states("Default", *LOCAL_TEETH),
+            {
+                name: (
+                    _drawing_simplified._bom_identity(self.configurations[name]),
+                    self.properties[name].values.copy(),
+                )
+                for name in ("Default", *LOCAL_TEETH)
+            },
+        )
+
+
+def test_configuration_local_targets_preserve_all_detailed_and_foreign_features():
+    part = FakeLocalToothPart()
+    before = part.detailed_state()
+    adapter = _part_adapter(part)
+    children = _drawing_simplified.add_simplified_configurations(
+        adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+    assert children == [simplified_name(parent) for parent in LOCAL_TEETH]
+    assert part.detailed_state() == before
+    assert part.ConfigurationManager.ActiveConfiguration.Name == "T120"
+    for parent, names in LOCAL_TEETH.items():
+        child = simplified_name(parent)
+        assert part.configurations[child].Comment == simplified_comment(", ".join(names))
+        assert part.properties[child].values == part.properties[parent].values
+        for name, feature in part.features.items():
+            assert (child in feature.suppressed) == (
+                True if name in names else parent in feature.suppressed
+            )
+    _drawing_simplified.assert_simplified_configurations(
+        adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        {"T006": LOCAL_TEETH["T006"]},
+        {**LOCAL_TEETH, "Default": TEETH},
+        {**LOCAL_TEETH, "T006": ()},
+        {**LOCAL_TEETH, "T006": ("",)},
+        {**LOCAL_TEETH, "T006": (" ",)},
+        {**LOCAL_TEETH, "T006": ("duplicate", "duplicate")},
+        {**LOCAL_TEETH, "T006": "ToothGapCutT006"},
+    ],
+)
+@pytest.mark.parametrize("operation", ["add", "assert", "saved"])
+def test_invalid_local_mapping_is_refused_before_any_native_mutation(mapping, operation):
+    part = FakeLocalToothPart()
+    before = part.detailed_state()
+    adapter = _part_adapter(part)
+    with pytest.raises(ValueError):
+        if operation == "saved":
+            asyncio.run(
+                _drawing_simplified.derive_simplified_on_saved_part(
+                    adapter, "local-teeth", mapping, "fixture.SLDPRT", list(LOCAL_TEETH)
+                )
+            )
+        else:
+            function = (
+                _drawing_simplified.add_simplified_configurations
+                if operation == "add"
+                else _drawing_simplified.assert_simplified_configurations
+            )
+            function(adapter, "local-teeth", mapping, list(LOCAL_TEETH))
+    assert not part.mutations
+    assert part.GetConfigurationNames() == ["Default", *LOCAL_TEETH]
+    assert part.detailed_state() == before
+    assert adapter.currentModel is part
+
+
+@pytest.mark.parametrize("defect", ["missing", "suppressed", "bad_suppression_answer"])
+def test_local_target_integrity_fails_before_deriving(defect):
+    part = FakeLocalToothPart()
+    name = LOCAL_TEETH["T006"][0]
+    if defect == "missing":
+        del part.features[name]
+    elif defect == "suppressed":
+        part.features[name].suppressed.add("T006")
+    else:
+        part.features[name].IsSuppressed2 = lambda *_args: ()
+    with pytest.raises(RuntimeError):
+        _drawing_simplified.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+    assert not part.mutations
+
+
+@pytest.mark.parametrize(
+    "defect", ["child_target", "parent_target", "foreign_child", "comment", "bom", "parent", "orphan"]
+)
+def test_local_full_readback_refuses_corrupted_configuration(defect):
+    part = FakeLocalToothPart()
+    adapter = _part_adapter(part)
+    _drawing_simplified.add_simplified_configurations(
+        adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+    child = part.configurations["T006 Simplified"]
+    if defect == "child_target":
+        part.features[LOCAL_TEETH["T006"][0]].suppressed.remove(child.Name)
+    elif defect == "parent_target":
+        part.features[LOCAL_TEETH["T006"][0]].suppressed.add("T006")
+    elif defect == "foreign_child":
+        part.features[LOCAL_TEETH["T120"][0]].suppressed.remove(child.Name)
+    elif defect == "comment":
+        child.Comment = simplified_comment(", ".join(LOCAL_TEETH["T120"]))
+    elif defect == "bom":
+        child.BOMPartNoSource = DOCUMENT
+    elif defect == "parent":
+        child.parent = part.configurations["T120"]
+    else:
+        part._add("Default Simplified", "", "", 0, "Default", "", False)
+    with pytest.raises(RuntimeError, match="readback failed"):
+        _drawing_simplified.assert_simplified_configurations(
+            adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+@pytest.mark.parametrize("refuse", ["activate", "rebuild"])
+def test_local_derivation_retains_activation_and_rebuild_gates(refuse):
+    part = FakeLocalToothPart()
+    part.refuse = refuse
+    with pytest.raises(RuntimeError, match="simplified configurations failed"):
+        _drawing_simplified.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+def test_local_derivation_retains_hard_fault_gate(monkeypatch):
+    part = FakeLocalToothPart()
+    monkeypatch.setattr(_drawing_simplified, "_hard_faults", lambda *_args: ["native fault"])
+    with pytest.raises(RuntimeError, match="rebuilt with faults"):
+        _drawing_simplified.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+def _saved_local_adapter(*, save_ok=True):
+    """Distinct authoring, reopened, persisted and readback document objects."""
+    authoring = FakeLocalToothPart()
+    disk = deepcopy(authoring)
+    events = []
+    adapter = _part_adapter(authoring)
+
+    def close(title):
+        events.append(("close", title))
+
+    def save(_options, _errors, _warnings):
+        nonlocal disk
+        events.append(("save",))
+        if save_ok:
+            disk = deepcopy(adapter.currentModel)
+        return (save_ok, 0 if save_ok else 1, 0)
+
+    async def open_model(path):
+        events.append(("open", path))
+        adapter.currentModel = deepcopy(disk)
+        adapter.currentModel.Save3 = save
+        return SimpleNamespace(is_success=True, data=None)
+
+    adapter.swApp = SimpleNamespace(CloseDoc=close)
+    adapter.open_model = open_model
+    return adapter, authoring, events
+
+
+def test_local_saved_reopen_derivation_persists_and_reads_every_parent_and_child():
+    adapter, authoring, events = _saved_local_adapter()
+    before = authoring.detailed_state()
+    asyncio.run(
+        _drawing_simplified.derive_simplified_on_saved_part(
+            adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
+        )
+    )
+    assert adapter.currentModel is None
+    assert authoring.GetConfigurationNames() == ["Default", *LOCAL_TEETH]
+    assert not authoring.mutations
+    assert [event[0] for event in events] == ["close", "open", "save", "close"]
+    asyncio.run(adapter.open_model("fixture.SLDPRT"))
+    reopened = adapter.currentModel
+    assert reopened is not authoring
+    assert reopened.detailed_state() == before
+    assert reopened.ConfigurationManager.ActiveConfiguration.Name == "T120"
+    assert all(
+        configuration.AddRebuildSaveMark for configuration in reopened.configurations.values()
+    )
+    _drawing_simplified.assert_simplified_configurations(
+        adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+
+
+def test_local_saved_derivation_refuses_failed_save():
+    adapter, _authoring, events = _saved_local_adapter(save_ok=False)
+    with pytest.raises(RuntimeError, match="Save3 failed"):
+        asyncio.run(
+            _drawing_simplified.derive_simplified_on_saved_part(
+                adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
+            )
+        )
+    assert [event[0] for event in events] == ["close", "open", "save"]
+
+
+def test_local_derivation_refuses_drift_in_an_unselected_detailed_parent(monkeypatch):
+    part = FakeLocalToothPart()
+    original_add = part._add
+
+    def add_with_drift(*args):
+        child = original_add(*args)
+        part.features[LOCAL_TEETH["T006"][0]].suppressed.discard("Default")
+        return child
+
+    monkeypatch.setattr(part.ConfigurationManager, "AddConfiguration2", add_with_drift)
+    with pytest.raises(RuntimeError, match="detailed configuration suppression changed"):
+        _drawing_simplified.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+@pytest.mark.parametrize("returns_success", [False, True])
+def test_local_child_suppression_must_succeed_and_read_back(monkeypatch, returns_success):
+    part = FakeLocalToothPart()
+    monkeypatch.setattr(
+        part.features[LOCAL_TEETH["T006"][0]],
+        "SetSuppression2",
+        lambda *_args: returns_success,
+    )
+    with pytest.raises(RuntimeError, match="SetSuppression2 refused|readback failed"):
+        _drawing_simplified.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+def test_local_telemetry_names_the_actual_targets_for_each_parent(monkeypatch):
+    part = FakeLocalToothPart()
+    annotations = []
+    monkeypatch.setattr(
+        _drawing_simplified._telemetry, "annotate", lambda **fields: annotations.append(fields)
+    )
+    _drawing_simplified.add_simplified_configurations(
+        _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+    assert len(annotations) == 2
+    assert all(
+        fields["feature_names_by_parent"]
+        == {parent: list(names) for parent, names in LOCAL_TEETH.items()}
+        for fields in annotations
+    )
+    assert all(fields["features"] == 4 for fields in annotations)
+
+
+def test_local_saved_derivation_refuses_failed_reopen():
+    adapter, authoring, events = _saved_local_adapter()
+
+    async def failed_open(_path):
+        return SimpleNamespace(is_success=False, error="cannot reopen saved part")
+
+    adapter.open_model = failed_open
+    with pytest.raises(RuntimeError, match="cannot reopen saved part"):
+        asyncio.run(
+            _drawing_simplified.derive_simplified_on_saved_part(
+                adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
+            )
+        )
+    assert not authoring.mutations
+    assert [event[0] for event in events] == ["close"]
+
+
+@pytest.mark.parametrize("defect", ["missing", "extra", "empty", "duplicate"])
+def test_direct_save_rejects_invalid_mapping_before_save_or_export(monkeypatch, defect):
+    part = FakeLocalToothPart()
+    adapter = _part_adapter(part)
+    # This API selects all detailed configurations, including the blank.
+    mapping = {**LOCAL_TEETH, "Default": TEETH}
+    if defect == "missing":
+        del mapping["T006"]
+    elif defect == "extra":
+        mapping["Unknown"] = TEETH
+    elif defect == "empty":
+        mapping["T120"] = ()
+    else:
+        mapping["T120"] = ("duplicate", "duplicate")
+    calls = []
+
+    async def save_or_export(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("invalid mappings must never save or export")
+
+    monkeypatch.setattr(_drawing_simplified, "save_part_and_images", save_or_export)
+    before = part.detailed_state()
+    with pytest.raises(ValueError):
+        asyncio.run(_drawing_simplified.save_simplified_part(adapter, "local-teeth", mapping))
+    assert not calls
+    assert not part.mutations
+    assert adapter.currentModel is part
+    assert part.GetConfigurationNames() == ["Default", *LOCAL_TEETH]
+    assert part.detailed_state() == before

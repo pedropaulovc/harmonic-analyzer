@@ -1,15 +1,15 @@
 r"""Create the curated manufacturing drawing for the crank pinion (16T).
 
 Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet has an end
-view, longitudinal section and isometric of a toothed disc with a hub boss and
-six native model dimensions. Every turned diameter sits beside its axial
-extent on the longitudinal section: tooth-tip blank, reamed bore and boss, with
-face width, overall length and the boss end break. The retention pin's
-matched-fit hole callout and the gear-data block carry the process facts that
-geometry cannot.
+view, longitudinal section and isometric of a toothed disc with a hub boss.
+Every turned diameter sits beside its axial extent on the longitudinal
+section: tooth-tip blank, turned north band, reamed bore and boss, with
+shoulder length, face width and overall length from the toothed south face.
+The retention pin's matched-fit callout and the normal-pitch gear-data block
+carry the requirements geometry cannot convey.
 
 No datums, no feature control frames, one roughness symbol (the bore): a
-removable stock pinion pinned to its crankshaft is not on the GD&T allowlist
+custom pinion pinned to its crankshaft is not on the GD&T allowlist
 (rules 3-5). The bore's native limits and feature callout jointly identify its
 mating crankshaft and required diametral clearance. The decimal places are the
 PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied natively by
@@ -92,19 +92,16 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 FRONT_CENTER = (0.110, 0.150)
-RIGHT_CENTER = (0.215, 0.150)
-# At 0.345 the isometric's outline began under the boss diameter's text
-# (eye pass of f0c105531); ``_isometric_clears_boss_dia`` now holds it clear.
-# The guard reads the view's bounding box, +-0.0509 about its centre at 3:1
-# (w15-301f4bf4e read-back), wider than the drawn silhouette: 0.360 failed it
-# by 2.7 mm, and 0.365 clears the text by 2.3 mm and the border by 3.2 mm.
-ISO_CENTER = (0.365, 0.150)
+RIGHT_CENTER = (0.210, 0.150)
+# Leave the current full-depth blank's isometric clear of the boss-diameter
+# text and the border. The native bounding-box guard remains authoritative.
+ISO_CENTER = (0.363, 0.150)
 
 # Half the printed tooth-tip circle, in sheet metres: the face-view silhouette
 # radius and the section's half-height, which every dimension is placed clear
 # of; and half the printed boss, the section's height past the teeth.
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0  # 0.0267
-HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0  # 0.0203
+HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
+HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0
 
 
 def _side_x(z_mm: float) -> float:

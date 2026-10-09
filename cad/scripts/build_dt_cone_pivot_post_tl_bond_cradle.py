@@ -691,7 +691,7 @@ async def build(adapter: Any) -> dict[str, str]:
     await dimension_between(
         adapter, f"{axis_line}.start", f"{axis_line}.end", "vertical_distance", CRANK_PIN_Y, "crank station"
     )
-    crank_ref.record("CrankAxisY")
+    crank_ref.record("CrankAxisY", '"CrankPinY"')
     check(
         "crank pin drop horizontal",
         await adapter.add_sketch_constraint(crank_drop, None, "horizontal"),

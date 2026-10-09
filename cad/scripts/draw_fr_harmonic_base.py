@@ -8,6 +8,10 @@ export behavior lives in ``_drawing_common``.
 The base is a stepped gray-iron frame with a raised rim, four column sockets,
 and blind tapped hardware seats. The plate is 457 mm long, so the whole sheet
 runs 1:4; the front elevation is also 1:4 and the pictorial isometric is 1:6.
+The transferred block, spring-foot and pedestal seats consume the builder's
+live model stations to select their actual Hole Wizard rims. They remain
+outside the coordinate table: their associative size/depth callouts name the
+identified mating parts and the rig-set or assembly transfer requirement.
 
 Run with SolidWorks open::
 
@@ -653,8 +657,8 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
 
 
 # U28 assembly corollary (Main ruling 2026-09-23, from the user's U27/U28):
-# the pinion rig is set on the base by a 2.5 feeler at the parked tip gap,
-# then the pivot-block and spring-foot seats are spotted THROUGH those parts.
+# the pinion rig is located by the current RIG_SET_STEP, then the pivot-block
+# and spring-foot seats are spotted THROUGH their finished mating parts.
 # U34c does the same for the arbor pedestals: each is stood on the base with
 # the arbor running in both straps, and its seat is spotted through the ledge
 # hole. The sheet therefore prints no position for any of them: they leave

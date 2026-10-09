@@ -37,6 +37,7 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     BODY_SEAT_CALLOUT,
     CONE_PIN_TOPS_NOTE,
     CONE_PIN_Y,
+    CRANK_PIN_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     SECTION_REFERENCE_SKETCHES,
@@ -106,8 +107,8 @@ PLAN_KEEP = {
     "CrankPinWestX": (-23.0, 144.0, 0.0),
     "CrankPinEastX": (-17.0, 152.0, 0.0),
     "BaseWidth": (0.0, 160.0, 0.0),
-    "ConePinY": (-48.0, 17.0, 0.0),
-    "CrankPinY": (-64.0, 36.0, 0.0),
+    "ConePinY": (-48.0, CONE_PIN_Y / 2.0, 0.0),
+    "CrankPinY": (-64.0, CRANK_PIN_Y / 2.0, 0.0),
     "CrankPinDia": (-52.0, 100.0, 0.0),
 }
 ELEVATION_KEEP = {
@@ -126,7 +127,7 @@ ELEVATION_KEEP = {
     # Pin tops from the post axis (the reference sketch's line at Z0): the
     # dimension stands beside the crank pin on its foot-B side, its upper
     # extension on the axis line, its lower on the pins' top edge.
-    "CrankPinFromAxis": (0.0, 62.0, -8.0),
+    "CrankPinFromAxis": (0.0, CRANK_PIN_Y - 10.7, -8.0),
     "TailSaddleHeight": (0.0, 130.0, -22.0),
 }
 # Each seat's profile sketch is parallel to its section, so the section

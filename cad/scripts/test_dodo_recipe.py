@@ -2186,13 +2186,16 @@ def test_config_deps_are_fine_grained():
     cfg = (REPO_ROOT / "cad" / "config").resolve()
     whole = set(dodo._CONFIG_YAMLS)
 
-    # The cone-gear part reads gear_train (through ``involute_gear``), its own
-    # registry row, title-block properties and the global release.  Its bore
-    # and tooth-thickness bands are cone-specific constants in
-    # ``cone_gear_spec`` (U38/U42), so ``tolerances.yaml`` is not an input.
+    # Face width is floor(SEAT_PITCH * 1e4) / 1e4: SEAT_PITCH depends on DP
+    # and nominal drum-seat length, hence gear_train + cone_incline. The stamped
+    # contact-ratio screen needs tolerances for oblique edge slack and journal
+    # float: c_deep=(N_cone*M + PD_drum)/2 + edge_slack, then opening/runout.
+    # World station_z0 and active_count cancel; channels.yaml remains unread.
     cone = dodo._config_deps(scripts / "build_dt_cone_gear.py", "dt_cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
+        "machine/cone_incline.yaml",
+        "tolerances.yaml",
         "parts/dt-cone-gear.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
@@ -2290,6 +2293,34 @@ def test_config_deps_recipe_digest_skips_unread_yaml():
     assert "machine/channels.yaml" not in frame, (
         "frame must not FULL on an active_count edit"
     )
+    frame_modules = {Path(path).name for path in dodo._recipe_files("fr_frame")}
+    assert "dt_post_mount_stack.py" in frame_modules, frame_modules
+    assert not frame_modules & {
+        "vn_post_mount_screw_spec.py",
+        "dt_cone_swing_platform_spec.py",
+        "cone_line.py",
+    }, frame_modules
+
+
+def test_shared_post_mount_interference_depth_matches_the_part():
+    """The universal exception needs penetration, not the cone's world pose.
+
+    Keep its import-free nominal law tied to the physical owners, including
+    the cut-length rounding; a second pinned engagement could drift silently.
+    """
+    import dt_post_mount_stack as stack
+    import dt_cone_pivot_post_spec as post
+    import dt_cone_swing_platform_spec as platform
+    import vn_post_mount_screw_spec as screw
+
+    assert stack.POST_BODY_HEIGHT_MM == post.BLOCK_HEIGHT
+    assert stack.POST_MOUNT_COUNTERBORE_DEPTH_MM == post.ATTACHMENT_CBORE_DEPTH
+    assert stack.PLATFORM_THICKNESS_MM == platform.PLATE_THICKNESS
+    assert stack.CUT_TO_FIT_SHORT_MM == platform.POST_SCREW_CUT_TO_FIT_SHORT
+    assert stack.CUT_LENGTH_PLACES == screw.DRAWING_PRECISION_BY_NAME["CutLength"]
+    assert stack.GRIP_MM == screw.GRIP_MM
+    assert stack.CUT_LENGTH_MM == screw.CUT_LENGTH_MM
+    assert stack.POST_SCREW_ENGAGEMENT_NOMINAL == screw.ENGAGEMENT_NOMINAL_MM
 
 
 def test_recipe_digest_ignores_yaml_comments(tmp_path):

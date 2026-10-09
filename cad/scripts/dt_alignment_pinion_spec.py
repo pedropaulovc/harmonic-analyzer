@@ -12,8 +12,11 @@ import math
 import _config
 import dt_cylinder_gear_spec as drum
 
+from _fit_limits import deviations, gear_tip_band_mm
+from _printed_tolerance import printed_deviations
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from stock_form_cutter import CutterTemplate, StockFormProfile
 
 
 MM_PER_IN = 25.4
@@ -23,44 +26,69 @@ DIAMETRAL_PITCH = float(_config.machine("gear_train", "diametral_pitch"))
 PRESSURE_ANGLE_DEG = float(_config.machine("gear_train", "pressure_angle_deg"))
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
-DEDENDUM_FACTOR = 1.25
-ROOT_DIA = PITCH_DIA - 2.0 * DEDENDUM_FACTOR * MODULE_MM
-WHOLE_DEPTH = (1.0 + DEDENDUM_FACTOR) * MODULE_MM
+OUTSIDE_DIA_BAND = gear_tip_band_mm("contact_critical")
+DEDENDUM_FACTOR = 1.25  # reference cutter root, not an actual-axis circular floor
+CUTTER_NUMBER = 4
+CUTTER_TEETH_RANGE = (26, 34)
+CUTTER_REFERENCE_TEETH = CUTTER_TEETH_RANGE[0]
+CUTTER_TEMPLATE = CutterTemplate(
+    CUTTER_REFERENCE_TEETH, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG
+)
+CUTTER_RADIAL_TRANSLATION_MM = PITCH_DIA / 2.0 - CUTTER_TEMPLATE.pitch_radius_mm
+_SUPPORT_PROFILE = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, CUTTER_RADIAL_TRANSLATION_MM
+)
+SUPPORT_OUTSIDE_DIA_MM = 2.0 * _SUPPORT_PROFILE.support_radius_max_mm
+# Pay the retained thickness inspection band with the actual cutter
+# translation.  W = 2*Rb*(beta-k) + 2*T*sin(beta), beta = 3*pi/N.
+BASE_TANGENT_SPAN_TEETH = 3
+# Four places keep the exact standard-depth model below its printed +0 cap;
+# three places would round 4.141050... DOWN and reject the native nominal.
+BASE_TANGENT_SPAN_PLACES = 4
+BASE_TANGENT_SPAN = _SUPPORT_PROFILE.tangent_span_mm(BASE_TANGENT_SPAN_TEETH)
+BASE_TANGENT_SPAN_BAND = (0.0, -0.100)  # retained (upper, lower) inspection band
+_SPAN_TRANSLATION_SENSITIVITY = 2.0 * math.sin(
+    math.pi * BASE_TANGENT_SPAN_TEETH / TEETH
+)
+_PRINTED_SPAN_MIN = (
+    round(BASE_TANGENT_SPAN, BASE_TANGENT_SPAN_PLACES) + BASE_TANGENT_SPAN_BAND[1]
+)
+MIN_SPAN_CUTTER_RADIAL_TRANSLATION_MM = CUTTER_RADIAL_TRANSLATION_MM + (
+    _PRINTED_SPAN_MIN - BASE_TANGENT_SPAN
+) / _SPAN_TRANSLATION_SENSITIVITY
+_MIN_SPAN_SUPPORT_PROFILE = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, MIN_SPAN_CUTTER_RADIAL_TRANSLATION_MM
+)
+MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM = (
+    2.0 * _MIN_SPAN_SUPPORT_PROFILE.support_radius_max_mm
+)
+# Turn down for the deepest accepted STOCK cutter, not only the native
+# standard-depth nominal.  The explicit OD upper deviation must fit too.
+OUTSIDE_DIA = math.floor(
+    (MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM - OUTSIDE_DIA_BAND[0]) * 100.0
+) / 100.0
+STOCK_FORM = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, CUTTER_RADIAL_TRANSLATION_MM
+)
+ROOT_ENVELOPE_DIA_MM = (
+    2.0 * STOCK_FORM.root_radius_min_mm,
+    2.0 * STOCK_FORM.root_radius_max_mm,
+)
+WHOLE_DEPTH = STOCK_FORM.plunge_mm
+MAX_CUT_DEPTH_MM = STOCK_FORM.blank_radius_mm - STOCK_FORM.root_radius_min_mm
+PITCH_TOOTH_THICKNESS_MM = STOCK_FORM.pitch_tooth_thickness_mm
 ENGAGED_CENTER_EXTENSION_MM = float(
     _config.machine("alignment_pinion", "engaged_center_extension_mm")
 )
 ENGAGED_CENTER_DISTANCE_MM = (
-    (PITCH_DIA + drum.PITCH_DIA) / 2.0 + ENGAGED_CENTER_EXTENSION_MM
+    PITCH_DIA + drum.PITCH_DIA
+) / 2.0 + ENGAGED_CENTER_EXTENSION_MM
+ENGAGED_CENTER_RADIAL_STACK_MM = float(
+    _config.machine("alignment_pinion", "engaged_center_radial_stack_mm")
 )
-_PRESSURE_ANGLE_RAD = math.radians(PRESSURE_ANGLE_DEG)
-_BASE_RADIUS = (
-    TEETH * MODULE_MM * math.cos(_PRESSURE_ANGLE_RAD) / 2.0
-)
-_BASE_TOOTH_HALF_ANGLE = (
-    math.pi / (2.0 * TEETH)
-    + math.tan(_PRESSURE_ANGLE_RAD)
-    - _PRESSURE_ANGLE_RAD
-)
-_HALF_GAP_ANGLE = math.pi / TEETH - _BASE_TOOTH_HALF_ANGLE
-MIN_CHORD_FLOOR_DIA = 2.0 * _BASE_RADIUS * math.cos(_HALF_GAP_ANGLE)
-AS_CUT_RADIAL_TOOTH_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
-# Tooth thickness is inspected as a base-tangent span.  Three teeth put the
-# caliper contacts at r8.14, on the flanks at the pitch circle (r8.16).  The
-# model is cut to the standard thickness, which is the upper limit.  The drum
-# swings into the cylinder bank until its flanks seat, so centre distance
-# takes up any thinning; the band only has to keep the flanks present.
-BASE_TANGENT_SPAN_TEETH = 3
-BASE_TANGENT_SPAN = (
-    MODULE_MM
-    * math.cos(_PRESSURE_ANGLE_RAD)
-    * (
-        math.pi * (BASE_TANGENT_SPAN_TEETH - 0.5)
-        + TEETH * (math.tan(_PRESSURE_ANGLE_RAD) - _PRESSURE_ANGLE_RAD)
-    )
-)
-BASE_TANGENT_SPAN_BAND = (0.0, -0.100)  # (upper, lower) deviations
-BASE_CHORD_ROOT_FORM = "INVOLUTE FLANKS; GAP FLOOR CHORD AT BASE CIRCLE"
+# Inspect the actual translated-template flanks, not an unrolled ideal N32
+# involute.  The core refuses a span whose tangent contacts leave finite support.
+TOOTH_FORM = "TRANSLATED STOCK FORM; FINITE FLANKS AND OFF-CENTRE ROOT ARC"
 
 BORE_DIA = 8.0  # Ø8 arbor through-bore (build_dt_pinion_arbor.py)
 # Slip fit bonded with Loctite 638, not a press: a press over the full 143.2
@@ -74,9 +102,9 @@ ARBOR_BORE_BAND = (0.100, 0.000)  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
 FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
-# The tooth-tip OD prints at the .XX general grade (U27).  At the worst of
-# +/-0.51, the drum tip keeps >= 0.21 mm to the 120T gap floor and the mesh
-# keeps a contact ratio >= 1.13 (test_dt_alignment_pinion_drawing).
+# Tips are functional gear surfaces, not routine exterior profiles.  Actual
+# stock-form support, coverage/no-gap, backlash, air and TE must pay both
+# printed tip corners and the retained tangent-span/fit bands independently.
 
 # Only the reamed bore carries a roughness symbol.  The two end faces bear on
 # the MHA-DT-014 straps' inner faces when the drum floats hard forward or hard
@@ -108,6 +136,71 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked alignment-pinion dimension needs native precision")
 
 
+def outside_dia_limits_mm() -> tuple[float, float]:
+    """Accepted tooth-tip MIN/MAX from the printed nominal and native band."""
+    lower, upper = printed_deviations(
+        OUTSIDE_DIA,
+        DRAWING_PRECISION_BY_NAME["OutsideDia"],
+        deviations(OUTSIDE_DIA_BAND),
+    )
+    return round(OUTSIDE_DIA + lower, 12), round(OUTSIDE_DIA + upper, 12)
+
+
+def base_tangent_span_limits_mm() -> tuple[float, float]:
+    """Accepted span MIN/MAX from its printed gear-data nominal and band."""
+    nominal = round(BASE_TANGENT_SPAN, BASE_TANGENT_SPAN_PLACES)
+    upper, lower = BASE_TANGENT_SPAN_BAND
+    return round(nominal + lower, 12), round(nominal + upper, 12)
+
+
+def manufacturing_corner_profiles() -> tuple[StockFormProfile, ...]:
+    """Finite actual profiles at every printed tip/thickness size corner."""
+    return tuple(
+        StockFormProfile(
+            TEETH,
+            CUTTER_TEMPLATE,
+            tip / 2.0,
+            CUTTER_RADIAL_TRANSLATION_MM
+            + (span - BASE_TANGENT_SPAN) / _SPAN_TRANSLATION_SENSITIVITY,
+        )
+        for tip in outside_dia_limits_mm()
+        for span in base_tangent_span_limits_mm()
+    )
+
+
+# Diagnostic only: the chosen +platen-X operating sense is crank world +Z,
+# cone -U and cylinder world +Z. Finishing zeroing in that direction loads
+# the lower/reverse alignment edge. The drum has NO index feature: notches
+# are set by eye and the drum is then parked, so this is not a readout datum.
+ENGAGED_HOME_LOADED_EDGE = "lower"
+
+
+def engaged_home_clocking_rad(
+    engaged_swing_rad: float, line_of_centres_rad: float
+) -> tuple[float, float]:
+    """Diagnostic authored-home clockings, NOT a cam/readout zero datum.
+
+    The caller supplies the PURE park owner's engaged swing and driver-to-
+    cylinder line heading; importing that owner here would create a cycle.
+    The drum is identity-placed at rest and anti-spun to the strap, so its
+    native tooth0 advances by the engagement swing.  Its canonical gap is
+    another pi/32 ahead.  The cylinder's row-vector placement is Ry(180)
+    THEN Rz(-lock): its native gap angle pi/120 maps to pi-pi/120-lock.
+    The engine's driven datum already includes pi-pi/120, leaving -lock-L.
+    Return absolute physical angles, not modulo/tared tooth phases.
+
+    Zeroing sets cylinder notches by eye, independently of this arbitrary
+    drum input clock, then parks the drum. No budget term uses this gauge.
+    """
+    if not math.isfinite(engaged_swing_rad) or not math.isfinite(line_of_centres_rad):
+        raise ValueError("alignment home swing and line heading must be finite")
+    lock = math.radians(float(_config.machine("gear_train", "cylinder_lock_phase_deg")))
+    return (
+        engaged_swing_rad + math.pi / TEETH - line_of_centres_rad,
+        -lock - line_of_centres_rad,
+    )
+
+
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
     """Render an aligned gear/sprocket data block for a property-linked note."""
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
@@ -121,17 +214,24 @@ GEAR_DATA = gear_data_note(
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
         (
-            "MIN CHORD-FLOOR DIAMETER (mm, REF)",
-            f"{MIN_CHORD_FLOOR_DIA:.3f}",
+            "ROOT ENVELOPE DIAMETER (mm, REF)",
+            f"{ROOT_ENVELOPE_DIA_MM[0]:.3f}-{ROOT_ENVELOPE_DIA_MM[1]:.3f}",
         ),
         (
-            "AS-CUT RADIAL TOOTH DEPTH (mm, REF)",
-            f"{AS_CUT_RADIAL_TOOTH_DEPTH:.3f}",
+            "CUTTER PLUNGE (mm, REF)",
+            f"{WHOLE_DEPTH:.3f}",
         ),
-        ("TOOTH FORM", BASE_CHORD_ROOT_FORM),
+        (
+            "FORM CUTTER (REF)",
+            f"#{CUTTER_NUMBER}, {CUTTER_TEETH_RANGE[0]}-{CUTTER_TEETH_RANGE[1]}T; "
+            f"{CUTTER_REFERENCE_TEETH}T REFERENCE",
+        ),
+        ("TOOTH FORM", TOOTH_FORM),
+        ("PITCH TOOTH THICKNESS (mm, REF)", f"{PITCH_TOOTH_THICKNESS_MM:.3f}"),
         (
             f"BASE-TANGENT SPAN, OVER {BASE_TANGENT_SPAN_TEETH} TEETH (mm)",
-            f"{BASE_TANGENT_SPAN:.3f} +{BASE_TANGENT_SPAN_BAND[0]:.3f}"
+            f"{BASE_TANGENT_SPAN:.{BASE_TANGENT_SPAN_PLACES}f} "
+            f"+{BASE_TANGENT_SPAN_BAND[0]:.3f}"
             f"/{BASE_TANGENT_SPAN_BAND[1]:.3f}",
         ),
     ]

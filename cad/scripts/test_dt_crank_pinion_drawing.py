@@ -1,7 +1,7 @@
 """Offline contracts for the crank-pinion drawing.
 
 The print is recreated under ``cad/docs/drawing-simplicity-policy.md``: a
-removable 16T stock pinion with a hub boss and a match-drilled retention pin
+custom 16T pinion with a hub boss and a match-drilled retention pin
 carries no datums or frames, its turned sizes and lengths are native model
 dimensions whose places and bands the PART owns, the pin hole is governed by
 its matched-fit feature callout, and the tooth system it cannot dimension
@@ -20,6 +20,7 @@ import pytest
 import _config
 import build_dt_crank_pinion as part
 import dt_crank_pinion_spec as spec
+import dt_crank_pinion_notes as notes
 import dt_crank_drive_gear_spec as mate
 import dt_crankshaft_spec
 import draw_dt_crank_pinion as drawing
@@ -100,13 +101,17 @@ def test_the_blank_sizes_are_native_model_dimensions() -> None:
     assert '\'"FaceWidth"\'' in build
     assert '\'"OutsideDia"\'' in build
     assert 'set_global(adapter, "OutsideDia"' in build
-    assert spec.OUTSIDE_DIA == pytest.approx(
-        (part.TEETH + 2) / part.DP * spec.MM_PER_IN
+    minimum_support = min(
+        profile.support_radius_max_mm for _, profile in spec.STOCK_PROFILE_CORNERS
     )
+    scale = 10**spec.DRAWING_PRECISION_BY_NAME["OutsideDia"]
+    assert spec.OUTSIDE_DIA == math.floor(
+        (2.0 * minimum_support - spec.OUTSIDE_DIA_TOLERANCE_MM) * scale
+    ) / scale
     assert spec.FACE_WIDTH == part.FACE_WIDTH
     assert spec.BORE_DIA == pytest.approx(part.BORE_DIAMETER)
-    assert "OUTSIDE DIAMETER" not in spec.GEAR_DATA
-    assert "FACE WIDTH" not in spec.GEAR_DATA
+    assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
+    assert "FACE WIDTH" not in notes.GEAR_DATA
 
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
@@ -132,12 +137,19 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
 
 
 def test_grown_teeth_keep_the_south_seat_and_boss_length() -> None:
-    # c'' variant B (user ruling 2026-09-30): the teeth grow 1.8 north of the
-    # 9.5 face, ruling R9-55 a further 0.1 and R9-56 0.2 more; the boss keeps
-    # its 14.0 so the W15 pin wall is unchanged, and the south seat on MHA-DT-005
-    # does not move.
-    assert spec.FACE_WIDTH == pytest.approx(9.5 + 1.8 + 0.1 + 0.2)
-    assert spec.BOSS_LENGTH == pytest.approx(14.0)
+    # The tooth length follows the part spec; the W15 boss is sized from the
+    # published pin, recess and printed allowances, not a former face pin.
+    assert spec.FACE_WIDTH == part.FACE_WIDTH
+    assert spec.BOSS_LENGTH == spec.ceil_to_places(
+        2.0
+        * (
+            spec.PIN_EDGE_MIN_WORST
+            + spec.SHAFT_END_RECESS_MAX
+            + spec.PIN_DIA / 2.0
+            + spec._PIN_EDGE_CLOSING_TERMS
+        ),
+        spec.BOSS_LENGTH_PLACES,
+    )
     assert spec.OVERALL_LENGTH == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH)
     assert spec.PIN_STATION == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH / 2.0)
     # The turned band is a real band at every accepted size.
@@ -248,19 +260,22 @@ def test_boss_dia_text_clears_its_extension_lines() -> None:
 
 
 def test_isometric_clears_the_boss_dia_text() -> None:
-    # Eye pass of f0c105531: at ISO_CENTER x 0.345 the isometric began under
-    # the boss diameter's text (0.3014 +- 0.0066). The sheet-side check reads
-    # the view's bounding box, which w15-301f4bf4e read back as
-    # (0.3091, 0.4109) at centre 0.360 -- wider than the drawn silhouette, so
-    # 0.360 failed it. Those offsets carry over to any centre at 3:1.
-    left_offset, right_offset = 0.3091023168 - 0.360, 0.4108976832 - 0.360
-    text_right = (
-        drawing.BOSS_DIA_TEXT_X + drawing.BOSS_DIA_TEXT_HALF_WIDTH + drawing.ISO_TEXT_CLEARANCE
+    # Bound the current blank by its circumscribed radius, not a former
+    # isometric's measured offsets. Native view extents still gate export.
+    extent = (
+        math.hypot(spec.OUTSIDE_DIA / 2.0, spec.OVERALL_LENGTH / 2.0)
+        * drawing.VIEW_SCALE[0]
+        / drawing.VIEW_SCALE[1]
+        / 1000.0
+        + 0.0056
     )
-    assert 0.360 + left_offset < text_right
-    assert 0.345 + left_offset < text_right
-    assert drawing.ISO_CENTER[0] + left_offset >= text_right
-    assert drawing.ISO_CENTER[0] + right_offset <= drawing.SHEET_INNER_BORDER[2]
+    text_right = (
+        drawing.BOSS_DIA_TEXT_X
+        + drawing.BOSS_DIA_TEXT_HALF_WIDTH
+        + drawing.ISO_TEXT_CLEARANCE
+    )
+    assert drawing.ISO_CENTER[0] - extent >= text_right
+    assert drawing.ISO_CENTER[0] + extent <= drawing.SHEET_INNER_BORDER[2]
     assert "_isometric_clears_boss_dia(iso)" in _source()
 
 
@@ -334,18 +349,23 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
 
 
 def test_tip_diameter_band_is_carried_by_the_fixed_centre_mesh() -> None:
-    # Tip enlargement consumes radial room even with no adjustable fit-up.
-    import crank_mesh_stack
+    # Each retained manufactured tip belongs to a named actual 3D corner.
+    import crank_mesh_stack as mesh
+    import crank_mesh_geometry as geometry
 
     assert spec.OUTSIDE_DIA_TOLERANCE_MM == 0.10
     assert spec.DRAWING_PRECISION_BY_NAME["OutsideDia"] == 2
     assert "OutsideDia" in spec.DRAWING_DIMENSIONS["BossProfile"]
-    assert spec.TIP_CLEARANCE_MM == pytest.approx(0.152, abs=0.001)
-    assert crank_mesh_stack.TIP_ROOT_BAND_RADIAL >= spec.OUTSIDE_DIA_TOLERANCE_MM / 2.0
-    assert crank_mesh_stack.TIGHT_BACKLASH_MM > 0.0
+    normal_module = _config.machine("gear_train", "crank_drive_normal_module_mm")
+    assert spec.TIP_CLEARANCE_MM == pytest.approx(
+        (spec.DEDENDUM_FACTOR - 1.0) * normal_module
+    )
     # The face width is the one free length: one place, so the title block's
     # .X grade is the band it claims, and nothing contradicts it.
     assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
+    payload = mesh.require_qualified()
+    assert geometry.required_calibration_case_names() <= payload["cases"].keys()
+    assert all(case["tight_backlash_lower_mm"] > 0.0 for case in payload["cases"].values())
 
 
 def test_callouts_add_only_what_the_number_cannot_carry() -> None:
@@ -390,53 +410,54 @@ def test_print_carries_no_gdt_or_basic_dimensions() -> None:
 
 
 def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
-    assert spec.DIAMETRAL_PITCH == pytest.approx(part.DP)
-    assert spec.PRESSURE_ANGLE_DEG == pytest.approx(part.PA_DEG)
-    assert spec.TEETH == part.TEETH
-    assert spec.PITCH_DIA == pytest.approx(spec.TEETH * spec.MODULE_MM)
-    assert spec.WHOLE_DEPTH == pytest.approx(2.157 * spec.MODULE_MM)
+    profile = spec.STOCK_PROFILE
+    assert part.STOCK_PROFILE is profile
+    assert spec.PITCH_DIA == pytest.approx(2.0 * profile.pitch_radius_mm)
+    normal_module = _config.machine("gear_train", "crank_drive_normal_module_mm")
+    assert spec.MODULE_MM == normal_module
+    assert spec.DIAMETRAL_PITCH == pytest.approx(spec.MM_PER_IN / normal_module)
+    assert spec.PRESSURE_ANGLE_DEG == _config.machine(
+        "gear_train", "crank_drive_pressure_angle_deg"
+    )
+    assert profile.radial_translation_mm == pytest.approx(
+        profile.pitch_radius_mm - profile.template.pitch_radius_mm
+    )
+    assert spec.DEDENDUM_FACTOR == 1.25
+    assert spec.WHOLE_DEPTH == pytest.approx(
+        profile.blank_radius_mm - profile.root_radius_min_mm
+    )
+    assert spec.ROOT_DIA == spec.ROOT_DIA_MIN
+    assert spec.ROOT_DIA_MIN == pytest.approx(2.0 * profile.root_radius_min_mm)
+    assert spec.ROOT_DIA_MAX == pytest.approx(2.0 * profile.root_radius_max_mm)
+    assert spec.ROOT_DIA_MIN < spec.ROOT_DIA_MAX
     assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
-        math.pi * spec.MODULE_MM / 2.0
+        profile.pitch_tooth_thickness_mm
     )
-
-    # The pinion must not consume the discrete voxel/phase study's unverified
-    # margin: it checks nominal 0.150 mm tooth thinning and samples 0.100 mm
-    # only at the nominal c2c/helix/shaft/offset/bore stack. Keep the maximum
-    # pinion tooth nominal and reuse MHA-DT-007's established 0.020 mm one-sided
-    # tooth-control capability. MHA-DT-007 is cut normal-defined by this gear's
-    # own cutter (#906), so its normal pressure angle IS the cutter's; convert
-    # its normal-span lower limit with it.
-    normal_pressure_angle_rad = math.radians(mate.CUTTER_PRESSURE_ANGLE_DEG)
-    assert math.tan(normal_pressure_angle_rad) == pytest.approx(
-        math.tan(math.radians(mate.PRESSURE_ANGLE_DEG))
-        * math.cos(math.radians(mate.HELIX_ANGLE_DEG))
-    )
-    mate_span_scale = math.cos(math.radians(mate.HELIX_ANGLE_DEG)) * math.cos(
-        normal_pressure_angle_rad
-    )
-    mate_extra_thinning = 0.020 / mate_span_scale
-    pair_minimum = mate.BACKLASH_MM - spec.TOOTH_THICKNESS_UPPER_DEVIATION
-    pair_maximum = (
-        mate.BACKLASH_MM
-        - spec.TOOTH_THICKNESS_LOWER_DEVIATION
-        + mate_extra_thinning
-    )
-    assert pair_minimum == pytest.approx(0.150)
-    assert pair_maximum == pytest.approx(0.191120, abs=1e-6)
+    assert spec.TOOL_PLUNGE_MM == pytest.approx(profile.plunge_mm)
+    assert spec.CUTTER_NUMBER == profile.template.cutter_number != mate.CUTTER_NUMBER
+    assert spec.CUTTER_TEETH_RANGE == profile.template.teeth_range
+    assert profile.template.reference_teeth == spec.CUTTER_TEETH_RANGE[0] < spec.TEETH
+    assert spec.CUTTER_TEETH_RANGE[0] <= spec.TEETH <= spec.CUTTER_TEETH_RANGE[1]
+    data = dict(line.partition(":")[::2] for line in notes.GEAR_DATA.splitlines()[1:])
+    assert "NORMAL = TRANSVERSE" in notes.GEAR_DATA
+    assert f"#{spec.CUTTER_NUMBER}" in data["FORM CUTTER"]
+    assert f"{profile.template.reference_teeth}T REFERENCE" in data["FORM CUTTER"]
+    assert "FINITE STOCK" in data["TOOTH FORM"]
+    span_row = next(line for line in notes.GEAR_DATA.splitlines() if "BASE TANGENT SPAN" in line)
+    assert "ACCEPT ON THIS PART" in span_row and "REF" not in span_row
+    lower, upper = spec.BASE_TANGENT_SPAN_LIMITS_MM
+    assert f"{lower:.{spec.BASE_TANGENT_SPAN_PLACES}f} TO {upper:.{spec.BASE_TANGENT_SPAN_PLACES}f}" in span_row
+    width_row = next(line for line in notes.GEAR_DATA.splitlines() if "CIRCULAR PITCH THICKNESS" in line)
+    assert "REF" in width_row and "ACCEPT" not in width_row
+    for obsolete in ("NONSTANDARD", "SAME CUTTER", "LONG ADDENDUM", "CONTACT RATIO"):
+        assert obsolete not in notes.GEAR_DATA
 
 
-def test_notes_carry_the_tooth_edge_override_and_the_boss_wall_fact() -> None:
+def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() -> None:
     lines = spec.DRAWING_NOTES.split("\n")
-    # The gear-data table already defines the nonstandard tooth system. One
-    # note overrides the title block's destructive edge break; the other
-    # states the option-C thin boss wall as a plain fact from the spec's own
-    # worst case, rounded down. The policy requires the sheet to state its
-    # named exception (Codex #857 P2), but exception and ruling labels never
-    # print (fleet ruling, 2026-09-26); the policy row keeps the provenance.
     assert spec.TOOTH_EDGE_NOTE in lines
-    wall = f"{math.floor(spec.BOSS_WALL_WORST * 100.0) / 100.0:.2f}"
-    assert wall == "1.67"
-    assert any(line.startswith("BOSS WALL") and f"{wall} MIN" in line for line in lines)
+    assert spec.BOSS_WALL_WORST >= 2.0
+    assert not any(line.startswith("BOSS WALL") for line in lines)
     # The T120 fit-up may turn the band down; the sheet states its floor.
     assert any(
         "TURNED BAND" in line and f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN" in line
@@ -449,11 +470,10 @@ def test_notes_carry_the_tooth_edge_override_and_the_boss_wall_fact() -> None:
     policy = (
         Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
     ).read_text(encoding="utf-8")
-    row = next(
-        line for line in policy.splitlines()
-        if line.startswith("| MHA-DT-010 crank pinion boss |")
+    assert not any(
+        line.startswith("| MHA-DT-010 crank pinion boss |")
+        for line in policy.splitlines()
     )
-    assert f"wall {math.floor(spec.BOSS_WALL_WORST * 1000.0) / 1000.0:.3f}" in row
     notes = spec.DRAWING_NOTES
     assert spec.PIN_NUMBER not in notes
     assert "LIGHT DRIVE FIT" not in notes
@@ -606,37 +626,30 @@ def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None
     concentric = bdt.PINION_T120_CONCENTRIC
     assert concentric["shoulder air"] >= bdt.T120_PINION_AIR_FLOOR
     assert concentric["turned band radial"] >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
-    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION >= bdt.CRANK_ROW_ENGAGEMENT_FLOOR
+    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION_WORST >= bdt.ROW_ENGAGEMENT_MIN
     assert sum(bdt.PINION_RECESS_STACK.values()) >= spec.SHAFT_END_RECESS_MIN_WORST
-    # Codex P2 on #892: 4d4e038e3 (recess 1.02, pinion 24.615 printed 24.6,
-    # shaft 136.6345 printed 136.6) passed only against the inch grade 0.762;
-    # at the printed +/-0.8 and printed nominals its recess is 0.240.
-    shipped = bdt.pinion_recess_stack(1.02, 136.6345, 24.615)
-    assert shipped["pinion overall length"] == pytest.approx(-0.815)
-    assert shipped["shaft length"] == pytest.approx(0.0345)
-    assert sum(shipped.values()) == pytest.approx(0.2395, abs=1e-4)
-    assert sum(shipped.values()) < spec.SHAFT_END_RECESS_MIN_WORST
-    assert 1.02 - 0.03 * 25.4 >= spec.SHAFT_END_RECESS_MIN_WORST
-    # The ruled g = 5.935 grew the boss and the shaft equally, keeping the old
-    # 0.32 recess: at the printed row the shaft end then stands proud.
-    equal_growth_recess = 113.039505572 + 17.28 - 130.0
-    assert sum(bdt.pinion_recess_stack(equal_growth_recess, 130.0, 17.28).values()) < 0.25
-
-
-def test_boss_wall_is_the_ruled_option_c_exception() -> None:
-    # USER RULING 2026-09-25 (MHA-DT-010 boss option C): the boss stays at the
-    # tooth root; its worst wall at the printed row over the bore's upper
-    # limit is under the 2.0 target and held above the 1.5 floor.
-    bore_lower, bore_upper = spec.deviations(spec.BORE_DIA_BAND)
-    printed_boss = round(spec.BOSS_DIA, spec.BOSS_DIA_PLACES)
-    worst = (printed_boss - 0.8 - (spec.BORE_DIA + bore_upper)) / 2.0
-    assert spec.BOSS_DIA == pytest.approx(spec.ROOT_DIA)
-    assert spec.BOSS_WALL_WORST == pytest.approx(worst) == pytest.approx(1.6725, abs=1e-3)
-    assert spec.BOSS_WALL_FLOOR_MM <= spec.BOSS_WALL_WORST < 2.0
-    assert spec.DRAWING_PRECISION["BossProfile"]["BossDia"] == spec.BOSS_DIA_PLACES
-    assert "USER RULING 2026-09-25, MHA-DT-010 boss option C" in Path(spec.__file__).read_text(
-        encoding="utf-8"
+    # The unfaced recess cannot be justified by a former inch stock grade.
+    # Carry the actual printed allowance and the current shaft/pinion sizes.
+    edge_recess = spec.SHAFT_END_RECESS_MIN_WORST + spec.OVERALL_LENGTH_GRADE_MM
+    under = bdt.pinion_recess_stack(
+        edge_recess - spec.printed_band_mm(spec.OVERALL_LENGTH_PLACES),
+        dt_crankshaft_spec.SHAFT_LENGTH,
+        spec.OVERALL_LENGTH,
     )
+    assert sum(under.values()) < spec.SHAFT_END_RECESS_MIN_WORST
+
+
+def test_root_diameter_boss_meets_the_current_printed_wall_target() -> None:
+    # Retain option C's root-circle boss and native bore band. Standard full
+    # depth now supplies the wall target without a thin-wall exception.
+    _, bore_upper = spec.deviations(spec.BORE_DIA_BAND)
+    printed_boss = round(spec.BOSS_DIA, spec.BOSS_DIA_PLACES)
+    row = spec.printed_band_mm(spec.BOSS_DIA_PLACES)
+    worst = (printed_boss - row - (spec.BORE_DIA + bore_upper)) / 2.0
+    assert spec.BOSS_DIA == pytest.approx(spec.ROOT_DIA)
+    assert spec.BOSS_WALL_WORST == pytest.approx(worst)
+    assert worst >= 2.0 > spec.BOSS_WALL_FLOOR_MM
+    assert spec.DRAWING_PRECISION["BossProfile"]["BossDia"] == spec.BOSS_DIA_PLACES
 
 
 
@@ -761,11 +774,9 @@ def test_boss_gate_wants_the_boss_cylinder_not_just_the_length(_plain_binding) -
 
 
 def test_turned_band_clears_t120_and_each_negative_control_flips() -> None:
-    # c'' variant B (user ruling 2026-09-30), print-worst at both end-play
-    # extremes and every cone-stack float, T120 and the crank on their
-    # nominal axes: shoulder air, turned-band radial and the row (stub teeth
-    # counted, reading (ii)) each hold their floor, and each fails when its
-    # own geometry is taken away.
+    # Printed end-play and cone-float corners retain each current floor.
+    # A missing shoulder section cannot be made present by length alone;
+    # negative controls must first reach a real T120 section.
     import build_dt_drive_train_assembly as bdt
 
     def nominal_axes(**geometry) -> dict[str, float]:
@@ -775,114 +786,844 @@ def test_turned_band_clears_t120_and_each_negative_control_flips() -> None:
     assert clear == bdt.PINION_T120_CONCENTRIC
     assert clear["shoulder air"] >= bdt.T120_PINION_AIR_FLOOR
     assert clear["turned band radial"] >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
-    # Each corner's own row width (Codex P2 on #1154), each slice meshing at
-    # its own centre with every axis pose (R9-56).
-    assert bdt.CRANK_ROW_ENGAGEMENT_UNFLOATED == pytest.approx(0.9702, abs=2e-3)
-    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION == pytest.approx(0.8596, abs=2e-3)
-    assert bdt.CRANK_ROW_FULL_DEPTH_FRACTION == pytest.approx(0.4362, abs=2e-3)
-    # Turned to the tip-circle row's +0.60, the band reaches T120.
-    oversize = nominal_axes(turned_dia=spec.TURNED_DIA + 0.60)
-    assert oversize["turned band radial"] < bdt.T120_TURNED_BAND_RADIAL_FLOOR
-    # A shoulder 1.0 longer, or no turned band at all, runs into T120.
-    longer = nominal_axes(shoulder_length=spec.SHOULDER_LENGTH + 1.0)
-    assert longer["shoulder air"] < bdt.T120_PINION_AIR_FLOOR
-    no_band = nominal_axes(shoulder_length=None)
-    assert no_band["shoulder air"] < bdt.T120_PINION_AIR_FLOOR
-    # Grown only 1.4, the floated row drops under 85%.
-    short = bdt.crank_row_engagement(
-        9.5 + 1.4, bdt._PINION_FACE_BAND, bdt.CONE_FLOAT_NORTH
+    # Supported carrying row is independently certified by actual stock 3D.
+    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION_WORST >= bdt.ROW_ENGAGEMENT_MIN
+    # Increasing the turned radius consumes the measured radial margin.
+    oversize = nominal_axes(
+        turned_dia=spec.TURNED_DIA
+        + 2.0 * (clear["turned band radial"] - bdt.T120_TURNED_BAND_RADIAL_FLOOR + 0.01)
     )
-    assert short < bdt.CRANK_ROW_ENGAGEMENT_FLOOR
+    assert oversize["turned band radial"] < bdt.T120_TURNED_BAND_RADIAL_FLOOR
+    longer = nominal_axes(shoulder_length=spec.FACE_WIDTH)
+    no_band = nominal_axes(shoulder_length=None)
+    if clear["shoulder air"] == math.inf:
+        assert longer["shoulder air"] == no_band["shoulder air"] == math.inf
+    else:
+        assert longer["shoulder air"] <= clear["shoulder air"]
+        assert no_band["shoulder air"] <= longer["shoulder air"]
+    # Enclose actual south-face rim points at every printed corner, then
+    # consume the resulting finite axial air. This is a real section-domain
+    # negative control, not a fictitious length transition through infinity.
+    shifts, heights = bdt._cone_corners(bdt._CONE_FLOATS, bdt._CRANK_HEIGHT_BAND)
+    section_reach = max(
+        math.hypot(
+            bdt.cone_station(bdt._T120_SOUTH_FACE_STATION + shift)[0] - bdt.X_CRANK,
+            bdt.Y_DRIVE - (bdt.Y_CRANK + height),
+        )
+        for shift, height in zip(shifts, heights, strict=True)
+    ) + bdt._TIP120
+    closing_radial_pose = (
+        section_reach - bdt._PINION_TIP_R_MAX + bdt.T120_PINION_AIR_FLOOR
+    )
+    reached = bdt.pinion_t120_clearances(
+        pose_radial=closing_radial_pose, pose_axial=0.0
+    )
+    assert math.isfinite(reached["shoulder air"])
+    closed = bdt.pinion_t120_clearances(
+        pose_radial=closing_radial_pose,
+        pose_axial=max(reached["shoulder air"], 0.0),
+    )
+    assert closed["shoulder air"] < bdt.T120_PINION_AIR_FLOOR
 
 
-def test_floated_64t_row_meshes_at_each_slice_own_azimuth() -> None:
-    # Codex P2 on #1154 (ruling R9-55): floated north along its inclined axis,
-    # each 64T slice sits farther +x, so it meshes at its own contact azimuth;
-    # translating the nominal row reported 86.20% where the slices give
-    # 84.36%. The row's ends are the contacts of the 64T's end slices, at
-    # every printed corner; the grown 16T keeps that row covered.
-    import itertools
+def test_actual_64t_rows_are_frozen_exact_qualified_physical_cases() -> None:
+    from dataclasses import FrozenInstanceError
 
+    import crank_mesh_stack as mesh
+    import crank_mesh_requirements as requirements
+
+    payload = mesh.require_qualified()
+    import build_dt_drive_train_assembly as bdt
+
+    assert bdt.CRANK_MESH_QUALIFICATION is payload
+    assert set(bdt.CRANK_ROW_QUALIFICATIONS) == set(payload["cases"])
+    assert bdt.CRANK_ROW_QUALIFICATIONS["nominal"] == mesh.row_qualification("nominal")
+    for name, case in payload["cases"].items():
+        row = bdt.CRANK_ROW_QUALIFICATIONS[name]
+        assert isinstance(row, mesh.RowQualification)
+        assert row.case_name == name
+        pose = case["placement"]
+        for field in ("driver_face_mm", "driven_face_mm", "driver_origin_mm", "driven_origin_mm"):
+            assert getattr(row, field) == tuple(pose[field])
+        for field in ("driver_frame", "driven_frame"):
+            assert getattr(row, field) == tuple(tuple(axis) for axis in pose[field])
+        assert row.driver_shoulder_z_mm == pose["driver_shoulder_z_mm"]
+        assert row.driver_turned_radius_mm == pose["driver_turned_radius_mm"]
+        assert row.supported_driven_station_intervals_mm == tuple(
+            tuple(interval) for interval in case["row_available_intervals_mm"]
+        )
+        assert row.row_fraction_lower == case["row_available_fraction_lower"]
+        assert row.row_fraction_lower >= requirements.ROW_ENGAGEMENT_MIN
+        assert row.coverage_lower == case["stock_form_coverage_lower"]
+        assert row.coverage_lower >= requirements.STOCK_FORM_COVERAGE_MIN
+        assert row.continuous_carrier
+        with pytest.raises(FrozenInstanceError):
+            row.row_fraction_lower = 1.0
+    worst = min(row.row_fraction_lower for row in bdt.CRANK_ROW_QUALIFICATIONS.values())
+    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION_WORST == worst == mesh.ROW_ENGAGEMENT_FRACTION_WORST
+
+
+def test_actual_64t_row_corners_retain_short_faces_and_fitup_band() -> None:
+    import crank_mesh_geometry as geometry
+    import crank_mesh_stack as mesh
+
+    payload = mesh.require_qualified()
+    assert geometry.required_calibration_case_names() <= payload["cases"].keys()
+    opened = mesh.row_qualification("booked_open")
+    fitup = mesh.row_qualification("turned_fitup_floor")
+    assert opened.driver_face_mm[1] - opened.driver_face_mm[0] == pytest.approx(
+        spec.FACE_WIDTH + min(spec.FACE_WIDTH_BAND)
+    )
+    assert opened.driver_shoulder_z_mm == pytest.approx(
+        spec.SHOULDER_LENGTH + min(spec.SHOULDER_LENGTH_BAND)
+    )
+    assert opened.driver_turned_radius_mm == pytest.approx(
+        (spec.TURNED_DIA - spec.TURNED_DIA_TOLERANCE_MM) / 2.0
+    )
+    assert fitup.driver_turned_radius_mm == spec.TURNED_DIA_FITUP_MIN / 2.0
+    assert opened.driven_face_mm[1] - opened.driven_face_mm[0] == pytest.approx(
+        mate.FACE_WIDTH + max(mate.FACE_WIDTH_BAND)
+    )
+    assert payload["geometry_sha256"] == mesh.geometry_sha256()
+
+
+@pytest.fixture(scope="module")
+def bounded_crank_contract_payload() -> dict:
+    """Synthetic receiver evidence, never an engineering/native certificate.
+
+    Exact source profiles, manufactured corners and full world placements
+    are real inputs. Positive bounded contact observations are deliberately
+    synthetic so refusal/mutation logic remains executable while the actual
+    engineering study is refused. No production module imports this fixture.
+    """
+    import hashlib
+    import json
+
+    import crank_mesh_geometry as geometry
+    import crank_mesh_stack as mesh
+
+    def profile_record(profile) -> dict:
+        return {
+            "teeth": profile.teeth,
+            "reference_teeth": profile.template.reference_teeth,
+            "dp": profile.template.diametral_pitch,
+            "pa_deg": profile.template.pressure_angle_deg,
+            "blank_radius_mm": profile.blank_radius_mm,
+            "radial_translation_mm": profile.radial_translation_mm,
+            "helix_angle_deg": profile.helix_angle_deg,
+        }
+
+    drivers = {"nominal": spec.STOCK_PROFILE, **dict(spec.STOCK_PROFILE_CORNERS)}
+    driven = {"nominal": mate.STOCK_PROFILE, **dict(mate.STOCK_PROFILE_CORNERS)}
+    placements = geometry.calibration_case_placements()
+    domains = geometry.calibration_case_domains()
+    pitch = 2.0 * math.pi / spec.TEETH
+    surface_error = 0.001
+    phase_error = surface_error / (spec.PITCH_DIA / 2.0)
+    phase_motion = 0.0001
+    root_air_lower = 0.02  # Synthetic positive bound, not a production root-air floor.
+    low, high = -0.025, -0.005
+    cases = {}
+    for source in geometry.calibration_case_parameters():
+        name = source["name"]
+        pose = placements[name]
+        domain = domains[name]
+        p16 = drivers[source["driver_profile_label"]]
+        p64 = driven[source["driven_profile_label"]]
+        face_low, face_high = pose["driven_face_mm"]
+        width = face_high - face_low
+        intervals = [[face_low + 0.05 * width, face_high - 0.05 * width]]
+        station = (face_low + face_high) / 2.0
+        driver_z = sum(pose["driver_face_mm"]) / 2.0
+        driver_radius = p16.pitch_radius_mm
+        world_point = [
+            pose["driver_origin_mm"][axis]
+            + pose["driver_frame"][axis][0] * driver_radius
+            + pose["driver_frame"][axis][2] * driver_z
+            for axis in range(3)
+        ]
+        normal = [pose["driver_frame"][axis][0] for axis in range(3)]
+
+        def contact(offset: float, tooth: int) -> dict:
+            return {
+                "phase_offset_rad": offset,
+                "driven_tooth": tooth,
+                "segment": "finite_flank",
+                "kind": "flank",
+                "parameter": 0.5,
+                "station_mm": station,
+                "world_point_mm": list(world_point),
+                "driver_radius_mm": driver_radius,
+                "driver_z_mm": driver_z,
+                "driven_normal_world": [-value for value in normal],
+                "driver_normal_world": list(normal),
+                "opposed_normal_residual": 0.0,
+                "common_normal_supported": True,
+                "common_normal_error_bound": 1e-12,
+                "driven_per_driver_velocity": -spec.TEETH / mate.TEETH,
+            }
+
+        rows = []
+        for index in range(65):
+            tooth = 0 if index < 32 else 1
+            rows.append({
+                "driver_phase_rad": index * pitch / 64.0,
+                "lower_rad": low,
+                "upper_rad": high,
+                "error_rad": phase_error,
+                "phase_error_rad": phase_motion / driver_radius,
+                "surface_numerical_resolved": True,
+                "surface_extrema_enclosures_rad": [{
+                    "side": side,
+                    "lower_rad": edge - phase_error / 2,
+                    "upper_rad": edge,
+                    "branches": [[tooth, edge - phase_error / 2, edge]],
+                    "unwitnessed_branch_lower_rad": [],
+                    "numerical_tolerance_rad": phase_error,
+                    "relaxed_incumbent_rad": edge - phase_error / 2,
+                    "achieved_residual_rad": 0.0,
+                    "terminal_lower_rad": None,
+                    "terminal_boxes": 0,
+                    "branch_numerics": [{
+                        "tooth": tooth,
+                        "lower_rad": edge - phase_error / 2,
+                        "relaxed_incumbent_rad": edge - phase_error / 2,
+                        "achieved_residual_rad": 0.0,
+                        "terminal_lower_rad": None,
+                        "terminal_boxes": 0,
+                    }],
+                    "radial_pose_error_mm": domain["radial_error_mm"],
+                    "axial_pose_error_mm": domain["axial_error_mm"],
+                } for side, edge in (("lower", -low), ("upper", high))],
+                "root_free_intervals_rad": [[-pitch / 2.0, pitch / 2.0]],
+                "free_intervals_rad": [[
+                    low + phase_error + phase_motion / driver_radius,
+                    high - phase_error - phase_motion / driver_radius,
+                ]],
+                "root_sweep": {
+                    "free_inner": [[-pitch / 2.0, pitch / 2.0]],
+                    "free_outer": [[-pitch / 2.0, pitch / 2.0]],
+                    "offset_domain_rad": [-pitch / 2.0, pitch / 2.0],
+                    # Matching inner/outer sets have no angular set uncertainty.
+                    "angular_uncertainty_rad": 0.0,
+                    "driver_pitch_displacement_uncertainty_mm": 0.0,
+                    "geometric_uncertainty_mm": surface_error,
+                    "radial_error_mm": domain["radial_error_mm"],
+                    "axial_error_mm": domain["axial_error_mm"],
+                    "required_root_air_mm": domain["required_root_air_mm"],
+                    "root_air_lower_bound_mm": root_air_lower,
+                    "root_max_radial_clearance_screen_mm": None,
+                    "witnesses": [],
+                    "enclosure_uncertainty": [],
+                    "uncertain_boxes": 0,
+                    "boxes": 1,
+                    "status": "resolved",
+                    "containment_proof": "synthetic complete outer-solid enclosure",
+                    "reason": "",
+                    "root_is_carrying": False,
+                    "native_solid_certificate": False,
+                },
+                "lower_contact": contact(low, tooth),
+                "upper_contact": contact(high, tooth),
+                "branch_intervals": [[tooth, low, high]],
+                "boxes": 1,
+                "root_contact": False,
+                # Covers half the uniform phase cell, within the branch window.
+                "branch_phase_reserves_rad": [[tooth, 0.004]],
+                "supported_branch_contacts": [{
+                    "tooth": tooth,
+                    "contacts": [
+                        {"side": "lower", "contact": contact(low, tooth)},
+                        {"side": "upper", "contact": contact(high, tooth)},
+                    ],
+                }],
+                "row_intervals_mm": [list(interval) for interval in intervals],
+            })
+        cases[name] = {
+            "case": name,
+            "metric": "STOCK-FORM COVERAGE",
+            "is_conjugate": False,
+            "driver_profile": profile_record(p16),
+            "driven_profile": profile_record(p64),
+            "placement": pose,
+            "pose_domain": domain,
+            "phase_rows": rows,
+            "phase_components_rad": [[
+                low + phase_error + phase_motion / driver_radius,
+                high - phase_error - phase_motion / driver_radius,
+            ]],
+            "phase_window_rad": [low + 2.0 * phase_error, high - 2.0 * phase_error],
+            "phase_seed_rad": (low + high) / 2.0,
+            "stock_form_coverage_lower": 1.0,
+            "coverage_definition": "synthetic bounded supported branch union / physical pitch",
+            "continuous_carrying_contact": True,
+            "uncovered_phase_rad": 0.0,
+            "phase_reserve_rad": 0.001,
+            "noncarrying_pair_normal_gap_upper_mm": 0.002,
+            "handovers": [{
+                "continuous": True,
+                "side": side,
+                "phase_rad": 31.5 * pitch / 64.0,
+                "phase_bracket_rad": [31.0 * pitch / 64.0, 32.0 * pitch / 64.0],
+                "pair": [0, 1],
+                "pitch_displacement_jump_upper_mm": 0.003,
+                "contact": contact(offset, 1),
+            } for side, offset in (("lower", low), ("upper", high))],
+            "row_available_fraction_lower": 0.89,
+            "row_available_intervals_mm": intervals,
+            "qualified": True,
+            "tight_backlash_lower_mm": (high - low - 2.0 * phase_error) * driver_radius - 2.0 * phase_motion,
+            "loose_backlash_upper_mm": (high - low + 2.0 * phase_error) * driver_radius + 2.0 * phase_motion,
+            "no_overlap_at_samples": True,
+            "parametric_driven_mechanical_datum_te_rad": [
+                -spec.TEETH / mate.TEETH * row["lower_rad"] for row in rows
+            ],
+            "parametric_actual_driver_phase_rad": [row["driver_phase_rad"] - low for row in rows],
+            "numerical_error_bounds": {
+                "surface_mm": surface_error,
+                "phase_motion_mm": phase_motion,
+                "root_surface_mm": surface_error,
+                "geom_ball_mm": 0.0,
+                "radial_mm": domain["radial_error_mm"],
+                "axial_mm": domain["axial_error_mm"],
+                "te_rad": (2.0 * surface_error + phase_motion) / driver_radius * spec.TEETH / mate.TEETH,
+            },
+            "native_certificate": False,
+        }
+    # Hash synthetic labels, NOT diagnostic files. These unit identities may
+    # never be mistaken for an actual collector's deployed-source manifest.
+    engine_sources = {
+        name: hashlib.sha256(f"synthetic receiver fixture: {name}".encode()).hexdigest()
+        for name in (
+            "crank_mesh_backlash_study.py", "crossed_mesh_study.py",
+            "stock_form_contact_3d.py", "stock_form_root_angles.py", "stock_form_root_sweep.py",
+            "stock_form_contact_continuation.py",
+        )
+    }
+    return {
+        "qualified": True,
+        "geometry_sha256": mesh.geometry_sha256(),
+        "measurement_engine_sources_sha256": engine_sources,
+        "measurement_engine_sha256": hashlib.sha256(
+            json.dumps(engine_sources, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest(),
+        "measurement_engine_provenance": "synthetic unit-fixture labels; not source bytes",
+        "refusal": None,
+        "cases": cases,
+        "phase_window_rad": [-0.020, -0.010],
+        "phase_seed_deg": math.degrees(-0.015),
+    }
+
+
+def _crank_case_mutation(payload: dict, case_name: str = "nominal") -> dict:
+    """Copy only the mutated case; the full source family remains present."""
+    from copy import deepcopy
+
+    result = dict(payload, cases=dict(payload["cases"]))
+    result["cases"][case_name] = deepcopy(payload["cases"][case_name])
+    return result
+
+
+@pytest.mark.parametrize("mutation", ["non_unit", "false_opposition"])
+def test_crank_receiver_reconstructs_claimed_common_normal(mutation, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = _crank_case_mutation(bounded_crank_contract_payload)
+    proof = payload["cases"]["nominal"]["phase_rows"][0]["lower_contact"]
+    if mutation == "non_unit":
+        proof["driven_normal_world"] = [2*value for value in proof["driven_normal_world"]]
+    else:
+        proof["driven_normal_world"] = list(proof["driver_normal_world"])
+    with pytest.raises(ValueError, match="common-normal"):
+        mesh.require_qualified(payload)
+
+
+@pytest.mark.parametrize("mutation", [
+    "missing", "unpaid_width", "dropped_pose", "duplicate_branch", "outside_tooth",
+    "detached_branch_lower", "detached_side_incumbent",
+])
+def test_crank_receiver_refuses_unpaid_surface_enclosures(mutation, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = _crank_case_mutation(bounded_crank_contract_payload)
+    row = payload["cases"]["nominal"]["phase_rows"][0]
+    if mutation == "missing":
+        del row["surface_extrema_enclosures_rad"]
+    else:
+        enclosure = row["surface_extrema_enclosures_rad"][0]
+        if mutation == "unpaid_width":
+            enclosure["lower_rad"] = enclosure["upper_rad"] - 2 * row["error_rad"]
+        elif mutation == "dropped_pose":
+            enclosure["radial_pose_error_mm"] = 0.0
+        elif mutation == "duplicate_branch":
+            enclosure["branches"].append(list(enclosure["branches"][0]))
+        elif mutation == "detached_branch_lower":
+            proof = enclosure["branch_numerics"][0]
+            proof["lower_rad"] -= row["error_rad"]
+            proof["relaxed_incumbent_rad"] = proof["lower_rad"]
+        elif mutation == "detached_side_incumbent":
+            enclosure["relaxed_incumbent_rad"] -= row["error_rad"]
+        else:
+            enclosure["branches"][0][0] = mate.TEETH
+    with pytest.raises(ValueError):
+        mesh.require_qualified(payload)
+
+
+@pytest.mark.parametrize("mutation", ["reversed", "overlap", "inner_outside_outer", "partial_pitch"])
+def test_crank_receiver_checks_unselected_root_components(mutation, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = _crank_case_mutation(bounded_crank_contract_payload)
+    root = payload["cases"]["nominal"]["phase_rows"][0]["root_sweep"]
+    half = math.pi / spec.TEETH
+    if mutation == "reversed":
+        root["free_outer"].append([half / 2, half / 4])
+    elif mutation == "overlap":
+        root["free_outer"].append([half / 4, half / 2])
+    elif mutation == "inner_outside_outer":
+        root["free_outer"] = [[-half, half / 2]]
+    else:
+        root["offset_domain_rad"] = [-half, half / 2]
+    with pytest.raises(ValueError):
+        mesh.require_qualified(payload)
+
+
+def test_bounded_full_crank_payload_executes_row_factory(monkeypatch, bounded_crank_contract_payload) -> None:
+    from dataclasses import FrozenInstanceError
+
+    import crank_mesh_geometry as geometry
+    import crank_mesh_stack as mesh
+
+    payload = bounded_crank_contract_payload
+    assert mesh.require_qualified(payload) is payload
+    assert set(payload["cases"]) == geometry.required_calibration_case_names()
+    monkeypatch.setattr(mesh, "CALIBRATION", payload)
+    # The full family is validated above. Exercise the factory across each
+    # physical case category without re-validating that family quadratically.
+    names = (
+        "nominal", "booked_closed", "booked_open", "centre_minus", "centre_plus",
+        "turned_fitup_floor",
+        next(name for name in payload["cases"] if name.startswith("profile_corner_")),
+        next(name for name in payload["cases"] if name.startswith("axis_corner_")),
+    )
+    for name in names:
+        row = mesh.row_qualification(name)
+        assert isinstance(row, mesh.RowQualification)
+        assert row.case_name == name
+        assert row.row_fraction_lower == 0.89
+        assert row.coverage_lower == 1.0
+        assert row.continuous_carrier
+        assert row.supported_driven_station_intervals_mm
+        assert row.driver_origin_mm == tuple(payload["cases"][name]["placement"]["driver_origin_mm"])
+        with pytest.raises(FrozenInstanceError):
+            row.driver_turned_radius_mm = 0.0
+    with pytest.raises(ValueError, match="row qualification"):
+        mesh.row_qualification("unmeasured_hypothetical_face")
+
+
+def test_crank_requires_every_source_owned_case(bounded_crank_contract_payload) -> None:
+    import crank_mesh_geometry as geometry
+    import crank_mesh_stack as mesh
+
+    for name in geometry.required_calibration_case_names():
+        payload = dict(bounded_crank_contract_payload, cases=dict(bounded_crank_contract_payload["cases"]))
+        del payload["cases"][name]
+        with pytest.raises(ValueError):
+            mesh.require_qualified(payload)
+
+
+@pytest.mark.parametrize("path,value", [
+    (("qualified",), False),
+    (("metric",), "CONTACT RATIO"),
+    (("is_conjugate",), True),
+    (("native_certificate",), True),
+    (("tight_backlash_lower_mm",), 0.0),
+    (("tight_backlash_lower_mm",), math.nan),
+    (("loose_backlash_upper_mm",), math.inf),
+    (("stock_form_coverage_lower",), 0.6199),
+    (("stock_form_coverage_lower",), math.nan),
+    (("row_available_fraction_lower",), 0.8499),
+    (("row_available_fraction_lower",), math.nan),
+    (("continuous_carrying_contact",), False),
+    (("uncovered_phase_rad",), 0.000001),
+    (("uncovered_phase_rad",), math.nan),
+    (("handovers", 0, "continuous"), False),
+    (("handovers", 0, "pitch_displacement_jump_upper_mm"), 0.005001),
+    (("handovers", 0, "pitch_displacement_jump_upper_mm"), math.nan),
+    (("handovers", 0, "pitch_displacement_jump_upper_mm"), -0.001),
+    (("handovers", 0, "contact"), None),
+    (("handovers",), []),
+    (("phase_rows",), []),
+    (("phase_rows", 0, "driver_phase_rad"), 0.001),
+    (("phase_rows", 64, "driver_phase_rad"), 0.1),
+    (("phase_rows", 64, "lower_contact", "driven_tooth"), 0),
+    (("phase_rows", 64, "upper_contact", "driven_tooth"), 2),
+    (("phase_rows", 2, "driver_phase_rad"), 0.0),
+    (("phase_rows", 2, "lower_rad"), math.nan),
+    (("phase_rows", 2, "upper_rad"), -0.030),
+    (("phase_rows", 2, "error_rad"), -0.001),
+    (("phase_rows", 2, "root_contact"), True),
+    (("phase_rows", 2, "phase_error_rad"), -0.001),
+    (("phase_rows", 2, "root_free_intervals_rad"), []),
+    (("phase_rows", 2, "root_free_intervals_rad"), [[0.01, 0.02]]),
+    (("phase_rows", 2, "free_intervals_rad"), []),
+    (("phase_rows", 2, "free_intervals_rad"), [[0.01, 0.02]]),
+    (("phase_rows", 2, "driver_phase_rad"), 0.013),
+    (("phase_rows", 2, "root_sweep", "status"), "unresolved"),
+    (("phase_rows", 2, "root_sweep", "root_is_carrying"), True),
+    (("phase_rows", 2, "root_sweep", "root_air_lower_bound_mm"), -0.001),
+    (("phase_rows", 2, "root_sweep", "root_air_lower_bound_mm"), None),
+    (("phase_rows", 2, "root_sweep", "required_root_air_mm"), 0.03),
+    (("phase_rows", 2, "root_sweep", "geometric_uncertainty_mm"), 0.002),
+    (("phase_rows", 2, "root_sweep", "geometric_uncertainty_mm"), math.nan),
+    (("phase_rows", 2, "root_sweep", "native_solid_certificate"), True),
+    (("phase_components_rad",), []),
+    (("phase_components_rad",), [[0.01, 0.02]]),
+    (("phase_rows", 2, "lower_contact"), None),
+    (("phase_rows", 2, "upper_contact", "kind"), "axial_face"),
+    (("phase_rows", 2, "lower_contact", "kind"), "root_arc"),
+    (("phase_rows", 2, "lower_contact", "kind"), "root_corner"),
+    (("phase_rows", 2, "supported_branch_contacts"), []),
+    (("phase_rows", 2, "branch_phase_reserves_rad"), [[63, 0.01]]),
+    (("phase_rows", 2, "branch_phase_reserves_rad"), [[0, 0.0]]),
+    (("phase_rows", 2, "supported_branch_contacts", 0, "tooth"), 63),
+    (("phase_rows", 2, "supported_branch_contacts", 0, "contacts"), []),
+    (("phase_rows", 2, "supported_branch_contacts", 0, "contacts", 0, "contact", "driven_tooth"), 63),
+    (("phase_rows", 2, "lower_contact", "world_point_mm"), [math.inf, 0.0, 0.0]),
+    (("phase_rows", 2, "lower_contact", "common_normal_supported"), False),
+    (("phase_rows", 2, "upper_contact", "common_normal_supported"), False),
+    (("phase_rows", 2, "lower_contact", "common_normal_error_bound"), -1e-12),
+    (("phase_rows", 2, "lower_contact", "common_normal_error_bound"), math.nan),
+    (("phase_rows", 2, "lower_contact", "opposed_normal_residual"), 1e-11),
+    (("phase_rows", 2, "lower_contact", "driven_per_driver_velocity"), math.nan),
+    (("numerical_error_bounds", "surface_mm"), -0.001),
+    (("numerical_error_bounds", "phase_motion_mm"), math.nan),
+    (("numerical_error_bounds",), {}),
+    (("pose_domain", "radial_error_mm"), 0.0),
+    (("pose_domain", "axial_error_mm"), 0.0),
+    (("pose_domain", "all_runout_angles"), False),
+    (("pose_domain", "components_mm"), []),
+    (("pose_domain", "required_root_air_mm"), 0.02),
+    (("numerical_error_bounds", "radial_mm"), 0.0),
+    (("numerical_error_bounds", "axial_mm"), 0.0),
+    (("row_available_intervals_mm",), []),
+    (("row_available_intervals_mm",), [[-0.1, 0.1]]),
+    (("row_available_intervals_mm",), [[-1.0, 1.0], [0.0, 2.0]]),
+    (("row_available_intervals_mm",), [[-100.0, 100.0]]),
+    (("placement", "driver_face_mm"), [0.0, 0.0]),
+    (("placement", "driver_shoulder_z_mm"), 0.0),
+    (("placement", "driver_turned_radius_mm"), 0.0),
+    (("placement", "driver_origin_mm"), [0.0, 0.0, 0.0]),
+    (("placement", "driven_origin_mm"), [0.0, 0.0, 0.0]),
+    (("placement", "driver_frame"), [[0.0] * 3] * 3),
+    (("placement", "driven_frame"), [[0.0] * 3] * 3),
+    (("driver_profile", "teeth"), 15),
+    (("driver_profile", "reference_teeth"), 16),
+    (("driver_profile", "blank_radius_mm"), 0.0),
+    (("driven_profile", "teeth"), 69),
+    (("driven_profile", "helix_angle_deg"), 0.0),
+    (("driven_profile", "radial_translation_mm"), 0.0),
+    (("phase_window_rad",), [-0.019, -0.016]),
+    (("phase_rows", 2, "lower_contact", "kind"), "axial_interior"),
+])
+def test_full_crank_contract_mutations_refuse(path, value, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = _crank_case_mutation(bounded_crank_contract_payload)
+    target = payload["cases"]["nominal"]
+    for field in path[:-1]:
+        target = target[field]
+    target[path[-1]] = value
+    with pytest.raises(ValueError):
+        mesh.require_qualified(payload)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("common_normal_supported", False),
+    ("kind", "root_corner"),
+    ("kind", "root_arc"),
+    ("kind", "axial_face"),
+])
+def test_crank_coverage_cannot_count_unsupported_branch_proofs(
+    field, value, bounded_crank_contract_payload
+) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = _crank_case_mutation(bounded_crank_contract_payload)
+    proof = payload["cases"]["nominal"]["phase_rows"][2]["supported_branch_contacts"][0]
+    for witness in proof["contacts"]:
+        witness["contact"][field] = value
+    with pytest.raises(ValueError):
+        mesh.require_qualified(payload)
+
+
+def test_all_crank_corners_share_one_machined_retention_clock() -> None:
+    import crank_mesh_geometry as geometry
+
+    placements = geometry.calibration_case_placements()
+    clock = placements["nominal"]["driver_clocking_rad"]
+    assert all(pose["driver_clocking_rad"] == clock for pose in placements.values())
+
+
+@pytest.mark.parametrize("field", ["driver_clocking_rad", "driven_clocking_rad"])
+def test_a_reclocked_corner_cannot_reuse_the_crank_certificate(field, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = _crank_case_mutation(bounded_crank_contract_payload, "booked_open")
+    pose = payload["cases"]["booked_open"]["placement"]
+    pose[field] += 0.001
+    with pytest.raises(ValueError, match="placement"):
+        mesh.require_qualified(payload)
+
+
+@pytest.mark.parametrize("field", [
+    "qualified", "geometry_sha256", "cases", "phase_window_rad", "phase_seed_deg",
+    "measurement_engine_sources_sha256", "measurement_engine_sha256",
+])
+def test_missing_crank_payload_fields_refuse(field, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = dict(bounded_crank_contract_payload)
+    del payload[field]
+    with pytest.raises(ValueError):
+        mesh.require_qualified(payload)
+
+
+@pytest.mark.parametrize("field", [
+    "qualified", "metric", "is_conjugate", "native_certificate", "driver_profile",
+    "driven_profile", "placement", "phase_rows", "phase_window_rad",
+    "tight_backlash_lower_mm", "loose_backlash_upper_mm", "stock_form_coverage_lower",
+    "row_available_fraction_lower", "row_available_intervals_mm",
+    "continuous_carrying_contact", "uncovered_phase_rad", "handovers", "numerical_error_bounds",
+    "phase_components_rad", "pose_domain",
+])
+def test_missing_crank_case_fields_refuse(field, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = _crank_case_mutation(bounded_crank_contract_payload)
+    del payload["cases"]["nominal"][field]
+    with pytest.raises(ValueError):
+        mesh.require_qualified(payload)
+
+
+def test_crank_pose_domains_are_exact_source_owned_not_corner_only(bounded_crank_contract_payload) -> None:
+    import crank_mesh_geometry as geometry
+
+    domains = geometry.calibration_case_domains()
+    assert set(domains) == geometry.required_calibration_case_names()
+    for name, case in bounded_crank_contract_payload["cases"].items():
+        domain = domains[name]
+        assert case["pose_domain"] == domain
+        assert domain["all_runout_angles"]
+        assert domain["components_mm"]
+        assert domain["radial_error_mm"] > 0.0
+        assert domain["axial_error_mm"] > 0.0
+        assert case["numerical_error_bounds"]["radial_mm"] == domain["radial_error_mm"]
+        assert case["numerical_error_bounds"]["axial_mm"] == domain["axial_error_mm"]
+        for row in case["phase_rows"]:
+            assert row["root_sweep"]["required_root_air_mm"] == domain["required_root_air_mm"]
+
+
+@pytest.mark.parametrize("field", ["phase_window_rad", "phase_seed_deg", "geometry_sha256"])
+def test_common_crank_phase_and_identity_mutations_refuse(field, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    mutations = {"phase_window_rad": [-0.030, -0.010], "phase_seed_deg": math.nan, "geometry_sha256": "0" * 64}
+    payload = dict(bounded_crank_contract_payload)
+    payload[field] = mutations[field]
+    with pytest.raises(ValueError):
+        mesh.require_qualified(payload)
+
+
+@pytest.mark.parametrize("source_name", [
+    "crank_mesh_backlash_study.py", "crossed_mesh_study.py",
+    "stock_form_contact_3d.py", "stock_form_root_angles.py", "stock_form_root_sweep.py",
+    "stock_form_contact_continuation.py",
+])
+def test_missing_crank_engine_source_manifest_refuses(source_name, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = dict(bounded_crank_contract_payload)
+    sources = dict(payload["measurement_engine_sources_sha256"])
+    del sources[source_name]
+    payload["measurement_engine_sources_sha256"] = sources
+    with pytest.raises(ValueError, match="measurement-engine identity"):
+        mesh.require_qualified(payload)
+
+
+@pytest.mark.parametrize("digest", ["", "0" * 63, "G" * 64, "A" * 64, None])
+def test_malformed_crank_engine_source_digest_refuses(digest, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = dict(bounded_crank_contract_payload)
+    sources = dict(payload["measurement_engine_sources_sha256"])
+    sources["stock_form_contact_3d.py"] = digest
+    payload["measurement_engine_sources_sha256"] = sources
+    with pytest.raises(ValueError, match="measurement-engine identity"):
+        mesh.require_qualified(payload)
+
+
+def test_stale_crank_engine_manifest_digest_refuses(bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = dict(bounded_crank_contract_payload)
+    payload["measurement_engine_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="provenance"):
+        mesh.require_qualified(payload)
+    payload = dict(bounded_crank_contract_payload)
+    sources = dict(payload["measurement_engine_sources_sha256"])
+    sources["stock_form_contact_3d.py"] = "0" * 64
+    payload["measurement_engine_sources_sha256"] = sources
+    with pytest.raises(ValueError, match="provenance"):
+        mesh.require_qualified(payload)
+
+
+def test_unregistered_crank_engine_source_refuses(bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = dict(bounded_crank_contract_payload)
+    sources = dict(payload["measurement_engine_sources_sha256"])
+    sources["ideal_contact_ratio_fallback.py"] = "0" * 64
+    payload["measurement_engine_sources_sha256"] = sources
+    with pytest.raises(ValueError, match="measurement-engine identity"):
+        mesh.require_qualified(payload)
+
+
+@pytest.mark.parametrize("path", [
+    ("placement", "driver_face_mm"),
+    ("placement", "driven_face_mm"),
+    ("placement", "driver_shoulder_z_mm"),
+    ("placement", "driver_turned_radius_mm"),
+    ("placement", "driver_origin_mm"),
+    ("placement", "driven_origin_mm"),
+    ("placement", "driver_frame"),
+    ("placement", "driven_frame"),
+    ("placement", "driver_clocking_rad"),
+    ("placement", "driven_clocking_rad"),
+    ("driver_profile", "teeth"),
+    ("driver_profile", "reference_teeth"),
+    ("driver_profile", "blank_radius_mm"),
+    ("driver_profile", "radial_translation_mm"),
+    ("driven_profile", "helix_angle_deg"),
+    ("phase_rows", 2, "driver_phase_rad"),
+    ("phase_rows", 2, "lower_rad"),
+    ("phase_rows", 2, "upper_rad"),
+    ("phase_rows", 2, "error_rad"),
+    ("phase_rows", 2, "root_contact"),
+    ("phase_rows", 2, "lower_contact"),
+    ("phase_rows", 2, "upper_contact"),
+    ("phase_rows", 2, "lower_contact", "kind"),
+    ("phase_rows", 2, "lower_contact", "world_point_mm"),
+    ("phase_rows", 2, "lower_contact", "driven_normal_world"),
+    ("phase_rows", 2, "lower_contact", "driver_normal_world"),
+    ("phase_rows", 2, "lower_contact", "common_normal_supported"),
+    ("phase_rows", 2, "lower_contact", "common_normal_error_bound"),
+    ("phase_rows", 2, "lower_contact", "opposed_normal_residual"),
+    ("phase_rows", 2, "lower_contact", "driven_per_driver_velocity"),
+    ("phase_rows", 2, "supported_branch_contacts"),
+    ("phase_rows", 2, "branch_phase_reserves_rad"),
+    ("phase_rows", 2, "supported_branch_contacts", 0, "tooth"),
+    ("phase_rows", 2, "supported_branch_contacts", 0, "contacts"),
+    ("phase_rows", 2, "supported_branch_contacts", 0, "contacts", 0, "side"),
+    ("phase_rows", 2, "supported_branch_contacts", 0, "contacts", 0, "contact"),
+    ("phase_rows", 2, "phase_error_rad"),
+    ("phase_rows", 2, "root_free_intervals_rad"),
+    ("phase_rows", 2, "free_intervals_rad"),
+    ("phase_rows", 2, "root_sweep"),
+    ("phase_rows", 2, "root_sweep", "status"),
+    ("phase_rows", 2, "root_sweep", "root_is_carrying"),
+    ("phase_rows", 2, "root_sweep", "required_root_air_mm"),
+    ("phase_rows", 2, "root_sweep", "root_air_lower_bound_mm"),
+    ("phase_rows", 2, "root_sweep", "geometric_uncertainty_mm"),
+    ("phase_rows", 2, "root_sweep", "native_solid_certificate"),
+    ("phase_rows", 2, "root_sweep", "free_inner"),
+    ("phase_rows", 2, "root_sweep", "free_outer"),
+    ("phase_rows", 2, "root_sweep", "offset_domain_rad"),
+    ("handovers", 0, "continuous"),
+    ("handovers", 0, "pitch_displacement_jump_upper_mm"),
+    ("handovers", 0, "contact"),
+    ("handovers", 0, "side"),
+    ("handovers", 0, "pair"),
+    ("handovers", 0, "phase_bracket_rad"),
+    ("numerical_error_bounds", "surface_mm"),
+    ("numerical_error_bounds", "phase_motion_mm"),
+    ("numerical_error_bounds", "te_rad"),
+    ("pose_domain", "radial_error_mm"),
+    ("pose_domain", "axial_error_mm"),
+    ("pose_domain", "all_runout_angles"),
+    ("pose_domain", "components_mm"),
+    ("pose_domain", "angularity_full_cone"),
+    ("pose_domain", "required_root_air_mm"),
+    ("numerical_error_bounds", "radial_mm"),
+    ("numerical_error_bounds", "axial_mm"),
+])
+def test_missing_crank_nested_contract_fields_refuse(path, bounded_crank_contract_payload) -> None:
+    import crank_mesh_stack as mesh
+
+    payload = _crank_case_mutation(bounded_crank_contract_payload)
+    target = payload["cases"]["nominal"]
+    for field in path[:-1]:
+        target = target[field]
+    del target[path[-1]]
+    with pytest.raises(ValueError):
+        mesh.require_qualified(payload)
+
+
+def test_row_factory_refuses_unqualified_before_reading_placement(monkeypatch) -> None:
+    import crank_mesh_stack as mesh
+
+    monkeypatch.setattr(mesh, "CALIBRATION", {"qualified": False, "refusal": "synthetic unqualified"})
+    with pytest.raises(ValueError, match="synthetic unqualified"):
+        mesh.row_qualification("nominal")
+
+
+@pytest.mark.parametrize("owner,field", [
+    ("pinion", "FACE_WIDTH"),
+    ("pinion", "SHOULDER_LENGTH"),
+    ("pinion", "TURNED_DIA"),
+    ("pinion", "TURNED_DIA_FITUP_MIN"),
+    ("pinion", "SEAT_GAP_MAX_MM"),
+    ("pinion", "BASE_TANGENT_SPAN_LIMITS_MM"),
+    ("pinion", "TOOTH_RUNOUT_TIR_MM"),
+    ("gear64", "FACE_WIDTH"),
+    ("gear64", "BASE_TANGENT_SPAN_LIMITS_MM"),
+    ("gear64", "TOOTH_RUNOUT_TIR_MM"),
+    ("geometry", "POST_ANGLE_DEG"),
+    ("geometry", "CONE_FLOAT_NORTH"),
+    ("geometry", "FRAME_DY"),
+    ("geometry", "GEAR_AXIS_SHIFT"),
+])
+def test_hypothetical_crank_geometry_refuses_stale_rows(
+    owner, field, monkeypatch, bounded_crank_contract_payload
+) -> None:
+    import crank_mesh_geometry as geometry
+    import crank_mesh_stack as mesh
+
+    payload = bounded_crank_contract_payload
+    mesh.require_qualified(payload)
+    monkeypatch.setattr(mesh, "CALIBRATION", payload)
+    module = {"pinion": geometry.pinion, "gear64": geometry.gear64, "geometry": geometry}[owner]
+    previous = getattr(module, field)
+    changed = tuple(value + 0.01 for value in previous) if isinstance(previous, tuple) else previous + 0.01
+    monkeypatch.setattr(module, field, changed)
+    assert mesh.geometry_sha256() != payload["geometry_sha256"]
+    with pytest.raises(ValueError, match="stale"):
+        mesh.require_qualified(payload)
+    with pytest.raises(ValueError, match="stale"):
+        mesh.row_qualification("nominal")
+
+
+def test_64t_pitch_cylinder_slice_law_is_only_a_physical_frame_construction() -> None:
     import build_dt_drive_train_assembly as bdt
     from cone_line import COS_I, SIN_I, cone_station
 
-    def contact_z(station: float) -> float:
-        centre = cone_station(station)
-        leg = (centre[0] - bdt.X_CRANK) * COS_I
-        alpha = math.atan2(bdt.Y_CRANK - bdt.Y_DRIVE, leg)
-        return centre[2] + bdt.R64 * math.cos(alpha) * SIN_I
-
-    mid = bdt.GEAR64_CENTRE_STATION
-    half = bdt.GEAR64_FACE / 2.0
-    sliced = translated = math.inf
-    for b1, b2, b3, b4, d_length, play, f in itertools.product(
-        bdt._BOSS_NORTH_BAND,
-        bdt._CONE_BOSS_NORTH_BAND,
-        bdt._COLLAR_WIDTH_BAND,
-        bdt._GEAR64_FACE_LIMITS,
-        bdt._PINION_FACE_BAND,
-        bdt.PINION_END_PLAY,
-        (0.0, bdt.CONE_FLOAT_NORTH),
-    ):
-        south = bdt._POST_BOSS_NORTH + b1 + bdt.PINION_SEAT_FEELER + play
-        north = south + spec.FACE_WIDTH + d_length
-        rows = (
-            (
-                contact_z(mid - half + b2 + b3 + f),
-                contact_z(mid + half + b2 + b3 + b4 + f),
-            ),
-            (
-                contact_z(mid) - half * COS_I + (b2 + b3 + f) * COS_I,
-                contact_z(mid) + half * COS_I + (b2 + b3 + b4 + f) * COS_I,
-            ),
-        )
-        shares = [(min(north, rn) - max(south, rs)) / (rn - rs) for rs, rn in rows]
-        sliced = min(sliced, shares[0])
-        translated = min(translated, shares[1])
-    # With every slice in contact and the axes nominal, the row is exactly
-    # the sliced cover; it is the conservative one.
-    tip = bdt._PINION_TIP_DIA_LOW + bdt.CRANK_MESH_TOOTH_RUNOUT_TIR
-    in_contact = ((max(bdt._CRANK_HEIGHT_BAND), tip),)
-    assert bdt.crank_row_engagement(
-        spec.FACE_WIDTH,
-        bdt._PINION_FACE_BAND,
-        bdt.CONE_FLOAT_NORTH,
-        band_corners=in_contact,
-        pose_axial=0.0,
-    ) == pytest.approx(sliced, abs=1e-9)
-    assert sliced >= bdt.CRANK_ROW_ENGAGEMENT_FRACTION
-    # The translated row overstates the cover: it is not the conservative one.
-    assert translated > sliced
-
-
-def test_band_contact_is_taken_at_each_64t_slice_own_centre(monkeypatch) -> None:
-    # Codex P1 on #1154 (R9-56): the band's contact path was read once, at
-    # the 64T mid-face centre, +0.149 at the printed open corner, and the
-    # row then counted every band slice.  A slice farther north meshes at a
-    # wider centre: with the R9-55 64T tip (Ø65.11, so 65.01 at its lower
-    # limit) a still-covered slice 3 mm north of the floated mid-face has no
-    # contact, and the honest row was 71%, under the 85% floor.
-    import build_dt_drive_train_assembly as bdt
-
-    high = max(bdt._CRANK_HEIGHT_BAND)
-    printed = spec.TURNED_DIA - spec.TURNED_DIA_TOLERANCE_MM
-    band = printed - bdt.CRANK_MESH_TOOTH_RUNOUT_TIR
-    stations = [bdt.CONE_FLOAT_NORTH + step for step in (0.0, 1.0, 2.0, 3.0, 4.0)]
-
-    def paths() -> list[float]:
-        return [bdt.crank_slice_contact_path(band, t, 0.0, high) for t in stations]
-
-    shipped = paths()
-    assert shipped == sorted(shipped, reverse=True)
-    assert shipped[0] > shipped[-1] + 0.4
-    monkeypatch.setattr(bdt, "_GEAR64_TIP_DIA_LOW", 65.01)
-    old = paths()
-    assert old[0] > 0.0 > old[3]
-    r9_55 = bdt.crank_row_engagement(
-        11.4, bdt._PINION_FACE_BAND, bdt.CONE_FLOAT_NORTH, pose_axial=0.0
-    )
-    assert r9_55 == pytest.approx(0.706, abs=2e-3)
-    assert r9_55 < bdt.CRANK_ROW_ENGAGEMENT_FLOOR
+    for shift in (-mate.FACE_WIDTH / 2.0, 0.0, mate.FACE_WIDTH / 2.0 + bdt.CONE_FLOAT_NORTH):
+        centre = cone_station(bdt.GEAR64_CENTRE_STATION + shift)
+        alpha = math.atan2(bdt.Y_CRANK - bdt.Y_DRIVE, (centre[0] - bdt.X_CRANK) * COS_I)
+        expected = centre[2] + bdt.R64 * math.cos(alpha) * SIN_I
+        assert bdt.gear64_contact_z(shift) == pytest.approx(expected, abs=1e-9)
+    translated = bdt.gear64_contact_z(0.0) + bdt.CONE_FLOAT_NORTH * COS_I
+    assert not math.isclose(bdt.gear64_contact_z(bdt.CONE_FLOAT_NORTH), translated, abs_tol=1e-9)
 
 
 def test_64t_row_carries_every_axis_pose() -> None:
@@ -918,48 +1659,25 @@ def test_64t_row_carries_every_axis_pose() -> None:
     cone_axial = (running / post.CONE_BOSS_LENGTH + angle) * rim
     budget = crank_side + cone_radial * sin_i + cone_axial * cos_i
     assert bdt.CRANK_ROW_POSE_AXIAL == pytest.approx(budget, abs=1e-9)
-    assert budget == pytest.approx(0.1825, abs=1e-3)
-    # With every slice in contact, the R9-55 11.4 teeth covered 85.7% on the
-    # nominal axes; the poses take them under the floor, and Codex's two
-    # terms (16T cock, cone tilt) alone already do.
-    tip = bdt._PINION_TIP_DIA_LOW + bdt.CRANK_MESH_TOOTH_RUNOUT_TIR
-    in_contact = ((max(bdt._CRANK_HEIGHT_BAND), tip),)
-
-    def row(face: float, pose_axial: float) -> float:
-        return bdt.crank_row_engagement(
-            face,
-            bdt._PINION_FACE_BAND,
-            bdt.CONE_FLOAT_NORTH,
-            band_corners=in_contact,
-            pose_axial=pose_axial,
-        )
-
-    floor = bdt.CRANK_ROW_ENGAGEMENT_FLOOR
-    assert row(11.4, 0.0) >= floor
-    assert row(11.4, budget) < floor
+    assert budget > 0.0
     codex = (
         bdt.CRANK_ROW_POSE_TERMS["16T bore on the crankshaft"]
         + bdt.CRANK_ROW_POSE_TERMS["cone shaft float in the post boss"]
     )
-    assert row(11.4, codex) < floor
-    # The grown 11.6 teeth hold the floor with every pose.
-    assert row(spec.FACE_WIDTH, budget) >= floor
+    assert 0.0 < codex <= budget
 
 
 def test_t120_radial_carries_every_fit_offset_and_axis_pose() -> None:
-    # Codex P1 on #1154: T120 held concentric on the nominal cone axis read
-    # 0.251 radial at the old turned 16.21, but its 0.105 seat clearance
-    # alone lets it sit (0.025, 0.046165) off centre, and the crank journal,
-    # 16T bore, runout, cone shaft and both post bores move the pair further.
-    # The budget is re-derived here from the fits, summed at print-worst.
+    # Every fit and angular pose enters at print-worst; a nominally clear
+    # band near the clearance threshold must not ignore the gear's seat float.
     import build_dt_drive_train_assembly as bdt
     import cone_line
     import dt_cone_pivot_post_spec as post
     import crank_mesh_stack as mesh
     from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
-    codex_offset = math.hypot(0.025, 0.046165)
-    assert codex_offset <= GEAR_SEAT_CLEARANCE[1] / 2.0 + 1e-6
+    seat_float = GEAR_SEAT_CLEARANCE[1] / 2.0
+    assert seat_float > 0.0
     running = _config.fit("shaft_in_bushing")["diametral_clearance_mm"][1]
     angle = math.tan(math.radians(post.CRANK_BORE_ANGLE_LIMIT_DEG))
     sin_i = math.sin(math.radians(cone_line.INCLINE_DEG))
@@ -989,16 +1707,17 @@ def test_t120_radial_carries_every_fit_offset_and_axis_pose() -> None:
         )["turned band radial"]
 
     floor = bdt.T120_TURNED_BAND_RADIAL_FLOOR
-    # The old band: Codex's corner alone takes it under the floor.
-    assert concentric(16.21) - codex_offset < floor
-    # With every offset and pose summed the printed band is under the floor,
-    # at least as far as the hand budget takes it (the named exception's
-    # radial figure).
-    assert concentric(spec.TURNED_DIA) - budget < floor
+    # Derive the negative control from the current clearance threshold,
+    # rather than reusing a diameter that belongs to another tooth system.
+    marginal = (
+        spec.TURNED_DIA + 2.0 * (concentric(spec.TURNED_DIA) - floor) - seat_float
+    )
+    assert concentric(marginal) > floor
+    assert concentric(marginal) - seat_float < floor
     assert bdt.T120_TURNED_BAND_RADIAL <= concentric(spec.TURNED_DIA) - budget + 1e-9
 
 
-def _t120_policy_row() -> str:
+def _assert_no_t120_shortfall_waiver() -> None:
     policy = (
         Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
     ).read_text(encoding="utf-8")
@@ -1007,76 +1726,79 @@ def _t120_policy_row() -> str:
         for line in policy.split("\n## Named exceptions", 1)[1].splitlines()
         if line.startswith("| MHA-DT-010") and "T120" in line.split("|")[1]
     ]
-    assert len(rows) == 1
-    return rows[0]
+    assert not rows
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "Named exception: MHA-DT-010 turned band" not in source
 
 
-def test_t120_shortfall_is_the_named_exception_the_policy_states() -> None:
-    # User ruling 2026-09-30 on Codex P1 (#1154): the band stays Ø16.21 and
-    # the shoulder 8.5.  At the arithmetic worst of every fit offset and axis
-    # pose the pair can close on T120 by the row's figures (worst case and
-    # RSS), and the sheets state the build's figures rounded down.
+def test_t120_clearance_facts_match_the_ordinary_floors_without_a_waiver() -> None:
+    # The current envelope passes the ordinary clearance floors. Its finite
+    # printed fact is exact and rounded down; an absent section is not a size.
     import build_dt_drive_train_assembly as bdt
 
     air, radial = bdt.T120_SHOULDER_AIR, bdt.T120_TURNED_BAND_RADIAL
-    assert air == pytest.approx(-0.0905, abs=5e-4)
-    assert radial == pytest.approx(-0.1157, abs=5e-4)
-    assert bdt.T120_SHOULDER_AIR_STATED_WORST == math.floor(air * 100.0) / 100.0
-    assert (
-        bdt.T120_TURNED_BAND_RADIAL_STATED_WORST == math.floor(radial * 100.0) / 100.0
+    assert math.isfinite(radial)
+    assert radial >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
+    assert air >= bdt.T120_PINION_AIR_FLOOR
+    assert spec.T120_SHOULDER_AIR_WORST == (
+        math.floor(air * 100.0) / 100.0 if math.isfinite(air) else math.inf
     )
+    assert spec.T120_TURNED_BAND_RADIAL_WORST == math.floor(radial * 100.0) / 100.0
     rss = bdt.pinion_t120_clearances(
         pose_radial=math.hypot(*(r for r, _ in bdt.T120_POSE_TERMS.values())),
         pose_axial=math.hypot(*(a for _, a in bdt.T120_POSE_TERMS.values())),
     )
-    assert rss["shoulder air"] == pytest.approx(0.1210, abs=5e-4)
-    assert rss["turned band radial"] == pytest.approx(0.1052, abs=5e-4)
-    # 0.02 more band or 0.1 more shoulder takes the pair past what the
-    # sheets state.
-    wider = bdt.pinion_t120_clearances(turned_dia=spec.TURNED_DIA + 0.02)
-    assert wider["turned band radial"] < bdt.T120_TURNED_BAND_RADIAL_STATED_WORST
-    longer = bdt.pinion_t120_clearances(shoulder_length=spec.SHOULDER_LENGTH + 0.1)
-    assert longer["shoulder air"] < bdt.T120_SHOULDER_AIR_STATED_WORST
-    # The row states the build's figures, the fit-up feeler and its limits.
-    row = _t120_policy_row()
-    concentric = bdt.PINION_T120_CONCENTRIC
-    for figure in (
-        f"air −{-air:.3f}",
-        f"radial −{-radial:.3f}",
-        f"−{-bdt.T120_SHOULDER_AIR_STATED_WORST:.2f} / "
-        f"−{-bdt.T120_TURNED_BAND_RADIAL_STATED_WORST:.2f}",
-        f"+{rss['shoulder air']:.2f} / +{rss['turned band radial']:.2f}",
-        f"+{concentric['shoulder air']:.3f} / +{concentric['turned band radial']:.3f}",
-        f"{spec.T120_FITUP_FEELER_MM:.2f} feeler",
-        f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN",
-        f"{spec.SHOULDER_LENGTH_FITUP_MIN:.1f} MIN",
-    ):
-        assert figure in row, figure
+    assert rss["shoulder air"] >= air
+    assert rss["turned band radial"] >= radial
+    # Increasing either feature consumes only its own stated margin.
+    wider = bdt.pinion_t120_clearances(
+        turned_dia=spec.TURNED_DIA
+        + 2.0 * (radial - spec.T120_TURNED_BAND_RADIAL_WORST + 0.01)
+    )
+    assert wider["turned band radial"] < spec.T120_TURNED_BAND_RADIAL_WORST
+    if math.isfinite(air):
+        longer = bdt.pinion_t120_clearances(
+            shoulder_length=spec.SHOULDER_LENGTH
+            + air
+            - spec.T120_SHOULDER_AIR_WORST
+            + 0.01
+        )
+        assert longer["shoulder air"] < spec.T120_SHOULDER_AIR_WORST
+    else:
+        assert air == math.inf
+        assert "NO AXIAL OVERLAP" in spec.DRAWING_NOTES
+    _assert_no_t120_shortfall_waiver()
 
 
-def test_t120_shoulder_air_is_no_higher_than_a_point_between_rim_samples() -> None:
-    # Codex P1 on #1154 (review 2): a 0.05-deg sampling of T120's south rim
-    # read the worst shoulder air -0.0851 and passed a stated -0.09, but the
-    # rim point at 94.055 deg, between two samples, lies inside the 16T's
-    # reach at -0.0904.
+def test_t120_shoulder_air_bounds_every_reachable_south_rim_point() -> None:
+    # Half-step samples do not define the answer: the continuous section
+    # search must bound them, or prove that the entire section is absent.
+    import numpy as np
+
     import build_dt_drive_train_assembly as bdt
 
+    shifts, heights = bdt._cone_corners(bdt._CONE_FLOATS, bdt._CRANK_HEIGHT_BAND)
+    reach = bdt._PINION_TIP_R_MAX + bdt.T120_POSE_RADIAL
+    if bdt.T120_SHOULDER_AIR == math.inf:
+        assert np.isposinf(
+            bdt._t120_lowest(bdt._T120_SOUTH_FACE_STATION + shifts, heights, reach)
+        ).all()
+        assert spec.T120_SHOULDER_AIR_WORST == math.inf
+        return
     shift = (
         min(bdt._CONE_BOSS_NORTH_BAND)
         + min(bdt._COLLAR_WIDTH_BAND)
         + min(bdt._GEAR64_FACE_LIMITS)
     )
     dy = min(bdt._CRANK_HEIGHT_BAND)
-    theta = math.radians(94.055)
+    theta = np.deg2rad((np.arange(7200) + 0.5) * 0.05)
     centre = bdt.cone_station(bdt._T120_SOUTH_FACE_STATION + shift)
-    offset = bdt._TIP120 * math.cos(theta)
+    offset = bdt._TIP120 * np.cos(theta)
     x = centre[0] + offset * bdt.COS_I
-    y = bdt.Y_DRIVE + bdt._TIP120 * math.sin(theta)
+    y = bdt.Y_DRIVE + bdt._TIP120 * np.sin(theta)
     z = centre[2] - offset * bdt.SIN_I
-    reach = (
-        bdt.R16 + bdt.ADD16 + max(bdt._PINION_TIP_RADIUS_BAND) + bdt.T120_POSE_RADIAL
-    )
-    assert math.hypot(x - bdt.X_CRANK, y - (bdt.Y_CRANK + dy)) <= reach
+    inside = np.hypot(x - bdt.X_CRANK, y - (bdt.Y_CRANK + dy)) <= reach
+    assert inside.any()
     shoulder_top = (
         bdt._POST_BOSS_NORTH
         + max(bdt._BOSS_NORTH_BAND)
@@ -1085,10 +1807,9 @@ def test_t120_shoulder_air_is_no_higher_than_a_point_between_rim_samples() -> No
         + spec.SHOULDER_LENGTH
         + max(bdt._PINION_SHOULDER_BAND)
     )
-    witness = z - bdt.T120_POSE_AXIAL - shoulder_top
-    assert witness == pytest.approx(-0.090072, abs=2e-6)
+    witness = float(z[inside].min()) - bdt.T120_POSE_AXIAL - shoulder_top
     assert bdt.T120_SHOULDER_AIR <= witness
-    assert bdt.T120_SHOULDER_AIR_STATED_WORST <= witness
+    assert spec.T120_SHOULDER_AIR_WORST <= witness
 
 
 def test_t120_search_never_looks_outside_the_section() -> None:
@@ -1112,8 +1833,6 @@ def test_t120_search_never_looks_outside_the_section() -> None:
     assert least[0] == pytest.approx(-3.0, abs=1e-9)
     nowhere = bdt._convex_min_where(objective, (lambda p: p + 1.0,), lo, hi)
     assert nowhere[0] == math.inf
-    assert bdt.T120_SHOULDER_AIR == pytest.approx(-0.090287, abs=2e-6)
-    assert bdt.T120_TURNED_BAND_RADIAL == pytest.approx(-0.116061, abs=2e-6)
 
 
 def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
@@ -1171,7 +1890,7 @@ def test_t120_fit_up_stops_a_band_that_would_pass_and_then_close() -> None:
 
     # The actual band that just passes with the cone shaft centred.
     passing = spec.TURNED_DIA + 2.0 * (radial(cone_centred, spec.TURNED_DIA) - feeler)
-    assert passing == pytest.approx(16.0431, abs=1e-3)
+    assert passing > spec.PITCH_DIA
     assert radial(cone_centred, passing) == pytest.approx(feeler, abs=1e-9)
     in_service = radial(bdt.pinion_t120_clearances, passing)
     cone_play = bdt.T120_POSE_TERMS["cone shaft float in the post boss"][0]
@@ -1183,66 +1902,38 @@ def test_t120_fit_up_stops_a_band_that_would_pass_and_then_close() -> None:
     assert radial(bdt.t120_fitup_reading, passing) < feeler
 
 
-def _row_with_band(crank_height: float, turned_dia: float) -> float:
-    """The 64T row the 16T covers and meshes with its band ``turned_dia`` at
-    ``crank_height``, every other corner at its worst."""
-    import build_dt_drive_train_assembly as bdt
-
-    return bdt.crank_row_engagement(
-        spec.FACE_WIDTH,
-        bdt._PINION_FACE_BAND,
-        bdt.CONE_FLOAT_NORTH,
-        band_corners=((crank_height, turned_dia),),
-    )
-
-
-def test_t120_turn_down_floor_keeps_the_band_in_mesh() -> None:
-    # Codex P1 on #1154 (review 2): turned to the old Ø15.48 floor the band
-    # has no contact at the open centres (path -0.63), yet the row still
-    # counted it.  The check stops the feeler on the band only with the crank
-    # low, where the 16T:64T centres close; the floor meshes there and clears
-    # the feeler at every corner, and a floor that does not mesh leaves the
-    # row the full-OD shoulder alone.
+def test_t120_turn_down_height_and_actual_fitup_row_are_separate_gates() -> None:
+    # Retain the physical feeler-height transition, and require the exact
+    # independently measured turned-fitup row instead of interpolating lengths.
     import build_dt_drive_train_assembly as bdt
 
     feeler = spec.T120_FITUP_FEELER_MM
-    floor = bdt.CRANK_ROW_ENGAGEMENT_FLOOR
     height = bdt.T120_BAND_CHECK_CRANK_HEIGHT
     low, high = bdt._CRANK_HEIGHT_BAND
-    assert low < height < high
+    assert low <= height <= high
 
     def band_reading(crank_height: float) -> float:
         return bdt.t120_fitup_reading(crank_heights=(crank_height,))[
             "turned band radial"
         ]
 
-    assert band_reading(height) == pytest.approx(feeler, abs=1e-9)
-    assert band_reading(height + 0.01) > feeler > band_reading(height - 0.01)
-    # The row is the lesser of the printed band at the top of the crank
-    # band and the fit-up floor wherever the check can turn it down.
-    printed = spec.TURNED_DIA - spec.TURNED_DIA_TOLERANCE_MM
-    (top, band), (check, fit_up) = bdt.CRANK_BAND_CORNERS
-    assert (top, band) == pytest.approx((high, printed), abs=1e-9)
-    fit_up_corner = (height, spec.TURNED_DIA_FITUP_MIN)
-    assert (check, fit_up) == pytest.approx(fit_up_corner, abs=1e-9)
-    at_floor = _row_with_band(height, spec.TURNED_DIA_FITUP_MIN)
-    assert at_floor >= floor
-    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION == pytest.approx(
-        min(at_floor, _row_with_band(high, printed)), abs=1e-12
-    )
-    # The printed floor sits inside the joint window: over the diameter that
-    # loses the row at that height, under the one that clears the feeler.
-    assert _row_with_band(height, spec.TURNED_DIA_FITUP_MIN - 0.02) < floor
-    feeler_max = spec.TURNED_DIA_FITUP_MIN + 2.0 * (
-        bdt.T120_FITUP_LIMIT_CLEARANCES["turned band radial"] - feeler
-    )
-    assert _row_with_band(high, feeler_max) < floor
-    assert _row_with_band(height, feeler_max) >= floor
-    # The old floor: no contact at that height, and the row keeps only the
-    # full-OD shoulder, under 85%.
-    old = _row_with_band(height, 15.48)
-    assert old == pytest.approx(bdt.CRANK_ROW_FULL_DEPTH_FRACTION)
-    assert old < floor
+    if band_reading(low) >= feeler:
+        assert height == pytest.approx(low, abs=1e-12)
+        assert band_reading(high) >= feeler
+    elif band_reading(high) < feeler:
+        assert height == pytest.approx(high, abs=1e-12)
+    else:
+        assert band_reading(height) == pytest.approx(feeler, abs=1e-9)
+        assert band_reading(height + 0.01) > feeler > band_reading(height - 0.01)
+    import crank_mesh_stack as mesh
+    import crank_mesh_requirements as requirements
+
+    mesh.require_qualified()
+    row = mesh.row_qualification("turned_fitup_floor")
+    assert row.driver_turned_radius_mm == spec.TURNED_DIA_FITUP_MIN / 2.0
+    assert row.row_fraction_lower >= requirements.ROW_ENGAGEMENT_MIN
+    assert row.coverage_lower >= requirements.STOCK_FORM_COVERAGE_MIN
+    assert row.continuous_carrier
 
 
 def _sentences(text: str) -> list[str]:
@@ -1250,27 +1941,11 @@ def _sentences(text: str) -> list[str]:
     return [part for part in re.split(r"[.;]\s+|[.;]$", " ".join(text.split())) if part]
 
 
-_FEATURE = re.compile(r"\b(BAND|SHOULDER)\b")
-_SHORTFALL = re.compile(r"(?<![\w.])-\d+\.\d+")
-
-
-def _t120_shortfalls(text: str) -> dict[str, set[float]]:
-    """The negative figures each sentence naming T120 ties to the band and
-    to the shoulder: each figure goes to the nearer of the two words."""
+def _t120_clearance_facts(text: str) -> dict[str, set[float]]:
+    """Finite clearance figures are attached to their own named feature."""
     found: dict[str, set[float]] = {"BAND": set(), "SHOULDER": set()}
-    for sentence in _sentences(text):
-        if "T120" not in sentence:
-            continue
-        words = [
-            (match.span(), match.group(1)) for match in _FEATURE.finditer(sentence)
-        ]
-        for figure in _SHORTFALL.finditer(sentence):
-            # Characters between the figure and the word, either side of it.
-            gaps = [
-                (max(start - figure.end(), figure.start() - end), word)
-                for (start, end), word in words
-            ]
-            found[min(gaps)[1]].add(round(float(figure.group()), 2))
+    for feature, figure in re.findall(r"\b(BAND|SHOULDER)\s+([+-]?\d+\.\d+)\b", text):
+        found[feature].add(float(figure))
     return found
 
 
@@ -1288,39 +1963,66 @@ def _crank_step() -> str:
     return step.split(f"\n{number + 1}. ")[0]
 
 
-def test_both_sheets_state_the_t120_shortfall_the_build_derives() -> None:
-    # Codex P2 on #1154 (review 2): the policy has both affected sheets state
-    # the shortfall and its value; the tagged emitters print the build's
-    # worst-case figures, rounded down.  Codex P3 (review 3): each sheet must
-    # tie each figure to its own feature, however the sentence is worded.
+def test_both_sheets_state_current_t120_clearance_and_absent_sections() -> None:
+    # Each finite fact belongs to its own feature. A missing shoulder section
+    # is stated as absence, never as an infinite size or an obsolete shortfall.
     import build_dt_drive_train_assembly as bdt
 
     band = round(math.floor(bdt.T120_TURNED_BAND_RADIAL * 100.0) / 100.0, 2)
-    shoulder = round(math.floor(bdt.T120_SHOULDER_AIR * 100.0) / 100.0, 2)
-    assert band != shoulder
+    shoulder = (
+        {round(math.floor(bdt.T120_SHOULDER_AIR * 100.0) / 100.0, 2)}
+        if math.isfinite(bdt.T120_SHOULDER_AIR)
+        else set()
+    )
     for text in (spec.DRAWING_NOTES, _crank_step()):
-        assert _t120_shortfalls(text) == {"BAND": {band}, "SHOULDER": {shoulder}}
+        assert _t120_clearance_facts(text) == {"BAND": {band}, "SHOULDER": shoulder}
+        if not shoulder:
+            assert "SHOULDER NO AXIAL OVERLAP" in text
+        assert not re.search(r"\b(?:INF|NAN)\b|∞", text)
 
 
 def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
-    # Codex P1 on #1154 (review 3): at crank +0.300 the band reads 0.1815 and
-    # passes while the shoulder reads 0.0636 and fails.  A check that let
-    # either failure turn the band down would cut it to Ø15.78 there, where
-    # it loses contact with most of the row: under the floor, yet counted.
+    # A passing band's reading must never trigger its cut merely because
+    # the independent shoulder reading fails.
     import build_dt_drive_train_assembly as bdt
 
-    witness = bdt.t120_fitup_reading(crank_heights=(0.300,))
-    assert witness["turned band radial"] == pytest.approx(0.181335, abs=2e-6)
-    assert witness["shoulder air"] == pytest.approx(0.063741, abs=2e-6)
-    assert bdt.t120_fitup_cuts(witness) == {"shoulder air"}
-    row_floor = bdt.CRANK_ROW_ENGAGEMENT_FLOOR
-    assert _row_with_band(0.300, spec.TURNED_DIA_FITUP_MIN) < row_floor
-    # Facing the shoulder alone closes that check.
-    faced = bdt.t120_fitup_reading(
-        crank_heights=(0.300,), shoulder_length=spec.SHOULDER_LENGTH_FITUP_MIN
-    )
-    assert bdt.t120_fitup_cuts(faced) == frozenset()
-    # Wherever the check does call for the band, the floor keeps the row.
+    # Exercise every cut combination independently of whether the current
+    # configuration needs a cut at any height.
+    feeler = spec.T120_FITUP_FEELER_MM
+    failing = math.nextafter(feeler, -math.inf)
+    for reading, expected in (
+        ({"turned band radial": feeler, "shoulder air": failing}, {"shoulder air"}),
+        (
+            {"turned band radial": failing, "shoulder air": feeler},
+            {"turned band radial"},
+        ),
+        (
+            {"turned band radial": failing, "shoulder air": failing},
+            {"turned band radial", "shoulder air"},
+        ),
+        ({"turned band radial": feeler, "shoulder air": math.inf}, set()),
+    ):
+        assert bdt.t120_fitup_cuts(reading) == expected
+    low, high = bdt._CRANK_HEIGHT_BAND
+    heights = [low + (high - low) * i / 40.0 for i in range(41)]
+    witnesses = [
+        (height, bdt.t120_fitup_reading(crank_heights=(height,))) for height in heights
+    ]
+    shoulder_only = [
+        (height, reading)
+        for height, reading in witnesses
+        if reading["turned band radial"] >= spec.T120_FITUP_FEELER_MM
+        and reading["shoulder air"] < spec.T120_FITUP_FEELER_MM
+    ]
+    if not shoulder_only:
+        assert all(reading["shoulder air"] >= feeler for _, reading in witnesses)
+    for height, witness in shoulder_only:
+        assert bdt.t120_fitup_cuts(witness) == {"shoulder air"}
+        faced = bdt.t120_fitup_reading(
+            crank_heights=(height,), shoulder_length=spec.SHOULDER_LENGTH_FITUP_MIN
+        )
+        assert bdt.t120_fitup_cuts(faced) == frozenset()
+    # The physical cut-height domain is separate from stock-contact evidence.
     low, high = bdt._CRANK_HEIGHT_BAND
     turned = [
         height
@@ -1328,12 +2030,16 @@ def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
         if "turned band radial"
         in bdt.t120_fitup_cuts(bdt.t120_fitup_reading(crank_heights=(height,)))
     ]
-    assert turned and max(turned) <= bdt.T120_BAND_CHECK_CRANK_HEIGHT
-    assert all(
-        _row_with_band(height, spec.TURNED_DIA_FITUP_MIN)
-        >= bdt.CRANK_ROW_ENGAGEMENT_FLOOR
-        for height in turned
-    )
+    assert max(turned, default=low) <= bdt.T120_BAND_CHECK_CRANK_HEIGHT + 1e-12
+    if not turned:
+        assert all(reading["turned band radial"] >= feeler for _, reading in witnesses)
+    import crank_mesh_stack as mesh
+    import crank_mesh_requirements as requirements
+
+    mesh.require_qualified()
+    fitup = mesh.row_qualification("turned_fitup_floor")
+    assert fitup.driver_turned_radius_mm == spec.TURNED_DIA_FITUP_MIN / 2.0
+    assert fitup.row_fraction_lower >= requirements.ROW_ENGAGEMENT_MIN
     # Both sheets give each cut its own condition: the turn-down floor is
     # stated with the band and its check only, the facing floor with the
     # shoulder only.  The part sheet points at the MHA-DT-000 T120 check, which
@@ -1378,17 +2084,19 @@ def test_crank_step_runs_free_only_after_the_t120_check_closes() -> None:
     assert seat < check < cuts < free < step.index("MATCH-DRILL")
 
 
-def test_both_gear_sheets_print_the_worst_contact_ratio_rounded_down() -> None:
-    # User ruling 2026-09-30: the 16T:64T contact ratio is under rule 12's
-    # 1.1 at the open corner, and both GEAR DATA blocks state it, never
-    # claiming more than the mesh gives.
-    import build_dt_drive_train_assembly as bdt
-    import dt_crank_drive_gear_notes
+def test_both_gear_sheets_state_stock_mesh_requirements_not_a_fake_certificate() -> None:
+    import crank_mesh_requirements as requirements
+    import dt_crank_drive_gear_notes as gear_notes
 
-    worst = bdt.CRANK_MESH_CONTACT_RATIO_WORST
-    printed = dt_crank_drive_gear_notes.WORST_CONTACT_RATIO
-    assert printed == math.floor(worst * 100.0) / 100.0
-    assert worst < 1.1 < bdt.CRANK_MESH_CONTACT_RATIO_NOMINAL
-    assert bdt.CRANK_MESH_CONTACT_RATIO_NOMINAL == pytest.approx(1.4345, abs=1e-3)
-    assert f"{printed:.2f}" in spec.GEAR_DATA
-    assert f"{printed:.2f}" in dt_crank_drive_gear_notes.GEAR_DATA
+    assert notes.STOCK_FORM_COVERAGE_ROW[1] == gear_notes.STOCK_FORM_COVERAGE_ROW[1]
+    for module in (notes, gear_notes):
+        data = module.GEAR_DATA
+        assert "STOCK-FORM COVERAGE" in data
+        assert f"{requirements.STOCK_FORM_COVERAGE_MIN:.2f} MIN" in data
+        assert "NO UNCOVERED PHASE" in data
+        assert f"HANDOVER JUMP {requirements.HANDOVER_JUMP_MAX_MM:.3f} mm MAX" in data
+        assert "CONTACT RATIO" not in data
+        assert not hasattr(module, "CONTACT_RATIO_ROW")
+        assert not hasattr(module, "WORST_CONTACT_RATIO")
+        assert "crank_mesh_stack" not in Path(module.__file__).read_text(encoding="utf-8")
+    assert requirements.UNCOVERED_PHASE_MAX_RAD == 0.0

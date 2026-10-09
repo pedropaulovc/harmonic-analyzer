@@ -1,9 +1,11 @@
 r"""Pure-data dimensional contract shared by the cone pivot post and drawing.
 
 The hand-modelled ``cone-pivot-post-v2.SLDPRT`` supplies the cone, foot and
-mounting datums.  Its original 86 mm height was manually rederived from the
-second ch30 eight-view; the normal-24DP crossed crank requires a real 90 mm
-body with the same 26.6 mm head, not a raised bore outside that casting.
+mounting datums. Its original 86 mm height was manually rederived from the
+second ch30 eight-view
+(``references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png``).
+The normal-24DP crossed crank uses the raised common journal station law,
+with the same head height and bore spacing above the unrelieved platform.
 The casting proportions came from the two sharp ch11 details
 (``ch11_images/page002_img05.jpeg`` and ``page002_img06.jpeg``); the retained
 diameters and journal stations are the exact harvested feature dimensions.
@@ -16,6 +18,11 @@ import math
 import _config
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from dt_post_mount_stack import (
+    CONE_AXIS_HEIGHT_MM,
+    POST_BODY_HEIGHT_MM,
+    POST_MOUNT_COUNTERBORE_DEPTH_MM,
+)
 
 
 MM_PER_IN = 25.4
@@ -27,7 +34,7 @@ MM_PER_IN = 25.4
 # head is a one-place reference size -- nothing mates on it; the body below it
 # is the locating/bore cylinder and keeps its turned size.
 BLOCK_DIA = 42.011
-BLOCK_HEIGHT = 90.0
+BLOCK_HEIGHT = POST_BODY_HEIGHT_MM
 HEAD_DIA = 42.7506
 HEAD_HEIGHT = 26.6
 HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
@@ -66,12 +73,12 @@ CRANK_BOSS_HEAD_MARGIN_MM = min(
 if CRANK_BOSS_HEAD_MARGIN_MM <= 0.0:
     raise AssertionError("crank boss lies outside the post head's height band")
 
-# Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
+# Inclined cone-shaft journal.  The configured cone-line incline is baked
 # into the part; downstream placement composes it with the exact Ry(180)
 # installation instead of re-authoring the harvested feature frame.
 INCLINE_DEG = _config.machine("cone_incline", "derived_incline_deg")
 CONE_AXIS_VIEW = "CONE JOURNAL"
-BORE_HEIGHT = 33.368
+BORE_HEIGHT = CONE_AXIS_HEIGHT_MM
 CONE_BOSS_DIA = 17.2
 BORE_DIA = 12.2808
 CONE_BOSS_LENGTH = BLOCK_DIA
@@ -88,7 +95,7 @@ CONE_BOSS_LENGTH = BLOCK_DIA
 # floor, so the former 3-1/2-inch stock is no longer long enough.
 ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.50874
-ATTACHMENT_CBORE_DEPTH = 6.0198
+ATTACHMENT_CBORE_DEPTH = POST_MOUNT_COUNTERBORE_DEPTH_MM
 WEB_FLOOR_MM = 1.5
 
 
@@ -216,8 +223,7 @@ CRANK_BORE_WEBS_WORST = {
 # the closing printed corner.  Its lower edge may blend into the lower body;
 # the nominal boss/head containment above is what the volume oracle requires.
 CRANK_BOSS_TOP_MARGIN_WORST_MM = (
-    BLOCK_HEIGHT - _row(1) - _CRANK_AXIS_Y_MAX
-    - (CRANK_BOSS_DIA + _row(1)) / 2.0
+    BLOCK_HEIGHT - _row(1) - _CRANK_AXIS_Y_MAX - (CRANK_BOSS_DIA + _row(1)) / 2.0
 )
 if CRANK_BOSS_TOP_MARGIN_WORST_MM <= 0.0:
     raise AssertionError("crank boss breaches the post's print-worst top outline")
@@ -259,11 +265,11 @@ for _name, _web in MOUNT_OTHER_WEBS_WORST.items():
             f"under the {WEB_FLOOR_MM} web floor"
         )
 
-# Journal-plan reference sketch (Top plane, all construction).  The 12.5182 deg
+# Journal-plan reference sketch (Top plane, all construction).  The configured
 # plan angle between the crank axis and the cone-journal axis is REAL model
-# geometry -- ConeShaftNormal's angle -- but no face carries it into a view, so
-# a construction sketch holds the two axis directions and a driven angular
-# reference dimension reports the angle the print has to state.
+# geometry -- ConeShaftNormal's angle -- but no face carries it into a view.
+# Two construction rays and a driving angular dimension use the same
+# ConeIncline owner as the actual plane.
 JOURNAL_REFERENCE_LENGTH = 40.0
 JOURNAL_REFERENCE_X = JOURNAL_REFERENCE_LENGTH * math.sin(math.radians(INCLINE_DEG))
 JOURNAL_REFERENCE_Z = JOURNAL_REFERENCE_LENGTH * math.cos(math.radians(INCLINE_DEG))
@@ -333,10 +339,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # 2026-09-29, option (a)): the shaft collar bears on its north face, half its
 # band off the post centre, and that half lands on the cone-tip adjuster's
 # engagement (build_dt_drive_train_assembly.TIP_EMBED_WORST_MM), which the .X
-# band's 0.40 pushes out of the block's 1.0D working window.  The plan angle
-# takes one: the title block holds angles to +/-1 deg, so a second place
-# would only suggest a precision nobody sets up for.  Only the two running
-# bores take three, and only because their size limits are what deliver the
+# band's 0.40 pushes out of the block's 1.0D working window.  The basic plan
+# angle feeds the retained crank-bore angularity frame; its four places spell
+# the configured geometry, not a tighter general angular band.  Only the two
+# running bores take three, because their size limits deliver the
 # `shaft_in_bushing` clearance band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MainBodyProfile": {"MainBodyDia": 1},
@@ -350,8 +356,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
     "ConeShaftBoss": {"ConeBossLen": 2},
     "JournalBoreProfile": {"JournalBoreDia": 3},
-    # BASIC since #906: it feeds the crank bore's angularity frame, so it
-    # prints the model's exact angle.
+    # BASIC since #906: it feeds the crank bore's angularity frame; four places
+    # retain the configured nominal without changing the frame's zone.
     "JournalPlanReference": {"InclineAngle": 4},
     "CrankBossStationReference": {"CrankBossStartZ": 2},
     "BoreSpacingReference": {"CrankAboveCone": 2},

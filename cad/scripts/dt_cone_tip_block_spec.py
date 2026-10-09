@@ -10,6 +10,7 @@ from _fit_limits import deviations
 from _gtol_spec import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
+from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM
 
 
 # Small black-steel clamp block on the swing platform that carries the axial
@@ -38,11 +39,9 @@ BLOCK_X = 17.0  # plan width across the shaft
 # (build_dt_drive_train_assembly's collar-to-block air).  9.75 sits between the
 # two at print-worst.
 BLOCK_Z = 9.75
-# The adjuster axis is the cone journal axis: 33.368 above the platform top,
-# on which the block's foot now stands directly.  The 2026-09-21 DFM
-# correction still stands relative to that axis: free material above the
-# slit floor, and the pinch screw located from the adjuster axis.
-ADJUSTER_AXIS_HEIGHT = 33.368
+# The adjuster and cone journal share one height above the platform top.
+# Free material above the slit floor and the pinch screw's rise stay fixed.
+ADJUSTER_AXIS_HEIGHT = CONE_AXIS_HEIGHT_MM
 # User ruling U24b (2026-09-23, W-target): the pinch screw sits 8.85 above the
 # adjuster axis and the top 14.56 above it, so the slit-mouth web between the
 # pinch clearance hole and the adjuster thread root, and the ligament over the
@@ -51,9 +50,9 @@ ADJUSTER_AXIS_HEIGHT = 33.368
 # straight from the foot (PinchHeight, .XX) rather than chaining it off the
 # adjuster axis.  PINCH_RISE stays the design offset; it no longer prints.
 TOP_ABOVE_AXIS = 14.56
-BLOCK_HEIGHT = ADJUSTER_AXIS_HEIGHT + TOP_ABOVE_AXIS  # 47.928
+BLOCK_HEIGHT = ADJUSTER_AXIS_HEIGHT + TOP_ABOVE_AXIS
 PINCH_RISE = 8.85
-PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE  # 42.218 above the foot
+PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE
 # The printed grade of every dimension a stack reads; DRAWING_PRECISION must
 # carry the same (checked at the end of this module).  Two dimensions carry
 # an explicit band instead of the title block's: the axis height (the tip's

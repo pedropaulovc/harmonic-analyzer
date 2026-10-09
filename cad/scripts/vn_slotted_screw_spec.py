@@ -1,16 +1,14 @@
-r"""Stock pinion-block hold-down slotted screw (McMaster 90280A201) nominals.
+"""McMaster 90280A203 catalog dimensions in mm, without CAD dependencies.
 
-PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure: the numbers other parts and assemblies read. The dims are the
-90280A201 row of the shared McMaster fillister table
-(``diagnostics/diag_mcmaster_fillister.py``, SolidWorks-free at import).
-Consumers read them here, not from ``build_vn_slotted_screw``, whose stock build
-recipe would otherwise ride their cache keys (#880).
+Live product page read 2026-10-08: #8-32 x 1-1/2, ASME B18.6.3,
+fully threaded zinc-plated steel, flat tip; length measured under the head.
+The native fillister family recipe reads these same catalogue nominals.
 """
 
-from __future__ import annotations
-
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
-
 THREAD = "#8-32"
-SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA = FILLISTER_SIZES["90280A201"][:4]
+THREAD_CLASS = "2A"
+SHANK_DIA = 4.1656
+SHANK_LEN = 38.1
+HEAD_DIA = 6.858
+HEAD_H = 3.9624
+PITCH = 0.79375

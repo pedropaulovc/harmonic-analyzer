@@ -170,16 +170,21 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "99607A213",
         material="AISI 304",
     ),
+    # MSC 40923906: 1/4-20 x 4 in (101.6 mm) supplied stock. Only the
+    # MHA-VN-031 modification applies vn_post_mount_screw_spec.CUT_LENGTH_MM
+    # as a reference trim, then matched-hole cut-to-fit/deburr acceptance.
     "vn-post-mount-screw": _stock(
         "vn-post-mount-screw",
         "Zinc-Plated Steel Slotted Fillister Head Machine Screw",
         "40923906",
         supplier="MSC Industrial Supply",
     ),
+    # McMaster 90280A203: #8-32 x 1-1/2 in (38.1 mm) supplied stock.
+    # The former 31.75-mm geometry was not this SKU's verified stock length.
     "vn-slotted-screw": _stock(
         "vn-slotted-screw",
         "Steel Narrow Fillister Head Slotted Screw",
-        "90280A201",
+        "90280A203",
     ),
     "vn-swing-stop-screw": _stock(
         "vn-swing-stop-screw",
@@ -200,11 +205,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "vn-boss-hook",
         "Zinc-Plated Steel #10-24 Open Routing Eyebolt (Trimmed Shank)",
         "9490T1",
-    ),
-    "vn-cone-tip-collar": _stock(
-        "vn-cone-tip-collar",
-        "Black-Oxide Carbon Steel Set Screw Shaft Collar",
-        "9414T1",
     ),
     "vn-transgear-knob-drive-pin": _stock(
         "vn-transgear-knob-drive-pin",

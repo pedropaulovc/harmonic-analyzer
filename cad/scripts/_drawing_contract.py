@@ -844,21 +844,22 @@ def drawing_specification_violations(
                     )
 
             if _call_is(node, "add_feature_control_frame", gtol_direct, gtol_modules):
-                tolerance = next(
-                    (kw.value for kw in node.keywords if kw.arg == "tolerance"),
-                    None,
-                )
-                if tolerance is not None and not _part_spec_sourced(
-                    tolerance,
-                    direct=part_spec_direct,
-                    modules=part_spec_modules,
-                    assignments=assignments,
-                ):
-                    add(
-                        tolerance,
-                        "drawing-gdt-provenance",
-                        f"tolerance={ast.unparse(tolerance)} is not part-spec-sourced",
+                for field in ("tolerance", "projected_zone_height_mm"):
+                    value = next(
+                        (kw.value for kw in node.keywords if kw.arg == field),
+                        None,
                     )
+                    if value is not None and not _part_spec_sourced(
+                        value,
+                        direct=part_spec_direct,
+                        modules=part_spec_modules,
+                        assignments=assignments,
+                    ):
+                        add(
+                            value,
+                            "drawing-gdt-provenance",
+                            f"{field}={ast.unparse(value)} is not part-spec-sourced",
+                        )
 
             if _call_is(node, "add_attached_note", note_direct, note_modules):
                 text = next(

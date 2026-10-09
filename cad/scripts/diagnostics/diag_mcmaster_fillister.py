@@ -23,6 +23,9 @@ Frame: head UP, under-head junction at y = 0 (the stock Top Plane plays
 the vendor Plane1's three roles: split plane, helix seed, runout).
 
 Per-part entry points: ``diag_build_90280A*.py``, ``diag_build_40923906.py``.
+
+The 90280A108 stock row is owned by pure ``vn_swing_stop_screw_spec``;
+this native recipe reads it without duplicating its supplier dimensions.
 """
 
 from __future__ import annotations
@@ -46,14 +49,24 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut,
 )
 from vn_frame_cross_screw_spec import HEAD_DIA, HEAD_H, PITCH, SHANK_DIA, SHANK_LEN
+import vn_slotted_screw_spec as block_screw
+from vn_swing_stop_screw_spec import FILLISTER_SIZE as stop_screw_size
 
 FILLISTER_SIZES = {
     # part:        (major dia, length, head height, head dia, pitch)
-    "90280A108": (2.8448, 9.525, 2.7178, 4.6482, 0.635),
+    "90280A108": stop_screw_size,
     "90280A194": (4.1656, 12.7, 3.9624, 6.858, 0.79375),
     "90280A197": (4.1656, 19.05, 3.9624, 6.858, 0.79375),
     "90280A199": (4.1656, 25.4, 3.9624, 6.858, 0.79375),
     "90280A201": (4.1656, 31.75, 3.9624, 6.858, 0.79375),
+    # Live McMaster product table, 2026-10-08: #8-32 x 1-1/2, same head.
+    "90280A203": (
+        block_screw.SHANK_DIA,
+        block_screw.SHANK_LEN,
+        block_screw.HEAD_H,
+        block_screw.HEAD_DIA,
+        block_screw.PITCH,
+    ),
     "90280A837": (SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, PITCH),
     # 18-8 stainless fillister, the same 0.183 x 0.107 #4-40 head (McMaster
     # 91794A product table, read 2026-09-25).

@@ -1,4 +1,4 @@
-r"""Create the native ten-sheet drive-train assembly drawing package (MHA-DT-000).
+r"""Create the native eleven-sheet drive-train assembly drawing package (MHA-DT-000).
 
 The released ``dt-drive-train.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``DRIVE_TRAIN_EXPLODED``
@@ -20,6 +20,7 @@ import re
 import sys
 import textwrap
 from datetime import UTC, datetime
+from fractions import Fraction
 from itertools import combinations
 from pathlib import Path
 from typing import Any, Callable, Literal, NamedTuple, Sequence
@@ -28,10 +29,20 @@ import _config
 import _seat_forensics
 import _telemetry
 import ch_connecting_rod_spec as rod
+import cone_line
 import cylinder_bank_layout as bank
 import dt_drive_train_steps as steps
+import dt_crank_drive_gear_spec as gear64
+import dt_crank_pinion_spec as pinion
+import dt_cylinder_gear_spec as drum
+import fr_harmonic_base_spec as base
 import pinion_rig_fitup as FITUP
 import pinion_rig_tip_gap as TIP_GAP
+import rocker_bank_layout as rockers
+import vn_cone_pivot_screw_spec as pivot_screw
+import vn_cone_tip_collar_spec as tip_collar
+import vn_post_mount_screw_spec as post_screw
+import vn_swing_stop_screw_spec as stop_screw
 from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY
 from _common import _early_bound, check, run_build
 from _drawing_common import (
@@ -82,6 +93,7 @@ from vn_keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 from dt_drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
+    FIT_LIMIT_PLACES,
     PENDING_STEMS,
     SOURCE_CONFIGURATION,
     Cluster,
@@ -376,7 +388,7 @@ BOM_PART_NUMBERS = {
     "vn-cone-tip-adjuster": "MHA-VN-017",
     "vn-cone-tip-pinch-screw": "MHA-VN-018",
     "vn-cone-tip-block-screw": "MHA-VN-030",
-    "vn-post-mount-screw": "MHA-VN-031",
+    "vn-post-mount-screw": str(_config.parts("vn-post-mount-screw")["number"]),
     "vn-cone-lock-knob": "MHA-VN-013",
     "vn-cone-pivot-screw": "MHA-VN-014",
     "vn-swing-stop-screw": "MHA-VN-015",
@@ -418,26 +430,26 @@ BOM_DESCRIPTIONS = {
     "dt-cylinder-gear-shaft": "CYLINDER GEAR ARBOR",
     "dt-arbor-pedestal": "ARBOR PEDESTAL",
     "dt-cylinder-end-disc": "CYLINDER BANK THRUST WASHER",
-    "dt-cylinder-gear": "CYLINDER GEAR WITH CAM, 120T",
+    "dt-cylinder-gear": f"CYLINDER GEAR WITH CAM, {drum.TEETH}T",
     "vn-pedestal-hold-down-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A197",
     "vn-arbor-set-screw": "#4-40 X 1/4 SET SCREW, MCMASTER 91375A106",
     "vn-foot-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
     "dt-cone-gear-shaft": "CONE GEAR SHAFT",
     "dt-cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH",
-    "dt-crank-drive-gear": "CRANK DRIVE GEAR, 64T",
+    "dt-crank-drive-gear": f"CRANK DRIVE GEAR, {gear64.TEETH}T",
     "dt-cone-swing-platform": "CONE SWING PLATFORM",
     "dt-cone-pivot-post": "CONE PIVOT POST AND CRANK COLUMN",
     "dt-cone-tip-block": "CONE TIP BLOCK",
-    "vn-cone-tip-collar": "1/16 SHAFT COLLAR, MCMASTER 9414T1",
+    "vn-cone-tip-collar": tip_collar.BOM_DESCRIPTION,
     "vn-cone-tip-adjuster": "CUP-TIP SET SCREW, MCMASTER 94025A164",
     "vn-cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
     "vn-cone-tip-block-screw": "#4-40 X 3/8 SHCS, MCMASTER 91251A108",
-    "vn-post-mount-screw": "1/4-20 FILLISTER SCREW, MSC 40923898",
+    "vn-post-mount-screw": f"{post_screw.THREAD} FILLISTER SCREW, MSC {post_screw.SKU}",
     "vn-cone-lock-knob": "KNURLED THUMB SCREW, MCMASTER 93585A190",
     "vn-cone-pivot-screw": "SHOULDER SCREW, MCMASTER 91829A560",
     "vn-swing-stop-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
     "dt-crankshaft": "CRANKSHAFT",
-    "dt-crank-pinion": "CRANK PINION, 16T",
+    "dt-crank-pinion": f"CRANK PINION, {pinion.TEETH}T",
     "dt-crank-pinion-pin": "CRANK PINION RETENTION PIN",
     "dt-crank-arm": "CRANK ARM",
     "dt-crank-pin": "CRANK TAPER PIN, 1:48",
@@ -470,7 +482,7 @@ BOM_DESCRIPTIONS = {
     "dt-pinion-arbor": "INTEGRAL PINION ARBOR AND GRIP HEAD",
     "dt-pinion-arbor-collar": "PINION ARBOR RETENTION COLLAR",
     "vn-pinion-strap-pin": "1/16 X 1/2 SPRING PIN, MCMASTER 98296A027",
-    "vn-slotted-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A201",
+    "vn-slotted-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A203",
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_PART_NUMBERS):
     raise AssertionError("drive-train BOM description coverage is incomplete")
@@ -549,6 +561,31 @@ def _split_sequence_notes(text: str, key: str, heading: str) -> tuple[str, str]:
     return first, f"{heading}\n{head}{rest}"
 
 
+def _inward_limits(low: float, high: float) -> str:
+    """Print only sizes inside the owning spec's acceptance interval."""
+    scale = 10**FIT_LIMIT_PLACES
+    return (
+        f"{math.ceil(low * scale - 1e-9) / scale:.{FIT_LIMIT_PLACES}f}-"
+        f"{math.floor(high * scale + 1e-9) / scale:.{FIT_LIMIT_PLACES}f}"
+    )
+
+
+_BANK_X = cone_line.X_DRUM + base.BOTTOM_LENGTH / 2.0
+BANK_X_LIMITS = _inward_limits(
+    _BANK_X - bank.BACK_STRAP_LOCATE_BAND, _BANK_X + bank.BACK_STRAP_LOCATE_BAND
+)
+_BACK_STRAP_Y = base.BOTTOM_REAR_Z - bank.BACK_STRAP_INNER_Z
+BACK_STRAP_Y_LIMITS = _inward_limits(
+    _BACK_STRAP_Y - bank.BACK_STRAP_LOCATE_BAND,
+    _BACK_STRAP_Y + bank.BACK_STRAP_LOCATE_BAND,
+)
+_NORTH_EAR_Y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
+NORTH_EAR_Y_LIMITS = _inward_limits(
+    _NORTH_EAR_Y - bank.BACK_STRAP_LOCATE_BAND,
+    _NORTH_EAR_Y + bank.BACK_STRAP_LOCATE_BAND,
+)
+
+
 ASSEMBLED_HEADING = (
     f"SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET {CHECKS_SHEET} FOR SETUP.\n"
     "VIEWS 1:2 AND SMALLER OMIT GEAR TEETH AND SCREW THREADS;\n"
@@ -567,17 +604,19 @@ CONE_CRANK_STEPS = _note_text(
         f"   STACK T120 SOUTH FACE TO T006 NORTH FACE: {STACK_L20_ACCEPT[0]:.3f}-"
         f"{STACK_L20_ACCEPT[1]:.3f}.",
         "   RE-FACE A LONG STACK; REMAKE THE THINNEST GEAR OF A SHORT ONE.",
-        # U37c (user, 2026-09-23): MHA-VN-031 is MSC 40923898, 1/4-20 x 3-1/2
-        # slotted fillister, through the 6.02 counterbore.  Cut each screw
-        # against its own MHA-DT-005/MHA-DT-020 matched holes, never proud of the
-        # plate underside.  The MHA-DT-020 plate's worst-case 5.72 mm = 0.90D
-        # includes stock, cut allowance and both tap-mouth edge breaks; this
-        # is the named short-engagement exception in the drawing policy.
+        # U37c cut-to-fit acceptance survives the taller post and longer stock:
+        # MHA-VN-031's registry/spec own the selected screw and reference length.
+        # Each screw is cut against its own matched post/platform hole, never
+        # proud of the plate underside. The short-engagement fact includes
+        # the stock band, cut allowance and both tap-mouth edge breaks.
         # The sheet states the actual minimum, never the governance label.
-        "2. ALIGN MHA-DT-005 COUNTERBORES TO MHA-DT-020 TAPS; SCREW WITH 2X",
-        "   MHA-VN-031 FROM TOP, EACH CUT TO FIT: FLUSH TO 0.3 SHORT OF",
-        "   MHA-DT-020 UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0).",
-        "   CHAMFER ENDS; " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
+        "2. ALIGN MHA-DT-005 COUNTERBORES TO MHA-DT-020 TAPS; USE 2X",
+        f"   MHA-VN-031: MSC {post_screw.SKU}, {post_screw.THREAD} X "
+        f"{post_screw.STOCK_LENGTH_MM / 25.4:g} IN STOCK, CUT TO FIT;",
+        f"   FLUSH TO {post_screw.POST_SCREW_CUT_TO_FIT_SHORT:g} SHORT OF "
+        "MHA-DT-020 UNDERSIDE, NEVER PROUD.",
+        f"   ({post_screw.CUT_LENGTH_MM:.{post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION]}f}) "
+        "REF CUT LENGTH. DEBURR ENDS; " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
         # User ruling 2026-09-29 (eight-views-4 photo): MHA-DT-021 is a prism
         # standing directly on MHA-DT-020, held by one #4-40 socket head cap
         # screw up from under the plate through its counterbored hole.  The
@@ -695,8 +734,8 @@ BANK_STEPS = _note_text(
         "   OVERHANG SUPPORTED; CONE SET (MHA-DT-020) NOT FITTED.",
         "9A. BACK MHA-DT-002 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
         "   MHA-FR-001 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO X AND Y.",
-        "   SET THE STRAP INNER FACE TO Y 70.44-70.63 AND THE MANDREL CENTRE",
-        "   (EDGE-FIND BOTH SIDES, HALVE) TO X 168.11-168.31.",
+        f"   SET THE STRAP INNER FACE TO Y {BACK_STRAP_Y_LIMITS} AND THE MANDREL CENTRE",
+        f"   (EDGE-FIND BOTH SIDES, HALVE) TO X {BANK_X_LIMITS}.",
         "   SPOT MHA-FR-001 THROUGH THE FOOT HOLE WITH AN 11/64 TRANSFER PUNCH;",
         "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
         "   BOTTOMING); BLOW OUT CHIPS. REFIT, RE-SET Y AND X, TIGHTEN",
@@ -709,8 +748,8 @@ BANK_STEPS = _note_text(
         "   OTHER MHA-DT-026. PUSH THE BANK BACK, CLOSED UP ON THE BACK MHA-DT-026.",
         "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
         "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-DT-002 ON.",
-        "9C. SLIDE THE FRONT MHA-DT-002 ON UNTIL A 0.45 LEAF BETWEEN ITS STRAP",
-        "   AND THE FRONT MHA-DT-026 IS LIGHTLY PINCHED. SET X 168.11-168.31 AND",
+        f"9C. SLIDE THE FRONT MHA-DT-002 ON UNTIL A {bank.BANK_END_FEELER:.2f} LEAF BETWEEN ITS STRAP",
+        f"   AND THE FRONT MHA-DT-026 IS LIGHTLY PINCHED. SET X {BANK_X_LIMITS} AND",
         "   SPOT AS 9A. SLIDE THE FRONT MHA-DT-002 OFF; DRAW THE LOADED MANDREL",
         "   OUT OF THE BACK MHA-DT-002, HOLDING BOTH MHA-DT-026, AND LAY IT IN",
         "   V-BLOCKS ON PARALLELS OFF THE BASE, RODS HANGING FREE. DRILL AND",
@@ -718,15 +757,16 @@ BANK_STEPS = _note_text(
         "   THE BANK BACK AND PROP IT AS 9B. REFIT THE FRONT MHA-DT-002; RE-SET",
         "   THE LEAF AND X, TIGHTEN MHA-VN-032 AND RECHECK.",
         "9D. MEASURE MHA-DT-002 OUTER FACE TO OUTER FACE. TURN MHA-DT-013: ITS",
-        "   CYLINDER IS THAT SPAN, PLUS A 1.5 DOME EACH END (SEE ITS PRINT).",
+        f"   CYLINDER IS THAT SPAN, PLUS A {bank.ARBOR_DOME_HEIGHT:.1f} DOME EACH END (SEE ITS PRINT).",
         "9E. PUSH MHA-DT-013 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
-        "   THE MANDREL IS OUT AND EACH DOME STANDS 1.5 PROUD (DEPTH GAUGE).",
+        f"   THE MANDREL IS OUT AND EACH DOME STANDS {bank.ARBOR_DOME_HEIGHT:.1f} PROUD (DEPTH GAUGE).",
         "   SPOT MHA-DT-013 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
         "   BLOW OUT CHIPS. RUN THE BACK MHA-VN-034 IN TIGHT, THEN THE FRONT ONE.",
         # F3: the leaf reads the end play only with the bank closed up on
         # the back washer; pulled forward it reads nothing.
         "9F. THE BANK TURNS FREE BY HAND. BANK PUSHED BACK:",
-        "   A 0.35 LEAF ENTERS AT THE FRONT MHA-DT-026, A 0.55 LEAF DOES NOT.",
+        f"   A {bank.BANK_END_PLAY[0]:.2f} LEAF ENTERS AT THE FRONT MHA-DT-026, "
+        f"A {bank.BANK_END_PLAY[1]:.2f} LEAF DOES NOT.",
         # #936 P1 b, option A (user ruling 2026-09-26): the north MHA-CH-008 ear
         # is the rocker bank's axial datum (rocker_bank_layout), set here on
         # the 9A DRO zero so the cams and the rocker stations share one datum.
@@ -738,7 +778,7 @@ BANK_STEPS = _note_text(
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-005 SCREWED DOWN ON THE BASE"
         " (FRAME ASSEMBLY MHA-FR-000 STEP 8),",
         "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE MHA-FR-005",
-        "   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y 67.62-67.81;",
+        f"   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y {NORTH_EAR_Y_LIMITS};",
         "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FEET PER THE MHA-FR-005 SEAT",
         "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
         f"   PINION RIG: CONT. ON SHEET {FIT_SHEET}.",
@@ -863,11 +903,13 @@ CHECKS = _note_text(
     (
         "ASSEMBLY-ONLY FUNCTIONAL CHECKS",
         "1. CRANK TURNS FREELY THROUGH FULL TURNS; ONE CRANK TURN TURNS THE",
-        "   CONE SET 1/4 TURN (16T:64T).",
+        f"   CONE SET {Fraction(pinion.TEETH, gear64.TEETH)} TURN "
+        f"({pinion.TEETH}T:{gear64.TEETH}T).",
         # User ruling 2026-09-28: the fixed-centre crank mesh must never bind;
         # no backlash acceptance interval or fit-up target remains.
         "2. MHA-DT-010/MHA-DT-007 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-DT-007",
-        "   TURN; EACH CONE GEAR MESHES ITS MHA-DT-012 PER THE MHA-DT-003 PRINT.",
+        "   TURN, MHA-DT-007 CLEAR OF THE UNRELIEVED MHA-DT-020 TOP THROUGHOUT;",
+        "   EACH CONE GEAR MESHES ITS MHA-DT-012 PER THE MHA-DT-003 PRINT.",
         "3. EACH MHA-DT-012 TURNS FREELY ON MHA-DT-013 WITHOUT AXIAL BINDING.",
         # The same bound the MHA-DT-012 print states (cylinder_gear_notes).
         f"   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO {RING_OVERHANG_TEXT} (AT LEAST",
@@ -878,10 +920,16 @@ CHECKS = _note_text(
         "4. CONE SWING (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON MHA-VN-014 TO",
         "   THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. SWING IT BACK UNTIL ALL",
         "   {cone_gears} MESHES RE-ENGAGE; TIGHTEN MHA-VN-013.",
+        "   VERIFY MHA-VN-014 FULL-FORM THREAD ENGAGEMENT "
+        f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_MM:.2f} MIN; SHOULDER FULLY SEATED.",
+        "   VERIFY MHA-VN-015 FULL-FORM THREAD ENGAGEMENT "
+        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_MM:.2f} MIN;",
+        "   HEAD FULLY SEATED; MHA-DT-020 REMAINS SEATED THROUGH P1.",
         "5. ZEROING (P2), CONE SET SWUNG CLEAR: TURN EACH MHA-DT-012 BY HAND",
         "   UNTIL ITS NOTCH LINES UP. TURN MHA-DT-016 TO ENGAGE MHA-DT-001; TURN",
         "   MHA-DT-001 BY MHA-DT-015 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",
-        "   (SINES). RETURN MHA-DT-016 TO PARK; RE-ENGAGE THE CONE SET.",
+        "   (SINES), FINISHING IN THE CYLINDERS' RUNNING DIRECTION TO TAKE UP PLAY.",
+        "   RETURN MHA-DT-016 TO PARK; RE-ENGAGE THE CONE SET.",
         "6. PARKED, MHA-DT-024 HOLDS MHA-DT-001 CLEAR OF EVERY MHA-DT-012.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_FEELER:.2f} FEELER IS SNUG TIP TO TIP",
         f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
@@ -916,7 +964,8 @@ CONSUMABLES_NOTES = _note_text(
         "GENERAL ASSEMBLY NOTES",
         "OIL THE MHA-DT-012/MHA-DT-013 JOURNALS AND ALL PIVOTS WITH ISO VG 32",
         "MACHINE OIL. NO THREADLOCKER UNLESS A STEP OR PRINT CALLS FOR IT",
-        "(LOCTITE 222 ON MHA-DT-032, STEP 7). #4-40, #6-32, #8-32 SCREWS: SNUG.",
+        f"(LOCTITE 222 ON MHA-DT-032, STEP {steps.step_number('crank-handle-fitted')}). "
+        "#4-40, #6-32, #8-32 SCREWS: SNUG.",
     )
 )
 
@@ -926,8 +975,9 @@ FIT_PLACEHOLDER = _note_text(
         # The rest of the old placeholder is owned elsewhere now: each cone
         # gear's mesh by the MHA-DT-003 print (check 2), the pinion engagement
         # by the rig-located step and check 7, the taper pin by step 6.
-        "16T:64T CENTRE DISTANCE FIXED BY MHA-DT-005 BORE SPACING; VERIFY NO",
-        "BINDING THROUGH ONE CRANK TURN (CHECK 2).",
+        f"{pinion.TEETH}T:{gear64.TEETH}T CENTRE DISTANCE FIXED BY MHA-DT-005 "
+        "BORE SPACING; VERIFY NO",
+        "BINDING THROUGH ONE FULL MHA-DT-007 TURN (CHECK 2).",
     ),
     heading=False,
 )

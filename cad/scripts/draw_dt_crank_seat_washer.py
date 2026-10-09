@@ -38,9 +38,10 @@ from dt_drive_train_steps import step_ref
 from dt_crank_seat_washer_spec import (
     BORE_CALLOUT,
     DRAWING_DIMENSIONS,
-    DRAWING_PRECISION,
+    DRAWING_PRECISION_BY_NAME,
     ID,
     OD,
+    REFERENCE_DIMENSIONS,
     SURFACE_FINISHES,
     THICKNESS,
     THICKNESS_CALLOUT,
@@ -82,11 +83,6 @@ DIMENSION_CALLOUTS = {
     "DiscThick": f"{THICKNESS_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}",
 }
 
-DRAWING_PRECISION_BY_NAME = {
-    name: digits
-    for names in DRAWING_PRECISION.values()
-    for name, digits in names.items()
-}
 
 END_KEEP = {
     "DiscDia": (0.040, 0.240),
@@ -196,7 +192,7 @@ async def build(adapter: Any) -> dict[str, str]:
     thickness_annotations = [
         annotation
         for annotation in annotations
-        if dimension_name(adapter, annotation) == "DiscThick"
+        if dimension_name(adapter, annotation) in REFERENCE_DIMENSIONS
     ]
     if len(thickness_annotations) != 1:
         raise RuntimeError("edge view does not carry exactly one washer thickness")

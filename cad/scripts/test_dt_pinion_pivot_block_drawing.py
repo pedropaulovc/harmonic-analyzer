@@ -20,6 +20,60 @@ from _fit_limits import REAM_SLIDE
 from _hole_spec import blind_cut_dia_mm
 
 
+def test_raised_pivot_follows_bank_without_changing_the_upper_envelope() -> None:
+    import cone_line
+    import dt_pinion_pivot_block_geometry as geometry
+    import dt_post_mount_stack
+    import pinion_rig_park_geometry as park
+
+    raise_mm = dt_post_mount_stack.AXIS_RAISE_MM
+    assert geometry.BORE_UP == pytest.approx(12.0 + raise_mm)
+    assert geometry.BLOCK_HEIGHT == pytest.approx(20.5 + raise_mm)
+    assert geometry.BLOCK_TOP_Y == pytest.approx(8.5)
+    assert park.PIVOT_Y == pytest.approx(cone_line.Y_BASE_TOP + geometry.BORE_UP)
+    assert park.APINION_Y == cone_line.Y_DRIVE
+    assert park.APINION_Y - park.PIVOT_Y == pytest.approx(27.718)
+    assert park.STRAP_C2C == 28.0
+    assert park.STRAP_LEAN_DEG == pytest.approx(8.138574451932667)
+
+
+def test_engaged_pinion_centre_and_clocking_share_the_pivot_swing() -> None:
+    import math
+
+    import dt_alignment_pinion_spec as pinion
+    import pinion_rig_park_geometry as park
+
+    x, y = park.ENGAGED_APINION_XY
+    assert math.hypot(x - park.PIVOT_X, y - park.PIVOT_Y) == pytest.approx(park.STRAP_C2C)
+    assert math.hypot(x - park.X_DRUM, y - park.Y_DRIVE) == pytest.approx(
+        pinion.ENGAGED_CENTER_DISTANCE_MM
+    )
+    parked = math.atan2(park.APINION_Y - park.PIVOT_Y, park.APINION_X - park.PIVOT_X)
+    engaged = math.atan2(y - park.PIVOT_Y, x - park.PIVOT_X)
+    assert engaged - parked == pytest.approx(park.ENGAGED_SWING_RAD)
+    assert 0.01 < park.ENGAGED_SWING_RAD < math.radians(10.0)
+    assert y != pytest.approx(park.APINION_Y)
+
+
+def test_live_stock_block_screw_keeps_full_threads_at_the_longest_grip() -> None:
+    import dt_pinion_pivot_block_geometry as geometry
+    import vn_slotted_screw_spec as screw
+    from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+
+    entry = _config.title_block("edge_break")
+    entry_loss = max(float(entry["radius_mm"]), float(entry["chamfer_max_mm"]))
+    full_threads = (
+        screw.SHANK_LEN - geometry.BLOCK_HEIGHT - geometry.BLOCK_HEIGHT_BAND
+        - screw.PITCH - entry_loss
+    )
+    assert full_threads >= 1.5 * screw.SHANK_DIA
+    assert FILLISTER_SIZES["90280A203"] == (
+        screw.SHANK_DIA, screw.SHANK_LEN, screw.HEAD_H, screw.HEAD_DIA, screw.PITCH
+    )
+    # The formerly registered 1-1/4-in stock fails before either end deduction.
+    assert 31.75 - geometry.BLOCK_HEIGHT - geometry.BLOCK_HEIGHT_BAND < 1.5 * screw.SHANK_DIA
+
+
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
     # Both bores run a shaft (rule 5): MHA-DT-019 in the pivot bore, MHA-DT-017
     # in the lift bore.
@@ -199,7 +253,7 @@ def test_views_carry_no_hidden_lines_and_the_drill_callout_names_its_process() -
     assert "set_hidden_lines_visible" not in source
     assert "for view in (front, top, right, iso):" in source
     assert 'process="DRILL"' in source
-    assert "symbol_xy=(0.208, 0.170)" in source
+    assert "symbol_xy=PIVOT_FINISH_XY" in source
     assert "char_height=0.0025" in source
     # The Ra leader must leave the block through its top face, left of the
     # corner where BlockHeight's extension line starts.
@@ -210,7 +264,8 @@ def test_views_carry_no_hidden_lines_and_the_drill_callout_names_its_process() -
     top_y = drawing._front_y(
         dt_pinion_pivot_block_spec.BLOCK_HEIGHT - dt_pinion_pivot_block_spec.BORE_UP
     )
-    slope = (0.170 - rim[1]) / (0.208 - rim[0])
+    finish_x, finish_y = drawing.PIVOT_FINISH_XY
+    slope = (finish_y - rim[1]) / (finish_x - rim[0])
     exit_x = rim[0] + (top_y - rim[1]) / slope
     assert exit_x < drawing._front_x(dt_pinion_pivot_block_spec.BLOCK_EAST) - 0.003
 

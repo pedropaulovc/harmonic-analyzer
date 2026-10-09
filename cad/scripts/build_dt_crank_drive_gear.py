@@ -8,11 +8,11 @@ The crank bore's configured height closes the mesh at the physical 64T
 centre without moving the 48DP cone stack or its face/seat datums.
 
 CROSSED-MESH CUT: the 64T rides the cone shaft while the straight 16T
-spins about machine z. Its true right-hand swept helix follows the actual
-cone incline; normal pitch and pressure angle derive the transverse
-involute, with standard normal full depth and configured tooth thinning.
-The diagnostic study supplies the calibrated phase/fit inputs; the native
-interference gate remains authoritative for the finished solids.
+spins about machine z. The finite normal-24DP PA20 stock #2/55T master
+owns the actual tooth form. The complete physical-pitch material sector
+is a nominal normal-section screw sweep with a right-hand constant lead,
+not an ideal transverse N64 involute or a physical disc-cutter envelope.
+Actual crossed-mesh engineering acceptance remains separate from this CAD gate.
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
@@ -72,28 +72,22 @@ from _drawing_marks import (
 )
 from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
-from _gear import build_fixed_gear, volume_check
+from _gear import build_stock_form_gear, volume_check
 from _part_pmi import author_part_pmi
 from dt_crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
 from gear_seat_fit import GEAR_SEAT_CLEARANCE, seat_bore_band
 from dt_crank_drive_gear_spec import (
-    BACKLASH_MM,
     BORE_AF,
     BORE_AF_BAND,
     BORE_SOUTH_CHAMFER,
     BORE_SOUTH_CHAMFER_BAND,
-    CUTTER_DIAMETRAL_PITCH,
-    DEDENDUM_FACTOR,
-    DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
     FACE_WIDTH_BAND,
-    HELIX_ANGLE_DEG as HELIX_DEG,
-    LONG_ADDENDUM_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
-    PRESSURE_ANGLE_DEG,
+    STOCK_PROFILE,
     SURFACE_FINISHES,
 )
 
@@ -157,9 +151,6 @@ def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None
 PART_NAME = "dt-crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
 
-TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
-DP = DIAMETRAL_PITCH
-PA_DEG = PRESSURE_ANGLE_DEG  # transverse, from the normal-plane cutter (spec)
 # The 64T seats on MHA-DT-004's flatted Sec1 gear land.
 BORE_DIAMETER = 0.375 * IN
 
@@ -194,20 +185,13 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Transverse DP/PA place the involute; normal DP and standard dedendum
-    # set the cutter depth without an extra long addendum.
-    disc = await build_fixed_gear(
-        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG,
-        helix_deg=HELIX_DEG,
-        backlash_mm=BACKLASH_MM, root_relief=True,
-        depth_dp=CUTTER_DIAMETRAL_PITCH,
-        dedendum=DEDENDUM_FACTOR,
-        long_addendum_mm=LONG_ADDENDUM_MM,
-    )
+    # The shared helper sweeps the complete finite stock-form sector, including
+    # offcentre root-floor lobes; its phase and Green-volume gates precede pattern.
+    disc = await build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)
     volume = disc.volume
 
-    # build_fixed_gear is shared by five recipes, so it leaves the blank under
-    # the adapter's default names. Name the boss here: the face width is a size
+    # The shared stock-form helper leaves the base under adapter default names.
+    # Name it here: the face width is a size
     # the turner sets, so it prints as a NATIVE model dimension
     # (drawing-simplicity-policy.md rules 1-2), which means it must be named,
     # driven, marked and given its decimal places like any other. Driving it is
@@ -336,8 +320,8 @@ async def build(adapter) -> dict[str, str]:
         expected, 0.03 * v_chamfer + 0.15,
     )
 
-    # The tip circle, as a REFERENCE sketch. The helix recipe grows the teeth
-    # off a ROOT cylinder blank (_gear.build_fixed_gear), so no solid feature
+    # The actual blank circle, as a REFERENCE sketch. The helix grows a complete
+    # stock material sector off an embedded base cylinder, so no solid feature
     # owns the outside diameter -- yet the OD is the first size the turner sets
     # and the print must carry it as a model dimension, not as text in the data
     # block (policy rule 2's "model it, even if that takes a hidden reference

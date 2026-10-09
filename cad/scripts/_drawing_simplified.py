@@ -12,10 +12,10 @@ edges references it (``_drawing_common``), exploded, BOM-bearing and
 ballooned views included; each drawing keeps one designated full-detail view.
 
 A part simplifies every configuration unless its builder names the placeable
-ones. cone-gear names its twenty ``T<teeth>`` configurations: its ``Default`` is
-never placed, and its teeth, authored while ``T120`` was active, read
-suppressed there together with the ``Default Simplified`` child derived from it
-(farm build 2 of #1102), while every ``T`` parent read them present.
+ones. cone-gear names its twenty ``T<teeth>`` configurations; its unplaced
+``Default`` is a blank. Each tooth count has its own sketch/cut/pattern triple,
+suppressed in every other parent. A per-parent feature mapping simplifies only
+that parent's cut and pattern, retaining foreign features' inherited suppression.
 
 The ``<parent> Simplified`` naming is uniform across tiers so one component rule
 serves parts and subassemblies alike. This module is part-tier: it imports no
@@ -51,7 +51,7 @@ Default's geometry is untouched.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 import _telemetry
@@ -289,6 +289,37 @@ def _simplified_parents(
     return chosen
 
 
+def _feature_names_by_parent(
+    part_name: str,
+    features: Sequence[str] | Mapping[str, Sequence[str]],
+    parents: Sequence[str],
+) -> dict[str, tuple[str, ...]]:
+    """Validate the entire target declaration before any native mutation."""
+    if isinstance(features, Mapping):
+        missing = [parent for parent in parents if parent not in features]
+        extra = [parent for parent in features if parent not in parents]
+        if missing or extra:
+            raise ValueError(
+                f"{part_name}: simplified feature mapping keys must match parents; "
+                f"missing={missing!r}, extra={extra!r}"
+            )
+        rows = {parent: features[parent] for parent in parents}
+    else:
+        rows = dict.fromkeys(parents, features)
+    result = {}
+    for parent, names in rows.items():
+        if isinstance(names, (str, bytes)) or not isinstance(names, Sequence):
+            raise ValueError(f"{part_name}: {parent}: expected a sequence of feature names")
+        if not names:
+            raise ValueError(f"{part_name}: {parent}: no tooth/thread features to simplify")
+        if any(not isinstance(name, str) or not name.strip() for name in names):
+            raise ValueError(f"{part_name}: {parent}: empty or invalid simplified feature name")
+        if len(set(names)) != len(names):
+            raise ValueError(f"{part_name}: {parent}: duplicate simplified features {list(names)!r}")
+        result[parent] = tuple(names)
+    return result
+
+
 def _assert_parents_keep_features(
     part_name: str, targets: Sequence[Any], parents: Sequence[str], names: Sequence[str]
 ) -> None:
@@ -323,7 +354,7 @@ def _assert_parents_keep_features(
 def add_simplified_configurations(
     adapter: Any,
     part_name: str,
-    features: Sequence[str],
+    features: Sequence[str] | Mapping[str, Sequence[str]],
     parents: Sequence[str] | None = None,
 ) -> list[str]:
     """Derive ``<P> Simplified`` from each configuration ``P`` in ``parents``
@@ -332,10 +363,11 @@ def add_simplified_configurations(
 
     Call on the saved part reopened from disk, after its configurations, BOM
     identity and configuration properties are final
-    (:func:`derive_simplified_on_saved_part`). Every parent must keep
-    ``features`` unsuppressed before anything is derived. Each child is
-    activated and force-rebuilt and must read What's Wrong clean; the active
-    configuration is restored. Nothing here saves.
+    (:func:`derive_simplified_on_saved_part`). A sequence applies to every parent;
+    a mapping must name exactly the selected parents and gives each its targets.
+    Every parent must keep its targets unsuppressed before anything is derived.
+    Each child is activated and force-rebuilt and must read What's Wrong clean;
+    the active configuration is restored. Nothing here saves.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
@@ -347,12 +379,22 @@ def add_simplified_configurations(
     if active not in names:
         raise RuntimeError(f"{part_name}: active configuration {active!r} not in {names}")
     parents = _simplified_parents(part_name, names, parents)
-    targets = _features(model, part_name, features)
-    _assert_parents_keep_features(part_name, targets, parents, names)
-    comment = simplified_comment(", ".join(features))
+    rows = _feature_names_by_parent(part_name, features, parents)
+    target_names = tuple(dict.fromkeys(name for row in rows.values() for name in row))
+    all_targets = _features(model, part_name, target_names)
+    by_name = dict(zip(target_names, all_targets, strict=True))
+    targets = {parent: [by_name[name] for name in row] for parent, row in rows.items()}
+    if isinstance(features, Mapping):
+        for parent in parents:
+            _assert_parents_keep_features(part_name, targets[parent], [parent], [parent])
+    else:
+        _assert_parents_keep_features(part_name, all_targets, parents, names)
+    detailed = [name for name in names if not is_simplified(name)]
+    before = {name: _suppression(feature, detailed) for name, feature in by_name.items()}
     children: list[str] = []
     failures: list[str] = []
     for parent in parents:
+        comment = simplified_comment(", ".join(rows[parent]))
         child = simplified_name(parent)
         if active_configuration_name(adapter, model) != parent and not bool(
             model.ShowConfiguration2(parent)
@@ -374,7 +416,7 @@ def add_simplified_configurations(
             continue
         refused = [
             str(feature.Name)
-            for feature in targets
+            for feature in targets[parent]
             if not bool(feature.SetSuppression2(_SUPPRESS, _SPECIFY_CONFIGURATION, _bstr_array([child])))
         ]
         if refused:
@@ -398,11 +440,20 @@ def add_simplified_configurations(
             f"{part_name}: simplified configurations failed: " + "; ".join(failures)
         )
     assert_simplified_configurations(adapter, part_name, features, parents)
+    changed = [
+        name
+        for name, feature in by_name.items()
+        if _suppression(feature, detailed) != before[name]
+    ]
+    if changed:
+        raise RuntimeError(f"{part_name}: detailed configuration suppression changed: {changed!r}")
     _telemetry.annotate(
-        configurations=len(parents), features=len(targets), feature_names=",".join(features)
+        configurations=len(parents),
+        features=len(all_targets),
+        feature_names_by_parent={parent: list(row) for parent, row in rows.items()},
     )
     _telemetry.success(
-        f"{part_name}: {len(children)} simplified configuration(s) suppress {list(features)}"
+        f"{part_name}: {len(children)} simplified configuration(s) suppress {rows!r}"
     )
     return children
 
@@ -411,13 +462,14 @@ def add_simplified_configurations(
 def assert_simplified_configurations(
     adapter: Any,
     part_name: str,
-    features: Sequence[str],
+    features: Sequence[str] | Mapping[str, Sequence[str]],
     parents: Sequence[str] | None = None,
 ) -> None:
     """Prove, without switching, every ``P`` in ``parents`` (default: every
-    configuration) has its derived ``P Simplified`` with exactly ``features``
-    suppressed there (not in ``P``), a comment naming them and ``P``'s BOM part
-    number, and that no other simplified configuration exists."""
+    configuration) has its derived ``P Simplified`` with its declared targets
+    suppressed there (not in ``P``), foreign targets retaining their parent's
+    states, a comment naming its targets and ``P``'s BOM part number, and that
+    no other simplified configuration exists."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
     parents = _simplified_parents(part_name, names, parents)
@@ -426,10 +478,12 @@ def assert_simplified_configurations(
         for name in names
         if is_simplified(name) and name not in {simplified_name(p) for p in parents}
     )
-    targets = _features(model, part_name, features)
-    comment = simplified_comment(", ".join(features))
+    rows = _feature_names_by_parent(part_name, features, parents)
+    target_names = tuple(dict.fromkeys(name for row in rows.values() for name in row))
+    targets = _features(model, part_name, target_names)
     failures: list[str] = [f"orphan simplified configurations {orphans}"] if orphans else []
     for parent in parents:
+        comment = simplified_comment(", ".join(rows[parent]))
         child = simplified_name(parent)
         if child not in names:
             failures.append(f"{parent}: no {child!r}")
@@ -442,7 +496,10 @@ def assert_simplified_configurations(
             failures.append(f"{child}: comment {configuration.Comment!r} != {comment!r}")
         for feature in targets:
             states = _suppression(feature, [parent, child])
-            if states != (False, True):
+            expected_states = (
+                (False, True) if str(feature.Name) in rows[parent] else (states[0], states[0])
+            )
+            if states != expected_states:
                 failures.append(
                     f"{feature.Name}: suppressed in ({parent}, {child}) reads {states}"
                 )
@@ -454,7 +511,11 @@ def assert_simplified_configurations(
         raise RuntimeError(
             f"{part_name}: simplified configuration readback failed: " + "; ".join(failures)
         )
-    _telemetry.annotate(parents=len(parents), features=len(targets))
+    _telemetry.annotate(
+        parents=len(parents),
+        features=len(targets),
+        feature_names_by_parent={parent: list(row) for parent, row in rows.items()},
+    )
 
 
 def _close_part(adapter: Any) -> None:
@@ -523,7 +584,7 @@ def persist_configurations_in_place(adapter: Any, part_name: str) -> None:
 async def derive_simplified_on_saved_part(
     adapter: Any,
     part_name: str,
-    features: Sequence[str],
+    features: Sequence[str] | Mapping[str, Sequence[str]],
     part_path: str,
     parents: Sequence[str] | None = None,
 ) -> None:
@@ -535,6 +596,10 @@ async def derive_simplified_on_saved_part(
     (``assert_saved_configurations_regenerate``) before anything force-rebuilds
     it, then reads the children back (:func:`assert_simplified_configurations`).
     """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    selected = _simplified_parents(part_name, names, parents)
+    _feature_names_by_parent(part_name, features, selected)
     _close_part(adapter)
     check(
         f"reopen saved {part_name} to derive simplified configurations",
@@ -548,7 +613,7 @@ async def derive_simplified_on_saved_part(
 async def save_simplified_part(
     adapter: Any,
     part_name: str,
-    features: Sequence[str],
+    features: Sequence[str] | Mapping[str, Sequence[str]],
     views: Iterable[str] = DEFAULT_VIEWS,
 ) -> dict[str, str]:
     """Save, derive the simplified configurations on the saved file, and prove
@@ -559,6 +624,10 @@ async def save_simplified_part(
     caches), so the part is reopened and every configuration is regenerated
     the way a placing assembly loads it, then the readback runs on the file.
     """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    selected = _simplified_parents(part_name, names, None)
+    _feature_names_by_parent(part_name, features, selected)
     artefacts = await save_part_and_images(adapter, part_name, views)
     await derive_simplified_on_saved_part(adapter, part_name, features, artefacts["part"])
     check(f"reopen saved {part_name}", await adapter.open_model(artefacts["part"]))

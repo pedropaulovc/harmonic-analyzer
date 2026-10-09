@@ -5,11 +5,13 @@ from __future__ import annotations
 import ast
 import math
 import re
+import tomllib
 from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
 
+import _config
 import build_dt_cone_pivot_post as part
 import dt_cone_pivot_post_spec as spec
 import _layout_geometry as layout
@@ -30,19 +32,29 @@ def test_required_drawing_paths() -> None:
     )
 
 
-def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
-    assert (spec.BLOCK_DIA, spec.BLOCK_HEIGHT) == (42.011, 86.0)
-    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT, spec.HEAD_BASE_Y) == (
-        42.7506,
-        26.6,
-        59.4,
+def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> None:
+    assert spec.BLOCK_DIA == 42.011
+    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (42.7506, 26.6)
+    assert spec.HEAD_BASE_Y == pytest.approx(spec.BLOCK_HEIGHT - spec.HEAD_HEIGHT)
+    assert (spec.CRANK_BOSS_DIA, spec.CRANK_BORE_DIA, spec.CRANK_BORE_OFFSET) == (
+        21.93,
+        11.438,
+        0.0,
     )
-    assert (
-        spec.CRANK_BOSS_DIA,
-        spec.CRANK_BORE_DIA,
-        round(spec.CRANK_BORE_HEIGHT, 6),
-        spec.CRANK_BORE_OFFSET,
-    ) == (21.93, 11.438, 72.7, 0.0)
+    assert spec.CRANK_BORE_HEIGHT == _config.machine(
+        "gear_train", "crank_axis_height_mm"
+    )
+    assert spec.CRANK_ABOVE_CONE == pytest.approx(
+        spec.CRANK_BORE_HEIGHT - spec.BORE_HEIGHT
+    )
+    assert spec.HEAD_BASE_Y < spec.CRANK_BORE_HEIGHT < spec.BLOCK_HEIGHT
+    assert spec.CRANK_BOSS_HEAD_MARGIN_MM == pytest.approx(
+        min(
+            spec.CRANK_BORE_HEIGHT - spec.CRANK_BOSS_DIA / 2.0 - spec.HEAD_BASE_Y,
+            spec.BLOCK_HEIGHT - spec.CRANK_BORE_HEIGHT - spec.CRANK_BOSS_DIA / 2.0,
+        )
+    )
+    assert spec.CRANK_BOSS_HEAD_MARGIN_MM > 0.0
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
     # v36 (user ruling 2026-09-28): the boss starts on the head's tangent
     # plane and runs the harvested 2.8360 in from there.
@@ -50,12 +62,12 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     assert spec.CRANK_BOSS_START_Z == -21.3753
     assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
     assert spec.CRANK_BOSS_LENGTH == pytest.approx(2.8360 * 25.4)
-    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA, spec.BORE_HEIGHT) == (
-        17.2,
-        12.2808,
-        33.368,
-    )
-    assert spec.INCLINE_DEG == 12.5182
+    from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, POST_BODY_HEIGHT_MM
+
+    assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.2, 12.2808)
+    assert spec.BORE_HEIGHT == CONE_AXIS_HEIGHT_MM
+    assert spec.BLOCK_HEIGHT == POST_BODY_HEIGHT_MM
+    assert spec.INCLINE_DEG == _config.machine("cone_incline", "derived_incline_deg")
     assert (
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
@@ -65,12 +77,74 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     # The final volume is the per-feature sum the build checks natively; a
     # constant that drifts from the features (the 2026-09-21 unbored-boss
     # build) fails at import, so only mass coherence is left to pin here.
-    assert spec.HARVESTED_VOLUME_MM3 == round(part._ANALYTIC_FINAL_MM3, 4)
-    assert round(spec.HARVESTED_VOLUME_MM3 * 7.2e-6, 6) == spec.HARVESTED_MASS_KG
+    assert spec.HARVESTED_VOLUME_MM3 == pytest.approx(
+        part._ANALYTIC_FINAL_MM3, abs=0.5e-4, rel=0.0
+    )
+    assert spec.HARVESTED_MASS_KG == spec.HARVESTED_VOLUME_MM3 * 7.2e-6
     assert part.CRANK_BORE_MM3 == pytest.approx(
         math.pi * (spec.CRANK_BORE_DIA / 2.0) ** 2 * spec.CRANK_BOSS_LENGTH
     )
-    assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7661.6
+    assert part.ATTACHMENT_HOLES_MM3 == pytest.approx(
+        2.0
+        * math.pi
+        * (
+            (spec.ATTACHMENT_THRU_DIA / 2.0) ** 2
+            * (spec.BLOCK_HEIGHT - spec.ATTACHMENT_CBORE_DEPTH)
+            + (spec.ATTACHMENT_CBORE_DIA / 2.0) ** 2 * spec.ATTACHMENT_CBORE_DEPTH
+        )
+    )
+    assert part.MAIN_BODY_MM3 == pytest.approx(
+        math.pi * (spec.BLOCK_DIA / 2.0) ** 2 * spec.BLOCK_HEIGHT
+    )
+    assert part.HEAD_SHELL_MM3 == pytest.approx(
+        math.pi
+        * ((spec.HEAD_DIA / 2.0) ** 2 - (spec.BLOCK_DIA / 2.0) ** 2)
+        * spec.HEAD_HEIGHT
+    )
+
+
+def test_current_manufacturing_plan_tracks_post_geometry_without_changing_tooling() -> (
+    None
+):
+    plan_path = (
+        Path(part.__file__).resolve().parents[1]
+        / "process/dt_cone_pivot_post/plan.toml"
+    )
+    plan = tomllib.loads(plan_path.read_text(encoding="utf-8"))
+    setups = {setup["id"]: setup for setup in plan["setups"]}
+    stock = plan["stock"]
+    assert stock["length_mm"] == pytest.approx(
+        stock["north_allowance_mm"] + spec.BLOCK_HEIGHT + stock["south_grip_mm"]
+    )
+    assert setups["S1"]["stock_state"]["south_end_z"] == pytest.approx(
+        -spec.BLOCK_HEIGHT - stock["south_grip_mm"]
+    )
+    assert setups["S1"]["hold"]["stickout_mm"] == pytest.approx(
+        stock["north_allowance_mm"] + spec.BLOCK_HEIGHT
+    )
+    assert setups["S2"]["stock_state"]["top_z"] == pytest.approx(
+        spec.BLOCK_HEIGHT + stock["south_grip_mm"]
+    )
+    assert setups["S2"]["stock_state"]["local_thickness"] == {
+        "mount_west": spec.BLOCK_HEIGHT,
+        "mount_east": spec.BLOCK_HEIGHT,
+    }
+    head_face = next(op for op in setups["S2"]["ops"] if op["do"] == "face")
+    assert head_face["to_z"] == spec.BLOCK_HEIGHT
+    incline = math.radians(_config.machine("cone_incline", "derived_incline_deg"))
+    journal = plan["frames"]["J3"]
+    assert journal["origin"] == [0.0, spec.BORE_HEIGHT, 0.0]
+    assert journal["x"] == pytest.approx([math.cos(incline), 0.0, -math.sin(incline)])
+    assert journal["z"] == pytest.approx([-math.sin(incline), 0.0, -math.cos(incline)])
+    assert plan["frames"]["C4"]["origin"] == [
+        0.0,
+        spec.CRANK_BORE_HEIGHT,
+        spec.CRANK_BOSS_START_Z,
+    ]
+    index = setups["S3"]["hold"]["index"]
+    assert index["angle_deg"] == pytest.approx(spec.INCLINE_DEG)
+    assert index["fixture"] == "BS-0" and index["positions"] == 1
+    assert plan["construction"] == "one_piece"
 
 
 def test_mounting_counterbores_take_the_last_printable_head_wall_station() -> None:
@@ -357,7 +431,7 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
 
 
 def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
-    """The 12.5182 deg plan incline is a DRIVING model dimension.
+    """The configured plan incline is a DRIVING model dimension.
 
     A driven reference angle cannot express it: SOLIDWORKS returns the
     obtuse member of a line pair whatever the ray directions, the selection
@@ -371,8 +445,13 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     # print the plan-angle rays.
     assert spec.DRAWING_DIMENSIONS["CrankBossStationReference"] == {"CrankBossStartZ"}
     assert spec.CRANK_BOSS_NEAR_Z == spec.CRANK_BOSS_NORTH_FACE
-    assert round(spec.JOURNAL_REFERENCE_X, 6) == 8.669989
-    assert round(spec.JOURNAL_REFERENCE_Z, 6) == 39.049088
+    incline = math.radians(_config.machine("cone_incline", "derived_incline_deg"))
+    assert spec.JOURNAL_REFERENCE_X == pytest.approx(
+        spec.JOURNAL_REFERENCE_LENGTH * math.sin(incline)
+    )
+    assert spec.JOURNAL_REFERENCE_Z == pytest.approx(
+        spec.JOURNAL_REFERENCE_LENGTH * math.cos(incline)
+    )
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'plan.record("InclineAngle", \'"ConeIncline"\')' in source
     assert "add_angular_reference_dimension" not in source
@@ -684,11 +763,16 @@ def test_north_cone_boss_end_carries_the_running_finish() -> None:
 
 
 def test_plan_angle_is_basic_and_prints_the_model_angle() -> None:
-    """#906: the plan angle feeds the crank bore's angularity frame (rule 4),
-    so it is boxed BASIC and prints the model's 12.5182 exactly."""
+    """#906: the basic nominal feeds the retained angularity frame; its
+    places spell the configured angle rather than tightening the zone."""
     assert spec.BASIC_DIMENSIONS == frozenset({"InclineAngle"})
-    assert spec.DRAWING_PRECISION_BY_NAME["InclineAngle"] == 4
-    assert round(spec.INCLINE_DEG, 4) == spec.INCLINE_DEG
+    places = spec.DRAWING_PRECISION_BY_NAME["InclineAngle"]
+    assert places == 4
+    printed = round(spec.INCLINE_DEG, places)
+    assert printed == round(
+        _config.machine("cone_incline", "derived_incline_deg"), places
+    )
+    assert abs(printed - spec.INCLINE_DEG) <= 0.5 * 10.0**-places
 
 
 def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
@@ -796,7 +880,9 @@ def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
     """
     import crank_mesh_stack
 
-    assert round(spec.CRANK_ABOVE_CONE, 3) == 39.332
+    assert spec.CRANK_ABOVE_CONE == pytest.approx(
+        _config.machine("gear_train", "crank_axis_height_mm") - spec.BORE_HEIGHT
+    )
     assert spec.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
     assert crank_mesh_stack.SPACING_PRINTED == round(spec.CRANK_ABOVE_CONE, 2)
     assert abs(crank_mesh_stack.FRAME_DY - spec.CRANK_ABOVE_CONE) < 1e-9

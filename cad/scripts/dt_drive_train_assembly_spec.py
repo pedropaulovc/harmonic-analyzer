@@ -16,6 +16,8 @@ from typing import Literal, Sequence
 
 EXPLODED_VIEW_NAME = "DRIVE_TRAIN_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
+# Acceptance limits on the assembly sheets round inward at these places.
+FIT_LIMIT_PLACES = 2
 
 # Families still arriving from a sibling branch, classified ahead of time so
 # the integration head needs no plan edit; an absent pending family is not an
@@ -145,9 +147,9 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # the MHA-VN-016 collar locked on it) withdraws north out of the post along
     # its own axis, so the MHA-DT-004 journal stands clear of the post (user
     # ruling 2026-09-29: run 7's touching gears, collar and tip hardware left
-    # no shaft face in view).  The journal is 43.011 long, so 50 leaves ~7 of
-    # air south of it; the tip hardware goes 12 further, which clears the
-    # 2.79 the tip runs into the block by ~9.
+    # no shaft face in view). The rotor travels farther than the current journal
+    # length; the tip hardware leads it far enough to clear the tip's embed in
+    # the block (both checked against the live shaft spec offline).
     ExplodeStep("swing plate drops", ("dt-cone-swing-platform",), "y", -30.0),
     ExplodeStep("post mount screws lift", ("vn-post-mount-screw",), "y", 100.0),
     ExplodeStep("pivot screw lifts", ("vn-cone-pivot-screw",), "y", 35.0),

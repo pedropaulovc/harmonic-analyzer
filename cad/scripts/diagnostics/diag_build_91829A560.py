@@ -1,14 +1,14 @@
 r"""Diagnostic: rebuild McMaster-Carr 91829A560 from scratch -- the re-author
 half of "edit in the GUI, re-author in the script" for a part nobody scripted.
 
-A PURE reverse-engineering of ``cad/references/mcmaster/91829A560.SLDPRT``
-(slotted 18-8 SS precision shoulder screw): every number below was harvested
-from the vendor model itself -- the dims/faces via ``diag_dump_part.py``
-(``cad/out/reports/mcmaster-91829A560-dump2.json``) and the sketch geometry /
-sweep options read live off the open vendor document -- nothing is imported
-from the repo's part specs, and the vendor thread is cut FOR REAL (helical
-sweep cut at the UN form), not simplified to a tap-drill envelope like the
-shipped ``cone-pivot-screw``.
+Native reverse-engineering of ``cad/references/mcmaster/91829A560.SLDPRT``
+(slotted 18-8 SS precision shoulder screw): the nominal dimensions were
+harvested via ``diag_dump_part.py``
+(``cad/out/reports/mcmaster-91829A560-dump2.json``), with sketch geometry /
+sweep options read live off the vendor document. Those supplier scalars
+now belong to the pure ``vn_cone_pivot_screw_spec`` consumed here; the
+native geometry and vendor gates remain in this recipe. The vendor thread
+is cut for real (helical sweep cut at the UN form), not a tap-drill envelope.
 
 Vendor recipe, reproduced feature-for-feature (tree order):
 
@@ -70,28 +70,28 @@ from _common import (  # noqa: E402
     volume_check,
 )
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
+from vn_cone_pivot_screw_spec import (  # noqa: E402
+    HEAD_CHAMFER,
+    HEAD_DIA,
+    HEAD_T,
+    PITCH,
+    REVS,
+    SHOULDER_DIA,
+    SHOULDER_LEN,
+    SLOT_D,
+    SLOT_W,
+    THREAD_LEN,
+    THREAD_MAJOR,
+    TIP_CHAMFER,
+    UC_LAND_DIA,
+    UC_W,
+    UNDERHEAD_LEN,
+)
 
 OUT_DIR = CAD_ROOT / "out" / "reference"
 REPLICA = OUT_DIR / "91829A560-replica.SLDPRT"
 REPORT = OUT_DIR / "91829A560-replica-report.json"
 VENDOR = REFERENCES_DIR / "mcmaster" / "91829A560.SLDPRT"
-
-# --- vendor dims (all mm/deg, straight from the harvest) -------------------
-HEAD_DIA = 9.525  # Head Diameter@Sketch1
-HEAD_T = 4.7625  # Head Height@Sketch1
-SHOULDER_DIA = 6.35  # Shoulder Diameter@Sketch1
-SHOULDER_LEN = 6.35  # Shoulder Length@Sketch1
-THREAD_MAJOR = 4.826  # Screw Size Decimal Equivalent@Sketch1
-THREAD_LEN = 9.525  # Thread Length@Sketch1
-UNDERHEAD_LEN = SHOULDER_LEN + THREAD_LEN  # 15.875
-SLOT_W = 1.524  # D1@Sketch8
-SLOT_D = 1.905  # D1@Cut-Extrude2
-HEAD_CHAMFER = 0.309563  # D1@Chamfer1 (45 deg)
-TIP_CHAMFER = 0.43434  # D1@Chamfer2 (45 deg)
-UC_LAND_DIA = 3.3528  # CADA@Sketch5 (diametric)
-UC_W = 1.6002  # CADB@Sketch5 (fillet + land; also the split-plane offset)
-PITCH = 1.058333  # Pitch@Helix/Spiral2 (#10-24: 25.4/24)
-REVS = 9.0  # 9000@Helix/Spiral2
 
 # Undercut (vendor Sketch5): R-UC_FILLET quarter-round upper boundary tangent
 # to the land, then the land, then the 45-deg lower flank up to the major.

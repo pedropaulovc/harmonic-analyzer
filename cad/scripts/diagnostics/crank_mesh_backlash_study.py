@@ -1,484 +1,220 @@
-"""Measured free play of the crossed 16T:64T crank mesh (SolidWorks-free).
+"""Actual16/64 crossed-mesh design cases and bounded3D report CLI.
 
-The crossed pair uses the current cone incline as the 64T helix, the crank's
-normal-plane pressure angle/module, standard cutter dedendum, actual tooth
-thinning, and configured crank height. No build/COM module or fitted
-crank-stack assertion is imported. This script measures free windows on the
-tooth solids that ``crossed_mesh_study`` builds:
-
-* each gear's material boundary is read from its ``GapLookup`` table (the same
-  2048 x 512 (theta, r) grid the voxel study tests against, ~0.0015 mm
-  circumferential), extruded along its own axis (the 64T with its helix
-  twist) in 0.1 mm slices; the pinion's turned band (north of
-  ``dt_crank_pinion_spec.SHOULDER_LENGTH``, cut to ``TURNED_DIA``) is honored in
-  both its boundary and its material, as ``crossed_mesh_study.pinion_material``
-  reads it;
-* with the 64T held at a crank phase, the pinion is rotated (``seed_off``)
-  and the pair collides when any boundary point of either gear lies inside
-  the other's material;
-* the two first-contact rotations bracket the free window; its width at the
-  16T standard pitch radius is the circular backlash at the MHA-DT-010 pitch
-  line -- the reading the drive-train sheet's check 2 takes;
-* each case is swept over one crank tooth pitch (22.5 deg) and reports the
-  tight spot (min) and the loose spot (max).
-
-Cases perturb one term at a time from the shipped pose: centre-distance slack
-(``extra`` in ``y_for_extra``), 64T tooth thinning (``widen64``) and 16T
-thinning (``widen16``).  Results append to a JSONL checkpoint, one line per
-(case, phase), so a rerun resumes where a crash stopped.
-
-Run (no SolidWorks)::
-
-    uv run python cad/scripts/diagnostics/crank_mesh_backlash_study.py \
-        --out C:/src/dt-logs/crank-mesh-backlash.jsonl
+Stock tooth geometry is source-owned; the shared contact engine accepts
+explicit physical axes/faces/clocks and imports no machine specifications.
+No ideal-N tooth facts, Tredgold contact ratio, old fitted sensitivities, or
+native CAD imports are used. JSON output belongs outside the source tree.
 """
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict, replace
+import hashlib
 import json
-from dataclasses import dataclass, replace
 import math
-import sys
-import time
 from pathlib import Path
+import time
 
 import numpy as np
 
 import crossed_mesh_study as cms
-
-Y_CRANK = cms.Y_CRANK
-GEAR64_SEAT = np.array(cms.GEAR64_SEAT)
-U = np.array([cms.SIN_I, 0.0, cms.COS_I])  # 64T axis
-EX = np.array([cms.COS_I, 0.0, -cms.SIN_I])
-EY = np.array([0.0, 1.0, 0.0])
-SLICE_MM = 0.1
-PITCH16 = 22.5
-IN = cms.IN
-DEDENDUM_FACTOR = cms.DEDENDUM_FACTOR
-
-
-@dataclass(frozen=True)
-class GearDef:
-    """One gear's tooth definition.
-
-    ``definition`` says which plane carries the cutter's DP and PA:
-    ``"transverse"`` carries DP and PA directly in the transverse section;
-    ``"normal"`` is the shipped 64T convention: a cutter set over at the
-    helix angle cuts its normal profile, with transverse DP
-    ``dp_n * cos(beta)`` and transverse PA
-    ``atan(tan(pa_n) / cos(beta))``. The tooth depth is the
-    cutter's either way. ``tip_mm`` moves the tip circle alone, radially (a
-    blank turned off its nominal outside diameter).
-    """
-
-    teeth: int
-    beta_deg: float = 0.0
-    dp_n: float = cms.DP_CRANK_CUTTER
-    pa_n: float = cms.PA_DEG
-    definition: str = "normal"
-    tip_mm: float = 0.0
-
-    @property
-    def dp_t(self) -> float:
-        if self.definition == "transverse":
-            return self.dp_n
-        return self.dp_n * math.cos(math.radians(self.beta_deg))
-
-    @property
-    def pa_t(self) -> float:
-        if self.definition == "transverse":
-            return self.pa_n
-        return math.degrees(math.atan(
-            math.tan(math.radians(self.pa_n)) / math.cos(math.radians(self.beta_deg))))
-
-    @property
-    def addendum_extra_in(self) -> float:
-        return 1.0 / self.dp_n - 1.0 / self.dp_t + self.tip_mm / IN
-
-    @property
-    def rp(self) -> float:
-        return self.teeth / self.dp_t / 2.0 * IN
-
-    @property
-    def root(self) -> float:
-        return self.rp - DEDENDUM_FACTOR * IN / self.dp_n
-
-    @property
-    def twist_per_mm(self) -> float:
-        """Rotation (rad) of the tooth per mm along the gear's own axis."""
-        return math.tan(math.radians(self.beta_deg)) / self.rp
-
-    def lookup(self, widen: float, lut: dict) -> cms.GapLookup:
-        key = (self.teeth, self.dp_t, self.pa_t, self.addendum_extra_in, widen, self.root)
-        if key not in lut:
-            lut[key] = cms.GapLookup(self.teeth, self.dp_t, widen, self.root,
-                                     pa_deg=self.pa_t,
-                                     addendum_extra_in=self.addendum_extra_in)
-        return lut[key]
-
-
-# Standard full-depth normal-plane cutter shared by both gears.
-SHIPPED16 = GearDef(16, dp_n=cms.DP_CRANK_CUTTER, pa_n=cms.PA_DEG)
-SHIPPED64 = GearDef(
-    64,
-    cms.HELIX_DEG,
-    dp_n=cms.DP_CRANK_CUTTER,
-    pa_n=cms.PA_DEG,
-    definition="normal",
-    tip_mm=cms.LONG_ADDENDUM64_MM,
+import crank_mesh_geometry as geometry
+import crank_drive_phase
+from crank_mesh_requirements import (
+    HANDOVER_JUMP_MAX_MM, POSITIVE_BACKLASH_MIN_MM,
+    ROW_ENGAGEMENT_MIN, STOCK_FORM_COVERAGE_MIN,
 )
-SHIPPED_EXTRA = cms.SLACK
-assert math.isclose(SHIPPED16.rp, cms.R16) and math.isclose(SHIPPED64.rp, cms.R64)
-assert math.isclose(SHIPPED16.root, cms.ROOT16) and math.isclose(SHIPPED64.root, cms.ROOT64)
+from stock_form_cutter import StockFormProfile
+from stock_form_contact_3d import ContactPair, Placement, analyse_3d_mesh, loaded_driven_contact
+from stock_form_root_angles import intersect_intervals
 
 
-def y_for_extra(extra: float, g16: GearDef, g64: GearDef) -> float:
-    """Crank-axle height for a centre distance of R64 + R16 + ``extra``."""
-    dxh = (GEAR64_SEAT[0] - cms.X_CRANK) * cms.COS_I
-    c2c = g64.rp + g16.rp + extra
-    return cms.Y_DRIVE + math.sqrt(c2c * c2c - dxh * dxh)
+def measurement_engine_identity() -> dict:
+    """Capture collector, adapters and actual geometric proof implementation."""
+    root = Path(__file__).resolve().parent
+    sources = {
+        name:hashlib.sha256((root/name).read_bytes()).hexdigest()
+        for name in (
+            "crank_mesh_backlash_study.py","crossed_mesh_study.py",
+            "stock_form_contact_3d.py","stock_form_root_angles.py",
+            "stock_form_root_sweep.py","stock_form_contact_continuation.py",
+        )
+    }
+    digest = hashlib.sha256(
+        json.dumps(sources,sort_keys=True,separators=(",",":")).encode()
+    ).hexdigest()
+    return {"measurement_engine_sha256":digest,
+            "measurement_engine_sources_sha256":sources}
 
 
-def boundary(
-    g: cms.GapLookup, r_max: float | None = None
-) -> tuple[np.ndarray, np.ndarray]:
-    """(theta, r) of every material cell with a non-material neighbour.
-
-    ``r_max`` cuts the section at a turned diameter: the last grid row at or
-    under it becomes the outer circle (the pinion's turned band).
-    """
-    mat = ~g.table
-    # The tip-circle row lies ON each gap polygon's rim arc, where
-    # contains_points is ambiguous (it reads material across the gaps); take
-    # the row just inside it.
-    mat[:, -1] = mat[:, -2]
-    rows = g.rmin + np.arange(g.nr) * (g.ra - g.rmin) / (g.nr - 1)
-    if r_max is not None:
-        keep = rows <= r_max
-        mat, rows = mat[:, keep], rows[keep]
-    edge = np.zeros_like(mat)
-    edge |= mat & ~np.roll(mat, 1, axis=0)
-    edge |= mat & ~np.roll(mat, -1, axis=0)
-    edge[:, :-1] |= mat[:, :-1] & ~mat[:, 1:]
-    edge[:, 1:] |= mat[:, 1:] & ~mat[:, :-1]
-    edge[:, -1] |= mat[:, -1]  # the tip (or turned) circle
-    edge[:, 0] = False  # solid hub below every gap floor
-    ti, ri = np.nonzero(edge)
-    theta = ti * g.gamma / g.nth
-    return theta, rows[ri]
+def crank_pair(name: str, driver: StockFormProfile, driven: StockFormProfile,
+               pose: cms.Placement | None = None) -> ContactPair:
+    """Map the source physical crank pose to the general3D engine datum."""
+    pose = cms.Placement() if pose is None else pose
+    placement = Placement(**geometry.placement_record(asdict(pose)))
+    return ContactPair(name,driver,driven,placement)
 
 
-class Pose:
-    """The pair at one (extra, widen16, widen64, crank phase, gear definitions).
-
-    Both helices twist about mid-face: the 64T by ``s * twist`` (s along its
-    axis from the seat), the pinion by ``(z - face/2) * twist16`` (z from its
-    tooth-row start). ``hand16`` picks the pinion's hand (``--hand-check``).
-    """
-
-    def __init__(self, extra: float, widen16: float, widen64: float,
-                 crank_deg: float, lut: dict, gear16: GearDef = SHIPPED16,
-                 gear64: GearDef = SHIPPED64, hand16: float = 1.0,
-                 skew64: bool = False, yaw16_deg: float = 0.0,
-                 tilt16_deg: float = 0.0,
-                 crank_xy: tuple[float, float] | None = None) -> None:
-        self.gear16, self.gear64 = gear16, gear64
-        # A misaligned crank bore: the pinion axis turned about the pinion's
-        # mid-face centre -- ``yaw16`` about machine y (the plan angle against
-        # the cone journal), ``tilt16`` about machine x (out of the horizontal)
-        # -- so the centre distance at mid-face is unchanged and only the
-        # angular error is measured.
-        ya, ti = math.radians(yaw16_deg), math.radians(tilt16_deg)
-        ry = np.array([[math.cos(ya), 0.0, math.sin(ya)], [0.0, 1.0, 0.0],
-                       [-math.sin(ya), 0.0, math.cos(ya)]])
-        rx = np.array([[1.0, 0.0, 0.0], [0.0, math.cos(ti), -math.sin(ti)],
-                       [0.0, math.sin(ti), math.cos(ti)]])
-        self.rot16 = ry @ rx
-        # The shop's straight skewed slot instead of a true helix: each
-        # mid-face point runs along its own tangent (w = s * tan(beta))
-        # rather than around the pitch cylinder, so it stands off radially
-        # by ~w^2 / 2r at the face ends -- the flank-line sag.
-        self.skew64 = skew64
-        self.tan64 = math.tan(math.radians(gear64.beta_deg))
-        # ``crank_xy`` evaluates a specified axis directly; otherwise
-        # ``extra`` perturbs the fixed-centre layout along y.
-        if crank_xy is None:
-            self.x_crank, self.y_crank = cms.X_CRANK, y_for_extra(extra, gear16, gear64)
-        else:
-            self.x_crank, self.y_crank = crank_xy
-        self.g16 = gear16.lookup(widen16, lut)
-        self.g64 = gear64.lookup(widen64, lut)
-        self.twist64 = gear64.twist_per_mm
-        self.twist16 = hand16 * gear16.twist_per_mm
-        self.crank = math.radians(crank_deg)
-        self.z0 = cms.PINION_TOOTH_Z - cms.PINION_FACE / 2.0
-        self.pivot16 = np.array([self.x_crank, self.y_crank, self.z0 + cms.PINION_FACE / 2.0])
-        # The seed the voxel study places at seed_off = 0 (tooth-in-gap
-        # formula for this centre distance); a 64T angle is 64/16 pinion
-        # angles whatever the pitch radii.
-        dx16 = (GEAR64_SEAT[0] - self.x_crank) * cms.COS_I
-        dy16 = self.y_crank - cms.Y_DRIVE
-        alpha64 = math.degrees(math.atan2(dy16, dx16))
-        alpha16 = math.degrees(math.atan2(dy16, GEAR64_SEAT[0] - self.x_crank))
-        tp64 = 360.0 / 64.0
-        delta64 = round(alpha64 / tp64) * tp64 - alpha64
-        self.seed0 = ((alpha16 + 180.0) - delta64 * (64.0 / 16.0)
-                      - PITCH16 / 2.0) % PITCH16
-        self._pinion_local()
-        self._gear_world()
-
-    def _pinion_local(self) -> None:
-        # The shipped solid: full-OD teeth over the shoulder, turned down to
-        # cms.PINION_TURNED_R north of it.  Each section's boundary is
-        # extruded over its own z slices (the shoulder face, like the end
-        # faces, is sampled at its edges only).
-        z = np.arange(0.0, cms.PINION_FACE + 1e-9, SLICE_MM)
-        band = z > cms.PINION_SHOULDER + 1e-9  # the shoulder slice keeps full OD
-        gamma = self.g16.gamma
-        self.p_sections = []
-        for r_max, zs in ((None, z[~band]), (cms.PINION_TURNED_R, z[band])):
-            th, r = boundary(self.g16, r_max)
-            # Every pinion tooth; points far from the 64T are culled per test.
-            ths = np.concatenate([th + k * gamma for k in range(16)])
-            rs = np.tile(r, 16)
-            # The toothed annulus only.
-            near = rs > self.g16.ra - 3.0 * IN / self.gear16.dp_n
-            self.p_sections.append((ths[near], rs[near], zs))
-
-    def _gear_world(self) -> None:
-        th, r = boundary(self.g64)
-        gamma = self.g64.gamma
-        pts = []
-        for s in np.arange(-cms.GEAR64_FACE / 2.0, cms.GEAR64_FACE / 2.0 + 1e-9, SLICE_MM):
-            for k in range(64):
-                if self.skew64:
-                    w = s * self.tan64
-                    phi = th + k * gamma - self.crank / 4.0 + np.arctan2(w, r)
-                    rr = np.hypot(r, w)
-                else:
-                    phi = th + k * gamma - self.crank / 4.0 + s * self.twist64
-                    rr = r
-                p = (GEAR64_SEAT + s * U)[None, :] + (
-                    (rr * np.cos(phi))[:, None] * EX + (rr * np.sin(phi))[:, None] * EY
-                )
-                loc = self._to_pinion(p)
-                d = np.hypot(loc[:, 0], loc[:, 1])
-                pz = loc[:, 2]
-                keep = (d <= self.g16.ra + 0.05) & (pz >= -0.05) & (pz <= cms.PINION_FACE + 0.05)
-                if keep.any():
-                    pts.append(p[keep])
-        self.gear_pts = np.concatenate(pts) if pts else np.zeros((0, 3))
-
-    def _in64(self, p: np.ndarray) -> np.ndarray:
-        rel = p - GEAR64_SEAT
-        s = rel @ U
-        radial = rel - np.outer(s, U)
-        r = np.linalg.norm(radial, axis=1)
-        th = np.arctan2(radial @ EY, radial @ EX) + self.crank / 4.0
-        if self.skew64:
-            w = s * self.tan64
-            r0 = np.sqrt(np.maximum(r * r - w * w, 0.0))
-            th = th - np.arctan2(w, r0)
-            r = r0
-        else:
-            th = th - s * self.twist64
-        return (np.abs(s) <= cms.GEAR64_FACE / 2.0) & self.g64.material(th, r)
-
-    def _to_pinion(self, p: np.ndarray) -> np.ndarray:
-        """World points -> pinion frame (x, y about its axis, z from its tooth-row start)."""
-        loc = (p - self.pivot16) @ self.rot16
-        loc[:, 2] += cms.PINION_FACE / 2.0
-        return loc
-
-    def _pinion_twist(self, z_local: np.ndarray) -> np.ndarray:
-        return (z_local - cms.PINION_FACE / 2.0) * self.twist16
-
-    def collides(self, seed_off: float) -> bool:
-        rot = math.radians(self.seed0 + seed_off) - self.crank
-        # Pinion boundary -> world; test in the 64T.
-        for p_th, p_r, p_z in self.p_sections:
-            phi = (p_th[:, None] - rot) + self._pinion_twist(p_z)[None, :]
-            r = np.broadcast_to(p_r[:, None], phi.shape)
-            lx = r * np.cos(phi)
-            ly = r * np.sin(phi)
-            lz = np.broadcast_to(p_z[None, :] - cms.PINION_FACE / 2.0, phi.shape)
-            # Cull to points within reach of the 64T teeth (in the pinion
-            # frame, which a sub-degree misalignment barely moves).
-            near = np.hypot(
-                lx + self.x_crank - GEAR64_SEAT[0], ly + self.y_crank - GEAR64_SEAT[1]
-            ) <= (self.g64.ra + 1.5)
-            loc = np.stack([lx[near], ly[near], lz[near]], axis=1)
-            p = self.pivot16 + loc @ self.rot16.T
-            if self._in64(p).any():
-                return True
-        # 64T boundary -> pinion frame; test in the pinion.
-        g = self._to_pinion(self.gear_pts)
-        px, py, pz = g[:, 0], g[:, 1], g[:, 2]
-        pth = np.arctan2(py, px) + rot - self._pinion_twist(pz)
-        return bool(cms.pinion_material(self.g16, pth, np.hypot(px, py), pz).any())
+def design_cases(centre_shift_mm: float = 0.0) -> tuple[ContactPair, ...]:
+    """Materialise the exact source-owned Cartesian manufacturing case set."""
+    drivers = dict(cms.pinion_spec.STOCK_PROFILE_CORNERS,nominal=cms.pinion_spec.STOCK_PROFILE)
+    driven = dict(cms.gear64_spec.STOCK_PROFILE_CORNERS,nominal=cms.gear64_spec.STOCK_PROFILE)
+    rows = []
+    for parameters in geometry.calibration_case_parameters():
+        pose = cms.Placement(**parameters["pose"])
+        if centre_shift_mm:
+            pose = replace(pose,extra_mm=pose.extra_mm+centre_shift_mm)
+        rows.append(crank_pair(parameters["name"],drivers[parameters["driver_profile_label"]],
+                               driven[parameters["driven_profile_label"]],pose))
+    return tuple(rows)
 
 
-def edge(pose: Pose, free: float, step: float, tol: float = 0.001) -> float | None:
-    """First colliding seed_off from ``free`` in the direction of ``step``."""
-    lo, hi = free, free + step
-    for _ in range(40):
-        if pose.collides(hi):
-            break
-        lo, hi = hi, hi + step
-    else:
+def json_safe(value):
+    """Nonfinite geometric refusals are null, never nonstandard JSON numbers."""
+    if isinstance(value,np.generic):
+        return json_safe(value.item())
+    if isinstance(value,float) and not math.isfinite(value):
         return None
-    while abs(hi - lo) > tol:
-        mid = (lo + hi) / 2.0
-        if pose.collides(mid):
-            hi = mid
-        else:
-            lo = mid
-    return (lo + hi) / 2.0
+    if isinstance(value,np.ndarray):
+        return json_safe(value.tolist())
+    if isinstance(value,dict):
+        return {key:json_safe(item) for key,item in value.items()}
+    if isinstance(value,(tuple,list)):
+        return [json_safe(item) for item in value]
+    return value
 
 
-def window(pose: Pose, guess: float) -> dict:
-    free = guess
-    if pose.collides(free):
-        grid = np.arange(-6.0, 6.0 + 1e-9, 0.05) + guess
-        frees = [g for g in grid if not pose.collides(float(g))]
-        if not frees:
-            return {"jam": True}
-        free = float(np.median(frees))
-    neg = edge(pose, free, -0.25)
-    pos = edge(pose, free, +0.25)
-    if neg is None or pos is None:
-        return {"jam": False, "open": True}
-    width = pos - neg
+def analyse_case(
+    case: ContactPair, pose_domain: dict, *, phases: int = 129,
+    maximum_error_mm: float = 0.001,
+) -> dict:
+    """Measure one source case with its continuous, paid pose domain."""
+    result = analyse_3d_mesh(
+        case,phases=phases,maximum_error_mm=maximum_error_mm,
+        coverage_min=STOCK_FORM_COVERAGE_MIN,row_min=ROW_ENGAGEMENT_MIN,
+        handover_max_mm=HANDOVER_JUMP_MAX_MM,
+        positive_backlash_min_mm=POSITIVE_BACKLASH_MIN_MM,driver_sense=1,
+        radial_error_mm=pose_domain["radial_error_mm"],
+        axial_error_mm=pose_domain["axial_error_mm"],
+        required_root_air_mm=pose_domain["required_root_air_mm"],
+    )
+    result["pose_domain"] = pose_domain
+    return result
+
+
+def measure_read_stalls(
+    nominal: ContactPair, phase_seed_rad: float, *, maximum_error_mm: float = 0.001,
+) -> dict:
+    """Directly root all21 physical read stalls; no periodicity substitution.
+
+    World +Z crank is the explicit paper/platen +X convention. The cone
+    runs about -U, so positive lag means actual-minus-ideal world cone angle.
+    This raw study is not budget-qualified until the complete manufacturing
+    family and its physical station/clock have also been frozen.
+    """
+    physical = replace(nominal,placement=replace(
+        nominal.placement,
+        driver_clocking_rad=nominal.placement.driver_clocking_rad-phase_seed_rad,
+    ))
+    observations = []
+    for index in range(21):
+        driver = 4*math.pi*index
+        ideal = physical.placement.driven_clocking_rad-driver*physical.driver.teeth/physical.driven.teeth
+        half_bracket = physical.driven.angular_pitch_rad/4
+        observations.append(loaded_driven_contact(
+            physical,driver,driver_sense=1,
+            driven_bracket_rad=(ideal-half_bracket,ideal+half_bracket),
+            maximum_error_mm=maximum_error_mm,
+        ))
     return {
-        "jam": False,
-        "neg_deg": neg,
-        "pos_deg": pos,
-        "width_deg": width,
-        "backlash_mm": math.radians(width) * pose.gear16.rp,
-        "centre_deg": (pos + neg) / 2.0,
+        "geometry_sha256":crank_drive_phase.geometry_sha256(),
+        **measurement_engine_identity(),
+        "qualified_for_budget":False,
+        "qualification_requirement":"complete all-corner calibration and final physical clock/source identity",
+        "operating_convention":"paper/platen world +X; crank world +Z; cone about -U",
+        "CONE_SHAFT_SENSE":-1,
+        "STALL_DRIVER_RAD":[row["driver_phase_rad"] for row in observations],
+        "CONE_SHAFT_LAG_RAD":[row["driven_lag_rad"] for row in observations],
+        "BOUND_RAD":[row["bound_rad"] for row in observations],
+        "alignment_zero_subtracted":False,"native_certificate":False,
+        "physical_placement":physical.placement.record(),"observations":observations,
     }
 
 
-@dataclass(frozen=True)
-class Case:
-    name: str
-    extra: float = SHIPPED_EXTRA
-    widen16: float = 0.0
-    widen64: float = cms.BACKLASH_MM
-    gear16: GearDef = SHIPPED16
-    gear64: GearDef = SHIPPED64
-    hand16: float = 1.0
-    skew64: bool = False
-    yaw16: float = 0.0
-    tilt16: float = 0.0
-    # Crank axis moved off the frame axis in its transverse plane (machine x,
-    # y; mm).  When either is set, ``extra`` is ignored.
-    dx: float = 0.0
-    dy: float = 0.0
-
-    def crank_xy(self) -> tuple[float, float] | None:
-        if self.dx == 0.0 and self.dy == 0.0:
-            return None
-        return cms.X_CRANK + self.dx, Y_CRANK + self.dy
-
-    def record(self) -> dict:
-        return {
-            "case": self.name, "extra": self.extra, "widen16": self.widen16,
-            "widen64": self.widen64, "hand16": self.hand16, "skew64": self.skew64,
-            "yaw16": self.yaw16, "tilt16": self.tilt16, "dx": self.dx, "dy": self.dy,
-            **{f"g16_{k}": v for k, v in _gear_record(self.gear16).items()},
-            **{f"g64_{k}": v for k, v in _gear_record(self.gear64).items()},
-        }
-
-
-def _gear_record(g: GearDef) -> dict:
-    return {"beta": g.beta_deg, "def": g.definition, "dp_n": g.dp_n, "pa_n": g.pa_n,
-            "dp_t": g.dp_t, "pa_t": g.pa_t, "rp": g.rp, "tip_mm": g.tip_mm}
-
-
-CASES: list[Case] = [
-    Case("nominal"),
-    *[Case(f"cd{e:+.3f}", extra=SHIPPED_EXTRA + e) for e in (-0.15, -0.075, 0.075, 0.15, 0.30)],
-    *[Case(f"thin64={w:.2f}", widen64=w) for w in (0.05, 0.10, 0.20, 0.25)],
-    *[Case(f"thin16={w:.3f}", widen16=w) for w in (0.02, 0.05)],
-    Case("cd-0.15,thin64=0.05", extra=SHIPPED_EXTRA - 0.15, widen64=0.05),
-]
-
-GEAR_KEYS = {"b16": "beta_deg", "b64": "beta_deg", "def16": "definition",
-             "def64": "definition", "dpn16": "dp_n", "dpn64": "dp_n",
-             "pan16": "pa_n", "pan64": "pa_n", "tip16": "tip_mm", "tip64": "tip_mm"}
-
-
-def parse_case(spec: str) -> Case:
-    """``NAME:key=value,...`` over the shipped case.
-
-    Keys: extra, w16, w64, hand16 (+1/-1), skew64 (1: straight skewed slots), yaw16, tilt16
-    (crank-axis misalignment, deg), dx, dy (crank axis off the frame axis, mm;
-    overrides extra), b16, b64 (helix deg), def16, def64 (transverse|normal),
-    dpn16, dpn64 (cutter DP), pan16, pan64 (cutter PA), tip16, tip64 (tip
-    radius off nominal, mm).
-    """
-    name, _, body = spec.partition(":")
-    fields: dict = {}
-    g16: dict = {}
-    g64: dict = {}
-    for item in filter(None, body.split(",")):
-        key, value = item.split("=")
-        if key in ("extra", "w16", "w64", "hand16", "yaw16", "tilt16", "dx", "dy"):
-            fields[{"w16": "widen16", "w64": "widen64"}.get(key, key)] = float(value)
-            continue
-        if key == "skew64":
-            fields["skew64"] = value == "1"
-            continue
-        target = g16 if key.endswith("16") else g64
-        attr = GEAR_KEYS[key]
-        target[attr] = value if attr == "definition" else float(value)
-    return Case(name, **fields,
-                gear16=replace(SHIPPED16, **g16), gear64=replace(SHIPPED64, **g64))
+def calibration_payload(results: dict, identity: str, centre_shift_mm: float,
+                        engine_identity: dict) -> dict:
+    """Separate a complete design candidate from current-source publication."""
+    complete = set(results) == geometry.required_calibration_case_names()
+    pitch = geometry.pinion.STOCK_PROFILE.angular_pitch_rad
+    common = ((-pitch/2,pitch/2),)
+    for result in results.values():
+        common = intersect_intervals(common,result.get("phase_components_rad",()))
+    window = max(common,key=lambda interval:interval[1]-interval[0]) if common else None
+    if window is not None:
+        for result in results.values():
+            result["phase_window_rad"] = next(
+                list(interval) for interval in result["phase_components_rad"]
+                if interval[0] <= window[0] < window[1] <= interval[1]
+            )
+    candidate = complete and all(result["qualified"] for result in results.values()) and window is not None
+    qualified = candidate and centre_shift_mm == 0.0
+    return {
+        "qualified":qualified,"candidate_qualified":candidate,"geometry_sha256":identity,
+        **engine_identity,
+        "refusal":"" if qualified else "Actual complete source case family, common phase window and published physical station are not jointly qualified.",
+        "method":"actual 3D finite stock boundary angular-envelope intersection",
+        "native_certificate":False,"design_centre_shift_mm":centre_shift_mm,
+        "phase_components_rad":common,
+        "phase_window_rad":window,
+        "phase_seed_deg":math.degrees(sum(window)/2) if window is not None and window[0] < window[1] else None,
+        "required_case_names":sorted(geometry.required_calibration_case_names()),
+        "cases":results,
+    }
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--phases", type=int, default=9)
-    ap.add_argument("--seed-off", type=float, default=0.0,
-                    help="initial free-window search guess, degrees from tooth-in-gap")
-    ap.add_argument("--case", action="append", help="run only these case names")
-    ap.add_argument(
-        "--custom", action="append", default=[],
-        help="extra case NAME:key=value,... (run instead of the built-ins; see parse_case)",
-    )
-    args = ap.parse_args()
-    cases = [parse_case(spec) for spec in args.custom] or CASES
-    done: set[tuple[str, float]] = set()
-    if args.out.exists():
-        for line in args.out.read_text(encoding="utf-8").splitlines():
-            rec = json.loads(line)
-            done.add((rec["case"], rec["crank_deg"]))
-    lut: dict = {}
-    phases = np.linspace(0.0, PITCH16, args.phases, endpoint=False)
-    centre = args.seed_off
-    for case in cases:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--out",type=Path,required=True)
+    parser.add_argument("--phases",type=int,default=129)
+    parser.add_argument("--maximum-error-mm",type=float,default=0.001)
+    parser.add_argument("--centre-shift-mm",type=float,default=0.0)
+    parser.add_argument("--case",action="append")
+    args = parser.parse_args()
+    available = design_cases(args.centre_shift_mm)
+    if args.case and not set(args.case) <= {case.name for case in available}:
+        raise ValueError("a requested case is not in the source-owned manufacturing family")
+    identity = crank_drive_phase.geometry_sha256()
+    engine_identity = measurement_engine_identity()
+    domains = geometry.calibration_case_domains()
+    results = {}
+    case_directory = args.out.with_suffix(".cases")
+    case_directory.mkdir(parents=True,exist_ok=True)
+    for index,case in enumerate(available):
         if args.case and case.name not in args.case:
             continue
-        guess = centre
-        for ph in phases:
-            if (case.name, float(ph)) in done:
-                continue
-            t0 = time.perf_counter()
-            pose = Pose(case.extra, case.widen16, case.widen64, float(ph), lut,
-                        case.gear16, case.gear64, case.hand16, case.skew64,
-                        case.yaw16, case.tilt16, case.crank_xy())
-            res = window(pose, guess)
-            if "centre_deg" in res:
-                guess = res["centre_deg"]
-            rec = {**case.record(), "crank_deg": float(ph),
-                   "seconds": round(time.perf_counter() - t0, 1), **res}
-            with args.out.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(rec) + "\n")
-            print(json.dumps(rec), flush=True)
-    return 0
+        started = time.perf_counter()
+        try:
+            result = analyse_case(
+                case,domains[case.name],phases=args.phases,maximum_error_mm=args.maximum_error_mm,
+            )
+        except (ValueError,RuntimeError) as exc:
+            result = {"case":case.name,"qualified":False,"refusal":str(exc)}
+        result["seconds"] = time.perf_counter()-started
+        results[case.name] = json_safe(result)
+        checkpoint = {"geometry_sha256":identity,**engine_identity,
+                      "design_centre_shift_mm":args.centre_shift_mm,"result":results[case.name]}
+        (case_directory/f"{index:04d}.json").write_text(
+            json.dumps(checkpoint,separators=(",",":"),allow_nan=False)+"\n",encoding="utf-8")
+        print(json.dumps({key:result.get(key) for key in (
+            "case","qualified","refusal","seconds","tight_backlash_lower_mm",
+            "stock_form_coverage_lower","row_available_fraction_lower",
+        )}),flush=True)
+    if not results:
+        raise ValueError("no requested source-owned design case exists")
+    payload = calibration_payload(results,identity,args.centre_shift_mm,engine_identity)
+    args.out.write_text(json.dumps(payload,separators=(",",":"),allow_nan=False)+"\n",encoding="utf-8")
+    return 0 if payload["qualified"] else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

@@ -10,12 +10,31 @@ is the drift alarm the offline test enforces.
 
 from __future__ import annotations
 
+import math
+
+import channel_frame_geom
+import ch_rocker_arm_spec
+import dt_cylinder_gear_spec
 from _hole_spec import HoleSpec
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"). ---
-CENTER_DISTANCE = 163.1010299795349  # fixed-post recenter; level arm, plumb rod
+# Close the actual phased cam centre to the level rocker's pin. The rocker
+# bank is fixed; raising the drive axis changes this physical rod length.
+_HOME_PIN_XY = (
+    channel_frame_geom.ROCKER_PIVOT_XY[0] - ch_rocker_arm_spec.ROD_HOLE_X,
+    channel_frame_geom.ROCKER_PIVOT_XY[1]
+    + ch_rocker_arm_spec.ROD_HOLE_Y - ch_rocker_arm_spec.PIVOT_MID_Y,
+)
+_CAM_PHASE = math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)
+_HOME_CAM_XY = (
+    channel_frame_geom.CAM_SHAFT_XY[0]
+    + dt_cylinder_gear_spec.ECCENTRICITY * math.sin(_CAM_PHASE),
+    channel_frame_geom.CAM_SHAFT_XY[1]
+    + dt_cylinder_gear_spec.ECCENTRICITY * math.cos(_CAM_PHASE),
+)
+CENTER_DISTANCE = math.dist(_HOME_PIN_XY, _HOME_CAM_XY)
 RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
 RING_BORE_DIA_BAND = (0.10, 0.00)  # running bore; (upper, lower) deviations
 RING_WALL = 5.0  # radial strap wall

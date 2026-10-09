@@ -1,13 +1,20 @@
 r"""The crank axis the MHA-DT-020 cone swing platform carries.
 
-PURE, SolidWorks-free. The restored post and the crank train share the fixed
-frame axis. ``build_cone_swing_platform`` authors this reference and the drive
-train mates the crank to it.
+PURE, SolidWorks-free. The post and the crank train share the configured
+frame axis. ``build_dt_cone_swing_platform`` authors this reference and the
+drive train mates the crank to it.
 """
 
 from __future__ import annotations
 
-from cone_line import COS_I as _COS_I, PIVOT_XZ, SIN_I as _SIN_I, X_CRANK, Y_BASE_TOP, Y_CRANK
+from cone_line import (
+    COS_I as _COS_I,
+    PIVOT_XZ,
+    SIN_I as _SIN_I,
+    X_CRANK,
+    Y_BASE_TOP,
+    Y_CRANK,
+)
 from dt_cone_swing_platform_geometry import INCLINE_DEG
 
 # --- crank axis (the machine-z crank line, carried BY the plate) -------------

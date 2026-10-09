@@ -8,8 +8,8 @@ sheet/template, import, curation and export behaviour lives in
 ``_drawing_common``.
 
 The casting has two axes and they are not parallel: the crank journal runs
-along part +Z and the cone journal is yawed 12.5182 degrees about the vertical
-body axis.  The part therefore persists a named view looking exactly down the
+along part +Z and the cone journal follows the configured cone-line incline
+about the vertical body axis. The part persists a view looking exactly down the
 cone axis.  That view retains the boss end face and shows its Ø17.2 OD and
 Ø12.281 bore as separate true-shape circles.  A native section in the
 horizontal cone-bore plane removes the head from the projection and exposes
@@ -1295,9 +1295,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="foot seat finish",
         char_height=0.0025,
     )
-    # The crank-bore Ra stands left of the head, between the (72.70)'s witness
-    # and the 86.0's top witness: above the view its leader crossed the 86.0's
-    # top witness (leader-crosses-line, ha-perf-parts audit).
+    # The crank-bore Ra stands left of the head, between the crank-height
+    # reference and the body's top witness: a symbol above the view crossed
+    # that top witness (leader-crosses-line, ha-perf-parts audit).
     add_surface_finish(
         adapter,
         front,

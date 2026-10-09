@@ -14,7 +14,7 @@ underside (user ruling 2026-09-29).  The three plan views run 1:2 and pivot
 section A-A 2:1.  Detail B enlarges a 12 mm radius around the pivot-to-hole
 region at 2:1 for the hole's station; section C-C (1:1), cut on the
 plate-profile plan through the hole's axis, shows the underside counterbore
-in solid lines and carries its native Hole Wizard callout.  The isometric
+in solid lines and carries its native Hole Wizard callout. The isometric
 runs 1:3.
 
 Run with SolidWorks open::
@@ -38,6 +38,7 @@ from _drawing_common import (
     add_surface_finish,
     assert_imported_precision,
     create_section_view,
+    create_blank_drawing_sheets,
     check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
@@ -95,6 +96,9 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # title block states the principal (plan) scale; iso and section carry their own
+SHEET_NAMES = ("PLATFORM",)
+SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE}
+
 
 # Sheet layout (meters).  Three 1:2 plan views separate the profile, hole
 # pattern and lock-notch definitions instead of routing unrelated leaders
@@ -312,6 +316,8 @@ def holddown_section_line_model_points() -> tuple[tuple[float, float, float], ..
         (x / 1000.0, PLATE_THICKNESS / 1000.0, HOLDDOWN_LOCAL_Z / 1000.0)
         for x in HOLDDOWN_SECTION_LINE_X_MM
     )
+
+
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
@@ -913,6 +919,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Profile View Note",
             "Feature View Note",
             "Notch View Note",
+            "Crank Relief View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
             "Post Mount Engagement",
@@ -925,6 +932,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Profile View Note",
             "Feature View Note",
             "Notch View Note",
+            "Crank Relief View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
             "Post Mount Engagement",
@@ -933,6 +941,12 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="cone swing platform package"
+    )
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate the platform sheet")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -1236,6 +1250,8 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     for sheet_geometry in collect_document(adapter):
         print(describe_sheet(sheet_geometry))
+        if sheet_geometry.name != SHEET_NAMES[0]:
+            continue
         thickness_geometry = [
             item for item in sheet_geometry.annotations if item.label == "PlateThk"
         ]
@@ -1263,6 +1279,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Cone Swing Platform Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+        sheet_scales=SHEET_SCALES,
     )
 
 
