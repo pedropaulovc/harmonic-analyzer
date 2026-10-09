@@ -391,14 +391,15 @@ help (`types/IGtol/SetDatumIdentifier.md`) says only that it "sets the name
 of the datum being defined"; the frame XML schema has no node for it.
 Do: insert a real datum tag on the selected frame
 (`_drawing_common.add_frame_datum_feature`) and require the tag's attachment
-to be that frame by annotation name. Selecting the frame is not settled:
-`IAnnotation::Select3(False, <view ISelectData>)` returned False on the
-knife mount's DetailItem354 (farm run 20261009T174542021Z), so the helper
-tries each of `FRAME_DATUM_SELECTIONS` in turn, deletes the tag of every
-attempt that fails, and logs each attempt as `datum.frame_attempt`. Once a
-leaf proves one, keep that one alone. Also end the sheet with
-`assert_frame_datums_defined`, which fails when any frame names a datum that
-no `IView::GetDatumTags` label prints.
+to be that frame by annotation name. Select the frame with
+`IAnnotation::Select2(False, 0)`: on farm run 20261009T182549169Z it
+attached the knife mount's datum B to DetailItem354 (one entity, type 13),
+where `IAnnotation::Select3(False, <view ISelectData>)` had returned False
+(run 20261009T174542021Z). Prove the tag's placement by its printed letter
+(display-data text position), not `IAnnotation::GetPosition`: the attached
+tag read back x 0.0 with the requested y on that run. Also end the sheet
+with `assert_frame_datums_defined`, which fails when any frame names a datum
+that no `IView::GetDatumTags` label prints.
 
 **m. A translation modifier proved by its XML alone.**
 Don't: take `<Translation>true</Translation>` read back from
@@ -411,7 +412,10 @@ Do: read the frame's printed text items (`IAnnotation::GetDisplayData`) and
 reject any bracketed vector (`_gtol_spec.translation_print_problem`).
 `add_feature_control_frame` tries each of `TRANSLATION_FORMS` until one
 prints the bare modifier after its letter, logging `gtol.translation_form`.
-Once a leaf proves one, keep that one alone.
+On farm run 20261009T182549169Z none did: empty i, j, k printed "[0,0,0]",
+"false" values printed "[false,false,false]" (the values print verbatim),
+and SOLIDWORKS rewrote the flag-after-letter form to the empty-vector XML.
+No XML form tried prints the bare modifier.
 
 ## The sheet-split rule
 

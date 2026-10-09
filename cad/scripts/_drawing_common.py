@@ -1201,6 +1201,29 @@ def _annotation_texts(annotation: Any) -> list[str]:
     return [str(data.GetTextAtIndex(i) or "") for i in range(int(data.GetTextCount() or 0))]
 
 
+def _annotation_text_positions(annotation: Any) -> list[tuple[str, tuple[float, float]]]:
+    """An annotation's printed text items with their sheet positions (m).
+
+    ``IDisplayData::GetTextPositionAtIndex``, the anchor the layout audit
+    boxes each text item from (diagnostics/drawing_layout_audit.py).
+    """
+    data = _sw_type_info.early_bound_or_flag(
+        annotation.GetDisplayData(),
+        "IDisplayData",
+        "GetTextCount",
+        "GetTextAtIndex",
+        "GetTextPositionAtIndex",
+    )
+    if data is None:
+        raise RuntimeError("annotation has no display data")
+    items = []
+    for i in range(int(data.GetTextCount() or 0)):
+        position = tuple(data.GetTextPositionAtIndex(i) or ())
+        if len(position) >= 2:
+            items.append((str(data.GetTextAtIndex(i) or ""), (float(position[0]), float(position[1]))))
+    return items
+
+
 _SEL_GTOL = 13  # swSelectType_e.swSelGTOLS
 
 
@@ -1222,40 +1245,6 @@ def _frame_name(gtol: Any) -> str:
         return str(annotation.GetName() or "")
     except Exception:  # noqa: BLE001 - neither names a frame
         return ""
-
-
-# How the frame is selected before InsertDatumTag2, in the order the leaf
-# tries them; the first that attaches the tag to the frame is kept.
-# ``IAnnotation.Select3(False, <view's ISelectData>)`` returned False on farm
-# run 20261009T174542021Z (DetailItem354), so it is not tried again.
-#   "select2"     -- IAnnotation.Select2(False, 0): selects the notes the
-#                    sheet recipes delete (delete_unnamed_imports);
-#   "multi-select" -- IModelDocExtension.MultiSelect2 on the IGtol itself, the
-#                    specific-annotation selection that worked where Select3
-#                    did not (vm2 rack-fresh-finish-control evidence);
-#   "select-by-id" -- IModelDocExtension.SelectByID2("<name>@<view>", "GTOL");
-#   "select3-null" -- IAnnotation.Select3(False, <null ISelectData>), the
-#                    vm2 datum probe's dimension selection;
-#   "select2-point" -- "select2", then ISelectionMgr.SetSelectionPoint2 at the
-#                    frame's bottom edge under the tag (the landing pattern of
-#                    layout-tuning lesson i).
-FrameDatumSelection = Literal[
-    "select2", "multi-select", "select-by-id", "select3-null", "select2-point"
-]
-FRAME_DATUM_SELECTIONS: tuple[FrameDatumSelection, ...] = (
-    "select2",
-    "multi-select",
-    "select-by-id",
-    "select3-null",
-    "select2-point",
-)
-
-
-def _datum_labels(view: Any) -> list[str]:
-    return sorted(
-        str(_early_bound(tag, "IDatumTag").GetLabel() or "")
-        for tag in (_early_bound(view, "IView").GetDatumTags() or ())
-    )
 
 
 @_telemetry.traced("drawing.frame_datum_feature", label_param="label")
@@ -1280,14 +1269,22 @@ def add_frame_datum_feature(
     selected and the tag is inserted on that selection, the way a tag goes on
     a selected edge.
 
-    Each way of selecting the frame (``FRAME_DATUM_SELECTIONS``) must select
-    ONE GTOL whose annotation name is the frame's.  After the rebuild, the tag
-    must be attached to exactly that frame (one entity, matched by name).  An
-    attempt that fails deletes its tag, and the view's datum labels must read
-    as they did before it.  Each attempt emits ``datum.frame_attempt`` with its
-    raw readbacks.  If no attempt attaches, the sheet fails: an unattached tag
-    would print a letter that defines nothing.  ``position_tolerance_m``
-    bounds the symbol's readback as in :func:`add_datum_feature`.
+    The frame is selected with ``IAnnotation.Select2(False, 0)``; the
+    selection must be ONE GTOL whose annotation name is the frame's.  On farm
+    run 20261009T182549169Z that attached the knife mount's datum B to its
+    frame DetailItem354 (one entity, type 13, named DetailItem354), where
+    ``IAnnotation.Select3(False, <view ISelectData>)`` had returned False
+    (run 20261009T174542021Z).  After the rebuild the tag must be attached to
+    exactly that frame, matched by name: an unattached tag would print a
+    letter that defines nothing.
+
+    The placement is proved by the printed letter, not by
+    ``IAnnotation.GetPosition``: on run 20261009T182549169Z the attached tag
+    read back x 0.0 (the sheet's left edge) with the requested y.  The API
+    help gives a datum symbol's position as "the point where the leader hits
+    the symbol", and a tag on a frame has no leader.  The letter's display-data
+    text position, the ink the layout audit reads, must lie within
+    ``position_tolerance_m`` of ``symbol_xy``.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -1296,162 +1293,94 @@ def add_frame_datum_feature(
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
     frame_name = _frame_name(gtol)
     frame_annotation = _sw_type_info.early_bound_or_flag(
-        _early_bound(gtol, "IGtol").GetAnnotation(),
-        "IAnnotation",
-        "Select2",
-        "Select3",
-        "GetPosition",
+        _early_bound(gtol, "IGtol").GetAnnotation(), "IAnnotation", "Select2"
     )
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    labels_before = _datum_labels(view)
-    failures: list[str] = []
-
-    def _select(method: str) -> str:
-        """Select the frame by ``method``; "" when ONE GTOL named the frame's is selected."""
-        draw.ClearSelection2(True)
-        if method in ("select2", "select2-point"):
-            ok = frame_annotation.Select2(False, 0)
-        elif method == "multi-select":
-            ok = int(
-                _early_bound(draw.Extension, "IModelDocExtension").MultiSelect2(
-                    dispatch_array([_early_bound(gtol, "IGtol")]), False, None
-                )
-                or 0
-            ) == 1
-        elif method == "select-by-id":
-            ok = draw.Extension.SelectByID2(
-                f"{frame_name}@{name}", "GTOL", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-            )
-        else:
-            ok = frame_annotation.Select3(False, null_callout())
-        if not ok:
-            return "the selection call returned False"
-        count = int(selection_manager.GetSelectedObjectCount2(-1))
-        kind = int(selection_manager.GetSelectedObjectType3(count, -1)) if count else 0
-        picked = selection_manager.GetSelectedObject6(count, -1) if count else None
-        picked_name = _frame_name(picked) if kind == _SEL_GTOL and picked is not None else ""
-        if count != 1 or kind != _SEL_GTOL or picked_name != frame_name:
-            return (
-                f"selected {count} object(s), type {kind}, name {picked_name!r}; "
-                f"expected one GTOL {frame_name!r}"
-            )
-        if method == "select2-point" and selection_manager.SetSelectionPoint2(
-            1, -1, symbol_xy[0], _frame_bottom(frame_annotation), 0.0
-        ) is not True:
-            return "SetSelectionPoint2 refused the frame's bottom edge"
-        return ""
-
-    def _remove(tag_annotation: Any) -> None:
-        draw.ClearSelection2(True)
-        if not tag_annotation.Select2(False, 0):
-            raise RuntimeError(f"failed to select the unattached datum {datum} to delete it ({label})")
-        draw.EditDelete()  # VT_VOID: the label re-read below is the proof
-        draw.ClearSelection2(True)
-        rebuild_drawing(adapter, label="add_frame_datum_feature cleanup")
-        if _datum_labels(view) != labels_before:
-            raise RuntimeError(
-                f"an unattached datum {datum} was left on the sheet ({label}): "
-                f"labels {_datum_labels(view)}, before {labels_before}"
-            )
-
-    for method in FRAME_DATUM_SELECTIONS:
-        problem = _select(method)
-        tag = tag_annotation = None
-        attached_count, types, attached_name = 0, (), ""
-        if not problem:
-            tag = draw.InsertDatumTag2()
-            if tag is None:
-                problem = "InsertDatumTag2 returned no tag"
-        if tag is not None:
-            tag = _sw_type_info.early_bound_or_flag(
-                tag, "IDatumTag", "SetLabel", "GetLabel", "GetAnnotation"
-            )
-            tag_annotation = _sw_type_info.early_bound_or_flag(
-                tag.GetAnnotation(),
-                "IAnnotation",
-                "Select2",
-                "GetPosition",
-                "SetPosition2",
-                "GetAttachedEntities3",
-                "GetAttachedEntityCount3",
-                "GetAttachedEntityTypes",
-            )
-            if not tag.SetLabel(datum):
-                problem = "SetLabel refused the letter"
-            elif not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
-                problem = "SetPosition2 refused the position"
-            else:
-                draw.ClearSelection2(True)
-                rebuild_drawing(adapter, label="add_frame_datum_feature")
-                attached = tuple(tag_annotation.GetAttachedEntities3() or ())
-                attached_count = int(tag_annotation.GetAttachedEntityCount3())
-                types = tuple(int(t) for t in (tag_annotation.GetAttachedEntityTypes() or ()))
-                # The readback type of an annotation-on-annotation attachment is
-                # not documented, so the type is logged and the NAME decides.
-                attached_name = (
-                    _frame_name(attached[0])
-                    if len(attached) == 1 and attached[0] is not None
-                    else ""
-                )
-                if attached_count != 1 or attached_name != frame_name:
-                    problem = (
-                        f"not attached to its frame {frame_name}: count={attached_count}, "
-                        f"types={types}, attached={attached_name!r}"
-                    )
-        _telemetry.event(
-            "datum.frame_attempt",
-            datum=datum,
-            frame=frame_name,
-            method=method,
-            count=attached_count,
-            types=str(types),
-            attached=attached_name,
-            outcome=problem or "attached",
-        )
-        if not problem:
-            break
-        failures.append(f"{method}: {problem}")
-        if tag_annotation is not None:
-            _remove(tag_annotation)
-    else:
+    draw.ClearSelection2(True)
+    if not frame_annotation.Select2(False, 0):
+        raise RuntimeError(f"failed to select the frame {frame_name} for datum {datum} ({label})")
+    count = int(selection_manager.GetSelectedObjectCount2(-1))
+    kind = int(selection_manager.GetSelectedObjectType3(count, -1)) if count else 0
+    picked = selection_manager.GetSelectedObject6(count, -1) if count else None
+    picked_name = _frame_name(picked) if kind == _SEL_GTOL and picked is not None else ""
+    if count != 1 or kind != _SEL_GTOL or picked_name != frame_name:
         draw.ClearSelection2(True)
         raise RuntimeError(
-            f"datum {datum} could not be attached to its frame {frame_name} ({label}): "
-            + "; ".join(failures)
+            f"selecting the frame for datum {datum} ({label}) selected {count} "
+            f"object(s), type {kind}, name {picked_name!r}; expected one GTOL "
+            f"{frame_name!r}"
         )
-    actual = tag_annotation.GetPosition()
-    if not actual:
-        raise RuntimeError(f"datum {datum} reports no position ({label})")
-    actual_xy = (float(actual[0]), float(actual[1]))
-    offset = math.hypot(actual_xy[0] - symbol_xy[0], actual_xy[1] - symbol_xy[1])
+    tag = draw.InsertDatumTag2()
+    if tag is None:
+        raise RuntimeError(f"failed to insert datum {datum} on frame {frame_name} ({label})")
+    tag = _sw_type_info.early_bound_or_flag(
+        tag, "IDatumTag", "SetLabel", "GetLabel", "GetAnnotation"
+    )
+    if not tag.SetLabel(datum):
+        raise RuntimeError(f"failed to label datum feature {datum} ({label})")
+    tag_annotation = _sw_type_info.early_bound_or_flag(
+        tag.GetAnnotation(),
+        "IAnnotation",
+        "GetPosition",
+        "SetPosition2",
+        "GetAttachedEntities3",
+        "GetAttachedEntityCount3",
+        "GetAttachedEntityTypes",
+        "GetDisplayData",
+    )
+    if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+        raise RuntimeError(f"failed to position datum {datum} ({label})")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="add_frame_datum_feature")
+    attached = tuple(tag_annotation.GetAttachedEntities3() or ())
+    attached_count = int(tag_annotation.GetAttachedEntityCount3())
+    types = tuple(int(t) for t in (tag_annotation.GetAttachedEntityTypes() or ()))
+    # The readback type of an annotation-on-annotation attachment is logged;
+    # the NAME decides.
+    attached_name = (
+        _frame_name(attached[0]) if len(attached) == 1 and attached[0] is not None else ""
+    )
+    _telemetry.event(
+        "datum.frame_attachment",
+        datum=datum,
+        frame=frame_name,
+        count=attached_count,
+        types=str(types),
+        attached=attached_name,
+    )
+    if attached_count != 1 or attached_name != frame_name:
+        raise RuntimeError(
+            f"datum {datum} is not attached to its frame {frame_name} ({label}): "
+            f"count={attached_count}, types={types}, attached={attached_name!r}"
+        )
+    printed = _annotation_text_positions(tag_annotation)
+    reported = tag_annotation.GetPosition()
+    letters = [xy for text, xy in printed if text.strip() == datum]
+    offset = (
+        math.hypot(letters[0][0] - symbol_xy[0], letters[0][1] - symbol_xy[1])
+        if len(letters) == 1
+        else math.inf
+    )
     _telemetry.event(
         "datum.frame_placement",
         datum=datum,
         frame=frame_name,
-        method=method,
         requested_x=symbol_xy[0],
         requested_y=symbol_xy[1],
-        reported_x=actual_xy[0],
-        reported_y=actual_xy[1],
+        reported=str(tuple(reported or ())),
+        printed=str(printed),
         offset_m=offset,
     )
     if offset > position_tolerance_m:
         raise RuntimeError(
-            f"datum {datum} position did not persist ({label}): {actual_xy}; "
-            f"requested={symbol_xy}, offset={offset:.6g} m, "
+            f"datum {datum} does not print where it was placed ({label}): "
+            f"printed {printed}, requested={symbol_xy}, "
             f"limit={position_tolerance_m:.6g} m"
         )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
     draw.ClearSelection2(True)
     return tag
-
-
-def _frame_bottom(frame_annotation: Any) -> float:
-    """The sheet y of a one-row frame's bottom edge: its position is the top
-    left corner and a row is 7.0 mm tall (DetailItem354, farm run
-    20261009T171439353Z: y 219.0 -> 212.0 mm)."""
-    return float(frame_annotation.GetPosition()[1]) - 0.007
 
 
 def assert_frame_datums_defined(views: Sequence[Any], *, label: str) -> None:
