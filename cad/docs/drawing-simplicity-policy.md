@@ -376,6 +376,38 @@ tagged emitter for every row, printing the shortfall it names.
 | MHA-CH-006-TL-07 rocker arm pivot washer (the sheet states WALL 1.64 MIN) | pivot washer wall 1.64 MIN (rule-12 target 2.0, floor 1.5) | OD set by as-supplied Ø10 drill rod; bore must clear the max shoulder; unhardened; screw clamp load only; Pedro may overturn | Ruled by Main (coordinator), 2026-10-08 |
 | MHA-MG-001 magnifying bracket counterbore floor and MHA-SM-003 summing lever bracket tap-drill wall, with MHA-VN-050 screws (McMaster 91794A077, #2-56 × 1/4 fillister) | Counterbore bearing floor 1.525 MIN and tap-drill lateral wall 1.501 MIN at the worst case of the printed joint-specific bands, below the 2.0 target but above the unchanged 1.5 floor; each affected sheet states its MIN. | The user's option-B joint keeps the full-thread major envelope inside the 5.08 rib and permits only the smaller drill/point to continue along the lever plate's mid-plane. The shallow counterbore retains at least 1.5D of full engagement without bottoming; its head deliberately protrudes 0.5582 nominal. Specific ±0.05 positions/depths and ±0.10 drill depth are authorized, not a relaxation of any threshold. | User, option B and clarified binding constraints, 2026-10-08 |
 
+## Purchased washer receiving reference
+
+`part:vn_knife_hanger_washer` retains the McMaster-Carr 90126A211 supplier
+geometry and purchase identity (MHA-VN-026). Its native annulus and extrusion
+dimensions own the ID, OD and thickness names and two-place display precision;
+the source build reads the nominal values back without modifying geometry.
+`drawing:vn_knife_hanger_washer` imports those dimensions into a compact
+top/front/isometric receipt sheet, displays them parenthesized with short
+diameter leaders, and reads the imported precision and native diametric state
+back without converting the model's diameters on the sheet. These are supplier
+nominal references, not production controls: general tolerances and edge-break
+instructions do not apply. Stock, supplier and SKU remain property-linked; the
+purchase identity is read from the statically named canonical part-registry row.
+After the last rebuild and before save/export, the finalizer's settled check
+enumerates the current dimensions only in the owned TOP/FRONT views. Native
+view names and full model-dimension identities establish presence; stale COM
+handles are not evidence. Every reference must be individually visible and
+retain its view role, source, native kind and presentation: ID/OD are diameter
+dimensions, thickness is a non-diametric linear dimension. All three kinds are
+checked before reading their values as lengths. Changed values, reference text
+or precision also refuse the drawing; no check rewrites state to make it pass.
+
+Acceptance requires an unchanged native supplier solid, all three reference
+dimensions, linked MHA-VN-026 identity and purchase fields, and readable,
+contained views, captions, dimensions and notes on the exported sheet.
+Run the registered part/drawing farm targets together, inspect the full-size
+sheet, then run
+`uv run cad/scripts/machinist_review.py vn_knife_hanger_washer --reviewer codex`.
+Offline
+specification-purity and purchased-drawing contracts supplement, but never
+replace, native and visual acceptance.
+
 ## The gate
 
 `uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or

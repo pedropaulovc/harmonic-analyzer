@@ -1,22 +1,517 @@
-"""Create the purchased reference drawing for the knife hanger washer."""
+"""Create the compact purchased reference drawing for the knife-hanger washer."""
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
+from pathlib import Path
 from typing import Any
 
 import _telemetry
-from _common import run_build
-from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _common import _early_bound, _read_member, check, run_build
+from _drawing_common import (
+    DrawingOutputs,
+    add_property_linked_note,
+    assert_asme_b_sheet,
+    assert_imported_precision,
+    curate_view_dimensions,
+    dimension_name,
+    finalize_drawing,
+    new_project_drawing,
+    property_link,
+    read_required_properties,
+    set_hidden_lines_removed,
+    set_reference_dimension,
+    sheet_drawable_region,
+    stamp_drawing_summary,
+)
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _fastener_catalog import fastener
+from _purchased_fastener_drawing import (
+    _box,
+    _fit_views,
+    _literal_note,
+    _purchased_title_block,
+    _rebuild,
+    _inside,
+)
+from vn_knife_hanger_washer_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    INNER_DIAMETER_DIM,
+    OUTER_DIAMETER_DIM,
+    PART_REGISTRY,
+    THICKNESS_DIM,
+)
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_full_name,
+    iter_views,
+    place_view,
+    view_name,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["vn_knife_hanger_washer"]
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+
+# This consumer owns its required property set so source-stamping analysis can
+# resolve it locally, including the native template's linked tolerance cells.
+_REQUIRED_SOURCE_PROPERTIES = (
+    "Number",
+    "Revision",
+    "Title",
+    "Material",
+    "Stock Name",
+    "Supplier",
+    "Supplier SKUs",
+    "TOL_LIN_X",
+    "TOL_LIN_XX",
+    "TOL_LIN_XXX",
+    "TOL_ANG",
+    "TOL_SURFACE",
+    "TOL_HOLE_MINUS",
+    "TOL_HOLE_PLUS",
+    "TOL_EDGE_BREAK_R",
+    "TOL_CHAMFER_MAX",
+    "THREAD_TYPE",
+    "THREAD_CLASS",
+)
+
+# The washer has one useful circular view, one edge view that carries the
+# thickness, and one pictorial.  The projected pair is deliberately aligned
+# instead of paying for a redundant right view.
+_VIEW_CELLS = (
+    ("*Top", (0.125, 0.180), (0.055, 0.120, 0.195, 0.240)),
+    ("*Front", (0.125, 0.115), (0.055, 0.075, 0.195, 0.145)),
+    ("*Isometric", (0.260, 0.180), (0.190, 0.120, 0.350, 0.240)),
+)
+
+# These are native model dimensions imported into their useful receiving views.
+# Their positions are sheet coordinates in metres and are parenthesized below.
+_TOP_KEEP = {
+    OUTER_DIAMETER_DIM: (0.125, 0.225),
+    INNER_DIAMETER_DIM: (0.178, 0.180),
+}
+_FRONT_KEEP = {THICKNESS_DIM: (0.180, 0.115)}
+
+_LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
+_DISPLAY_DIMENSION_ANNOTATION = 4  # swAnnotationType_e.swDisplayDimension
+_ANNOTATION_VISIBLE = 1  # swAnnotationVisibilityState_e.swAnnotationVisible
+_DIAMETER_DIMENSION = 6  # swDimensionType_e.swDiameterDimension
+_LINEAR_DIMENSIONS = {2, 11, 12}  # swLinear / swHorLinear / swVertLinearDimension
+
+
+def _short_diametric_reference(adapter: Any, annotation: Any, *, label: str) -> None:
+    """Keep a native diameter callout as a short, one-sided leader."""
+    display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+    if display is None:
+        raise RuntimeError(f"{label} has no display annotation")
+    display = _sw_type_info.early_bound_or_flag(
+        display,
+        "IDisplayDimension",
+        "SetSecondArrow",
+        "GetUseDocSecondArrow",
+        "GetSecondArrow",
+        "SetBrokenLeader2",
+        "GetUseDocBrokenLeader",
+        "GetBrokenLeader2",
+    )
+    adapter._attempt(lambda: setattr(display, "DisplayAsLinear", False))
+    if bool(adapter._attempt(lambda: display.DisplayAsLinear)):
+        raise RuntimeError(f"{label} became a linear dimension")
+    if not bool(adapter._attempt(lambda: display.Diametric)):
+        raise RuntimeError(f"{label} is not diametric")
+    adapter._attempt(lambda: setattr(display, "ArrowSide", 1))
+    if int(adapter._attempt(lambda: display.ArrowSide)) != 1:
+        raise RuntimeError(f"{label} did not retain its outside arrow")
+    display.SetSecondArrow(False, False)
+    if bool(display.GetUseDocSecondArrow()) or bool(display.GetSecondArrow()):
+        raise RuntimeError(f"{label} retained its opposite-side arrow")
+    adapter._attempt(lambda: setattr(display, "SolidLeader", False))
+    if display.SetBrokenLeader2(False, 2) != 0:
+        raise RuntimeError(f"failed to apply {label} broken leader")
+    display.LeaderVisibility = _LEADER_LINE_NONE
+    if int(display.LeaderVisibility) != _LEADER_LINE_NONE:
+        raise RuntimeError(f"{label} retained its dimension leader line")
+
+
+def _reference_display(adapter: Any, annotation: Any, name: str) -> Any:
+    display = annotation.GetSpecificAnnotation()
+    if display is None:
+        raise RuntimeError(f"{name}: washer reference has no display dimension")
+    return _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "GetDimension2", "GetText", "GetPrimaryPrecision2"
+    )
+
+
+def _reference_value(display: Any, name: str) -> float:
+    dimension = display.GetDimension2(0)
+    if dimension is None:
+        raise RuntimeError(f"{name}: washer reference has no native model dimension")
+    dimension = _early_bound(dimension, "IDimension")
+    return float(_read_member(dimension, "SystemValue"))
+
+
+def _assert_reference_kind(display: Any, name: str) -> None:
+    kind = int(display.Type2)
+    if name in {OUTER_DIAMETER_DIM, INNER_DIAMETER_DIM}:
+        if (
+            kind != _DIAMETER_DIMENSION
+            or not bool(display.Diametric)
+            or bool(display.DisplayAsLinear)
+        ):
+            raise RuntimeError(f"{name}: settled washer reference is not diametric")
+    elif name == THICKNESS_DIM:
+        if kind not in _LINEAR_DIMENSIONS or bool(display.Diametric):
+            raise RuntimeError(f"{name}: settled washer reference is not linear")
+    else:
+        raise RuntimeError(f"unexpected settled washer reference {name!r}")
+
+
+def _assert_settled_references(
+    adapter: Any,
+    references: tuple[tuple[str, str, dict[str, tuple[str, float]]], ...],
+) -> None:
+    """Check current owned-view references, not stale captured COM handles."""
+    views = {}
+    for view in iter_views(adapter):
+        name = view_name(adapter, view)
+        if not name or name in views:
+            raise RuntimeError("settled washer reference view identities changed")
+        views[name] = view
+    current = []
+    for native_view_name, orientation, expected in references:
+        view = views.get(native_view_name)
+        if view is None or view.GetOrientationName() != orientation:
+            raise RuntimeError("settled washer reference owned view changed")
+        if Path(view.GetReferencedModelName()).resolve() != SPEC.source.resolve():
+            raise RuntimeError("settled washer reference view source changed")
+        present = {}
+        for raw_annotation in view.GetAnnotations() or ():
+            annotation = _early_bound(raw_annotation, "IAnnotation")
+            if annotation.GetType() != _DISPLAY_DIMENSION_ANNOTATION:
+                continue
+            identity = dimension_full_name(adapter, annotation)
+            if not identity or identity in present:
+                raise RuntimeError("settled washer reference census has invalid identities")
+            present[identity] = annotation
+        if set(present) != set(expected):
+            raise RuntimeError("settled washer reference owned-view census changed")
+        for identity, (name, expected_value) in expected.items():
+            annotation = present[identity]
+            if dimension_name(adapter, annotation) != name:
+                raise RuntimeError(f"{name}: settled washer reference identity changed")
+            if int(annotation.Visible) != _ANNOTATION_VISIBLE:
+                raise RuntimeError(f"{name}: settled washer reference is not visible")
+            display = _reference_display(adapter, annotation, name)
+            _assert_reference_kind(display, name)
+            current.append((display, name, expected_value))
+    if len(current) != 3 or {name for _, name, _ in current} != set(DRAWING_PRECISION_BY_NAME):
+        raise RuntimeError("settled washer reference dimensions changed")
+    # Prove EVERY current dimension's native kind before treating any value as
+    # a length. The following checks only read the settled, visible instances.
+    for display, name, expected_value in current:
+        actual_value = _reference_value(display, name)
+        if not math.isclose(actual_value, expected_value, rel_tol=0.0, abs_tol=1e-9):
+            raise RuntimeError(f"{name}: settled washer reference value changed")
+        diameter = name in {OUTER_DIAMETER_DIM, INNER_DIAMETER_DIM}
+        prefix = "(<MOD-DIAM>" if diameter else "("
+        if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != (
+            prefix, ")"
+        ):
+            raise RuntimeError(f"{name}: settled washer reference text changed")
+        if display.GetPrimaryPrecision2() != DRAWING_PRECISION_BY_NAME[name]:
+            raise RuntimeError(f"{name}: settled washer reference precision changed")
+
+
+def _center_caption(adapter: Any, text: str, x: float, y: float) -> Any:
+    note = _literal_note(adapter, text, x, y)
+    bounds = _box(note.GetExtent(), label=text, kind="note")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    centered_x = 2.0 * x - (bounds[0] + bounds[2]) / 2.0
+    if not annotation.SetPosition(centered_x, y, 0.0):
+        raise RuntimeError(f"failed to center washer view caption {text!r}")
+    return note
+
+_CAPTION_CLEARANCE_M = 0.010  # 10 mm of paper below each native view outline
+
+
+def _caption_below_view(
+    adapter: Any, text: str, view: Any, x: float
+) -> Any:
+    """Place a centered caption below the view's measured native outline."""
+    outline = _box(view.GetOutline(), label=f"{text} view", kind="view")
+    return _center_caption(adapter, text, x, outline[1] - _CAPTION_CLEARANCE_M)
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    stock = fastener(SPEC.artifact_stem)
+    source = SPEC.source
+    if SPEC.source_kind != "part" or source.stem != stock.part_name:
+        raise ValueError(f"purchased drawing source identity mismatch: {SPEC!r}")
+    if not source.is_file():
+        raise FileNotFoundError(f"source purchased part is missing: {source}")
+
+    with _telemetry.span("drawing.purchased_source", part=stock.part_name):
+        check(f"open {stock.part_name} source", await adapter.open_model(str(source)))
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        if Path(model.GetPathName()).resolve() != source.resolve():
+            raise RuntimeError(f"opened purchased part is not {source}")
+        properties = read_required_properties(
+            model,
+            _REQUIRED_SOURCE_PROPERTIES,
+            required=_REQUIRED_SOURCE_PROPERTIES,
+        )
+        registry = PART_REGISTRY
+        finish = str(registry["finish"]).strip()
+        if not finish:
+            raise RuntimeError(f"{stock.part_name}: registered purchased finish is empty")
+        expected = {
+            "Number": str(registry["number"]),
+            # The native PART cell carries the slug (_common.part_properties).
+            "Title": stock.part_name,
+            "Material": str(registry["material"]),
+            "Stock Name": stock.stock_name,
+            "Supplier": stock.supplier,
+            "Supplier SKUs": ", ".join(stock.skus),
+        }
+        for name, value in expected.items():
+            if properties[name] != value:
+                raise RuntimeError(
+                    f"{stock.part_name}: stale source {name} "
+                    f"{properties[name]!r} != {value!r}"
+                )
+
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    draw, sheet = new_project_drawing(adapter, layout=SPEC.layout)
+    title_block_notes = _purchased_title_block(
+        adapter,
+        draw,
+        material=properties["Material"],
+        finish=finish,
+    )
+    title = f"{registry['title']} — Purchased Part Reference Drawing"
+    stamp_drawing_summary(
+        adapter,
+        draw,
+        {
+            0: title,
+            1: "Purchased reference; TOP above FRONT; ISO pictorial",
+            2: "Harmonic Analyzer Project",
+            3: f"{SPEC.artifact_stem}; {properties['Supplier']}; "
+            f"{properties['Supplier SKUs']}",
+            4: "Native supplier ID / OD / thickness references; no PMI",
+        },
+    )
+
+    views = []
+    for name, center, _cell in _VIEW_CELLS:
+        view = _early_bound(
+            place_view(adapter, str(source), name, *center, scale=(1, 1)),
+            "IView",
+        )
+        if name != "*Isometric":
+            set_hidden_lines_removed(adapter, view)
+        views.append(view)
+        view.UseSheetScale = 0
+        view.ScaleRatio = double_array([1.0, 1.0])
+
+    scale = _fit_views(draw, views, _VIEW_CELLS)
+    values = tuple(adapter._get_attr_or_call(sheet, "GetProperties2"))
+    if len(values) != 8:
+        raise RuntimeError(f"washer drawing has incomplete sheet properties: {values!r}")
+    sheet.SetProperties2(
+        int(values[0]),
+        int(values[1]),
+        float(scale[0]),
+        float(scale[1]),
+        False,
+        float(values[5]),
+        float(values[6]),
+        False,
+    )
+    first_name = view_name(adapter, views[0])
+    if not first_name:
+        raise RuntimeError("washer top view has no native name")
+    sheet.CustomPropertyView = first_name
+    assert_asme_b_sheet(
+        adapter,
+        sheet,
+        layout=SPEC.layout,
+        phase="washer compact layout",
+        scale=scale,
+    )
+
+    scale_text = f"{int(scale[0])}:{int(scale[1])}"
+    top_view, front_view, iso_view = views
+    notes: list[tuple[Any, str]] = []
+    linked_notes: list[tuple[Any, str, str]] = []
+    notes.append(
+        (
+            _caption_below_view(
+                adapter, f"TOP  {scale_text}", top_view, _VIEW_CELLS[0][1][0]
+            ),
+            f"TOP  {scale_text}",
+        )
+    )
+    notes.append(
+        (
+            _caption_below_view(
+                adapter, f"FRONT  {scale_text}", front_view, _VIEW_CELLS[1][1][0]
+            ),
+            f"FRONT  {scale_text}",
+        )
+    )
+    notes.append(
+        (
+            _caption_below_view(
+                adapter,
+                f"ISOMETRIC  {scale_text}  (PICTORIAL)",
+                iso_view,
+                _VIEW_CELLS[2][1][0],
+            ),
+            f"ISOMETRIC  {scale_text}  (PICTORIAL)",
+        )
+    )
+
+    top_annotations = curate_view_dimensions(
+        adapter,
+        top_view,
+        keep=_TOP_KEEP,
+        view_label="washer top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    front_annotations = curate_view_dimensions(
+        adapter,
+        front_view,
+        keep=_FRONT_KEEP,
+        view_label="washer front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    imported = [*top_annotations, *front_annotations]
+    for annotation in imported:
+        name = dimension_name(adapter, annotation)
+        if name in {OUTER_DIAMETER_DIM, INNER_DIAMETER_DIM}:
+            set_reference_dimension(
+                adapter,
+                annotation,
+                label=f"{name} reference",
+                diameter=True,
+            )
+            _short_diametric_reference(
+                adapter, annotation, label=f"{name} reference"
+            )
+        elif name == THICKNESS_DIM:
+            set_reference_dimension(
+                adapter,
+                annotation,
+                label="washer thickness reference",
+                diameter=False,
+            )
+        else:
+            raise RuntimeError(f"unexpected washer reference dimension {name!r}")
+    assert_imported_precision(adapter, imported, DRAWING_PRECISION_BY_NAME)
+    reference_state = []
+    for view, orientation, view_annotations in (
+        (top_view, "*Top", top_annotations), (front_view, "*Front", front_annotations)
+    ):
+        expected = {}
+        for annotation in view_annotations:
+            name = dimension_name(adapter, annotation)
+            identity = dimension_full_name(adapter, annotation)
+            if not identity or identity in expected:
+                raise RuntimeError("washer reference import has invalid native identities")
+            display = _reference_display(adapter, annotation, name)
+            _assert_reference_kind(display, name)
+            expected[identity] = (name, _reference_value(display, name))
+        reference_state.append((view_name(adapter, view), orientation, expected))
+    references = tuple(reference_state)
+    set_hidden_lines_removed(adapter, top_view)
+    set_hidden_lines_removed(adapter, front_view)
+
+
+    purchase_text = (
+        "PURCHASED PART / REFERENCE GEOMETRY\n"
+        "REFERENCE SIZES ARE SUPPLIER NOMINALS; VERIFY RECEIPT AGAINST SKU.\n"
+        "GENERAL TOLERANCES AND EDGE-BREAK NOTES DO NOT APPLY."
+    )
+    purchase_note = _literal_note(adapter, purchase_text, 0.018, 0.072)
+    notes.append((purchase_note, purchase_text))
+    for name, y, label in (
+        ("Stock Name", 0.050, "STOCK:"),
+        ("Supplier", 0.038, "SUPPLIER:"),
+        ("Supplier SKUs", 0.026, "SKU:"),
+    ):
+        label_note = _literal_note(adapter, label, 0.018, y)
+        notes.append((label_note, label))
+        linked = add_property_linked_note(adapter, name, 0.052, y, char_height=0.003)
+        notes.append((linked, properties[name]))
+        linked_notes.append((linked, property_link(name), properties[name]))
+
+    _rebuild(draw, phase="washer linked notes and native references")
+    for note, linked_text, resolved_text in title_block_notes:
+        if note.PropertyLinkedText != linked_text or note.GetText() != resolved_text:
+            raise RuntimeError(
+                f"washer title-block property did not resolve: {linked_text!r}"
+            )
+    for note, linked_text, resolved_text in linked_notes:
+        if (
+            note.PropertyLinkedText != linked_text
+            or note.GetText().replace("\r\n", "\n") != resolved_text
+        ):
+            raise RuntimeError(
+                f"washer linked property did not resolve: {linked_text!r}"
+            )
+
+    actual_views = list(iter_views(adapter))
+    orientations = tuple(view.GetOrientationName() for view in actual_views)
+    expected_orientations = {name for name, _center, _cell in _VIEW_CELLS}
+    if len(actual_views) != 3 or set(orientations) != expected_orientations:
+        raise RuntimeError(f"washer drawing views are not the compact set: {orientations!r}")
+    views_by_orientation = dict(zip(orientations, actual_views, strict=True))
+    region = sheet_drawable_region(
+        adapter,
+        sheet,
+        width=template.width_m,
+        height=template.height_m,
+    )
+    border = (region.xmin, region.ymin, region.xmax, region.ymax)
+    for name, _center, cell in _VIEW_CELLS:
+        view = views_by_orientation[name]
+        if Path(view.GetReferencedModelName()).resolve() != source.resolve():
+            raise RuntimeError(f"{name}: washer view references the wrong model")
+        if tuple(view.ScaleRatio) != scale:
+            raise RuntimeError(f"{name}: washer view scale changed")
+        box = _box(view.GetOutline(), label=name)
+        if not _inside(box, cell) or not _inside(box, border):
+            raise RuntimeError(f"{name}: washer view leaves its cell/border: {box!r}")
+    for note, expected_text in notes:
+        actual_text = note.GetText().replace("\r\n", "\n")
+        if actual_text != expected_text:
+            raise RuntimeError(
+                f"washer note readback mismatch: {actual_text!r} != {expected_text!r}"
+            )
+        box = _box(note.GetExtent(), label=expected_text, kind="note")
+        if not _inside(box, border):
+            raise RuntimeError(
+                f"washer note leaves the drawable border: {expected_text!r}: {box!r}"
+            )
+
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        layout=SPEC.layout,
+        pdf_title=title,
+        scale=scale,
+        settled_checks=(lambda: _assert_settled_references(adapter, references),),
+    )
 
 
 def _parse_args() -> argparse.Namespace:
