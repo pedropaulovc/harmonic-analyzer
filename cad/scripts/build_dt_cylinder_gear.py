@@ -215,6 +215,22 @@ def _higher_accuracy_volume_mm3(adapter, label: str) -> float:
     return volume
 
 
+def _body_state(adapter, feature_name: str | None = None) -> str:
+    """Body/face count and, if named, the feature's swFeatureError_e state."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    part = _early_bound(model, "IPartDoc")
+    bodies = tuple(part.GetBodies2(0, False) or ())
+    faces = sum(int(_early_bound(b, "IBody2").GetFaceCount()) for b in bodies)
+    state = f"bodies {len(bodies)}, faces {faces}"
+    if feature_name is not None:
+        raw = part.FeatureByName(feature_name)
+        if raw is None:
+            return f"{state}, {feature_name} missing"
+        error = _early_bound(raw, "IFeature").GetErrorCode2()
+        state += f", {feature_name} error {error!r}"
+    return state
+
+
 def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
     """Start point (mm) of a named reference axis via IRefAxis.GetRefAxisParams."""
     model = adapter.currentModel
@@ -375,6 +391,7 @@ async def build(adapter) -> dict[str, str]:
         math.pi * RA_MM**2 - TEETH * STOCK_FORM.gap_area_mm2
     ) * FACE_WIDTH + v_cam
     before_notch = _higher_accuracy_volume_mm3(adapter, "before notch")
+    before_state = _body_state(adapter)
     _telemetry.info(
         f"before notch: analytic {analytic_before:.4f} mm^3, "
         f"higher-accuracy minus analytic {before_notch - analytic_before:+.4f}"
@@ -560,10 +577,22 @@ async def build(adapter) -> dict[str, str]:
     # same spline-toothed body (see _higher_accuracy_volume_mm3); the band is
     # unchanged.
     removed = before_notch - _higher_accuracy_volume_mm3(adapter, "after notch")
+    after_state = _body_state(adapter, "NotchKerf")
+    default_after = await adapter.get_mass_properties()
+    default_text = (
+        f"{float(default_after.data.volume):.4f}"
+        if default_after.is_success
+        else f"unreadable ({default_after.error})"
+    )
+    _telemetry.info(
+        f"notch: before {before_state}; after {after_state}; "
+        f"default-accuracy volume after {default_text} mm^3"
+    )
     if abs(removed - v_notch) > 0.06 * v_notch:
         raise RuntimeError(
             f"notch: removed {removed:.4f} mm^3 at higher accuracy, expected "
-            f"{v_notch:.4f} (+/- {0.06 * v_notch:.4f})"
+            f"{v_notch:.4f} (+/- {0.06 * v_notch:.4f}); before {before_state}; "
+            f"after {after_state}; default-accuracy volume after {default_text}"
         )
     _telemetry.success(f"notch: removed {removed:.4f} mm^3 (analytic {v_notch:.4f})")
     mass = await adapter.get_mass_properties()
