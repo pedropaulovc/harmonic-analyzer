@@ -308,6 +308,10 @@ is sold as semi-universal
 cut spirals ([BS-2](https://www.precisionmatthews.com/products/dividinghead-bs-2)). Change gears
 for the lead depend on the head and the table screw: `TODO(cut it first)`.
 
+Set each crank gear up for tooth cutting within 0.05 mm TIR of its finished bore
+(`tolerances.yaml` `crank_mesh.tooth_cutting_runout_tir_mm`, read by both gear specs). This is a
+setup allowance, not a gear accuracy grade.
+
 ### Paper drive
 
 | part | teeth | pitch | cutter | index per tooth (40:1) |
