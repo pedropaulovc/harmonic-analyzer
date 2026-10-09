@@ -1606,18 +1606,57 @@ def vendor_warning_capture(monkeypatch):
     )
     import _telemetry
 
-    monkeypatch.setattr(_telemetry, "_resolve_otlp_endpoint", lambda _signal, **_kw: None)
-    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
-    monkeypatch.setenv("HARMONIC_VERBOSITY", "warn")
-    _telemetry.configure(force=True)
-    logs = InMemoryLogRecordExporter()
-    processor = SimpleLogRecordProcessor(logs)
-    get_logger_provider().add_log_record_processor(processor)
-    # Task-stage logger providers share these processors, as in test_telemetry.
-    _telemetry._log_processors.append(processor)
-    _telemetry._aux_logger_providers.clear()
     try:
-        yield logs
+        with monkeypatch.context() as capture_patch:
+            capture_patch.setattr(
+                _telemetry, "_resolve_otlp_endpoint", lambda _signal, **_kw: None
+            )
+            capture_patch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+            capture_patch.setenv("HARMONIC_VERBOSITY", "warn")
+            _telemetry.configure(force=True)
+            logs = InMemoryLogRecordExporter()
+            processor = SimpleLogRecordProcessor(logs)
+            get_logger_provider().add_log_record_processor(processor)
+            # Task-stage logger providers share these processors, as in test_telemetry.
+            _telemetry._log_processors.append(processor)
+            _telemetry._aux_logger_providers.clear()
+            yield logs
+    finally:
+        _telemetry.configure(force=True)
+
+
+@pytest.mark.parametrize("failed", [False, True], ids=["normal-exit", "exception"])
+def test_vendor_warning_capture_restores_jsonl_sink(tmp_path, monkeypatch, failed):
+    """A subsequent real log reaches the restored sink even after a test raises."""
+    import json
+    import _telemetry
+
+    try:
+        with monkeypatch.context() as restored:
+            restored.setattr(_telemetry, "_telemetry_dir", lambda: tmp_path)
+            restored.setattr(
+                _telemetry, "_resolve_otlp_endpoint", lambda _signal, **_kw: None
+            )
+            capture = vendor_warning_capture.__wrapped__(monkeypatch)
+            try:
+                next(capture)
+                _telemetry.warn("temporary capture", fixture_probe="captured")
+                assert not (tmp_path / "logs.jsonl").exists()
+                if failed:
+                    with pytest.raises(RuntimeError):
+                        capture.throw(RuntimeError("test failed during capture"))
+            finally:
+                capture.close()
+
+            _telemetry.warn("restored sink", fixture_probe="restored")
+            rows = [
+                json.loads(line)
+                for line in (tmp_path / "logs.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+            assert any(
+                row.get("attributes", {}).get("fixture_probe") == "restored"
+                for row in rows
+            )
     finally:
         _telemetry.configure(force=True)
 
