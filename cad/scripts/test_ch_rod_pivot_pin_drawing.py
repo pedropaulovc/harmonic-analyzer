@@ -1,10 +1,12 @@
 """Offline contracts for the rod pivot pin (MHA-CH-010) part and drawing.
 
-The installed pressed pin under ``cad/docs/drawing-simplicity-policy.md``, as
-the MHA-CH-011 bar pin's (user ruling 2026-10-09, PR #1292 review F1): two
-native model dimensions whose places (and the diameter's grind band) the PART
-owns, the installed length as REFERENCE, no GD&T, no roughness symbol, and at
-most four note lines: the blank, the press, the flush ends, the running fit.
+The installed pressed pin under ``cad/docs/drawing-simplicity-policy.md``
+(user ruling 2026-10-09, PR #1292 review F1): three native model dimensions
+whose places and bands the PART owns -- the diameter with its grind band, the
+installed length as REFERENCE, and the blank's cut length from a blanked
+reference sketch with its band (rule 2; PR #1292 review N1: never note
+text) -- no GD&T, no roughness symbol, and at most four note lines: cut the
+blank, the press, the flush ends, the running fit.
 """
 
 from __future__ import annotations
@@ -50,8 +52,7 @@ def test_installed_model_is_flush_with_the_fork() -> None:
         math.pi * (spec.PIN_DIA / 2.0) ** 2 * rod.FORK_THICKNESS
     )
     build = _build_source()
-    for gone in ("Csk", "BlankLen", "BlankReference", "blank_reference_sketches"):
-        assert gone not in build, gone
+    assert "Csk" not in build
 
 
 def test_pin_axis_and_mid_plane_contract() -> None:
@@ -67,7 +68,7 @@ def test_pin_axis_and_mid_plane_contract() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
     marked = set().union(*notes.DRAWING_DIMENSIONS.values())
-    assert set(drawing.RIGHT_KEEP) == marked == {"PinDia", "PinLen"}
+    assert set(drawing.RIGHT_KEEP) == marked == {"PinDia", "PinLen", "BlankLen"}
     assert notes.REFERENCE_DIMENSIONS == {"PinLen"}
     # Drawing-only data stays out of the spec the channel assembly imports.
     for name in ("DRAWING_DIMENSIONS", "DRAWING_PRECISION", "REFERENCE_DIMENSIONS"):
@@ -77,8 +78,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 def test_precision_and_band_are_authored_on_the_part() -> None:
     # The installed length is the fork's 3-place thickness, so it prints at
-    # three places (the bar pin's is the 2-place stock width).
-    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 3}
+    # three places; the blank's band is written at two.
+    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 3, "BlankLen": 2}
     assert "draw_ch_rod_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
@@ -87,12 +88,34 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     # A LINEAR reference: the plural helper forces a diameter glyph.
     assert "set_reference_dimensions(" not in source
     assert "set_reference_dimension(adapter, matches[0]" in source
-    assert "hidden_sketches" not in source
+    assert "hidden_sketches.curate_view_dimensions(" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
     assert "require_saved_drawing_properties(" in _build_source()
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "PinDia"): "PIN_DIA_TOLERANCE",
+        ("BlankReference", "BlankLen"): "blank_upper",
     }
+
+
+def test_blank_length_is_a_model_dimension_with_its_band() -> None:
+    """PR #1292 review N1: the 6.40 +/-0.13 cut length prints from a blanked
+    reference sketch on the pin axis with its native band at its native two
+    places, never from note text (policy rules 2 and 6)."""
+    assert spec.PIN_BLANK_LENGTH == 6.40
+    assert spec.PIN_BLANK_LENGTH_BAND == (0.13, -0.13)
+    assert notes.DRAWING_DIMENSIONS["BlankReference"] == {"BlankLen"}
+    assert notes.DRAWING_PRECISION["BlankReference"] == {"BlankLen": 2}
+    build = "".join(_build_source().split())
+    assert 'set_global(adapter,"BlankLen",f"{PIN_BLANK_LENGTH}mm")' in build
+    assert 'blank.record("BlankLen",\'"BlankLen"\')' in build
+    assert 'name_last_feature(adapter,"BlankReference")' in build
+    assert '"origin",blank_line,"midpoint"' in build
+    assert "blank_lower,blank_upper=deviations(PIN_BLANK_LENGTH_BAND)" in build
+    assert 'blank_reference_sketches(adapter,("BlankReference",))' in build
+    source = _source()
+    assert '{"BlankLen": "BLANK"}' in source
+    # The blank is longer than the installed pin by the two ends' dressing.
+    assert spec.PIN_BLANK_LENGTH > spec.PIN_INSTALLED_LENGTH
 
 
 def test_print_carries_no_gdt_roughness_or_callouts() -> None:
@@ -104,9 +127,11 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
         "project_part_pmi(",
         "add_surface_finish(",
         "add_native_hole_callout(",
-        "set_dimension_callouts(",
     ):
         assert helper not in source, helper
+    # The one dimension callout is the blank's descriptive word beneath its
+    # native value and band.
+    assert source.count("set_dimension_callouts(") == 1
     assert "author_part_pmi" not in _build_source()
     assert (
         "for view in (front, right, iso):\n        set_hidden_lines_removed" in source
@@ -118,14 +143,22 @@ def test_notes_state_blank_press_flush_ends_and_running_fit() -> None:
     lines = notes.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4  # policy rule 6
     assert lines == [
-        f"1. CUT BLANK {spec.PIN_BLANK_LENGTH:.2f} "
-        f"\u00b1{spec.PIN_BLANK_LENGTH_BAND[0]:.2f} LONG; INSTALLED STATE SHOWN.",
+        "1. CUT BLANK TO THE BLANK LENGTH SHOWN; INSTALLED STATE SHOWN.",
         "2. PRESS IN; REMOVABLE WITH PUNCH.",
         "3. PRESSED IN THE MHA-CH-003 REAMED FORK PIN HOLE;"
         " DRESS BOTH ENDS FLUSH, NEVER PROUD.",
         "4. RUNS FREE IN THE MHA-CH-006 #47 ROD HOLE.",
     ]
     text = notes.DRAWING_NOTES
+    # Rules 2 and 6 (PR #1292 review N1): the blank's size and band are the
+    # BlankLen model dimension's, so no limit may ride the note text.
+    for limit in (
+        f"{spec.PIN_BLANK_LENGTH:.2f}",
+        f"{spec.PIN_BLANK_LENGTH_BAND[0]:.2f}",
+        "\u00b1",
+        "+/-",
+    ):
+        assert limit not in text, limit
     assert "PEEN" not in text and "#746" not in text
     assert "DRILL ROD" not in text  # the title-block MATERIAL owns the stock
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
@@ -148,6 +181,7 @@ def test_sheet_runs_at_10_to_1_and_lands_clear_of_the_title_block() -> None:
     assert dia_y > drawing.RIGHT_CENTER[1] + drawing.HALF_DIA
     assert dia_x < drawing.RIGHT_CENTER[0] - 0.015  # off the centerline pick
     assert drawing.RIGHT_KEEP["PinLen"][1] < drawing.RIGHT_CENTER[1] - drawing.HALF_DIA
+    assert drawing.RIGHT_KEEP["BlankLen"][1] < drawing.RIGHT_KEEP["PinLen"][1] - 0.010
     for x, y in (*drawing.RIGHT_KEEP.values(), drawing.NOTES_XY):
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267
