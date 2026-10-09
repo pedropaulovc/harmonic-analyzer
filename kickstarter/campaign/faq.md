@@ -40,7 +40,7 @@ says exactly where the difficulty is instead of pretending it's uniform.
 
 **How long does a build take?**
 Unknown, honestly. The CAD inventory has
-[147 registered part families](../../cad/docs/subsystem-identities.md), including
+[151 registered part families](../../cad/docs/subsystem-identities.md), including
 parts repeated across the twenty channels.
 The logbook records real hours per part as they are cut, and the book publishes
 those numbers.

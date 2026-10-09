@@ -14,7 +14,7 @@
 </tr>
 <tr>
 <td align="center"><sub><b>The machine.</b> The surviving 20-element analyzer, in a corridor case at the University of Illinois.<br>Photographed 2025-08-28.</sub></td>
-<td align="center"><sub><b>The model.</b> 147 registered part families, generated from Python, gated on every build.<br>Same pose, rendered from the glTF this repository exports.</sub></td>
+<td align="center"><sub><b>The model.</b> 151 registered part families, generated from Python, gated on every build.<br>Same pose, rendered from the glTF this repository exports.</sub></td>
 </tr>
 </table>
 
@@ -51,7 +51,7 @@ What none of that gives you is a way to make one. No dimensioned drawings, no
 tolerances, no stock list, no setups, no process. A beautifully explained
 machine that nobody has written down how to build.
 
-So: 147 registered part families modelled in SolidWorks, generated from Python, verified on every
+So: 151 registered part families modelled in SolidWorks, generated from Python, verified on every
 build and checked against those same photographs. Plus a book being written to
 turn all of that into chips on a shop floor.
 

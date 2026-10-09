@@ -13,7 +13,7 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | Prefix | Category | Parts |
 |---|---|---:|
 | `ha` / `HA` | Harmonic analyzer | 2 |
-| `ch` / `CH` | Channel | 10 |
+| `ch` / `CH` | Channel | 11 |
 | `dt` / `DT` | Drive train | 36 |
 | `fr` / `FR` | Frame | 5 |
 | `mg` / `MG` | Magnifier | 9 |
