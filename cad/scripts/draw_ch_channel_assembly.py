@@ -99,7 +99,8 @@ def _fitup_steps() -> str:
         "rod-forks-pinned": (
             f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH: PIN EACH {rod} "
             f"ROD FORK TO ITS {arm} ARM WITH ONE {pin}. PRESS IT IN, FAR TINE "
-            "BACKED; DRESS BOTH ENDS FLUSH. DRIVE OUT WITH A PUNCH. ACCEPT IF THE ARM SWINGS FREE UNDER ITS OWN WEIGHT."
+            "BACKED; DRESS BOTH ENDS FLUSH. PIN REMOVABLE WITH PUNCH. "
+            "ACCEPT IF THE ARM SWINGS FREE UNDER ITS OWN WEIGHT."
         ),
         "north-ear-datum": (
             f"BASE ON THE MILL, DRO ZEROED, NORTH {bracket} LIFTED "

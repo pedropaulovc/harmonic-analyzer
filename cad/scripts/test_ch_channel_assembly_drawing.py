@@ -213,7 +213,10 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
     assert f"EACH {rod} ROD FORK TO ITS {arm} ARM WITH ONE {pin}." in body
     assert "PRESS IT IN, FAR TINE BACKED; DRESS BOTH ENDS FLUSH." in body
     assert PIN_END_PROUD_MAX == 0.0  # what "FLUSH" states
-    assert "DRIVE OUT WITH A PUNCH." in body
+    # Removal is a property of the pin, not a step: the later steps need the
+    # pin in place (CodeRabbit, PR #1292).
+    assert "PIN REMOVABLE WITH PUNCH." in body
+    assert "DRIVE OUT" not in body
     assert "SWINGS FREE UNDER ITS OWN WEIGHT" in body
     assert "PEEN" not in drawing.FITUP_STEPS
     assert "COUNTERSINK" not in drawing.FITUP_STEPS
