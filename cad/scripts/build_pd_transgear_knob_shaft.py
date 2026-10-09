@@ -62,7 +62,7 @@ from _drawing_marks import (
 )
 from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
-from _gear import ToothedDisc
+from _gear import ToothedDisc, stock_gap_fix_order
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from paper_drive_stock_native import (
@@ -253,12 +253,14 @@ async def _straight_stock_gaps(
     )
 
     await _create_sketch(adapter, "Front", "finite straight stock gap")
-    curves = [
-        await placed_ground_curve(adapter, segment, math.pi / TEETH)
-        for segment in STOCK_PROFILE.native_segments(clearance_radius_mm=radius + 1.0)
-    ]
+    segments = STOCK_PROFILE.native_segments(clearance_radius_mm=radius + 1.0)
+    curves = [await placed_ground_curve(adapter, segment, math.pi / TEETH) for segment in segments]
+    order = stock_gap_fix_order([segment.name for segment in segments])
     await ensure_fully_defined(
-        adapter, "finite straight stock gap", fix_entities=curves, allow_fix_escalation=True
+        adapter,
+        "finite straight stock gap",
+        fix_entities=[curves[i] for i in order],
+        allow_fix_escalation=True,
     )
     check("exit_sketch straight stock gap", await adapter.exit_sketch())
     name_last_feature(adapter, "StraightToothProfile")
