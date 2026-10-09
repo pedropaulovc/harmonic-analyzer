@@ -48,16 +48,18 @@ explicit way to stop a run, `-Cancel` (see
   silently leave it out of the build.
 - **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
   Azure credentials for the cache (`az login`; `off` is refused).
-- **A log directory outside every Git worktree.** By default the launcher uses
-  `$env:HARMONIC_AGENT_SCRATCHPAD\harmonic-analyzer\farm-runs`; if unset, it
-  uses `%LOCALAPPDATA%\ha-farm\runs`.
-  Set `HARMONIC_AGENT_SCRATCHPAD` to the host-visible root of the agent's
-  scratchpad, or pass `-LogDirectory` to override it. The directory holds the
-  run records, logs, build snapshots, shared environments and each run's
-  outputs. In OMP, resolve its `local://` URI before launching with
-  `HARMONIC_AGENT_SCRATCHPAD="$(realpath local://)"`. The launcher enables
-  `core.longpaths=true` only for itself and its child processes, allowing deep
-  snapshots without changing the user's Git configuration.
+- **A log directory outside every Git worktree.** An explicit
+  `HARMONIC_AGENT_SCRATCHPAD` uses
+  `<root>\harmonic-analyzer\farm-runs`. For an OMP persistent process, when
+  `OMPCODE=1` and its working-directory basename is `local`, the launcher uses
+  `<working-directory>\harmonic-analyzer\farm-runs`. Otherwise it falls back to
+  `%LOCALAPPDATA%\ha-farm\runs`. Pass `-LogDirectory` to override the default.
+  In OMP, run `realpath local://` in the outer shell and set the persistent
+  process working directory to that host path; the PowerShell process cannot
+  resolve the OMP-only URI itself. The directory holds run records, logs,
+  snapshots, shared environments and outputs. The launcher enables
+  `core.longpaths=true` only for itself and its child processes, without
+  changing the user's Git configuration.
 
 ### Parameters
 
@@ -71,11 +73,11 @@ explicit way to stop a run, `-Cancel` (see
 | `-DisplayName` | yes, Launch only | short owner/session plus reason; nonblank, single-line, no control characters, at most 160 characters; tracking commands such as `-Watch` do not require it |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
 
-When `HARMONIC_AGENT_SCRATCHPAD` is set, it names the scratchpad root and the
-launcher creates an application subdirectory beneath it. Otherwise, the
-default root is `%LOCALAPPDATA%\ha-farm`, which
-survives automatic temporary-file cleanup. Pass its resulting absolute path
-when handing a run to an agent on another host.
+An explicit `HARMONIC_AGENT_SCRATCHPAD` always wins. Otherwise, an OMP
+persistent process automatically uses its resolved `local` working directory
+when `OMPCODE=1`; a direct PowerShell launch falls back to
+`%LOCALAPPDATA%\ha-farm\runs`. Pass the resulting absolute path when handing a
+run to an agent on another host.
 
 For example, use `-DisplayName 'InchPD - Add new drawing detail view to pd_transgear_stub v3'`.
 The launcher records it as `display_name`, passes one `--display-name=<label>` argument,
@@ -233,6 +235,7 @@ would lose live monitoring, so it is not used.
 {
   "op": "start",
   "name": "farm-pen-rod-smoke",            // unique; record it in the brief
+  "cwd": "<host path returned by realpath local://>",
   "application": "pwsh.exe",
   "args": [
     "-NoProfile", "-NonInteractive",
@@ -263,16 +266,26 @@ or not the hub is still around.
 ### Tracking a run: status, watch, list, cancel
 
 Every operation selects one run by `-RunId <run-id>` or `-Tag <tag>` (the newest
-run with that tag). Omitting `-LogDirectory` uses the same scratchpad default as
-launch; supply the original explicit directory when the launch overrode it. A
-selection that matches nothing, or both selectors at once, exits 2.
+run with that tag). The default `-LogDirectory` is recomputed from the current
+process environment and working directory. Omit it only when that computed
+default resolves to the launch's effective `-LogDirectory`. Without a matching
+`HARMONIC_AGENT_SCRATCHPAD` or an explicit `-LogDirectory`, an OMP launch
+requires the tracking process to use the same resolved `local` `cwd`. If the
+launch used an explicit override, or the computed defaults differ, pass the
+launch's effective `-LogDirectory`: it is the parent directory of the
+`.run.json` path printed on the `farm-launch started` readiness line. This also
+applies to the `hub` process used for `-Watch`. If the computed default does
+not match, tracking searches that other directory instead of the launch
+directory. A selection that matches nothing, or both selectors at once, exits 2.
 
 ```powershell
 $launcher = 'C:/src/harmonic-analyzer/scripts/farm-run.ps1'
-pwsh -NoProfile -File $launcher -Status -RunId <run-id>
-pwsh -NoProfile -File $launcher -Watch  -Tag full-build
-pwsh -NoProfile -File $launcher -List   -State running -MaxAgeHours 24
-pwsh -NoProfile -File $launcher -Cancel -RunId <run-id> -Why 'superseded by <sha>'
+$runRecordPath = '<absolute .run.json path from the farm-launch started line>'
+$logDirectory = Split-Path -Path $runRecordPath -Parent
+pwsh -NoProfile -File $launcher -LogDirectory $logDirectory -Status -RunId <run-id>
+pwsh -NoProfile -File $launcher -LogDirectory $logDirectory -Watch  -Tag full-build
+pwsh -NoProfile -File $launcher -LogDirectory $logDirectory -List   -State running -MaxAgeHours 24
+pwsh -NoProfile -File $launcher -LogDirectory $logDirectory -Cancel -RunId <run-id> -Why 'superseded by <sha>'
 ```
 
 The run's state is derived, never trusted from one file: `.done`'s `state` when

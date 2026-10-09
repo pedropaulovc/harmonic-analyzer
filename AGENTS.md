@@ -262,21 +262,20 @@ such build:
   querying the fleet, so an undefined CAD/build-script name cannot dispatch a
   COM leaf even when the stamped checks would run later in the doit graph.
 - The build runs from a private snapshot of the pushed HEAD under
-  `-LogDirectory` (which must sit outside every Git worktree). By default the
-  launcher stores its logs, run records, snapshots, shared environments and
-  final output under the agent-local scratchpad:
-  `$env:HARMONIC_AGENT_SCRATCHPAD\harmonic-analyzer\farm-runs`, falling back to
-  `%LOCALAPPDATA%\ha-farm\runs`.
-  Explicit `-LogDirectory` overrides the default. The OMP `local://` URI is not a
-  Windows filesystem path; convert it with `realpath local://` and pass the
-  result through `HARMONIC_AGENT_SCRATCHPAD`. The launcher scopes Git long-path
-  support to its process tree; global Git configuration stays unchanged.
+  `-LogDirectory` (which must sit outside every Git worktree). The default root
+  is `$env:HARMONIC_AGENT_SCRATCHPAD` when set; otherwise, an OMP persistent
+  process with `OMPCODE=1` and working-directory basename `local` uses the
+  resolved session-local path. It stores logs, run records, snapshots, shared
+  environments and final output under
+  `<root>\harmonic-analyzer\farm-runs`; without an OMP local working directory,
+  it falls back to `%LOCALAPPDATA%\ha-farm\runs`. Set the service `cwd` to the
+  output of OMP's outer-shell `realpath local://`; the PowerShell launcher
+  cannot resolve that URI. Explicit `-LogDirectory` overrides the default.
   Outputs land in the run record's `outputs` (`<LogDirectory>\<run-id>.out`),
   not the worktree's `cad/out`, and recovery works from the recorded commit,
-  not the worktree. A
-  direct `build.py --executor farm` has no snapshot: it refuses to dispatch a
-  leaf whose key a checkout change since launch can move, naming the files, so
-  never commit or edit in that worktree mid-run.
+  not the worktree. A direct `build.py --executor farm` has no snapshot: it
+  refuses to dispatch a leaf whose key a checkout change since launch can
+  move, naming the files, so never commit or edit in that worktree mid-run.
 - Prove one real remote leaf on the launcher, protocol and pool configuration
   you are about to use before fanning parallel agents out over the farm. A green
   `check:math` is local-only and a submitter cache hit dispatches nothing;
