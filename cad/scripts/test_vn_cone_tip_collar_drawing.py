@@ -85,7 +85,7 @@ def test_terminal_web_guard_reads_current_cutter_floor(monkeypatch):
         gears.floor_limits_mm(teeth)[0] - 2.0 * minimum - gears.bore_dia_mm(teeth)
         for teeth, minimum in gears.TERMINAL_WEB_REQUIREMENTS_MM.items()
     )
-    assert gears._terminal_web_upper() <= expected_cap + 1e-9
+    assert gears.terminal_web_bore_upper_mm() <= expected_cap + 1e-9
 
 
 def test_custom_wall_target_uses_loose_printed_bands():

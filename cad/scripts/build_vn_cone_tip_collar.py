@@ -287,7 +287,7 @@ def _functional_dimension_types(adapter):
 def _configuration_bom_identity(adapter):
     apply_grouped_bom_properties(
         adapter, ("Default",), part_number=str(_config.parts(PART_NAME)["number"]),
-        description=spec.BOM_DESCRIPTION,
+        description=str(_config.parts(PART_NAME)["description"]),
     )
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     for name, description in spec.MANUFACTURING_DESCRIPTIONS.items():
