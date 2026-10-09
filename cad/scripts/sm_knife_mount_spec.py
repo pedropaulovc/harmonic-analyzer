@@ -15,7 +15,9 @@ circular bore CLOSE around the mating hex trunnion (Ø12 over the 8.653 x 10.268
 hex), so only the trunnion's TOP VERTEX LINE nears the bore's upper inner wall
 -- the true knife-edge line contact.  The sharp ridge is on the LEVER trunnion
 (``build_sm_summing_lever``), NOT on this part; this part's critical surface is the
-bore's upper inner wall, whose roundness/finish is called out in the notes.
+bore's upper inner wall, the knife SEAT: it carries ``MACHINED_UM`` (1.6, policy
+rule 5 -- ``GROUND_UM`` 0.8 is reserved for knife edges and pivot-screw
+shoulders).
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ import _config
 import vn_knife_mount_dowel_spec as DOWEL
 from _gtol_spec import CylinderFace
 from _hole_spec import DRILL_POINT_H, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
-from _surface_finish import GROUND_UM, SurfaceFinishControl
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # --- fixed geometry for the drawing's view math (mirrors build_sm_knife_mount) ----
 R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
@@ -37,7 +39,7 @@ BLK_BOT = -14.75  # local block bottom (BORE_CY - R_BORE - 3.0 wall)
 BORE_CY = -5.75  # bore centre below the ridge origin (TopClear 0.25 - R_BORE)
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl("knife_bore", GROUND_UM, CylinderFace(2.0 * R_BORE)),
+    SurfaceFinishControl("knife_bore", MACHINED_UM, CylinderFace(2.0 * R_BORE)),
 )
 
 # --- Knife-hanger screw tap and anti-rotation dowel hole (top seat) ----------
@@ -57,7 +59,6 @@ BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # mid-depth.  The drill runs 1.2 past the full thread (>= 1.5 P for the
 # bottoming tap's chamfer).
 STUD_THREAD = "#6-32"
-STUD_SCREW_NUMBER = "MHA-VN-024"
 STUD_TAP_DRILL_DEPTH = 10.9
 STUD_TAP_THREAD_DEPTH = 9.7
 STUD_TAP_SPEC = HoleSpec(
@@ -172,7 +173,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # BoreCz was dropped from the print: the sketch dim measures the centre
     # from the invisible part origin, which sits 0.25 above the bore top -- on
     # the sheet it read as a (wrong) 12.45 bore radius (blind review round 2).
-    # The centre height rides the notes, stated from the datum-A top seat.
+    # The centre height is a sheet-added BASIC from the datum-A top seat.
     "BoreProfile": {"BoreDia"},
     # The dowel hole: its reamed Ø, its station from the tap axis (the part
     # origin's projection in the top view) and its flat-floor depth.
@@ -203,18 +204,4 @@ PIN_HOLE_CALLOUT = "\n".join(
     )
 )
 
-DRAWING_NOTES = "\n".join(
-    (
-        f"BORE Ø{2.0 * R_BORE:.1f} THRU, CENTRED IN THE {2.0 * BLK_HALF_X:.2f} WIDTH (ON THE BLOCK VERTICAL",
-        f"CENTRELINE), CENTRE {BLK_TOP - BORE_CY:.2f} BELOW THE TOP SEAT",
-        "(DATUM A). THE BORE IS THE KNIFE-EDGE BEARING: THE LEVER TRUNNION",
-        "RIDES ITS UPPER INNER WALL. TWO BLOCKS USED, ONE PER TRUNNION.",
-        f"TAP {STUD_THREAD} UNC-2B BOTTOMING X {STUD_TAP_THREAD_DEPTH:.2f} FULL THREAD, DRILL",
-        f"Ø{STUD_TAP_DIA:.2f} X {STUD_TAP_DRILL_DEPTH:.2f}, IN THE TOP SEAT ON THE BORE VERTICAL",
-        f"CENTRELINE AT MID-DEPTH: THE {STUD_SCREW_NUMBER} SCREW CLAMPS THE SEAT",
-        "TO THE TOP-FRAME CROSSBAR UNDERSIDE.",
-        "HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING; LEAVE UNPAINTED.",
-        "THE BORE UPPER WALL IS THE HARDENED KNIFE SEAT.",
-    )
-)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

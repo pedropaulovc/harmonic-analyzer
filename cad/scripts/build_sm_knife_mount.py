@@ -87,7 +87,6 @@ from _drawing_marks import (
 from _part_pmi import author_part_pmi
 from sm_knife_mount_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     PIN_HOLE_DEPTH,
@@ -467,10 +466,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
     return await save_part_and_images(adapter, PART_NAME)
 

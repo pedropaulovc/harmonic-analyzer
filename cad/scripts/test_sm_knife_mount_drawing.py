@@ -12,10 +12,12 @@ import sm_knife_mount_spec
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_ground_bore_finish_is_part_owned_and_consumed_by_key() -> None:
+def test_knife_seat_bore_finish_is_part_owned_and_consumed_by_key() -> None:
+    # Policy rule 5: the knife SEAT carries MACHINED_UM (1.6); GROUND_UM (0.8)
+    # is for the knife edge itself, which is the lever trunnion's ridge.
     (control,) = sm_knife_mount_spec.SURFACE_FINISHES
     assert control.key == "knife_bore"
-    assert control.roughness_um == sm_knife_mount_spec.GROUND_UM == 0.8
+    assert control.roughness_um == sm_knife_mount_spec.MACHINED_UM == 1.6
     assert control.face.diameter_mm == 2.0 * sm_knife_mount_spec.R_BORE
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -103,11 +105,15 @@ def test_dowel_callout_is_parked_clear_of_the_top_view() -> None:
     assert shoulder_y > drawing.RIGHT_CENTER[1] + drawing.RIGHT_HALF_Y + 0.040
 
 
-def test_the_tap_is_stated_once_in_the_notes_not_by_solidworks_note() -> None:
-    # Rule 6: SolidWorks' raw "#6-32 Tapped Hole" note restated the tap the
-    # notes already state in full; it is deleted and finalize proves none is
-    # left at export.
+def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
+    # Rule 6: the tap rides one native Hole Wizard callout (thread, full
+    # thread depth, drill and drill depth stay associative); SolidWorks' raw
+    # "#6-32 Tapped Hole" note would restate it, so it is deleted and
+    # finalize proves none is left at export.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_native_hole_callout(") == 1
+    assert "process=TAP_CALLOUT_PROCESS" in source
+    assert drawing.TAP_CALLOUT_PROCESS == "BOTTOMING TAP\n"
     assert drawing.TAPPED_HOLE_NOTE == "Tapped Hole"
     assert "remove_notes_matching(adapter, TAPPED_HOLE_NOTE)" in source
     assert "redundant_note_substrings=(TAPPED_HOLE_NOTE,)" in source
@@ -115,6 +121,24 @@ def test_the_tap_is_stated_once_in_the_notes_not_by_solidworks_note() -> None:
     assert source.index("remove_notes_matching(adapter, TAPPED_HOLE_NOTE)") > (
         source.index("keep=TOP_KEEP")
     )
+
+
+def test_tap_callout_parks_between_the_top_view_and_the_datum_tag() -> None:
+    # Rule 8: the three rows stand in the band under the top view and over
+    # the front view's datum-A tag, left of the tag, so neither the text nor
+    # its steep leader crosses a view, a dimension or the A-A cutting line.
+    x, y = drawing.TAP_CALLOUT_XY
+    top_view_bottom = drawing.TOP_CENTER[1] - drawing.TOP_HALF_Z
+    datum_tag_top = drawing._front_y(sm_knife_mount_spec.BLK_TOP) + 0.018 + 0.0075
+    assert y + drawing.TAP_CALLOUT_HALF_HEIGHT < top_view_bottom
+    assert y - drawing.TAP_CALLOUT_HALF_HEIGHT > datum_tag_top
+    assert x + drawing.TAP_CALLOUT_HALF_WIDTH < drawing.FRONT_CENTER[0] - 0.0035
+    # Over the 29.62 height line's upper witness line (y at the block top),
+    # not beside it.
+    assert y - drawing.TAP_CALLOUT_HALF_HEIGHT > drawing._front_y(
+        sm_knife_mount_spec.BLK_TOP
+    )
+    assert x - drawing.TAP_CALLOUT_HALF_WIDTH > 0.0
 
 
 def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
@@ -176,44 +200,25 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
-def test_linked_notes_expose_the_stud_tap_and_hardened_knife_seat() -> None:
-    notes = sm_knife_mount_spec.DRAWING_NOTES
-    assert f"BORE Ø{2.0 * sm_knife_mount_spec.R_BORE:.1f} THRU, CENTRED IN THE {2.0 * sm_knife_mount_spec.BLK_HALF_X:.2f} WIDTH" in notes
-    assert "BORE Ø12.0 THRU" in notes
-    notes_and_callouts = notes + "\n" + sm_knife_mount_spec.PIN_HOLE_CALLOUT
-    # Redesign: a #6-32 bottoming tap (no 1/2-13 stud, no bore-crown break-in).
-    assert "1/2-13" not in notes_and_callouts
-    assert "BREAKS INTO" not in notes_and_callouts
-    assert "TAP #6-32 UNC-2B BOTTOMING X 9.70 FULL THREAD" in notes
-    assert "Ø2.71 X 10.90" in notes
-    assert "MHA-VN-024 SCREW CLAMPS THE SEAT" in notes
-    assert "CENTRE 20.62 BELOW THE TOP SEAT" in notes
-    # Rule 6: the hanger text is at most four short lines.
-    lines = notes.splitlines()
-    first = next(i for i, line in enumerate(lines) if line.startswith("TAP #6-32"))
-    last = next(i for i, line in enumerate(lines) if "CROSSBAR UNDERSIDE" in line)
-    assert last - first + 1 <= 4
+def test_the_sheet_carries_no_notes_block() -> None:
+    # Rule 6: every fact the notes held now rides a callout or a field --
+    # the bore's location its BASICs and position frame, the tap its hole
+    # callout, the heat treatment the Finish field -- and the design-intent
+    # prose (knife-edge bearing, screw clamp, two blocks) is gone.
+    assert not hasattr(sm_knife_mount_spec, "DRAWING_NOTES")
+    assert not hasattr(sm_knife_mount_spec, "STUD_SCREW_NUMBER")
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "Manufacturing Notes" not in part_source
+    assert "Manufacturing Notes" not in drawing_source
+    assert drawing_source.count("add_property_linked_note(") == 1
+    assert 'add_property_linked_note(adapter, "Isometric View Note"' in drawing_source
     # The dowel hole's press rides the Ø callout (MHA-PD-018 precedent).
     assert sm_knife_mount_spec.PIN_HOLE_CALLOUT.splitlines() == [
         "BLIND FLAT-BOTTOM REAM",
         "PRESS MHA-VN-051 DOWEL TO FLOOR",
         "0.0025/0.0177 INTERFERENCE",
     ]
-    # ch18 p.42 (2026-09-02): the block IS the hardened knife seat -- the old
-    # "no hardened seat / do not release" hold is gone.
-    assert "HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING" in notes
-    assert "LEAVE UNPAINTED" in notes
-    assert "NO HARDENED KNIFE SEAT" not in notes
-    assert "DO NOT RELEASE" not in notes
-    # Title block owns the alloy callout (test_magnifier_drawing_metadata).
-    assert "MATERIAL:" not in notes
-    assert "Ra 0.8" not in notes
-    assert "GRAY IRON" not in notes and "PAINT BLACK" not in notes
-    assert "DEBURR" not in notes and "BREAK SHARP" not in notes
-    assert "X.XX" not in notes
-    assert "LINEAR +/-" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
 def test_native_gdt_and_bore_geometry() -> None:
@@ -236,10 +241,11 @@ def test_part_stamps_make_critical_properties() -> None:
     # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.
     assert part.MATERIAL == "Plain Carbon Steel"
     assert config["material"] == "Plain Carbon Steel"
-    assert "O1 tool steel" in config["material_specification"]
-    assert "58-60 HRC" in config["material_specification"]
+    assert config["material_specification"] == "AISI O1 tool steel"
+    # Rule 1: the heat treatment and the bare surface are the Finish field's,
+    # stated once there (the sheet has no notes block).
+    assert config["finish"] == "hardened and tempered 58-60 HRC, unpainted"
     assert "Brass" not in config["material_specification"]
-    assert "unpainted" in str(config["finish"]).lower()
     assert int(config["quantity"]) == 2
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_color(adapter, HARDENED_STEEL)" in source

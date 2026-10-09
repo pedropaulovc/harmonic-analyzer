@@ -20,6 +20,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -32,6 +33,7 @@ from _drawing_common import (
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
+    add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
@@ -61,6 +63,7 @@ from sm_knife_mount_spec import (
     PIN_HOLE_DEPTH,
     PIN_HOLE_X,
     R_BORE,
+    STUD_TAP_DIA,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
@@ -82,7 +85,7 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
-# SolidWorks' own descriptive thread note; the manufacturing notes state the tap.
+# SolidWorks' own descriptive thread note; the tap's hole callout states the tap.
 TAPPED_HOLE_NOTE = "Tapped Hole"
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
@@ -169,6 +172,19 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
+# The #6-32 bottoming tap is stated once, on its Hole Wizard callout in the
+# top view (fr-top-frame's KEEPER TAP precedent), not in a note.  The
+# process rides its own row over the native drill and thread rows: three
+# 4.3 mm rows, the widest ("#6-32 UNC-2B" and its depth) ~52 mm at the dowel
+# callout's 2.73 mm a character.  The block parks in the band between the
+# top view and the front view's datum-A tag (its top at y 0.1951), left of
+# that tag (x >= 0.1115), so the leader climbs steeply to the tap's lower
+# rim: ~14 mm over the part against a 12 mm approach from the view's lower
+# edge, a ~2 mm detour (_layout_audit.LEADER_DETOUR_PROVISIONAL_M is 10).
+TAP_CALLOUT_PROCESS = "BOTTOMING TAP\n"
+TAP_CALLOUT_HALF_WIDTH = 0.026
+TAP_CALLOUT_HALF_HEIGHT = 0.0065
+TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.022, TOP_CENTER[1] - TOP_HALF_Z - 0.014)
 
 RIGHT_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 RIGHT_HALF_Y = (BLK_TOP - BLK_BOT) / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -220,7 +236,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -228,7 +243,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -320,13 +334,36 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # SolidWorks pins its own raw "#6-32 Tapped Hole" note to a view that
     # imports from the tapped part (the dda9a33a8 render put it on the top
-    # view, through the dowel callout).  The tap is stated once, in the
-    # manufacturing notes (thread, full-thread depth, drill and drill depth;
-    # rule 6), so every such note goes.  Which views receive one is
-    # SolidWorks' choice (draw_fr_top_frame._auto_tapped_hole_notes), so the
-    # count is logged, not gated; finalize_drawing then proves none is left.
+    # view, through the dowel callout).  The tap is stated once, on its hole
+    # callout below (rule 6), so every such note goes.  Which views receive
+    # one is SolidWorks' choice (draw_fr_top_frame._auto_tapped_hole_notes),
+    # so the count is logged, not gated; finalize_drawing then proves none is
+    # left.
     removed_tap_notes = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
     _telemetry.info(f"removed {removed_tap_notes} automatic tapped-hole note(s)")
+    # The tap's lower-left drill rim (the rim nearer the callout), picked on
+    # whichever side of the cutting line model -Z/+Z projects below it.
+    rim_mm = STUD_TAP_DIA / 2.0 / math.sqrt(2.0)
+    tap_rim = min(
+        (
+            model_point_in_view(
+                adapter,
+                top,
+                (-rim_mm / 1000.0, BLK_TOP / 1000.0, side * rim_mm / 1000.0),
+                label=f"knife-hanger tap rim z{side:+.0f}",
+            )
+            for side in (1.0, -1.0)
+        ),
+        key=lambda point: point[1],
+    )
+    add_native_hole_callout(
+        adapter,
+        top,
+        edge_xy=tap_rim,
+        callout_xy=TAP_CALLOUT_XY,
+        label="knife-hanger screw bottoming tap",
+        process=TAP_CALLOUT_PROCESS,
+    )
     # One arrow on the bore's near (upper-left) rim, its leader short from
     # the text on the left; native, the Ø line ran rim to rim through the
     # centre and across the view to a shoulder left of it.
@@ -356,8 +393,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Datum A = the block top seat (clamped to the top-frame casting underside;
     # carries the #6-32 knife-hanger-screw tap and the MHA-VN-051 dowel hole);
-    # Ra 0.8 on the bore's working upper wall, tagged on the bore rim (a real
-    # circular edge).
+    # Ra 1.6 (MACHINED_UM) on the bore's working upper wall, tagged on the
+    # bore rim (a real circular edge).
     add_datum_feature(
         adapter,
         front,
@@ -386,7 +423,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="knife bore finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
 
     return await finalize_drawing(
