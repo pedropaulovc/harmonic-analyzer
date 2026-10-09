@@ -49,9 +49,10 @@ Features, in order:
    they run free on a stationary arbor (DIMENSIONS.md ch. 13, "M6.2 keyway
    refutation"). The legacy keyway was fiction and was removed in M6.2.
 
-Every feature's volume delta is asserted against its actual geometry oracle.
-The gear uses the core's translated-template gap area, and the notch delta
-integrates material classified by that same finite repeated-tooth profile.
+Every feature's volume delta is asserted against its actual geometry oracle,
+except the notch kerf, whose ~2.2 mm^3 is below the mass-property noise of the
+spline-toothed body: its floor and wall faces are read back against material
+classified by that same finite repeated-tooth profile.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
@@ -187,32 +188,58 @@ def notch_solid_area(step: float = 0.004) -> float:
     return hits * dx * dy
 
 
-def _higher_accuracy_volume_mm3(adapter, label: str) -> float:
-    """Part volume from IMassProperty2 at swMassPropertyAccuracyLevel_Higher.
+def notch_wall_area(x: float, step: float = 0.001) -> float:
+    """Solid area (mm^2) of one kerf wall: the material height at ``x`` from
+    the floor up through the kerf window, times the face width."""
+    ny = max(2, round((NOTCH_OUTER - NOTCH_FLOOR) / step))
+    dy = (NOTCH_OUTER - NOTCH_FLOOR) / ny
+    hits = sum(is_solid(x, NOTCH_FLOOR + (j + 0.5) * dy) for j in range(ny))
+    return hits * dy * FACE_WIDTH
 
-    The notch removes ~2.2 mm^3 from a ~12444 mm^3 body whose 120 gaps are
-    equation-curve (spline) faces. At the default accuracy the toothed disc
-    reads 2.39 mm^3 under its exact Green-area oracle (probe 3, 187ab61f2),
-    and every stock-patterned cone row reads low by a fraction growing with
-    radius, as a surface-quadrature error on x.n does. A 0.13 mm^3 band on a
-    difference of two such readings needs the higher-accuracy integration.
+
+_KERF_PLANE_TOL_MM = 1e-4
+
+
+def _notch_kerf_readback(adapter) -> dict[str, float]:
+    """Read NotchKerf's own planar faces: floor and wall positions and areas.
+
+    Probe 4 (7a12fb7f1): the cut is real (faces 484 -> 487, error (0, False),
+    default-accuracy volume down 2.41) but a Higher-accuracy IMassProperty2
+    read after it returned the pre-notch volume, and the default reading
+    carries ~2.4 mm^3 of quadrature noise on the spline-toothed body, the
+    kerf's own size. So the kerf is verified by B-rep geometry: one floor
+    plane at y = NOTCH_FLOOR and one wall plane at each x = NOTCH_X -+ W/2.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    model.ForceRebuild3(False)
-    model.ClearSelection2(True)
-    extension = _early_bound(model.Extension, "IModelDocExtension")
-    mass = _early_bound(extension.CreateMassProperty2(), "IMassProperty2")
-    if mass is None:
-        raise RuntimeError(f"{label}: CreateMassProperty2 failed")
-    mass.UseSystemUnits = True
-    mass.AccuracyLevel = 2  # swMassPropertyAccuracyLevel_Higher
-    if int(mass.AccuracyLevel) != 2:
-        raise RuntimeError(f"{label}: mass-property accuracy did not take Higher")
-    if not mass.Recalculate():
-        raise RuntimeError(f"{label}: higher-accuracy mass recalculation failed")
-    volume = float(mass.Volume) * 1e9
-    _telemetry.info(f"{label}: higher-accuracy volume {volume:.4f} mm^3")
-    return volume
+    raw = _early_bound(model, "IPartDoc").FeatureByName("NotchKerf")
+    if raw is None:
+        raise RuntimeError("notch: NotchKerf feature is missing")
+    feature = _early_bound(raw, "IFeature")
+    error = feature.GetErrorCode2()
+    if not isinstance(error, (list, tuple)) or len(error) < 2 or int(error[0] or 0):
+        raise RuntimeError(f"notch: NotchKerf error state {error!r}")
+    sides = {
+        "floor": (1, NOTCH_FLOOR),
+        "west wall": (0, NOTCH_X - NOTCH_WIDTH / 2.0),
+        "east wall": (0, NOTCH_X + NOTCH_WIDTH / 2.0),
+    }
+    areas = dict.fromkeys(sides, 0.0)
+    for raw_face in feature.GetFaces() or ():
+        face = _early_bound(raw_face, "IFace2")
+        surface = _early_bound(face.GetSurface(), "ISurface")
+        if surface is None or not surface.IsPlane():
+            raise RuntimeError("notch: NotchKerf has a non-planar face")
+        values = tuple(float(value) for value in surface.PlaneParams)
+        if len(values) != 6 or not all(math.isfinite(value) for value in values):
+            raise RuntimeError(f"notch: invalid NotchKerf plane parameters {values}")
+        normal, root = values[:3], [value * 1000.0 for value in values[3:]]
+        for side, (axis, position) in sides.items():
+            if abs(abs(normal[axis]) - 1.0) < 1e-9 and abs(root[axis] - position) < _KERF_PLANE_TOL_MM:
+                areas[side] += float(face.GetArea()) * 1e6
+                break
+        else:
+            raise RuntimeError(f"notch: unexpected NotchKerf plane {values}")
+    return areas
 
 
 def _body_state(adapter, feature_name: str | None = None) -> str:
@@ -387,15 +414,7 @@ async def build(adapter) -> dict[str, str]:
             "-- extrude direction flipped"
         )
     _telemetry.success(f"cam placement: COM y {com[1]:.3f} z {com[2]:.3f}")
-    analytic_before = (
-        math.pi * RA_MM**2 - TEETH * STOCK_FORM.gap_area_mm2
-    ) * FACE_WIDTH + v_cam
-    before_notch = _higher_accuracy_volume_mm3(adapter, "before notch")
     before_state = _body_state(adapter)
-    _telemetry.info(
-        f"before notch: analytic {analytic_before:.4f} mm^3, "
-        f"higher-accuracy minus analytic {before_notch - analytic_before:+.4f}"
-    )
 
     # ------------------------------------------------------------------
     # Alignment notch at +Y (top = cosine mode): a thin saw KERF seated in
@@ -573,28 +592,26 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "NotchKerf")
     v_notch = notch_solid_area() * FACE_WIDTH
-    # The kerf delta is the difference of two higher-accuracy readings of the
-    # same spline-toothed body (see _higher_accuracy_volume_mm3); the band is
-    # unchanged.
-    removed = before_notch - _higher_accuracy_volume_mm3(adapter, "after notch")
     after_state = _body_state(adapter, "NotchKerf")
-    default_after = await adapter.get_mass_properties()
-    default_text = (
-        f"{float(default_after.data.volume):.4f}"
-        if default_after.is_success
-        else f"unreadable ({default_after.error})"
+    _telemetry.info(f"notch: before {before_state}; after {after_state}")
+    # The kerf's own B-rep faces against the same stock-form profile, each at
+    # the band the former volume delta used (6%); see _notch_kerf_readback.
+    measured = _notch_kerf_readback(adapter)
+    expected = {
+        "floor": NOTCH_WIDTH * FACE_WIDTH,
+        "west wall": notch_wall_area(NOTCH_X - NOTCH_WIDTH / 2.0),
+        "east wall": notch_wall_area(NOTCH_X + NOTCH_WIDTH / 2.0),
+    }
+    faces = "; ".join(
+        f"{side} {measured[side]:.4f} mm^2 (expected {expected[side]:.4f})"
+        for side in expected
     )
-    _telemetry.info(
-        f"notch: before {before_state}; after {after_state}; "
-        f"default-accuracy volume after {default_text} mm^3"
+    if any(abs(measured[side] - area) > 0.06 * area for side, area in expected.items()):
+        raise RuntimeError(f"notch: kerf faces off by more than 6%: {faces}; after {after_state}")
+    kerf = NOTCH_WIDTH * (measured["west wall"] + measured["east wall"]) / 2.0
+    _telemetry.success(
+        f"notch: {faces}; kerf from walls {kerf:.4f} mm^3 (analytic {v_notch:.4f})"
     )
-    if abs(removed - v_notch) > 0.06 * v_notch:
-        raise RuntimeError(
-            f"notch: removed {removed:.4f} mm^3 at higher accuracy, expected "
-            f"{v_notch:.4f} (+/- {0.06 * v_notch:.4f}); before {before_state}; "
-            f"after {after_state}; default-accuracy volume after {default_text}"
-        )
-    _telemetry.success(f"notch: removed {removed:.4f} mm^3 (analytic {v_notch:.4f})")
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"notch: get_mass_properties failed: {mass.error}")
