@@ -20,10 +20,16 @@ DRAWING_DIMENSIONS = {
     "StockTrimProfile": {"FinishedOverall"},
     "StockDeburrProfile": {"ChamferWidth", "ChamferAngle"},
 }
-DIMENSION_PRECISION = {"FinishedOverall": 1, "ChamferWidth": 2, "ChamferAngle": 0}
+DRAWING_PRECISION = {
+    "StockTrimProfile": {"FinishedOverall": 1},
+    "StockDeburrProfile": {"ChamferWidth": 2, "ChamferAngle": 0},
+}
+# Flattened only for drawing readback; the part applies the feature-owned map.
+DRAWING_PRECISION_BY_NAME = {
+    name: decimals
+    for dimensions in DRAWING_PRECISION.values()
+    for name, decimals in dimensions.items()
+}
 DIMENSION_TOLERANCE_TYPES = {"FinishedOverall": 11, "ChamferWidth": 4, "ChamferAngle": 11}
-DRAWING_NOTES = (
-    "FINISHED OVERALL TO EYE CROWN IS THE ACCEPTANCE SIZE.\n"
-    "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
-)
+DRAWING_NOTES = "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

@@ -10,6 +10,18 @@
 > Enforced by each migrated sheet's offline contract and by its machinist review
 > (`cad/scripts/machinist_review.py`).
 
+The modified purchased counter-spring anchor (`MHA-VN-001`, `vn_boss_hook`)
+owns FinishedOverall, ChamferWidth and ChamferAngle precision in its native
+cutting sketches. Its drawing imports and verifies those driving controls
+without changing their precision. Trim the free shank end after purchase,
+restore the dimensioned deburr, and install directly into the `MHA-SM-003`
+summing lever's #10-24 tapped boss with no nut. The remaining supplier geometry
+and stock identity are unchanged. The part's Manufacturing Notes property
+includes the registry-owned installation instructions; the custom sheet links
+that property and verifies its resolved text and measured lower-left note cell
+before export. The trim and deburr are defined only by those native dimensions,
+not repeated as fabrication instructions or a typed angle in the note block.
+
 ## Why
 
 The fleet grew ~125 feature-control frames, 100+ datum tags, roughness symbols
