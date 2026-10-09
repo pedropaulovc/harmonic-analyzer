@@ -9,6 +9,7 @@ import { buildOriginalPresentationSamples, createSourceVideoPlayer, isSourceVide
 import { INPUT_FIELDS, equalRecord, type InputField } from './source-witness'
 import { unavailableNativePrimitiveSnapshot, type NativeInputSnapshot, type NativePrimitiveSnapshot, type NativePrimitiveSubmissionMetadata, type NativeTargetSurfaceRequest } from './native-primitive-snapshot'
 import { compileSourceAssemblyState, createSourceAssemblyBuffer, OPERATING_SOURCE_ASSEMBLY, solveSourceAssembly, type CompiledSourceAssembly, type SourceAssemblyBuffer, type SourceAssemblyState } from './source-assembly'
+import { loadSyncTrack, serializeSyncInput, type SyncTrack, type EvaluatedSync } from './sync-track'
 
 function element<T extends HTMLElement>(selector: string): T {
   const found = document.querySelector<T>(selector)
@@ -85,6 +86,9 @@ const assemblyOverrides: PartOverrideProvider = baseline => {
 }
 let machine: Machine | null = null
 let reference: CompactVideoReference | null = null
+let syncTrack: SyncTrack | null = null
+let syncFrame: EvaluatedSync | null = null
+let syncViews: SourceView[] = []
 let presentedSampleTimes = new Map<number, number>()
 let player: VideoPlayer | null = null
 let video: Video | null = null
@@ -292,6 +296,7 @@ function configureLandmarkProbe(): void {
 
 function renderPending(): void {
   if (paintRevision === 'clean') return
+  if (syncTrack && mode === 'following-video') { renderSyncSource(modelTime); return }
   paintRevision = 'clean'
   if (referenceState === 'hold-last-readable' && activeViews.length && (mode !== 'exploring' || manualSceneOwnership === 'initial')) drawSourceViews(activeViews, modelTime)
   else viewer.render(currentAssembly.state)
@@ -341,7 +346,7 @@ function updateControlState(): void {
   driveControls.disabled = !editable
   channelFieldset.disabled = !editable
   fitButton.disabled = modelState !== 'ready' || mode !== 'exploring'
-  followButton.disabled = modelState !== 'ready' || !reference || referenceSeek !== 'idle' || manualSourceSeek !== 'idle'
+  followButton.disabled = modelState !== 'ready' || (!reference && !syncTrack) || referenceSeek !== 'idle' || manualSourceSeek !== 'idle'
   pauseButton.disabled = !player
   pauseButton.textContent = playbackState === 'playing' || playbackState === 'buffering' ? 'Pause & explore' : 'Play video'
   const local = player && isSourceVideoPlayer(player) ? player : null
@@ -427,6 +432,12 @@ function validateSourceViews(views: readonly PlaybackView[]): void {
 }
 
 function explore(): void {
+  if (syncFrame && syncViews.length && machine?.availability === 'available') {
+    copyInput(syncFrame.input)
+    updateMachine(input, OPERATING_SOURCE_ASSEMBLY)
+    viewer.applyCamera(syncViews[0]!.camera)
+    syncViews = []
+  }
   const chosen = primaryView()
   if (chosen && machine?.availability === 'available') {
     copyInput(chosen.input)
@@ -565,6 +576,10 @@ function sourceCapture<T extends {
 
 
 function renderSource(timeSeconds: number, sourceReference: SourcePublicationReference | null = reference, sourceExposureTimeSeconds = timeSeconds): void {
+  if (syncTrack && sourceReference === reference) {
+    renderSyncSource(timeSeconds)
+    return
+  }
   configureLandmarkProbe()
   if (!sourceReference || !machine || machine.availability !== 'available') {
     referenceState = 'unavailable'
@@ -647,7 +662,35 @@ function renderSource(timeSeconds: number, sourceReference: SourcePublicationRef
   notice(sourceError, sourceReference.approximationMessage)
 }
 
+function renderSyncSource(timeSeconds: number): void {
+  if (!syncTrack || machine?.availability !== 'available') {
+    referenceState = 'unavailable'
+    return
+  }
+  syncFrame = syncTrack.evaluate(timeSeconds)
+  if (syncViews.length !== syncFrame.views.length || syncViews.some((view, i) => view.camera !== syncFrame!.views[i]!.camera)) {
+    syncViews = syncFrame.views.map(view => ({ id: view.viewId, rectSourcePixels: view.rect, presentation: view.presentation, camera: view.camera }))
+  }
+  copyInput(syncFrame.input)
+  updateMachine(input, OPERATING_SOURCE_ASSEMBLY)
+  if (syncViews.length) viewer.renderViews(syncViews, undefined, timeSeconds)
+  else viewer.render()
+  sourceDrawRevision++
+  sourceDrawTimeSeconds = timeSeconds
+  modelTime = timeSeconds
+  sourceSampleTimeSeconds = timeSeconds
+  referenceState = syncViews.length ? 'approximate' : 'hold-last-readable'
+  manualRevision = 'clean'
+  paintRevision = 'clean'
+  notice(sourceError, '')
+  notice(physicsError, '')
+}
+
 function renderFollowingSource(timeSeconds: number): void {
+  if (syncTrack) {
+    if (paintRevision !== 'clean' || modelTime !== timeSeconds) renderSyncSource(timeSeconds)
+    return
+  }
   const seekState = player && isSourceVideoPlayer(player) ? player.getSeekState() : ''
   const presented = player && isSourceVideoPlayer(player) && seekState === 'idle' ? player.getPresentation() : null
   const exposureTime = presented ? originalPresentedSampleTime(presented) : timeSeconds
@@ -679,7 +722,9 @@ function updateHud(inputMode: 'sync' | 'preserve' = 'sync'): void {
     setControlValue(sourceScrubTime, `${time.toFixed(3)} s`)
   }
   const chosen = mode === 'exploring' ? undefined : primaryView()
-  const context = mode === 'exploring'
+  const context = syncTrack && mode !== 'exploring'
+    ? 'Kinematic sync track'
+    : mode === 'exploring'
     ? explorationOrigin === 'chosen-feasible-reconstruction' ? 'Manual exploration from chosen feasible reconstruction (not recovered history)' : 'Manual exploration'
     : mode === 'reference-review' && referenceSeek !== 'idle' ? 'Seeking original exposure; retaining the displayed model until real native presentation'
       : referenceState === 'approximate' ? 'Approximate source-following; chosen inputs, not recovered history or a final matched result'
@@ -819,6 +864,9 @@ async function selectVideo(next: Video): Promise<void> {
   player?.destroy()
   player = null
   reference = null
+  syncTrack = null
+  syncFrame = null
+  syncViews = []
   presentedSampleTimes.clear()
   activeViews = []
   explorationOrigin = 'interactive-default'
@@ -857,7 +905,11 @@ async function selectVideo(next: Video): Promise<void> {
   notice(sourceError, '')
   notice(physicsError, '')
   updateControlState()
-  const sourcePromise = loadReference(next).then((loaded) => {
+  const sourcePromise = loadSyncTrack(next.id, selection.signal).then(async loadedSync => {
+    if (selection.signal.aborted) return
+    syncTrack = loadedSync
+    if (loadedSync) return
+    const loaded = await loadReference(next)
     if (selection.signal.aborted) return
     if (localOriginal) presentedSampleTimes = buildOriginalPresentationSamples(loaded.data.frames)
     reference = loaded
@@ -1554,6 +1606,27 @@ if (verificationEnabled) {
   }
   Object.defineProperty(window, 'harmonicAnalyzer', { value: bridge, configurable: true })
 }
+if (import.meta.env.DEV) {
+  Object.defineProperty(window, 'harmonicSync', { configurable: true, value: {
+    evaluate(t: number) {
+      if (!syncTrack) throw new Error('No sync track loaded')
+      const frame = syncTrack.evaluate(t)
+      return { views: structuredClone(frame.views), input: serializeSyncInput(frame.input) }
+    },
+    drawAt(t: number) {
+      if (!syncTrack || modelState !== 'ready') throw new Error('Sync track/model not ready')
+      renderSyncSource(t)
+      following()
+      const result = this.snapshot()
+      explore()
+      return result
+    },
+    snapshot() {
+      return { videoId: video?.id, loaded: syncTrack !== null, modelState, mode, modelTime, camera: cameraRecord(), input: serializeSyncInput(input), views: syncViews }
+    },
+  } })
+}
+
 
 viewer.resize()
 selectRoute()

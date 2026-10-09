@@ -26,6 +26,122 @@ It also accepts `cad/out/gltf/ha-harmonic-analyzer.glb` when no path is supplied
 The raw cache stays outside public assets under `web/.vite/model-source/`.
 Missing models and failed YouTube playback produce visible errors.
 
+
+### Kinematic fit renderer
+
+`fit.html` loads the same native GLB and mechanism solver as the companion, with
+no animation loop. `window.harmonicFit.ready()` returns native drawable paths,
+disjoint groups, explicit `groupIds`, the physical-station → harmonic mapping,
+default-pose model/group bounds in metres, and the actual WebGL renderer string.
+`render(request)` and `renderBatch(requests)` return base64 group IDs with a
+`dtype` of `uint8` (up to 255 groups) or little-endian `uint16`, top-left row-major,
+with zero for background. The Python client always returns uint16 arrays.
+Requested groups are the only geometry drawn; an omitted filter draws all groups.
+Camera principal points are viewport-local pixels at the requested resolution
+(scale them when resizing).
+The horizontal-mirror presentation flips the finished image, not the camera.
+Native spring deformation is preserved in the unlit ID pass.
+
+The Python client owns a headless Chromium and a free-port Vite server, or attaches
+to an existing `fit.html` URL. It returns numpy uint16 arrays; use
+`RenderClient` as a context manager to release both processes. The private smoke
+saves only synthetic colour-mapped ID PNGs and group/timing metadata:
+
+```sh
+uv run --project web/sync python -m harmonic_sync.render_client --smoke
+# Preview requires a prior npm --prefix web run build.
+uv run --project web/sync python -m harmonic_sync.render_client --smoke --preview
+```
+
+Outputs default to `~/data/harmonic-analyzer-sync/harness-smoke/`, overridable with
+`HARMONIC_SYNC_DATA`. Per-batch shot/view timing goes to stderr and `render.jsonl`
+in that data root. `HARMONIC_CHROME` selects a Chromium executable. On WSL, the
+client's auto backend uses isolated Mesa D3D12/WSLg launch settings with headless
+Chromium; it does not change the shell environment or open a browser window.
+`--gpu-backend=browser-default` opts out; `--gpu-backend=wsl-d3d12` selects it
+explicitly. The smoke accepts repeated `--chromium-arg=...` options. Its summary
+records the actual GPU renderer and throughput, not just the requested backend.
+Camera-only batches reuse an unchanged solved input. The Python client compresses
+its CDP envelope with gzip without changing the page API or the returned arrays.
+Readiness exposes cumulative render timing counters; each Python batch logs
+solver/matrix update, draw, readback, encoding, browser compression,
+CDP/serialization, Python unpack and decode times.
+
+### Source masks and shot census
+
+The standalone `sync/` uv project uses Python 3.12 and CUDA 12.4 PyTorch. The
+six hand-editable `sync/videos/<videoId>/shots.json` files retain the human shot
+census and view layouts, with hashes and rational frame rates from the current
+MP4s. `shots` refreshes video metadata without overwriting saved census edits;
+legacy observations are only needed to bootstrap a missing census.
+
+```sh
+SAM2_BUILD_CUDA=0 uv sync --project web/sync
+uv run --project web/sync python -m harmonic_sync shots 8KmVDxkia_w
+uv run --project web/sync python -m harmonic_sync keyframes 8KmVDxkia_w
+# Inspect keyframes, then edit source-pixel points/boxes in prompts.json.
+uv run --project web/sync python -m harmonic_sync source 8KmVDxkia_w
+uv run --project web/sync python -m harmonic_sync source 6dW6VYXp9HM --shot analysis-23
+```
+
+MP4s default to `~/data/harmonic-analyzer-videos/` (`HARMONIC_SYNC_VIDEOS` overrides
+it). Derived images never enter git: `HARMONIC_SYNC_DATA` defaults to
+`~/data/harmonic-analyzer-sync`. Each shot/view has full-resolution keyframes,
+every-second-frame SAM2 masks and masked Canny edges at half crop resolution,
+source-only static ORB homographies, and an `index.json` containing frame times,
+mask areas/coverage and sharpness. `maskScale` and `cropOriginSourcePixels` map
+mask pixels back to source pixels; `motion.json` maps current crop pixels to
+its reference crop (`space: "view-crop-halfres"`). Insufficient static features
+are explicitly `unobservable`, not fitted identity motion.
+
+All container PTS are checked against the rational frame clock before propagation.
+Finished shot/views resume only when their source/prompt/model/code hash and
+required artifacts match. Per-shot timing/progress goes to stderr and
+`source.jsonl`; per-video statistics and mask-overlay sheets are saved as
+`<data>/<videoId>/source-stats.json` and `source-review.png`. Mask coverage is a
+pixel-area statistic, not an accuracy claim; inspect the overlays after edits.
+
+
+### Kinematic sync and manual alignment
+
+Videos with `content/sync/<videoId>.sync.json` use the kinematic track while
+following playback. Cameras interpolate only within their shot; setup inputs
+come from the current segment, crank turns interpolate linearly, and non-machine
+intervals hold the last machine pose. Other videos still use the existing path.
+The small Synthesis track is a rough, unfitted development fixture until replaced
+by the fitter; it is not a source-match result.
+
+Open `align.html?video=synthesis` (or `video=analysis`) on the Vite dev server.
+Keep the original MP4s in `~/data/harmonic-analyzer-videos/<videoId>.mp4` and the
+shot/setup census in `sync/videos/<videoId>/`. If `segments.json` is absent,
+alignment starts with one whole-video `default` segment and the mechanism's
+interactive defaults. The selected view is rendered over
+the original video. Orbit/pan/dolly the camera, adjust FOV and the viewport-local
+principal point, then save a camera key. Setup controls use metres, radians and
+normalized physical amplitudes; save the current segment initialization
+separately from the crank turns.
+
+Left/right step a frame, Shift steps ten, Space toggles playback, and C/S/K save
+camera/segment/crank (outside text inputs). Unsaved camera adjustments persist
+within the shot; “Reload saved camera” restores interpolated manual/fitted keys.
+Saves merge into `sync/videos/<videoId>/manual.json`, replacing the matching
+shot/view/time, segment ID or crank time. The fitter treats these entries as
+authoritative. Private video and save endpoints exist only on the dev server;
+video requests support byte-range seeking. Save timing logs go to
+`HARMONIC_SYNC_DATA` (default `~/data/harmonic-analyzer-sync`).
+
+Run the focused headless smoke against a running dev server:
+
+```sh
+HARMONIC_CHROME=/usr/bin/google-chrome node web/scripts/runtime-sync-smoke.mjs http://127.0.0.1:5173/harmonic-analyzer/
+```
+
+It records three runtime camera/input evaluations and screenshots, checks the
+alignment overlay and camera/setup/crank save round trips, then restores the
+previous manual file. Artifacts are private under
+`~/data/harmonic-analyzer-sync/runtime-smoke/`.
+
+
 To adopt a future approved CAD release, provide both its full commit and raw
 SHA-256 (not the optimized file's hash):
 

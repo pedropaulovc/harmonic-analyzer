@@ -1,0 +1,479 @@
+{
+  "videoId": "4mBuyixt22U",
+  "sourceSha256": "0f274997bc2c68eb5447e9dc21c0ef8136ab4b5722b151c26fcc16e8e6206f9b",
+  "fps": [
+    24000,
+    1001
+  ],
+  "shots": [
+    {
+      "id": "overlay-1",
+      "start": 0,
+      "end": 48.298249999999996,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 1 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-2",
+      "start": 48.298249999999996,
+      "end": 96.72162499999999,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 2 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-3",
+      "start": 96.72162499999999,
+      "end": 145.14499999999998,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 3 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-4",
+      "start": 145.14499999999998,
+      "end": 193.56837499999997,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 4 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-5",
+      "start": 193.56837499999997,
+      "end": 241.99175,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 5 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-6",
+      "start": 241.99175,
+      "end": 290.415125,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 6 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-7",
+      "start": 290.415125,
+      "end": 338.83849999999995,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 7 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-8",
+      "start": 338.83849999999995,
+      "end": 387.261875,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 8 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-9",
+      "start": 387.261875,
+      "end": 435.68525,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 9 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-10",
+      "start": 435.68525,
+      "end": 484.10862499999996,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 10 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-11",
+      "start": 484.10862499999996,
+      "end": 532.5319999999999,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 11 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-12",
+      "start": 532.5319999999999,
+      "end": 580.2880416666666,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 12 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-13",
+      "start": 580.2880416666666,
+      "end": 628.6279999999999,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 13 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-14",
+      "start": 628.6279999999999,
+      "end": 677.051375,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 14 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-15",
+      "start": 677.051375,
+      "end": 725.47475,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 15 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-16",
+      "start": 725.47475,
+      "end": 773.8981249999999,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 16 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-17",
+      "start": 773.8981249999999,
+      "end": 822.3214999999999,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 17 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-18",
+      "start": 822.3214999999999,
+      "end": 870.744875,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 18 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-19",
+      "start": 870.744875,
+      "end": 919.16825,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 19 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-20",
+      "start": 919.16825,
+      "end": 967.5916249999999,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited 20 trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "overlay-all",
+      "start": 967.5916249999999,
+      "end": 1014.26325,
+      "classification": "machine",
+      "reason": "Locked native lower-rocker/connecting-rod closeup with composited all-channel trace and channel label; graph is not a physical landmark.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "machine-to-navigation",
+      "start": 1014.26325,
+      "end": 1015.7230416666666,
+      "classification": "transition",
+      "reason": "Actual native source24318..24352 retains live rocker pixels during the navigation transition. The last live rod is independently source-registered, not exempted.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "navigation",
+      "start": 1015.7230416666666,
+      "end": 1020.7280416666666,
+      "classification": "non-machine",
+      "reason": "Actual frame24353 is pure navigation; source-only mixture and local rod-registration negative controls reject live-machine contribution.",
+      "views": []
+    },
+    {
+      "id": "navigation-emphasis",
+      "start": 1020.7280416666666,
+      "end": 1024.6903333333332,
+      "classification": "non-machine",
+      "reason": "Green emphasis on navigation panels, not a corresponding physical-mechanism view; hold pose.",
+      "views": []
+    },
+    {
+      "id": "navigation-restored",
+      "start": 1024.6903333333332,
+      "end": 1043.3756666666666,
+      "classification": "non-machine",
+      "reason": "Navigation panels restored; hold pose.",
+      "views": []
+    },
+    {
+      "id": "navigation-to-credits",
+      "start": 1043.3756666666666,
+      "end": 1044.5852083333332,
+      "classification": "transition",
+      "reason": "Navigation and credits crossfade; no corresponding live physical machine.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "credits",
+      "start": 1044.5852083333332,
+      "end": 1048.361,
+      "classification": "non-machine",
+      "reason": "Credit card only; hold pose.",
+      "views": []
+    }
+  ]
+}

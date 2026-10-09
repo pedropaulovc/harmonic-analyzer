@@ -1,0 +1,37 @@
+[project]
+name = "harmonic-sync"
+version = "0.1.0"
+description = "Source segmentation and kinematic video fitting for the harmonic analyzer"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "torch==2.5.1",
+  "torchvision==0.20.1",
+  "SAM-2",
+  "opencv-python-headless>=4.10",
+  "numpy>=2.0,<3",
+  "av>=13",
+  "playwright>=1.48",
+  "pillow>=10",
+  "cma>=4",
+  "scipy>=1.14",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["harmonic_sync"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
+SAM-2 = { git = "https://github.com/facebookresearch/sam2.git" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.extra-build-dependencies]
+SAM-2 = ["torch==2.5.1", "numpy>=2.0,<3"]

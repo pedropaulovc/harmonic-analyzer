@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Align video · Harmonic analyzer</title>
+  </head>
+  <body class="align-page">
+    <header class="align-header">
+      <h1>Align video</h1>
+      <label>Video <select id="video-id"><option value="8KmVDxkia_w">Synthesis</option><option value="6dW6VYXp9HM">Analysis</option></select></label>
+      <a id="companion-link" href="./?video=synthesis">Companion</a>
+    </header>
+    <main class="align-workspace">
+      <section class="align-view" aria-label="Video and model overlay">
+        <div id="align-stage"><video id="original" preload="auto" muted playsinline></video><canvas id="overlay" tabindex="0" aria-label="Orbit model camera"></canvas></div>
+        <div class="align-transport">
+          <button id="previous-frame" title="Left arrow">Previous frame</button><button id="play">Play</button><button id="next-frame" title="Right arrow">Next frame</button>
+          <label>Time (s) <input id="time" type="number" min="0" step="0.001" value="0" /></label><button id="seek">Seek</button>
+          <input id="scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Video time" />
+          <label>Model opacity <input id="opacity" type="range" min="0" max="1" step="0.01" value="0.5" /></label>
+        </div>
+        <p id="align-status" role="status">Loading video, shot census and model…</p>
+        <p class="hint">Left / right: one frame · Shift: ten frames · Space: play/pause · C: save camera · S: save segment · K: save crank. Drag to orbit; right-drag to pan; scroll to dolly.</p>
+      </section>
+      <aside class="align-panel">
+        <label>Shot <select id="shot"></select></label><label>View <select id="view"></select></label>
+        <fieldset><legend>Camera</legend>
+          <label>Vertical FOV (°) <input id="fov" type="number" min="1" max="170" step="0.25" value="35" /></label>
+          <label>Principal point X (view px) <input id="pp-x" type="number" step="1" value="960" /></label>
+          <label>Principal point Y (view px) <input id="pp-y" type="number" step="1" value="540" /></label>
+          <div class="align-actions"><button id="pp-left">X −1</button><button id="pp-right">X +1</button><button id="pp-up">Y −1</button><button id="pp-down">Y +1</button></div>
+          <button id="reset-camera">Reload saved camera</button><button id="save-camera">Save camera key at t</button>
+        </fieldset>
+        <fieldset><legend>Setup segment</legend>
+          <label>Segment <select id="segment"></select></label>
+          <label>ID <input id="segment-id" type="text" /></label>
+          <label>Start (s) <input id="segment-start" type="number" min="0" step="0.001" /></label>
+          <label>End (s) <input id="segment-end" type="number" min="0" step="0.001" /></label>
+          <label>Gearing <select id="align-gearing"><option>small-large</option><option>medium-medium</option><option>large-small</option></select></label>
+          <label>Magnification <input id="align-magnification" type="number" step="0.01" /></label>
+          <div id="setup-fields"></div>
+          <button id="save-segment">Save segment init</button>
+        </fieldset>
+        <fieldset><legend>Crank</legend><label>Turns <input id="align-crank" type="number" step="0.001" value="0" /></label><button id="save-crank">Save crank at t</button></fieldset>
+        <details><summary>Twenty channel amplitudes and phases</summary><div id="align-channels"></div></details>
+      </aside>
+    </main>
+    <script type="module" src="/src/align.ts"></script>
+  </body>
+</html>

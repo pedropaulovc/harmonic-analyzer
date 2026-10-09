@@ -1,0 +1,438 @@
+{
+  "videoId": "XPQwKRt4Y2k",
+  "sourceSha256": "72d85eb839bca4c0e5ead170fe1fbc46b7921ea213225f925a036de5cee8c95a",
+  "fps": [
+    24000,
+    1001
+  ],
+  "shots": [
+    {
+      "id": "opening-black",
+      "start": 0,
+      "end": 0.04170833333333333,
+      "classification": "non-machine",
+      "reason": "Actual decoded native exposure0 is black; no visible corresponding native landmark. Later attenuated exposures remain required.",
+      "views": []
+    },
+    {
+      "id": "opening-fade",
+      "start": 0.04170833333333333,
+      "end": 0.625625,
+      "classification": "transition",
+      "reason": "Fade from black; conservatively include frames0–14.",
+      "views": [
+        {
+          "viewId": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "whole-machine",
+      "start": 0.625625,
+      "end": 107.48237499999999,
+      "classification": "machine",
+      "reason": "Continuous rapid whole-machine turntable. Every integer-second image was inspected; no chapter approximation.",
+      "views": [
+        {
+          "viewId": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "whole-machine-credit",
+      "start": 107.48237499999999,
+      "end": 112.57079166666666,
+      "classification": "machine",
+      "reason": "Same whole-machine spin; music credit first becomes nonzero in independently sampled lower-left ROI at frame2577.",
+      "views": [
+        {
+          "viewId": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "whole-closeup-crossfade",
+      "start": 112.57079166666666,
+      "end": 112.98787499999999,
+      "classification": "transition",
+      "reason": "Crossfade between whole-machine and enlarged lower-machine crop. First new crop pixels at frame2699; last conservative superposition sample2708.",
+      "views": [
+        {
+          "viewId": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "closeup",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "closeup-sweep",
+      "start": 112.98787499999999,
+      "end": 141.55808333333331,
+      "classification": "machine",
+      "reason": "Continuous enlarged rotating machine; crop pans vertically from base/drive train through wheel/spring bank to top casting. Treat as continuous camera framing, NOT a single fixed whole-machine camera.",
+      "views": [
+        {
+          "viewId": "closeup",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "machine-endcard-crossfade",
+      "start": 141.55808333333331,
+      "end": 143.017875,
+      "classification": "transition",
+      "reason": "Conservative crossfade interval, visually bracketed to <=0.167s boundary uncertainty; visible machine and six-panel endcard overlap.",
+      "views": [
+        {
+          "viewId": "closeup",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-intro",
+          "rectSourcePixels": [
+            0,
+            0,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-synthesis",
+          "rectSourcePixels": [
+            640,
+            0,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-analysis",
+          "rectSourcePixels": [
+            1280,
+            0,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-analysis-pen-inset",
+          "rectSourcePixels": [
+            1519.5814926887965,
+            9.123177360620705,
+            400.4185073112036,
+            263.7260142551111
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-operation-paper-0",
+          "rectSourcePixels": [
+            0,
+            540,
+            640,
+            180
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-operation-paper-1",
+          "rectSourcePixels": [
+            0,
+            720,
+            640,
+            180
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-operation-paper-2",
+          "rectSourcePixels": [
+            0,
+            900,
+            640,
+            180
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-book",
+          "rectSourcePixels": [
+            640,
+            540,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-guide",
+          "rectSourcePixels": [
+            1280,
+            540,
+            640,
+            540
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "endcard",
+      "start": 143.017875,
+      "end": 168.62679166666666,
+      "classification": "machine",
+      "reason": "Actual retained Spin endcard contains six machine-photograph/depiction panels, including nested camera layouts. It is not exempted as non-machine; source/native ambiguities remain explicit.",
+      "views": [
+        {
+          "viewId": "endcard-intro",
+          "rectSourcePixels": [
+            0,
+            0,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-synthesis",
+          "rectSourcePixels": [
+            640,
+            0,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-analysis",
+          "rectSourcePixels": [
+            1280,
+            0,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-analysis-pen-inset",
+          "rectSourcePixels": [
+            1519.5814926887965,
+            9.123177360620705,
+            400.4185073112036,
+            263.7260142551111
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-operation-paper-0",
+          "rectSourcePixels": [
+            0,
+            540,
+            640,
+            180
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-operation-paper-1",
+          "rectSourcePixels": [
+            0,
+            720,
+            640,
+            180
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-operation-paper-2",
+          "rectSourcePixels": [
+            0,
+            900,
+            640,
+            180
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-book",
+          "rectSourcePixels": [
+            640,
+            540,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-guide",
+          "rectSourcePixels": [
+            1280,
+            540,
+            640,
+            540
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "endcard-credit-crossfade",
+      "start": 168.62679166666666,
+      "end": 169.41924999999998,
+      "classification": "transition",
+      "reason": "Panel-to-credit crossfade bracketed by unchanged panel ROI before frame4043 and zero panel ROI at frame4062.",
+      "views": [
+        {
+          "viewId": "endcard-intro",
+          "rectSourcePixels": [
+            0,
+            0,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-synthesis",
+          "rectSourcePixels": [
+            640,
+            0,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-analysis",
+          "rectSourcePixels": [
+            1280,
+            0,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-analysis-pen-inset",
+          "rectSourcePixels": [
+            1519.5814926887965,
+            9.123177360620705,
+            400.4185073112036,
+            263.7260142551111
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-operation-paper-0",
+          "rectSourcePixels": [
+            0,
+            540,
+            640,
+            180
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-operation-paper-1",
+          "rectSourcePixels": [
+            0,
+            720,
+            640,
+            180
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-operation-paper-2",
+          "rectSourcePixels": [
+            0,
+            900,
+            640,
+            180
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-book",
+          "rectSourcePixels": [
+            640,
+            540,
+            640,
+            540
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "endcard-guide",
+          "rectSourcePixels": [
+            1280,
+            540,
+            640,
+            540
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "credits",
+      "start": 169.41924999999998,
+      "end": 173.741,
+      "classification": "non-machine",
+      "reason": "Creator/support credits on black; container audio outlasts video by0.025792s.",
+      "views": []
+    }
+  ]
+}

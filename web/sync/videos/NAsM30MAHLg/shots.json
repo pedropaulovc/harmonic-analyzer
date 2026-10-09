@@ -1,0 +1,2903 @@
+{
+  "videoId": "NAsM30MAHLg",
+  "sourceSha256": "e1bb453815e94b5671f132196cb810b4432239697ec1eac946e9d2a7af451a20",
+  "fps": [
+    30000,
+    1001
+  ],
+  "shots": [
+    {
+      "id": "opening-title",
+      "start": 0,
+      "end": 1.8018,
+      "classification": "non-machine",
+      "reason": "Black/title card only; no corresponding physical machine.",
+      "views": []
+    },
+    {
+      "id": "machine-title-fade",
+      "start": 1.8018,
+      "end": 2.3023,
+      "classification": "transition",
+      "reason": "Corresponding whole physical machine fades in behind title; visible landmarks remain required.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "presenter-first",
+      "start": 2.3023,
+      "end": 53.987267,
+      "classification": "machine",
+      "reason": "Stationary whole corresponding machine alongside presenter and changing title/plot overlays.",
+      "views": [
+        {
+          "viewId": "whole-machine",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-entry-crossfade",
+      "start": 53.987267,
+      "end": 54.6546,
+      "classification": "transition",
+      "reason": "Whole-machine shot crossfades to actual cam-bank close-up; both physical views are required while visible.",
+      "views": [
+        {
+          "viewId": "whole-out",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "cam-bank",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-cams",
+      "start": 54.6546,
+      "end": 55.188467,
+      "classification": "machine",
+      "reason": "Actual cylinder cam bank and connecting rods; visible crank-driven motion, not an illustrative diagram.",
+      "views": [
+        {
+          "viewId": "cam-bank",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "cone-bank",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-cone-gears",
+      "start": 55.188467,
+      "end": 56.4564,
+      "classification": "machine",
+      "reason": "Actual moving cone gear teeth; native cadence retained through rapid rotation and hard cut.",
+      "views": [
+        {
+          "viewId": "cone-bank",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-gears-bars-crossfade",
+      "start": 56.4564,
+      "end": 56.689967,
+      "classification": "transition",
+      "reason": "Actual cone bank superposed with moving pivoted-bar close-up.",
+      "views": [
+        {
+          "viewId": "cone-bank",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "moving-rockers",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-moving-bars",
+      "start": 56.689967,
+      "end": 59.893167,
+      "classification": "machine",
+      "reason": "Actual moving pivoted bars with sine overlays; 4x playback source acceleration.",
+      "views": [
+        {
+          "viewId": "moving-rockers",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-bars-summing-crossfade",
+      "start": 59.893167,
+      "end": 60.2602,
+      "classification": "transition",
+      "reason": "Actual bar bank superposed with counter spring/summing knife close-up.",
+      "views": [
+        {
+          "viewId": "moving-rockers",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "summing",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-summing",
+      "start": 60.2602,
+      "end": 62.4624,
+      "classification": "machine",
+      "reason": "Actual top casting, counter spring, knife and summing lever; visible oscillation.",
+      "views": [
+        {
+          "viewId": "summing",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-summing-crank-crossfade",
+      "start": 62.4624,
+      "end": 62.7627,
+      "classification": "transition",
+      "reason": "Actual summing linkage crossfades to actual crank/pen/platen.",
+      "views": [
+        {
+          "viewId": "summing",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "cranking",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-cranking",
+      "start": 62.7627,
+      "end": 63.4634,
+      "classification": "machine",
+      "reason": "Hand rotates actual crank; chain, gears, paper and pen move at annotated accelerated playback.",
+      "views": [
+        {
+          "viewId": "cranking",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "synthesis-exit-fade",
+      "start": 63.4634,
+      "end": 63.897167,
+      "classification": "transition",
+      "reason": "Actual crank view fades out; corresponding machine features remain required when visible.",
+      "views": [
+        {
+          "viewId": "cranking",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "navigation-gap-one",
+      "start": 63.897167,
+      "end": 64.297567,
+      "classification": "machine",
+      "reason": "The main viewport is black, but three right-side source-photo containers contain five independently visible physical hardware views. All five remain required; navigation labels do not exempt physical photographs.",
+      "views": [
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-hand-bars",
+      "start": 64.297567,
+      "end": 65.098367,
+      "classification": "machine",
+      "reason": "Hand sets actual coefficient/amplitude levers; small station details visible.",
+      "views": [
+        {
+          "viewId": "hand-bars",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-bars-pen-crossfade",
+      "start": 65.098367,
+      "end": 65.398667,
+      "classification": "transition",
+      "reason": "Actual setting bank superposed with actual pen/platen.",
+      "views": [
+        {
+          "viewId": "hand-bars",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-wide",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-pen-wide",
+      "start": 65.398667,
+      "end": 66.099367,
+      "classification": "machine",
+      "reason": "Actual paper platen, pen hanger and marker in front of drawn plot; machine is required despite plot.",
+      "views": [
+        {
+          "viewId": "pen-wide",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-pen-bars-crossfade",
+      "start": 66.099367,
+      "end": 66.399667,
+      "classification": "transition",
+      "reason": "Actual pen/platen superposed with coefficient bar bank.",
+      "views": [
+        {
+          "viewId": "pen-wide",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "coefficient-bank",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-coefficient-bank",
+      "start": 66.399667,
+      "end": 67.333933,
+      "classification": "machine",
+      "reason": "Actual coefficient-bank station marks and links; hand enters frame.",
+      "views": [
+        {
+          "viewId": "coefficient-bank",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-bank-composite-crossfade",
+      "start": 67.333933,
+      "end": 67.634233,
+      "classification": "transition",
+      "reason": "Actual coefficient view transitions into two simultaneously corresponding views: bank and pen/platen.",
+      "views": [
+        {
+          "viewId": "coefficient-bank",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "composite-bank",
+          "rectSourcePixels": [
+            78,
+            573,
+            1271,
+            365
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "composite-pen",
+          "rectSourcePixels": [
+            420,
+            233,
+            760,
+            340
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-two-view-composite",
+      "start": 67.634233,
+      "end": 69.235833,
+      "classification": "machine",
+      "reason": "Two actual physical viewports: coefficient bank below and pen/platen inset above; digital axes are not physical landmarks.",
+      "views": [
+        {
+          "viewId": "composite-bank",
+          "rectSourcePixels": [
+            78,
+            573,
+            1271,
+            365
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "composite-pen",
+          "rectSourcePixels": [
+            420,
+            233,
+            760,
+            340
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-composite-pen-crossfade",
+      "start": 69.235833,
+      "end": 69.536133,
+      "classification": "transition",
+      "reason": "Actual bank/pen composite crossfades to enlarged actual pen marker.",
+      "views": [
+        {
+          "viewId": "composite-bank",
+          "rectSourcePixels": [
+            78,
+            573,
+            1271,
+            365
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "composite-pen",
+          "rectSourcePixels": [
+            420,
+            233,
+            760,
+            340
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-macro",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-pen-macro",
+      "start": 69.536133,
+      "end": 72.605867,
+      "classification": "machine",
+      "reason": "Actual pen/v-block/rod against paper; paper graph alone is not exemption.",
+      "views": [
+        {
+          "viewId": "pen-macro",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "analysis-exit-fade",
+      "start": 72.605867,
+      "end": 73.039633,
+      "classification": "transition",
+      "reason": "Actual pen marker view fades toward black.",
+      "views": [
+        {
+          "viewId": "pen-macro",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "navigation-gap-two",
+      "start": 73.039633,
+      "end": 73.406667,
+      "classification": "machine",
+      "reason": "The main viewport is black, but three right-side source-photo containers contain five independently visible physical hardware views. All five remain required; navigation labels do not exempt physical photographs.",
+      "views": [
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "operation-entry-fade",
+      "start": 73.406667,
+      "end": 73.740333,
+      "classification": "transition",
+      "reason": "Actual output fixture/cam-bank close-up fades in.",
+      "views": [
+        {
+          "viewId": "output-fixture",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "operation-output-fixture",
+      "start": 73.740333,
+      "end": 75.408667,
+      "classification": "machine",
+      "reason": "Actual output fixture, phase/setup handle and bent rods, not schematic artwork.",
+      "views": [
+        {
+          "viewId": "output-fixture",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "operation-fixture-three-view-crossfade",
+      "start": 75.408667,
+      "end": 75.742333,
+      "classification": "transition",
+      "reason": "Actual fixture view crossfades to three simultaneous physical platen examples.",
+      "views": [
+        {
+          "viewId": "output-fixture",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "gearing-top",
+          "rectSourcePixels": [
+            510,
+            225,
+            735,
+            237
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "gearing-middle",
+          "rectSourcePixels": [
+            510,
+            465,
+            735,
+            236
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "gearing-bottom",
+          "rectSourcePixels": [
+            510,
+            704,
+            735,
+            234
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "operation-three-view-gearing",
+      "start": 75.742333,
+      "end": 77.410667,
+      "classification": "machine",
+      "reason": "Three physical pen/platen viewport rows show different gearing; illustrated gear glyphs are not physical landmarks.",
+      "views": [
+        {
+          "viewId": "gearing-top",
+          "rectSourcePixels": [
+            510,
+            225,
+            735,
+            237
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "gearing-middle",
+          "rectSourcePixels": [
+            510,
+            465,
+            735,
+            236
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "gearing-bottom",
+          "rectSourcePixels": [
+            510,
+            704,
+            735,
+            234
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "operation-gearing-counter-crossfade",
+      "start": 77.410667,
+      "end": 77.744333,
+      "classification": "transition",
+      "reason": "Three physical platen rows superposed with actual counter-spring setting.",
+      "views": [
+        {
+          "viewId": "gearing-top",
+          "rectSourcePixels": [
+            510,
+            225,
+            735,
+            237
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "gearing-middle",
+          "rectSourcePixels": [
+            510,
+            465,
+            735,
+            236
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "gearing-bottom",
+          "rectSourcePixels": [
+            510,
+            704,
+            735,
+            234
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "counter-setting",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "operation-counter-setting",
+      "start": 77.744333,
+      "end": 79.412667,
+      "classification": "machine",
+      "reason": "Hands adjust actual counter spring height beneath top casting.",
+      "views": [
+        {
+          "viewId": "counter-setting",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "operation-counter-phase-crossfade",
+      "start": 79.412667,
+      "end": 79.746333,
+      "classification": "transition",
+      "reason": "Counter setup view crossfades to actual phase/eccentric knob.",
+      "views": [
+        {
+          "viewId": "counter-setting",
+          "rectSourcePixels": [
+            78,
+            223,
+            1271,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "phase-cylinder-left",
+          "rectSourcePixels": [
+            78,
+            223,
+            628,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "phase-rocker-right",
+          "rectSourcePixels": [
+            706,
+            223,
+            643,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "operation-phase-knob",
+      "start": 79.746333,
+      "end": 80.413667,
+      "classification": "machine",
+      "reason": "Actual phase-setting eccentric control and cam-bank rods; fingertip enters frame.",
+      "views": [
+        {
+          "viewId": "phase-cylinder-left",
+          "rectSourcePixels": [
+            78,
+            223,
+            628,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "phase-rocker-right",
+          "rectSourcePixels": [
+            706,
+            223,
+            643,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "operation-exit-fade",
+      "start": 80.413667,
+      "end": 80.914167,
+      "classification": "transition",
+      "reason": "Actual phase control and navigation fade out.",
+      "views": [
+        {
+          "viewId": "phase-cylinder-left",
+          "rectSourcePixels": [
+            78,
+            223,
+            628,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "phase-rocker-right",
+          "rectSourcePixels": [
+            706,
+            223,
+            643,
+            715
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-synthesis",
+          "rectSourcePixels": [
+            1380,
+            93,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-analysis",
+          "rectSourcePixels": [
+            1380,
+            405,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-top",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-middle",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "right-operation-bottom",
+          "rectSourcePixels": [
+            1380,
+            717,
+            480,
+            270
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "history-entry-fade",
+      "start": 80.914167,
+      "end": 81.514767,
+      "classification": "transition",
+      "reason": "Whole corresponding physical machine and presenter fade in.",
+      "views": [
+        {
+          "viewId": "whole-in",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "presenter-history-first",
+      "start": 81.514767,
+      "end": 118.585133,
+      "classification": "machine",
+      "reason": "Stationary corresponding machine remains alongside presenter, portrait and historical photos; photos do not exempt live machine.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "plaque-entry-crossfade",
+      "start": 118.585133,
+      "end": 119.285833,
+      "classification": "transition",
+      "reason": "Whole corresponding machine superposed with its actual base-maker plaque macro.",
+      "views": [
+        {
+          "viewId": "whole-machine",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "base-plaque",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "base-maker-plaque",
+      "start": 119.285833,
+      "end": 121.654867,
+      "classification": "machine",
+      "reason": "Actual corresponding machine base/plaque close-up; plate is a physical CAD part, no invented pose exemption.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "plaque-exit-crossfade",
+      "start": 121.654867,
+      "end": 122.288833,
+      "classification": "transition",
+      "reason": "Physical base/plaque macro superposed with whole corresponding machine.",
+      "views": [
+        {
+          "viewId": "whole-machine",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "base-plaque",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "presenter-history-second",
+      "start": 122.288833,
+      "end": 184.21736666666666,
+      "classification": "machine",
+      "reason": "Stationary corresponding machine beside presenter plus historical catalogue pages/photos/building image. Copyrighted overlays are not reproduced.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "endcard-entry-crossfade",
+      "start": 184.21736666666666,
+      "end": 185.185,
+      "classification": "transition",
+      "reason": "Live corresponding whole machine crossfades beneath six actual source-photo containers comprising eight physical hardware views. Live whole-machine state remains required until185.185s; all preview states are independently required while their source pixels remain present.",
+      "views": [
+        {
+          "viewId": "whole-machine",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-synthesis",
+          "rectSourcePixels": [
+            0,
+            0,
+            639,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-analysis",
+          "rectSourcePixels": [
+            642,
+            0,
+            637,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-operation-top",
+          "rectSourcePixels": [
+            1282,
+            0,
+            638,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-operation-middle",
+          "rectSourcePixels": [
+            1282,
+            0,
+            638,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-operation-bottom",
+          "rectSourcePixels": [
+            1282,
+            0,
+            638,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-book-posters",
+          "rectSourcePixels": [
+            0,
+            542,
+            639,
+            538
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-page-by-page",
+          "rectSourcePixels": [
+            642,
+            542,
+            637,
+            538
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-rocker-arms",
+          "rectSourcePixels": [
+            1282,
+            542,
+            638,
+            538
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "navigation-endcards",
+      "start": 185.185,
+      "end": 213.646767,
+      "classification": "machine",
+      "reason": "Six source-photo containers contain eight required physical hardware views, including the three independent Operation paper images. Book/page-linked hardware photos are required; excluded linked guide/private destinations remain excluded.",
+      "views": [
+        {
+          "viewId": "end-synthesis",
+          "rectSourcePixels": [
+            0,
+            0,
+            639,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-analysis",
+          "rectSourcePixels": [
+            642,
+            0,
+            637,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-operation-top",
+          "rectSourcePixels": [
+            1282,
+            0,
+            638,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-operation-middle",
+          "rectSourcePixels": [
+            1282,
+            0,
+            638,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-operation-bottom",
+          "rectSourcePixels": [
+            1282,
+            0,
+            638,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-book-posters",
+          "rectSourcePixels": [
+            0,
+            542,
+            639,
+            538
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-page-by-page",
+          "rectSourcePixels": [
+            642,
+            542,
+            637,
+            538
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-rocker-arms",
+          "rectSourcePixels": [
+            1282,
+            542,
+            638,
+            538
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "credits-crossfade",
+      "start": 213.646767,
+      "end": 214.34746666666666,
+      "classification": "transition",
+      "reason": "Credits crossfade still contains eight physical hardware source-photo views through native exposure6423/214.3141s. All remain required until actual disappearance6424/214.347466667s.",
+      "views": [
+        {
+          "viewId": "end-synthesis",
+          "rectSourcePixels": [
+            0,
+            0,
+            639,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-analysis",
+          "rectSourcePixels": [
+            642,
+            0,
+            637,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-operation-top",
+          "rectSourcePixels": [
+            1282,
+            0,
+            638,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-operation-middle",
+          "rectSourcePixels": [
+            1282,
+            0,
+            638,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-operation-bottom",
+          "rectSourcePixels": [
+            1282,
+            0,
+            638,
+            539
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-book-posters",
+          "rectSourcePixels": [
+            0,
+            542,
+            639,
+            538
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-page-by-page",
+          "rectSourcePixels": [
+            642,
+            542,
+            637,
+            538
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "end-rocker-arms",
+          "rectSourcePixels": [
+            1282,
+            542,
+            638,
+            538
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "credits-crossfade-no-machine",
+      "start": 214.34746666666666,
+      "end": 214.7145,
+      "classification": "transition",
+      "reason": "Decoded source hardware-photo patterns have disappeared by native exposure6424; remaining credits/background crossfade has no corresponding machine.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ]
+    },
+    {
+      "id": "credits",
+      "start": 214.7145,
+      "end": 218.381,
+      "classification": "non-machine",
+      "reason": "Credits and final fade to black; no corresponding physical machine.",
+      "views": []
+    }
+  ]
+}

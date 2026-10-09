@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "videoId": "8KmVDxkia_w",
+  "sourceSha256": "da74c5c395c6a797a2a8cb445bc7b58f2b4c2a4a5c91e8568cdb0fc176743cdf",
+  "modelSha256": "941b6193698091781f133642bdc2a7411a18c2cfcb5252646a79b9bd57c6a805",
+  "shots": [
+    {
+      "id": "fixture-wide",
+      "start": 0,
+      "end": 10,
+      "classification": "machine",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native",
+          "cameraKeys": [
+            {
+              "t": 0,
+              "camera": {
+                "positionMetres": [
+                  1.2,
+                  1,
+                  1.6
+                ],
+                "quaternion": [
+                  -0.0751778932764319,
+                  0.3152332970925426,
+                  0.02505929775881063,
+                  0.945699891277628
+                ],
+                "verticalFovDegrees": 35,
+                "principalPointViewportPixels": [
+                  960,
+                  540
+                ]
+              }
+            },
+            {
+              "t": 10,
+              "camera": {
+                "positionMetres": [
+                  1,
+                  1.1,
+                  1.4
+                ],
+                "quaternion": [
+                  -0.11373523713842293,
+                  0.302993061611239,
+                  0.036448168843996,
+                  0.9454792601831276
+                ],
+                "verticalFovDegrees": 32,
+                "principalPointViewportPixels": [
+                  940,
+                  535
+                ]
+              }
+            }
+          ],
+          "quality": {
+            "medianPx": 0,
+            "p90Px": 0,
+            "maxPx": 0,
+            "status": "unfitted"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fixture-cut",
+      "start": 10,
+      "end": 20,
+      "classification": "machine",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native",
+          "cameraKeys": [
+            {
+              "t": 10,
+              "camera": {
+                "positionMetres": [
+                  -1.2,
+                  1.05,
+                  1.6
+                ],
+                "quaternion": [
+                  -0.0866512168333165,
+                  -0.314905905985565,
+                  -0.028883738944438832,
+                  0.944717717956695
+                ],
+                "verticalFovDegrees": 35,
+                "principalPointViewportPixels": [
+                  960,
+                  540
+                ]
+              }
+            }
+          ],
+          "quality": {
+            "medianPx": 0,
+            "p90Px": 0,
+            "maxPx": 0,
+            "status": "unfitted"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fixture-hold",
+      "start": 20,
+      "end": 1000,
+      "classification": "non-machine",
+      "views": []
+    }
+  ],
+  "segments": [
+    {
+      "id": "fixture-setup",
+      "start": 0,
+      "end": 1000,
+      "input": {
+        "amplitudes": [
+          0,
+          0.031578947368421054,
+          0,
+          0.03529411764705882,
+          0,
+          0.04,
+          0,
+          0.04615384615384615,
+          0,
+          0.05454545454545454,
+          0,
+          0.06666666666666667,
+          0,
+          0.08571428571428572,
+          0,
+          0.12,
+          0,
+          0.19999999999999998,
+          0,
+          0.6
+        ],
+        "phases": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "gearing": "small-large",
+        "magnification": 4.1405269761606025,
+        "setup": {
+          "counterHeightM": null,
+          "meanLineAngleRad": 0,
+          "platenOffsetM": 0,
+          "wireFixtureOffsetM": 0,
+          "coneSwingRad": 0,
+          "pinionCamRad": 0,
+          "heldChannelTurns": 0,
+          "driveCrankOffsetTurns": 0
+        }
+      },
+      "provenance": {
+        "amplitudes": "chosen",
+        "phases": "chosen",
+        "gearing": "chosen",
+        "magnification": "chosen",
+        "setup": "chosen"
+      }
+    }
+  ],
+  "crank": [
+    {
+      "t": 0,
+      "turns": 0,
+      "source": "held"
+    },
+    {
+      "t": 10,
+      "turns": 1,
+      "source": "inferred"
+    },
+    {
+      "t": 20,
+      "turns": 2,
+      "source": "inferred"
+    },
+    {
+      "t": 1000,
+      "turns": 100,
+      "source": "inferred"
+    }
+  ]
+}
