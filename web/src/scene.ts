@@ -222,11 +222,17 @@ export interface Machine {
   /** Remove the native root from the scene and free its GPU resources and probes. */
   dispose(): void
 }
+export type ModelLoadProgress =
+  | { phase: 'downloading'; loadedBytes: number; totalBytes: number }
+  | { phase: 'preparing' }
+
 export interface LoadMachineOptions {
   /** GLB location; defaults to the pinned harmonic-analyzer export. */
   url?: string
   /** Retain decoded primitive associations only for the existing verification bridge. */
   nativePrimitiveSnapshots?: boolean
+  /** Decoded response-body progress, followed by identity checking and model preparation. */
+  onProgress?: (progress: ModelLoadProgress) => void
 }
 
 /** Predictable device-capacity refusal, before a prepared source sample is published. */
@@ -2358,9 +2364,27 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   let snapshotSolvedInputKey: string | null = null
   const snapshotOrigins = options.nativePrimitiveSnapshots ? new WeakMap<THREE.Object3D, THREE.Object3D>() : null
   try {
+    const onProgress = options.onProgress
+    const totalBytes = modelRepresentation.representation.byteLength
+    onProgress?.({ phase: 'downloading', loadedBytes: 0, totalBytes })
     const response = await fetch(url)
     if (!response.ok) throw new Error(`Model request returned HTTP ${response.status}`)
-    const buffer = await response.arrayBuffer()
+    let buffer: ArrayBuffer
+    if (onProgress && response.body) {
+      let loadedBytes = 0
+      // Fetch exposes decoded body bytes; compressed Content-Length is not the model size.
+      const observedBody = response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          loadedBytes += chunk.byteLength
+          onProgress({ phase: 'downloading', loadedBytes, totalBytes })
+          controller.enqueue(chunk)
+        },
+      }))
+      buffer = await new Response(observedBody).arrayBuffer()
+    } else {
+      buffer = await response.arrayBuffer()
+    }
+    onProgress?.({ phase: 'preparing' })
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', buffer))
     provenance.observedSha256 = Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('')
     provenance.observedByteLength = buffer.byteLength
