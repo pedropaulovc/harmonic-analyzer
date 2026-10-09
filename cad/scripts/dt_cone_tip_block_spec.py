@@ -86,10 +86,13 @@ SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 # engagement, sit that much shallower.  User ruling 2026-09-29: the block is
 # fixed by its hold-down, so the tip's axial scatter lands on that
 # engagement; build_dt_drive_train_assembly sums the stack and asserts it stays
-# inside ADJUSTER_EMBED_WINDOW.  The value centres the engagement there.
+# inside ADJUSTER_EMBED_WINDOW.  The value centres the engagement there: the
+# Ø1/32 in terminal stub seats 0.397 mm (its radius / tan 45 deg) short of the
+# apex, so 7.77 keeps main's 7.376 mm centred engagement (8.17 with the former
+# Ø1/16 stub's 0.794 mm seat depth).
 ADJUSTER_THREAD = "#10-32"
 ADJUSTER_SCREW_LENGTH = 9.525
-ADJUSTER_EMBED = 8.17
+ADJUSTER_EMBED = 7.77
 # 90-degree countersink on each mouth to Ø5.0, just over the 4.826 major, so
 # the first thread starts full rather than on a feather edge (Main,
 # 2026-09-24).  Its depth is the 45-degree break on the tap drill.
