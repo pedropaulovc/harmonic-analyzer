@@ -187,6 +187,34 @@ def notch_solid_area(step: float = 0.004) -> float:
     return hits * dx * dy
 
 
+def _higher_accuracy_volume_mm3(adapter, label: str) -> float:
+    """Part volume from IMassProperty2 at swMassPropertyAccuracyLevel_Higher.
+
+    The notch removes ~2.2 mm^3 from a ~12444 mm^3 body whose 120 gaps are
+    equation-curve (spline) faces. At the default accuracy the toothed disc
+    reads 2.39 mm^3 under its exact Green-area oracle (probe 3, 187ab61f2),
+    and every stock-patterned cone row reads low by a fraction growing with
+    radius, as a surface-quadrature error on x.n does. A 0.13 mm^3 band on a
+    difference of two such readings needs the higher-accuracy integration.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ForceRebuild3(False)
+    model.ClearSelection2(True)
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    mass = _early_bound(extension.CreateMassProperty2(), "IMassProperty2")
+    if mass is None:
+        raise RuntimeError(f"{label}: CreateMassProperty2 failed")
+    mass.UseSystemUnits = True
+    mass.AccuracyLevel = 2  # swMassPropertyAccuracyLevel_Higher
+    if int(mass.AccuracyLevel) != 2:
+        raise RuntimeError(f"{label}: mass-property accuracy did not take Higher")
+    if not mass.Recalculate():
+        raise RuntimeError(f"{label}: higher-accuracy mass recalculation failed")
+    volume = float(mass.Volume) * 1e9
+    _telemetry.info(f"{label}: higher-accuracy volume {volume:.4f} mm^3")
+    return volume
+
+
 def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
     """Start point (mm) of a named reference axis via IRefAxis.GetRefAxisParams."""
     model = adapter.currentModel
@@ -343,6 +371,14 @@ async def build(adapter) -> dict[str, str]:
             "-- extrude direction flipped"
         )
     _telemetry.success(f"cam placement: COM y {com[1]:.3f} z {com[2]:.3f}")
+    analytic_before = (
+        math.pi * RA_MM**2 - TEETH * STOCK_FORM.gap_area_mm2
+    ) * FACE_WIDTH + v_cam
+    before_notch = _higher_accuracy_volume_mm3(adapter, "before notch")
+    _telemetry.info(
+        f"before notch: analytic {analytic_before:.4f} mm^3, "
+        f"higher-accuracy minus analytic {before_notch - analytic_before:+.4f}"
+    )
 
     # ------------------------------------------------------------------
     # Alignment notch at +Y (top = cosine mode): a thin saw KERF seated in
@@ -520,9 +556,20 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "NotchKerf")
     v_notch = notch_solid_area() * FACE_WIDTH
-    # Looser band than the old square: the kerf removes only ~1.8 mm^3, so the
-    # grid-integration error on notch_solid_area is relatively larger.
-    volume = await volume_check(adapter, "notch", volume - v_notch, 0.06 * v_notch)
+    # The kerf delta is the difference of two higher-accuracy readings of the
+    # same spline-toothed body (see _higher_accuracy_volume_mm3); the band is
+    # unchanged.
+    removed = before_notch - _higher_accuracy_volume_mm3(adapter, "after notch")
+    if abs(removed - v_notch) > 0.06 * v_notch:
+        raise RuntimeError(
+            f"notch: removed {removed:.4f} mm^3 at higher accuracy, expected "
+            f"{v_notch:.4f} (+/- {0.06 * v_notch:.4f})"
+        )
+    _telemetry.success(f"notch: removed {removed:.4f} mm^3 (analytic {v_notch:.4f})")
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"notch: get_mass_properties failed: {mass.error}")
+    volume = float(mass.data.volume)
 
     # ------------------------------------------------------------------
     # Shaft bore through gear + cam (the bore circle is fully inside the

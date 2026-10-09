@@ -797,6 +797,42 @@ def _restrict_to_configuration(adapter: Any, teeth: int) -> None:
             raise RuntimeError(f"{selected}: cannot suppress {name} in {others}")
 
 
+def _suppress_other_rows_in_each_configuration(adapter: Any) -> None:
+    """Suppress every other row's sketch/cut/pattern with the target active.
+
+    ``_restrict_to_configuration`` specifies the other configurations from the
+    row being authored. Probe 3 (187ab61f2) read T012..T120 back unsuppressed
+    in T006 after that call returned True, the crank-v4-10 ferrule finding
+    (SetSuppression2 specified from another configuration left the cut live).
+    So, like the ferrule and the tip-collar builds, each configuration is
+    activated and suppresses the foreign rows in this configuration only,
+    dependents before parents, and each state is read back.
+    """
+    from solidworks_mcp.adapters.com_variant import null_variant
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    part = _early_bound(model, "IPartDoc")
+    for configuration in [str(name) for name in model.GetConfigurationNames()]:
+        _activate_configuration(model, configuration)
+        for row, row_teeth in CONFIGS:
+            if row == configuration:
+                continue
+            for name in reversed(tooth_features(row_teeth)):
+                raw = part.FeatureByName(name)
+                if raw is None:
+                    raise RuntimeError(f"{configuration}: missing configured feature {name}")
+                feature = _early_bound(raw, "IFeature")
+                states = feature.IsSuppressed2(1, null_variant())
+                if isinstance(states, (list, tuple)) and len(states) == 1 and states[0] is True:
+                    continue
+                if feature.SetSuppression2(0, 1, null_variant()) is not True:
+                    raise RuntimeError(f"cannot suppress {name} in {configuration}")
+                states = feature.IsSuppressed2(1, null_variant())
+                if not isinstance(states, (list, tuple)) or len(states) != 1 or states[0] is not True:
+                    raise RuntimeError(f"{name}: suppression did not persist in {configuration}")
+    _telemetry.success("foreign tooth rows suppressed with each configuration active")
+
+
 def require_complete_stock_family() -> None:
     """Refuse publication of any absent/unqualified configured native member."""
     refused = []
@@ -1213,6 +1249,7 @@ async def build(adapter) -> dict[str, str]:
             teeth * (0.01 * removed - area_error),
         )
         _restrict_to_configuration(adapter, teeth)
+    _suppress_other_rows_in_each_configuration(adapter)
     blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
     check("activate T120 for native PMI", await adapter.set_active_configuration("T120"))
 
