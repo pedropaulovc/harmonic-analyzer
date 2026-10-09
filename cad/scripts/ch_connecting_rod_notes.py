@@ -12,6 +12,7 @@ part + drawing and leaves the assembly to its cheap token refresh.
 from __future__ import annotations
 
 from ch_connecting_rod_spec import (
+    FORK_TINE_MATCH,
     RING_SLOT_SYMMETRY,
     RING_THICKNESS,
     SHANK_THICKNESS,
@@ -64,7 +65,7 @@ DRAWING_NOTES = "\n".join(
         f"2. RING AND SHANK {RING_THICKNESS:.3f} THICK;",
         f"   SYMMETRIC TO SLOT WITHIN {RING_SLOT_SYMMETRY:.2f}.",
         "3. RING WALL 4.50 MIN AFTER BORING.",
-        "4. SLOT CENTRED; TINES EQUAL WITHIN 0.10",
+        f"4. SLOT CENTRED; TINES EQUAL WITHIN {FORK_TINE_MATCH:.2f}",
         f"5. PRESS FIT PIN {PIN_NUMBER} INTO THE",
         "   REAMED PIN HOLE, BOTH TINES.",
     )

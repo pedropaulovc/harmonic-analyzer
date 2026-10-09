@@ -175,8 +175,13 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "3.00" not in notes and "2.50" not in notes
     assert "0.10 MIN CLR/SIDE" in notes
     assert "RING WALL 4.50 MIN AFTER BORING" in notes
-    assert "SLOT CENTRED; TINES EQUAL WITHIN 0.10" in notes
-    assert f"{ch_connecting_rod_spec.FORK_TINE_MATCH:.2f}" in notes
+    # Note 4 prints the spec's tine match on its own line, not a literal that
+    # note 2's 0.10 symmetry would also satisfy (CodeRabbit, PR #1292).
+    tine_note = (
+        f"4. SLOT CENTRED; TINES EQUAL WITHIN "
+        f"{ch_connecting_rod_spec.FORK_TINE_MATCH:.2f}"
+    )
+    assert tine_note in notes.splitlines()
     # The press fit (user ruling 2026-10-09, PR #1292 review F1) names its
     # pin; the hole's size and band are the model's PinHoleDia (rules 2 and 6,
     # PR #1292 review N1), so no limit of it may ride the note text.

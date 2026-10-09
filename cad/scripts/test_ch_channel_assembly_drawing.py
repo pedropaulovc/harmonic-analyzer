@@ -253,8 +253,13 @@ def test_the_shaft_supplied_long_is_cut_to_fit_before_the_preload_is_accepted() 
     # step, the south bracket staying down at its spring setting.
     assert "UNSCREW THE NORTH" in body and "DRAW THE SHAFT NORTH" in body
     assert "EACH ARM LEFT HANGING ON ITS ROD" in body
-    assert f"REFIT AS STEP {steps.step_number('north-ear-datum')};" in body
-    assert f"SOUTH EAR LEFT AT ITS STEP {steps.step_number('south-bracket-spring-set')} SETTING" in body
+    # The refit re-threads the washer and spring the draw-out caught: the
+    # first pass fits them after the shaft (CodeRabbit, PR #1292).
+    assert (
+        f"REFIT AS STEP {steps.step_number('north-ear-datum')}, WASHER AND SPRING"
+        " THREADED ON PAST HUB 0;"
+    ) in body
+    assert f"SOUTH EAR AT ITS STEP {steps.step_number('south-bracket-spring-set')} SETTING" in body
     assert "CATCH WASHER AND SPRING" in body
     assert "UNSCREW THE SOUTH" not in body
     # Positive control: no other step mentions the cut.

@@ -123,8 +123,8 @@ def _fitup_steps() -> str:
             "NORTH; DRAW THE SHAFT NORTH OUT OF THE HUBS, EACH ARM LEFT "
             "HANGING ON ITS ROD; CATCH WASHER AND SPRING. CUT THE PLAIN END "
             f"{cut_low:.1f} TO {cut_high:.1f} PAST THE SCRIBE AND DOME IT "
-            f"{DOME_HEIGHT:.1f}. REFIT AS STEP {north_step}; "
-            f"SOUTH EAR LEFT AT ITS STEP {set_step} SETTING."
+            f"{DOME_HEIGHT:.1f}. REFIT AS STEP {north_step}, WASHER AND SPRING "
+            f"THREADED ON PAST HUB 0; SOUTH EAR AT ITS STEP {set_step} SETTING."
         ),
         "preload-accepted": (
             "ACCEPT: PUSHED SOUTH, BANK AND SHAFT SPRING BACK ONTO THE NORTH "
