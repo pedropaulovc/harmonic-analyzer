@@ -69,7 +69,7 @@ def test_pin_axis_and_mid_plane_contract() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
     marked = set().union(*notes.DRAWING_DIMENSIONS.values())
-    assert set(drawing.RIGHT_KEEP) == marked == {"PinDia", "PinLen"}
+    assert set(drawing.RIGHT_KEEP) == marked == {"PinDia", "PinLen", "BlankLen"}
     assert notes.REFERENCE_DIMENSIONS == {"PinLen"}
     # Drawing-only data stays out of the spec the channel assembly imports.
     for name in ("DRAWING_DIMENSIONS", "DRAWING_PRECISION", "REFERENCE_DIMENSIONS"):
@@ -78,7 +78,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_precision_and_band_are_authored_on_the_part() -> None:
-    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 3}
+    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 3, "BlankLen": 3}
     assert "draw_ch_rod_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
@@ -91,7 +91,26 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "PinDia"): "PIN_DIA_TOLERANCE",
+        ("BlankReference", "BlankLen"): "blank_upper",
     }
+
+
+def test_blank_length_is_a_model_dimension_with_its_band() -> None:
+    """The 7.500 +/-0.127 cut length prints from a blanked reference sketch
+    on the pin axis, never from note text."""
+    assert spec.PIN_BLANK_LENGTH_BAND == (0.127, -0.127)
+    assert notes.DRAWING_DIMENSIONS["BlankReference"] == {"BlankLen"}
+    build = "".join(_build_source().split())
+    assert 'set_global(adapter,"BlankLen",f"{PIN_BLANK_LENGTH}mm")' in build
+    assert 'blank.record("BlankLen",\'"BlankLen"\')' in build
+    assert 'name_last_feature(adapter,"BlankReference")' in build
+    assert '"origin",blank_line,"midpoint"' in build
+    assert 'blank_reference_sketches(adapter,("BlankReference",))' in build
+    source = _source()
+    assert "hidden_sketches.curate_view_dimensions(" in source
+    assert '{"BlankLen": "BLANK"}' in source
+    # The blank is longer than the installed pin by the two ends' upset.
+    assert spec.PIN_BLANK_LENGTH > spec.PIN_INSTALLED_LENGTH
 
 
 def test_print_carries_no_gdt_roughness_or_callouts() -> None:
@@ -116,7 +135,8 @@ def test_notes_state_blank_peening_running_fit_and_reconstruction() -> None:
     lines = notes.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4  # policy rule 6
     text = notes.DRAWING_NOTES
-    assert "CUT BLANK 7.50 \u00b10.13 LONG" in text
+    assert "CUT BLANK TO THE BLANK LENGTH SHOWN" in text
+    assert "7.50" not in text and "\u00b1" not in text  # rule 2: model-owned
     assert "PEEN BOTH ENDS INTO THE MHA-CH-003 FORK COUNTERSINKS AT ASSEMBLY" in text
     assert "DRESS TO 0.10 MAX PROUD" in text
     assert "RUNS FREE IN THE MHA-CH-006 #47 ROD HOLE" in text
@@ -142,6 +162,7 @@ def test_sheet_runs_at_10_to_1_and_lands_clear_of_the_title_block() -> None:
     assert dia_y > drawing.RIGHT_CENTER[1] + drawing.HALF_RIM
     assert dia_x < drawing.RIGHT_CENTER[0] - 0.015  # off the centerline pick
     assert drawing.RIGHT_KEEP["PinLen"][1] < drawing.RIGHT_CENTER[1] - drawing.HALF_RIM
+    assert drawing.RIGHT_KEEP["BlankLen"][1] < drawing.RIGHT_KEEP["PinLen"][1] - 0.010
     for x, y in (*drawing.RIGHT_KEEP.values(), drawing.NOTES_XY):
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267

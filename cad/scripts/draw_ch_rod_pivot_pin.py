@@ -2,13 +2,14 @@ r"""Create the curated manufacturing drawing for the rod pivot pin (MHA-CH-010).
 
 Under ``cad/docs/drawing-simplicity-policy.md``: the INSTALLED pin -- a
 5/64 drill-rod journal whose ends are peened into the fork's countersinks --
-on two native model dimensions, both on the side view where a turned part's
+on three native model dimensions, all on the side view where a turned part's
 diameter sits beside its length (rule 7): the journal Ø with the drill rod's
-own grind band, and the installed length as REFERENCE (the fork's thickness;
-the MHA-CH-003 print owns it). An axis centerline, a bare end view with its
-center mark, the isometric, and the property-linked notes (the blank's cut
-length, the peen-at-assembly step, the running fit, the #746 reconstruction
-statement). No datums, no frames, no roughness symbol.
+own grind band, the installed length as REFERENCE (the fork's thickness;
+the MHA-CH-003 print owns it), and the blank's cut length with its band from
+the part's blanked ``BlankReference`` sketch. An axis centerline, a bare end
+view with its center mark, the isometric, and the property-linked notes (cut
+the blank, the peen-at-assembly step, the running fit, the #746
+reconstruction statement). No datums, no frames, no roughness symbol.
 The decimal places and the band are the PART's
 (``ch_rod_pivot_pin_notes.DRAWING_PRECISION``, applied natively by
 ``build_ch_rod_pivot_pin``); this script only reads them back off the sheet.
@@ -22,6 +23,7 @@ import argparse
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -29,10 +31,10 @@ from _drawing_common import (
     add_property_linked_note,
     add_view_centerline,
     assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimensions,
     stamp_drawing_summary,
@@ -76,10 +78,11 @@ HALF_LEN = PIN_INSTALLED_LENGTH * VIEW_SCALE[0] / 2000.0  # 0.0304
 
 # Side view: the diameter above the view, its text left of centre so the
 # axis-centerline pick at the view's middle lands on bare face; the installed
-# length below.
+# length below, and the blank's cut length below that.
 RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] - 0.020, RIGHT_CENTER[1] + HALF_RIM + 0.016),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_RIM - 0.016),
+    "BlankLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_RIM - 0.032),
 }
 
 
@@ -129,9 +132,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # Both dimensions live on the revolve's half-profile and import into the
-    # side view only; the end view is a bare circle with its center mark.
-    right_annotations = curate_view_dimensions(
+    # The journal and installed length live on the revolve's half-profile and
+    # the blank length on a reference sketch the part saves hidden, all on the
+    # Right plane: the side view curates through _drawing_hidden_sketches,
+    # which shows that sketch in this view only. The end view is a bare
+    # circle with its center mark.
+    right_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         right,
         keep=RIGHT_KEEP,
@@ -141,6 +147,8 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, right_annotations, DRAWING_PRECISION_BY_NAME)
     # The installed length is the fork's thickness: REFERENCE, keyed by name.
     set_reference_dimensions(adapter, right_annotations, REFERENCE_DIMENSIONS)
+    # Descriptive text only; the value and band are the model's.
+    set_dimension_callouts(adapter, right_annotations, {"BlankLen": "BLANK"})
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
     add_view_centerline(

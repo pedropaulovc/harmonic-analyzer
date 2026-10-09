@@ -8,33 +8,33 @@ would re-key them on every drawing edit. Imported ONLY by
 ``build_ch_rod_pivot_pin``, ``draw_ch_rod_pivot_pin`` and the offline tests.
 
 Policy rule 6: four lines a machinist cannot read off the views. The model is
-the INSTALLED pin, so the blank's cut length is the one size the views cannot
-show; the peen-at-assembly step IS the retention requirement; the running fit
-names its mating part; and the last line states, once, that peened retention
-is this reconstruction's choice (issue #746), not the documented original.
-The title block owns the drill rod (MATERIAL) and its finish.
+the INSTALLED pin, so the blank's cut length prints from a blanked reference
+sketch and note 1 only says to cut it; the peen-at-assembly step IS the
+retention requirement; the running fit names its mating part; and the last
+line states, once, that peened retention is this reconstruction's choice
+(issue #746), not the documented original. The title block owns the drill
+rod (MATERIAL) and its finish.
 """
 
 from __future__ import annotations
 
 import ch_rod_pivot_pin_spec as pin
-from _fit_limits import deviations
-
-_BLANK_LOWER, _BLANK_UPPER = deviations(pin.PIN_BLANK_LENGTH_BAND)
-if _BLANK_UPPER != -_BLANK_LOWER:
-    raise AssertionError("the blank note prints a symmetric band")
 
 # --- Drawing contract (policy rule 2: the PART owns places and bands). ---
-# Both marked dimensions live on the revolve's half-profile (``PinProfile``),
-# so both import into the side view beside each other (rule 7, turned part).
-# The journal carries the drill rod's own grind band natively at three places;
-# the installed length is the fork's thickness, printed as REFERENCE (the fork
-# print owns it). The blank cut length is the shop instruction in note 1.
+# The journal and the installed length live on the revolve's half-profile
+# (``PinProfile``), so both import into the side view beside each other
+# (rule 7, turned part). The journal carries the drill rod's own grind band
+# natively at three places; the installed length is the fork's thickness,
+# printed as REFERENCE (the fork print owns it). The blank's cut length lives
+# on the blanked ``BlankReference`` sketch on the same plane and carries its
+# own 3-place band (the upset budget in ch_rod_pivot_pin_spec is judged at it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
+    "BlankReference": {"BlankLen"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {"PinDia": 3, "PinLen": 3},
+    "BlankReference": {"BlankLen": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
@@ -49,8 +49,7 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 
 DRAWING_NOTES = "\n".join(
     (
-        f"1. CUT BLANK {pin.PIN_BLANK_LENGTH:.2f} "
-        f"\u00b1{_BLANK_UPPER:.2f} LONG; INSTALLED STATE SHOWN.",
+        "1. CUT BLANK TO THE BLANK LENGTH SHOWN; INSTALLED STATE SHOWN.",
         "2. PEEN BOTH ENDS INTO THE MHA-CH-003 FORK COUNTERSINKS AT ASSEMBLY;"
         f" DRESS TO {pin.PIN_END_PROUD_MAX:.2f} MAX PROUD.",
         "3. RUNS FREE IN THE MHA-CH-006 #47 ROD HOLE.",
