@@ -259,6 +259,19 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Curved Disc Spring",
         "9715K43",
     ),
+    # MHA-VN-050 / -051 (#948 ruling R): one wave disc spring preloading each
+    # bank north on its datum; steel and high-carbon steel, the library's
+    # plain carbon steel.
+    "vn-cylinder-bank-spring": _stock(
+        "vn-cylinder-bank-spring",
+        "Wave Disc Spring",
+        "9714K392",
+    ),
+    "vn-rocker-bank-spring": _stock(
+        "vn-rocker-bank-spring",
+        "Wave Disc Spring",
+        "9714K24",
+    ),
     "vn-tube-frame-cap": _stock(
         "vn-tube-frame-cap",
         "Metal Round Cap",

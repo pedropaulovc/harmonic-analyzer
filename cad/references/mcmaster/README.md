@@ -51,6 +51,8 @@ recipes:
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `vn-cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 9714K24 | `vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
+| 9714K392 | `vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
 | 97431A260 | `vn-transgear-retaining-ring` | Side-Mount External Retaining Ring |
 | 98296A026 | `vn-transgear-collar-cross-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
@@ -516,6 +518,33 @@ Catalog specifications checked on September 10, 2026:
   SolidWorks model is offered on the page, but none was fetched or kept here,
   so it is catalogue-only: no replica gate, and its standalone diagnostic is
   a catalog-only run.
+
+- [9714K392](https://www.mcmaster.com/9714K392/) (`vn-cylinder-bank-spring`,
+  MHA-VN-050, one) sits on the MHA-DT-013 arbor between the front MHA-DT-026
+  washer and the front MHA-DT-002 strap, set by a 0.95 blade, and holds the
+  20-gear stack north on its datum (#948 ruling R). Its page was read live on
+  October 9, 2026: Wave Disc Spring, steel, stackable; ID 0.385 in -0.01/+0.01,
+  OD 0.5 in -0.01/+0.01, thickness 0.005 in, height 0.05 in (free); compressed
+  height 0.024 in and deflection 0.026 in at the 1.5 lb working load; pack of
+  10, $11.18. The page states no rate and no wave count (the spec's rate is
+  the working point taken as linear [INFERENCE]); the part carries the
+  library's `Plain Carbon Steel`.
+- [9714K24](https://www.mcmaster.com/9714K24/) (`vn-rocker-bank-spring`,
+  MHA-VN-051, one) sits on the MHA-CH-005 pivot shaft between the MHA-CH-009
+  washer and the south MHA-CH-008 ear, set by a 0.60 blade, and holds the
+  20-hub stack north on its datum. Its page was read live on October 9, 2026:
+  Wave Disc Spring, high-carbon steel, stackable; ID 0.265 in -0.02/+0.01, OD
+  0.367 in -0.02/+0.01, thickness 0.006 in, height 0.03 in (free); compressed
+  height 0.015 in and deflection 0.015 in at the 3 lb working load; pack of 25,
+  $16.31. The page states no rate, no wave count and no shaft size. The
+  catalogue's minimum ID (6.22 mm) is under the 6.35 mm shaft, so each spring
+  is slid onto MHA-CH-005 first and one that does not run free is rejected.
+- Both are modelled as their installed envelope: `diag_build_9714K392.py` and
+  `diag_build_9714K24.py` extrude the ID x OD annulus to the installed height
+  (the set-blade gap) [INFERENCE: the waves are not modelled]. A 3-D
+  SolidWorks model is offered on each page, but none was fetched or kept
+  here, so both are catalogue-only: no replica gate, and their standalone
+  diagnostics are catalog-only runs.
 
 - [3606T118](https://www.mcmaster.com/3606T118/) (`vn-keeper-chain`, MHA-VN-035)
   and [3606T811](https://www.mcmaster.com/3606T811/) (`vn-keeper-chain-link`,

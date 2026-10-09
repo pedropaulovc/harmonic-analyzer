@@ -1,0 +1,16 @@
+vn-cylinder-bank-spring:
+  title: Cylinder Bank Spring
+  number: MHA-VN-050
+  stock_name: Wave Disc Spring
+  supplier: McMaster-Carr
+  supplier_skus: [9714K392]
+  material: Plain Carbon Steel
+  material_specification: "Steel wave disc spring, 0.385 ID x 0.5 OD; McMaster-Carr 9714K392"
+  finish: plain; no coating
+  installation_notes: |-
+    INSTALLATION - ON THE MHA-DT-013 ARBOR, BETWEEN THE FRONT
+    MHA-DT-026 WASHER AND THE FRONT MHA-DT-002 STRAP;
+    SET BY A 0.95 BLADE.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased
