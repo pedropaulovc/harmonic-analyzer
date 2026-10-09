@@ -27,6 +27,17 @@ html, body { overflow-x: clip; }
 .align-panel > label, #setup-fields label { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem; margin-bottom: 0.5rem; font-size: 0.75rem; }
 .align-panel > label select { max-width: 100%; }
 .align-panel fieldset > label { align-items: center; }
+.camera-controls { min-width: 0; }
+.camera-controls .camera-mode { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem; margin-bottom: 0.75rem; font-size: 0.75rem; }
+.camera-mode select { min-width: 0; max-width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--rule); border-radius: 3px; padding: 0.3rem; }
+.camera-slider { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; gap: 0.2rem 0.5rem; margin-bottom: 0.5rem; }
+.camera-slider label { min-width: 0; font-size: 0.75rem; line-height: 1.4; overflow-wrap: anywhere; }
+.camera-slider output { min-width: 4.5rem; padding: 0.15rem 0.3rem; border: 1px solid var(--rule); border-radius: 3px; background: var(--bg); color: var(--ink); font: 0.75rem var(--mono); font-variant-numeric: tabular-nums; text-align: right; user-select: text; }
+.camera-slider input[type='range'] { grid-column: 1 / -1; width: 100%; min-width: 0; margin: 0; min-height: 1.5rem; accent-color: var(--accent); cursor: pointer; }
+.camera-slider input[type='range']:hover:not(:disabled) { background: var(--align-hover); border-radius: 3px; }
+.camera-slider input[type='range']:disabled, .camera-mode select:disabled { opacity: 0.5; cursor: not-allowed; }
+.camera-controls :is(input, select, output):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#camera-control-hint { margin: 0.5rem 0 0.75rem; font-size: 0.75rem; line-height: 1.5; overflow-wrap: anywhere; }
 .align-panel summary { font-size: 0.8rem; padding: 0.75rem 0; cursor: pointer; }
 .align-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .align-channel { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 0.25rem; padding: 0.5rem 0; border-top: 1px solid var(--rule); }

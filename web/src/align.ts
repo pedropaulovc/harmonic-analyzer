@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { loadMachine, type CameraRecord, type Machine, type Presentation } from './scene'
@@ -46,6 +47,11 @@ const scrub = element<HTMLInputElement>('scrub')
 const fov = element<HTMLInputElement>('fov')
 const ppX = element<HTMLInputElement>('pp-x')
 const ppY = element<HTMLInputElement>('pp-y')
+const azimuth = element<HTMLInputElement>('camera-azimuth')
+const elevation = element<HTMLInputElement>('camera-elevation')
+const roll = element<HTMLInputElement>('camera-roll')
+const distance = element<HTMLInputElement>('camera-distance')
+const rotateMode = element<HTMLSelectElement>('rotate-mode')
 const crankControl = element<HTMLInputElement>('align-crank')
 const gearing = element<HTMLSelectElement>('align-gearing')
 const magnification = element<HTMLInputElement>('align-magnification')
@@ -76,11 +82,37 @@ pmrem.dispose()
 environment.dispose()
 const camera = new THREE.PerspectiveCamera(35, 16 / 9, 0.005, 100)
 camera.position.set(1.2, 1, 1.6)
-camera.lookAt(0, 0.68, 0)
-let controls = new OrbitControls(camera, overlay)
-controls.target.set(0, 0.68, 0)
-controls.enableDamping = false
-controls.addEventListener('change', render)
+camera.lookAt(0, 0, 0)
+camera.layers.enable(1)
+const controlCamera = new THREE.PerspectiveCamera()
+const pivot = new THREE.Vector3()
+const orientationOffset = new THREE.Quaternion()
+const worldUp = new THREE.Vector3(0, 1, 0)
+const principalPoint = new THREE.Vector2(960, 540)
+const raycaster = new THREE.Raycaster()
+const rayPoint = new THREE.Vector2()
+const intersections: THREE.Intersection[] = []
+const modelRoots: THREE.Object3D[] = []
+const modelBounds = new THREE.Box3()
+const rollAxis = new THREE.Vector3(0, 0, 1)
+const offset = new THREE.Vector3()
+const spherical = new THREE.Spherical()
+const forward = new THREE.Vector3()
+const lookMatrix = new THREE.Matrix4()
+const referenceRotation = new THREE.Quaternion()
+const rollRotation = new THREE.Quaternion()
+const pivotMarker = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffcb5b, depthTest: false, depthWrite: false }))
+pivotMarker.layers.set(1)
+pivotMarker.renderOrder = 1000
+pivotMarker.visible = false
+scene.add(pivotMarker)
+let controls: OrbitControls | TrackballControls
+let controlsNeedUpdate = false
+let pivotSource: 'centre' | 'bounds' | 'picked' = 'bounds'
+let pivotRevision = 0
+let rotationMode: 'turntable' | 'free' = 'turntable'
+try { if (localStorage.getItem('harmonic-align-rotation-mode') === 'free') rotationMode = 'free' } catch { /* Storage may be disabled. */ }
+rotateMode.value = rotationMode
 let machine: Machine | null = null
 let census: Census | null = null
 let segments: SetupSegment[] = []
@@ -106,16 +138,19 @@ let renderFrame = 0
 function render(): void {
   if (renderFrame) return
   renderFrame = requestAnimationFrame(() => {
+    if (controlsNeedUpdate && controls instanceof TrackballControls) {
+      controlsNeedUpdate = false
+      controls.update()
+    }
     renderFrame = 0
     if (!machine || !currentView) return
     try {
       machine.update(input)
-      const rect = currentView.rectSourcePixels
-      camera.aspect = rect[2] / rect[3]
-      camera.fov = Number(fov.value)
-      camera.setViewOffset(rect[2], rect[3], rect[2] / 2 - Number(ppX.value), rect[3] / 2 - Number(ppY.value), rect[2], rect[3])
-      camera.updateProjectionMatrix()
-      camera.updateMatrixWorld(true)
+      updateProjection()
+      syncControlMatrices()
+      pivotMarker.position.copy(pivot)
+      pivotMarker.scale.setScalar(Math.max(0.0001, camera.position.distanceTo(pivot) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.012))
+      pivotMarker.visible = modelRoots.length > 0
       const width = Math.max(1, Math.round(overlay.clientWidth)), height = Math.max(1, Math.round(overlay.clientHeight))
       renderer.setSize(width, height, false)
       renderer.render(scene, camera)
@@ -126,34 +161,159 @@ function render(): void {
   })
 }
 
+function updateProjection(): void {
+  const rect = currentView?.rectSourcePixels ?? [0, 0, 1920, 1080]
+  camera.aspect = rect[2]! / rect[3]!
+  camera.setViewOffset(rect[2]!, rect[3]!, rect[2]! / 2 - principalPoint.x, rect[3]! / 2 - principalPoint.y, rect[2]!, rect[3]!)
+  camera.updateProjectionMatrix()
+  camera.updateMatrixWorld(true)
+}
+
+function syncControlMatrices(): void {
+  camera.updateMatrixWorld(true)
+  // Orbit a look-at proxy, but pan and cursor-zoom in the actual camera's
+  // screen space. The orientation offset keeps an off-centre pivot from
+  // snapping the authored camera direction or removing its roll.
+  controlCamera.matrix.copy(camera.matrix)
+  controlCamera.matrixWorld.copy(camera.matrixWorld)
+  controlCamera.matrixWorldInverse.copy(camera.matrixWorldInverse)
+  controlCamera.projectionMatrix.copy(camera.projectionMatrix)
+  controlCamera.projectionMatrixInverse.copy(camera.projectionMatrixInverse)
+  controlCamera.fov = camera.fov
+  controlCamera.aspect = camera.aspect
+}
+
+function cameraRoll(): number {
+  forward.set(0, 0, -1).applyQuaternion(camera.quaternion)
+  offset.copy(camera.position).add(forward)
+  lookMatrix.lookAt(camera.position, offset, worldUp)
+  referenceRotation.setFromRotationMatrix(lookMatrix).invert().multiply(camera.quaternion)
+  const degrees = THREE.MathUtils.radToDeg(2 * Math.atan2(referenceRotation.z, referenceRotation.w))
+  return THREE.MathUtils.euclideanModulo(degrees + 180, 360) - 180
+}
+
+function syncCameraSliders(): void {
+  offset.subVectors(camera.position, pivot)
+  spherical.setFromVector3(offset)
+  const metres = Math.max(spherical.radius, 0.00001)
+  const logDistance = Math.log10(metres)
+  distance.min = String(Math.min(-2, logDistance))
+  distance.max = String(Math.max(Math.log10(20), logDistance))
+  const rect = currentView?.rectSourcePixels ?? [0, 0, 1920, 1080]
+  ppX.max = String(rect[2])
+  ppY.max = String(rect[3])
+  for (const [control, value, label] of [
+    [azimuth, THREE.MathUtils.radToDeg(spherical.theta), '°'],
+    [elevation, 90 - THREE.MathUtils.radToDeg(spherical.phi), '°'],
+    [roll, cameraRoll(), '°'],
+    [distance, logDistance, ''],
+    [fov, camera.fov, '°'],
+    [ppX, principalPoint.x, ' px'],
+    [ppY, principalPoint.y, ' px'],
+  ] as const) {
+    control.value = String(value)
+    element<HTMLOutputElement>(`${control.id}-value`).value = control === distance ? `${metres.toFixed(3)} m` : `${value.toFixed(2)}${label}`
+  }
+}
+
+function visibleModelPoint(x: number, y: number): THREE.Vector3 | null {
+  updateProjection()
+  scene.updateMatrixWorld(true)
+  rayPoint.set(currentView?.presentation === 'horizontal-mirror' ? -x : x, y)
+  raycaster.setFromCamera(rayPoint, camera)
+  intersections.length = 0
+  raycaster.intersectObjects(modelRoots, true, intersections)
+  for (const hit of intersections) {
+    if (!(hit.object instanceof THREE.Mesh)) continue
+    let node: THREE.Object3D | null = hit.object
+    while (node?.visible) node = node.parent
+    if (!node) return hit.point
+  }
+  return null
+}
+
+function defaultPivot(): void {
+  if (machine?.availability === 'available') machine.update(input)
+  const hit = visibleModelPoint(0, 0)
+  if (hit) {
+    pivot.copy(hit)
+    pivotSource = 'centre'
+  } else {
+    modelBounds.makeEmpty()
+    for (const root of modelRoots) modelBounds.expandByObject(root)
+    if (!modelBounds.isEmpty()) modelBounds.getCenter(pivot)
+    else pivot.set(0, 0, 0)
+    pivotSource = 'bounds'
+  }
+  pivotRevision++
+}
+
+function controlSpeeds(fine: boolean): void {
+  const factor = fine ? 0.25 : 1
+  controls.rotateSpeed = 0.4 * factor
+  controls.panSpeed = (controls instanceof OrbitControls ? 1 : 0.3) * factor
+  controls.zoomSpeed = (controls instanceof OrbitControls ? 1 : 1.2) * factor
+}
+
+function rebaseControls(): void {
+  controls?.dispose()
+  controlCamera.copy(camera)
+  controlCamera.up.copy(rotationMode === 'turntable' ? worldUp : camera.up)
+  controlCamera.lookAt(pivot)
+  if (rotationMode === 'turntable') {
+    controls = new OrbitControls(controlCamera, overlay)
+    controls.enableDamping = false
+    controls.zoomToCursor = true
+    controls.screenSpacePanning = true
+  } else {
+    controls = new TrackballControls(controlCamera, overlay)
+    controls.staticMoving = true
+    // A/S are review shortcuts, not Trackball's default mouse-mode keys.
+    controls.keys = ['', '', '']
+  }
+  controls.target.copy(pivot)
+  controls.minDistance = 0.001
+  controls.update()
+  orientationOffset.copy(controlCamera.quaternion).invert().multiply(camera.quaternion)
+  syncControlMatrices()
+  controls.addEventListener('change', () => {
+    camera.position.copy(controlCamera.position)
+    camera.quaternion.copy(controlCamera.quaternion).multiply(orientationOffset)
+    camera.up.copy(worldUp).applyQuaternion(camera.quaternion)
+    pivot.copy(controls.target)
+    updateProjection()
+    syncControlMatrices()
+    syncCameraSliders()
+    render()
+  })
+  controlsNeedUpdate = false
+  controlSpeeds(false)
+  syncCameraSliders()
+}
+
 function applyCamera(record: CameraRecord): void {
   camera.position.fromArray(record.positionMetres)
-  camera.quaternion.fromArray(record.quaternion).normalize()
-  camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion)
-  fov.value = String(record.verticalFovDegrees)
-  ppX.value = String(record.principalPointViewportPixels?.[0] ?? (currentView?.rectSourcePixels[2] ?? 1920) / 2)
-  ppY.value = String(record.principalPointViewportPixels?.[1] ?? (currentView?.rectSourcePixels[3] ?? 1080) / 2)
-  const position = camera.position.clone(), quaternion = camera.quaternion.clone()
-  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion)
-  const distance = Math.max(position.distanceTo(new THREE.Vector3(0, 0.68, 0)), 0.1)
-  controls.dispose()
-  controls = new OrbitControls(camera, overlay)
-  controls.target.copy(position).addScaledVector(forward, distance)
-  controls.enableDamping = false
-  controls.update()
-  // OrbitControls initializes by looking at its default target. Retain the
-  // exact authored pose after rebasing its spherical state, including roll.
-  camera.position.copy(position)
-  camera.quaternion.copy(quaternion)
-  controls.addEventListener('change', render)
+  camera.quaternion.fromArray(record.quaternion)
+  camera.up.copy(worldUp).applyQuaternion(camera.quaternion)
+  camera.fov = record.verticalFovDegrees
+  principalPoint.set(record.principalPointViewportPixels?.[0] ?? (currentView?.rectSourcePixels[2] ?? 1920) / 2, record.principalPointViewportPixels?.[1] ?? (currentView?.rectSourcePixels[3] ?? 1080) / 2)
+  updateProjection()
+  defaultPivot()
+  rebaseControls()
 }
 
 function cameraRecord(): CameraRecord {
-  return { positionMetres: camera.position.toArray() as [number, number, number], quaternion: camera.quaternion.toArray() as [number, number, number, number], verticalFovDegrees: Number(fov.value), principalPointViewportPixels: [Number(ppX.value), Number(ppY.value)] }
+  return { positionMetres: camera.position.toArray() as [number, number, number], quaternion: camera.quaternion.toArray() as [number, number, number, number], verticalFovDegrees: camera.fov, principalPointViewportPixels: principalPoint.toArray() as [number, number] }
 }
 
 function reloadCamera(): void {
   if (!currentShot || !currentView) return
+  if (census) {
+    const fps = census.fps[0] / census.fps[1]
+    const frame = Math.round(original.currentTime * fps)
+    const exact = manual.cameraKeys.find(key => key.shotId === currentShot!.id && key.viewId === currentView!.viewId && Math.round(key.t * fps) === frame)
+    if (exact) { applyCamera(exact.camera); render(); return }
+  }
   const fitted = track?.data.shots.find(shot => shot.id === currentShot!.id)?.views.find(view => view.viewId === currentView!.viewId)?.cameraKeys ?? []
   const keys = [...fitted]
   for (const key of manual.cameraKeys) {
@@ -176,8 +336,11 @@ function reloadCamera(): void {
     applyCamera({ positionMetres: position.toArray() as [number, number, number], quaternion: quaternion.toArray() as [number, number, number, number], verticalFovDegrees: a.camera.verticalFovDegrees + (b.camera.verticalFovDegrees - a.camera.verticalFovDegrees) * f, principalPointViewportPixels: [p0[0]! + (p1[0]! - p0[0]!) * f, p0[1]! + (p1[1]! - p0[1]!) * f] })
   } else {
     camera.position.set(1.2, 1, 1.6)
-    camera.up.set(0, 1, 0)
-    camera.lookAt(0, 0.68, 0)
+    camera.up.copy(worldUp)
+    modelBounds.makeEmpty()
+    for (const root of modelRoots) modelBounds.expandByObject(root)
+    modelBounds.isEmpty() ? offset.set(0, 0, 0) : modelBounds.getCenter(offset)
+    camera.lookAt(offset)
     applyCamera({ positionMetres: camera.position.toArray() as [number, number, number], quaternion: camera.quaternion.toArray() as [number, number, number, number], verticalFovDegrees: 35 })
   }
   render()
@@ -578,15 +741,82 @@ for (let index = 0; index < 20; index++) {
   element('align-channels').append(row)
 }
 refreshInputControls()
-for (const control of [fov, ppX, ppY]) control.addEventListener('input', render)
+for (const [control, fineStep] of [[azimuth, 0.1], [elevation, 0.1], [roll, 0.1], [distance, 0.001], [fov, 0.1], [ppX, 0.1], [ppY, 0.1]] as const) {
+  // Loading a saved camera must not snap its values onto an HTML range step.
+  control.step = 'any'
+  control.addEventListener('keydown', event => {
+    const direction = event.key === 'ArrowRight' || event.key === 'ArrowUp' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1 : 0
+    if (!direction) return
+    event.preventDefault()
+    control.value = String(THREE.MathUtils.clamp(Number(control.value) + direction * fineStep * (event.shiftKey ? 0.25 : 1), Number(control.min), Number(control.max)))
+    control.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  control.addEventListener('input', () => {
+    if (control === fov) camera.fov = Number(fov.value)
+    else if (control === ppX) principalPoint.x = Number(ppX.value)
+    else if (control === ppY) principalPoint.y = Number(ppY.value)
+    else if (control === roll) {
+      rollRotation.setFromAxisAngle(rollAxis, THREE.MathUtils.degToRad(Number(roll.value) - cameraRoll()))
+      camera.quaternion.multiply(rollRotation)
+      camera.up.copy(worldUp).applyQuaternion(camera.quaternion)
+      rebaseControls()
+    } else {
+      spherical.setFromVector3(offset.subVectors(camera.position, pivot))
+      if (control === azimuth) spherical.theta = THREE.MathUtils.degToRad(Number(azimuth.value))
+      if (control === elevation) spherical.phi = THREE.MathUtils.degToRad(90 - Number(elevation.value))
+      if (control === distance) spherical.radius = 10 ** Number(distance.value)
+      controlCamera.position.copy(pivot).add(offset.setFromSpherical(spherical))
+      controlCamera.lookAt(pivot)
+      camera.position.copy(controlCamera.position)
+      camera.quaternion.copy(controlCamera.quaternion).multiply(orientationOffset)
+      camera.up.copy(worldUp).applyQuaternion(camera.quaternion)
+      rebaseControls()
+    }
+    updateProjection()
+    syncControlMatrices()
+    syncCameraSliders()
+    render()
+  })
+}
+rotateMode.addEventListener('change', () => {
+  rotationMode = rotateMode.value === 'free' ? 'free' : 'turntable'
+  try { localStorage.setItem('harmonic-align-rotation-mode', rotationMode) } catch { /* Storage may be disabled. */ }
+  rebaseControls()
+  render()
+})
+overlay.addEventListener('dblclick', event => {
+  const rect = overlay.getBoundingClientRect()
+  const hit = visibleModelPoint((event.clientX - rect.left) / rect.width * 2 - 1, 1 - (event.clientY - rect.top) / rect.height * 2)
+  if (!hit) return
+  pivot.copy(hit)
+  pivotSource = 'picked'
+  pivotRevision++
+  rebaseControls()
+  render()
+})
+overlay.addEventListener('pointerdown', event => {
+  controlSpeeds(event.shiftKey)
+  if (controls instanceof OrbitControls) {
+    const modifier = event.shiftKey || event.ctrlKey || event.metaKey
+    const rotate = !event.ctrlKey && !event.metaKey
+    // OrbitControls normally treats Shift-left as pan; here Shift is precision.
+    controls.mouseButtons.LEFT = modifier ? (rotate ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE) : THREE.MOUSE.ROTATE
+    controls.mouseButtons.RIGHT = modifier ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN
+  }
+}, { capture: true })
+for (const eventName of ['pointermove', 'wheel'] as const) overlay.addEventListener(eventName, event => {
+  controlSpeeds(event.shiftKey)
+  if (controls instanceof TrackballControls) { controlsNeedUpdate = true; render() }
+}, { capture: true })
+overlay.addEventListener('pointerup', () => {
+  if (controls instanceof TrackballControls) { controlsNeedUpdate = true; render() }
+}, { capture: true })
+rebaseControls()
 element<HTMLInputElement>('opacity').addEventListener('input', event => { overlay.style.opacity = (event.target as HTMLInputElement).value })
 overlay.style.opacity = '0.5'
 gearing.addEventListener('change', () => { input.gearing = gearing.value as MechanismInput['gearing']; render() })
 magnification.addEventListener('input', () => { input.magnification = Number(magnification.value); render() })
 crankControl.addEventListener('input', () => { input.crankTurns = Number(crankControl.value); render() })
-for (const [id, control, delta] of [['pp-left', ppX, -1], ['pp-right', ppX, 1], ['pp-up', ppY, -1], ['pp-down', ppY, 1]] as const) {
-  element(id).addEventListener('click', () => { control.value = String(Number(control.value) + delta); render() })
-}
 shotSelect.addEventListener('change', () => { const shot = census?.shots.find(item => item.id === shotSelect.value); if (shot && census) void seek(shot.startFrame * census.fps[1] / census.fps[0]).catch(handleError) })
 viewSelect.addEventListener('change', selectView)
 segmentSelect.addEventListener('change', () => { const segment = segments.find(item => item.id === segmentSelect.value); if (segment && census) void seek(Math.round(segment.start * census.fps[0] / census.fps[1]) * census.fps[1] / census.fps[0]).catch(handleError) })
@@ -616,7 +846,7 @@ original.addEventListener('play', () => { element('play').textContent = 'Pause' 
 original.addEventListener('pause', () => { element('play').textContent = 'Play' })
 original.addEventListener('timeupdate', updateTime)
 original.addEventListener('seeked', updateTime)
-new ResizeObserver(render).observe(element('align-stage'))
+new ResizeObserver(() => { if (controls instanceof TrackballControls) controls.handleResize(); render() }).observe(element('align-stage'))
 document.addEventListener('keydown', event => {
   if ((event.target as HTMLElement).matches('input, select, textarea') || event.ctrlKey || event.altKey || event.metaKey) return
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); stepFrame((event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 10 : 1)) }
@@ -637,12 +867,16 @@ else {
   void loadMachine(scene).then(loadedMachine => {
     machine = loadedMachine
     if (machine.availability !== 'available') throw new Error(machine.loadError ?? 'CAD model unavailable. Run npm run fetch-model.')
+    modelRoots.push(...scene.children.filter(object => object !== pivotMarker && !(object instanceof THREE.Light)))
+    defaultPivot()
+    rebaseControls()
     render()
   }).catch(handleError)
   void loadVideo().catch(handleError)
 }
 if (import.meta.env.DEV) Object.defineProperty(window, 'harmonicAlign', { value: {
   seek,
-  snapshot() { return { loaded, modelState: machine?.availability, videoId: videoSelect.value, t: original.currentTime, videoReadyState: original.readyState, shotId: currentShot?.id, viewId: currentView?.viewId, camera: cameraRecord(), input: serializeSyncInput(input), manual, review: { enabled: reviewMode, busy: reviewBusy, index: reviewIndex, total: reviewQueue.length, reviewed: reviewedCount, frame: reviewQueue[reviewIndex]?.frame, seedSource: reviewSeedSource } } },
+  hitTest(x: number, y: number) { return visibleModelPoint(x, y)?.toArray() ?? null },
+  snapshot() { return { loaded, modelState: machine?.availability, videoId: videoSelect.value, t: original.currentTime, videoReadyState: original.readyState, shotId: currentShot?.id, viewId: currentView?.viewId, camera: cameraRecord(), pivot: pivot.toArray(), pivotSource, pivotRevision, rotationMode, input: serializeSyncInput(input), manual, review: { enabled: reviewMode, busy: reviewBusy, index: reviewIndex, total: reviewQueue.length, reviewed: reviewedCount, frame: reviewQueue[reviewIndex]?.frame, seedSource: reviewSeedSource } } },
 } })
-window.addEventListener('pagehide', () => { cancelAnimationFrame(renderFrame); controls.dispose(); machine?.dispose(); renderer.dispose(); environmentTarget.dispose() }, { once: true })
+window.addEventListener('pagehide', () => { cancelAnimationFrame(renderFrame); controls.dispose(); pivotMarker.geometry.dispose(); pivotMarker.material.dispose(); machine?.dispose(); renderer.dispose(); environmentTarget.dispose() }, { once: true })

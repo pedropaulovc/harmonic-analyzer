@@ -18,6 +18,87 @@ const errors = []
 page.on('pageerror', error => errors.push(error.message))
 const samples = []
 let modifiedManual = false
+async function setSlider(id, value) {
+  await page.locator(`#${id}`).evaluate((control, next) => { control.value = String(next); control.dispatchEvent(new Event('input', { bubbles: true })) }, value)
+}
+
+async function cameraControlsSmoke() {
+  const initial = await page.evaluate(() => window.harmonicAlign.snapshot())
+  for (const id of ['camera-azimuth', 'camera-elevation', 'camera-roll', 'camera-distance', 'fov', 'pp-x', 'pp-y']) assert.equal(await page.locator(`#${id}`).getAttribute('type'), 'range')
+  await page.locator('#rotate-mode').selectOption('free')
+  assert.deepEqual((await page.evaluate(() => window.harmonicAlign.snapshot())).camera, initial.camera)
+  assert.equal(await page.evaluate(() => localStorage.getItem('harmonic-align-rotation-mode')), 'free')
+  for (const [id, delta] of [['camera-azimuth', 3], ['camera-elevation', 1], ['camera-roll', 5], ['camera-distance', 0.03]]) {
+    const value = await page.locator(`#${id}`).evaluate(control => Number(control.value))
+    await setSlider(id, value + delta)
+  }
+  await setSlider('fov', 36.25)
+  await setSlider('pp-x', initial.camera.principalPointViewportPixels[0] + 0.25)
+  await setSlider('pp-y', initial.camera.principalPointViewportPixels[1] + 0.25)
+  const changed = await page.evaluate(() => window.harmonicAlign.snapshot())
+  assert.notDeepEqual(changed.camera.positionMetres, initial.camera.positionMetres)
+  assert.notDeepEqual(changed.camera.quaternion, initial.camera.quaternion)
+  assert.equal(changed.camera.verticalFovDegrees, 36.25)
+  await page.locator('#pp-x').focus()
+  await page.keyboard.press('ArrowRight')
+  assert.ok(Math.abs((await page.evaluate(() => window.harmonicAlign.snapshot())).camera.principalPointViewportPixels[0] - changed.camera.principalPointViewportPixels[0] - 0.1) < 1e-9)
+  const box = await page.locator('#overlay').boundingBox()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2 + 35, box.y + box.height / 2 + 10, { steps: 3 })
+  await page.mouse.up()
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  const dragged = await page.evaluate(() => window.harmonicAlign.snapshot())
+  assert.notDeepEqual(dragged.camera.quaternion, changed.camera.quaternion)
+  const azimuth = Math.atan2(dragged.camera.positionMetres[0] - dragged.pivot[0], dragged.camera.positionMetres[2] - dragged.pivot[2]) * 180 / Math.PI
+  assert.ok(Math.abs(await page.locator('#camera-azimuth').evaluate(control => Number(control.value)) - azimuth) < 1e-8)
+  const candidate = await page.evaluate(() => {
+    const current = window.harmonicAlign.snapshot().pivot
+    for (const y of [0, 0.25, -0.25, 0.5, -0.5]) for (const x of [0, 0.25, -0.25, 0.5, -0.5]) {
+      const point = window.harmonicAlign.hitTest(x, y)
+      if (point && point.some((value, i) => Math.abs(value - current[i]) > 1e-6)) return { x, y, point }
+    }
+    return null
+  })
+  assert.ok(candidate, 'A visible native model point must be pickable')
+  await page.locator('#overlay').evaluate(canvas => canvas.addEventListener('dblclick', event => {
+    const rect = canvas.getBoundingClientRect()
+    // MouseEvent client coordinates may be rounded to CSS pixels.
+    window.__syncSmokePivot = window.harmonicAlign.hitTest((event.clientX - rect.left) / rect.width * 2 - 1, 1 - (event.clientY - rect.top) / rect.height * 2)
+  }, { capture: true, once: true }))
+  await page.locator('#overlay').dblclick({ position: { x: (candidate.x + 1) * box.width / 2, y: (1 - candidate.y) * box.height / 2 } })
+  const picked = await page.evaluate(() => window.harmonicAlign.snapshot())
+  assert.equal(picked.pivotSource, 'picked')
+  assert.ok(picked.pivotRevision > dragged.pivotRevision)
+  const expectedPoint = await page.evaluate(() => window.__syncSmokePivot)
+  assert.ok(expectedPoint)
+  assert.ok(picked.pivot.every((value, i) => Math.abs(value - expectedPoint[i]) < 1e-8))
+  assert.deepEqual(picked.camera, dragged.camera)
+  await page.locator('#reset-camera').click()
+  assert.deepEqual((await page.evaluate(() => window.harmonicAlign.snapshot())).camera, initial.camera)
+  return { initial, changed, dragged, picked }
+}
+
+if (process.argv.includes('--camera-controls')) {
+  try {
+    let saveRequests = 0
+    page.on('request', request => { if (request.url().endsWith('/__sync/save')) saveRequests++ })
+    await page.goto(new URL('align.html?video=synthesis', base).href)
+    await page.waitForFunction(() => window.harmonicAlign?.snapshot().loaded && window.harmonicAlign.snapshot().modelState === 'available' && window.harmonicAlign.snapshot().videoReadyState >= 2, undefined, { timeout: 90000 })
+    await page.waitForFunction(() => !document.querySelector('#original').seeking)
+    const controls = await cameraControlsSmoke()
+    for (const width of [320, 375, 414, 768]) {
+      await page.setViewportSize({ width, height: 900 })
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    }
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.screenshot({ path: join(output, 'camera-controls.png') })
+    assert.equal(saveRequests, 0)
+    assert.deepEqual(errors, [])
+    await writeFile(join(output, 'camera-controls.json'), JSON.stringify({ controls, saveRequests, errors }, null, 2) + '\n')
+    console.error(`PASS: camera sliders + fine arrow, free mouse/slider sync, native double-click pivot, exact camera reset, responsive widths; no manual saves; ${output}`)
+  } finally { await browser.close() }
+} else
 try {
   await page.goto(new URL('?video=synthesis', base).href)
   await page.waitForFunction(() => window.harmonicSync?.snapshot().loaded && window.harmonicSync.snapshot().modelState === 'ready', undefined, { timeout: 90000 })
@@ -100,9 +181,9 @@ try {
   await page.waitForFunction(t => window.harmonicAlign.snapshot().t > t && !document.querySelector('#original').seeking, initial.t)
   const stepped = await page.evaluate(() => window.harmonicAlign.snapshot())
   assert.ok(stepped.t - initial.t < 0.05)
-  await page.locator('#fov').fill('36.25')
-  await page.locator('#fov').dispatchEvent('input')
-  await page.locator('#pp-right').click()
+  await cameraControlsSmoke()
+  await setSlider('fov', 36.25)
+  await setSlider('pp-x', initial.camera.principalPointViewportPixels[0] + 1)
   const authored = await page.evaluate(() => ({ ...window.harmonicAlign.snapshot(), segmentId: document.getElementById('segment-id').value }))
   assert.equal(authored.camera.verticalFovDegrees, 36.25)
   assert.equal(authored.camera.principalPointViewportPixels[0], initial.camera.principalPointViewportPixels[0] + 1)
@@ -202,8 +283,7 @@ try {
   assert.deepEqual(await readFile(manualPath), manualBeforeNavigation)
   await page.keyboard.press('n')
   await page.waitForFunction(() => window.harmonicAlign.snapshot().review.index === 1 && !window.harmonicAlign.snapshot().review.busy)
-  await page.locator('#fov').fill('39.25')
-  await page.locator('#fov').dispatchEvent('input')
+  await setSlider('fov', 39.25)
   await page.locator('#overlay').focus()
   await page.keyboard.press('c')
   await page.waitForFunction(() => !window.harmonicAlign.snapshot().review.busy && document.getElementById('align-status').dataset.state === 'saved')
