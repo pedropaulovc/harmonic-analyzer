@@ -91,8 +91,8 @@ async def _volume(adapter) -> float:
     return res.data.volume if res.is_success else float("nan")
 
 
-def _name_mounting_dimensions(adapter) -> None:
-    """Resolve native Hole Wizard dimensions before assigning stable names."""
+def _resolve_native_mounting_dimensions(adapter) -> dict[str, str]:
+    """Name the extrusion height; resolve Wizard roles without renaming them."""
     from _common import _early_bound
     model = _early_bound(adapter.currentModel, "IPartDoc")
     flange = _early_bound(model.FeatureByName("Flange"), "IFeature")
@@ -119,10 +119,28 @@ def _name_mounting_dimensions(adapter) -> None:
             if kind in native_name and abs(float(dimension.SystemValue) * 1000.0 - nominal) < 1e-5:
                 matches[name].append(dimension)
         display = feature.GetNextDisplayDimension(display)
+    resolved = {}
     for name, dimensions in matches.items():
         if len(dimensions) != 1:
             raise RuntimeError(f"MountingCounterbores: expected one native {name}, found {len(dimensions)}")
-        dimensions[0].Name = name
+        resolved[name] = str(dimensions[0].Name)
+    return resolved
+
+
+def _apply_native_mounting_annotations(adapter, native_names: dict[str, str]) -> None:
+    """Apply head-seat bands and callout precision to observed Wizard names."""
+    set_dimension_symmetric_tolerance(
+        adapter, "MountingCounterbores", native_names["CounterBoreDepth"], COUNTERBORE_DEPTH_BAND
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "MountingCounterbores", native_names["CounterBoreDiameter"], 0.0, 0.10
+    )
+    for role, decimals in (
+        ("HoleDiameter", 3), ("CounterBoreDiameter", 2), ("CounterBoreDepth", 2)
+    ):
+        set_dimension_display_precision(
+            adapter, "MountingCounterbores", native_names[role], decimals
+        )
 
 
 async def _mounting_coordinate_dimensions(adapter) -> None:
@@ -394,17 +412,12 @@ async def build(adapter) -> dict[str, str]:
 
     # Native model dimensions own the flange and head-seat bands; the print
     # imports the plan dimensions and exposes the stepped holes by callout.
-    _name_mounting_dimensions(adapter)
+    native_mounting_names = _resolve_native_mounting_dimensions(adapter)
     await _mounting_coordinate_dimensions(adapter)
     set_dimension_symmetric_tolerance(
         adapter, "FlangeProfile", "FlangeDepth", PLATE_THICKNESS_BAND
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "MountingCounterbores", "CounterBoreDepth", COUNTERBORE_DEPTH_BAND
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "MountingCounterbores", "CounterBoreDiameter", 0.0, 0.10
-    )
+    _apply_native_mounting_annotations(adapter, native_mounting_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -416,6 +429,12 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
+    )
+    # Annotation changes must preserve the cut holes through the final rebuild,
+    # not merely at the earlier, pre-annotation equation check.
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "final magnifying-bracket (annotations neutral)", expected, 0.02 * cut_volume
     )
     return await save_part_and_images(adapter, PART_NAME)
 

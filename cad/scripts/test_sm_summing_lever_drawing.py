@@ -147,6 +147,11 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert "RibDepth" in drawing.TOP_KEEP
     assert "Bracket Receiver Note" in drawing_source
     assert "BRACKET TAP DRILL LATERAL WALL {DRILL_LATERAL_WALL_MIN:.3f} MIN." in source
+    final_proof = source.index('"summing lever after native receiver bands"')
+    assert source.index("_receiver_model_bands(adapter)") < final_proof
+    assert source.index("_receiver_coordinate_dimensions(adapter)") < final_proof
+    assert final_proof < source.index("artefacts = await save_part_and_images")
+    assert "v_built, 1e-5 * v_built" in source
 
 
 def test_receiver_rim_scan_uses_back_entry_face(monkeypatch) -> None:
@@ -186,35 +191,101 @@ def test_receiver_view_is_on_a_back_view_sheet_with_real_binding() -> None:
     assert 'length = _early_bound(raw, "ICalloutLengthVariable")' in source
 
 
-def test_receiver_depth_bands_select_native_depths_not_diameter(monkeypatch) -> None:
+def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesses(monkeypatch) -> None:
     import _common
+    import _drawing_marks
     import build_sm_summing_lever as part
+    import pytest
 
-    def dimension(name, nominal):
-        return SimpleNamespace(FullName=name, Name=name, SystemValue=nominal / 1000.0)
+    class Dimension:
+        def __init__(self, name, owner, nominal, kind=0):
+            self._name = name
+            self.owner = owner
+            self._value = nominal / 1000.0
+            self.kind = kind
 
-    native = [
-        dimension("Tap Drill Dia.@BracketMountingTaps", 1.778),
-        dimension("Tap Drill Depth@BracketMountingTaps", 6.05),
-        dimension("Thread Depth@BracketMountingTaps", 4.95),
-    ]
-    displays = [SimpleNamespace(GetDimension=lambda dim=dim: dim) for dim in native]
-    taps = SimpleNamespace(
-        GetFirstDisplayDimension=lambda: displays[0],
-        GetNextDisplayDimension=lambda current: (
-            displays[displays.index(current) + 1]
-            if displays.index(current) + 1 < len(displays) else None
-        ),
+        @property
+        def Name(self):
+            return self._name
+
+        @Name.setter
+        def Name(self, value):
+            if self.owner in {"BracketMountingTaps", "CosmeticThread1", "ReferencePlane"}:
+                raise AssertionError("native Wizard dimension names must not be rewritten")
+            self._name = value
+
+        @property
+        def FullName(self):
+            return f"{self.Name}@{self.owner}"
+
+        @property
+        def SystemValue(self):
+            return self._value
+
+        def GetType(self):
+            return self.kind
+
+    def display(dimension):
+        def get_dimension(index):
+            assert index == 0
+            return dimension
+        return SimpleNamespace(GetDimension2=get_dimension)
+
+    class Feature:
+        def __init__(self, name, dimensions=(), children=()):
+            self.Name = name
+            self.displays = [display(dim) for dim in dimensions]
+            self.children = children
+            self.next_subfeature = None
+            for current, following in zip(children, children[1:]):
+                current.next_subfeature = following
+
+        def Parameter(self, name):
+            return next(
+                (item.GetDimension2(0) for item in self.displays if item.GetDimension2(0).Name == name),
+                None,
+            )
+
+        def GetFirstDisplayDimension(self):
+            return self.displays[0] if self.displays else None
+
+        def GetNextDisplayDimension(self, current):
+            index = self.displays.index(current) + 1
+            return self.displays[index] if index < len(self.displays) else None
+
+        def GetFirstSubFeature(self):
+            return self.children[0] if self.children else None
+
+        def GetNextSubFeature(self):
+            return self.next_subfeature
+
+    drill = Dimension("D2", "BracketMountingTaps", 6.05)
+    thread = Dimension("D1", "CosmeticThread1", 4.95)
+    unrelated = Dimension("Depth", "ReferencePlane", 4.95)
+    angular = Dimension("D3", "BracketMountingTaps", 4.95, kind=1)
+    thread_feature = Feature("CosmeticThread1", [thread])
+    taps = Feature(
+        "BracketMountingTaps",
+        [Dimension("D1", "BracketMountingTaps", 1.778), drill, thread, unrelated, angular],
+        [thread_feature],
     )
     features = {
-        name: SimpleNamespace(Parameter=lambda key: dimension(key, 5.08))
+        name: Feature(name, [Dimension("D1", name, 5.08)])
         for name in part.RECEIVER_DIMENSION_BANDS
     }
     features["BracketMountingTaps"] = taps
-    adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(FeatureByName=features.get),
-    )
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
+
+    def invoke(value, interface, member, *args):
+        attribute = getattr(value, member)
+        if callable(attribute):
+            return attribute(*args)
+        assert not args
+        return attribute
+
     monkeypatch.setattr(_common, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_common, "_com_invoke", invoke)
+    monkeypatch.setattr(_drawing_marks, "_com_invoke", invoke)
     bands = []
     monkeypatch.setattr(
         part, "set_dimension_symmetric_tolerance",
@@ -222,20 +293,35 @@ def test_receiver_depth_bands_select_native_depths_not_diameter(monkeypatch) -> 
     )
     monkeypatch.setattr(part, "set_dimension_display_precision", lambda *args: None)
     monkeypatch.setattr(part, "mark_dimensions_for_drawing", lambda *args: None)
+    inventory = []
+    monkeypatch.setattr(part._telemetry, "info", inventory.append)
     part._receiver_model_bands(adapter)
     assert bands == [
         ("CoefficientsPlate", "PlateThickness", 0.05),
         ("EdgeRibBack", "RibDepth", 0.05),
-        ("BracketMountingTaps", "FullThreadDepth", 0.05),
-        ("BracketMountingTaps", "TapDrillDepth", 0.10),
+        ("CosmeticThread1", "D1", 0.05),
+        ("BracketMountingTaps", "D2", 0.10),
     ]
-    assert native[0].Name == "Tap Drill Dia.@BracketMountingTaps"
-    assert native[1].Name == "TapDrillDepth"
-    assert native[2].Name == "FullThreadDepth"
-    import pytest
-    duplicate = dimension("Second Thread Depth@BracketMountingTaps", 4.95)
-    displays.append(SimpleNamespace(GetDimension=lambda: duplicate))
-    with pytest.raises(RuntimeError, match="expected one native FullThreadDepth"):
+    assert (drill.Name, thread.Name, unrelated.Name) == ("D2", "D1", "Depth")
+    assert angular.Name == "D3"
+    assert any("D3@BracketMountingTaps = 0.00495 SI" in row for row in inventory)
+    assert any("D1@CosmeticThread1 = 4.95 mm (feature CosmeticThread1)" in row for row in inventory)
+    assert any("Depth@ReferencePlane = 4.95 mm" in row for row in inventory)
+
+    # Restore the farm's parent-only traversal: the ghost child/reference
+    # dimensions must not be mistaken for owned parent depth parameters.
+    taps.children = ()
+    inventory.clear()
+    for name in part.RECEIVER_DIMENSION_BANDS:
+        features[name].displays[0].GetDimension2(0).Name = "D1"
+    with pytest.raises(RuntimeError, match="expected one native FullThreadDepth, found 0"):
+        part._receiver_model_bands(adapter)
+    assert inventory and any("D1@CosmeticThread1" in row for row in inventory)
+    taps.children = (thread_feature,)
+    thread_feature.displays.append(display(Dimension("D9", thread_feature.Name, 4.95)))
+    for name in part.RECEIVER_DIMENSION_BANDS:
+        features[name].displays[0].GetDimension2(0).Name = "D1"
+    with pytest.raises(RuntimeError, match="expected one native FullThreadDepth, found 2"):
         part._receiver_model_bands(adapter)
 
 

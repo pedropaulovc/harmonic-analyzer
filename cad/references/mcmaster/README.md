@@ -90,6 +90,27 @@ Live catalog verification on October 8, 2026:
   pitch mismatch at the printed ±0.05 position bands. The minimum end wall
   is 2.00 mm from the real end-face station datum, without double-counting
   its general location band.
+  Receiver depth bands are authored on owned source-model dimensions across
+  the Hole Wizard's full subfeature tree, using the same `GetDimension2(0)`
+  traversal as the drawing-mark/tolerance helpers. The two validated model
+  values identify the depths; native display names need not contain the word
+  "depth". The build logs every native dimension name/value before its
+  uniqueness checks, including borrowed and non-linear dimensions it refuses
+  to tolerance. Linear values are logged in mm; other parameter types retain
+  their native system units instead of being mislabeled as lengths.
+  Wizard-owned dimension names are retained; bands and precision use their
+  observed native names and owners, never foreign aliases. The farm receipt
+  at `849347e57` passed the bracket's pre-annotation cut-volume check but its
+  saved STL had no mounting holes. The measured 20.1045903 mm³ per-screw
+  interference matches a solid plate's head/thread/runout overlap:
+  20.1051883 mm³ analytically (0.0005980 mm³ residual), rather than a reversed
+  counterbore or screw. Foreign Wizard-parameter renames in that loss window
+  were removed; their causal role remains a native-validation inference.
+  The same run's bracket drawing found no mounting-face circle at
+  `(-39.0, 0.0, 52.01258778042654)` with radius 1.9 mm, corroborating the
+  missing-cut diagnosis.
+  Both builders force a final rebuild and prove the post-annotation volume
+  before publication, so a later missing cut cannot inherit an earlier pass.
   `diagnostics.diag_build_91794A077` reuses the native fillister family recipe;
   its derived slot, dome, thread/runout and vendor-frame mapping are family
   assumptions, not verified vendor geometry. No vendor model is harvested.

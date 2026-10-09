@@ -130,10 +130,11 @@ def test_counterbore_volume_and_native_bands() -> None:
     assert joint.PLATE_THICKNESS_BAND == 0.05
     assert joint.COUNTERBORE_DEPTH_BAND == 0.05
     assert '"FlangeProfile", "FlangeDepth", PLATE_THICKNESS_BAND' in source
-    assert '"MountingCounterbores", "CounterBoreDepth", COUNTERBORE_DEPTH_BAND' in source
-    assert '"MountingCounterbores", "CounterBoreDiameter", 0.0, 0.10' in source
+    assert '"MountingCounterbores", native_names["CounterBoreDepth"], COUNTERBORE_DEPTH_BAND' in source
+    assert '"MountingCounterbores", native_names["CounterBoreDiameter"], 0.0, 0.10' in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     assert part.DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"] == 3
+    assert "MountingCounterbores" not in part.DRAWING_PRECISION
     assert "#4" not in source
 
 
@@ -154,7 +155,8 @@ def test_coordinates_and_hole_dimensions_are_owned_by_model() -> None:
     assert "model.BlankSketch()" in source
     assert "feature.GetFirstDisplayDimension()" in source
     assert "feature.GetNextDisplayDimension(display)" in source
-    assert "dimensions[0].Name = name" in source
+    assert "resolved[name] = str(dimensions[0].Name)" in source
+    assert "dimensions[0].Name =" not in source
     assert "expected one native" in source
     assert mg_magnifying_bracket_spec.DRAWING_POSITION_BAND == 0.05
     assert f"COUNTERBORE FLOOR {mg_magnifying_bracket_spec.GRIP_MIN:.3f} MIN." in mg_magnifying_bracket_spec.DRAWING_NOTES
@@ -174,23 +176,35 @@ def test_flange_height_is_native_and_primary_views_stay_aligned() -> None:
     assert '"*Front", *FRONT_CENTER' in drawing_source
 
 
-def test_native_counterbore_dimensions_accept_dia_names_and_reject_ambiguity(monkeypatch) -> None:
+def test_native_counterbore_dimensions_keep_names_and_route_annotations(monkeypatch) -> None:
+    """Offline routing contract, not proof of native SOLIDWORKS geometry."""
     from types import SimpleNamespace
     import pytest
     import _common
 
-    def dimension(name, nominal):
-        return SimpleNamespace(FullName=name, Name=name, SystemValue=nominal / 1000.0)
+    class WizardDimension:
+        def __init__(self, full_name, nominal):
+            self.FullName = full_name
+            self.SystemValue = nominal / 1000.0
 
-    height = dimension("D1@Flange", 12.7)
+        @property
+        def Name(self):
+            return self.FullName.split("@")[0]
+
+        @Name.setter
+        def Name(self, value):
+            raise AssertionError("Hole Wizard dimension identifiers must not be renamed")
+
+    height = SimpleNamespace(Name="D1", SystemValue=12.7 / 1000.0)
     native = [
-        dimension("Thru Hole Dia.@MountingCounterbores", 2.591),
-        dimension("Counterbore Dia.@MountingCounterbores", 3.8),
-        dimension("Counterbore Depth@MountingCounterbores", 1.55),
+        WizardDimension("Thru Hole Dia.@MountingCounterbores", 2.591),
+        WizardDimension("Counterbore Dia.@MountingCounterbores", 3.8),
+        WizardDimension("Counterbore Depth@MountingCounterbores", 1.55),
     ]
+    original_names = [dim.Name for dim in native]
     displays = [SimpleNamespace(GetDimension=lambda dim=dim: dim) for dim in native]
     holes = SimpleNamespace(
-        GetFirstDisplayDimension=lambda: displays[0],
+        GetFirstDisplayDimension=lambda: displays[0] if displays else None,
         GetNextDisplayDimension=lambda current: (
             displays[displays.index(current) + 1]
             if displays.index(current) + 1 < len(displays) else None
@@ -202,12 +216,79 @@ def test_native_counterbore_dimensions_accept_dia_names_and_reject_ambiguity(mon
     }
     adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
     monkeypatch.setattr(_common, "_early_bound", lambda value, interface: value)
-    part._name_mounting_dimensions(adapter)
+    resolved = part._resolve_native_mounting_dimensions(adapter)
     assert height.Name == "FlangeHeight"
-    assert [dim.Name for dim in native] == [
-        "HoleDiameter", "CounterBoreDiameter", "CounterBoreDepth",
+    assert resolved == {
+        "HoleDiameter": "Thru Hole Dia.",
+        "CounterBoreDiameter": "Counterbore Dia.",
+        "CounterBoreDepth": "Counterbore Depth",
+    }
+    calls = []
+    monkeypatch.setattr(part, "set_dimension_symmetric_tolerance", lambda *args: calls.append(("symmetric", args)))
+    monkeypatch.setattr(part, "set_dimension_bilateral_tolerance", lambda *args: calls.append(("bilateral", args)))
+    monkeypatch.setattr(part, "set_dimension_display_precision", lambda *args: calls.append(("precision", args)))
+    part._apply_native_mounting_annotations(adapter, resolved)
+    assert calls == [
+        ("symmetric", (adapter, "MountingCounterbores", "Counterbore Depth", 0.05)),
+        ("bilateral", (adapter, "MountingCounterbores", "Counterbore Dia.", 0.0, 0.10)),
+        ("precision", (adapter, "MountingCounterbores", "Thru Hole Dia.", 3)),
+        ("precision", (adapter, "MountingCounterbores", "Counterbore Dia.", 2)),
+        ("precision", (adapter, "MountingCounterbores", "Counterbore Depth", 2)),
     ]
-    duplicate = dimension("Second Counterbore Dia.@MountingCounterbores", 3.8)
+    assert [dim.Name for dim in native] == original_names
+    duplicate = WizardDimension("Second Counterbore Dia.@MountingCounterbores", 3.8)
     displays.append(SimpleNamespace(GetDimension=lambda: duplicate))
-    with pytest.raises(RuntimeError, match="expected one native CounterBoreDiameter"):
-        part._name_mounting_dimensions(adapter)
+    with pytest.raises(RuntimeError, match="expected one native CounterBoreDiameter, found 2"):
+        part._resolve_native_mounting_dimensions(adapter)
+    displays.pop()
+    missing = displays.pop(1)
+    with pytest.raises(RuntimeError, match="expected one native CounterBoreDiameter, found 0"):
+        part._resolve_native_mounting_dimensions(adapter)
+    displays.insert(1, missing)
+    native[1].SystemValue = 3.9 / 1000.0
+    with pytest.raises(RuntimeError, match="expected one native CounterBoreDiameter, found 0"):
+        part._resolve_native_mounting_dimensions(adapter)
+    native[1].SystemValue = 3.8 / 1000.0
+    native[1].FullName = "Counterbore Depth@MountingCounterbores"
+    with pytest.raises(RuntimeError, match="expected one native CounterBoreDiameter, found 0"):
+        part._resolve_native_mounting_dimensions(adapter)
+    assert height.Name == "FlangeHeight"
+
+
+def test_final_forced_volume_guard_follows_annotations_before_publication() -> None:
+    """Source ordering only; the parent must still validate rebuilt native geometry."""
+    import ast
+
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    build = next(
+        node for node in ast.parse(source).body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    rebuild, guard, publish = build.body[-3:]
+    assert isinstance(rebuild, ast.Expr) and isinstance(rebuild.value, ast.Await)
+    assert rebuild.value.value.func.id == "force_rebuild"
+    assert isinstance(guard, ast.Expr) and isinstance(guard.value, ast.Await)
+    call = guard.value.value
+    assert call.func.id == "volume_check"
+    assert call.args[1].value == "final magnifying-bracket (annotations neutral)"
+    assert call.args[2].id == "expected"
+    assert ast.unparse(call.args[3]) == "0.02 * cut_volume"
+    assert isinstance(publish, ast.Return) and isinstance(publish.value, ast.Await)
+    assert publish.value.value.func.id == "save_part_and_images"
+    for mutation in (
+        "_resolve_native_mounting_dimensions",
+        "_mounting_coordinate_dimensions",
+        "set_dimension_symmetric_tolerance",
+        "_apply_native_mounting_annotations",
+        "apply_drawing_precision",
+        "clear_dimensions_for_drawing",
+        "mark_dimensions_for_drawing",
+        "apply_drawing_properties",
+    ):
+        calls = [
+            node for node in ast.walk(build)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id == mutation
+        ]
+        assert calls, mutation
+        assert all(node.lineno < rebuild.lineno for node in calls), mutation

@@ -36,15 +36,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MountingCoordinates": {"MountingX0", "MountingX1", "MountingY0"},
 }
 
+# Wizard callout precision is applied in the build through observed native
+# dimension names; those identifiers must never be renamed for this contract.
 DRAWING_PRECISION = {
     "ArmProfile": {"ArmWidth": 2, "ArmDepth": 2},
     "FlangeProfile": {"FlangeWidth": 2, "FlangeDepth": 3},
     "Flange": {"FlangeHeight": 2},
-    "MountingCounterbores": {
-        "HoleDiameter": 3,
-        "CounterBoreDiameter": 2,
-        "CounterBoreDepth": 2,
-    },
 }
 DRAWING_POSITION_BAND = POSITION_BAND
 

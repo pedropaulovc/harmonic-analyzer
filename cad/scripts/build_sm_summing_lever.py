@@ -63,6 +63,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _common import (
     CASTING_GREEN,
     IN,
@@ -760,8 +761,9 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
 
 def _receiver_model_bands(adapter) -> None:
-    """Author the receiver limits on the actual native feature dimensions."""
-    from _common import _early_bound
+    """Author receiver limits on owned source dimensions, including subfeatures."""
+    from _common import _com_invoke, _display_dimensions, _early_bound
+    from _drawing_marks import _feature_tree
     from magnifying_bracket_joint_layout import THREAD_DEPTH
 
     model = _early_bound(adapter.currentModel, "IPartDoc")
@@ -792,24 +794,39 @@ def _receiver_model_bands(adapter) -> None:
         "TapDrillDepth": (DRILL_DEPTH, DRILL_DEPTH_BAND),
     }
     matches = {name: [] for name in required}
-    display = feature.GetFirstDisplayDimension()
-    while display is not None:
-        display = _early_bound(display, "IDisplayDimension")
-        dimension = _early_bound(display.GetDimension(), "IDimension")
-        native_name = str(dimension.FullName).split("@")[0]
-        if "depth" in native_name.lower():
+    # Hole Wizard thread lengths can belong to its cosmetic-thread subfeature.
+    # Follow the same owned-dimension tree as the tolerance/precision helpers;
+    # native names are not a semantic API ("depth" is not guaranteed in them).
+    for current in _feature_tree(feature):
+        owner = str(_com_invoke(current, "IFeature", "Name"))
+        for dimension in _display_dimensions(current):
+            full_name = str(_com_invoke(dimension, "IDimension", "FullName"))
+            system_value = float(_com_invoke(dimension, "IDimension", "SystemValue"))
+            dimension_type = int(_com_invoke(dimension, "IDimension", "GetType"))
+            linear = dimension_type == 0  # swDimensionParamTypeDoubleLinear
+            value_mm = system_value * 1000.0
+            reported_value = value_mm if linear else system_value
+            reported_units = "mm" if linear else "SI"
+            _telemetry.info(
+                f"BracketMountingTaps native dimension {full_name} = "
+                f"{reported_value:.6g} {reported_units} (feature {owner}) "
+                f"[parameter type {dimension_type}]"
+            )
+            parts = full_name.split("@")
+            if not linear or len(parts) < 2 or parts[1] != owner:
+                continue
             for name, (nominal, _band) in required.items():
-                if abs(float(dimension.SystemValue) * 1000.0 - nominal) < 1e-5:
-                    matches[name].append(dimension)
-        display = feature.GetNextDisplayDimension(display)
+                if abs(value_mm - nominal) < 1e-5:
+                    matches[name].append((owner, parts[0]))
     for name, (_nominal, band) in required.items():
         if len(matches[name]) != 1:
             raise RuntimeError(
                 f"BracketMountingTaps: expected one native {name}, found {len(matches[name])}"
             )
-        matches[name][0].Name = name
-        set_dimension_symmetric_tolerance(adapter, "BracketMountingTaps", name, band)
-        set_dimension_display_precision(adapter, "BracketMountingTaps", name, 2)
+        owner, native_name = matches[name][0]
+        # Wizard-owned names are its native parameter contract; never rewrite them.
+        set_dimension_symmetric_tolerance(adapter, owner, native_name, band)
+        set_dimension_display_precision(adapter, owner, native_name, 2)
 
 
 async def _receiver_coordinate_dimensions(adapter) -> None:
@@ -1027,6 +1044,11 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Bracket Receiver Note": f"BRACKET TAP DRILL LATERAL WALL {DRILL_LATERAL_WALL_MIN:.3f} MIN.",
         },
+    )
+    # Native dimension metadata must not erase the already-verified blind taps.
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "summing lever after native receiver bands", v_built, 1e-5 * v_built
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
