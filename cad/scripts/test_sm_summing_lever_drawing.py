@@ -259,15 +259,20 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         def GetNextSubFeature(self):
             return self.next_subfeature
 
-    drill = Dimension("D2", "BracketMountingTaps", 6.05)
-    thread = Dimension("D1", "CosmeticThread1", 4.95)
+    # Native shape observed on the farm (2026-10-09): the tap drill depth lives
+    # on a sketch subfeature, and each hole gets its own cosmetic thread.
+    drill = Dimension("Tap Drill Depth", "Sketch14", 6.05)
+    thread = Dimension("D1", "Hole Thread22", 4.95)
+    thread_b = Dimension("D1", "Hole Thread23", 4.95)
     unrelated = Dimension("Depth", "ReferencePlane", 4.95)
     angular = Dimension("D3", "BracketMountingTaps", 4.95, kind=1)
-    thread_feature = Feature("CosmeticThread1", [thread])
+    sketch_feature = Feature("Sketch14", [drill])
+    thread_feature = Feature("Hole Thread22", [thread])
+    thread_feature_b = Feature("Hole Thread23", [thread_b])
     taps = Feature(
         "BracketMountingTaps",
-        [Dimension("D1", "BracketMountingTaps", 1.778), drill, thread, unrelated, angular],
-        [thread_feature],
+        [drill, thread, thread_b, unrelated, angular],
+        [sketch_feature, thread_feature, thread_feature_b],
     )
     features = {
         name: Feature(name, [Dimension("D1", name, 5.08)])
@@ -299,29 +304,35 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     assert bands == [
         ("CoefficientsPlate", "PlateThickness", 0.05),
         ("EdgeRibBack", "RibDepth", 0.05),
-        ("CosmeticThread1", "D1", 0.05),
-        ("BracketMountingTaps", "D2", 0.10),
+        ("Hole Thread22", "D1", 0.05),
+        ("Hole Thread23", "D1", 0.05),
+        ("Sketch14", "Tap Drill Depth", 0.10),
     ]
-    assert (drill.Name, thread.Name, unrelated.Name) == ("D2", "D1", "Depth")
+    assert (drill.Name, thread.Name, thread_b.Name, unrelated.Name) == (
+        "Tap Drill Depth", "D1", "D1", "Depth"
+    )
     assert angular.Name == "D3"
     assert any("D3@BracketMountingTaps = 0.00495 SI" in row for row in inventory)
-    assert any("D1@CosmeticThread1 = 4.95 mm (feature CosmeticThread1)" in row for row in inventory)
+    assert any("D1@Hole Thread22 = 4.95 mm (feature Hole Thread22)" in row for row in inventory)
     assert any("Depth@ReferencePlane = 4.95 mm" in row for row in inventory)
 
-    # Restore the farm's parent-only traversal: the ghost child/reference
-    # dimensions must not be mistaken for owned parent depth parameters.
+    # Parent-only traversal: dimensions owned by subfeatures must not be
+    # mistaken for parent parameters.
     taps.children = ()
     inventory.clear()
     for name in part.RECEIVER_DIMENSION_BANDS:
         features[name].displays[0].GetDimension2(0).Name = "D1"
-    with pytest.raises(RuntimeError, match="expected one native FullThreadDepth, found 0"):
+    with pytest.raises(RuntimeError, match="expected 2 native FullThreadDepth .*found 0"):
         part._receiver_model_bands(adapter)
-    assert inventory and any("D1@CosmeticThread1" in row for row in inventory)
-    taps.children = (thread_feature,)
+    assert inventory and any("D1@Hole Thread22" in row for row in inventory)
+    # Two depths on ONE cosmetic thread (one hole uncovered) is ambiguous.
+    taps.children = (sketch_feature, thread_feature)
+    thread_feature.next_subfeature = None
+    sketch_feature.next_subfeature = thread_feature
     thread_feature.displays.append(display(Dimension("D9", thread_feature.Name, 4.95)))
     for name in part.RECEIVER_DIMENSION_BANDS:
         features[name].displays[0].GetDimension2(0).Name = "D1"
-    with pytest.raises(RuntimeError, match="expected one native FullThreadDepth, found 2"):
+    with pytest.raises(RuntimeError, match="expected 2 native FullThreadDepth \\(one per owner\\), found 2"):
         part._receiver_model_bands(adapter)
 
 

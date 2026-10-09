@@ -818,15 +818,21 @@ def _receiver_model_bands(adapter) -> None:
             for name, (nominal, _band) in required.items():
                 if abs(value_mm - nominal) < 1e-5:
                     matches[name].append((owner, parts[0]))
+    # Native shape (farm, 2026-10-09): Hole Wizard owns the tap drill depth on
+    # one sketch subfeature, but adds one cosmetic-thread subfeature PER HOLE,
+    # each owning its own full-thread depth.
+    expected = {"FullThreadDepth": len(LEVER_HOLE_POINTS), "TapDrillDepth": 1}
     for name, (_nominal, band) in required.items():
-        if len(matches[name]) != 1:
+        owners = {owner for owner, _native_name in matches[name]}
+        if len(matches[name]) != expected[name] or len(owners) != expected[name]:
             raise RuntimeError(
-                f"BracketMountingTaps: expected one native {name}, found {len(matches[name])}"
+                f"BracketMountingTaps: expected {expected[name]} native {name} "
+                f"(one per owner), found {len(matches[name])}: {matches[name]}"
             )
-        owner, native_name = matches[name][0]
-        # Wizard-owned names are its native parameter contract; never rewrite them.
-        set_dimension_symmetric_tolerance(adapter, owner, native_name, band)
-        set_dimension_display_precision(adapter, owner, native_name, 2)
+        for owner, native_name in matches[name]:
+            # Wizard-owned names are its native parameter contract; never rewrite them.
+            set_dimension_symmetric_tolerance(adapter, owner, native_name, band)
+            set_dimension_display_precision(adapter, owner, native_name, 2)
 
 
 async def _receiver_coordinate_dimensions(adapter) -> None:
