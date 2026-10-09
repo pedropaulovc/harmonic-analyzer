@@ -177,7 +177,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         back,
         edge=rims[0].edge,
-        callout_xy=(0.205, 0.064),
+        # Clear band between the front/back views and the right view; at
+        # (0.205, 0.064) the callout printed over the title block.
+        callout_xy=(0.150, 0.150),
         label="two bracket counterbores",
         process="DRILL / COUNTERBORE",
     )
