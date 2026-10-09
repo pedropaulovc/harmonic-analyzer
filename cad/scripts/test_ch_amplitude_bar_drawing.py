@@ -12,7 +12,7 @@ import ch_amplitude_bar_spec
 import draw_ch_amplitude_bar as drawing
 import build_ch_amplitude_bar as bar
 from _drawing_registry import DRAWINGS_BY_NAME
-from _hole_spec import blind_cut_dia_mm, drill_process
+from _config import parts
 
 
 def test_required_drawing_paths() -> None:
@@ -41,8 +41,22 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_part_geometry_matches_the_spec() -> None:
     assert ch_amplitude_bar_spec.BAR_LENGTH == bar.BAR_LENGTH
     assert ch_amplitude_bar_spec.BAR_WIDTH == bar.BAR_WIDTH
-    assert bar.TOP_PIN_HOLE_SPEC is ch_amplitude_bar_spec.TOP_PIN_HOLE_SPEC
-    assert blind_cut_dia_mm(ch_amplitude_bar_spec.TOP_PIN_HOLE_SPEC) == 1.994
+    assert bar.TOP_PIN_HOLE_DIA is ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA
+    assert bar.TOP_PIN_HOLE_BAND is ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND
+
+
+def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
+    """User ruling 2026-10: the MHA-CH-011 pin is pressed into both top-notch
+    cheeks (ch_bar_pivot_pin_spec holds the fit), so the hole is reamed to a
+    band of its own, native on TopPinDia, not a #47 drill."""
+    from _drawing_contract import model_toleranced_dimensions
+
+    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA == 1.968
+    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND == (0.010, 0.0)
+    assert model_toleranced_dimensions(bar)[("TopPinProfile", "TopPinDia")] == (
+        "*deviations(TOP_PIN_HOLE_BAND)"
+    )
+    assert ch_amplitude_bar_notes.TOP_PIN_NUMBER == parts("ch-bar-pivot-pin")["number"]
 
 
 def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
@@ -60,7 +74,8 @@ def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
 def test_linked_notes_carry_the_notches_and_hole() -> None:
     notes = ch_amplitude_bar_notes.DRAWING_NOTES
     assert "END NOTCHES (DETAILS A, B)" in notes
-    assert drill_process(ch_amplitude_bar_spec.TOP_PIN_HOLE_SPEC) in notes
+    assert "\u00d81.968 +0.010/0 REAM" in notes
+    assert "PRESS FIT PIN MHA-CH-011" in notes
     assert "LINEAR +/-" not in notes
     assert "STEEL" not in notes
     assert "CHROME" not in notes
@@ -200,9 +215,10 @@ def test_notes_keep_only_the_ruled_prose() -> None:
         "   BOTH THRU THE FULL DEPTH, OPEN TO",
         "   OPPOSITE ENDS, IN ONE COMMON PLANE;",
         "   ROOTS R0.40 MAX.",
-        f"3. TOP PIN HOLE {drill_process(ch_amplitude_bar_spec.TOP_PIN_HOLE_SPEC)} THRU BOTH",
-        "   TOP-NOTCH CHEEKS AT MID-DEPTH,",
-        "   6.35 BELOW THE BAR TOP.",
+        "3. TOP PIN HOLE \u00d81.968 +0.010/0 REAM",
+        "   THRU BOTH TOP-NOTCH CHEEKS AT",
+        "   MID-DEPTH, 6.35 BELOW THE BAR TOP;",
+        "   PRESS FIT PIN MHA-CH-011.",
         "4. DIMS APPLY AFTER PLATING.",
     ]
 

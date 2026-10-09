@@ -2,9 +2,9 @@ r"""Reproduction script: amplitude bar (book ch. 15, pp. 30-33).
 
 One of the 20 chrome-finished bars (~81 cm long, 1/4" square) that set each
 channel's Fourier coefficient. The bottom-end notch rides the rocker arm;
-the deeper top-end notch straddles the channel lever and hangs from its Ø2
-bar pin through the top pin hole (M6.3 layout: bars run UP the spine from
-the rocker bank to the top-lever bank).
+the deeper top-end notch straddles the channel lever and hangs from the
+MHA-CH-011 bar pivot pin pressed through the top pin hole (M6.3 layout: bars
+run UP the spine from the rocker bank to the top-lever bank).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 15" — width 6.35 mm is book-annotated,
 length legacy 32" = 812.8 mm SHORTENED 4.5 at the top to 808.3 by the
@@ -15,11 +15,12 @@ Audit verdict: PASS.
 
 Profile (on the Front plane, bar length along +Y, origin at bottom-left
 corner) is a single 12-segment chain; both notches are centred slots in the
-end faces. Extruded by the bar depth (+Z, 0..6.35). The top pin hole runs
-along global X through the top-slot cheeks at 6.35 below the bar top,
-mid-depth (Z = 3.175): a Right-plane sketch maps local +X -> global -Z, so
-the circle centre sits at sketch_x = -BarDepth/2 to land inside the body, and
-the removed volume is asserted against analytic so a wrong side fails loud.
+end faces. Extruded by the bar depth (+Z, 0..6.35). The top pin hole -- a
+Ø1.968 +0.010/0 reamed press hole for the 5/64 pin -- runs along global X
+through the top-slot cheeks at 6.35 below the bar top, mid-depth
+(Z = 3.175): a Right-plane sketch maps local +X -> global -Z, so the circle
+centre sits at sketch_x = -BarDepth/2 to land inside the body, and the
+removed volume is asserted against analytic so a wrong side fails loud.
 
 Run (SolidWorks already open)::
 
@@ -39,6 +40,7 @@ from _common import (
     apply_color,
     BAR_STEEL,
     check,
+    define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -51,8 +53,6 @@ from _common import (
     set_global,
     volume_check,
 )
-from _hole_spec import blind_cut_dia_mm
-from _holes import wizard_holes
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -77,7 +77,8 @@ from ch_amplitude_bar_spec import (
     NOTCH_WIDTH_BAND,
     TOP_NOTCH_OFFSET,
     TOP_NOTCH_WIDTH,
-    TOP_PIN_HOLE_SPEC,
+    TOP_PIN_HOLE_BAND,
+    TOP_PIN_HOLE_DIA,
 )
 
 import _telemetry
@@ -94,8 +95,11 @@ BAR_DEPTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: legacy, square section (med)
 # (was the legacy 1/8" = 3.175; user ruling 2026-09-27, #1038).
 BOTTOM_NOTCH_HEIGHT = 0.09375 * IN  # 2.381  DIMENSIONS.md ch15: legacy 3/32" (med)
 TOP_NOTCH_HEIGHT = 0.5 * IN  # 12.7   DIMENSIONS.md ch15: legacy (med)
-# top pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature
+# top pin hole: was Ø2.0 drill, then #47 (Ø1.994) Hole Wizard; now the
+# Ø1.968 +0.010/0 reamed press hole for the MHA-CH-011 pin (a sketch cut: the
+# Hole Wizard has no reamed-size table)
 TOP_PIN_DROP = 0.25 * IN  # 6.35  DIMENSIONS.md ch15: hole centre below bar top (derived)
+THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > the bar width
 
 
 async def build(adapter) -> dict[str, str]:
@@ -117,9 +121,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TopNotchWidth", f"{TOP_NOTCH_WIDTH}mm")
     await set_global(adapter, "TopNotchHeight", f"{TOP_NOTCH_HEIGHT}mm")
     # TopPinDrop stays a live knob: the top-pin bore AXIS drive references it
-    # ('"BarLength" - "TopPinDrop"'). The pin DIAMETER is now the #47 drill
-    # standard (Hole Wizard), so the old TopPinHoleDia knob is gone.
+    # ('"BarLength" - "TopPinDrop"'). TopPinDia is the reamed press hole.
     await set_global(adapter, "TopPinDrop", f"{TOP_PIN_DROP}mm")
+    await set_global(adapter, "TopPinDia", f"{TOP_PIN_HOLE_DIA}mm")
     await set_global(
         adapter, "BottomNotchOffset", '("BarWidth" - "BottomNotchWidth") / 2'
     )
@@ -212,30 +216,38 @@ async def build(adapter) -> dict[str, str]:
     # longer has. Evaluates to the as-built BAR_DEPTH, so it stays neutral.
     drive_jobs.append(("D1@Bar", '"BarDepth"'))
 
-    # Native number-drill hole through the top-slot cheeks. The removed volume
-    # is asserted against both cheeks so a misplaced hole fails loud.
+    # Reamed press hole through the top-slot cheeks. The removed volume is
+    # asserted against both cheeks so a misplaced hole fails loud.
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
     _telemetry.info(f"volume before top pin hole: {vol_before:.1f} mm^3")
     pin_y = BAR_LENGTH - TOP_PIN_DROP
-    pin_dia = blind_cut_dia_mm(TOP_PIN_HOLE_SPEC)
-    expected_removed = math.pi * (pin_dia / 2.0) ** 2 * (BAR_WIDTH - TOP_NOTCH_WIDTH)
-    pin_cut = wizard_holes(
-        adapter,
-        TOP_PIN_HOLE_SPEC,
-        [[BAR_WIDTH, pin_y, BAR_DEPTH / 2.0]],
-        (1.0, 0.0, 0.0),
-        f"top pin hole ({TOP_PIN_HOLE_SPEC.size})",
-        name="TopPinHole",
-        expect_dia_mm=pin_dia,
-        placement_dims=[
-            (
-                ("TopPinX", '"BarDepth" / 2'),
-                ("TopPinY", '"BarLength" - "TopPinDrop"'),
-            )
-        ],
+    expected_removed = (
+        math.pi * (TOP_PIN_HOLE_DIA / 2.0) ** 2 * (BAR_WIDTH - TOP_NOTCH_WIDTH)
     )
-    drive_jobs += pin_cut.placement_drive_jobs
+    pin_hole = SketchDims()
+    check("create_sketch top pin hole", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        -BAR_DEPTH / 2.0,
+        pin_y,
+        TOP_PIN_HOLE_DIA / 2.0,
+        "top pin hole",
+        dims=pin_hole,
+        names=("TopPinX", "TopPinY", "TopPinDia"),
+        drives=('"BarDepth" / 2', '"BarLength" - "TopPinDrop"', '"TopPinDia"'),
+    )
+    await ensure_fully_defined(adapter, "top pin hole sketch")
+    check("exit_sketch top pin hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "TopPinProfile")
+    drive_jobs += pin_hole.apply(adapter, "TopPinProfile")
+    check(
+        "cut top pin hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "TopPinHole")
     res = await adapter.get_mass_properties()
     removed = vol_before - res.data.volume
     if abs(removed - expected_removed) >= 2.0:
@@ -352,6 +364,11 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter, "BarProfile", "TopRightLedge", NOTCH_OFFSET_TOLERANCE_MM
+    )
+    # The reamed press hole's band rides natively on its diameter; the sheet
+    # states it in note 3 (the hole is dimensioned in the notes).
+    set_dimension_bilateral_tolerance(
+        adapter, "TopPinProfile", "TopPinDia", *deviations(TOP_PIN_HOLE_BAND)
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

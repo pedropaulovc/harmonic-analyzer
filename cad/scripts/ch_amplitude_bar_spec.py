@@ -13,8 +13,6 @@ square section, and a native detail of each small end notch.
 from __future__ import annotations
 import math
 
-from _hole_spec import HoleSpec
-
 
 MM_PER_IN = 25.4
 
@@ -61,7 +59,12 @@ TOP_NOTCH_WIDTH = _straddle_minimum(LEVER_THICKNESS, LEVER_THICKNESS_TOLERANCE) 
 NOTCH_WIDTH_BAND = (0.30, 0.0)  # (upper, lower) deviations, native on both widths
 TOP_NOTCH_HEIGHT = 0.5 * MM_PER_IN  # 12.7
 TOP_PIN_DROP = 0.25 * MM_PER_IN  # 6.35 hole centre below the bar top
-TOP_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
+# The MHA-CH-011 bar pivot pin presses into this hole through both top-notch
+# cheeks and runs in the lever's #47 hole (user ruling 2026-10, press fit;
+# ch_bar_pivot_pin_spec holds the fit budget). Reamed to H7 under the 5/64
+# drill rod: the 0.0775 in stock reamer cuts inside the band.
+TOP_PIN_HOLE_DIA = 1.968
+TOP_PIN_HOLE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed; native
 
 # --- Derived. ---
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.95

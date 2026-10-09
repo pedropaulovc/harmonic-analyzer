@@ -10,8 +10,15 @@ ONLY by ``build_amplitude_bar`` and the offline tests.
 
 from __future__ import annotations
 
-from _hole_spec import drill_process
-from ch_amplitude_bar_spec import TOP_PIN_HOLE_SPEC
+from ch_amplitude_bar_spec import TOP_PIN_HOLE_BAND, TOP_PIN_HOLE_DIA
+
+# The pin pressed into the top pin hole (test_ch_amplitude_bar_drawing pins it
+# to the part registry). The hole is dimensioned in the notes, so its reamed
+# band (the model's, native on TopPinDia) is stated with it.
+TOP_PIN_NUMBER = "MHA-CH-011"
+_HOLE_UPPER, _HOLE_LOWER = TOP_PIN_HOLE_BAND
+if _HOLE_LOWER != 0.0:
+    raise AssertionError("note 3 prints the reamed band as +upper/0")
 
 # The title-block QTY cell owns the 20-off count; notch orientation and
 # coplanarity are stated because no view resolves them at 1:4 (machinist
@@ -32,9 +39,10 @@ DRAWING_NOTES = "\n".join(
         "   BOTH THRU THE FULL DEPTH, OPEN TO",
         "   OPPOSITE ENDS, IN ONE COMMON PLANE;",
         "   ROOTS R0.40 MAX.",
-        f"3. TOP PIN HOLE {drill_process(TOP_PIN_HOLE_SPEC)} THRU BOTH",
-        "   TOP-NOTCH CHEEKS AT MID-DEPTH,",
-        "   6.35 BELOW THE BAR TOP.",
+        f"3. TOP PIN HOLE \u00d8{TOP_PIN_HOLE_DIA:.3f} +{_HOLE_UPPER:.3f}/0 REAM",
+        "   THRU BOTH TOP-NOTCH CHEEKS AT",
+        "   MID-DEPTH, 6.35 BELOW THE BAR TOP;",
+        f"   PRESS FIT PIN {TOP_PIN_NUMBER}.",
         "4. DIMS APPLY AFTER PLATING.",
     )
 )

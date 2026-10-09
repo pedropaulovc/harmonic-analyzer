@@ -619,7 +619,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
 UNTHREADED_PARTS: frozenset[str] = frozenset(
     {
         "dt_alignment_pinion",  # bonded to pinion_arbor (Loctite 638, drum-bonded)
-        "ch_amplitude_bar",  # #47 drilled top pin hole, end notches; pinned/sliding only
+        "ch_amplitude_bar",  # reamed top pin hole (pressed MHA-CH-011 pin), end notches; pinned/sliding only
+        "ch_bar_pivot_pin",  # plain 5/64 drill-rod pin pressed in the bar cheeks, runs in the lever
         "vn_chain_inner_link",  # roller-chain plate, no thread
         "vn_chain_outer_link",  # roller-chain plate, no thread
         "ch_channel_lever",  # Ø6.5 fulcrum bore, #47 bar-pin hole, #21 spring-eye hole; no taps

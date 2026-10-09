@@ -154,6 +154,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("ch_connecting_rod_spec", "RING_THICKNESS_BAND"): (
         "indexed by cylinder_bank_layout for the thickest ring its cam slot holds"
     ),
+    ("ch_bar_pivot_pin_spec", "PIN_BLANK_LENGTH_BAND"): (
+        "the drill-rod blank's cut-length deviations: indexed into the blank "
+        "note and the dressing-stock stack (blank_excess_min/max)"
+    ),
     ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"): (
         "centred (cylinder_bank_layout asserts it): indexed as the symmetric "
         "tolerance and the fit-up mic limits"

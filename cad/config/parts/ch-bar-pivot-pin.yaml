@@ -1,0 +1,9 @@
+ch-bar-pivot-pin:
+  number: MHA-CH-011
+  title: Amplitude Bar Pivot Pin
+  material: "AISI O1 or W1 drill rod, 5/64 in"
+  material_specification: "AISI O1 or W1 drill rod, 5/64 in, ground, as supplied (annealed)"
+  finish: "bright, oiled"
+  quantity: 20
+  tolerance_class: machined_block
+  process: "cut from drill rod; pressed into the bar at assembly, ends dressed flush"

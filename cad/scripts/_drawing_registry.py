@@ -362,6 +362,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_bar_pivot_pin",
+        part="ch_bar_pivot_pin",
+        artifact_stem="ch-bar-pivot-pin",
+        script_name="draw_ch_bar_pivot_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_counter_spring",
         part="vn_counter_spring",
         artifact_stem="vn-counter-spring",
