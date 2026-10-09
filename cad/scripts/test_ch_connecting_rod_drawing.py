@@ -321,6 +321,167 @@ def test_reamed_pin_hole_is_a_native_three_place_dimension() -> None:
     assert text_y < 0.267
 
 
+def test_reamed_pin_hole_band_prints_at_the_value_s_places(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Farm render of 1b1f2f7fd printed "Ø1.968 +0.01/0.00": the shared
+    setter prints a band at the fewest places that hold it (two, for 0.010),
+    under a value authored at three.  The part build re-sets PinHoleDia's
+    tolerance places from the same DRAWING_PRECISION entry as its value's,
+    after both the band and the value places are authored."""
+    import _drawing_marks
+    import inspect
+
+    from _fit_limits import deviations
+
+    spec = ch_connecting_rod_spec
+    value_places = ch_connecting_rod_notes.DRAWING_PRECISION["PinHoleProfile"][
+        "PinHoleDia"
+    ]
+    # The defect: left to the shared setter the band reads +0.01/0.00.
+    assert _drawing_marks._tolerance_places(*deviations(spec.PIN_HOLE_BAND)) == 2
+    assert value_places == 3
+
+    calls: list[tuple[int, int, int, int]] = []
+
+    class Display:
+        tolerance_places = 2
+
+        def SetPrecision3(
+            self, primary: int, dual: int, primary_tol: int, dual_tol: int
+        ) -> int:
+            calls.append((primary, dual, primary_tol, dual_tol))
+            self.tolerance_places = primary_tol
+            return 0
+
+        def GetPrimaryTolPrecision2(self) -> int:
+            return self.tolerance_places
+
+    display = Display()
+    looked_up: list[tuple[str, str]] = []
+
+    def named_dimension(_adapter, feature: str, name: str):
+        looked_up.append((feature, name))
+        return display, None
+
+    monkeypatch.setattr(rod, "_named_dimension", named_dimension)
+    monkeypatch.setattr(rod, "_early_bound", lambda value, _type: value)
+    places = rod.tolerance_at_dimension_places(object(), "PinHoleProfile", "PinHoleDia")
+    assert looked_up == [("PinHoleProfile", "PinHoleDia")]
+    # Primary (value) places untouched; the tolerance takes the value's places.
+    assert calls == [(-1, -1, value_places, -1)]
+    assert places == display.tolerance_places == value_places
+
+    build = inspect.getsource(rod.build)
+    band = build.index('"PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)')
+    value = build.index("apply_drawing_precision(adapter, DRAWING_PRECISION)")
+    tolerance = build.index(
+        'tolerance_at_dimension_places(adapter, "PinHoleProfile", "PinHoleDia")'
+    )
+    assert band < tolerance and value < tolerance
+
+
+def test_side_view_fork_dimensions_stand_clear_of_each_other() -> None:
+    """Farm render of 1b1f2f7fd: centred over the slot, the 2.625's stacked
+    +0.127/0.000 touched the 6.075's dimension line and arrows, and the
+    6.075's extension line and the 14.75's top arrow tail ran through its
+    0.000; the 14.75 and 18.00 values stood 1 mm apart.  Model each side-view
+    text frame, line and tail from the measured ink and require air between
+    every text and any other dimension's ink."""
+    d = drawing
+    spec = ch_connecting_rod_spec
+    gap = d.SIDE_TEXT_CLEARANCE_MM
+    arrow = d.ARROW_HALF_WIDTH_MM
+    # Measured on the same render: extension lines run ~1.1 mm past their
+    # dimension line; text is 3.4 mm tall.
+    overshoot, half_text = 1.1, 1.7
+
+    def mm(name: str) -> tuple[float, float]:
+        x, y = d.LEFT_KEEP[name]
+        return x * 1000.0, y * 1000.0
+
+    cx = d.LEFT_CENTER[0] * 1000.0
+    top = d._left_xy(0.0, spec.FORK_TOP_Y)[1] * 1000.0
+    crotch = d._left_xy(0.0, spec.FORK_CROTCH_Y)[1] * 1000.0
+    base = d._left_xy(0.0, spec.FORK_BASE_Y)[1] * 1000.0
+    fork = spec.FORK_THICKNESS / 2.0
+    slot = spec.FORK_SLOT_WIDTH / 2.0
+    reach = d.DIM_ARROW_REACH_MM
+
+    sx, sy = mm("SlotWidth")
+    s_line = sy - d.SLOT_WIDTH_LINE_DROP_MM
+    tx, ty = mm("ForkThick")
+    t_line = ty - d.FORK_THICK_LINE_DROP_MM
+    dx, dy = mm("SlotDepth")
+    bx, by = mm("ForkBossLength")
+    vertical = d.VERTICAL_TEXT_HALF_WIDTH_MM
+
+    Box = tuple[float, float, float, float]  # x0, y0, x1, y1 (mm)
+    ink: dict[str, dict[str, Box]] = {
+        "SlotWidth": {
+            "text": (
+                sx - d.SLOT_WIDTH_TEXT_HALF_WIDTH_MM,
+                s_line,
+                sx + d.SLOT_WIDTH_TEXT_HALF_WIDTH_MM,
+                sy + d.SLOT_WIDTH_TEXT_RISE_MM,
+            ),
+            # Run out under its text on the left, the right tail outside.
+            "line": (
+                sx - d.SLOT_WIDTH_TEXT_HALF_WIDTH_MM,
+                s_line - arrow,
+                cx + slot + reach,
+                s_line + arrow,
+            ),
+            "left ext": (cx - slot, top, cx - slot, s_line + overshoot),
+            "right ext": (cx + slot, top, cx + slot, s_line + overshoot),
+        },
+        "ForkThick": {
+            "text": (
+                tx - d.FORK_THICK_TEXT_HALF_WIDTH_MM,
+                ty - half_text,
+                tx + d.FORK_THICK_TEXT_HALF_WIDTH_MM,
+                ty + half_text,
+            ),
+            "line": (
+                cx - fork - reach,
+                t_line - arrow,
+                cx + fork + reach,
+                t_line + arrow,
+            ),
+            "left ext": (cx - fork, top, cx - fork, t_line + overshoot),
+            "right ext": (cx + fork, top, cx + fork, t_line + overshoot),
+        },
+        "SlotDepth": {
+            "text": (dx - vertical, dy - half_text, dx + vertical, dy + half_text),
+            "top tail": (dx - arrow, top, dx + arrow, top + reach),
+            "bottom tail": (dx - arrow, crotch - reach, dx + arrow, crotch),
+            "top ext": (cx + fork, top, dx + overshoot, top),
+            "bottom ext": (cx + slot, crotch, dx + overshoot, crotch),
+        },
+        "ForkBossLength": {
+            "text": (bx - vertical, by - half_text, bx + vertical, by + half_text),
+            "top tail": (bx - arrow, top, bx + arrow, top + reach),
+            "bottom tail": (bx - arrow, base - reach, bx + arrow, base),
+            "top ext": (cx + fork, top, bx + overshoot, top),
+            "bottom ext": (cx + fork, base, bx + overshoot, base),
+        },
+    }
+
+    def air(a: Box, b: Box) -> float:
+        return max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3])
+
+    for owner, items in ink.items():
+        text = items["text"]
+        for other, other_items in ink.items():
+            if other == owner:
+                continue
+            for part, box in other_items.items():
+                assert air(text, box) >= gap - 1e-9, (owner, other, part)
+    # The slot's text stands left of the fork, its line just above the tines.
+    assert ink["SlotWidth"]["text"][2] < cx - fork
+    assert 1.0 <= s_line - top
+
+
 def test_model_bands_are_owned_by_named_model_dimensions() -> None:
     assert ch_connecting_rod_spec.RING_BORE_DIA_BAND == (0.10, 0.00)
     assert ch_connecting_rod_spec.FORK_THICKNESS_BAND == (0.05, -0.05)

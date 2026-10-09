@@ -48,6 +48,7 @@ from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
     FORK_BASE_Y,
     FORK_CROTCH_Y,
+    FORK_THICKNESS,
     FORK_TOP_Y,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
@@ -124,13 +125,50 @@ FRONT_CALLOUTS = {
     "ForkWidthDim": "FULL R",
     "PinHoleDia": "THRU - REAM",
 }
-# The fork's 3-place thickness and slot stack above the crown; the slot depth
-# and the boss length run from the tine tops down the right-hand side.
+# Side-view ink, read off the farm render of 1b1f2f7fd (run
+# 20261009T190048955Z; mm at 1:1, from each dimension's keep point).  A
+# horizontal dimension's text centres on its keep x.  The thickness's one
+# line ("6.075 ±0.05", 23.9 wide) centres on its keep y and stands on its
+# dimension line FORK_THICK_LINE_DROP_MM under it.  The slot's stacked band
+# ("2.625 +0.127/0.000", 26.9 wide) rises over the value: its frame tops out
+# SLOT_WIDTH_TEXT_RISE_MM over the keep y, its line SLOT_WIDTH_LINE_DROP_MM
+# under it.  Smart arrows stand outside these short spans, their tails
+# DIM_ARROW_REACH_MM past the extension line (the 14.75 and 18.00 top tails
+# rise that far over the tine tops); an arrowhead is ARROW_HALF_WIDTH_MM
+# either side of its line.
+FORK_THICK_TEXT_HALF_WIDTH_MM = 12.0
+FORK_THICK_LINE_DROP_MM = 2.8
+SLOT_WIDTH_TEXT_HALF_WIDTH_MM = 13.5
+SLOT_WIDTH_TEXT_RISE_MM = 4.4
+SLOT_WIDTH_LINE_DROP_MM = 4.5
+VERTICAL_TEXT_HALF_WIDTH_MM = 5.4  # "14.75", "18.00"
+DIM_ARROW_REACH_MM = 6.4
+ARROW_HALF_WIDTH_MM = 0.3
+# Air between side-view text and any other dimension's ink.
+SIDE_TEXT_CLEARANCE_MM = 2.5
+# The slot's 2.625 span is narrower than its value: centred over the slot, the
+# thickness's dimension line cut the top of its band, the thickness's right
+# extension line and the 14.75's top arrow tail ran through its "0.000"
+# (farm render of 1b1f2f7fd).  So the slot's text stands LEFT of the fork,
+# clear of the thickness's left extension line, on its own dimension line
+# run out just above the tine tops; the thickness stands centred over the
+# fork, its line and arrows clear above the slot's band.  The slot depth and
+# the boss length run from the tine tops down the right-hand side, their
+# values a clear gap apart.
+SLOT_WIDTH_TEXT_DX_MM = -(
+    FORK_THICKNESS / 2.0 + SIDE_TEXT_CLEARANCE_MM + SLOT_WIDTH_TEXT_HALF_WIDTH_MM
+)
+SLOT_WIDTH_RISE_MM = 6.0
+FORK_THICK_RISE_MM = 16.5
+SLOT_DEPTH_DX_MM = 12.0
+FORK_BOSS_LENGTH_DX_MM = 28.0
 LEFT_KEEP = {
-    "SlotWidth": _left_xy(0.0, FORK_TOP_Y + 6.0),
-    "ForkThick": _left_xy(0.0, FORK_TOP_Y + 13.0),
-    "SlotDepth": _left_xy(12.0, (FORK_TOP_Y + FORK_CROTCH_Y) / 2.0),
-    "ForkBossLength": _left_xy(24.0, (FORK_TOP_Y + FORK_BASE_Y) / 2.0),
+    "SlotWidth": _left_xy(SLOT_WIDTH_TEXT_DX_MM, FORK_TOP_Y + SLOT_WIDTH_RISE_MM),
+    "ForkThick": _left_xy(0.0, FORK_TOP_Y + FORK_THICK_RISE_MM),
+    "SlotDepth": _left_xy(SLOT_DEPTH_DX_MM, (FORK_TOP_Y + FORK_CROTCH_Y) / 2.0),
+    "ForkBossLength": _left_xy(
+        FORK_BOSS_LENGTH_DX_MM, (FORK_TOP_Y + FORK_BASE_Y) / 2.0
+    ),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 
