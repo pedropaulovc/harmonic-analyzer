@@ -805,12 +805,28 @@ def _loop_authored_names(tree: ast.AST, in_blank: set[int]) -> set[str]:
                 if isinstance(value, ast.Constant) and isinstance(value.value, str)
             }
             # A reassigned placeholder cannot be resolved from the loop literal.
-            rebound = {
-                node.id
-                for statement in loop.body
-                for node in ast.walk(statement)
-                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
-            }
+            # Nested lexical scopes do not rebind the enclosing loop's names.
+            rebound: set[str] = set()
+            pending = list(loop.body)
+            while pending:
+                node = pending.pop()
+                if isinstance(
+                    node,
+                    (
+                        ast.FunctionDef,
+                        ast.AsyncFunctionDef,
+                        ast.ClassDef,
+                        ast.Lambda,
+                        ast.ListComp,
+                        ast.SetComp,
+                        ast.DictComp,
+                        ast.GeneratorExp,
+                    ),
+                ):
+                    continue
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                    rebound.add(node.id)
+                pending.extend(ast.iter_child_nodes(node))
             for name in rebound:
                 bindings.pop(name, None)
             # Do not descend into another scope, where a loop variable may be rebound.
@@ -826,6 +842,10 @@ def _loop_authored_names(tree: ast.AST, in_blank: set[int]) -> set[str]:
                         ast.AsyncFunctionDef,
                         ast.ClassDef,
                         ast.Lambda,
+                        ast.ListComp,
+                        ast.SetComp,
+                        ast.DictComp,
+                        ast.GeneratorExp,
                     ),
                 ):
                     continue
@@ -914,6 +934,29 @@ def test_the_blank_sweep_resolves_literal_loop_names(container: str) -> None:
         ' ("TailSeatPlane", "PLANE"), ("JournalSeatPlane", "PLANE")))\n'
     )
     assert _blanked_names_never_authored(source) == ["JournalSeatPlane"]
+
+
+@pytest.mark.parametrize(
+    "nested_binding",
+    [
+        "    def helper():\n        which = other\n",
+        "    async def helper():\n        which = other\n",
+        "    class Helper:\n        which = other\n",
+        "    values = [which for which in others]\n",
+        "    values = {which for which in others}\n",
+        "    values = {which: 1 for which in others}\n",
+        "    values = (which for which in others)\n",
+    ],
+)
+def test_the_blank_sweep_ignores_nested_scope_bindings(nested_binding: str) -> None:
+    source = (
+        'for which in ("Body", "Tail"):\n'
+        '    create_plane(f"{which}SeatPlane")\n'
+        + nested_binding
+        + 'blank_reference_geometry(adapter, (("BodySeatPlane", "PLANE"),'
+        ' ("TailSeatPlane", "PLANE")))\n'
+    )
+    assert _blanked_names_never_authored(source) == []
 
 
 @pytest.mark.parametrize(
