@@ -77,10 +77,6 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     assert "set_dimension_precision" not in source
     assert "SetPrecision3" not in source
     assert "assert_imported_precision(" in source
-    assert (
-        "set_reference_dimensions(adapter, front_annotations, REFERENCE_DIMENSIONS)"
-        in source
-    )
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "PinDia"): "PIN_DIA_TOLERANCE",

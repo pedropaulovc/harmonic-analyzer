@@ -34,11 +34,12 @@ from _drawing_common import (
     add_view_centerline,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
-    set_reference_dimensions,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -145,8 +146,13 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
-    # The installed length is the bar's width: REFERENCE, keyed by name.
-    set_reference_dimensions(adapter, front_annotations, REFERENCE_DIMENSIONS)
+    # The installed length is the bar's width: a LINEAR reference. The plural
+    # set_reference_dimensions forces a diameter glyph, printing "(Ø6.35)".
+    for name in sorted(REFERENCE_DIMENSIONS):
+        matches = [a for a in front_annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one pin {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"pin {name}")
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
     add_view_centerline(
