@@ -557,7 +557,7 @@ inputs are byte-identical.
 ### Debugging a miss (provenance & diagnostics)
 
 A key is `sha256(epoch + salt + Σ(relpath, digest))`, so an unexpected key shift
-is almost always **one dep digest moving**. Three best-effort tools surface that
+is almost always **one dep digest moving**. Four best-effort tools surface that
 without reconstructing build history from terminal scrollback (none can fail a
 build):
 
@@ -584,6 +584,86 @@ build):
   failure that raises instead of "building locally", see AGENTS.md's seat
   contract). Post-hoc
   debugging reads this file instead of scrollback. Gitignored (under `cad/out/`).
+  Every record also carries the recipe (`schema`, `recipe_known`, `input_count`,
+  `inputs: [{path, digest}, ...]`) and remote manifest integrity metadata. Misses
+  and drift retain `previous_key` / `previous_inputs` from the local sidecar when
+  available; successful hits and stores now retain their own full inputs too.
+- **App Insights cache manifests** — `cache.miss`, `cache.hit`, and successful
+  `cache.store` span events keep the existing `label` and 12-character `key`,
+  and add `key_full`, `epoch`, `salt`, and `manifest_*` fields. Each is followed
+  by structured DEBUG logs with message `cache.provenance`, carrying the *same
+  canonical recipe as cache.jsonl* in ordered ASCII JSON fragments
+  (`chunk_index`, `chunk`). Logs correlate to the task trace/span and use the
+  `build-infra` service; warning-level consoles suppress them. No dependency
+  opens a span. The SHA-256 of the complete canonical payload is `manifest_id`.
+  Recipe epoch/salt are captured when the key is computed, not from a later
+  environment. An arbitrary key not computed with a label in this process is
+  explicitly unknown (`recipe_known=false`, `manifest_input_count=-1`).
+
+  The SDK exports through OTLP without a project-specific truncation override;
+  span event retention defaults to 128 and configured SDK limits may be lower.
+  Chunks are therefore logs, not span events: they cannot evict cache decisions
+  or other task events. Azure customDimensions values allow 8192 characters, so
+  each chunk is at most 6000 ASCII characters/bytes. There is **no input/chunk
+  cap**: every known recipe is emitted in full. `manifest_transport=logs`,
+  `manifest_chunk_count` is the required count, `manifest_emitted_chunks` is the
+  planned count, `manifest_chars` is the full payload length, and
+  `manifest_input_count` is the complete input count. `manifest_complete=true`
+  is **not an ingestion guarantee**: exporters, sampling, retention, or an SDK
+  attribute limit can still omit/truncate records.
+
+  Retrieve the decision and fragments remotely, for example:
+
+  ```kusto
+  traces
+  | where message in ("cache.miss", "cache.hit", "cache.store", "cache.provenance")
+  | extend record_name=message
+  | where tostring(customDimensions["label"]) == "part:vn_counter_spring"
+  | project timestamp, operation_Id, record_name,
+      label=tostring(customDimensions["label"]),
+      key_full=tostring(customDimensions["key_full"]),
+      manifest_id=tostring(customDimensions["manifest_id"]),
+      schema=toint(customDimensions["manifest_schema"]),
+      transport=tostring(customDimensions["manifest_transport"]),
+      complete=tobool(customDimensions["manifest_complete"]),
+      chunks=toint(customDimensions["manifest_chunk_count"]),
+      emitted=toint(customDimensions["manifest_emitted_chunks"]),
+      chars=toint(customDimensions["manifest_chars"]),
+      inputs=toint(customDimensions["manifest_input_count"]),
+      chunk_index=toint(customDimensions["chunk_index"]),
+      chunk=tostring(customDimensions["chunk"])
+  | order by timestamp asc, manifest_id asc, chunk_index asc
+  ```
+
+  First require all mandatory decision metadata, with the expected types:
+  full key, manifest identity/schema/transport, completeness, character count,
+  required/planned chunk counts, and input count. Missing metadata means
+  incomplete evidence, even if the remaining `complete` flag is true.
+  Require each matching fragment to have a valid integer index and string chunk.
+  Reassemble by manifest identity (and operation when inspecting one decision).
+  Deduplicate identical fragments by zero-based index; reject conflicting
+  duplicates. Require `complete=true`, planned count equal to required count,
+  every index `0..chunks-1`, exact concatenated character count, SHA-256 equal to
+  `manifest_id`, and decoded `recipe_known=true` with `len(inputs)` equal to both
+  input counts. Reject incomplete evidence rather than treating an omitted dep
+  as unchanged. Find the last earlier **successful `cache.hit` or `cache.store`**
+  for the same label with a verified manifest, then compare full keys, epoch/salt,
+  and path/digest lists against the miss. This works across disposable snapshots
+  with no previous-key sidecar; older successful events without manifests cannot
+  establish a complete baseline. All provenance emission is best-effort and
+  cannot change cache outcomes.
+
+**Vendor-part builds are actionable.** An actual `part:vn_*` build emits a
+`!!` / OTel `WARN` immediately before its COM execution, with structured `label`
+and `cache.key` (the 12-character prefix shared with phase spans and the console),
+plus the full `key_full` for correlation with cache events and recipe manifests.
+This happens on a local seat or the farm worker, not on the submitter's dispatch,
+a cache probe, a miss that becomes a hit while waiting for the seat, or
+`drawing:vn_*`. Vendor-part rebuilds should be rare: compare the recorded cache
+inputs with the previous key, investigate the changed dependency, and refactor
+unnecessary dependencies rather than treating every miss as expected. The warning
+marks one build execution, including an execution that later fails; COM recovery
+retries do not emit duplicate vendor-build warnings.
 
 **Store-skip-on-hit drift.** `restore` returns early on a HIT and never re-stores,
 so a seat can *serve* a key it never *published* (this is what bit the v0.9.0 cut:

@@ -1596,6 +1596,162 @@ def test_com_seat_hands_back_its_wait_and_logs_total_elapsed(tmp_path, monkeypat
     }
 
 
+@pytest.fixture
+def vendor_warning_capture(monkeypatch):
+    """Capture the real severity/resource-routed OTel logs without disk or OTLP."""
+    from opentelemetry._logs import get_logger_provider
+    from opentelemetry.sdk._logs.export import (
+        InMemoryLogRecordExporter,
+        SimpleLogRecordProcessor,
+    )
+    import _telemetry
+
+    try:
+        with monkeypatch.context() as capture_patch:
+            capture_patch.setattr(
+                _telemetry, "_resolve_otlp_endpoint", lambda _signal, **_kw: None
+            )
+            capture_patch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+            capture_patch.setenv("HARMONIC_VERBOSITY", "warn")
+            _telemetry.configure(force=True)
+            logs = InMemoryLogRecordExporter()
+            processor = SimpleLogRecordProcessor(logs)
+            get_logger_provider().add_log_record_processor(processor)
+            # Task-stage logger providers share these processors, as in test_telemetry.
+            _telemetry._log_processors.append(processor)
+            _telemetry._aux_logger_providers.clear()
+            yield logs
+    finally:
+        _telemetry.configure(force=True)
+
+
+@pytest.mark.parametrize("failed", [False, True], ids=["normal-exit", "exception"])
+def test_vendor_warning_capture_restores_jsonl_sink(tmp_path, monkeypatch, failed):
+    """A subsequent real log reaches the restored sink even after a test raises."""
+    import json
+    import _telemetry
+
+    try:
+        with monkeypatch.context() as restored:
+            restored.setattr(_telemetry, "_telemetry_dir", lambda: tmp_path)
+            restored.setattr(
+                _telemetry, "_resolve_otlp_endpoint", lambda _signal, **_kw: None
+            )
+            capture = vendor_warning_capture.__wrapped__(monkeypatch)
+            try:
+                next(capture)
+                _telemetry.warn("temporary capture", fixture_probe="captured")
+                assert not (tmp_path / "logs.jsonl").exists()
+                if failed:
+                    with pytest.raises(RuntimeError):
+                        capture.throw(RuntimeError("test failed during capture"))
+            finally:
+                capture.close()
+
+            _telemetry.warn("restored sink", fixture_probe="restored")
+            rows = [
+                json.loads(line)
+                for line in (tmp_path / "logs.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+            assert any(
+                row.get("attributes", {}).get("fixture_probe") == "restored"
+                for row in rows
+            )
+    finally:
+        _telemetry.configure(force=True)
+
+
+@pytest.mark.parametrize(
+    "stem,executor,restores,worker,expected",
+    [
+        pytest.param("vn_bearing", "local", (False, False), False, True, id="local-build"),
+        pytest.param("vn_bearing", "local", (False, False), True, True, id="worker-build"),
+        pytest.param("vn_bearing", "local", (True,), False, False, id="initial-hit"),
+        pytest.param("vn_bearing", "local", (False, True), False, False, id="hit-after-wait"),
+        pytest.param("vn_bearing", "farm", (False,), False, False, id="submitter-dispatch"),
+        pytest.param("pn_pen_rod", "local", (False, False), False, False, id="ordinary-part"),
+        pytest.param("vn_bearing", "drawing", (False, False), False, False, id="vendor-drawing"),
+    ],
+)
+def test_vendor_part_warning_only_at_actual_build(
+    tmp_path, monkeypatch, capsys, vendor_warning_capture,
+    stem, executor, restores, worker, expected
+):
+    """Warn at the work boundary, not a miss that later restores or dispatches.
+
+    A farm worker executes with the local executor and autostart disabled. All
+    host-facing collaborators are replaced, including prewarm before dodo import.
+    """
+    import _artifact_cache
+
+    monkeypatch.setattr(_artifact_cache, "prewarm", lambda: None)
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "farm" if executor == "farm" else "local")
+    if worker:
+        monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+        monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "farm.execution=test-vendor-warning")
+    dodo = _load_dodo()
+    key = "a" * 64
+    script = tmp_path / f"build_{stem}.py"
+    output = tmp_path / f"{stem}.SLDPRT"
+    outcomes = iter(restores)
+    events = []
+    logs = vendor_warning_capture
+    label = f"part:{stem}"
+
+    def vendor_warnings():
+        return [
+            record.log_record
+            for record in logs.get_finished_logs()
+            if (record.log_record.attributes or {}).get("label") == label
+        ]
+
+    def execute(*_args, **_kwargs):
+        # Inspect the consumer-visible record at the execution boundary.
+        assert len(vendor_warnings()) == int(expected)
+        events.append("execute")
+
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda *_a: key)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
+    monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
+    monkeypatch.setattr(dodo, "_stamp_part_execution", lambda _stem: None)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(0.0))
+    monkeypatch.setattr(dodo, "_farm_build", lambda *_a: events.append("dispatch"))
+    monkeypatch.setattr(dodo, "_exec_com", execute)
+
+    if executor == "drawing":
+        dodo._cached_com_action(
+            f"drawing:{stem}", [sys.executable, str(script)], [], [output], "drawing"
+        )
+    else:
+        dodo._cached_part_action(stem, script)
+
+    warnings = vendor_warnings()
+    console = capsys.readouterr().err
+    if expected:
+        from opentelemetry._logs import SeverityNumber
+
+        assert len(warnings) == 1
+        record = warnings[0]
+        assert record.severity_number == SeverityNumber.WARN
+        assert record.attributes["cache.key"] == key[:12]
+        assert record.attributes["key_full"] == key
+        assert record.trace_id and record.span_id
+        assert "!!" in console and label in console and key[:12] in console
+        assert events == ["execute"]
+    else:
+        assert warnings == []
+        assert "!!" not in console
+        if executor == "farm":
+            assert events == ["dispatch"]
+        elif not all(outcome is False for outcome in restores):
+            assert events == []
+        else:
+            assert events == ["execute"]
+
+
 def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
     """A cached COM task is FOUR top-level spans, never nested: the cache probe (the
     Azure restore attempt), the seat wait, the task itself (starting once the seat is

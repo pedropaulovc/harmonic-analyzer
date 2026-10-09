@@ -2402,6 +2402,16 @@ def _cached_part_action(stem: str, script: Path) -> None:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
             _tag_cache_key(sp, key)
+            # Warn only once work starts, never for a probe or farm dispatch.
+            if stem.startswith("vn_"):
+                _telemetry.warn(
+                    f"[vendor-part] Building {label} (cache key {key[:12]}); "
+                    "vendor-part rebuilds should be rare: investigate the cache "
+                    "provenance and refactor dependencies that cause unnecessary rebuilds.",
+                    label=label,
+                    key_full=key,
+                    **{"cache.key": key[:12]},
+                )
             _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)
 

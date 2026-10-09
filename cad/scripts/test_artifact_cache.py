@@ -8,6 +8,7 @@ on-disk sinks (cache.jsonl, the per-label key sidecar) are redirected to a tmp d
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import sys
@@ -42,7 +43,12 @@ class _FakeBackend:
 
 
 @pytest.fixture
-def fake(tmp_path, monkeypatch):
+def real_unpack():
+    return cache._unpack
+
+
+@pytest.fixture
+def fake(tmp_path, monkeypatch, real_unpack):
     """rw cache on a LOCAL-executor seat, wired to an in-memory backend with all
     sinks under tmp_path -- i.e. the role that both builds and publishes, so a HIT
     under an unpublished key is real drift. _unpack is a no-op (we test
@@ -54,6 +60,9 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setattr(cache, "_EVENTS_LOG", tmp_path / "cache.jsonl")
     monkeypatch.setattr(cache, "_KEYDIR", tmp_path / "cache-keys")
     monkeypatch.setattr(cache, "_unpack", lambda blob: None)
+    monkeypatch.setattr(cache, "_KEY_INPUTS", {})
+    monkeypatch.setattr(cache, "_KEY_CONTEXT", {})
+    monkeypatch.setattr(cache, "_KEY_MANIFESTS", {})
     backend = _FakeBackend()
     monkeypatch.setattr(cache, "_BACKEND", backend)
     return backend
@@ -103,18 +112,6 @@ def test_key_inputs_sorted_with_missing_marker(tmp_path):
     assert key == cache.cache_key([present, missing], _digest_one)
 
 
-def test_debug_logs_provenance_without_changing_key(tmp_path, monkeypatch):
-    records: list[str] = []
-    monkeypatch.setattr(_telemetry, "info", lambda message, **_: records.append(message))
-    monkeypatch.setenv("HARMONIC_CACHE_DEBUG", "1")
-    a = _make_dep(tmp_path, "a.txt", "alpha")
-    key = cache.cache_key([a], _digest_one, label="part:x")
-    logged = "\n".join(records)
-    assert "key provenance part:x" in logged
-    assert "a.txt" in logged and key in logged
-    # Same inputs, debug off -> identical key (logging is side-effect only).
-    monkeypatch.delenv("HARMONIC_CACHE_DEBUG")
-    assert cache.cache_key([a], _digest_one) == key
 
 
 # --------------------------------------------------------------------------- #
@@ -153,21 +150,6 @@ def test_store_retains_last_published_input_provenance(tmp_path, fake):
     assert cache.last_stored_inputs("part:x") == [("input.py", "VALUE = 1\n")]
 
 
-def test_restore_miss_logs_event_at_debug(tmp_path, fake, monkeypatch):
-    records: list[tuple[str, str]] = []
-    monkeypatch.setattr(
-        _telemetry, "debug", lambda message, **_: records.append(("debug", message))
-    )
-    monkeypatch.setattr(
-        _telemetry, "warn", lambda message, **_: records.append(("warning", message))
-    )
-    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
-    key = cache.cache_key([dep], _digest_one, label="part:x")
-    assert cache.restore(key, [], "part:x") is False
-    assert records == [("debug", f"[cache] miss  part:x ({key[:12]}) -> building locally")]
-    events = _events(tmp_path)
-    assert [e["event"] for e in events] == ["restore_miss"]
-    assert events[0]["inputs"] == [{"path": "input.py", "digest": "VALUE = 1\n"}]
 
 
 def test_restore_hit_over_a_share_locked_output_raises_instead_of_falling_through(
@@ -289,7 +271,6 @@ def test_farm_submitter_hit_on_worker_published_key_does_not_warn(
     with caplog.at_level(logging.DEBUG, logger=logger.name):
         assert cache.restore(k_new, [out], "part:x") is True
     assert _records(caplog, logger, logging.WARNING) == []
-    assert any("expected" in msg for msg in _records(caplog, logger, logging.DEBUG))
     event = _events(tmp_path)[-1]
     assert event["event"] == "restore_hit_drift"      # the record stays complete
     assert event["previous_key"] == k_old
@@ -607,6 +588,460 @@ def test_a_thread_that_cannot_start_is_no_prewarm(leaf, monkeypatch):
     assert cache.prewarm() is None
     assert cache._PREWARMED.is_set()
     assert leaf == []
+
+
+@pytest.fixture
+def exported_cache_spans(monkeypatch):
+    """Real SDK + in-memory exporter, not a mocked telemetry event echo."""
+    from opentelemetry.sdk.trace import SpanLimits, TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.sdk._logs import LoggerProvider
+    from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter, SimpleLogRecordProcessor
+    from opentelemetry.sdk.resources import Resource
+
+    providers = []
+
+    def make(**limits):
+        if "max_attribute_length" in limits:
+            monkeypatch.setenv("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", str(limits["max_attribute_length"]))
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider(
+            span_limits=SpanLimits(**limits), shutdown_on_exit=False
+        )
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        providers.append(provider)
+        tracer = provider.get_tracer("cache-test")
+        monkeypatch.setattr(_telemetry, "get_tracer", lambda **kwargs: tracer)
+        log_exporter = InMemoryLogRecordExporter()
+        log_provider = LoggerProvider(
+            resource=Resource.create({"service.name": _telemetry.BUILD_INFRA_SERVICE}),
+            shutdown_on_exit=False,
+        )
+        log_provider.add_log_record_processor(SimpleLogRecordProcessor(log_exporter))
+        providers.append(log_provider)
+        logger = logging.Logger("cache-test", level=logging.DEBUG)
+        logger.addHandler(_telemetry._ResourceRoutedLoggingHandler(logger_provider=log_provider))
+        monkeypatch.setattr(_telemetry, "get_logger", lambda: logger)
+        monkeypatch.setattr(_telemetry, "_logger_provider_for_service", lambda service: log_provider)
+        exporter.cache_logs = log_exporter
+        return tracer, exporter
+
+    yield make
+    for provider in providers:
+        provider.shutdown()
+
+
+def _wire_events(exporter):
+    """Read consumer-visible attributes after actual OTLP protobuf roundtrip."""
+    from opentelemetry.exporter.otlp.proto.common.trace_encoder import encode_spans
+    from opentelemetry.exporter.otlp.proto.common._log_encoder import encode_logs
+
+    request = encode_spans(exporter.get_finished_spans())
+    received = type(request).FromString(request.SerializeToString())
+    events = [
+        (event.name, {
+            item.key: getattr(item.value, item.value.WhichOneof("value"))
+            for item in event.attributes
+        })
+        for resource in received.resource_spans
+        for scope in resource.scope_spans
+        for span in scope.spans
+        for event in span.events
+    ]
+    request = encode_logs(exporter.cache_logs.get_finished_logs())
+    received = type(request).FromString(request.SerializeToString())
+    events.extend(
+        (record.body.string_value, {
+            item.key: getattr(item.value, item.value.WhichOneof("value"))
+            for item in record.attributes
+        })
+        for resource in received.resource_logs
+        for scope in resource.scope_logs
+        for record in scope.log_records
+    )
+    return events
+
+
+def _received_recipe(events, outcome):
+    """Independent consumer: fail closed on omission, truncation or unknown recipe."""
+    decisions = [attrs for name, attrs in events if name == outcome]
+    if len(decisions) != 1:
+        return None
+    decision = decisions[0]
+    required = {
+        "manifest_id", "manifest_schema", "manifest_chars", "manifest_chunk_count",
+        "manifest_emitted_chunks", "manifest_input_count", "manifest_complete",
+        "manifest_transport", "key_full",
+    }
+    if not required <= decision.keys() or decision["manifest_complete"] is not True:
+        return None
+    if decision["manifest_transport"] != "logs":
+        return None
+    if not isinstance(decision["manifest_id"], str) or len(decision["manifest_id"]) != 64:
+        return None
+    if not isinstance(decision["key_full"], str):
+        return None
+    for field in ("manifest_schema", "manifest_chars", "manifest_chunk_count",
+                  "manifest_emitted_chunks", "manifest_input_count"):
+        if type(decision[field]) is not int or decision[field] < 0:
+            return None
+    count = decision["manifest_chunk_count"]
+    if count == 0 or decision["manifest_emitted_chunks"] != count:
+        return None
+    chunks = {}
+    for name, attrs in events:
+        if name == "cache.provenance" and attrs.get("manifest_id") == decision["manifest_id"]:
+            if not {"chunk_index", "chunk"} <= attrs.keys():
+                return None
+            index, fragment = attrs["chunk_index"], attrs["chunk"]
+            if type(index) is not int or not 0 <= index < count or not isinstance(fragment, str):
+                return None
+            if index in chunks and chunks[index] != fragment:
+                return None
+            chunks[index] = fragment
+    if set(chunks) != set(range(count)) or decision["manifest_emitted_chunks"] != count:
+        return None
+    payload = "".join(chunks[index] for index in range(count))
+    if len(payload) != decision["manifest_chars"]:
+        return None
+    try:
+        if hashlib.sha256(payload.encode("ascii")).hexdigest() != decision["manifest_id"]:
+            return None
+        recipe = json.loads(payload)
+    except (UnicodeError, json.JSONDecodeError):
+        return None
+    fields = {"schema", "key", "epoch", "salt", "recipe_known", "input_count", "inputs"}
+    if not isinstance(recipe, dict) or not fields <= recipe.keys():
+        return None
+    if recipe["recipe_known"] is not True or not isinstance(recipe["inputs"], list):
+        return None
+    if recipe["schema"] != decision["manifest_schema"] or recipe["key"] != decision["key_full"]:
+        return None
+    if type(recipe["input_count"]) is not int:
+        return None
+    if len(recipe["inputs"]) != recipe["input_count"] or recipe["input_count"] != decision["manifest_input_count"]:
+        return None
+    if not isinstance(recipe["epoch"], str) or not isinstance(recipe["salt"], str):
+        return None
+    for item in recipe["inputs"]:
+        if not isinstance(item, dict) or not {"path", "digest"} <= item.keys():
+            return None
+        if not isinstance(item["path"], str) or not isinstance(item["digest"], str):
+            return None
+    return recipe
+
+
+@pytest.mark.parametrize("outcome", ["cache.miss", "cache.store", "cache.hit"])
+def test_remote_recipe_survives_disposable_seat_without_sidecars(
+    tmp_path, fake, monkeypatch, exported_cache_spans, outcome
+):
+    dep = _make_dep(tmp_path, "entrée.py", "source digest")
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "salt-at-key-time")
+    key = cache.cache_key([dep], _digest_one, label="part:x")
+    # Salt is recipe provenance, not the later environment at restore/store time.
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "later-salt")
+    out = tmp_path / "out.bin"
+    out.write_bytes(b"payload")
+    if outcome == "cache.hit":
+        fake.blobs[key] = b"built-on-another-seat"
+    tracer, exporter = exported_cache_spans(max_attribute_length=8192)
+    with tracer.start_as_current_span("disposable-build"):
+        if outcome == "cache.store":
+            assert cache.store(key, [out], "part:x") == "stored"
+        else:
+            assert cache.restore(key, [out], "part:x") is (outcome == "cache.hit")
+
+    events = _wire_events(exporter)
+    recipe = _received_recipe(events, outcome)
+    assert recipe == {
+        "schema": 1, "key": key, "epoch": cache._CACHE_EPOCH,
+        "salt": "salt-at-key-time", "recipe_known": True, "input_count": 1,
+        "inputs": [{"path": "entrée.py", "digest": "source digest"}],
+    }
+    decision = next(attrs for name, attrs in events if name == outcome)
+    assert decision["key"] == key[:12] and decision["key_full"] == key
+    local = _events(tmp_path)[-1]
+    assert {field: local[field] for field in recipe} == recipe
+    assert local["manifest_id"] == decision["manifest_id"]
+    # An independent re-derivation from the wire recipe verifies actual full key.
+    h = hashlib.sha256()
+    h.update(f"epoch={recipe['epoch']}\0salt={recipe['salt']}\0".encode())
+    for item in recipe["inputs"]:
+        h.update(f"{item['path']}\0{item['digest']}\0".encode())
+    assert h.hexdigest() == recipe["key"]
+
+
+@pytest.mark.parametrize("payload_chars", [5999, 6000, 6001, 12000, 12001])
+def test_remote_manifest_exact_chunk_boundaries(
+    tmp_path, fake, monkeypatch, exported_cache_spans, payload_chars
+):
+    # An empty dependency set is known, unlike an arbitrary key with no recipe.
+    expected = {
+        "schema": 1, "key": "0" * 64, "epoch": cache._CACHE_EPOCH, "salt": "",
+        "recipe_known": True, "input_count": 0, "inputs": [],
+    }
+    overhead = len(json.dumps(expected, sort_keys=True, separators=(",", ":")))
+    salt = "s" * (payload_chars - overhead)
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", salt)
+    key = cache.cache_key([], _digest_one, label="part:boundary")
+    expected.update(key=key, salt=salt)
+    tracer, exporter = exported_cache_spans(max_attribute_length=8192)
+    with tracer.start_as_current_span("boundary"):
+        assert cache.restore(key, [], "part:boundary") is False
+    events = _wire_events(exporter)
+    assert _received_recipe(events, "cache.miss") == expected
+    chunks = [attrs for name, attrs in events if name == "cache.provenance"]
+    assert len(chunks) == (payload_chars + 5999) // 6000
+    assert sum(len(attrs["chunk"]) for attrs in chunks) == payload_chars
+    assert all(len(attrs["chunk"].encode("ascii")) <= 6000 for attrs in chunks)
+    assert len(exporter.get_finished_spans()) == 3  # task, download, record; no dep spans
+
+
+def test_remote_manifest_many_inputs_roundtrip(
+    tmp_path, fake, exported_cache_spans
+):
+    deps = [
+        _make_dep(tmp_path, f"recipe-{index:04d}.py", hashlib.md5(str(index).encode()).hexdigest())
+        for index in range(250)
+    ]
+    key = cache.cache_key(deps, _digest_one, label="assembly:many")
+    tracer, exporter = exported_cache_spans(max_attribute_length=8192)
+    with tracer.start_as_current_span("many"):
+        assert cache.restore(key, [], "assembly:many") is False
+    events = _wire_events(exporter)
+    recipe = _received_recipe(events, "cache.miss")
+    assert recipe["input_count"] == 250
+    assert recipe["inputs"] == _events(tmp_path)[-1]["inputs"]
+    assert 1 < sum(name == "cache.provenance" for name, _ in events) < 32
+
+
+@pytest.mark.parametrize("limits", [
+    {"max_attribute_length": 64},
+    {"max_event_attributes": 2},
+])
+def test_sdk_truncation_or_event_loss_cannot_appear_complete(
+    tmp_path, fake, exported_cache_spans, limits
+):
+    dep = _make_dep(tmp_path, "long.py", "d" * 7000)
+    key = cache.cache_key([dep], _digest_one, label="part:loss")
+    tracer, exporter = exported_cache_spans(**limits)
+    with tracer.start_as_current_span("limited"):
+        assert cache.restore(key, [], "part:loss") is False
+    assert _received_recipe(_wire_events(exporter), "cache.miss") is None
+
+
+def test_unknown_recipe_is_explicitly_incomplete(tmp_path, fake, exported_cache_spans):
+    tracer, exporter = exported_cache_spans()
+    with tracer.start_as_current_span("unknown"):
+        assert cache.restore("a" * 64, [], "part:unknown") is False
+    events = _wire_events(exporter)
+    decision = next(attrs for name, attrs in events if name == "cache.miss")
+    assert decision["manifest_input_count"] == -1
+    assert decision["manifest_complete"] is False
+    assert _received_recipe(events, "cache.miss") is None
+    assert _events(tmp_path)[-1]["recipe_known"] is False
+
+
+def test_large_manifest_emits_every_input_without_span_event_flood(
+    tmp_path, fake, exported_cache_spans
+):
+    dep = _make_dep(tmp_path, "huge.py", "d" * (6000 * 32))
+    key = cache.cache_key([dep], _digest_one, label="part:huge")
+    tracer, exporter = exported_cache_spans(max_attribute_length=8192)
+    with tracer.start_as_current_span("huge"):
+        assert cache.restore(key, [], "part:huge") is False
+    events = _wire_events(exporter)
+    decision = next(attrs for name, attrs in events if name == "cache.miss")
+    assert decision["manifest_chunk_count"] == 33
+    assert decision["manifest_emitted_chunks"] == 33
+    assert decision["manifest_complete"] is True
+    assert decision["manifest_transport"] == "logs"
+    assert sum(name == "cache.provenance" for name, _ in events) == 33
+    assert _received_recipe(events, "cache.miss")["inputs"][0]["digest"] == "d" * (6000 * 32)
+    assert not any(
+        event.name == "cache.provenance"
+        for span in exporter.get_finished_spans() for event in span.events
+    )
+    assert _events(tmp_path)[-1]["inputs"][0]["digest"] == "d" * (6000 * 32)
+
+
+@pytest.mark.parametrize("failure_at", ["outcome", "chunk", "logging"])
+def test_telemetry_sink_failure_preserves_successful_cache_behavior(
+    tmp_path, fake, real_unpack, monkeypatch, exported_cache_spans, failure_at
+):
+    monkeypatch.setattr(cache, "REPO_ROOT", tmp_path)
+    output_root = tmp_path / "cad" / "out"
+    output_root.mkdir(parents=True)
+    monkeypatch.setattr(cache, "_CACHE_OUTPUT_ROOT", output_root)
+    monkeypatch.setattr(cache, "_unpack", real_unpack)
+    dep = _make_dep(tmp_path, "input.py", "digest")
+    key = cache.cache_key([dep], _digest_one, label="part:sink-failure")
+    out = output_root / "out.bin"
+    out.write_bytes(b"real packed payload")
+    original_event = _telemetry.event
+    original_debug = _telemetry.debug
+
+    def event(name, **attributes):
+        if failure_at == "outcome":
+            raise RuntimeError("telemetry sink failed")
+        original_event(name, **attributes)
+
+    def debug(message, **attributes):
+        if failure_at == "chunk" and message == "cache.provenance":
+            raise RuntimeError("chunk sink failed")
+        original_debug(message, **attributes)
+
+    def broken_log(*args, **kwargs):
+        raise RuntimeError("logging sink failed")
+
+    monkeypatch.setattr(_telemetry, "event", event)
+    monkeypatch.setattr(_telemetry, "debug", debug)
+    if failure_at == "logging":
+        for name in ("info", "debug", "warn"):
+            monkeypatch.setattr(_telemetry, name, broken_log)
+    tracer, exporter = exported_cache_spans()
+    with tracer.start_as_current_span("failing-sink"):
+        assert cache.restore(key, [], "part:sink-failure") is False
+        assert cache.store(key, [out], "part:sink-failure") == "stored"
+        assert fake.blobs[key].startswith(b"\x1f\x8b")  # real gzip packing/upload
+        assert cache.last_stored_key("part:sink-failure") == key
+        out.unlink()
+        assert cache.restore(key, [out], "part:sink-failure") is True
+        assert out.read_bytes() == b"real packed payload"
+    assert _received_recipe(_wire_events(exporter), "cache.store") is None
+    assert [item["event"] for item in _events(tmp_path)] == [
+        "restore_miss", "store", "restore_hit",
+    ]
+
+
+def test_manifest_logs_do_not_consume_span_event_budget(
+    tmp_path, fake, exported_cache_spans
+):
+    dep = _make_dep(tmp_path, "many-fragments.py", "d" * 18000)
+    key = cache.cache_key([dep], _digest_one, label="part:budget")
+    tracer, exporter = exported_cache_spans(max_events=1)
+    with tracer.start_as_current_span("single-event-budget") as task_span:
+        assert cache.restore(key, [], "part:budget") is False
+        trace_id = task_span.get_span_context().trace_id
+        span_id = task_span.get_span_context().span_id
+    events = _wire_events(exporter)
+    assert _received_recipe(events, "cache.miss")["inputs"][0]["digest"] == "d" * 18000
+    chunks = [
+        record for record in exporter.cache_logs.get_finished_logs()
+        if record.log_record.body == "cache.provenance"
+    ]
+    assert len(chunks) == 4
+    assert all(record.log_record.trace_id == trace_id for record in chunks)
+    assert all(record.log_record.span_id == span_id for record in chunks)
+    assert all(
+        record.resource.attributes["service.name"] == _telemetry.BUILD_INFRA_SERVICE
+        for record in chunks
+    )
+    # Real exported evidence with one ingested fragment lost must fail closed.
+    missing_one = []
+    for name, attrs in events:
+        if name == "cache.provenance" and attrs["chunk_index"] == 1:
+            continue
+        missing_one.append((name, attrs))
+    assert _received_recipe(missing_one, "cache.miss") is None
+    # An equal-length alteration is detected by checksum, not just counts.
+    damaged = [
+        (name, {**attrs, "chunk": "x" + attrs["chunk"][1:]})
+        if name == "cache.provenance" and attrs["chunk_index"] == 1
+        else (name, attrs)
+        for name, attrs in events
+    ]
+    assert _received_recipe(damaged, "cache.miss") is None
+
+
+@pytest.mark.parametrize("baseline", ["cache.store", "cache.hit"])
+def test_remote_baseline_identifies_changed_dependency_across_disposable_seats(
+    tmp_path, fake, monkeypatch, exported_cache_spans, baseline
+):
+    recipe_dep = _make_dep(tmp_path, "_stock_fastener.py", "old recipe digest")
+    config_dep = _make_dep(tmp_path, "spring.yaml", "unchanged config digest")
+    label = "part:vn_counter_spring"
+    old_key = cache.cache_key([recipe_dep, config_dep], _digest_one, label=label)
+    out = tmp_path / "out.bin"
+    out.write_bytes(b"payload")
+    tracer, exporter = exported_cache_spans()
+    with tracer.start_as_current_span("previous-disposable-seat"):
+        if baseline == "cache.store":
+            assert cache.store(old_key, [out], label) == "stored"
+        else:
+            fake.blobs[old_key] = b"built-on-another-seat"
+            assert cache.restore(old_key, [out], label) is True
+    # New seat has neither process provenance nor the old local key sidecar.
+    monkeypatch.setattr(cache, "_KEY_INPUTS", {})
+    monkeypatch.setattr(cache, "_KEY_CONTEXT", {})
+    monkeypatch.setattr(cache, "_KEY_MANIFESTS", {})
+    monkeypatch.setattr(cache, "_KEYDIR", tmp_path / "new-seat" / "cache-keys")
+    Path(recipe_dep).write_text("new recipe digest", encoding="utf-8")
+    new_key = cache.cache_key([recipe_dep, config_dep], _digest_one, label=label)
+    with tracer.start_as_current_span("current-disposable-seat"):
+        assert cache.restore(new_key, [], label) is False
+    assert cache.last_stored_key(label) is None
+    evidence = _wire_events(exporter)
+    previous = _received_recipe(evidence, baseline)
+    current = _received_recipe(evidence, "cache.miss")
+    assert previous["key"] == old_key and current["key"] == new_key
+    assert previous["epoch"] == current["epoch"]
+    assert previous["salt"] == current["salt"]
+    old_inputs = {item["path"]: item["digest"] for item in previous["inputs"]}
+    new_inputs = {item["path"]: item["digest"] for item in current["inputs"]}
+    changed = {
+        path for path in old_inputs.keys() | new_inputs.keys()
+        if old_inputs.get(path) != new_inputs.get(path)
+    }
+    assert changed == {"_stock_fastener.py"}
+
+
+def test_recipe_serialization_is_shared_without_suppressing_outcomes(
+    tmp_path, fake, monkeypatch, exported_cache_spans
+):
+    dep = _make_dep(tmp_path, "input.py", "digest")
+    key = cache.cache_key([dep], _digest_one, label="part:shared")
+    out = tmp_path / "out.bin"
+    out.write_bytes(b"payload")
+    original = cache._manifest
+    serialized = []
+
+    def manifest(provenance):
+        serialized.append(provenance["key"])
+        return original(provenance)
+
+    monkeypatch.setattr(cache, "_manifest", manifest)
+    tracer, exporter = exported_cache_spans()
+    with tracer.start_as_current_span("shared-recipe"):
+        assert cache.restore(key, [], "part:shared") is False
+        assert cache.store(key, [out], "part:shared") == "stored"
+        assert cache.restore(key, [out], "part:shared") is True
+    assert serialized == [key]
+    events = _wire_events(exporter)
+    recipes = [
+        _received_recipe(events, outcome)
+        for outcome in ("cache.miss", "cache.store", "cache.hit")
+    ]
+    assert all(recipe == recipes[0] for recipe in recipes)
+    assert recipes[0]["inputs"] == [{"path": "input.py", "digest": "digest"}]
+    assert len(_events(tmp_path)) == 3
+    # Recapturing provenance invalidates its private canonical snapshot.
+    assert cache.cache_key([dep], _digest_one, label="part:shared") == key
+    cache._record("restore_hit", "part:shared", key)
+    assert serialized == [key, key]
+
+
+def test_debug_provenance_uses_key_time_salt(tmp_path, fake, monkeypatch):
+    dep = _make_dep(tmp_path, "input.py", "digest")
+    monkeypatch.setenv("HARMONIC_CACHE_DEBUG", "1")
+    salts = iter(["captured-salt"])
+    monkeypatch.setattr(cache, "_salt", lambda: next(salts))
+    records = []
+    monkeypatch.setattr(_telemetry, "info", lambda message, **kwargs: records.append(message))
+    key = cache.cache_key([dep], _digest_one, label="part:captured")
+    assert cache._KEY_CONTEXT[("part:captured", key)] == (cache._CACHE_EPOCH, "captured-salt")
+    assert any("salt=captured-salt" in record for record in records)
 
 
 if __name__ == "__main__":
