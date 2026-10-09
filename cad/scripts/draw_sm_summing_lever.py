@@ -541,12 +541,33 @@ async def build(adapter: Any) -> dict[str, str]:
         if abs(float(length.Length) * 1000.0 - expected_depth) > 1e-5:
             raise RuntimeError(f"bracket mounting callout has wrong {variable_name}")
         band = THREAD_DEPTH_BAND if variable_name == "hw-threaddepth" else DRILL_DEPTH_BAND
+        observed = (
+            int(variable.ToleranceType),
+            float(variable.ToleranceMin) * 1000.0,
+            float(variable.ToleranceMax) * 1000.0,
+        )
+        _telemetry.info(
+            f"bracket mounting callout {variable_name} imported tolerance "
+            f"type {observed[0]} {observed[1]:+.4f}/{observed[2]:+.4f} mm"
+        )
+        # A hole callout variable carries its OWN tolerance (SW 2016+:
+        # ICalloutVariable.ToleranceType; the model IDimensionTolerance does
+        # not override it). Farm 2026-10-09: the cosmetic-thread depth band
+        # did not reach hw-threaddepth, so author the same source band here.
+        variable.ToleranceType = 4  # swTolType_e.swTolSYMMETRIC
+        variable.ToleranceMin = -band / 1000.0
+        variable.ToleranceMax = band / 1000.0
+        length.TolerancePrecision = 2
         if (
             int(variable.ToleranceType) != 4
             or abs(float(variable.ToleranceMin) * 1000.0 + band) > 1e-5
             or abs(float(variable.ToleranceMax) * 1000.0 - band) > 1e-5
+            or int(length.TolerancePrecision) != 2
         ):
-            raise RuntimeError(f"bracket mounting callout omits native tolerance for {variable_name}")
+            raise RuntimeError(
+                f"bracket mounting callout tolerance for {variable_name} did not "
+                f"persist: wanted +/-{band} mm at 2 places"
+            )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
     from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
