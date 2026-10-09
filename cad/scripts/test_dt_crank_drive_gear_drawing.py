@@ -437,7 +437,7 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
     )
     assert f"{spec.VIRTUAL_TEETH:.{spec.GEAR_DATA_REFERENCE_PLACES}f}" in notes.GEAR_DATA
     assert f"{spec.HELIX_LEAD_MM:.{spec.GEAR_DATA_REFERENCE_PLACES}f}" in notes.GEAR_DATA
-    assert "build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)" in _build_source()
+    assert "screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM" in _build_source()
     profile = spec.STOCK_PROFILE
     assert spec.DEDENDUM_FACTOR == 1.25
     assert profile.radial_translation_mm == pytest.approx(

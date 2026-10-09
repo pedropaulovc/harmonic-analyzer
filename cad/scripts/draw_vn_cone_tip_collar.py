@@ -14,7 +14,7 @@ from typing import Any
 
 import _telemetry
 import vn_cone_tip_collar_spec as spec
-from _common import CAD_ROOT, _early_bound, check, double_array, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs, PmiDrawingPlacement, add_native_hole_callout, add_property_linked_note,
     assert_imported_precision, create_blank_drawing_sheets,
@@ -27,6 +27,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import format_findings
 from diagnostics.drawing_layout_audit import audit_document
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 

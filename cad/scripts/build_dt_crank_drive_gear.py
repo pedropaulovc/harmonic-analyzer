@@ -85,6 +85,7 @@ from dt_crank_drive_gear_spec import (
     DRAWING_PRECISION,
     FACE_WIDTH,
     FACE_WIDTH_BAND,
+    NATIVE_SWEEP_BOUND_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
     STOCK_PROFILE,
@@ -187,7 +188,9 @@ async def build(adapter) -> dict[str, str]:
 
     # The shared helper sweeps the complete finite stock-form sector, including
     # offcentre root-floor lobes; its phase and Green-volume gates precede pattern.
-    disc = await build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)
+    disc = await build_stock_form_gear(
+        adapter, STOCK_PROFILE, FACE_WIDTH, screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM
+    )
     volume = disc.volume
 
     # The shared stock-form helper leaves the base under adapter default names.

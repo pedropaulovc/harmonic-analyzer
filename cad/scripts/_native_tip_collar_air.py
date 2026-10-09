@@ -12,7 +12,8 @@ from typing import Any
 import _telemetry
 import cone_line
 import dt_tip_collar_air as air
-from _common import _early_bound, double_array
+from _common import _early_bound
+from solidworks_mcp.adapters.com_variant import double_array
 
 GEAR_COMPONENT = "dt-cylinder-gear-20"
 NATIVE_RESOLUTION_MM = air.collar.NATIVE_CONTACT_RESOLUTION_MM

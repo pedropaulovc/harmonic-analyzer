@@ -125,6 +125,13 @@ OUTSIDE_DIA_TOLERANCE_MM = 0.10
 # Critical tooth-cutting setup, indicated to the finished bore. This process
 # limit is shared by both shop gears; it is not an AGMA/form accuracy class.
 TOOTH_RUNOUT_TIR_MM = _config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")
+# Native sweep-fidelity bound for the twisted screw sweep (_gear's flank
+# probe), NOT a machining band. Bore TIR allows TIR/2 radial eccentricity;
+# the numerical sweep's surface sag may use one tenth of that, TIR/20
+# (0.0025 mm at the configured 0.05 TIR). The probe measured 1.4 um sag on the
+# farm (probe 20261009T195743546Z); a wrong hand, missing twist or wrong phase
+# moves the quarter-face flank by tenths of a millimetre, so detection holds.
+NATIVE_SWEEP_BOUND_MM = TOOTH_RUNOUT_TIR_MM / 20.0
 
 # Geometry selection is finite-support-qualified, not a crossed-mesh certificate.
 TOOTH_THICKNESS_DEVIATIONS = tuple(

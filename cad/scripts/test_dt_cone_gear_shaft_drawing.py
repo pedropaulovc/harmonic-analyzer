@@ -1701,7 +1701,7 @@ def test_the_64t_front_plane_is_its_south_face(monkeypatch) -> None:
     assert 'check("create_sketch stock base", await adapter.create_sketch("Front"))' in blank
     assert "create_extrusion(ExtrusionParameters(depth=face_width))" in blank
     crank = inspect.getsource(build_dt_crank_drive_gear.build)
-    assert "build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)" in crank
+    assert "screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM" in crank
 
 
 def test_the_64t_native_stock_sector_preserves_material_and_phase_gates(monkeypatch) -> None:
@@ -1746,7 +1746,8 @@ def test_the_64t_native_stock_sector_preserves_material_and_phase_gates(monkeypa
         events.append("sweep")
         return "StockSweep"
 
-    def record_probe(_adapter, actual_profile, width, *, midface_tooth_phase_rad):
+    def record_probe(_adapter, actual_profile, width, *, midface_tooth_phase_rad, tolerance_mm):
+        assert tolerance_mm == gear.NATIVE_SWEEP_BOUND_MM
         assert actual_profile is profile
         assert width == face
         assert midface_tooth_phase_rad == 0.0
@@ -1770,7 +1771,11 @@ def test_the_64t_native_stock_sector_preserves_material_and_phase_gates(monkeypa
     monkeypatch.setattr(_gear, "assert_stock_screw_sweep_phase", record_probe)
     monkeypatch.setattr(_gear, "pattern_about_z", record_pattern)
     adapter = AsyncMock()
-    disc = asyncio.run(_gear.build_stock_form_gear(adapter, profile, face))
+    disc = asyncio.run(
+        _gear.build_stock_form_gear(
+            adapter, profile, face, screw_sweep_bound_mm=gear.NATIVE_SWEEP_BOUND_MM
+        )
+    )
 
     assert adapter.create_sketch.await_args_list[0].args == ("Front",)
     extrusion = adapter.create_extrusion.await_args.args[0]
@@ -1845,12 +1850,16 @@ def test_the_64t_phase_gate_samples_physical_flanks_and_rejects_wrong_sweeps(
     monkeypatch.setattr(_gear, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(_gear._telemetry, "info", lambda *_args: None)
     if twist_sign == 1.0 and phase_offset == 0.0:
-        _gear.assert_stock_screw_sweep_phase(adapter, profile, face_width)
+        _gear.assert_stock_screw_sweep_phase(
+            adapter, profile, face_width, tolerance_mm=gear.NATIVE_SWEEP_BOUND_MM
+        )
         for query, native in zip(queries, native_points, strict=True):
             assert query == pytest.approx(native)
     else:
         with pytest.raises(RuntimeError, match="stock screw-sweep phase mismatch"):
-            _gear.assert_stock_screw_sweep_phase(adapter, profile, face_width)
+            _gear.assert_stock_screw_sweep_phase(
+                adapter, profile, face_width, tolerance_mm=gear.NATIVE_SWEEP_BOUND_MM
+            )
     assert len(queries) == 12
     assert sorted({point[2] for point in queries}) == pytest.approx(
         [face_width / 4.0, face_width / 2.0, 3.0 * face_width / 4.0]

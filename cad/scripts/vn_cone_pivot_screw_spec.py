@@ -12,6 +12,8 @@ The qualified UNC-2A limits constrain only the supplied thread form.
 MIN_USEFUL_ENGAGEMENT_MM is a functional installed-joint inspection with
 the shoulder fully seated, not a supplier thread-tail/tip tolerance or a
 thread-to-shoulder coaxiality grade.
+Its two-place MIN callout is spec-owned so assembly drawings consume the
+installed-joint requirement without choosing or reformatting its limit.
 """
 
 from __future__ import annotations
@@ -70,6 +72,7 @@ __all__ = [
     "EXTERNAL_PITCH_DIA_MIN_MM",
     "MIN_USEFUL_ENGAGEMENT_MM",
     "MIN_USEFUL_ENGAGEMENT_SOURCE",
+    "MIN_USEFUL_ENGAGEMENT_TEXT",
     "THREAD_SOLID_DIA",
     "THREAD_TAIL_LEN",
     "THREAD_TAP_DRILL_DIA",
@@ -92,3 +95,4 @@ MIN_USEFUL_ENGAGEMENT_SOURCE = (
     "Functional installation inspection: full-form pivot thread engagement "
     "at least 1D, rounded upward to 0.01 mm; shoulder fully seated"
 )
+MIN_USEFUL_ENGAGEMENT_TEXT = f"{MIN_USEFUL_ENGAGEMENT_MM:.2f} MIN"

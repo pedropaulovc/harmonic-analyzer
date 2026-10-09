@@ -242,7 +242,7 @@ sections:
         - legacy + derived current spec
         - med
       - - Crankshaft bearing
-        - 'Integral Ø11.388 journal in the MHA-DT-005 Ø11.438 crank bore; relieved middle Ø10.4. dt_crankshaft_spec owns JOURNAL_START/JOURNAL_END and RELIEF_START/RELIEF_END (selected nominal local stations 40.755105572..108.6 and 55.3..93.6). Moving stations are SHAFT_LENGTH minus the preserved 29.5, 82.8 and 44.5 far-end dimensions.'
+        - 'Integral Ø11.388 journal in the MHA-DT-005 Ø11.438 crank bore; relieved middle Ø10.4. dt_crankshaft_spec owns JOURNAL_START/JOURNAL_END and RELIEF_START/RELIEF_END (selected nominal local stations 40.755105572..108.6 and 56.0..93.6). Moving stations are SHAFT_LENGTH minus the 29.5, 82.1 and 44.5 far-end dimensions. Only the outboard relief end moved inward 0.7 mm from 82.8; outer journal ends, shaft length, seats and mates are unchanged.'
         - —
         - 'User ruling 2026-09-28: restore the journal and relief, running directly in the post with the shaft_in_bushing clearance class; no separate bearing sleeve. Shaft floating/cock uses the actual JOURNAL_DIAMETRAL_CLEARANCE_MM and JOURNAL_SUPPORT_SPAN_MIN_MM between retained bearing contacts, not the whole 72.0344 mm boss or the relieved middle.'
         - derived from current spec

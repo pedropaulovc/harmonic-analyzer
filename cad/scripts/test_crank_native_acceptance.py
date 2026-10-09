@@ -113,6 +113,7 @@ def test_stock_screw_sweep_gate_measures_supported_flanks_and_all_three_stations
         profile,
         spec.FACE_WIDTH,
         midface_tooth_phase_rad=midface_phase,
+        tolerance_mm=spec.NATIVE_SWEEP_BOUND_MM,
     )
     record = json.loads(messages[-1].removeprefix("crank.stock_screw_sweep_phase "))
     assert record["physical_teeth"] == spec.TEETH
@@ -163,7 +164,8 @@ def test_stock_screw_sweep_gate_rejects_wrong_hand_missing_twist_and_double_twis
 
     with pytest.raises(RuntimeError, match="stock screw-sweep phase mismatch"):
         geometry.assert_stock_screw_sweep_phase(
-            _screw_adapter(_ClosestFace(native_phase_error)), profile, spec.FACE_WIDTH
+            _screw_adapter(_ClosestFace(native_phase_error)), profile, spec.FACE_WIDTH,
+            tolerance_mm=spec.NATIVE_SWEEP_BOUND_MM,
         )
     record = json.loads(messages[-1].removeprefix("crank.stock_screw_sweep_phase "))
     assert all(
@@ -190,6 +192,7 @@ def test_stock_screw_sweep_gate_rejects_rotated_midface_datum(monkeypatch) -> No
             _screw_adapter(_ClosestFace(lambda _z: math.pi / spec.TEETH)),
             spec.STOCK_PROFILE,
             spec.FACE_WIDTH,
+            tolerance_mm=spec.NATIVE_SWEEP_BOUND_MM,
         )
 
 
@@ -205,5 +208,6 @@ def test_stock_screw_sweep_gate_refuses_empty_native_faces(monkeypatch) -> None:
     )
     with pytest.raises(RuntimeError, match="no native faces"):
         geometry.assert_stock_screw_sweep_phase(
-            adapter, spec.STOCK_PROFILE, spec.FACE_WIDTH
+            adapter, spec.STOCK_PROFILE, spec.FACE_WIDTH,
+            tolerance_mm=spec.NATIVE_SWEEP_BOUND_MM,
         )

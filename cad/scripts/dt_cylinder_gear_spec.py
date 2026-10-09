@@ -1,8 +1,10 @@
 r"""Pure-data dimensional contract for the cylinder gear and its drawing.
 
 The tooth system and ordinary blank, cam and notch geometry are shared by
-part and assembly recipes. Drawing prose lives in ``dt_cylinder_gear_notes`` so
-wording changes do not invalidate the channel's geometry recipe.
+part and assembly recipes. General drawing prose lives in
+``dt_cylinder_gear_notes``; this spec owns the separate BASIC pattern locator
+and its manufacturing callout. The published angular grade is read lazily
+when the drawing is requested, never while importing the mechanical spec.
 """
 
 from __future__ import annotations
@@ -117,6 +119,7 @@ NOTCH_CENTER_X = -NOTCH_MEAN_RADIUS * math.sin(math.radians(NOTCH_PHASE_DEG))
 # BASIC; it is not the cam-lobe-to-kerf NotchPhase/cam_phase control above.
 TOOTH_PATTERN_GAP_RAD = math.pi / TEETH
 PATTERN_NOTCH_BASIC_ANGLE_DEG = 90.0
+BASIC_DIMENSIONS = frozenset({"PatternNotchPhase"})
 PATTERN_NOTCH_SHOP_CANDIDATE_DEG = 0.02
 
 
@@ -132,6 +135,18 @@ def pattern_notch_clock_grade_deg() -> float:
             "report the admissible grade, do not issue the production drawing"
         )
     return grade
+
+
+def pattern_notch_phase_callouts() -> tuple[str, str]:
+    """Print the actual published pattern-to-notch grade without a fallback."""
+    grade_deg = pattern_notch_clock_grade_deg()
+    return (
+        "TOOTH PATTERN TO CAM NOTCH\n"
+        f"ANGULAR ERROR +/-{grade_deg:g} DEG FROM BASIC",
+        "INSPECT FROM THE ACTUAL SEED TOOTH GAP,\n"
+        "NOT FROM THE ECCENTRIC CAM LOBE.",
+    )
+
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(

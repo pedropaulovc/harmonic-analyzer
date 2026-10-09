@@ -12,6 +12,8 @@ manufactured title-block grades. They bound head size, slot depth, length,
 the underside bearing circle and where full thread form starts near the
 head, not the supplier's complete curved head/rounded-tip profile.
 Only the manufactured platform's thickness uses its title-block allowance.
+The two-place MIN engagement callout below owns the installed-joint limit
+printed by the assembly drawing; it does not qualify supplier tail geometry.
 """
 
 from __future__ import annotations
@@ -89,6 +91,7 @@ MIN_USEFUL_ENGAGEMENT_SOURCE = (
     "Functional installation inspection: full-form stop thread engagement "
     "at least 1D, rounded upward to 0.01 mm; head fully seated"
 )
+MIN_USEFUL_ENGAGEMENT_TEXT = f"{MIN_USEFUL_ENGAGEMENT_MM:.2f} MIN"
 PLATE_THICKNESS_ALLOWANCE = 25.4 * float(_config.title_block("linear_2pl")["value_in"])
 
 

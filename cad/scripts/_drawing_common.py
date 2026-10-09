@@ -4551,7 +4551,7 @@ def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
     model_dimension = _sw_type_info.early_bound_or_flag(
         display.GetDimension(), "IDimension", "SetToleranceType", "GetToleranceType"
     )
-    if not model_dimension.SetToleranceType(TOL_BASIC):
+    if model_dimension.SetToleranceType(TOL_BASIC) is not True:
         raise RuntimeError(f"failed to make {label} dimension BASIC")
     if int(model_dimension.GetToleranceType()) != TOL_BASIC:
         raise RuntimeError(f"{label} dimension did not retain BASIC tolerance")

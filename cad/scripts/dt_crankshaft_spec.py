@@ -135,7 +135,10 @@ JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
 STEP_WEB_WORST = JOURNAL_INBOARD_STATION - PINION_SEAT_STATION - 2.0 * STATION_ROW
 RELIEF_DIA = 10.4
 RELIEF_DIA_PLACES = 1
-RELIEF_OUTBOARD_STATION = 82.8
+# The post bore's south rim and the general edge breaks leave the outboard
+# land's real contact short at 82.8; inset only this relief end by 0.7 mm on
+# the one-place station grid. Outer journal ends, seats and fits are unchanged.
+RELIEF_OUTBOARD_STATION = 82.1
 RELIEF_INBOARD_STATION = 44.5
 RELIEF_START = local_station(RELIEF_OUTBOARD_STATION)
 RELIEF_END = local_station(RELIEF_INBOARD_STATION)

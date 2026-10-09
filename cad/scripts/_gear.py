@@ -602,6 +602,7 @@ async def build_stock_form_gear(
     face_width: float,
     *,
     rotate_rad: float | None = None,
+    screw_sweep_bound_mm: float | None = None,
 ) -> ToothedDisc:
     """Author a disc from its actual finite translated stock-tool profile.
 
@@ -611,12 +612,18 @@ async def build_stock_form_gear(
     ``rotate_rad`` locates the gap bisector at mid-face; its default pi/N
     retains a tooth centred on +X. This is the nominal normal-section screw
     sweep, not a claim about the envelope of a finite disc cutter.
+    Helical callers must pass ``screw_sweep_bound_mm``, the native flank
+    distance their own spec derives from its documented error budget; the
+    shared tier owns no tolerance.
     """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     if profile.helix_angle_deg:
+        if screw_sweep_bound_mm is None:
+            raise ValueError("helical stock-form gear requires screw_sweep_bound_mm")
         return await _build_helical_stock_form_gear(
-            adapter, profile, face_width, rotate_rad=rotate_rad
+            adapter, profile, face_width, rotate_rad=rotate_rad,
+            sweep_bound_mm=screw_sweep_bound_mm,
         )
     if not math.isfinite(face_width) or face_width <= 0.0:
         raise ValueError("stock-form gear face width must be positive and finite")
@@ -680,6 +687,7 @@ async def _build_helical_stock_form_gear(
     face_width: float,
     *,
     rotate_rad: float | None,
+    sweep_bound_mm: float,
 ) -> ToothedDisc:
     """Sweep the core's complete physical-pitch material sector, never an ideal tooth."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -734,7 +742,8 @@ async def _build_helical_stock_form_gear(
     seeded_volume = base_volume + sector_area * face_width
     await volume_check(adapter, "seeded tooth/gap", seeded_volume, 1.0)
     assert_stock_screw_sweep_phase(
-        adapter, profile, face_width, midface_tooth_phase_rad=midface_phase
+        adapter, profile, face_width, midface_tooth_phase_rad=midface_phase,
+        tolerance_mm=sweep_bound_mm,
     )
     pattern = await pattern_about_z(
         adapter, seed, profile.teeth, profile.blank_radius_mm, face_width / 2.0
@@ -768,14 +777,18 @@ def assert_stock_screw_sweep_phase(
     face_width: float,
     *,
     midface_tooth_phase_rad: float = 0.0,
+    tolerance_mm: float,
 ) -> None:
     """Measure actual solid flank points at quarter/mid-face stations.
 
     Volume cannot distinguish the wrong hand, no twist, or a wrong phase.
     Query trimmed native faces, not the input sketch or sweep's option bag.
-    The 1 um comparison is a native geometry fidelity gate, not a machining band.
+    ``tolerance_mm`` is the caller's native sweep-fidelity bound (the twisted
+    sweep's surface sag), not a machining band. A wrong hand, missing twist or
+    wrong phase displaces the quarter-face flank by tenths of a millimetre.
     """
-    tolerance_mm = 1e-3
+    if not math.isfinite(tolerance_mm) or tolerance_mm <= 0.0:
+        raise ValueError("stock screw-sweep tolerance must be positive and finite")
     if not math.isfinite(face_width) or face_width <= 0.0:
         raise ValueError("stock screw-sweep face width must be positive and finite")
     part = _early_bound(adapter.currentModel, "IPartDoc")
