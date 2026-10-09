@@ -350,18 +350,28 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 
 
 # Left of the profile: the 30.0 floor, its text parked further left on a
-# jog.  Under the slip hole: its size, between extension lines off the hole
-# walls.  Right: its depth.  Above: the 6.350 station between the owned
-# axes, its text on a jog to the right, clear of the locator's land text.
-# The caption takes the empty lower-left corner of the band.
+# jog.  Under the slip hole: its size, between short extension lines off the
+# hole walls, its four-line callout parked on a leader in the open band
+# below-right of the section (the dda9a33a8 render printed it across its own
+# extension lines and the underside edge).  Right: its depth.  Above: the
+# 6.350 station between the owned axes, its text on a jog to the right, clear
+# of the locator's land text.  The caption takes the empty lower-left corner
+# of the band.
 HANGER_FLOOR_TEXT_XY = _hanger_section_xy(
     BAR_X0 - HANGER_SECTION_GUSSET_REACH - 8.0, -HALF_H + HANGER_GRIP / 2.0
 )
 HANGER_FLOOR_OFFSET_XY = (0.058, 0.076)
 PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
 PIN_STATION_OFFSET_XY = (0.160, 0.106)
+# The callout block is 65 x 19 mm on that render (3.5 mm text).  Centred
+# here it spans sheet x 0.140..0.205 and y 0.025..0.044: its left edge is
+# 5.7 mm right of the size's outer arrow tail (0.1343), its top 6 mm under
+# the depth's lower arrow tail (0.0504), its right edge 11 mm left of the
+# title block (0.216), and its bottom 12 mm over the border.  The leader
+# runs up-left from the shoulder to the size's dimension line.
+HANGER_PIN_DIA_OFFSET_XY = (0.1725, 0.034)
 HANGER_SECTION_KEEP = {
-    "HangerPinHoleDia": _hanger_section_xy(PIN_HOLE_X, -HALF_H - 11.0),
+    "HangerPinHoleDia": _hanger_section_xy(PIN_HOLE_X, -HALF_H - 6.0),
     "HangerPinHoleDepth": _hanger_section_xy(
         BAR_X1 + HANGER_SECTION_GUSSET_REACH + 8.0, -HALF_H + HANGER_PIN_HOLE_DEPTH / 2.0
     ),
@@ -1090,6 +1100,11 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, dimensions, HANGER_SECTION_CALLOUTS)
+    # Four lines cannot stand between extension lines 3.24 apart: park the
+    # text on a leader, clear of the section (rule 8: no text on a line).
+    offset_dimension_text(
+        adapter, dimensions, {"HangerPinHoleDia": HANGER_PIN_DIA_OFFSET_XY}
+    )
     _assert_section_display(
         adapter, view, label="F-F knife-hanger section", cut_surface_only=True,
         removed=True,

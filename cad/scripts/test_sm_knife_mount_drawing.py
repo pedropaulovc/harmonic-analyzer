@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_sm_knife_mount as part
 import draw_sm_knife_mount as drawing
 import sm_knife_mount_spec
@@ -77,6 +79,43 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
         sm_knife_mount_spec.BLK_TOP - sm_knife_mount_spec.PIN_HOLE_DEPTH
     )
     assert floor_y < y < top_y
+
+
+def test_dowel_callout_is_parked_clear_of_the_top_view() -> None:
+    # Rule 8 (dda9a33a8 render): the three callout lines ran through both
+    # holes and the leader shoulder crossed the view.  The block now hangs
+    # wholly right of the block's +X face, and the shoulder's near end stands
+    # below the hole centre so the leader climbs to the hole rim.
+    x, y = drawing.TOP_KEEP["PinHoleDia"]
+    face_x = drawing._sheet_x(sm_knife_mount_spec.BLK_HALF_X)
+    shoulder_x, shoulder_y = drawing.PIN_CALLOUT_SHOULDER_START
+    assert shoulder_x > face_x
+    shoulder_start_x = (
+        x - drawing.PIN_CALLOUT_HALF_WIDTH - drawing.PIN_CALLOUT_SHOULDER_OVERHANG
+    )
+    assert shoulder_start_x == pytest.approx(shoulder_x)
+    assert y - drawing.PIN_CALLOUT_SHOULDER_DROP == pytest.approx(shoulder_y)
+    assert shoulder_y < drawing.TOP_CENTER[1]
+    # Right edge clear of the right view's column and on the sheet.
+    right_edge = x + drawing.PIN_CALLOUT_HALF_WIDTH
+    assert right_edge < drawing.ISO_CENTER[0] - 0.050
+    # Above the right view's box (front row, 2:1 block height).
+    assert shoulder_y > drawing.RIGHT_CENTER[1] + drawing.RIGHT_HALF_Y + 0.040
+
+
+def test_the_tap_is_stated_once_in_the_notes_not_by_solidworks_note() -> None:
+    # Rule 6: SolidWorks' raw "#6-32 Tapped Hole" note restated the tap the
+    # notes already state in full; it is deleted and finalize proves none is
+    # left at export.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert drawing.TAPPED_HOLE_NOTE == "Tapped Hole"
+    assert "remove_notes_matching(adapter, TAPPED_HOLE_NOTE)" in source
+    assert "redundant_note_substrings=(TAPPED_HOLE_NOTE,)" in source
+    assert "expected_redundant_notes=0" in source
+    assert source.index("remove_notes_matching(adapter, TAPPED_HOLE_NOTE)") > (
+        source.index("keep=TOP_KEEP")
+    )
+
 
 
 def test_spec_geometry_mirrors_the_build_source() -> None:

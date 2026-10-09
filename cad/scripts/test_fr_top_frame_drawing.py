@@ -741,6 +741,7 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
         "station": drawing.PIN_STATION_TEXT_XY,
         "station offset": drawing.PIN_STATION_OFFSET_XY,
         "caption": drawing.HANGER_SECTION_CAPTION_XY,
+        "slip-hole callout": drawing.HANGER_PIN_DIA_OFFSET_XY,
         **drawing.HANGER_SECTION_KEEP,
     }
     for name, (x, y) in points.items():
@@ -750,6 +751,29 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
     bottom = drawing._hanger_section_xy(part.HANGER_X, -part.HALF_H)[1]
     assert drawing.PIN_STATION_TEXT_XY[1] > top
     assert drawing.HANGER_SECTION_KEEP["HangerPinHoleDia"][1] < bottom
+
+
+def test_slip_hole_callout_is_parked_clear_of_the_section() -> None:
+    # Rule 8 (dda9a33a8 render): the four-line callout stood across the hole's
+    # own extension lines and the underside edge.  It now rides a leader to a
+    # block wholly below the section, right of the size's extension lines and
+    # left of the title block.
+    half_w, half_h = 0.0325, 0.0095  # 65 x 19 mm block on that render
+    x, y = drawing.HANGER_PIN_DIA_OFFSET_XY
+    bottom = drawing._hanger_section_xy(part.HANGER_X, -part.HALF_H)[1]
+    hole_right = drawing._hanger_section_xy(
+        part.PIN_HOLE_X + spec.HANGER_PIN_HOLE_DIA / 2.0, 0.0
+    )[0]
+    assert y + half_h < bottom - 0.010
+    assert x - half_w > hole_right + 0.010
+    assert x + half_w < TITLE_BLOCK[0] - 0.005
+    assert y - half_h > 0.0127 + 0.005
+    # Clear of the caption, which stands left of the section.
+    assert x - half_w > drawing.HANGER_SECTION_CAPTION_XY[0] + 0.025
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '{"HangerPinHoleDia": HANGER_PIN_DIA_OFFSET_XY}' in source, (
+        "the slip-hole size must be offset onto its leader"
+    )
 
 
 def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:

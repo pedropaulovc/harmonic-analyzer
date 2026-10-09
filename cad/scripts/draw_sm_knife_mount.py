@@ -66,6 +66,7 @@ from sm_knife_mount_spec import (
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
+    remove_notes_matching,
 )
 
 
@@ -80,6 +81,8 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+# SolidWorks' own descriptive thread note; the manufacturing notes state the tap.
+TAPPED_HOLE_NOTE = "Tapped Hole"
 
 SHEET_SCALE = (2.0, 1.0)
 _BLOCK_CY = (BLK_TOP + BLK_BOT) / 2.0  # block centre height (model mm)
@@ -130,11 +133,29 @@ SECTION_KEEP = {
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
+# The dowel hole's Ø and its three callout lines park in the open band right
+# of the top view (policy rule 8: callout text outside the silhouette, no text
+# on a line).  SolidWorks hangs the block left of its text position by half
+# the widest line plus the shoulder's overhang and runs the shoulder under the
+# last line; both are measured on the dda9a33a8 farm render (3.5 mm text,
+# "PRESS MHA-VN-05x DOWEL TO FLOOR" 84.5 wide, shoulder 1.6 past it and 12.86
+# under the text position).  The shoulder's near end stands 6 mm right of the
+# block's +X face and 10 mm below the hole centre, so the leader reaches the
+# hole's lower-right rim at ~33 degrees, clear of its centre mark's arm.
+PIN_CALLOUT_HALF_WIDTH = 0.04225
+PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
+PIN_CALLOUT_SHOULDER_DROP = 0.01286
+PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.006, TOP_CENTER[1] - 0.010)
 TOP_KEEP = {
     # The 6.350 station from the tap axis (the origin's projection) runs
-    # above the top view; the Ø and its three-line callout sit to its right.
+    # above the top view.
     "PinHoleX": (_sheet_x(PIN_HOLE_X / 2.0), TOP_CENTER[1] + TOP_HALF_Z + 0.010),
-    "PinHoleDia": (_sheet_x(PIN_HOLE_X) + 0.030, TOP_CENTER[1] + 0.004),
+    "PinHoleDia": (
+        PIN_CALLOUT_SHOULDER_START[0]
+        + PIN_CALLOUT_SHOULDER_OVERHANG
+        + PIN_CALLOUT_HALF_WIDTH,
+        PIN_CALLOUT_SHOULDER_START[1] + PIN_CALLOUT_SHOULDER_DROP,
+    ),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
@@ -289,6 +310,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    # SolidWorks pins its own raw "#6-32 Tapped Hole" note to a view that
+    # imports from the tapped part (the dda9a33a8 render put it on the top
+    # view, through the dowel callout).  The tap is stated once, in the
+    # manufacturing notes (thread, full-thread depth, drill and drill depth;
+    # rule 6), so every such note goes.  Which views receive one is
+    # SolidWorks' choice (draw_fr_top_frame._auto_tapped_hole_notes), so the
+    # count is logged, not gated; finalize_drawing then proves none is left.
+    removed_tap_notes = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
+    _telemetry.info(f"removed {removed_tap_notes} automatic tapped-hole note(s)")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to knife bore")
 
@@ -343,6 +373,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Knife-Mount Bearing Block Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=(TAPPED_HOLE_NOTE,),
+        expected_redundant_notes=0,
     )
 
 
