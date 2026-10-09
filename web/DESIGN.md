@@ -84,8 +84,10 @@ replaced with proxy parts.
 
 The loading progress meter counts decoded response-body bytes against the
 compiled representation size, never a compressed length or guessed total.
-Identity checking and decoder preparation run as an indeterminate phase, and
-the overlay never reports a ready model before the accepted digest.
+The meter retains the received download progress during identity checking and
+decoder preparation, labeled separately; no timed fill estimates that work.
+Only stage changes are announced, and the overlay stays until the model is
+verified and loaded.
 
 The viewer generates a PMREM room environment once for image-based lighting.
 The native steel and brass materials are fully metallic, so diffuse hemisphere

@@ -21,6 +21,7 @@ const canvas = element<HTMLCanvasElement>('#stage')
 const loading = element('#loading')
 const modelStatus = element('#model-status')
 const modelProgress = element<HTMLProgressElement>('#model-progress')
+const modelProgressPercentage = element('#model-progress-percentage')
 const retryModel = element<HTMLButtonElement>('#retry-model')
 const title = element('#video-title')
 const playbackStatus = element('#playback-status')
@@ -927,6 +928,7 @@ async function fetchMachine(): Promise<void> {
   modelStatus.textContent = 'Loading the released CAD model…'
   modelProgress.hidden = false
   modelProgress.removeAttribute('value')
+  notice(modelProgressPercentage, '0%')
   retryModel.hidden = true
   updateControlState()
   try {
@@ -935,11 +937,11 @@ async function fetchMachine(): Promise<void> {
       onProgress: (progress) => {
         if (progress.phase === 'downloading') {
           const loadedBytes = Math.min(progress.loadedBytes, progress.totalBytes)
-          modelProgress.max = progress.totalBytes
+          if (modelProgress.max !== progress.totalBytes) modelProgress.max = progress.totalBytes
           modelProgress.value = loadedBytes
-          modelStatus.textContent = `Downloading the released CAD model… ${Math.round((loadedBytes / progress.totalBytes) * 100)}%`
+          notice(modelStatus, 'Downloading the released CAD model…')
+          notice(modelProgressPercentage, `${Math.floor((loadedBytes / progress.totalBytes) * 100)}%`)
         } else {
-          modelProgress.removeAttribute('value')
           modelStatus.textContent = 'Download complete; verifying and preparing the model…'
         }
       },
@@ -959,6 +961,7 @@ async function fetchMachine(): Promise<void> {
   } catch (error) {
     modelState = 'unavailable'
     modelProgress.hidden = true
+    modelProgressPercentage.hidden = true
     modelStatus.textContent = `No compatible model loaded. Run npm run fetch-model -- path/to/released.glb. ${error instanceof Error ? error.message : String(error)}`
     notice(modelError, error instanceof Error ? error.message : String(error))
     retryModel.hidden = false
