@@ -74,6 +74,7 @@ from _common import (
     CASTING_GREEN,
     SketchDims,
     add_line_chain,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -81,6 +82,7 @@ from _common import (
     define_circle,
     define_polygon_chain,
     define_rectilinear_chain,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
@@ -91,6 +93,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
@@ -201,6 +204,94 @@ HANGER_X = BAR_X0 + 11.0  # -15.0: the crossbar centreline, KNIFE x
 PIN_HOLE_X = HANGER_X + HANGER_ROUND_X  # -8.65: round dowel slip holes, +X
 SLOT_X = HANGER_X + HANGER_SLOT_X  # -21.35: dowel slots, -X of the screw
 SLOT_FLAT = HANGER_SLOT_LENGTH - HANGER_SLOT_WIDTH  # 1.36: straight run
+HANGER_SLOT_AREA = (
+    SLOT_FLAT * HANGER_SLOT_WIDTH + math.pi * (HANGER_SLOT_WIDTH / 2.0) ** 2
+)
+
+
+def slot_stadium_points(
+    centre: tuple[float, float], *, along_u: bool, half_flat: float, half_w: float
+) -> tuple[tuple[float, float], ...]:
+    """One slot's stadium in sketch ``(u, v)``, counter-clockwise.
+
+    Returns ``(p1, p2, p3, p4, centre_b, centre_a)``: side a runs p1 -> p2,
+    end b arcs (CCW, the ``add_arc`` sense) about centre_b from p2 to p3,
+    side b runs p3 -> p4 and end a arcs about centre_a from p4 back to p1.
+    The slot runs along sketch u when ``along_u``, else along v (the same
+    shape turned a quarter, which keeps it counter-clockwise).
+    """
+    u0, v0 = centre
+
+    def at(du: float, dv: float) -> tuple[float, float]:
+        return (u0 + du, v0 + dv) if along_u else (u0 - dv, v0 + du)
+
+    return (
+        at(-half_flat, -half_w),
+        at(half_flat, -half_w),
+        at(half_flat, half_w),
+        at(-half_flat, half_w),
+        at(half_flat, 0.0),
+        at(-half_flat, 0.0),
+    )
+
+
+def swept_contours_disjoint(
+    contours: tuple[tuple[tuple[float, float], tuple[float, float], float], ...],
+) -> bool:
+    """Whether one sketch's closed contours enclose disjoint regions.
+
+    Each contour is a core segment ``(start, end)`` swept by a radius: a
+    stadium, or a circle when the segment is a point.  A cut fails on
+    contours that cross (FeatureCut3 "Type mismatch") and merges ones that
+    touch, so the regions must stand strictly apart.
+    """
+
+    def segment_gap(a0, a1, b0, b1) -> float:
+        def point_to_segment(p, s0, s1) -> float:
+            dx, dy = s1[0] - s0[0], s1[1] - s0[1]
+            span = dx * dx + dy * dy
+            t = 0.0
+            if span > 0.0:
+                t = ((p[0] - s0[0]) * dx + (p[1] - s0[1]) * dy) / span
+                t = min(1.0, max(0.0, t))
+            return math.hypot(p[0] - (s0[0] + t * dx), p[1] - (s0[1] + t * dy))
+
+        # The two cores of one sketch's contours never cross here (parallel
+        # or point cores), so the endpoint distances bound the gap.
+        return min(
+            point_to_segment(a0, b0, b1),
+            point_to_segment(a1, b0, b1),
+            point_to_segment(b0, a0, a1),
+            point_to_segment(b1, a0, a1),
+        )
+
+    return all(
+        segment_gap(*a[:2], *b[:2]) > a[2] + b[2]
+        for i, a in enumerate(contours)
+        for b in contours[i + 1 :]
+    )
+
+
+# Each underside cut's sketch contours in model (x, z): the round dowel holes
+# (circles) and the dowel slots (stadiums), one per station.
+HANGER_PIN_CONTOURS = tuple(
+    ((PIN_HOLE_X, z), (PIN_HOLE_X, z), HANGER_PIN_HOLE_DIA / 2.0)
+    for z in (STUD_Z_FRONT, STUD_Z_REAR)
+)
+HANGER_SLOT_CONTOURS = tuple(
+    (
+        (SLOT_X - SLOT_FLAT / 2.0, z),
+        (SLOT_X + SLOT_FLAT / 2.0, z),
+        HANGER_SLOT_WIDTH / 2.0,
+    )
+    for z in (STUD_Z_FRONT, STUD_Z_REAR)
+)
+for _cut, _contours in (
+    ("dowel slip holes", HANGER_PIN_CONTOURS),
+    ("dowel slots", HANGER_SLOT_CONTOURS),
+):
+    if not swept_contours_disjoint(_contours):
+        raise AssertionError(f"the {_cut} sketch's contours overlap: {_contours}")
 
 # --- Gooseneck hub (old gooseneck-clamp function, merged) -------------------
 GOOSENECK_Z = SUMMING_Z
@@ -1371,52 +1462,101 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # 12c. Dowel slots, HANGER_PIN_X -X of each screw axis, as blind and
-    #      flat-floored as the round holes: the straight run (a rectangle
-    #      HangerSlotWidth across and HangerSlotLength - HangerSlotWidth along
-    #      X, the FRONT one owning the marked HangerSlotWidth -- the underside
-    #      locator carries it there, clear of F-F's cutting line along the
-    #      rear station), then the two Ø HangerSlotWidth ends.  Section F-F
-    #      cuts the rear slot along its length.
+    #      flat-floored as the round holes: ONE closed stadium per slot (two
+    #      straight sides HangerSlotLength - HangerSlotWidth long joined by
+    #      two tangent half-round ends), so the cut takes each slot as one
+    #      region.  Separate end circles 1.36 apart overlap, and SOLIDWORKS
+    #      rejects a cut whose sketch contours intersect (farm run
+    #      20261009T155421516Z: FeatureCut3 "Type mismatch").  The FRONT slot
+    #      owns the marked HangerSlotWidth (the side-to-side distance) -- the
+    #      underside locator carries it there, clear of F-F's cutting line
+    #      along the rear station.  Section F-F cuts the rear slot along its
+    #      length.
     slot_dims = SketchDims()
-    half_flat, half_w = SLOT_FLAT / 2.0, HANGER_SLOT_WIDTH / 2.0
-    slot_corners = [
-        [
-            (SLOT_X - half_flat, -HALF_H, z - half_w),
-            (SLOT_X + half_flat, -HALF_H, z - half_w),
-            (SLOT_X + half_flat, -HALF_H, z + half_w),
-            (SLOT_X - half_flat, -HALF_H, z + half_w),
-        ]
-        for z in (STUD_Z_FRONT, STUD_Z_REAR)
-    ]
     mapped, u_is_x, normal_out = _open_underside_sketch(
-        adapter, [corner for corners in slot_corners for corner in corners]
+        adapter, [(SLOT_X, -HALF_H, z) for z in (STUD_Z_FRONT, STUD_Z_REAR)]
     )
-    for index, station in enumerate(("Front", "Rear")):
-        points = mapped[4 * index : 4 * index + 4]
+    half_flat, half_w = SLOT_FLAT / 2.0, HANGER_SLOT_WIDTH / 2.0
+    for (u, v), station in zip(mapped, ("Front", "Rear"), strict=True):
         prefix = "HangerSlot" if station == "Front" else "HangerSlot1"
-        anchor_names = (
-            (f"Slot{station}X", f"Slot{station}Z")
-            if u_is_x
-            else (f"Slot{station}Z", f"Slot{station}X")
+        where = station.lower()
+        p1, p2, p3, p4, c_end_b, c_end_a = slot_stadium_points(
+            (u, v), along_u=u_is_x, half_flat=half_flat, half_w=half_w
         )
-        lines = await add_line_chain(adapter, points)
-        # Emission order: the X run (corner 0 -> 1), the Z width (1 -> 2),
-        # then corner 0's sketch anchors.
-        await define_rectilinear_chain(
+        set_sketch_direct_db(adapter, True)
+        side_a = check(f"dowel slot side a ({where})", await adapter.add_line(*p1, *p2))
+        end_b = check(
+            f"dowel slot end b ({where})", await adapter.add_arc(*c_end_b, *p2, *p3)
+        )
+        side_b = check(f"dowel slot side b ({where})", await adapter.add_line(*p3, *p4))
+        end_a = check(
+            f"dowel slot end a ({where})", await adapter.add_arc(*c_end_a, *p4, *p1)
+        )
+        set_sketch_direct_db(adapter, False)
+        for join, a, b in (
+            ("side a - end b", f"{side_a}.end", f"{end_b}.start"),
+            ("end b - side b", f"{end_b}.end", f"{side_b}.start"),
+            ("side b - end a", f"{side_b}.end", f"{end_a}.start"),
+            ("end a - side a", f"{end_a}.end", f"{side_a}.start"),
+        ):
+            check(
+                f"dowel slot {join} ({where})",
+                await adapter.add_sketch_constraint(a, b, "coincident"),
+            )
+        along = "horizontal" if u_is_x else "vertical"
+        for side in (side_a, side_b):
+            check(
+                f"dowel slot {side} {along} ({where})",
+                await adapter.add_sketch_constraint(side, None, along),
+            )
+        # Tangency closes the shape: both ends' radii follow from the sides'
+        # spacing, the far side's length from the near side's.
+        for a, b in (
+            (side_a, end_b),
+            (end_b, side_b),
+            (side_b, end_a),
+            (end_a, side_a),
+        ):
+            check(
+                f"dowel slot {a} tangent {b} ({where})",
+                await adapter.add_sketch_constraint(a, b, "tangent"),
+            )
+        # Emission order: the width across the sides, the near side's
+        # straight run, then end a's centre anchors.
+        await dimension_between(
             adapter,
-            lines,
-            points,
-            label=f"dowel slot run ({station.lower()})",
-            dims=slot_dims,
-            names=[f"{prefix}Flat", f"{prefix}Width", *anchor_names],
-            drives=['"HangerSlotLength" - "HangerSlotWidth"', '"HangerSlotWidth"'],
+            f"{side_a}.start",
+            f"{side_b}.end",
+            "vertical_distance" if u_is_x else "horizontal_distance",
+            HANGER_SLOT_WIDTH,
+            f"dowel slot width ({where})",
         )
-    await ensure_fully_defined(adapter, "dowel slot run sketch")
-    check("exit_sketch dowel slot runs", await adapter.exit_sketch())
+        slot_dims.record(f"{prefix}Width", '"HangerSlotWidth"')
+        await dimension_between(
+            adapter,
+            f"{side_a}.start",
+            f"{side_a}.end",
+            "horizontal_distance" if u_is_x else "vertical_distance",
+            SLOT_FLAT,
+            f"dowel slot run ({where})",
+        )
+        slot_dims.record(f"{prefix}Flat", '"HangerSlotLength" - "HangerSlotWidth"')
+        if min(abs(c_end_a[0]), abs(c_end_a[1])) < 1e-6:
+            raise RuntimeError(
+                f"dowel slot ({where}): end centre {c_end_a} on a sketch axis"
+                " anchors with one dimension, not two"
+            )
+        await anchor_point_to_origin(
+            adapter, f"{end_a}.center", *c_end_a, f"dowel slot end a ({where})"
+        )
+        for axis_name in ("X", "Z") if u_is_x else ("Z", "X"):
+            slot_dims.record(f"Slot{station}{axis_name}")
+    await ensure_fully_defined(adapter, "dowel slot sketch")
+    check("exit_sketch dowel slots", await adapter.exit_sketch())
     name_last_feature(adapter, "HangerSlotProfile")
     drive_jobs += slot_dims.apply(adapter, "HangerSlotProfile")
     check(
-        "cut dowel slot runs",
+        "cut dowel slots",
         await adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=HANGER_SLOT_DEPTH, reverse_direction=not normal_out
@@ -1430,50 +1570,9 @@ async def build(adapter) -> dict[str, str]:
             '"HangerSlotDepth"',
         )
     )
-    v_slot_runs = 2.0 * SLOT_FLAT * HANGER_SLOT_WIDTH * HANGER_SLOT_DEPTH
+    v_slots = len(HANGER_SLOT_CONTOURS) * HANGER_SLOT_AREA * HANGER_SLOT_DEPTH
     volume = await volume_check(
-        adapter, "dowel slot runs", volume - v_slot_runs, 0.01 * v_slot_runs
-    )
-    end_dims = SketchDims()
-    end_centres = [
-        (SLOT_X + side * half_flat, -HALF_H, z)
-        for z in (STUD_Z_FRONT, STUD_Z_REAR)
-        for side in (-1.0, 1.0)
-    ]
-    mapped_ends, _u_is_x, ends_normal_out = _open_underside_sketch(adapter, end_centres)
-    for index, (u, v) in enumerate(mapped_ends):
-        await define_circle(
-            adapter,
-            u,
-            v,
-            half_w,
-            f"dowel slot end {index + 1}",
-            dims=end_dims,
-            drives=(None, None, '"HangerSlotWidth"'),
-        )
-    await ensure_fully_defined(adapter, "dowel slot end sketch")
-    check("exit_sketch dowel slot ends", await adapter.exit_sketch())
-    name_last_feature(adapter, "HangerSlotEndProfile")
-    drive_jobs += end_dims.apply(adapter, "HangerSlotEndProfile")
-    check(
-        "cut dowel slot ends",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(
-                depth=HANGER_SLOT_DEPTH, reverse_direction=not ends_normal_out
-            )
-        ),
-    )
-    name_last_feature(adapter, "HangerSlotEnds")
-    drive_jobs.append(
-        (
-            name_dimensions(adapter, "HangerSlotEnds", ["HangerSlotEndDepth"])[0],
-            '"HangerSlotDepth"',
-        )
-    )
-    # Each end adds the half disc outside the run.
-    v_slot_ends = 2.0 * math.pi * half_w**2 * HANGER_SLOT_DEPTH
-    volume = await volume_check(
-        adapter, "dowel slot ends", volume - v_slot_ends, 0.01 * v_slot_ends
+        adapter, "dowel slots", volume - v_slots, 0.01 * v_slots
     )
 
     # 13. Cross-screw taps (#10-32 UNF-2B bottoming): one per boss,

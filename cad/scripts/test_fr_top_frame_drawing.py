@@ -738,6 +738,58 @@ def test_dowel_slot_contract() -> None:
     assert 'prefix = "HangerSlot" if station == "Front" else "HangerSlot1"' in source
 
 
+def test_dowel_slot_sketch_contours_never_cross() -> None:
+    # 48ad988c6 cut each slot's ends as two Ø3.24 circles 1.36 apart in one
+    # sketch; they cross, and the farm leaf's cut failed (FeatureCut3 "Type
+    # mismatch").  Each slot is now one closed stadium, the two apart.
+    w, flat = spec.HANGER_SLOT_WIDTH, part.SLOT_FLAT
+    end_circles = tuple(
+        ((part.SLOT_X + side * flat / 2, z), (part.SLOT_X + side * flat / 2, z), w / 2)
+        for z in (part.STUD_Z_FRONT, part.STUD_Z_REAR)
+        for side in (-1.0, 1.0)
+    )
+    assert not part.swept_contours_disjoint(end_circles)
+    assert len(part.HANGER_SLOT_CONTOURS) == 2
+    assert part.swept_contours_disjoint(part.HANGER_SLOT_CONTOURS)
+    assert part.swept_contours_disjoint(part.HANGER_PIN_CONTOURS)
+    # The checker separates by the swept radii, so touching is a failure.
+    assert not part.swept_contours_disjoint((((0, 0), (1, 0), 1.0), ((1, 2), (3, 2), 1.0)))
+    assert part.swept_contours_disjoint((((0, 0), (1, 0), 1.0), ((1, 2.001), (3, 2.001), 1.0)))
+    assert part.HANGER_SLOT_AREA == pytest.approx(flat * w + math.pi * (w / 2) ** 2)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    step = source[source.index("    # 12c. Dowel slots") : source.index("    # 13. Cross-screw")]
+    assert "define_circle" not in step
+    assert step.count("create_cut_extrude(") == 1
+    assert step.count("await adapter.add_arc(") == 2
+    assert step.count("await adapter.add_line(") == 2
+
+
+@pytest.mark.parametrize("along_u", [True, False])
+def test_dowel_slot_stadium_closes_counter_clockwise(along_u: bool) -> None:
+    centre, half_flat, half_w = (5.0, -7.0), part.SLOT_FLAT / 2, spec.HANGER_SLOT_WIDTH / 2
+    p1, p2, p3, p4, c_b, c_a = part.slot_stadium_points(
+        centre, along_u=along_u, half_flat=half_flat, half_w=half_w
+    )
+    # Straight sides of the flat run, each end a half round about its centre.
+    assert math.dist(p1, p2) == pytest.approx(2 * half_flat)
+    assert math.dist(p3, p4) == pytest.approx(2 * half_flat)
+    assert math.dist(c_a, c_b) == pytest.approx(2 * half_flat)
+    for c, a, b in ((c_b, p2, p3), (c_a, p4, p1)):
+        assert math.dist(c, a) == pytest.approx(half_w)
+        assert math.dist(c, b) == pytest.approx(half_w)
+        # add_arc sweeps counter-clockwise from a to b: the half round
+        # bulges away from the slot's centre.
+        sweep_mid = (c[0] + (b[1] - a[1]) / 2, c[1] - (b[0] - a[0]) / 2)
+        assert math.dist(sweep_mid, centre) == pytest.approx(half_flat + half_w)
+    # The sides run along the slot (u when along_u), counter-clockwise.
+    axis = 0 if along_u else 1
+    assert p1[1 - axis] == pytest.approx(p2[1 - axis])
+    area2 = sum(
+        x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip((p1, p2, p3, p4), (p2, p3, p4, p1))
+    )
+    assert area2 > 0
+
+
 def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
     # Policy rule 3 (knife-edge system): datum B the front round hole, C the
     # rear; each slot 0.05 to its own station's hole, the other translated.
