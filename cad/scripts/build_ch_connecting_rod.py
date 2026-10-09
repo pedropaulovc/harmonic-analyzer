@@ -133,8 +133,8 @@ SLOT_RUNOUT = 1.0  # unprinted
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness or width
 
 SHANK_START_Y = RING_BORE_DIA / 2.0 - 0.5  # overlaps the strap annulus
-FORK_BOSS_LENGTH = FORK_TOP_Y - FORK_BASE_Y  # crown top -> root step (16.0)
-SLOT_DEPTH = FORK_TOP_Y - FORK_CROTCH_Y  # crown top -> slot floor (13.0)
+FORK_BOSS_LENGTH = FORK_TOP_Y - FORK_BASE_Y  # crown top -> root step (18.0)
+SLOT_DEPTH = FORK_TOP_Y - FORK_CROTCH_Y  # crown top -> slot floor (14.75)
 SLOT_CUT_HEIGHT = SLOT_DEPTH + SLOT_RUNOUT
 PIN_DRILL_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 # 90-degree countersink = an equal-distance chamfer whose leg is the radial

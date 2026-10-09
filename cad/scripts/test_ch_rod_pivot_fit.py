@@ -8,15 +8,19 @@ floors and the swing it designs for are pinned to their sources here.
 
 from __future__ import annotations
 
+import itertools
 import math
 
+import numpy as np
 import pytest
 
 import _config
 import ch_amplitude_bar_spec as bar
 import channel_frame_geom as frame
 import channel_kinematics as ck
+import ch_connecting_rod_notes as rod_notes
 import ch_connecting_rod_spec as rod
+import ch_rocker_arm_notes as arm_notes
 import ch_rocker_arm_spec as arm
 import ch_rod_pivot_pin_spec as pin
 import cylinder_bank_layout as drum_bank
@@ -59,7 +63,10 @@ def test_worst_case_joint_budget() -> None:
     assert b["retention_overlap_min"] >= pin.RETENTION_OVERLAP_MIN
     assert b["upset_projection_min"] >= b["upset_needed_max"]
     assert b["crown_wall_min"] >= 2.0
+    assert b["crotch_clearance_min"] == pytest.approx(1.1524, abs=1e-4)
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
+    assert b["bridge_min"] == pytest.approx(2.234, abs=1e-6)
+    assert b["bridge_min"] >= pin.BRIDGE_TARGET
 
 
 def test_neighbour_stack_fills_the_inter_arm_gap_exactly() -> None:
@@ -75,8 +82,8 @@ def test_neighbour_stack_fills_the_inter_arm_gap_exactly() -> None:
     ) == pytest.approx(b["neighbour_clearance_min"])
 
 
-def _relative_swing_deg() -> tuple[float, float]:
-    """(min, max) arm tilt less rod tilt over one cam turn (degrees)."""
+def _relative_swing_deg() -> list[float]:
+    """Arm tilt less rod tilt at each half-degree of one cam turn (degrees)."""
     ox, oy = frame.ROCKER_PIVOT_XY
     lever, c2c = ck._ARM_ROD_LEVER, rod.CENTER_DISTANCE
     rel = []
@@ -92,13 +99,95 @@ def _relative_swing_deg() -> tuple[float, float]:
         arm_tilt = math.degrees(math.atan2(py - oy, ox - px)) - ck._ARM_LEVER_BETA_DEG
         rod_tilt = math.degrees(math.atan2(px - cx, py - cy))
         rel.append(arm_tilt - rod_tilt)
-    return min(rel), max(rel)
+    return rel
+
+
+def test_restated_swing_brackets_the_solved_loop() -> None:
+    rel = _relative_swing_deg()
+    lo, hi = pin.RELATIVE_SWING_DEG
+    assert lo <= min(rel) <= lo + 0.01
+    assert hi - 0.01 <= max(rel) <= hi
+
+
+def _arm_bottom_silhouette(
+    r_top: float, r_bottom: float, top_above_pivot: float
+) -> np.ndarray:
+    """Arm-frame points along the arm's lower outline near the rod pin: the
+    bottom arc, then the straight taper to the tip land (arm notes 3-5)."""
+    cy = arm.PIVOT_MID_Y + top_above_pivot + r_top
+    a_bot = arm.BOT_ARC_LEN / 2.0 / r_bottom
+    a_top = arm.TOP_ARC_LEN / 2.0 / r_top
+    bot_end = np.array([r_bottom * math.sin(a_bot), cy - r_bottom * math.cos(a_bot)])
+    tip = np.array(
+        [
+            (r_top + arm.TIP_FACE) * math.sin(a_top),
+            cy - (r_top + arm.TIP_FACE) * math.cos(a_top),
+        ]
+    )
+    x = np.arange(arm.ROD_HOLE_X - 10.0, bot_end[0], 0.005)
+    arc = np.stack([x, cy - np.sqrt(r_bottom**2 - x * x)], axis=1)
+    t = np.linspace(0.0, 1.0, 2001)[:, None]
+    return np.concatenate([arc, bot_end + t * (tip - bot_end)])
 
 
 def test_crotch_clears_the_arm_through_the_whole_swing() -> None:
-    low, high = _relative_swing_deg()
-    assert max(abs(low), abs(high)) <= pin.ARM_TO_ROD_SWING_DEG
-    assert (low, high) == pytest.approx((-8.60, 1.01), abs=0.01)
+    """Every printed-band corner of the arm's curved lower outline and the
+    fork's slot floor, at every solved pose of one cam turn: the floor stays
+    CROTCH_CLEARANCE_MIN below the arm with both pin holes wandered and the
+    pin dropped in its clearances."""
+    two_place = arm.LINEAR_2PL
+    # The bands the sweep reads are the ones the sheets print.
+    assert "SlotDepth" not in rod_notes.DRAWING_PRECISION.get("ForkSlotProfile", {})
+    assert "ForkWidthDim" not in rod_notes.DRAWING_PRECISION.get("ForkProfile", {})
+    assert arm_notes.DRAWING_DIMENSIONS["StrapProfile"] == {"TopRadius", "BottomRadius"}
+    assert arm_notes.DEFAULT_DRAWING_PRECISION == 2
+    rad = np.radians(np.array(_relative_swing_deg()))
+    cos, sin = np.cos(rad)[:, None], np.sin(rad)[:, None]
+    hole = np.array([arm.ROD_HOLE_X, arm.ROD_HOLE_Y])
+    slot_depth = rod.FORK_TOP_Y - rod.FORK_CROTCH_Y
+    worst = math.inf
+    for r_top, r_bottom, top_above_pivot in itertools.product(
+        (arm.R_TOP - two_place, arm.R_TOP + two_place),
+        (arm.R_BOTTOM - two_place, arm.R_BOTTOM + two_place),
+        (
+            arm.TOP_EDGE_ABOVE_PIVOT + arm.TOP_EDGE_BAND[1],
+            arm.TOP_EDGE_ABOVE_PIVOT + arm.TOP_EDGE_BAND[0],
+        ),
+    ):
+        local = _arm_bottom_silhouette(r_top, r_bottom, top_above_pivot) - hole
+        # Rows are poses, columns outline points, in the rod frame (pin at
+        # the origin): the arm turned CCW on the pin by the relative swing.
+        x = cos * local[:, 0] - sin * local[:, 1]
+        y = sin * local[:, 0] + cos * local[:, 1]
+        for width in (rod.FORK_WIDTH - two_place, rod.FORK_WIDTH + two_place):
+            low = np.where(np.abs(x) <= width / 2.0, y, np.inf).min()
+            for depth in (slot_depth - two_place, slot_depth + two_place):
+                worst = min(worst, low - (width / 2.0 - depth))
+    b = pin.BUDGET
+    hole_wander = (
+        float(rod.GEOMETRIC_TOLERANCES_MM["rocker pin hole position"])
+        + float(arm.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
+    ) / 2.0
+    pin_drop = (b["running_clearance_max"] + b["tine_hole_clearance_max"]) / 2.0
+    clearance = worst - hole_wander - pin_drop
+    assert clearance >= pin.CROTCH_CLEARANCE_MIN
+    # The spec's closed-form budget is the same envelope, on its restated swing.
+    assert b["crotch_clearance_min"] == pytest.approx(clearance, abs=0.005)
+    assert b["crotch_clearance_min"] <= clearance
+
+
+def test_fork_bridge_below_the_slot_holds_the_rule_12_target() -> None:
+    """The bridge joining the tines under the slot floor: ForkBossLength less
+    SlotDepth, both measured at two places from the crown top."""
+    two_place = arm.LINEAR_2PL
+    assert "ForkBossLength" not in rod_notes.DRAWING_PRECISION.get(
+        "ForkSlotProfile", {}
+    )
+    boss_length = rod.FORK_TOP_Y - rod.FORK_BASE_Y
+    slot_depth = rod.FORK_TOP_Y - rod.FORK_CROTCH_Y
+    bridge = (boss_length - two_place) - (slot_depth + two_place)
+    assert bridge == pytest.approx(pin.BUDGET["bridge_min"], abs=1e-9)
+    assert bridge >= pin.BRIDGE_TARGET >= pin.RULE12_WALL_FLOOR
 
 
 def test_fork_stays_clear_of_the_amplitude_bar_foot() -> None:

@@ -45,10 +45,14 @@ FORK_SLOT_WIDTH = 2.625
 FORK_SLOT_BAND = (0.127, 0.0)  # (upper, lower) deviations
 # Slot centred in the fork: the two tines equal within this (|T_n - T_s|).
 FORK_TINE_MATCH = 0.10
-# The flat slot floor (the crotch) below the pin centre. It clears the arm's
-# bottom edge (5.533 below the pin) through the +/-9 deg arm-to-rod swing.
-FORK_CROTCH_BELOW_PIN = 8.0
-FORK_BASE_BELOW_PIN = 11.0  # the fork boss's root step onto the shank
+# The flat slot floor (the crotch) below the pin centre. The arm's curved
+# bottom edge dips into the slot as the arm turns on the pin; the floor clears
+# it by 1.0 MIN at the printed worst case of both parts through the solved
+# swing (ch_rod_pivot_pin_spec.BUDGET: 1.15 worst, 3.30 nominal).
+FORK_CROTCH_BELOW_PIN = 9.75
+# The fork boss's root step onto the shank. The bridge below the slot floor
+# (ForkBossLength less SlotDepth, both .XX from the crown top) keeps 2.0 MIN.
+FORK_BASE_BELOW_PIN = 13.0
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 # 90-degree countersink on both tine outer faces: the peened pin ends fill
 # them (ch_rod_pivot_pin_spec). Printed 3-place: the fill volume is the

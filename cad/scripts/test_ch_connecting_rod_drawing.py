@@ -61,8 +61,8 @@ def test_fork_reference_lengths_run_from_the_crown_top() -> None:
     assert rod.FORK_BOSS_LENGTH == pytest.approx(
         spec.FORK_CROWN_RADIUS + spec.FORK_BASE_BELOW_PIN
     )
-    assert rod.SLOT_DEPTH == pytest.approx(13.0)
-    assert rod.FORK_BOSS_LENGTH == pytest.approx(16.0)
+    assert rod.SLOT_DEPTH == pytest.approx(14.75)
+    assert rod.FORK_BOSS_LENGTH == pytest.approx(18.0)
     # The slot floor stands above the root step, so the bridge is solid.
     assert spec.FORK_BASE_Y < spec.FORK_CROTCH_Y < spec.CENTER_DISTANCE
     # Every drive in the slot sketch evaluates to its built value.

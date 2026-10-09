@@ -700,9 +700,9 @@ sections:
         - scaled
         - low
       - - Fork (Y-shaped upper end)
-        - 10 wide, full-round crown R5 on the pin, root step 11 below the pin; slot 2.625 +0.127/0 with its floor 8 below the pin; #47 pin hole through both tines, 90° CSK Ø3.2 both faces
+        - 10 wide, full-round crown R5 on the pin, root step 13 below the pin; slot 2.625 +0.127/0 with its floor 9.75 below the pin; #47 pin hole through both tines, 90° CSK Ø3.2 both faces
         - —
-        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): two rod cheeks round each rocker, width ≈10, crown below the arm top edge. The slot floor clears the arm''s bottom edge by 1.75 through the ±9° arm-to-rod swing. Pin MHA-CH-010 (5/64 drill rod) runs in the rocker''s #47 rod-pin hole at +127.37 from the pivot and is peened into both countersinks: a RECONSTRUCTION choice (issue #746), not the original fastener. Supersedes the 2.5-thick tombstone head pinned beside the arm'
+        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): two rod cheeks round each rocker, width ≈10, crown below the arm top edge. The slot floor clears the arm''s curved bottom edge by 1.15 at the print-worst case of both parts (3.30 nominal) through the solved −8.60..+1.01° arm-to-rod swing, with a 2.23 MIN bridge under the floor. Pin MHA-CH-010 (5/64 drill rod) runs in the rocker''s #47 rod-pin hole at +127.37 from the pivot and is peened into both countersinks: a RECONSTRUCTION choice (issue #746), not the original fastener. Supersedes the 2.5-thick tombstone head pinned beside the arm'
         - measured/derived
         - med
   - prose: |2
