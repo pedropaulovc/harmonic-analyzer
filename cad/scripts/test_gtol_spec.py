@@ -12,6 +12,7 @@ from _gtol_spec import (
     PartDatum,
     PlanarFace,
     TRANSLATION_FORMS,
+    TRANSLATION_GLYPH,
     SphereFace,
     TorusFace,
     gtol_frame_signature,
@@ -243,63 +244,57 @@ def test_frame_xml_carries_the_translation_modifier_on_its_datum_only() -> None:
         gtol_frame_xml("position", "0.05", datums=("B",), translated=("D",))
 
 
-def test_each_translation_form_states_the_modifier_in_its_own_compartment() -> None:
-    # The bare flag printed "B ▷ [0,0,0]" (farm run 20261009T174542021Z); each
-    # form that the leaf tries still reads back as the modifier on C alone.
+def test_each_translation_form_states_the_modifier_on_its_datum_only() -> None:
+    # User ruling: the modifier's symbol code inline in the letter first; the
+    # <Translation> flag (which prints "[0,0,0]", farm runs
+    # 20261009T174542021Z / 20261009T182549169Z) as the last form.
     from xml.etree import ElementTree
 
-    assert TRANSLATION_FORMS == ("empty-vector", "vector-false", "after-letter")
+    assert TRANSLATION_FORMS == ("inline", "flag")
+    assert TRANSLATION_GLYPH == "<MOD-TRANS2>"
     shapes = {}
     for form in TRANSLATION_FORMS:
         xml = gtol_frame_xml(
             "position", "0.05", datums=("B", "C"), translated=("C",),
             translation_form=form,
         )
-        assert gtol_frame_signature(xml).translated == ("C",), form
+        signature = gtol_frame_signature(xml)
+        assert signature.datums == ("B", "C"), form
+        assert signature.translated == ("C",), form
         plain, moved = ElementTree.fromstring(xml).iter("DatumCompartment")
-        assert [child.tag for child in plain] == ["DatumDetail"], form
-        shapes[form] = [(child.tag, child.text) for child in moved if child.tag != "DatumDetail"]
-        assert [child.tag for child in moved].count("DatumDetail") == 1
+        assert [(c.tag, c.findtext("DatumLetter")) for c in plain] == [("DatumDetail", "B")]
+        shapes[form] = [
+            (child.tag, child.findtext("DatumLetter") if child.tag == "DatumDetail" else child.text)
+            for child in moved
+        ]
     assert shapes == {
-        "empty-vector": [
-            ("Translation", "true"),
-            ("TranslationValueI", None),
-            ("TranslationValueJ", None),
-            ("TranslationValueK", None),
-        ],
-        "vector-false": [
-            ("Translation", "true"),
-            ("TranslationValueI", "false"),
-            ("TranslationValueJ", "false"),
-            ("TranslationValueK", "false"),
-        ],
-        "after-letter": [("Translation", "true")],
+        "inline": [("DatumDetail", "C<MOD-TRANS2>")],
+        "flag": [("Translation", "true"), ("DatumDetail", "C")],
     }
-    after = ElementTree.fromstring(
-        gtol_frame_xml(
-            "position", "0.05", datums=("B", "C"), translated=("C",),
-            translation_form="after-letter",
-        )
+    # The glyph is XML-escaped text in the letter, not markup.
+    inline = gtol_frame_xml(
+        "position", "0.05", datums=("B", "C"), translated=("C",), translation_form="inline"
     )
-    assert [child.tag for child in list(after.iter("DatumCompartment"))[1]] == [
-        "DatumDetail",
-        "Translation",
-    ]
+    assert "<DatumLetter>C&lt;MOD-TRANS2&gt;</DatumLetter>" in inline
+    assert "Translation" not in inline
 
 
 @pytest.mark.parametrize(
-    ("texts", "problem"),
+    ("texts", "zero_vector", "problem"),
     (
         # Farm run 20261009T174542021Z, rear slot frame DetailItem507.
-        (("<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[0,0,0]"), "translation vector"),
-        (("<GTOL-POSI>", "0.05", "C", "B"), "0 translation modifier"),
-        (("<GTOL-POSI>", "0.05", "C", "<MOD-TRANS2>", "B"), "off datum B"),
-        (("<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>"), ""),
-        (("<GTOL-POSI>", "0.05", "C", "B<MOD-TRANS2>"), ""),
+        (("<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[0,0,0]"), False, "translation vector"),
+        (("<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[0,0,0]"), True, ""),
+        (("<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[false,false,false]"), True, "translation vector"),
+        (("<GTOL-POSI>", "0.05", "C", "B", "[0,0,0]", "<MOD-TRANS2>"), True, "translation vector"),
+        (("<GTOL-POSI>", "0.05", "C", "B"), False, "0 translation modifier"),
+        (("<GTOL-POSI>", "0.05", "C", "<MOD-TRANS2>", "B"), False, "off datum B"),
+        (("<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>"), False, ""),
+        (("<GTOL-POSI>", "0.05", "C", "B<MOD-TRANS2>"), False, ""),
     ),
 )
-def test_translation_prints_as_the_bare_modifier_after_its_letter(
-    texts: tuple[str, ...], problem: str
+def test_translation_prints_the_modifier_after_its_letter(
+    texts: tuple[str, ...], zero_vector: bool, problem: str
 ) -> None:
-    found = translation_print_problem(texts, ("B",))
+    found = translation_print_problem(texts, ("B",), zero_vector=zero_vector)
     assert (problem in found and found) if problem else found == ""

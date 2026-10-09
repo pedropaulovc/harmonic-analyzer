@@ -409,13 +409,16 @@ frame's slot frames (farm run 20261009T174542021Z) that flag printed
 translation vector (`<TranslationValueI/J/K>`) at its zero default, 13.6 mm
 of text that ASME Y14.5-2018 does not write.
 Do: read the frame's printed text items (`IAnnotation::GetDisplayData`) and
-reject any bracketed vector (`_gtol_spec.translation_print_problem`).
-`add_feature_control_frame` tries each of `TRANSLATION_FORMS` until one
-prints the bare modifier after its letter, logging `gtol.translation_form`.
-On farm run 20261009T182549169Z none did: empty i, j, k printed "[0,0,0]",
-"false" values printed "[false,false,false]" (the values print verbatim),
-and SOLIDWORKS rewrote the flag-after-letter form to the empty-vector XML.
-No XML form tried prints the bare modifier.
+reject any bracketed vector the form does not admit (`_gtol_spec.translation_print_problem`).
+On farm run 20261009T182549169Z every flag form printed a vector: empty i,
+j, k printed "[0,0,0]", "false" values printed "[false,false,false]" (the
+values print verbatim), and SOLIDWORKS rewrote the flag-after-letter form to
+the empty-vector XML. By user ruling, `add_feature_control_frame` now tries
+`TRANSLATION_FORMS` in order: the modifier's symbol code inline in the
+letter (`<DatumLetter>C&lt;MOD-TRANS2&gt;</DatumLetter>`, no flag), which
+must print the glyph after the letter and no brackets, then the native flag,
+which is accepted with exactly one "[0,0,0]" after the glyph. It logs
+`gtol.translation_form`. Once a leaf proves one, keep that one alone.
 
 ## The sheet-split rule
 

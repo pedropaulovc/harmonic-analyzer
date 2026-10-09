@@ -17,6 +17,7 @@ model-authored one, and the part tier may not import a drawing module.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Literal, Sequence, Union
 from xml.etree import ElementTree
 
@@ -35,24 +36,25 @@ GTOL_SYMBOLS = {
 }
 
 ToleranceZone = Literal["linear", "diametral"]
-# How a translated compartment is serialized.  The bare ``<Translation>``
-# flag (Gtol Frame XML Schema) printed "B ▷ [0,0,0]" on farm run
-# 20261009T174542021Z: SOLIDWORKS showed the translation vector (the Datum
-# dialog's i, j, k, ``<TranslationValueI/J/K>``) at its zero default in a
-# compartment of its own.  Which serialization prints the bare ASME Y14.5-2018
-# modifier is proven per leaf by the printed text
-# (``translation_print_problem``), in this order:
-#   "empty-vector" -- the flag with i, j, k present and empty;
-#   "vector-false" -- the flag with i, j, k "false" (the dialog help calls all
-#                     13 compartment controls true/false);
-#   "after-letter" -- the flag after the compartment's DatumDetail.
-TranslationForm = Literal["bare", "empty-vector", "vector-false", "after-letter"]
-TRANSLATION_FORMS: tuple[TranslationForm, ...] = (
-    "empty-vector",
-    "vector-false",
-    "after-letter",
-)
+# How a translated compartment is serialized, in the order a leaf tries them
+# (the printed text decides, ``translation_print_problem``):
+#   "inline" -- no flag; the modifier's symbol code follows the letter in the
+#               DatumLetter text (the schema's "string value for datum letter
+#               displayed in the edit box"), spelt as SOLIDWORKS printed it;
+#   "flag"   -- the compartment's ``<Translation>`` flag (Gtol Frame XML
+#               Schema, the Datum dialog's triangle).  It prints "C ▷ [0,0,0]":
+#               SOLIDWORKS adds the dialog's i, j, k translation vector at its
+#               zero default.  Empty i, j, k, "false" ones (printed verbatim,
+#               "[false,false,false]") and the flag after the letter (rewritten
+#               to empty i, j, k) all printed a vector on farm runs
+#               20261009T174542021Z and 20261009T182549169Z.  By the user's
+#               ruling it is the fallback, its "[0,0,0]" accepted.
+TranslationForm = Literal["inline", "flag"]
+TRANSLATION_FORMS: tuple[TranslationForm, ...] = ("inline", "flag")
+# The modifier's symbol code: farm run 20261009T174542021Z's display text.
+TRANSLATION_GLYPH = "<MOD-TRANS2>"
 _TRANSLATION_MODIFIER = "MOD-TRANS"
+_ZERO_VECTOR = "[0,0,0]"
 _PMI_NAME_PREFIX = "HARMONIC_PMI_"
 
 
@@ -73,17 +75,15 @@ def gtol_frame_xml(
     datums: Sequence[str] = (),
     diameter: bool = False,
     translated: Sequence[str] = (),
-    translation_form: TranslationForm = "bare",
+    translation_form: TranslationForm = "inline",
 ) -> str:
     """Build the SOLIDWORKS-2022+ feature-control-frame XML payload.
 
     ``translated`` names the datum references that carry the ASME Y14.5-2018
-    translation modifier (the open triangle after the letter): the frame
-    XML's per-compartment ``<Translation>`` flag (SOLIDWORKS API help, "Gtol
-    Frame XML Schema", the Datum dialog's triangle control).  A clocking
+    translation modifier (the open triangle after the letter), serialized
+    per ``translation_form`` (``TRANSLATION_FORMS``).  A clocking
     datum feature of size at a basic distance from the primary takes it, so
     its simulator may slide along that distance and only orients.
-    ``translation_form`` serializes that flag (``TRANSLATION_FORMS``).
     """
     symbol = GTOL_SYMBOLS.get(characteristic)
     if symbol is None:
@@ -106,18 +106,14 @@ def gtol_frame_xml(
     for datum in datums:
         compartment = ElementTree.SubElement(root, "DatumCompartment")
         moved = datum in translated
-        if moved and translation_form != "after-letter":
+        if moved and translation_form == "flag":
             ElementTree.SubElement(compartment, "Translation").text = "true"
-            if translation_form in ("empty-vector", "vector-false"):
-                value = "false" if translation_form == "vector-false" else ""
-                for axis in "IJK":
-                    ElementTree.SubElement(
-                        compartment, f"TranslationValue{axis}"
-                    ).text = value
         detail = ElementTree.SubElement(compartment, "DatumDetail")
-        ElementTree.SubElement(detail, "DatumLetter").text = datum
-        if moved and translation_form == "after-letter":
-            ElementTree.SubElement(compartment, "Translation").text = "true"
+        ElementTree.SubElement(detail, "DatumLetter").text = (
+            f"{datum}{TRANSLATION_GLYPH}"
+            if moved and translation_form == "inline"
+            else datum
+        )
     return ElementTree.tostring(root, encoding="unicode", short_empty_elements=True)
 
 
@@ -163,28 +159,39 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
     if any(value != "phi" for value in range_symbols) or len(range_symbols) > 1:
         raise ValueError(f"unsupported primary range symbols: {range_symbols!r}")
     tolerance_zone: ToleranceZone = "diametral" if range_symbols else "linear"
-    translated = tuple(
-        letter.text or ""
-        for compartment in root.iter()
-        if compartment.tag.rsplit("}", 1)[-1] == "DatumCompartment"
-        and any(
+    # A letter carries the modifier inline ("C<MOD-TRANS2>") or its
+    # compartment carries the <Translation> flag; either way the datum is C.
+    datums: list[str] = []
+    translated_letters: list[str] = []
+    for compartment in root.iter():
+        if compartment.tag.rsplit("}", 1)[-1] != "DatumCompartment":
+            continue
+        flagged = any(
             child.tag.rsplit("}", 1)[-1] == "Translation"
             and (child.text or "").strip().lower() == "true"
             for child in compartment
         )
-        for letter in compartment.iter()
-        if letter.tag.rsplit("}", 1)[-1] == "DatumLetter"
-    )
+        for letter in compartment.iter():
+            if letter.tag.rsplit("}", 1)[-1] != "DatumLetter":
+                continue
+            text = str(letter.text or "")
+            name = re.sub(rf"<{_TRANSLATION_MODIFIER}\d*>", "", text)
+            datums.append(name)
+            if flagged or name != text:
+                translated_letters.append(name)
+    translated = tuple(translated_letters)
     return GtolFrameSignature(
         characteristic_symbol=symbols[0],
         tolerance=tolerances[0],
-        datums=tuple(texts("DatumLetter")),
+        datums=tuple(datums),
         tolerance_zone=tolerance_zone,
         translated=translated,
     )
 
 
-def translation_print_problem(texts: Sequence[str], translated: Sequence[str]) -> str:
+def translation_print_problem(
+    texts: Sequence[str], translated: Sequence[str], *, zero_vector: bool = False
+) -> str:
     """Why a frame's printed text items misstate its translation modifiers,
     or "" when they print exactly as ASME Y14.5-2018 writes them.
 
@@ -192,12 +199,24 @@ def translation_print_problem(texts: Sequence[str], translated: Sequence[str]) -
     (``IDisplayData.GetTextAtIndex``).  Each translated datum's letter must be
     followed directly by one modifier glyph (``<MOD-TRANS...>``), and nothing
     may print a bracketed vector: farm run 20261009T174542021Z printed
-    "C", "B", "<MOD-TRANS2>", "[0,0,0]" for the frame C|B▷.
+    "C", "B", "<MOD-TRANS2>", "[0,0,0]" for the frame C|B▷.  ``zero_vector``
+    (the ruled "flag" fallback) admits exactly that "[0,0,0]" right after
+    each modifier, and nothing else in brackets.
     """
     items = [str(text).strip() for text in texts]
-    vectors = [text for text in items if "[" in text or "]" in text]
-    if vectors:
-        return f"prints a translation vector {vectors!r} in {items!r}"
+    vectors = [i for i, text in enumerate(items) if "[" in text or "]" in text]
+    admitted = [
+        i
+        for i in vectors
+        if zero_vector
+        and items[i] == _ZERO_VECTOR
+        and i > 0
+        and _TRANSLATION_MODIFIER in items[i - 1]
+    ]
+    if vectors != admitted:
+        return (
+            f"prints a translation vector {[items[i] for i in vectors]!r} in {items!r}"
+        )
     modifiers = [i for i, text in enumerate(items) if _TRANSLATION_MODIFIER in text]
     if len(modifiers) != len(translated):
         return (

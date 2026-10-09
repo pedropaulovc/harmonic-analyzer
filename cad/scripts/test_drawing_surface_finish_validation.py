@@ -618,41 +618,62 @@ def _translated_frame(
 
 
 _VECTOR = ["<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[0,0,0]"]
-_BARE = ["<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>"]
+_INLINE = ["<GTOL-POSI>", "0.05", "C", "B<MOD-TRANS2>"]
 
 
-def test_translated_frame_keeps_the_first_form_that_prints_no_vector(monkeypatch) -> None:
-    # Farm run 20261009T174542021Z printed C|B▷[0,0,0]; the leaf moves on
-    # until the frame prints C|B▷ (here SOLIDWORKS refuses empty i, j, k and
-    # prints the vector for "false" ones).
+def test_translated_frame_prints_the_inline_glyph_first(monkeypatch) -> None:
+    gtol, handed = _translated_frame(
+        monkeypatch, lambda xml: _INLINE if "&lt;MOD-TRANS2&gt;" in xml else _VECTOR
+    )
+    assert [_gtol_form(xml) for xml in handed] == ["inline"]
+    assert _gtol_form(gtol.GetFrame(1).GetSymbolXml()) == "inline"
+
+
+@pytest.mark.parametrize(
+    ("accepts", "inline_prints"),
+    (
+        # SOLIDWORKS refuses the inline letter, or takes it and prints it wrong.
+        (lambda xml: "&lt;" not in xml, _INLINE),
+        (lambda _xml: True, ["<GTOL-POSI>", "0.05", "C", "B"]),
+    ),
+)
+def test_translated_frame_falls_back_to_the_flag_and_its_zero_vector(
+    monkeypatch, accepts: Any, inline_prints: list[str]
+) -> None:
+    # User ruling: the native flag is the last form, its "[0,0,0]" accepted
+    # (farm runs 20261009T174542021Z / 20261009T182549169Z printed it).
     gtol, handed = _translated_frame(
         monkeypatch,
-        lambda xml: _BARE if "</DatumDetail><Translation>" in xml else _VECTOR,
-        accepts=lambda xml: "<TranslationValueI />" not in xml,
+        lambda xml: inline_prints if "&lt;MOD-TRANS2&gt;" in xml else _VECTOR,
+        accepts=accepts,
     )
-    assert [_gtol_form(xml) for xml in handed] == [
-        "empty-vector", "vector-false", "after-letter"
-    ]
-    assert _gtol_form(gtol.GetFrame(1).GetSymbolXml()) == "after-letter"
+    assert [_gtol_form(xml) for xml in handed] == ["inline", "flag"]
+    assert _gtol_form(gtol.GetFrame(1).GetSymbolXml()) == "flag"
 
 
-def test_translated_frame_fails_closed_when_every_form_prints_a_vector(monkeypatch) -> None:
+def test_translated_frame_fails_closed_when_the_flag_prints_another_vector(
+    monkeypatch,
+) -> None:
     with pytest.raises(
         RuntimeError,
-        match=r"no translation-modifier form prints as ASME Y14.5 .*"
-        r"empty-vector: prints a translation vector .*after-letter: prints a translation vector",
+        match=r"no translation-modifier form prints as ruled .*"
+        r"inline: prints 0 translation modifier.*flag: prints a translation vector "
+        r"\['\[false,false,false\]'\]",
     ):
-        _translated_frame(monkeypatch, lambda _xml: _VECTOR)
+        _translated_frame(
+            monkeypatch,
+            lambda xml: ["<GTOL-POSI>", "0.05", "C", "B"]
+            if "&lt;" in xml
+            else ["<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[false,false,false]"],
+        )
 
 
 def _gtol_form(xml: str) -> str:
-    if "<TranslationValueI />" in xml:
-        return "empty-vector"
-    if "<TranslationValueI>false" in xml:
-        return "vector-false"
-    if "</DatumDetail><Translation>" in xml:
-        return "after-letter"
-    return "bare"
+    if "&lt;MOD-TRANS2&gt;" in xml:
+        return "inline"
+    if "<Translation>true</Translation>" in xml:
+        return "flag"
+    return "plain"
 
 
 def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:

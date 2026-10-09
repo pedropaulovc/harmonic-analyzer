@@ -1042,10 +1042,11 @@ def add_feature_control_frame(
     )
     # A migrated frame was seeded through the old setters, which carry no
     # translation modifier; the current-format XML then states it.  A
-    # translated frame tries each serialization of the modifier in turn
-    # (_gtol_spec.TRANSLATION_FORMS) until one is accepted here and, after
-    # the rebuild below, prints as Y14.5 writes it.
-    forms = iter(_TRANSLATION_FORMS if translated else ("bare",))
+    # translated frame tries the modifier inline in the letter first, then
+    # (user ruling) the <Translation> flag with its "[0,0,0]" accepted
+    # (_gtol_spec.TRANSLATION_FORMS): the first one accepted here and, after
+    # the rebuild below, printed as its guard requires is kept.
+    forms = iter(_TRANSLATION_FORMS if translated else ("inline",))
     rejected: list[str] = []
 
     def _author(form: str) -> bool:
@@ -1147,11 +1148,13 @@ def add_feature_control_frame(
         label=label,
     )
     if translated:
-        # The XML read back the modifier on every form; only the print shows
-        # whether SOLIDWORKS also draws a translation vector beside it.
+        # The XML reads back the modifier on either form; only the print
+        # shows the letter, the glyph and any translation vector beside it.
         while True:
             texts = _annotation_texts(annotation)
-            problem = _translation_print_problem(texts, translated)
+            problem = _translation_print_problem(
+                texts, translated, zero_vector=form == "flag"
+            )
             _telemetry.event(
                 "gtol.translation_form",
                 label=label,
@@ -1166,7 +1169,7 @@ def add_feature_control_frame(
             form = next((form for form in forms if _author(form)), None)
             if form is None:
                 raise RuntimeError(
-                    f"no translation-modifier form prints as ASME Y14.5 ({label}): "
+                    f"no translation-modifier form prints as ruled ({label}): "
                     f"{rejected}"
                 )
             rebuild_drawing(adapter, label="add_feature_control_frame translation")
