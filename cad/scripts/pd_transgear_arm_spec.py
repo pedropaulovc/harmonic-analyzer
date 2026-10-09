@@ -27,7 +27,6 @@ from pd_transgear_arm_geometry import (
     BAND_XXX,
     LATCH_PIN_HEIGHT_BAND,
     REDUCER_POSITION_DIAMETER,
-    REDUCER_POSITION_RADIUS,
     PIN_BORE_DIA,
     PIN_STATION,
     PIVOT_BORE_DIA,

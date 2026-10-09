@@ -6,7 +6,6 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 
 import _purchased_fastener_drawing as purchased
 from _drawing_registry import DrawingLayout

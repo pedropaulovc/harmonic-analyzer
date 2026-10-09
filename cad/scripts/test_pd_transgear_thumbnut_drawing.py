@@ -534,9 +534,9 @@ def test_native_cone_angle_offsets_only_text_and_refuses_noops(
 def test_native_cone_angle_requires_exactly_one_model_annotation(monkeypatch) -> None:
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
     angle = SimpleNamespace(name="CountersinkHalfAngle")
-    for annotations in ([], [angle, angle]):
+    for imported in ([], [angle, angle]):
         with pytest.raises(RuntimeError, match="needs one native"):
-            drawing._place_countersink_angle(object(), annotations)
+            drawing._place_countersink_angle(object(), imported)
 
 
 def test_the_section_stands_rim_up_or_is_refused() -> None:
