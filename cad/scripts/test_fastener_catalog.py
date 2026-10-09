@@ -27,7 +27,7 @@ _EXPECTED = {
     "vn-hanger-screw": (("93075A194",), "MHA-VN-007", 1),
     "vn-hex-bolt": (("92865A585",), "MHA-VN-008", None),
     "vn-knife-hanger-stud": (("91251A157",), "MHA-VN-024", 2),
-    "vn-knife-mount-dowel": (("98381A473",), "MHA-VN-051", 2),
+    "vn-knife-mount-dowel": (("98381A473",), "MHA-VN-051", 4),
     "vn-latch-hook-bracket-screw": (("90280A108",), "MHA-VN-043", 2),
     "vn-magnifying-bracket-screw": (("91794A077",), "MHA-VN-050", 2),
     "vn-lag-screw": (("92240A540",), "MHA-VN-009", 4),

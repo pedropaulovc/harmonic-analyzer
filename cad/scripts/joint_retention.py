@@ -652,7 +652,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_guide_lock",  # 1/8 drill holes (R9-49) only; clamped by guide_lock_screw
         "vn_keeper_chain",  # bead chain
         "vn_keeper_chain_link",  # snap loop link
-        "vn_knife_mount_dowel",  # MHA-VN-051 1/8 dowel pressed into the knife mount's reamed top-seat hole, slip in the crossbar
+        "vn_knife_mount_dowel",  # MHA-VN-051 1/8 dowels, two pressed into each knife mount's reamed top-seat holes, slip in the crossbar hole and slot
         "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "mg_lever_wire",  # wire, tied through the fixture cross hole; no thread
         "mg_magnifying_bracket",  # two counterbored normal #2 clearance holes in its front mounting flange; no thread
@@ -1322,8 +1322,8 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the knife-edge bearing block's top seat to the stationary crossbar underside (MOUNT_GAP 0); "
-            "block and casting never move relative to each other. The pressed MHA-VN-051 dowel, slipped into "
-            "the crossbar, reacts any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
+            "block and casting never move relative to each other. The two pressed MHA-VN-051 dowels, slipped into "
+            "the crossbar's round hole and slot, react any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
             "acts about machine Z, perpendicular to the vertical (Y) screw, so it reaches the thread only as "
             "cyclic tension and shear, never as torque about its own axis"
         ),

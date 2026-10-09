@@ -316,11 +316,18 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
                 3.505, 2.705, 8.10
             ),
             # 98381A473 at its largest (3.18262) in the smallest Ø3.165 ream,
-            # pressed 9.5 deep (the models are line to line).
+            # pressed 9.5 deep (the models are line to line); two per mount,
+            # the front mount's pair first.
             frozenset(("vn-knife-mount-dowel-1", "sm-knife-mount-1")): _annulus_limit(
                 3.18262, 3.165, 9.5
             ),
-            frozenset(("vn-knife-mount-dowel-2", "sm-knife-mount-2")): _annulus_limit(
+            frozenset(("vn-knife-mount-dowel-2", "sm-knife-mount-1")): _annulus_limit(
+                3.18262, 3.165, 9.5
+            ),
+            frozenset(("vn-knife-mount-dowel-3", "sm-knife-mount-2")): _annulus_limit(
+                3.18262, 3.165, 9.5
+            ),
+            frozenset(("vn-knife-mount-dowel-4", "sm-knife-mount-2")): _annulus_limit(
                 3.18262, 3.165, 9.5
             ),
             # 9490T1 #10-24 through the 0.75-in boss; #25 tap drill.
@@ -450,7 +457,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 8.10,
                 second_number=None,
             ),
-            # Stock 98381A473 pressed 9.5 into the Ø3.175 +0/-0.010 ream.
+            # Stock 98381A473 pressed 9.5 into the Ø3.175 +0/-0.010 ream,
+            # two per knife mount.
             **_expected_numbered_pairs(
                 "vn-knife-mount-dowel",
                 range(1, 3),
@@ -458,7 +466,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 3.18262,
                 3.165,
                 9.5,
-                second_number=None,
+            ),
+            **_expected_numbered_pairs(
+                "vn-knife-mount-dowel",
+                range(3, 5),
+                "sm-knife-mount",
+                3.18262,
+                3.165,
+                9.5,
+                second_number=2,
             ),
             # Stock 9490T1: #10-24 major, #25 drill, 0.75-in boss engagement.
             frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(

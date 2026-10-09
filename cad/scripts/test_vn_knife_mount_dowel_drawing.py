@@ -28,7 +28,7 @@ def test_catalogue_row_is_the_registered_mcmaster_dowel() -> None:
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"]
     assert row["number"] == "MHA-VN-051"
-    assert int(row["quantity"]) == 2  # one per knife mount
+    assert int(row["quantity"]) == spec.QUANTITY == 4  # two per knife mount
     metadata = STOCK_RECIPES[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_98381A473

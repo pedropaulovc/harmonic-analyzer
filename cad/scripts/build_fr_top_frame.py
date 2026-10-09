@@ -134,8 +134,14 @@ from fr_top_frame_spec import (
     HANGER_PIN_HOLE_DEPTH,
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_HOLE_DIA_BAND,
-    HANGER_PIN_X,
     HANGER_PIN_X_TOL,
+    HANGER_ROUND_X,
+    HANGER_SLOT_DEPTH,
+    HANGER_SLOT_LENGTH,
+    HANGER_SLOT_LENGTH_TOL,
+    HANGER_SLOT_WIDTH,
+    HANGER_SLOT_WIDTH_BAND,
+    HANGER_SLOT_X,
     REAR_COLUMN_Z,
     RING_HEIGHT,
     SURFACE_FINISHES,
@@ -192,7 +198,9 @@ HEX_Z_MID = 87.06  # knife-mount trunnion mid offset (build_sm_summing_assembly)
 STUD_Z_FRONT = SUMMING_Z - HEX_Z_MID  # -83.972
 STUD_Z_REAR = SUMMING_Z + HEX_Z_MID  # +90.148
 HANGER_X = BAR_X0 + 11.0  # -15.0: the crossbar centreline, KNIFE x
-PIN_HOLE_X = HANGER_X + HANGER_PIN_X  # -8.65: dowel slip holes, +X of the screw
+PIN_HOLE_X = HANGER_X + HANGER_ROUND_X  # -8.65: round dowel slip holes, +X
+SLOT_X = HANGER_X + HANGER_SLOT_X  # -21.35: dowel slots, -X of the screw
+SLOT_FLAT = HANGER_SLOT_LENGTH - HANGER_SLOT_WIDTH  # 1.36: straight run
 
 # --- Gooseneck hub (old gooseneck-clamp function, merged) -------------------
 GOOSENECK_Z = SUMMING_Z
@@ -279,26 +287,34 @@ if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
     raise AssertionError("top-frame assumes a symmetric column span about z 0")
 if STUD_Z_REAR + HANGER_CBORE_DIA / 2.0 >= INNER_Z + GUSSET:
     raise AssertionError("rear hanger counterbore escapes the junction material")
-# Dowel slip holes (rule 12, print-worst): the largest reamed hole keeps a wall
-# to the crossbar's +X face, and to the largest drilled screw clearance hole
-# with the pin station at its .XXX limit; its blind floor stays below the
-# counterbore floor, so the slip hole never meets the screw's bearing face.
+# Dowel slip holes and slots (rule 12, print-worst): the largest reamed hole
+# and the longest slot keep a wall to the crossbar's +X / -X face and to the
+# largest drilled screw clearance hole with their stations at the .XXX limit;
+# their blind floors stay below the counterbore floor, so neither meets the
+# screw's bearing face.
 _PIN_HOLE_MAX_R = (HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)) / 2.0
-PIN_HOLE_BAR_WALL = BAR_X1 - PIN_HOLE_X - _PIN_HOLE_MAX_R  # 3.015
+_CLEARANCE_MAX_R = (HANGER_CLEARANCE_DIA + DRILL_OVERSIZE) / 2.0
+_SLOT_MAX_HALF_L = (HANGER_SLOT_LENGTH + HANGER_SLOT_LENGTH_TOL) / 2.0
+PIN_HOLE_BAR_WALL = BAR_X1 - (PIN_HOLE_X + HANGER_PIN_X_TOL) - _PIN_HOLE_MAX_R  # 2.885
 PIN_HOLE_SCREW_WALL = (
-    HANGER_PIN_X
-    - HANGER_PIN_X_TOL
-    - _PIN_HOLE_MAX_R
-    - (HANGER_CLEARANCE_DIA + DRILL_OVERSIZE) / 2.0
-)  # 2.38
+    HANGER_ROUND_X - HANGER_PIN_X_TOL - _PIN_HOLE_MAX_R - _CLEARANCE_MAX_R
+)  # 2.376
+SLOT_BAR_WALL = (SLOT_X - HANGER_PIN_X_TOL - _SLOT_MAX_HALF_L) - BAR_X0  # 2.155
+SLOT_SCREW_WALL = (
+    -HANGER_SLOT_X - HANGER_PIN_X_TOL - _SLOT_MAX_HALF_L - _CLEARANCE_MAX_R
+)  # 1.646
 PIN_HOLE_FLOOR_MARGIN = HANGER_GRIP - HANGER_PIN_HOLE_DEPTH  # 18.0
+SLOT_FLOOR_MARGIN = HANGER_GRIP - HANGER_SLOT_DEPTH  # 18.0
 for _label, _value in (
-    ("wall to the crossbar +X face", PIN_HOLE_BAR_WALL),
-    ("wall to the screw clearance hole", PIN_HOLE_SCREW_WALL),
-    ("floor below the counterbore floor", PIN_HOLE_FLOOR_MARGIN),
+    ("hole wall to the crossbar +X face", PIN_HOLE_BAR_WALL),
+    ("hole wall to the screw clearance hole", PIN_HOLE_SCREW_WALL),
+    ("slot wall to the crossbar -X face", SLOT_BAR_WALL),
+    ("slot wall to the screw clearance hole", SLOT_SCREW_WALL),
+    ("hole floor below the counterbore floor", PIN_HOLE_FLOOR_MARGIN),
+    ("slot floor below the counterbore floor", SLOT_FLOOR_MARGIN),
 ):
     if _value <= 0.0:
-        raise AssertionError(f"knife-mount dowel slip hole {_label}: {_value:.3f}")
+        raise AssertionError(f"knife-mount dowel slip {_label}: {_value:.3f}")
 if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
 if (
@@ -702,6 +718,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "Flange", f"{FLANGE}mm")
     await set_global(adapter, "HangerPinHoleDia", f"{HANGER_PIN_HOLE_DIA}mm")
     await set_global(adapter, "HangerPinHoleDepth", f"{HANGER_PIN_HOLE_DEPTH}mm")
+    await set_global(adapter, "HangerSlotWidth", f"{HANGER_SLOT_WIDTH}mm")
+    await set_global(adapter, "HangerSlotLength", f"{HANGER_SLOT_LENGTH}mm")
+    await set_global(adapter, "HangerSlotDepth", f"{HANGER_SLOT_DEPTH}mm")
     await set_global(adapter, "OuterX", '"ColumnX" + "RailWSide" / 2')
     await set_global(adapter, "OuterZ", '"ColumnZ" + "RailWFR" / 2')
     await set_global(adapter, "InnerX", '"ColumnX" - "RailWSide" / 2')
@@ -1303,10 +1322,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "knife-hanger counterbores", volume - v_hangers, 10.0
     )
 
-    # 12b. Dowel slip holes: blind, flat-bottomed (a plain cut-extrude -- a
-    #      wizard drill point would leave a cone where the reamer finishes),
-    #      cut HangerPinHoleDepth up from the crossbar underside, HANGER_PIN_X
-    #      +X of each screw axis. The rear circle owns the marked
+    # 12b. Round dowel slip holes: blind, flat-bottomed (a plain cut-extrude
+    #      -- a wizard drill point would leave a cone where the reamer
+    #      finishes), cut HangerPinHoleDepth up from the crossbar underside,
+    #      HANGER_PIN_X +X of each screw axis. The rear circle owns the marked
     #      HangerPinHoleDia: section F-F cuts the rear station.
     pins = SketchDims()
     pin_centres = [(PIN_HOLE_X, -HALF_H, z) for z in (STUD_Z_FRONT, STUD_Z_REAR)]
@@ -1349,6 +1368,112 @@ async def build(adapter) -> dict[str, str]:
     v_pins = 2.0 * math.pi * (HANGER_PIN_HOLE_DIA / 2.0) ** 2 * HANGER_PIN_HOLE_DEPTH
     volume = await volume_check(
         adapter, "dowel slip holes", volume - v_pins, 0.01 * v_pins
+    )
+
+    # 12c. Dowel slots, HANGER_PIN_X -X of each screw axis, as blind and
+    #      flat-floored as the round holes: the straight run (a rectangle
+    #      HangerSlotWidth across and HangerSlotLength - HangerSlotWidth along
+    #      X, the FRONT one owning the marked HangerSlotWidth -- the underside
+    #      locator carries it there, clear of F-F's cutting line along the
+    #      rear station), then the two Ø HangerSlotWidth ends.  Section F-F
+    #      cuts the rear slot along its length.
+    slot_dims = SketchDims()
+    half_flat, half_w = SLOT_FLAT / 2.0, HANGER_SLOT_WIDTH / 2.0
+    slot_corners = [
+        [
+            (SLOT_X - half_flat, -HALF_H, z - half_w),
+            (SLOT_X + half_flat, -HALF_H, z - half_w),
+            (SLOT_X + half_flat, -HALF_H, z + half_w),
+            (SLOT_X - half_flat, -HALF_H, z + half_w),
+        ]
+        for z in (STUD_Z_FRONT, STUD_Z_REAR)
+    ]
+    mapped, u_is_x, normal_out = _open_underside_sketch(
+        adapter, [corner for corners in slot_corners for corner in corners]
+    )
+    for index, station in enumerate(("Front", "Rear")):
+        points = mapped[4 * index : 4 * index + 4]
+        prefix = "HangerSlot" if station == "Front" else "HangerSlot1"
+        anchor_names = (
+            (f"Slot{station}X", f"Slot{station}Z")
+            if u_is_x
+            else (f"Slot{station}Z", f"Slot{station}X")
+        )
+        lines = await add_line_chain(adapter, points)
+        # Emission order: the X run (corner 0 -> 1), the Z width (1 -> 2),
+        # then corner 0's sketch anchors.
+        await define_rectilinear_chain(
+            adapter,
+            lines,
+            points,
+            label=f"dowel slot run ({station.lower()})",
+            dims=slot_dims,
+            names=[f"{prefix}Flat", f"{prefix}Width", *anchor_names],
+            drives=['"HangerSlotLength" - "HangerSlotWidth"', '"HangerSlotWidth"'],
+        )
+    await ensure_fully_defined(adapter, "dowel slot run sketch")
+    check("exit_sketch dowel slot runs", await adapter.exit_sketch())
+    name_last_feature(adapter, "HangerSlotProfile")
+    drive_jobs += slot_dims.apply(adapter, "HangerSlotProfile")
+    check(
+        "cut dowel slot runs",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=HANGER_SLOT_DEPTH, reverse_direction=not normal_out
+            )
+        ),
+    )
+    name_last_feature(adapter, "HangerSlots")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "HangerSlots", ["HangerSlotDepth"])[0],
+            '"HangerSlotDepth"',
+        )
+    )
+    v_slot_runs = 2.0 * SLOT_FLAT * HANGER_SLOT_WIDTH * HANGER_SLOT_DEPTH
+    volume = await volume_check(
+        adapter, "dowel slot runs", volume - v_slot_runs, 0.01 * v_slot_runs
+    )
+    end_dims = SketchDims()
+    end_centres = [
+        (SLOT_X + side * half_flat, -HALF_H, z)
+        for z in (STUD_Z_FRONT, STUD_Z_REAR)
+        for side in (-1.0, 1.0)
+    ]
+    mapped_ends, _u_is_x, ends_normal_out = _open_underside_sketch(adapter, end_centres)
+    for index, (u, v) in enumerate(mapped_ends):
+        await define_circle(
+            adapter,
+            u,
+            v,
+            half_w,
+            f"dowel slot end {index + 1}",
+            dims=end_dims,
+            drives=(None, None, '"HangerSlotWidth"'),
+        )
+    await ensure_fully_defined(adapter, "dowel slot end sketch")
+    check("exit_sketch dowel slot ends", await adapter.exit_sketch())
+    name_last_feature(adapter, "HangerSlotEndProfile")
+    drive_jobs += end_dims.apply(adapter, "HangerSlotEndProfile")
+    check(
+        "cut dowel slot ends",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=HANGER_SLOT_DEPTH, reverse_direction=not ends_normal_out
+            )
+        ),
+    )
+    name_last_feature(adapter, "HangerSlotEnds")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "HangerSlotEnds", ["HangerSlotEndDepth"])[0],
+            '"HangerSlotDepth"',
+        )
+    )
+    # Each end adds the half disc outside the run.
+    v_slot_ends = 2.0 * math.pi * half_w**2 * HANGER_SLOT_DEPTH
+    volume = await volume_check(
+        adapter, "dowel slot ends", volume - v_slot_ends, 0.01 * v_slot_ends
     )
 
     # 13. Cross-screw taps (#10-32 UNF-2B bottoming): one per boss,
@@ -1549,6 +1674,13 @@ async def build(adapter) -> dict[str, str]:
             "HangerPinProfile",
             pin_dia_name,
             *deviations(HANGER_PIN_HOLE_DIA_BAND),
+        )
+    for slot_width_name in ("HangerSlotWidth", "HangerSlot1Width"):
+        set_dimension_bilateral_tolerance(
+            adapter,
+            "HangerSlotProfile",
+            slot_width_name,
+            *deviations(HANGER_SLOT_WIDTH_BAND),
         )
     await volume_check(adapter, "driven casting (equations neutral)", volume, 200.0)
 

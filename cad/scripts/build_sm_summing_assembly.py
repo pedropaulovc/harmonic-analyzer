@@ -5,7 +5,7 @@ the summing lever, in machine coordinates (assembly origin = base origin;
 base top y = 50.8; the output side is -Z). The lever rocks on a true knife
 edge carried by two bearing supports, each clamped to the underside of the
 top-frame casting's integral crossbar by one knife-hanger screw and keyed
-against turning by one pressed dowel, and counter-balanced from above by the
+against turning by two pressed dowels, and counter-balanced from above by the
 boss-hook / counter-spring / gooseneck chain.
 
 * knife-mount x2 -- the bearing supports, one per hex trunnion, centred on
@@ -15,9 +15,11 @@ boss-hook / counter-spring / gooseneck chain.
   screws under the stable legacy stem: each drops through the crossbar's #6
   counterbore, its head seated on the counterbore floor (no washer), and
   threads into the knife-mount's #6-32 bottoming top tap.
-* knife-mount-dowel x2 -- McMaster 98381A473 1/8 x 3/4 dowels, each pressed
-  to the floor of its knife-mount's top-seat hole and slipped into the
-  crossbar underside's blind hole: the key against turning about the screw.
+* knife-mount-dowel x4 -- McMaster 98381A473 1/8 x 3/4 dowels, two per
+  knife mount either side of its screw, each pressed to the floor of its
+  top-seat hole; one slips into the crossbar underside's blind round hole,
+  the other into its blind slot along the dowel line: the pair keys the
+  block against turning about the screw without overconstraining it.
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
   Motion study. The rock is the sub's single FREED operational DOF: its
@@ -32,7 +34,7 @@ Cross-subassembly fits (checked at the top level): the channel springs
 analytically by build_ch_channel_assembly._assert_plate_threading; the knife-
 hanger screws drop through the top-frame casting's integral crossbar (#6
 counterbores with O4.318 clearance holes) and the knife-mount dowels slip
-into its O3.24 blind holes (fr-frame.SLDASM); the gooseneck post drops
+into its blind round holes and slots (fr-frame.SLDASM); the gooseneck post drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact
@@ -48,6 +50,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -91,7 +94,13 @@ ASM_NAME = "sm-summing"
 from spring_mount_geom import COLUMN_X, KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # --- knife bearing supports (build_sm_knife_mount) -----------------------------
-from sm_summing_lever_spec import HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
+from sm_summing_lever_spec import (  # noqa: E402
+    HEX_BAND,
+    HEX_H,
+    HEX_W,
+    HEX_Z_INNER,
+    HEX_Z_OUTER,
+)
 
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
@@ -128,9 +137,61 @@ HANGER_THREAD_SPARE = hanger_screw.THREAD_LENGTH - HANGER_REACH_MAX
 # Diametral clearance of the screw in the crossbar's #6 hole: 0.813.
 HANGER_SCREW_CLEARANCE = top_frame.HANGER_CLEARANCE_DIA - hanger_screw.SHANK_DIA
 # Each dowel's pressed end on its hole floor: 990.2, standing PROUD 9.55 into
-# the crossbar's slip hole.
+# the crossbar's slip hole or slot.
 KNIFE_DOWEL_Y = KNIFE_MOUNT_TOP_Y - knife_dowel.PRESS_DEPTH
-KNIFE_DOWEL_X_OFFSET = knife_dowel.HANGER_OFFSET  # 6.350 along +X
+# The pair's stations from the screw axis, -X (slot) first: 6.350 along X.
+KNIFE_DOWEL_X_OFFSETS = knife_mount.PIN_HOLE_XS
+# The screw must still pass the crossbar's #6 clearance hole (rule 12) when
+# every station sits at its limit.  Along the dowel line (X): the crossbar's
+# round-hole station (.XXX, 0.13), the knife mount's half-span band (0.065),
+# its tap's position zone radius (0.05) and the round-hole pin across its
+# loosest slip (0.046).  Across it (Z): the crossbar's implied-zero offset of
+# the round hole from the screw hole (.XXX, 0.13), the tap zone radius
+# (0.05), and the pair's mid-point between the round-hole pin and the slot
+# pin, each across its loosest slip and the slot's centre plane off by its
+# zone radius, (0.046 + 0.046 + 0.025) / 2 = 0.059.  hypot(0.291, 0.239) =
+# 0.376 inside the 0.4065 float.
+_KNIFE_DOWEL_SLIP_MAX = top_frame.HANGER_PIN_SLIP_CLEARANCE_MAX
+_KNIFE_DOWEL_PAIR_SHIFT = (
+    _KNIFE_DOWEL_SLIP_MAX / 2.0
+    + _KNIFE_DOWEL_SLIP_MAX / 2.0
+    + top_frame.HANGER_SLOT_POSITION_TOL / 2.0
+)  # 0.117: the slot pin's worst offset across the dowel line from the round
+# hole's pin
+HANGER_SCREW_MISMATCH_X = (
+    top_frame.HANGER_PIN_X_TOL
+    + knife_mount.PIN_HOLE_HALF_SPAN_TOL
+    + knife_mount.STUD_TAP_POSITION_TOL / 2.0
+    + _KNIFE_DOWEL_SLIP_MAX / 2.0
+)  # 0.291
+HANGER_SCREW_MISMATCH_Z = (
+    top_frame.HANGER_PIN_X_TOL
+    + knife_mount.STUD_TAP_POSITION_TOL / 2.0
+    + _KNIFE_DOWEL_PAIR_SHIFT / 2.0
+)  # 0.239
+HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
+# The free rock the knife-edge keeps at the rule-12 worst case (the
+# 2026-10-09 ruling: >= 5.0 deg).  The pair yaws the block about the screw by
+# the slot pin's worst offset over the shortest span, atan(0.117 / 12.57) =
+# 0.535 deg; across the 14 deep bore that walks its far end 0.131 off the
+# ridge line, and the bore's Ø0.05 orientation tier adds 0.05: t = 0.181.
+# The trunnion is judged at its widest, lowest .XXX section (8.21 x 10.138)
+# in the smallest .XX bore (Ø11.49): 5.038 deg.
+KNIFE_DOWEL_SPAN_MIN = knife_mount.PIN_HOLE_SPAN - knife_mount.PIN_HOLE_SPAN_TOL
+KNIFE_MOUNT_YAW_DEG = math.degrees(
+    math.atan(_KNIFE_DOWEL_PAIR_SHIFT / KNIFE_DOWEL_SPAN_MIN)
+)
+KNIFE_BORE_FAR_END_OFFSET = (
+    knife_mount.SUPPORT_Z_THICK * math.tan(math.radians(KNIFE_MOUNT_YAW_DEG))
+    + knife_mount.KNIFE_BORE_ORIENTATION_TOL
+)
+KNIFE_FREE_ROCK_WORST_DEG = knife_mount.free_rock_deg(
+    KNIFE_BORE_FAR_END_OFFSET,
+    hex_w=HEX_W + HEX_BAND,
+    hex_h=HEX_H - HEX_BAND,
+    r_bore=knife_mount.R_BORE - knife_mount.BORE_DIA_TOL / 2.0,
+)
+KNIFE_FREE_ROCK_FLOOR_DEG = 5.0
 
 
 def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
@@ -187,16 +248,32 @@ def _assert_knife_hanger_stack() -> None:
             "knife-hanger screw does not clear the crossbar hole: "
             f"{HANGER_SCREW_CLEARANCE:.4f} mm diametral clearance"
         )
-    # Both parts' dowel stations are the dowel spec's, and the crossbar hole is
-    # deep enough for the proud pin (the spec asserts the print-worst case).
-    for owner, station in (
-        ("knife mount", knife_mount.PIN_HOLE_X),
-        ("crossbar", top_frame.HANGER_PIN_X),
+    if HANGER_SCREW_MISMATCH > top_frame.HANGER_SCREW_FLOAT:
+        raise RuntimeError(
+            f"knife-hanger screw float {top_frame.HANGER_SCREW_FLOAT:.4f} does not "
+            f"cover the dowel and tap mismatch {HANGER_SCREW_MISMATCH:.4f}"
+        )
+    if KNIFE_FREE_ROCK_WORST_DEG < KNIFE_FREE_ROCK_FLOOR_DEG:
+        raise RuntimeError(
+            f"knife edge rocks {KNIFE_FREE_ROCK_WORST_DEG:.3f} deg at the worst "
+            f"case (far-end offset {KNIFE_BORE_FAR_END_OFFSET:.4f}), under "
+            f"{KNIFE_FREE_ROCK_FLOOR_DEG}"
+        )
+    # Both parts' dowel stations are the dowel spec's pair, and the crossbar
+    # hole and slot are deep enough for the proud pin (the spec asserts the
+    # print-worst case).
+    expected_stations = (-knife_dowel.HANGER_OFFSET, knife_dowel.HANGER_OFFSET)
+    for owner, stations in (
+        ("knife mount", knife_mount.PIN_HOLE_XS),
+        ("crossbar", top_frame.HANGER_PIN_XS),
     ):
-        if abs(station - KNIFE_DOWEL_X_OFFSET) > 1e-9:
+        if len(stations) != knife_dowel.PER_MOUNT or any(
+            abs(station - expected) > 1e-9
+            for station, expected in zip(stations, expected_stations, strict=True)
+        ):
             raise RuntimeError(
-                f"{owner} dowel station {station:.3f} is not the dowel's "
-                f"{KNIFE_DOWEL_X_OFFSET:.3f}"
+                f"{owner} dowel stations {stations} are not the dowel pair's "
+                f"{expected_stations}"
             )
     dowel_top_y = KNIFE_DOWEL_Y + knife_dowel.LENGTH
     slip_floor_y = CASTING_UNDERSIDE_Y + top_frame.HANGER_PIN_HOLE_DEPTH
@@ -212,8 +289,11 @@ def _assert_knife_hanger_stack() -> None:
         f"{HANGER_REACH:.3f} ({HANGER_REACH_MIN:.3f}..{HANGER_REACH_MAX:.3f}); "
         f"full thread {HANGER_ENGAGEMENT_MIN:.3f} >= {HANGER_ENGAGEMENT_FLOOR:.3f}; "
         f"tip {HANGER_TIP_CLEARANCE:.3f} under the thread; crossbar clearance "
-        f"{HANGER_SCREW_CLEARANCE:.4f}; dowel {KNIFE_DOWEL_Y:.4f}..{dowel_top_y:.4f} "
-        f"under the slip floor {slip_floor_y:.4f} mm"
+        f"{HANGER_SCREW_CLEARANCE:.4f}, mismatch {HANGER_SCREW_MISMATCH:.4f} <= "
+        f"{top_frame.HANGER_SCREW_FLOAT:.4f}; dowel {KNIFE_DOWEL_Y:.4f}.."
+        f"{dowel_top_y:.4f} under the slip floor {slip_floor_y:.4f} mm; rock "
+        f"{KNIFE_FREE_ROCK_WORST_DEG:.3f} deg (yaw {KNIFE_MOUNT_YAW_DEG:.3f}, "
+        f"t {KNIFE_BORE_FAR_END_OFFSET:.4f})"
     )
 
 
@@ -342,9 +422,9 @@ async def build(adapter) -> dict[str, str]:
     # Purchased knife-hanger hardware on each mount centreline: one #6-32
     # screw, its under-head face exactly on the crossbar's counterbore floor
     # (no washer), clamping the block's top seat to the crossbar underside; and
-    # one dowel, its pressed end exactly on the floor of the block's top-seat
-    # hole HANGER_OFFSET along +X, standing proud into the crossbar's slip
-    # hole.  Every part is independently fixed at the authored transform, so
+    # two dowels, their pressed ends exactly on the floors of the block's
+    # top-seat holes HANGER_OFFSET either side along X, standing proud into the
+    # crossbar's slot (-X) and round slip hole (+X).  Every part is independently fixed at the authored transform, so
     # this structural stack contributes no operational DOF.
     hanger_screws: list[str] = []
     knife_dowels: list[str] = []
@@ -363,45 +443,49 @@ async def build(adapter) -> dict[str, str]:
                 label=f"knife-hanger-stud ({side})",
             )
         )
-        knife_dowels.append(
-            await place_component(
-                adapter,
-                "vn-knife-mount-dowel",
-                [KNIFE[0] + KNIFE_DOWEL_X_OFFSET, KNIFE_DOWEL_Y, station_z],
-                [0.0, 0.0, 0.0],
-                IDENTITY,
-                ground=True,
-                label=f"knife-mount-dowel ({side})",
+        for x_offset in KNIFE_DOWEL_X_OFFSETS:
+            knife_dowels.append(
+                await place_component(
+                    adapter,
+                    "vn-knife-mount-dowel",
+                    [KNIFE[0] + x_offset, KNIFE_DOWEL_Y, station_z],
+                    [0.0, 0.0, 0.0],
+                    IDENTITY,
+                    ground=True,
+                    label=f"knife-mount-dowel ({side}, x {x_offset:+.3f})",
+                )
             )
-        )
 
     # Count the live top-level instances, not just the placement requests:
-    # exactly two stock screws and two dowels must survive insertion.
+    # exactly two stock screws and four dowels must survive insertion.
     live_names = component_names(adapter)
-    for stem, inserted in (
-        ("vn-knife-hanger-stud", hanger_screws),
-        ("vn-knife-mount-dowel", knife_dowels),
+    for stem, inserted, count in (
+        ("vn-knife-hanger-stud", hanger_screws, 2),
+        ("vn-knife-mount-dowel", knife_dowels, knife_dowel.QUANTITY),
     ):
         live = [
             name for name in live_names if name == stem or name.startswith(f"{stem}-")
         ]
-        if len(live) != 2 or set(live) != set(inserted):
+        if len(live) != count or set(live) != set(inserted):
             raise RuntimeError(
-                f"{stem}: expected exactly two inserted instances, got {sorted(live)}"
+                f"{stem}: expected exactly {count} inserted instances, got "
+                f"{sorted(live)}"
             )
 
     # Read back both physical stacks.  This catches a per-instance station
     # typo that the shared scalar derivation alone cannot: each screw must
     # stand on the knife axis with its head on the counterbore floor and the
-    # exact nominal reach, and each dowel must sit HANGER_OFFSET +X of its
-    # screw at the same station, its pressed end on the hole floor.
-    for screw, dowel in zip(hanger_screws, knife_dowels, strict=True):
+    # exact nominal reach, and each dowel must sit at its station either side
+    # of its screw, at the same z, its pressed end on the hole floor.
+    per_mount = knife_dowel.PER_MOUNT
+    dowel_pairs = [
+        knife_dowels[index : index + per_mount]
+        for index in range(0, len(knife_dowels), per_mount)
+    ]
+    for screw, pair in zip(hanger_screws, dowel_pairs, strict=True):
         screw_transform = component_transform(adapter, screw)
-        dowel_transform = component_transform(adapter, dowel)
         _assert_hanger_axis_positive_y(screw, screw_transform)
-        _assert_hanger_axis_positive_y(dowel, dowel_transform)
         screw_o = [value * 1000.0 for value in screw_transform[9:12]]
-        dowel_o = [value * 1000.0 for value in dowel_transform[9:12]]
         screw_under_head_y = screw_o[1] + hanger_screw.UNDERHEAD_LEN
         reach = KNIFE_MOUNT_TOP_Y - screw_o[1]
         if abs(screw_o[0] - KNIFE[0]) > 1e-6:
@@ -415,20 +499,22 @@ async def build(adapter) -> dict[str, str]:
             )
         if abs(reach - HANGER_REACH) > 1e-6:
             raise RuntimeError(f"{screw}: knife-mount reach drifted to {reach:.6f} mm")
-        dowel_offset = (dowel_o[0] - screw_o[0], dowel_o[2] - screw_o[2])
-        if (
-            abs(dowel_offset[0] - KNIFE_DOWEL_X_OFFSET) > 1e-6
-            or abs(dowel_offset[1]) > 1e-6
-        ):
-            raise RuntimeError(
-                f"{dowel}: offset (x, z) {dowel_offset[0]:.6f}, {dowel_offset[1]:.6f} "
-                f"mm from {screw}, not ({KNIFE_DOWEL_X_OFFSET:.3f}, 0)"
-            )
-        if abs(dowel_o[1] - KNIFE_DOWEL_Y) > 1e-6:
-            raise RuntimeError(
-                f"{dowel}: pressed end {dowel_o[1] - KNIFE_DOWEL_Y:.6f} mm off "
-                "the hole floor"
-            )
+        for dowel, x_offset in zip(pair, KNIFE_DOWEL_X_OFFSETS, strict=True):
+            dowel_transform = component_transform(adapter, dowel)
+            _assert_hanger_axis_positive_y(dowel, dowel_transform)
+            dowel_o = [value * 1000.0 for value in dowel_transform[9:12]]
+            dowel_offset = (dowel_o[0] - screw_o[0], dowel_o[2] - screw_o[2])
+            if abs(dowel_offset[0] - x_offset) > 1e-6 or abs(dowel_offset[1]) > 1e-6:
+                raise RuntimeError(
+                    f"{dowel}: offset (x, z) {dowel_offset[0]:.6f}, "
+                    f"{dowel_offset[1]:.6f} mm from {screw}, not "
+                    f"({x_offset:.3f}, 0)"
+                )
+            if abs(dowel_o[1] - KNIFE_DOWEL_Y) > 1e-6:
+                raise RuntimeError(
+                    f"{dowel}: pressed end {dowel_o[1] - KNIFE_DOWEL_Y:.6f} mm off "
+                    "the hole floor"
+                )
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial distance,
     # leaving the rock DOF -- the sub's freed operational DOF (its drive spec

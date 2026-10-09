@@ -16,8 +16,8 @@ knife-edge suspension: line contact at the ridge, free to rock, replacing the
 M6.4 "diamond knife-bar in the lever tube bore" (which clashed with the lever's
 solid pivot cylinder once the bore was removed). 2026-09-02 user re-read of
 ch18 p.42: the block is an UNPAINTED HEAT-TREATED STEEL block (not brass) with
-a CLOSE bore around the trunnion -- Ø12 over the 8.653 x 10.268 hex, so the
-across-corners diagonal clears by ~0.87 and the shoulders by ~0.6.
+a CLOSE bore around the trunnion -- Ø12 over the 8.080 x 10.268 hex, so the
+upper shoulders clear by ~0.86 and the lower ones by ~1.5.
 
 There are TWO supports, one per trunnion (placed front/back in the assembly at
 |z| ~ 87). This single part is built once and placed twice.
@@ -93,6 +93,7 @@ from sm_knife_mount_spec import (
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
     PIN_HOLE_X,
+    PIN_HOLE_XS,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH,
     STUD_TAP_SPEC,
@@ -113,9 +114,9 @@ RIDGE_Y = HEX_H / 2.0  # hex top vertex above the pivot/cylinder centreline (5.1
 
 # --- bore: close around the hex trunnion, top-edge contact only ------------
 R_BORE = 6.0  # Ø12 bore (2026-09-02 ch18 p.42 re-read: a CLOSE bore, down from
-# the Ø16 of the 2026-09 page001_img01 pass); the hex is 8.653 wide x 10.268
-# tall (~Ø10.3 across-corners) -> ~0.87 clear on the diagonal, ~0.6 at the
-# shoulders, everywhere but the top vertex line
+# the Ø16 of the 2026-09 page001_img01 pass); the hex is 8.080 wide x 10.268
+# tall -> ~0.86 clear at the upper shoulders, ~1.5 at the lower ones,
+# everywhere but the top vertex line
 TOP_CLEAR = 0.25  # hex top vertex hangs this far below the bore upper inner wall
 # Bore centre BELOW the origin so only the upper wall reaches the ridge:
 BORE_CY = TOP_CLEAR - R_BORE  # -5.75 (bore top inner wall at local y +TOP_CLEAR)
@@ -152,9 +153,10 @@ if _TAP_WEB_WORST < sm_knife_mount_spec.STUD_TAP_WEB_MIN:
 
 THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
 
-# --- the MHA-VN-051 dowel hole: blind, flat-floored, reamed in the top seat --
+# --- the MHA-VN-051 dowel holes: blind, flat-floored, reamed in the top seat -
 _R_PIN = PIN_HOLE_DIA / 2.0
 V_PIN = math.pi * _R_PIN**2 * PIN_HOLE_DEPTH
+V_PINS = len(PIN_HOLE_XS) * V_PIN
 
 
 async def _volume(adapter) -> float:
@@ -169,21 +171,22 @@ async def _mass(adapter) -> tuple[float, list[float]]:
     return float(res.data.volume), [float(c) for c in res.data.center_of_mass]
 
 
-def _open_top_seat_sketch(adapter) -> tuple[float, float, bool]:
-    """Open a sketch ON the top seat; map the dowel-hole centre into it.
+def _open_top_seat_sketch(adapter) -> tuple[list[tuple[float, float]], bool]:
+    """Open a sketch ON the top seat; map the dowel-hole centres into it.
 
     The MHA-PD-018 latch-pin precedent (``build_pd_transgear_arm``
     ``_open_end_face_sketch``): a face sketch anchors the blind depth on the
     real seat edge.  The face's sketch axes are SolidWorks' choice, so the
-    centre maps through ``ModelToSketchTransform``.  Returns the sketch
-    ``(u, v)`` and whether the sketch normal points OUT of the seat (+Y).
+    centres map through ``ModelToSketchTransform``.  Returns each hole's
+    sketch ``(u, v)`` in ``PIN_HOLE_XS`` order and whether the sketch normal
+    points OUT of the seat (+Y).
     """
     import pythoncom
     from win32com.client import VARIANT
 
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    centre = (PIN_HOLE_X, BLK_TOP, 0.0)
-    face = find_planar_face(model, (0.0, 1.0, 0.0), [list(centre)])
+    centres = [(x, BLK_TOP, 0.0) for x in PIN_HOLE_XS]
+    face = find_planar_face(model, (0.0, 1.0, 0.0), [list(c) for c in centres])
     model.ClearSelection2(True)
     if not _early_bound(face, "IEntity").Select2(False, 0):
         raise RuntimeError("dowel hole: top seat Select2 failed")
@@ -211,13 +214,16 @@ def _open_top_seat_sketch(adapter) -> tuple[float, float, bool]:
         )
         return tuple(c * 1000.0 for c in mapped.ArrayData)
 
-    u, v, w = to_sketch(centre)
-    if abs(w) > 1e-4:
-        raise RuntimeError(f"dowel hole centre is {w:g} mm off the top-seat sketch")
+    mapped: list[tuple[float, float]] = []
+    for centre in centres:
+        u, v, w = to_sketch(centre)
+        if abs(w) > 1e-4:
+            raise RuntimeError(f"dowel hole centre is {w:g} mm off the top-seat sketch")
+        mapped.append((u, v))
     w_out = to_sketch((PIN_HOLE_X, BLK_TOP + 1.0, 0.0))[2]
     if abs(abs(w_out) - 1.0) > 1e-4:
         raise RuntimeError(f"top-seat sketch normal is not along Y (w {w_out:g})")
-    return u, v, w_out > 0.0
+    return mapped, w_out > 0.0
 
 
 async def _volume(adapter) -> float:
@@ -370,40 +376,47 @@ async def build(adapter) -> dict[str, str]:
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"stud tap volume {vol:.1f} != {expected:.1f}")
 
-    # MHA-VN-051 dowel hole: blind along -Y from the top seat, PIN_HOLE_X along
-    # +X from the tap axis (the MHA-PD-018 latch-pin hole precedent). A plain
-    # cut-extrude, so the floor is flat: the dowel is pressed onto it (a
-    # wizard drill point would leave a cone under the pressed end).
+    # MHA-VN-051 dowel holes (the datum-B pattern): blind along -Y from the
+    # top seat, PIN_HOLE_X either side of the tap axis along X (the MHA-PD-018
+    # latch-pin hole precedent).  One sketch, one plain cut-extrude, so both
+    # floors are flat at one depth: each dowel is pressed onto its floor (a
+    # wizard drill point would leave a cone under the pressed end).  The +X
+    # circle owns the marked PinHoleX / PinHoleDia; the -X circle's station
+    # and size are driven by the same globals.
     before, com_before = await _mass(adapter)
     pin = SketchDims()
-    u, v, normal_out = _open_top_seat_sketch(adapter)
-    # The seat's sketch axes carry model x on one axis and z (= 0) on the
-    # other; the one nonzero centre offset is the station from the tap axis.
-    if abs(abs(u) - PIN_HOLE_X) < 1e-4 and abs(v) < 1e-4:
-        v = 0.0
-    elif abs(abs(v) - PIN_HOLE_X) < 1e-4 and abs(u) < 1e-4:
-        u = 0.0
-    else:
-        raise RuntimeError(
-            f"dowel-hole centre mapped to unexpected sketch ({u:g}, {v:g})"
+    sketch_centres, normal_out = _open_top_seat_sketch(adapter)
+    for (u, v), station_x, suffix in zip(
+        sketch_centres, PIN_HOLE_XS, ("2", ""), strict=True
+    ):
+        # The seat's sketch axes carry model x on one axis and z (= 0) on the
+        # other; the one nonzero centre offset is the station from the tap axis.
+        if abs(abs(u) - abs(station_x)) < 1e-4 and abs(v) < 1e-4:
+            v = 0.0
+        elif abs(abs(v) - abs(station_x)) < 1e-4 and abs(u) < 1e-4:
+            u = 0.0
+        else:
+            raise RuntimeError(
+                f"dowel-hole centre {station_x:+.3f} mapped to unexpected sketch "
+                f"({u:g}, {v:g})"
+            )
+        await define_circle(
+            adapter,
+            u,
+            v,
+            _R_PIN,
+            f"dowel hole x {station_x:+.3f}",
+            dims=pin,
+            names=(f"PinHole{suffix}X", f"PinHole{suffix}X", f"PinHole{suffix}Dia"),
+            drives=('"PinHoleX"', '"PinHoleX"', '"PinHoleDia"'),
         )
-    await define_circle(
-        adapter,
-        u,
-        v,
-        _R_PIN,
-        "dowel hole",
-        dims=pin,
-        names=("PinHoleX", "PinHoleX", "PinHoleDia"),
-        drives=('"PinHoleX"', '"PinHoleX"', '"PinHoleDia"'),
-    )
     await ensure_fully_defined(adapter, "dowel hole sketch")
-    check("exit_sketch dowel hole", await adapter.exit_sketch())
+    check("exit_sketch dowel holes", await adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += pin.apply(adapter, "PinHoleProfile")
     # A cut runs opposite the sketch normal unless reversed.
     check(
-        "cut dowel hole",
+        "cut dowel holes",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=PIN_HOLE_DEPTH, reverse_direction=not normal_out)
         ),
@@ -412,22 +425,26 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [
         (name_dimensions(adapter, "PinHole", ["PinHoleDepth"])[0], '"PinHoleDepth"')
     ]
-    expected -= V_PIN
+    expected -= V_PINS
     after, com_after = await _mass(adapter)
-    if abs((before - after) - V_PIN) > 0.02 * V_PIN:
+    if abs((before - after) - V_PINS) > 0.02 * V_PINS:
         raise RuntimeError(
-            f"dowel hole removed {before - after:.2f} mm^3, expected "
-            f"{V_PIN:.2f}: circle misplaced or cut the wrong way"
+            f"dowel holes removed {before - after:.2f} mm^3, expected "
+            f"{V_PINS:.2f}: a circle misplaced or cut the wrong way"
         )
-    # Material removed at +X moves the centre of mass toward -X.
-    if com_after[0] >= com_before[0]:
+    # The pair is symmetric about the tap axis, so the centre of mass keeps
+    # its x (a hole stacked on the other, or one station mirrored onto the
+    # other, moves it) and drops (the material left the top).  The COM shift
+    # one hole alone would cause is ~0.05 mm; 1e-3 mm separates the cases.
+    if abs(com_after[0] - com_before[0]) > 1e-3 or com_after[1] >= com_before[1]:
         raise RuntimeError(
-            f"dowel hole missed the +X station (COM x {com_before[0]:.4f} -> "
-            f"{com_after[0]:.4f})"
+            "dowel holes are not the symmetric top-seat pair (COM "
+            f"{com_before[0]:.4f}, {com_before[1]:.4f} -> "
+            f"{com_after[0]:.4f}, {com_after[1]:.4f})"
         )
     _telemetry.success(
-        f"dowel hole (top-seat sketch {u:+g}, {v:+g}) removed "
-        f"{before - after:.2f} mm^3 (analytic {V_PIN:.2f})"
+        f"dowel holes (top-seat sketch {sketch_centres}) removed "
+        f"{before - after:.2f} mm^3 (analytic {V_PINS:.2f})"
     )
 
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The
@@ -451,11 +468,12 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, HARDENED_STEEL)
     await report_mass_properties(adapter)
 
-    # Explicit band on the dowel ream (the station and depth are governed by
+    # Explicit band on both dowel reams (the station and depth are governed by
     # their places); then the places the sheet prints (DRAWING_PRECISION).
-    set_dimension_bilateral_tolerance(
-        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
-    )
+    for pin_dia_name in ("PinHoleDia", "PinHole2Dia"):
+        set_dimension_bilateral_tolerance(
+            adapter, "PinHoleProfile", pin_dia_name, *deviations(PIN_HOLE_DIA_BAND)
+        )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.

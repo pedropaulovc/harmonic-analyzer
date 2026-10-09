@@ -305,7 +305,12 @@ _KNIFE_HANGER_REACH = 8.10
 # (sm_knife_mount_spec.PIN_HOLE_DIA, band +0/-0.010: smallest 3.165,
 # test-pinned).  The models are line to line, so this bounds the press at its
 # print-worst: the largest catalogue pin in the smallest ream, the whole depth.
+# Two per mount, inserted front mount first (build_sm_summing_assembly):
+# dowels 1-2 in sm-knife-mount-1, 3-4 in sm-knife-mount-2.
 _KNIFE_DOWEL_HOLE_MIN = 3.165
+_KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
+    _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_PRESS_DEPTH
+)
 _SUMMING_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "vn-knife-hanger-stud",
@@ -317,13 +322,14 @@ _SUMMING_ALLOWED_PAIRS = {
         second_number=None,
     ),
     **_numbered_pairs(
+        "vn-knife-mount-dowel", range(1, 3), "sm-knife-mount", _KNIFE_DOWEL_PRESS_LIMIT
+    ),
+    **_numbered_pairs(
         "vn-knife-mount-dowel",
-        range(1, 3),
+        range(3, 5),
         "sm-knife-mount",
-        _smooth_annulus_limit_mm3(
-            _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_PRESS_DEPTH
-        ),
-        second_number=None,
+        _KNIFE_DOWEL_PRESS_LIMIT,
+        second_number=2,
     ),
     frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _COUNTER_ANCHOR_THREAD_LIMIT,
 }

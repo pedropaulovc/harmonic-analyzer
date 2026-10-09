@@ -10,7 +10,7 @@ vn-knife-mount-dowel:
   installation_notes: |-
     INSTALLATION - KNIFE MOUNT MHA-SM-002 TOP SEAT
     PRESS IN, CHAMFER END FIRST, TO THE HOLE FLOOR.
-    SLIPS INTO THE MHA-FR-002 CROSSBAR HOLE AT ASSEMBLY.
-  quantity: 2
+    SLIPS INTO THE MHA-FR-002 CROSSBAR HOLE OR SLOT AT ASSEMBLY.
+  quantity: 4
   tolerance_class: machined_block
   process: purchased
