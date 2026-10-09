@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { BINDINGS, instanceIndex, type Binding, type Motion } from '../bindings'
 import { CHANNELS, channelAngle, physicalChannelAngle, MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX } from '../kinematics'
 import { createMechanismInput, MECHANISM_DATA, type MechanismInput, type SerializedMechanismInput } from '../mechanics'
@@ -11,8 +12,19 @@ export interface FitRequest {
   height: number
   presentation: Presentation
   groups?: string[]
+  /** Optional appearance passes; IDs are always returned. */
+  outputs?: ('rgb' | 'worldPositions')[]
 }
-export interface FitRender { width: number; height: number; ids: string; dtype: 'uint8' | 'uint16' }
+export interface FitRender {
+  width: number
+  height: number
+  ids: string
+  dtype: 'uint8' | 'uint16'
+  /** sRGB uint8 RGB, top-left row-major, background matches the companion. */
+  rgb?: string
+  /** Little-endian float32 XYZ in native metres; all three components NaN off-machine. */
+  worldPositions?: string
+}
 export interface FitBounds { min: Point3; max: Point3 }
 export interface FitTimings {
   renders: number
@@ -92,7 +104,21 @@ const setupKeys = Object.keys(input.setup) as (keyof MechanismInput['setup'])[]
 const timings: FitTimings = { renders: 0, solveMs: 0, drawMs: 0, readbackMs: 0, encodeMs: 0, batchMs: 0 }
 
 type Drawable = THREE.Mesh | THREE.Line | THREE.Points
-const drawables: { path: string; object: Drawable; group: string }[] = []
+type MaterialSet = THREE.Material | THREE.Material[]
+interface FitDrawable {
+  path: string
+  object: Drawable
+  group: string
+  nativeMaterial: MaterialSet
+  idMaterial: MaterialSet
+  worldMaterial?: MaterialSet
+}
+const drawables: FitDrawable[] = []
+let lightingReady = false
+let rgbBytes = new Uint8Array(0)
+let worldTarget: THREE.WebGLRenderTarget | undefined
+let worldRgba = new Float32Array(0)
+let worldXyz = new Float32Array(0)
 
 function bindingFor(path: string): { binding: Binding; path: string } | undefined {
   for (let candidate = path; candidate; candidate = candidate.slice(0, candidate.lastIndexOf('/'))) {
@@ -117,7 +143,7 @@ function collect(node: THREE.Object3D, parentPath: string): void {
       if (!mapping) throw new Error(`Invalid physical station: ${path}`)
       group = `channel-${mapping.harmonic}`
     } else if (bound) group = motionGroups[bound.binding.motion]
-    drawables.push({ path, object: node, group: group ?? 'static' })
+    drawables.push({ path, object: node, group: group ?? 'static', nativeMaterial: node.material, idMaterial: node.material })
   }
   for (const child of node.children) collect(child, path)
 }
@@ -139,6 +165,110 @@ function idMaterial(source: THREE.Material, id: number): THREE.MeshBasicMaterial
   }
   result.customProgramCacheKey = () => `fit-id:${nativeKey}`
   return result
+}
+
+function worldMaterial(source: THREE.Material): THREE.MeshBasicMaterial {
+  const result = new THREE.MeshBasicMaterial({ side: source.side, toneMapped: false, blending: THREE.NoBlending })
+  const nativeCompile = source.onBeforeCompile
+  const nativeKey = source.customProgramCacheKey()
+  result.onBeforeCompile = (shader, activeRenderer) => {
+    shader.vertexShader = shader.vertexShader.replace('#if defined ( USE_ENVMAP ) || defined ( USE_SKINNING )', '#if 1')
+    nativeCompile.call(source, shader, activeRenderer)
+    shader.vertexShader = 'varying vec3 fitWorldPosition;\n' + shader.vertexShader
+    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', `
+#include <project_vertex>
+fitWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+`)
+    shader.fragmentShader = 'varying vec3 fitWorldPosition;\nvoid main() { gl_FragColor = vec4(fitWorldPosition, 1.0); }'
+  }
+  result.customProgramCacheKey = () => `fit-world:${nativeKey}`
+  return result
+}
+
+function prepareLighting(): void {
+  if (lightingReady) return
+  // Same environment and light settings as createViewer in scene.ts. The
+  // environment geometry supplies reflections only and is never added here.
+  const room = new RoomEnvironment()
+  const pmrem = new THREE.PMREMGenerator(renderer)
+  try { scene.environment = pmrem.fromScene(room).texture }
+  finally { room.dispose(); pmrem.dispose() }
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x404050, 1.6))
+  const key = new THREE.DirectionalLight(0xffffff, 2.2)
+  key.position.set(2, 3, 2)
+  scene.add(key)
+  lightingReady = true
+}
+
+function renderAppearance(request: FitRequest, result: FitRender): void {
+  const { width, height } = request
+  const mirror = request.presentation === 'horizontal-mirror'
+  try {
+    if (request.outputs?.includes('rgb')) {
+      prepareLighting()
+      for (const item of drawables) item.object.material = item.nativeMaterial
+      renderer.outputColorSpace = THREE.SRGBColorSpace
+      if (canvas.width !== width || canvas.height !== height) renderer.setSize(width, height, false)
+      scene.background = new THREE.Color(0x11131a)
+      renderer.setRenderTarget(null)
+      renderer.render(scene, camera)
+      const gl = renderer.getContext()
+      gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, rgba)
+      if (rgbBytes.length !== width * height * 3) rgbBytes = new Uint8Array(width * height * 3)
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        const source = ((height - 1 - y) * width + (mirror ? width - 1 - x : x)) * 4
+        const destination = (y * width + x) * 3
+        rgbBytes[destination] = rgba[source]!
+        rgbBytes[destination + 1] = rgba[source + 1]!
+        rgbBytes[destination + 2] = rgba[source + 2]!
+      }
+      result.rgb = base64(rgbBytes)
+    }
+    scene.background = null
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+    if (request.outputs?.includes('worldPositions')) {
+      if (!worldTarget) {
+        if (!renderer.getContext().getExtension('EXT_color_buffer_float')) throw new Error('World-position rendering requires EXT_color_buffer_float')
+        worldTarget = new THREE.WebGLRenderTarget(width, height, {
+          minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+          format: THREE.RGBAFormat, type: THREE.FloatType, depthBuffer: true, stencilBuffer: false,
+        })
+        worldTarget.texture.colorSpace = THREE.NoColorSpace
+      }
+      if (worldTarget.width !== width || worldTarget.height !== height) worldTarget.setSize(width, height)
+      if (worldRgba.length !== width * height * 4) {
+        worldRgba = new Float32Array(width * height * 4)
+        worldXyz = new Float32Array(width * height * 3)
+      }
+      for (const item of drawables) {
+        if (!item.worldMaterial) item.worldMaterial = Array.isArray(item.nativeMaterial)
+          ? item.nativeMaterial.map(worldMaterial) : worldMaterial(item.nativeMaterial)
+        item.object.material = item.worldMaterial
+      }
+      renderer.setRenderTarget(worldTarget)
+      renderer.render(scene, camera)
+      renderer.readRenderTargetPixels(worldTarget, 0, 0, width, height, worldRgba)
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        const pixel = y * width + x
+        const destination = pixel * 3
+        const idOffset = pixel * bytesPerId
+        if (encoded[idOffset] === 0 && (bytesPerId === 1 || encoded[idOffset + 1] === 0)) {
+          worldXyz[destination] = worldXyz[destination + 1] = worldXyz[destination + 2] = NaN
+        } else {
+          const source = ((height - 1 - y) * width + (mirror ? width - 1 - x : x)) * 4
+          worldXyz[destination] = worldRgba[source]!
+          worldXyz[destination + 1] = worldRgba[source + 1]!
+          worldXyz[destination + 2] = worldRgba[source + 2]!
+        }
+      }
+      result.worldPositions = base64(new Uint8Array(worldXyz.buffer))
+    }
+  } finally {
+    renderer.setRenderTarget(null)
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+    scene.background = null
+    for (const item of drawables) item.object.material = item.idMaterial
+  }
 }
 
 function probeInput(seed: number): MechanismInput {
@@ -201,8 +331,9 @@ const loaded = (async (): Promise<FitReady> => {
       }
       return material
     }
-    item.object.material = Array.isArray(item.object.material)
-      ? item.object.material.map(replace) : replace(item.object.material)
+    item.idMaterial = Array.isArray(item.nativeMaterial)
+      ? item.nativeMaterial.map(replace) : replace(item.nativeMaterial)
+    item.object.material = item.idMaterial
   }
   const recordBounds = (box: THREE.Box3): FitBounds => ({
     min: [box.min.x, box.min.y, box.min.z], max: [box.max.x, box.max.y, box.max.z],
@@ -249,6 +380,7 @@ async function render(request: FitRequest): Promise<FitRender> {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) throw new RangeError('Render size must be positive integers')
   if (width > renderer.capabilities.maxTextureSize || height > renderer.capabilities.maxTextureSize) throw new RangeError('Render size exceeds GPU texture capacity')
   if (request.presentation !== 'native' && request.presentation !== 'horizontal-mirror') throw new Error('Unknown presentation')
+  if (request.outputs?.some(output => output !== 'rgb' && output !== 'worldPositions')) throw new Error('Unknown appearance output')
   if (request.input.amplitudes.length !== CHANNELS || request.input.phases.length !== CHANNELS) throw new RangeError('Exactly twenty amplitudes and phases required')
   const solveStart = performance.now()
   if (!sameInput(request.input)) {
@@ -300,7 +432,9 @@ async function render(request: FitRequest): Promise<FitRender> {
   const ids = base64(encoded)
   timings.encodeMs += performance.now() - encodeStart
   timings.renders++
-  return { width, height, ids, dtype: bytesPerId === 1 ? 'uint8' : 'uint16' }
+  const result: FitRender = { width, height, ids, dtype: bytesPerId === 1 ? 'uint8' : 'uint16' }
+  if (request.outputs?.length) renderAppearance(request, result)
+  return result
 }
 
 window.harmonicFit = {

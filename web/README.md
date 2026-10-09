@@ -42,13 +42,23 @@ Camera principal points are viewport-local pixels at the requested resolution
 The horizontal-mirror presentation flips the finished image, not the camera.
 Native spring deformation is preserved in the unlit ID pass.
 
+Optional `outputs: ['rgb', 'worldPositions']` adds shaded sRGB uint8 RGB and
+little-endian float32 native-world XYZ, each top-left row-major with three values
+per pixel. RGB uses the GLB's own materials and the companion's exact environment
+and lights. World positions use the same native deformation, camera and mirror;
+all three XYZ components are NaN on background pixels (`ids == 0`). No appearance
+passes run for ordinary ID requests. Python `render_appearance` and
+`render_appearance_batch` return `ids`, `rgb`, and `world_positions` arrays;
+`world_positions=False` omits XYZ for coarse RGB-only camera searches.
+
 The Python client owns a headless Chromium and a free-port Vite server, or attaches
 to an existing `fit.html` URL. It returns numpy uint16 arrays; use
 `RenderClient` as a context manager to release both processes. The private smoke
-saves only synthetic colour-mapped ID PNGs and group/timing metadata:
+saves synthetic ID PNGs (and shaded RGB with `--appearance`) plus group/timing metadata:
 
 ```sh
 uv run --project web/sync python -m harmonic_sync.render_client --smoke
+uv run --project web/sync python -m harmonic_sync.render_client --smoke --appearance
 # Preview requires a prior npm --prefix web run build.
 uv run --project web/sync python -m harmonic_sync.render_client --smoke --preview
 ```
@@ -188,6 +198,47 @@ source process, `python -m harmonic_sync.readiness <videoId> --watch` publishes
 the same snapshot without loading SAM2.
 
 
+### Appearance camera proposals
+
+Appearance matching supplies **unapproved camera proposals**, not runtime tracks
+or evidence of mechanical correctness. RoMa matches shaded native-GLB renders
+to source machine masks, ranks coarse viewpoints, solves PnP from rendered world
+positions, and initializes the existing bidirectional chamfer/IoU refinement.
+Render/photo domain gaps and repeated parts can still select the wrong machine
+side; every proposal requires human inspection and acceptance in the alignment
+tool.
+
+```sh
+uv sync --project web/sync --extra appearance
+uv run --project web/sync --extra appearance python -m harmonic_sync.fit.appearance \
+  --videos 8KmVDxkia_w 6dW6VYXp9HM \
+  --output "$HOME/data/harmonic-analyzer-sync/appearance-proposals" \
+  --matcher roma
+```
+
+There is one keyframe per machine/transition shot view: the earliest sampled
+frame with maximum source machine-mask area. Turntables still receive one
+proposal per view, not one per existing camera key. Per-view private checkpoints
+resume when the selected source identity, matcher/settings, code and group bounds
+agree. Per-view timing JSONL, candidate/match diagnostics, sheets and a final
+failure summary remain under the private output directory.
+
+Successful proposals are written incrementally to
+`sync/videos/<videoId>/proposals.json` as
+`{cameras:[{shotId,viewId,frame,camera,iou,s2rPx,r2sPx,pnpInliers,pnpInlierFraction}]}`.
+Principal points use pixels of the original source-view rectangle, matching
+manual/runtime camera records. The directed chamfers use original source pixels.
+Views without a supported PnP camera or with an execution failure are recorded in
+the private summary and do not receive a fabricated proposal. The producer never
+writes `manual.json`; acceptance is a separate human action.
+
+The optional extra pins Kornia and RoMa and downloads their pretrained weights
+to the normal Torch cache. The uv project excludes RoMa's GUI `opencv-python`
+dependency because the existing `opencv-python-headless` supplies the same `cv2`
+API; both distributions must not overwrite the same installed files. When
+repairing a pre-existing duplicate installation, use
+`uv sync --project web/sync --extra appearance --reinstall-package opencv-python-headless`.
+
 ### Kinematic sync and manual alignment
 
 Videos with `content/sync/<videoId>.sync.json` use the kinematic track while
@@ -214,6 +265,29 @@ separately from the crank turns.
 Left/right step a frame, Shift steps ten, Space toggles playback, and C/S/K save
 camera/segment/crank (outside text inputs). Unsaved camera adjustments persist
 within the shot; “Reload saved camera” restores interpolated manual/fitted keys.
+
+For Pedro's per-view camera pass, click **Review queue**. It visits every machine
+and transition shot view in source-frame order, seeking the frame in
+`sync/videos/<videoId>/proposals.json` and applying that camera. A view without a
+proposal starts from the latest preceding accepted camera (or the nearest
+accepted shot if none precedes it), at its midpoint frame. If no accepted camera
+exists either, adjust the displayed camera and use C; A is disabled.
+
+- **A** accepts the proposed/seed camera unchanged and advances to the next view
+  without a manual camera, skipping reviewed views and wrapping to any remaining
+  earlier view. The saved camera key has `provenance: "proposal-accepted"`.
+- **C** saves the camera after your Orbit/FOV/principal-point adjustment, with
+  `provenance: "manual"`, and stays so you can verify it.
+- **Shift+C** saves the adjusted camera and advances to the next unreviewed view.
+- **N/P** move one view forward/back without saving. The expandable shot-view
+  list also jumps directly to a view and marks every view with a manual camera.
+
+The counter reports **k of N reviewed** from saved manual cameras, not from
+visiting a view. Shortcuts work outside text/select inputs. Review mode fetches
+proposals again when switched on, so toggle it off/on to load newly generated
+proposals. Saves remain authoritative for the fitter; proposals alone are not
+accepted fits. The dev endpoint is `GET /__sync/proposals/<videoId>`.
+
 Saves merge into `sync/videos/<videoId>/manual.json`, replacing the matching
 shot/view/time, segment ID or crank time. The fitter treats these entries as
 authoritative. Private video and save endpoints exist only on the dev server;
@@ -227,8 +301,9 @@ HARMONIC_CHROME=/usr/bin/google-chrome node web/scripts/runtime-sync-smoke.mjs h
 ```
 
 It records three runtime camera/input evaluations and screenshots, checks the
-alignment overlay and camera/setup/crank save round trips, then restores the
-previous manual file. Artifacts are private under
+alignment overlay, camera/setup/crank round trips and A/N/P/C/Shift+C review
+actions, then restores the previous manual file. Its inline proposal fixture does
+not overwrite generated proposals. Artifacts are private under
 `~/data/harmonic-analyzer-sync/runtime-smoke/`.
 
 

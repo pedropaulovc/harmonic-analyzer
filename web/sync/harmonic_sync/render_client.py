@@ -10,6 +10,8 @@ The caller builds and records that snapshot; this client only serves it.
 Candidate search may reject only the two documented native magnifier RangeErrors;
 manual/final renders remain strict. last_candidate_failures holds per-call reason
 counts; candidate_failure_counts accumulates them across the client's lifetime.
+Appearance renders optionally add sRGB uint8 RGB and float32 native XYZ; XYZ
+background is NaN and uses the same pixel order, mirror and principal point as IDs.
 
 Run the private smoke/throughput check from the repository root:
     uv run --project web/sync python -m harmonic_sync.render_client --smoke
@@ -24,6 +26,7 @@ import math
 import os
 from pathlib import Path
 import platform
+import re
 import signal
 import socket
 import subprocess
@@ -111,6 +114,8 @@ class RenderClient:
                 status=200, content_type="application/javascript", body="",
             ))
             self.page.goto(self.url, wait_until="load", timeout=timeout_seconds * 1000)
+            if self._browser_errors:
+                raise RuntimeError("Browser startup error: " + "\n".join(self._browser_errors))
             self.page.wait_for_function("window.harmonicFit !== undefined")
             self._ready = self.page.evaluate("() => window.harmonicFit.ready()")
             self._log("ready", seconds=time.perf_counter() - started, renderer=self._ready["renderer"], groups={k: len(v) for k, v in self._ready["groups"].items()})
@@ -125,7 +130,16 @@ class RenderClient:
         vite = self.web_root / "node_modules" / ".bin" / "vite"
         if not vite.is_file():
             raise FileNotFoundError(f"Vite missing at {vite}; run npm --prefix web ci")
-        command = [str(vite), *(["preview"] if preview else []), "--host", "127.0.0.1", "--port", str(port), "--strictPort", "--base", "/"]
+        base = "/"
+        if preview:
+            built = (self._preview_out_dir or self.web_root / "dist") / "fit.html"
+            html = built.read_text(encoding="utf-8")
+            # Serve the exact base embedded in this snapshot, not today's Vite
+            # environment. Relative/root-based snapshot assets use "/".
+            asset = re.search(r"""<script\b[^>]*\bsrc=["'](/(?:[^"']*/)?assets/)""", html)
+            if asset:
+                base = asset.group(1).removesuffix("assets/")
+        command = [str(vite), *(["preview"] if preview else []), "--host", "127.0.0.1", "--port", str(port), "--strictPort", "--base", base]
         if self._preview_out_dir is not None:
             command.extend(["--outDir", str(self._preview_out_dir)])
         self._server_log = (self.data_root / f"render-vite-{port}.log").open("wb")
@@ -133,7 +147,7 @@ class RenderClient:
             command, cwd=self.web_root, env={**os.environ, "BROWSER": "none"},
             stdout=self._server_log, stderr=subprocess.STDOUT, start_new_session=True,
         )
-        url = f"http://127.0.0.1:{port}/fit.html"
+        url = f"http://127.0.0.1:{port}{base}fit.html"
         deadline = time.monotonic() + timeout_seconds
         while time.monotonic() < deadline:
             if self._server.poll() is not None:
@@ -170,6 +184,21 @@ class RenderClient:
             raise ValueError("Browser ID byte count does not match render dimensions")
         return np.frombuffer(raw, dtype=dtype).reshape(height, width).astype(np.uint16, copy=False)
 
+    @classmethod
+    def _decode_appearance(cls, result: dict[str, Any]) -> dict[str, np.ndarray]:
+        arrays = {"ids": cls._decode(result)}
+        for field, key, dtype in (("rgb", "rgb", np.dtype("u1")), ("worldPositions", "world_positions", np.dtype("<f4"))):
+            if field not in result:
+                continue
+            raw = base64.b64decode(result[field], validate=True)
+            width, height = result["width"], result["height"]
+            if len(raw) != width * height * 3 * dtype.itemsize:
+                raise ValueError(f"Browser {field} byte count does not match render dimensions")
+            arrays[key] = np.frombuffer(raw, dtype=dtype).reshape(height, width, 3)
+        if "rgb" not in arrays:
+            raise ValueError("Browser did not return requested shaded RGB")
+        return arrays
+
     def render(self, request: dict[str, Any], *, shot_id: str | None = None, view_id: str | None = None) -> np.ndarray:
         return self.render_batch([request], shot_id=shot_id, view_id=view_id)[0]
 
@@ -178,16 +207,32 @@ class RenderClient:
     ) -> list[np.ndarray]:
         return cast(list[np.ndarray], self._render_batch(requests, shot_id, view_id, candidates=False))
 
+    def render_appearance(
+        self, request: dict[str, Any], *, world_positions: bool = True,
+        shot_id: str | None = None, view_id: str | None = None,
+    ) -> dict[str, np.ndarray]:
+        return self.render_appearance_batch([request], world_positions=world_positions, shot_id=shot_id, view_id=view_id)[0]
+
+    def render_appearance_batch(
+        self, requests: Iterable[dict[str, Any]], *, world_positions: bool = True,
+        shot_id: str | None = None, view_id: str | None = None,
+    ) -> list[dict[str, np.ndarray]]:
+        """Strict native-material RGB; optional XYZ is in metres with NaN background."""
+        outputs = ["rgb", "worldPositions"] if world_positions else ["rgb"]
+        batch = [{**request, "outputs": outputs} for request in requests]
+        return cast(list[dict[str, np.ndarray]], self._render_batch(batch, shot_id, view_id, candidates=False, appearance=True))
+
     def render_candidate_batch(
         self, requests: Iterable[dict[str, Any]], *, shot_id: str | None = None, view_id: str | None = None,
     ) -> list[np.ndarray | None]:
         """Return None only for documented physical infeasibility during search."""
         self.last_candidate_failures = {}
-        return self._render_batch(requests, shot_id, view_id, candidates=True)
+        return cast(list[np.ndarray | None], self._render_batch(requests, shot_id, view_id, candidates=True))
 
     def _render_batch(
-        self, requests: Iterable[dict[str, Any]], shot_id: str | None, view_id: str | None, *, candidates: bool,
-    ) -> list[np.ndarray | None]:
+        self, requests: Iterable[dict[str, Any]], shot_id: str | None, view_id: str | None, *,
+        candidates: bool, appearance: bool = False,
+    ) -> list[np.ndarray | dict[str, np.ndarray] | None]:
         if self.page is None:
             raise RuntimeError("RenderClient is closed")
         batch = list(requests)
@@ -239,7 +284,10 @@ class RenderClient:
                 if self.last_candidate_failures:
                     self._log("candidate-infeasible", shotId=shot_id, viewId=view_id,
                               count=sum(self.last_candidate_failures.values()), reasons=self.last_candidate_failures)
-            arrays = [None if candidates and result is None else self._decode(result) for result in payload["results"]]
+            arrays = [
+                None if candidates and result is None else self._decode_appearance(result) if appearance else self._decode(result)
+                for result in payload["results"]
+            ]
             decoded = time.perf_counter()
         except Exception as error:
             self._log("batch-error", shotId=shot_id, viewId=view_id, count=len(batch), candidates=candidates,
@@ -335,8 +383,8 @@ def _camera(eye: tuple[float, float, float], target: tuple[float, float, float],
     return {"positionMetres": list(eye), "quaternion": q.tolist(), "verticalFovDegrees": 38, "principalPointViewportPixels": [240, 135]}
 
 
-def smoke(client: RenderClient, count: int = 64) -> dict[str, Any]:
-    """Save only synthetic ID images, check pose/filter/mirror, and time a batch."""
+def smoke(client: RenderClient, count: int = 64, *, appearance: bool = False) -> dict[str, Any]:
+    """Save synthetic renders, check pose/filter/mirror, and time a batch."""
     from PIL import Image
 
     destination = client.data_root / "harness-smoke"
@@ -402,6 +450,46 @@ def smoke(client: RenderClient, count: int = 64) -> dict[str, Any]:
     shifted = client.render(request(offcenter, 0), shot_id="harness-smoke-principal-point")
     if not np.array_equal(shifted[7:, 13:], first[:-7, :-13]):
         raise AssertionError("Principal-point camera did not translate the image by (13,7)")
+    appearance_checks: dict[str, Any] = {}
+    if appearance:
+        appearance_request = request(offcenter, 0)
+        shaded = client.render_appearance(appearance_request, shot_id="harness-smoke-appearance")
+        if not np.array_equal(shaded["ids"], shifted):
+            raise AssertionError("Appearance changed the native ID projection")
+        xyz = shaded["world_positions"]
+        mask = shaded["ids"] > 0
+        if not np.isfinite(xyz[mask]).all() or not np.isnan(xyz[~mask]).all():
+            raise AssertionError("World positions must be finite on-machine and NaN off-machine")
+        x, y, z, w = offcenter["quaternion"]
+        rotation = np.array([
+            [1 - 2 * (y*y + z*z), 2 * (x*y - z*w), 2 * (x*z + y*w)],
+            [2 * (x*y + z*w), 1 - 2 * (x*x + z*z), 2 * (y*z - x*w)],
+            [2 * (x*z - y*w), 2 * (y*z + x*w), 1 - 2 * (x*x + y*y)],
+        ])
+        local = (xyz[mask] - np.asarray(offcenter["positionMetres"])) @ rotation
+        tangent = math.tan(math.radians(offcenter["verticalFovDegrees"] / 2))
+        cx, cy = offcenter["principalPointViewportPixels"]
+        projected = np.column_stack((cx + local[:, 0] / -local[:, 2] * 270 / (2 * tangent),
+                                     cy - local[:, 1] / -local[:, 2] * 270 / (2 * tangent)))
+        yy, xx = np.nonzero(mask)
+        error = np.linalg.norm(projected - np.column_stack((xx + 0.5, yy + 0.5)), axis=1)
+        if float(error.max()) > 0.1:
+            raise AssertionError(f"World-position reprojection error: {float(error.max()):.6f}px")
+        mirrored_appearance = client.render_appearance(
+            {**appearance_request, "presentation": "horizontal-mirror"}, shot_id="harness-smoke-appearance-mirror",
+        )
+        if not np.array_equal(mirrored_appearance["rgb"], shaded["rgb"][:, ::-1]):
+            raise AssertionError("Shaded RGB mirror is not an exact x flip")
+        if not np.array_equal(mirrored_appearance["ids"], shaded["ids"][:, ::-1]):
+            raise AssertionError("Appearance IDs mirror is not an exact x flip")
+        if not np.allclose(mirrored_appearance["world_positions"], xyz[:, ::-1], rtol=0, atol=0, equal_nan=True):
+            raise AssertionError("World-position mirror is not an exact x flip")
+        if not np.array_equal(client.render(appearance_request, shot_id="harness-smoke-material-restore"), shifted):
+            raise AssertionError("Appearance did not restore ID materials")
+        Image.fromarray(shaded["rgb"]).save(destination / "front-rgb.png")
+        Image.fromarray(mirrored_appearance["rgb"]).save(destination / "front-rgb-mirror.png")
+        appearance_checks = {"worldPositionsNaNBackground": True, "worldPositionsMaxReprojectionPx": float(error.max()),
+                             "rgbMirrorExact": True, "worldPositionsMirrorExact": True, "idMaterialsRestored": True}
     # Warm shader programs and GPU buffers before the timed transport+decode batch.
     client.render_batch([request(cameras["front"], i * 0.13) for i in range(8)], shot_id="harness-throughput-warmup")
     started = time.perf_counter()
@@ -421,6 +509,7 @@ def smoke(client: RenderClient, count: int = 64) -> dict[str, Any]:
         "groupCounts": {name: len(parts) for name, parts in groups.items()},
         "channelMapping": ready["channelMapping"], "checks": checks,
         "boundsMetres": ready["boundsMetres"], "cameras": cameras,
+        "appearanceChecks": appearance_checks,
         "mirrorExact": True, "principalPointExact": True,
         "throughput": {"count": count, "width": 480, "height": 270, "seconds": seconds, "rendersPerSecond": count / seconds, "targetRendersPerSecond": 30},
         "timingSplit": crank_timing,
@@ -435,6 +524,7 @@ def smoke(client: RenderClient, count: int = 64) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--smoke", action="store_true", required=True)
+    parser.add_argument("--appearance", action="store_true", help="Also verify shaded RGB and native per-pixel XYZ")
     parser.add_argument("--url", help="Attach to an existing Vite fit.html URL")
     parser.add_argument("--preview", action="store_true", help="Serve an already-built web/dist instead of Vite dev")
     parser.add_argument("--count", type=int, default=64)
@@ -444,7 +534,7 @@ def main() -> None:
     if args.count < 1:
         parser.error("--count must be positive")
     with RenderClient(url=args.url, preview=args.preview, chromium_args=args.chromium_arg, gpu_backend=args.gpu_backend) as client:
-        print(json.dumps(smoke(client, args.count), indent=2))
+        print(json.dumps(smoke(client, args.count, appearance=args.appearance), indent=2))
 
 
 if __name__ == "__main__":

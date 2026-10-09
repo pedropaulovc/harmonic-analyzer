@@ -27,7 +27,7 @@ LIMITS = {
     "sourceGroups": "Per-group source support is projection-conditioned: source mask/edges are clipped near the rendered group. No independent source part labels exist; per-group IoU is not independently observed source-group IoU, even with tracked crank.",
     "crank": "Only independently tracked crank samples enter harmonic regressions. Inferred crank is fitted from the same moving parts being compared; held and inferred samples cannot validate kinematics.",
     "triage": "Kinematics-suspect requires harmonic correlation persistent in independent segments with different explicit fitted/manual setups. Local supported failures are setup-suspect, not proof of a setup defect. Insufficient phase/support or unresolved independent evidence is unvalidated.",
-    "pixels": "Chamfer is symmetric and untruncated, in original source-video pixels: rectSourcePixels width / render width. Distributions retain all finite raw errors, including low-IoU samples. Acceptance requires mask IoU >= 0.5 and each supplied render-to-source/source-to-render chamfer <= 960 px; their mean cannot conceal a one-sided failure. Robust truncated camera loss is never an acceptance error.",
+    "pixels": "Chamfer is symmetric and untruncated, in original source-video pixels: rectSourcePixels width / render width. Distributions retain all finite raw errors, including low-IoU samples. Acceptance requires mask IoU >= 0.5 and both required render-to-source/source-to-render chamfers <= 960 px; their mean cannot conceal a one-sided failure. Robust truncated camera loss is never an acceptance error.",
     "independentTakes": "Only the shot's driverViewId (largest machine view by median source mask area normalized to original source pixels) drives setup/crank. Other views may be independent takes: their numeric residuals remain pixel-alignment diagnostics, not independent mechanism/kinematics validation, even when they inherit a tracked crank.",
     "heldOut": "Setup parameters are fitted once at their first observable segment frame and then frozen. Fitting observations are excluded only from independent evidence for their fitted groups; dense raw pixel-alignment metrics still include every fitting frame/group.",
 }
@@ -85,6 +85,7 @@ def _distribution(values: Sequence[float], total: int, acceptance_values: Sequen
     validated = len(qualified)
     passing = int(np.count_nonzero(qualified <= THRESHOLD_PX))
     fraction = passing / total if total else None
+    raw_passing = int(np.count_nonzero(numbers <= THRESHOLD_PX))
     return {
         "sampledFrames": total, "validatedFrames": validated,
         "finiteMetricFrames": observed,
@@ -92,11 +93,13 @@ def _distribution(values: Sequence[float], total: int, acceptance_values: Sequen
         "medianPx": float(np.median(numbers)) if observed else None,
         "p90Px": float(np.percentile(numbers, 90)) if observed else None,
         "maxPx": float(numbers.max()) if observed else None,
+        "rawFramesAtOrBelow960Px": raw_passing,
+        "rawPercentAtOrBelow960Px": 100 * raw_passing / total if total else None,
         "fractionAtOrBelow960Px": fraction,
         "percentAtOrBelow960Px": 100 * fraction if fraction is not None else None,
         "thresholdPx": THRESHOLD_PX, "requiredFraction": TARGET_FRACTION,
         "requiredIoU": REQUIRED_IOU,
-        "distributionPopulation": "all finite nonnegative raw chamfer samples, including low-IoU and unsupported observations; acceptance separately requires supported mask IoU >= 0.5 and each supplied directed chamfer <= 960 px; every sample remains in the denominator",
+        "distributionPopulation": "all finite nonnegative raw chamfer samples, including low-IoU and unsupported observations; acceptance separately requires supported mask IoU >= 0.5 and both required directed chamfers <= 960 px; every sample remains in the denominator",
         "status": "unvalidated" if not total else "pass" if fraction >= TARGET_FRACTION else "fail",
     }
 
@@ -183,7 +186,11 @@ def _coverage_frames(video_id: str, root: Path, residuals: Mapping[str, Any]) ->
             if not actual or any(_acceptance_error(row) is None for row in actual):
                 missing_views.append({**identity, "sampledFrames": len(actual), "unvalidatedFrames": sum(_acceptance_error(row) is None for row in actual)})
     upstream = residuals.get("sourceCoverage", {})
-    coverage = {"expectedViews": expected_views, "processedViews": len(expected_views) - len(missing_views), "missingViews": missing_views, "unknownSampleCountViews": unknown_counts, "reportedByFitter": upstream}
+    processed_views = {(str(row["shotId"]), str(row["viewId"])) for row in residuals.get("frames", [])
+                       if str(row.get("shotId")) in machine}
+    coverage = {"expectedViews": expected_views, "processedViews": len(processed_views),
+                "qualifiedViews": len(expected_views) - len(missing_views), "missingViews": missing_views,
+                "unknownSampleCountViews": unknown_counts, "reportedByFitter": upstream}
     return list(frames.values()), coverage, shots
 
 
@@ -635,6 +642,8 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
         "renderSnapshot": snapshot, "renderer": residuals.get("renderer"),
         "partial": partial, "reportScope": report_scope,
         "reviewNotes": review_notes,
+        "visualFalsePasses": [note for note in review_notes if note.get("numericPassAtInspectedFrame") is True],
+        "visualReviewScope": review.get("scope", "unrecorded"),
         "candidateInfeasibility": residuals.get("candidateInfeasibility", []),
         "candidateInfeasibilityClassification": "optimizer-domain-rejection",
         "acceptance": acceptance, "frameViewAcceptance": frame_view_acceptance,
@@ -671,7 +680,8 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
         "## Acceptance (all sampled machine frames)", "",
         f"Status: **{acceptance['status']}**; sampled {acceptance['sampledFrames']}; validated {acceptance['validatedFrames']}; unvalidated {acceptance['unvalidatedFrames']}.",
         f"All-finite raw untruncated source-pixel chamfer median / p90 / max (including low-IoU observations): {number(acceptance['medianPx'])} / {number(acceptance['p90Px'])} / {number(acceptance['maxPx'])}.",
-        f"Each supplied render→source AND source→render chamfer at most 960 px AND mask IoU at least {REQUIRED_IOU}: {number(acceptance['percentAtOrBelow960Px'])}% of all sampled frames (target 90%); the symmetric mean alone cannot pass a one-sided failure.",
+        f"Raw symmetric mean at most 960 px (without an IoU/directional qualification): {number(acceptance['rawPercentAtOrBelow960Px'])}% of all sampled frames; this diagnostic is not acceptance.",
+        f"Both required render→source AND source→render chamfers at most 960 px AND mask IoU at least {REQUIRED_IOU}: {number(acceptance['percentAtOrBelow960Px'])}% of all sampled frames (target 90%); the symmetric mean alone cannot pass a one-sided failure.",
         f"Frame-view support: {frame_view_acceptance['validatedFrames']} / {frame_view_acceptance['sampledFrames']}; low-IoU or missing support is never a success.",
         f"Fit computation runtime: {number(summary['fitRuntimeSeconds'])} s (not a temporal alignment acceptance metric).", "",
         "## Temporal alignment", "",
@@ -752,7 +762,18 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
         )) + " |")
     if not manual_needed_reasons:
         lines.append("| — | — | No unsupported samples or explicit private review reasons recorded | Not a visual acceptance claim |")
-    lines.extend(["", "## Worst-first contact sheets", ""])
+    visual_false_passes = [note for note in review_notes if note.get("numericPassAtInspectedFrame") is True]
+    lines.extend(["", "## Inspected semantic false passes", "",
+                  "These named frames satisfy the numerical IoU/directional limits but remain visibly wrong. Silhouette/edge camera fitting is ill-posed for these views; do not promote their numerical qualification to camera or mechanism approval.", "",
+                  "| Shot | View | Frame index | Semantic failure | Sheet |",
+                  "| --- | --- | --- | --- | --- |"])
+    for note in visual_false_passes:
+        lines.append("| " + " | ".join(table_cell(note.get(key, "")) for key in (
+            "shotId", "viewId", "inspectedIndex", "reason", "evidence",
+        )) + " |")
+    if not visual_false_passes:
+        lines.append("| — | — | — | None explicitly recorded; not visual approval | — |")
+    lines.extend(["", "## Lowest-IoU-first contact sheets", ""])
     lines.extend(f"- [{Path(path).name}]({os.path.relpath(path, directory)})" for path in contacts)
     if missing_contacts or missing_shot_sheets:
         lines.append(f"Missing sheet evidence: {missing_contacts}; shots without sheets: {missing_shot_sheets}.")

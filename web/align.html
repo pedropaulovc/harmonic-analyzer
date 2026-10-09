@@ -9,6 +9,7 @@
     <header class="align-header">
       <h1>Align video</h1>
       <label>Video <select id="video-id"><option value="8KmVDxkia_w">Synthesis</option><option value="6dW6VYXp9HM">Analysis</option></select></label>
+      <button id="review-mode" aria-pressed="false" disabled>Review queue</button>
       <a id="companion-link" href="./?video=synthesis">Companion</a>
     </header>
     <main class="align-workspace">
@@ -21,16 +22,22 @@
           <label>Model opacity <input id="opacity" type="range" min="0" max="1" step="0.01" value="0.5" /></label>
         </div>
         <p id="align-status" role="status">Loading video, shot census and model…</p>
-        <p class="hint">Left / right: one frame · Shift: ten frames · Space: play/pause · C: save camera · S: save segment · K: save crank. Drag to orbit; right-drag to pan; scroll to dolly.</p>
+        <p class="hint">Left / right: one frame · Shift: ten frames · Space: play/pause · C: save camera · S: save segment · K: save crank. Review: A accepts + next unreviewed; C saves + stays; Shift+C saves + next; N/P move without saving. Drag to orbit; right-drag to pan; scroll to dolly.</p>
       </section>
       <aside class="align-panel">
+        <section id="camera-review" aria-label="Camera review queue" hidden>
+          <p id="review-count" role="status">0 of 0 reviewed</p>
+          <div class="align-actions"><button id="review-previous">Previous (P)</button><button id="review-accept">Accept &amp; next (A)</button><button id="review-next">Next (N)</button></div>
+          <p id="review-source" class="hint"></p>
+          <details><summary>Shot views and saved cameras</summary><ol id="review-list"></ol></details>
+        </section>
         <label>Shot <select id="shot"></select></label><label>View <select id="view"></select></label>
         <fieldset><legend>Camera</legend>
           <label>Vertical FOV (°) <input id="fov" type="number" min="1" max="170" step="0.25" value="35" /></label>
           <label>Principal point X (view px) <input id="pp-x" type="number" step="1" value="960" /></label>
           <label>Principal point Y (view px) <input id="pp-y" type="number" step="1" value="540" /></label>
           <div class="align-actions"><button id="pp-left">X −1</button><button id="pp-right">X +1</button><button id="pp-up">Y −1</button><button id="pp-down">Y +1</button></div>
-          <button id="reset-camera">Reload saved camera</button><button id="save-camera">Save camera key at t</button>
+          <button id="reset-camera">Reload saved camera</button><button id="save-camera" title="C saves; Shift+C saves and advances to the next unreviewed view">Save camera key at t</button>
         </fieldset>
         <fieldset><legend>Setup segment</legend>
           <label>Segment <select id="segment"></select></label>

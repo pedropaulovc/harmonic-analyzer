@@ -42,6 +42,8 @@ class FitReportTests(unittest.TestCase):
                 self.assertEqual(distribution['medianPx'], 500.)
                 self.assertEqual(distribution['framesAtOrBelow960Px'], 0)
                 self.assertEqual(distribution['fractionAtOrBelow960Px'], 0.)
+                self.assertEqual(distribution['rawFramesAtOrBelow960Px'], 1)
+                self.assertEqual(distribution['rawPercentAtOrBelow960Px'], 100.)
                 self.assertEqual(distribution['status'], 'fail')
 
     def test_raw_distribution_retains_low_iou_and_unsupported_denominator(self):
@@ -60,6 +62,8 @@ class FitReportTests(unittest.TestCase):
         self.assertEqual(distribution['unvalidatedFrames'], 2)
         self.assertEqual(distribution['framesAtOrBelow960Px'], 1)
         self.assertAlmostEqual(distribution['fractionAtOrBelow960Px'], 1 / 3)
+        self.assertEqual(distribution['rawFramesAtOrBelow960Px'], 2)
+        self.assertAlmostEqual(distribution['rawPercentAtOrBelow960Px'], 200 / 3)
         self.assertEqual(distribution['medianPx'], 500.)
         self.assertAlmostEqual(distribution['p90Px'], 820.)
         self.assertEqual(distribution['maxPx'], 900.)
@@ -123,7 +127,8 @@ class FitReportTests(unittest.TestCase):
             {'shotId': 'machine', 'viewId': 'driver'},
             {'shotId': 'transition', 'viewId': 'driver'},
         ])
-        self.assertEqual(coverage['processedViews'], 1)
+        self.assertEqual(coverage['processedViews'], 2)
+        self.assertEqual(coverage['qualifiedViews'], 1)
         self.assertEqual(coverage['missingViews'], [
             {'shotId': 'transition', 'viewId': 'driver',
              'sampledFrames': 3, 'unvalidatedFrames': 2},

@@ -11,8 +11,21 @@ interface CensusView { viewId: string; rectSourcePixels: [number, number, number
 interface CensusShot { id: string; start: number; end: number; startFrame: number; endFrame: number; classification: string; views: CensusView[] }
 interface Census { videoId: string; fps: [number, number]; shots: CensusShot[] }
 interface SetupSegment { id: string; start: number; end: number; init: SegmentInit }
+type CameraProvenance = 'proposal-accepted' | 'manual'
+interface CameraProposal {
+  shotId: string
+  viewId: string
+  frame: number
+  camera: CameraRecord
+  iou: number | null
+  s2rPx: number | null
+  r2sPx: number | null
+  pnpInliers: number | null
+  pnpInlierFraction: number | null
+}
+interface ReviewEntry { shot: CensusShot; view: CensusView; frame: number; proposal?: CameraProposal }
 interface ManualData {
-  cameraKeys: (SyncCameraKey & { shotId: string; viewId: string })[]
+  cameraKeys: (SyncCameraKey & { shotId: string; viewId: string; provenance?: CameraProvenance })[]
   segments: SetupSegment[]
   crank: { t: number; turns: number }[]
 }
@@ -39,6 +52,12 @@ const magnification = element<HTMLInputElement>('align-magnification')
 const segmentId = element<HTMLInputElement>('segment-id')
 const segmentStart = element<HTMLInputElement>('segment-start')
 const segmentEnd = element<HTMLInputElement>('segment-end')
+const reviewToggle = element<HTMLButtonElement>('review-mode')
+const reviewPanel = element('camera-review')
+const reviewList = element<HTMLOListElement>('review-list')
+const reviewPrevious = element<HTMLButtonElement>('review-previous')
+const reviewNext = element<HTMLButtonElement>('review-next')
+const reviewAccept = element<HTMLButtonElement>('review-accept')
 const input = createMechanismInput()
 const renderer = new THREE.WebGLRenderer({ canvas: overlay, antialias: true, alpha: true })
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
@@ -72,26 +91,39 @@ let currentView: CensusView | undefined
 let currentSegment: SetupSegment | undefined
 let loaded = false
 let loadingVersion = 0
+let reviewMode = false
+let reviewBusy = false
+let reviewIndex = 0
+let reviewQueue: ReviewEntry[] = []
+let reviewItems: HTMLButtonElement[] = []
+let reviewedCount = 0
+let reviewSeedCamera: CameraRecord | null = null
+let reviewSeedSource: string | null = null
 const setupControls: { key: keyof MechanismInput['setup']; control: HTMLInputElement }[] = []
 const channelControls: { amplitude: HTMLInputElement; phase: HTMLInputElement }[] = []
 
+let renderFrame = 0
 function render(): void {
-  if (!machine || !currentView) return
-  try {
-    machine.update(input)
-    const rect = currentView.rectSourcePixels
-    camera.aspect = rect[2] / rect[3]
-    camera.fov = Number(fov.value)
-    camera.setViewOffset(rect[2], rect[3], rect[2] / 2 - Number(ppX.value), rect[3] / 2 - Number(ppY.value), rect[2], rect[3])
-    camera.updateProjectionMatrix()
-    camera.updateMatrixWorld(true)
-    const width = Math.max(1, Math.round(overlay.clientWidth)), height = Math.max(1, Math.round(overlay.clientHeight))
-    renderer.setSize(width, height, false)
-    renderer.render(scene, camera)
-  } catch (error) {
-    status.textContent = error instanceof Error ? error.message : String(error)
-    status.dataset.state = 'error'
-  }
+  if (renderFrame) return
+  renderFrame = requestAnimationFrame(() => {
+    renderFrame = 0
+    if (!machine || !currentView) return
+    try {
+      machine.update(input)
+      const rect = currentView.rectSourcePixels
+      camera.aspect = rect[2] / rect[3]
+      camera.fov = Number(fov.value)
+      camera.setViewOffset(rect[2], rect[3], rect[2] / 2 - Number(ppX.value), rect[3] / 2 - Number(ppY.value), rect[2], rect[3])
+      camera.updateProjectionMatrix()
+      camera.updateMatrixWorld(true)
+      const width = Math.max(1, Math.round(overlay.clientWidth)), height = Math.max(1, Math.round(overlay.clientHeight))
+      renderer.setSize(width, height, false)
+      renderer.render(scene, camera)
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : String(error)
+      status.dataset.state = 'error'
+    }
+  })
 }
 
 function applyCamera(record: CameraRecord): void {
@@ -154,7 +186,7 @@ function reloadCamera(): void {
 function selectView(): void {
   currentView = currentShot?.views.find(view => view.viewId === viewSelect.value)
   overlay.hidden = !currentView
-  element<HTMLButtonElement>('save-camera').disabled = !currentView
+  element<HTMLButtonElement>('save-camera').disabled = !currentView || reviewBusy
   if (!currentView) return
   const [x, y, w, h] = currentView.rectSourcePixels
   overlay.style.left = `${x / 1920 * 100}%`
@@ -243,7 +275,9 @@ async function seek(t: number): Promise<void> {
   if (!Number.isFinite(t)) throw new Error('Seek time must be finite')
   original.pause()
   t = Math.max(0, Math.min(original.duration || 0, t))
-  if (original.currentTime !== t) {
+  // Browsers quantize media times; the current source frame needs no seeked event.
+  const fps = census ? census.fps[0] / census.fps[1] : undefined
+  if (fps ? Math.round(original.currentTime * fps) !== Math.round(t * fps) : original.currentTime !== t) {
     await new Promise<void>((resolve, reject) => {
       const timer = window.setTimeout(() => { cleanup(); reject(new Error('Video seek timed out')) }, 15000)
       const done = () => { cleanup(); resolve() }
@@ -255,11 +289,163 @@ async function seek(t: number): Promise<void> {
   updateTime()
 }
 
-async function save(kind: 'camera' | 'segment' | 'crank'): Promise<void> {
-  const body: Record<string, unknown> = { videoId: videoSelect.value }
+function refreshReviewQueue(): void {
+  reviewedCount = 0
+  for (let index = 0; index < reviewQueue.length; index++) {
+    const entry = reviewQueue[index]!, button = reviewItems[index]!
+    const hasCamera = manual.cameraKeys.some(key => key.shotId === entry.shot.id && key.viewId === entry.view.viewId)
+    if (hasCamera) reviewedCount++
+    button.dataset.reviewed = String(hasCamera)
+    button.lastElementChild!.textContent = hasCamera ? 'Manual camera' : 'Not saved'
+    button.setAttribute('aria-current', String(index === reviewIndex))
+    button.disabled = reviewBusy
+  }
+  element('review-count').textContent = `${reviewedCount} of ${reviewQueue.length} reviewed`
+  reviewToggle.disabled = !loaded || reviewBusy
+  reviewToggle.setAttribute('aria-pressed', String(reviewMode))
+  reviewPanel.hidden = !reviewMode
+  reviewPrevious.disabled = reviewBusy || reviewIndex === 0
+  reviewNext.disabled = reviewBusy || reviewIndex + 1 >= reviewQueue.length
+  reviewAccept.disabled = reviewBusy || !reviewSeedCamera
+  element<HTMLButtonElement>('save-camera').disabled = !currentView || reviewBusy
+  shotSelect.disabled = reviewMode
+  viewSelect.disabled = reviewMode
+}
+
+function buildReviewQueue(proposals: CameraProposal[]): void {
+  reviewQueue = []
+  for (const shot of census?.shots ?? []) {
+    if (shot.classification !== 'machine' && shot.classification !== 'transition') continue
+    for (const view of shot.views) {
+      const proposal = proposals.find(item => item.shotId === shot.id && item.viewId === view.viewId)
+      reviewQueue.push({ shot, view, proposal, frame: proposal?.frame ?? Math.floor((shot.startFrame + shot.endFrame - 1) / 2) })
+    }
+  }
+  reviewQueue.sort((a, b) => a.frame - b.frame)
+  reviewIndex = 0
+  reviewSeedCamera = null
+  reviewSeedSource = null
+  reviewItems = reviewQueue.map((entry, index) => {
+    const item = document.createElement('li')
+    const button = document.createElement('button')
+    const label = document.createElement('span'), saved = document.createElement('span')
+    label.textContent = `${entry.shot.id} · ${entry.view.viewId}`
+    button.title = label.textContent
+    button.append(label, saved)
+    button.addEventListener('click', () => { void showReviewEntry(index).catch(handleError) })
+    item.append(button)
+    reviewList.append(item)
+    return button
+  })
+  refreshReviewQueue()
+}
+
+async function showReviewEntry(index: number): Promise<void> {
+  if (!reviewMode || reviewBusy || !census) return
+  const entry = reviewQueue[index]
+  if (!entry) return
+  const version = loadingVersion
+  reviewBusy = true
+  reviewIndex = index
+  refreshReviewQueue()
+  try {
+    await seek(entry.frame * census.fps[1] / census.fps[0])
+    if (version !== loadingVersion || !reviewMode) return
+    viewSelect.value = entry.view.viewId
+    selectView()
+    const fps = census.fps[0] / census.fps[1]
+    let previous: ManualData['cameraKeys'][number] | undefined
+    let nearest: ManualData['cameraKeys'][number] | undefined
+    for (const key of manual.cameraKeys) {
+      const frame = Math.round(key.t * fps)
+      if (frame <= entry.frame && (!previous || key.t > previous.t)) previous = key
+      if (!nearest || Math.abs(frame - entry.frame) < Math.abs(Math.round(nearest.t * fps) - entry.frame)) nearest = key
+    }
+    const accepted = previous ?? nearest
+    reviewSeedCamera = entry.proposal?.camera ?? accepted?.camera ?? null
+    reviewSeedSource = entry.proposal ? 'proposal' : accepted ? `accepted camera from ${accepted.shotId}` : null
+    if (reviewSeedCamera) { applyCamera(reviewSeedCamera); render() }
+    element('review-source').textContent = `View ${index + 1} of ${reviewQueue.length} · frame ${entry.frame} · ${reviewSeedSource ?? 'no proposal or accepted camera; adjust and save with C'}`
+  } finally {
+    if (version === loadingVersion) {
+      reviewBusy = false
+      refreshReviewQueue()
+    }
+  }
+}
+
+async function toggleReviewQueue(): Promise<void> {
+  if (!loaded || reviewBusy) return
+  if (reviewMode) {
+    reviewMode = false
+    refreshReviewQueue()
+    return
+  }
+  const version = loadingVersion
+  reviewBusy = true
+  refreshReviewQueue()
+  try {
+    const response = await fetch(`/__sync/proposals/${videoSelect.value}`)
+    if (!response.ok) throw new Error('Camera proposals unavailable')
+    const data = await response.json() as { cameras: CameraProposal[] }
+    if (version !== loadingVersion) return
+    reviewList.replaceChildren()
+    reviewMode = true
+    buildReviewQueue(data.cameras)
+  } finally {
+    if (version === loadingVersion) {
+      reviewBusy = false
+      refreshReviewQueue()
+    }
+  }
+  await showReviewEntry(0)
+}
+
+async function saveReviewCamera(provenance: CameraProvenance, advance = provenance === 'proposal-accepted'): Promise<void> {
+  if (reviewBusy || !census) return
+  const entry = reviewQueue[reviewIndex]
+  if (!entry) return
+  if (provenance === 'proposal-accepted' && !reviewSeedCamera) throw new Error('No proposed camera to accept; adjust and save with C')
+  if (provenance === 'manual' && (currentShot?.id !== entry.shot.id || currentView?.viewId !== entry.view.viewId)) throw new Error('Return to this review view with N/P or the list before saving')
+  const version = loadingVersion
+  reviewBusy = true
+  refreshReviewQueue()
+  try {
+    if (provenance === 'proposal-accepted') {
+      await seek(entry.frame * census.fps[1] / census.fps[0])
+      if (version !== loadingVersion) return
+      viewSelect.value = entry.view.viewId
+      selectView()
+      applyCamera(reviewSeedCamera!)
+      render()
+    }
+    await save('camera', provenance)
+  } finally {
+    if (version === loadingVersion) {
+      reviewBusy = false
+      refreshReviewQueue()
+    }
+  }
+  if (advance && version === loadingVersion) {
+    for (let offset = 1; offset <= reviewQueue.length; offset++) {
+      const index = (reviewIndex + offset) % reviewQueue.length
+      const next = reviewQueue[index]!
+      if (!manual.cameraKeys.some(key => key.shotId === next.shot.id && key.viewId === next.view.viewId)) {
+        await showReviewEntry(index)
+        break
+      }
+    }
+  }
+}
+
+async function save(kind: 'camera' | 'segment' | 'crank', provenance: CameraProvenance = 'manual'): Promise<void> {
+  const id = videoSelect.value, version = loadingVersion
+  const body: Record<string, unknown> = { videoId: id }
   if (kind === 'camera') {
     if (!currentShot || !currentView) throw new Error('Select a machine shot/view before saving')
-    body.cameraKey = { shotId: currentShot.id, viewId: currentView.viewId, t: original.currentTime, camera: cameraRecord() }
+    const frame = provenance === 'proposal-accepted' ? reviewQueue[reviewIndex]?.frame : census ? Math.round(original.currentTime * census.fps[0] / census.fps[1]) : undefined
+    const t = reviewMode && census && frame !== undefined ? frame * census.fps[1] / census.fps[0] : original.currentTime
+    body.cameraKey = { shotId: currentShot.id, viewId: currentView.viewId, t, camera: cameraRecord(), provenance }
   } else if (kind === 'segment') {
     const { crankTurns: _crank, ...init } = serializeSyncInput(input)
     body.segment = { id: segmentId.value.trim(), start: Number(segmentStart.value), end: Number(segmentEnd.value), init }
@@ -268,9 +454,12 @@ async function save(kind: 'camera' | 'segment' | 'crank'): Promise<void> {
   status.dataset.state = 'loading'
   const response = await fetch('/__sync/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!response.ok) throw new Error(await response.text())
-  const saved = await fetch(`/__sync/manual/${videoSelect.value}`)
+  const saved = await fetch(`/__sync/manual/${id}`)
   if (!saved.ok) throw new Error('Could not reload manual entries')
-  manual = await saved.json() as ManualData
+  const nextManual = await saved.json() as ManualData
+  if (version !== loadingVersion) return
+  manual = nextManual
+  refreshReviewQueue()
   if (kind === 'segment') {
     const entry = manual.segments.find(item => item.id === segmentId.value.trim())!
     const index = segments.findIndex(item => item.id === entry.id)
@@ -291,9 +480,15 @@ function handleError(error: unknown): void {
 async function loadVideo(): Promise<void> {
   const version = ++loadingVersion
   loaded = false
+  reviewBusy = false
   currentShot = undefined
   currentView = undefined
   currentSegment = undefined
+  reviewQueue = []
+  reviewItems = []
+  reviewList.replaceChildren()
+  reviewSeedCamera = null
+  refreshReviewQueue()
   const id = videoSelect.value
   const base = `${import.meta.env.BASE_URL}sync/videos/${id}`
   status.textContent = 'Loading original video and shot census…'
@@ -334,6 +529,11 @@ async function loadVideo(): Promise<void> {
   loaded = true
   const firstMachine = census.shots.find(shot => shot.classification === 'machine' && shot.views.length)
   await seek((firstMachine?.startFrame ?? 0) * census.fps[1] / census.fps[0])
+  refreshReviewQueue()
+  if (reviewMode) {
+    reviewMode = false
+    await toggleReviewQueue()
+  }
 }
 
 // Physical setup coordinates remain in SI units; phase controls are radians.
@@ -395,11 +595,19 @@ element('reset-camera').addEventListener('click', reloadCamera)
 element('seek').addEventListener('click', () => { void seek(Number(timeControl.value)).catch(handleError) })
 timeControl.addEventListener('keydown', event => { if (event.key === 'Enter') void seek(Number(timeControl.value)).catch(handleError) })
 scrub.addEventListener('change', () => { void seek(Number(scrub.value)).catch(handleError) })
-for (const [id, kind] of [['save-camera', 'camera'], ['save-segment', 'segment'], ['save-crank', 'crank']] as const) element(id).addEventListener('click', () => { void save(kind).catch(handleError) })
+element('save-camera').addEventListener('click', () => { void (reviewMode ? saveReviewCamera('manual') : save('camera')).catch(handleError) })
+for (const [id, kind] of [['save-segment', 'segment'], ['save-crank', 'crank']] as const) element(id).addEventListener('click', () => { void save(kind).catch(handleError) })
+reviewToggle.addEventListener('click', () => { void toggleReviewQueue().catch(handleError) })
+reviewPrevious.addEventListener('click', () => { void showReviewEntry(reviewIndex - 1).catch(handleError) })
+reviewNext.addEventListener('click', () => { void showReviewEntry(reviewIndex + 1).catch(handleError) })
+reviewAccept.addEventListener('click', () => { void saveReviewCamera('proposal-accepted').catch(handleError) })
 const stepFrame = (delta: number) => {
   if (!census) return
   const fps = census.fps[0] / census.fps[1]
-  void seek((Math.round(original.currentTime * fps) + delta) / fps).catch(handleError)
+  let frame = Math.round(original.currentTime * fps) + delta
+  const entry = reviewMode ? reviewQueue[reviewIndex] : undefined
+  if (entry) frame = Math.max(entry.shot.startFrame, Math.min(entry.shot.endFrame - 1, frame))
+  void seek(frame / fps).catch(handleError)
 }
 element('previous-frame').addEventListener('click', () => stepFrame(-1))
 element('next-frame').addEventListener('click', () => stepFrame(1))
@@ -413,6 +621,10 @@ document.addEventListener('keydown', event => {
   if ((event.target as HTMLElement).matches('input, select, textarea') || event.ctrlKey || event.altKey || event.metaKey) return
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); stepFrame((event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 10 : 1)) }
   else if (event.code === 'Space') { event.preventDefault(); element('play').click() }
+  else if (reviewMode && event.key.toLowerCase() === 'a') reviewAccept.click()
+  else if (reviewMode && event.key.toLowerCase() === 'n') reviewNext.click()
+  else if (reviewMode && event.key.toLowerCase() === 'p') reviewPrevious.click()
+  else if (reviewMode && event.shiftKey && event.key.toLowerCase() === 'c') void saveReviewCamera('manual', true).catch(handleError)
   else if (event.key.toLowerCase() === 'c') element('save-camera').click()
   else if (event.key.toLowerCase() === 's') element('save-segment').click()
   else if (event.key.toLowerCase() === 'k') element('save-crank').click()
@@ -431,6 +643,6 @@ else {
 }
 if (import.meta.env.DEV) Object.defineProperty(window, 'harmonicAlign', { value: {
   seek,
-  snapshot() { return { loaded, modelState: machine?.availability, videoId: videoSelect.value, t: original.currentTime, videoReadyState: original.readyState, shotId: currentShot?.id, viewId: currentView?.viewId, camera: cameraRecord(), input: serializeSyncInput(input), manual } },
+  snapshot() { return { loaded, modelState: machine?.availability, videoId: videoSelect.value, t: original.currentTime, videoReadyState: original.readyState, shotId: currentShot?.id, viewId: currentView?.viewId, camera: cameraRecord(), input: serializeSyncInput(input), manual, review: { enabled: reviewMode, busy: reviewBusy, index: reviewIndex, total: reviewQueue.length, reviewed: reviewedCount, frame: reviewQueue[reviewIndex]?.frame, seedSource: reviewSeedSource } } },
 } })
-window.addEventListener('pagehide', () => { controls.dispose(); machine?.dispose(); renderer.dispose(); environmentTarget.dispose() }, { once: true })
+window.addEventListener('pagehide', () => { cancelAnimationFrame(renderFrame); controls.dispose(); machine?.dispose(); renderer.dispose(); environmentTarget.dispose() }, { once: true })

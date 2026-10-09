@@ -34,8 +34,9 @@ function validateSave(value: unknown): RecordValue {
   if (request.cameraKey === undefined && request.segment === undefined && request.crank === undefined) throw new BadRequest('No save action')
   if (request.cameraKey !== undefined) {
     const key = object(request.cameraKey)
-    fields(key, ['shotId', 'viewId', 't', 'camera'])
+    fields(key, ['shotId', 'viewId', 't', 'camera', 'provenance'])
     identifier(key.shotId); identifier(key.viewId); time(key.t)
+    if (key.provenance !== undefined && key.provenance !== 'proposal-accepted' && key.provenance !== 'manual') throw new BadRequest('Invalid camera provenance')
     const camera = object(key.camera)
     fields(camera, ['positionMetres', 'quaternion', 'verticalFovDegrees', 'principalPointViewportPixels'])
     if (!vector(camera.positionMetres, 3) || !vector(camera.quaternion, 4)
@@ -145,13 +146,24 @@ export function syncDevMiddleware(): Plugin {
             await task
             json(response, 200, { ok: true }); return
           }
-          const match = /^\/__sync\/(video|manual)\/([A-Za-z0-9_-]+)(\.mp4)?$/.exec(pathname)
+          const match = /^\/__sync\/(video|manual|proposals)\/([A-Za-z0-9_-]+)(\.mp4)?$/.exec(pathname)
           if (!match || !match[2] || !Object.hasOwn(VIDEO_IDS, match[2]) || (match[1] === 'video') !== (match[3] === '.mp4')) { json(response, 404, { error: 'Unknown sync resource' }); return }
           if (request.method !== 'GET' && request.method !== 'HEAD') { json(response, 405, { error: 'GET or HEAD required' }); return }
           const head = request.method === 'HEAD'
           if (match[1] === 'manual') {
             await queue
             json(response, 200, await manual(manualPath(match[2])), head); return
+          }
+          if (match[1] === 'proposals') {
+            let contents: string
+            try {
+              contents = await readFile(join(server.config.root, 'sync', 'videos', match[2], 'proposals.json'), 'utf8')
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+              json(response, 200, { cameras: [] }, head); return
+            }
+            response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(contents), 'Cache-Control': 'no-store' })
+            response.end(head ? undefined : contents); return
           }
           const path = join(homedir(), 'data', 'harmonic-analyzer-videos', `${match[2]}.mp4`)
           const info = await stat(path)
