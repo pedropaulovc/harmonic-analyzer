@@ -65,12 +65,12 @@ DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the contact
 # azimuth; the oblique-mesh edge slack is checker-arbitrated (see the drive
 # train's mesh notes).
-DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0  # -85.80 at DP 49.82
+DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0
 PEN_EDGE_SLACK = _config.fit(
     "cone_drum_oblique_mesh", "edge_slack_mm"
 )  # cad/config/tolerances.yaml
-PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.565
-X_PITCH = DRUM_TIP_X - ADDENDUM * SEC_I + PEN_MID  # -85.76 at DP 49.82
+PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.137 mm
+X_PITCH = DRUM_TIP_X - ADDENDUM * SEC_I + PEN_MID
 
 
 def cone_seat(j: int) -> tuple[float, float]:
