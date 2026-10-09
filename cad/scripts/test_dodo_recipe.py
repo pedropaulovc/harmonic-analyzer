@@ -1596,6 +1596,85 @@ def test_com_seat_hands_back_its_wait_and_logs_total_elapsed(tmp_path, monkeypat
     }
 
 
+@pytest.mark.parametrize(
+    "stem,executor,restores,worker,expected",
+    [
+        pytest.param("vn_bearing", "local", (False, False), False, True, id="local-build"),
+        pytest.param("vn_bearing", "local", (False, False), True, True, id="worker-build"),
+        pytest.param("vn_bearing", "local", (True,), False, False, id="initial-hit"),
+        pytest.param("vn_bearing", "local", (False, True), False, False, id="hit-after-wait"),
+        pytest.param("vn_bearing", "farm", (False,), False, False, id="submitter-dispatch"),
+        pytest.param("pn_pen_rod", "local", (False, False), False, False, id="ordinary-part"),
+        pytest.param("vn_bearing", "drawing", (False, False), False, False, id="vendor-drawing"),
+    ],
+)
+def test_vendor_part_warning_only_at_actual_build(
+    tmp_path, monkeypatch, stem, executor, restores, worker, expected
+):
+    """Warn at the work boundary, not a miss that later restores or dispatches.
+
+    A farm worker executes with the local executor and autostart disabled. All
+    host-facing collaborators are replaced, including prewarm before dodo import.
+    """
+    import _artifact_cache
+
+    monkeypatch.setattr(_artifact_cache, "prewarm", lambda: None)
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "farm" if executor == "farm" else "local")
+    if worker:
+        monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+        monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "farm.execution=test-vendor-warning")
+    dodo = _load_dodo()
+    key = "a" * 64
+    script = tmp_path / f"build_{stem}.py"
+    output = tmp_path / f"{stem}.SLDPRT"
+    outcomes = iter(restores)
+    events = []
+
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda *_a: key)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
+    monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
+    monkeypatch.setattr(dodo, "_stamp_part_execution", lambda _stem: None)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(0.0))
+    monkeypatch.setattr(
+        dodo, "_farm_build", lambda *_a: events.append(("dispatch", {}))
+    )
+    monkeypatch.setattr(
+        dodo, "_exec_com", lambda *_a, **_kw: events.append(("execute", {}))
+    )
+    monkeypatch.setattr(
+        dodo._telemetry,
+        "warn",
+        lambda message, **fields: events.append((message, fields)),
+    )
+
+    if executor == "drawing":
+        dodo._cached_com_action(
+            f"drawing:{stem}", [sys.executable, str(script)], [], [output], "drawing"
+        )
+    else:
+        dodo._cached_part_action(stem, script)
+
+    warnings = [(message, fields) for message, fields in events if fields]
+    if expected:
+        assert len(warnings) == 1
+        message, fields = warnings[0]
+        assert fields == {"label": f"part:{stem}", "cache.key": key[:12]}
+        assert f"part:{stem}" in message and key[:12] in message
+        assert "investigate" in message and "refactor" in message
+        assert events == [warnings[0], ("execute", {})]
+    else:
+        assert warnings == []
+        if executor == "farm":
+            assert events == [("dispatch", {})]
+        elif not all(outcome is False for outcome in restores):
+            assert events == []
+        else:
+            assert events == [("execute", {})]
+
+
 def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
     """A cached COM task is FOUR top-level spans, never nested: the cache probe (the
     Azure restore attempt), the seat wait, the task itself (starting once the seat is
