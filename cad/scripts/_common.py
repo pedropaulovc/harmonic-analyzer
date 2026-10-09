@@ -264,6 +264,38 @@ def _log_sketch_relations(adapter: Any, label: str, phase: str, severity: str) -
             )
 
 
+def _delete_redundant_fix(adapter: Any, segment: Any) -> bool:
+    """Delete the FIX just added to ``segment`` iff it alone over-defines.
+
+    True only when the native swOverDefining inventory (filter 2) is exactly
+    one FIX relation (swConstraintType_FIXED = 17) on exactly this segment
+    (same ISketchSegment.GetID) and ISketchRelationManager.DeleteRelation
+    returns True. Anything else is left in place for the caller to raise on.
+    """
+    try:
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
+        relmgr = _early_bound(sketch.RelationManager, "ISketchRelationManager")
+        over = relmgr.GetRelations(2)
+        if not isinstance(over, (list, tuple)) or len(over) != 1 or over[0] is None:
+            return False
+        relation = _early_bound(over[0], "ISketchRelation")
+        if relation.GetRelationType() != 17:
+            return False
+        entities = relation.GetEntities()
+        if not isinstance(entities, (list, tuple)) or len(entities) != 1:
+            return False
+        fixed = _early_bound(entities[0], "ISketchSegment")
+        if list(fixed.GetID()) != list(segment.GetID()):
+            return False
+        return relmgr.DeleteRelation(relation) is True
+    except Exception as exc:
+        with contextlib.suppress(Exception):
+            _telemetry.error(f"redundant FIX deletion refused: {exc}")
+        return False
+
+
+
 async def equation_curve(
     adapter: Any, label: str, x_expr: str, y_expr: str
 ) -> str:
@@ -272,7 +304,8 @@ async def equation_curve(
     Range locks define the equation's endpoints. Normal sketch inference can
     add redundant relations between adjacent locked curves; AddToDB avoids
     that creation mechanism, not a solver failure. Native farm proof remains
-    required; an over-defined result is never repaired by deleting relations.
+    required. Only ensure_fully_defined may delete a relation: the single
+    FIX it just added, when that FIX alone over-defines the sketch.
     """
     from solidworks_mcp.adapters.base import CreateEquationCurveParameters
 
@@ -330,7 +363,14 @@ async def ensure_fully_defined(
     removable variants. Their equations and locked parameter bounds carry the
     analytic shape; configured curves re-solve from globals. Only an owned,
     natively under-constrained equation curve may receive FIX; an already
-    constrained curve is skipped. Everything else uses semantic relations/dims.
+    constrained curve is skipped. A curve's native Status can still read
+    under-constrained when the closed loop already determines it (farm run
+    20261009T195743546Z: the 120T drum gap's fourth FIX over-defined the
+    sketch). Such a FIX is deleted again only when it is the SOLE native
+    over-defining relation and it is the FIX just added to that curve; the
+    loop then tries the next curve. Any other over-definition still raises,
+    and success still requires a fully defined sketch. Everything else uses
+    semantic relations/dims.
     """
     async def _over_defined() -> None:
         _log_sketch_relations(adapter, label, "over_defined", "error")
@@ -405,7 +445,16 @@ async def ensure_fully_defined(
             raise RuntimeError(f"{label}: fix {entity_id} failed: {fixed.error}")
         state = await _state()
         if state == "over_defined":
-            await _over_defined()
+            if not _delete_redundant_fix(adapter, segment):
+                await _over_defined()
+            state = await _state()
+            if state == "over_defined":
+                await _over_defined()
+            _telemetry.warn(
+                f"{label}: {entity_id} was already determined by the closed"
+                f" loop; its redundant FIX was deleted -> {state}"
+            )
+            continue
         with contextlib.suppress(Exception):
             _telemetry.debug(f"fixed {entity_id} -> {state}")
         if state == "fully_defined":

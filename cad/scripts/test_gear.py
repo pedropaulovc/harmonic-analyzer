@@ -102,12 +102,17 @@ class _SketchRelation:
 
 
 class _RelationManager:
-    __slots__ = ("relations", "calls", "refuse_all")
+    __slots__ = ("relations", "calls", "refuse_all", "deleted")
 
     def __init__(self, relations: dict[int, tuple]) -> None:
         self.relations = relations
         self.calls: list[int] = []
         self.refuse_all = False
+        self.deleted: list[object] = []
+
+    def DeleteRelation(self, relation: object) -> bool:
+        self.deleted.append(relation)
+        return True
 
     def GetRelations(self, filter_value: int) -> tuple:
         self.calls.append(filter_value)
@@ -527,8 +532,34 @@ async def test_post_fix_overdefined_inventory_precedes_refusable_debug(
     assert len(snapshot["relations"]["swAll"]) == 2
     assert set(adapter.relations.calls) == {0, 1, 2, 6}
     assert adapter.fixed == ["EquationCurve_1"]
+    assert adapter.relations.deleted == []  # a non-FIX over-definition is never deleted
     assert not any("fixed EquationCurve_1 -> over_defined" in line for line in attempted)
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("own_fix", [True, False])
+async def test_only_the_sole_just_added_fix_is_deleted(own_fix, sketch_logs) -> None:
+    # Native 20261009T195743546Z: the drum gap's 4th FIX over-defined the loop.
+    states = ["under_defined", "over_defined", "under_defined", "fully_defined"]
+    adapter = _SketchAdapter(states, statuses=(2, 2))
+    target = adapter._sketch_entities["EquationCurve_1" if own_fix else "EquationCurve_2"]
+    fix = _SketchRelation(17, (target,), (7,))
+    adapter.relations.relations[2] = (fix,)
+
+    if own_fix:
+        await _common.ensure_fully_defined(
+            adapter, "gap", fix_entities=["EquationCurve_1", "EquationCurve_2"],
+            allow_fix_escalation=True,
+        )
+        assert adapter.fixed == ["EquationCurve_1", "EquationCurve_2"]
+        assert adapter.relations.deleted == [fix]
+    else:
+        with pytest.raises(RuntimeError, match="gap: sketch OVER-defined"):
+            await _common.ensure_fully_defined(
+                adapter, "gap", fix_entities=["EquationCurve_1", "EquationCurve_2"],
+                allow_fix_escalation=True,
+            )
+        assert adapter.relations.deleted == []
 
 @pytest.mark.asyncio
 async def test_entity_status_refusal_survives_eligibility_debug_refusal(
