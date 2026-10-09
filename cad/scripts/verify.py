@@ -175,13 +175,14 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
-# active_count build-speed knob): channel = 8N + 13 (N×{rocker,rod,rod-pivot-pin,
+# active_count build-speed knob): channel = 8N + 14 (N×{rocker,rod,rod-pivot-pin,
 # bar,bar-pivot-pin,lever,spring,spring-hook} + pivot shaft + south thrust washer
 # + fulcrum shaft + 2 pivot brackets + 4 bracket hold-down screws + 2 fulcrum
-# keepers + 2 keeper foot screws; 2026-09-02: the 2 spacer bushings per gap are
-# gone -- integral hubs; 2026-10: + the peened rod-pivot pin and the pressed bar
-# pivot pin per channel),
-# drive-train = 61 + N
+# keepers + 2 keeper foot screws + the MHA-VN-053 rocker-bank spring; 2026-09-02:
+# the 2 spacer bushings per gap are gone -- integral hubs; 2026-10: + the pressed
+# rod-pivot pin and the pressed bar pivot pin per channel, + the bank spring
+# (#948 ruling R)),
+# drive-train = 62 + N
 # (full 20-gear cone stack + crank/structure ≈ 33 -- including the cone swing
 # platform + tip block that joined the pivot post in the p1 swing rework, and
 # the NORTH arbor pedestal + its foot screw (PR8, ch12 img09) -- + the ch25
@@ -191,8 +192,9 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # + 2 foot screws (PR7), 2 eccentric cam collars (PR8), + the PR2 cone-swing
 # hardware 6: lock knob, pivot screw, swing-stop screw, tip
 # bushing/adjuster/pinch screw, MINUS the crank-pedestal the merged column
-# absorbed, plus N cylinder gears). Both reproduce the measured N=20 bands
-# (164, 77 pre-PR8 -> 81) and stay correct at N=3.
+# absorbed, + the MHA-VN-052 cylinder-bank spring (#948 ruling R), plus N
+# cylinder gears). At N=20 they give 174 and 82 (measured 164 and 77 pre-PR8 ->
+# 81 before the pins and springs) and stay correct at N=3.
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
     "fr-frame": (16, 21),  # measured 18 (9 structure + 4 lag-screw hold-downs
