@@ -43,7 +43,7 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("knife_bore", MACHINED_UM, CylinderFace(2.0 * R_BORE)),
 )
 
-# --- Knife-hanger screw tap and anti-rotation dowel hole (top seat) ----------
+# --- Knife-hanger screw tap and anti-rotation dowel holes (top seat) ---------
 # General tolerances the printed places claim (title block, policy rule 12).
 _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))

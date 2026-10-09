@@ -145,7 +145,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
    critical interface.
 3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02; #6-32 redesign, 2026-10): the
    block is clamped to the top-frame casting's integral crossbar by a #6-32 socket head cap screw threaded
-   into a bottoming tap in the block top and keyed by a pressed dowel; the screw, dowel and all their holes are modeled.
+   into a bottoming tap in the block top and keyed by two pressed dowels; the screw, dowels and all their holes are modeled.
 4. **Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding) before it becomes a
    drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
 5. **Consider enlarging the tip cone gears** (T006–T012) — the model already flags them marginal and a

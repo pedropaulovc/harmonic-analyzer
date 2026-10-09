@@ -56,8 +56,6 @@ from magnifying_bracket_joint_layout import (
     SCREW_MAJOR_DIA as _BRACKET_SCREW_MAJOR_DIA,
     TAP_DRILL_DIA as _BRACKET_TAP_DRILL_DIA,
 )
-from vn_knife_mount_dowel_spec import DIA_MAX as _KNIFE_DOWEL_DIA_MAX
-from vn_knife_mount_dowel_spec import PRESS_DEPTH as _KNIFE_DOWEL_PRESS_DEPTH
 
 
 def _smooth_annulus_limit_mm3(
@@ -302,12 +300,18 @@ _CHANNEL_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
 # knife-mount or top-frame edit does not re-key every assembly).
 _KNIFE_HANGER_REACH = 8.10
 # Each MHA-VN-051 dowel pressed to the floor of its knife mount's Ø3.175 ream
-# (sm_knife_mount_spec.PIN_HOLE_DIA, band +0/-0.010: smallest 3.165,
-# test-pinned).  The models are line to line, so this bounds the press at its
-# print-worst: the largest catalogue pin in the smallest ream, the whole depth.
+# (sm_knife_mount_spec.PIN_HOLE_DIA, band +0/-0.010: smallest 3.165), its
+# largest catalogue diameter 3.18262 over its 9.5 press depth
+# (vn_knife_mount_dowel_spec.DIA_MAX, PRESS_DEPTH).  All three are literals,
+# test-pinned to their owners like _KNIFE_HANGER_REACH, so a knife-mount or
+# dowel edit does not re-key every assembly.  The models are line to line, so
+# this bounds the press at its print-worst: the largest catalogue pin in the
+# smallest ream, the whole depth.
 # Two per mount, inserted front mount first (build_sm_summing_assembly):
 # dowels 1-2 in sm-knife-mount-1, 3-4 in sm-knife-mount-2.
 _KNIFE_DOWEL_HOLE_MIN = 3.165
+_KNIFE_DOWEL_DIA_MAX = 3.18262
+_KNIFE_DOWEL_PRESS_DEPTH = 9.5
 _KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
     _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_PRESS_DEPTH
 )

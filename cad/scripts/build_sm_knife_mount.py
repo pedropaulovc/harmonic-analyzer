@@ -3,7 +3,7 @@ r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 The hardened-steel bearing block that suspends the summing lever's knife edge from the
 top-frame casting's integral crossbar (clamped to its underside by the MHA-VN-024
 #6-32 socket head cap screw threaded into a bottoming tap in the block top, and
-keyed against turning by the MHA-VN-051 dowel pressed into the top seat).
+keyed against turning by the two MHA-VN-051 dowels pressed into the top seat).
 The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_sm_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
@@ -29,8 +29,8 @@ bore's upper inner wall lands on the ridge (with a TOP_CLEAR sliver margin). The
 block rises from below the bore up to the top-frame casting underside (999.7),
 its top seat clamped flush to it: the #6-32 screw threads into a 9.7 full-thread
 bottoming tap (drill 10.9) on the bore's vertical centreline, which leaves 2.0
-of metal over the bore crown at worst case; the dowel's blind flat-bottom reamed
-hole sits 6.350 along +X from the tap axis.
+of metal over the bore crown at worst case; the two dowels' blind flat-bottom
+reamed holes sit 6.350 either side of the tap axis along X.
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@sm-summing-lever``) coincident to

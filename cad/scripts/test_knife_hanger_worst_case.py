@@ -216,6 +216,10 @@ def test_the_summing_interference_rows_match_their_owners() -> None:
     assert _interference_contracts._KNIFE_DOWEL_HOLE_MIN == pytest.approx(
         knife_mount.PIN_HOLE_DIA + min(knife_mount.PIN_HOLE_DIA_BAND)
     )
+    assert _interference_contracts._KNIFE_DOWEL_DIA_MAX == pytest.approx(dowel.DIA_MAX)
+    assert _interference_contracts._KNIFE_DOWEL_PRESS_DEPTH == pytest.approx(
+        dowel.PRESS_DEPTH
+    )
     assert screw.THREAD == knife_mount.STUD_THREAD == "#6-32"
     assert THREAD_MAJOR_MM["#6-32"] == knife_mount.STUD_THREAD_MAJOR
     assert TAP_DRILL_MM["#6-32"] == knife_mount.STUD_TAP_DIA

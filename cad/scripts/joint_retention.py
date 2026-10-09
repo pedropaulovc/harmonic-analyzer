@@ -579,7 +579,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
         "vn_knife_hanger_stud",  # #6-32 UNC (McMaster 91251A157 socket head cap screw x 2), member into the knife-mount top tap
-        "sm_knife_mount",  # #6-32 UNC-2B bottoming tap (9.7 full thread, 10.9 drill) in the top seat, receiver of the knife-hanger screw; plain reamed dowel hole
+        "sm_knife_mount",  # #6-32 UNC-2B bottoming tap (9.7 full thread, 10.9 drill) in the top seat, receiver of the knife-hanger screw; two plain reamed dowel holes
         "vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
         "vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-VN-043), member: 2 into the support_bar's #4-40 through taps
         "vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
