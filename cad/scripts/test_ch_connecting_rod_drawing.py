@@ -187,6 +187,23 @@ def test_native_gdt_and_finish_present() -> None:
     assert not hasattr(ch_connecting_rod_notes, "PIN_CSK_QUALIFIER")
 
 
+def test_datum_b_leader_clears_the_shank_width_text() -> None:
+    """Datum B's leader runs level at the tag's height (the edge attachment
+    re-solves square to the vertical flank). Farm audit at 71a6e3107: with the
+    tag 10 mm under the pick, the fork-raised bbox centre put that leader at
+    y 151.1 mm, 0.37 mm through the 8.00 text [148.2..151.7]."""
+    keep_y = drawing.FRONT_KEEP["ShankWidthDim"][1]
+    text_top = keep_y + 0.0017  # measured: 3.5 mm text on the y-0.150 keep
+    leader_y = drawing.DATUM_B_SYMBOL[1]
+    assert leader_y - text_top >= 0.0025
+    # The leader meets the shank's left flank, between the ring and the fork.
+    flank_x, _ = drawing._sheet_xy(-ch_connecting_rod_spec.SHANK_WIDTH / 2.0, 0.0)
+    assert drawing.DATUM_B_EDGE[0] == pytest.approx(flank_x)
+    ring_top = drawing._sheet_xy(0.0, ch_connecting_rod_spec.RING_OUTER_RADIUS)[1]
+    fork_root = drawing._sheet_xy(0.0, ch_connecting_rod_spec.FORK_BASE_Y)[1]
+    assert ring_top < leader_y < fork_root
+
+
 def test_countersink_diameter_is_model_owned() -> None:
     """The Ø3.200 +/-0.127 countersink prints from a blanked reference sketch
     whose dimension and the chamfer's unprinted leg share one knob."""

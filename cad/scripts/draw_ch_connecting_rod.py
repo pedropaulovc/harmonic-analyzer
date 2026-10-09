@@ -135,6 +135,13 @@ TOP_KEEP: dict[str, tuple[float, float]] = {}
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)
+# Datum B on the shank's left flank. The tag's edge attachment re-solves
+# square to the flank, so its leader runs level at the tag's height; the tag
+# stands 4.5 mm above the ShankWidthDim keep, whose 3.5 mm text reads
+# 148.2..151.7 at y 150, leaving the leader 2.8 mm over the text (it rode 1.3
+# mm lower, through the text, once the fork's crown raised the bbox centre).
+DATUM_B_EDGE = _sheet_xy(-4.0, 100.0)
+DATUM_B_SYMBOL = (DATUM_B_EDGE[0] - 0.016, FRONT_KEEP["ShankWidthDim"][1] + 0.0045)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -272,19 +279,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # axis unconstrained, so the pin-hole position (and the 147.67 direction)
     # could not be inspected; B clocks the rod and the 4.00 BASIC below ties
     # the pin to the shank centreline.
-    shank_flank = _sheet_xy(-4.0, 100.0)
     add_datum_feature(
         adapter,
         front,
-        edge_xy=shank_flank,
-        symbol_xy=(shank_flank[0] - 0.016, shank_flank[1] - 0.010),
+        edge_xy=DATUM_B_EDGE,
+        symbol_xy=DATUM_B_SYMBOL,
         datum="B",
         label="shank left flank",
     )
     pin_offset = add_edge_dimension(
         adapter,
         front,
-        p0=shank_flank,
+        p0=DATUM_B_EDGE,
         p1=pin_rim,
         text_xy=(0.152, 0.224),
         label="pin C/L from shank flank",
