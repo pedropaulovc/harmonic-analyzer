@@ -258,7 +258,6 @@ if lines:
         # ...then start_workflow(USE_EXISTING, memo=...): only a creation writes it.
         if workflow in workflows and not workflows[workflow].get("_old"):
             workflows[workflow].setdefault("farm_run", os.environ.get("HARMONIC_FARM_RUN"))
-            workflows[workflow].setdefault("display_name", os.environ.get("HARMONIC_FARM_DISPLAY_NAME"))
     farm_state.write_text(json.dumps(workflows), encoding="utf-8")
     print(printed, end="", flush=True)
 print("uv-stderr", file=sys.stderr, flush=True)
@@ -336,8 +335,8 @@ def _command(
         "90",
         "-Tag",
         tag,
-        "-DisplayName",
-        display_name,
+        *([f"-DisplayName:{display_name}"] if display_name.startswith("-")
+          else ["-DisplayName", display_name]),
     ]
 
 
@@ -368,7 +367,8 @@ def test_launch_preserves_boundary_display_names_and_overrides_environment(tmp_p
     environment = dict(fixture["environment"])
     environment["HARMONIC_FARM_DISPLAY_NAME"] = "Inherited label"
     result = _run_launcher(
-        fixture, _command(fixture, "part:pen_rod", display_name=label), environment
+        fixture, _command(fixture, "part:pen_rod", display_name=label), environment,
+        creationflags=subprocess.CREATE_NO_WINDOW if not label.isascii() else 0,
     )
     assert result.returncode == 0, (result.stdout, result.stderr)
     record = _record(_only(Path(fixture["log_directory"]), "*.run.json"))
@@ -385,12 +385,18 @@ def test_launch_rejects_untransportable_display_name_before_creating_records(tmp
     fixture = _launcher_fixture(tmp_path)
     # Construct NUL and lone surrogates within PowerShell rather than relying
     # on native argv encoding to carry them to the script's validator.
-    command = _command(fixture, "part:pen_rod")[:-1]
+    command = _command(fixture, "part:pen_rod")
+    parameters = "; ".join(
+        name.removeprefix("-") + " = '" + value.replace("'", "''") + "'"
+        for name, value in zip(command[5:-2:2], command[6:-2:2])
+    )
     script = (
-        "$ErrorActionPreference = 'Stop'; try { & "
-        + " ".join("'" + arg.replace("'", "''") + "'" for arg in command[4:])
-        + f" ('a' + [char]{codepoint} + 'b')"
-        + " } catch { Write-Error $_ -ErrorAction Continue; exit 2 }"
+        "$ErrorActionPreference = 'Stop'; $parameters = @{ "
+        + parameters
+        + f"; DisplayName = ('a' + [char]{codepoint} + 'b')"
+        + " }; try { & '"
+        + str(LAUNCHER).replace("'", "''")
+        + "' @parameters } catch { Write-Error $_ -ErrorAction Continue; exit 2 }"
     )
     result = _run_launcher(
         fixture, [*command[:3], "-Command", script], fixture["environment"]
@@ -416,7 +422,8 @@ def _observed(log_directory: Path) -> str:
 
 
 def _run_launcher(
-    fixture: dict[str, object], command: list[str], environment: dict[str, str]
+    fixture: dict[str, object], command: list[str], environment: dict[str, str],
+    *, creationflags: int = 0,
 ) -> subprocess.CompletedProcess[str]:
     """Run the launcher to exit; only the hang guard can end the wait early."""
     try:
@@ -427,6 +434,7 @@ def _run_launcher(
             encoding="utf-8",
             capture_output=True,
             timeout=HANG_GUARD_S,
+            creationflags=creationflags,
         )
     except subprocess.TimeoutExpired as expired:
         raise AssertionError(

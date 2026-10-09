@@ -101,6 +101,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:PSNativeCommandUseErrorActionPreference = $false
+# Detached Windows launches otherwise emit JSON labels in the OEM code page
+# (for example, Omega becomes byte 0xEA in CP437), not the capture's UTF-8.
+[System.Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 # A snapshot rooted under an agent scratchpad can exceed Windows MAX_PATH.
 # Scope core.longpaths to this process tree and preserve any Git environment

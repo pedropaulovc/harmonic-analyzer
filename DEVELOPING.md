@@ -92,6 +92,10 @@ Invalid labels are refused before contacting the farm, after doit has rejected
 any invalid task selection.
 For a direct label beginning with `-`, use `--display-name="-Owner - Reason"`
 so it is not parsed as an option. Wrapper options are never abbreviated.
+For the native `pwsh -File` launcher, attach a dash-leading label with a colon,
+for example `-DisplayName:'-DisplayName'`; a separate value matching a known
+PowerShell parameter name would otherwise be parsed as another parameter.
+Launcher stdout JSON and its logs use UTF-8, including detached Windows launches.
 
 Every new leaf execution has Temporal memo `display_name`, separate from the
 optional launcher ownership memo `farm_run`. Neither label enters `LeafRequest`,
