@@ -325,11 +325,17 @@ class _NamedAnnotation:
         self.position = (0.0, 0.0)
         self.attached: tuple[Any, ...] = ()
         self.types: tuple[int, ...] = ()
+        self.selected_by: list[str] = []
 
     def GetName(self) -> str:
         return self.name
 
+    def Select2(self, _append: bool, _mark: int) -> bool:
+        self.selected_by.append("Select2")
+        return self.selects
+
     def Select3(self, _append: bool, _data: Any) -> bool:
+        self.selected_by.append("Select3")
         return self.selects
 
     def SetPosition2(self, x: float, y: float, _z: float) -> bool:
@@ -352,6 +358,7 @@ class _NamedAnnotation:
 class _FrameGtol:
     def __init__(self, name: str, datums: tuple[str, ...] = ("A",)) -> None:
         self.annotation = _NamedAnnotation(name)
+        self.annotation.position = (0.1466, 0.219)
         self.frames = [_FrameXml(datums)]
 
     def GetAnnotation(self) -> _NamedAnnotation:
@@ -365,9 +372,9 @@ class _FrameGtol:
 
 
 class _DatumTag:
-    def __init__(self, label: str = "") -> None:
+    def __init__(self, label: str = "", name: str = "DetailItem900") -> None:
         self.label = label
-        self.annotation = _NamedAnnotation("DetailItem900")
+        self.annotation = _NamedAnnotation(name)
 
     def SetLabel(self, label: str) -> bool:
         self.label = label
@@ -380,28 +387,47 @@ class _DatumTag:
         return self.annotation
 
 
+class _View:
+    def __init__(self, tags: tuple[str, ...], frames: tuple[_FrameGtol, ...]) -> None:
+        self.tags = [_DatumTag(label) for label in tags]
+        self.frames = frames
+
+    def GetDatumTags(self) -> tuple[_DatumTag, ...]:
+        return tuple(self.tags)
+
+    def GetGTols(self) -> tuple[_FrameGtol, ...]:
+        return self.frames
+
+
 def _frame_datum(
     monkeypatch: pytest.MonkeyPatch,
     frame: _FrameGtol,
     *,
+    attaches: dict[str, Any] | None = None,
     selected: tuple[int, Any] | None = None,
-    attaches_to: Any | None = None,
-) -> _DatumTag:
+    deletes: bool = True,
+) -> tuple[_DatumTag, _View, list[str], list[tuple[float, float]]]:
     """Run add_frame_datum_feature on a fake seat.
 
-    ``selected`` is what the selection manager reports after Select3 (type,
-    object; default the frame); the inserted tag attaches, after the rebuild,
-    to ``attaches_to`` (default the frame) -- None leaves it attached to nothing.
+    ``attaches`` maps a selection method to what the inserted tag is attached
+    to after the rebuild (default: the frame, on the first method; False
+    attaches it to nothing).  ``selected`` is what the selection manager
+    reports (type, object; default the frame).  Returns the tag, the view, the
+    methods tried and the selection points set.
     """
-    tag = _DatumTag()
+    view = _View(("A",), (frame,))
     kind, picked = selected if selected is not None else (13, frame)
+    attaches = {"select2": frame} if attaches is None else attaches
+    tried: list[str] = []
+    points: list[tuple[float, float]] = []
+    current: dict[str, Any] = {}
 
     class _SelectionManager:
         def CreateSelectData(self) -> Any:
             return type("_Data", (), {"View": None})()
 
         def GetSelectedObjectCount2(self, _mark: int) -> int:
-            return 1 if frame.annotation.selects else 0
+            return 1
 
         def GetSelectedObjectType3(self, _index: int, _mark: int) -> int:
             return kind
@@ -409,86 +435,141 @@ def _frame_datum(
         def GetSelectedObject6(self, _index: int, _mark: int) -> Any:
             return picked
 
+        def SetSelectionPoint2(self, _i: int, _m: int, x: float, y: float, _z: float) -> bool:
+            points.append((x, y))
+            tried[-1] = "select2-point"
+            return True
+
+    class _Extension:
+        def MultiSelect2(self, objects: Any, _append: bool, _data: Any) -> int:
+            assert list(objects) == [frame]
+            tried.append("multi-select")
+            return 1 if frame.annotation.selects else 0
+
+        def SelectByID2(self, name: str, kind: str, *_args: Any) -> bool:
+            assert (name, kind) == (f"{frame.annotation.name}@Drawing View3", "GTOL")
+            tried.append("select-by-id")
+            return frame.annotation.selects
+
     class _Draw:
         SelectionManager = _SelectionManager()
+        Extension = _Extension()
 
         def ActivateView(self, _name: str) -> bool:
             return True
 
         def ClearSelection2(self, _all: bool) -> None:
-            pass
+            current.pop("selected", None)
 
         def InsertDatumTag2(self) -> _DatumTag:
+            tag = _DatumTag(name=f"DetailItem9{len(tried)}")
+            view.tags.append(tag)
+            current["tag"] = tag
             return tag
 
-    class _Adapter:
-        currentModel = _Draw()
+        def EditDelete(self) -> None:
+            if deletes and current.get("selected") in view.tags:
+                view.tags.remove(current["selected"])
+
+    original_select2 = _NamedAnnotation.Select2
+
+    def select2(annotation: _NamedAnnotation, append: bool, mark: int) -> bool:
+        if annotation is frame.annotation:
+            tried.append("select2")
+        else:
+            current["selected"] = next(t for t in view.tags if t.annotation is annotation)
+        return original_select2(annotation, append, mark)
+
+    def select3(annotation: _NamedAnnotation, _append: bool, _data: Any) -> bool:
+        tried.append("select3-null")
+        return annotation.selects
 
     def rebuild(_adapter: Any, *, label: str) -> None:
-        target = frame if attaches_to is None else attaches_to
-        if target is not False:
-            tag.annotation.attached = (target,)
-            tag.annotation.types = (13,)
+        tag = current.get("tag")
+        if label == "add_frame_datum_feature" and tag is not None:
+            target = attaches.get(tried[-1], False)
+            if target is not False:
+                tag.annotation.attached = (target,)
+                tag.annotation.types = (13,)
 
+    monkeypatch.setattr(_NamedAnnotation, "Select2", select2)
+    monkeypatch.setattr(_NamedAnnotation, "Select3", select3)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
+    monkeypatch.setattr(_drawing_common, "null_callout", lambda: None)
+    monkeypatch.setattr(_drawing_common, "dispatch_array", list)
     monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Drawing View3")
     monkeypatch.setattr(_drawing_common, "rebuild_drawing", rebuild)
-    return _drawing_common.add_frame_datum_feature(
-        _Adapter(), object(), frame, datum="B", symbol_xy=(0.161, 0.206),
-        label="dowel hole pattern datum B",
+    tag = _drawing_common.add_frame_datum_feature(
+        type("_Adapter", (), {"currentModel": _Draw()})(), view, frame, datum="B",
+        symbol_xy=(0.161, 0.200), label="dowel hole pattern datum B",
     )
+    return tag, view, tried, points
 
 
 def test_frame_datum_symbol_goes_on_the_frame_it_names(monkeypatch) -> None:
-    frame = _FrameGtol("DetailItem356")
-    tag = _frame_datum(monkeypatch, frame)
+    frame = _FrameGtol("DetailItem354")
+    tag, view, tried, _ = _frame_datum(monkeypatch, frame)
     assert tag.label == "B"
     assert tag.annotation.attached == (frame,)
+    assert tried == ["select2"]
+    assert sorted(t.label for t in view.tags) == ["A", "B"]
+
+
+def test_frame_datum_tries_each_selection_and_deletes_each_stray_tag(monkeypatch) -> None:
+    # Farm run 20261009T174542021Z: Select3 with the view's ISelectData
+    # returned False on DetailItem354.  Each failed attempt's tag is removed.
+    frame = _FrameGtol("DetailItem354")
+    tag, view, tried, points = _frame_datum(
+        monkeypatch, frame, attaches={"select2-point": frame}
+    )
+    assert tried == [
+        "select2", "multi-select", "select-by-id", "select3-null", "select2-point"
+    ]
+    # The landing point is the frame's bottom edge (7 mm under its top-left
+    # position), under the tag.
+    assert points == [pytest.approx((0.161, 0.212))]
+    assert tag.annotation.attached == (frame,)
+    assert sorted(t.label for t in view.tags) == ["A", "B"]
 
 
 @pytest.mark.parametrize(
     ("case", "match"),
     (
-        ("not selectable", r"failed to select the frame DetailItem356"),
-        ("other frame", r"selected 1 object\(s\), type 13, name 'DetailItem355'"),
-        ("a dimension", r"selected 1 object\(s\), type 14, name ''"),
-        ("attached to nothing", r"not attached to its frame DetailItem356 .*count=0"),
-        ("attached elsewhere", r"not attached to its frame .*attached='DetailItem355'"),
+        (
+            "not selectable",
+            r"select2: the selection call returned False; multi-select: the selection "
+            r"call returned False; select-by-id: ",
+        ),
+        ("other frame", r"select2: selected 1 object\(s\), type 13, name 'DetailItem355'"),
+        ("a dimension", r"select2: selected 1 object\(s\), type 14, name ''"),
+        ("attached to nothing", r"select2: not attached to its frame DetailItem354: count=0"),
+        ("attached elsewhere", r"select2-point: not attached .*attached='DetailItem355'"),
     ),
 )
 def test_frame_datum_symbol_fails_closed_off_its_frame(
     monkeypatch, case: str, match: str
 ) -> None:
-    frame = _FrameGtol("DetailItem356")
+    frame = _FrameGtol("DetailItem354")
     other = _FrameGtol("DetailItem355")
-    kwargs: dict[str, Any] = {}
+    kwargs: dict[str, Any] = {"attaches": {}}
     if case == "not selectable":
         frame.annotation.selects = False
     elif case == "other frame":
         kwargs["selected"] = (13, other)
     elif case == "a dimension":
         kwargs["selected"] = (14, object())
-    elif case == "attached to nothing":
-        kwargs["attaches_to"] = False
-    else:
-        kwargs["attaches_to"] = other
-    with pytest.raises(RuntimeError, match=match):
+    elif case == "attached elsewhere":
+        kwargs["attaches"] = dict.fromkeys(_drawing_common.FRAME_DATUM_SELECTIONS, other)
+    with pytest.raises(RuntimeError, match=r"datum B could not be attached .*" + match):
         _frame_datum(monkeypatch, frame, **kwargs)
 
 
-class _View:
-    def __init__(self, tags: tuple[str, ...], frames: tuple[_FrameGtol, ...]) -> None:
-        self.tags = tuple(_DatumTag(label) for label in tags)
-        self.frames = frames
-
-    def GetDatumTags(self) -> tuple[_DatumTag, ...]:
-        return self.tags
-
-    def GetGTols(self) -> tuple[_FrameGtol, ...]:
-        return self.frames
+def test_frame_datum_fails_when_a_stray_tag_survives_its_delete(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match=r"unattached datum B was left on the sheet"):
+        _frame_datum(monkeypatch, _FrameGtol("DetailItem354"), attaches={}, deletes=False)
 
 
 def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
@@ -506,7 +587,7 @@ def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
         match=r"reference datum\(s\) no tag prints: B by \['DetailItem355', 'DetailItem358'\]; tags print \['A'\]",
     ):
         _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
-    top.tags = (_DatumTag("B"),)
+    top.tags = [_DatumTag("B")]
     _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
 
 

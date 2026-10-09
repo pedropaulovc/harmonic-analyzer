@@ -391,8 +391,12 @@ help (`types/IGtol/SetDatumIdentifier.md`) says only that it "sets the name
 of the datum being defined"; the frame XML schema has no node for it.
 Do: insert a real datum tag on the selected frame
 (`_drawing_common.add_frame_datum_feature`) and require the tag's attachment
-to be that frame by annotation name. This path is not yet proven on a farm
-leaf, and its guards fail closed. Also end the sheet with
+to be that frame by annotation name. Selecting the frame is not settled:
+`IAnnotation::Select3(False, <view ISelectData>)` returned False on the
+knife mount's DetailItem354 (farm run 20261009T174542021Z), so the helper
+tries each of `FRAME_DATUM_SELECTIONS` in turn, deletes the tag of every
+attempt that fails, and logs each attempt as `datum.frame_attempt`. Once a
+leaf proves one, keep that one alone. Also end the sheet with
 `assert_frame_datums_defined`, which fails when any frame names a datum that
 no `IView::GetDatumTags` label prints.
 
