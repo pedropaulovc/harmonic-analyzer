@@ -36,7 +36,7 @@ from pd_transgear_arm_plate_geometry import (
     CSK_ANGLE_DEG,
     CSK_DIA_BAND,
     REDUCER_POSITION_DIAMETER,
-    REDUCER_POSITION_RADIUS,
+    REDUCER_POSITION_RADIUS,  # noqa: F401 - the drawing test reads it off the spec
     EDGE_PLUS_X,
     SCREW_HOLE_DIA,
     THICKNESS_OVER_ARM,
@@ -160,7 +160,12 @@ GEOMETRIC_CONTROLS += (
 REDUCER_POSITION_INSPECTION_NOTE = REGISTRATION.MATCHED_REGISTRATION_NOTE
 ARM_PLATE_NORMAL_INSPECTION_NOTE = REGISTRATION.NORMAL_INSPECTION_NOTE
 CLAMP_AXIS_INSPECTION_NOTE = REGISTRATION.CLAMP_AXIS_INSPECTION_NOTE
-LOCATOR_CALLOUT = "2X REAM SLIP BORES THROUGH\nMOUTH BREAK 0.05 AXIAL/RADIAL MAX\nMATCHED PAIR TO MHA-PD-018; SCREWS CLAMP ONLY"
+# The dowel engagement pays the arm's mouth break, which is tighter than the
+# title block's edge break; the part notes say the dowels locate and the
+# screws only clamp, so the callout does not repeat it (policy rule 6).
+LOCATOR_CALLOUT = (
+    f"2X REAM THRU\nBREAK EDGE {PLATE.ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
+)
 
 # The bore is the knob shaft's running surface (policy rule 5): MACHINED, on
 # the exact native bore face the part build resolves. The hub face and the
@@ -181,7 +186,7 @@ SURFACE_FINISHES = (
 # --- Printed text -------------------------------------------------------------
 # The bore is a fit: REAM is the requirement (policy rule 7).  The screw
 # holes are clearance, drilled; both countersinks take the oval heads.
-BORE_CALLOUT = "REAM THRU; PROJECTED AXIS PER NATIVE CONTROL"
+BORE_CALLOUT = "REAM THRU"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
 CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK"
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
