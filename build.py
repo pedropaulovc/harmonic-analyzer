@@ -105,6 +105,7 @@ def _parser() -> argparse.ArgumentParser:
         epilog=_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False,
+        allow_abbrev=False,
     )
     parser.add_argument(
         "--verbosity",
@@ -166,20 +167,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"release: {refusal}", file=sys.stderr)
         return 2
     if options.executor == "farm" and executing is not None:
-        display_name = options.display_name
-        if (
-            display_name is None
-            or not display_name.strip()
-            or len(display_name) > 160
-            or any(char in display_name for char in "\r\n\x85\u2028\u2029")
-        ):
-            print(
-                "farm: --display-name must be nonblank, single-line, and at most "
-                "160 characters",
-                file=sys.stderr,
-            )
-            return 2
-        os.environ["HARMONIC_FARM_DISPLAY_NAME"] = display_name
+        if options.display_name is not None:
+            os.environ["HARMONIC_FARM_DISPLAY_NAME"] = options.display_name
         doit_args = _with_farm_parallelism(doit_args, *executing)
     return doit.run(doit_args)
 
@@ -260,6 +249,13 @@ def _farm_command(command_class):
                     self.sel_tasks,
                     auto_delayed_regex=kwargs.get("auto_delayed_regex", False),
                 )
+                sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
+                import _farm
+
+                try:
+                    _farm._display_name()
+                except RuntimeError as exc:
+                    raise FarmPreflightError(str(exc)) from None
                 _farm_preflight()
                 print(
                     "farm: every SolidWorks task runs on the farm (parts, "

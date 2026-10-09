@@ -39,8 +39,14 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [ValidateScript({
         if ([string]::IsNullOrWhiteSpace($_) -or $_.Length -gt 160 -or
-            $_ -match '[\r\n\u0085\u2028\u2029]') {
-            throw 'DisplayName must be nonblank, single-line, and at most 160 characters'
+            $_ -match '[\p{Cc}\p{Zl}\p{Zp}]') {
+            throw 'DisplayName must be nonblank, single-line, free of control characters, and at most 160 characters'
+        }
+        try {
+            [void][System.Text.UTF8Encoding]::new($false, $true).GetByteCount($_)
+        }
+        catch [System.Text.EncoderFallbackException] {
+            throw 'DisplayName must contain valid Unicode'
         }
         $true
     })]
@@ -849,6 +855,7 @@ function Get-RunStatus {
         commit = $record['commit']
         targets = @($record['targets'])
         leaf_timeout_minutes = $record['leaf_timeout_minutes']
+        display_name = $record['display_name']
         cache_environment = $record['cache_environment']
         started_at = $record['started_at']
         finished_at = if ($null -ne $done) { $done['finished_at'] } else { $null }
@@ -1123,6 +1130,7 @@ function Invoke-RunList {
         Write-Output ([ordered]@{
                 run_id = $record['run_id']
                 tag = $record['tag']
+                display_name = $record['display_name']
                 state = $runState
                 exit_code = if ($null -ne $done) { $done['exit_code'] } else { $null }
                 started_at = $record['started_at']
@@ -1758,7 +1766,7 @@ try {
     $buildArgs = @(
         'run', '--frozen', '--no-sync', '--active', 'python', 'build.py',
         '--executor', 'farm',
-        '--display-name', $DisplayName,
+        ('--display-name=' + $DisplayName),
         '--leaf-timeout', [string]$LeafTimeout,
         '--verbosity', 'info',
         '--continue'

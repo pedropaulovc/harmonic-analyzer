@@ -68,7 +68,7 @@ explicit way to stop a run, `-Cancel` (see
 | `-LogDirectory` | no | optional absolute path for run files and outputs; defaults under the agent scratchpad and must resolve outside every Git worktree |
 | `-Targets` | yes | doit task names as ONE comma-separated string (`part:pn_pen_rod,part:dt_cone_gear`) |
 | `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
-| `-DisplayName` | yes, Launch only | short owner/session plus reason; nonblank, single-line, at most 160 characters; tracking commands such as `-Watch` do not require it |
+| `-DisplayName` | yes, Launch only | short owner/session plus reason; nonblank, single-line, no control characters, at most 160 characters; tracking commands such as `-Watch` do not require it |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
 
 When `HARMONIC_AGENT_SCRATCHPAD` is set, it names the scratchpad root and the
@@ -78,12 +78,18 @@ survives automatic temporary-file cleanup. Pass its resulting absolute path
 when handing a run to an agent on another host.
 
 For example, use `-DisplayName 'InchPD - Add new drawing detail view to pd_transgear_stub v3'`.
-The launcher records it as `display_name`, passes it through `--display-name`,
+The launcher records it as `display_name`, passes one `--display-name=<label>` argument,
 and exports `HARMONIC_FARM_DISPLAY_NAME` to the build. An attended direct farm
 build must supply `--display-name` (also accepted as `-DisplayName`) or that
 environment variable; local builds and non-executing commands such as `--help`
 and `list` do not need it. An explicit option overrides the inherited value.
-Invalid labels are refused before contacting the farm.
+Labels retain surrounding whitespace and must be valid Unicode encodable as
+UTF-8; malformed surrogate text, Unicode control characters (`Cc`) and
+line/paragraph separators (`Zl`, `Zp`) are rejected. Valid emoji are allowed.
+Invalid labels are refused before contacting the farm, after doit has rejected
+any invalid task selection.
+For a direct label beginning with `-`, use `--display-name="-Owner - Reason"`
+so it is not parsed as an option. Wrapper options are never abbreviated.
 
 Every new leaf execution has Temporal memo `display_name`, separate from the
 optional launcher ownership memo `farm_run`. Neither label enters `LeafRequest`,
@@ -269,7 +275,7 @@ no `.done`.
 - **`-Status`** prints one JSON object: `state`, `exit_code`, `launcher`
   (`pid`, `alive`, and for a dead launcher the `orphaned_processes` it left —
   a build child outlives a killed launcher and keeps dispatching), `commit`,
-  `targets`, `leaf_timeout_minutes`, `cache_environment`, `counts` (cache
+  `targets`, `leaf_timeout_minutes`, `display_name`, `cache_environment`, `counts` (cache
   `hits`, farm leaves `requested`/`succeeded`/`failed`/`in_flight`), every farm
   leaf with its `workflow_id` and state, `in_flight_workflows`,
   `unsettled_workflows` (every leaf with a workflow id and no result: the
@@ -293,7 +299,8 @@ no `.done`.
   (`LAUNCHER DIED` on the summary line), **22** cancelled. Run it under the
   same kind of persistent supervisor as the launch, with `progress: "wake"`.
 - **`-List`** prints one JSON line per run, newest first, filtered by `-Tag`,
-  `-State` and `-MaxAgeHours`.
+  `-State` and `-MaxAgeHours`. Both `-Status` and `-List` report `display_name`
+  as `null` for historical runs recorded before labels were required.
 - **`-Cancel -Why <reason>`** stops the launcher and every process it started,
   including a build a dead launcher left behind. The launcher joins a named
   Windows job object (`job` in the run record) before it starts anything, so
@@ -387,7 +394,7 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
   },
   "tag": "smoke",
   "argv": ["uv", "run", "--frozen", "--no-sync", "--active", "python", "build.py",
-           "--executor", "farm", "--display-name", "InchPD - Build pen rod",
+           "--executor", "farm", "--display-name=InchPD - Build pen rod",
            "--leaf-timeout", "90", "--verbosity", "info",
            "--continue", "part:pen_rod"],
   "snapshot": "C:\\src\\dt-logs\\farm-runs\\snapshots\\3f7b1c9a2d5e",
@@ -485,9 +492,12 @@ nothing about what was launched. The recorded identity is `commit`, `targets`,
 `leaf_timeout_minutes` and `cache_environment`. Launch `scripts/farm-run.ps1`
 again with exactly those — `-Worktree` pointed at a clean checkout whose HEAD
 is `commit` (the kept snapshot itself, or a fresh
-`git worktree add --detach <path> <commit>`), `-Targets`, `-LeafTimeout` and
-`-DisplayName` from the record, and `HARMONIC_CACHE_ACCOUNT`/`CONTAINER`/`SALT` set (or unset)
-to match `cache_environment`. Same commit, cache environment and budget give
+`git worktree add --detach <path> <commit>`), `-Targets` and `-LeafTimeout`
+from the record, and `HARMONIC_CACHE_ACCOUNT`/`CONTAINER`/`SALT` set (or unset)
+to match `cache_environment`. Supply `-DisplayName` with the recovering session's
+owner and reason; historical records may have no label. This metadata does not
+change identity, and a rejoined workflow still retains its creator's label.
+Same commit, cache environment and budget give
 the same keys and workflow IDs, so every finished leaf restores from the cache
 and a running one is rejoined rather than duplicated. The leaf budget is part
 of the workflow ID, so changing it during recovery creates a different

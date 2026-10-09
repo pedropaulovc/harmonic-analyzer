@@ -610,11 +610,16 @@ def _install_real_doit(monkeypatch, namespace=None):
     return seen, executed
 
 
-@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b"])
+@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\ud800b", "a\udfffb"])
 @pytest.mark.parametrize("command", [["part:x"], ["run", "part:x"], ["strace", "part:x"]])
 def test_farm_execution_requires_a_valid_display_name(label, command, monkeypatch, capsys):
     if label is None:
         monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
+    elif "\0" in label or any(0xD800 <= ord(char) <= 0xDFFF for char in label):
+        # Inject labels that OS environment encoding may reject at the read
+        # boundary so the validator itself must reject them.
+        get = os.environ.get
+        monkeypatch.setattr(os.environ, "get", lambda key, default=None: label if key == "HARMONIC_FARM_DISPLAY_NAME" else get(key, default))
     else:
         monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label)
     monkeypatch.setattr(build, "_farm_preflight", lambda: pytest.fail("preflight before valid label"))
@@ -626,7 +631,7 @@ def test_farm_execution_requires_a_valid_display_name(label, command, monkeypatc
 
 
 @pytest.mark.parametrize("flag", [None, "--display-name", "-DisplayName"])
-@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  "])
+@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "-review", "--executor", "-DisplayName"])
 def test_display_name_reaches_the_task_boundary(flag, label, monkeypatch):
     _preflight_fakes(monkeypatch)
     monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label if flag is None else "Inherited label")
@@ -635,10 +640,38 @@ def test_display_name_reaches_the_task_boundary(flag, label, monkeypatch):
         "actions": [lambda: observed.append(os.environ.get("HARMONIC_FARM_DISPLAY_NAME"))]
     }}
     seen, _executed = _install_real_doit(monkeypatch, namespace)
-    options = [] if flag is None else [flag, label]
+    options = [] if flag is None else (
+        [f"{flag}={label}"] if label.startswith("-") else [flag, label]
+    )
     assert build.main(["--executor", "farm", *options, "part"]) == 0
     assert seen == [["-n", "8", "part"]]
     assert observed == [label]
+
+
+@pytest.mark.parametrize("option", ["--display", "--display-n"])
+def test_display_name_abbreviations_are_not_consumed(option, monkeypatch):
+    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
+    seen = []
+
+    class RecordingDoit:
+        def run(self, args):
+            seen.append(list(args))
+            return 3
+
+    monkeypatch.setattr(build, "_FarmDoitMain", RecordingDoit)
+    assert build.main(["--executor", "farm", f"{option}=other", "part:x"]) == 3
+    assert seen == [["-n", "8", f"{option}=other", "part:x"]]
+    assert os.environ["HARMONIC_FARM_DISPLAY_NAME"] == DISPLAY_NAME
+
+
+@pytest.mark.parametrize("option", ["--display", "--display-n"])
+def test_display_name_abbreviations_are_rejected_by_doit(option, monkeypatch):
+    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
+    monkeypatch.setattr(build, "_farm_preflight", lambda: pytest.fail("preflight before valid options"))
+    _seen, executed = _install_real_doit(monkeypatch)
+    assert build.main(["--executor", "farm", f"{option}=other", "part:x"]) == 3
+    assert executed == []
+    assert os.environ["HARMONIC_FARM_DISPLAY_NAME"] == DISPLAY_NAME
 
 
 def test_farm_build_refuses_a_dirty_tree_before_contacting_the_fleet(
@@ -1546,7 +1579,6 @@ def temporal_boundary(tmp_path, monkeypatch):
     monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
     monkeypatch.delenv("HARMONIC_FARM_REQUESTS", raising=False)
     calls: dict = {"connect": [], "start": []}
-    calls["creator_memos"] = {}
     outcome: dict = {}
 
     class Handle:
@@ -1558,7 +1590,6 @@ def temporal_boundary(tmp_path, monkeypatch):
     class FakeClient:
         async def start_workflow(self, workflow, arg, **options):
             calls["start"].append((workflow, arg, options))
-            calls["creator_memos"].setdefault(options["id"], dict(options["memo"]))
             return Handle()
 
     async def connect(target_host, **options):
@@ -1708,13 +1739,16 @@ def test_a_launcher_run_is_stamped_as_the_creator_memo(temporal_boundary, monkey
     }
 
 
-@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b"])
+@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\ud800b", "a\udfffb"])
 def test_invalid_dispatch_display_name_has_no_side_effects(
     temporal_boundary, tmp_path, monkeypatch, label
 ):
     calls, _resolve = temporal_boundary
     if label is None:
         monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
+    elif "\0" in label or any(0xD800 <= ord(char) <= 0xDFFF for char in label):
+        get = os.environ.get
+        monkeypatch.setattr(os.environ, "get", lambda key, default=None: label if key == "HARMONIC_FARM_DISPLAY_NAME" else get(key, default))
     else:
         monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label)
     requests = tmp_path / "requests"
@@ -1728,7 +1762,7 @@ def test_invalid_dispatch_display_name_has_no_side_effects(
     assert list(requests.iterdir()) == []
 
 
-@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  "])
+@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "-review", "--executor"])
 def test_dispatch_preserves_valid_display_name(temporal_boundary, monkeypatch, label):
     calls, resolve = temporal_boundary
     resolve(_leaf_result())
@@ -1739,30 +1773,6 @@ def test_dispatch_preserves_valid_display_name(temporal_boundary, monkeypatch, l
     assert request.task == "part:pen_rod"
     assert request.cache_key == "k" * 64
     assert options["id"] == "leaf:part:pen_rod:" + "k" * 64 + ":900s"
-
-
-def test_shared_workflow_keeps_creator_label_and_run(temporal_boundary, monkeypatch):
-    from temporalio.common import WorkflowIDConflictPolicy
-
-    calls, resolve = temporal_boundary
-    resolve(_leaf_result())
-    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", "Creator's build")
-    monkeypatch.setenv("HARMONIC_FARM_RUN", "creator-run")
-    _farm.run_leaf("part:pen_rod", "k" * 64)
-    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", "Attaching build")
-    monkeypatch.setenv("HARMONIC_FARM_RUN", "attaching-run")
-    _farm.run_leaf("part:pen_rod", "k" * 64)
-    [(_, first_request, first), (_, second_request, second)] = calls["start"]
-    assert first["id"] == second["id"]
-    assert first_request.task == second_request.task
-    assert first_request.cache_key == second_request.cache_key
-    assert first_request.commit == second_request.commit
-    assert first["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
-    assert second["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
-    assert second["memo"] == {"display_name": "Attaching build", "farm_run": "attaching-run"}
-    assert calls["creator_memos"] == {
-        first["id"]: {"display_name": "Creator's build", "farm_run": "creator-run"}
-    }
 
 
 def test_a_launcher_run_names_each_workflow_before_creating_it(

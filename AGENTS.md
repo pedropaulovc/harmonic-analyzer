@@ -248,7 +248,8 @@ such build:
   build and leaves the remote workflow running.
 - Every launch requires `-DisplayName`: a short owner/session plus the reason,
   for example `'InchPD - Add new drawing detail view to pd_transgear_stub v3'`.
-  Use a nonblank single-line label of at most 160 characters, and include it in
+  Use a nonblank single-line label without control characters, at most 160
+  characters, and include it in
   the handoff. Temporal memo `display_name` identifies the workflow's creator;
   attaching with `USE_EXISTING` retains that creator's label and `farm_run`,
   rather than transferring ownership to the attaching session. The label does

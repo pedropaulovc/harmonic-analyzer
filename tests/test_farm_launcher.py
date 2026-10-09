@@ -99,6 +99,11 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+# Match the PowerShell collaborator's UTF-8 redirected streams explicitly,
+# rather than inheriting Windows' legacy Python pipe encoding.
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
 
 farm = next((i for i, arg in enumerate(sys.argv) if arg.endswith("farm.py")), None)
 if farm is not None:
@@ -276,6 +281,26 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
     if pwsh is None:
         pytest.skip("PowerShell 7.3+ is not installed")
 
+    collaborator = tmp_path / "launcher collaborator.ps1"
+    collaborator.write_text(
+        "$OutputEncoding = [System.Text.UTF8Encoding]::new($false)\n"
+        "[Console]::OutputEncoding = $OutputEncoding\n"
+        f"$launcher = '{str(LAUNCHER).replace(chr(39), chr(39) * 2)}'\n"
+        "$parameters = (Get-Command $launcher).Parameters\n"
+        "$forward = @{}\n"
+        "for ($i = 0; $i -lt $args.Count; $i++) {\n"
+        "    $name = $args[$i].TrimStart('-')\n"
+        "    if ($parameters[$name].ParameterType -eq [switch]) {\n"
+        "        $forward[$name] = $true\n"
+        "    } else {\n"
+        "        $forward[$name] = $args[++$i]\n"
+        "    }\n"
+        "}\n"
+        "& $launcher @forward\n"
+        "exit $LASTEXITCODE\n",
+        encoding="utf-8",
+    )
+
     environment = os.environ.copy()
     environment["PATH"] = str(tools) + os.pathsep + environment["PATH"]
     environment["UV_STUB_INVOCATION"] = str(invocation)
@@ -297,6 +322,7 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
 
     return {
         "pwsh": pwsh,
+        "collaborator": collaborator,
         "worktree": worktree,
         "pool": pool,
         "log_directory": log_directory,
@@ -318,7 +344,7 @@ def _command(
         "-NoProfile",
         "-NonInteractive",
         "-File",
-        str(LAUNCHER),
+        str(fixture["collaborator"]),
         "-Worktree",
         str(fixture["worktree"]),
         "-PoolHome",
@@ -338,7 +364,7 @@ def _command(
 
 @pytest.mark.parametrize(
     "label",
-    [None, "", " \t", "x" * 161, "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b"],
+    [None, "", " \t", "x" * 161, "a\tb", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b"],
 )
 def test_launch_requires_valid_display_name_before_creating_records(tmp_path, label):
     fixture = _launcher_fixture(tmp_path)
@@ -357,7 +383,7 @@ def test_launch_requires_valid_display_name_before_creating_records(tmp_path, la
     assert not log_directory.exists() or list(log_directory.iterdir()) == []
 
 
-@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  "])
+@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  ", "Review \U0001f680: gear train", "-review", "--executor", "-DisplayName"])
 def test_launch_preserves_boundary_display_names_and_overrides_environment(tmp_path, label):
     fixture = _launcher_fixture(tmp_path)
     environment = dict(fixture["environment"])
@@ -371,8 +397,30 @@ def test_launch_preserves_boundary_display_names_and_overrides_environment(tmp_p
     invocation = json.loads(Path(fixture["invocation"]).read_text(encoding="utf-8"))
     assert record["display_name"] == finished["display_name"] == label
     assert invocation["environment"]["HARMONIC_FARM_DISPLAY_NAME"] == label
-    index = invocation["argv"].index("--display-name")
-    assert invocation["argv"][index + 1] == label
+    assert invocation["argv"].count(f"--display-name={label}") == 1
+    assert "--display-name" not in invocation["argv"]
+
+
+@pytest.mark.parametrize("codepoint", [0, 0xD800, 0xDFFF])
+def test_launch_rejects_untransportable_display_name_before_creating_records(tmp_path, codepoint):
+    fixture = _launcher_fixture(tmp_path)
+    # Construct NUL and lone surrogates within PowerShell rather than relying
+    # on native argv encoding to carry them to the script's validator.
+    command = _command(fixture, "part:pen_rod")[:-1]
+    script = (
+        "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+        "[Console]::OutputEncoding = $OutputEncoding; & "
+        + " ".join("'" + arg.replace("'", "''") + "'" for arg in command[4:])
+        + f" ('a' + [char]{codepoint} + 'b')"
+    )
+    result = _run_launcher(
+        fixture, [*command[:3], "-Command", script], fixture["environment"]
+    )
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert "DisplayName" in result.stdout + result.stderr
+    assert not Path(fixture["invocation"]).exists()
+    log_directory = Path(fixture["log_directory"])
+    assert not log_directory.exists() or list(log_directory.iterdir()) == []
 
 
 def _only(path: Path, pattern: str) -> Path:
@@ -397,6 +445,7 @@ def _run_launcher(
             command,
             env=environment,
             text=True,
+            encoding="utf-8",
             capture_output=True,
             timeout=HANG_GUARD_S,
         )
@@ -571,8 +620,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
         "build.py",
         "--executor",
         "farm",
-        "--display-name",
-        DISPLAY_NAME,
+        f"--display-name={DISPLAY_NAME}",
         "--leaf-timeout",
         "90",
         "--verbosity",
@@ -1234,7 +1282,7 @@ def _tracking(fixture: dict[str, object], *args: str) -> list[str]:
         "-NoProfile",
         "-NonInteractive",
         "-File",
-        str(LAUNCHER),
+        str(fixture["collaborator"]),
         *args,
         "-LogDirectory",
         str(fixture["log_directory"]),

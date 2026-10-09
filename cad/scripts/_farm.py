@@ -21,6 +21,7 @@ import json
 import os
 import socket
 import subprocess
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -375,18 +376,30 @@ def _record_request(task: str, wf_id: str) -> None:
     os.replace(staging, path)
 
 
-async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
-    display_name = os.environ.get("HARMONIC_FARM_DISPLAY_NAME")
+def _display_name() -> str:
+    """Validate human metadata before any farm side effect; preserve its text."""
+    label = os.environ.get("HARMONIC_FARM_DISPLAY_NAME")
     if (
-        display_name is None
-        or not display_name.strip()
-        or len(display_name) > 160
-        or any(char in display_name for char in "\r\n\x85\u2028\u2029")
+        label is None
+        or not label.strip()
+        or len(label) > 160
+        or any(unicodedata.category(char) in {"Cc", "Zl", "Zp"} for char in label)
     ):
         raise RuntimeError(
-            "HARMONIC_FARM_DISPLAY_NAME must be nonblank, single-line, and at most "
-            "160 characters"
+            "--display-name / HARMONIC_FARM_DISPLAY_NAME must be nonblank, "
+            "single-line, free of control characters, and at most 160 characters"
         )
+    try:
+        label.encode("utf-8")
+    except UnicodeEncodeError:
+        raise RuntimeError(
+            "--display-name / HARMONIC_FARM_DISPLAY_NAME must contain valid Unicode"
+        ) from None
+    return label
+
+
+async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
+    display_name = _display_name()
     # temporalio loads a Rust bridge; import it only when a leaf is dispatched so
     # local builds and the offline check:* workers never pay for it.
     from temporalio.client import Client, WorkflowFailureError
