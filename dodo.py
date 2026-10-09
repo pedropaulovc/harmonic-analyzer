@@ -3128,6 +3128,8 @@ def task_check():
         # The amplitude bar's pressed MHA-CH-011 pin: its worst-case press,
         # running fit and flush-end gap budget, pinned to their sources.
         SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",
+        # The rod fork / peened MHA-CH-010 pin joint's worst-case budget.
+        SCRIPTS_DIR / "test_ch_rod_pivot_fit.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

@@ -710,15 +710,25 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     )
     assert 8.4 < paper_allowed[cross_pin_pair] < 8.6
     # MHA-CH-011: each 5/64 bar pivot pin pressed into its bar's Ø1.968 ream
-    # through both top-notch cheeks (6.35 bar less the 3.20 notch), channel j's
-    # pin with channel j's bar only.
+    # through both top-notch cheeks (6.35 bar less the 3.20 notch), and
+    # MHA-CH-010: the same pin pressed into its rod's Ø1.968 fork ream through
+    # both tines (6.075 fork less the 2.625 slot); channel j's pin with
+    # channel j's bar or rod only.
     channel_allowed = _interference_contracts.allowed_interference_pairs("ch-channel")
     assert channel_allowed == pytest.approx(
         {
-            frozenset(
-                (f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}")
-            ): _annulus_limit(1.984375, 1.968, 3.15)
-            for n in range(1, 21)
+            **{
+                frozenset(
+                    (f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}")
+                ): _annulus_limit(1.984375, 1.968, 3.15)
+                for n in range(1, 21)
+            },
+            **{
+                frozenset(
+                    (f"ch-rod-pivot-pin-{n}", f"ch-connecting-rod-{n}")
+                ): _annulus_limit(1.984375, 1.968, 3.45)
+                for n in range(1, 21)
+            },
         }
     )
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}

@@ -131,6 +131,22 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "the button-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"
     ),
+    ("vn_cylinder_bank_spring_spec", "ID_BAND"): (
+        "McMaster 9714K392's catalogue ID tolerance (plus, minus): indexed for "
+        "the tightest spring against the largest arbor"
+    ),
+    ("vn_cylinder_bank_spring_spec", "OD_BAND"): (
+        "McMaster 9714K392's catalogue OD tolerance (plus, minus): indexed for "
+        "its seat on the washer and strap faces"
+    ),
+    ("vn_rocker_bank_spring_spec", "ID_BAND"): (
+        "McMaster 9714K24's catalogue ID tolerance (plus, minus): indexed to show "
+        "it reaches under the pivot shaft (the slide-free check at fit-up)"
+    ),
+    ("vn_rocker_bank_spring_spec", "OD_BAND"): (
+        "McMaster 9714K24's catalogue OD tolerance (plus, minus): indexed for "
+        "the largest spring under the hub's O10.2"
+    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them
@@ -152,11 +168,16 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "air and the chain envelope's reach"
     ),
     ("ch_connecting_rod_spec", "RING_THICKNESS_BAND"): (
+        "2.200 plate at three places stated in note 2 (title-block linear_3pl), "
         "indexed by cylinder_bank_layout for the thickest ring its cam slot holds"
     ),
     ("ch_bar_pivot_pin_spec", "PIN_BLANK_LENGTH_BAND"): (
         "the drill-rod blank's cut-length deviations: indexed into the blank "
         "note and the dressing-stock stack (blank_excess_min/max)"
+    ),
+    ("ch_connecting_rod_spec", "SHANK_THICKNESS_BAND"): (
+        "same 2.200 plate as the ring (note 2), indexed by cylinder_bank_layout "
+        "for the thickest shank its cam slot holds"
     ),
     ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"): (
         "centred (cylinder_bank_layout asserts it): indexed as the symmetric "

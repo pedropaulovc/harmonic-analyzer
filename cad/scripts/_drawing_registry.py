@@ -369,6 +369,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rod_pivot_pin",
+        part="ch_rod_pivot_pin",
+        artifact_stem="ch-rod-pivot-pin",
+        script_name="draw_ch_rod_pivot_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_counter_spring",
         part="vn_counter_spring",
         artifact_stem="vn-counter-spring",
@@ -1024,6 +1031,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="vn_transgear_pivot_spring",
         artifact_stem="vn-transgear-pivot-spring",
         script_name="draw_vn_transgear_pivot_spring.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_cylinder_bank_spring",
+        part="vn_cylinder_bank_spring",
+        artifact_stem="vn-cylinder-bank-spring",
+        script_name="draw_vn_cylinder_bank_spring.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_rocker_bank_spring",
+        part="vn_rocker_bank_spring",
+        artifact_stem="vn-rocker-bank-spring",
+        script_name="draw_vn_rocker_bank_spring.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

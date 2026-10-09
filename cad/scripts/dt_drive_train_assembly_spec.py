@@ -30,6 +30,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-cylinder-gear-shaft",
         "dt-arbor-pedestal",
         "dt-cylinder-end-disc",
+        "vn-cylinder-bank-spring",
         "dt-cylinder-gear",
         "vn-pedestal-hold-down-screw",
         "vn-arbor-set-screw",
@@ -138,6 +139,9 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         ("north",),
     ),
     ExplodeStep("south thrust washer", ("dt-cylinder-end-disc",), "z", -15.0, ("south",)),
+    # MHA-VN-052 (#948 ruling R) sits between the front strap and the front
+    # washer: it stops between their exploded stations.
+    ExplodeStep("bank spring", ("vn-cylinder-bank-spring",), "z", -25.0),
     ExplodeStep("north thrust washer", ("dt-cylinder-end-disc",), "z", 15.0, ("north",)),
     ExplodeStep("pedestal screws lift", ("vn-pedestal-hold-down-screw",), "y", 30.0),
     ExplodeStep("apex set screws lift", ("vn-arbor-set-screw",), "y", 20.0),

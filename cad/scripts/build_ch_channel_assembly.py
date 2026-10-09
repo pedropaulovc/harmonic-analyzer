@@ -5,7 +5,7 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each retained by a stock eyebolt threaded into the plate.
-153 components (7 * CHANNELS + 13):
+174 components (8 * CHANNELS + 14):
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
@@ -14,7 +14,8 @@ the M6.8 mirror layer is gone).
   integral shoulder on the north ear's inner face, the cylinder spanning
   both ears, each end domed -- rocker_bank_layout)
 * rocker-thrust-washer x1 (MHA-CH-009, between rocker 0's hub and the south
-  ear; the end-play leaf is set between it and the ear)
+  ear) + vn-rocker-bank-spring x1 (MHA-VN-053, the wave disc spring between
+  the washer and the south ear that preloads the bank north; #948 ruling R)
   + fulcrum-shaft x1 (lever bank at (199.9, 1061.4), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
@@ -32,6 +33,9 @@ the M6.8 mirror layer is gone).
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),
+  rod-pivot-pin x20 (MHA-CH-010, one 5/64 drill-rod pin pressed through
+  each rod's fork tines and running in its arm's #47 rod hole, lock-mated to
+  the rod),
   bar-pivot-pin x20 (MHA-CH-011, one 5/64 drill-rod pin pressed through
   each bar's top-notch cheeks and running in its lever's #47 bar-pin hole,
   lock-mated to the bar),
@@ -57,9 +61,12 @@ Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
 across Z, straddling the 2.5 arm / 3.0 lever; the spring's end-hook ring
 lies perpendicular to the lever face. Channel
-stations: z_j = -64.0124 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
-cam/rod plane z_j - 3.528 (half the cylinder gear's 7.0565 stacking
-thickness: the ring centred in its closed slot, #743).
+stations: z_j = -64.0124 + 7.0565 j. The connecting rod is flat -- ring,
+shank and fork share one mid-plane -- so the cam, the rod, the arm/bar/lever
+mid-planes and the spring stations all sit at z_j + ARM_MID_DZ (= the cam
+plane, -3.528: half the cylinder gear's 7.0565 stacking thickness, the ring
+centred in its closed slot, #743). Each rod's U-shaped fork straddles its
+arm in that plane.
 
 Operational DOF use semantic contact mates; fixed hardware and the static
 spring bank retain their measured transforms. Radial joints are concentric
@@ -67,11 +74,11 @@ or coincident, and parts within a channel slice share an axial reference:
   * rocker/lever concentric on the shaft OD; rod/bar coincident axis-to-
     axis on the named bore axes (the revolute radials);
   * the rocker is each channel's Z ANCHOR: channel 0 sits on the Front
-    datum; every other rocker is a PITCH distance off the previous
-    channel's rocker mid-plane (hub face on hub face);
-    the lever and the amplitude bar are seated COINCIDENT to the rocker's
-    mid-plane (lever Front plane / bar MidWidth plane), so a channel's
-    parts share ONE Z reference;
+    datum; every other rocker is j * PITCH off channel 0's rocker
+    mid-plane (hub face on hub face);
+    the rod, the lever and the amplitude bar are seated COINCIDENT to the
+    rocker's mid-plane (rod/lever Front plane / bar MidWidth plane), so a
+    channel's parts share ONE Z reference;
   * the fulcrum shaft is datum-located by orthogonal plane distances;
   * springs and lower anchors are grounded at fixed measured / threaded
     installation transforms; their actual final contacts are statically gated.
@@ -95,22 +102,23 @@ Only the SEED channels are authored mate-by-mate: channel 0 (the global
 Z anchor) plus the first channel >= 1 of each distinct amplitude value.
 Every other channel is ONE CopyWithMates2 of its seed's 4-part slice
 (rocker + rod + bar + lever, 9 mates -- see _cwm.py for the pinned
-native-call contract). The J1a axial dim is re-pointed to THIS channel's
-PREVIOUS channel's rocker (Repeat=false + NewEntityToMateTo) at the local PITCH
-seat -- the SAME per-gap neighbour idiom the authored channels use --
-so a copy is topologically identical to an authored channel, not chained
-to the seed's bushing on a cumulative ladder. The copied mates pin a copy only up
+native-call contract). The J1a axial dim is re-pointed to channel 0's
+rocker (Repeat=false + NewEntityToMateTo) at j * PITCH -- the SAME seat the
+authored channels use -- so a copy is topologically identical to an
+authored channel. The copied mates pin a copy only up
 to its 3 free operational DOF, so its design pose is PUT (no solve)
 right after the copy and one closing rebuild solves everything from
 that consistent state. The call's return value lies, so each copy is
 then proven from the model -- pose = seed pose translated down-spine,
 per-part mate count = the seed's, constrained status under-constrained
 -- and its 3 freed-DOF drive specs are recorded exactly like an
-authored channel's, its pose re-anchored into the ledger. The bar pivot
-pins stay OUTSIDE the slice: once every chain is landed, each pin is
-inserted on its bar's actual top pin bore and lock-mated to that bar (it is
-pressed in the bar and runs in the lever), so the pinned slice contract
-never sees it.
+authored channel's, its pose re-anchored into the ledger. Both pin
+families stay OUTSIDE the slice: once every chain is landed, each rod-pivot
+pin is inserted on its rod's actual pin axis and lock-mated to that rod (it
+is retained in the fork), and each bar pivot pin is inserted on its bar's
+actual top pin bore and lock-mated to that bar (it is pressed in the bar and
+runs in the lever); neither adds a DOF, so the pinned slice contract never
+sees them.
 
 The cams themselves live in dt-drive-train.SLDASM (integral with the
 cylinder gears); the frame, supports and top-frame ring in fr-frame.SLDASM.
@@ -172,11 +180,9 @@ from _native_spring_contact import assert_assembly_spring_contacts
 from _interference_contracts import allowed_interference_pairs
 from _cwm import (
     component_constrained_status,
-    component_distance_mate_flip,
     component_mate_count,
     component_mate_dump,
     copy_with_mates,
-    ensure_component_distance_mate_flip,
     external_mate_rows,
     mates_with_owners,
     resolve_entity,
@@ -212,6 +218,8 @@ from ch_connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
 # phased cam centre.  Imported from the PURE-DATA spec, not the part builder:
 # the builder's closure carries drawing prose, and pulling it here made every
 # notes edit full-rebuild this assembly (codex #354).
+from ch_connecting_rod_spec import FORK_THICKNESS as ROD_FORK_THICKNESS
+from ch_rod_pivot_pin_spec import PIN_INSTALLED_LENGTH
 from ch_rocker_arm_spec import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
 from ch_rocker_arm_spec import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
 
@@ -251,12 +259,28 @@ if abs(Z0 - CHANNEL_Z0) > 1e-9:
     raise AssertionError(
         f"channels.station_z0_mm {Z0:g} != installation contract {CHANNEL_Z0:g}"
     )
-from rocker_bank_layout import ARM_MID_DZ  # noqa: E402  (arm/bar/lever mid-planes at z_j + 0.8)
+from rocker_bank_layout import ARM_MID_DZ  # noqa: E402  (cam/rod/arm/bar/lever mid-plane at z_j + ARM_MID_DZ)
 
 # End-for-end cylinder gear: the cam / rod-ring mid-plane sits half the gear's
 # overall (stacking) thickness south of z_j, centred in the closed rod slot
 # between gear j's web and gear j-1's back face (#743 solid stack).
 CAM_DZ = -(CYL_FACE_WIDTH + CYL_CAM_THICKNESS) / 2.0
+# The rod is flat (ring, shank and fork share one mid-plane) and its fork
+# straddles the arm, so the cam plane IS the arm plane: the rocker bank sits on
+# cam_plane.CAM_MID_DZ. The J2 axial mate is a coincident mid-plane
+# mate only because of this.
+if abs(CAM_DZ - ARM_MID_DZ) > 1e-9:
+    raise AssertionError(
+        f"cam / rod mid-plane z_j{CAM_DZ:+.5f} != arm mid-plane z_j{ARM_MID_DZ:+.5f}"
+    )
+# The pivot pin is modelled installed: flush with both fork faces, its axial
+# mid-plane on its Front Plane, lock-mated to the rod's Front Plane -- the rod
+# mid-plane, which the J2 coincident mate puts on the arm mid-plane.
+if abs(PIN_INSTALLED_LENGTH - ROD_FORK_THICKNESS) > 1e-9:
+    raise AssertionError(
+        f"rod pivot pin length {PIN_INSTALLED_LENGTH:g} != fork thickness"
+        f" {ROD_FORK_THICKNESS:g}"
+    )
 
 # --- rocker bank ------------------------------------------------------------
 # PIVOT (72.9, 253.8): the rocker pivot shaft axis -- imported from channel_frame_geom.
@@ -327,14 +351,16 @@ LEVER_THICKNESS = 3.0
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
 CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
-# Rocker pivot brackets, shaft and south washer (#743 PR2, Reading 1): the
-# rocker bank's retention stack, from rocker_bank_layout. The north ear's
-# inner face is the datum the shaft's shoulder bears on; the south ear is
-# feeler-set off the MHA-CH-009 washer on hub 0. Feet inside the rocker-arm-
+# Rocker pivot brackets, shaft, south washer and spring (#948 ruling R, PR
+# #1292): the rocker bank's retention stack, from rocker_bank_layout. The
+# north ear's inner face is the datum the shaft's shoulder bears on; the
+# MHA-VN-053 spring between the south ear and the MHA-CH-009 washer on hub 0
+# preloads the bank and shaft north onto it. Feet inside the rocker-arm-
 # support's +-88.9 top (it is the only stand; the old south "A-frame" is gone).
 from rocker_bank_layout import (  # noqa: E402
     PIVOT_BRACKET_Z,
     PIVOT_SHAFT_NORTH_Z,
+    ROCKER_SPRING_Z,
     SHOULDER_Z,
     SOUTH_WASHER_Z,
     STACK_MID_Z as _STACK_MID_Z,
@@ -369,6 +395,14 @@ if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
     raise AssertionError(
         "south thrust washer's north face is not on hub 0's south face"
     )
+# The spring's part runs z 0..MODEL_HEIGHT from its origin (axis +Z), so
+# IDENTITY at ROCKER_SPRING_Z[0] fills the south ear to washer envelope.
+import vn_rocker_bank_spring_spec as _rocker_spring  # noqa: E402
+
+if abs(ROCKER_SPRING_Z[1] - ROCKER_SPRING_Z[0] - _rocker_spring.MODEL_HEIGHT) > 1e-9:
+    raise AssertionError("rocker bank spring is not its installed envelope")
+if abs(ROCKER_SPRING_Z[1] - SOUTH_WASHER_Z[0]) > 1e-9:
+    raise AssertionError("rocker bank spring's north face is not on the washer")
 # Bracket hold-downs (#743 PR2): two MHA-VN-032 (#8-32 x 3/4 fillister) per
 # bracket, through its #8 close-clearance foot holes into the support rail's
 # transferred seats. rocker_bracket_seat_layout owns the seats and their
@@ -971,9 +1005,8 @@ async def build(adapter) -> dict[str, str]:
             label=f"pivot-bracket rocker z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
-    # South thrust washer (MHA-CH-009): on the shaft against rocker 0's hub, the
-    # end-play leaf between it and the south ear. Free-space structure here,
-    # datum-located like the brackets.
+    # South thrust washer (MHA-CH-009): on the shaft against rocker 0's hub.
+    # Free-space structure here, datum-located like the brackets.
     washer = await place_component(
         adapter,
         "ch-rocker-thrust-washer",
@@ -984,6 +1017,18 @@ async def build(adapter) -> dict[str, str]:
         label="rocker-thrust-washer south",
     )
     await _locate_to_datum(adapter, washer)
+    # Rocker bank spring (MHA-VN-053, #948 ruling R): coaxial on the shaft,
+    # south face on the south ear's inner face, north face on the washer.
+    rocker_spring = await place_component(
+        adapter,
+        "vn-rocker-bank-spring",
+        [PIVOT[0], PIVOT[1], ROCKER_SPRING_Z[0]],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="rocker-bank-spring south",
+    )
+    await _locate_to_datum(adapter, rocker_spring)
     # Bracket hold-downs (MHA-VN-032): head down on each bracket foot's top,
     # over the rail seat rocker_bracket_seat_layout derived from its hole.
     # Free-space here (the support is the frame's), datum-located likewise.
@@ -1040,12 +1085,14 @@ async def build(adapter) -> dict[str, str]:
     # axial (Z) seat as a PITCH distance off the PREVIOUS channel's rocker
     # mid-plane (hub face on hub face, the #110 neighbour idiom), and the
     # lever rides coincident to its own rocker. rocker_by_channel[j] is the
-    # rocker instance every later neighbour seat refers to.
+    # rocker instance every later neighbour seat refers to; rod_by_channel[j]
+    # is the rod each rod-pivot pin is locked into.
     rocker_by_channel: dict[int, str] = {}
     # The bar and lever each channel's MHA-CH-011 pin joins (inserted once
     # every chain is landed, outside the CopyWithMates slice).
     bar_by_channel: dict[int, str] = {}
     lever_by_channel: dict[int, str] = {}
+    rod_by_channel: dict[int, str] = {}
     if abs(ROCKER_HUB_LENGTH - PITCH) > 1e-6 or abs(LEVER_HUB_LENGTH - PITCH) > 1e-6:
         raise RuntimeError("hub lengths must equal the station pitch")
     _hub_bottom = PIVOT[1] - ROCKER_HUB_DIA / 2.0
@@ -1120,7 +1167,7 @@ async def build(adapter) -> dict[str, str]:
         rod = await place_component(
             adapter,
             "ch-connecting-rod",
-            [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
+            [RING_CENTER[0], RING_CENTER[1], z_mid],
             euler_from_rows(rod_rows),
             rod_rows,
             ground=False,
@@ -1174,7 +1221,9 @@ async def build(adapter) -> dict[str, str]:
         # replacing the old design-pose pin to the global datums. The rod's pin
         # bore (Axis2@rod) is made coaxial with the rocker's rod bore (Axis2@rocker)
         # -- a coincident of two named axes (AddMate5 rejects concentric on axes);
-        # a distance to the rocker's Front plane pins Z; and the swing about the
+        # the rod is flat and its fork straddles the arm, so Z is a COINCIDENT
+        # mid-plane mate to the rocker's Front plane (CAM_DZ == ARM_MID_DZ,
+        # asserted at import); and the swing about the
         # pin is a freed DOF (recorded on the rod's cam-ring bore Axis1@rod, not
         # authored) so the rod follows the rocker. NB the cam ring's external
         # journal (the cylinder-gear lobe) lives at the TOP level only; this
@@ -1191,12 +1240,11 @@ async def build(adapter) -> dict[str, str]:
             label=f"J2 rod ch{j:02d} coaxial pin <- {rocker}",
             verify=(rod, rod_tgt),
         )
-        await distance_driver(
+        await coincident_mate(
             adapter,
             named_ref(f"Front Plane@{rod}", "PLANE"),
             named_ref(f"Front Plane@{rocker}", "PLANE"),
-            rod_tgt[2] - z_mid,
-            label=f"J2 rod ch{j:02d} axial d={abs(rod_tgt[2] - z_mid):.2f} <- {rocker}",
+            label=f"J2 rod ch{j:02d} axial coincident mid-plane <- {rocker}",
             verify=(rod, rod_tgt),
         )
         await spin_driver(
@@ -1386,11 +1434,6 @@ async def build(adapter) -> dict[str, str]:
             "n": len(rows),
             "dim_slot": slot,
             "dim_flip": bool(dim["flip"]),
-            "rod_axial_flip": component_distance_mate_flip(
-                adapter,
-                seed_comps["ch-connecting-rod"],
-                abs(CAM_DZ - ARM_MID_DZ),
-            ),
             "arrays": arrays,
             "mate_counts": mate_counts,
             "rocker_off": world_point(
@@ -1429,6 +1472,7 @@ async def build(adapter) -> dict[str, str]:
             rocker_by_channel[j] = comps["ch-rocker-arm"]
             bar_by_channel[j] = comps["ch-amplitude-bar"]
             lever_by_channel[j] = comps["ch-channel-lever"]
+            rod_by_channel[j] = comps["ch-connecting-rod"]
             if j >= 1:
                 seed_by_amp[amp_key] = (j, comps)
             continue
@@ -1469,12 +1513,7 @@ async def build(adapter) -> dict[str, str]:
         rocker_by_channel[j] = comps["ch-rocker-arm"]
         bar_by_channel[j] = comps["ch-amplitude-bar"]
         lever_by_channel[j] = comps["ch-channel-lever"]
-        ensure_component_distance_mate_flip(
-            adapter,
-            comps["ch-connecting-rod"],
-            abs(CAM_DZ - ARM_MID_DZ),
-            slice_info["rod_axial_flip"],
-        )
+        rod_by_channel[j] = comps["ch-connecting-rod"]
         # Land the copy on its DESIGN pose by pinning its 3 operational DOF
         # with TRANSIENT drivers, then deleting them. The chain's DOF are
         # genuinely free, so the copied mates pin the copy only up to the
@@ -1743,6 +1782,60 @@ async def build(adapter) -> dict[str, str]:
                 free_dof_key=f"bar_amplitude_{j:02d}",
             )
             free_dof_keys.append(f"bar_amplitude_{j:02d}")
+
+    # Rod-pivot pins (MHA-CH-010): one per channel, OUTSIDE the CopyWithMates
+    # slice, so the pinned slice contract (SLICE_MATES / SLICE_EXTERNAL / the
+    # per-part mate counts above) never sees them. Each pin is modelled
+    # installed -- pressed through the fork's reamed tines and dressed flush
+    # with both (user ruling 2026-10-09, PR #1292 review F1), its axis the
+    # rod's pin axis (Axis2@rod), its axial mid-plane the rod's Front plane --
+    # so it is inserted at the rod's SOLVED pose and locked to the rod: it is
+    # pressed in the fork tines and runs in the arm's #47 hole with the rod,
+    # adding no DOF. It reads under-constrained with its free rod
+    # (ch-channel.yaml allowed_free_stems). Channel j's pin is the (j + 1)th
+    # instance, like its rod, so _interference_contracts can name each
+    # modelled press pair exactly.
+    for j in range(CHANNELS):
+        rod = rod_by_channel[j]
+        if rod != f"ch-connecting-rod-{j + 1}":
+            raise RuntimeError(
+                f"ch{j:02d} rod is {rod!r}, not ch-connecting-rod-{j + 1} -- the"
+                " press-fit interference contract would name the wrong pair"
+            )
+        a = component_transform(adapter, rod)
+        pin_rows = [list(a[0:3]), list(a[3:6]), list(a[6:9])]
+        pin_at = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
+        arm_hole = world_point(adapter, rocker_by_channel[j], ROCKER_ROD_BORE_LOCAL)
+        z_mid = z_station(j) + ARM_MID_DZ
+        if (
+            math.hypot(pin_at[0] - arm_hole[0], pin_at[1] - arm_hole[1]) > 0.01
+            or abs(pin_at[2] - z_mid) > 0.01
+            or abs(arm_hole[2] - z_mid) > 0.01
+        ):
+            raise RuntimeError(
+                f"ch{j:02d} rod pin axis {pin_at} is not on the arm's rod hole"
+                f" {arm_hole} at mid-plane z {z_mid:.3f} -- the J2 joint moved"
+            )
+        pin = await place_component(
+            adapter,
+            "ch-rod-pivot-pin",
+            pin_at,
+            euler_from_rows(pin_rows),
+            pin_rows,
+            ground=False,
+            label=f"rod-pivot-pin ch{j:02d} pressed",
+        )
+        if pin != f"ch-rod-pivot-pin-{j + 1}":
+            raise RuntimeError(
+                f"ch{j:02d} pin is {pin!r}, not ch-rod-pivot-pin-{j + 1} -- the"
+                " press-fit interference contract would name the wrong pair"
+            )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{pin}", "PLANE"),
+            named_ref(f"Front Plane@{rod}", "PLANE"),
+            label=f"rod-pivot-pin ch{j:02d} locked to {rod}",
+        )
 
     # Bar pivot pins (MHA-CH-011): one per channel, OUTSIDE the CopyWithMates
     # slice, so the pinned slice contract (SLICE_MATES / SLICE_EXTERNAL / the

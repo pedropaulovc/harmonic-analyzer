@@ -12,12 +12,12 @@ from __future__ import annotations
 
 from ch_rocker_arm_spec import (
     ARM_DEPTH,
-    ARM_THICKNESS,
     BOT_ARC_LEN,
     CENTER_Y,
     PIVOT_MID_Y,
     R_BOTTOM,
     R_TOP,
+    STRAP_HUB_SYMMETRY,
     TIP_FACE,
     TOP_ARC_LEN,
     HUB_DIA,
@@ -49,6 +49,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # PRRT_kwDOPHDy386mV3AO). Only this one of the sketch's two dimensions
     # prints; the other places the line's foot on the pivot centre.
     "TopEdgeReference": {"TopAbovePivot"},
+    # The strap thickness, +/-0.025 natively at three places (Main ruling
+    # 2026-10, option b; ch_rocker_arm_spec.ARM_THICKNESS_BAND): the Strap
+    # extrude's depth, printed in the end view where the section reads.
+    "Strap": {"StrapThickness"},
 }
 
 # Decimal classes already authored by the part; shared with the offline
@@ -57,6 +61,7 @@ DEFAULT_DRAWING_PRECISION = 2
 DRAWING_PRECISION = {
     "Hub": {"HubLength": 3},
     "TopEdgeReference": {"TopAbovePivot": DEFAULT_DRAWING_PRECISION},
+    "Strap": {"StrapThickness": 3},
 }
 
 # BUILT_UP_PERMISSION_NOTE may be supplied only as exact explicit permission
@@ -70,7 +75,7 @@ DRAWING_NOTES = "\n".join(
         # full line of headroom at the measured pitch).
         "1. MIRROR-SYMMETRIC ABOUT THE PIVOT AXIS;",
         "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
-        f"2. STRAP {ARM_THICKNESS:.{DEFAULT_DRAWING_PRECISION}f} THICK; ALL HOLES THRU.",
+        "2. ALL HOLES THRU.",
         f"3. TOP EDGE R{R_TOP:.{DEFAULT_DRAWING_PRECISION}f}, "
         f"BOTTOM EDGE R{R_BOTTOM:.{DEFAULT_DRAWING_PRECISION}f},",
         "   CONCENTRIC; COMMON CENTRE ON THE",
@@ -84,8 +89,11 @@ DRAWING_NOTES = "\n".join(
         # REAM is the fit bore's process requirement (policy rule 6); its
         # +0.03/0 band rides the O6.50 natively and its Ra the bore's symbol.
         "6. PIVOT HOLE: REAM.",
-        f"7. INTEGRAL HUB DIA {HUB_DIA:.{DEFAULT_DRAWING_PRECISION}f}, CENTRED ON THE",
-        "   STRAP: THE HUBS SET THE STATION PITCH",
+        # #948 ruling R: the rod's float on the arm is taken from the hub's
+        # mid-plane, so the strap's offset from it is held.
+        "7. STRAP SYMMETRIC TO HUB WITHIN "
+        f"{STRAP_HUB_SYMMETRY:.{DEFAULT_DRAWING_PRECISION}f};",
+        f"   INTEGRAL HUB DIA {HUB_DIA:.{DEFAULT_DRAWING_PRECISION}f} SETS THE PITCH",
         "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
         f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f} (TURN HUB AND REAM",
         "   BORE IN ONE SETUP).",

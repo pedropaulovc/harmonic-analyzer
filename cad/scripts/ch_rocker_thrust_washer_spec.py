@@ -9,8 +9,8 @@ south ear off hub 0 (``rocker_bank_layout``, ``test_rocker_bank_layout``).
 
 It is cut from 1/16 in steel stock (user ruling, 2026-09-26): the print states
 the thickness as the stock's, so the mill's tolerance governs it rather than
-a machined .XX band. The end-play leaf is set between this washer and the
-south ear, so the thickness sits in no datum chain.
+a machined .XX band. The south ear is set off this washer by the MHA-VN-053
+spring's set blade (#948 ruling R), so the thickness sits in no datum chain.
 """
 
 from __future__ import annotations

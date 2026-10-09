@@ -23,8 +23,9 @@ BUILDER = SCRIPTS / "build_dt_drive_train_assembly.py"
 # The rig's steps at the built assembly's counts.
 RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
-# Step 10 sets the channel's north MHA-CH-008 on the frame's MHA-FR-005 (#936 P1 b).
-EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008"})
+# Step 10 sets the channel's north MHA-CH-008 on the frame's MHA-FR-005 (#936 P1 b),
+# offset by the miced MHA-CH-005 shoulder (#948 ruling R, PR #1292).
+EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008", "MHA-CH-005"})
 # Named installation assemblies are external interfaces, not drive-train BOM rows.
 EXTERNAL_NUMBERS |= frozenset(
     assembly_contract(stem).number
@@ -55,7 +56,8 @@ def _instances(**overrides) -> list[spec.Instance]:
         "dt-cylinder-gear-shaft": [(drum_x, 90.5, -86.9)],
         "dt-arbor-pedestal": [(drum_x, 50.8, -87.4), (drum_x, 50.8, 100.6)],
         "dt-cylinder-end-disc": [(drum_x, 90.5, -72.5), (drum_x, 90.5, 72.1)],
-        "vn-arbor-set-screw": [(drum_x, 95.3, -76.519), (drum_x, 95.3, 78.062)],
+        "vn-cylinder-bank-spring": [(drum_x, 90.5, -72.019)],
+        "vn-arbor-set-screw": [(drum_x, 95.3, -77.019), (drum_x, 95.3, 78.062)],
         "dt-cylinder-gear": [(drum_x, 90.5, -64.0 + 7.0 * j) for j in range(20)],
         "vn-foot-screw": [(7.49, 52.0, 74.0)],
         "vn-pedestal-hold-down-screw": [(drum_x, 55.8, -91.652), (drum_x, 55.8, 94.202)],
@@ -555,8 +557,8 @@ def test_cone_station_rows_run_front_to_back() -> None:
     assert table.splitlines()[1].startswith("STN  1  T120")
 
 
-def test_bom_split_keeps_the_second_column_no_taller() -> None:
-    assert drawing.bom_split_row(39) == 20
+def test_bom_split_keeps_the_first_column_no_taller() -> None:
+    assert drawing.bom_split_row(39) == 19
     assert drawing.bom_split_row(42) == 21
     with pytest.raises(ValueError):
         drawing.bom_split_row(1)
@@ -571,10 +573,11 @@ def test_bom_reference_view_and_metadata_fit_below_the_first_piece() -> None:
     assert drawing.bom_extent_violations(
         drawing.BOM_ANCHOR, drawing.BOM_COLUMN_WIDTH, first_height
     ) == []
+    second_height = 0.0102 + (data_rows - first_rows) * drawing.BOM_ROW_HEIGHT
     assert drawing.bom_extent_violations(
         (drawing.BOM_SECOND_COLUMN_X, drawing.BOM_ANCHOR[1]),
         drawing.BOM_COLUMN_WIDTH,
-        first_height,
+        second_height,
     ) == []
     half = drawing.REFERENCE_ISO_HALF_OUTLINE
     cx, cy = drawing.BOM_REFERENCE_ISO_CENTER
@@ -1048,6 +1051,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     rounded inward so a part inside the print is inside the model band."""
     import math
 
+    import ch_pivot_shaft_spec as pivot_shaft
     import cylinder_bank_layout as bank
     import fr_harmonic_base_spec as base
     import rocker_bank_layout as rockers
@@ -1069,17 +1073,30 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     assert short in " ".join(steps.split())
     back_y = base.BOTTOM_REAR_Z - bank.BACK_STRAP_INNER_Z
     band = bank.BACK_STRAP_LOCATE_BAND
-    assert f"Y {limits(back_y - band, back_y + band, 2)}" in steps
-    # Step 10: the north MHA-CH-008 ear inner face on the same DRO zero and band.
-    ear_y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
-    assert f"EAR INNER FACE TO Y {limits(ear_y - band, ear_y + band, 2)}" in steps
-    assert f"A {bank.BANK_END_FEELER:.2f} LEAF" in steps
-    assert f"A {bank.BANK_END_PLAY[0]:.2f} LEAF ENTERS" in steps
-    assert steps.index("BANK PUSHED BACK:") < steps.index(
-        f"A {bank.BANK_END_PLAY[0]:.2f} LEAF ENTERS"
+    # #948 ruling R (PR #1292): the target moves north -- LESS Y, a rear-face
+    # distance -- by the miced back washer's excess over nominal.
+    washer = f"{bank.WASHER_THICK:.3f}"
+    assert (
+        f"Y {limits(back_y - band, back_y + band, 2)} LESS (W - {washer})" in steps
     )
-    assert f"A {bank.BANK_END_PLAY[1]:.2f} LEAF DOES NOT" in steps
-    for gone in ("MHA-125", "0.025", "-6.0", "END PLAY 0.5-0.8"):
+    assert steps.index("MIC ONE MHA-DT-026, W") < steps.index("FACE TO Y")
+    # Step 10: the north MHA-CH-008 ear inner face on the same DRO zero, its
+    # target offset north by the miced MHA-CH-005 shoulder's excess.
+    ear_y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
+    ear_band = rockers.NORTH_EAR_LOCATE_BAND
+    shoulder = f"{pivot_shaft.SHOULDER_LENGTH:.3f}"
+    assert (
+        f"EAR INNER FACE TO Y {limits(ear_y - ear_band, ear_y + ear_band, 2)} "
+        f"LESS (S - {shoulder})" in steps
+    )
+    assert steps.index("MIC THE MHA-CH-005 SHOULDER, S") < steps.index("EAR INNER FACE")
+    # The front strap is set one spring-set blade off the front washer, the
+    # MHA-VN-052 beside it; the bank then has no end play to read.
+    assert f"A {bank.BANK_SPRING_SET:.2f} BLADE BETWEEN ITS STRAP" in steps
+    assert "BESIDE MHA-VN-052" in steps
+    assert "MHA-VN-052 THAT SLIDES FREE ON THE MHA-DT-013 BAR" in steps
+    assert "REMOVE THE BLADE" in steps
+    for gone in ("MHA-125", "0.025", "-6.0", "END PLAY", "LEAF", "0.45"):
         assert gone not in steps, gone
     assert "MHA-VN-034" in steps
     dome = f"{bank.ARBOR_DOME_HEIGHT:.1f}"
@@ -1098,25 +1115,23 @@ def test_bank_drills_the_front_foot_with_the_loaded_mandrel_off_the_base() -> No
     mandrel_off = steps.index("DRAW THE LOADED MANDREL OUT OF THE BACK MHA-DT-002")
     drill = steps.index("DRILL AND TAP AS 9A", mandrel_off)
     back_in = steps.index("PASS THE MANDREL BACK THROUGH THE BACK MHA-DT-002")
-    refit = steps.index("REFIT THE FRONT MHA-DT-002; RE-SET THE LEAF AND X")
+    refit = steps.index("REFIT THE FRONT MHA-DT-002; RE-SET THE BLADE AND X")
     assert prop < front_on < spot < mandrel_off < drill < back_in < refit
     assert "LIFT OFF, DRILL AND TAP" not in steps
 
 
-def test_ring_overhang_check_matches_the_cylinder_gear_print() -> None:
-    """dtrefactor F4 on #937: check 3 and the MHA-DT-012 callout print the same
-    bound, the bank's RING_OVERHANG_MAX."""
-    import ch_connecting_rod_spec as rod
-    import cylinder_bank_layout as bank
+def test_bank_preload_check_replaces_the_ring_overhang_bound() -> None:
+    """#948 ruling R (PR #1292): MHA-VN-052 preloads the bank back, so no ring
+    overhangs its cam; check 3 proves the spring holds instead, and neither
+    check 3 nor the MHA-DT-012 callout states an overhang bound."""
     import dt_cylinder_gear_notes
 
-    bound = f"{bank.RING_OVERHANG_MAX:.2f}"
     checks = " ".join(drawing.CHECKS.split())
-    assert f"OVERHANG ITS CAM UP TO {bound} (AT LEAST" in checks
-    assert f"OVERHANGS CAM {bound} MAX" in dt_cylinder_gear_notes.STACK_FIT_CALLOUT
-    on_cam = 100.0 * (rod.RING_THICKNESS - bank.RING_OVERHANG_MAX) / rod.RING_THICKNESS
-    assert f"AT LEAST {math.floor(on_cam)}% OF THE RING WIDTH" in checks
-    assert "0.56" not in checks
+    check3 = checks.split("3. ")[1].split(" 4. ")[0]
+    assert "PUSH GEAR 0 TOWARD THE FRONT BY HAND AND RELEASE" in check3
+    assert "SPRINGS BACK ONTO THE BACK MHA-DT-026" in check3
+    assert "OVERHANG" not in checks
+    assert "OVERHANG" not in dt_cylinder_gear_notes.STACK_FIT_CALLOUT
 
 
 def test_the_collar_pin_explodes_with_the_arbor_and_the_strap_pins_stay() -> None:

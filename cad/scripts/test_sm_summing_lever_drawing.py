@@ -6,11 +6,15 @@ from types import SimpleNamespace
 
 import pytest
 
+import _config
 import _drawing_common as common
+import build_sm_summing_lever as lever_build
 import draw_sm_summing_lever as drawing
+import rocker_bank_layout
 import sm_summing_lever_spec
 from _drawing_common import ViewEdge, ViewEdges, assert_dimension_measures
 from _hole_spec import blind_cut_dia_mm
+from dt_cone_pivot_post_installation import SUMMING_Z
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
@@ -31,6 +35,26 @@ def test_anchor_seats_are_the_purchased_anchors_own_threads() -> None:
     assert blind_cut_dia_mm(plate) < sm_summing_lever_spec.HOLE_EDGE_OFFSET
 
 
+def test_spring_hole_column_rides_the_channel_arm_plane() -> None:
+    """Each anchor tap is coaxial with its channel spring at z_j + ARM_MID_DZ
+    (the cam plane), in the lever's frame (machine z less SUMMING_Z). The spec
+    restates the offset (its closure must stay config-free); this pins it."""
+    spec = sm_summing_lever_spec
+    assert spec.HOLE_Z_OFFSET == pytest.approx(rocker_bank_layout.ARM_MID_DZ, abs=1e-12)
+    z0 = _config.machine("channels", "station_z0_mm")
+    pitch = _config.machine("channels", "station_pitch_mm")
+    assert spec.CHANNEL_Z0 == pytest.approx(z0 - SUMMING_Z, abs=1e-9)
+    assert spec.CHANNEL_PITCH == pytest.approx(pitch, abs=1e-9)
+    for j in (0, spec.HOLE_COUNT - 1):
+        hole_z = spec.CHANNEL_Z0 + spec.CHANNEL_PITCH * j + spec.HOLE_Z_OFFSET
+        assert hole_z + SUMMING_Z == pytest.approx(rocker_bank_layout.hub_mid_z(j))
+    assert spec.HOLE_END_OFFSET_FIRST == pytest.approx(5.572, abs=5e-4)
+    assert spec.HOLE_END_OFFSET_LAST == pytest.approx(12.755, abs=5e-4)
+    # Rule-12: the j=0 tap keeps a 2.0 wall to the -Z plate end.
+    tap_r = blind_cut_dia_mm(spec.HOLE_SPEC) / 2.0
+    assert spec.HOLE_END_OFFSET_FIRST - tap_r >= 2.0
+
+
 def _line(start, end):
     return ViewEdge(object(), (start, end), None, None)
 
@@ -40,15 +64,28 @@ def test_end_face_edge_is_the_rib_top_edge_not_the_flange_or_underside() -> None
     5.08 mm inboard reads 3.35 for 8.43 (#1105), and the rib's underside edge
     shares the end plane but is hidden under the plate."""
     z = sm_summing_lever_spec.PLATE_L / 2.0
-    top = _line((0.0, 15.24, z), (sm_summing_lever_spec.PLATE_W, 0.0, z))
-    flange = _line((0.0, 15.24, z - sm_summing_lever_spec.PLATE_T), (44.45, 0.0, z - 5.08))
-    underside = _line((sm_summing_lever_spec.PLATE_W, 0.0, z), (0.0, -15.24, z))
-    plate_end = _line((37.04, 2.54, z), (sm_summing_lever_spec.PLATE_W, 2.54, z))
-    edges = ViewEdges(label="plan", edges=(flange, underside, plate_end, top))
+    # The ribs keep the slant towards (PLATE_W, 0) but end on a vertical face
+    # at build_sm_summing_lever.RIB_PLATE_REACH (HOLE_X - 4.1), short of the
+    # hole column and still proud of the plate top there.
+    reach = lever_build.RIB_PLATE_REACH
+    end_h = lever_build.edge_rib_half_height(reach)
+    half_t = sm_summing_lever_spec.PLATE_T / 2.0
+    assert reach == pytest.approx(sm_summing_lever_spec.HOLE_X - 4.1)
+    assert end_h - half_t == pytest.approx(0.44286, abs=1e-5)
+    top = _line((0.0, 15.24, z), (reach, end_h, z))
+    flange = _line(
+        (0.0, 15.24, z - sm_summing_lever_spec.PLATE_T), (reach, end_h, z - 5.08)
+    )
+    step = _line((reach, end_h, z), (reach, half_t, z))
+    underside = _line((reach, -end_h, z), (0.0, -15.24, z))
+    plate_end = _line((reach, half_t, z), (sm_summing_lever_spec.PLATE_W, half_t, z))
+    edges = ViewEdges(label="plan", edges=(flange, underside, step, plate_end, top))
     assert drawing._end_face_edge(edges, x_mm=10.0) is top
-    # The plate's own end edge only shows past the rib taper: two lines there.
+    assert drawing._end_face_edge(edges, x_mm=32.0) is top
+    assert drawing._end_face_edge(edges, x_mm=40.0) is plate_end
+    # At the rib's end face the rib edge, its step and the plate edge all meet.
     with pytest.raises(RuntimeError, match="expected one visible line"):
-        drawing._end_face_edge(edges, x_mm=40.0)
+        drawing._end_face_edge(edges, x_mm=reach)
     with pytest.raises(RuntimeError, match="expected one visible line"):
         drawing._end_face_edge(ViewEdges(label="plan", edges=(flange, underside)), x_mm=10.0)
 

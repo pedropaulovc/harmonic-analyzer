@@ -27,12 +27,13 @@ from typing import Any, Callable, Literal, NamedTuple, Sequence
 import _config
 import _seat_forensics
 import _telemetry
-import ch_connecting_rod_spec as rod
+import ch_pivot_shaft_spec as pivot_shaft
 import cylinder_bank_layout as bank
 import dt_drive_train_steps as steps
 import pinion_rig_fitup as FITUP
 import pinion_rig_tip_gap as TIP_GAP
-from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY
+from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY, RODS_PINNED_REF
+from ch_channel_assembly_steps import step_ref as channel_step_ref
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -77,6 +78,7 @@ from dt_crank_pinion_spec import SHAFT_END_RECESS_MAX as PINION_RECESS_MAX
 from dt_crank_pinion_spec import SHAFT_END_RECESS_MIN as PINION_RECESS_MIN
 from dt_crank_seat_washer_spec import GAP_MAX as WASHER_GAP_MAX
 from dt_crank_seat_washer_spec import GAP_MIN as WASHER_GAP_MIN
+from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
 from vn_keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 from dt_drive_train_assembly_spec import (
@@ -362,6 +364,7 @@ BOM_PART_NUMBERS = {
     "dt-cylinder-gear-shaft": "MHA-DT-013",
     "dt-arbor-pedestal": "MHA-DT-002",
     "dt-cylinder-end-disc": "MHA-DT-026",
+    "vn-cylinder-bank-spring": "MHA-VN-052",
     "dt-cylinder-gear": "MHA-DT-012",
     "vn-pedestal-hold-down-screw": "MHA-VN-032",
     "vn-arbor-set-screw": "MHA-VN-034",
@@ -418,6 +421,7 @@ BOM_DESCRIPTIONS = {
     "dt-cylinder-gear-shaft": "CYLINDER GEAR ARBOR",
     "dt-arbor-pedestal": "ARBOR PEDESTAL",
     "dt-cylinder-end-disc": "CYLINDER BANK THRUST WASHER",
+    "vn-cylinder-bank-spring": "WAVE DISC SPRING, MCMASTER 9714K392",
     "dt-cylinder-gear": "CYLINDER GEAR WITH CAM, 120T",
     "vn-pedestal-hold-down-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A197",
     "vn-arbor-set-screw": "#4-40 X 1/4 SET SCREW, MCMASTER 91375A106",
@@ -670,33 +674,42 @@ BANK_STEPS = _note_text(
         # the edge finder) and its cut-to-fit rule (Main, r9).
         # #743 (retention743 plan section 4, user rulings Q1-Q3): the bank is
         # a solid stack, so fit-up proves the stack length, locates the back
-        # strap as the Z datum, sets the front strap by one 0.45 leaf and
-        # swaps a setting mandrel for the finished arbor, which the MHA-VN-034
-        # apex set screws hold. Supersedes U34's disc/feeler end play and
-        # its "span -6.0" arbor. Every limit is cylinder_bank_layout's,
-        # rounded inward (test_bank_fitup_limits_are_the_layout_bands):
+        # strap as the Z datum and swaps a setting mandrel for the finished
+        # arbor, which the MHA-VN-034 apex set screws hold. #948 ruling R
+        # (PR #1292): the front strap is set one BANK_SPRING_SET blade off the
+        # front washer and the MHA-VN-052 wave spring in that gap holds the
+        # bank back (no end play); the back strap's DRO target moves north by
+        # the miced back washer's excess, W - 1.500. Supersedes U34's
+        # disc/feeler end play and its "span -6.0" arbor. Every limit is
+        # cylinder_bank_layout's, rounded inward
+        # (test_bank_fitup_limits_are_the_layout_bands):
         # 9A: Y is the hole-table rear-face distance of the back strap inner
-        # face, 70.538 +/-0.10. 9F: E_b 0.35-0.55.
-        # 8 (user ruling L20 d'): T 7.0565 +/-0.025 and L20 141.13 +/-0.20,
+        # face, 70.538 +/-0.10; north (+Z) is LESS Y.
+        # 8 (user ruling L20 d'): T 7.0565 +/-0.025 and L20 141.13 +/-0.10,
         # both exact at the places printed, read from the layout's limits. A
         # short stack cannot be re-faced longer: its thinnest gear is remade.
         "8. MIC EACH OF {cylinder_gears}X MHA-DT-012, CAM FACE TO BACK FACE:",
         f"   {bank.GEAR_THICKNESS_ACCEPT[0]:.4f}-{bank.GEAR_THICKNESS_ACCEPT[1]:.4f};"
         " RECORD. SLIDE THEM ONTO A 3/8 GROUND SETTING",
-        "   MANDREL ~190 LONG, ALL ALIKE, CAM SIDE FRONT; ADD EACH CONNECTING",
-        "   ROD (CHANNEL ASSEMBLY MHA-CH-000) ON ITS CAM AS ITS GEAR GOES ON.",
+        # Each connecting rod comes pinned to its rocker arm (MHA-CH-000's
+        # bench pinning step, cited by key): its ring is captured in the closed
+        # cam slot as the next gear goes on, so the pair travels with its gear.
+        "   MANDREL ~190 LONG, ALL ALIKE, CAM SIDE FRONT; SET EACH CONNECTING",
+        f"   ROD + ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM AS ITS GEAR GOES ON.",
         "   CLAMP LIGHTLY END TO END: GEAR 0 CAM FACE TO GEAR 19 BACK FACE",
         f"   {bank.STACK_L20_ACCEPT[0]:.2f}-{bank.STACK_L20_ACCEPT[1]:.2f}."
-        " LONG: RE-FACE THE THICKEST CAM FACE, REMEASURE.",
+        " LONG: SLIDE THE GEARS OFF IN ORDER WITH THEIR PAIRS TO THE THICKEST",
+        "   CAM; RE-FACE ITS CAM FACE, RESTACK, REMEASURE.",
         f"   SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR,"
         " REMEASURE.",
-        "   SLIDE THE STACK OFF IN ORDER.",
+        "   SLIDE THE STACK OFF IN ORDER, EACH GEAR WITH ITS PAIR.",
         "9. BASE MHA-FR-001 OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
         "   OVERHANG SUPPORTED; CONE SET (MHA-DT-020) NOT FITTED.",
         "9A. BACK MHA-DT-002 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
         "   MHA-FR-001 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO X AND Y.",
-        "   SET THE STRAP INNER FACE TO Y 70.44-70.63 AND THE MANDREL CENTRE",
-        "   (EDGE-FIND BOTH SIDES, HALVE) TO X 168.11-168.31.",
+        "   MIC ONE MHA-DT-026, W; IT GOES AT THE BACK. SET THE STRAP INNER",
+        f"   FACE TO Y 70.44-70.63 LESS (W - {BANK_WASHER_THICK:.3f}) AND THE MANDREL",
+        "   CENTRE (EDGE-FIND BOTH SIDES, HALVE) TO X 168.11-168.31.",
         "   SPOT MHA-FR-001 THROUGH THE FOOT HOLE WITH AN 11/64 TRANSFER PUNCH;",
         "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
         "   BOTTOMING); BLOW OUT CHIPS. REFIT, RE-SET Y AND X, TIGHTEN",
@@ -705,43 +718,57 @@ BANK_STEPS = _note_text(
         # strap alone until the front one goes on (F2), and its front end sits
         # over the front foot hole, where no chuck or tap wrench reaches (F1).
         # So the loaded mandrel leaves the base for the drill and tap.
-        "9B. FROM THE FRONT, LOAD ONE MHA-DT-026, THE STACK IN ORDER, THEN THE",
-        "   OTHER MHA-DT-026. PUSH THE BANK BACK, CLOSED UP ON THE BACK MHA-DT-026.",
+        "9B. FROM THE FRONT, LOAD THE MICED MHA-DT-026, THE STACK IN ORDER, ITS",
+        "   PAIRS HANGING FREE, THEN THE OTHER MHA-DT-026, THEN ONE MHA-VN-052",
+        "   THAT SLIDES FREE ON THE MHA-DT-013 BAR (ELSE TAKE ANOTHER). PUSH THE",
+        "   BANK BACK, CLOSED UP ON THE BACK MHA-DT-026.",
         "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
         "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-DT-002 ON.",
-        "9C. SLIDE THE FRONT MHA-DT-002 ON UNTIL A 0.45 LEAF BETWEEN ITS STRAP",
-        "   AND THE FRONT MHA-DT-026 IS LIGHTLY PINCHED. SET X 168.11-168.31 AND",
-        "   SPOT AS 9A. SLIDE THE FRONT MHA-DT-002 OFF; DRAW THE LOADED MANDREL",
-        "   OUT OF THE BACK MHA-DT-002, HOLDING BOTH MHA-DT-026, AND LAY IT IN",
-        "   V-BLOCKS ON PARALLELS OFF THE BASE, RODS HANGING FREE. DRILL AND",
-        "   TAP AS 9A. PASS THE MANDREL BACK THROUGH THE BACK MHA-DT-002, PUSH",
-        "   THE BANK BACK AND PROP IT AS 9B. REFIT THE FRONT MHA-DT-002; RE-SET",
-        "   THE LEAF AND X, TIGHTEN MHA-VN-032 AND RECHECK.",
+        "9C. SLIDE THE FRONT MHA-DT-002 ON UNTIL A "
+        f"{bank.BANK_SPRING_SET:.2f} BLADE BETWEEN ITS STRAP",
+        "   AND THE FRONT MHA-DT-026, BESIDE MHA-VN-052, IS LIGHTLY PINCHED. SET",
+        "   X 168.11-168.31 AND SPOT AS 9A. SLIDE THE FRONT MHA-DT-002 OFF; DRAW",
+        "   THE LOADED MANDREL OUT OF THE BACK MHA-DT-002, HOLDING BOTH",
+        "   MHA-DT-026 AND MHA-VN-052, AND LAY IT IN V-BLOCKS ON PARALLELS OFF",
+        "   THE BASE, PAIRS HANGING FREE. DRILL AND TAP AS 9A. PASS THE MANDREL",
+        "   BACK THROUGH THE BACK MHA-DT-002, PUSH THE BANK BACK AND",
+        "   PROP IT AS 9B. REFIT THE FRONT MHA-DT-002; RE-SET THE BLADE AND X, TIGHTEN",
+        "   MHA-VN-032, REMOVE THE BLADE AND RECHECK.",
         "9D. MEASURE MHA-DT-002 OUTER FACE TO OUTER FACE. TURN MHA-DT-013: ITS",
         "   CYLINDER IS THAT SPAN, PLUS A 1.5 DOME EACH END (SEE ITS PRINT).",
         "9E. PUSH MHA-DT-013 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
         "   THE MANDREL IS OUT AND EACH DOME STANDS 1.5 PROUD (DEPTH GAUGE).",
         "   SPOT MHA-DT-013 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
         "   BLOW OUT CHIPS. RUN THE BACK MHA-VN-034 IN TIGHT, THEN THE FRONT ONE.",
-        # F3: the leaf reads the end play only with the bank closed up on
-        # the back washer; pulled forward it reads nothing.
-        "9F. THE BANK TURNS FREE BY HAND. BANK PUSHED BACK:",
-        "   A 0.35 LEAF ENTERS AT THE FRONT MHA-DT-026, A 0.55 LEAF DOES NOT.",
+        # #948 ruling R (PR #1292): MHA-VN-052 holds the bank back on its
+        # datum, so there is no end play to read; check 3 proves the preload.
+        "9F. THE BANK TURNS FREE BY HAND, HELD BACK BY MHA-VN-052.",
         # #936 P1 b, option A (user ruling 2026-09-26): the north MHA-CH-008 ear
         # is the rocker bank's axial datum (rocker_bank_layout), set here on
         # the 9A DRO zero so the cams and the rocker stations share one datum.
         # Y is the hole-table rear-face distance of the ear inner face,
-        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 67.711, held to the same
-        # BACK_STRAP_LOCATE_BAND edge-find as 9A. Channel assembly MHA-CH-000
-        # cites this step by key (channel_steps.NORTH_BRACKET_SET_REF). The
-        # band the rod pins need from it is open: #948.
+        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 72.039, held to the
+        # NORTH_EAR_LOCATE_BAND edge-find. #948 ruling R (PR #1292): the
+        # target moves north (LESS Y) by the miced shoulder's excess,
+        # S - 1.500, so hub 19 stays at nominal. Channel assembly MHA-CH-000
+        # cites this step by key (channel_steps.NORTH_BRACKET_SET_REF).
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-005 SCREWED DOWN ON THE BASE"
         " (FRAME ASSEMBLY MHA-FR-000 STEP 8),",
         "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE MHA-FR-005",
-        "   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y 67.62-67.81;",
+        "   RAIL, EAR TO THE BACK. MIC THE MHA-CH-005 SHOULDER, S. SET ITS EAR",
+        "   INNER FACE TO Y 71.94-72.13 LESS "
+        f"(S - {pivot_shaft.SHOULDER_LENGTH:.3f});",
         "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FEET PER THE MHA-FR-005 SEAT",
         "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
-        f"   PINION RIG: CONT. ON SHEET {FIT_SHEET}.",
+        # Main's ruling (option i): the shaft's integral shoulder cannot pass
+        # the north ear, so the bracket comes off again and MHA-CH-000 threads
+        # the shaft from the north and refits it on these seats, rechecking Y
+        # on this DRO zero -- which must survive until its cut-to-fit refit.
+        "   UNSCREW IT AND LIFT IT OFF; KEEP THE BASE ON THE MILL, DRO ZEROED,",
+        f"   THROUGH {channel_step_ref('shaft-cut-to-fit')}."
+        f" {channel_step_ref('north-ear-datum')} REFITS IT OVER THE SHAFT.",
+        # NBSP keeps the continuation pointer on one printed line.
+        f"   PINION\u00a0RIG:\u00a0CONT.\u00a0ON\u00a0SHEET {FIT_SHEET}.",
     )
 )
 
@@ -852,12 +879,6 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         (RIG_SEQUENCE_HEADING, *(_numbered_step(key, text) for key, text in numbered))
     )
 
-# Check 3 prints the bank's ring-overhang bound (#743 user ruling Q1) and the
-# share of the ring width that bound leaves on the cam, rounded down.
-RING_OVERHANG_TEXT = f"{bank.RING_OVERHANG_MAX:.2f}"
-RING_ON_CAM_PERCENT = math.floor(
-    100.0 * (rod.RING_THICKNESS - bank.RING_OVERHANG_MAX) / rod.RING_THICKNESS
-)
 
 CHECKS = _note_text(
     (
@@ -869,9 +890,10 @@ CHECKS = _note_text(
         "2. MHA-DT-010/MHA-DT-007 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-DT-007",
         "   TURN; EACH CONE GEAR MESHES ITS MHA-DT-012 PER THE MHA-DT-003 PRINT.",
         "3. EACH MHA-DT-012 TURNS FREELY ON MHA-DT-013 WITHOUT AXIAL BINDING.",
-        # The same bound the MHA-DT-012 print states (cylinder_gear_notes).
-        f"   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO {RING_OVERHANG_TEXT} (AT LEAST",
-        f"   {RING_ON_CAM_PERCENT}% OF THE RING WIDTH STAYS ON THE CAM).",
+        # #948 ruling R (PR #1292): MHA-VN-052 preloads the bank back, so no
+        # ring overhangs its cam; the fitter proves the spring holds.
+        "   PUSH GEAR 0 TOWARD THE FRONT BY HAND AND RELEASE; THE BANK SPRINGS",
+        "   BACK ONTO THE BACK MHA-DT-026.",
         # MHA-VN-015 is the DISENGAGED stop (build_cone_swing_platform
         # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
         # it, so the cone set comes back on its meshes, not on the stop.
@@ -1204,10 +1226,12 @@ def bom_row_fit(requested: float, actual: float) -> Literal["short", "exact", "g
 
 
 def bom_split_row(data_rows: int) -> int:
-    """Data rows in the FIRST column: the larger half, so column two is never taller."""
+    """Data rows in the FIRST column: the smaller half, so the first piece never
+    grows into the reference view below it; the second has open paper below.
+    (#948 ruling R's MHA-VN-052 made the count odd: 28 rows met the view.)"""
     if data_rows < 2:
         raise ValueError("a split BOM needs at least two data rows")
-    return (data_rows + 1) // 2
+    return data_rows // 2
 
 
 def bom_extent_violations(

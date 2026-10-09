@@ -66,11 +66,11 @@ UNKNOWN = "unknown"
 # The offline tripwire resolves every emitted YAML path, including registry ones.
 SOURCE_MAP = {
     "rocker_hole": (
-        "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:510-516",
+        "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:517-523",
         (("ROD_HOLE_SPEC", "expect_dia_mm"),),
     ),
     "rocker_hole_callout": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:435-445",
+        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:442-452",
         (("add_native_hole_callout", 'label="rod-pin hole"'),),
     ),
     "hole_callout": (
@@ -78,7 +78,7 @@ SOURCE_MAP = {
         (("dia_tolerance_mm",), ("AddHoleCallout2",), ("compose_hole_callout_prefix",)),
     ),
     "rocker_position": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:539-549",
+        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:546-556",
         (("add_feature_control_frame", 'datums=("A", "B", "C")'),),
     ),
     "cone_mount": (
@@ -90,11 +90,11 @@ SOURCE_MAP = {
         (("add_native_hole_callout", 'label="mounting counterbores"'),),
     ),
     "rocker_strap_frame": (
-        "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:396-403",
+        "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:398-410",
         (("depth=ARM_THICKNESS", "both_directions=True"),),
     ),
     "rocker_hub_frame": (
-        "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:424-434",
+        "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:431-441",
         (("depth=HUB_LENGTH", "both_directions=True"),),
     ),
     "cone_frame": (
@@ -114,11 +114,11 @@ SOURCE_MAP = {
         (("journal axis runs through (0, BORE_HEIGHT, 0)", "(sin I, 0, cos I)", "CONE_BOSS_LENGTH/2 either side"),),
     ),
     "rocker_datum_a": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:476-495",
+        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:483-502",
         (('datum="A"', "_require_datum_on_bore"),),
     ),
     "rocker_datum_b": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:510-529",
+        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:517-536",
         (("RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0", 'datum="B"'),),
     ),
     "right_view_frame": (
@@ -126,7 +126,7 @@ SOURCE_MAP = {
         (('"*Right"', "Model -Z runs to the sheet's right"),),
     ),
     "rocker_datum_c": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:530-538",
+        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:537-545",
         (("_sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)", 'datum="C"'),),
     ),
     "drawing_revision": (
@@ -448,6 +448,8 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
     p = rocker_notes.DEFAULT_DRAWING_PRECISION
     hub_p = rocker_notes.DRAWING_PRECISION["Hub"]["HubLength"]
     top_p = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
+    strap_p = rocker_notes.DRAWING_PRECISION["Strap"]["StrapThickness"]
+    strap_band = (_band(rocker.ARM_THICKNESS, strap_p, rocker.ARM_THICKNESS_BAND), ("ARM_THICKNESS", "ARM_THICKNESS_BAND"))
     axis = ((0.0, 0.0, 1.0), ("__frame__",))
     centre = ([0.0, rocker.PIVOT_MID_Y, 0.0], ("PIVOT_MID_Y",))
     top, tip, bottom = _rocker_points()
@@ -488,11 +490,11 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
             "lower_z": (-rocker.HUB_LENGTH / 2, ("HUB_LENGTH",)),
         }, precision={"length": hub_p}),
         "strap_faces": _feature(rocker, "face", ["thickness"], {
-            "thickness": (_band(rocker.ARM_THICKNESS, p), ("ARM_THICKNESS",)),
+            "thickness": strap_band,
             "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
             "upper_z": (rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
             "lower_z": (-rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
-        }, precision={"thickness": p}),
+        }, precision={"thickness": strap_p}),
         "top_edge": _feature(rocker, "profile", ["height_above_pivot", "radius", "arc_len"], {
             "height_above_pivot": (_band(rocker.TOP_EDGE_ABOVE_PIVOT, top_p, rocker.TOP_EDGE_BAND), ("TOP_EDGE_ABOVE_PIVOT", "TOP_EDGE_BAND")),
             "height_from": ("pivot_bore", ("PIVOT_MID_Y",)),
@@ -513,11 +515,11 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
         }, precision={"bottom_radius": p, "bottom_arc_len": p}),
     }
     result["strap_datum_b"] = _feature(rocker, "face", ["thickness"], {
-        "thickness": (_band(rocker.ARM_THICKNESS, p), ("ARM_THICKNESS",)),
+        "thickness": strap_band,
         "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
         "plane": ({"frame": "model", "axis": "z", "value": rocker.ARM_THICKNESS / 2}, ("ARM_THICKNESS",)),
         "datum": ("B", ("ARM_THICKNESS",)),
-    }, precision={"thickness": p})
+    }, precision={"thickness": strap_p})
     result["strap_datum_b"]["cite"]["datum"] = _source_cite("rocker_datum_b", "right_view_frame")
     result["pivot_bore"]["cite"]["datum"] = _source_cite("rocker_datum_a")
     for name, sign in (("tip_land_pos_x", 1), ("tip_land_neg_x", -1)):
@@ -531,7 +533,7 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
     result["tip_land_pos_x"]["datum"] = "C"
     result["tip_land_pos_x"]["cite"]["datum"] = _source_cite("rocker_datum_c")
     notes_cite = _cite(rocker_notes, "DRAWING_NOTES")
-    for name in ("pivot_bore", "strap_faces", "strap_datum_b", "top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x", "hub_od"):
+    for name in ("pivot_bore", "top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x", "hub_od"):
         for key in result[name]["cite"]:
             result[name]["cite"][key] += notes_cite
     result["hub_od"]["cite"]["coaxiality_dia"] = _cite(rocker_notes, "HUB_COAXIALITY_DIA", "DRAWING_NOTES")

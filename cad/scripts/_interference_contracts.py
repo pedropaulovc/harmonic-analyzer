@@ -621,13 +621,28 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
 # Literals, like the rows above, so every assembly does not re-key on the pin
 # spec; test_ch_bar_pivot_fit pins them to it.
 BAR_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.35 - 3.20)
-_CHANNEL_ALLOWED_PAIRS = _numbered_pairs(
-    "ch-bar-pivot-pin",
-    range(1, 21),
-    "ch-amplitude-bar",
-    _smooth_annulus_limit_mm3(*BAR_PIVOT_PIN_PRESS),
-    second_number=None,
-)
+# The MHA-CH-010 rod pivot pins (ch_rod_pivot_pin_spec), the same drill rod
+# pressed into each MHA-CH-003 rod's Ø1.968 fork ream through both tines:
+# 6.075 fork less the 2.625 slot (user ruling 2026-10-09, PR #1292 review F1).
+# Channel j's pin and rod are both its (j + 1)th instance, as the bar pin's
+# are; test_ch_rod_pivot_fit pins the literals to the pin spec.
+ROD_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.075 - 2.625)
+_CHANNEL_ALLOWED_PAIRS = {
+    **_numbered_pairs(
+        "ch-bar-pivot-pin",
+        range(1, 21),
+        "ch-amplitude-bar",
+        _smooth_annulus_limit_mm3(*BAR_PIVOT_PIN_PRESS),
+        second_number=None,
+    ),
+    **_numbered_pairs(
+        "ch-rod-pivot-pin",
+        range(1, 21),
+        "ch-connecting-rod",
+        _smooth_annulus_limit_mm3(*ROD_PIVOT_PIN_PRESS),
+        second_number=None,
+    ),
+}
 
 _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {
     "ch-channel": _CHANNEL_ALLOWED_PAIRS,

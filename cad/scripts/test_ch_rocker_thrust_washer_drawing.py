@@ -42,7 +42,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_only_the_bore_is_banded() -> None:
-    """The end-play leaf is set against this washer, so its thickness sits in
+    """The south ear is blade-set off this washer (#948 ruling R), so its thickness sits in
     no datum chain: it is the stock's, judged at the mill's band by the bar
     clearance (test_rocker_bank_layout)."""
     assert model_toleranced_dimensions(part) == {
