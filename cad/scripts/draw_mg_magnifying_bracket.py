@@ -177,9 +177,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         back,
         edge=rims[0].edge,
-        # Clear band between the front/back views and the right view; at
-        # (0.205, 0.064) the callout printed over the title block.
-        callout_xy=(0.150, 0.150),
+        # Above-right of the attached hole (263.6, 96.3 mm): clear of the
+        # right view (y >= 175 mm), the isometric (y <= 135 mm) and the
+        # MountingX dimension text (x <= 242 mm). (0.205, 0.064) printed over
+        # the title block; (0.150, 0.150) led through the 17.70 text.
+        callout_xy=(0.270, 0.155),
         label="two bracket counterbores",
         process="DRILL / COUNTERBORE",
     )
