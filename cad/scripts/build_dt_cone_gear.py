@@ -96,6 +96,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _gear import stock_gap_fix_order
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 # Equation-parser/unit guards are reused, not their historical ideal profiles.
@@ -1166,12 +1167,14 @@ async def build(adapter) -> dict[str, str]:
         bored = (math.pi * profile.blank_radius_mm**2 - bore_area_mm2(teeth)) * FACE_WIDTH
         await volume_check(adapter, f"{configuration} bored blank", bored, 0.01 * bored)
         check(f"create {configuration} gap sketch", await adapter.create_sketch("Front"))
+        segments = native_gap_segments(teeth)
         curves = [
             await equation_curve(adapter, f"{configuration} {label}", x, y)
-            for label, x, y in native_gap_segments(teeth)
+            for label, x, y in segments
         ]
+        order = stock_gap_fix_order([label for label, _, _ in segments])
         await ensure_fully_defined(
-            adapter, f"{configuration} finite gap", fix_entities=curves,
+            adapter, f"{configuration} finite gap", fix_entities=[curves[i] for i in order],
             allow_fix_escalation=True,
         )
         check(f"exit {configuration} gap sketch", await adapter.exit_sketch())

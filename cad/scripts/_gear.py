@@ -596,6 +596,31 @@ async def build_fixed_gear(
     return ToothedDisc(volume, (*seeds, str(pattern.name)))
 
 
+def stock_gap_fix_order(names: list[str] | tuple[str, ...]) -> list[int]:
+    """FIX order for a ``StockFormProfile.native_segments`` loop (indices).
+
+    SolidWorks solves each locked equation curve as a rigid body pinned to
+    its neighbours at the shared loop vertices, so a loop of n curves is
+    fully defined after n - 2 FIXes, and the last two curves are placed by
+    the closure. Farm runs 20261009T195743546Z and 20261009T214825987Z show
+    that closure is singular when those two curves are nearly collinear:
+    in native order the 120T drum's last pair is the UpperClosingRay and the
+    almost radial UpperFiniteFlank, and its 4th FIX over-defined (then gave
+    no_solution). Every passing 8-curve gap and material sector fixed 6
+    curves. So FIX the loop as one chain starting at UpperClosingRay and
+    leave LowerClosingRay + ClearanceArc last: a radial ray and a
+    tangential arc, near-perpendicular at their shared vertex for any N.
+    """
+    names = list(names)
+    if names.count("UpperClosingRay") != 1:
+        raise ValueError("stock gap loop needs exactly one UpperClosingRay")
+    start = names.index("UpperClosingRay")
+    order = [(start + k) % len(names) for k in range(len(names))]
+    if [names[i] for i in order[-2:]] != ["LowerClosingRay", "ClearanceArc"]:
+        raise ValueError("stock gap loop must end LowerClosingRay, ClearanceArc, UpperClosingRay")
+    return order
+
+
 async def build_stock_form_gear(
     adapter: Any,
     profile: StockFormProfile,
@@ -661,8 +686,10 @@ async def build_stock_form_gear(
                 f"({segment.x}) * {sine} + ({segment.y}) * {cosine}",
             )
         )
+    order = stock_gap_fix_order([segment.name for segment in segments])
     await ensure_fully_defined(
-        adapter, "stock gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
+        adapter, "stock gap sketch", fix_entities=[gap_curves[i] for i in order],
+        allow_fix_escalation=True,
     )
     check("exit_sketch stock gap", await adapter.exit_sketch())
     seed = check(

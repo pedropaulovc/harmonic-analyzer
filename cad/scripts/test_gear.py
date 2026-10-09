@@ -532,34 +532,31 @@ async def test_post_fix_overdefined_inventory_precedes_refusable_debug(
     assert len(snapshot["relations"]["swAll"]) == 2
     assert set(adapter.relations.calls) == {0, 1, 2, 6}
     assert adapter.fixed == ["EquationCurve_1"]
-    assert adapter.relations.deleted == []  # a non-FIX over-definition is never deleted
+    assert adapter.relations.deleted == []  # no relation is ever deleted
     assert not any("fixed EquationCurve_1 -> over_defined" in line for line in attempted)
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("own_fix", [True, False])
-async def test_only_the_sole_just_added_fix_is_deleted(own_fix, sketch_logs) -> None:
-    # Native 20261009T195743546Z: the drum gap's 4th FIX over-defined the loop.
-    states = ["under_defined", "over_defined", "under_defined", "fully_defined"]
-    adapter = _SketchAdapter(states, statuses=(2, 2))
-    target = adapter._sketch_entities["EquationCurve_1" if own_fix else "EquationCurve_2"]
-    fix = _SketchRelation(17, (target,), (7,))
-    adapter.relations.relations[2] = (fix,)
+@pytest.mark.parametrize("module", ["dt_cylinder_gear_spec", "dt_alignment_pinion_spec"])
+def test_stock_gap_fix_order_leaves_the_perpendicular_closing_pair_last(module) -> None:
+    # Farm 20261009T214825987Z: the drum's native-order closure (closing ray
+    # + nearly radial flank) was singular; the closing pair is not.
+    import importlib
+    import math
 
-    if own_fix:
-        await _common.ensure_fully_defined(
-            adapter, "gap", fix_entities=["EquationCurve_1", "EquationCurve_2"],
-            allow_fix_escalation=True,
-        )
-        assert adapter.fixed == ["EquationCurve_1", "EquationCurve_2"]
-        assert adapter.relations.deleted == [fix]
-    else:
-        with pytest.raises(RuntimeError, match="gap: sketch OVER-defined"):
-            await _common.ensure_fully_defined(
-                adapter, "gap", fix_entities=["EquationCurve_1", "EquationCurve_2"],
-                allow_fix_escalation=True,
-            )
-        assert adapter.relations.deleted == []
+    segments = importlib.import_module(module).STOCK_FORM.native_segments()
+    order = _gear.stock_gap_fix_order([s.name for s in segments])
+    assert sorted(order) == list(range(len(segments)))
+    # One chain: each FIX after the first touches the previous one.
+    assert all((b - a) % len(segments) == 1 for a, b in zip(order, order[1:]))
+    ray, arc = segments[order[-2]], segments[order[-1]]
+    assert (ray.name, arc.name) == ("LowerClosingRay", "ClearanceArc")
+    u = (ray.start_mm[0] - ray.end_mm[0], ray.start_mm[1] - ray.end_mm[1])
+    v = (arc.end_mm[0] - arc.start_mm[0], arc.end_mm[1] - arc.start_mm[1])
+    sine = abs(u[0] * v[1] - u[1] * v[0]) / (math.hypot(*u) * math.hypot(*v))
+    assert sine > 0.9
+    with pytest.raises(ValueError):
+        _gear.stock_gap_fix_order([s.name for s in reversed(segments)])
+
 
 @pytest.mark.asyncio
 async def test_entity_status_refusal_survives_eligibility_debug_refusal(
