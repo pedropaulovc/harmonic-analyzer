@@ -181,15 +181,18 @@ ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
-# The middle rib spans the lever to the +X plate edge (PLATE_W), but its z-span
-# (+-RIB_T/2 = +-2.54) crosses the channel-hole column at HOLE_X. The rib extrude
-# (feature 7) runs AFTER the holes (feature 1), so it re-fills the one hole whose
-# z lands inside that span -- j=10 at z+1.515 -- leaving its spring no clear bore
-# (the 4.21 mm^3 channel-spring-installed-6 clash). Stop the +X vertex inboard of
-# the hole column by the spring coil radius (~3.25) + margin so every hole stays
-# open; the rib still stiffens the inner lever, the outer plate arm is the (thin)
+# Every rib extrudes AFTER the spring holes (feature 1), so a rib reaching the
+# hole column at HOLE_X re-fills any hole whose z lands in its z-span. The middle
+# rib (+-RIB_T/2 = +-2.54) once refilled j=10 (the 4.21 mm^3
+# channel-spring-installed-6 clash); on the cam plane (HOLE_Z_OFFSET -3.528) the
+# j=0 tap sits 0.49 inboard of the -Z edge rib's inner face (-71.12), so that rib
+# would refill 0.86 of it. Every rib's +X vertex therefore stops inboard of the
+# hole column by the spring coil radius (~3.25) + margin so every hole stays
+# open; the ribs still stiffen the inner lever, the outer plate arm is the (thin)
 # spring-hole field.
-MID_RIB_PLATE_REACH = HOLE_X - 4.1  # 35.75 local +X: clears the (shifted) hole column
+RIB_PLATE_REACH = HOLE_X - 4.1  # 35.75 local +X: clears the hole column
+if RIB_PLATE_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
+    raise AssertionError("a rib's +X vertex reaches the spring-hole column")
 
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
 HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]
@@ -462,17 +465,18 @@ async def _hex_collar(
 async def _edge_rib(
     adapter, flip: bool, name: str, stem: str, drive_jobs: list[tuple[str, str]]
 ) -> None:
-    """Feature 4: Front-plane rib -- two lines to the plate-edge tip and a
-    semicircle (radius ARC_R, centred at the origin) wrapping the cylinder,
-    blind-extruded at the +-RIB_OFFSET start offset along Z.
+    """Feature 4: Front-plane rib -- two lines to the +X tip and a semicircle
+    (radius ARC_R, centred at the origin) wrapping the cylinder, blind-extruded
+    at the +-RIB_OFFSET start offset along Z.
 
-    Vertices (A, C on the arc, B the +X plate tip): the arc centre is the origin
+    Vertices (A, C on the arc, B the +X tip at RIB_PLATE_REACH, short of the
+    spring-hole column the -Z rib's span crosses): the arc centre is the origin
     (the two y-symmetric ends + the cylinder-side interior point force it there),
     so it defines off a coincident-to-origin centre + a radial dim, with A/C
     pinned on the y-axis."""
     rib = SketchDims()
     check(f"create_sketch {name}", await adapter.create_sketch("Front"))
-    a, b, c = (0.0, ARC_R), (SX * -PLATE_W, 0.0), (0.0, -ARC_R)
+    a, b, c = (0.0, ARC_R), (SX * -RIB_PLATE_REACH, 0.0), (0.0, -ARC_R)
     interior = (SX * ARC_R, 0.0)  # cylinder-side point the arc passes through
     set_sketch_direct_db(adapter, True)
     line_ab = check(f"{name} line A-B", await adapter.add_line(*a, *b))
@@ -484,8 +488,8 @@ async def _edge_rib(
         await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
     )
     # Two display dims, recorded in creation order: the arc radius (-> "ArcR")
-    # then the tip's horizontal distance from the origin (b is at +PLATE_W since
-    # SX=-1, unsigned magnitude PLATE_W -> "PlateW").
+    # then the tip's horizontal distance from the origin (b is at
+    # +RIB_PLATE_REACH since SX=-1, unsigned magnitude -> "RibReach").
     check(
         f"{name} arc radius",
         await adapter.add_sketch_dimension(arc, None, "radial", ARC_R),
@@ -502,7 +506,7 @@ async def _edge_rib(
         await adapter.add_sketch_constraint(f"{arc}.end", "origin", "vertical_points"),
     )
     await anchor_point_to_origin(adapter, f"{line_ab}.end", *b, f"{name} tip")
-    rib.record(f"{stem}Tip", '"PlateW"')
+    rib.record(f"{stem}Tip", '"RibReach"')
     _ = line_bc
     await ensure_fully_defined(adapter, f"{name} sketch")
     check(f"exit_sketch {name}", await adapter.exit_sketch())
@@ -647,7 +651,7 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
     sd = SketchDims()
     check("create_sketch middle rib", await adapter.create_sketch("Front"))
-    left = (SX * -MID_RIB_PLATE_REACH, 0.0)  # +X arm vertex, short of hole column
+    left = (SX * -RIB_PLATE_REACH, 0.0)  # +X arm vertex, short of hole column
     right = (TIP_X, 0.0)  # -X summation-tip vertex
     r = ARC_R
     # Tangent points from each end vertex to the radius-r circle at the origin.
@@ -693,8 +697,8 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     )
     # Three display dims in creation order: the shared arc radius (-> "ArcR"),
     # then each end-vertex anchor (both on the x-axis -> one horizontal dim each).
-    # left is at +MID_RIB_PLATE_REACH (SX=-1), right at TIP_X<0 -- both unsigned
-    # magnitudes positive, so "MidRibReach" and "SumH" (|TIP_X|).
+    # left is at +RIB_PLATE_REACH (SX=-1), right at TIP_X<0 -- both unsigned
+    # magnitudes positive, so "RibReach" and "SumH" (|TIP_X|).
     check(
         "middle rib arc radius",
         await adapter.add_sketch_dimension(arc1, None, "radial", r),
@@ -703,7 +707,7 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     await anchor_point_to_origin(
         adapter, f"{line1}.start", *left, "middle rib left vertex"
     )
-    sd.record("MidRibLeftX", '"MidRibReach"')
+    sd.record("MidRibLeftX", '"RibReach"')
     await anchor_point_to_origin(
         adapter, f"{line2}.end", *right, "middle rib right vertex"
     )
@@ -730,7 +734,7 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
     Authored LAST, after every rib: the middle rib's -X vertex lands on this
     station, and a rib extruded after the cut would refill it (the same trap
-    the +X hole column hit -- see MID_RIB_PLATE_REACH). Ordering it here also
+    the +X hole column hit -- see RIB_PLATE_REACH). Ordering it here also
     makes the gate below exact: inside the boss footprint the plate and rib
     material sits WITHIN the boss's own +-ANCHOR_H/2 Y span, so the cut removes
     boss height and nothing else.
@@ -964,7 +968,7 @@ async def build(adapter) -> dict[str, str]:
     # an auto "D3@Sketch5"). Every length carries an explicit ``mm`` unit: this is
     # an INCH document and the equation manager evaluates BARE numbers in document
     # units, so an unsuffixed "152.4" would read as 152.4 inches and blow the part
-    # up 25.4x. Derived globals (ArcR, MidRibReach) reference others as equation
+    # up 25.4x. Derived globals (ArcR, RibReach) reference others as equation
     # strings so a primitive edit propagates. PlateT/RibT/AnchorH/HexDepth are
     # extrude depths/offsets -- feature params, not sketch dims, so nothing drives
     # them, but they stay editable knobs (matches the exemplars).
@@ -981,7 +985,7 @@ async def build(adapter) -> dict[str, str]:
     # Hole Wizard taps -- a #6-32 seed + linear pattern on the plate and one
     # #10-24 through the boss -- sized by the tap standard from the purchased
     # anchors' own threads, so a diameter knob would be a second, lying source.
-    # HoleX stays -- MidRibReach references it -- and the three station globals
+    # HoleX stays -- RibReach references it -- and the three station globals
     # drive the seed while ChannelPitch also drives the pattern spacing.)
     await set_global(adapter, "HoleX", f"{HOLE_X}mm")
     await set_global(adapter, "ChannelZ0", f"{CHANNEL_Z0}mm")
@@ -991,7 +995,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexH", f"{HEX_H}mm")
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
-    await set_global(adapter, "MidRibReach", '"HoleX" - 4.1mm')
+    await set_global(adapter, "RibReach", '"HoleX" - 4.1mm')
 
     # Per-sketch SketchDims record each dim in the helper's emission order; their
     # drive equations are collected here and applied in one deferred batch at the

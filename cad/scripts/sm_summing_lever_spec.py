@@ -70,7 +70,12 @@ HOLE_X = 39.85
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
-HOLE_Z_OFFSET = 0.8
+# The spring stations sit on the channel arm plane, the cam plane
+# (rocker_bank_layout.ARM_MID_DZ = cylinder_bank_layout.CAM_MID_DZ). Restated,
+# like CHANNEL_Z0/CHANNEL_PITCH, not imported: this spec is read by
+# _interference_contracts, so an import would put the gear-train and channel
+# config into every assembly's closure. test_sm_summing_lever_drawing pins it.
+HOLE_Z_OFFSET = -3.52825
 
 # The vn-counter-spring lower anchor (McMaster 9490T1, part ``vn-boss-hook``) threads
 # DIRECTLY through the summation-anchor boss on the same no-nut rule, authored
@@ -80,11 +85,11 @@ COUNTER_HOLE_SPEC = HoleSpec("tapped", ANCHOR_9490T1.thread_size)
 # --- Derived. ---
 CYL_DIA = 2.0 * CYL_R  # 25.4
 TIP_X = -SUM_H  # -76.20 summation tip / anchor X
-HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET  # -66.3
-HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET  # 67.77
+HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET
+HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET
 HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
-HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # 9.90 from -Z end
-HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # 8.43 from +Z end
+HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # from the -Z end
+HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # from the +Z end
 HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
 

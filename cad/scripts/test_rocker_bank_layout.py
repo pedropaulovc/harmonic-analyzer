@@ -40,9 +40,9 @@ def test_hub_length_is_the_station_pitch_and_only_comes_out_long() -> None:
 
 
 def test_end_play_rule_is_the_cylinder_bank_rule() -> None:
-    """The rocker layout redefines the feeler rule rather than importing
-    cylinder_bank_layout (which would pull gear_train/cone_incline into the
-    pivot shaft's config deps); this pins the two in lockstep."""
+    """The rocker layout imports ONE datum from cylinder_bank_layout (the cam
+    plane, its arm plane) but restates the feeler rule, because its running
+    faces are its own steel hubs; this pins the two rules in lockstep."""
     assert bank.MIN_END_PLAY == drum_bank.MIN_END_PLAY
     assert bank.MARGIN_SPARE == drum_bank.MARGIN_SPARE
     assert bank.FEELER_STEP == drum_bank.FEELER_STEP
@@ -54,9 +54,11 @@ def test_end_play_rule_is_the_cylinder_bank_rule() -> None:
 def test_hub_mid_planes_are_the_channel_arm_planes() -> None:
     z0 = _config.machine("channels", "station_z0_mm")
     pitch = _config.machine("channels", "station_pitch_mm")
-    assert bank.ARM_MID_DZ == 0.8
+    # Option A (rod fork joint): the arm plane IS the cam plane.
+    assert bank.ARM_MID_DZ == drum_bank.CAM_MID_DZ
+    assert bank.ARM_MID_DZ == pytest.approx(-3.52825)
     for j in (0, 7, 19):
-        assert bank.hub_mid_z(j) == pytest.approx(z0 + pitch * j + 0.8)
+        assert bank.hub_mid_z(j) == pytest.approx(z0 + pitch * j + drum_bank.CAM_MID_DZ)
     assert bank.STACK_MID_Z == pytest.approx(
         (bank.hub_mid_z(0) + bank.hub_mid_z(19)) / 2
     )
@@ -75,7 +77,7 @@ def test_stack_closes_north_on_the_shoulder_against_the_north_ear() -> None:
     assert bank.NORTH_EAR_OUTER_Z == pytest.approx(
         bank.NORTH_EAR_INNER_Z + bracket.EAR_T
     )
-    assert bank.NORTH_EAR_INNER_Z == pytest.approx(75.889, abs=5e-4)
+    assert bank.NORTH_EAR_INNER_Z == pytest.approx(71.561, abs=5e-4)
 
 
 def test_south_bracket_is_feeler_set_off_the_thrust_washer() -> None:
@@ -93,7 +95,7 @@ def test_south_bracket_is_feeler_set_off_the_thrust_washer() -> None:
     )
     # 1/16 stock (1.59, was 1.50) moves the south ear 0.09 out; the end play
     # is the feeler leaf, set at assembly, so it does not move with it.
-    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-68.781, abs=5e-4)
+    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-73.109, abs=5e-4)
 
 
 def test_brackets_sit_on_their_ears_and_move_in_from_78() -> None:
@@ -160,12 +162,15 @@ def test_no_keeper_is_needed_at_the_south_extreme() -> None:
 def test_south_apex_stays_on_the_support_at_the_worst_case() -> None:
     """Main (a): both ends domed. The plain end is cut flush to +0.5 past the
     south ear, then domed; floated south by E_r max, the apex must stay over
-    the rocker-arm-support's -88.9 end and no further out than the retired
-    170 shaft's end (-81.2), which nothing outboard ever touched."""
+    the rocker-arm-support's -88.9 end. The bank moved 4.33 south onto the
+    cam plane (rod fork joint, option A), so the apex now reaches 0.46 past
+    the retired 170 shaft's end (-81.2): outboard of the south ear at the
+    shaft's height there is only the support's own top, so its end is the
+    bound."""
     assert bank.PLAIN_END_CUT_BAND == (0.5, 0.0)
     assert bank.SOUTH_APEX_REACH_MAX == pytest.approx(0.5 + 1.5 + 0.55)
     apex_z = bank.SOUTH_EAR_OUTER_Z - bank.SOUTH_APEX_REACH_MAX
-    assert apex_z > -81.2
+    assert apex_z == pytest.approx(-81.659, abs=5e-4)
     assert apex_z - (-88.9) >= 2.0
 
 
@@ -285,12 +290,17 @@ def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(
     assert max(deltas) / fundamental(nom, nom.d_max) < 0.0005
 
 
-def test_layout_reads_only_the_channel_stations() -> None:
-    assert config_files_of(Path(bank.__file__)) == {"machine/channels.yaml"}
+def test_layout_reads_only_the_channel_stations_and_the_cam_plane() -> None:
+    """The rocker bank reads the channel stations and, for CAM_MID_DZ alone,
+    cylinder_bank_layout (whose bank pitch reads gear_train/cone_incline):
+    the arm plane is the cam plane. No builder or notes module joins it."""
+    assert config_files_of(Path(bank.__file__)) == config_files_of(
+        SCRIPTS / "cylinder_bank_layout.py"
+    ) | {"machine/channels.yaml"}
     deps = {Path(p).name for p in module_deps_of(Path(bank.__file__))}
+    assert "cylinder_bank_layout.py" in deps
     assert deps.isdisjoint(
         {
-            "cylinder_bank_layout.py",
             "build_ch_pivot_bracket.py",
             "build_ch_pivot_shaft.py",
             "ch_rocker_arm_notes.py",
@@ -298,12 +308,12 @@ def test_layout_reads_only_the_channel_stations() -> None:
     )
 
 
-def test_pivot_parts_read_no_gear_train_config() -> None:
+def test_pivot_parts_read_only_the_rocker_bank_config() -> None:
+    """The shaft reads the stations and the cam plane through the rocker bank
+    layout; the bracket and washer read no machine config at all."""
     shaft_cfg = config_files_of(SCRIPTS / "build_ch_pivot_shaft.py")
-    assert "machine/channels.yaml" in shaft_cfg
-    assert {"machine/gear_train.yaml", "machine/cone_incline.yaml"}.isdisjoint(
-        shaft_cfg
-    )
+    machine_cfg = {t for t in shaft_cfg if t.startswith("machine/")}
+    assert machine_cfg == config_files_of(Path(bank.__file__))
     assert not any(
         t.startswith("machine/")
         for t in config_files_of(SCRIPTS / "build_ch_pivot_bracket.py")
