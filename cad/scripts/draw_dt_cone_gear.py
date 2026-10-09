@@ -183,15 +183,11 @@ CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAn
 # Top-aligned with the manufacturing notes: the 14-line block (header + 13
 # rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
 # line; the 15-line block ends ~52.6 mm down, still above the largest side
-# view (top 0.197) with FaceWidth below it.  Its widest row may
-# not pass the MATES WITH row (66 characters, ~122 mm): the sheet count sits
-# at x 0.3496 (a 78-character row reached 0.3588 and failed the audit).
+# view (top 0.197) with FaceWidth below it.
 GEAR_DATA_POS = (0.215, 0.263)
-# Rendered height/width budget of the Gear Data block, for the layout test.
+# Rendered height budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
-GEAR_DATA_MAX_LINE_CHARS = 66
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
-SHEET_COUNT_POS = (0.350, 0.263)
 
 DIMENSION_CALLOUTS = {
     # No process word: a reamer would cut away the flat, and the dimensions
@@ -889,7 +885,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
-    for sheet_index, teeth in enumerate(CONFIGURATION_TEETH, start=1):
+    for teeth in CONFIGURATION_TEETH:
         configuration = f"T{teeth:03d}"
         view_scale = SHEET_SCALES[configuration]
         if not ddoc.ActivateSheet(configuration):
@@ -982,15 +978,6 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS,
             char_height=0.0025,
         )
-        if (
-            add_note(
-                adapter,
-                f"SHEET {sheet_index} OF {len(SHEET_NAMES)}",
-                *SHEET_COUNT_POS,
-            )
-            is None
-        ):
-            raise RuntimeError(f"failed to stamp sheet count on {configuration}")
         rebuild_drawing(adapter, label=f"{configuration} layout audit")
         check_drawing_layout(
             adapter, layout=SPEC.layout, stem=f"cone-gear {configuration}"

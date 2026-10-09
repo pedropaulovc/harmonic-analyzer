@@ -203,13 +203,6 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         assert "TOOTH THICKNESS IN VIEW:  ARC LENGTH AT PITCH DIAMETER" in data
         # 49.1 mm measured for 14 lines natively (e91d2581 layout audit).
         assert len(data.splitlines()) * 0.00351 <= drawing.GEAR_DATA_HEIGHT
-        # 144.2 mm for 78 characters natively: the block must end before the
-        # sheet count at x 0.3496.
-        widest = max(len(line) for line in data.splitlines())
-        assert widest <= drawing.GEAR_DATA_MAX_LINE_CHARS
-        assert (
-            drawing.GEAR_DATA_POS[0] + widest * 0.00185 < drawing.SHEET_COUNT_POS[0] - 0.003
-        )
         assert "OPERATING MESH:  LONG ADDENDUM, PARTIAL DEPTH ON INCLINED AXES" in data
         assert "48 DP" not in data
         # These values are native imported dimensions, never parallel typed rows.

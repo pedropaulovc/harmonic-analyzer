@@ -596,8 +596,8 @@ def test_bom_reference_view_and_metadata_fit_below_the_first_piece() -> None:
     assert drawing.bom_reference_iso_violations(onto_bom)
     onto_metadata = (outline[0] + 0.020, outline[1], outline[2] + 0.020, outline[3])
     assert drawing.bom_reference_iso_violations(onto_metadata)
-    onto_sheet_number = (outline[0], outline[1] - 0.002, outline[2], outline[3])
-    assert drawing.bom_reference_iso_violations(onto_sheet_number)
+    below_view_field = (outline[0], outline[1] - 0.002, outline[2], outline[3])
+    assert drawing.bom_reference_iso_violations(below_view_field)
 
 
 def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:

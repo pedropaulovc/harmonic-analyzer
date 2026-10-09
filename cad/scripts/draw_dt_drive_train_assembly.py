@@ -299,7 +299,7 @@ NOTE_BLOCK_GAP = 0.006
 HEADING_XY = (0.018, 0.263)
 # Sheet 1's four-line heading sits over the isometric, clear of the top view.
 ASSEMBLED_HEADING_XY = (0.222, 0.263)
-SHEET_NUMBER_XY = (0.018, 0.025)
+BOM_REFERENCE_VIEW_BOTTOM = 0.025
 REFERENCE_ISO_CENTER = (0.380, 0.110)
 # Notes print at 4.525 mm a line (summing-assembly.pdf; this package's telemetry:
 # 47 lines measure 212.33 mm).
@@ -319,8 +319,8 @@ REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 REFERENCE_ISO_HALF_OUTLINE = 0.0247
 # With 27 data rows the first piece ends near y=80 mm (the historical header
 # measured 10.2 mm). The 1:8 reference view is wholly below that piece; its
-# complete metadata, including scale, sits beside it rather than over the
-# lower-left sheet number. The native table budget reserves this field.
+# complete metadata, including scale, sits beside it. The native table budget
+# reserves this field.
 BOM_REFERENCE_FIELD = (
     BOM_ANCHOR[0],
     0.077,
@@ -332,7 +332,7 @@ BOM_REFERENCE_VIEW_FIELD = (
     BOM_REFERENCE_FIELD[0],
     BOM_REFERENCE_FIELD[1],
     0.094,
-    SHEET_NUMBER_XY[1],
+    BOM_REFERENCE_VIEW_BOTTOM,
 )
 BOM_REFERENCE_NOTE_FIELD = (0.100, 0.072, BOM_REFERENCE_FIELD[2], 0.040)
 
@@ -1252,7 +1252,7 @@ def bom_extent_violations(
 
 
 def bom_reference_iso_violations(outline: tuple[float, ...]) -> list[str]:
-    """Hold the reference view below BOM piece 1 and above the sheet number."""
+    """Hold the reference view within its reserved field below BOM piece 1."""
     return note_field_violations(tuple(outline), BOM_REFERENCE_VIEW_FIELD)
 
 
@@ -2369,18 +2369,12 @@ def _create_package_sheets(adapter: Any) -> None:
     _hide_model_reference_types(adapter)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="drive-train assembly package")
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
-    for sheet_number, sheet_name in enumerate(SHEET_NAMES, start=1):
+    for sheet_name in SHEET_NAMES:
         _activate_sheet(adapter, sheet_name)
         sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
         scale = SHEET_SCALES[sheet_name]
         if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
             raise RuntimeError(f"failed to set drive-train sheet scale: {sheet_name}")
-        _add_note_block(
-            adapter,
-            f"SHEET {sheet_number} OF {len(SHEET_NAMES)}",
-            SHEET_NUMBER_XY,
-            label="package sheet number",
-        )
 
 
 def _heading(
