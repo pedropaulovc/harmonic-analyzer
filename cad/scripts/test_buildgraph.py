@@ -1700,6 +1700,18 @@ def test_data_deps_of_follows_a_same_tick_rewrite():
         script.unlink()
 
 
+def test_registered_calibration_inputs_are_published():
+    """The production publish list must never name an absent tracked packet."""
+    assert isinstance(bg.REGISTERED_CALIBRATION_INPUTS, frozenset)
+    for relative in bg.REGISTERED_CALIBRATION_INPUTS:
+        assert relative.startswith("calibration/") and relative.endswith(".json")
+        assert (SCRIPTS_DIR.parent / relative).is_file(), relative
+    assert {
+        "calibration/dt-cone-stock-form.json",
+        "calibration/dt-crank-stock-form.json",
+    }.isdisjoint(bg.REGISTERED_CALIBRATION_INPUTS)
+
+
 @pytest.mark.parametrize(
     ("script_name", "packet_name"),
     [
@@ -1714,9 +1726,9 @@ def test_data_deps_of_follows_a_same_tick_rewrite():
         ("dt_cone_mesh_domain.py", "dt-cone-stock-form.json"),
     ],
 )
-def test_data_deps_of_calibration_reaches_real_stock_consumers(script_name, packet_name):
+def test_data_deps_of_excludes_unpublished_real_stock_packets(script_name, packet_name):
     packet = (SCRIPTS_DIR.parent / "calibration" / packet_name).resolve()
-    assert str(packet) in data_deps_of(SCRIPTS_DIR / script_name)
+    assert str(packet) not in data_deps_of(SCRIPTS_DIR / script_name)
     assert str(packet) not in data_deps_of(SCRIPTS_DIR / "build_pd_platen.py")
 
 
@@ -1729,6 +1741,7 @@ def calibration_source_tree(tmp_path, monkeypatch):
     references.mkdir()
     monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
     monkeypatch.setattr(bg, "REFERENCES_DIR", references)
+    monkeypatch.setattr(bg, "REGISTERED_CALIBRATION_INPUTS", frozenset())
     bg.clear_import_caches()
     try:
         yield scripts
@@ -1741,9 +1754,10 @@ def calibration_source_tree(tmp_path, monkeypatch):
     ["calibration/selected-form.json", "calibration/tooling/selected-form.json"],
 )
 def test_data_deps_of_calibration_literal_is_cad_relative(
-    calibration_source_tree, relative
+    calibration_source_tree, monkeypatch, relative
 ):
     scripts = calibration_source_tree
+    monkeypatch.setattr(bg, "REGISTERED_CALIBRATION_INPUTS", frozenset({relative}))
     packet = scripts.parent / relative
     packet.parent.mkdir(parents=True)
     packet.write_text("{}", encoding="utf-8")
@@ -1757,9 +1771,14 @@ def test_data_deps_of_calibration_literal_is_cad_relative(
 
 
 def test_data_deps_of_calibration_follows_transitive_lazy_helper(
-    calibration_source_tree,
+    calibration_source_tree, monkeypatch
 ):
     scripts = calibration_source_tree
+    monkeypatch.setattr(
+        bg,
+        "REGISTERED_CALIBRATION_INPUTS",
+        frozenset({"calibration/selected-form.json"}),
+    )
     script = scripts / "build_fixture.py"
     bridge = scripts / "profile_api.py"
     reader = scripts / "packet_reader.py"
@@ -1792,21 +1811,58 @@ def test_data_deps_of_calibration_follows_transitive_lazy_helper(
     ]
 
 
-def test_data_deps_of_calibration_keeps_absent_named_file(calibration_source_tree):
+def test_data_deps_of_calibration_keeps_absent_registered_file(
+    calibration_source_tree, monkeypatch
+):
     scripts = calibration_source_tree
+    monkeypatch.setattr(
+        bg,
+        "REGISTERED_CALIBRATION_INPUTS",
+        frozenset({"calibration/missing-form.json"}),
+    )
     script = scripts / "build_fixture.py"
     script.write_text(
         'PACKET = "calibration/missing-form.json"\n', encoding="utf-8"
     )
     missing = scripts.parent / "calibration" / "missing-form.json"
+    missing.parent.mkdir()
+    missing.write_text("{}", encoding="utf-8")
+    assert data_deps_of(script) == [str(missing.resolve())]
+    missing.unlink()
     assert not missing.exists()
     assert data_deps_of(script) == [str(missing.resolve())]
 
 
-def test_data_deps_of_calibration_ignores_unrelated_json_and_outputs(
-    calibration_source_tree,
+def test_data_deps_of_calibration_requires_explicit_registration(
+    calibration_source_tree, monkeypatch
 ):
     scripts = calibration_source_tree
+    relative = "calibration/unregistered-form.json"
+    packet = scripts.parent / relative
+    packet.parent.mkdir()
+    packet.write_text("{}", encoding="utf-8")
+    script = scripts / "build_fixture.py"
+    script.write_text(f'PACKET = "{relative}"\n', encoding="utf-8")
+    assert data_deps_of(script) == []
+    monkeypatch.setattr(bg, "REGISTERED_CALIBRATION_INPUTS", frozenset({relative}))
+    # The same memoized literal text must reflect the new registration.
+    assert data_deps_of(script) == [str(packet.resolve())]
+    monkeypatch.setattr(bg, "REGISTERED_CALIBRATION_INPUTS", frozenset())
+    assert data_deps_of(script) == []
+
+
+def test_data_deps_of_calibration_ignores_unrelated_json_and_outputs(
+    calibration_source_tree, monkeypatch
+):
+    scripts = calibration_source_tree
+    monkeypatch.setattr(
+        bg,
+        "REGISTERED_CALIBRATION_INPUTS",
+        frozenset({
+            "calibration/selected-form.json",
+            "calibration/unrelated-form.json",
+        }),
+    )
     calibration = scripts.parent / "calibration"
     calibration.mkdir()
     for name in ("selected-form.json", "unrelated-form.json"):
@@ -1825,9 +1881,14 @@ def test_data_deps_of_calibration_ignores_unrelated_json_and_outputs(
 
 
 def test_data_deps_of_calibration_preserves_reference_dxf_dwg_basenames(
-    calibration_source_tree,
+    calibration_source_tree, monkeypatch
 ):
     scripts = calibration_source_tree
+    monkeypatch.setattr(
+        bg,
+        "REGISTERED_CALIBRATION_INPUTS",
+        frozenset({"calibration/selected-form.json"}),
+    )
     script = scripts / "build_fixture.py"
     script.write_text(
         'PACKET = "calibration/selected-form.json"\n'
@@ -1849,6 +1910,11 @@ def test_data_deps_of_calibration_follows_same_tick_helper_rewrite(
     calibration_source_tree, monkeypatch
 ):
     scripts = calibration_source_tree
+    monkeypatch.setattr(
+        bg,
+        "REGISTERED_CALIBRATION_INPUTS",
+        frozenset({"calibration/old-form.json", "calibration/new-form.json"}),
+    )
     script = scripts / "build_fixture.py"
     reader = scripts / "packet_reader.py"
     script.write_text("import packet_reader\n", encoding="utf-8")
@@ -1872,8 +1938,19 @@ def test_data_deps_of_calibration_follows_same_tick_helper_rewrite(
     ]
 
 
-def test_data_deps_of_can_omit_test_entry_fixture_literals(calibration_source_tree):
+def test_data_deps_of_can_omit_test_entry_fixture_literals(
+    calibration_source_tree, monkeypatch
+):
     scripts = calibration_source_tree
+    monkeypatch.setattr(
+        bg,
+        "REGISTERED_CALIBRATION_INPUTS",
+        frozenset({
+            "calibration/production-form.json",
+            "calibration/fixture-form.json",
+            "calibration/other-fixture.json",
+        }),
+    )
     script = scripts / "test_fixture.py"
     reader = scripts / "packet_reader.py"
     reader.write_text(

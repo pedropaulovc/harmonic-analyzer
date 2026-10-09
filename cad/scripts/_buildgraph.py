@@ -43,13 +43,16 @@ REFERENCES_DIR = SCRIPTS_DIR.parent / "references"
 
 # Explicit runtime data inputs must rebuild their consumers and bust their
 # remote-cache keys -- see data_deps_of, honored at each native recipe boundary.
-# DXF/DWG basenames keep the existing cad/references convention; calibration
-# JSON literals name their complete CAD-relative path.
+# DXF/DWG basenames keep the existing cad/references convention; registered
+# calibration JSON literals name their complete CAD-relative path.
 _DATA_EXTENSIONS = (".dxf", ".dwg")
 _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECASE)
 _CALIBRATION_LITERAL_RE = re.compile(
     r"""["'](calibration/[^"'{}\r\n]+\.json)["']"""
 )
+# Register a calibration input only in the commit publishing its genuine JSON.
+# Keep registered inputs declared after deletion; never filter by disk existence.
+REGISTERED_CALIBRATION_INPUTS: frozenset[str] = frozenset()
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
 # six subs, so it is last. doit derives ordering from file_dep, but this tuple
@@ -1785,19 +1788,21 @@ def data_deps_of(script: Path, *, include_entry: bool = True) -> list[str]:
     part, drawing or assembly or move its cache key. This scans the transitive
     source closure for quoted ``*.dxf``/``*.dwg`` literals, resolving each
     basename under ``cad/references`` as before. Explicit ``calibration/*.json``
-    literals retain their complete path (including subdirectories), resolved
-    against the CAD root. Other JSON names and output/report paths are ignored.
+    literals are included only when in ``REGISTERED_CALIBRATION_INPUTS`` and
+    retain their complete CAD-relative path (including subdirectories). Publish
+    the genuine JSON and its registration in the same commit. Other JSON names
+    and output/report paths are ignored.
 
     ``include_entry=False`` omits the entry's own text, not its imported local
     source closure. Check tasks use it for ``test_*`` entries: literals inside
     temporary test fixtures are not required runtime inputs of the check.
 
-    A named artefact is listed **whether or not it currently exists on disk**: a
-    referenced input that is accidentally deleted or renamed after a build is a
-    MISSING runtime dependency, and keeping it in ``file_dep`` makes doit/the
-    build fail loud on it rather than silently report the stale ``.SLDPRT`` up to
-    date. It is CONSERVATIVE (can over- but never under-invalidate): only files
-    named by a literal in the script's own import closure are ever listed.
+    A named DXF/DWG or registered calibration input is listed **whether or not it
+    currently exists on disk**: an input accidentally deleted or renamed after a
+    build remains a MISSING runtime dependency, making doit/the build fail loud
+    rather than silently report the stale ``.SLDPRT`` up to date. Unpublished
+    calibration literals do not declare phantom inputs; their readers still
+    refuse absent packets at run time.
     """
     entry = _resolved(script)
     sources = [Path(p) for p in module_deps_of(script) if p != str(entry)]
@@ -1813,8 +1818,9 @@ def data_deps_of(script: Path, *, include_entry: bool = True) -> list[str]:
             candidate = REFERENCES_DIR / Path(literal).name
             found.add(str(_resolved(candidate)))
         for literal in _calibration_literals(text):
-            candidate = SCRIPTS_DIR.parent / literal
-            found.add(str(_resolved(candidate)))
+            if literal in REGISTERED_CALIBRATION_INPUTS:
+                candidate = SCRIPTS_DIR.parent / literal
+                found.add(str(_resolved(candidate)))
     return sorted(found)
 
 

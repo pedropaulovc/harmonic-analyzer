@@ -211,6 +211,11 @@ def isolated_calibration_keys(tmp_path, monkeypatch):
     monkeypatch.setattr(bg, "ASSEMBLY_CONTRACT_DIR", config / "assemblies")
     monkeypatch.setattr(dodo, "REPO_ROOT", root)
     monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
+    monkeypatch.setattr(
+        bg,
+        "REGISTERED_CALIBRATION_INPUTS",
+        frozenset({"calibration/selected-form.json"}),
+    )
     revision = config / "release.yaml"
     revision.write_text("next_revision: fixture\n", encoding="utf-8")
     monkeypatch.setattr(dodo, "RELEASE_VERSION_FILE", revision)
@@ -288,6 +293,36 @@ def isolated_calibration_keys(tmp_path, monkeypatch):
         yield dodo, packet, unrelated_json, report, snapshot
     finally:
         clear_closure()
+
+
+def test_unpublished_stock_packets_are_excluded_from_every_task_family():
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    cad = dodo.SCRIPTS_DIR.parent.resolve()
+    calibration = cad / "calibration"
+    packets = {
+        str(calibration / "dt-cone-stock-form.json"),
+        str(calibration / "dt-crank-stock-form.json"),
+    }
+    for family, generator in (
+        ("check", dodo.task_check),
+        ("part", dodo.task_part),
+        ("assembly", dodo.task_assembly),
+        ("drawing", dodo.task_drawing),
+    ):
+        tasks = list(generator())
+        assert tasks, family
+        for task in tasks:
+            label = f"{family}:{task['name']}"
+            declared = {str(Path(path).resolve()) for path in task["file_dep"]}
+            assert packets.isdisjoint(declared), label
+            for dependency in declared:
+                path = Path(dependency)
+                if path.suffix == ".json" and path.is_relative_to(calibration):
+                    relative = path.relative_to(cad).as_posix()
+                    assert relative in bg.REGISTERED_CALIBRATION_INPUTS, (label, relative)
+                    assert path.is_file(), (label, relative)
 
 
 def test_calibration_dependency_reaches_task_recipes_and_rekeys_only_consumers(
@@ -3219,6 +3254,9 @@ def test_check_gates_depend_on_everything_they_execute():
                 str(entry.resolve()),
                 *dodo.module_deps_of(entry),
                 *dodo._config_deps(entry),
+                *dodo.data_deps_of(
+                    entry, include_entry=not entry.name.startswith("test_")
+                ),
             )
         }
         missing = sorted(executed - declared)
@@ -3233,7 +3271,7 @@ def test_check_gates_depend_on_everything_they_execute():
 
 
 def test_calibration_check_named_runtime_inputs_have_no_fixture_phantoms():
-    """Named check data must exist, except the two authentic unpublished packets."""
+    """Every named check data input must exist; unpublished packets are excluded."""
     dodo = _load_dodo()
     tasks = {task["name"]: task for task in dodo.task_check()}
     assert tasks.keys() == set(dodo._CHECK_NAMES) | set(dodo._OPTIONAL_CHECK_NAMES)
@@ -3262,19 +3300,26 @@ def test_calibration_check_named_runtime_inputs_have_no_fixture_phantoms():
         missing = {
             path.relative_to(REPO_ROOT).as_posix()
             for path in named[name]
-            if path not in packets and not path.is_file()
+            if not path.is_file()
         }
         assert not missing, f"check:{name} requires fixture/nonexistent data: {missing}"
-    for name in ("budget", "recipe"):
-        assert packets <= named[name], f"check:{name} misses an authentic stock packet"
+        assert packets.isdisjoint(named[name]), f"check:{name} declares an unpublished packet"
     assert references / "fr-nameplate-engraving.dxf" in named["nameplate"]
 
 
 
 
-@pytest.fixture(params=("dt-cone-stock-form.json", "dt-crank-stock-form.json"))
+@pytest.fixture(
+    params=(
+        ("dt_cone_gear_spec.py", "dt-cone-stock-form.json"),
+        ("crank_mesh_calibration.py", "dt-crank-stock-form.json"),
+    ),
+    ids=("cone-reader", "crank-reader"),
+)
 def isolated_calibration_check_keys(tmp_path, monkeypatch, request):
-    """Copy four real source-only check tasks' inputs; never run their actions."""
+    """Copy real check definitions, registering only an isolated cache-test input."""
+    import _buildgraph as bg
+
     dodo = _load_dodo()
     selected = {"budget", "recipe", "graph", "nameplate"}
     original_tasks = {
@@ -3285,14 +3330,10 @@ def isolated_calibration_check_keys(tmp_path, monkeypatch, request):
         (REPO_ROOT / "cad" / "calibration" / name).resolve()
         for name in ("dt-cone-stock-form.json", "dt-crank-stock-form.json")
     }
-    original_packet = (
-        REPO_ROOT / "cad" / "calibration" / request.param
-    ).resolve()
     for name, task in original_tasks.items():
-        for packet in original_packets:
-            assert (str(packet) in task["file_dep"]) == (
-                name in {"budget", "recipe"}
-            ), (name, packet.name)
+        assert original_packets.isdisjoint(
+            Path(path).resolve() for path in task["file_dep"]
+        ), f"check:{name} declares an unpublished packet"
 
     root = tmp_path / "repo"
     paths = {
@@ -3306,57 +3347,111 @@ def isolated_calibration_check_keys(tmp_path, monkeypatch, request):
     for task in original_tasks.values():
         for path in task["file_dep"]:
             original = Path(path).resolve()
+            assert original.is_file(), f"check:{task['name']} missing source: {original}"
             copied = mapped[path]
-            if original == original_packet:
-                continue
-            if not original.is_file():
-                assert original in original_packets, (
-                    f"check:{task['name']} missing source: {original}"
-                )
-                continue
             copied.parent.mkdir(parents=True, exist_ok=True)
             copied.write_bytes(original.read_bytes())
-    tasks = {
-        name: {
-            **task,
-            "file_dep": [str(mapped[path]) for path in task["file_dep"]],
-            "targets": [str(mapped[path]) for path in task["targets"]],
-        }
-        for name, task in original_tasks.items()
-    }
-    packet = root / original_packet.relative_to(REPO_ROOT)
+
+    scripts = root / "cad" / "scripts"
+    reader_name, packet_name = request.param
+    reader = scripts / reader_name
+    text = reader.read_text(encoding="utf-8")
+    original_literal = f"calibration/{packet_name}"
+    relative = "calibration/check-cache-fixture.json"
+    assert text.count(original_literal) == 1, reader_name
+    reader.write_text(text.replace(original_literal, relative), encoding="utf-8")
+    packet = root / "cad" / relative
     packet.parent.mkdir(parents=True, exist_ok=True)
-    # Cache/freshness test bytes only; no real calibration schema is supplied.
+    # Cache/freshness bytes only; never used as a production geometric packet.
     packet.write_text('{"fixture_revision": "before"}\n', encoding="utf-8")
     unrelated = packet.with_name("unrelated-form.json")
     report = root / "cad" / "out" / "reports" / packet.name
     for ignored in (unrelated, report):
         ignored.parent.mkdir(parents=True, exist_ok=True)
         ignored.write_text('{"fixture_revision": "before"}\n', encoding="utf-8")
-    for task in tasks.values():
-        stamp = Path(task["targets"][0])
-        stamp.parent.mkdir(parents=True, exist_ok=True)
-        stamp.write_text("previous successful check\n", encoding="utf-8")
     monkeypatch.setattr(dodo, "REPO_ROOT", root)
     monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
+    monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+    monkeypatch.setattr(bg, "REFERENCES_DIR", scripts.parent / "references")
+    monkeypatch.setattr(bg, "REGISTERED_CALIBRATION_INPUTS", frozenset({relative}))
+    bg.clear_import_caches()
     dodo._ARTEFACT_INDEX = {}
+    entries = {
+        name: [
+            mapped[str(Path(arg).resolve())]
+            for arg in task["actions"][0][1][0]
+            if str(arg).endswith(".py")
+        ]
+        for name, task in original_tasks.items()
+    }
+    consumers = {
+        name
+        for name, task_entries in entries.items()
+        if any(str(reader.resolve()) in dodo.module_deps_of(entry)
+               for entry in task_entries)
+    }
+    assert {"budget", "recipe"} <= consumers
+    assert "nameplate" not in consumers
 
-    def snapshot():
-        return {
-            name: (
-                dodo._digest_files(task["file_dep"]),
-                dodo._cache_key(task["file_dep"], f"check:{name}"),
-            )
-            for name, task in tasks.items()
-        }
+    def tasks():
+        current = {}
+        for name, task in original_tasks.items():
+            # Preserve the real hand-listed/config/source inputs and derive data
+            # edges from the copied action entries exactly as task_check does.
+            runtime_data = {
+                dependency
+                for entry in entries[name]
+                for dependency in dodo.data_deps_of(
+                    entry, include_entry=not entry.name.startswith("test_")
+                )
+            }
+            current[name] = {
+                **task,
+                "file_dep": sorted(
+                    {
+                        *(str(mapped[path]) for path in task["file_dep"]),
+                        *runtime_data,
+                    }
+                ),
+                "targets": [str(mapped[path]) for path in task["targets"]],
+            }
+            assert (str(packet) in current[name]["file_dep"]) == (
+                name in consumers
+            ), (name, reader_name)
+            assert all(
+                Path(path).resolve().is_relative_to(root.resolve())
+                for path in current[name]["file_dep"]
+            ), name
+        return current
 
-    return dodo, tasks, packet, unrelated, report, snapshot
+    try:
+        current = tasks()
+        for task in current.values():
+            stamp = Path(task["targets"][0])
+            stamp.parent.mkdir(parents=True, exist_ok=True)
+            stamp.write_text("previous successful check\n", encoding="utf-8")
+
+        def snapshot():
+            bg.clear_import_caches()
+            return {
+                name: (
+                    dodo._digest_files(task["file_dep"]),
+                    dodo._cache_key(task["file_dep"], f"check:{name}"),
+                )
+                for name, task in tasks().items()
+            }
+
+        yield dodo, current, packet, unrelated, report, snapshot, consumers
+    finally:
+        bg.clear_import_caches()
 
 
 def test_calibration_check_gates_rekey_and_stale_saved_stamps_on_packet_republish(
     isolated_calibration_check_keys,
 ):
-    dodo, tasks, packet, unrelated, report, snapshot = isolated_calibration_check_keys
+    dodo, tasks, packet, unrelated, report, snapshot, consumers = (
+        isolated_calibration_check_keys
+    )
     before = snapshot()
     checker = dodo.ContentChecker()
     state = checker.get_state(str(packet), None)
@@ -3373,12 +3468,12 @@ def test_calibration_check_gates_rekey_and_stale_saved_stamps_on_packet_republis
     packet.write_text('{"fixture_revision": "after"}\n', encoding="utf-8")
     os.utime(packet, (state[0] + 10, state[0] + 10))
     after = snapshot()
-    for name in ("budget", "recipe"):
+    for name in consumers:
         assert str(packet) in tasks[name]["file_dep"]
         assert checker.check_modified(str(packet), packet.stat(), state) is True
         assert all(a != b for a, b in zip(before[name], after[name])), name
-    assert after["nameplate"] == before["nameplate"]
-    assert after["graph"] == before["graph"]
+    for name in tasks.keys() - consumers:
+        assert after[name] == before[name], name
     # The saved .ok files still exist, but changed declared input invalidates them.
     assert {
         name: Path(task["targets"][0]).read_bytes() for name, task in tasks.items()
@@ -3388,11 +3483,13 @@ def test_calibration_check_gates_rekey_and_stale_saved_stamps_on_packet_republis
 def test_calibration_check_gates_keep_missing_packet_as_required_input(
     isolated_calibration_check_keys,
 ):
-    dodo, tasks, packet, _unrelated, _report, snapshot = isolated_calibration_check_keys
+    dodo, tasks, packet, _unrelated, _report, snapshot, consumers = (
+        isolated_calibration_check_keys
+    )
     before = snapshot()
     packet.unlink()
     after = snapshot()
-    for name in ("budget", "recipe"):
+    for name in consumers:
         deps = tasks[name]["file_dep"]
         assert str(packet) in deps
         assert all(a != b for a, b in zip(before[name], after[name])), name
@@ -3400,8 +3497,8 @@ def test_calibration_check_gates_keep_missing_packet_as_required_input(
         assert (packet.relative_to(dodo.REPO_ROOT).as_posix(), "<missing>") in inputs
         with pytest.raises(FileNotFoundError):
             dodo.ContentChecker().get_state(str(packet), None)
-    assert after["nameplate"] == before["nameplate"]
-    assert after["graph"] == before["graph"]
+    for name in tasks.keys() - consumers:
+        assert after[name] == before[name], name
 
 
 def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():

@@ -571,9 +571,15 @@ The cone native factory reads only the source-qualified ALL20 packet
 DESIGN or numerically refused data cannot fall back to an ideal profile.
 Retained seat/AF/face/cutter/grade inputs have a separate identity from selected
 OUTPUT geometry, so publishing the authentic JSON does not circularly change
-the measurement input. The JSON is nevertheless a declared per-file
-part/drawing/budget recipe and farm-package input. Numerical qualification
-requires the actual six-source engine receipt, whole booked source domain,
+the measurement input. A packet becomes a declared per-file recipe and
+farm-package input only when its genuine JSON and its CAD-relative entry in
+`_buildgraph.REGISTERED_CALIBRATION_INPUTS` are committed together. The production
+registration is currently empty: neither the cone nor crank packet is published.
+Do not declare absent packets in check/part/assembly/drawing inputs or supply
+placeholder JSON. Registered inputs remain dependencies if deleted; native,
+budget and direct packet readers continue to refuse missing or unqualified data.
+Numerical qualification requires the actual six-source engine receipt, whole
+booked source domain,
 nominal plus all sixteen printed-profile pairs, continuous first-contact/
 handover and paid full-period seam proof, actual RootArc FREE INNER air and
 untared physical signed reads. Cone driver-root/full-drum material clearance
