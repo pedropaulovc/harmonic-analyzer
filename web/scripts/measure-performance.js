@@ -35,6 +35,8 @@ async page => {
     requestAnimationFrame(frame);
   });
   const cdp = await page.context().newCDPSession(page);
+  // Playwright CLI enables focus emulation; measure real native window focus.
+  await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: false });
   await cdp.send('Network.enable');
   await cdp.send('Performance.enable');
   const samples = [];

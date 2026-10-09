@@ -1,6 +1,8 @@
 // Run in a fresh native Chrome session: no draw-call instrumentation is installed.
 async page => {
   const cdp = await page.context().newCDPSession(page);
+  // Playwright CLI enables focus emulation; measure real native window focus.
+  await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: false });
   await cdp.send('Network.enable');
   await cdp.send('Performance.enable');
   const collect = async label => {
