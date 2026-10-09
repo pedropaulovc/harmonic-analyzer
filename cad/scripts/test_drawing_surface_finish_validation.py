@@ -412,26 +412,39 @@ class _View:
 _DATUM_B_XY = (0.1613, 0.200)
 
 
+def _frame_relative_print(anchor_y: float) -> Any:
+    """The tag's print as farm runs 20261009T182549169Z/185542819Z saw it:
+    the letter held at the frame's mid-width (x 0.15997), ``anchor_y`` plus
+    the set y plus its 0.72 mm rise; GetPosition reads back (0.0, set y)."""
+
+    def prints(label: str, position: tuple[float, float]) -> list[tuple[str, tuple[float, float]]]:
+        return [(label, (0.15997, anchor_y + position[1] + 0.00072))]
+
+    return prints
+
+
 def _frame_datum(
     monkeypatch: pytest.MonkeyPatch,
     frame: _FrameGtol,
     *,
     attaches_to: Any = "frame",
     selected: tuple[int, Any] | None = None,
-    prints: list[tuple[str, tuple[float, float]]] | None = None,
-) -> _DatumTag:
+    prints: Any = None,
+) -> tuple[_DatumTag, list[tuple[float, float]]]:
     """Run add_frame_datum_feature on a fake seat.
 
     ``attaches_to`` is what the inserted tag is attached to after the rebuild
     ("frame", another object, or None for nothing).  ``selected`` is what the
     selection manager reports (type, object; default the frame).  ``prints``
-    is the tag's printed text (default: its letter 1.5 mm right of and 2 mm
-    under the request).  Like farm run 20261009T182549169Z, the tag's
-    GetPosition reads x 0.0 with the requested y.
+    maps (letter, set position) to the tag's printed text (default: as the
+    farm printed it, y from the frame's bottom edge 0.212).  Returns the tag
+    and every position set on it.
     """
     view = _View(("A",), (frame,))
     kind, picked = selected if selected is not None else (13, frame)
     inserted: list[_DatumTag] = []
+    placed: list[tuple[float, float]] = []
+    printer = _frame_relative_print(0.212) if prints is None else prints
 
     class _SelectionManager:
         def GetSelectedObjectCount2(self, _mark: int) -> int:
@@ -464,12 +477,9 @@ def _frame_datum(
         if target is not None:
             annotation.attached = (target,)
             annotation.types = (13,)
+        placed.append(annotation.position)
+        annotation.prints = printer(inserted[-1].label, annotation.position)
         annotation.position = (0.0, annotation.position[1])
-        annotation.prints = (
-            [(inserted[-1].label, (_DATUM_B_XY[0] + 0.0015, _DATUM_B_XY[1] - 0.002))]
-            if prints is None
-            else prints
-        )
 
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
@@ -477,21 +487,47 @@ def _frame_datum(
     )
     monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Drawing View3")
     monkeypatch.setattr(_drawing_common, "rebuild_drawing", rebuild)
-    return _drawing_common.add_frame_datum_feature(
+    tag = _drawing_common.add_frame_datum_feature(
         type("_Adapter", (), {"currentModel": _Draw()})(), view, frame, datum="B",
         symbol_xy=_DATUM_B_XY, label="dowel hole pattern datum B",
     )
+    return tag, placed
 
 
 def test_frame_datum_symbol_goes_on_the_frame_it_names(monkeypatch) -> None:
     # Farm run 20261009T182549169Z: Select2 on DetailItem354 attached datum B
-    # to it (one entity, type 13, named DetailItem354), and GetPosition read
-    # x 0.0: the printed letter is the placement proof.
+    # to it (one entity, type 13, named DetailItem354).
     frame = _FrameGtol("DetailItem354")
-    tag = _frame_datum(monkeypatch, frame)
+    tag, _ = _frame_datum(monkeypatch, frame)
     assert tag.label == "B"
     assert tag.annotation.attached == (frame,)
-    assert tag.annotation.GetPosition()[0] == 0.0
+
+
+def test_frame_datum_is_set_from_the_frame_bottom_edge(monkeypatch) -> None:
+    # Runs 20261009T182549169Z / 185542819Z: SetPosition2(0.1613, 0.2)
+    # printed the letter at (0.15997, 0.41272), 0.2 m above the frame's
+    # bottom edge (0.212).  The first position is that offset, and the
+    # letter then prints at its place with no correction.
+    frame = _FrameGtol("DetailItem354")
+    printer = _frame_relative_print(0.212)
+    assert printer("B", (0.0, 0.2)) == [("B", (0.15997, pytest.approx(0.41272)))]
+    tag, placed = _frame_datum(monkeypatch, frame)
+    assert placed == [pytest.approx((0.0, 0.200 - 0.212))]
+    (letter, (x, y)), = tag.annotation.prints
+    assert (x, y) == pytest.approx((_DATUM_B_XY[0] - 0.00173, _DATUM_B_XY[1] + 0.00072), abs=0.0005)
+
+
+def test_frame_datum_moves_by_its_printed_miss(monkeypatch) -> None:
+    # Were the offset measured from the frame's TOP edge instead, the first
+    # print lands 7 mm high and one correction, in the space GetPosition
+    # reports, brings the letter to its place.
+    tag, placed = _frame_datum(
+        monkeypatch, _FrameGtol("DetailItem354"), prints=_frame_relative_print(0.219)
+    )
+    assert len(placed) == 2
+    assert placed[1][1] == pytest.approx(0.200 - 0.212 - 0.007, abs=1e-6)
+    (_, (_, y)), = tag.annotation.prints
+    assert y == pytest.approx(_DATUM_B_XY[1] + 0.00072, abs=1e-6)
 
 
 @pytest.mark.parametrize(
@@ -502,7 +538,8 @@ def test_frame_datum_symbol_goes_on_the_frame_it_names(monkeypatch) -> None:
         ("a dimension", r"selected 1 object\(s\), type 14, name ''"),
         ("attached to nothing", r"not attached to its frame DetailItem354 .*count=0"),
         ("attached elsewhere", r"not attached .*attached='DetailItem355'"),
-        ("printed elsewhere", r"datum B does not print where it was placed .*\(0\.0015, 0\.198\)"),
+        # The farm's print, wherever the tag is set: the letter never moves.
+        ("printed elsewhere", r"datum B does not print where it was placed .*\(0\.15997, 0\.41272\)"),
         ("not printed", r"datum B does not print where it was placed .*printed \[\]"),
     ),
 )
@@ -523,9 +560,9 @@ def test_frame_datum_symbol_fails_closed_off_its_frame(
     elif case == "attached elsewhere":
         kwargs["attaches_to"] = other
     elif case == "printed elsewhere":
-        kwargs["prints"] = [("B", (0.0015, 0.198))]
+        kwargs["prints"] = lambda label, _position: [(label, (0.15997, 0.41272))]
     elif case == "not printed":
-        kwargs["prints"] = []
+        kwargs["prints"] = lambda _label, _position: []
     with pytest.raises(RuntimeError, match=match):
         _frame_datum(monkeypatch, frame, **kwargs)
 

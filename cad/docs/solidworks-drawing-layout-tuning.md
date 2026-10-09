@@ -395,11 +395,15 @@ to be that frame by annotation name. Select the frame with
 `IAnnotation::Select2(False, 0)`: on farm run 20261009T182549169Z it
 attached the knife mount's datum B to DetailItem354 (one entity, type 13),
 where `IAnnotation::Select3(False, <view ISelectData>)` had returned False
-(run 20261009T174542021Z). Prove the tag's placement by its printed letter
-(display-data text position), not `IAnnotation::GetPosition`: the attached
-tag read back x 0.0 with the requested y on that run. Also end the sheet
-with `assert_frame_datums_defined`, which fails when any frame names a datum
-that no `IView::GetDatumTags` label prints.
+(run 20261009T174542021Z). A tag on a frame is not placed in sheet
+coordinates: on runs 20261009T182549169Z and 20261009T185542819Z,
+`SetPosition2(0.1613, 0.2)` read back as (0.0, 0.2) and the letter printed
+at (0.160, 0.413), 0.2 m above the frame's bottom edge and held to its
+mid-width. Set y as the offset from the frame's bottom edge, then correct by
+the printed letter's miss (display-data text position) in the space
+`GetPosition` reports, and prove the final print. Also end the sheet with
+`assert_frame_datums_defined`, which fails when any frame names a datum that
+no `IView::GetDatumTags` label prints.
 
 **m. A translation modifier proved by its XML alone.**
 Don't: take `<Translation>true</Translation>` read back from

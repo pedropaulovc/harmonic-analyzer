@@ -1228,6 +1228,11 @@ def _annotation_text_positions(annotation: Any) -> list[tuple[str, tuple[float, 
 
 
 _SEL_GTOL = 13  # swSelectType_e.swSelGTOLS
+# A one-row frame's height: DetailItem354 printed y 219.0 -> 212.0 mm from
+# its 0.219 position (farm run 20261009T171439353Z).
+_GTOL_ROW_HEIGHT = 0.007
+_DATUM_LETTER_FROM_SYMBOL = (-0.00173, 0.00072)
+_FRAME_DATUM_CORRECTIONS = 2
 
 
 def _frame_name(gtol: Any) -> str:
@@ -1259,7 +1264,7 @@ def add_frame_datum_feature(
     datum: str,
     symbol_xy: tuple[float, float],
     label: str,
-    position_tolerance_m: float = 0.02,
+    position_tolerance_m: float = 0.003,
 ) -> Any:
     """Attach a native datum-feature symbol to a feature-control frame.
 
@@ -1281,13 +1286,20 @@ def add_frame_datum_feature(
     exactly that frame, matched by name: an unattached tag would print a
     letter that defines nothing.
 
-    The placement is proved by the printed letter, not by
-    ``IAnnotation.GetPosition``: on run 20261009T182549169Z the attached tag
-    read back x 0.0 (the sheet's left edge) with the requested y.  The API
-    help gives a datum symbol's position as "the point where the leader hits
-    the symbol", and a tag on a frame has no leader.  The letter's display-data
-    text position, the ink the layout audit reads, must lie within
-    ``position_tolerance_m`` of ``symbol_xy``.
+    ``symbol_xy`` is the letter box's bottom middle.  A tag on a frame is
+    NOT positioned in sheet coordinates.  On runs 20261009T182549169Z and
+    20261009T185542819Z ``SetPosition2(0.1613, 0.2)`` read back from
+    ``GetPosition`` as (0.0, 0.2), and the letter printed at (0.15997,
+    0.41272).  That is the frame's mid-width, 0.2 m above its bottom edge
+    (DetailItem354: top 0.219, one 7.0 mm row) plus the letter's own 0.72 mm
+    rise: y is an offset from the frame's bottom edge, and x is held to the
+    frame.  So the tag is first set at (0, ``symbol_xy`` y - frame bottom).
+    Then the printed letter (display-data text position, the ink the layout
+    audit reads) is compared with where ``symbol_xy`` puts it, and the
+    position is moved, in the space ``GetPosition`` reports, by the miss: up
+    to ``_FRAME_DATUM_CORRECTIONS`` times.  Each step emits
+    ``datum.frame_placement``.  The letter must end within
+    ``position_tolerance_m`` of its place, or the sheet fails.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -1296,8 +1308,9 @@ def add_frame_datum_feature(
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
     frame_name = _frame_name(gtol)
     frame_annotation = _sw_type_info.early_bound_or_flag(
-        _early_bound(gtol, "IGtol").GetAnnotation(), "IAnnotation", "Select2"
+        _early_bound(gtol, "IGtol").GetAnnotation(), "IAnnotation", "Select2", "GetPosition"
     )
+    frame_bottom = float(frame_annotation.GetPosition()[1]) - _GTOL_ROW_HEIGHT
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
     draw.ClearSelection2(True)
     if not frame_annotation.Select2(False, 0):
@@ -1331,7 +1344,8 @@ def add_frame_datum_feature(
         "GetAttachedEntityTypes",
         "GetDisplayData",
     )
-    if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+    position = (0.0, symbol_xy[1] - frame_bottom)
+    if not tag_annotation.SetPosition2(position[0], position[1], 0.0):
         raise RuntimeError(f"failed to position datum {datum} ({label})")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_frame_datum_feature")
@@ -1356,28 +1370,47 @@ def add_frame_datum_feature(
             f"datum {datum} is not attached to its frame {frame_name} ({label}): "
             f"count={attached_count}, types={types}, attached={attached_name!r}"
         )
-    printed = _annotation_text_positions(tag_annotation)
-    reported = tag_annotation.GetPosition()
-    letters = [xy for text, xy in printed if text.strip() == datum]
-    offset = (
-        math.hypot(letters[0][0] - symbol_xy[0], letters[0][1] - symbol_xy[1])
-        if len(letters) == 1
-        else math.inf
+    # Where the letter's text item prints for a tag whose letter box has its
+    # bottom middle at symbol_xy: datum A's free tag at (0.115, 0.18762)
+    # printed its "A" at (0.11327, 0.18834) (half a 3.5 mm letter left, 0.72
+    # mm up; farm run 20261009T174542021Z).
+    wanted = (
+        symbol_xy[0] + _DATUM_LETTER_FROM_SYMBOL[0],
+        symbol_xy[1] + _DATUM_LETTER_FROM_SYMBOL[1],
     )
-    _telemetry.event(
-        "datum.frame_placement",
-        datum=datum,
-        frame=frame_name,
-        requested_x=symbol_xy[0],
-        requested_y=symbol_xy[1],
-        reported=str(tuple(reported or ())),
-        printed=str(printed),
-        offset_m=offset,
-    )
+    for step in range(_FRAME_DATUM_CORRECTIONS + 1):
+        printed = _annotation_text_positions(tag_annotation)
+        reported = tuple(float(v) for v in (tag_annotation.GetPosition() or ())[:2])
+        letters = [xy for text, xy in printed if text.strip() == datum]
+        miss = (
+            (wanted[0] - letters[0][0], wanted[1] - letters[0][1])
+            if len(letters) == 1
+            else (math.inf, math.inf)
+        )
+        offset = math.hypot(*miss)
+        _telemetry.event(
+            "datum.frame_placement",
+            datum=datum,
+            frame=frame_name,
+            step=step,
+            set=str(position),
+            reported=str(reported),
+            wanted=str(wanted),
+            printed=str(printed),
+            offset_m=offset,
+        )
+        if offset <= position_tolerance_m or not math.isfinite(offset):
+            break
+        if step == _FRAME_DATUM_CORRECTIONS or len(reported) != 2:
+            break
+        position = (reported[0] + miss[0], reported[1] + miss[1])
+        if not tag_annotation.SetPosition2(position[0], position[1], 0.0):
+            raise RuntimeError(f"failed to move datum {datum} by {miss} ({label})")
+        rebuild_drawing(adapter, label="add_frame_datum_feature placement")
     if offset > position_tolerance_m:
         raise RuntimeError(
             f"datum {datum} does not print where it was placed ({label}): "
-            f"printed {printed}, requested={symbol_xy}, "
+            f"printed {printed}, wanted letter at {wanted} for symbol {symbol_xy}, "
             f"limit={position_tolerance_m:.6g} m"
         )
     if str(tag.GetLabel()) != datum:
