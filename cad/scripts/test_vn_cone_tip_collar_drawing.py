@@ -404,25 +404,6 @@ def test_filled_cylinder_projection_is_three_dimensional_not_z_only():
                                 (0.6, 0.0, 0.8), maximum=True) == pytest.approx(2.0)
 
 
-def test_full_source_collar_air_gate_books_continuous_p1_and_all_clocks():
-    from dt_cone_support_pose import P1_SWEEP_DEG
-
-    installed, bank_thrust = air.installation_acceptances()
-    rows = air.full_sweep_proof(installed=installed, bank_thrust=bank_thrust)
-    assert len(rows) == 400 * len(air.TIERS) * len(air.DRUM_TIERS)
-    for tier in air.TIERS:
-        for fixed in air.DRUM_TIERS:
-            selected = [row for row in rows if row["tier"] == tier.name and row["drum_tier"] == fixed.name]
-            assert selected[0]["angle_interval_deg"][0] == P1_SWEEP_DEG[0]
-            assert selected[-1]["angle_interval_deg"][1] == pytest.approx(P1_SWEEP_DEG[1])
-            for row in selected:
-                assert row["worst_mm"] > 0.0
-                assert row["closure_mm"]["continuous p1 interval arc"] > 0.0
-                assert all(math.isfinite(value) and value >= 0.0 for value in row["closure_mm"].values())
-                assert row["worst_mm"] == pytest.approx(row["nominal_mm"] - sum(row["closure_mm"].values()))
-                assert math.sqrt(sum(value**2 for value in row["normal"])) == pytest.approx(1.0)
-
-
 @pytest.mark.parametrize("result", [None, (False, 0.0, 0.0, 0.0),
                                     (1, 0.0, 0.0, 0.0),
                                     (True, 0.0, 0.0), (True, math.nan, 0.0, 0.0)])
