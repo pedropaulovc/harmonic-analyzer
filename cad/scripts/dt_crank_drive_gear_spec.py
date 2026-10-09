@@ -134,10 +134,22 @@ TOOTH_RUNOUT_TIR_MM = _config.fit("crank_mesh", "tooth_cutting_runout_tir_mm")
 NATIVE_SWEEP_BOUND_MM = TOOTH_RUNOUT_TIR_MM / 20.0
 
 # Geometry selection is finite-support-qualified, not a crossed-mesh certificate.
+# The deviations are about the STANDARD-depth thickness (cutter reference pitch
+# line on the gear's pitch circle). They are thin-only (Main ruling 2026-10-10)
+# so the fixed-centre closing corner keeps positive backlash; the part is
+# modelled at the band's maximum-material limit, the 16T's convention.
 TOOTH_THICKNESS_DEVIATIONS = tuple(
     _config.fit("crank_mesh", "gear64_tooth_thickness_deviations_mm")
 )
-STOCK_TOOL_TRANSLATION_MM = PITCH_DIA / 2.0 - CUTTER_TEMPLATE.pitch_radius_mm
+_STANDARD_TRANSLATION_MM = PITCH_DIA / 2.0 - CUTTER_TEMPLATE.pitch_radius_mm
+STANDARD_TRANSVERSE_TOOTH_THICKNESS = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, _STANDARD_TRANSLATION_MM, HELIX_ANGLE_DEG
+).pitch_tooth_thickness_mm
+STOCK_TOOL_TRANSLATION_MM = translation_for_pitch_tooth_thickness(
+    TEETH, CUTTER_TEMPLATE,
+    STANDARD_TRANSVERSE_TOOTH_THICKNESS + max(TOOTH_THICKNESS_DEVIATIONS),
+    HELIX_ANGLE_DEG,
+)
 _PITCH_PROBE = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, STOCK_TOOL_TRANSLATION_MM, HELIX_ANGLE_DEG
 )
@@ -147,7 +159,7 @@ BASE_TANGENT_SPAN_PLACES = 4
 _SPAN_SCALE = 10**BASE_TANGENT_SPAN_PLACES
 _RAW_TRANSLATIONS = tuple(
     translation_for_pitch_tooth_thickness(
-        TEETH, CUTTER_TEMPLATE, TRANSVERSE_CIRCULAR_TOOTH_THICKNESS + deviation,
+        TEETH, CUTTER_TEMPLATE, STANDARD_TRANSVERSE_TOOTH_THICKNESS + deviation,
         HELIX_ANGLE_DEG,
     )
     for deviation in reversed(TOOTH_THICKNESS_DEVIATIONS)

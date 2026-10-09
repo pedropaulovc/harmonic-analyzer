@@ -306,8 +306,8 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "LONG ADDENDUM",
     ):
         assert banned not in data, banned
-    # Exact stock span is checked on the part. Backlash and supported carrying
-    # coverage belong to the actual assembly, never a circular-caliper shortcut.
+    # Exact stock span is checked on the part; backlash belongs to the actual
+    # assembly, never a circular-caliper shortcut.
     accepting = [
         line
         for line in data.splitlines()
@@ -315,7 +315,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
             "ACCEPT ON THIS PART", "ACCEPT AT ASSEMBLY", "ACCEPT AT SETUP"
         ))
     ]
-    assert len(accepting) == 4
+    assert len(accepting) == 3
     for line in accepting:
         assert "REF" not in line
     # ... and no OTHER row claims an acceptance band. A tooth count, the
@@ -336,18 +336,19 @@ def test_exact_stock_span_limits_book_printed_corners_without_tightening(part_sp
     from stock_form_cutter import translation_for_pitch_tooth_thickness
 
     profile = part_spec.STOCK_PROFILE
-    deviations = (
-        part_spec.TOOTH_THICKNESS_DEVIATIONS
-        if part_spec is spec
-        else (
+    # The 64T band is booked about its standard-depth thickness; the 16T's
+    # about its modelled thickness.
+    if part_spec is spec:
+        reference = spec.STANDARD_TRANSVERSE_TOOTH_THICKNESS
+        deviations = spec.TOOTH_THICKNESS_DEVIATIONS
+    else:
+        reference = profile.pitch_tooth_thickness_mm
+        deviations = (
             part_spec.TOOTH_THICKNESS_UPPER_DEVIATION,
             part_spec.TOOTH_THICKNESS_LOWER_DEVIATION,
         )
-    )
     raw_profiles = tuple(
-        part_spec.stock_profile(
-            tooth_thickness_mm=profile.pitch_tooth_thickness_mm + deviation
-        )
+        part_spec.stock_profile(tooth_thickness_mm=reference + deviation)
         for deviation in deviations
     )
     raw_spans = tuple(
@@ -440,8 +441,14 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
     assert "screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM" in _build_source()
     profile = spec.STOCK_PROFILE
     assert spec.DEDENDUM_FACTOR == 1.25
-    assert profile.radial_translation_mm == pytest.approx(
+    # Standard depth puts the cutter's reference pitch line on the gear's pitch
+    # circle; the part is modelled at the thin-only band's maximum-material limit.
+    standard = spec.stock_profile(tooth_thickness_mm=spec.STANDARD_TRANSVERSE_TOOTH_THICKNESS)
+    assert standard.radial_translation_mm == pytest.approx(
         profile.pitch_radius_mm - profile.template.pitch_radius_mm
+    )
+    assert profile.pitch_tooth_thickness_mm == pytest.approx(
+        spec.STANDARD_TRANSVERSE_TOOTH_THICKNESS + max(spec.TOOTH_THICKNESS_DEVIATIONS)
     )
     assert spec.WHOLE_DEPTH == pytest.approx(
         profile.blank_radius_mm - profile.root_radius_min_mm
