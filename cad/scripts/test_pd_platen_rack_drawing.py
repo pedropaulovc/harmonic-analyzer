@@ -126,7 +126,7 @@ def test_model_authors_and_hides_the_seam_witness_without_changing_the_solid() -
     assert {
         "define_rectilinear_chain",
         "dimension_between",
-        "blank_reference_geometry",
+        "blank_reference_sketches",
     } <= calls
     assert not ({"create_extrusion", "create_cut_extrude", "create_plane"} & calls)
     names = {

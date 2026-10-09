@@ -162,7 +162,7 @@ def test_builder_has_no_ideal_or_flat_slot_cutover_path() -> None:
     }
     straight = _calls(part._straight_stock_gaps, "ExtrusionParameters")
     assert {"FACE_WIDTH", "FULL_DEPTH"} <= {_keyword(call, "depth") for call in straight}
-    native = _calls(part._straight_stock_gaps, "native_segments")
+    native = _calls(part._straight_stock_gaps, "cut_order_native_segments")
     assert len(native) == 1
     end = _calls(part._stock_cutter_endcut, "author_cutter_endcut")
     assert len(end) == 1

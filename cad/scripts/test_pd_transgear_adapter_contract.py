@@ -238,7 +238,7 @@ def test_straight_stock_pass_keeps_blind_boss_cut_direction_and_native_guards(re
     calls = [node for node in ast.walk(straight) if isinstance(node, ast.Call)]
     defined = sorted(node.lineno for node in calls if isinstance(node.func, ast.Name) and node.func.id == "ensure_fully_defined")
     exited = [node.lineno for node in _adapter_calls(straight) if node.func.attr == "exit_sketch"]
-    native = [node for node in calls if isinstance(node.func, ast.Attribute) and node.func.attr == "native_segments"]
+    native = [node for node in calls if isinstance(node.func, ast.Attribute) and node.func.attr == "cut_order_native_segments"]
     assert len(defined) == len(exited) == 2 and len(native) == 1
     boss, cut = extrusions
     assert defined[0] < exited[0] < boss.lineno < native[0].lineno < defined[1] < exited[1] < cut.lineno
