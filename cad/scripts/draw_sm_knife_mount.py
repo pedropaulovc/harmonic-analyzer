@@ -205,8 +205,15 @@ TAP_CALLOUT_HALF_WIDTH = 0.026
 TAP_CALLOUT_HALF_HEIGHT = 0.0065
 TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.022, TOP_CENTER[1] - TOP_HALF_Z - 0.014)
 # The tap's position frame hangs under its callout block, on its own leader
-# to the same rim.
+# to the tap.  The two leaders land on the tap's two lower rims (model x
+# side): the callout's on the lower-left, nearer its block, the frame's on
+# the lower-right, so the frame's leader, climbing from the frame's right
+# end, stays right of the callout's.  Both on the lower-left rim, it crossed
+# the callout's 2 mm short of the tip (leader-crosses-leader, farm run
+# 20261009T164113078Z).
 TAP_FRAME_XY = (TAP_CALLOUT_XY[0], TAP_CALLOUT_XY[1] - TAP_CALLOUT_HALF_HEIGHT - 0.007)
+TAP_CALLOUT_RIM_SIDE = -1.0
+TAP_FRAME_RIM_SIDE = 1.0
 # The bore's two-tier frame stands above the block's upper-right corner,
 # right of the datum-A tag; its BASIC height under A runs down the block's
 # right side.
@@ -272,6 +279,25 @@ def _look_section_along_minus_z(adapter: Any, section: Any) -> None:
         raise RuntimeError(
             f"section A-A still looks along +Z (sign product {direction})"
         )
+
+
+def _tap_lower_rim(adapter: Any, top: Any, x_side: float) -> tuple[float, float]:
+    """The #6-32 tap's drill rim at 45 deg on model ``x_side``, below its
+    centre in the top view: picked on whichever side of the cutting line
+    model -Z/+Z projects below it."""
+    rim_mm = STUD_TAP_DIA / 2.0 / math.sqrt(2.0)
+    return min(
+        (
+            model_point_in_view(
+                adapter,
+                top,
+                (x_side * rim_mm / 1000.0, BLK_TOP / 1000.0, side * rim_mm / 1000.0),
+                label=f"knife-hanger tap rim x{x_side:+.0f} z{side:+.0f}",
+            )
+            for side in (1.0, -1.0)
+        ),
+        key=lambda point: point[1],
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -394,21 +420,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # left.
     removed_tap_notes = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
     _telemetry.info(f"removed {removed_tap_notes} automatic tapped-hole note(s)")
-    # The tap's lower-left drill rim (the rim nearer the callout), picked on
-    # whichever side of the cutting line model -Z/+Z projects below it.
-    rim_mm = STUD_TAP_DIA / 2.0 / math.sqrt(2.0)
-    tap_rim = min(
-        (
-            model_point_in_view(
-                adapter,
-                top,
-                (-rim_mm / 1000.0, BLK_TOP / 1000.0, side * rim_mm / 1000.0),
-                label=f"knife-hanger tap rim z{side:+.0f}",
-            )
-            for side in (1.0, -1.0)
-        ),
-        key=lambda point: point[1],
-    )
+    tap_rim = _tap_lower_rim(adapter, top, TAP_CALLOUT_RIM_SIDE)
     add_native_hole_callout(
         adapter,
         top,
@@ -571,7 +583,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=tap_rim,
+        edge_xy=_tap_lower_rim(adapter, top, TAP_FRAME_RIM_SIDE),
         frame_xy=TAP_FRAME_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"],

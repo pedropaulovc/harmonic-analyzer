@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -143,6 +144,34 @@ def test_tap_callout_parks_between_the_top_view_and_the_datum_tag() -> None:
         sm_knife_mount_spec.BLK_TOP
     )
     assert x - drawing.TAP_CALLOUT_HALF_WIDTH > 0.0
+
+
+def test_tap_frame_leader_lands_clear_of_the_tap_callout_leader() -> None:
+    # Farm run 20261009T164113078Z: both leaders landed on the tap's
+    # lower-left rim and the frame's, climbing from the frame's right end,
+    # crossed the callout's 2 mm short of the tip (leader-crosses-leader,
+    # enforced in report mode).  The leader ends below are that run's
+    # printed ones; the frame now lands on the lower-right rim instead.
+    from _layout_audit import _segment_crossing
+    from _layout_geometry import Segment
+
+    callout_shoulder_end, callout_tip = (0.0947, 0.1986), (0.1137, 0.2326)
+    frame_end, old_frame_tip = (0.1103, 0.1900), (0.1130, 0.2332)
+    callout = Segment(*callout_shoulder_end, *callout_tip)
+    assert _segment_crossing(callout, Segment(*frame_end, *old_frame_tip)) is not None
+
+    rim = drawing.STUD_TAP_DIA / 2.0 / 2.0**0.5 * drawing.SHEET_SCALE[0] / 1000.0
+
+    def lower_rim(x_side: float) -> tuple[float, float]:
+        return (drawing._sheet_x(0.0) + x_side * rim, drawing.TOP_CENTER[1] - rim)
+
+    assert math.dist(lower_rim(drawing.TAP_CALLOUT_RIM_SIDE), callout_tip) < 0.001
+    assert drawing.TAP_FRAME_RIM_SIDE == -drawing.TAP_CALLOUT_RIM_SIDE
+    frame_tip = lower_rim(drawing.TAP_FRAME_RIM_SIDE)
+    assert _segment_crossing(callout, Segment(*frame_end, *frame_tip)) is None
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "tap_rim = _tap_lower_rim(adapter, top, TAP_CALLOUT_RIM_SIDE)" in source
+    assert "edge_xy=_tap_lower_rim(adapter, top, TAP_FRAME_RIM_SIDE)" in source
 
 
 def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:

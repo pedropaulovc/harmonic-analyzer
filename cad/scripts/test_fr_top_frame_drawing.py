@@ -813,6 +813,51 @@ def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
         assert 0.013 < x < TITLE_BLOCK[0] and 0.125 < y < 0.270, name
 
 
+def test_no_datum_tag_is_attached_to_a_circle_by_edge_object() -> None:
+    # Farm run 20261009T164113078Z: datum B, attached to the scanned round
+    # dowel-hole circle as an edge object, ignored SetPosition2 and stayed at
+    # its default drop 37.6 mm from its request (as crank_pinion datum A and
+    # the vm2 probe's rod/rack bores did: layout-tuning lesson h).  A circle
+    # is attached by a sheet-point pick, proved by expected_entity.
+    import ast
+
+    offenders = []
+    for path in sorted(Path(drawing.__file__).parent.glob("draw_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for call in ast.walk(tree):
+            if not (
+                isinstance(call, ast.Call)
+                and getattr(call.func, "id", getattr(call.func, "attr", "")) == "add_datum_feature"
+            ):
+                continue
+            for keyword in call.keywords:
+                if keyword.arg in {"edge_entity", "entity"} and "circle_at(" in ast.unparse(
+                    keyword.value
+                ):
+                    offenders.append(f"{path.name}:{call.lineno}")
+    assert offenders == []
+
+
+def test_hanger_datums_are_picked_on_their_rims_toward_their_tags() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    underside = source[source.index('ddoc.ActivateSheet("UNDERSIDE")') :]
+    loop = underside[: underside.index("add_feature_control_frame(")]
+    assert "with _zoomed_on(adapter, datum_pick, HANGER_DATUM_PICK_ZOOM_HALF):" in loop
+    assert "edge_xy=datum_pick, expected_entity=round_hole," in loop
+    assert "edge_entity" not in loop
+    # The zoom window holds the whole rim and the pick is ON it, facing the tag.
+    radius = drawing.HANGER_PIN_HOLE_DIA / 2.0 * drawing._HUB_BOTTOM_M_PER_MM
+    assert radius < drawing.HANGER_DATUM_PICK_ZOOM_HALF / 2.0
+    for datum, (x, y) in drawing.HANGER_DATUM_SYMBOL_XY.items():
+        centre = (0.107, 0.172 if datum == "B" else 0.230)
+        pick = drawing.hanger_datum_pick(centre, (x, y))
+        assert math.dist(pick, centre) == pytest.approx(radius), datum
+        to_pick = (pick[0] - centre[0], pick[1] - centre[1])
+        to_tag = (x - centre[0], y - centre[1])
+        assert to_pick[0] * to_tag[1] - to_pick[1] * to_tag[0] == pytest.approx(0.0, abs=1e-12)
+        assert to_pick[0] * to_tag[0] + to_pick[1] * to_tag[1] > 0.0, datum
+
+
 def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
     text = spec.HANGER_PIN_HOLE_CALLOUT
     assert text.startswith("2X ") and "REAM" in text and "MHA-VN-051" in text

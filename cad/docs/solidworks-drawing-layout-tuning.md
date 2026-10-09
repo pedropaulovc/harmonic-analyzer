@@ -298,7 +298,10 @@ loosen the placement guard until the build passes. `SetPosition2` returns True
 and the tag stays at its default drop on the far side of the bore — crank_pinion
 datum A read 60.3 mm from its request and printed on top of the Ø dimension
 leader; the 80 mm `position_tolerance_m` that let it through was added in the
-same commit as the `entity=` pick (73a3ceb1).
+same commit as the `entity=` pick (73a3ceb1). fr_top_frame datum B, attached to
+its scanned dowel-hole circle by `edge_entity=`, read 37.6 mm from its request
+(farm run 20261009T164113078Z); `test_fr_top_frame_drawing` now refuses any
+`add_datum_feature` edge-object attachment to a `circle_at` circle.
 Do: pick the edge by SHEET POINT (`edge_xy=bore_top`, as cone_gear and the
 transgear recipes do); the same tag then reads 8.0 mm from its request and
 prints there. Keep the guard at its 20 mm default and tighten it only where the

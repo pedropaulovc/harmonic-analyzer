@@ -52,6 +52,7 @@ from _drawing_common import (
     model_point_in_view,
     offset_dimension_text,
     _select_view_entity,
+    _zoomed_on,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -413,6 +414,25 @@ HANGER_SECTION_CAPTION_XY = (0.070, 0.040)
 # land's dimension line.
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
 HANGER_DATUM_SYMBOL_XY = {"B": (0.122, 0.185), "C": (0.130, 0.257)}
+# Each round hole is 1.06 mm across at 1:3, its rim 1.0 mm (sheet) inside
+# the crossbar's +X edge, so the rim is hit-tested zoomed onto a 5 mm square
+# (draw_ch_rocker_arm's pivot-bore datum precedent), where the pick aperture
+# is hundredths of a millimetre.
+HANGER_DATUM_PICK_ZOOM_HALF = 0.0025
+
+
+def hanger_datum_pick(
+    centre: tuple[float, float], symbol_xy: tuple[float, float]
+) -> tuple[float, float]:
+    """The sheet point on a round dowel hole's rim facing its datum tag.
+
+    The view looks along the hole's axis, so the rim prints as a circle of
+    the hole's radius at the view's scale about the projected centre.
+    """
+    dx, dy = symbol_xy[0] - centre[0], symbol_xy[1] - centre[1]
+    reach = math.hypot(dx, dy)
+    radius = HANGER_PIN_HOLE_DIA / 2.0 * _HUB_BOTTOM_M_PER_MM
+    return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
 HANGER_SLOT_FRAME_XY = {"front": (0.078, 0.185), "rear": (0.078, 0.218)}
 HANGER_SLOT_WIDTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[0] + (BAR_X0 - 24.0) * _HUB_BOTTOM_M_PER_MM,
@@ -2612,18 +2632,30 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The knife-hanger dowel pattern: datum B the front round hole, datum C
     # the rear one; each slot located to the near round hole, free along the
-    # line to the far one (tolerance-gdt-assessment / policy rule 3).
+    # line to the far one (tolerance-gdt-assessment / policy rule 3).  Each
+    # tag is attached by a sheet-point pick on its hole's rim, toward the tag,
+    # proved to be the scanned circle: selected as an edge object, the tag
+    # ignored SetPosition2 and stayed at its default drop, 37.6 mm from its
+    # request (farm run 20261009T164113078Z; layout-tuning lesson h).
     for datum, station_z in (("B", STUD_Z_FRONT), ("C", STUD_Z_REAR)):
-        add_datum_feature(
+        round_hole = hub_bottom_edges.circle_at(
+            (PIN_HOLE_X, -HALF_H, station_z), HANGER_PIN_HOLE_DIA/2,
+            axis=(0.0, 1.0, 0.0),
+            label=f"underside locator datum {datum} round dowel hole",
+        ).edge
+        hole_centre = model_point_in_view(
             adapter, hub_bottom_parent,
-            edge_entity=hub_bottom_edges.circle_at(
-                (PIN_HOLE_X, -HALF_H, station_z), HANGER_PIN_HOLE_DIA/2,
-                axis=(0.0, 1.0, 0.0),
-                label=f"underside locator datum {datum} round dowel hole",
-            ).edge,
-            symbol_xy=HANGER_DATUM_SYMBOL_XY[datum], datum=datum,
-            label=f"knife-hanger round dowel hole datum {datum}",
+            (PIN_HOLE_X/1000.0, -HALF_H/1000.0, station_z/1000.0),
+            label=f"underside locator datum {datum} round dowel hole centre",
         )
+        datum_pick = hanger_datum_pick(hole_centre, HANGER_DATUM_SYMBOL_XY[datum])
+        with _zoomed_on(adapter, datum_pick, HANGER_DATUM_PICK_ZOOM_HALF):
+            add_datum_feature(
+                adapter, hub_bottom_parent,
+                edge_xy=datum_pick, expected_entity=round_hole,
+                symbol_xy=HANGER_DATUM_SYMBOL_XY[datum], datum=datum,
+                label=f"knife-hanger round dowel hole datum {datum}",
+            )
     for station, station_z, datums in (
         ("front", STUD_Z_FRONT, ("B", "C")),
         ("rear", STUD_Z_REAR, ("C", "B")),
