@@ -628,6 +628,68 @@ def test_the_build_runs_from_a_snapshot_the_caller_cannot_change(
     ) == "built\n"
 
 
+def test_launch_defaults_to_the_agent_scratchpad(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    scratchpad = tmp_path / "agent scratchpad"
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_AGENT_SCRATCHPAD"] = str(scratchpad)
+
+    command = _command(fixture, "part:pen_rod")
+    log_directory = command.index("-LogDirectory")
+    del command[log_directory : log_directory + 2]
+    result = _run_launcher(fixture, command, environment)
+
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    finished = json.loads(result.stdout.splitlines()[-1])
+    expected_directory = scratchpad / "harmonic-analyzer" / "farm-runs"
+    assert Path(finished["log"]).parent == expected_directory
+    assert Path(finished["outputs"]) == Path(finished["log"]).with_suffix(".out")
+    assert (Path(finished["outputs"]) / "reports" / "stub-output.txt").read_text(
+        encoding="utf-8"
+    ) == "built\n"
+
+    status_result = _run_launcher(
+        fixture,
+        [
+            str(fixture["pwsh"]),
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(LAUNCHER),
+            "-Status",
+            "-RunId",
+            finished["run_id"],
+        ],
+        environment,
+    )
+    assert status_result.returncode == 0, (
+        status_result.stdout,
+        status_result.stderr,
+    )
+    assert json.loads(status_result.stdout.splitlines()[-1])["state"] == "succeeded"
+
+
+def test_launch_defaults_to_local_appdata_when_no_agent_scratchpad_is_set(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    local_app_data = tmp_path / "local app data"
+    environment = dict(fixture["environment"])
+    environment.pop("HARMONIC_AGENT_SCRATCHPAD", None)
+    environment["LOCALAPPDATA"] = str(local_app_data)
+
+    command = _command(fixture, "part:pen_rod")
+    log_directory = command.index("-LogDirectory")
+    del command[log_directory : log_directory + 2]
+    result = _run_launcher(fixture, command, environment)
+
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    finished = json.loads(result.stdout.splitlines()[-1])
+    expected_directory = local_app_data / "ha-farm" / "runs"
+    assert Path(finished["log"]).parent == expected_directory
+    assert Path(finished["outputs"]) == Path(finished["log"]).with_suffix(".out")
+
+
 def test_launches_share_one_environment_synced_once(tmp_path: Path) -> None:
     fixture = _launcher_fixture(tmp_path)
 

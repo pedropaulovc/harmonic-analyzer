@@ -8,8 +8,26 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [string]$PoolHome,
 
-    [Parameter(Mandatory)]
-    [string]$LogDirectory,
+    # Use a host-visible agent scratchpad when supplied by the harness. `local://`
+    # tool URIs are not filesystem paths that PowerShell can write to directly.
+    # Keep the fallback root short; snapshots append deep tracked paths to it.
+    [string]$LogDirectory = $(
+        $scratchpad = [System.Environment]::GetEnvironmentVariable(
+            'HARMONIC_AGENT_SCRATCHPAD'
+        )
+        if ([string]::IsNullOrWhiteSpace($scratchpad)) {
+            $localAppData = [System.Environment]::GetEnvironmentVariable(
+                'LOCALAPPDATA'
+            )
+            if ([string]::IsNullOrWhiteSpace($localAppData)) {
+                throw 'LOCALAPPDATA missing; set HARMONIC_AGENT_SCRATCHPAD'
+            }
+            Join-Path $localAppData 'ha-farm\runs'
+        }
+        else {
+            Join-Path $scratchpad 'harmonic-analyzer\farm-runs'
+        }
+    ),
 
     [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [string[]]$Targets,
