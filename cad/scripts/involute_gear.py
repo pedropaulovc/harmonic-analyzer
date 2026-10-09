@@ -194,23 +194,6 @@ async def set_global(adapter: Any, name: str, expression: str, expected: float) 
         )
 
 
-async def equation_curve(
-    adapter: Any, label: str, x_expr: str, y_expr: str
-) -> str:
-    """Add a parametric equation curve over t in [0, 1]; return its entity ID."""
-    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
-
-    res = await adapter.create_equation_driven_curve(
-        CreateEquationCurveParameters(
-            x_expression=x_expr,
-            y_expression=y_expr,
-            range_start="0",
-            range_end="1",
-        )
-    )
-    return check(f"curve {label}", res)
-
-
 def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) -> str:
     """Find the pattern's instance-count dimension name (``D?@<feature>``).
 

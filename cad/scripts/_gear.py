@@ -30,6 +30,7 @@ from _common import (
     check,
     define_circle,
     dimension_between,
+    equation_curve,
     ensure_fully_defined,
     name_last_feature,
     volume_check,
@@ -69,21 +70,6 @@ class ToothedDisc(NamedTuple):
 def fmt(value: float) -> str:
     """Literal for a curve expression (document units = inches, radians)."""
     return f"{value:.12g}"
-
-
-async def equation_curve(adapter: Any, label: str, x_expr: str, y_expr: str) -> str:
-    """Add a parametric equation curve over t in [0, 1]; return its entity ID."""
-    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
-
-    res = await adapter.create_equation_driven_curve(
-        CreateEquationCurveParameters(
-            x_expression=x_expr,
-            y_expression=y_expr,
-            range_start="0",
-            range_end="1",
-        )
-    )
-    return check(f"curve {label}", res)
 
 
 def _root_start_parameter(base_r_in: float, root_r_in: float | None) -> float:

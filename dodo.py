@@ -2974,6 +2974,8 @@ def task_check():
         SCRIPTS_DIR / "test_export_features.py",
         SCRIPTS_DIR / "test_export_feature_faces.py",
         SCRIPTS_DIR / "test_features_bound.py",
+        # Shared native gear-gap authoring/status contracts use bounded fakes.
+        SCRIPTS_DIR / "test_gear.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",

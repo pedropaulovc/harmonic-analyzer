@@ -1057,3 +1057,31 @@ raw evidence, honest unqualified status, reload refusal/fresh-handle semantics,
 multi-sheet annotation enumeration and read-only-open cleanup. Existing
 `test_gtol_spec.py` also covers canonical writer capture and ordinary-path bypass.
 These authored tests are pending parent centralized checks and native farm proof.
+
+## Native equation-curve stock gaps
+
+`_common.equation_curve` is the canonical stock-gap curve creator. `_gear` uses
+it internally and `build_dt_cone_gear` imports it directly. It preserves the
+authored expressions, range `[0, 1]` and locked endpoints while using
+`ISketchManager.AddToDB=True` to avoid creation-time snapping/inference. The
+native BOOL property is checked after enabling and after restoring its previous
+value in `finally`; DEBUG records show the actual before/enabled/restored values.
+
+`ensure_fully_defined` remains strict. Its explicit equation-curve FIX whitelist
+may target only registered equation curves whose actual `ISketchSegment.Status`
+is `swUnderConstrained`. Already fully-constrained curves are skipped; unknown,
+invalid, over-constrained, no-solution and autosolve-off entity statuses refuse.
+The sketch must report fully defined before any consuming feature is created.
+There is no automatic relation deletion or over-defined status waiver.
+
+Both entry and post-FIX `over_defined` results log ERROR evidence for every
+`ISketchRelationManager.GetRelations(swAll)` relation before raising. Records
+include raw relation/entity types, typed point/segment IDs and constraint
+statuses, nullable entries, document path, sketch constrained status and
+read-only `AddToDB`/`AutoInference`/`AutoSolve` observations. Separate
+`swOverDefining`, `swDangling` and `swBroken` inventories report native filter
+results. `ISketchRelation` has no `SolveStatus`, `Status` or `IsDangling` accessor:
+relation solve status stays UNKNOWN rather than joining fresh wrappers by
+Python identity. Failed reads remain unavailable evidence, not empty proof;
+diagnostic failure never masks the strict sketch failure. Before-FIX and
+successful final inventories are DEBUG only; the escalation WARN remains.

@@ -86,6 +86,7 @@ from _common import (
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
+    equation_curve,
     force_rebuild,
     name_dimensions,
     name_last_feature,
@@ -101,7 +102,6 @@ from _visibility import assert_reference_geometry_hidden, blank_reference_geomet
 
 import _telemetry
 from involute_gear import (
-    equation_curve,
     pattern_count_dimension,
     read_dimension,
     set_global,

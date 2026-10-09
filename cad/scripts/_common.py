@@ -38,10 +38,10 @@ driving dims, SolidworksMCP-python PRs #55/#56):
 * **Over-defined triage**: ``adapter.get_over_defining_relations()`` names
   the conflicting relations; drop the redundant anchor dim, keep the
   semantic relation.
-* **fix is a last resort** for reference geometry that genuinely cannot be
-  dimensioned (currently only the equation-driven spring-hook curves, which
-  have no free endpoints). Every surviving ``fix`` needs an inline comment
-  justifying it.
+* **fix is a last resort** for explicitly whitelisted equation-driven gear
+  gaps, and only when the registered curve's native Status is under-constrained.
+  Locked equation curves that are already fully constrained must not receive
+  a redundant FIX. Everything else uses semantic relations/dimensions.
 """
 
 from __future__ import annotations
@@ -135,6 +135,179 @@ def check(label: str, result: Any) -> Any:
     return result.data
 
 
+_CONSTRAINT_STATUS_NAMES = {
+    1: "swUnknownConstraint",
+    2: "swUnderConstrained",
+    3: "swFullyConstrained",
+    4: "swOverConstrained",
+    5: "swNoSolution",
+    6: "swInvalidSolution",
+    7: "swAutosolveOff",
+}
+
+
+def _sketch_relation_snapshot(adapter: Any, label: str) -> dict[str, Any]:
+    """Read actual native relations; never infer a relation's SolveStatus.
+
+    ISketchRelation declares no SolveStatus/Status/IsDangling accessor. Its
+    status evidence is the manager's actual filtered inventories, while point
+    and segment Status properties use swConstrainedStatus_e. Filter entries
+    are not joined by Python object identity or by non-unique entity IDs.
+    """
+    def probe(read: Callable[[], Any]) -> Any:
+        try:
+            return read()
+        except Exception as exc:
+            return {"unavailable": str(exc)}
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    snapshot: dict[str, Any] = {
+        "label": label,
+        "path": probe(model.GetPathName),
+    }
+    sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
+    if sketch is None:
+        raise RuntimeError("No active sketch for relation diagnostics")
+    raw_status = probe(sketch.GetConstrainedStatus)
+    snapshot["sketch_status"] = raw_status
+    snapshot["sketch_status_name"] = (
+        _CONSTRAINT_STATUS_NAMES.get(raw_status, "UNKNOWN")
+        if type(raw_status) is int else "UNKNOWN"
+    )
+    manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    snapshot["AddToDB"] = probe(lambda: manager.AddToDB)
+    snapshot["AutoInference"] = probe(lambda: manager.AutoInference)
+    snapshot["AutoSolve"] = probe(lambda: manager.AutoSolve)
+    relmgr = _early_bound(sketch.RelationManager, "ISketchRelationManager")
+    if relmgr is None:
+        raise RuntimeError("Active sketch has no RelationManager")
+    inventories: dict[str, Any] = {}
+    # swSketchRelationFilterType_e: swAll, swOverDefining, swDangling, swBroken.
+    for filter_name, filter_value in (
+        ("swAll", 0), ("swOverDefining", 2), ("swDangling", 1), ("swBroken", 6)
+    ):
+        raw = probe(lambda: relmgr.GetRelations(filter_value))
+        if raw is not None and not isinstance(raw, (list, tuple)):
+            inventories[filter_name] = {"unavailable": raw}
+            continue
+        rows = []
+        for index, relation in enumerate(() if raw is None else raw):
+            row: dict[str, Any] = {
+                "index": index,
+                "returned_by_filter": filter_name,
+                "relation_solve_status": "UNKNOWN (no native accessor)",
+            }
+            rows.append(row)
+            if relation is None:  # documented nullable array entries
+                row["null_relation"] = True
+                continue
+            try:
+                relation = _early_bound(relation, "ISketchRelation")
+                row["relation_type"] = probe(relation.GetRelationType)
+                types = probe(relation.GetEntitiesType)
+                entities = probe(relation.GetEntities)
+                row["entity_types"] = types
+                if not isinstance(types, (list, tuple)) or not isinstance(
+                    entities, (list, tuple)
+                ):
+                    row["entities_unavailable"] = entities
+                    continue
+                row["entity_array_lengths"] = [len(types), len(entities)]
+                descriptions = []
+                row["entities"] = descriptions
+                for slot, entity in enumerate(entities):
+                    entity_type = types[slot] if slot < len(types) else None
+                    description: dict[str, Any] = {"relation_entity_type": entity_type}
+                    descriptions.append(description)
+                    if entity is None:
+                        description["null_entity"] = True
+                        continue
+                    # swSketchRelationEntityTypes_e, not swSketchSegments_e.
+                    interface = (
+                        "ISketchPoint" if entity_type == 2 else
+                        "ISketchSegment" if entity_type in (3, 4, 5, 6, 7) else None
+                    )
+                    if interface is None:
+                        description["status"] = "UNKNOWN (unhandled entity type)"
+                        continue
+                    try:
+                        typed = _early_bound(entity, interface)
+                        description["interface"] = interface
+                        description["native_id"] = probe(typed.GetID)
+                        status = probe(lambda: typed.Status)
+                        description["status"] = status
+                        description["status_name"] = (
+                            _CONSTRAINT_STATUS_NAMES.get(status, "UNKNOWN")
+                            if type(status) is int else "UNKNOWN"
+                        )
+                    except Exception as exc:
+                        description["unavailable"] = str(exc)
+            except Exception as exc:
+                row["unavailable"] = str(exc)
+        inventories[filter_name] = rows
+    snapshot["relations"] = inventories
+    return snapshot
+
+
+def _log_sketch_relations(adapter: Any, label: str, phase: str, severity: str) -> None:
+    """Best-effort evidence must not mask the strict sketch failure."""
+    try:
+        snapshot = _sketch_relation_snapshot(adapter, label)
+        getattr(_telemetry, severity)(
+            f"{label}: native sketch relations ({phase}): "
+            f"{json.dumps(snapshot, default=repr, sort_keys=True)}"
+        )
+    except Exception as exc:
+        with contextlib.suppress(Exception):
+            _telemetry.error(
+                f"{label}: native sketch relations ({phase}) unavailable: {exc}"
+            )
+
+
+async def equation_curve(
+    adapter: Any, label: str, x_expr: str, y_expr: str
+) -> str:
+    """Author exact equation coordinates without creation-time snapping.
+
+    Range locks define the equation's endpoints. Normal sketch inference can
+    add redundant relations between adjacent locked curves; AddToDB avoids
+    that creation mechanism, not a solver failure. Native farm proof remains
+    required; an over-defined result is never repaired by deleting relations.
+    """
+    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
+
+    manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    if manager is None:
+        raise RuntimeError(f"curve {label}: no active sketch manager")
+    before = manager.AddToDB
+    if type(before) is not bool:
+        raise RuntimeError(f"curve {label}: AddToDB is not a native bool: {before!r}")
+    _telemetry.debug(f"curve {label}: AddToDB before={before!r}")
+    try:
+        manager.AddToDB = True
+        enabled = manager.AddToDB
+        _telemetry.debug(f"curve {label}: AddToDB enabled={enabled!r}")
+        if enabled is not True:
+            raise RuntimeError(f"curve {label}: AddToDB write refused")
+        result = await adapter.create_equation_driven_curve(
+            CreateEquationCurveParameters(
+                x_expression=x_expr,
+                y_expression=y_expr,
+                range_start="0",
+                range_end="1",
+                lock_start=True,
+                lock_end=True,
+            )
+        )
+        return check(f"curve {label}", result)
+    finally:
+        manager.AddToDB = before
+        restored = manager.AddToDB
+        _telemetry.debug(f"curve {label}: AddToDB restored={restored!r}")
+        if restored is not before:
+            raise RuntimeError(f"curve {label}: AddToDB restore refused")
+
+
 @_telemetry.traced("sketch.ensure_defined", label_param="label")
 async def ensure_fully_defined(
     adapter: Any,
@@ -144,18 +317,28 @@ async def ensure_fully_defined(
 ) -> None:
     """Assert the active sketch is fully defined.
 
-    Raises when the sketch is under- or over-defined. On over-defined, the
-    error includes ``get_over_defining_relations()`` so the redundant anchor
-    is identifiable without opening SolidWorks.
+    Raises when the sketch is under- or over-defined. On over-defined, ERROR
+    logs include EVERY native relation and actual status-filter inventories
+    before raising, both at entry and after an attempted whitelisted fix.
 
     ``fix_entities`` + ``allow_fix_escalation=True`` enable the fix-escalation
     loop with a loud WARN. The only legitimate users are the whitelisted
-    equation-driven gear-gap sketches (_gear.cut_tooth_gap and its cone/
-    removable variants): those curves re-solve from equation globals on
-    configuration changes, so no static relation/dimension scheme can define
-    them without breaking regeneration. Everything else anchors points to the
-    origin with semantic relations/dims.
+    equation-driven gear-gap sketches, including finite stock gaps and cone/
+    removable variants. Their equations and locked parameter bounds carry the
+    analytic shape; configured curves re-solve from globals. Only an owned,
+    natively under-constrained equation curve may receive FIX; an already
+    constrained curve is skipped. Everything else uses semantic relations/dims.
     """
+    async def _over_defined() -> None:
+        _log_sketch_relations(adapter, label, "over_defined", "error")
+        try:
+            over = await adapter.get_over_defining_relations()
+            detail = over.data if over.is_success else over.error
+        except Exception as exc:
+            detail = {"unavailable": str(exc)}
+        raise RuntimeError(
+            f"{label}: sketch OVER-defined; over-defining relations: {detail!r}"
+        )
 
     async def _state() -> str | None:
         res = await adapter.check_sketch_fully_defined()
@@ -172,11 +355,7 @@ async def ensure_fully_defined(
         return
 
     if state == "over_defined":
-        over = await adapter.get_over_defining_relations()
-        detail = over.data if over.is_success else over.error
-        raise RuntimeError(
-            f"{label}: sketch OVER-defined; over-defining relations: {detail!r}"
-        )
+        await _over_defined()
 
     fix_entities = list(fix_entities)
     if not (allow_fix_escalation and fix_entities):
@@ -197,18 +376,39 @@ async def ensure_fully_defined(
         f"{label}: fix escalation (equation-curve whitelist only"
         " — anything else must use semantic anchors)"
     )
+    _log_sketch_relations(adapter, label, "before_fix", "debug")
     for entity_id in fix_entities:
         if state not in ("under_defined", "unknown"):
             break
+        # A sketch-level under-defined status does not mean every equation
+        # curve is free. Never FIX an already constrained locked curve.
+        entity = adapter._sketch_entities.get(entity_id)
+        if entity is None or not entity_id.startswith("EquationCurve_"):
+            raise RuntimeError(
+                f"{label}: fix entity is not an owned equation curve: {entity_id}"
+            )
+        segment = _early_bound(entity, "ISketchSegment")
+        status = segment.Status
+        _telemetry.debug(f"{label}: {entity_id}.Status={status!r}")
+        if type(status) is not int or status not in (2, 3):
+            raise RuntimeError(
+                f"{label}: cannot fix {entity_id} with native Status={status!r}"
+            )
+        if status == 3:  # swFullyConstrained; its equation already anchors it.
+            continue
         fixed = await adapter.add_sketch_constraint(entity_id, None, "fix")
         if not fixed.is_success:
             raise RuntimeError(f"{label}: fix {entity_id} failed: {fixed.error}")
         state = await _state()
         _telemetry.debug(f"fixed {entity_id} -> {state}")
+        if state == "over_defined":
+            await _over_defined()
         if state == "fully_defined":
             _telemetry.success(f"fully defined after fixing {entity_id}: {label}")
+            _log_sketch_relations(adapter, label, "after_fix", "debug")
             return
 
+    _log_sketch_relations(adapter, label, "final_not_fully_defined", "error")
     raise RuntimeError(f"{label}: sketch not fully defined (state={state!r})")
 
 
