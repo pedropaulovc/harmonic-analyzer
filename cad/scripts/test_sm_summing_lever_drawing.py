@@ -8,6 +8,7 @@ import pytest
 
 import _config
 import _drawing_common as common
+import build_sm_summing_lever as lever_build
 import draw_sm_summing_lever as drawing
 import rocker_bank_layout
 import sm_summing_lever_spec
@@ -63,19 +64,28 @@ def test_end_face_edge_is_the_rib_top_edge_not_the_flange_or_underside() -> None
     5.08 mm inboard reads 3.35 for 8.43 (#1105), and the rib's underside edge
     shares the end plane but is hidden under the plate."""
     z = sm_summing_lever_spec.PLATE_L / 2.0
-    # The ribs stop at build_sm_summing_lever.RIB_PLATE_REACH (HOLE_X - 4.1),
-    # short of the hole column, and dip under the plate top at x ~29.8.
-    tip = sm_summing_lever_spec.HOLE_X - 4.1
-    top = _line((0.0, 15.24, z), (tip, 0.0, z))
-    flange = _line((0.0, 15.24, z - sm_summing_lever_spec.PLATE_T), (tip, 0.0, z - 5.08))
-    underside = _line((tip, 0.0, z), (0.0, -15.24, z))
-    plate_end = _line((29.79, 2.54, z), (sm_summing_lever_spec.PLATE_W, 2.54, z))
-    edges = ViewEdges(label="plan", edges=(flange, underside, plate_end, top))
+    # The ribs keep the slant towards (PLATE_W, 0) but end on a vertical face
+    # at build_sm_summing_lever.RIB_PLATE_REACH (HOLE_X - 4.1), short of the
+    # hole column and still proud of the plate top there.
+    reach = lever_build.RIB_PLATE_REACH
+    end_h = lever_build.edge_rib_half_height(reach)
+    half_t = sm_summing_lever_spec.PLATE_T / 2.0
+    assert reach == pytest.approx(sm_summing_lever_spec.HOLE_X - 4.1)
+    assert end_h - half_t == pytest.approx(0.44286, abs=1e-5)
+    top = _line((0.0, 15.24, z), (reach, end_h, z))
+    flange = _line(
+        (0.0, 15.24, z - sm_summing_lever_spec.PLATE_T), (reach, end_h, z - 5.08)
+    )
+    step = _line((reach, end_h, z), (reach, half_t, z))
+    underside = _line((reach, -end_h, z), (0.0, -15.24, z))
+    plate_end = _line((reach, half_t, z), (sm_summing_lever_spec.PLATE_W, half_t, z))
+    edges = ViewEdges(label="plan", edges=(flange, underside, step, plate_end, top))
     assert drawing._end_face_edge(edges, x_mm=10.0) is top
+    assert drawing._end_face_edge(edges, x_mm=32.0) is top
     assert drawing._end_face_edge(edges, x_mm=40.0) is plate_end
-    # The plate's own end edge only shows past the rib taper: two lines there.
+    # At the rib's end face the rib edge, its step and the plate edge all meet.
     with pytest.raises(RuntimeError, match="expected one visible line"):
-        drawing._end_face_edge(edges, x_mm=32.0)
+        drawing._end_face_edge(edges, x_mm=reach)
     with pytest.raises(RuntimeError, match="expected one visible line"):
         drawing._end_face_edge(ViewEdges(label="plan", edges=(flange, underside)), x_mm=10.0)
 

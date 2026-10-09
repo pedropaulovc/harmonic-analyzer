@@ -154,11 +154,11 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
 
     In the plan the +Z end (bottom of the view) shows a single line at
     z = PLATE_L/2: the edge rib's outer top edge, which covers the plate's own
-    end edge until the rib tapers below the plate (x ~29.8, short of its
-    RIB_PLATE_REACH tip). The end rib's inboard flange edge sits 5.08 mm up
-    the sheet and the rib's underside edge (y < 0) is hidden, so exactly one
-    visible +y line at that z spans the requested x; anything else is a
-    changed model and fails loud.
+    end edge out to the rib's vertical end face at RIB_PLATE_REACH (35.75,
+    0.44 proud of the plate there); the plate's end edge shows only beyond it.
+    The end rib's inboard flange edge sits 5.08 mm up the sheet and the rib's
+    underside edge (y < 0) is hidden, so exactly one visible +y line at that z
+    spans the requested x; anything else is a changed model and fails loud.
     """
     z_mm = PLATE_L / 2.0
     matches = [
