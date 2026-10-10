@@ -77,7 +77,6 @@ from dt_pinion_bracket_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    add_note,
     place_view,
 )
 
@@ -384,11 +383,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*annotations, seat_depth], DRAWING_PRECISION_BY_NAME
     )
 
-    for index, sheet_name in enumerate(SHEET_NAMES, start=1):
+    for sheet_name in SHEET_NAMES:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate sheet {sheet_name!r} for audit")
-        if add_note(adapter, f"SHEET {index} OF {len(SHEET_NAMES)}", 0.380, 0.260) is None:
-            raise RuntimeError(f"failed to stamp sheet count on {sheet_name!r}")
         rebuild_drawing(adapter, label=f"pinion bracket {sheet_name} layout")
         check_drawing_layout(adapter, layout=SPEC.layout, stem=sheet_name)
 

@@ -33,10 +33,8 @@ from _gear_quality import (
     purchased_rack_working_side_form_model_premise,
     pinion_pitch_index_deviation_mm,
     rack_face_lead_deviation_mm,
-    feed_loaded_travel_height_deviation_mm,
     rack_face_width_max_mm,
     rack_stock_height_max_mm,
-    reducer_setup_clock_deviation_mm,
     recording_paper_left_inset_deviation_mm,
     recording_paper_width_deviation_mm,
     recording_pen_x_deviation_mm,
@@ -389,39 +387,6 @@ def feed_lateral_deviation_mm() -> float:
     window reserves this lateral offset beyond one pitch at each cut end.
     """
     return math.nextafter(math.fsum(feed_lateral_deviation_terms_mm().values()), math.inf)
-
-
-def feed_loaded_geometry_inspection_text() -> str:
-    """One traveller requirement for the source whole-travel geometry grade."""
-    return (
-        "AT THE SAME POSITIVE-LOADED TOOTH-CENTRED SETUP GEOMETRY. "
-        "ALIGN FEED TOOTH AND RACK-SPACE CENTRES; HOLD THE KNOB AND TAKE THE "
-        "FORWARD PLATEN ENDPOINT UNDER POSITIVE PAPER RESISTANCE. "
-        "INSPECT THE ENTIRE LOCATED RECORDING STROKE WITHIN THE PRINTED ENGAGED WINDOW. "
-        "CAPTURE THE LOADED RUNNING-STUD AXIS DATUM ONCE; MEASURE THE "
-        "RACK/SUPPORT ASSET RANGE AGAINST THAT FIXED DATUM, NOT A MOVING "
-        "PIVOT OR RUNNING-JOURNAL DATUM. "
-        "INCLUDE RACK/SOLDER, GUIDE/SUPPORT STRAIGHTNESS AND PLATEN ROCKING: "
-        f"RELATIVE RACK PITCH-HEIGHT RANGE {feed_loaded_travel_height_deviation_mm():.3f} MM MAX; "
-        "REJECT AN EXCESS. KEEP ARM FACES, HOOK LOWER BEARING AND PLATEN Y SUPPORT "
-        "SEATED. RETAIN ONE LOADED SETUP AND ONE PAPER ZERO; DO NOT RE-ZERO AT "
-        "EACH STATION OR LOAD."
-    )
-
-
-def reducer_setup_clock_inspection_text() -> str:
-    """One actual reducer clock setup, distinct from relative tooth indexing."""
-    return (
-        "WITH THE DISC CLUSTER LOCKED TO ITS MATCHED RUNNING-BORE DATUM, "
-        "KEEP THE ACTUAL S-K GEAR-PLANE AXES IN THE MATCHED LOADED SETUP. "
-        "ALIGN THE INTEGRAL 12T GAP BISECTOR TOWARD S AND A 120T TOOTH "
-        "BISECTOR TOWARD K, USING THEIR ACTUAL FORMED FLANKS. "
-        f"AT EACH GEAR'S OWN REFERENCE RADIUS, ABSOLUTE SETUP-CLOCK ERROR "
-        f"INCLUDING CALIBRATION UNCERTAINTY {reducer_setup_clock_deviation_mm():.3f} MM MAX; "
-        "REJECT AN EXCESS. THIS IS ONE MATCHED CLOCK DATUM, NOT TOOTH THICKNESS, "
-        "TIR OR THE RELATIVE ALL-SPACE INDEX RANGE. RETAIN IT THROUGH ALL "
-        "RUNNING PHASES AND POSITIVE LOADS; DO NOT RE-CLOCK OR RE-ZERO PER LOAD."
-    )
 
 
 def feed_rack_cut_end_section_maxima_mm() -> tuple[float, float]:

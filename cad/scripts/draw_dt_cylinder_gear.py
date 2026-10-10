@@ -30,6 +30,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_visible,
+    set_reference_dimension,
     set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
@@ -471,8 +472,9 @@ def _pattern_notch_reference(adapter: Any, annotations: list[Any]) -> Any:
 
     The kerf is sawn into a root the tooth indexing already cut, so the
     angle has nothing separate to inspect (dt_cylinder_gear_spec).  The
-    part leaves the driven dimension untoleranced; parentheses mark it
-    reference, as the cam thickness's (4.06) on this sheet.
+    part leaves the driven dimension untoleranced; it prints (90°) through
+    main's prefix/suffix reference form, as (Ø9.575) on this sheet: at
+    f68549253 ShowParenthesis read True on this angle but rendered "90°".
     """
     matches = [annotation for annotation in annotations
                if dimension_name(adapter, annotation) == "PatternNotchPhase"]
@@ -494,10 +496,7 @@ def _pattern_notch_reference(adapter: Any, annotations: list[Any]) -> Any:
         raise RuntimeError("pattern-to-CAM-notch locator is not the actual driven 90-degree angle")
     if int(dimension.GetToleranceType()) != 0:  # swTolNONE
         raise RuntimeError("pattern-to-CAM-notch reference carries a tolerance")
-    display.ShowParenthesis = True
-    if display.ShowParenthesis is not True:
-        raise RuntimeError("pattern-to-CAM-notch reference lost its parentheses")
-    return display
+    return set_reference_dimension(adapter, matches[0], label="pattern-to-CAM-notch reference")
 
 
 async def build(adapter: Any) -> dict[str, str]:

@@ -531,7 +531,7 @@ async def _revolve_profile(adapter: Any, label: str, feature: str) -> None:
 
 
 def _runout_max_limit(adapter: Any) -> None:
-    """CutterRunout as the single limit "10.50 MAX" (swTolMAX): SolidWorks
+    """CutterRunout as the single limit "10.60 MAX" (swTolMAX): SolidWorks
     prints the nominal then the limit word, so the nominal is the limit; the
     deviations stay on the native tolerance as the model's record of the
     band."""

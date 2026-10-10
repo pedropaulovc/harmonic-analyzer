@@ -72,7 +72,18 @@ def test_native_stock_source_is_the_selected_12t_48dp_master() -> None:
     assert spec.CUTTER_SKU == "10-289-488"
     assert part.STOCK_PROFILE is profile
     assert "PROFILE SHIFT" not in spec.GEAR_DATA
-    assert "RIGID TRANSLATION" in spec.GEAR_DATA
+    lower, upper = sorted(spec.SPAN_LIMITS)
+    assert spec.GEAR_DATA.splitlines()[1:] == [
+        "NUMBER OF TEETH:  12",
+        "DIAMETRAL PITCH:  48.00",
+        "PRESSURE ANGLE:  20.0 DEG",
+        f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
+        f"CIRCULAR THICKNESS AT PD (mm, REF):  {spec.TOOTH_THICKNESS:.3f}",
+        f"WHOLE DEPTH (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
+        "CUTTER:  #8, 12-13T",
+        f"SPAN OVER 2 TEETH:  {lower:.4f}-{upper:.4f}",
+        "MATES WITH:  DISC MHA-PD-006, 120T",
+    ]
 
 
 def test_span_is_actual_finite_contact_and_printed_limits_are_inverted() -> None:
@@ -91,7 +102,7 @@ def test_span_is_actual_finite_contact_and_printed_limits_are_inverted() -> None
         a, b = span_contact_points_mm(profile, 2)
         assert math.dist(a, b) == pytest.approx(actual, abs=1e-10)
     assert spec.SPAN_PREFIX == "CONTROL SPAN 2 TEETH "
-    assert "BISECTOR" in spec.SPAN_ORIENTATION and "MAXIMUM" in spec.SPAN_ORIENTATION
+    assert "BISECTOR" not in spec.DRAWING_NOTES  # method, not requirement
     # Rounded limits, not the old provisional setting band, define acceptance.
     lo, hi = spec.RADIAL_SETTING_LIMITS
     assert lo < spec.RADIAL_SETTING < hi
@@ -130,8 +141,8 @@ def test_front_core_and_actual_rear_terminal_window() -> None:
 
 
 def test_real_d_core_thread_and_six_mm_g6_source() -> None:
-    assert spec.CORE_DIA == 4.9 and spec.CORE_DIA_BAND == (0.0, -0.008)
-    assert spec.CORE_FLAT_FROM_AXIS == 2.15 and spec.CORE_FLAT_BAND == (0.0, -0.015)
+    assert spec.CORE_DIA == 4.85 and spec.CORE_DIA_BAND == (0.0, -0.008)
+    assert spec.CORE_FLAT_FROM_AXIS == 2.125 and spec.CORE_FLAT_BAND == (0.0, -0.015)
     assert spec.JOURNAL_DIA == 6.0 and spec.JOURNAL_DIA_BAND == (-0.004, -0.012)
     assert spec.THREAD == "#8-32" and spec.THREAD_CALLOUT == "#8-32 UNC"
     assert spec.RELIEF_DIA_MAX < spec.THREAD_ROOT_2A_MIN
@@ -190,7 +201,7 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert "CoreFlatProfile" in source and "FlatToAxis" in source and "FlatEnd" in source
     assert _calls(part._cut_core_flat, "_native_arc")
     assert _calls(part._create_sketch, "suppress_dimension_input")
-    assert spec.FRONT_RELIEF_DIA == 4.0
+    assert spec.FRONT_RELIEF_DIA == 3.95
     assert spec.FRONT_RELIEF_WIDTH == 0.4
     assert spec.FRONT_CORNER_RADIUS == 0.05
     assert spec.FRONT_CORNER_RADIUS_MAX == 0.1
@@ -202,9 +213,10 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert spec.FRONT_RELIEF_WIDTH_MIN - 0.170 >= 0.100 - 1e-12
     # .XXX general ±.130 on the terminal could overrun F; not equivalent.
     assert 0.110 - 0.130 < 0.0
-    # The old4.050 neck misses the adopted full-relative-axis D-plane charge.
-    assert 2.150 - 0.015 - ((4.050 + 0.130) / 2 + 0.050) < 0.0
-    assert 2.150 - 0.015 - ((spec.FRONT_RELIEF_DIA + 0.130) / 2 + 0.050) > 0.0
+    # The old 4.050 neck misses the adopted full-relative-axis D-plane charge.
+    flat_min = spec.CORE_FLAT_FROM_AXIS + min(spec.CORE_FLAT_BAND)
+    assert flat_min - ((4.050 + 0.130) / 2 + 0.050) < 0.0
+    assert flat_min - ((spec.FRONT_RELIEF_DIA + 0.130) / 2 + 0.050) > 0.0
 
 
 def test_neck_radius_is_real_equal_tangent_geometry_not_a_dummy_carrier() -> None:
@@ -325,12 +337,12 @@ def test_supported_certified_pin_inspects_all_actual_finite_corners() -> None:
 def test_indicator_grade_has_one_live_source_and_span_does_not_certify_eccentricity() -> None:
     from _gear_quality import toothspace_runout_tir_mm
 
-    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.005
-    assert spec.TOOTH_SPACE_CALLOUT.splitlines()[0] == "TOOTH SPACE RADIAL INDICATOR TIR 0.005 MAX TO A"
+    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
+    assert spec.TOOTH_SPACE_CALLOUT.splitlines()[0] == "TOOTH SPACE RUNOUT 0.05 TIR TO A"
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert all(word not in spec.TOOTH_SPACE_CALLOUT for word in ("CANDIDATE", "TODO", "GATE"))
     contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)
-    eccentricity = 0.004
+    eccentricity = 0.04
     a, b = span_contact_points_mm(spec.STOCK_PROFILE, spec.SPAN_TEETH)
     tree = ast.parse(inspect.getsource(spec))
     grade_assignments = [
@@ -362,11 +374,11 @@ def test_native_inspection_callout_keeps_live_index_and_certified_pin_rows() -> 
     contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)
     assert spec.PITCH_INDEX_REFERENCE_RADIUS_MM != pytest.approx(contact.center_radius_mm)
     assert spec.TOOTH_SPACE_CALLOUT.splitlines() == [
-        f"TOOTH SPACE RADIAL INDICATOR TIR {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.3f} MAX TO A",
-        f"PITCH INDEX RANGE+2U {spec.PITCH_INDEX_DEVIATION_MM} mm MAX AT REF Ø{spec.PITCH_DIA:.3f}",
-        f"ALL SPACES + WRAP; ABS POSITION U {spec.PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM} mm MAX",
-        f"CERTIFIED PIN Ø{spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} mm; ALL {spec.TEETH} SPACES",
+        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A",
+        f"Ø{spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {spec.TEETH} SPACES",
+        f"INDEX RANGE {spec.PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     ]
+    assert "U " not in spec.TOOTH_SPACE_CALLOUT  # uncertainty is method, not printed
     tree = ast.parse(inspect.getsource(spec))
     for field, getter in (
         ("PITCH_INDEX_DEVIATION_MM", "pinion_pitch_index_deviation_mm"),
@@ -429,37 +441,24 @@ def test_wrong_inspection_pin_cannot_certify_an_unsupported_contact(pin_diameter
         toothspace_gauge_contact_mm(spec.STOCK_PROFILE, pin_diameter)
 
 
-def test_shared_callout_refuses_a_line_circle_or_off_contact_edge(monkeypatch) -> None:
+def test_shared_callout_takes_the_one_formed_edge_through_the_contact() -> None:
     import paper_drive_stock_drawing as ink
 
-    contact = (2.5, 1.5)
-
-    class Curve:
-        line = circle = False
-        shift_m = 0.0
-
-        def IsLine(self):
-            return self.line
-
-        def IsCircle(self):
-            return self.circle
-
-        def GetClosestPointOn(self, x, y, z):
-            # A planar end-face edge at z = 5.9 mm, whatever station is asked.
-            return (x + self.shift_m, y, 0.0059, 0.0, 0.0)
-
-    curve = Curve()
-    edge = SimpleNamespace(GetCurve=lambda: curve)
-    monkeypatch.setattr(ink, "_early_bound", lambda value, interface: value)
-    ink._require_formed_flank(edge, contact, 0.0)
-    for kind in ("line", "circle"):
-        setattr(curve, kind, True)
-        with pytest.raises(RuntimeError, match="not a formed flank"):
-            ink._require_formed_flank(edge, contact, 0.0)
-        setattr(curve, kind, False)
-    curve.shift_m = 0.02e-3  # a neighbouring formed edge 0.02 mm off
-    with pytest.raises(RuntimeError, match=r"passes 0\.0200 mm from the gauge contact"):
-        ink._require_formed_flank(edge, contact, 0.0)
+    contact = (2.5, 1.5, 0.0)
+    flank = ink.EdgeReading("flank", (2.5, 1.505, 0.0), False)
+    neighbour = ink.EdgeReading("next flank", (2.5, 1.52, 0.0), False)
+    root_line = ink.EdgeReading("root line", contact, True)
+    far_face = ink.EdgeReading("far face flank", (2.5, 1.5, 5.9), False)
+    assert ink.flank_at_contact([neighbour, root_line, flank, far_face], contact) is flank
+    # Run 11: the knob's hit test took a line or circle; the feed's took the
+    # far face's partial-depth flank 0.23 mm off; the rack's a neighbour.
+    with pytest.raises(RuntimeError, match=r"matched 0 of 3 drawn edges; nearest: line/circle 0\.0000"):
+        ink.flank_at_contact([root_line, neighbour, far_face], contact)
+    twin = ink.EdgeReading("twin", (2.5, 1.495, 0.0), False)
+    with pytest.raises(RuntimeError, match="matched 2 of 2"):
+        ink.flank_at_contact([flank, twin], contact)
+    with pytest.raises(RuntimeError, match="matched 0 of 0 drawn edges; nearest: none"):
+        ink.flank_at_contact([], contact)
 
 
 @pytest.mark.parametrize(
@@ -485,15 +484,21 @@ def test_flank_ends_lie_far_outside_the_contact_tolerance(spec_module: str, pin_
         assert math.dist(contact.flank_point_mm, end) > 20.0 * ink.CONTACT_TOLERANCE_MM
 
 
-def test_shared_callout_picks_the_contact_and_checks_one_edge_attachment() -> None:
+def test_shared_callout_selects_the_flank_by_entity_and_proves_the_landing() -> None:
     import paper_drive_stock_drawing as ink
 
     source = inspect.getsource(ink.add_toothspace_callout)
     assert _calls(ink.add_toothspace_callout, "toothspace_gauge_contact_mm")
+    assert _calls(ink.add_toothspace_callout, "flank_at_contact")
     assert _calls(ink.add_toothspace_callout, "model_point_in_view")
-    assert _calls(ink.add_toothspace_callout, "add_property_linked_callout")
-    assert "GetAttachedEntities3" in source and "GetAttachedEntityTypes" in source
-    assert _calls(ink.add_toothspace_callout, "_require_formed_flank")
+    (select,) = _calls(ink.add_toothspace_callout, "_select_view_entity")
+    assert _keyword(select, "entity") == "flank.edge"
+    assert "SetSelectionPoint2" in source
+    assert "GetAttachedEntityCount3" in source and "GetAttachedEntityTypes" in source
+    assert _calls(ink.add_toothspace_callout, "_assert_leader_lands")
+    # Never a sheet hit test.
+    assert "SelectByID2" not in inspect.getsource(ink)
+    assert not _calls(ink.add_toothspace_callout, "add_property_linked_callout")
 
 
 def test_single_native_solid_volume_has_no_adapter_fallback(monkeypatch) -> None:

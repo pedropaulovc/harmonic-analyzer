@@ -233,6 +233,52 @@ def test_corner_arc_station_is_the_fillet_centre_in_model_space() -> None:
     assert "station_xy" not in source and "corner_fillet_centre_mm" in source
 
 
+def test_r12_corner_arrow_lands_at_its_arc_middle() -> None:
+    """Run 20261010T072401692Z: CornerSER's fixed shelf put its arrow at
+    183.3 deg about the R12 centre, past the arc's 178 deg end, on the east
+    edge.  The text now derives from the arc's middle; the old station is
+    the positive control."""
+    px, py = drawing.PROFILE_PIVOT_XY
+    corners = {c[0]: c for c in part.PLATE_CORNERS}
+    index = [c[0] for c in part.PLATE_CORNERS].index("SE")
+    _label, vx, vz, radius = corners["SE"]
+    cx, cz = drawing.corner_fillet_centre_mm("SE")
+    centre = (px + cx * 0.0005, py - cz * 0.0005)
+
+    def sheet_angle(x, z):
+        return math.degrees(math.atan2(-(z - cz), x - cx)) % 360.0
+
+    # The arc's ends are the tangent points on the two edges into the vertex.
+    ends = []
+    for _n, nx, nz, _r in (
+        part.PLATE_CORNERS[index - 1], part.PLATE_CORNERS[(index + 1) % 4]
+    ):
+        length = math.hypot(nx - vx, nz - vz)
+        ux, uz = (nx - vx) / length, (nz - vz) / length
+        t = (cx - vx) * ux + (cz - vz) * uz
+        ends.append(sheet_angle(vx + t * ux, vz + t * uz))
+    low, high = sorted(ends)
+    assert high - low < 180.0
+
+    def arrow_angle(text_xy):
+        knee = (
+            text_xy[0] + drawing.RADIUS_KNEE_FROM_TEXT[0],
+            text_xy[1] + drawing.RADIUS_KNEE_FROM_TEXT[1],
+        )
+        return math.degrees(math.atan2(knee[1] - centre[1], knee[0] - centre[0])) % 360.0
+
+    text = drawing.PROFILE_KEEP["CornerSER"]
+    assert arrow_angle(text) == pytest.approx((low + high) / 2.0, abs=1e-6)
+    assert not low <= arrow_angle((0.040, 0.2435)) <= high
+    # R12.0 is 11.7 x 3.9 mm round its position (run 20261009T172850508Z):
+    # above the 223.4 south witness, below the 24.0 dimension line (2.6 mm
+    # under its text), and left of the 24.0 east extension line.
+    south_witness_y = py - min(c[2] for c in part.PLATE_CORNERS) * 0.0005
+    assert text[1] - 0.00195 > south_witness_y + 0.0015
+    assert text[1] + 0.00195 < drawing.PROFILE_KEEP["SouthEastX"][1] - 0.0026 - 0.0015
+    assert text[0] + 0.00585 < px + vx * 0.0005 - 0.002
+
+
 def test_disengaged_collar_margin_survives_general_bands() -> None:
     """Linear worst case at .X plate outline and .XX base holes keeps 2.0 mm (U27)."""
     general, base_axis = 0.8, 0.51
@@ -837,3 +883,102 @@ def test_lower_journal_and_larger_tip_close_air_without_changing_bands(monkeypat
     assert spec.crank_gear_platform_clearance() == pytest.approx(before - 1.0)
     monkeypatch.setattr(post, "BORE_HEIGHT", post.BORE_HEIGHT - 3.0)
     assert spec.crank_gear_platform_clearance() < 0.5
+
+
+class _PixelDrawing:
+    """A drawing window whose note extents read to the pixel of its zoom.
+
+    The failed detail-B seat: a 405x470 px view window fitted to the sheet
+    at 0.951 px/mm.  ``ViewZoomTo2`` fits a sheet box into the window,
+    ``ViewZoomtofit2`` restores the fit, and each ``GetExtent`` floors the
+    note's true box to the current pixel grid.
+    """
+
+    WINDOW_PX = (405, 470)
+    FIT_PX_PER_M = 951.0
+
+    def __init__(self) -> None:
+        self.px_per_m = self.FIT_PX_PER_M
+        self.zooms: list[tuple[float, ...]] = []
+        self.sheet = types.SimpleNamespace(SetScale=lambda *_args: True)
+
+    def GetCurrentSheet(self):  # noqa: N802
+        return self.sheet
+
+    def ViewZoomTo2(self, x0, y0, _z0, x1, y1, _z1):  # noqa: N802
+        self.zooms.append((x0, y0, x1, y1))
+        self.px_per_m = min(
+            self.WINDOW_PX[0] / (x1 - x0), self.WINDOW_PX[1] / (y1 - y0)
+        )
+
+    def ViewZoomtofit2(self):  # noqa: N802
+        self.px_per_m = self.FIT_PX_PER_M
+
+    def EditRebuild3(self):  # noqa: N802
+        return True
+
+
+class _PixelLabel:
+    """A native view label: an anchor, and a box a fixed offset from it."""
+
+    def __init__(self, window: _PixelDrawing, anchor, corner_offset, size) -> None:
+        self.window = window
+        self.anchor = list(anchor)
+        self.corner_offset = corner_offset
+        self.size = size
+        self.read_px_per_m: list[float] = []
+
+    def true_lower_left(self) -> tuple[float, float]:
+        return tuple(a + o for a, o in zip(self.anchor, self.corner_offset))
+
+    def GetExtent(self):  # noqa: N802
+        px = self.window.px_per_m
+        self.read_px_per_m.append(px)
+        x0, y0 = self.true_lower_left()
+        corners = (x0, y0, x0 + self.size[0], y0 + self.size[1])
+        x0, y0, x1, y1 = (math.floor(value * px) / px for value in corners)
+        return (x0, y0, 0.0, x1, y1, 0.0)
+
+    def GetAnnotation(self):  # noqa: N802
+        return self
+
+    def GetPosition(self):  # noqa: N802
+        return (*self.anchor, 0.0)
+
+    def SetPosition2(self, x, y, _z):  # noqa: N802
+        self.anchor = [x, y]
+        return True
+
+
+def test_detail_label_is_placed_and_read_zoomed_onto_its_box(monkeypatch) -> None:
+    """Detail B's label lands on its request on a small, fitted seat window.
+
+    At 0.951 px/mm a pixel is 1.05 mm, so the fitted readback could not
+    resolve the 0.5 mm landing check: run f08e23d0b1b6 read the box
+    0.70/-0.39 mm off after both corrections.  Zoomed onto the box, every
+    readback that moves or judges the label resolves a tenth of a
+    millimetre, and the fit is restored afterwards.
+    """
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    window = _PixelDrawing()
+    target = drawing.DETAIL_LABEL_LOWER_LEFT
+    # Measured on the green builds: the box's lower-left sits (-15.85, -16.37)
+    # mm from the label's anchor and the box is 31.45 x 16.68 mm.
+    label = _PixelLabel(
+        window,
+        anchor=(target[0] + 0.0172, target[1] + 0.0158),
+        corner_offset=(-0.01585, -0.01637),
+        size=(0.03145, 0.01668),
+    )
+    view = types.SimpleNamespace(GetNotes=lambda: (label,))
+    adapter = types.SimpleNamespace(currentModel=window)
+
+    drawing._position_view_label(adapter, view, target, label="detail B label")
+
+    assert max(abs(a - b) for a, b in zip(label.true_lower_left(), target)) < 0.0002
+    assert len(window.zooms) == 1
+    x0, y0, x1, y1 = window.zooms[0]
+    assert x0 < target[0] and y0 < target[1]
+    assert x1 > target[0] + label.size[0] and y1 > target[1] + label.size[1]
+    assert all(px >= 5000.0 for px in label.read_px_per_m[1:])
+    assert window.px_per_m == window.FIT_PX_PER_M

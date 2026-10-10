@@ -1,11 +1,12 @@
 r"""Generate the base's stamped serial-number artwork (ch26 p.70, page001_img02/03).
 
-The museum machine carries a hand-stamped "2" on the bright machined top of the
-base rim beside the nameplate. The build imports this DXF onto a plane at the
-rim top (build_fr_harmonic_base.SERIAL_*) and cuts it SERIAL_DEPTH deep, the same
-closed-region import the nameplate engraving and the measuring-stick numerals
-use. Coordinates are ABSOLUTE part mm converted into the rim-top Top-sketch
-frame (sketch x = part X, sketch y = -part Z; the Makers seat ignores
+The museum machine carries a hand-stamped "2" on the base top; since the user
+ruling of 2026-10-09 it sits in the black deck's north-west corner. The build
+imports this DXF onto a plane at the deck top (build_fr_harmonic_base.SERIAL_*)
+and cuts it SERIAL_DEPTH deep, the same closed-region import the nameplate
+engraving and the measuring-stick numerals use. Coordinates are ABSOLUTE part
+mm converted into the deck-top Top-sketch frame (sketch x = part X, sketch y =
+-part Z; the Makers seat ignores
 SetPosition), so the file is regenerated whenever a SERIAL_* constant moves::
 
     uv run python cad/scripts/gen_base_serial_dxf.py

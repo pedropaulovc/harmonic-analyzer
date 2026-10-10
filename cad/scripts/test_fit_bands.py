@@ -174,6 +174,22 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "the button-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"
     ),
+    ("vn_cylinder_bank_spring_spec", "ID_BAND"): (
+        "McMaster 9714K392's catalogue ID tolerance (plus, minus): indexed for "
+        "the tightest spring against the largest arbor"
+    ),
+    ("vn_cylinder_bank_spring_spec", "OD_BAND"): (
+        "McMaster 9714K392's catalogue OD tolerance (plus, minus): indexed for "
+        "its seat on the washer and strap faces"
+    ),
+    ("vn_rocker_bank_spring_spec", "ID_BAND"): (
+        "McMaster 9714K24's catalogue ID tolerance (plus, minus): indexed to show "
+        "it reaches under the pivot shaft (the slide-free check at fit-up)"
+    ),
+    ("vn_rocker_bank_spring_spec", "OD_BAND"): (
+        "McMaster 9714K24's catalogue OD tolerance (plus, minus): indexed for "
+        "the largest spring under the hub's O10.2"
+    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them
@@ -203,6 +219,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "air and the chain envelope's reach"
     ),
     ("ch_connecting_rod_spec", "RING_THICKNESS_BAND"): (
+        "2.200 plate at three places stated in note 2 (title-block linear_3pl), "
         "indexed by cylinder_bank_layout for the thickest ring its cam slot holds"
     ),
     ("ch_bar_pivot_pin_spec", "PIN_BLANK_LENGTH_BAND"): (
@@ -211,6 +228,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("dt_cylinder_gear_spec", "WHOLE_DEPTH_BAND"): (
         "indexed into the cylinder gear-data whole-depth limits"
+    ),
+    ("ch_connecting_rod_spec", "SHANK_THICKNESS_BAND"): (
+        "same 2.200 plate as the ring (note 2), indexed by cylinder_bank_layout "
+        "for the thickest shank its cam slot holds"
     ),
     ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"): (
         "centred (cylinder_bank_layout asserts it): indexed as the symmetric "
@@ -244,6 +265,14 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"
+    ),
+    ("vn_knife_mount_dowel_spec", "DIA_BAND"): (
+        "the pressed dowel's catalogue diameter: read by min/max for the press "
+        "interference against the knife mount's reamed blind hole"
+    ),
+    ("vn_knife_hanger_stud_spec", "LENGTH_BAND"): (
+        "the socket head screw's catalogue length tolerance: indexed into "
+        "LENGTH_MIN/LENGTH_MAX for the tap reach and bottoming stack"
     ),
     ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"): (
         "indexed for the symmetric rod-pin coordinate tolerance and position budget"

@@ -154,10 +154,11 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
 
     In the plan the +Z end (bottom of the view) shows a single line at
     z = PLATE_L/2: the edge rib's outer top edge, which covers the plate's own
-    end edge until the rib tapers below the plate near x = PLATE_W. The end
-    rib's inboard flange edge sits 5.08 mm up the sheet and the rib's underside
-    edge (y < 0) is hidden, so exactly one visible +y line at that z spans the
-    requested x; anything else is a changed model and fails loud.
+    end edge out to the rib's vertical end face at RIB_PLATE_REACH (35.75,
+    0.44 proud of the plate there); the plate's end edge shows only beyond it.
+    The end rib's inboard flange edge sits 5.08 mm up the sheet and the rib's
+    underside edge (y < 0) is hidden, so exactly one visible +y line at that z
+    spans the requested x; anything else is a changed model and fails loud.
     """
     z_mm = PLATE_L / 2.0
     matches = [
@@ -403,6 +404,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole second rim",
     )
     seed_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, -HOLE_Z_LAST)
+    # The start-Z and pitch texts ride with the hole column (tuned at the 0.8
+    # arm offset, seed centre at sheet y 0.0961), so a station move keeps them.
+    seed_y = seed_rim_right[1]
     row_x = add_edge_dimension(
         adapter,
         top,
@@ -422,16 +426,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, row_x, label="spring-hole row X")
     seed_rim_top = _top_xy(HOLE_X, -HOLE_Z_LAST + HOLE_DIA / 2.0)
-    # 8.43 spans 4.2 mm of sheet (0.0919..0.0961); text between the arrows
-    # would sit on its own line (3.35 there stood on 7.06's extension line
-    # and 152.40's), so it hangs above the span, right of the 7.06 text
-    # (0.275..0.284, up to 0.1035) and left of the 152.40 line (0.396).
+    # The start Z (12.76) spans 6.4 mm of sheet (0.0919..0.0983); text between
+    # the arrows would sit on its own line (3.35 there stood on 7.06's extension
+    # line and 152.40's), so it hangs above the span, right of the 7.06 text
+    # (0.275..0.284, up to seed_y + 0.0074) and left of the 152.40 line (0.396).
     start_z = add_edge_dimension(
         adapter,
         top,
         p0=plate_end_edge,
         p1=seed_rim_top,
-        text_xy=(0.292, 0.106),
+        text_xy=(0.292, seed_y + 0.0099),
         label="spring-hole start Z",
         orientation="vertical",
         entities=(end_edge.edge, seed_rim.edge),
@@ -452,7 +456,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=seed_rim_top,
         p1=second_rim_bottom,
-        text_xy=(0.275, 0.1015),
+        text_xy=(0.275, seed_y + 0.0054),
         label="spring-hole pitch",
         orientation="vertical",
         entities=(seed_rim.edge, second_rim.edge),

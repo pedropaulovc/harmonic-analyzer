@@ -295,9 +295,13 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # and B's letters clear land 1 by 3.7 mm.  At the old 24 mm (C on the
 # detail's centre) D's letter crowded C's arrow at 1.7 mm on swmaker00000f.
 # B's reach puts its lower letter 3.5 mm under land 2 and C's matches it; D's,
-# on the thinnest land, is shorter.  The four stand in a 2 x 2
-# grid right of the side view, under the pictorial, each over its caption,
-# the bottom row's captions above the title block (x > 0.216, y < 0.066).
+# on the thinnest land, is shorter.  The four stand in two rows right of the
+# side view, under the pictorial, each over its caption, the bottom row's
+# captions above the title block (x > 0.216, y < 0.066).  D's across-flat
+# carries the torque-corner callout, centred over D's text and
+# TORQUE_CALLOUT_REACH either side of it, so D stands between C-C's outline
+# and the right border; C stands left of A's column, its cell clear of that
+# callout and of the side view's big end.
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
@@ -319,7 +323,7 @@ D_SECTIONS = (
         SECTION_ENDS[3] - 0.8,
         CutParent.TIP_DETAIL,
         0.0210,
-        (0.337, 0.100),
+        (0.305, 0.100),
         (5, 1),
     ),
     DSection(
@@ -328,7 +332,7 @@ D_SECTIONS = (
         TIP_DETAIL_STATION_MM + 8.0,
         CutParent.TIP_DETAIL,
         0.0155,
-        (0.393, 0.100),
+        (0.3846, 0.100),
         (20, 1),
     ),
 )
@@ -337,6 +341,30 @@ D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
+# An above callout is centred on its dimension's text, set as one run: that
+# 40-character run read 110.6 mm wide in COM (Sec4AF's 0.3377..0.4483 at
+# 20261010T071427837Z) and 8.7 mm above the text position (f68549253).
+TORQUE_CALLOUT_CHAR_WIDTH = 0.1106243 / 40
+TORQUE_CALLOUT_REACH = (len(TORQUE_CORNER_CALLOUT) * TORQUE_CALLOUT_CHAR_WIDTH / 2.0, 0.0087)
+# Section C-C's native outline, (0.2597..0.3503) x (0.0682..0.1318) at
+# 20261010T071427837Z, which the layout audit holds text off.
+SECTION_C_OUTLINE_RIGHT = 0.3503
+
+
+def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
+    """Refuse an above-callout SolidWorks would keep but not print.
+
+    A line break in the above compartment is stored (``GetDisplayData`` reads
+    it back) yet nothing of the callout reaches the PDF (main's
+    draw_pd_transgear_thumbnut; this sheet's torque corners at
+    20261010T071427837Z), while one-line above callouts print.
+    """
+    broken = sorted(name for name, text in callouts.items() if "\n" in text)
+    if broken:
+        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
+    return callouts
+
+
 # A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf
 # for c8b0aad); each is hung SECTION_CAPTION_GAP under its section's ink.
 SECTION_CAPTION_SIZE = (0.046, 0.017)
@@ -774,6 +802,17 @@ def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
     Position and ModelToViewTransform lag its ink (draw_cone_swing_platform,
     leaf 20260928T075849Z-1-882b4704), so the view is placed by its outline,
     and its projection must catch up before any cut is projected through it.
+
+    The projection is read only behind UpdateViewDisplayGeometry, the view
+    barrier draw_dt_cylinder_gear takes: a rebuild leaves the regenerated view
+    pending until Windows repaints the sheet.  Rebuilds alone caught the
+    transform up within one settle on all 28 earlier leaves that read it (26
+    of them stale at the first read), but on leaf
+    20261009T165136Z-1-acbeda8d (swmaker000004) three never did: the centre
+    projected to (-0.04756, 0.236), the ink centre moved by exactly
+    TIP_DETAIL_CENTER - Position, so the transform still stood where
+    CreateDetailViewAt4 first put the view, while Position (0.24756, 0.236)
+    and the outline (centred on (0.1, 0.236)) had moved on.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -842,6 +881,7 @@ def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
             f"tip detail outline centre stayed at {landed}, requested {TIP_DETAIL_CENTER}"
         )
     for attempt in range(3):
+        _early_bound(detail, "IView").UpdateViewDisplayGeometry()
         (projected,) = model_points_in_view(
             adapter, detail, (centre,), label=f"tip detail centre, read {attempt}"
         )
@@ -854,7 +894,9 @@ def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
     else:
         raise RuntimeError(
             f"tip detail projects its centre to {projected} while its outline is "
-            f"centred on {landed}"
+            f"centred on {landed}; it now reads outline "
+            f"{tuple(float(value) for value in detail.GetOutline())}, Position "
+            f"{tuple(float(value) for value in detail.Position)}"
         )
     _telemetry.info(
         f"tip detail: parent circle centre {sheet[0]}, detail centre {projected}, "
@@ -1055,7 +1097,10 @@ def _add_d_sections(
             # The terminal flat's torque corners stay sharp in the model; the
             # break limit rides above that flat's own across-flat value.
             set_dimension_callouts(
-                adapter, [across_flat], {name: TORQUE_CORNER_CALLOUT}, location="above"
+                adapter,
+                [across_flat],
+                _printable_above_callouts({name: TORQUE_CORNER_CALLOUT}),
+                location="above",
             )
         placed.append(PlacedSection(section, view, face, across_flat, caption, centre_marks))
     return placed

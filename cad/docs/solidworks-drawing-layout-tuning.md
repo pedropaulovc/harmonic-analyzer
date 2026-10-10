@@ -148,6 +148,13 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   swmaker000008 and swmaker000005 (runs 20260928T144159300Z,
   20260928T145256004Z), while the same SetPosition printed its leader from the
   ring. Check a leader start only on the read right after `SetPosition`.
+  Zoomed, the ring centre snaps to the window's pixel rows. An anchor-to-ring
+  offset read inside the window misses the placed ring only by the choice of
+  the two rows bracketing the target, under a pixel; read with the ring some
+  50 mm above a 24 mm zoom, it was up to two rows off, and frame item 5 landed
+  1.59 and 1.89 px high (2026-10-01; run 20261010T073339590Z). Bring a ring
+  inside the zoomed window (place it at fit first) before reading the
+  anchor-to-ring offset zoomed.
 
 ## Refusal catalogue — do / don't
 
@@ -298,7 +305,10 @@ loosen the placement guard until the build passes. `SetPosition2` returns True
 and the tag stays at its default drop on the far side of the bore — crank_pinion
 datum A read 60.3 mm from its request and printed on top of the Ø dimension
 leader; the 80 mm `position_tolerance_m` that let it through was added in the
-same commit as the `entity=` pick (73a3ceb1).
+same commit as the `entity=` pick (73a3ceb1). fr_top_frame datum B, attached to
+its scanned dowel-hole circle by `edge_entity=`, read 37.6 mm from its request
+(farm run 20261009T164113078Z); `test_fr_top_frame_drawing` now refuses any
+`add_datum_feature` edge-object attachment to a `circle_at` circle.
 Do: pick the edge by SHEET POINT (`edge_xy=bore_top`, as cone_gear and the
 transgear recipes do); the same tag then reads 8.0 mm from its request and
 prints there. Keep the guard at its 20 mm default and tighten it only where the
@@ -378,6 +388,57 @@ why. Every datum and dimension of summing-lever's pattern definition (A, B,
 acceptable where no second line runs inside the hit radius of the pick, and
 `draw_ch_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
 `IsSame` readback against the named bore.
+
+**l. A datum named by a frame's datum identifier.**
+Don't: name a pattern datum with `IGtol::SetDatumIdentifier` and take
+`GetDatumIdentifier` as proof. On the knife mount (farm run
+20261009T171439353Z) it read "B" back before and after the rebuild and the
+sheet printed no B, while the tap and bore frames referenced A|B. The API
+help (`types/IGtol/SetDatumIdentifier.md`) says only that it "sets the name
+of the datum being defined"; the frame XML schema has no node for it.
+Do: insert a real datum tag on the selected frame
+(`_drawing_common.add_frame_datum_feature`) and require the tag's attachment
+to be that frame by annotation name. Select the frame with
+`IAnnotation::Select2(False, 0)`: on farm run 20261009T182549169Z it
+attached the knife mount's datum B to DetailItem354 (one entity, type 13),
+where `IAnnotation::Select3(False, <view ISelectData>)` had returned False
+(run 20261009T174542021Z). A tag on a frame is not placed in sheet
+coordinates: on runs 20261009T182549169Z and 20261009T185542819Z,
+`SetPosition2(0.1613, 0.2)` read back as (0.0, 0.2) and the letter printed
+at (0.160, 0.413), 0.2 m above the frame's bottom edge and held to its
+mid-width. Set y as the offset from the frame's bottom edge, then correct by
+the printed letter's miss (display-data text position) in the space
+`GetPosition` reports, and prove the final print. On runs
+20261009T200747541Z and 20261009T204136744Z the first set printed 7.0 mm
+low and one correction landed the letter 0.40 mm off; the sheet passed with
+B under the ⌖Ø0.13|A frame. Read a composite frame's lower tier for its
+datums only (`gtol_frame_datums`): it reads back with an empty
+`<ToleranceSymbol>`. Also end the sheet with `assert_frame_datums_defined`,
+which fails when any frame names a datum that no `IView::GetDatumTags`
+label prints.
+
+**m. A translation modifier proved by its XML alone.**
+Don't: take `<Translation>true</Translation>` read back from
+`IGtolFrame::GetSymbolXml` as proof that a frame prints "B▷". On the top
+frame's slot frames (farm run 20261009T174542021Z) that flag printed
+"B", "<MOD-TRANS2>", "[0,0,0]": SOLIDWORKS also prints the Datum dialog's
+translation vector (`<TranslationValueI/J/K>`) at its zero default, 13.6 mm
+of text that ASME Y14.5-2018 does not write.
+Do: write the modifier as its symbol code after the letter,
+`<DatumLetter>C&lt;MOD-TRANS2&gt;</DatumLetter>`, with no flag
+(`_gtol_spec.TRANSLATION_GLYPH`). On farm run 20261009T204136744Z both slot
+frames printed "<GTOL-POSI> | 0.05 | C | B | <MOD-TRANS2>", the triangle in
+the datum's compartment and no vector. Every flag form tried printed a
+vector (run 20261009T182549169Z): empty i, j, k printed "[0,0,0]", "false"
+values printed "[false,false,false]", and SOLIDWORKS rewrote the flag after
+the letter to the empty-vector XML. `add_feature_control_frame` still reads
+the printed text items (`IAnnotation::GetDisplayData`) and fails on any
+bracket or a missing or misplaced glyph
+(`_gtol_spec.translation_print_problem`), logging `gtol.translation_print`.
+`GetSymbolXml` reads the symbol code back unescaped,
+`<DatumLetter>C<MOD-TRANS2></DatumLetter>`, which is not well-formed XML
+(run 20261009T200747541Z); the frame-XML parser escapes `<MOD-…>`/`<GTOL-…>`
+codes before parsing.
 
 ## The sheet-split rule
 

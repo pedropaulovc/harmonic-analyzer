@@ -86,6 +86,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
@@ -94,6 +95,7 @@ from ch_rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from ch_rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_rocker_arm_spec import (
     ARM_THICKNESS as SPEC_ARM_THICKNESS,
+    ARM_THICKNESS_BAND,
     HUB_DIA,
     HUB_LENGTH,
     HUB_LENGTH_BAND,
@@ -400,6 +402,11 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Strap")
+    # The strap thickness prints natively at three places (ARM_THICKNESS_BAND,
+    # Main ruling 2026-10 option b): each inter-arm gap holds one tine of each
+    # neighbouring rod fork. Named so the drawing selects it by name.
+    strap_thickness_dim = name_dimensions(adapter, "Strap", ["StrapThickness"])
+    drive_jobs.append((strap_thickness_dim[0], '"ArmThickness"'))
     v_strap = _strap_area() * ARM_THICKNESS
     await volume_check(adapter, "strap", v_strap, 0.01 * v_strap)
 
@@ -567,6 +574,12 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
     # and stamp the make-critical title-block properties.
+    # The strap is centred (mid-plane extrude) and its band symmetric, so it
+    # prints +/- at three places.
+    strap_lower, strap_upper = deviations(ARM_THICKNESS_BAND)
+    if strap_lower != -strap_upper:
+        raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS_BAND must be symmetric")
+    set_dimension_symmetric_tolerance(adapter, "Strap", "StrapThickness", strap_upper)
     # The hub length only comes out long (#743 PR2): three places hold it.
     set_dimension_bilateral_tolerance(
         adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND)

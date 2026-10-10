@@ -298,13 +298,46 @@ _CHANNEL_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
     blind_cut_dia_mm(sm_summing_lever_spec.HOLE_SPEC),
     sm_summing_lever_spec.PLATE_T,
 )
+# MHA-VN-024 #6-32 (91251A157) in each knife mount's #36 tap drill over its
+# nominal reach, 8.10: the 30.0 crossbar grip under the 38.1 screw
+# (build_sm_summing_assembly.HANGER_REACH; a literal, test-pinned, so a
+# knife-mount or top-frame edit does not re-key every assembly).
+_KNIFE_HANGER_REACH = 8.10
+# Each MHA-VN-051 dowel pressed to the floor of its knife mount's Ø3.175 ream
+# (sm_knife_mount_spec.PIN_HOLE_DIA, band +0/-0.010: smallest 3.165), its
+# largest catalogue diameter 3.18262 over its 9.5 press depth
+# (vn_knife_mount_dowel_spec.DIA_MAX, PRESS_DEPTH).  All three are literals,
+# test-pinned to their owners like _KNIFE_HANGER_REACH, so a knife-mount or
+# dowel edit does not re-key every assembly.  The models are line to line, so
+# this bounds the press at its print-worst: the largest catalogue pin in the
+# smallest ream, the whole depth.
+# Two per mount, inserted front mount first (build_sm_summing_assembly):
+# dowels 1-2 in sm-knife-mount-1, 3-4 in sm-knife-mount-2.
+_KNIFE_DOWEL_HOLE_MIN = 3.165
+_KNIFE_DOWEL_DIA_MAX = 3.18262
+_KNIFE_DOWEL_PRESS_DEPTH = 9.5
+_KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
+    _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_PRESS_DEPTH
+)
 _SUMMING_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "vn-knife-hanger-stud",
         range(1, 3),
         "sm-knife-mount",
-        _smooth_annulus_limit_mm3(12.7, 10.716, 11.3735),
+        _smooth_annulus_limit_mm3(
+            THREAD_MAJOR_MM["#6-32"], TAP_DRILL_MM["#6-32"], _KNIFE_HANGER_REACH
+        ),
         second_number=None,
+    ),
+    **_numbered_pairs(
+        "vn-knife-mount-dowel", range(1, 3), "sm-knife-mount", _KNIFE_DOWEL_PRESS_LIMIT
+    ),
+    **_numbered_pairs(
+        "vn-knife-mount-dowel",
+        range(3, 5),
+        "sm-knife-mount",
+        _KNIFE_DOWEL_PRESS_LIMIT,
+        second_number=2,
     ),
     frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _COUNTER_ANCHOR_THREAD_LIMIT,
 }
@@ -627,13 +660,28 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
 # Literals, like the rows above, so every assembly does not re-key on the pin
 # spec; test_ch_bar_pivot_fit pins them to it.
 BAR_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.35 - 3.20)
-_CHANNEL_ALLOWED_PAIRS = _numbered_pairs(
-    "ch-bar-pivot-pin",
-    range(1, 21),
-    "ch-amplitude-bar",
-    _smooth_annulus_limit_mm3(*BAR_PIVOT_PIN_PRESS),
-    second_number=None,
-)
+# The MHA-CH-010 rod pivot pins (ch_rod_pivot_pin_spec), the same drill rod
+# pressed into each MHA-CH-003 rod's Ø1.968 fork ream through both tines:
+# 6.075 fork less the 2.625 slot (user ruling 2026-10-09, PR #1292 review F1).
+# Channel j's pin and rod are both its (j + 1)th instance, as the bar pin's
+# are; test_ch_rod_pivot_fit pins the literals to the pin spec.
+ROD_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.075 - 2.625)
+_CHANNEL_ALLOWED_PAIRS = {
+    **_numbered_pairs(
+        "ch-bar-pivot-pin",
+        range(1, 21),
+        "ch-amplitude-bar",
+        _smooth_annulus_limit_mm3(*BAR_PIVOT_PIN_PRESS),
+        second_number=None,
+    ),
+    **_numbered_pairs(
+        "ch-rod-pivot-pin",
+        range(1, 21),
+        "ch-connecting-rod",
+        _smooth_annulus_limit_mm3(*ROD_PIVOT_PIN_PRESS),
+        second_number=None,
+    ),
+}
 
 _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {
     "ch-channel": _CHANNEL_ALLOWED_PAIRS,

@@ -284,7 +284,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "FloorDepth": SPOT_FACE_FLOOR_PLACES,
     },
     # The reducer offsets print at the stations' .XXX: each BASIC rounds by
-    # <= 0.0005, so the 35.080 centre distance they compose moves <= 0.0007
+    # <= 0.0005, so the 35.101 centre distance they compose moves <= 0.0007
     # (backlash 2 tan 20 x 0.0007 = 0.0005), under 2 % of the feed stud's
     # Ø0.050 position zone.  Six places asked for nothing the mesh needs.
     "StationReference": {

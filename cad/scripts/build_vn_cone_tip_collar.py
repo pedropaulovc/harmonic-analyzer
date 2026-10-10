@@ -16,7 +16,8 @@ import vn_cone_tip_collar_spec as spec
 from _common import (
     SketchDims, _early_bound, _feature_by_name, active_configuration_name,
     assert_saved_configurations_regenerate,
-    add_line_chain, apply_material, check, define_circle, define_rectilinear_chain, dimension_between,
+    add_line_chain, anchor_point_to_origin, apply_material, check, define_circle,
+    define_rectilinear_chain, dimension_between,
     drive_dimension, ensure_fully_defined, force_rebuild, name_bore_axis,
     name_dimensions, name_last_feature, report_mass_properties, run_build,
     save_part_and_images, set_global, set_sketch_direct_db, volume_check,
@@ -38,7 +39,7 @@ PART_NAME = "vn-cone-tip-collar"
 MATERIAL = "Plain Carbon Steel"
 CONFIGURATIONS = ("Default", "Collar", "SetScrew")
 COLLAR_FEATURES = (
-    "Ring", "BodyPlane", "Body", "ShoulderRoot",
+    "Ring", "Body", "ShoulderRoot",
     "MountFlat", "SetScrewTap",
     "TapRootPlane", "TapRootGauge",
 )
@@ -53,7 +54,7 @@ def _plane(adapter, name, offset, *, base="Top Plane"):
 
 
 async def _ring(adapter, jobs):
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     dims = SketchDims()
     check("ring sketch", await adapter.create_sketch("Top"))
@@ -71,27 +72,40 @@ async def _ring(adapter, jobs):
     jobs.append((name_dimensions(adapter, "Ring", ["CollarWidth"])[0], '"CollarWidth"'))
     nose_area = math.pi / 4.0 * (spec.NOSE_DIA**2 - spec.BORE_MODEL_DIA_MM**2)
     await volume_check(adapter, "nose annulus", nose_area * spec.WIDTH, 0.005 * nose_area * spec.WIDTH)
-    _plane(adapter, "BodyPlane", spec.NOSE_LENGTH)
-    jobs.append((name_dimensions(adapter, "BodyPlane", ["NoseLength"])[0], '"NoseLength"'))
-    check("large body sketch", await adapter.create_sketch("BodyPlane"))
+    # The body step is a turned profile, as main's turned parts are: its
+    # NoseLength is a sketch dimension the drawing imports (a reference
+    # plane's offset is not importable, drawing:vn_cone_tip_collar at
+    # 437cb0842). The axis centreline is fixed as in build_vn_post_mount_screw;
+    # the step's inner edge lies on the ring's OD and is driven by it.
+    nose_r, outer_r = spec.NOSE_DIA / 2.0, spec.OUTER_DIA / 2.0
+    points = [(nose_r, spec.NOSE_LENGTH), (outer_r, spec.NOSE_LENGTH),
+              (outer_r, spec.WIDTH), (nose_r, spec.WIDTH)]
+    check("large body sketch", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    axis = check("collar axis", await adapter.add_centerline(0.0, 0.0, 0.0, spec.WIDTH))
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    check("fix collar axis", await adapter.add_sketch_constraint(axis, None, "fix"))
+    for index, line in enumerate(lines):
+        direction = "horizontal" if index % 2 == 0 else "vertical"
+        check("body profile direction", await adapter.add_sketch_constraint(line, None, direction))
     dims = SketchDims()
-    for name, dia, expression in (
-        ("CollarDia", spec.OUTER_DIA, '"CollarDia"'),
-        ("BodyBoreDia", spec.BORE_MODEL_DIA_MM, '"BoreDia"'),
-    ):
-        await define_circle(
-            adapter, 0.0, 0.0, dia / 2.0, name, dims=dims,
-            names=(None, None, name), drives=(None, None, expression),
-        )
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[1], (outer_r / 2.0, spec.WIDTH + 2.0), "CollarDia",
+    )
+    dims.record("CollarDia", '"CollarDia"')
+    await anchor_point_to_origin(adapter, f"{lines[0]}.start", nose_r, spec.NOSE_LENGTH, "shoulder root corner")
+    dims.record("BodyInnerRadius", '"NoseDia" / 2')
+    dims.record("NoseLength", '"NoseLength"')
+    await dimension_between(adapter, f"{lines[1]}.start", f"{lines[1]}.end",
+                            "vertical_distance", spec.WIDTH - spec.NOSE_LENGTH, "body width")
+    dims.record("BodyWidth", '"CollarWidth" - "NoseLength"')
     await ensure_fully_defined(adapter, "large collar body")
     check("exit body", await adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     jobs.extend(dims.apply(adapter, "BodyProfile"))
-    check("merge large body", await adapter.create_extrusion(ExtrusionParameters(
-        depth=spec.WIDTH - spec.NOSE_LENGTH,
-    )))
+    check("merge large body", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Body")
-    jobs.append((name_dimensions(adapter, "Body", ["BodyWidth"])[0], '"CollarWidth" - "NoseLength"'))
     expected = nose_area * spec.WIDTH + math.pi / 4.0 * (
         spec.OUTER_DIA**2 - spec.NOSE_DIA**2
     ) * (spec.WIDTH - spec.NOSE_LENGTH)
@@ -162,17 +176,19 @@ async def _screw(adapter, jobs):
               (x + spec.DOG_LENGTH, y + screw_r), (end, y + screw_r), (end, y)]
     check("ground screw profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    axis = check("screw axis", await adapter.add_centerline(0.0, y, end + 1.0, y))
+    # Main's revolved-pin pattern (build_ch_bar_pivot_pin): the axis runs
+    # exactly the closing edge's endpoints, so they merge and the axis needs
+    # no relation of its own; every profile line is horizontal or vertical,
+    # one corner is anchored to the origin, and the rest are dimensions. The
+    # farm run at f68549253 left the former fixed-line scheme (stock lines and
+    # a longer, unmerged axis fixed) under-defined.
+    axis = check("screw axis", await adapter.add_centerline(x, y, end, y))
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     dims = SketchDims()
-    # The stock envelope is fixed; only the ground dog's actual dimensions
-    # are driving manufacturing dimensions. Fix the stock/profile endpoints,
-    # not the dog itself, then dimension its length and doubled radius.
-    for line in (lines[4], lines[5], axis):
-        check("fix retained stock profile", await adapter.add_sketch_constraint(line, None, "fix"))
-    for index, direction in ((0, "vertical"), (1, "horizontal"), (2, "vertical"), (3, "horizontal")):
-        check("ground profile direction", await adapter.add_sketch_constraint(lines[index], None, direction))
+    for index, line in enumerate(lines):
+        direction = "vertical" if index % 2 == 0 else "horizontal"
+        check("screw profile direction", await adapter.add_sketch_constraint(line, None, direction))
     await dimension_between(adapter, f"{lines[1]}.start", f"{lines[1]}.end",
                             "horizontal_distance", spec.DOG_LENGTH, "ground dog length")
     dims.record("DogLength", '"DogLength"')
@@ -181,6 +197,17 @@ async def _screw(adapter, jobs):
     if abs(float(dim.SystemValue) * 1000.0 - spec.DOG_DIA) > 1e-6:
         raise RuntimeError("ground dog native diameter differs from the contract")
     dims.record("DogDia", '"DogDia"')
+    # The stock screw's own length and major diameter, then its end corner.
+    await dimension_between(adapter, f"{lines[5]}.start", f"{lines[5]}.end",
+                            "horizontal_distance", spec.SET_SCREW_LENGTH, "stock screw length")
+    dims.record("ScrewLength")
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[3], (end - 1.0, y + screw_r + 2.0), "stock screw major diameter"
+    )
+    dims.record("ScrewMajorDia")
+    await anchor_point_to_origin(adapter, f"{lines[5]}.start", end, y, "stock screw end corner")
+    dims.record("ScrewEndStation")
+    dims.record("ScrewAxisStation")
     await ensure_fully_defined(adapter, "ground screw profile")
     check("exit screw profile", await adapter.exit_sketch())
     name_last_feature(adapter, "SetScrewProfile")
@@ -326,24 +353,12 @@ async def build(adapter) -> dict[str, str]:
         expected = 2 if configuration == "Default" else 1
         if len(bodies) != expected:
             raise RuntimeError(f"{configuration} has {len(bodies)} solids, expected {expected}")
-        for body in bodies:
-            native = _early_bound(body, "IBody2")
-            bounds = tuple(float(value) for value in native.GetBodyBox())
-            if len(bounds) != 6 or not all(math.isfinite(value) for value in bounds):
-                raise RuntimeError(f"{configuration}: actual body bounds are unavailable/non-finite")
-            is_screw = bounds[1] > 0.001
-            material = "AISI 304" if is_screw else MATERIAL
-            if native.SetMaterialProperty(configuration, "", material) != 1:
-                raise RuntimeError(f"{configuration}: cannot assign {material} to its body")
-            observed, _database = native.GetMaterialPropertyName(configuration)
-            if str(observed) != material:
-                raise RuntimeError(f"{configuration}: body material {observed!r} != {material}")
     _activate_configuration(adapter, "Default")
     author_part_pmi(adapter, datums=spec.PART_DATUMS, controls=spec.GEOMETRIC_CONTROLS)
     blank_sketch_feature(model, _feature_by_name(adapter, "TapRootGauge"), "tap root limit gauge")
     blank_reference_geometry(adapter, (
         ("ScrewAxis", "AXIS"), ("InstalledShaftAxis", "AXIS"), ("SocketFace", "PLANE"),
-        ("TapRootPlane", "PLANE"), ("BodyPlane", "PLANE"),
+        ("TapRootPlane", "PLANE"),
     ))
     await report_mass_properties(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)

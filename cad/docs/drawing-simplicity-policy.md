@@ -76,8 +76,20 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    the requirement AND the machine's error model rewards it
    (assessment §2: the summing knife edge, the cams, channel-to-channel
    consistency). The allowlist:
-   - **knife-edge system** — knife-mount bore; summing-lever knife seat and its
-     20-hole spring pattern (one pattern position frame);
+   - **knife-edge system** — knife-mount 2X dowel-hole pattern (one position
+     frame under its 2X Ø, Ø0.13 to the top seat, datum A, at the BASIC
+     12.700 span, the datum feature symbol B on that frame — the zone
+     the .XXX span gave, so the screw-float and slot stacks are unchanged),
+     bore (⌖Ø0.20 to A|B with ⊥Ø0.05 to B stacked under it: the one Ø
+     zone bounds both the yaw off the dowel line and the tilt) and its #6-32 hanger tap (Ø0.10 to
+     A|B, so the crossbar's Ø4.318 clearance hole still floats round the screw
+     — `build_sm_summing_assembly._assert_knife_hanger_stack`); the top
+     frame's two knife-hanger dowel slots (⌖0.05 to the round dowel hole at
+     their own station, BASIC 12.700 from it, datum B front / C rear, with
+     the other station's round hole translated, B|C▷ and C|B▷, so the two
+     knife mounts' dowel
+     lines stay square to the knife-edge line); summing-lever knife seat and
+     its 20-hole spring pattern (one pattern position frame);
    - **cams** — pinion-cam eccentric-axis position (and any future cam);
    - **channel consistency** — at most one control per channel part
      (rocker arm, channel lever, amplitude bar, connecting rod) where a
@@ -108,11 +120,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      the user's gear-tooth and bore-to-shaft critical classes, not a general
      permission to add frames to shafts.
      The tooth-pattern indicator requirement is a feature-local,
-     model-property-linked callout, for example `TOOTH SPACE RADIAL
-     INDICATOR TIR 0.005 MAX TO A`, using the configured critical grade.
+     model-property-linked callout, for example `TOOTH SPACE RUNOUT 0.05
+     TIR TO A`, using the configured critical grade.
      Attach it to a real finite tooth flank, name the actual running datum,
-     and keep calibrated-pin/all-spaces metadata in Gear Data. It is not
-     a circular-runout frame on the blank OD and not a multi-line
+     and keep the pin size and all-spaces line in the same callout. It is
+     not a circular-runout frame on the blank OD and not a multi-line
      inspection procedure in Manufacturing Notes. On the disc sheet,
      distinguish the assembled feed-bore datum from the disc's own pilot.
    - **paper reducer location** — the transgear arm and arm plate's locating
@@ -125,14 +137,13 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      the configured controls needed at the actual projected gear and chain
      planes. Name those planes and reachable datum features; neither screw
      clearance nor assumed countersink centring is a location control.
-   - **purchased paper rack acceptance** — the MHA-PD-005 rack may carry
-     incoming over-pins span limits for local pitch and cumulative index,
-     and an assembly face/axis-skew check, derived from the remaining
-     paper-feed error and backlash budgets. These are incoming acceptance
-     requirements, not a claim about the commercial supplier's accuracy;
-     reject racks that fail. Keep numerical limits in the shared functional
-     source and inspection details in the assembly procedure, not a generic
-     multi-line Manufacturing Notes block.
+   - **purchased paper rack acceptance** — the MHA-PD-005 rack sheet carries
+     only its two incoming stock sizes (stock height and face width MAX)
+     and the purchased-rack line. Its pitch accuracy is the catalogue
+     part's; the assembly checks the running mesh over the whole engaged
+     window (no tight spot, shake at every tooth). Keep numerical limits in
+     the shared functional source, not a generic multi-line Manufacturing
+     Notes block.
 
    Everything else — frames, bases, crank parts, handles, knobs, brackets,
    blocks, pedestals, shafts, bushings, gears, screws — carries **no frames

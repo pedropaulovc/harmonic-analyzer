@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the knife hanger washer."""
+"""Create the purchased reference drawing for the rocker bank spring (MHA-VN-053, McMaster 9714K24)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
-SPEC = DRAWINGS_BY_NAME["vn_knife_hanger_washer"]
+SPEC = DRAWINGS_BY_NAME["vn_rocker_bank_spring"]
 
 
 async def build(adapter: Any) -> dict[str, str]:

@@ -1,12 +1,12 @@
 r"""Pure-data dimensional contract shared by the rocker pivot shaft (MHA-CH-005)
 and its drawing.
 
-#743 PR2, Reading 1 (user, Q4): the shaft is held by the brackets, with no
-keeper. It is turned from O10 bar and leaves an integral O10 x 1.5 SHOULDER
+#948 ruling R (PR #1292): the shaft is held by the brackets and preloaded north
+by the MHA-VN-053 spring. It is turned from O10 bar and leaves an integral O10 x 1.5 SHOULDER
 one ear thickness from its north end. The shoulder's north face bears on the
 north ear's inner face, so the shaft cannot move north, and rocker 19's hub
-bears on its south face. Southward the whole stack closes on the MHA-CH-009
-washer at the south ear. The north journal runs through the north ear, the
+bears on its south face. At the south ear the spring pushes the stack north
+through the MHA-CH-009 washer. The north journal runs through the north ear, the
 body carries the 20 rocker hubs and journals in the south ear, and both ends
 are domed DOME_HEIGHT proud of their ears, like the cylinder arbor's ends.
 

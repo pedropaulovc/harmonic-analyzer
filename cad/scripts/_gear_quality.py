@@ -201,15 +201,6 @@ def require_pitch_index_measurements_mm(
     return deviation
 
 
-def feed_loaded_travel_height_deviation_mm() -> float:
-    """Static rack/support asset range about ONE captured loaded axis datum.
-
-    Pivot and running-journal movement after that capture are paid separately,
-    not measured into this range and then added a second time.
-    """
-    return _positive_limit_mm("feed_loaded_travel_height_deviation_mm")
-
-
 def rack_face_width_max_mm() -> float:
     """Incoming measured maximum rack face width, not a catalog stock tolerance."""
     return _positive_limit_mm("rack_face_width_max_mm")

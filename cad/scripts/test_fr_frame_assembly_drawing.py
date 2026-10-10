@@ -254,8 +254,9 @@ class _Window:
     leaving its leader start at the fit ring: move its SetPosition anchor
     (``"position"``) or only its ring (``"ring"``) 1 mm, grow the ring 1 mm
     (``"radius"``), or move the arrowtip 1 mm (``"tip"``). ``fault``: raise
-    from ViewZoomTo2 (``"zoom"``) or SetPosition (``"position"``), or place
-    the leader starting 1 mm inside the ring (``"leader"``).
+    from ViewZoomTo2 (``"zoom"``) or the zoomed SetPosition (``"position"``),
+    or place the leader starting 1 mm inside the ring (``"leader"``).
+    ``centre``: the sheet point the window is zoomed onto.
     """
 
     def __init__(
@@ -272,6 +273,7 @@ class _Window:
         self.rebuild = rebuild
         self.balloon: _ShortBalloon | None = None
         self.span: float | None = None  # None: fit to the sheet
+        self.centre: tuple[float, float] | None = None
         self.log: list[tuple[str, float | None]] = []
 
     def pixel(self) -> float:
@@ -280,14 +282,15 @@ class _Window:
     def ring_r(self) -> float:
         return (_RING_R_FIT if self.span is None else _RING_R) + self.balloon.ring_grow
 
-    def ViewZoomTo2(self, x1, y1, _z1, x2, _y2, _z2):  # noqa: N802
+    def ViewZoomTo2(self, x1, y1, _z1, x2, y2, _z2):  # noqa: N802
         self.span = x2 - x1
+        self.centre = ((x1 + x2) / 2, (y1 + y2) / 2)
         self.log.append(("zoom", self.span))
         if self.fault == "zoom":
             raise RuntimeError("ViewZoomTo2 moved the view, then failed")
 
     def ViewZoomtofit2(self):  # noqa: N802
-        self.span = None
+        self.span = self.centre = None
         self.log.append(("fit", None))
 
     def GraphicsRedraw2(self):  # noqa: N802
@@ -337,9 +340,17 @@ def _short_balloon_rig(monkeypatch, window: _Window):
     def position(_adapter, notes, *, item_number, position_xy, label):
         assert notes == [balloon] and item_number == "5"
         placed_at.append((tuple(position_xy), window.span))
-        if window.fault == "position":
+        if window.fault == "position" and window.span is not None:
             raise RuntimeError("SetPosition failed")
+        outside = window.span is not None and any(
+            abs(ring - centre) > window.span / 2
+            for ring, centre in zip(balloon.centre, window.centre)
+        )
         balloon.position = balloon.centre = tuple(position_xy)
+        if outside:
+            # Run 20261010T073339590Z: item 5's ring, read 52 mm above the
+            # zoomed window before SetPosition, landed 1.89 zoomed pixels high.
+            balloon.centre = (position_xy[0], position_xy[1] + 1.89 * window.pixel())
         balloon.leader_r = _RING_R - (0.001 if window.fault == "leader" else 0.0)
 
     def readback(_adapter, annotation, entity, item):
@@ -389,8 +400,9 @@ def test_short_balloon_places_and_rechecks_zoomed_around_the_fit_rebuild(
     window = _Window(window_px, fit_drift_px=2.0)
     run, placed_at, events = _short_balloon_rig(monkeypatch, window)
     run()
-    [(position_xy, span)] = placed_at
+    [(fit_xy, fit_span), (position_xy, span)] = placed_at
     zoomed = 2 * drawing._SHORT_BALLOON_ZOOM_HALF
+    assert fit_span is None and fit_xy == pytest.approx(_TARGET)
     assert span == pytest.approx(zoomed)
     assert position_xy == pytest.approx(_TARGET)
     assert window.log[-6:] == [
@@ -401,6 +413,26 @@ def test_short_balloon_places_and_rechecks_zoomed_around_the_fit_rebuild(
     assert final["failed_checks"] == []
     assert final["fit"]["viewport_pixel_bounds_m"][0] == _FIT_PIXEL_M[window_px]
     assert final["after"]["rendered_circle"][:2] == pytest.approx(_TARGET)
+
+
+@pytest.mark.parametrize("window_px", [640, 820])
+def test_short_balloon_starting_above_the_zoomed_window_is_placed_at_fit_first(
+    monkeypatch, window_px
+) -> None:
+    """Item 5 starts 52 mm above its target, outside the 24 mm zoomed window,
+    where its ring reads a pixel lower against its anchor than inside it; a
+    zoomed placement from there landed 1.89 zoomed pixels high (run
+    20261010T073339590Z). Placed at fit first, the zoomed placement starts
+    inside the window and its ring lands on target."""
+    window = _Window(window_px, fit_drift_px=0.0)
+    run, placed_at, events = _short_balloon_rig(monkeypatch, window)
+    window.balloon.position = window.balloon.centre = (_TARGET[0] - 0.004, _TARGET[1] + 0.052)
+    run()
+    zoomed = 2 * drawing._SHORT_BALLOON_ZOOM_HALF
+    assert [span for _xy, span in placed_at] == [None, pytest.approx(zoomed)]
+    final = events["drawing.frame_short_balloon"]
+    assert final["failed_checks"] == []
+    assert final["placed"]["rendered_circle"][:2] == pytest.approx(_TARGET)
 
 
 @pytest.mark.parametrize("window_px", [640, 820])
@@ -511,4 +543,6 @@ def test_short_balloon_restores_fit_when_zooming_or_positioning_fails(
     with pytest.raises(RuntimeError, match=message):
         run()
     assert window.span is None and window.log[-1] == ("fit", None)
-    assert len(placed_at) == (fault == "position")
+    zoomed = 2 * drawing._SHORT_BALLOON_ZOOM_HALF
+    expected = [None, pytest.approx(zoomed)] if fault == "position" else [None]
+    assert [span for _xy, span in placed_at] == expected

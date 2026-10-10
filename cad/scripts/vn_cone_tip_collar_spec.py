@@ -30,7 +30,6 @@ from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM
 from _printed_tolerance import printed_band_mm
 from cone_shaft_land_bands import (
-    FLAT_AF_BAND,
     RUNNING_DIA_BAND,
     TERMINAL_DIA_MM,
     TERMINAL_DIA_PLACES,
@@ -48,7 +47,6 @@ from cone_shaft_land_bands import (
     TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD,
     TIP_COLLAR_BACK_ARC_REACTION_ANGLE_RAD,
     TIP_COLLAR_MIN_CONTACT_SPAN_MM,
-    TIP_COLLAR_MIN_REACTION_ARM_MM,
     TIP_SCREW_TO_JOURNAL_MAX_AXIS_ANGLE_RAD,
     TIP_SCREW_DOG_AXIAL_PROJECTION_MM,
     TIP_SCREW_DOG_AXIS_OFFSET_MM,
@@ -120,9 +118,10 @@ DOG_DIA_BAND = TIP_SCREW_DOG_DIA_BAND
 DOG_LENGTH = TIP_SCREW_DOG_LENGTH_MM
 # The title block's R0.25 exceeds the Ø0.20 dog's radius and would remove its
 # ground face; 0.02 keeps Ø0.15 of face at the dog's least Ø0.19. Printed
-# above the dog Ø; the model's dog edge stays sharp.
+# above the dog Ø, on one line (SolidWorks prints no above-callout line
+# break); the model's dog edge stays sharp.
 DOG_EDGE_BREAK = 0.02
-DOG_EDGE_CALLOUT = f"DOG EDGE:\nSTONE BURR ONLY, {DOG_EDGE_BREAK:.2f} MAX"
+DOG_EDGE_CALLOUT = f"STONE DOG EDGE {DOG_EDGE_BREAK:.2f} MAX"
 # Coordinates in the collar's frame. The loaded collar centre moves toward
 # +X; its bore seats on the shaft's retained -X BACK arc. The dog consequently
 # advances by that nonzero displacement rather than hovering above the flat.
@@ -450,8 +449,7 @@ RADIAL_TAP_VIEW_NOTE = (
 )
 DRAWING_DIMENSIONS = {
     "RingProfile": {"NoseDia", "BoreDia"},
-    "BodyProfile": {"CollarDia"},
-    "BodyPlane": {"NoseLength"},
+    "BodyProfile": {"CollarDia", "NoseLength"},
     "Ring": {"CollarWidth"},
     "ShoulderRoot": {"ShoulderRadius"},
     "MountFlatProfile": {"FlatDistance"},
@@ -461,8 +459,7 @@ DRAWING_DIMENSIONS = {
 }
 DRAWING_PRECISION = {
     "RingProfile": {"NoseDia": 2, "BoreDia": TERMINAL_DIA_PLACES},
-    "BodyProfile": {"CollarDia": 2},
-    "BodyPlane": {"NoseLength": 2},
+    "BodyProfile": {"CollarDia": 2, "NoseLength": 2},
     "ShoulderRoot": {"ShoulderRadius": 2},
     "Ring": {"CollarWidth": 2},
     "MountFlatProfile": {"FlatDistance": 2},

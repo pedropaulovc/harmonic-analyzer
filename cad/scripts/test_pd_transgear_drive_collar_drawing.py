@@ -254,14 +254,14 @@ def test_end_view_leaders_run_straight_in_without_crossing() -> None:
 def test_true_d_sizes_are_not_a_full_round_hole_or_an_unlocated_flat() -> None:
     assert spec.DRAWING_DIMENSIONS["BoreProfile"] == {"BoreDia", "FlatToAxis"}
     assert {"BoreDia", "FlatToAxis"} <= set(drawing.END_KEEP)
-    assert spec.BORE_DIA == pytest.approx(4.910)
+    assert spec.BORE_DIA == pytest.approx(4.860)
     assert spec.BORE_DIA_BAND == pytest.approx((0.012, 0.0))
-    assert spec.FLAT_TO_AXIS == pytest.approx(2.1775)
-    assert spec.FLAT_LIMITS == pytest.approx((2.170, 2.185))
+    assert spec.FLAT_TO_AXIS == pytest.approx(2.1525)
+    assert spec.FLAT_LIMITS == pytest.approx((2.145, 2.160))
     assert spec.FLAT_BAND == pytest.approx((0.0075, -0.0075))
     assert spec.FLAT_TOL_TYPE == 3
     assert spec.FLAT_CLEARANCE == pytest.approx((0.020, 0.050))
-    assert spec.STUD_D_BORE_AIR == pytest.approx(0.110)
+    assert spec.STUD_D_BORE_AIR == pytest.approx(0.085)
     # The source gate, not a test-only reimplementation, refuses a round
     # stud which fits the diameter but cannot pass the retained D-flat.
     assert 2.0 * (spec.FLAT_TO_AXIS + min(spec.FLAT_BAND)) < spec.BORE_DIA
@@ -322,8 +322,8 @@ def test_drive_pin_rim_is_the_seat_shortfall_and_needs_three_place_offsets() -> 
 
 
 def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
-    assert spec.PILOT_WALL == pytest.approx((10.0 - 4.910) / 2.0)
-    assert spec.PILOT_WALL_WORST == pytest.approx(2.48)
+    assert spec.PILOT_WALL == pytest.approx((10.0 - 4.860) / 2.0)
+    assert spec.PILOT_WALL_WORST == pytest.approx(2.51)
     assert spec.PILOT_WALL_WORST >= 2.0
     # Negative control: a pilot narrower than the D-bore leaves no wall.
     assert (spec.BORE_DIA - (spec.BORE_DIA + max(spec.BORE_DIA_BAND))) / 2.0 < 0.0
@@ -332,7 +332,7 @@ def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
 
 def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
     # The unchanged dowel circle clears the smaller D-bore and pilot.
-    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.324)
+    assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.349)
     assert spec.BORE_PIN_WALL_WORST >= spec.WALL_FLOOR
     assert spec.PIN_HOLE_INNER_R_MIN == pytest.approx(5.785)
     assert spec.PIN_HOLE_INNER_R_MIN > spec.PILOT_R_MAX
@@ -856,16 +856,16 @@ def test_native_rear_entry_has_both_actual_legs_on_both_d_edges(monkeypatch) -> 
         + max(spec.BORE_ENTRY_BREAK_BAND) - min(spec.BORE_ENTRY_BREAK_BAND)
     )
     assert spec.BORE_ENTRY_BREAK_REQUIRED_MIN == pytest.approx(0.080)
-    assert spec.BORE_ENTRY_FLAT_EDGE_MIN == pytest.approx(2.238570972741)
-    assert spec.BORE_ENTRY_ARC_EDGE_MIN == pytest.approx(13.035830221893)
+    assert spec.BORE_ENTRY_FLAT_EDGE_MIN == pytest.approx(2.226477037834)
+    assert spec.BORE_ENTRY_ARC_EDGE_MIN == pytest.approx(12.890700407832)
     assert spec.BORE_ENTRY_AXIAL_SPAN_MIN == pytest.approx(3.870)
     assert spec.BORE_ENTRY_PROFILE_DEPTH_MIN == pytest.approx(0.270)
     assert spec.BORE_ENTRY_BREAK_GEOMETRY_MAX == pytest.approx(0.270)
-    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.065117421552)
+    assert spec.BORE_ENTRY_WALL_WORST == pytest.approx(3.090117421552)
     assert spec.NECK_CORNER_D_BORE_AIR_MIN == pytest.approx(0.064853316221)
-    assert spec.D_DRIVE_AREA_MIN == pytest.approx(7.390993401970)
+    assert spec.D_DRIVE_AREA_MIN == pytest.approx(7.339179692138)
     assert spec.D_SUPPORT_LENGTH_MIN == pytest.approx(4.072234843105)
-    assert spec.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.058506696080)
+    assert spec.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.058542058772)
     assert spec.BORE_ENTRY_BREAK_LEG_MIN > spec.BORE_ENTRY_BREAK_REQUIRED_MIN
     assert spec.BORE_ENTRY_BREAK_LEG_MAX < spec.BORE_ENTRY_BREAK_GEOMETRY_MAX
     for width in (spec.BORE_ENTRY_BREAK_MIN, spec.BORE_ENTRY_BREAK_MAX):

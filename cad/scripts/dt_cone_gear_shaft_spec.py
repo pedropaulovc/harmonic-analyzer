@@ -150,11 +150,10 @@ COLLAR_STOCK_CALLOUT = (
 POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
 # The terminal flat's two long torque corners stay sharp in the model; their
 # break limit is a drawing requirement, printed above the terminal across-flat
-# (draw_dt_cone_gear_shaft).  cone_shaft_land_bands derives the number.
-# Two lines for width; the method is named so it matches the number.
-TORQUE_CORNER_CALLOUT = (
-    f"TORQUE CORNERS:\nSTONE BURR ONLY, {TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX"
-)
+# (draw_dt_cone_gear_shaft).  cone_shaft_land_bands derives the number.  One
+# line: SolidWorks stores an above callout's line break but prints none of it
+# (run 20261010T071427837Z).  Stoning is named because it matches the number.
+TORQUE_CORNER_CALLOUT = f"STONE CORNERS {TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX"
 
 # Station layout.  Every cone gear station was laid out on a 6.5 reference
 # face one exact-tracking seat pitch (dt_cone_gear_spec.SEAT_PITCH) from the next;

@@ -170,19 +170,3 @@ def require_matched_registration(
     if any(width > LOCATOR_COORDINATE_TRAVEL_MAX_MM for width in widths):
         raise ValueError("measured loaded K motion exceeds the accepted full two-pose envelope")
     return widths
-
-
-# The assembled acceptance MHA-PD-000 prints at the arm/plate fit step; the
-# part drawings carry only their own FCFs and point to that step (drawing-
-# simplicity rule 6: no method text on a part sheet).
-ARM_PLATE_ACCEPTANCE_TEXT = (
-    "ACCEPT THE ACTUAL GEAR-PLANE S-K POSE WITHIN DIA "
-    f"{reducer_position_diameter_mm():.3f} RFS: PUSHED +/-X/Y AND ROCKED UNDER "
-    "EVERY QUALIFIED LOAD, X/Y RANGE + 2X GAUGE UNCERTAINTY "
-    f"{LOCATOR_COORDINATE_TRAVEL_MAX_MM:.4f} MAX, FULL TRAVEL "
-    f"{LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM:.3f} MAX. AT ARM XY "
-    + ", ".join(f"({x:.3f},{y:.3f})" for x, y in ARM_SEAT_NORMAL_WITNESS_XY_MM)
-    + ", EACH REAR-FACE NORMAL LOADED - SNUG, PLUS UNCERTAINTY, "
-    f"{ARM_PLATE_LOADED_NORMAL_CHANGE_MAX_MM:.3f} MAX. RE-ACCEPT AFTER EVERY "
-    "REMOVAL OR PIN REPLACEMENT."
-)

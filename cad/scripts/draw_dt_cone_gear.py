@@ -6,7 +6,8 @@ blank diameter, D-bore (diameter, across-flat and flat clock), face width,
 driving circular-tooth-thickness requirement and functional root-envelope
 limits, plus the actual finite cutter recipe and bounded carrying-contact data.
 The native imported bands remain model-owned. A separate DT6-FORM1 sheet
-defines the complete custom tool grind from model-stamped core equations.
+gives the custom tool's grind data beside its installed T006 gap outline; the
+exact grinding equations stay in the model's "Cutter Profile" property.
 
 There are no datums or feature-control frames.  Hidden lines communicate no
 additional manufacturing fact on these through-bored spur gears, so every view
@@ -170,6 +171,34 @@ BORE_VIEW_LABEL_DROP = 0.016
 # up; the text's left edge clears the flat's witness by BORE_VIEW_AF_GAP.
 BORE_VIEW_AF_GAP = 0.004
 BORE_VIEW_AF_HALF_WIDTH = 0.022
+# The flat clock's two-line text ("90° ±0.25°" over TO TOOTH CENTERLINE),
+# measured in the run-20261010T051729717Z T006 PDF: x 69.8-119.9 mm, y
+# 60.0-72.0 mm round its SetPosition point (94.9, 66.0) mm, so the point is
+# the block's centre. Its arc ends on the bore's +X axis line with an
+# arrowhead at radius |text - vertex|, i.e. under the text: there the axis
+# line and arrow ran through the C of CENTERLINE (eye pass of that run). The
+# arrowhead (3.6 mm long on that PDF; the document's 6.35 mm arrow-length
+# preference is not what this arc end draws) now ends ARROW_TEXT_CLEARANCE
+# under the block, and the block's left edge stands CLEAR_GAP_M right of the
+# crop circle the audit flagged it against (detail-circle crossing at x
+# 70.6 mm).
+BORE_CLOCK_TEXT_HALF_WIDTH = 0.025
+BORE_CLOCK_TEXT_HALF_HEIGHT = 0.006
+BORE_CLOCK_TEXT_GAP = 0.002
+BORE_CLOCK_ARROW_LENGTH = 0.0036
+# swDimensionArrowsSide_e.swDimArrowsInside, set rather than left to the
+# document's smart arrows (main's draw_dt_cone_tip_block form). Left smart,
+# the clock read whole at the sweep (0-14.6 and 24.2-90 deg about the
+# vertex at 35.0 mm) but the settling rebuild drew it with its arrows
+# outside on every sheet whose arc is that short (T018-T120, run
+# 20261010T073917031Z): two 10 deg stubs beyond the legs, no arc between
+# them. At 46.4 mm (T006/T012) smart arrows stayed inside.
+ARROWS_INSIDE = 0
+# A settled clock's arcs reach both legs within this, and sweep at least
+# CLOCK_MIN_SWEEP_DEG between them (the text gap is the rest; T006 swept
+# 0-11 and 18-90 deg in that run, 83 deg).
+CLOCK_LEG_TOL_DEG = 1.0
+CLOCK_MIN_SWEEP_DEG = 45.0
 # The bore axis must land within 0.1 mm of BORE_VIEW_CENTER after the move
 # (draw_amplitude_bar's detail tolerance), and the title within 1 mm.
 BORE_VIEW_POSITION_TOL_M = 1e-4
@@ -187,15 +216,16 @@ CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
 CLOCK_ARC_OVERRUN = 0.0003
 CLOCK_ARC_CENTRE_TOL = 0.0005
 CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")
-# Fifteen compact data lines retain the measured 3.51 mm line-height budget.
-# The dedicated custom-tool sheet keeps exact grinding equations out of these
+# Top-aligned with the manufacturing notes: the 14-line block (header + 13
+# rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
+# line; the 15-line block ends ~52.6 mm down, still above the largest side
+# view (top 0.197) with FaceWidth below it.
+# The dedicated custom-tool sheet keeps the grind data out of these
 # dimension/view lanes.
 GEAR_DATA_POS = (0.215, 0.263)
-# Rendered height/width budget of the Gear Data block, for the layout test.
+# Rendered height budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
-GEAR_DATA_MAX_LINE_CHARS = 66
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
-SHEET_COUNT_POS = (0.350, 0.263)
 CUTTER_DETAIL_POS = (0.015, 0.263)
 CUTTER_DETAIL_VIEW_CENTER = (0.325, 0.155)
 
@@ -219,6 +249,50 @@ def cutter_detail_window_mm() -> tuple[float, float, float]:
             for index in range(samples + 1)
         ) + deviation + profile.geometry_error_bound_mm)
     return cosine * radial_midpoint, sine * radial_midpoint, radius + 0.15
+
+
+def cutter_grind_data() -> str:
+    """What the toolmaker grinds DT6-FORM1 to and checks it against.
+
+    The sheet once printed the part's "Cutter Profile" property: parametric
+    equations with 17-digit floats, which no shop grinds to (eye pass of
+    run 20261010T051729717Z). The equations stay in the model; the sheet
+    gives the form's outline sizes at 3 places, read from the same profile
+    the native cut uses. T006 cuts at T=0 on a spur (helix 0) gear, so its
+    installed gap IS the ground form, and the widths are chords across that
+    gap. The comparator magnification is this sheet's own scale, so the
+    sheet's gap view serves as the overlay chart.
+    """
+    profile = stock_form_profile(6)
+    template = profile.template
+    if template.cutter_number is not None or template.name != CUTTER_DETAIL_SHEET:
+        raise ValueError("T006 must use the specified DT6-FORM1 custom cutter")
+    if profile.radial_translation_mm != 0.0 or profile.helix_angle_deg != 0.0:
+        raise ValueError("DT6-FORM1's installed gap is its ground form only at T=0, helix 0")
+    pitch_radius = profile.pitch_radius_mm
+    pitch_half_gap = (
+        profile.angular_pitch_rad - profile.pitch_tooth_thickness_mm / pitch_radius
+    ) / 2.0
+    blank_radius = profile.blank_radius_mm
+    numerator, denominator = SHEET_SCALES[CUTTER_DETAIL_SHEET]
+    rows = (
+        ("FORM DEPTH (PLUNGE FROM BLANK OD)", f"{profile.plunge_mm:.3f}"),
+        ("TIP ARC (FORMS GEAR ROOT)", f"R{template.root_radius_mm:.3f}"),
+        (
+            f"WIDTH AT PITCH DIA {2.0 * pitch_radius:.3f} (CHORD)",
+            f"{2.0 * pitch_radius * math.sin(pitch_half_gap):.3f}",
+        ),
+        (
+            f"WIDTH AT BLANK OD {2.0 * blank_radius:.3f} (CHORD)",
+            f"{2.0 * blank_radius * math.sin(profile.tip_half_angle_rad):.3f}",
+        ),
+        ("TIF (RELIEF TO INVOLUTE)", f"R{template.relief_junction_radius_mm:.3f} REF"),
+    )
+    return "\n".join((
+        f"{template.name} GROUND FORM TOOL, mm",
+        *(f"{label}:  {value}" for label, value in rows),
+        f"GRIND TO TEMPLATE; CHECK ON OPTICAL COMPARATOR AT {numerator:g}:{denominator:g}",
+    ))
 
 
 DIMENSION_CALLOUTS = {
@@ -369,9 +443,10 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     arc's -X point and the flat) and runs on right to its text, which stands
     outside the flat's witness; the clock's arc sweeps the quadrant between
     the flat's upper half and the +X centre-mark line
-    (``_sweep_clock_right_of_flat``), its text right of the circle and just
-    above the axis, where the front view's thickness callout (above right,
-    x 134-164 y 78-108 mm) never reaches.
+    (``_sweep_clock_right_of_flat``), its text right of the circle and
+    raised clear of the axis line and the arc's arrowhead on it
+    (BORE_CLOCK_TEXT_*), where the front view's thickness callout (above
+    right, x 134-164 y 78-108 mm) never reaches.
     """
     ratio = _bore_view_ratio(teeth)
     flat = bore_flat_offset_mm(teeth) * ratio / 1000.0
@@ -383,7 +458,10 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
             x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
             y - crop - BORE_VIEW_AF_DROP,
         ),
-        "BoreFlatClock": (x + crop + 0.024, y + 0.006),
+        "BoreFlatClock": (
+            x + crop + BORE_CLOCK_TEXT_GAP + BORE_CLOCK_TEXT_HALF_WIDTH,
+            y + BORE_CLOCK_ARROW_LENGTH + ARROW_TEXT_CLEARANCE + BORE_CLOCK_TEXT_HALF_HEIGHT,
+        ),
     }
 
 
@@ -657,6 +735,60 @@ def _crop_bore_view(
         raise RuntimeError(f"{label} lost {lost} to its crop; it holds {sorted(after)}")
 
 
+def clock_arc_faults(
+    arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
+    vertex: tuple[float, float],
+) -> list[str]:
+    """Why a flat clock's drawn arcs do not read as one 90 deg arc between
+    its legs: centred on the flat/axis crossing, inside the quadrant right of
+    the flat and above the axis, reaching both legs and sweeping most of the
+    way between them. Empty when they do."""
+    if not arcs:
+        return ["no arc"]
+    faults = []
+    angles = []
+    for centre, points in arcs:
+        if math.dist(centre, vertex) > CLOCK_ARC_CENTRE_TOL:
+            faults.append(f"arc centred {math.dist(centre, vertex) * 1000:.2f} mm off the vertex")
+        ends = [
+            math.degrees(math.atan2(py - vertex[1], px - vertex[0]))
+            for px, py in (points[0], points[-1])
+        ]
+        angles.append((min(ends), max(ends)))
+    stray = [
+        point
+        for _centre, points in arcs
+        for point in points
+        if point[0] < vertex[0] - CLOCK_ARC_OVERRUN or point[1] < vertex[1] - CLOCK_ARC_OVERRUN
+    ]
+    if stray:
+        faults.append(f"{len(stray)} point(s) outside the quadrant")
+    low = min(a for a, _b in angles)
+    high = max(b for _a, b in angles)
+    if abs(low) > CLOCK_LEG_TOL_DEG or abs(high - 90.0) > CLOCK_LEG_TOL_DEG:
+        faults.append(f"arcs end at {low:.1f}..{high:.1f} deg, not on the legs")
+    swept = sum(b - a for a, b in angles)
+    if swept < CLOCK_MIN_SWEEP_DEG:
+        faults.append(f"arcs sweep {swept:.1f} deg")
+    return faults
+
+
+def _assert_settled_clocks(adapter: Any, clocks: list[tuple[str, Any, int]]) -> None:
+    """After finalize's settling rebuild, every sheet's flat clock still draws
+    one arc between its legs (run 20261010T073917031Z: read whole at the
+    sweep, drawn as two outside stubs in the PDF on T018-T120)."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    faults = []
+    for configuration, display, teeth in clocks:
+        if not ddoc.ActivateSheet(configuration):
+            raise RuntimeError(f"failed to activate {configuration} for its settled clock")
+        found = clock_arc_faults(_clock_arcs(display), bore_flat_vertex(teeth))
+        if found:
+            faults.append(f"{configuration}: {'; '.join(found)}")
+    if faults:
+        raise RuntimeError("flat clock arcs after the settling rebuild:\n" + "\n".join(faults))
+
+
 def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[float, float]]]]:
     """The clock dimension's drawn arcs as (centre, tessellated points), in
     sheet metres, read the way the layout audit reads them."""
@@ -674,7 +806,7 @@ def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[floa
 
 def _sweep_clock_right_of_flat(
     adapter: Any, view: Any, annotations: list[Any], teeth: int, *, label: str
-) -> None:
+) -> Any:
     """Flip the imported flat clock until its arc sweeps only the quadrant
     right of the flat and above the axis, then re-seat its text there.
 
@@ -693,6 +825,9 @@ def _sweep_clock_right_of_flat(
     annotation = clocks[0]
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    display.ArrowSide = ARROWS_INSIDE
+    if int(display.ArrowSide) != ARROWS_INSIDE:
+        raise RuntimeError(f"{label}: the flat clock did not keep its arrows inside")
     selection_name = str(display.GetNameForSelection() or "")
     if not selection_name:
         raise RuntimeError(f"{label}: the flat clock has no selection name")
@@ -760,7 +895,9 @@ def _sweep_clock_right_of_flat(
                 f"{math.degrees(imported):.4f} to {math.degrees(measured):.4f} deg"
             )
         if not stray:
-            return
+            if int(display.ArrowSide) != ARROWS_INSIDE:
+                raise RuntimeError(f"{label}: {flips} put the clock's arrows outside")
+            return display
     raise RuntimeError(
         f"{label}: flat clock arc still leaves the quadrant right of the flat and "
         f"above the axis after {flips}; first stray points "
@@ -920,7 +1057,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
-            "Cutter Profile",
         ),
         required=(
             "Number",
@@ -929,7 +1065,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
-            "Cutter Profile",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -950,7 +1085,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
-    for sheet_index, teeth in enumerate(CONFIGURATION_TEETH, start=1):
+    clocks: list[tuple[str, Any, int]] = []
+    for teeth in CONFIGURATION_TEETH:
         configuration = f"T{teeth:03d}"
         view_scale = SHEET_SCALES[configuration]
         if not ddoc.ActivateSheet(configuration):
@@ -991,9 +1127,10 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} bore",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-        _sweep_clock_right_of_flat(
+        clock = _sweep_clock_right_of_flat(
             adapter, bore_view, bore_annotations, teeth, label=f"{configuration} bore view"
         )
+        clocks.append((configuration, clock, teeth))
         _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
         # The part saves both authoring sketches hidden; the front view shows
         # them again for their dimensions (the side and iso views show the
@@ -1043,15 +1180,6 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS,
             char_height=0.0025,
         )
-        if (
-            add_note(
-                adapter,
-                f"SHEET {sheet_index} OF {len(SHEET_NAMES)}",
-                *SHEET_COUNT_POS,
-            )
-            is None
-        ):
-            raise RuntimeError(f"failed to stamp sheet count on {configuration}")
         rebuild_drawing(adapter, label=f"{configuration} layout audit")
         check_drawing_layout(
             adapter, layout=SPEC.layout, stem=f"cone-gear {configuration}"
@@ -1089,9 +1217,10 @@ async def build(adapter: Any) -> dict[str, str]:
         radius=radius_mm * numerator / denominator / 1000.0,
     )
     set_hidden_lines_removed(adapter, detail)
-    add_property_linked_note(
-        adapter, "Cutter Profile", *CUTTER_DETAIL_POS, char_height=0.0025
-    )
+    # The grind data, not the model's "Cutter Profile" equations (see
+    # cutter_grind_data).
+    if add_note(adapter, cutter_grind_data(), *CUTTER_DETAIL_POS) is None:
+        raise RuntimeError("failed to add the DT6-FORM1 grind data")
     if add_note(
         adapter, "T006 INSTALLED GAP - SEE T006 FOR FINISHED GEAR",
         0.230, 0.092,
@@ -1112,6 +1241,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales=SHEET_SCALES,
+        settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),),
     )
 
 

@@ -646,14 +646,15 @@ native STLs (nine placed instances), never imports builders or COM, and never
 writes into the source tree:
 
 ```powershell
-uv run --frozen python cad/scripts/diagnostics/collect_dt_swing_gravity.py --outroot C:/src/dt-logs/farm-runs/20261008T164225457Z-6a2365ac09404a98b9cde46767f8d792.out --source-root C:/src/ha-gstd-inch-train --report C:/src/dt-logs/inch-train-swing-gravity.json
+uv run --frozen python cad/scripts/diagnostics/collect_dt_swing_gravity.py --outroot C:/src/dt-logs/farm-runs/20261010T084710772Z-bcad1a8e9e664595b56e918f9cc4f1e4.out --source-root C:/src/ha-swing-0d454 --report C:/src/dt-logs/swing-gravity-r15.json
 ```
 
 For subsequent calibrations, substitute the completed run and its matching source
 tree. STL has no units or commit metadata: the collector checks the source
 exporter's enforced **mm / preserved part-local origin** settings and reports
 source/mesh SHA-256 hashes, but cannot prove those sources generated those bytes.
-The example artifacts were built at `fb97437db18ac88669256295638cc87b802f9592`;
+The example artifacts were built at `0d454fa91c238af5be268fa7733def9e003b30e6`,
+checked out detached as the source root;
 review any governing geometry/material differences before using a rebased source.
 
 Method provenance is #859, original `03b51bce2` (main equivalent `964b1229f`):

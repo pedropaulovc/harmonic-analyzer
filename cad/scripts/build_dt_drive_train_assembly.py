@@ -425,9 +425,10 @@ if not (
 # range; the native interference gate below checks the actual flanks.
 CRANK_MESH_CHECK = crank_mesh.standard_check()
 from cone_stack_end_play import CONE_FLOAT_NORTH  # noqa: E402
-# Contact azimuths (from each gear's centre toward the other axis, in that
-# gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
-# the inclined cone shaft; the 16T plane is a plain machine-Z section.
+# Line-of-centres azimuths (from each gear's centre toward the other axis, in
+# that gear's own plane, ccw from the in-plane horizontal), for the pitch-
+# cylinder contact-z law below. The 64T plane rides the inclined cone shaft;
+# the 16T plane is a plain machine-Z section.
 ALPHA64 = math.degrees(math.atan2(_DY16, _DX16))
 ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))
 # (both horizontal legs run TOWARD the other axis and read positive -- the
@@ -451,22 +452,27 @@ if not math.isclose(
     raise AssertionError("crankshaft pinion seat must match the restored boss-face feeler")
 # The pinion follows the recentered cone/64T row while the photo-anchored crank
 # arm and T12 chain plane remain at their existing stations below.
-# Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
-# keyed at its authored phase (a tooth centred at azimuth 0 -- for the helical
-# teeth that is the MID-FACE azimuth, the twist's symmetry plane), so its
-# nearest tooth leads the contact azimuth by DELTA64; the pinion's gap must
-# sit that same contact arc (64/16 pinion degrees per 64T degree -- the tooth
-# ratio, whatever the two pitch radii) past the contact on ITS side.
+# Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch, at the
+# PITCH POINT: the 64T mid-plane pitch-circle point nearest the crank axis
+# (dt_crank_pinion_spec.pitch_point_azimuths), not the line of centres
+# ALPHA64/ALPHA16 above, which sat 1.68 pinion degrees off it and interfered
+# at 8e991c4ac. The 64T is keyed at its authored phase (a tooth centred at
+# azimuth 0 -- for the helical teeth that is the MID-FACE azimuth), so its
+# nearest tooth leads the pitch point; the pinion's gap sits that same arc
+# (64/16 pinion degrees per 64T degree) past it on ITS side
+# (dt_crank_pinion_spec.tooth_in_gap_seed_deg).
 # gear_train.crank_mesh_phase_offset_deg is the one configured offset from
 # that standard tooth-in-gap seed; the crankshaft's matched-hole clocking
 # (dt_crank_pinion_spec.PIN_CLOCKING_DEG) is checked against it below.
 from dt_crank_pinion_spec import PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG  # noqa: E402
+from dt_crank_pinion_spec import pitch_point_azimuths, tooth_in_gap_seed_deg  # noqa: E402
 
-_TP64 = 360.0 / 64.0
-DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
-PINION_SEED_DEG = (
-    (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0
-) % 22.5 + _config.machine("gear_train", "crank_mesh_phase_offset_deg")
+PITCH_ALPHA64, PITCH_ALPHA16 = pitch_point_azimuths(
+    GEAR64_SEAT[0] - X_CRANK, _DY16, INCLINE_DEG, R64
+)
+PINION_SEED_DEG = tooth_in_gap_seed_deg(PITCH_ALPHA64, PITCH_ALPHA16) + _config.machine(
+    "gear_train", "crank_mesh_phase_offset_deg"
+)
 
 # ARBOR_SOUTH_Z / ARBOR_LENGTH (the cylinder arbor) follow from the pedestal
 # strap faces and are defined with them below (U34b/U34c).
@@ -689,12 +695,14 @@ from build_dt_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E40
 # The cylinder bank is a SOLID STACK (#743, cylinder_bank_layout): each
 # MHA-DT-012 is one station pitch thick, cam face to back face, and a turned
 # MHA-DT-026 thrust washer closes each end. The back (north) strap is the bank's
-# axial datum and the bank is modelled pushed back against it; the front
-# strap stands one BANK_END_FEELER leaf off the front washer. Every station
-# below is the layout module's, so the ladder, the washers, the straps, the
-# arbor and the apex set screws cannot drift apart. (Supersedes U34's
-# END_DISC_AIR split and its -72.652 / +75.202 strap stations.)
+# axial datum and the bank is modelled held back against it; the front strap
+# stands one BANK_SPRING_SET blade off the front washer, and the MHA-VN-052
+# wave spring in that gap preloads the stack north (#948 ruling R, PR #1292).
+# Every station below is the layout module's, so the ladder, the washers, the
+# spring, the straps, the arbor and the apex set screws cannot drift apart.
+# (Supersedes U34's END_DISC_AIR split and its -72.652 / +75.202 strap stations.)
 import cylinder_bank_layout as _bank  # noqa: E402
+import vn_cylinder_bank_spring_spec as BANK_SPRING  # noqa: E402
 
 if abs(Z_DRUM0 - _bank.STATION_Z0) > 1e-9 or abs(Z_PITCH - _bank.BANK_PITCH) > 1e-9:
     raise AssertionError("drive-train drum ladder left the cylinder-bank stations")
@@ -702,6 +710,13 @@ if abs(END_DISC_THICK - (_bank.BACK_WASHER_Z[1] - _bank.BACK_WASHER_Z[0])) > 1e-
     raise AssertionError("placed thrust washer is not the bank layout's washer")
 END_DISC_SOUTH_Z0 = _bank.FRONT_WASHER_Z[0]
 END_DISC_NORTH_Z0 = _bank.BACK_WASHER_Z[0]
+# The spring's model is its installed envelope: z = 0 on the front strap's
+# inner face, z = MODEL_HEIGHT on the front washer.
+BANK_SPRING_Z0 = _bank.BANK_SPRING_Z[0]
+if abs(_bank.BANK_SPRING_Z[1] - _bank.BANK_SPRING_Z[0] - BANK_SPRING.MODEL_HEIGHT) > 1e-9:
+    raise AssertionError("placed bank spring is not the layout's front-strap gap")
+if abs(_bank.BANK_SPRING_Z[1] - END_DISC_SOUTH_Z0) > 1e-9:
+    raise AssertionError("bank spring does not bear on the front thrust washer")
 
 # Arbor pedestals (U34c, dt-bank-pedestal-layout-20260923 rev 3): the SAME
 # casting twice -- south as built, north rotated 180 about Y so its strap looks
@@ -714,17 +729,17 @@ from dt_arbor_pedestal_spec import (  # noqa: E402
     STRAP_ROOT_Z as ARBOR_PED_STRAP_ROOT_Z,
 )
 
-ARBOR_STRAP_SOUTH_Z = _bank.FRONT_STRAP_INNER_Z  # -71.519
+ARBOR_STRAP_SOUTH_Z = _bank.FRONT_STRAP_INNER_Z  # -72.019
 ARBOR_STRAP_NORTH_Z = _bank.BACK_STRAP_INNER_Z  # +73.062
 # Pedestal ORIGINS: south at -ARBOR_PEDESTAL_Z (as built, local +Z = machine
 # +Z), north at +ARBOR_PEDESTAL_NORTH_Z (Ry180, local +Z = machine -Z).
-ARBOR_PEDESTAL_Z = -_bank.FRONT_PEDESTAL_ORIGIN_Z  # 79.519
+ARBOR_PEDESTAL_Z = -_bank.FRONT_PEDESTAL_ORIGIN_Z  # 80.019
 ARBOR_PEDESTAL_NORTH_Z = _bank.BACK_PEDESTAL_ORIGIN_Z  # 81.062
 # Plan z band of each whole foot (strap inner face .. ledge end).
 ARBOR_PED_SOUTH_Z_BAND = (
     -ARBOR_PEDESTAL_Z + ARBOR_PED_FOOT_NEAR_Z,
     -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_INNER_Z,
-)  # -99.519..-71.519
+)  # -100.019..-72.019
 ARBOR_PED_NORTH_Z_BAND = (
     ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_INNER_Z,
     ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_FOOT_NEAR_Z,
@@ -1087,7 +1102,6 @@ from fr_nameplate_spec import (  # noqa: E402
 )
 from fr_harmonic_base_spec import (  # noqa: E402
     COLUMN_SOCKET_XZ as BASE_COLUMN_SOCKET_XZ,
-    LIP_W as BASE_LIP_W,
     TOP_LENGTH as BASE_TOP_LENGTH,
     TOP_WIDTH as BASE_TOP_WIDTH,
 )
@@ -2851,7 +2865,9 @@ def _plan_gap_to_plate(point: Plan, swing_deg: float) -> float:
 # seated manufacturing enclosure, not just the nominal DISENGAGE_DEG:
 # - the straight west edge against both arbor-pedestal blocks (their floors
 #   above: 2.0 south, 0.25 north);
-# - every sharp plate vertex inside the base deck, within the green lip;
+# - every sharp plate vertex over the base pad (user ruling 2026-10-09 took
+#   away the green lip it used to stay inside; the plate swings above the
+#   black deck, so the deck's 3.0 step is no obstacle);
 # - every other base-fixed occupant clear of the plate outline: see
 #   SWING_OCCUPANT_CLEARANCE, after the rig and spring layout it reads.
 SWING_SAMPLES = 400
@@ -2870,15 +2886,13 @@ for _k, _swing in enumerate(SWING_ANGLES):
     for _label, (_vx, _vz) in zip(
         ("NE", "NW", "SW", "SE"), plate_vertices_machine(_swing), strict=True
     ):
-        _margin = min(
-            _BASE_X_LIMIT - BASE_LIP_W - abs(_vx), _BASE_Z_LIMIT - BASE_LIP_W - abs(_vz)
-        )
-        _key = f"{_label} corner inside the lip"
+        _margin = min(_BASE_X_LIMIT - abs(_vx), _BASE_Z_LIMIT - abs(_vz))
+        _key = f"{_label} corner over the base"
         SWING_SWEEP[_key] = min(SWING_SWEEP.get(_key, math.inf), _margin)
         if _margin < 0.0:
             raise AssertionError(
-                f"swing-plate {_label} corner crosses the base lip by {-_margin:.3f} "
-                f"at swing {_swing:.3f} deg"
+                f"swing-plate {_label} corner overhangs the base by "
+                f"{-_margin:.3f} at swing {_swing:.3f} deg"
             )
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
 # The 32T drum shares the train's configured pitch and pressure angle.
@@ -3000,9 +3014,9 @@ if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > APINION_Z_BACK + 0.5:
 # and must stay 1.0 south of g0's front face.  Both spares join RIG_MARGINS
 # (below), and one leaf step thinner would leave j = 19 short of
 # RIG_MARGIN_SPARE (D is the thinnest setting that holds).  D is set with the
-# bank pushed north, so the bank adds nothing to j = 19; at the front g0
-# itself walks south by the bank's end play and a long g0 -> g19 pitch stack
-# (RIG.G0_FRONT_SOUTH_STACK, #743), so the j = 0 row carries those beside the
+# bank held north (preloaded, #948 ruling R, PR #1292), so the bank adds
+# nothing to j = 19; at the front g0 sits south by a long g0 -> g19 pitch
+# stack (RIG.G0_FRONT_SOUTH_STACK), so the j = 0 row carries it beside the
 # drum's own retreat (Codex #858, PRRT_kwDOPHDy386mUjhU).
 _G19_FACE_Z = (
     Z_DRUM0 + 19 * Z_PITCH - DRUM_FACE / 2.0,
@@ -3400,26 +3414,25 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # crest's penetration into the swung flank on top of its PRESET (the free form
 # stands PRESET into the parked flank; the model hovers PARKED_AIR off it).
 # Gravity moments of the swing cluster about the pivot, parked then engaged,
-# N.mm; both turn it INTO mesh. Re-measured 2026-10-08 with
+# N.mm; both turn it INTO mesh. Re-measured 2026-10-10 with
 # diagnostics/collect_dt_swing_gravity.py from the seven native STL exports of
-# farm run 20261008T164225457Z-6a2365ac09404a98b9cde46767f8d792 (fb97437).
-# This is the historical measured basis. The finite-stock-profile cutover needs
-# replacement native STL data before release; the frozen fingerprint below must
-# continue refusing changed governing geometry until that report is installed.
+# farm run 20261010T084710772Z-bcad1a8e9e664595b56e918f9cc4f1e4 (0d454fa91),
+# the finite-stock-profile 48DP drum: its weight volume fell 449 mm^3 and the
+# moments 1.0% parked, 4.5% engaged against the 2026-10-08 basis (fb97437).
 # The 1e-5 mm KD-tree seam weld preserves every face; watertightness and winding
 # are checked separately. Centroids use this module's analytic transforms;
 # five weight volumes remain analytic, and drum/brackets use mesh volumes.
 # This preserves #859's hybrid method (03b51bce2), not native COM mass metrology.
 # Brass is 8500 nominal / 8800 corner; steel is 7800 kg/m^3.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
-SWING_GRAVITY_NMM = (14.461309550760282, 25.574227334343778)
-SWING_GRAVITY_CORNER_NMM = (14.748760512092852, 26.075971959169426)
+SWING_GRAVITY_NMM = (14.312953639673118, 24.418432096063757)
+SWING_GRAVITY_CORNER_NMM = (14.595168510026149, 24.893891179679525)
 # The basis those moments were computed at: part -> (count, volume mm^3,
 # density kg/m^3). The measured basis and fingerprint deliberately stay frozen:
 # the support-layout regression names both moment constants when
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
-    "dt-alignment-pinion": (1, 24649.012295126508, 8500.0),
+    "dt-alignment-pinion": (1, 24200.015811223286, 8500.0),
     "dt-pinion-arbor": (1, 13702.959423527212, 7800.0),
     "dt-pinion-pivot-shaft": (1, 5937.0169027658985, 7800.0),
     "dt-pinion-bracket": (2, 4563.672483959315, 7800.0),
@@ -3427,9 +3440,9 @@ SWING_GRAVITY_BASIS = {
     "dt-pinion-handle": (1, 1837.831702350029, 7800.0),
     "dt-pinion-cam-pin": (2, 256.62204310603346, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 468.89889600694056
+SWING_GRAVITY_MASS_G = 465.0824258937632
 # Frozen governing dimensions of the accepted native-STL calibration, never
-# live config aliases. ROOT_DIA is the standard full-depth arc-root diameter.
+# live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
     "dt-alignment-pinion": {
         "TEETH": 32,
@@ -3437,8 +3450,16 @@ SWING_GRAVITY_FINGERPRINT = {
         "PRESSURE_ANGLE_DEG": 20.0,
         "FACE_WIDTH": 143.2,
         "BORE_DIA": 8.0,
-        "ROOT_DIA": 15.610416666666664,
-        "AS_CUT_RADIAL_TOOTH_DEPTH": 1.1906250000000016,
+        "CUTTER_REFERENCE_TEETH": 26,
+        "CUTTER_RADIAL_TRANSLATION_MM": 1.5874999999999986,
+        "PITCH_TOOTH_THICKNESS_MM": 0.8293770709126581,
+        "SUPPORT_OUTSIDE_DIA_MM": 17.979877681931494,
+        "OUTSIDE_DIA": 17.63,
+        "WHOLE_DEPTH": 1.0097916666666675,
+        "MAX_CUT_DEPTH_MM": 1.0111012137912878,
+        "BASE_TANGENT_SPAN": 4.141050235926491,
+        "ROOT_MIN_DIA_MM": 15.607797572417423,
+        "ROOT_MAX_DIA_MM": 15.610416666666664,
     },
     "dt-pinion-bracket": {
         "WIDTH": 15.0,
@@ -4611,7 +4632,7 @@ async def build(adapter) -> dict[str, str]:
     await _lock_static(adapter, north_pedestal, arbor)
     # Thrust washers (MHA-DT-026, #743): the front one on gear 0's cam face, the
     # back one on gear 19's back face against the datum strap -- the bank
-    # modelled pushed back. They turn with nothing, so each is held like the
+    # modelled held back. They turn with nothing, so each is held like the
     # pedestals: one lock to the fixed seed arbor.
     for _disc_z0, _end in ((END_DISC_SOUTH_Z0, "south"), (END_DISC_NORTH_Z0, "north")):
         end_disc = await place_component(
@@ -4624,6 +4645,19 @@ async def build(adapter) -> dict[str, str]:
             label=f"cylinder thrust washer {_end} z0={_disc_z0:.3f}",
         )
         await _lock_static(adapter, end_disc, arbor)
+    # Bank spring (MHA-VN-052, #948 ruling R, PR #1292): its installed envelope
+    # fills the front-strap gap, south face on the strap, north face on the
+    # front washer, coaxial with the arbor; static like the washers.
+    bank_spring = await place_component(
+        adapter,
+        "vn-cylinder-bank-spring",
+        [X_DRUM, Y_DRIVE, BANK_SPRING_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label=f"cylinder bank spring z0={BANK_SPRING_Z0:.3f}",
+    )
+    await _lock_static(adapter, bank_spring, arbor)
     # Apex set screws (MHA-VN-034, #743 Q3): point down through each crown onto
     # the arbor's top at the strap's mid-depth; static like their pedestals.
     for _screw_z, _end in ((SET_SCREW_SOUTH_Z, "south"), (SET_SCREW_NORTH_Z, "north")):

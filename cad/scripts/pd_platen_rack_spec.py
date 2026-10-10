@@ -603,25 +603,11 @@ RACK_FLANK_INSPECTION_PROPERTY = "Rack Flank Inspection"
 
 
 def rack_flank_inspection_callout_text() -> str:
-    """The flank requirement the drawing carries (policy option (c)); the
-    measuring procedure is MHA-PD-000's (``rack_flank_inspection_procedure_text``)."""
+    """The flank requirement the drawing carries (policy option (c))."""
     from paper_drive_geom import feed_rack_form_admission_controls
 
     controls = feed_rack_form_admission_controls()
     return f"FLANKS {PA_DEG:g} DEG +/-{controls['working_side_angle_deviation_deg']:g}"
-
-
-def rack_flank_inspection_procedure_text() -> str:
-    """How the flank requirement is measured: one MHA-PD-000 sentence."""
-    from paper_drive_geom import feed_rack_form_admission_controls
-
-    controls = feed_rack_form_admission_controls()
-    return (
-        "MEASURE BOTH FLANKS WITH ONE WIRE DIA, SECANT DY "
-        f"{controls['working_side_secant_minimum_height_mm']:g} MM MIN, PAYING BOTH XY "
-        f"READINGS, MIC/WIRE U +/-{controls['wire_measurement_uncertainty_mm']:g} MM AND "
-        f"INDICATOR U +/-{controls['indicator_measurement_uncertainty_mm']:g} MM."
-    )
 
 
 GAP_AREA = (half_width(ROOT_Y) + half_width(BAR_HEIGHT)) * (BAR_HEIGHT - ROOT_Y)
@@ -667,11 +653,11 @@ GEAR_DATA = (
     f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA; "
     f"{PURCHASED_RACK_MATERIAL.upper()}"
 )
+# A purchased rack is received by its two stock sizes; its pitch accuracy is
+# the catalogue part's, checked only by the running mesh at assembly.
 INCOMING_RACK_INSPECTION_NOTE = (
     f"STOCK HEIGHT {quality.rack_stock_height_max_mm():g} MAX; "
-    f"FACE WIDTH {quality.rack_face_width_max_mm():g} MAX; "
-    f"ALL USABLE GAPS X-INDEX RANGE {quality.rack_pitch_index_deviation_mm():g} MAX; "
-    f"ASSEMBLED RIGID FACE/AXIS LEAD {quality.rack_face_lead_deviation_mm():g} MAX; REJECT EXCESS"
+    f"FACE WIDTH {quality.rack_face_width_max_mm():g} MAX"
 )
 DRAWING_NOTES = "\n".join(
     (

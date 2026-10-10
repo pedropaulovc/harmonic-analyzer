@@ -8,7 +8,7 @@ drive train import that module, and a rail or seat edit must not re-key them.
 Each MHA-CH-008 bracket is held by two MHA-VN-032 (McMaster 90280A197, #8-32 x 3/4
 slotted fillister) through its #8 close-clearance foot holes into
 bottoming-tapped seats in the support's top rail, transferred from the set
-bracket at assembly (the south bracket is feeler-set, so its seats cannot be
+bracket at assembly (the south bracket is blade-set off the preload spring's washer, so its seats cannot be
 cast or pre-drilled).
 
 The rail was 6.35 deep, the window's top edge at local y 82.55: too shallow

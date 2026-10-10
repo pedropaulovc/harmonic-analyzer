@@ -26,6 +26,8 @@ The screws, and the small parts that do not belong anywhere else.
 | `vn-transgear-arm-plate-screw` | TODO | TODO | TODO |
 | `vn-transgear-pivot-screw` | TODO | TODO | TODO |
 | `vn-transgear-pivot-spring` | TODO | TODO | TODO |
+| `vn-cylinder-bank-spring` | TODO | TODO | TODO |
+| `vn-rocker-bank-spring` | TODO | TODO | TODO |
 | `vn-transgear-latch-pin` | TODO | TODO | TODO |
 | `vn-latch-hook-bracket-screw` | TODO | TODO | TODO |
 | `vn-transgear-disc-screw` | TODO | TODO | TODO |

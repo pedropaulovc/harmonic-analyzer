@@ -62,7 +62,7 @@ def test_the_bore_and_the_float_stop_carry_their_bands_on_the_model() -> None:
 
 
 def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
-    assert spec.ID == pytest.approx(6.1)
+    assert spec.ID == pytest.approx(6.05)
     assert spec.ID_BAND == pytest.approx((0.10, 0.0))
     assert spec.LENGTH == pytest.approx(5.2)
     assert spec.LENGTH_TOL == pytest.approx(0.05)

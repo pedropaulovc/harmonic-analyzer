@@ -101,9 +101,9 @@ def test_true_front_disk_clears_active_core_and_both_neck_corners():
 
 
 def test_physical_flat_terminal_has_two_actual_end_limits():
-    assert shaft.FRONT_RELIEF_DIA == 4.0
-    assert shaft.FRONT_RELIEF_DIA_MIN == pytest.approx(3.87)
-    assert shaft.FRONT_RELIEF_DIA_MAX == pytest.approx(4.13)
+    assert shaft.FRONT_RELIEF_DIA == 3.95
+    assert shaft.FRONT_RELIEF_DIA_MIN == pytest.approx(3.82)
+    assert shaft.FRONT_RELIEF_DIA_MAX == pytest.approx(4.08)
     assert shaft.CORE_FLAT_CUT_END_FROM_F == pytest.approx(0.110)
     assert shaft.CORE_FLAT_CUT_END_LIMITS == (0.050, 0.170)
     assert shaft.CORE_FLAT_CUT_END_Z == -shaft.CORE_FLAT_CUT_END_FROM_F
@@ -132,8 +132,8 @@ def test_torque_contact_uses_no_favourable_bore_float_credit():
     assert collar.BORE_ENTRY_BREAK_ANGLE_LIMITS == pytest.approx((44.0, 46.0))
     assert collar.BORE_ENTRY_BREAK_LEG_MIN == pytest.approx(0.144853316221)
     assert collar.BORE_ENTRY_BREAK_LEG_MAX == pytest.approx(0.258882578448)
-    assert collar.FLAT_TO_AXIS == pytest.approx(2.1775)
-    assert collar.FLAT_LIMITS == (2.170, 2.185)
+    assert collar.FLAT_TO_AXIS == pytest.approx(2.1525)
+    assert collar.FLAT_LIMITS == (2.145, 2.160)
     assert min(collar.FLAT_CLEARANCE) > 0.0
     assert collar.STUD_D_BORE_AIR > 0.0
 
@@ -142,9 +142,9 @@ def test_shortened_drive_face_is_real_not_old_full_core_length():
     assert shaft.CORE_FRONT_FROM_F == 5.25
     assert shaft.CORE_ACTIVE_LENGTH == pytest.approx(4.85)
     assert shaft.CORE_ACTIVE_LENGTH_MIN == pytest.approx(4.59)
-    assert collar.D_DRIVE_AREA_MIN == pytest.approx(7.390993401970)
+    assert collar.D_DRIVE_AREA_MIN == pytest.approx(7.339179692138)
     assert collar.D_DRIVE_AREA_MIN > 0.0
-    assert shaft.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.87**2 / 4.0)
+    assert shaft.FRONT_RELIEF_AREA_MIN == pytest.approx(math.pi * 3.82**2 / 4.0)
     assert collar.LENGTH == collar.SET_NOMINAL == 6.2
     assert (collar.LENGTH_FITTED_MIN, collar.LENGTH_FITTED_MAX) == (3.870, 6.900)
     assert collar.BODY_BLANK_LENGTH_MIN >= collar.LENGTH_FITTED_MAX + collar.FACING_ALLOWANCE
@@ -163,7 +163,7 @@ def test_rear_disk_chord_uses_deep_ground_x_not_polar_root():
     )
     end = shaft.FULL_DEPTH_MAX + math.sqrt(shaft.CUTTER_DIA * rise - rise**2)
     assert end == pytest.approx(shaft.CUTTER_RUNOUT_END_WORST)
-    assert end < 9.49
+    assert end < 9.59  # 10.6 printed limit less its 1.0 margin (0.05 TIR)
     assert shaft.CUTTER_RUNOUT_MAX - end > 1.0
     assert shaft.HUB_BORE_FROM_F_WORST == pytest.approx(10.92)
     assert shaft.CUTTER_RUNOUT_MAX < shaft.HUB_BORE_FROM_F_WORST
@@ -176,12 +176,12 @@ def test_bearing_material_charges_breaks_axis_error_and_loose_float():
     assert collar.FRONT_BEARING_INNER_RADIUS_MAX > (collar.BORE_DIA + max(collar.BORE_DIA_BAND)) / 2.0
     # Regression value, not a load floor: the spec's physical gate is a
     # positive face. It charges bore, entry break, D-axis error at F and
-    # half the 0.005 tooth-space TIR, so it sits below the uncharged ring.
-    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(7.8979, abs=1e-3)
+    # half the 0.05 tooth-space TIR, so it sits below the uncharged ring.
+    assert collar.FRONT_BEARING_AREA_MIN == pytest.approx(7.9219, abs=1e-3)
     assert shaft.RING_TRANSVERSE_FLOAT_MAX >= (ring.ID + max(ring.ID_BAND) - shaft.JOURNAL_DIA_MIN) / 2.0
-    assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.11218668292522871)
+    assert shaft.RING_TRANSVERSE_FLOAT_MAX == pytest.approx(0.10960380794239155)
     assert collar.D_SUPPORT_LENGTH_MIN == pytest.approx(4.072234843105)
-    assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.058506696080)
+    assert collar.D_AXIS_AT_F_FROM_JOURNAL_MAX == pytest.approx(0.058542058772)
     assert shaft.REAR_BEARING_INNER_RADIUS_MAX >= 3.4585
     assert shaft.REAR_BEARING_AREA_MIN > 1.0
     assert shaft.REAR_BEARING_AREA_MIN < 2.0  # not the uncharged centred claim
@@ -205,7 +205,7 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
     assert shaft.CUP_FACE_Z == pytest.approx(40.3375)
     assert shaft.REAR_END_Z == pytest.approx(46.8375)
     assert collar.COLLAR_DISC_AIR_MIN == 0.10
-    assert "ONE FULL DISC TURN" in collar.COLLAR_DISC_AIR_PHRASE
+    assert "ONE FULL TURN" in collar.COLLAR_DISC_AIR_PHRASE
 
 
 def test_actual_arbor_mount_has_room_and_a_manufacturable_spacer_wall():
@@ -300,15 +300,13 @@ def test_angular_index_receiving_uses_actual_pitch_reference_and_live_grades():
     assert shaft.PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM == uncertainty
     assert shaft.PITCH_INDEX_STATIONS == tuple(range(13))
     rows = shaft.TOOTH_SPACE_CALLOUT.splitlines()
-    assert len(rows) == 4
-    assert rows[0] == (
-        f"TOOTH SPACE RADIAL INDICATOR TIR {shaft.TOOTH_SPACE_RUNOUT_TIR_MM:.3f} MAX TO A"
-    )
-    assert rows[1] == (
-        f"PITCH INDEX RANGE+2U {shaft.PITCH_INDEX_DEVIATION_MM} mm MAX AT REF Ø6.350"
-    )
-    assert rows[2] == f"ALL SPACES + WRAP; ABS POSITION U {uncertainty} mm MAX"
-    assert rows[3] == "CERTIFIED PIN Ø1.000 mm; ALL 12 SPACES"
+    assert rows == [
+        f"TOOTH SPACE RUNOUT {shaft.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A",
+        "Ø1.000 PIN, ALL 12 SPACES",
+        f"INDEX RANGE {shaft.PITCH_INDEX_DEVIATION_MM:.2f} MAX",
+    ]
+    # Measurement uncertainty is method, never a printed requirement.
+    assert "U " not in shaft.TOOTH_SPACE_CALLOUT
     measurements = {station: 0.0 for station in shaft.PITCH_INDEX_STATIONS}
     assert shaft.require_pitch_index_errors_mm(measurements) == 2.0 * uncertainty
     interior = dict(measurements)

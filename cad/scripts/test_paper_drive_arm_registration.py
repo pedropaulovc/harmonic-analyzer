@@ -107,7 +107,7 @@ def test_native_controls_reference_actual_bores_and_project_past_real_chain_plan
     for control, datum_z, height in ((arm_control, registration.ARM_FRONT_MACHINE_Z_MM, registration.S_PROJECTED_HEIGHT_MM),
                                     (plate_control, registration.PLATE_MOUNT_MACHINE_Z_MM, registration.K_PROJECTED_HEIGHT_MM)):
         assert control.projected_zone_height_mm == height
-        assert control.tolerance == "0.010" and control.datums == ("A",)
+        assert control.tolerance == "0.050" and control.datums == ("A",)
         assert datum_z - height <= registration.CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0]
         assert datum_z - height < registration.gear_plane_machine_z_mm() < datum_z
 

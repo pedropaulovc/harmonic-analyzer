@@ -58,8 +58,10 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert features["hub_faces"]["length_nominal"] == 7.0565
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         assert features[name]["tip_land"] == [5.08, 6.10]
+    # The strap's native 2.500 +/-0.025 (Main ruling 2026-10, option b).
     for name in ("strap_datum_b", "strap_faces"):
-        assert features[name]["thickness"] == [1.99, 3.01]
+        assert features[name]["thickness"] == [2.475, 2.525]
+        assert features[name]["precision"]["thickness"] == 3
     assert features["rod_hole"]["dia"] == [1.994, 2.094]
     assert features["rod_hole"]["nominal_dia"] == 1.994
     assert features["rod_hole"]["precision"]["dia"] == 2

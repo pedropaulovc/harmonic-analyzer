@@ -232,23 +232,26 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert "SOFT-SOLDER TO BACKER" in installation
     assert "SET MESH AT ASSEMBLY" in installation
     # Policy option (c): the sheet carries the flank requirement only; the
-    # wire/secant/uncertainty procedure is MHA-PD-000's rack-soldered step.
+    # assembly's rack step carries no measuring method.
     callout = spec.rack_flank_inspection_callout_text()
     assert callout == f"FLANKS {spec.PA_DEG:g} DEG +/-{quality.rack_working_side_angle_deviation_deg():g}"
-    procedure = spec.rack_flank_inspection_procedure_text()
-    for method in ("WIRE", "SECANT", "INDICATOR"):
-        assert method not in callout and method in procedure
-    assembly_source = inspect.getsource(importlib.import_module("draw_pd_paper_drive_assembly"))
-    assert "platen_rack.rack_flank_inspection_procedure_text()" in assembly_source
+    assembly = importlib.import_module("draw_pd_paper_drive_assembly")
+    steps_module = importlib.import_module("pd_paper_drive_assembly_steps")
+    soldered = assembly._step_text(
+        operating_domain=steps_module.feed_rack_operating_domain()
+    )["rack-soldered"]
+    for method in ("WIRE", "SECANT", "INDICATOR", "U +/-"):
+        assert method not in callout and method not in soldered
 
 
-def test_incoming_rack_limits_are_source_requirements_not_supplier_accuracy() -> None:
+def test_incoming_rack_note_is_the_two_stock_sizes() -> None:
     note = spec.INCOMING_RACK_INSPECTION_NOTE
-    assert f"STOCK HEIGHT {quality.rack_stock_height_max_mm():g} MAX" in note
-    assert f"FACE WIDTH {quality.rack_face_width_max_mm():g} MAX" in note
-    assert f"X-INDEX RANGE {quality.rack_pitch_index_deviation_mm():g} MAX" in note
-    assert f"ASSEMBLED RIGID FACE/AXIS LEAD {quality.rack_face_lead_deviation_mm():g} MAX" in note
-    assert "ALL USABLE GAPS" in note and "REJECT EXCESS" in note
+    assert note == (
+        f"STOCK HEIGHT {quality.rack_stock_height_max_mm():g} MAX; "
+        f"FACE WIDTH {quality.rack_face_width_max_mm():g} MAX"
+    )
+    for metrology in ("INDEX", "LEAD", "REJECT", "USABLE GAPS"):
+        assert metrology not in note
     source = inspect.getsource(drawing)
     assert '"Incoming Rack Inspection"' in source
     assert '"Purchased Rack", PURCHASED_RACK_XY' not in source
@@ -724,11 +727,6 @@ def test_raw_pins_cloud_or_roll_scalar_is_not_a_material_envelope_certificate(un
 def test_feature_local_flank_ink_uses_one_canonical_shop_resolution_source():
     text = spec.rack_flank_inspection_callout_text()
     assert text == f"FLANKS {spec.PA_DEG:g} DEG +/-{quality.rack_working_side_angle_deviation_deg():g}"
-    procedure = spec.rack_flank_inspection_procedure_text()
-    assert f"SECANT DY {quality.rack_flank_secant_minimum_height_mm():g} MM MIN" in procedure
-    assert f"MIC/WIRE U +/-{quality.wire_measurement_uncertainty_mm():g} MM" in procedure
-    assert f"INDICATOR U +/-{quality.pitch_index_measurement_uncertainty_mm():g} MM" in procedure
-    assert "ONE WIRE DIA" in procedure and "PAYING BOTH XY READINGS" in procedure
     for qualifier in (
         quality.stock_form_receiving_status_text(),
         "WHOLE MATERIAL", "X-INTERCEPT", "BOUNDARY", "ROOT INTRUSION",

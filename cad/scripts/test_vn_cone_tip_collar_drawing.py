@@ -261,10 +261,50 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
     # Edges stay sharp in the model: the title block covers the collar's
     # breaks, and the dog's tighter limit is printed once on its diameter.
     assert "add_chamfer" not in source
-    assert spec.DOG_EDGE_CALLOUT.replace("\n", " ") == (
-        f"DOG EDGE: STONE BURR ONLY, {spec.DOG_EDGE_BREAK:.2f} MAX"
-    )
-    assert '{"DogDia": spec.DOG_EDGE_CALLOUT}' in drawing_source
+    # One line: an above callout's line break prints nothing (main's guard).
+    assert spec.DOG_EDGE_CALLOUT == f"STONE DOG EDGE {spec.DOG_EDGE_BREAK:.2f} MAX"
+    assert drawing._printable_above_callouts({"DogDia": spec.DOG_EDGE_CALLOUT})
+    with pytest.raises(RuntimeError, match="do not print"):
+        drawing._printable_above_callouts({"DogDia": "DOG EDGE:\nSTONE"})
+    assert '_printable_above_callouts({"DogDia": spec.DOG_EDGE_CALLOUT})' in drawing_source
+    # The screw faces come from the faces the screw view draws.
+    assert "_view_faces(\n        screw," in drawing_source
+    assert "_resolve_faces" not in drawing_source
+
+
+def test_screw_faces_come_from_the_view_one_per_spec(monkeypatch):
+    """4323e8d1e and 7924d573e: a part-document face selected into the view
+    read back as another face. The pick is from the view's own faces."""
+    from _part_pmi import _FaceGeometry
+
+    def cylinder(diameter_mm, x0_mm, x1_mm):
+        radius = diameter_mm / 2000.0
+        return _FaceGeometry(
+            face=object(), identity=4002,
+            parameters=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, radius),
+            outward_normal=None,
+            box=(x0_mm / 1000.0, -radius, -radius, x1_mm / 1000.0, radius, radius),
+        )
+
+    seat = spec.SET_SCREW_SEAT_RADIUS
+    major = cylinder(spec.SET_SCREW_MAJOR_DIA, seat + spec.DOG_LENGTH, seat + spec.DOG_LENGTH + 5.0)
+    dog = cylinder(spec.DOG_DIA, seat, seat + spec.DOG_LENGTH)
+    faces = {id(g.face): g for g in (major, dog)}
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda _v, kind, label: [g.face for g in faces.values()] if kind == 3 else [])
+    monkeypatch.setattr(drawing, "_face_geometry", lambda face: faces[id(face)])
+    specs = {
+        **{datum.key: datum.face for datum in spec.SCREW_DATUMS},
+        **{control.key: control.face for control in spec.SCREW_CONTROLS},
+    }
+    picked = drawing._view_faces(None, specs, label="screw")
+    assert picked == {"datum:D": major.face, "ground_dog_runout": dog.face}
+    faces.pop(id(dog.face))
+    with pytest.raises(RuntimeError, match="ground_dog_runout .* matched 0 of the view's 1"):
+        drawing._view_faces(None, specs, label="screw")
+    twin = cylinder(spec.SET_SCREW_MAJOR_DIA, seat + spec.DOG_LENGTH, seat + spec.DOG_LENGTH + 5.0)
+    faces[id(twin.face)] = twin
+    with pytest.raises(RuntimeError, match="datum:D .* matched 2"):
+        drawing._view_faces(None, specs, label="screw")
 
 
 def test_blind_tap_qualifier_retains_native_depth_variables():
@@ -794,3 +834,23 @@ def test_all_land_physical_limit_readers_share_native_print_precision(section, n
     else:
         with pytest.raises(ValueError, match="no finished across-flat"):
             lands.land_finished_af_limits_mm(section)
+
+
+def test_each_view_asserts_only_the_precision_it_keeps() -> None:
+    # 027369849: each view asserted the whole map and failed on names that
+    # live on other views or the screw sheet.
+    keeps = (drawing.END_KEEP.keys() | drawing.SIDE_KEEP.keys(), drawing.TAP_KEEP.keys(),
+             drawing.BORE_KEEP.keys(), drawing.SCREW_KEEP.keys())
+    for keep in keeps:
+        assert set(drawing._precision(keep)) == set(keep)
+    source = inspect.getsource(drawing)
+    assert "assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)" not in source
+    assert source.count(", _precision(") == 4
+
+
+def test_tap_view_imports_the_blanked_root_gauge_through_the_hidden_owner_path() -> None:
+    # 8f1cd4a9f: the blanked TapRootGauge sketch's TapRootLimit never imported.
+    source = inspect.getsource(drawing.build)
+    assert "hidden_sketches.curate_view_dimensions(\n        adapter, tap, keep=TAP_KEEP" in source
+    assert "TapRootLimit" in drawing.TAP_KEEP
+    assert "TapRootLimit" in spec.DRAWING_DIMENSIONS["TapRootGauge"]

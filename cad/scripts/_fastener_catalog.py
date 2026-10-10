@@ -140,13 +140,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "vn-knife-hanger-stud": _stock(
         "vn-knife-hanger-stud",
-        "Medium-Strength Grade 5 Steel Hex Head Screw",
-        "91247A720",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91251A157",
+        material="Alloy Steel",
     ),
-    "vn-knife-hanger-washer": _stock(
-        "vn-knife-hanger-washer",
-        "Zinc-Plated Steel SAE Washer",
-        "90126A211",
+    "vn-knife-mount-dowel": _stock(
+        "vn-knife-mount-dowel",
+        "Alloy Steel Dowel Pin",
+        "98381A473",
+        material="Alloy Steel",
     ),
     "vn-lag-screw": _stock(
         "vn-lag-screw",
@@ -259,6 +261,19 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "vn-transgear-pivot-spring",
         "Curved Disc Spring",
         "9715K43",
+    ),
+    # MHA-VN-052 / -053 (#948 ruling R): one wave disc spring preloading each
+    # bank north on its datum; steel and high-carbon steel, the library's
+    # plain carbon steel.
+    "vn-cylinder-bank-spring": _stock(
+        "vn-cylinder-bank-spring",
+        "Wave Disc Spring",
+        "9714K392",
+    ),
+    "vn-rocker-bank-spring": _stock(
+        "vn-rocker-bank-spring",
+        "Wave Disc Spring",
+        "9714K24",
     ),
     "vn-tube-frame-cap": _stock(
         "vn-tube-frame-cap",

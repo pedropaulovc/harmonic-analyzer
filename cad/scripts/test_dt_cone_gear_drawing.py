@@ -19,6 +19,7 @@ import dt_cone_gear_spec as spec
 import draw_dt_cone_gear as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
+import _drawing_annotation_extent
 
 
 def test_required_drawing_paths_and_registry_entry() -> None:
@@ -180,7 +181,6 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
         for obsolete in ("CONTACT RATIO", "RANGE ONLY", "MATCH FLANKS", "LONG ADDENDUM"):
             assert obsolete not in data
         assert len(data.splitlines()) * 0.00351 <= drawing.GEAR_DATA_HEIGHT
-        assert max(map(len, data.splitlines())) <= drawing.GEAR_DATA_MAX_LINE_CHARS
 
 
 def test_native_gap_features_are_distinct_and_preserve_real_template_topology() -> None:
@@ -328,6 +328,21 @@ def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.Mon
         part._native_root_envelope_mm(body, teeth=profile.teeth)
 
 
+def test_root_envelope_reads_the_body_and_failures_name_their_call() -> None:
+    # f68549253: the reopened audit passed the IPartDoc where the reader calls
+    # IBody2.GetFaces, and every configuration failed as an anonymous
+    # DISP_E_MEMBERNOTFOUND.
+    source = inspect.getsource(part._configuration_topology)
+    assert "_native_root_envelope_mm(bodies[0], teeth=teeth)" in source
+    try:
+        part._exit_face(object())
+    except AttributeError as exc:
+        site = part._failure_site(exc)
+    assert '_com_invoke(body, "IBody2", "GetFaces")' in site
+    assert "in _exit_face" in site
+    assert "_failure_site(exc)" in inspect.getsource(part.assert_saved_configuration_topology)
+
+
 def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:
     from dataclasses import replace
 
@@ -357,7 +372,31 @@ def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> 
     assert "clearance_arc" not in detail
     assert "STOCK #8" not in detail
     assert max(map(len, detail.splitlines())) <= notes.CUTTER_DETAIL_LINE_CHARS
-    assert len(detail.splitlines()) * 0.00351 < 0.200
+
+
+def test_custom_six_sheet_gives_grind_data_not_equations() -> None:
+    """Sheet DT6-FORM1 prints what the toolmaker grinds to (3 places, the
+    comparator check at the sheet's own scale), not the model's equations."""
+    profile = spec.stock_form_profile(6)
+    data = drawing.cutter_grind_data()
+    lines = data.splitlines()
+    assert lines[0] == "DT6-FORM1 GROUND FORM TOOL, mm"
+    assert lines[-1] == "GRIND TO TEMPLATE; CHECK ON OPTICAL COMPARATOR AT 20:1"
+    assert "FORM DEPTH (PLUNGE FROM BLANK OD):  1.055" in lines
+    assert "TIP ARC (FORMS GEAR ROOT):  R1.100" in lines
+    assert "TIF (RELIEF TO INVOLUTE):  R1.531 REF" in lines
+    # Chords across the installed gap, which at T=0 IS the ground form:
+    # the pitch chord closes on the tool's pitch tooth thickness.
+    pitch = next(line for line in lines if line.startswith("WIDTH AT PITCH DIA 3.175 (CHORD)"))
+    chord = float(pitch.rsplit(" ", 1)[1])
+    half_gap = math.asin(chord / (2.0 * profile.pitch_radius_mm))
+    thickness = profile.pitch_radius_mm * (profile.angular_pitch_rad - 2.0 * half_gap)
+    assert thickness == pytest.approx(profile.pitch_tooth_thickness_mm, abs=0.002)
+    assert "WIDTH AT BLANK OD 4.310 (CHORD):  1.953" in lines
+    assert "(t)" not in data and "sin" not in data and "SOURCE" not in data
+    # Every decimal prints at 3 places.
+    for number in re.findall(r"\d+\.\d+", data):
+        assert len(number.split(".")[1]) == 3, number
 
 
 def test_custom_gap_detail_crop_contains_every_real_boundary() -> None:
@@ -376,8 +415,12 @@ def test_custom_gap_detail_crop_contains_every_real_boundary() -> None:
             assert math.dist((center_x, center_y), rotated) < radius
     numerator, denominator = drawing.SHEET_SCALES[notes.CUTTER_DETAIL_SHEET]
     rendered_radius = radius * numerator / denominator / 1000.0
+    # The grind data at the default note height: 2.4 mm a character, measured
+    # on the run-20261010T051729717Z render of this sheet's 47-character
+    # installed-gap label (113 mm).
+    widest = max(map(len, drawing.cutter_grind_data().splitlines()))
     assert drawing.CUTTER_DETAIL_VIEW_CENTER[0] - rendered_radius > (
-        drawing.CUTTER_DETAIL_POS[0] + notes.CUTTER_DETAIL_LINE_CHARS * 0.00185 + 0.005
+        drawing.CUTTER_DETAIL_POS[0] + widest * 0.0024 + 0.005
     )
     assert drawing.CUTTER_DETAIL_VIEW_CENTER[0] + rendered_radius < 0.420
     assert drawing.CUTTER_DETAIL_VIEW_CENTER[1] - rendered_radius > 0.100
@@ -558,13 +601,11 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
 
 # Text half-widths in the bore view, sheet metres: the stacked diameter
 # (~33 mm, measured when its callout still read "REAM THRU"; "THRU" is
-# narrower) and the clock value over "TO TOOTH CENTERLINE" (~42 mm,
-# estimated at the fleet's 2.5 mm text), and the two-line title.
+# narrower), and the two-line title. The clock text's measured block is
+# drawing.BORE_CLOCK_TEXT_HALF_WIDTH/HEIGHT.
 _BORE_DIA_TEXT_HALF_WIDTH = 0.0165
-_BORE_CALLOUT_TEXT_HALF_WIDTH = 0.021
 _BORE_TEXT_HALF_HEIGHT = 0.005
 _BORE_TITLE_HEIGHT = 0.008
-_THICKNESS_TEXT_HALF_WIDTH = 0.0325
 # The layout audit compares IView.GetOutline boxes, which pad the geometry:
 # ~5.5 mm round an uncropped view (T084 front [54.8, 99.8, 155.2, 200.2]
 # about a 44.66 mm half tip circle) and 10.1-10.75 mm past a bore view's crop
@@ -629,13 +670,26 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         # The clock text stands wholly right of the circle and clear of the
         # thickness callout under the front view.
         clock_x, clock_y = keep["BoreFlatClock"]
-        assert clock_x - _BORE_CALLOUT_TEXT_HALF_WIDTH > cx + crop
-        ctt_x, ctt_y = drawing.front_keep(teeth)["ToothThickness"]
-        assert (
-            ctt_x - _THICKNESS_TEXT_HALF_WIDTH
-            > clock_x + _BORE_CALLOUT_TEXT_HALF_WIDTH + 0.005
-            or ctt_y - clock_y > 4.0 * _BORE_TEXT_HALF_HEIGHT
+        # Its two-line block (measured half-extents) stands an arrow length
+        # plus clearance above the axis line, where the arc's arrowhead ends
+        # under the text, and clear of the crop circle.
+        assert clock_y - drawing.BORE_CLOCK_TEXT_HALF_HEIGHT >= (
+            cy + drawing.BORE_CLOCK_ARROW_LENGTH + _drawing_leaders.ARROW_TEXT_CLEARANCE - 1e-12
         ), teeth
+        assert clock_x - drawing.BORE_CLOCK_TEXT_HALF_WIDTH >= cx + crop + 0.002 - 1e-12, teeth
+        # The thickness callout, measured on the T006 PDF of run
+        # 20261010T051729717Z: its text spans x 136.2-200.4, y 100.0-116.5 mm
+        # round its keep (136.24, 107.76) mm, starting at its dimension line
+        # (the keep x) and running right, with its leader above.
+        ctt_x, ctt_y = drawing.front_keep(teeth)["ToothThickness"]
+        clock_box = (
+            clock_x - drawing.BORE_CLOCK_TEXT_HALF_WIDTH,
+            clock_y - drawing.BORE_CLOCK_TEXT_HALF_HEIGHT,
+            clock_x + drawing.BORE_CLOCK_TEXT_HALF_WIDTH,
+            clock_y + drawing.BORE_CLOCK_TEXT_HALF_HEIGHT,
+        )
+        ctt_box = (ctt_x - 0.001, ctt_y - 0.0078, ctt_x + 0.0642, ctt_y + 0.0088)
+        assert _drawing_annotation_extent.boxes_clear(clock_box, ctt_box), teeth
         # The clock's arc centres where the flat crosses the axis and swings
         # through its text, in the quadrant right of the flat and above the
         # axis: clear of the diameter's upper-left lane and under the front
@@ -651,6 +705,43 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
             "BORE PROFILE",
             f"SCALE {view_numerator:g} : {view_denominator:g}",
         ]
+
+
+def test_settled_clock_check_refuses_outside_arrow_stubs() -> None:
+    """Run 20261010T073917031Z's arc readbacks (sheet mm): T006's clock drew
+    one arc between its legs, broken by its text; T120's, its arrows left
+    smart, drew two 10 deg stubs outside them and no arc. The clock is forced
+    arrows-inside, and finalize re-reads every sheet's arcs after settling."""
+
+    def arc(vertex, radius, start, end):
+        steps = 12
+        return (
+            vertex,
+            [
+                (
+                    vertex[0] + radius * math.cos(math.radians(start + (end - start) * i / steps)),
+                    vertex[1] + radius * math.sin(math.radians(start + (end - start) * i / steps)),
+                )
+                for i in range(steps + 1)
+            ],
+        )
+
+    good_vertex = (0.05292, 0.060)
+    good = [arc(good_vertex, 0.04642, 0.0, 11.0), arc(good_vertex, 0.04642, 18.0, 90.0)]
+    assert drawing.clock_arc_faults(good, good_vertex) == []
+    bad_vertex = (0.068, 0.060)
+    bad = [arc(bad_vertex, 0.03503, -10.2, 0.0), arc(bad_vertex, 0.03503, 90.0, 100.2)]
+    faults = drawing.clock_arc_faults(bad, bad_vertex)
+    assert any("outside the quadrant" in fault for fault in faults)
+    assert any("sweep" in fault for fault in faults)
+    assert drawing.clock_arc_faults([], bad_vertex) == ["no arc"]
+    assert drawing.ARROWS_INSIDE == 0  # swDimensionArrowsSide_e.swDimArrowsInside
+    assert "display.ArrowSide = ARROWS_INSIDE" in inspect.getsource(
+        drawing._sweep_clock_right_of_flat
+    )
+    assert "settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),)" in (
+        inspect.getsource(drawing.build)
+    )
 
 
 def test_dimension_arrow_length_is_read_from_the_drawing() -> None:

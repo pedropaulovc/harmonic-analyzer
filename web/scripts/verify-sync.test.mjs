@@ -623,7 +623,17 @@ test('explicit YouTube review and rendered capture use real clocks without a nat
   assert.ok(measureFixture(fixture).measured.every(point => point.status === 'passed'))
   fixture.response.native.mediaTime += 0.50001
   assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true, 'youtube', null), /clock exceeds/)
-  assert.throws(() => measureFixture(fixture), /clock|timing/)
+  // measureView preserves observed timing counterexamples; acceptance belongs
+  // to requirePausedReview and finishVideo, not discarded visual diagnostics.
+  const result = measureFixture(fixture)
+  assert.ok(result.measured.every(point => point.status === 'passed'))
+  assert.equal(result.clockSkewSeconds, Math.abs(actual.modelTime - fixture.response.native.mediaTime))
+  assert.ok(result.clockSkewSeconds > 0.5)
+  const video = videoFixture()
+  video.samples[0].maxClockSkewSeconds = result.clockSkewSeconds
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.stageMeasurement.status, 'failed')
+  assert.ok(video.failures.some(failure => failure.code === 'mandatory-clock-counterexample'))
 })
 
 test('missing or unknown player transport and missing local ownership never fall back to YouTube', () => {

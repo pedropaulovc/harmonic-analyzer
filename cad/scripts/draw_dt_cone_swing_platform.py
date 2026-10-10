@@ -33,6 +33,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _zoomed_on,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -124,6 +125,63 @@ SECTION_CENTER = _shifted(0.335, 0.105)
 # taking SECTION_SHIFT's extra 10 mm past the border (0.4189).
 BASE_SLIDE_FINISH_XY = (0.375, _shifted(0.355, 0.120)[1])
 
+# The pivot on the profile plan, where the farm run at 039e557da landed it
+# (the plate's current outline re-centres the 1:2 view).
+PROFILE_PIVOT_XY = (0.0718, 0.1357)
+
+
+def corner_fillet_centre_mm(label: str) -> tuple[float, float]:
+    """Model plan (x, z) of a corner fillet's centre, from the part's own corners.
+
+    The build fillets the sharp ``PLATE_CORNERS`` vertex, so the arc centre
+    lies on the interior bisector, r / sin(theta / 2) from the vertex.
+    """
+    corners = _part.PLATE_CORNERS
+    idx = [corner[0] for corner in corners].index(label)
+    _label, x, z, radius = corners[idx]
+    rays = []
+    for _n, nx, nz, _r in (corners[idx - 1], corners[(idx + 1) % len(corners)]):
+        length = math.hypot(nx - x, nz - z)
+        rays.append(((nx - x) / length, (nz - z) / length))
+    bx, bz = rays[0][0] + rays[1][0], rays[0][1] + rays[1][1]
+    norm = math.hypot(bx, bz)
+    reach = radius / math.sin(_part._corner_theta(label) / 2.0)
+    return (x + bx / norm * reach, z + bz / norm * reach)
+
+
+# A left-standing radius's leader knee (where its shelf meets the radial
+# leader) relative to the text position SetPosition sets: measured on the R12
+# corner, (+8.6, -2.8) mm on the run-20261009T172850508Z render, and the
+# ray from the arc centre through it read 183.5 deg against the 183.3 deg
+# arrow of run 20261010T072401692Z. The leader runs this far past the arc.
+RADIUS_KNEE_FROM_TEXT = (0.0086, -0.0028)
+CORNER_LEADER_REACH = 0.004
+
+
+def corner_radius_text_xy(label: str) -> tuple[float, float]:
+    """Text position that lands a corner radius's arrow at its arc's middle.
+
+    The arc's middle lies on the ray from the fillet centre to the sharp
+    ``PLATE_CORNERS`` vertex it rounds, in model space; the 1:2 plan maps
+    model (x, z) to sheet (x, -z) about PROFILE_PIVOT_XY. A fixed sheet
+    station went stale when the plate outline moved: CornerSER's
+    near-horizontal shelf landed its arrow 5 deg past the R12 arc's end, on
+    the east edge (run 20261010T072401692Z).
+    """
+    per_mm = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
+    corners = {corner[0]: corner for corner in _part.PLATE_CORNERS}
+    _label, vx, vz, radius = corners[label]
+    cx, cz = corner_fillet_centre_mm(label)
+    length = math.hypot(vx - cx, vz - cz)
+    ux, uy = (vx - cx) / length, -(vz - cz) / length
+    reach = radius * per_mm + CORNER_LEADER_REACH
+    knee = (
+        PROFILE_PIVOT_XY[0] + cx * per_mm + ux * reach,
+        PROFILE_PIVOT_XY[1] - cz * per_mm + uy * reach,
+    )
+    return (knee[0] - RADIUS_KNEE_FROM_TEXT[0], knee[1] - RADIUS_KNEE_FROM_TEXT[1])
+
+
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
     "NorthEastX": (0.045, 0.105),
@@ -131,13 +189,15 @@ PROFILE_KEEP = {
     "SouthWestX": (0.104, 0.258),
     "SouthEastX": (0.045, 0.259),
     # Radial rays must meet actual trimmed corners, not circle extensions.
-    # CornerNE/R10 is left and CornerNW/R8 is right in this view.  R10 and
-    # R12 shelves sit just above horizontal enough to land inside their arcs
-    # while clearing the 223.4 witness lines.
+    # CornerNE/R10 is left and CornerNW/R8 is right in this view.  The R10
+    # shelf sits just above horizontal enough to land inside its arc while
+    # clearing the 223.4 witness lines.
     "CornerNER": (0.045, 0.139),
     "CornerNWR": (0.135, 0.118),
     "CornerSWR": (0.110, 0.249),
-    "CornerSER": (0.040, 0.2435),
+    # R12's arrow lands at its arc's middle (corner_radius_text_xy); its
+    # text stands between the 223.4 south witness and the 24.0 line.
+    "CornerSER": corner_radius_text_xy("SE"),
 }
 FEATURE_KEEP = {
     # Short lines (12 characters, ~34 mm at most) between the 195.09 line
@@ -297,9 +357,6 @@ HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.072)
 # caption).  Its 59.7 x 4.8 mm box, anchored upper-left and centred under
 # the notch plan, clears the 7.0 arrow tip (y 0.1276) above.
 NOTCH_CAPTION_UPPER_LEFT = (NOTCH_CENTER[0] - 0.02985, 0.1255)
-# The pivot on the profile plan, where the farm run at 039e557da landed it
-# (the plate's current outline re-centres the 1:2 view).
-PROFILE_PIVOT_XY = (0.0718, 0.1357)
 
 
 def plate_edge_mm(z_mm: float, side: int) -> float:
@@ -395,6 +452,15 @@ def _position_section_label(adapter: Any, section: Any) -> None:
         )
 
 
+# INote.GetExtent is read off the drawing as displayed, to the pixel: every
+# maximised 1280x752 seat (2.1 px/mm) read detail B's box at the same point,
+# 0.22/-0.16 mm off its request, and a 1024x640 one (0.95 px/mm) left it
+# 0.70/-0.39 mm off after both corrections -- each residual under one pixel.
+# The label is moved and read zoomed onto its own box, plus this margin, so
+# a pixel is about a tenth of a millimetre whatever the seat's window.
+VIEW_LABEL_ZOOM_MARGIN = 0.005
+
+
 def _position_view_label(
     adapter: Any,
     view: Any,
@@ -405,7 +471,8 @@ def _position_view_label(
     """Move a view's native label so its box's lower-left lands at ``lower_left``.
 
     The label's anchor is not its box corner, so the move is measured: read
-    ``INote.GetExtent``, shift the anchor by the corner's error, read back.
+    ``INote.GetExtent``, shift the anchor by the corner's error, read back,
+    all zoomed onto the requested box (:data:`VIEW_LABEL_ZOOM_MARGIN`).
     The sheet scale is pinned first; finalization re-applying it must not
     move a dynamic label after this readback.  The script adds no notes to
     these views, so the native label is the view's one note.
@@ -419,17 +486,21 @@ def _position_view_label(
         raise RuntimeError(f"expected one native {label}, found {len(notes)} notes")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    for _attempt in range(2):
-        extent = tuple(float(v) for v in note.GetExtent())
-        error = (lower_left[0] - extent[0], lower_left[1] - extent[1])
-        if max(abs(error[0]), abs(error[1])) < 0.0002:
-            break
-        anchor = tuple(float(v) for v in _read_member(annotation, "GetPosition"))
-        moved = (anchor[0] + error[0], anchor[1] + error[1], 0.0)
-        if not annotation.SetPosition2(*moved):
-            raise RuntimeError(f"failed to position native {label}")
-        adapter.currentModel.EditRebuild3()
     extent = tuple(float(v) for v in note.GetExtent())
+    size = (extent[3] - extent[0], extent[4] - extent[1])
+    centre = (lower_left[0] + size[0] / 2.0, lower_left[1] + size[1] / 2.0)
+    with _zoomed_on(adapter, centre, max(size) / 2.0 + VIEW_LABEL_ZOOM_MARGIN):
+        for _attempt in range(2):
+            extent = tuple(float(v) for v in note.GetExtent())
+            error = (lower_left[0] - extent[0], lower_left[1] - extent[1])
+            if max(abs(error[0]), abs(error[1])) < 0.0002:
+                break
+            anchor = tuple(float(v) for v in _read_member(annotation, "GetPosition"))
+            moved = (anchor[0] + error[0], anchor[1] + error[1], 0.0)
+            if not annotation.SetPosition2(*moved):
+                raise RuntimeError(f"failed to position native {label}")
+            adapter.currentModel.EditRebuild3()
+        extent = tuple(float(v) for v in note.GetExtent())
     print(f"{label}: requested lower-left={lower_left} extent={extent}")
     if max(abs(lower_left[0] - extent[0]), abs(lower_left[1] - extent[1])) > 0.0005:
         raise RuntimeError(
@@ -790,25 +861,6 @@ def expected_corner_arcs(feature_name: str) -> int:
     label = feature_name.removeprefix("Corner")
     radius = {corner[0]: corner[3] for corner in _part.PLATE_CORNERS}[label]
     return 2 if _part._north_fillet_relief_overlap(label, radius) > 0.0 else 1
-
-
-def corner_fillet_centre_mm(label: str) -> tuple[float, float]:
-    """Model plan (x, z) of a corner fillet's centre, from the part's own corners.
-
-    The build fillets the sharp ``PLATE_CORNERS`` vertex, so the arc centre
-    lies on the interior bisector, r / sin(theta / 2) from the vertex.
-    """
-    corners = _part.PLATE_CORNERS
-    idx = [corner[0] for corner in corners].index(label)
-    _label, x, z, radius = corners[idx]
-    rays = []
-    for _n, nx, nz, _r in (corners[idx - 1], corners[(idx + 1) % len(corners)]):
-        length = math.hypot(nx - x, nz - z)
-        rays.append(((nx - x) / length, (nz - z) / length))
-    bx, bz = rays[0][0] + rays[1][0], rays[0][1] + rays[1][1]
-    norm = math.hypot(bx, bz)
-    reach = radius / math.sin(_part._corner_theta(label) / 2.0)
-    return (x + bx / norm * reach, z + bz / norm * reach)
 
 
 def check_corner_arc_plan(
