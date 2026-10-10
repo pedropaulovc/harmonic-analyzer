@@ -37,7 +37,6 @@ from _drawing_common import (
     apply_view_configuration,
     assert_balloon_landings,
     assert_full_detail_view,
-    create_blank_drawing_sheets,
     create_section_view,
     finalize_drawing,
     insert_bom_table,
@@ -54,6 +53,8 @@ from _drawing_common import (
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_simplified import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
 
 SPEC = DRAWINGS_BY_NAME["ms_measuring_stick_assembly"]
@@ -74,8 +75,10 @@ SHEET_NAMES = (
     "ASSEMBLY STEPS",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
-    raise AssertionError("the measuring-stick package is drawn on landscape sheets")
-SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
+    raise AssertionError("the measuring-stick primary sheet must remain landscape")
+SHEET_LAYOUTS = dict(zip(SHEET_NAMES, (
+    DrawingLayout.LANDSCAPE, DrawingLayout.PORTRAIT, DrawingLayout.LANDSCAPE
+)))
 SHEET_SCALE = (1.0, 1.0)
 SHEET_SCALES = {name: SHEET_SCALE for name in SHEET_NAMES}
 
@@ -106,13 +109,13 @@ SETUP_NOTE_XY = (0.030, 0.160)
 FINISH_NOTE_XY = (0.030, 0.118)
 SETUP_NOTE_WIDTH = 52  # characters; default-format note text
 
-# Sheet 2: the BOM across the top-left; the exploded isometric below-right
-# of it. Balloons ring the view at BALLOON_MARGIN; the second plate screw's
-# balloon rides an outer ring so both screw instances carry one.
-EXPLODED_ISO_CENTER = (0.300, 0.145)
+# Sheet 2 alone is portrait: the native full-size exploded outline plus its
+# unchanged 24 mm balloon ring is taller than landscape's title-clear band.
+# Centre the measured outline, not the assembly origin, below the BOM.
+EXPLODED_ISO_CENTER = (0.1397, 0.235)
 BALLOON_MARGIN = 0.012
 SECOND_SCREW_BALLOON_MARGIN = 0.024
-BOM_ANCHOR = (0.018, 0.258)
+BOM_ANCHOR = (0.018, 0.405)
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
     "part": 0.026,
@@ -126,7 +129,7 @@ BOM_SKU_TITLE = "VENDOR SKU"
 MADE_PART_SKU = "-"
 BOM_ROW_HEIGHT = 0.006
 EXPLODED_CAPTION = "EXPLODED - ASSEMBLE IN REVERSE ORDER, SEE SHEET 3"
-EXPLODED_CAPTION_XY = (0.018, 0.205)
+EXPLODED_CAPTION_XY = (0.018, 0.354)
 
 # Sheet 3: the order and checks down the left; the finished isometric right.
 ASSEMBLY_ISO_CENTER = (0.315, 0.170)
@@ -262,22 +265,50 @@ def _view_outline(view: Any, *, label: str) -> tuple[float, float, float, float]
     return outline[0], outline[1], outline[2], outline[3]
 
 
-def _assert_view_on_sheet(view: Any, *, margin: float = 0.0, label: str) -> None:
+def _assert_view_on_sheet(
+    view: Any, *, margin: float = 0.0, label: str,
+    layout: DrawingLayout = DrawingLayout.LANDSCAPE,
+) -> None:
     """The view's outline, grown by ``margin`` (a balloon ring), stays inside
     the inner border and clear of the title block."""
     x0, y0, x1, y1 = _view_outline(view, label=label)
     x0, y0, x1, y1 = x0 - margin, y0 - margin, x1 + margin, y1 + margin
-    left, bottom, right, top = SHEET_INNER_BORDER
+    template = DRAWING_TEMPLATES[layout]
+    border = (0.0127, 0.0127, template.width_m - 0.0127, template.height_m - 0.0127)
+    title = (template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m)
+    left, bottom, right, top = border
     findings = []
     if x0 < left or y0 < bottom or x1 > right or y1 > top:
-        findings.append(f"leaves the inner border {SHEET_INNER_BORDER}")
-    tx0, ty0, tx1, ty1 = TITLE_BLOCK
+        findings.append(f"leaves the inner border {border}")
+    tx0, ty0, tx1, ty1 = title
     if x1 > tx0 and x0 < tx1 and y0 < ty1 and y1 > ty0:
-        findings.append(f"enters the title block {TITLE_BLOCK}")
+        findings.append(f"enters the title block {title}")
     if findings:
         raise RuntimeError(
             f"{label}: outline {(x0, y0, x1, y1)!r} " + "; ".join(findings)
         )
+
+
+def _center_view_outline(
+    adapter: Any, view: Any, center: tuple[float, float], *, label: str
+) -> None:
+    """Translate the actual exploded outline using the current native origin."""
+    view = _early_bound(view, "IView")
+    x0, y0, x1, y1 = _view_outline(view, label=label)
+    before = tuple(float(value) for value in view.Position)
+    target = (
+        before[0] + center[0] - (x0 + x1) / 2.0,
+        before[1] + center[1] - (y0 + y1) / 2.0,
+    )
+    if not view.SetViewPosition(double_array(list(target)), False):
+        raise RuntimeError(f"{label}: SetViewPosition refused {target!r}")
+    adapter.currentModel.EditRebuild3()
+    after = tuple(float(value) for value in view.Position)
+    if len(after) != 2 or any(abs(a - b) > 1e-6 for a, b in zip(after, target)):
+        raise RuntimeError(f"{label}: view moved to {after!r}, expected {target!r}")
+    x0, y0, x1, y1 = _view_outline(view, label=label)
+    if abs((x0 + x1) / 2.0 - center[0]) > 1e-6 or abs((y0 + y1) / 2.0 - center[1]) > 1e-6:
+        raise RuntimeError(f"{label}: measured outline did not centre at {center!r}")
 
 
 def _component_stem(component: Any) -> str:
@@ -709,8 +740,12 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         configuration=configuration,
         label="measuring-stick exploded",
     )
+    _center_view_outline(
+        adapter, exploded, EXPLODED_ISO_CENTER, label="measuring-stick exploded"
+    )
     _assert_view_on_sheet(
-        exploded, margin=SECOND_SCREW_BALLOON_MARGIN, label="measuring-stick exploded"
+        exploded, margin=SECOND_SCREW_BALLOON_MARGIN, label="measuring-stick exploded",
+        layout=SHEET_LAYOUTS[SHEET_NAMES[1]],
     )
     table = insert_bom_table(
         adapter,
@@ -785,8 +820,89 @@ def _place_steps_sheet(adapter: Any) -> None:
     )
 
 
+def _activate_package(adapter: Any, target: Any) -> None:
+    title = str(target.GetTitle() or "")
+    if not title:
+        raise RuntimeError("measuring-stick package drawing has no title")
+    activation = adapter.swApp.ActivateDoc3(title, False, 2, 0)
+    if not activation:
+        raise RuntimeError("failed to reactivate measuring-stick package")
+    activated, errors = activation
+    if int(errors) != 0:
+        raise RuntimeError(f"failed to reactivate measuring-stick package: {errors}")
+    if activated is None:
+        activated = adapter.swApp.ActiveDoc
+    if activated is None or int(adapter.swApp.IsSame(activated, target)) != 1:
+        raise RuntimeError("reactivated document is not the measuring-stick package")
+    adapter.currentModel = _early_bound(activated, "IModelDoc2")
+
+
+def _append_template_sheet(adapter: Any, target: Any, *, name: str) -> None:
+    """Copy a real project-template sheet, closing its donor even on failure."""
+    donor_title = ""
+    try:
+        donor, donor_sheet = new_project_drawing(
+            adapter, layout=SHEET_LAYOUTS[name], scale=SHEET_SCALES[name]
+        )
+        donor = _early_bound(donor, "IModelDoc2")
+        donor_sheet = _early_bound(donor_sheet, "ISheet")
+        donor_title = str(donor.GetTitle() or "")
+        donor_name = str(donor_sheet.GetName() or "")
+        if not donor_title or not donor_name:
+            raise RuntimeError(f"{name}: donor drawing is incomplete")
+        donor.ClearSelection2(True)
+        if not donor.Extension.SelectByID2(
+            donor_name, "SHEET", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+        ):
+            raise RuntimeError(f"{name}: failed to select donor sheet")
+        donor.EditCopy()
+        _activate_package(adapter, target)
+        ddoc = _early_bound(target, "IDrawingDoc")
+        before = tuple(ddoc.GetSheetNames() or ())
+        returned = bool(ddoc.PasteSheet(2, 2))  # append; preserve view names
+        after = tuple(ddoc.GetSheetNames() or ())
+        added = tuple(sheet for sheet in after if sheet not in before)
+        if len(after) != len(before) + 1 or len(added) != 1:
+            raise RuntimeError(f"{name}: sheet paste failed ({returned=}, {before=}, {after=})")
+        if not returned:
+            _telemetry.warn(f"{name}: PasteSheet returned false but created {added[0]!r}")
+        if not ddoc.ActivateSheet(added[0]):
+            raise RuntimeError(f"{name}: failed to activate pasted sheet")
+        sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+        sheet.SetName(name)
+        if str(sheet.GetName() or "") != name:
+            raise RuntimeError(f"{name}: failed to rename pasted sheet")
+    finally:
+        primary_error = sys.exception()
+        if donor_title:
+            try:
+                adapter.swApp.CloseDoc(donor_title)
+                _activate_package(adapter, target)
+            except Exception as exc:
+                if primary_error is None:
+                    raise
+                _telemetry.warn(f"{name}: donor cleanup failed: {exc}")
+
+
+def _create_mixed_package_sheets(adapter: Any) -> None:
+    """Use native template copies, not a metadata-only portrait declaration."""
+    target, initial = new_project_drawing(
+        adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]]
+    )
+    target = _early_bound(target, "IModelDoc2")
+    initial = _early_bound(initial, "ISheet")
+    initial.SetName(SHEET_NAMES[0])
+    if str(initial.GetName() or "") != SHEET_NAMES[0]:
+        raise RuntimeError("failed to name measuring-stick primary sheet")
+    for name in SHEET_NAMES[1:]:
+        _append_template_sheet(adapter, target, name=name)
+    actual = tuple(_early_bound(target, "IDrawingDoc").GetSheetNames() or ())
+    if actual != SHEET_NAMES:
+        raise RuntimeError(f"measuring-stick sheet order mismatch: {actual!r}")
+
+
 def _place_package(adapter: Any) -> Callable[[], None]:
-    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="measuring-stick package")
+    _create_mixed_package_sheets(adapter)
     for sheet_name in SHEET_NAMES:
         sheet = _activate_sheet(adapter, sheet_name)
         scale = SHEET_SCALES[sheet_name]
@@ -830,7 +946,6 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     _validate_source(source_model)
 
-    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
     settled = _place_package(adapter)
     return await finalize_drawing(
         adapter,

@@ -119,13 +119,35 @@ class _StickMathUtility:
         return _StickMathPoint(xyz)
 
 
-def test_build_projects_metre_scale_fence_and_section_points(monkeypatch, tmp_path) -> None:
+@pytest.mark.parametrize(("cut_only", "partial", "error"), [
+    (True, True, None),
+    (False, True, "kept geometry beyond the cut"),
+    (True, False, "not a partial section"),
+])
+def test_build_projects_metre_scale_fence_and_section_points(
+    monkeypatch, tmp_path, cut_only, partial, error,
+) -> None:
     """Run the real callers and projection math without opening a COM seat."""
     source = tmp_path / "ms-stick.SLDPRT"
     source.write_bytes(b"offline source sentinel")
     monkeypatch.setattr(drawing, "SOURCE", source)
     utility = _StickMathUtility()
     circles, notes, sections, views = [], [], [], []
+    section_modes, rebuilds = [], []
+
+    def set_cut_only(display):
+        section_modes.append(display)
+        # SetDisplayOnlySurfaceCut is void, including when persistence fails.
+
+    def read_section_mode(value):
+        assert rebuilds == ["engraving section cut face"]
+        return value
+
+    cut = SimpleNamespace(
+        SetDisplayOnlySurfaceCut=set_cut_only,
+        GetDisplayOnlySurfaceCut=lambda: read_section_mode(cut_only),
+        GetPartialSection=lambda: read_section_mode(partial),
+    )
     sketch_transform = _StickAffine((2.0, -3.0, 1.0), (0.03, 0.04, 0.02))
 
     def make_view(position, scale, center_x):
@@ -190,6 +212,9 @@ def test_build_projects_metre_scale_fence_and_section_points(monkeypatch, tmp_pa
     monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
     monkeypatch.setattr(drawing, "place_view", place_view)
     monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.GetName2())
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing", lambda adapter, *, label: rebuilds.append(label),
+    )
     for name in (
         "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
         "set_hidden_lines_removed", "set_dimension_callouts", "assert_manufacturing_dimensions",
@@ -205,7 +230,7 @@ def test_build_projects_metre_scale_fence_and_section_points(monkeypatch, tmp_pa
 
     def section(adapter, view, **kwargs):
         sections.append((view, kwargs))
-        return object()
+        return SimpleNamespace(GetSection=lambda: cut)
 
     async def finalize(adapter, outputs, **kwargs):
         return {"slddrw": str(outputs.slddrw)}
@@ -213,7 +238,16 @@ def test_build_projects_metre_scale_fence_and_section_points(monkeypatch, tmp_pa
     monkeypatch.setattr(drawing, "add_note", note)
     monkeypatch.setattr(drawing, "create_section_view", section)
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    if error is not None:
+        with pytest.raises(RuntimeError, match=error):
+            asyncio.run(drawing.build(adapter))
+        assert section_modes == [True]
+        assert source.read_bytes() == b"offline source sentinel"
+        return
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
+    assert section_modes == [True]
+    assert rebuilds == ["engraving section cut face"]
+    assert source.read_bytes() == b"offline source sentinel"
     assert len(utility.points) == 16
     assert len(notes) == 11
     for value, (xyz, (text, x, y)) in enumerate(zip(
@@ -227,15 +261,22 @@ def test_build_projects_metre_scale_fence_and_section_points(monkeypatch, tmp_pa
     assert utility.points[13] == pytest.approx((0.2188, 0.240, 0.0))
     assert len(circles) == 1
     assert circles[0] == pytest.approx((0.4546, -0.680, 0.02, 0.4676, -0.680, 0.02))
-    assert utility.points[14] == pytest.approx((0.0575, -0.001, 0.0))
-    assert utility.points[15] == pytest.approx((0.0575, 0.009, 0.0))
+    assert utility.points[14] == pytest.approx((0.0563, 0.0065, 0.0))
+    assert utility.points[15] == pytest.approx((0.0587, 0.0065, 0.0))
+    start_x, start_y, _ = utility.points[14]
+    end_x, end_y, _ = utility.points[15]
+    assert start_y == end_y
+    assert (spec.BODY_WIDTH - spec.TICK_LENGTH) / 1000.0 < start_y < spec.BODY_WIDTH / 1000.0
+    assert start_x < (spec.SCALE_START_X - spec.TICK_WIDTH / 2.0) / 1000.0
+    assert end_x > (spec.SCALE_START_X + spec.TICK_WIDTH / 2.0) / 1000.0
     assert len(sections) == 1
     section_view, arguments = sections[0]
     assert section_view is detail
-    assert arguments["line_start"] == pytest.approx((0.1374, 0.185))
-    assert arguments["line_end"] == pytest.approx((0.1374, 0.125))
+    assert arguments["line_start"] == pytest.approx((0.1302, 0.140))
+    assert arguments["line_end"] == pytest.approx((0.1446, 0.140))
     assert arguments["view_xy"] == drawing.SECTION_CENTER
     assert arguments["section_label"] == "B"
     assert arguments["scale"] == drawing.DETAIL_SCALE
+    assert arguments["partial"] is True
     assert views[1].Angle == views[-1].Angle == pytest.approx(math.pi)
     assert tuple(getattr(detail.ScaleRatio, "value", detail.ScaleRatio)) == drawing.DETAIL_SCALE

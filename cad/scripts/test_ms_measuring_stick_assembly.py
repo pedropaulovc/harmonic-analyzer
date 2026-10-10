@@ -224,6 +224,13 @@ def test_fitter_package_covers_rule_9() -> None:
         "EXPLODED VIEW + BOM",
         "ASSEMBLY STEPS",
     )
+    assert drawing.SPEC.layout is drawing.DrawingLayout.LANDSCAPE
+    assert tuple(drawing.SHEET_LAYOUTS[name] for name in drawing.SHEET_NAMES) == (
+        drawing.DrawingLayout.LANDSCAPE,
+        drawing.DrawingLayout.PORTRAIT,
+        drawing.DrawingLayout.LANDSCAPE,
+    )
+    assert all(scale == (1.0, 1.0) for scale in drawing.SHEET_SCALES.values())
     assert drawing.BOM_COMPONENTS == spec.BOM_ORDER
     assert set(drawing.BOM_DESCRIPTIONS) == set(spec.QUANTITIES)
     assert set(drawing.BALLOON_ANCHORS) == set(spec.QUANTITIES)
@@ -257,7 +264,8 @@ def test_bom_prints_registry_material_and_vendor_sku() -> None:
         "sku",
         "quantity",
     }
-    left, _bottom, right, _top = drawing.SHEET_INNER_BORDER
+    template = drawing.DRAWING_TEMPLATES[drawing.SHEET_LAYOUTS[drawing.SHEET_NAMES[1]]]
+    left, right = 0.0127, template.width_m - 0.0127
     assert left <= drawing.BOM_ANCHOR[0]
     assert drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values()) < right
 
@@ -277,6 +285,179 @@ def test_every_component_instance_carries_a_balloon() -> None:
     assert len(singles) + len(pinned) == sum(spec.QUANTITIES.values()) == 6
     # The second pass rings outside the first, at least a balloon apart.
     assert drawing.SECOND_SCREW_BALLOON_MARGIN - drawing.BALLOON_MARGIN >= 0.010
+
+
+@pytest.mark.parametrize("layout", tuple(drawing.DrawingLayout))
+def test_view_regions_use_selected_template(monkeypatch, layout) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    template = drawing.DRAWING_TEMPLATES[layout]
+    view = SimpleNamespace(GetOutline=lambda: (0.02, 0.12, 0.08, 0.18))
+    drawing._assert_view_on_sheet(view, layout=layout, label="inside")
+    view.GetOutline = lambda: (0.02, 0.12, template.width_m, 0.18)
+    with pytest.raises(RuntimeError, match="inner border"):
+        drawing._assert_view_on_sheet(view, layout=layout, label="outside")
+    view.GetOutline = lambda: (
+        template.title_block_left_m + 0.001, 0.02,
+        template.width_m - 0.02, template.title_block_top_m - 0.001,
+    )
+    with pytest.raises(RuntimeError, match="title block"):
+        drawing._assert_view_on_sheet(view, layout=layout, label="title")
+
+
+def test_measured_exploded_outline_recenters_and_fits_only_portrait(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    rebuilt = []
+
+    class View:
+        Position = (0.300, 0.145)
+        original = Position
+
+        def GetOutline(self):
+            # Native observation, without the 24 mm balloon ring.
+            x0, y0, x1, y1 = (0.2187158944414347, 0.0691861987846213,
+                              0.4166394446178927, 0.22326010614945984)
+            dx, dy = (self.Position[i] - self.original[i] for i in range(2))
+            return x0 + dx, y0 + dy, x1 + dx, y1 + dy
+
+        def SetViewPosition(self, position, children):
+            assert children is False
+            self.Position = tuple(position)
+            return True
+
+    view = View()
+    before = view.GetOutline()
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: rebuilt.append(True)))
+    drawing._center_view_outline(adapter, view, drawing.EXPLODED_ISO_CENTER, label="exploded")
+    assert view.Position == pytest.approx((
+        0.300 + 0.1397 - (before[0] + before[2]) / 2,
+        0.145 + 0.235 - (before[1] + before[3]) / 2,
+    ))
+    assert rebuilt == [True]
+    drawing._assert_view_on_sheet(
+        view, margin=0.024, layout=drawing.DrawingLayout.PORTRAIT, label="exploded"
+    )
+    with pytest.raises(RuntimeError, match="inner border"):
+        drawing._assert_view_on_sheet(view, margin=0.024, label="exploded")
+
+
+@pytest.mark.parametrize("defect", ("refused", "unapplied", "stale outline"))
+def test_outline_recentering_refuses_failed_or_unapplied_move(monkeypatch, defect) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    view = SimpleNamespace(
+        Position=(0.3, 0.145),
+        GetOutline=lambda: (0.2, 0.07, 0.4, 0.22),
+    )
+    def move(position, _children):
+        if defect == "stale outline":
+            view.Position = tuple(position)
+        return defect != "refused"
+
+    view.SetViewPosition = move
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: None))
+    with pytest.raises(RuntimeError, match="refused|view moved|measured outline"):
+        drawing._center_view_outline(adapter, view, drawing.EXPLODED_ISO_CENTER, label="failed")
+
+
+@pytest.mark.parametrize("defect", (None, "selection", "paste", "activation", "rename"))
+def test_mixed_sheets_copy_real_templates_and_close_donors(monkeypatch, defect) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
+    created, closed, clipboard = [], [], []
+    documents = {}
+
+    class Sheet:
+        def __init__(self, layout):
+            self.name, self.layout = "Sheet1", layout
+
+        def SetName(self, name):
+            if defect != "rename" or name == drawing.SHEET_NAMES[0]:
+                self.name = name
+
+        def GetName(self):
+            return self.name
+
+    class Document:
+        def __init__(self, title, layout):
+            self.title = title
+            self.sheets = [Sheet(layout)]
+            self.active = self.sheets[0]
+            self.Extension = SimpleNamespace(
+                SelectByID2=lambda *args: defect != "selection" and args[0] == self.active.name
+            )
+
+        def GetTitle(self):
+            return self.title
+
+        def ClearSelection2(self, _all):
+            pass
+
+        def EditCopy(self):
+            clipboard[:] = [self.active.layout]
+
+        def GetSheetNames(self):
+            return [sheet.name for sheet in self.sheets]
+
+        def PasteSheet(self, insertion, rename):
+            assert (insertion, rename) == (2, 2)
+            if defect == "paste":
+                return False
+            sheet = Sheet(clipboard[0])
+            sheet.name = f"Sheet{len(self.sheets) + 1}"
+            self.sheets.append(sheet)
+            return True
+
+        def ActivateSheet(self, name):
+            if defect == "activation":
+                return False
+            self.active = next(sheet for sheet in self.sheets if sheet.name == name)
+            return True
+
+        def GetCurrentSheet(self):
+            return self.active
+
+    adapter = SimpleNamespace(currentModel=None)
+
+    def activate(title, silent, rebuild, errors):
+        assert (silent, rebuild, errors) == (False, 2, 0)
+        adapter.currentModel = documents[title]
+        return adapter.currentModel, 0
+
+    adapter.swApp = SimpleNamespace(
+        ActivateDoc3=activate, IsSame=lambda a, b: int(a is b),
+        CloseDoc=lambda title: closed.append(documents.pop(title)),
+    )
+
+    def new_drawing(_adapter, *, layout, scale):
+        assert scale == (1.0, 1.0)
+        document = Document(f"Drawing{len(created)}", layout)
+        documents[document.title] = document
+        created.append(document)
+        adapter.currentModel = document
+        return document, document.active
+
+    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
+    if defect is None:
+        drawing._create_mixed_package_sheets(adapter)
+        target = created[0]
+        assert tuple(target.GetSheetNames()) == drawing.SHEET_NAMES
+        assert tuple(sheet.layout for sheet in target.sheets) == (
+            drawing.DrawingLayout.LANDSCAPE, drawing.DrawingLayout.PORTRAIT,
+            drawing.DrawingLayout.LANDSCAPE,
+        )
+    else:
+        message = {
+            "selection": "select donor sheet", "paste": "sheet paste failed",
+            "activation": "activate pasted sheet", "rename": "rename pasted sheet",
+        }[defect]
+        with pytest.raises(RuntimeError, match=message):
+            drawing._create_mixed_package_sheets(adapter)
+        target = created[0]
+        assert len(created) == 2
+    assert closed == created[1:]
+    assert adapter.currentModel is target
+    assert list(documents.values()) == [target]
 
 
 def test_reference_dimensions_follow_the_spec() -> None:
