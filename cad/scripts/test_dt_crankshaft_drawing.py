@@ -347,6 +347,19 @@ def test_blind_pin_holes_bottom_in_the_collar_body_not_the_spigot_end() -> None:
     assert collar_min - deepest >= 2.0
 
 
+def test_drive_pin_callout_is_placed_inside_the_zone_frame_from_its_read_back() -> None:
+    # Its anchor sits inside the border, but the text centres on it and the
+    # press row runs ~110 mm, so it printed 3 mm past the left inner border
+    # (run 15, 06a20f94c).  After its prose is set, the measured callout is
+    # moved clear of the zone frame and asserted inside it.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    prose = source.index("_set_callout_below(drive_pins, DRIVE_PIN_CALLOUT,")
+    call = source[prose:]
+    call = call[: call.index("add_attached_note(")]
+    assert "place_callout_clear(" in call
+    assert '_early_bound(drive_pins, "IDisplayDimension").GetAnnotation()' in call
+
+
 def test_sheet_placements_stay_inside_the_border() -> None:
     inner = (0.0127, 0.0127, 0.4191, 0.2667)  # ASME B landscape inner border
     title_block = (0.218, 0.065)  # x >= and y <=
