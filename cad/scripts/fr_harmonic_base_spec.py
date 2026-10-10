@@ -24,7 +24,7 @@ TOP_LENGTH = 17.5 * MM_PER_IN  # 444.5 (0.25 in reveal per side)
 TOP_THICKNESS = 1.5 * MM_PER_IN  # 38.1
 # The pad DEPTH is set by the column stations, not by the ch6 28 cm callout.
 # The sockets sit at x = +/-197 and z = +/-112, so a pad centred on the part
-# origin leaves an EQUAL socket-to-rim deck land on all four sides only at
+# origin leaves an EQUAL socket-to-pad-edge land on all four sides only at
 # TOP_WIDTH = TOP_LENGTH - 2 * (197 - 112) = 274.5. The former 10.5 in pad
 # (266.7) left 1.6 mm of land in Z against 5.5 in X, and the 2026-09 blind
 # machinist review rejected that asymmetry as a blocker: no tolerance stack
@@ -42,16 +42,57 @@ BOTTOM_CENTER_Z = (BOTTOM_FRONT_Z + BOTTOM_REAR_Z) / 2.0
 TOP_FRONT_Z = -TOP_WIDTH / 2.0
 TOP_REAR_Z = TOP_WIDTH / 2.0
 TOP_CENTER_Z = (TOP_FRONT_Z + TOP_REAR_Z) / 2.0
-STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8: the deck (pad top)
-LIP_W = 7.0  # raised rim width, in from the pad outline (2026-09 photo re-derive)
-LIP_H = 2.5  # raised rim height above the deck
-RIM_TOP = STACK_HEIGHT + LIP_H  # 53.3: the casting's overall height
+STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8: the deck top, overall height
+# Black machined deck + green land (user ruling 2026-10-09, ch30 p002/p003/p006
+# and ch26 p.71 photos): the green raised rim is gone. The black panel is a
+# raised machined pad DECK_RISE proud of the green casting top, centred on the
+# pad; everything on the pad top outside it is the green land at GREEN_TOP.
+# The deck top stays at STACK_HEIGHT, so nothing seated on the deck moves.
+DECK_RISE = 3.0
+GREEN_TOP = STACK_HEIGHT - DECK_RISE  # 47.8: green land, socket mouths
+DECK_LENGTH = 334.0  # x -167.0..+167.0 (the nameplate's west edge is 4.0 inside)
+DECK_LAND = 7.0  # green land in front of and behind the deck (z)
+DECK_WIDTH = TOP_WIDTH - 2.0 * DECK_LAND  # 260.5: z -130.25..+130.25
+DECK_HALF_X = DECK_LENGTH / 2.0
+DECK_HALF_Z = DECK_WIDTH / 2.0
+# Plan corners 1/4 in, the casting's rounded-corner language (the photographed
+# black panel reads round-cornered); the top edge takes a 1/32 in x 45 break,
+# half the plates' 1/16 in rim break, so 2.2 of the 3.0 step stays square.
+DECK_CORNER_R = 0.25 * MM_PER_IN  # 6.35
+DECK_EDGE_BREAK = MM_PER_IN / 32.0  # 0.79375 legs
+
+# Underside lightening (same ruling): one cored pocket from the underside
+# inside a POCKET_WALL perimeter wall, its ceiling POCKET_SKIN under the deck
+# top (so GREEN_SKIN under the green ends), crossed by two ribs that stop
+# RIB_RELIEF above the underside and hung with bosses under every blind deck
+# seat. Each column socket stands in a full-height SOCKET_BOSS_DIA boss merged
+# into the walls; the casting fillets round the pocket's reentrant edges.
+POCKET_WALL = 12.0
+POCKET_HALF_X = TOP_LENGTH / 2.0 - POCKET_WALL  # 210.25
+POCKET_HALF_Z = TOP_WIDTH / 2.0 - POCKET_WALL  # 125.25
+POCKET_SKIN = 12.0
+POCKET_CEILING_Y = STACK_HEIGHT - POCKET_SKIN  # 38.8: also the pocket depth
+GREEN_SKIN = GREEN_TOP - POCKET_CEILING_Y  # 9.0
+RIB_THICKNESS = 10.0
+RIB_RELIEF = 3.0  # rib bottoms clear the bench by this much
+SOCKET_BOSS_DIA = 41.5
+HANGING_BOSS_MIN_DIA = 16.0  # max(this, 2.5 x tap drill) per seat
+# Hanging bosses and lugs end on one of two cast levels above the underside:
+# each seat takes the higher level that still leaves its drill tip 1.5D of
+# metal (build_fr_harmonic_base proves it), so the pattern carries two boss
+# lengths instead of one per seat.
+DEEP_BOSS_BOTTOM_Y = 12.0
+SHALLOW_BOSS_BOTTOM_Y = 28.0
+CASTING_FILLET_R = 6.0
 
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")
 
-# The deck is black in the source photographs. Machining and black coating of
-# the full underside is the user's reconstruction choice, not photo evidence.
+# The deck is black in the source photographs. "deck" is the raised deck top
+# alone; the green land around it is as-cast. "underside" is the perimeter
+# foot the casting stands on (the socket bosses merge into it); the pocket and
+# the hanging bosses inside it stay as-cast. Machining and black coating of
+# the foot is the user's reconstruction choice, not photo evidence.
 # The registry Finish field owns the paint and its masking, so each roughness
 # symbol carries the grade alone; there are no locally masked feet.
 #
@@ -65,8 +106,8 @@ if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
 # field). The part authors one native symbol per qualified face; the sheet
 # states the requirement once, as this target on the plan profile. The target
 # NAMES the surface, so the one sheet symbol cannot be misread as the pad side
-# face or the rim (2026-09 review clarity item: three nested plan outlines sit
-# within a few millimetres of each other). "(TABLE ORIGIN)" states the
+# face or the deck (2026-09 review clarity item: three nested plan outlines
+# share the plan view). "(TABLE ORIGIN)" states the
 # function: the 2026-09-25 Codex machinist review read the edges as neither
 # running nor locating and asked for the symbol's removal (Main: rebutted,
 # and made legible on the sheet).
@@ -134,27 +175,94 @@ SOCKET_BORE_FINISHES = tuple(
 )
 PART_SURFACE_FINISHES = (*SURFACE_FINISHES, *SOCKET_BORE_FINISHES)
 
+# The underside's rect pads, cross-tap lugs, ribs and MHA-DT-024 foot boss
+# stand under seats the hole table does not locate (transfer seats, cross
+# taps) or under none, so their sizes and their places from the table's X0 Y0
+# are model dims too (Codex P2 on #1310; machinist review of the ribs and the
+# foot boss). Each pair shares its size and one coordinate, so one pad of the
+# pair carries the shared dim (UNDERSIDE_PAD_PREFIXES prints it 2X) and each
+# pad its own other one. Not marked: what the casting cannot show -- the lock
+# pad's and the lugs' outer ends and the lugs' widths run into the wall and
+# the socket bosses, the block pads' east ends into the cross rib, and the
+# ribs' ends into the wall (a rib's other coordinate is its centring, shown by
+# its thickness about the pocket's centre line).
+UNDERSIDE_PAD_DIMENSIONS: dict[str, tuple[str, ...]] = {
+    "DeepBossProfile": (
+        "LockPadWidth",
+        "LockPadX",
+        "LockPadY",
+        "PedestalPad0Width",
+        "PedestalPadLength",
+        "PedestalPad1X",
+        "PedestalPad0Y",
+        "PedestalPad1Y",
+        "FootBossX",
+        "FootBossY",
+    ),
+    "ShallowBossProfile": ("BlockPad0Width", "BlockPad1X", "BlockPad0Y", "BlockPad1Y"),
+    "CrossTapLugProfile": ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y"),
+    "LongRibProfile": ("LongRibY",),
+    "CrossRibProfile": ("CrossRibX",),
+}
+UNDERSIDE_PAD_PREFIXES: dict[tuple[str, str], str] = {
+    (feature, name): "2X "
+    for feature, names in (
+        ("DeepBossProfile", ("PedestalPad0Width", "PedestalPadLength", "PedestalPad1X")),
+        ("ShallowBossProfile", ("BlockPad0Width", "BlockPad1X")),
+        ("CrossTapLugProfile", ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y")),
+    )
+    for name in names
+}
+
 # Mark every dimension the drawing imports. Policy rule 2: a printed nominal
-# whose decimal places state a tolerance is a MODEL dimension, so the rim
-# step, the rim width, the flange-to-rim height, both 45-degree edge breaks,
-# the cross-screw axis height and the spotface size and depth are authored on
-# the part and imported -- not drawn on the sheet from picked geometry. Only
-# the hole table and the parenthesised overall height stay sheet-side.
+# whose decimal places state a tolerance is a MODEL dimension, so the deck
+# extent and rise, the flange-to-deck height, the 45-degree edge breaks, the
+# cross-screw axis height, the spotface size and depth and the underside
+# pocket's wall, depth, ribs and bosses are authored on the part and imported
+# -- not drawn on the sheet from picked geometry. Only the hole table and the
+# parenthesised reference heights stay sheet-side.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BottomProfile": {"BottomLen", "BottomWid"},
     "TopProfile": {"TopLen", "TopWid"},
     "BottomPlate": {"BottomThickness"},
     "PadCorners": {"PadCornerRadius"},
     "FlangeCorners": {"FlangeCornerRadius"},
-    "RimInnerCorners": {"RimInnerCornerRadius"},
-    "Rim": {"RimHeight"},
-    "RimWidthReference": {"RimWidth"},
-    "HeightReference": {"FlangeToRim"},
+    "DeckProfile": {"DeckLen", "DeckWid"},
+    "Deck": {"DeckRise"},
+    "DeckCorners": {"DeckCornerRadius"},
+    "DeckEdgeBreak": {"DeckEdgeChamfer"},
+    "HeightReference": {"FlangeToDeck"},
     "CrossTapReference": {"CrossTapX", "CrossTapPitch"},
     "TopRimBreaks": {"TopRimChamfer"},
     "BottomEdgeBreak": {"BottomEdgeChamfer"},
     "BaseSpotFaceRearProfile": {"SpotFaceDia", "Spot0Y"},
     "BaseSpotFaceRear": {"SpotFaceDepth"},
+    "PocketProfile": {"PocketLen", "PocketWid"},
+    "Pocket": {"PocketDepth"},
+    "SocketBossProfile": {"SocketBossDia"},
+    "LongRibProfile": {
+        "LongRibThickness",
+        *UNDERSIDE_PAD_DIMENSIONS["LongRibProfile"],
+    },
+    "CrossRibProfile": {
+        "CrossRibThickness",
+        *UNDERSIDE_PAD_DIMENSIONS["CrossRibProfile"],
+    },
+    "LongRib": {"RibRelief"},
+    "DeepBossProfile": {
+        "HangingBossDia",
+        *UNDERSIDE_PAD_DIMENSIONS["DeepBossProfile"],
+    },
+    # The shallow level's round-boss diameter, on the rear-west nameplate
+    # tap's boss (sheet 3 calls the level out at each diameter).
+    "ShallowBossProfile": {
+        "ShallowBoss4Dia",
+        *UNDERSIDE_PAD_DIMENSIONS["ShallowBossProfile"],
+    },
+    "CrossTapLugProfile": set(UNDERSIDE_PAD_DIMENSIONS["CrossTapLugProfile"]),
+    "DeepBosses": {"DeepBossBottom"},
+    "ShallowBosses": {"ShallowBossBottom"},
+    "PocketFillets": {"PocketFilletRadius"},
 }
 
 # Decimal places ARE the tolerance statement (policy rule 2), so the MODEL
@@ -173,20 +281,48 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BottomPlate": {"BottomThickness": 1},
     "PadCorners": {"PadCornerRadius": 1},
     "FlangeCorners": {"FlangeCornerRadius": 1},
-    "RimInnerCorners": {"RimInnerCornerRadius": 1},
-    "Rim": {"RimHeight": 1},
-    "RimWidthReference": {"RimWidth": 1},
-    "HeightReference": {"FlangeToRim": 1},
+    "DeckProfile": {"DeckLen": 1, "DeckWid": 1},
+    "Deck": {"DeckRise": 1},
+    "DeckCorners": {"DeckCornerRadius": 1},
+    "DeckEdgeBreak": {"DeckEdgeChamfer": 1},
+    "HeightReference": {"FlangeToDeck": 1},
     "CrossTapReference": {"CrossTapX": 1, "CrossTapPitch": 1},
     "TopRimBreaks": {"TopRimChamfer": 1},
     "BottomEdgeBreak": {"BottomEdgeChamfer": 1},
     "BaseSpotFaceRearProfile": {"SpotFaceDia": 1, "Spot0Y": 1},
     "BaseSpotFaceRear": {"SpotFaceDepth": 2},
+    "PocketProfile": {"PocketLen": 1, "PocketWid": 1},
+    "Pocket": {"PocketDepth": 1},
+    "SocketBossProfile": {"SocketBossDia": 1},
+    "LongRibProfile": {
+        "LongRibThickness": 1,
+        **dict.fromkeys(UNDERSIDE_PAD_DIMENSIONS["LongRibProfile"], 1),
+    },
+    "CrossRibProfile": {
+        "CrossRibThickness": 1,
+        **dict.fromkeys(UNDERSIDE_PAD_DIMENSIONS["CrossRibProfile"], 1),
+    },
+    "LongRib": {"RibRelief": 1},
+    "DeepBossProfile": {
+        "HangingBossDia": 1,
+        **dict.fromkeys(UNDERSIDE_PAD_DIMENSIONS["DeepBossProfile"], 1),
+    },
+    "ShallowBossProfile": {
+        "ShallowBoss4Dia": 1,
+        **dict.fromkeys(UNDERSIDE_PAD_DIMENSIONS["ShallowBossProfile"], 1),
+    },
+    "CrossTapLugProfile": dict.fromkeys(
+        UNDERSIDE_PAD_DIMENSIONS["CrossTapLugProfile"], 1
+    ),
+    "DeepBosses": {"DeepBossBottom": 1},
+    "ShallowBosses": {"ShallowBossBottom": 1},
+    "PocketFillets": {"PocketFilletRadius": 1},
 }
 
-# The overall 53.3 is a pure REFERENCE dimension: the read-only sum of the
-# three model-owned heights below it, parenthesised, carrying no tolerance of
-# its own and having no model dimension to import. Its places are therefore
+# The overall 50.8 and the pocket skins are pure REFERENCE dimensions: each
+# the read-only difference or sum of model-owned heights, parenthesised,
+# carrying no tolerance of its own and having no model dimension to import.
+# Their places are therefore
 # not a tolerance statement -- but they are still specification, so the PART
 # owns the digit and the sheet passes it through instead of writing a literal.
 DRAWING_REFERENCE_PRECISION = 1
@@ -211,7 +347,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 # No Manufacturing Notes block. The one note it carried, a 1.0 MIN finished
-# deck land between each bore and the rim, put a dimension in a note; the
+# land between each bore and the casting edge, put a dimension in a note; the
 # land is now a design guarantee that build_fr_harmonic_base proves at import
 # from every tolerance the sheet prints (hb-render-4 eye pass).
 

@@ -37,14 +37,21 @@ on swmaker000005, 000007 and 000008, and the walk then took lag-screw-2 at
 20260928T125521595Z, 20260928T141421973Z). Moving on to a sibling was a
 hit result choosing the instance, so the pin makes that choice instead.
 
-The nameplate screw is pinned to fillister-screw-3, the plate's west rear
-corner (``nameplate_spec.MOUNT_HOLE_XZ[2]``). The explode withdraws the four
+The nameplate screw is pinned to fillister-screw-2, the plate's front west
+corner (``nameplate_spec.MOUNT_HOLE_XZ[1]``). The explode withdraws the four
 screws 35 mm straight up off the lifted plate, and in the isometric the
 first screw's corner is the plate's nearest: its screw hangs over the
 engraving, where run 20260928T194845954Z-44f5de00de924735961d14f4aad40337
 ballooned its head among the letters and the leader read as the nameplate's.
-The west rear corner is the plate's leftmost, so its screw hangs clear
-beyond the plate instead.
+fillister-screw-3's corner is the plate's leftmost, so its screw hangs clear
+beyond the plate, but once the plate moved onto the deck's west end (#1310)
+that head printed at (154.03, 143.78) mm, 0.48 mm right of and 4.68 mm under
+the base's frozen point (153.54, 148.46): the base leader, running down from
+that point, crossed the screw's leader 1.6 mm short of its head (run
+20261010T080952518Z-e181d98b5be149ab856b66e780131dbd, swmaker00000a). The
+plate's rightmost corner is fillister-screw-2's; projected from screw-3's
+head, its head prints some 12 mm right of the base point, and its screw too
+hangs beyond the plate.
 """
 
 from __future__ import annotations
@@ -59,7 +66,7 @@ FRAME_BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
     "vn-lag-screw": BalloonAnchor(instance="vn-lag-screw-2"),
     "fr-top-frame": BalloonAnchor(),
     "fr-nameplate": BalloonAnchor(),
-    "vn-fillister-screw": BalloonAnchor(instance="vn-fillister-screw-3"),
+    "vn-fillister-screw": BalloonAnchor(instance="vn-fillister-screw-2"),
     "vn-frame-cross-screw": BalloonAnchor(),
     "vn-gooseneck-set-screw": BalloonAnchor(),
 }

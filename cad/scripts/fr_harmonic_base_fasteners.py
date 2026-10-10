@@ -124,10 +124,10 @@ PEDESTAL_SCREW_ENGAGEMENT = PEDESTAL_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS
 # like the other seats. The stations are the plate's four corner screw holes
 # (fr_nameplate_spec.SCREW_XY, plate-local) carried through the plate's mount
 # transform into the machine frame -- fr_nameplate_spec.MOUNT_HOLE_XZ, the ONE
-# derivation the frame assembly's screw drops read too:
-# (209.75, +/-45.5) and (163.75, +/-45.5). The plate is anchored to the pad's
-# east edge, not to the mechanism, so unlike the swing/rig seats no
-# MECHANISM/POST shift applies (no _FORMER_ twin). The plate lies flat on the
+# derivation the frame assembly's screw drops read too (the four DXF
+# screw-head marks, scaled). The plate is anchored to the black deck's west
+# edge (user ruling 2026-10-09), not to the mechanism, so unlike the swing/rig
+# seats no MECHANISM/POST shift applies (no _FORMER_ twin). The plate lies flat on the
 # deck (its back face at STACK_HEIGHT, gap 0 -- asserted below), so each
 # screw axis runs -Y straight from the plate's front face into the deck.
 NAMEPLATE_SCREW_XZ = fr_nameplate_spec.MOUNT_HOLE_XZ

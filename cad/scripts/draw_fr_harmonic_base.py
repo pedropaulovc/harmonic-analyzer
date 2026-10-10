@@ -5,9 +5,14 @@ native footprint/socket dimensions, the ordinary-coordinate mounting-hole table,
 and manufacturing notes; every shared sheet/template, import, curation, and
 export behavior lives in ``_drawing_common``.
 
-The base is a stepped gray-iron frame with a raised rim, four column sockets,
-and blind tapped hardware seats. The plate is 457 mm long, so the whole sheet
-runs 1:4; the front elevation is also 1:4 and the pictorial isometric is 1:6.
+The base is a stepped gray-iron frame: a raised black deck stands 3.0 proud of
+a green land on the pad, four column sockets open on that land, blind tapped
+hardware seats run down into the deck, and the casting is cored from below by
+a ribbed underside pocket whose bosses back every seat. The plate is 457 mm
+long, so the whole package runs 1:4 -- the front elevation too -- except the
+pictorial isometric (1:6) and the underside section and pads (1:2). Four
+sheets: exterior geometry, holes and sockets, the underside, and the
+underside's pads and lugs placed from the hole table's X0 Y0.
 
 Run with SolidWorks open::
 
@@ -27,6 +32,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_leader_note,
     add_native_hole_callout,
     add_surface_finish,
     create_blank_drawing_sheets,
@@ -39,8 +45,10 @@ from _drawing_common import (
     insert_hole_table,
     import_cosmetic_threads,
     model_point_in_view,
+    model_points_in_view,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hole_callout_precision,
@@ -62,22 +70,31 @@ from _surface_finish import surface_finish_by_key
 from build_fr_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
+    BLOCK_PAD_SHAPES,
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
     COLUMN_SOCKET_DIAMETER,
+    CROSS_TAP_LUG_SHAPES,
+    DEEP_BOSS_SHAPES,
     FOOT_SCREW_HOLE_DIA,
     FOOT_SCREW_XZ,
     HOLD_DOWN_TAP_DRILL_DIA,
     HOLE_XZ,
     LOCK_KNOB_XZ,
+    LOCK_PAD_SHAPE,
     LOCK_SCREW_HOLE_DIA,
+    LONG_RIB_SHAPE,
     NAMEPLATE_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_XZ,
+    PEDESTAL_PAD_SHAPES,
     PEDESTAL_SCREW_HOLE_DIA,
     PEDESTAL_SCREW_XZ,
     SERIAL_HEIGHT_MM,
     SERIAL_TEXT,
     SERIAL_XZ,
+    SHALLOW_BOSS_CENTRES,
+    SHALLOW_BOSS_SHAPES,
+    SOCKET_BOSS_SHAPES,
     PIVOT_SCREW_HOLE_DIA,
     PIVOT_SCREW_XZ,
     STOP_SCREW_HOLE_DIA,
@@ -93,8 +110,9 @@ from fr_harmonic_base_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    GREEN_TOP,
     PART_SURFACE_FINISHES,
-    RIM_TOP,
+    POCKET_CEILING_Y,
     STACK_HEIGHT,
     socket_bore_finish_key,
 )
@@ -124,7 +142,7 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 4.0)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
-SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS")
+SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS", "UNDERSIDE", "UNDERSIDE-PADS")
 
 # Section A-A is projected from a vertical cutting line, which lays machine +Y
 # across the sheet: it reads as the upright section turned 90 degrees
@@ -132,15 +150,17 @@ SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS")
 # the sheet carries exactly one "SECTION A-A" and it is the one under the view.
 # The custom-scale compartment PREFIXES the scale SolidWorks formats itself
 # (label renders "<this text> 1 : 4"), so spelling the ratio here too printed
-# it twice -- state the rotation and let the native value follow.
+# it twice -- state the rotation and let the native value follow. The text is
+# a document preference, so it labels every section: sheet 3's B-B is cut on
+# a vertical line too and the build proves it turns the same way.
 SECTION_LABEL_SCALE_TEXT = "ROTATED 90 DEG CW  SCALE"
 
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
 
-# Two landscape B sheets keep each annotation authoritative and readable:
+# Three landscape B sheets keep each annotation authoritative and readable:
 # exterior geometry on sheet 1; the associative hole table, sockets and
-# cross-taps on sheet 2.
+# cross-taps on sheet 2; the underside pocket, its ribs and bosses on sheet 3.
 TOP_CENTER = (0.145, 0.185)
 SIDE_CENTER = (0.145, 0.100)
 # The isometric owns the whole field right of the sheet-1 dimension envelope
@@ -150,10 +170,14 @@ ISO_SCALE = (1, 6)
 ISO_CENTER = (0.3425, 0.175)
 # The stamped-ID note's top-left corner, below the plan. SolidWorks runs its
 # leader from the right end of the note's last line (hb-render-5: 44.0 mm
-# right of and 11.8 mm below this anchor) to the serial on the +X rim. From
-# (0.125, 0.130) that leader ran through the A3 socket bore (2026-09-25 Codex
-# machinist review, clarity); from here it passes 4 mm clear of the bore.
-SERIAL_NOTE_XY = (0.080, 0.130)
+# right of and 11.8 mm below this anchor) to the serial in the deck's corner.
+# From (0.125, 0.130) the leader to the old +X-rim serial ran through the A3
+# socket bore (2026-09-25 Codex machinist review, clarity). With the serial
+# now inboard on the deck, this anchor makes the leader short and steep: it
+# stays well clear of every socket bore and crosses each plan outline's lower
+# edge left of where that outline's width dimension starts its witness line,
+# so it crosses no dimension.
+SERIAL_NOTE_XY = (0.100, 0.135)
 SERIAL_LEADER_START_OFFSET_M = (0.0440, -0.0118)
 # The flange-perimeter finish symbol, in sheet 1's open field left of the
 # plan. Its target, "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)", runs ~63 mm at
@@ -225,61 +249,71 @@ HOLES_TOP_LABEL_XY = (0.170, 0.237)
 
 # Section A-A cuts the socket pair at x = +COLUMN_X and lays machine -Z up the
 # sheet, so the lower-Z (front) socket of that pair is the UPPER one on paper.
-# Its inner bore wall is the leader target, picked midway between the
-# cross-screw axis and the deck: that puts the arrowhead 6.35 mm (1.6 mm on
-# paper) clear of BOTH the window the cross tap opens through the wall and the
-# deck outline, so the symbol reads as the bore's and cannot be mistaken for
-# the tapped cross hole whose cosmetic thread crowds the same wall.
+# Its inner bore wall is the leader target, picked midway between the top of
+# the window the cross tap opens through the wall and the socket's mouth on
+# the green land: that puts the arrowhead 3.84 mm (1 mm on paper) clear of
+# BOTH, so the symbol reads as the bore's and cannot be mistaken for the
+# tapped cross hole whose cosmetic thread crowds the same wall. The deck-era
+# 4 mm cannot survive: the mouth dropped 3.0 to the land, leaving 7.7 mm of
+# bore wall between the window and the mouth.
 SECTION_SOCKET_XZ = min(
     (station for station in COLUMN_SOCKET_XZ if station[0] > 0.0),
     key=lambda station: station[1],
 )
 SOCKET_LEADER_POINT_MM = (
     COLUMN_X,
-    (BASE_SCREW_Y + STACK_HEIGHT) / 2.0,
+    (BASE_SCREW_Y + BASE_CROSS_TAP_DRILL_DIA / 2.0 + GREEN_TOP) / 2.0,
     SECTION_SOCKET_XZ[1] + COLUMN_SOCKET_DIAMETER / 2.0,
 )
-# The symbol sits in the open field on the DECK side of the section, between
+# The symbol sits in the open field on the TOP side of the section, between
 # the upper-rim and underside chamfer callouts, so its leader reaches the bore
-# by crossing the deck outline alone and its text clears both. The shoulder is
+# by crossing the land outline alone and its text clears both. The shoulder is
 # short so the elbow stays out of the cut geometry it points into.
 SOCKET_FINISH_SYMBOL_XY = (0.387, 0.1435)
 SOCKET_FINISH_SHOULDER = 0.004
 
 # Per-view survivors of the native marked-dimension import. Sheet 1 owns the
 # exterior envelope and edge geometry. Sheet 2 owns socket and hole definition.
-# Every manufacturing value on both sheets is imported here: the part marks
+# Sheet 3 owns the underside pocket.
+# Every manufacturing value on the sheets is imported here: the part marks
 # and precises them (harmonic_base_spec.DRAWING_DIMENSIONS / DRAWING_PRECISION)
 # and these tables only say WHICH view shows each one and WHERE its text sits
-# -- the placement-only division policy rule 2 draws. The four keeps partition
+# -- the placement-only division policy rule 2 draws. The six keeps partition
 # DRAWING_PRECISION_BY_NAME exactly, which assert_imported_precision proves at
 # the end of the build.
 GEOMETRY_TOP_KEEP = {
-    "BottomLen": (TOP_CENTER[0], 0.244),
-    "TopLen": (TOP_CENTER[0], 0.230),
-    "BottomWid": (0.238, 0.172),
-    "TopWid": (0.217, 0.200),
+    # Three lengths stacked above the plan, shortest nearest the outline, and
+    # three widths right of it the same way. The widths' texts stagger in y
+    # so no value sits on a neighbour's dimension line.
+    "BottomLen": (TOP_CENTER[0], 0.256),
+    "TopLen": (TOP_CENTER[0], 0.244),
+    "DeckLen": (TOP_CENTER[0], 0.230),
+    "BottomWid": (0.250, 0.172),
+    "TopWid": (0.236, 0.200),
+    "DeckWid": (0.222, 0.186),
     "PadCornerRadius": (0.070, 0.236),
     "FlangeCornerRadius": (0.040, 0.215),
-    "RimInnerCornerRadius": (0.050, 0.232),
-    # Above the plan, beside the 444.5/457.2 stack, not below it. The
-    # witnesses rise from the reference line at the view centre (sheet y
-    # 0.184), and the stamped ID sits on the rim between them, 14.5 mm below
-    # that line. With the value below the plan (was (0.243, 0.125)) the
-    # witnesses ran 71 mm down past the serial, and the STAMPED ID leader had
-    # to cross one of them to reach it (leader-crosses-line). Going up, they
-    # leave the outline 10 mm before the dimension line and never pass the
-    # serial. x keeps the 54 mm caption row clear of the 457.2 witness.
-    "RimWidth": (0.238, 0.241),
+    # On the top-left deck corner, reading above the pad radius so the two
+    # radial leaders do not cross.
+    "DeckCornerRadius": (0.062, 0.252),
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
-    "FlangeToRim": (0.0625, 0.112),
+    "FlangeToDeck": (0.0625, 0.112),
+    # Right of the front view, above the deck step it measures at its right
+    # end; the 0.75 mm span on paper puts the arrows outside.
+    "DeckRise": (0.228, 0.116),
+    # The front view, not the plan: a chamfer dimension imports only where its
+    # edge shows in profile (farm leaf 20261010T064423Z: the plan import
+    # delivered every other plan dimension but this one). Above DeckRise in
+    # the strip right of the front view and below the plan; the serial note
+    # holds the matching strip on the left.
+    "DeckEdgeChamfer": (0.205, 0.138),
 }
 HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
-# Section A-A lays machine +Y across the sheet, so the three height values
-# read left-to-right beside the view and the spotface depth -- a machine-Z
-# value, which the rotation lays UP the sheet -- sits off the rear end it cuts.
+# Section A-A lays machine +Y across the sheet, so the spotface depth -- a
+# machine-Z value, which the rotation lays UP the sheet -- sits off the rear
+# end it cuts.
 # Both edge breaks land on the view's top-left corner, so their text stacks in
 # the strip between the view (right edge 387.3 mm) and the sheet's right inner
 # border (419.1 mm). The native layout audit measured what that strip costs:
@@ -288,23 +322,13 @@ HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
 # captions ran off the sheet edge -- 433.6 mm on a 431.8 mm sheet. Both texts
 # now sit beside the corner they dimension, captions inside the border.
 SECTION_KEEP = {
-    # Below the section, between the view (bottom 93.5 mm) and its SECTION
-    # A-A label (top 80.5 mm). The witnesses start at the rear end (y 0.1017).
-    # Above the view (was (0.393, 0.215)) they ran up the whole section, and
-    # the A1-A4 bore Ra leader had to cross them (leader-crosses-line). Beside
-    # the view (e252ac13d) the 2.5's outside-arrow stub printed across the
-    # hatched deck. Under the view the stub is clear of the part, the
-    # witnesses stop 18 mm down, and the block stays 3.8 mm under the
-    # spotface depth line. x keeps the caption right of the spotface arrow
-    # stub at 384.5 mm.
-    "RimHeight": (0.400, 0.0928),
     "TopRimChamfer": (0.400, 0.189),
     "BottomEdgeChamfer": (0.385, 0.1633),
     # Right of the section, not left: a display dimension anchors where
     # its leader meets the text box border, so a position LEFT of the
     # spotface ran the block back across the front cross-tap view (seen
     # on the 200 dpi sheet-2 render).  This lands it in the same
-    # 382-418 mm callout column the three dimensions above use, ABOVE its own
+    # 382-418 mm callout column the two dimensions above use, ABOVE its own
     # dimension line: the leader drops from the arrow to the block's bottom-left
     # corner, so a block straddling the dimension line gets its widest caption
     # row struck by that drop (measured at y 0.103: the line crossed '4X
@@ -325,17 +349,18 @@ HOLE_SIDE_KEEP = {
 }
 GEOMETRY_CALLOUTS = {
     "TopLen": "PAD CENTERED ON FLANGE",
+    "DeckLen": "DECK CENTERED ON PAD",
     "PadCornerRadius": "PAD",
     "FlangeCornerRadius": "FLANGE",
-    "RimInnerCornerRadius": "RIM INNER",
-    "RimWidth": "FROM PAD OUTER EDGE\nTO RIM INNER FACE\n4 SIDES",
+    "DeckCornerRadius": "DECK",
+    "DeckEdgeChamfer": "X 45 DEG\nDECK EDGE",
+    "DeckRise": "DECK ABOVE\nLAND",
 }
 # One chamfer feature breaks both plates' top rims, so its caption names the
 # feature -- in the PLURAL -- rather than whichever of its edges the import
 # attached to. Plural, not spelled out: this column is 32 mm wide, and a
 # caption row wider than that leaves the sheet (see SECTION_KEEP).
 SECTION_CALLOUTS = {
-    "RimHeight": "RIM ABOVE\nDECK",
     "TopRimChamfer": "X 45 DEG\nTOP RIMS",
     "BottomEdgeChamfer": "X 45 DEG\nUNDERSIDE",
     "SpotFaceDepth": "4X SPOTFACE\nDEPTH",
@@ -356,13 +381,41 @@ HOLE_TAG_POSITIONS = {
     # with U34c the arbor-pedestal seats followed them, taking the last #4-40
     # rows (the former E) along. The native tags re-letter: the
     # rocker-support taps are now E and the nameplate seats are now F.
-    "E1": (0.306, 0.187),
+    # North-east of its tap, short of E3's tap and west of the nameplate's
+    # rear-west tap, whose mark the former (0.306, 0.187) box sat on.
+    "E1": (0.297, 0.1895),
     "E2": (0.289, 0.206),
     "E3": (0.312, 0.173),
     "E4": (0.312, 0.214),
-    "F3": (0.343, 0.181),
-    "F4": (0.343, 0.214),
 }
+# The nameplate taps sit on the plate's DXF screw marks, about 2 mm (at 1:4)
+# inside the deck's east edge with section line A 7.5 mm east of that, so a
+# tag east of section A's line crosses it (F3/F4 at ec323b4eb: crossed
+# section line A and each other). Nor do four tags fit inside the 9 x 23 mm
+# four-tap quad: two tags whose columns overlap read as one block unless a
+# full row pitch (5.4 mm) separates them (enforced merged-blocks, ab1f78504),
+# and E4 already stands over the quad. So the west taps' tags read just east
+# of their taps, inside the quad -- the front one stepped down a row pitch
+# under E4, the rear one stepped down away from E1, whose box ends beside
+# that tap -- and the east taps' tags read in the open pad strip between the
+# deck's east edge and section line A, a row pitch clear of A3 and A4. Placed
+# from each tag's own table row, not its letter, so a re-lettered or
+# re-sorted table still lands each tag beside its own tap.
+# (east tap, rear tap) -> (tap centre to tag box's left edge, tap centre to
+# tag mid-height), sheet m. A tag's insertion point is its box's top-left: F3
+# at (342.5, 181.0) mm started its leader at (342.5, 179.2), mid-height of a
+# 3.5 mm tag.
+NAMEPLATE_TAG_OFFSETS = {
+    (False, False): (0.0025, -0.0040),
+    (False, True): (0.0025, -0.0020),
+    (True, False): (0.0033, -0.0036),
+    (True, True): (0.0033, 0.0010),
+}
+_HOLE_TAG_HALF_HEIGHT_M = 0.00175
+_NAMEPLATE_QUAD_CENTRE_XZ = (
+    sum(x for x, _ in NAMEPLATE_SCREW_XZ) / len(NAMEPLATE_SCREW_XZ),
+    sum(z for _, z in NAMEPLATE_SCREW_XZ) / len(NAMEPLATE_SCREW_XZ),
+)
 
 # Hole-table origin is the finished plate's lower-left theoretical sharp
 # corner. The physical corner is filleted, so the native table is seeded from
@@ -386,6 +439,24 @@ def _plan_xy(
 def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, float]:
     """Sheet pick on a hole-sheet plan rim, offset in machine +X."""
     return _plan_xy(x_mm + diameter_mm / 2.0, z_mm, center=HOLE_TOP_CENTER)
+
+
+def _nameplate_tag_position(
+    table_mm: tuple[float, float],
+) -> tuple[float, float] | None:
+    """Tag insertion point for the nameplate tap at hole-table ``table_mm``,
+    or ``None`` when that row is not a nameplate tap."""
+    x_mm = table_mm[0] - BOTTOM_LENGTH / 2.0
+    z_mm = BOTTOM_REAR_Z - table_mm[1]
+    # The table prints two places, so a row matches its tap within 0.01 mm.
+    if not any(
+        abs(x_mm - x) < 0.01 and abs(z_mm - z) < 0.01 for x, z in NAMEPLATE_SCREW_XZ
+    ):
+        return None
+    hole_x, hole_y = _plan_xy(x_mm, z_mm, center=HOLE_TOP_CENTER)
+    centre_x, centre_z = _NAMEPLATE_QUAD_CENTRE_XZ
+    dx, dy = NAMEPLATE_TAG_OFFSETS[(x_mm > centre_x, z_mm > centre_z)]
+    return (hole_x + dx, hole_y + dy + _HOLE_TAG_HALF_HEIGHT_M)
 
 
 @_telemetry.traced("drawing.base_cross_tap_edge")
@@ -584,7 +655,7 @@ def _serial_edge(view: Any) -> Any:
         edge = _early_bound(raw, "IEdge")
         values = tuple(float(value) for value in edge.GetCurveParams2())
         x0, y0, z0, x1, y1, z1 = values[:6]
-        if max(abs(y0 - RIM_TOP / 1000.0), abs(y1 - RIM_TOP / 1000.0)) > 1e-7:
+        if max(abs(y0 - STACK_HEIGHT / 1000.0), abs(y1 - STACK_HEIGHT / 1000.0)) > 1e-7:
             continue
         distance = (
             ((x0 + x1) / 2.0 - SERIAL_XZ[0] / 1000.0) ** 2
@@ -607,7 +678,19 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
             float(table.DisplayedText2(row, column, False))
             for column in (1, 2)
         )
-    remaining = dict(HOLE_TAG_POSITIONS)
+    nameplate_tags = {
+        tag: position
+        for tag, location in table_locations.items()
+        if (position := _nameplate_tag_position(location)) is not None
+    }
+    if len(nameplate_tags) != len(NAMEPLATE_SCREW_XZ):
+        raise RuntimeError(
+            f"hole table carries {sorted(nameplate_tags)} for the "
+            f"{len(NAMEPLATE_SCREW_XZ)} nameplate taps: {table_locations!r}"
+        )
+    if overlap := set(nameplate_tags) & set(HOLE_TAG_POSITIONS):
+        raise RuntimeError(f"nameplate tags also placed by letter: {sorted(overlap)}")
+    remaining = {**HOLE_TAG_POSITIONS, **nameplate_tags}
     found = set()
     for raw in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
@@ -628,7 +711,7 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
             raise RuntimeError(f"failed to reposition native hole tag {tag}")
         if str(note.GetText()).strip() != tag:
             raise RuntimeError(f"moving native hole tag changed its text: {tag}")
-        if tag in ("D1", "E1", "E3"):
+        if tag in ("D1", "E1", "E3") or tag in nameplate_tags:
             points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
             if len(points) < 6 or len(points) % 3:
                 raise RuntimeError(f"native hole tag {tag} has no complete leader: {points!r}")
@@ -731,17 +814,295 @@ ALL_HOLES = (
 # split the two pedestal seats out of FootScrewHoles into PedestalSeats with
 # the hole count unchanged (warm-c486; both runs import 22 cosmetic threads).
 # One note per feature in each plan view fits both runs, with the side-face
-# BaseCrossTaps adding none. _log_tapped_hole_notes records the per-view
-# split on every build, so a drifted count names the view it drifted in.
+# BaseCrossTaps adding none. Sheets 3's and 4's bottom views count as plan
+# views too: SolidWorks drops the same per-feature note there although every
+# deck seat ends blind inside its boss (leaf 20261010T072847Z: 8 per view on
+# all three sheets then). _log_tapped_hole_notes records the per-view split on
+# every build, so a drifted count names the view it drifted in.
 TAPPED_HOLE_NOTE = "Tapped Hole"
 # finalize_drawing deletes every note containing one of these (case-blind, the
 # adapter's remove_notes_matching), so none of them reaches the final sheet.
 FINAL_SHEET_REMOVED_NOTES = (TAPPED_HOLE_NOTE,)
-PLAN_VIEWS = ((SHEET_NAMES[0], "*Top"), (SHEET_NAMES[1], "*Top"))
+PLAN_VIEWS = (
+    (SHEET_NAMES[0], "*Top"),
+    (SHEET_NAMES[1], "*Top"),
+    (SHEET_NAMES[2], "*Bottom"),
+    (SHEET_NAMES[3], "*Bottom"),
+)
 TAPPED_HOLE_NOTES = len(DECK_TAPPED_SEAT_FEATURES) * len(PLAN_VIEWS)
 TABLE_HOLES = tuple(hole for hole in ALL_HOLES if hole not in TRANSFER_HOLES)
 if len(TABLE_HOLES) != len(ALL_HOLES) - len(TRANSFER_HOLES):
     raise AssertionError("a transferred seat is not a unique base hole")
+
+# Sheet 3, the underside. The bottom view holds sheet 1's plan station, so it
+# reads as the plan turned over. SolidWorks' *Bottom view keeps machine +X to
+# the right and lays +Z UP the sheet (the plan mirrored top to bottom); the
+# build proves that mapping before any pick or text position relies on it.
+BOTTOM_CENTER = TOP_CENTER
+UNDERSIDE_SECTION_SCALE = (1, 2)
+# Right of the bottom view and its pocket-width dimension, above the title
+# block: at 1:2 the section's 287.2 mm runs 143.6 mm up the sheet and its
+# 50.8 mm height 25.4 mm across. Its caption hangs 31.2 mm under the cut's
+# lowest edge (bp3 render: at y 0.160 the caption ran into the title block).
+UNDERSIDE_SECTION_CENTER = (0.300, 0.176)
+
+
+def _bottom_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point for a machine X/Z station in the sheet-3 bottom view."""
+    return (
+        BOTTOM_CENTER[0] + x_mm * VIEW_SCALE / 1000.0,
+        BOTTOM_CENTER[1] + z_mm * VIEW_SCALE / 1000.0,
+    )
+
+
+def _x_span(shape: tuple) -> tuple[float, float]:
+    """Machine-X extent of one build_fr_harmonic_base pocket shape."""
+    if shape[0] == "disc":
+        return (shape[1] - shape[3], shape[1] + shape[3])
+    return (shape[1], shape[2])
+
+
+# Section B-B is cut at constant X -- a vertical line on the bottom view, like
+# A-A's, so the shared rotated label is true of it -- through the widest X
+# band where a deep boss (bottom 12.0) and a shallow one (bottom 28.0) overlap,
+# so one section shows the ceiling, the long rib's relief and both boss levels.
+# That band is the spring-foot boss over the pinion-block pads; it lies
+# between the foot and block-screw bores, so no thread clutters the cut.
+_DEEP_SHALLOW_X_BANDS = [
+    (max(deep[0], shallow[0]), min(deep[1], shallow[1]))
+    for deep in map(_x_span, DEEP_BOSS_SHAPES)
+    for shallow in map(_x_span, SHALLOW_BOSS_SHAPES)
+]
+_CUT_BAND = max(_DEEP_SHALLOW_X_BANDS, key=lambda band: band[1] - band[0])
+UNDERSIDE_CUT_X = (_CUT_BAND[0] + _CUT_BAND[1]) / 2.0
+if _CUT_BAND[1] <= _CUT_BAND[0]:
+    raise AssertionError("no X band crosses both a deep and a shallow boss")
+if any(abs(UNDERSIDE_CUT_X - x) <= diameter / 2.0 for x, _z, diameter in ALL_HOLES):
+    raise AssertionError("section B-B would cut a hole bore")
+if any(abs(UNDERSIDE_CUT_X - shape[1]) <= shape[3] for shape in SOCKET_BOSS_SHAPES):
+    raise AssertionError("section B-B would cut a socket boss")
+if not LONG_RIB_SHAPE[1] < UNDERSIDE_CUT_X < LONG_RIB_SHAPE[2]:
+    raise AssertionError("section B-B misses the long rib that carries RibRelief")
+
+# Bottom-view texts, sheet metres, all outside the casting's footprint. The
+# pocket size reads below the view, clear of the B-B arrows; the corner group
+# stacks left of the view. Each rib's thickness reads well clear of its own
+# witness lines (bp3 machinist review: both "10.0 RIB" texts sat on lines):
+# the long rib's above its span, left of the view; the cross rib's high above
+# the B arrow, left of the rib. The two round-boss diameters' leaders drop
+# from the top-right, one per cast level (the review read all eleven bosses
+# as shallow): the deep diameter on E1's boss, the shallow one on the rear
+# west nameplate tap's (ShallowBoss4, pinned by test).
+UNDERSIDE_BOTTOM_KEEP = {
+    "PocketLen": (0.170, 0.130),
+    "PocketWid": (0.222, 0.200),
+    "SocketBossDia": (0.055, 0.140),
+    "PocketFilletRadius": (0.050, 0.165),
+    "LongRibThickness": (0.070, 0.198),
+    "CrossRibThickness": (0.128, 0.247),
+    "HangingBossDia": (0.180, 0.248),
+    "ShallowBoss4Dia": (0.240, 0.248),
+}
+UNDERSIDE_BOTTOM_NOTE_XY = (0.030, 0.258)
+_DEEP_ROUND_BOSSES = sum(shape[0] == "disc" for shape in DEEP_BOSS_SHAPES)
+_SHALLOW_ROUND_BOSSES = sum(shape[0] == "disc" for shape in SHALLOW_BOSS_SHAPES)
+if _DEEP_ROUND_BOSSES != len(HOLE_XZ) + len(FOOT_SCREW_XZ):
+    raise AssertionError("the deep round bosses are not E1-E4 and the foot boss")
+if _SHALLOW_ROUND_BOSSES != len(SHALLOW_BOSS_CENTRES):
+    raise AssertionError("the shallow round bosses are not B1, D1 and F1-F4")
+# Each level is named, not typed: section B-B prints its height (DEEP LEVEL /
+# SHALLOW LEVEL under the model's DeepBossBottom and ShallowBossBottom).
+UNDERSIDE_BOTTOM_CALLOUTS = {
+    "PocketLen": "POCKET CENTERED ON PAD",
+    "SocketBossDia": f"{len(SOCKET_BOSS_SHAPES)}X SOCKET\nBOSSES",
+    "PocketFilletRadius": f"{2 * len(SOCKET_BOSS_SHAPES)}X BOSS\nTO WALL",
+    "LongRibThickness": "RIB",
+    "CrossRibThickness": "RIB",
+    "HangingBossDia": (
+        f"{_DEEP_ROUND_BOSSES}X BOSSES UNDER\nE1-E4, MHA-DT-024\nTO DEEP LEVEL"
+    ),
+    "ShallowBoss4Dia": (
+        f"{_SHALLOW_ROUND_BOSSES}X BOSSES UNDER\nB1, D1, F1-F4\nTO SHALLOW LEVEL"
+    ),
+}
+# Section B-B texts as MACHINE (Y, Z) points in the cut plane, projected
+# through the section at build time: which way +Z runs up a section is
+# SolidWorks' choice, and these must land in the pocket's open air whichever
+# it makes. The ceiling height reads inside the pocket, in the void in front
+# of the front block pad; the 3.0 rib relief and the two level heights --
+# too short for their text and its level caption -- read outside the
+# underside, level with what they measure.
+UNDERSIDE_OUTSIDE_Y_MM = -24.0
+UNDERSIDE_SECTION_TEXT_MM = {
+    "PocketDepth": (POCKET_CEILING_Y / 2.0, -110.0),
+    "ShallowBossBottom": (UNDERSIDE_OUTSIDE_Y_MM, BLOCK_SCREW_XZ[0][1]),
+    "DeepBossBottom": (UNDERSIDE_OUTSIDE_Y_MM, FOOT_SCREW_XZ[0][1]),
+    "RibRelief": (UNDERSIDE_OUTSIDE_Y_MM, 0.0),
+}
+UNDERSIDE_SECTION_CALLOUTS = {
+    "DeepBossBottom": "DEEP\nLEVEL",
+    "ShallowBossBottom": "SHALLOW\nLEVEL",
+}
+
+# Sheet 4, the underside pads (Codex P2 on #1310). The rect pads, the
+# cross-tap lugs, the ribs and the MHA-DT-024 foot boss stand under seats the
+# hole table does not locate, or under none, so their sizes and their places
+# are model dims, placed from the table's own X0 Y0 -- the flange's rear-west
+# theoretical corner, top left in a bottom view (rule 7: one feature origin
+# per view; baselines, never chains). One *Bottom view at 1:2: the X
+# baselines stack in rows above it and the Y baselines in columns left of it,
+# shortest innermost, so no extension line crosses a dimension line.
+PADS_SCALE = (1.0, 2.0)
+_PADS_M_PER_MM = PADS_SCALE[0] / PADS_SCALE[1] / 1000.0
+# The view's 228.6 x 143.6 mm sit right of the nine Y columns and under the
+# seven X rows, its bottom edge 9.7 mm above the title block.
+PADS_CENTER = (0.2253, 0.1475)
+
+
+def _pads_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point for a machine X/Z station in the sheet-4 bottom view."""
+    return (
+        PADS_CENTER[0] + x_mm * _PADS_M_PER_MM,
+        PADS_CENTER[1] + z_mm * _PADS_M_PER_MM,
+    )
+
+
+PADS_DATUM = _pads_xy(-BOTTOM_LENGTH / 2.0, BOTTOM_REAR_Z)
+# Baseline pitch: a 3.5 mm text row and its air; the first 8 mm off the view.
+PADS_BASELINE_FIRST_M = 0.008
+PADS_BASELINE_ROW_M = 0.0058
+_LOCK_PAD = LOCK_PAD_SHAPE
+_FRONT_PEDESTAL_PAD = PEDESTAL_PAD_SHAPES[0]
+_FRONT_BLOCK_PAD = BLOCK_PAD_SHAPES[0]
+# X rows, innermost first: (name, machine X of the text's centre). The lugs'
+# 39.6 is shorter than its "2X" text, which reads just past its witness line.
+# The foot boss's extension line rises 1.75 mm west of the rear block pad's.
+PADS_X_ROWS = (
+    ("Lug1X", -166.5),
+    ("LockPadX", -168.6),
+    ("PedestalPad1X", -148.6),
+    ("FootBossX", -110.0),
+    ("BlockPad1X", -129.8),
+    ("CrossRibX", -90.0),
+    ("Lug3X", -19.8),
+)
+# Y columns, innermost first: (name, column offset left of X0, text depth
+# below X0; sheet mm). Each pitch clears the wider neighbouring text from the
+# next dimension line by 2.5 mm; the depths step down column by column, so
+# neighbouring texts never share a row, each inside its own span and clear of
+# every longer column's extension line (stations 19.3, 24.1, 33.6, 34.3, 69.3,
+# then 109.3 on). The foot boss's extension line runs 0.7 mm over the rear
+# lugs' (their fronts stand 1.4 mm in front of the boss centre), its arrow on
+# its own line above theirs.
+PADS_Y_COLUMNS = (
+    ("PedestalPad1Y", 8.0, 6.0),
+    ("BlockPad1Y", 15.5, 14.0),
+    ("FootBossY", 23.0, 21.0),
+    ("Lug1Y", 34.25, 28.0),
+    ("LongRibY", 45.5, 36.0),
+    ("Lug0Y", 58.0, 45.0),
+    ("PedestalPad0Y", 70.5, 55.0),
+    ("BlockPad0Y", 79.25, 65.0),
+    ("LockPadY", 88.0, 75.0),
+)
+# Sizes, machine (X, Z) of each text. In the pocket's open air: the pedestal
+# pad's length rises from its west side and the block pad's width rises from
+# its west side, a row above the length. Outside, either one's extension
+# lines would lie on the Y columns' (the pedestal pad's rear edge IS
+# PedestalPad0Y's, its front edge 0.03 from the lock pad's; the block pad's
+# rear edge 0.4 from the pedestal pad's) and cross their dimension lines.
+# A vertical dimension whose text reads beyond its span hangs the text WEST
+# of its dimension line, which runs at the keep X (13f1ca261 render): the
+# pedestal length's line hugs its pad so its "2X 26.0" ends clear of the
+# lock pad's X extension line (at the gap's midpoint it ran through "2X").
+PADS_SIZE_TEXT_MM = {
+    "PedestalPadLength": (
+        _FRONT_PEDESTAL_PAD[1] - 1.6,
+        _FRONT_PEDESTAL_PAD[4] + 16.0,
+    ),
+    "BlockPad0Width": (
+        (_FRONT_PEDESTAL_PAD[2] + _FRONT_BLOCK_PAD[1]) / 2.0,
+        _FRONT_PEDESTAL_PAD[4] + 28.0,
+    ),
+}
+# The lock and front pedestal pads' widths read below the view (machine X, Z
+# of each text), outside the silhouette, in one column left of the lock pad
+# and of the title block. A dimension with a callout runs its line under the
+# callout's last row, so each text block stands over its own dimension line:
+# the lock pad's first, the pedestal pad's under it, below the lock pad's
+# extension lines.
+PADS_SIZE_BELOW_MM = {
+    "LockPadWidth": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 10.6),
+    "PedestalPad0Width": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 50.2),
+}
+
+
+def _cast_level(shapes: tuple, *, deep: bool) -> str:
+    """Section B-B's level word for rect pads cast with the deep or the
+    shallow bosses; fails if the builder hung them at the other level."""
+    if not set(shapes) <= set(DEEP_BOSS_SHAPES if deep else SHALLOW_BOSS_SHAPES):
+        raise AssertionError(f"{shapes} are not cast at the {'deep' if deep else 'shallow'} level")
+    return "DEEP LEVEL" if deep else "SHALLOW LEVEL"
+
+
+# Each rect pad group's and the lugs' cast level (machinist review of bp4:
+# section B-B cuts only the block pads and the foot boss, and the round-boss
+# callouts named no pad), worded as section B-B captions its 12.0 and 28.0.
+# The pad sizes below the view carry it as callouts; the block pads and the
+# lugs, whose sizes read inside the view or are not printed, take pointer
+# notes below the view -- the block pads' in the band over the title block,
+# its arrow ON the front pad's front edge, east of the corner where the
+# 2X 16.0's extension line leaves it (bp5: through the edge, it read as
+# crossing that line).
+# The builder hangs the lugs to the shallow level (CrossTapLugs' LugBottom
+# is driven by "ShallowBossBottom"; CROSS_TAP_LUG_WALLS reckons from it).
+PADS_CALLOUTS = {
+    "LockPadWidth": f"PAD TO\n{_cast_level((_LOCK_PAD,), deep=True)}",
+    "PedestalPad0Width": f"PADS TO\n{_cast_level(PEDESTAL_PAD_SHAPES, deep=True)}",
+}
+# label -> (text, top-left sheet xy, leader tip machine (X, Z)).
+PADS_LEVEL_NOTES = {
+    "pinion-block pads level": (
+        f"{len(BLOCK_PAD_SHAPES)}X PADS TO {_cast_level(BLOCK_PAD_SHAPES, deep=False)}",
+        (0.222, 0.0735),
+        (-20.0, _FRONT_BLOCK_PAD[3]),
+    ),
+    "cross-tap lugs level": (
+        f"{len(CROSS_TAP_LUG_SHAPES)}X LUGS TO\nSHALLOW LEVEL",
+        (0.070, 0.071),
+        (-200.0, -109.0),
+    ),
+}
+UNDERSIDE_PADS_KEEP = {
+    **{
+        name: (
+            _pads_xy(x_mm, 0.0)[0],
+            PADS_DATUM[1] + PADS_BASELINE_FIRST_M + row * PADS_BASELINE_ROW_M,
+        )
+        for row, (name, x_mm) in enumerate(PADS_X_ROWS)
+    },
+    **{
+        name: (
+            PADS_DATUM[0] - offset_mm / 1000.0,
+            PADS_DATUM[1] - depth_mm / 1000.0,
+        )
+        for name, offset_mm, depth_mm in PADS_Y_COLUMNS
+    },
+    **{
+        name: _pads_xy(*xz)
+        for name, xz in (*PADS_SIZE_TEXT_MM.items(), *PADS_SIZE_BELOW_MM.items())
+    },
+}
+# Below the Y columns, left of the title block: the view's scale, the
+# baselines' origin, named as sheet 2 names it, and where the levels print.
+PADS_NOTE = (
+    "BOTTOM VIEW SCALE 1:2\n"
+    "PAD, LUG, RIB AND FOOT-BOSS\n"
+    "LOCATIONS FROM HOLE TABLE\n"
+    "X0 Y0: FLANGE OUTER SHARP CORNER\n"
+    "LEVELS: SECTION B-B, SHEET 3"
+)
+PADS_NOTE_XY = (0.020, 0.052)
 
 
 _SW_NOTE = 6  # swAnnotationType_e.swNote
@@ -1179,12 +1540,79 @@ def _view_geometry_box(adapter: Any, view: Any, label: str) -> Box:
     points = [
         model_point_in_view(adapter, view, (x, y, z), label=f"{label} extent")
         for x in (-BOTTOM_LENGTH / 2000.0, BOTTOM_LENGTH / 2000.0)
-        for y in (0.0, RIM_TOP / 1000.0)
+        for y in (0.0, STACK_HEIGHT / 1000.0)
         for z in (BOTTOM_FRONT_Z / 1000.0, BOTTOM_REAR_Z / 1000.0)
     ]
     xs = [point[0] for point in points]
     ys = [point[1] for point in points]
     return (min(xs), min(ys), max(xs), max(ys))
+
+
+# A drawn station a hundredth of a millimetre off its intended sheet point is
+# still that point; a wrong axis mapping is tens of millimetres off.
+_PROJECTION_TOLERANCE_M = 1e-5
+
+
+def _require_bottom_view_mapping(
+    adapter: Any, view: Any, sheet_xy: Any = _bottom_xy, *, sheet: str = "sheet 3"
+) -> None:
+    """Fail unless the bottom view maps machine X/Z the way ``sheet_xy`` (and
+    so the cutting line and every bottom-view text position) assumes."""
+    stations = ((0.0, 0.0), (100.0, 0.0), (0.0, 100.0))
+    drawn = model_points_in_view(
+        adapter,
+        view,
+        [(x / 1000.0, 0.0, z / 1000.0) for x, z in stations],
+        label=f"{sheet} bottom view mapping",
+    )
+    for (x, z), point in zip(stations, drawn, strict=True):
+        expected = sheet_xy(x, z)
+        error = max(abs(point[0] - expected[0]), abs(point[1] - expected[1]))
+        if error > _PROJECTION_TOLERANCE_M:
+            raise RuntimeError(
+                f"bottom view draws machine X/Z ({x}, {z}) mm at {point}, not {expected}: "
+                f"{sheet} assumes +X right and +Z up"
+            )
+
+
+def _section_turns_clockwise(adapter: Any, section: Any) -> bool:
+    """True when ``section`` lays machine +Y rightward and +Z up or down the
+    sheet: the upright section turned 90 degrees clockwise, as the shared
+    section-label text says."""
+    underside, deck, rear = model_points_in_view(
+        adapter,
+        section,
+        [
+            (UNDERSIDE_CUT_X / 1000.0, 0.0, 0.0),
+            (UNDERSIDE_CUT_X / 1000.0, STACK_HEIGHT / 1000.0, 0.0),
+            (UNDERSIDE_CUT_X / 1000.0, 0.0, BOTTOM_REAR_Z / 1000.0),
+        ],
+        label="section B-B orientation",
+    )
+    return (
+        deck[0] - underside[0] > _PROJECTION_TOLERANCE_M
+        and abs(deck[1] - underside[1]) <= _PROJECTION_TOLERANCE_M
+        and abs(rear[0] - underside[0]) <= _PROJECTION_TOLERANCE_M
+    )
+
+
+def _turn_underside_section_clockwise(adapter: Any, section: Any) -> None:
+    """Make section B-B read the way its label says.
+
+    The label's rotation text is a document preference that A-A's orientation
+    fixes, and which way a section from a bottom view looks is SolidWorks'
+    choice. If B-B lays +Y leftward, reversing its cut direction flips it;
+    if neither way is clockwise, the build fails rather than print a false
+    label."""
+    if _section_turns_clockwise(adapter, section):
+        return
+    _early_bound(section.GetSection(), "IDrSection").SetReversedCutDirection(True)
+    rebuild_drawing(adapter, label="section B-B reversed")
+    if not _section_turns_clockwise(adapter, section):
+        raise RuntimeError(
+            "section B-B lays machine +Y leftward or along the cut either way round, "
+            "so its 'ROTATED 90 DEG CW' label would be false"
+        )
 
 
 _TEXT_OBSTACLE_KINDS = ("note ", "label ", "table ", "origin ", "section ")
@@ -1443,10 +1871,10 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, side, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # RimWidth and FlangeToRim are owned by construction sketches the part
-    # saves blanked (build_harmonic_base REFERENCE_SKETCHES); the hidden-owner
-    # curate shows each in the one view that dimensions it.
-    top_dimensions = curate_hidden_owner_dimensions(
+    # FlangeToDeck is owned by a construction sketch the part saves blanked
+    # (build_harmonic_base REFERENCE_SKETCHES); the hidden-owner curate shows
+    # it in the one view that dimensions it. The plan owns no blanked sketch.
+    top_dimensions = curate_view_dimensions(
         adapter,
         top,
         keep=GEOMETRY_TOP_KEEP,
@@ -1467,41 +1895,44 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for annotation in top_dimensions:
         name = dimension_name(adapter, annotation)
-        if name not in ("PadCornerRadius", "FlangeCornerRadius", "RimInnerCornerRadius"):
+        if name not in ("PadCornerRadius", "FlangeCornerRadius", "DeckCornerRadius"):
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         display.ArcExtensionLineOrOppositeSide = False
         if display.ArcExtensionLineOrOppositeSide:
             raise RuntimeError(f"{name} leader did not stay on its native corner arc")
     # All three height dimensions stack on the LEFT of the front view,
-    # shortest nearest the outline: the part-owned 12.7 at x 0.073 and 40.6 at
+    # shortest nearest the outline: the part-owned 12.7 at x 0.073 and 38.1 at
     # 0.0625 (SIDE_KEEP), this derived overall at 0.0425. At 0.052 the two
     # outer dimensions sat inside each other's ink -- this text was struck by
-    # the 40.6's lower witness line and its own dimension line ran through the
-    # 40.6's text (native layout audit); 10 mm of extra offset clears both,
-    # and the text still sits below the 53.3 witness lines it belongs to.
+    # the 38.1's lower witness line and its own dimension line ran through the
+    # 38.1's text (native layout audit); 10 mm of extra offset clears both,
+    # and the text still sits below the 50.8 witness lines it belongs to.
     # The overall is the ONLY dimension this sheet
-    # creates: it is the read-only sum of three model-owned heights, so there
-    # is no model dimension to import and no tolerance to carry -- which is
-    # why its places are the one precision the part hands over as a constant.
+    # creates: it is the read-only sum of two model-owned heights (12.7 +
+    # 38.1), so there is no model dimension to import and no tolerance to
+    # carry -- which is why its places are the one precision the part hands
+    # over as a constant.
     overall_height = _add_base_height(
         adapter,
         side,
-        _horizontal_base_edge(side, RIM_TOP),
-        RIM_TOP,
+        _horizontal_base_edge(side, STACK_HEIGHT),
+        STACK_HEIGHT,
         (0.0425, 0.099),
-        "overall rim height",
+        "overall deck height",
     )
     set_reference_dimension(
         adapter,
         overall_height.GetAnnotation(),
-        label="derived overall rim height",
+        label="derived overall deck height",
     )
     overall_height.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
     if int(overall_height.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError("base overall reference precision did not persist")
 
-    add_note(adapter, "TOP VIEW SCALE 1:4", 0.100, 0.255)
+    # Right of the 334.0/444.5/457.2 stack, under the border: at the stack's
+    # old place the 457.2 now runs through it.
+    add_note(adapter, "TOP VIEW SCALE 1:4", 0.212, 0.258)
     add_note(adapter, "FRONT VIEW SCALE 1:4", 0.105, 0.075)
     add_note(adapter, "ISOMETRIC VIEW SCALE 1:6", 0.3183, 0.145)
     _attached_note(
@@ -1751,7 +2182,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tap_callout, {"hw-tapdrldepth": 0}, label="base cross-tap drill depth"
     )
     _check_cross_tap_callout(tap_callout)
-    # 38.10 is also the deck above the flange (40.6 - 2.5), so the axis height
+    # 38.10 is also the deck above the flange (FlangeToDeck), so the axis height
     # has to SHOW which two features it spans (2026-09 review blocker). The
     # imported Spot0Y does that natively and for free: it is the spotface
     # sketch's own dimension, from the sketch origin -- which lies ON the
@@ -1818,8 +2249,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("socket bore finish leader shoulder did not persist")
     add_note(adapter, "TOP VIEW SCALE 1:4", *HOLES_TOP_LABEL_XY)
     add_note(adapter, "FRONT CROSS-TAP VIEW SCALE 1:4", 0.245, 0.075)
-    # Three nested outlines (flange, pad side, rim inner) sit within 1.6 mm of
-    # each other at the table origin, so the corner is named instead of left to
+    # Two nested outlines (flange, pad side) sit 1.6 mm apart at the table
+    # origin, so the corner is named instead of left to
     # be inferred from A1-A4 symmetry. The note reads from the open field left
     # of the plan view: against the corner itself it ran into the E1/F3 hole
     # tags and the table's own X0/Y0 axis labels (2026-09 review clarity item).
@@ -1835,11 +2266,95 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("section A-A has no native cosmetic-thread instances")
     _telemetry.info(f"section A-A native cosmetic threads: seeds/instances={section_threads!r}")
 
+    # Sheet 3, the underside: the pocket in plan from below, and section B-B
+    # through it for the heights. Rule 7: both views hidden-lines-removed --
+    # the pocket opens downward, so every rib, boss and fillet the bottom view
+    # dimensions is a visible edge, and the section draws its cut solid.
+    if not ddoc.ActivateSheet(SHEET_NAMES[2]):
+        raise RuntimeError("failed to activate harmonic-base underside sheet")
+    bottom = place_view(
+        adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=SHEET_SCALE
+    )
+    _require_bottom_view_mapping(adapter, bottom)
+    cut_line_x = _bottom_xy(UNDERSIDE_CUT_X, 0.0)[0]
+    underside_section = create_section_view(
+        adapter,
+        bottom,
+        line_start=(cut_line_x, BOTTOM_CENTER[1] - 0.040),
+        line_end=(cut_line_x, BOTTOM_CENTER[1] + 0.040),
+        view_xy=UNDERSIDE_SECTION_CENTER,
+        section_label="B",
+        scale=UNDERSIDE_SECTION_SCALE,
+        label="base underside section",
+    )
+    _turn_underside_section_clockwise(adapter, underside_section)
+    for view in (bottom, underside_section):
+        set_hidden_lines_removed(adapter, view)
+    bottom_dimensions = curate_view_dimensions(
+        adapter,
+        bottom,
+        keep=UNDERSIDE_BOTTOM_KEEP,
+        view_label="underside bottom",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    section_text_xy = model_points_in_view(
+        adapter,
+        underside_section,
+        [
+            (UNDERSIDE_CUT_X / 1000.0, y / 1000.0, z / 1000.0)
+            for y, z in UNDERSIDE_SECTION_TEXT_MM.values()
+        ],
+        label="section B-B dimension texts",
+        names=tuple(UNDERSIDE_SECTION_TEXT_MM),
+    )
+    underside_section_dimensions = curate_view_dimensions(
+        adapter,
+        underside_section,
+        keep=dict(zip(UNDERSIDE_SECTION_TEXT_MM, section_text_xy, strict=True)),
+        view_label="section B-B",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(adapter, bottom_dimensions, UNDERSIDE_BOTTOM_CALLOUTS)
+    set_dimension_callouts(
+        adapter, underside_section_dimensions, UNDERSIDE_SECTION_CALLOUTS
+    )
+    add_note(adapter, "BOTTOM VIEW SCALE 1:4", *UNDERSIDE_BOTTOM_NOTE_XY)
+
+    # Sheet 4, the underside pads: the same bottom view at 1:2, carrying only
+    # the pads', lugs', ribs' and foot boss's sizes and places from X0 Y0.
+    # Hidden lines removed like sheet 3's, so each dimensioned edge draws as
+    # the visible edge it is; the "2X" prefixes come with the part's dims.
+    if not ddoc.ActivateSheet(SHEET_NAMES[3]):
+        raise RuntimeError("failed to activate harmonic-base underside pads sheet")
+    pads = place_view(adapter, str(SOURCE), "*Bottom", *PADS_CENTER, scale=PADS_SCALE)
+    _require_bottom_view_mapping(adapter, pads, _pads_xy, sheet="sheet 4")
+    set_hidden_lines_removed(adapter, pads)
+    pads_dimensions = curate_view_dimensions(
+        adapter,
+        pads,
+        keep=UNDERSIDE_PADS_KEEP,
+        view_label="underside pads",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(adapter, pads_dimensions, PADS_CALLOUTS)
+    add_note(adapter, PADS_NOTE, *PADS_NOTE_XY)
+    # Pointer notes owned by the view (add_leader_note), after the sheet's
+    # own note so that one stays sheet-owned.
+    for label, (text, text_xy, tip_mm) in PADS_LEVEL_NOTES.items():
+        add_leader_note(
+            adapter,
+            text,
+            text_xy=text_xy,
+            attach_xy=_pads_xy(*tip_mm),
+            label=label,
+            view=pads,
+        )
+
     # Policy rule 2's proof obligation, now that no sheet code writes places:
     # every imported dimension must still print what its PART authored. A
     # silent fallback to the drawing document's two places would ask the shop
     # for a band nobody specified, and nothing else on the sheet would look
-    # wrong. The four keeps partition this map, so a missing name fails too.
+    # wrong. The seven keeps partition this map, so a missing name fails too.
     assert_imported_precision(
         adapter,
         [
@@ -1847,6 +2362,9 @@ async def build(adapter: Any) -> dict[str, str]:
             *side_dimensions,
             *section_dimensions,
             *hole_side_dimensions,
+            *bottom_dimensions,
+            *underside_section_dimensions,
+            *pads_dimensions,
         ],
         DRAWING_PRECISION_BY_NAME,
     )
@@ -1874,6 +2392,10 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
+        sheet_scales={
+            **dict.fromkeys(SHEET_NAMES[:3], SHEET_SCALE),
+            SHEET_NAMES[3]: PADS_SCALE,
+        },
         redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,
         expected_redundant_notes=TAPPED_HOLE_NOTES,
         layout=SPEC.layout,

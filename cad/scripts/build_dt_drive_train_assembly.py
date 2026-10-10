@@ -1177,7 +1177,6 @@ from fr_nameplate_spec import (  # noqa: E402
 )
 from fr_harmonic_base_spec import (  # noqa: E402
     COLUMN_SOCKET_XZ as BASE_COLUMN_SOCKET_XZ,
-    LIP_W as BASE_LIP_W,
     TOP_LENGTH as BASE_TOP_LENGTH,
     TOP_WIDTH as BASE_TOP_WIDTH,
 )
@@ -3084,7 +3083,9 @@ def _plan_gap_to_plate(point: Plan, swing_deg: float) -> float:
 # p1 swing, not only engaged -- every sampled angle from 0 to DISENGAGE_DEG:
 # - the straight west edge against both arbor-pedestal blocks (their floors
 #   above: 2.0 south, 0.25 north);
-# - every sharp plate vertex inside the base deck, within the green lip;
+# - every sharp plate vertex over the base pad (user ruling 2026-10-09 took
+#   away the green lip it used to stay inside; the plate swings above the
+#   black deck, so the deck's 3.0 step is no obstacle);
 # - every other base-fixed occupant clear of the plate outline: see
 #   SWING_OCCUPANT_CLEARANCE, after the rig and spring layout it reads.
 SWING_SAMPLES = 400
@@ -3103,15 +3104,13 @@ for _k, _swing in enumerate(SWING_ANGLES):
     for _label, (_vx, _vz) in zip(
         ("NE", "NW", "SW", "SE"), plate_vertices_machine(_swing), strict=True
     ):
-        _margin = min(
-            _BASE_X_LIMIT - BASE_LIP_W - abs(_vx), _BASE_Z_LIMIT - BASE_LIP_W - abs(_vz)
-        )
-        _key = f"{_label} corner inside the lip"
+        _margin = min(_BASE_X_LIMIT - abs(_vx), _BASE_Z_LIMIT - abs(_vz))
+        _key = f"{_label} corner over the base"
         SWING_SWEEP[_key] = min(SWING_SWEEP.get(_key, math.inf), _margin)
         if _margin < 0.0:
             raise AssertionError(
-                f"swing-plate {_label} corner crosses the base lip by {-_margin:.3f} "
-                f"at swing {_swing:.3f} deg"
+                f"swing-plate {_label} corner overhangs the base by "
+                f"{-_margin:.3f} at swing {_swing:.3f} deg"
             )
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
 # The rig stays level-inboard of the cylinder bank. Its user-authoritative 32T
