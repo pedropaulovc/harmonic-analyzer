@@ -72,7 +72,7 @@ note = "AUTHOR'S CHOICE: shoulder north face (seats on the north ear); +Z toward
 cite = [
   "AUTHOR'S CHOICE",
   "harmonic-analyzer/cad/scripts/ch_pivot_shaft_spec.py:44",
-  "harmonic-analyzer/cad/scripts/ch_pivot_bracket_spec.py:24",
+  "harmonic-analyzer/cad/scripts/ch_pivot_bracket_spec.py:29",
   "harmonic-analyzer/cad/scripts/build_ch_pivot_shaft.py:104-117",
 ]
 

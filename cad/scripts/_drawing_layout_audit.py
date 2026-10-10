@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 import _telemetry
-from _common import _early_bound
+from _com import _early_bound
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from _pdf_ink import PageInk, page_ink, read_pdf_ink
 from _layout_audit import (

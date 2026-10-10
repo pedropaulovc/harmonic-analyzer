@@ -148,6 +148,13 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   swmaker000008 and swmaker000005 (runs 20260928T144159300Z,
   20260928T145256004Z), while the same SetPosition printed its leader from the
   ring. Check a leader start only on the read right after `SetPosition`.
+  Zoomed, the ring centre snaps to the window's pixel rows. An anchor-to-ring
+  offset read inside the window misses the placed ring only by the choice of
+  the two rows bracketing the target, under a pixel; read with the ring some
+  50 mm above a 24 mm zoom, it was up to two rows off, and frame item 5 landed
+  1.59 and 1.89 px high (2026-10-01; run 20261010T073339590Z). Bring a ring
+  inside the zoomed window (place it at fit first) before reading the
+  anchor-to-ring offset zoomed.
 
 ## Refusal catalogue — do / don't
 
@@ -419,7 +426,7 @@ translation vector (`<TranslationValueI/J/K>`) at its zero default, 13.6 mm
 of text that ASME Y14.5-2018 does not write.
 Do: write the modifier as its symbol code after the letter,
 `<DatumLetter>C&lt;MOD-TRANS2&gt;</DatumLetter>`, with no flag
-(`_gtol_spec.TRANSLATION_GLYPH`). On farm run 20261009T204136744Z both slot
+(`_gtol_frame.TRANSLATION_GLYPH`). On farm run 20261009T204136744Z both slot
 frames printed "<GTOL-POSI> | 0.05 | C | B | <MOD-TRANS2>", the triangle in
 the datum's compartment and no vector. Every flag form tried printed a
 vector (run 20261009T182549169Z): empty i, j, k printed "[0,0,0]", "false"
@@ -427,7 +434,7 @@ values printed "[false,false,false]", and SOLIDWORKS rewrote the flag after
 the letter to the empty-vector XML. `add_feature_control_frame` still reads
 the printed text items (`IAnnotation::GetDisplayData`) and fails on any
 bracket or a missing or misplaced glyph
-(`_gtol_spec.translation_print_problem`), logging `gtol.translation_print`.
+(`_gtol_frame.translation_print_problem`), logging `gtol.translation_print`.
 `GetSymbolXml` reads the symbol code back unescaped,
 `<DatumLetter>C<MOD-TRANS2></DatumLetter>`, which is not well-formed XML
 (run 20261009T200747541Z); the frame-XML parser escapes `<MOD-…>`/`<GTOL-…>`

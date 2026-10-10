@@ -5,7 +5,7 @@ hold-down clearance holes: a thin-walled cast bracket with a trapezoidal wedge
 wall (wide foot, narrow top) stood **Y-up**, lightened by a window that
 opens on the two big front/back faces, with a mounting foot drilled for four
 top-down hex-head screws, the window rim broken by a fillet + chamfer, and a
-top rail tapped for the rocker pivot brackets' hold-down screws.
+top face tapped for the rocker pivot brackets' hold-down screws.
 
 The part is oriented to match the source SLDPRT's standard views: the **Front**
 view (along Z) looks square-on at the rounded window; the **Right** view (along
@@ -20,10 +20,10 @@ WindowCut2 (``Cut-Extrude2/3/4``) -> CornerFillet (``Fillet3``) ->
 PocketCornerFillet -> FootClearanceHoles (5/16 DRILL THRU, HoleWzd) ->
 RimChamfer (``Chamfer2``) -> BracketSeats (#743, HoleWzd). The trapezoid lives
 on the **Right plane** (sketch-x -> model Z taper, sketch-y -> model Y height,
-mid-plane extrude along X); the window/cavity cuts use single rectangles on the
-**Front plane** (matching the source's window/cavity sketches). The source
-casting's per-stage ``volume_check`` targets were native SolidWorks
-measurements; #743's deeper rail adds exact analytic deltas to them (see the
+mid-plane extrude along X); the window/cavity cuts use SINGLE origin-centred
+squares on the **Front plane** (matching the source's window/cavity sketches).
+The source casting's per-stage ``volume_check`` targets were native SolidWorks
+measurements; the thicker web adds exact analytic deltas to them (see the
 volume-target block), and the hole, chamfer and seat targets are analytic
 expectations, all within the original 200 mm³ check tolerance.
 
@@ -35,15 +35,16 @@ Z = wall thickness):
   ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 177.8 (``X ±88.9``).
 * **CavityCut** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
   central cavity, leaving 6.35 mm shell walls (whole ``CavityProfile``).
-* **WindowCut1 / WindowCut2** -- ONE shared window, 165.1 mm wide
-  (``WindowProfile``, ``X ±82.55``, ``Y -82.55..+66.2``: the source's square
-  with its top edge lowered so the top rail is 22.7 deep, #743). Each cut is a
-  Through-All that STARTS ``WEB``
-  (3.175) off the sketch plane in the opposite direction (forward / reverse, the
-  second re-selecting ``WindowProfile`` -> a shared-sketch reference), so the
-  2*WEB band between them survives as the central web -- the source's
-  ``FromOffsetDistance`` / ``ReverseDirection`` pair, reproducing the
-  two-sketches-feed-three-cuts tree.
+* **WindowCut1 / WindowCut2** -- ONE shared 165.1 mm window square
+  (``WindowProfile``, ``±82.55``), so the top rail is the source's 6.35, as
+  deep as the side posts and the foot. Each cut is a Through-All that STARTS
+  ``WEB`` (4.7625) off the sketch plane in the opposite direction (forward /
+  reverse, the second re-selecting ``WindowProfile`` -> a shared-sketch
+  reference), so the 2*WEB band between them survives as the central web --
+  the source's ``FromOffsetDistance`` / ``ReverseDirection`` pair, reproducing
+  the two-sketches-feed-three-cuts tree. The web is 9.525 (3/8 in), up from
+  the source's 6.35, to carry the bracket seats (user-approved sketch,
+  2026-10-09).
 * **CornerFillet** -- R12.7 on the four cavity corner edges.
 * **PocketCornerFillet** -- R6.35 on the four corners of each opposed pocket.
 * **FootClearanceHoles** -- a single Hole Wizard (``HoleWzd``) feature, 4x
@@ -54,15 +55,16 @@ Z = wall thickness):
 * **RimChamfer** -- 1.27 mm / 45° on the 12 inner-frame opening edges plus the
   two slant faces, the two trapezoid (±X) faces, and one fillet face, with
   tangent propagation -- i.e. the whole window rim.
-* **BracketSeats** -- one Hole Wizard feature, 4x #8-32 bottoming-tapped seats
-  down from the top face on the rail's centreline, under the MHA-CH-008 pivot
-  brackets' hold-down holes (``rocker_bracket_seat_layout`` owns their stack;
-  the print transfers them from the set brackets at assembly).
+* **BracketSeats** -- one Hole Wizard feature, 2x #8-32 bottoming-tapped seats
+  down from the top face on the centreline, under the MHA-CH-008 pivot
+  brackets' hold-down holes, each over a window side edge: the post outboard,
+  the web inboard (``rocker_bracket_seat_layout`` owns their stack; the print
+  transfers them from the set brackets at assembly).
 
-Like the 71 tracked parts, this is **equation-driven and self-naming**: seven
+Like the 71 tracked parts, this is **equation-driven and self-naming**: six
 equation-manager globals (``FootHalf``/``TopHalf``/``HalfHeight``/``CavHalf``/
-``WindowOuter``/``RailDepth``/``WallWidth``, all ``mm``) drive every profile
-sketch's dimensions (named e.g.
+``WindowOuter``/``WallWidth``, all ``mm``) drive every profile sketch's
+dimensions (named e.g.
 ``WallHeight@WallProfile``, ``WinWidth@WindowProfile``), the sketches and
 features carry stable names, and the drive equations are applied in one deferred
 batch after a rebuild. A final "equations neutral" ``volume_check`` proves the
@@ -79,34 +81,25 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    CASTING_GREEN,
+from _appearance import CASTING_GREEN, apply_color, apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
-    apply_color,
-    apply_material,
-    check,
-    define_centered_rectangle,
-    define_polygon_chain,
-    define_rectilinear_chain,
-    dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_sketch_direct_db,
-    set_global,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain
+from _sketch_rectangle import define_centered_rectangle
 from _holes import blind_hole_volume_mm3, wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
-    apply_drawing_precision,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
@@ -121,13 +114,7 @@ from fr_rocker_arm_support_section_spec import (
     WIDE,
 )
 from fr_rocker_arm_support_spec import HOLE_DIA, HOLE_SPEC
-from rocker_bracket_seat_layout import (
-    RAIL_DEPTH,
-    RAIL_DEPTH_PLACES,
-    SEAT_LOCAL_X,
-    SEAT_SPEC,
-    WINDOW_TOP_Y,
-)
+from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB
 
 PART_NAME = "fr-rocker-arm-support"
 # The source repro was authored in steel, but this casting is now the machine's
@@ -144,15 +131,11 @@ MATERIAL = "Gray Cast Iron"
 BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
 
 CAV = 63.5  # 127 mm square half (Cut-Extrude2)
-# The window: 165.1 wide (X ±BIG), its bottom edge FOOT_THICKNESS over the foot
-# face and its top edge RAIL_DEPTH under the top face (#743: the rail carries
-# the rocker brackets' #8-32 seats, so it grew down into the window from the
-# source's 6.35 -- the window is no longer square).
-WEB = 3.175  # window-cut start-offset; the 2*WEB band left as the web
-# The cavity's top rim (chamfered on both web faces) must stay a web edge
-# under the rail, not run into the pocket's top face: the 2.7 band keeps it.
-if WINDOW_TOP_Y - CAV < 2.0:
-    raise AssertionError("the deeper rail's underside reaches the cavity's top rim")
+# The window is the source's 165.1 square (half BIG), its edges FOOT_THICKNESS
+# inside the foot and top faces. WEB, the window cuts' start offset (the
+# 2*WEB band left as the web), is rocker_bracket_seat_layout's: the seats'
+# thread walls ride on it. The source casting's was SOURCE_WEB.
+SOURCE_WEB = 3.175
 
 FILLET_R = 12.7
 FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
@@ -172,50 +155,43 @@ def _wall_half_z_at(y_mm: float) -> float:
 POCKET_FILLET_EDGES = [
     [
         x_sign * BIG,
-        window_y,
-        face_sign * (WEB + _wall_half_z_at(window_y)) / 2.0,
+        y_sign * BIG,
+        face_sign * (WEB + _wall_half_z_at(y_sign * BIG)) / 2.0,
     ]
     for x_sign in (-1, 1)
-    for window_y in (-BIG, WINDOW_TOP_Y)
+    for y_sign in (-1, 1)
     for face_sign in (-1, 1)
 ]
 
-# Volume targets. The source casting's (square window, 6.35 rail) are native
-# SolidWorks measurements; the deeper rail's are those plus exact analytic
-# deltas, so the first build re-proves them:
-# * each window cut now stops at WINDOW_TOP_Y, leaving the band
-#   WINDOW_TOP_Y..BIG across the 2*BIG window, from the web face out to the
-#   tapered wall -- linear in y, so its mid-band depth integrates exactly;
-# * the four top pocket-corner fillets move down to the new window top, where
-#   the wall is thicker: each fillet's spandrel ((1 - pi/4) R^2) runs from the
-#   web face to the wall at its centroid, which sits R (10 - 3 pi)/(12 - 3 pi)
-#   inside the corner.
+# Volume targets. The source casting's (square window, 6.35 web) are native
+# SolidWorks measurements; the thicker web's are those plus exact analytic
+# deltas (WEB_GROWTH a face), so the first build re-proves them:
+# * each window cut leaves the pocket WEB_GROWTH shallower over the window
+#   less the through cavity (the cuts' net area, the same at every depth);
+# * the cavity's four corner edges run through the web, so CornerFillet's
+#   R12.7 spandrels ((1 - pi/4) R^2) grow by 2 * WEB_GROWTH each;
+# * each of the eight pocket-corner edges starts at a web face, so its R6.35
+#   spandrel loses WEB_GROWTH (the web face is square to the edge).
 SQUARE_WINDOW_CUT1_VOLUME = 434_257
 SQUARE_WINDOW_CUT2_VOLUME = 245_806
 SQUARE_CORNER_FILLET_VOLUME = 246_685
 SQUARE_POCKET_FILLET_VOLUME = 247_860
 SQUARE_RIM_CHAMFER_REMOVAL = 3_153
-RAIL_BAND_VOLUME = (
-    2.0
-    * BIG
-    * (BIG - WINDOW_TOP_Y)
-    * (_wall_half_z_at((BIG + WINDOW_TOP_Y) / 2.0) - WEB)
+WEB_GROWTH = WEB - SOURCE_WEB  # 1.5875
+WINDOW_NET_AREA = (2.0 * BIG) ** 2 - (2.0 * CAV) ** 2
+WEB_BAND_VOLUME = WINDOW_NET_AREA * WEB_GROWTH  # left per window cut
+CORNER_FILLET_GROWTH = 4.0 * (1.0 - math.pi / 4.0) * FILLET_R**2 * 2.0 * WEB_GROWTH
+POCKET_FILLET_LOSS = 8.0 * (1.0 - math.pi / 4.0) * POCKET_FILLET_R**2 * WEB_GROWTH
+WINDOW_CUT1_VOLUME = SQUARE_WINDOW_CUT1_VOLUME + WEB_BAND_VOLUME
+WINDOW_CUT2_VOLUME = SQUARE_WINDOW_CUT2_VOLUME + 2.0 * WEB_BAND_VOLUME
+CORNER_FILLET_VOLUME = (
+    SQUARE_CORNER_FILLET_VOLUME + 2.0 * WEB_BAND_VOLUME + CORNER_FILLET_GROWTH
 )
-_SPANDREL_CENTROID = POCKET_FILLET_R * (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi)
-TOP_FILLET_SHIFT_VOLUME = (
-    4.0
-    * (1.0 - math.pi / 4.0)
-    * POCKET_FILLET_R**2
-    * (
-        _wall_half_z_at(WINDOW_TOP_Y - _SPANDREL_CENTROID)
-        - _wall_half_z_at(BIG - _SPANDREL_CENTROID)
-    )
-)
-WINDOW_CUT1_VOLUME = SQUARE_WINDOW_CUT1_VOLUME + RAIL_BAND_VOLUME
-WINDOW_CUT2_VOLUME = SQUARE_WINDOW_CUT2_VOLUME + 2.0 * RAIL_BAND_VOLUME
-CORNER_FILLET_VOLUME = SQUARE_CORNER_FILLET_VOLUME + 2.0 * RAIL_BAND_VOLUME
 POCKET_FILLET_VOLUME = (
-    SQUARE_POCKET_FILLET_VOLUME + 2.0 * RAIL_BAND_VOLUME + TOP_FILLET_SHIFT_VOLUME
+    SQUARE_POCKET_FILLET_VOLUME
+    + 2.0 * WEB_BAND_VOLUME
+    + CORNER_FILLET_GROWTH
+    - POCKET_FILLET_LOSS
 )
 
 HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
@@ -223,7 +199,7 @@ HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
 # The manufacturing print's dimension set (draw_fr_rocker_arm_support.py imports
 # exactly these marked dimensions; its keep maps must stay in lockstep).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "WallProfile": {"FootSpan", "TopSpan", "WallHeight", "RailDepth"},
+    "WallProfile": {"FootSpan", "TopSpan", "WallHeight"},
     "Wall": {"Depth"},
     # A single associative size plus an SQ callout defines each square.
     "WindowProfile": {"WinWidth"},
@@ -239,31 +215,31 @@ FOOT_HOLED_VOLUME = (
 )
 
 CHAMFER = 1.27  # leg, 45°
-# The measured window-rim chamfer removal, less the four window side edges
-# (two per slant face) the rail shortened: square to both faces, each lost
-# millimetre removed CHAMFER^2 / 2. The rail's top edges keep their length.
-RIM_CHAMFER_VOLUME = FOOT_HOLED_VOLUME - (
-    SQUARE_RIM_CHAMFER_REMOVAL - 4.0 * (BIG - WINDOW_TOP_Y) * CHAMFER**2 / 2.0
-)
-# The rocker brackets' four bottoming-tapped seats, down from the top face on
-# the rail's centreline (rocker_bracket_seat_layout owns their stack).
+# The measured window-rim chamfer removal: none of the chamfered edges changes
+# length with the web (the cavity rim loops lie on the web faces, the window
+# rim on the slant faces), so it carries over unchanged.
+RIM_CHAMFER_VOLUME = FOOT_HOLED_VOLUME - SQUARE_RIM_CHAMFER_REMOVAL
+# The rocker brackets' two bottoming-tapped seats, down from the top face on
+# the centreline (rocker_bracket_seat_layout owns their stack). Each runs in
+# solid iron for its whole length: the post outboard of the window edge, the
+# web column (wider than the drill) inboard of it.
 SEAT_POINTS = [[x, HALF_Y, 0.0] for x in SEAT_LOCAL_X]
 BRACKET_SEATS_VOLUME = RIM_CHAMFER_VOLUME - len(SEAT_POINTS) * blind_hole_volume_mm3(
     blind_cut_dia_mm(SEAT_SPEC), SEAT_SPEC.depth_mm
 )
 CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
-    [0.0, -63.5, -3.175],
-    [63.5, 0.0, -3.175],
-    [59.78, 59.78, -3.175],
-    [0.0, 63.5, -3.175],
-    [-63.5, 0.0, -3.175],
-    [-59.78, -59.78, -3.175],
-    [0.0, -63.5, 3.175],
-    [-59.78, -59.78, 3.175],
-    [-63.5, 0.0, 3.175],
-    [-59.78, 59.78, 3.175],
-    [0.0, 63.5, 3.175],
-    [63.5, 0.0, 3.175],
+    [0.0, -63.5, -WEB],
+    [63.5, 0.0, -WEB],
+    [59.78, 59.78, -WEB],
+    [0.0, 63.5, -WEB],
+    [-63.5, 0.0, -WEB],
+    [-59.78, -59.78, -WEB],
+    [0.0, -63.5, WEB],
+    [-59.78, -59.78, WEB],
+    [-63.5, 0.0, WEB],
+    [-59.78, 59.78, WEB],
+    [0.0, 63.5, WEB],
+    [63.5, 0.0, WEB],
 ]
 CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagated)
     [0.0, -85.0, 31.24],
@@ -397,8 +373,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TopHalf", f"{NARROW}mm")  # trapezoid top half-width (Z)
     await set_global(adapter, "HalfHeight", f"{HALF_Y}mm")  # trapezoid half-height (Y)
     await set_global(adapter, "CavHalf", f"{CAV}mm")  # cavity square half
-    await set_global(adapter, "WindowOuter", f"{BIG}mm")  # window side/bottom half
-    await set_global(adapter, "RailDepth", f"{RAIL_DEPTH}mm")  # top face to window
+    await set_global(adapter, "WindowOuter", f"{BIG}mm")  # window square half
     await set_global(
         adapter, "WallWidth", f"{BOSS_DEPTH}mm"
     )  # mid-plane extrude span (X)
@@ -442,37 +417,6 @@ async def build(adapter) -> dict[str, str]:
             '2 * "TopHalf"',
         ],
     )
-    # The rail depth as a model dimension (Codex #936 PRRT_kwDOPHDy386mTMXw):
-    # a construction line across the trapezoid at the window's top edge,
-    # RailDepth under its top edge. It drives no solid (WindowProfile runs off
-    # the same global), and Section A-A, parallel to this Right-plane sketch,
-    # imports it with the other WallProfile dimensions.
-    rail_half = _wall_half_z_at(WINDOW_TOP_Y)
-    set_sketch_direct_db(adapter, True)
-    rail = check(
-        "rail depth line",
-        await adapter.add_centerline(-rail_half, WINDOW_TOP_Y, rail_half, WINDOW_TOP_Y),
-    )
-    set_sketch_direct_db(adapter, False)
-    check("rail depth line level", await adapter.add_sketch_constraint(rail, None, "horizontal"))
-    left_slant, right_slant, top = trap_lines[3], trap_lines[1], trap_lines[2]
-    check(
-        "rail depth line on the left wall",
-        await adapter.add_sketch_constraint(f"{rail}.start", left_slant, "coincident"),
-    )
-    check(
-        "rail depth line on the right wall",
-        await adapter.add_sketch_constraint(f"{rail}.end", right_slant, "coincident"),
-    )
-    await dimension_between(
-        adapter,
-        f"{rail}.end",
-        f"{top}.start",
-        "vertical_distance",
-        RAIL_DEPTH,
-        "trapezoid RailDepth",
-    )
-    trap.record("RailDepth", '"RailDepth"')
     await ensure_fully_defined(adapter, "trapezoid")
     check("exit boss", await adapter.exit_sketch())
     name_last_feature(adapter, "WallProfile")
@@ -490,42 +434,32 @@ async def build(adapter) -> dict[str, str]:
 
     # 2-4. Two sketches drive three cuts, exactly as the source tree does (only
     # the names are semantic here, not the source's Sketch11/Cut-ExtrudeN). Both
-    # window/cavity sketches are single rectangles on the Front plane:
-    #   * WindowProfile -- the 165.1 mm wide window, its top edge RailDepth under
-    #     the top face (so NOT origin-centred: a rectilinear chain anchored at its
-    #     top-left corner). WindowCut1 and WindowCut2 BOTH consume this ONE sketch
-    #     (the second re-selects it -> a shared-sketch reference), each a
-    #     Through-All cut that STARTS WEB (3.175) off the sketch plane in the
-    #     opposite direction, so the 2*WEB band between them survives as the
-    #     central web -- the source's FromOffsetDistance/ReverseDirection pair,
-    #     not a sketch gap. Drives off WindowOuter/HalfHeight/RailDepth.
+    # window/cavity sketches are SINGLE origin-centred squares on the Front plane,
+    # drawn center-rectangle style (four real sides + two construction diagonals),
+    # matching the source's segment set:
+    #   * WindowProfile -- the 165.1 mm window square. WindowCut1 and WindowCut2
+    #     BOTH consume this ONE sketch (the second re-selects it -> a shared-sketch
+    #     reference), each a Through-All cut that STARTS WEB (4.7625) off the
+    #     sketch plane in the opposite direction, so the 2*WEB band between them
+    #     survives as the central web -- the source's FromOffsetDistance/
+    #     ReverseDirection pair, not a sketch gap. The square drives off
+    #     WindowOuter.
     #   * CavityProfile -- the 127 mm cavity square; CavityCut consumes it whole
     #     (Through-All-Both). Drives off CavHalf.
     # Built in the source's creation order (window profile, then cavity) and cut
     # in the source's order (cavity, then the two windows).
     windows = SketchDims()
     check("sketch windows", await adapter.create_sketch("Front"))
-    window_pts = [
-        (-BIG, WINDOW_TOP_Y),
-        (BIG, WINDOW_TOP_Y),
-        (BIG, -BIG),
-        (-BIG, -BIG),
-    ]
-    window_lines = await add_line_chain(adapter, window_pts)
-    await define_rectilinear_chain(
+    await define_centered_rectangle(
         adapter,
-        window_lines,
-        window_pts,
-        anchor=0,
-        label="window",
+        BIG,
+        BIG,
+        "window",
         dims=windows,
-        names=["WinWidth", "WinHeight", "WinAnchorX", "WinAnchorY"],
-        drives=[
-            '2 * "WindowOuter"',
-            '"HalfHeight" - "RailDepth" + "WindowOuter"',
-            '"WindowOuter"',
-            '"HalfHeight" - "RailDepth"',
-        ],
+        name_width="WinWidth",
+        drive_width='2 * "WindowOuter"',
+        name_depth="WinHeight",
+        drive_depth='2 * "WindowOuter"',
     )
     await ensure_fully_defined(adapter, "window")
     check("exit windows", await adapter.exit_sketch())
@@ -620,8 +554,8 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "RimChamfer", ["RimChamferSize"])
     await volume_check(adapter, "RimChamfer", RIM_CHAMFER_VOLUME, 200)
 
-    # 9. BracketSeats: the rocker brackets' four #8-32 bottoming-tapped seats,
-    #    down from the top face into the deepened rail. Located at their
+    # 9. BracketSeats: the rocker brackets' two #8-32 bottoming-tapped seats,
+    #    down from the top face over the window's side edges. Located at their
     #    nominal stations; the print says TRANSFER FROM MHA-CH-008 AT ASSEMBLY.
     wizard_holes(
         adapter,
@@ -650,7 +584,6 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_precision(adapter, {"WallProfile": {"RailDepth": RAIL_DEPTH_PLACES}})
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)

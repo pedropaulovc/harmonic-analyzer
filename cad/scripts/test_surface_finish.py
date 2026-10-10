@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import SurfaceFinishControl, surface_finish_by_key
 
 

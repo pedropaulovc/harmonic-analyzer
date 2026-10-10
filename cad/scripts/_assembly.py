@@ -17,33 +17,19 @@ from typing import Any
 import _config
 import _telemetry
 from _assembly_contract import AssemblyContract, assembly_contract
-from _common import (
-    DEFAULT_VIEWS,
-    FULLY_CONSTRAINED,
-    OUT_PNG,
-    OUT_SLDASM,
-    OUT_SLDPRT,
-    UNDER_CONSTRAINED,
-    _CHAIN_LINK_PREFIXES,
-    _FEATURE_ERROR,
-    _MATE_TOL_MM,
-    _SUMMARY_TITLE,
-    _git_commit_year,
-    _git_sha,
-    _early_bound,
-    _read_member,
-    apply_custom_properties,
-    apply_summary_info,
-    active_configuration_name,
-    check,
-    log,
-    set_isometric_view,
-    whats_wrong,
-)
-from _drawing_simplified import (
+from _bore_axis import _MATE_TOL_MM
+from _check import check, log
+from _com import FULLY_CONSTRAINED, UNDER_CONSTRAINED, _early_bound, _read_member
+from _custom_properties import apply_custom_properties
+from _part_properties import _SUMMARY_TITLE, apply_summary_info
+from _part_save import set_isometric_view
+from _source_identity import _git_commit_year, _git_sha
+from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDASM, OUT_SLDPRT, _CHAIN_LINK_PREFIXES
+from _rebuild import _FEATURE_ERROR, active_configuration_name, whats_wrong
+from _simplified_identity import components_identity
+from _simplified_names import (
     SIMPLIFIED_COMMENT,
     SIMPLIFIED_SUFFIX,
-    components_identity,
     is_simplified,
     simplified_comment,
     simplified_name,
@@ -134,7 +120,7 @@ def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bo
 # A chain link touching one of these is intended MESH, not a fault: the chain
 # rides the pitch circle so the links overlap the teeth in the shared z-plane
 # (a coplanar single-plane stand-in). Whitelisted like link<->link contact in
-# check_no_interference. Defined here (not in _common) so it stays off every
+# check_no_interference. Defined here (not in _session) so it stays off every
 # part's recipe digest -- only the assemblies that read it rebuild on a change.
 _CHAIN_SPROCKET_PREFIXES = ("pd-transgear-removable",)
 # Only the sprockets the roller chain actually WRAPS mesh it: the T12 crank wheel
@@ -2290,7 +2276,7 @@ def sync_simplified_configuration(
 
     Every assembly-drawing view at 1:2 or smaller that inks edges references
     it, so modeled gear teeth and screw threads do not print black
-    (``_drawing_simplified``). The rule is the
+    (``_simplified_names``). The rule is the
     uniform ``<parent> Simplified`` name, so a subassembly's own ``Default
     Simplified`` is picked up the same way as a part's ``T24 Simplified``; a
     component whose model has no such configuration keeps its parent one.
@@ -2747,7 +2733,7 @@ async def reconcile_saved_rebuild_state(
     build's reconcile held. So every other configuration is shown and
     ``EditRebuild3``-ed first and the rest configuration last, each marked for
     rebuild-save and read back (the part-side finalization,
-    ``_drawing_simplified.persist_configurations_in_place``), before the one
+    ``_simplified_part.persist_configurations_in_place``), before the one
     ``Save3``. The saved file is then reopened the way that gate opens it and
     must read clean, so an artifact that would fail it is never cached; a dirty
     reopen raises naming each configuration's saved state.

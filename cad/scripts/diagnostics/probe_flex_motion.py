@@ -31,14 +31,14 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    OUT_SLDASM,
-    _flag,
-    _read_member,
-    check,
-    log,
-    run_build,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _com import _flag, _read_member
+from _paths import OUT_SLDASM
+from _session import run_build
 from _assembly import (
     coincident_mate,
     component_transform,

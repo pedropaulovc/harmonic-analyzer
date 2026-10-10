@@ -24,24 +24,17 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    SketchDims,
-    apply_material,
-    bbox_extent_check,
-    check,
-    define_circle,
-    drive_dimension,
-    ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
-)
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, ensure_fully_defined
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -50,7 +43,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry

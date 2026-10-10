@@ -88,14 +88,11 @@ from _chain import (
     centreline_distance,
     loop_point_tangent,
 )
-from _common import (
-    IN,
-    _early_bound,
-    apply_custom_properties,
-    check,
-    log,
-    run_build,
-)
+from _check import check, log
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _paths import IN
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
@@ -217,7 +214,7 @@ from build_pd_guide_lock import (  # noqa: E402
 # The printed bands the lock-station sweep judges the platen's lock stack at:
 # the same spec constants the guide and lock builds author on their model
 # dimensions, so the sheets and the sweep read one source.
-from _fit_limits import deviations  # noqa: E402
+from _fit_deviations import deviations  # noqa: E402
 from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
 from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
@@ -263,7 +260,7 @@ from vn_guide_lock_screw_spec import (  # noqa: E402
     SHANK_DIA as LOCK_SCREW_SHANK_DIA,
     SHANK_LEN as LOCK_SCREW_SHANK_LEN,
 )
-from build_pd_platen_rack import (  # noqa: E402
+from _platen_rack_geometry import (  # noqa: E402
     ADDENDUM as RACK_ADDENDUM,
     BAR_HEIGHT as RACK_BAR_HEIGHT,
     BAR_LENGTH as RACK_BAR_LENGTH,
@@ -302,13 +299,13 @@ RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # 282.984 (Rx180: local y 0..12 maps dow
 RACK_BACK_Z = BAR_FRONT_Z + RACK_BAR_THICKNESS  # -132.9 (on the platen back)
 
 # --- transgear (the real six-gear train) -------------------------------------
-from build_pd_rack_pinion import (  # noqa: E402
-    DP as DISC_DP,
+from pd_rack_pinion_spec import (  # noqa: E402
+    DIAMETRAL_PITCH as DISC_DP,
     FACE_WIDTH as DISC_FACE,
     TEETH as DISC_TEETH,
 )
-from build_pd_transgear_feed_pinion import (  # noqa: E402
-    DP as FEED_DP,
+from pd_transgear_feed_pinion_spec import (  # noqa: E402
+    DIAMETRAL_PITCH as FEED_DP,
     FACE_WIDTH as FEED_FACE,
     TEETH as FEED_TEETH,
 )
@@ -871,7 +868,10 @@ assert math.isclose(
 # Keep the loose T18 on the deck, ahead of the nameplate. At the previous
 # Z=-15 storage station, lowering onto the deck intersected the nameplate;
 # Z=-75 leaves 5 mm between the T18 tip envelope and the plate's Z=-50 edge.
-SPARE_GEAR_POS = (160.0, BASE_DECK_Y, -75.0)
+# X=140 (was 160): the black deck now ends at X=167 (user ruling 2026-10-09),
+# and at X=160 the tip envelope (to X=180) straddled its 3.0 step; from 140 it
+# spans X 120..160, flat on the deck and west of the rocker-support foot.
+SPARE_GEAR_POS = (140.0, BASE_DECK_Y, -75.0)
 
 # --- fasteners ----------------------------------------------------------------
 # Platen-clip screws: through the clips' integral outer seats and #4 clearance

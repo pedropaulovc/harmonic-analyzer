@@ -16,7 +16,7 @@ from _drawing_contract import (
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import REAM_SLIDE
+from _fit_ream_slide import REAM_SLIDE
 from _hole_spec import blind_cut_dia_mm
 
 

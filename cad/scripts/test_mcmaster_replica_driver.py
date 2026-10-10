@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 
 
 def test_91255A148_is_a_diagnostic_recipe_only() -> None:
@@ -29,7 +29,7 @@ def test_91255A148_is_a_diagnostic_recipe_only() -> None:
     ]
     assert users == []
     assert "91255A148" in driver.REGISTRY
-    assert "91255A148" in STOCK_RECIPES
+    assert "91255A148" in discovered_recipes()
 
 
 def test_replica_driver_names_a_missing_local_vendor_file(

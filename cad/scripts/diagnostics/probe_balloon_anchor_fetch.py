@@ -22,7 +22,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import win32com.client  # noqa: E402
 
 import draw_fr_frame_assembly as frame  # noqa: E402
-from _common import _early_bound, check, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _com import _early_bound  # noqa: E402
+from _session import run_build  # noqa: E402
 from _drawing_common import (  # noqa: E402
     _drawing_component_children,
     _drawing_component_stems,

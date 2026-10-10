@@ -13,7 +13,7 @@ from prechips.model import Features
 
 import export_features as exporter
 from _export_feature_faces import FeatureFaceError, face_name
-from _part_pmi import _FaceGeometry, _face_matches
+from _gtol_face import FaceGeometry
 
 
 def _step(tmp_path: Path, stem: str) -> Path:
@@ -33,14 +33,14 @@ def _load(path: Path) -> dict:
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
-def _plane(normal: tuple[float, float, float], point_mm: tuple[float, float, float]) -> _FaceGeometry:
-    return _FaceGeometry(None, 4001, (*normal, *(v / 1000 for v in point_mm)), normal, ())
+def _plane(normal: tuple[float, float, float], point_mm: tuple[float, float, float]) -> FaceGeometry:
+    return FaceGeometry(None, 4001, (*normal, *(v / 1000 for v in point_mm)), normal, ())
 
 
-def _owners(stem: str, geometry: _FaceGeometry) -> list[str]:
+def _owners(stem: str, geometry: FaceGeometry) -> list[str]:
     return [
         feature for feature, selectors in exporter.feature_selectors(stem).items()
-        if any(_face_matches(geometry, selector) for selector in selectors)
+        if any(selector.matches(geometry) for selector in selectors)
     ]
 
 
@@ -139,8 +139,8 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
         assert selectors[manifest["datums"][datum.letter]["feature"]] == (datum.face,)
     # A same-diameter face away from the drawing journal must not become A.
     diameter = exporter.cone.BORE_DIA / 1000
-    remote = _FaceGeometry(None, 4002, (0, 0, 0, 0, 0, 1, diameter / 2), None, (-diameter, 0, -0.1, diameter, 0.005, 0.1))
-    assert not _face_matches(remote, selectors["journal_bore"][0])
+    remote = FaceGeometry(None, 4002, (0, 0, 0, 0, 0, 1, diameter / 2), None, (-diameter, 0, -0.1, diameter, 0.005, 0.1))
+    assert not selectors["journal_bore"][0].matches(remote)
 
 
 def test_mount_stations_lie_in_their_own_signed_bands_and_mirror() -> None:

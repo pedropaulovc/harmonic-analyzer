@@ -34,7 +34,9 @@ import pinion_rig_fitup as FITUP
 import pinion_rig_tip_gap as TIP_GAP
 from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY, RODS_PINNED_REF
 from ch_channel_assembly_steps import step_ref as channel_step_ref
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     BalloonLanding,
@@ -62,7 +64,7 @@ from _drawing_common import (
     set_view_exploded_state,
     view_configuration,
 )
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _dt_drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
@@ -755,10 +757,10 @@ BANK_STEPS = _note_text(
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-005 SCREWED DOWN ON THE BASE"
         " (FRAME ASSEMBLY MHA-FR-000 STEP 8),",
         "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE MHA-FR-005",
-        "   RAIL, EAR TO THE BACK. MIC THE MHA-CH-005 SHOULDER, S. SET ITS EAR",
+        "   RAIL, FOOT TO THE BACK. MIC THE MHA-CH-005 SHOULDER, S. SET ITS EAR",
         "   INNER FACE TO Y 71.94-72.13 LESS "
         f"(S - {pivot_shaft.SHOULDER_LENGTH:.3f});",
-        "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FEET PER THE MHA-FR-005 SEAT",
+        "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FOOT PER THE MHA-FR-005 SEAT",
         "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
         # Main's ruling (option i): the shaft's integral shoulder cannot pass
         # the north ear, so the bracket comes off again and MHA-CH-000 threads

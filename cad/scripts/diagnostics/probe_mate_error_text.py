@@ -50,7 +50,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
-from _common import _early_bound, log  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log  # noqa: E402
+from _com import _early_bound  # noqa: E402
 
 ERR_NAMES = {
     1: "(folder/component rollup)",

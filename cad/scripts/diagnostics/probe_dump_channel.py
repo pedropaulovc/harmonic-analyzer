@@ -22,7 +22,11 @@ from build_motion_study import (
     DISTANCE, ANGLE, OUT_SLDASM, _iter_mates, _mate_value, _real_parts, _family,
 )
 import _telemetry
-from _common import log
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log
 
 
 async def main():

@@ -6,11 +6,10 @@ shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 The support is a painted gray-iron frame with a trapezoidal wall, two opposed
-pockets leaving a central web, a through cavity, a chamfered window rim,
-four 5/16 clearance holes through its mounting foot, and a 22.7-deep top rail
-carrying the rocker brackets' four #8-32 seats (#743), transferred from the set
-brackets at assembly. The sheet runs 1:2, with each view's scale pinned
-explicitly.
+pockets leaving a 9.525 central web, a through cavity, a chamfered window rim,
+four 5/16 clearance holes through its mounting foot, and the rocker brackets'
+two #8-32 seats in its top face, transferred from the set brackets at
+assembly. The sheet runs 1:2, with each view's scale pinned explicitly.
 
 Run with SolidWorks open::
 
@@ -27,18 +26,19 @@ from typing import Any
 
 import _config
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
     add_leader_note,
     add_native_hole_callout,
     add_surface_finish,
-    assert_imported_precision,
     create_section_view,
     create_view_theoretical_datum,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     import_cosmetic_threads,
     insert_hole_table,
@@ -55,9 +55,9 @@ from _drawing_common import (
     visible_component_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _hole_spec import blind_cut_dia_mm
-from _part_pmi import _resolve_faces
+from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
 from build_fr_rocker_arm_support import (
     BIG,
@@ -73,13 +73,7 @@ from build_fr_rocker_arm_support import (
     WIDE,
 )
 from fr_rocker_arm_support_drawing_spec import SURFACE_FINISHES
-from rocker_bracket_seat_layout import (
-    RAIL_DEPTH,
-    RAIL_DEPTH_PLACES,
-    SEAT_LOCAL_X,
-    SEAT_SPEC,
-    WINDOW_TOP_Y,
-)
+from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB_PLACES
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -135,7 +129,7 @@ CAVITY_RADIUS_CORNER = (1, 1)
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",
     "CavityRadius": "4X",
-    "WinWidth": " POCKET",
+    "WinWidth": "SQ POCKET",
     "CavWidth": "SQ CAVITY THRU",
     "RimChamferSize": " X 45 DEG\n2 FACES",
 }
@@ -149,7 +143,9 @@ DIMENSION_PRECISION = {
     "FootSpan": 1,
     "TopSpan": 1,
     "RimChamferSize": 2,
-    "WebThickness": 2,  # a held thickness: 6.35, routine ±0.51
+    # A held thickness, 9.525 at the routine ±0.51: the seats' thread-wall
+    # stack reads the same places (rocker_bracket_seat_layout).
+    "WebThickness": WEB_PLACES,
     "FootThickness": 2,
 }
 
@@ -158,8 +154,7 @@ def imported_precision() -> dict[str, int]:
     """Precision for the imported model dimensions the sheet still sets. The
     sheet-made ones (web, foot) set their own when they are created, after the
     import; set_dimension_precision fails on a name it cannot find, which
-    is how the #743 rail's RailDepth entry broke r743-rocker-fix. RailDepth is
-    part-owned (MODEL_OWNED_PRECISION): the sheet only asserts it."""
+    is how the #743 rail's RailDepth entry broke r743-rocker-fix."""
     kept = set(FRONT_KEEP) | set(RIGHT_KEEP)
     return {
         name: digits for name, digits in DIMENSION_PRECISION.items() if name in kept
@@ -208,14 +203,10 @@ VIEW_B_ARROW = (
     ),
     (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0),
 )
-# RailDepth carries the seat stack's .X band, so its places are the part's
-# (Codex #936 PRRT_kwDOPHDy386mTMXw); the sheet imports and asserts them.
-MODEL_OWNED_PRECISION = {"RailDepth": RAIL_DEPTH_PLACES}
 # The web thickness text sits right of the section, clear of the slanted
 # wall (x ~0.2187 at y 0.157) and of the 177.8 dimension line at x 0.240;
 # at x 0.221 it printed across the wall line (fix3 render).
 WEB_TEXT_XY = (RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.028)
-RAIL_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.039)
 # The foot's 6.35 spans only 3.2 mm of sheet, too little for its text: at
 # y 0.142 the text sat between the extension lines with its own dimension
 # line through it (fix4 render). It prints just above the foot's top
@@ -231,10 +222,7 @@ RIGHT_KEEP = {
     "WallHeight": (0.240, 0.185),
     "FootSpan": (0.205, 0.133),
     "TopSpan": (0.205, 0.238),
-    # Below the rail-depth dimension, whose rail depth sits at y 0.224 in the same
-    # lane: at 0.225 the two ran together ("X 45 DEG21.0", fix3 render).
     "RimChamferSize": (0.165, 0.200),
-    "RailDepth": RAIL_TEXT_XY,
 }
 
 # Top-left anchor; the native four-row table grows down and right while
@@ -268,13 +256,14 @@ def _seat_entry_edge(view: Any) -> Any:
     """The east seat's entry rim on the rail top, as a part edge.
 
     Resolved through the part's typed seat cylinder rather than a sheet pick:
-    the four seats pair up a few millimetres apart on a 1:2 sheet. It is the
+    each seat straddles the window's side edge, among the post's and web's
+    edges on a 1:2 sheet. It is the
     drill-diameter circle on the top face, not the one where the drill point
     starts.
     """
     model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
     diameter = blind_cut_dia_mm(SEAT_SPEC)
-    face = _resolve_faces(
+    face = resolve_faces(
         model, {"seat": CylinderFace(diameter, contains_x_mm=SEAT_CALLOUT_X_MM)}
     )["seat"]
     matches = []
@@ -640,23 +629,6 @@ async def build(adapter: Any) -> dict[str, str]:
     dimensions = [*front_dimensions, *right_dimensions]
     set_dimension_callouts(adapter, dimensions, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, dimensions, imported_precision())
-    assert_imported_precision(adapter, right_dimensions, MODEL_OWNED_PRECISION)
-    rail_dimensions = [
-        annotation
-        for annotation in right_dimensions
-        if dimension_name(adapter, annotation) == "RailDepth"
-    ]
-    if len(rail_dimensions) != 1:
-        raise RuntimeError("section A-A does not carry exactly one rail depth")
-    rail_display = _early_bound(
-        _early_bound(rail_dimensions[0], "IAnnotation").GetSpecificAnnotation(),
-        "IDisplayDimension",
-    )
-    measured = float(
-        _early_bound(rail_display.GetDimension2(0), "IDimension").SystemValue
-    )
-    if abs(measured * 1000.0 - RAIL_DEPTH) > 1e-5:
-        raise RuntimeError(f"section rail dimension measured {measured * 1000.0:.6f} mm")
     _create_view_centerline(
         adapter,
         front,
@@ -679,8 +651,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="section web",
     )
     # Pick the two cut pocket floors in the LOWER web band, between the cavity
-    # and the foot: the upper band is solid rail since #743. HLR ensures the
-    # selected edges are visible section edges.
+    # and the foot. HLR ensures the selected edges are visible section edges.
     web_y = RIGHT_CENTER[1] - (BIG + CAV) / 2.0 * VIEW_SCALE / 1000.0
     half_web = WEB * VIEW_SCALE / 1000.0
     web_dimension = _early_bound(

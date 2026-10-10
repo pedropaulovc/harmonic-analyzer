@@ -17,7 +17,9 @@ from typing import Any
 import _config
 import _telemetry
 import ch_channel_assembly_steps as steps
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     ViewRole,
@@ -115,7 +117,7 @@ def _fitup_steps() -> str:
             f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS. "
             f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
             f"{ROCKER_SPRING_SET:.2f} BLADE BESIDE THE SPRING, BANK PUSHED NORTH. "
-            f"CLAMP, TRANSFER ITS SEATS INTO THE {support} RAIL, SCREW DOWN, "
+            f"CLAMP, TRANSFER ITS SEAT INTO THE {support} RAIL, SCREW DOWN, "
             "PULL THE BLADE."
         ),
         "shaft-cut-to-fit": (

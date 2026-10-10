@@ -5,10 +5,12 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from diagnostics.diag_build_93075A194 import HX_UNDERSIDE, build_93075A194
+from _simplified_part import save_simplified_part
+from _mcmaster_93075a194 import HX_UNDERSIDE
+from diagnostics.diag_build_93075A194 import build_93075A194
 
 PART_NAME = "vn-hanger-screw"
 SPEC = fastener(PART_NAME)
@@ -30,6 +32,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         screw_axis_planes=("Top Plane", "Right Plane"),
     )
 

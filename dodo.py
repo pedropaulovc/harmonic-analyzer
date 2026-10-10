@@ -7,8 +7,8 @@ A ``.SLDASM`` is a thin reference layer over its part files, so when only a
 referenced ``.SLDPRT`` changed, an assembly is REFRESHED (reopen + per-config
 ForceRebuild3 + gates + in-place Save3 -- seconds) instead of rebuilt from
 scratch (re-insert + re-mate ~122 components -- ~500 s). The recipe escalates to a
-FULL rebuild (+ any post-assembly hooks) when the assembly script / _common.py / a
-hook changed, or the target is missing. A refresh that hits a dangling mate, free
+FULL rebuild (+ any post-assembly hooks) when the assembly script / shared helper
+closure / a hook changed, or the target is missing. A refresh that hits a dangling mate, free
 DOF, or interference FAILS LOUD (non-zero exit, .SLDASM untouched); recover with
 the full escape below.
 
@@ -88,7 +88,7 @@ from filelock import FileLock, Timeout  # noqa: E402
 # "A ∩ B" gate labels); on Windows the parent stdout defaults to cp1252, so
 # re-emitting that glyph raises UnicodeEncodeError and kills the reader (which can
 # then hang the child on a full pipe). Force UTF-8 on the parent too, mirroring
-# run_build (_common.py).
+# run_build (_session.py).
 for _stream in (sys.stdout, sys.stderr):
     _reconfigure = getattr(_stream, "reconfigure", None)
     if _reconfigure is not None:
@@ -119,6 +119,7 @@ from _buildgraph import (  # noqa: E402
     fastener_rows_selected,
     is_racy_mtime,
     machine_family_files,
+    tolerance_family_files,
     module_deps_of,
     part_row_files,
     part_scripts,
@@ -148,12 +149,12 @@ _cache.prewarm()
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
 RELEASE_VERSION_FILE = (CONFIG_DIR / "release.yaml").resolve()
-# The repo-owned part template (see _common.PART_TEMPLATE -- path duplicated
-# deliberately; importing _buildgraph from _common would drag graph tooling
+# The repo-owned part template (see _paths.PART_TEMPLATE -- path duplicated
+# deliberately; importing _buildgraph from _paths would drag graph tooling
 # into every part's dep closure). A runtime input of every part build.
 PART_TEMPLATE = REPO_ROOT / "cad" / "templates" / "harmonic-analyzer.PRTDOT"
 # The vendored COM adapter (``solidworks_mcp``) lives in this submodule and is
-# imported AT RUNTIME by _common/_assembly (e.g. the mate/plane creation glue), so
+# imported AT RUNTIME by _com/_assembly (e.g. the mate/plane creation glue), so
 # its source is a genuine build input of every COM task -- yet it is an installed
 # package, not a repo-local ``_*.py`` helper, so ``module_deps_of`` never walks it.
 # Its tracked source content is folded into every COM task's recipe (see
@@ -207,7 +208,7 @@ _COM_LOCK = FileLock(str(_COM_LOCK_PATH))
 _COM_SEAT_POLL_S = 30.0
 # Set in the environment while the seat is held (inherited by the COM subprocess via
 # ``_telemetry.inject_env``): a COM build launched under doit WITHOUT it trips the
-# ``_common`` guard loud -- the runtime successor to the removed spine tripwire.
+# ``_session.run_build`` guard loud -- the runtime successor to the removed spine tripwire.
 _COM_SEAT_HELD_ENV = "HARMONIC_COM_SEAT"
 
 
@@ -241,7 +242,7 @@ def _com_seat(label: str):
     While blocked it logs the current holder every ``_COM_SEAT_POLL_S`` so a wedged
     seat is diagnosable rather than a silent hang. Sets ``HARMONIC_COM_SEAT`` in this
     process's environment (inherited by the COM subprocess) so a COM build launched
-    WITHOUT the seat trips ``_common``'s guard loud -- the runtime successor to the
+    WITHOUT the seat trips ``_session.run_build``'s guard loud -- the runtime successor to the
     removed ``_assert_spine_complete`` tripwire. Reentrancy-safe (``filelock`` counts
     same-process acquisitions), though no COM action nests it.
 
@@ -370,8 +371,8 @@ def _seat_part_order() -> list[str]:
 # doit's stock MD5Checker hashes RAW FILE BYTES, so a comment-only or reflow edit
 # to a SHARED config (every part lists cad/config/*.yaml as a file_dep) flips that
 # file's md5 and marks EVERY dependent part stale -> a spurious full rebuild. This
-# bit us once: a provenance-comment retarget in tolerances.yaml (value unchanged)
-# rebuilt 75 parts. ContentChecker digests the *parsed* YAML instead -- key order
+# bit us once: a provenance-comment retarget in the former monolithic tolerance
+# config (value unchanged) rebuilt 75 parts. ContentChecker digests the *parsed* YAML instead -- key order
 # preserved, comments and formatting discarded -- so only a real data change
 # invalidates. Non-YAML deps (.py, .SLDPRT) fall through to the exact stock md5,
 # so their stored state stays valid across the switch.
@@ -683,8 +684,8 @@ def _run_subprocess(
 
     ``label`` is the display name; ``task`` is the doit task the subprocess works
     for (default: ``label``, which already is one for most callers). The fastener
-    guard is keyed on ``task``, so a FULL/REFRESH/hook subprocess with a display
-    label still gets its assembly's rows."""
+    and fit-group guards are keyed on ``task``, so a FULL/REFRESH/hook subprocess
+    with a display label still gets its assembly's read sets."""
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
@@ -693,6 +694,10 @@ def _run_subprocess(
     fastener_rows = _fastener_rows_env(task or label)
     if fastener_rows is not None:
         env["HARMONIC_FASTENER_ROWS"] = fastener_rows
+    env.pop("HARMONIC_FIT_GROUPS", None)
+    fit_groups = _fit_groups_env(task or label)
+    if fit_groups is not None:
+        env["HARMONIC_FIT_GROUPS"] = fit_groups
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
     # the build's warning-by-default policy while preserving an explicit override.
     env.setdefault("LOGURU_LEVEL", _external_console_level())
@@ -1011,11 +1016,11 @@ def _run(
 
 # --- Per-script helper dependencies, computed from each build script's REAL
 # transitive imports (``module_deps_of``) instead of a blanket "every ``_*.py`` is
-# a dep of every build". A leaf part that imports only ``_common`` no longer
-# rebuilds when an assembly-only helper (``_assembly``) or an unrelated one
-# (``_gear``) changes; the closure follows imports (``_chain_link -> _chain ->
-# _common``; ``_common -> _config``) so it never under-invalidates as long as a
-# script imports what it uses. (Excludes _buildgraph.py: the build-GRAPH helper
+# a dep of every build". A leaf part that imports only the focused helpers it
+# uses no longer rebuilds when an assembly-only helper (``_assembly``) or an
+# unrelated one (``_gear``) changes; the closure follows each helper's imports
+# transitively so it never under-invalidates as long as a script imports what
+# it uses. (Excludes _buildgraph.py: the build-GRAPH helper
 # imported here, not a geometry input.)
 #
 # The YAML data layer is now a FINE-GRAINED dep: each part/assembly depends on
@@ -1044,7 +1049,7 @@ def _helper_deps(script) -> list[str]:
 
 def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> list[str]:
     """Per-task expansion of the ``"parts/*"`` registry token (the dynamic part
-    name in ``_common.part_properties``):
+    name in ``_part_properties.part_properties``):
 
       * a PART stamps only its OWN row -> parts/<dashed-stem>.yaml + _defaults
         (editing one row rebuilds one part);
@@ -1056,7 +1061,7 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
       * a DRAWING reads its OWN part's row -> parts/<dashed-part>.yaml +
         _defaults (none for an assembly-sourced sheet, which has no row).
         Every dynamic registry read a drawing closure reaches is its own part
-        (``_common.part_properties``, ``_purchased_fastener_drawing``,
+        (``_part_properties.part_properties``, ``_purchased_fastener_drawing``,
         ``_drawing_marks.apply_drawing_properties``);
         test_dodo_recipe.test_drawing_closures_read_no_foreign_dynamic_part_row
         fails loud on any new one.  A literal read of ANOTHER part's row
@@ -1080,7 +1085,7 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
 
 def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     """Per-task expansion of the ``"title_block"`` token (the TOL_* stamping in
-    ``_common.part_properties`` or ``_assembly.assembly_title_properties``):
+    ``_part_properties.part_properties`` or ``_assembly.assembly_title_properties``):
     every part and every drawing-owning assembly stamps these values. An
     assembly whose closure sizes geometry from the printed rows
     (``reads_title_block_geometry``) keeps it too, stamping or not. Other
@@ -1122,6 +1127,8 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
     for tok in tokens:
         if tok == "machine/*":
             out.update(machine_family_files())
+        elif tok == "tolerances/*":
+            out.update(tolerance_family_files())
         elif tok == "parts/*":
             out.update(_expand_parts_token(stem, kind, script))
         elif tok == "title_block":
@@ -1256,7 +1263,7 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
 
     A failure that captured NOTHING says so on its own line. Most failures
     capture nothing: ``capture_com_failure`` fires at COM-failure sites, so an
-    ordinary recipe rejection (``_common.check`` raising on a refused sketch
+    ordinary recipe rejection (``_check.check`` raising on a refused sketch
     relation, say) leaves ``failures/`` empty and there is no bundle to fetch.
     Emitting nothing at all made that indistinguishable from "the forensics
     never ran", and the submitter's message advertised a ``failures/*``
@@ -1451,9 +1458,9 @@ def _digest_files(files: list[str]) -> str:
 
 # --- SolidworksMCP-python submodule: a runtime build input of EVERY COM task.
 #
-# ``_common``/``_assembly`` import ``solidworks_mcp`` (the vendored COM adapter) at
+# ``_com``/``_assembly`` import ``solidworks_mcp`` (the vendored COM adapter) at
 # runtime for the mate/plane/feature creation glue, so its source is as much a part
-# of a .SLDPRT/.SLDASM's recipe as ``_common.py`` -- but it is an INSTALLED package,
+# of a .SLDPRT/.SLDASM's recipe as the shared helper closure -- but it is an INSTALLED package,
 # not a repo-local ``_*.py`` helper, so ``module_deps_of`` (which walks only local
 # ``_*.py`` imports) never included it. That left BOTH the local staleness digest
 # AND the remote cache key blind to a submodule bump: bumping it left every COM
@@ -1841,6 +1848,33 @@ def _fastener_rows_env(task: str) -> str | None:
     return None if rows is None else ",".join(sorted(rows))
 
 
+def _fit_groups_env(task: str) -> str | None:
+    """Guard fit reads with the same concrete config files folded by the task.
+
+    Like the fastener guard, recompute in doit workers and leave unnarrowed
+    tasks unrestricted. Empty selections refuse every fit group.
+    """
+    if not task or any(ch.isspace() for ch in task):
+        raise ValueError(f"{task!r} is not a doit task name; its fit groups are unknown")
+    family, _, stem = task.partition(":")
+    if family == "part" and stem in part_stems():
+        deps = _part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem)
+    elif family == "assembly" and stem in ASSEMBLY_ORDER:
+        deps = _recipe_files(stem)
+    elif family == "drawing" and stem in DRAWINGS_BY_NAME:
+        deps = _drawing_file_deps(stem)
+    elif family in ("part", "assembly", "drawing"):
+        raise ValueError(f"{task!r} names no {family} task; its fit groups are unknown")
+    else:
+        return None
+    tolerance_dir = _resolved(CONFIG_DIR / "tolerances")
+    groups = {
+        Path(dep).stem for dep in deps
+        if _resolved(Path(dep).parent) == tolerance_dir and Path(dep).stem != "_base"
+    }
+    return ",".join(sorted(groups))
+
+
 def _drawing_file_deps(stem: str) -> list[str]:
     """Inputs for both doit freshness and the shared drawing-cache key.
 
@@ -1949,7 +1983,7 @@ def _kinematics_file_deps() -> list[str]:
 
     verify.py's gate LOGIC lives partly in _assembly_postbuild.py
     (load_dof_manifest/author_dof_drives -- the kinematics replays). Unlike
-    verify's other helper imports (_assembly/_common/build_*), that module is
+    verify's other helper imports (_assembly/focused helpers/build_*), that module is
     deliberately OUTSIDE every assembly recipe (it is on NO build script's
     closure), so a change to the replay logic does NOT bump any .SLDASM digest --
     and the .SLDASM deps below would then leave a fresh verify-kinematics.ok stamp
@@ -2266,7 +2300,7 @@ def _cached_drawing_action(stem: str) -> None:
 
 def _part_file_deps(script: Path, stem: str) -> list[str]:
     # The repo-owned part TEMPLATE is a runtime input of every part build
-    # (_common._pin_default_part_template points the seat's default at it, so
+    # (_session._pin_default_part_template points the seat's default at it, so
     # NewPart inherits its document properties -- the DimXpert block-tolerance
     # get-only prefs ride it). Folding it in makes a template edit rebuild
     # every part AND shift the remote-cache key, so no seat can publish
@@ -2576,7 +2610,7 @@ def task_part():
 # file_deps, but it is UNRELIABLE after an intervening task FAILS: it then
 # falsely flags pristine recipe files (and omits the real change), forcing a
 # spurious FULL (measured -- "D2"). Instead we track the recipe (assembly script
-# / _common.py / hooks) with an ``uptodate`` callable modelled on doit's own
+# / shared helper closure / hooks) with an ``uptodate`` callable modelled on doit's own
 # ``config_changed``: it compares an md5 of the recipe CONTENT against the value
 # saved on the last *successful* run (value_savers only fire on success), so a
 # failed task never corrupts it. It also stashes the changed-bit into
@@ -2623,8 +2657,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
     """FULL rebuild vs cheap REFRESH for one assembly stem.
 
     FULL (run build_<stem>_assembly.py + any POST_ASSEMBLY hooks) when the target
-    is missing OR the recipe itself changed (assembly script / _common.py / a hook
-    script). Otherwise only referenced parts changed: REFRESH (refresh_assembly.py,
+    is missing OR the recipe itself changed (assembly script / shared helper
+    closure / a hook script). Otherwise only referenced parts changed: REFRESH (refresh_assembly.py,
     no hooks -- reopening preserves the existing configuration).
 
     The recipe-changed decision is recomputed HERE from a sidecar digest (the
@@ -2793,7 +2827,7 @@ def _clean_assembly(stem):
 def task_assembly():
     """One task per assembly stem (``assembly:<stem>``).
 
-    file_dep edges -- the assembly script, _common.py, this stem's hooks, and the
+    file_dep edges -- the assembly script, shared helper closure, this stem's hooks, and the
     referenced .SLDPRT/sub-.SLDASM targets -- give doit both ordering (top depends
     on the sub .SLDASMs, so it runs after) and the refresh/full decision (only
     parts changed -> refresh).
@@ -3014,10 +3048,10 @@ def task_check():
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",
-        # The assembly-view configuration policy (1:2 boundary, roles, BOM
-        # identity, simplified re-save fingerprint).
-        SCRIPTS_DIR / "test_drawing_simplified.py",
-        # Stock fasteners declare their thread; a missing groove fails loud.
+        # The split simplified helpers' shared policy (1:2 boundary, roles,
+        # BOM identity, part derivation and simplified re-save fingerprint).
+        SCRIPTS_DIR / "test_simplified_helpers.py",
+        # Recipe-local stock declarations; a missing groove fails loud.
         SCRIPTS_DIR / "test_stock_fastener.py",
         # The shared layout audit's own contract (_layout_audit.py finders + ink model).
         SCRIPTS_DIR / "test_layout_audit.py",
@@ -3057,7 +3091,7 @@ def task_check():
         # model-PMI controls that drawings consume.
         SCRIPTS_DIR / "test_drawing_specification_purity.py",
         SCRIPTS_DIR / "test_drawing_surface_finish_validation.py",
-        SCRIPTS_DIR / "test_gtol_spec.py",
+        SCRIPTS_DIR / "test_gtol_contracts.py",
         SCRIPTS_DIR / "test_part_owned_geometric_tolerances.py",
         SCRIPTS_DIR / "test_probe_surface_finish_pmi_telemetry.py",
         SCRIPTS_DIR / "test_surface_finish.py",
@@ -3283,15 +3317,26 @@ def task_check():
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
         },
         "nameplate": {
-            # Guards the vendored engraving DXF the nameplate build imports; the
-            # DXF is now the source of truth (the re-traced coordinate loops are
-            # retired), so the gate depends on the file + its integrity test.
+            # The plate outline, notched field and engraving are all vendored
+            # geometry; any contour or its pinned area/bbox must invalidate this
+            # SolidWorks-free integrity gate.
             "file_dep": [
                 str((SCRIPTS_DIR / "test_fr_nameplate_geometry.py").resolve()),
                 str((SCRIPTS_DIR / "fr_nameplate_spec.py").resolve()),
+                str((SCRIPTS_DIR / "build_fr_nameplate.py").resolve()),
                 str(
                     (
                         REPO_ROOT / "cad" / "references" / "fr-nameplate-engraving.dxf"
+                    ).resolve()
+                ),
+                str(
+                    (
+                        REPO_ROOT / "cad" / "references" / "fr-nameplate-outline.dxf"
+                    ).resolve()
+                ),
+                str(
+                    (
+                        REPO_ROOT / "cad" / "references" / "fr-nameplate-field.dxf"
                     ).resolve()
                 ),
             ],
@@ -3385,13 +3430,14 @@ def task_check():
             # hard-exits the COM subprocess (releasing the seat via the doit
             # parent); a hung SW window only warns. Pure python, injectable
             # probes -- so the fatal/log-only contract can't silently regress.
-            # _common.py is a dep because the gate also pins the INTEGRATION
-            # (run_build arms/disarms the watchdog): an edit that drops those
-            # calls must re-run this gate, not reuse the old stamp (codex #344).
+            # The test's closure (_session, _paths, _com, ...) is a dep because
+            # the gate also pins the INTEGRATION (run_build arms/disarms the
+            # watchdog, CAD_ROOT steers seat parking): an edit there must re-run
+            # this gate, not reuse the old stamp (codex #344).
             "file_dep": [
+                *module_deps_of(SCRIPTS_DIR / "test_watchdog.py"),
                 str((SCRIPTS_DIR / "_watchdog.py").resolve()),
                 str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                str((SCRIPTS_DIR / "_common.py").resolve()),
                 # run_build's teardown (seat parking) lives in the recipe-inert
                 # module, which no module_deps_of closure reaches.
                 str((SCRIPTS_DIR / "_seat_forensics.py").resolve()),
@@ -3430,9 +3476,9 @@ def task_check():
         "flagonly": {
             # The targeted late-binding flag helper (_flag_only, issue #87) -- pure
             # dispatch glue. Was merged WITHOUT a check task, so it never ran in CI;
-            # wired here so a regression in _common._flag_only fails an offline gate.
+            # wired here so a regression in _com._flag_only fails an offline gate.
             "file_dep": [
-                str((SCRIPTS_DIR / "_common.py").resolve()),
+                str((SCRIPTS_DIR / "_com.py").resolve()),
                 str((SCRIPTS_DIR / "test_flag_only.py").resolve()),
             ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],

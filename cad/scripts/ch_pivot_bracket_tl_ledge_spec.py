@@ -16,7 +16,8 @@ its back face (the face that seats on the upright). +X along the ledge, +Y up,
 It is the angle plate's model frame translated by
 (PLATE_LENGTH/2 - LEDGE_WIDTH/2, BLOCK_HEIGHT, 0), so the inventory's fixture
 frame (bracket plan setup frame TC) is
-TC = (x - LEDGE_WIDTH/2, -z, y + BLOCK_HEIGHT - (PLATE_HEIGHT + PART_PROUD)).
+TC = (x - LEDGE_WIDTH/2, -z, y + BLOCK_HEIGHT - (PLATE_HEIGHT + PART_PROUD[c]))
+for bracket configuration c (both stand on this one ledge).
 """
 
 from __future__ import annotations
@@ -24,7 +25,8 @@ from __future__ import annotations
 import ch_pivot_bracket_spec as bracket
 import ch_pivot_bracket_tl_angle_plate_spec as plate
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm
 
@@ -34,14 +36,15 @@ from _printed_tolerance import drilled_oversize_mm
 # general tolerance; its ends stay clear of the bridge's stud nuts.
 LEDGE_WIDTH = 22.6
 LEDGE_THICK = bracket.FOOT_H  # 6.0
-LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)  # 17.9
+# 27.7, under the shorter S foot at the stack's worst case (angle-plate spec)
+LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)
 SIZE_PLACES = 1
 if LEDGE_WIDTH < bracket.FOOT_W:
     raise AssertionError("ledge narrower than the bracket foot it carries")
 if limits(LEDGE_WIDTH, SIZE_PLACES)[1] / 2.0 >= plate.STUD_HALF_PITCH - plate.STUD_NUT_DIA / 2.0:
     raise AssertionError("ledge end reaches a bridge stud nut")
 
-# Two #5 screw holes, 9.0 under the top, on the upright's tap pitch. The taps
+# Two #5 screw holes, 10.5 under the top, on the upright's tap pitch. The taps
 # are spotted through these holes, so their stations only have to keep the
 # walls, all at the general one-place tolerance.
 CLEARANCE_SPEC = plate.LEDGE_CLEARANCE_SPEC
@@ -49,7 +52,7 @@ HOLE_X = (
     round(LEDGE_WIDTH / 2.0 - plate.SCREW_HALF_PITCH, 6),
     round(LEDGE_WIDTH / 2.0 + plate.SCREW_HALF_PITCH, 6),
 )
-HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 8.9
+HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 17.2
 HOLE_X_PLACES = 1
 HOLE_Y_PLACES = 1
 HOLE_DIA = blind_cut_dia_mm(CLEARANCE_SPEC)
@@ -105,11 +108,11 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "plane": ({"frame": "model", "axis": "y", "value": LEDGE_HEIGHT}, ("LEDGE_HEIGHT",)),
             "height": (
                 limits(LEDGE_HEIGHT, SIZE_PLACES),
-                ("LEDGE_HEIGHT", "SIZE_PLACES", ("ch_pivot_bracket_spec", "FOOT_LEN")),
+                ("LEDGE_HEIGHT", "SIZE_PLACES", ("ch_pivot_bracket_sides", "FOOT_LEN")),
             ),
             "height_nominal": (
                 LEDGE_HEIGHT,
-                ("LEDGE_HEIGHT", ("ch_pivot_bracket_spec", "FOOT_LEN")),
+                ("LEDGE_HEIGHT", ("ch_pivot_bracket_sides", "FOOT_LEN")),
             ),
             "height_from": ("block_face", ("__frame__",)),
             "width": (limits(LEDGE_WIDTH, SIZE_PLACES), ("LEDGE_WIDTH", ("ch_pivot_bracket_spec", "FOOT_W"))),

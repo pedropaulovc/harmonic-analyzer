@@ -34,7 +34,8 @@ import draw_dt_crank_drive_gear
 import draw_dt_crank_pinion
 import draw_dt_crankshaft
 import draw_dt_cylinder_gear_shaft
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 

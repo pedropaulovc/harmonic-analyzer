@@ -27,7 +27,12 @@ import channel_kinematics  # noqa: E402
 import vn_channel_spring_stock_geom as channel_stock  # noqa: E402
 import settled_spring_seats  # noqa: E402
 from _assembly import component_transform  # noqa: E402
-from _common import _early_bound, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound  # noqa: E402
+from _session import run_build  # noqa: E402
 from _transforms import ROT_Y_180, compose_rows, rot_z_rows  # noqa: E402
 from diagnostics._seat_search import solve_component_contact  # noqa: E402
 
