@@ -410,6 +410,9 @@ KEEPER_TAP_CALLOUT_PRECISION = {
     "hw-tapdrldepth": 1,
     "hw-threaddepth": 1,
 }
+# Rule 12 receiver-wall stack: realistic angular drift through the FULL
+# printed cylindrical pilot depth, without relying on a precision drill jig.
+KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit.
 DRAWING_NOTES = (

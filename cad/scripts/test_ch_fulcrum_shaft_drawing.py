@@ -68,16 +68,30 @@ def test_flat_pair_is_located_from_the_end() -> None:
     assert "FlatStation" not in source
 
 
-def test_paired_keeper_bores_keep_the_slide_fit() -> None:
+def test_paired_keeper_bores_keep_a_running_fit_at_the_inclination_budget() -> None:
     # Bored apart, the two keepers' .XX LugRise bands could put the bores
     # 1.02 out of line, far past the fit; reamed as a pair they share one
-    # axis and the shaft keeps the fit's least 0.010 clearance through both.
+    # axis. GPT re-review (PR #1311): that common axis may lean 0.2 deg to the
+    # seat unseen by the bench slide test (bores 6 apart); installed 148 apart
+    # on the flat rail, the straight shaft's best line runs through both lug
+    # centres and each 6.0 lug spends 6 tan(0.2 deg) of diametral clearance.
+    keeper = ch_fulcrum_keeper_spec
     spec = ch_fulcrum_shaft_spec
     assert math.isclose(spec.BORE_OFFSET_UNPAIRED_MM, 1.02)
     assert spec.BORE_OFFSET_UNPAIRED_MM > (
-        ch_fulcrum_keeper_spec.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1]
+        keeper.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1]
     )
-    assert math.isclose(spec.PAIRED_MIN_CLEARANCE_MM, 0.010)
+    assert keeper.BORE_INCLINATION_BUDGET_DEG == 0.2
+    lug_t = 2.0 * keeper.LUG_HALF_T
+    angular = lug_t * math.tan(math.radians(keeper.BORE_INCLINATION_BUDGET_DEG))
+    assert math.isclose(keeper.BORE_INCLINATION_ALLOWANCE_MM, angular)
+    assert round(angular, 4) == 0.0209
+    # Tilting the shaft to follow the lean costs the span, not the lug.
+    assert 2.0 * keeper.KEEPER_Z_OFF == 148.0 > lug_t
+    least = keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0]
+    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + angular  # 0.035 >= 0.0309
+    assert math.isclose(spec.PAIRED_MIN_CLEARANCE_MM, least - angular)
+    assert spec.PAIRED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
 
 
 def test_installed_set_screw_meets_rule_12() -> None:

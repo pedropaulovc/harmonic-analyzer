@@ -39,9 +39,10 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     assert spec.FOOT_TIP_X == spec.LUG_HALF_T + spec.FOOT_L == 13.5
     assert spec.SCREW_X == 8.25
     assert spec.KEEPER_SCREW_Z_OFF == spec.KEEPER_Z_OFF + spec.SCREW_X == 82.25
-    # Plain reamed slide-fit bore on the plain Ø6.35 shaft.
+    # Plain reamed bore on the plain Ø6.35 shaft: a running band that covers
+    # the paired bores' 0.2 deg inclination budget (ch_fulcrum_shaft_spec).
     assert spec.BORE_DIA == 6.35
-    assert spec.BORE_DIA_BAND == (0.025, 0.010)  # (upper, lower)
+    assert spec.BORE_DIA_BAND == (0.050, 0.035)  # (upper, lower)
 
 
 def test_crown_set_screw_tap_stops_at_the_bore() -> None:

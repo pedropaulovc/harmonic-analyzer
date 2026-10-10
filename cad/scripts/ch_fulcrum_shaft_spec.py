@@ -24,6 +24,9 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from ch_fulcrum_keeper_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
+    BORE_INCLINATION_ALLOWANCE_MM,
+    BORE_INCLINATION_BUDGET_DEG,
+    BORE_RUNNING_MIN_CLEARANCE_MM,
     CROWN_DIA,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_Z_OFF,
@@ -255,13 +258,22 @@ if FLAT_STATION_WINDOW_MM <= 0.0:
 # (ch_fulcrum_keeper_spec.BORE_PAIR_CALLOUT, MHA-CH-000): bored apart, each
 # keeper's .XX LugRise could put the two bores BORE_OFFSET_UNPAIRED_MM out of
 # line, past the fit's largest diametral clearance; paired they share one
-# axis, so the shaft keeps the fit's least clearance through both.
+# axis. That axis may still lean BORE_INCLINATION_BUDGET_DEG to the seat,
+# which the bench slide test cannot see; installed 2 x KEEPER_Z_OFF apart,
+# each lug then spends BORE_INCLINATION_ALLOWANCE_MM of its clearance on the
+# straight shaft, and the rest must still be the running minimum.
 BORE_OFFSET_UNPAIRED_MM = 2.0 * _band(KEEPER_PRECISION, "LugProfile", "LugRise")
-PAIRED_MIN_CLEARANCE_MM = BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0]
+PAIRED_MIN_CLEARANCE_MM = (
+    BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0] - BORE_INCLINATION_ALLOWANCE_MM
+)  # 0.0141
 if BORE_OFFSET_UNPAIRED_MM <= BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1]:
     raise AssertionError("the keeper bores line up unpaired: drop the pair reaming")
-if PAIRED_MIN_CLEARANCE_MM <= 0.0:
-    raise AssertionError("the paired keeper bores do not clear the shaft")
+if PAIRED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
+    raise AssertionError(
+        f"the paired keeper bores keep {PAIRED_MIN_CLEARANCE_MM:.4f} on the shaft "
+        f"after the {BORE_INCLINATION_BUDGET_DEG} deg inclination "
+        f"(< {BORE_RUNNING_MIN_CLEARANCE_MM})"
+    )
 
 DRAWING_NOTES = "\n".join(
     (

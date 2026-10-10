@@ -31,9 +31,9 @@ underside x -3..+13.5 is the flat seat.
 
 from __future__ import annotations
 
-from math import sqrt
+from math import radians, sqrt, tan
 
-from _fit_limits import REAM_SLIDE
+from _fit_limits import SHAFT_H
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from dt_cone_pivot_post_installation import CHANNEL_Z0, FRAME_FRONT_COLUMN_Z
 
@@ -64,21 +64,38 @@ FOOT_L = 10.5  # foot length outboard of the lug's outer face
 FOOT_TIP_X = LUG_HALF_T + FOOT_L  # 13.5: outboard end of the foot
 CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_DIA / 2.0  # 32.2: the set-screw tap's entry
 # Plain reamed bore for the plain Ø6.35 (1/4 in ground, SHAFT_H) fulcrum
-# shaft. REAM_SLIDE (+0.025/+0.010) over the shaft's 0/-0.020 band gives
-# 0.010-0.045 diametral clearance: the shaft slides through both lugs at
-# assembly and the set screw then pulls it onto the bore wall, so the fit
-# only has to locate it, not run on it. Each keeper prints LugRise at .XX, so
-# two keepers bored apart could sit 2 x 0.51 out of line -- far past that
-# clearance, and a reamer only follows the holes it is given. So the two are
-# drilled and reamed as a pair in one setup (BORE_PAIR_CALLOUT, MHA-CH-000):
-# one axis, one height off one seat flat, and the shaft keeps the bore
-# band's own clearance through both (ch_fulcrum_shaft_spec proves the
-# stack, PAIRED_MIN_CLEARANCE_MM). Each crown is then
-# rounded about its own reamed bore (CROWN_ABOUT_BORE_CALLOUT), keeping it
-# concentric, which the crown thread's worst case below assumes.
-# ch_fulcrum_shaft_spec pins the nominal to its SHAFT_DIA.
+# shaft: the shaft slides through both lugs at assembly and the set screw
+# then pulls it onto the bore wall, so the fit only has to locate it, not run
+# on it. Each keeper prints LugRise at .XX, so two keepers bored apart could
+# sit 2 x 0.51 out of line -- far past any slide clearance, and a reamer only
+# follows the holes it is given. So the two are drilled and reamed as a pair
+# in one setup (BORE_PAIR_CALLOUT, MHA-CH-000): one axis, one height off one
+# seat flat. Pairing does not square that axis to the seat, though: a common
+# inclination passes the bench slide test (the bores 6 apart) and then, with
+# the keepers 2 x KEEPER_Z_OFF apart on the flat rail, each bore crosses the
+# straight shaft at that angle. The shaft's best line runs through both lug
+# centres (tilting it costs the 148 span, not the 6 lug), so each lug costs
+# its thickness x tan(inclination) of diametral clearance. With a budget of
+# BORE_INCLINATION_BUDGET_DEG that allowance rides on top of the running
+# minimum, and BORE_DIA_BAND (+0.035/+0.050, a 0.2515 in over-size reamer)
+# keeps both over the shaft's 0/-0.020 band (ch_fulcrum_shaft_spec proves the
+# stack, PAIRED_MIN_CLEARANCE_MM). Each crown is then rounded about its own
+# reamed bore (CROWN_ABOUT_BORE_CALLOUT), keeping it concentric, which the
+# crown thread's worst case below assumes. ch_fulcrum_shaft_spec pins the
+# nominal to its SHAFT_DIA.
 BORE_DIA = 6.35
-BORE_DIA_BAND = REAM_SLIDE
+BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
+BORE_INCLINATION_BUDGET_DEG = 0.2
+BORE_INCLINATION_ALLOWANCE_MM = (
+    2.0 * LUG_HALF_T * tan(radians(BORE_INCLINATION_BUDGET_DEG))
+)  # 0.0209
+BORE_DIA_BAND = (0.050, 0.035)  # (upper, lower)
+if KEEPER_Z_OFF <= LUG_HALF_T:
+    raise AssertionError("the keeper span no longer exceeds a lug thickness")
+if BORE_DIA_BAND[1] - SHAFT_H[0] < (
+    BORE_RUNNING_MIN_CLEARANCE_MM + BORE_INCLINATION_ALLOWANCE_MM
+):
+    raise AssertionError("the keeper bore band does not cover the inclination")
 BORE_PAIR_CALLOUT = (
     "DRILL AND REAM AS A PAIR WITH THE\n"
     "MATING MHA-CH-007, INNER LUG FACES\n"
@@ -281,7 +298,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # owns them. One place is the general grade: the crown thread is sized at
 # the .X worst case (SET_SCREW_ENGAGEMENT_D). The shaft-axis height takes
 # two (it sets the fulcrum height; the pair reaming lines the two bores
-# up); the reamed bore carries its own REAM_SLIDE band; the lug thickness
+# up); the reamed bore carries its own BORE_DIA_BAND; the lug thickness
 # and the tap station take three, the web's worst case (SET_SCREW_WEB_MM),
 # and so do the foot screw's stations: off the lug for the tip wall
 # (FOOT_TIP_WALL_MM), off the side for the frame tap's ligament

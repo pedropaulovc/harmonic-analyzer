@@ -30,8 +30,9 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   a 1/4-20 tap through the rib to the bore for the square-head set screw
   (book p.45: "a square-head screw pinches the post in its socket").
 * Webbed faces (T-rail section): an 8-tall full-thickness top flange, then
-  the web thins to 12.7 (0.5 in) centred on each rail and STAYS thin through
-  the bottom edge (ch19 img04/img05 + user read), with full-thickness lands
+  the web thins to 13.0 centred on each rail and STAYS thin through the
+  bottom edge. The former photo-read 12.7 web is thickened for the keeper
+  receivers' printed-band plus drill-wander stack; full-thickness lands remain
   at the bosses, hub rib and crossbar junctions.
 * Finishing (chamfer external, fillet internal): R3 cast fillets along
   the internal web/flange T-roots (both shelves of every rail, ch19
@@ -151,6 +152,7 @@ from fr_top_frame_spec import (
     HANGER_SLOT_WIDTH_BAND,
     HANGER_SLOT_X,
     KEEPER_TAP_CALLOUT_PRECISION,
+    KEEPER_TAP_DRILL_WANDER_DEG,
     PRINTED_DRILLED_HOLE_PLUS_MM,
     PRINTED_LINEAR_BAND_MM,
     REAR_COLUMN_Z,
@@ -374,14 +376,14 @@ KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +81.746
 # per-face setback differs by rail family (the rails are 34.2/38.0 wide but
 # share one web thickness).
 FLANGE = 8.0  # top flange band (the only full-thickness band)
-WEB_T = 12.7  # 0.5 in web, centred on each rail's centreline
-RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.75 setback per side-rail face
-RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.65 setback per front/rear-rail face
+WEB_T = 13.0  # user ruling: retain loose bands plus realistic deep-drill wander
+RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.6 setback per side-rail face
+RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.5 setback per front/rear-rail face
 FLANGE_BOT_Y = RING_HEIGHT / 2.0 - FLANGE  # +10.25 (flange underside)
-WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.35
-WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.65
-WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.35
-WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.65
+WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.5
+WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.5
+WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.5
+WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.5
 LAND_X0 = BAR_X0 - GUSSET - 6.0  # -50; crossbar-junction land pads on the
 LAND_X1 = BAR_X1 + GUSSET + 6.0  # +20; front/rear inner faces (6 margin)
 
@@ -486,7 +488,7 @@ SIDE_TAP_DRILL_POINT_Z = (
 # |x - ColumnX| <= radius < WebT/2 and |y| <= radius < HalfH, so boss ∪
 # web supplies uninterrupted metal beyond both ends. The actual limiting
 # walls are the web's x faces (and its y faces), not z=112-R22.5. Nominal
-# lateral ligaments: thread major 6.35-2.413=3.937; drill 6.35-2.0193=4.3307.
+# lateral ligaments: thread major 6.5-2.413=4.087; drill 6.5-2.0193=4.4807.
 SIDE_TAP_THREAD_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
 SIDE_TAP_DRILL_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_DRILL_DIA / 2.0
 if min(SIDE_TAP_THREAD_WALL_MARGIN, SIDE_TAP_DRILL_WALL_MARGIN) < 2.0:
@@ -620,10 +622,22 @@ KEEPER_MAX_FULL_THREAD_DEPTH = (
     )
     + PRINTED_LINEAR_BAND_MM[KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]]
 )
+KEEPER_MAX_TAP_DRILL_DEPTH = (
+    round(KEEPER_TAP_SPEC.depth_mm, KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldepth"])
+    + PRINTED_LINEAR_BAND_MM[KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldepth"]]
+)
+# Rule 12: budget realistic deep-drill wander over the FULL allowed
+# cylindrical depth, not only the shorter threaded region. Its displacement
+# disk conservatively covers every pilot/thread section and every direction;
+# subtracting its radius from the normal wall distance handles the T-root
+# without an optimistic horizontal projection or a claimed guide operation.
+KEEPER_TAP_AXIS_WANDER_MM = KEEPER_MAX_TAP_DRILL_DEPTH * math.tan(
+    math.radians(KEEPER_TAP_DRILL_WANDER_DEG)
+)
 # The limiting full-thread corner lies next to the quarter-circle T-root.
 # Use its shortest NORMAL distance to that arc, not the larger horizontal
 # section width. Below the arc the same expression becomes the bare web.
-KEEPER_TAP_THREAD_WALL_MARGIN = (
+KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER = (
     math.hypot(
         KEEPER_MIN_WEB_HALF_WIDTH
         + KEEPER_MIN_ROOT_RADIUS
@@ -638,6 +652,9 @@ KEEPER_TAP_THREAD_WALL_MARGIN = (
     )
     - KEEPER_MIN_ROOT_RADIUS
 )
+KEEPER_TAP_THREAD_WALL_MARGIN = (
+    KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER - KEEPER_TAP_AXIS_WANDER_MM
+)
 KEEPER_MAX_TAP_DRILL_RADIUS = (
     round(
         TAP_DRILL_MM[KEEPER_TAP_SPEC.size],
@@ -645,13 +662,16 @@ KEEPER_MAX_TAP_DRILL_RADIUS = (
     )
     + PRINTED_DRILLED_HOLE_PLUS_MM
 ) / 2.0
-KEEPER_TAP_DRILL_WALL_MARGIN = (
+KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER = (
     KEEPER_MIN_WEB_HALF_WIDTH
     - KEEPER_MAX_WEB_CENTRE_OFFSET
     - KEEPER_MAX_TAP_DRILL_RADIUS
 )
+KEEPER_TAP_DRILL_WALL_MARGIN = (
+    KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER - KEEPER_TAP_AXIS_WANDER_MM
+)
 if min(KEEPER_TAP_THREAD_WALL_MARGIN, KEEPER_TAP_DRILL_WALL_MARGIN) < 1.5:
-    raise AssertionError("keeper receiver leaves less than 1.5 mm at printed bands")
+    raise AssertionError("keeper receiver leaves less than 1.5 mm with drill wander")
 KEEPER_MAX_STOCK_ENTRY = FOOT_SCREW_LENGTH_MM - (
     (
         round(FOOT_H, KEEPER_DRAWING_PRECISION["FootProfile"]["FootRise"])
@@ -931,7 +951,7 @@ def _t_root_add() -> float:
 
     The reentrant junction where each recessed web face meets the flange
     underside (y +10.25), on BOTH the outer and the window side of every
-    rail. Every web face sits WEB_T/2 = 6.35 off its rail centreline, so
+    rail. Every web face sits WEB_T/2 = 6.5 off its rail centreline, so
     one boss chord covers all four families; the hub rib interrupts both
     east-rail runs, the junction lands interrupt both front/rear WINDOW
     runs. The fillet ends dying into boss barrels / rib / land walls and
@@ -1098,7 +1118,7 @@ async def build(adapter) -> dict[str, str]:
     # 1. Web ring: the full-height THIN section (T-rail web) as one annular
     #    extrude -- two nested origin-centred rectangles, the WEB_T-wide web
     #    centred on each rail's centreline (per-face setback: side rails
-    #    10.75, front/rear 12.65).
+    #    10.6, front/rear 12.5).
     web = SketchDims()
     check("create_sketch web ring", await adapter.create_sketch("Top"))
     await define_centered_rectangle(
@@ -1141,7 +1161,7 @@ async def build(adapter) -> dict[str, str]:
 
     # 2. Crossbar junction lands: full-thickness pads on the front/rear
     #    inner faces where the crossbar + gussets butt in (x -50..20,
-    #    z +/-(93..105.65)), full height. Sketch z flipped: (x, y) -> (X, -Z).
+    #    z +/-(93..105.5)), full height. Sketch z flipped: (x, y) -> (X, -Z).
     lands = SketchDims()
     check("create_sketch junction lands", await adapter.create_sketch("Top"))
     for k, (z_lo, z_hi) in enumerate(((-WEB_IN_Z, -INNER_Z), (INNER_Z, WEB_IN_Z))):
@@ -1918,10 +1938,10 @@ async def build(adapter) -> dict[str, str]:
     #     per uninterrupted run: the hub rib splits both east-rail runs,
     #     the junction lands split both front/rear window runs. The web
     #     ring's BOTTOM rim stays sharp (no low-side breaks).
-    x_shelf_out = COLUMN_X + WEB_T / 2.0  # 203.35
-    x_shelf_in = COLUMN_X - WEB_T / 2.0  # 190.65
-    z_shelf_out = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.35
-    z_shelf_in = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.65
+    x_shelf_out = COLUMN_X + WEB_T / 2.0  # 203.5
+    x_shelf_in = COLUMN_X - WEB_T / 2.0  # 190.5
+    z_shelf_out = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.5
+    z_shelf_in = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.5
     rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0  # -10.41
     rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0  # +16.59
     root_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (WEB_T / 2.0) ** 2)

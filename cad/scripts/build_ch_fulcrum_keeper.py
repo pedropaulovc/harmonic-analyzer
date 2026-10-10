@@ -451,7 +451,7 @@ async def build(adapter) -> dict[str, str]:
     )
     _hide_reference_sketches(adapter)
     # Decimal places are the tolerance statement, so the PART carries them;
-    # the reamed bore's REAM_SLIDE band is a native model tolerance.
+    # the reamed bore's running band (BORE_DIA_BAND) is a native model tolerance.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_bilateral_tolerance(
         adapter, "ShaftBoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)

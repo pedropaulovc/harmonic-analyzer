@@ -138,8 +138,8 @@ def test_cross_tap_ends_stay_in_the_real_boss_and_side_web_union() -> None:
     assert part.SIDE_TAP_THREAD_END_Z == pytest.approx(thread_end_z)
     assert part.SIDE_TAP_DRILL_POINT_Z == pytest.approx(drill_point_z)
     assert 0.0 < drill_point_z < thread_end_z < part.WEB_IN_Z
-    assert part.SIDE_TAP_THREAD_WALL_MARGIN == pytest.approx(3.937)
-    assert part.SIDE_TAP_DRILL_WALL_MARGIN == pytest.approx(4.3307)
+    assert part.SIDE_TAP_THREAD_WALL_MARGIN == pytest.approx(4.087)
+    assert part.SIDE_TAP_DRILL_WALL_MARGIN == pytest.approx(4.4807)
     assert major_dia / 2.0 < part.HALF_H
 
 
@@ -291,8 +291,8 @@ def test_boss_additions_match_an_independent_t_section_area_integral() -> None:
     actual_upper, actual_lower = part._boss_add_volumes()
     assert actual_upper == pytest.approx(upper, abs=10.0)
     assert actual_lower == pytest.approx(lower, abs=10.0)
-    assert actual_upper == pytest.approx(19001.990069857347)
-    assert actual_lower == pytest.approx(28755.37161240547)
+    assert actual_upper == pytest.approx(18869.376997453055)
+    assert actual_lower == pytest.approx(28519.255654222216)
 
 
 def test_reseated_spotface_and_cross_tap_volumes_match_smooth_integrals() -> None:
@@ -336,7 +336,20 @@ def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
     outer, window = part._top_rim_removal()
     assert outer == pytest.approx(2296.176445206839)
     assert window == pytest.approx(2774.3499756456845)
-    assert part._t_root_add() == pytest.approx(3732.721907110104)
+    assert part.WEB_T == 13.0
+    root_chord = math.sqrt((part.BOSS_DIA / 2.0) ** 2 - (part.WEB_T / 2.0) ** 2)
+    side_run = 2.0 * (abs(part.FRONT_COLUMN_Z) - root_chord)
+    front_rear_run = 2.0 * (part.COLUMN_X - root_chord)
+    outer_run = 2.0 * side_run - part.HUB_RIB_W + 2.0 * front_rear_run
+    window_run = outer_run - 2.0 * (part.LAND_X1 - part.LAND_X0)
+    assert root_chord == pytest.approx(21.540659228538015)
+    assert side_run == pytest.approx(180.91868154292396)
+    assert front_rear_run == pytest.approx(350.918681542924)
+    assert outer_run == pytest.approx(1036.674726171696)
+    assert window_run == pytest.approx(896.674726171696)
+    fillet_area = (1.0 - math.pi / 4.0) * part.ROOT_FILLET_R**2
+    assert part._t_root_add() == pytest.approx(fillet_area * (outer_run + window_run))
+    assert part._t_root_add() == pytest.approx(3734.103089406865)
     points = part._outer_corner_top_edges()
     assert len(points) == 8
     for x, y, z in points:
@@ -387,12 +400,16 @@ def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -
     assert part.KEEPER_TAP_X == part.COLUMN_X + keeper.KEEPER_FITUP_X_FROM_WEB_MM
     assert part.KEEPER_MAX_TRANSVERSE_OFFSET == pytest.approx(0.53)
     assert part.KEEPER_MAX_WEB_CENTRE_OFFSET == pytest.approx(3.45)
-    assert part.KEEPER_MIN_WEB_HALF_WIDTH == pytest.approx(5.95)
+    assert part.KEEPER_MIN_WEB_HALF_WIDTH == pytest.approx(6.1)
     assert part.KEEPER_MIN_ROOT_RADIUS == pytest.approx(2.2)
     assert part.KEEPER_MIN_FLANGE_THICKNESS == pytest.approx(7.2)
     assert part.KEEPER_MAX_FULL_THREAD_DEPTH == pytest.approx(8.4)
-    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(1.543824360196402)
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.560)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER == pytest.approx(
+        1.688580825956946
+    )
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER == pytest.approx(1.710)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(1.6241775880068343)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.645596762049888)
     assert (
         min(part.KEEPER_TAP_THREAD_WALL_MARGIN, part.KEEPER_TAP_DRILL_WALL_MARGIN)
         >= 1.5
@@ -419,10 +436,140 @@ def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -
         )
         for index in range(4097)
     )
-    assert sampled == pytest.approx(part.KEEPER_TAP_THREAD_WALL_MARGIN, abs=1e-6)
+    assert sampled == pytest.approx(
+        part.KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER, abs=1e-6
+    )
     # The cylindrical pilot extends below the root and therefore reaches
     # the bare-web wall. Its .XX diameter also carries DRILLED HOLES +0.10.
     assert part.KEEPER_MAX_TAP_DRILL_RADIUS == pytest.approx(0.94)
+    assert (
+        part.KEEPER_MIN_WEB_HALF_WIDTH
+        - part.KEEPER_MAX_WEB_CENTRE_OFFSET
+        - part.KEEPER_MAX_TAP_DRILL_RADIUS
+    ) == pytest.approx(part.KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER)
+
+
+@pytest.mark.parametrize(
+    ("web_thickness", "expected_thread_wall", "expected_pilot_wall"),
+    (
+        (12.7, 1.4794211222462903, 1.4955967620498885),
+        (13.0, 1.6241775880068343, 1.645596762049888),
+    ),
+)
+def test_keeper_receiver_full_depth_displaced_axis_proves_web_change(
+    web_thickness: float, expected_thread_wall: float, expected_pilot_wall: float
+) -> None:
+    # Independently reconstruct the worst printed sizes and transferred axis.
+    # The .X band stays loose; widening the web, not tightening it, buys wall.
+    web_places = spec.DRAWING_REFERENCE_PRECISION["side rail web thickness"]
+    assert web_places == 1
+    assert spec.PRINTED_LINEAR_BAND_MM[web_places] == 0.8
+    half_width = (
+        round(web_thickness, web_places) - spec.PRINTED_LINEAR_BAND_MM[web_places]
+    ) / 2.0
+    root_places = spec.DRAWING_REFERENCE_PRECISION["T rail root radius"]
+    root_radius = (
+        round(part.ROOT_FILLET_R, root_places)
+        - spec.PRINTED_LINEAR_BAND_MM[root_places]
+    )
+    flange_places = spec.DRAWING_REFERENCE_PRECISION["top flange thickness"]
+    flange_depth = (
+        round(part.FLANGE, flange_places) - spec.PRINTED_LINEAR_BAND_MM[flange_places]
+    )
+    foot_places = keeper.DRAWING_PRECISION["Foot"]["Depth"]
+    station_places = keeper.DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"]
+    transverse_offset = max(
+        abs(
+            round(keeper.SCREW_FROM_SIDE, station_places)
+            + station_direction * spec.PRINTED_LINEAR_BAND_MM[station_places]
+            - (
+                round(keeper.KEEPER_WIDTH, foot_places)
+                + foot_direction * spec.PRINTED_LINEAR_BAND_MM[foot_places]
+            )
+            / 2.0
+        )
+        for station_direction in (-1, 1)
+        for foot_direction in (-1, 1)
+    )
+    axis_offset = (
+        abs(round(keeper.KEEPER_FITUP_X_FROM_WEB_MM, keeper.KEEPER_FITUP_PLACES))
+        + keeper.KEEPER_FITUP_LOCATION_BAND_MM
+        + transverse_offset
+    )
+    thread_places = spec.KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]
+    thread_depth = (
+        round(keeper.KEEPER_TAP_SPEC.overrides_mm["ThreadDepth"], thread_places)
+        + spec.PRINTED_LINEAR_BAND_MM[thread_places]
+    )
+    drill_places = spec.KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldepth"]
+    cylinder_depth = (
+        round(keeper.KEEPER_TAP_SPEC.depth_mm, drill_places)
+        + spec.PRINTED_LINEAR_BAND_MM[drill_places]
+    )
+    assert cylinder_depth == pytest.approx(12.3)
+    assert spec.KEEPER_TAP_DRILL_WANDER_DEG == 0.3
+    displacement = cylinder_depth * math.tan(math.radians(0.3))
+    assert displacement == pytest.approx(0.06440323795011157)
+    assert part.KEEPER_MAX_TAP_DRILL_DEPTH == pytest.approx(cylinder_depth)
+    assert part.KEEPER_TAP_AXIS_WANDER_MM == pytest.approx(displacement)
+
+    major_radius = (
+        max(
+            part.THREAD_MAJOR_MM[keeper.KEEPER_TAP_SPEC.size],
+            FILLISTER_SIZES[keeper_screw.SKU][0],
+        )
+        / 2.0
+    )
+    assert 2.0 * major_radius == pytest.approx(2.1844)
+    corner_x = axis_offset + major_radius
+    centre_x = half_width + root_radius
+    centre_depth = flange_depth + root_radius
+    normal_length = math.hypot(centre_x - corner_x, centre_depth - thread_depth)
+    # Move the worst thread corner toward its nearest point on the arc by
+    # the FULL-depth displacement disk. This assumes no guiding operation
+    # and deliberately does not scale the allowance down to thread depth.
+    displaced_x = corner_x + displacement * (centre_x - corner_x) / normal_length
+    displaced_depth = (
+        thread_depth + displacement * (centre_depth - thread_depth) / normal_length
+    )
+    thread_wall = min(
+        math.hypot(
+            centre_x - root_radius * math.cos(index * math.pi / 8192.0) - displaced_x,
+            centre_depth
+            - root_radius * math.sin(index * math.pi / 8192.0)
+            - displaced_depth,
+        )
+        for index in range(4097)
+    )
+    # The pilot cylinder reaches below the root into the bare web; shift
+    # its axis toward that face instead of toward the quarter-circle.
+    assert cylinder_depth > centre_depth
+    diameter_places = spec.KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldia"]
+    drilled_band = spec.PRINTED_DRILLED_HOLE_PLUS_MM
+    assert drilled_band == 0.10
+    pilot_radius = (
+        round(part.TAP_DRILL_MM[keeper.KEEPER_TAP_SPEC.size], diameter_places)
+        + drilled_band
+    ) / 2.0
+    assert pilot_radius == pytest.approx(0.94)
+    displaced_pilot_axis = axis_offset + displacement
+    pilot_wall = half_width - (displaced_pilot_axis + pilot_radius)
+    assert thread_wall == pytest.approx(expected_thread_wall, abs=1e-6)
+    assert pilot_wall == pytest.approx(expected_pilot_wall)
+    if web_thickness == 12.7:
+        # Both former no-wander guards passed, yet .3 degrees over the
+        # full printed drill depth supplies a counterexample to both.
+        assert thread_wall + displacement >= 1.5
+        assert pilot_wall + displacement >= 1.5
+        assert thread_wall < 1.5
+        assert pilot_wall < 1.5
+    else:
+        assert thread_wall >= 1.5
+        assert pilot_wall >= 1.5
+        assert thread_wall == pytest.approx(
+            part.KEEPER_TAP_THREAD_WALL_MARGIN, abs=1e-6
+        )
+        assert pilot_wall == pytest.approx(part.KEEPER_TAP_DRILL_WALL_MARGIN)
 
 
 def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
