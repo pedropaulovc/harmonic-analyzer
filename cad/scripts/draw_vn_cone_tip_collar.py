@@ -14,18 +14,19 @@ from typing import Any
 
 import _telemetry
 import vn_cone_tip_collar_spec as spec
-from _common import CAD_ROOT, _early_bound, active_configuration_name, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
-    DrawingOutputs, PmiDrawingPlacement, add_native_hole_callout, add_property_linked_note,
-    assert_imported_precision, create_blank_drawing_sheets,
+    DrawingOutputs, PmiDrawingPlacement, _select_view_entity, add_native_hole_callout,
+    add_property_linked_note, assert_imported_precision, create_blank_drawing_sheets,
     curate_view_dimensions, dimension_name, finalize_drawing,
     model_point_in_view, new_project_drawing, project_part_pmi,
     read_required_properties, rebuild_drawing,
     set_dimension_callouts, set_hidden_lines_removed,
     set_hole_callout_precision, stamp_drawing_summary, view_name,
+    visible_view_entities,
 )
 import _drawing_hidden_sketches as hidden_sketches
-from _part_pmi import _resolve_faces
+from _part_pmi import _face_geometry, _face_matches
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import format_findings
 from diagnostics.drawing_layout_audit import audit_document
@@ -81,30 +82,69 @@ def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
     return callouts
 
 
-def _show_view_configuration(adapter, view):
-    """The part ``view`` references, shown in the configuration the view
-    draws, and a callable that restores the part's previous configuration.
+# swViewEntityType_e.swViewEntityType_Face
+_VIEW_FACES = 3
 
-    A face resolved in another configuration is another object: resolved in
-    Default (collar and screw bodies) while the screw views draw SetScrew,
-    datum D's FACE pick read back as a different face (farm run at 4323e8d1e:
-    "datum D pick resolved to a face other than the one named")."""
-    native = _early_bound(view, "IView")
-    part = _early_bound(native.ReferencedDocument, "IModelDoc2")
-    wanted = str(native.ReferencedConfiguration)
-    active = active_configuration_name(adapter, part)
-    if active != wanted and not bool(part.ShowConfiguration2(wanted)):
-        raise RuntimeError(f"collar part refused to show {wanted} for its view faces")
-    if active_configuration_name(adapter, part) != wanted:
-        raise RuntimeError(f"collar part did not show {wanted} for its view faces")
 
-    def restore() -> None:
-        if active_configuration_name(adapter, part) != active and not bool(
-            part.ShowConfiguration2(active)
-        ):
-            raise RuntimeError(f"collar part refused to restore {active}")
+def _face_reading(face: Any) -> dict[str, Any]:
+    """Owning body, surface identity, area (mm^2) and box (mm) of one face."""
+    native = _early_bound(face, "IFace2")
+    body = native.GetBody()
+    geometry = _face_geometry(face)
+    return {
+        "body": None if body is None else str(_early_bound(body, "IBody2").Name),
+        "surface": None if geometry is None else geometry.identity,
+        "area_mm2": round(float(native.GetArea()) * 1e6, 4),
+        "box_mm": tuple(round(v * 1000.0, 4) for v in (geometry.box if geometry else ())),
+    }
 
-    return part, restore
+
+def _view_faces(view: Any, specs: dict[str, Any], *, label: str) -> dict[str, Any]:
+    """The one face ``view`` draws for each face spec, taken from the view's
+    own visible faces (main's draw_dt_cylinder_gear cam-face form).
+
+    A face resolved on the part document and selected into the view read
+    back as another face, in Default (4323e8d1e) and again in the view's own
+    SetScrew configuration (7924d573e): "datum D pick resolved to a face
+    other than the one named"."""
+    candidates = [
+        geometry
+        for face in visible_view_entities(view, _VIEW_FACES, label=label)
+        if (geometry := _face_geometry(face)) is not None
+    ]
+    picked = {}
+    for key, face_spec in specs.items():
+        matches = [geometry for geometry in candidates if _face_matches(geometry, face_spec)]
+        if len(matches) != 1:
+            listing = [
+                (
+                    geometry.identity,
+                    tuple(round(float(value), 6) for value in geometry.parameters),
+                    tuple(round(value * 1000.0, 3) for value in geometry.box),
+                )
+                for geometry in candidates
+            ]
+            raise RuntimeError(
+                f"{label}: {key} {face_spec!r} matched {len(matches)} of the view's "
+                f"{len(candidates)} visible faces; candidates (identity, parameters, "
+                f"box mm): {listing}"
+            )
+        picked[key] = matches[0].face
+    return picked
+
+
+def _log_view_picks(adapter: Any, view: Any, faces: dict[str, Any], *, label: str) -> None:
+    """Debug-log each picked face beside what selecting it in ``view`` returns,
+    so a pick guard failure names both faces."""
+    for key, face in faces.items():
+        selected = _select_view_entity(
+            adapter, view, "FACE", None, label=f"{label} {key}", entity=face
+        )
+        _telemetry.debug(
+            f"{label} {key}: picked {_face_reading(face)}; the view selects "
+            f"{_face_reading(selected)}; IsSame={int(adapter.swApp.IsSame(selected, face))}"
+        )
+    adapter.currentModel.ClearSelection2(True)
 
 
 def _horizontal_axis(adapter, view):
@@ -328,44 +368,42 @@ async def build(adapter: Any) -> dict[str, str]:
     # The major and dog diameters draw as a revolve's flank SILHOUETTES, not
     # model edges, so an EDGE pick at their projected points misses (farm run
     # at a0defd137: "failed to select ... datum:D edge at sheet (0.219831,
-    # 0.221844)"). Main's form (draw_dt_pinion_cam_pin._crown_face): attach to
-    # the part-owned FACE resolved on the referenced part; the projected point
-    # stays as the frame's leader landing.
-    part, restore = _show_view_configuration(adapter, screw)
-    try:
-        screw_faces = _resolve_faces(
-            part,
-            {
-                **{datum.key: datum.face for datum in spec.SCREW_DATUMS},
-                **{control.key: control.face for control in spec.SCREW_CONTROLS},
-            },
-        )
-        project_part_pmi(
-            adapter,
-            placements={
-                "datum:D": PmiDrawingPlacement(
-                    view=screw, position=(0.203, 0.203),
-                    entity=screw_faces["datum:D"], attachment_type="FACE",
+    # 0.221844)"). Attach to the FACE (main's draw_dt_pinion_cam_pin form),
+    # taken from the faces the view draws; the projected point stays as the
+    # frame's leader landing.
+    screw_faces = _view_faces(
+        screw,
+        {
+            **{datum.key: datum.face for datum in spec.SCREW_DATUMS},
+            **{control.key: control.face for control in spec.SCREW_CONTROLS},
+        },
+        label="ground stock screw faces",
+    )
+    _log_view_picks(adapter, screw, screw_faces, label="ground stock screw")
+    project_part_pmi(
+        adapter,
+        placements={
+            "datum:D": PmiDrawingPlacement(
+                view=screw, position=(0.203, 0.203),
+                entity=screw_faces["datum:D"], attachment_type="FACE",
+            ),
+            "ground_dog_runout": PmiDrawingPlacement(
+                view=screw, position=(0.046, 0.161),
+                entity=screw_faces["ground_dog_runout"], attachment_type="FACE",
+                # Mid-length, half a radius off the axis: inside the dog
+                # face's projection, not on its silhouette, where a
+                # landing could re-solve onto the neighbouring flank.
+                leader_attachment_xy=point(
+                    screw,
+                    (spec.SET_SCREW_SEAT_RADIUS + spec.DOG_LENGTH / 2.0,
+                     spec.TAP_STATION + spec.DOG_DIA / 4.0, 0.0),
+                    "ground dog runout face",
                 ),
-                "ground_dog_runout": PmiDrawingPlacement(
-                    view=screw, position=(0.046, 0.161),
-                    entity=screw_faces["ground_dog_runout"], attachment_type="FACE",
-                    # Mid-length, half a radius off the axis: inside the dog
-                    # face's projection, not on its silhouette, where a
-                    # landing could re-solve onto the neighbouring flank.
-                    leader_attachment_xy=point(
-                        screw,
-                        (spec.SET_SCREW_SEAT_RADIUS + spec.DOG_LENGTH / 2.0,
-                         spec.TAP_STATION + spec.DOG_DIA / 4.0, 0.0),
-                        "ground dog runout face",
-                    ),
-                ),
-            },
-            datums=spec.SCREW_DATUMS, controls=spec.SCREW_CONTROLS,
-            label="ground dog relative to retained stock thread",
-        )
-    finally:
-        restore()
+            ),
+        },
+        datums=spec.SCREW_DATUMS, controls=spec.SCREW_CONTROLS,
+        label="ground dog relative to retained stock thread",
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.080)
     add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.210)
     for sheet in SHEET_NAMES:

@@ -267,34 +267,44 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
     with pytest.raises(RuntimeError, match="do not print"):
         drawing._printable_above_callouts({"DogDia": "DOG EDGE:\nSTONE"})
     assert '_printable_above_callouts({"DogDia": DOG_EDGE_CALLOUT})' in drawing_source
-    # The screw faces resolve in the configuration the screw views draw.
-    assert "_show_view_configuration(adapter, screw)" in drawing_source
+    # The screw faces come from the faces the screw view draws.
+    assert "_view_faces(\n        screw," in drawing_source
+    assert "_resolve_faces" not in drawing_source
 
 
-def test_screw_faces_resolve_in_the_views_configuration(monkeypatch):
-    """4323e8d1e resolved datum D in Default while the view drew SetScrew."""
-    shown = []
+def test_screw_faces_come_from_the_view_one_per_spec(monkeypatch):
+    """4323e8d1e and 7924d573e: a part-document face selected into the view
+    read back as another face. The pick is from the view's own faces."""
+    from _part_pmi import _FaceGeometry
 
-    class Part:
-        active = "Default"
+    def cylinder(diameter_mm, x0_mm, x1_mm):
+        radius = diameter_mm / 2000.0
+        return _FaceGeometry(
+            face=object(), identity=4002,
+            parameters=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, radius),
+            outward_normal=None,
+            box=(x0_mm / 1000.0, -radius, -radius, x1_mm / 1000.0, radius, radius),
+        )
 
-        def ShowConfiguration2(self, name):
-            shown.append(name)
-            self.active = name
-            return True
-
-    part_doc = Part()
-    view = SimpleNamespace(ReferencedDocument=part_doc, ReferencedConfiguration="SetScrew")
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(drawing, "active_configuration_name", lambda _a, p: p.active)
-    resolved, restore = drawing._show_view_configuration(None, view)
-    assert resolved is part_doc and part_doc.active == "SetScrew"
-    restore()
-    assert shown == ["SetScrew", "Default"] and part_doc.active == "Default"
-    part_doc.ShowConfiguration2 = lambda _name: False
-    with pytest.raises(RuntimeError, match="refused to show SetScrew"):
-        drawing._show_view_configuration(None, view)
-
+    seat = spec.SET_SCREW_SEAT_RADIUS
+    major = cylinder(spec.SET_SCREW_MAJOR_DIA, seat + spec.DOG_LENGTH, seat + spec.DOG_LENGTH + 5.0)
+    dog = cylinder(spec.DOG_DIA, seat, seat + spec.DOG_LENGTH)
+    faces = {id(g.face): g for g in (major, dog)}
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda _v, kind, label: [g.face for g in faces.values()] if kind == 3 else [])
+    monkeypatch.setattr(drawing, "_face_geometry", lambda face: faces[id(face)])
+    specs = {
+        **{datum.key: datum.face for datum in spec.SCREW_DATUMS},
+        **{control.key: control.face for control in spec.SCREW_CONTROLS},
+    }
+    picked = drawing._view_faces(None, specs, label="screw")
+    assert picked == {"datum:D": major.face, "ground_dog_runout": dog.face}
+    faces.pop(id(dog.face))
+    with pytest.raises(RuntimeError, match="ground_dog_runout .* matched 0 of the view's 1"):
+        drawing._view_faces(None, specs, label="screw")
+    twin = cylinder(spec.SET_SCREW_MAJOR_DIA, seat + spec.DOG_LENGTH, seat + spec.DOG_LENGTH + 5.0)
+    faces[id(twin.face)] = twin
+    with pytest.raises(RuntimeError, match="datum:D .* matched 2"):
+        drawing._view_faces(None, specs, label="screw")
 
 
 def test_blind_tap_qualifier_retains_native_depth_variables():
