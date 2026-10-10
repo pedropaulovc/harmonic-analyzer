@@ -3437,7 +3437,35 @@ def find_arrows_near_text(sheet: SheetGeometry, *, clearance: float = ARROW_TEXT
             *getattr(annotation, "arrow_tails", ()),
         )
     ]
-    return _near_foreign_text(sheet, sources, kind="arrow-near-text", what="arrow", clearance=clearance)
+    findings = _near_foreign_text(sheet, sources, kind="arrow-near-text", what="arrow", clearance=clearance)
+    by_label = {annotation.label: annotation for annotation in sheet.annotations}
+    return [
+        finding
+        for finding in findings
+        if not _datum_seated_on_frame(by_label[finding.a], by_label[finding.b])
+    ]
+
+
+def _datum_seated_on_frame(source: AnnotationGeometry, target: AnnotationGeometry) -> bool:
+    """A datum tag whose triangle stands on a feature-control frame's own
+    border: the tag is attached to that frame (ASME Y14.5-2018 names a
+    pattern datum by the symbol on the frame under its nX callout), so the
+    frame's text is the triangle's feature, not a neighbour it crowds.  The
+    knife mount's datum B on its dowel-pair frame (MHA-SM-002,
+    _drawing_common.add_frame_datum_feature) seats its triangle's base on the
+    frame's bottom border, 1.66 mm under the frame's 0.13."""
+    if source.kind != "datum" or target.kind != "gtol":
+        return False
+    borders = [s for s in target.segments if s.role == "line"]
+    return any(
+        all(
+            point_segment_distance(end, border) <= COLLINEAR_TOL_M
+            for end in ((arrow.x0, arrow.y0), (arrow.x1, arrow.y1))
+        )
+        for arrow in source.segments
+        if arrow.role == "arrow"
+        for border in borders
+    )
 
 
 def find_extensions_near_text(sheet: SheetGeometry, *, clearance: float = ARROW_TEXT_CLEARANCE_M) -> list[Finding]:
@@ -3804,8 +3832,17 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
 # frame-assembly reads zero of both on replay of runs 20260928T124727673Z
 # (swmaker000007), 20260928T141421973Z (swmaker000008) and
 # 20260928T152556482Z (swmaker000004).
+# sm-knife-mount's sheet is crowded (three frames, a stacked frame pair and a
+# frame-attached datum over a 24 mm block), and its placements were tuned
+# against this audit, so it enforces every gating kind but
+# "view-edges-missing": its front and right views print their edges but
+# none the audit reads as a 0.25 mm model edge, the line-weight false
+# positive the fleet holds that kind out for (see above).
 STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
-    {"fr-frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"})}
+    {
+        "fr-frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"}),
+        "sm-knife-mount": GATING_KINDS - {"view-edges-missing"},
+    }
 )
 
 

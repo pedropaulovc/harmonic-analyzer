@@ -270,15 +270,19 @@ async def build(adapter) -> dict[str, str]:
     # 1. Bearing block: Front-plane rectangle, mid-plane extrude along Z (the
     #    bore/trunnion axis), straddling the trunnion mid. Asymmetric in Y (not
     #    origin-centred), so a generic rectilinear chain, not define_centered_*.
-    #    Emission order (anchor vertex 0 at (-BlkHalfX, BlkBot)): the width dim
-    #    (seg 0), the height dim (seg 1), then the anchor dims (x, then z).
+    #    Emission order (anchor vertex 0 at (BlkHalfX, BlkBot)): the width dim
+    #    (seg 0, the bottom edge), the height dim (seg 1, the -X face), then
+    #    the anchor dims (x, then z).  The height dim is on the -X face, the
+    #    side the drawing prints it: on the +X face its extension lines ran
+    #    across the front view to the left, under the bore's position-frame
+    #    leader (layout audit leader-crosses-line, MHA-SM-002).
     block_dims = SketchDims()
     check("create_sketch block", await adapter.create_sketch("Front"))
     block_rect = [
-        (-BLK_HALF_X, BLK_BOT),
         (BLK_HALF_X, BLK_BOT),
-        (BLK_HALF_X, BLK_TOP),
+        (-BLK_HALF_X, BLK_BOT),
         (-BLK_HALF_X, BLK_TOP),
+        (BLK_HALF_X, BLK_TOP),
     ]
     block = await add_line_chain(adapter, block_rect)
     await define_rectilinear_chain(
