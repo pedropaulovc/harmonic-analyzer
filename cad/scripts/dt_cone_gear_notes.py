@@ -38,14 +38,24 @@ def cutter_description(teeth: int) -> str:
     return f"#{template.cutter_number} {minimum}-{upper}T; TEMPLATE {template.reference_teeth}T"
 
 
+def _tooth_form(template) -> str:
+    if template.relief is not None:
+        return "FINITE INVOLUTE; TROCHOID RELIEF BELOW TIF"
+    if template.root_radius_mm < template.base_radius_mm:
+        return "FINITE INVOLUTE; RADIAL BELOW BASE"
+    return "FINITE INVOLUTE; ABOVE-BASE ROOT ARC"
+
+
 def gear_data(teeth: int) -> str:
     """One physical recipe with its reference sizes."""
     profile = spec.stock_form_profile(teeth)
     mesh = dt_mesh_checks.cone_check(teeth)
     # Conservative reference reporting: round the backlash range and web
-    # outward. These rows do not replace native toleranced sizes.
-    minimum = math.floor(mesh.backlash_min_mm * 100.0) / 100.0
-    maximum = math.ceil(mesh.backlash_max_mm * 100.0) / 100.0
+    # outward. These rows do not replace native toleranced sizes. Backlash is
+    # the set-at-assembly mesh's RSS band about its nominal (dt_mesh_checks).
+    spread = mesh.backlash_nominal_mm - mesh.backlash_rss_mm
+    minimum = math.floor(mesh.backlash_rss_mm * 100.0) / 100.0
+    maximum = math.ceil((mesh.backlash_nominal_mm + spread) * 100.0) / 100.0
     web = math.floor(root_to_bore_web_min_mm(teeth) * 100.0) / 100.0
     whole_depth_max = math.ceil(max(
         corner.blank_radius_mm - corner.root_radius_min_mm
@@ -57,7 +67,7 @@ def gear_data(teeth: int) -> str:
         ("CUTTER", cutter_description(teeth)),
         ("TOOL T / PLUNGE (mm, REF)", f"{profile.radial_translation_mm:.4f} / {profile.plunge_mm:.4f}"),
         ("WHOLE DEPTH MAX / ROOT ARC R (mm, REF)", f"{whole_depth_max:.4f} / {profile.template.root_radius_mm:.4f}"),
-        ("TOOTH FORM", "FINITE INVOLUTE; RADIAL BELOW BASE" if profile.template.root_radius_mm < profile.template.base_radius_mm else "FINITE INVOLUTE; ABOVE-BASE ROOT ARC"),
+        ("TOOTH FORM", _tooth_form(profile.template)),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T; INCLINED AXES"),
         ("BACKLASH WITH MATE (mm, REF)", f"{minimum:.2f} TO {maximum:.2f}"),
         ("ROOT RADIAL MIN/MAX (mm, REF)", f"{profile.root_radius_min_mm:.3f} / {profile.root_radius_max_mm:.3f}"),
@@ -88,11 +98,12 @@ def custom_cutter_detail() -> str:
         f"N={template.reference_teeth}; ROOT R={template.root_radius_mm:.17g}",
         f"BASE R={template.base_radius_mm:.17g}; FINITE TIP R={template.tip_radius_mm:.17g}",
         f"TOOL PITCH TOOTH THICKNESS={tool.pitch_tooth_thickness_mm:.17g}",
-        "RAISED ROOT; RADIAL ROOT-TO-BASE; N6 WORKING INVOLUTE",
+        "ROOT ARC; DRUM-TIP TROCHOID RELIEF TO TIF; N6 WORKING INVOLUTE",
+        f"TIF R={template.relief_junction_radius_mm:.4f}",
         "LOWER FLANK MIRRORS UPPER; ALL SEGMENTS REQUIRED",
     ]
     for segment in tool.native_segments(unit_scale=1.0, clearance_radius_mm=template.tip_radius_mm + 1.0):
-        if segment.kind not in {"root_arc", "radial", "flank"}:
+        if segment.kind not in {"root_arc", "relief", "flank"}:
             continue
         lines.append(f"{segment.name} ({segment.kind})")
         for coordinate, equation in (("X", segment.x), ("Y", segment.y)):

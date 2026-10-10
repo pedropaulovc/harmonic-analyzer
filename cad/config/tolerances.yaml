@@ -31,19 +31,20 @@ fits:
     note: "Functional fit/process tip grades, not AGMA accuracy classes or an ideal-CR allocation. Contact-critical retains the 0.02 mm diametral grade for 32T alignment and 120T cylinder tips. Finite stock support pays both printed tip and retained thickness/depth limits. Alignment is a fit-up mesh: actual supported-union continuity, positive backlash and root air must pass the whole booked centre stack; smooth-flank span is reported, not gated at >1.1. Operating meshes and absolute zero TE have separate source-owned gates. See tolerance-policy.md."
 
   cone_drum_oblique_mesh:  # the inclined cone partial engagement
-    # The engaged cone-to-drum centre is SET AT ASSEMBLY, not fixed: swing the platform in,
-    #   set the tightest cone against a feeler/backlash, then lock the cone-lock-knob
-    #   (MHA-VN-013). The swing stop screw (MHA-VN-015) only limits the disengaged swing.
-    #   The values below still book a fixed centre; re-deriving them is pending a user ruling.
-    # User ruling 2026-10-10, option B: worst-corner contact ratio >= 1.2 for T012..T120.
-    # edge_slack: the T012 closing corner needs >= 0.076 over standard for no involute
-    #   interference at the largest drum/cone tips; 0.08 is that, rounded up.
-    # centre_opening: largest opening that keeps the T012 open-corner contact ratio >= 1.2
-    #   with the 0/-0.04 thickness and 0/-0.02 blank bands (1.217 at 0.06).
-    edge_slack_mm: 0.08
-    centre_opening_mm: 0.06           # total booked opening, including runout/bearing allowance
+    # The engaged centre is SET AT ASSEMBLY (user ruling 2026-10-10): pedestal screws
+    #   snug-loose, swing in on shims at T012 and T120 so the arbor aligns to the cone
+    #   line, tighten the pedestals, then set T120 with a radial tip-to-root feeler at
+    #   the standard clearance + edge_slack and lock the cone-lock-knob (MHA-VN-013).
+    #   The other cones follow the swing rotation. cone_set_stack books the centres;
+    #   dt_mesh_checks gates nominal CR >= 1.0 and no binding/interference at the RSS
+    #   corner (RSS CR reported). The swing stop (MHA-VN-015) only limits the disengaged swing.
+    edge_slack_mm: 0.20               # T120 feeler set point over standard; the CAD placement
+    set_feeler_reading_mm: 0.0254     # one 0.001-in feeler leaf step
+    pivot_bore_band_mm: [0.015, 0.0]  # platform pivot bore, reamed 6.35 H7 on the stock shoulder
+    pivot_seat_position_mm: 0.05      # base pivot seat to the arbor-pedestal seats, one setup
+    tooth_cutting_runout_tir_mm: 0.05 # per gear (each cone and the drum) about its finished bore
     drum_tooth_to_cam_notch_clock_deg: 0.02  # drum tooth pattern to CAM-NOTCH half-width (Main ruling 2026-10-09)
-    note: "oblique partial engagement; checker-arbitrated edge slacks 0.00..1.14"
+    note: "oblique partial engagement; centre set at assembly on T120 (cone_set_stack)"
 
   crank_mesh:              # 16T:64T crossed mesh (crank machine-z over the inclined 64T)
     c2c_slack_mm: 0.30               # configured extension; actual 3D functional centre selection pending

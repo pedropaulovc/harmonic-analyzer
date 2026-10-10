@@ -33,6 +33,7 @@ from gear_seat_fit import flat_bore_af_band, seat_bore_band
 from stock_form_cutter import (
     CustomSixCutter,
     StockFormProfile,
+    TrochoidRelief,
     template_for_teeth,
     translation_for_pitch_tooth_thickness,
 )
@@ -53,23 +54,72 @@ DIAMETRAL_PITCH = _config.machine("gear_train", "diametral_pitch")
 PRESSURE_ANGLE_DEG = _config.machine("gear_train", "pressure_angle_deg")
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH * MODULE_MM
-# (upper, lower), actual pitch arc, about the standard-depth (maximum-material)
-# thickness. Option B (user ruling 2026-10-10): thin-only so the closing corner
-# keeps backlash at 0.08 edge slack, 0.04 wide so T012's open corner holds a
-# contact ratio >= 1.2 at the 0.06 opening (tolerances.yaml cone_drum_oblique_mesh).
-TOOTH_THICKNESS_BAND = (0.0, -0.04)
-CUSTOM_SIX_TOOL_THICKNESS_MM = 1.05
+# (upper, lower), actual pitch arc, about the standard-depth thickness: the
+# ordinary cut-gear band (user ruling 2026-10-10, set-at-assembly cones;
+# dt_mesh_checks.cone_check gates it at the RSS corner of cone_set_stack).
+TOOTH_THICKNESS_BAND = (0.075, -0.075)
+
+# DT6-FORM1, T006 option (a) (user ruling 2026-10-10). T006 is a named
+# exception: against the shared 20 deg 120T drum no full-depth six-tooth form
+# can reach a contact ratio of 1, so its tooth is sized for no binding and
+# the drum-tip path instead.
+# * Thickness 0.872 at the tool pitch, the band's upper limit
+#   (CUSTOM_SIX_TOOTH_THICKNESS_BAND): every corner pair keeps >= 0.02
+#   backlash at the RSS-closed centre (cone_set_stack, ~std + 0.095).
+# * Root R 1.10 sets the plunge; the involute stops where the relief rejoins it.
+# * Relief: the path of one virtual drum-tip point, held at C0 = standard +
+#   CUSTOM_SIX_RELIEF_CENTRE_ABOVE_STANDARD_MM (0.09, just inside the RSS-closed
+#   centre) with the thick tooth's flank in contact (TrochoidRelief), at radius
+#   C0 - 1.10 so it grazes the root, led 0.0002 rad into the drum tooth. That
+#   keeps every printed drum-tip corner >= 10 um clear of the T006 form at
+#   both T006 thickness limits over the RSS centre range
+#   (dt_mesh_checks.t006_relief_clearance_mm, gated in test_standard_mesh_checks).
+# * Tool tip R 2.25: finite support above the 4.31 blank at the thin corner.
+# * Blank OD 4.31 (+0/-0.02, CUSTOM_SIX_BLANK_DIA_BAND), above the AGMA
+#   (N+2)/DP 4.23: the largest OD, floored to 0.01, whose thin corner keeps the
+#   0.25 m tip land; the extra addendum raises the contact ratio (~0.77, REF).
+CUSTOM_SIX_TOOL_THICKNESS_MM = 0.872
+CUSTOM_SIX_ROOT_RADIUS_MM = 1.10
+CUSTOM_SIX_TOOL_TIP_RADIUS_MM = 2.25
+CUSTOM_SIX_RELIEF_LEAD_RAD = 0.0002
+CUSTOM_SIX_OUTSIDE_DIA_MM = 4.31
+CUSTOM_SIX_RELIEF_CENTRE_ABOVE_STANDARD_MM = 0.09
+
+
+def _custom_six_relief(involute_only: CustomSixCutter) -> TrochoidRelief:
+    """Phase the virtual drum-tip point from the conjugate involute contact.
+
+    At the closing centre C0 the thick T006 flank's line of action leaves its
+    base circle at the operating angle aw; the drum flank in contact starts at
+    polar angle aw + pi - (C0 sin aw - (aw - k6) rb6) / rbD about the drum
+    centre (k6 the tool's half-space base angle), and its involute reaches the
+    virtual radius Rv = C0 - root a further inv(acos(rbD / Rv)) round.
+    """
+    drum_teeth = int(_config.machine("gear_train", "cylinder_teeth"))
+    alpha = math.radians(PRESSURE_ANGLE_DEG)
+    centre = (6 + drum_teeth) * MODULE_MM / 2.0 + CUSTOM_SIX_RELIEF_CENTRE_ABOVE_STANDARD_MM
+    pitch_six, pitch_drum = 6 * MODULE_MM / 2.0, drum_teeth * MODULE_MM / 2.0
+    base_six, base_drum = pitch_six * math.cos(alpha), pitch_drum * math.cos(alpha)
+    aw = math.acos((pitch_six + pitch_drum) * math.cos(alpha) / centre)
+    k6 = involute_only.half_space_base_angle_rad
+    start = aw + math.pi - (centre * math.sin(aw) - (aw - k6) * base_six) / base_drum
+    radius = centre - CUSTOM_SIX_ROOT_RADIUS_MM
+    roll = math.acos(base_drum / radius)
+    phase = start + (math.tan(roll) - roll) - CUSTOM_SIX_RELIEF_LEAD_RAD
+    return TrochoidRelief(drum_teeth, centre, phase)
 
 
 def cutter_template(teeth: int) -> Any:
     """Canonical stock master or the explicitly approved finite N6 tool."""
     _require_member(teeth)
     if teeth == 6:
-        return CustomSixCutter(
-            DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG, 1.491, 2.35,
-            CUSTOM_SIX_TOOL_THICKNESS_MM, "DT6-FORM1",
-            "Main-approved N6 PA20 working involute; physical root MIN2.346 mm; finite ground form",
+        args = (
+            DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG, CUSTOM_SIX_ROOT_RADIUS_MM,
+            CUSTOM_SIX_TOOL_TIP_RADIUS_MM, CUSTOM_SIX_TOOL_THICKNESS_MM, "DT6-FORM1",
+            "User ruling 2026-10-10 option (a): N6 PA20 working involute over a "
+            "drum-tip trochoid relief; root R1.10; finite ground form",
         )
+        return CustomSixCutter(*args, relief=_custom_six_relief(CustomSixCutter(*args)))
     return template_for_teeth(teeth, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
 
 
@@ -97,20 +147,29 @@ def _member(teeth: int) -> _Member:
     translation = standard_translation_mm(teeth)
     pitch_radius = teeth * MODULE_MM / 2.0
     thickness = StockFormProfile(teeth, cutter, pitch_radius, translation).pitch_tooth_thickness_mm
+    thickness_band, blank_band = tooth_thickness_band(teeth), blank_dia_band(teeth)
     translations = tuple(
         translation_for_pitch_tooth_thickness(teeth, cutter, thickness + side)
-        for side in (TOOTH_THICKNESS_BAND[1], TOOTH_THICKNESS_BAND[0])
+        for side in (thickness_band[1], thickness_band[0])
     )
     # AGMA standard blank, capped where either thickness limit's finite cutter
-    # form stops supporting the tip at the blank band's upper limit.
+    # form stops supporting the tip at the blank band's upper limit. T006 takes
+    # its ruled land-limited OD instead (CUSTOM_SIX_OUTSIDE_DIA_MM), still
+    # under the same support cap.
     support = min(
         StockFormProfile(teeth, cutter, pitch_radius, shift).support_radius_max_mm
         for shift in translations
     )
-    od = math.floor(min((teeth + 2) * MODULE_MM, 2.0 * support - BLANK_DIA_BAND[0]) * 100.0) / 100.0
+    cap = 2.0 * support - blank_band[0]
+    if teeth == 6:
+        if CUSTOM_SIX_OUTSIDE_DIA_MM > cap:
+            raise ValueError("T006: DT6-FORM1 finite tip does not support the ruled OD")
+        od = CUSTOM_SIX_OUTSIDE_DIA_MM
+    else:
+        od = math.floor(min((teeth + 2) * MODULE_MM, cap) * 100.0) / 100.0
     profile = StockFormProfile(teeth, cutter, od / 2.0, translation)
     corners = tuple(StockFormProfile(teeth, cutter, (od + side) / 2.0, shift)
-                    for side, shift in itertools.product(BLANK_DIA_BAND, translations))
+                    for side, shift in itertools.product(blank_band, translations))
     required_land = max(0.10, 0.25 * MODULE_MM)
     for corner in (profile, *corners):
         corner.require_tip_land(required_land)
@@ -126,8 +185,15 @@ def _member(teeth: int) -> _Member:
     web_required = WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
     if (minimum - maximum_bore) / 2.0 < web_required - 1e-9:
         raise ValueError(f"T{teeth:03d}: printed root misses the retained web")
-    if teeth == 6 and minimum < 2.346 - 1e-9:
-        raise ValueError("T006: root misses the approved physical D2.346 MIN")
+    # T006 root (re-derived for option (a), replacing the D2.346 MIN of the
+    # retired R1.491 tool): the standard-depth thick corner sits the tool root
+    # R1.10 on the gear's own axis offset 0, so the root MAX is D2.20; the thin
+    # corner's -0.032 translation gives the MIN. The web above is the strength
+    # floor: D >= the MAX bore + 2 x 0.62.
+    if teeth == 6 and not math.isclose(
+        root_max, CUSTOM_SIX_ROOT_RADIUS_MM + max(translations), abs_tol=error
+    ):
+        raise ValueError("T006: root MAX is not the ruled R1.10 at standard depth")
     return _Member(profile, corners, (minimum, maximum))
 
 
@@ -362,12 +428,27 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     GAP_FLOOR_SKETCH: {"FloorDia"},
 }
 
-# Blank band about the AGMA (N + 2)/DP outside diameter, undersize only, so
-# the closing corner keeps root clearance and the 0.02 width costs T012's
-# open-corner contact ratio no more than option B allows (user ruling
-# 2026-10-10). Every corner must still keep finite cutter support, tip land,
+# Blank band below the printed outside diameter, undersize only, so the
+# closing corner keeps root clearance (user ruling 2026-10-10: ordinary
+# 0/-0.05). Every corner must still keep finite cutter support, tip land,
 # root air and web before construction.
-BLANK_DIA_BAND = (0.0, -0.02)
+BLANK_DIA_BAND = (0.0, -0.05)
+# T006 keeps its own bands (the named exception, user ruling 2026-10-10):
+# DT6-FORM1's relief leaves no flank for a tooth thicker than the tool, and a
+# thinner or smaller T006 loses the tip land. build_dt_cone_gear writes them
+# into the T006 configuration only (IDimensionTolerance.SetValues2).
+CUSTOM_SIX_TOOTH_THICKNESS_BAND = (0.0, -0.04)
+CUSTOM_SIX_BLANK_DIA_BAND = (0.0, -0.02)
+
+
+def tooth_thickness_band(teeth: int) -> tuple[float, float]:
+    _require_member(teeth)
+    return CUSTOM_SIX_TOOTH_THICKNESS_BAND if teeth == 6 else TOOTH_THICKNESS_BAND
+
+
+def blank_dia_band(teeth: int) -> tuple[float, float]:
+    _require_member(teeth)
+    return CUSTOM_SIX_BLANK_DIA_BAND if teeth == 6 else BLANK_DIA_BAND
 
 
 def configuration_number(part_number: str, teeth: int) -> str:

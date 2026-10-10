@@ -10,9 +10,10 @@ model's maximum radial envelope over the knurl crests, not a tolerance-high
 supplied diameter. Head and stud supplier tolerances are unprovided; no
 manufactured title-block grade is assigned to these purchased nominals.
 
-The knob sets the cone-to-drum mesh at assembly: swing the platform in until
-the tightest cone meets a feeler/backlash, hold it, and tighten the knob. It
-clamps by friction anywhere along the lock notch.
+The knob locks the cone-to-drum set at assembly (cone_set_stack): with the
+pedestals already shimmed and tightened, swing the platform in until T120's
+radial feeler is snug, hold it, and tighten the knob. It clamps by friction
+anywhere along the lock notch.
 """
 
 from __future__ import annotations

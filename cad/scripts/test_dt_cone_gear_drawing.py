@@ -90,14 +90,18 @@ def test_model_owns_precision_for_every_printed_dimension() -> None:
 
 
 def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
-    # Option B (user ruling 2026-10-10): undersize-only blank band about the
-    # AGMA outside diameter, narrow enough for the open-corner contact ratio.
-    assert spec.BLANK_DIA_BAND == (0.0, -0.02)
+    # Ordinary undersize-only blank band (user ruling 2026-10-10, cones at
+    # ordinary tolerances); T006 keeps its own -0.02 band for the DT6-FORM1
+    # relief, written into T006 alone.
+    assert spec.BLANK_DIA_BAND == (0.0, -0.05)
+    assert spec.blank_dia_band(6) == spec.CUSTOM_SIX_BLANK_DIA_BAND == (0.0, -0.02)
+    assert all(spec.blank_dia_band(t) is spec.BLANK_DIA_BAND for t in spec.CONFIGURATION_TEETH if t != 6)
     assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert (
         '"BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)' in source
     )
+    assert "_set_custom_six_bands(adapter)" in source
 
 
 def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
@@ -139,11 +143,12 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
 
 
 def test_native_tooth_inspection_reads_the_actual_installed_cutter() -> None:
-    # Thin-only about the standard-depth thickness (option B), so the nominal
-    # profile is the maximum-material limit.
-    upper, lower = spec.TOOTH_THICKNESS_BAND
-    assert (upper, lower) == (0.0, -0.04)
+    # Ordinary +/-0.075 thickness band about the cutter's standard-depth
+    # thickness; T006 alone is thin-only (DT6-FORM1 relief clearance).
+    assert spec.TOOTH_THICKNESS_BAND == (0.075, -0.075)
+    assert spec.tooth_thickness_band(6) == spec.CUSTOM_SIX_TOOTH_THICKNESS_BAND == (0.0, -0.04)
     for teeth in spec.CONFIGURATION_TEETH:
+        _upper, lower = spec.tooth_thickness_band(teeth)
         profile = spec.stock_form_profile(teeth)
         assert profile.pitch_tooth_thickness_mm == pytest.approx(spec.tooth_thickness_mm(teeth))
         assert 2.0 * profile.blank_radius_mm == pytest.approx(spec.outside_dia_mm(teeth))
@@ -166,10 +171,10 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
         assert f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG" in data
         for physical_recipe in (
             "CUTTER", "TEMPLATE", "TOOL T", "PLUNGE", "WHOLE DEPTH",
-            "ROOT RADIAL MIN/MAX", "STOCK-FORM COVERAGE", "SIGNED TE",
-            "PHASE RESERVE", "NONCARRYING GAP", "WEB",
+            "TOOTH FORM", "BACKLASH WITH MATE", "ROOT RADIAL MIN/MAX", "WEB",
         ):
             assert physical_recipe in data, (teeth, physical_recipe)
+        assert ("TROCHOID RELIEF" in data) == (teeth == 6)
         assert notes.CYLINDER_MATE_NUMBER in data
         for obsolete in ("CONTACT RATIO", "RANGE ONLY", "MATCH FLANKS", "LONG ADDENDUM"):
             assert obsolete not in data
@@ -315,17 +320,17 @@ def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> 
     assert drawing.SHEET_NAMES[-1] == notes.CUTTER_DETAIL_SHEET
     assert "CUSTOM GROUND FORM" in detail
     assert "NO UPPER CONTINUATION" in detail
-    assert "RAISED ROOT; RADIAL ROOT-TO-BASE; N6 WORKING INVOLUTE" in detail
+    assert "ROOT ARC; DRUM-TIP TROCHOID RELIEF TO TIF; N6 WORKING INVOLUTE" in detail
     normalized = re.sub(r"\s+", "", detail)
     required = []
     for segment in tool.native_segments(
         unit_scale=1.0, clearance_radius_mm=template.tip_radius_mm + 1.0
     ):
-        if segment.kind in {"root_arc", "radial", "flank"}:
+        if segment.kind in {"root_arc", "relief", "flank"}:
             required.append(segment.kind)
             assert re.sub(r"\s+", "", segment.x) in normalized
             assert re.sub(r"\s+", "", segment.y) in normalized
-    assert sorted(required) == ["flank", "flank", "radial", "radial", "root_arc"]
+    assert sorted(required) == ["flank", "flank", "relief", "relief", "root_arc"]
     assert "closing_ray" not in detail
     assert "clearance_arc" not in detail
     assert "STOCK #8" not in detail

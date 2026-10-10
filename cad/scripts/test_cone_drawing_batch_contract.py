@@ -71,7 +71,7 @@ def test_every_cone_sheet_names_the_actual_finite_cutting_system() -> None:
         assert "CUTTER:" in data
         assert "PLUNGE" in data
         assert "WHOLE DEPTH" in data
-        assert "STOCK-FORM COVERAGE" in data
+        assert "TOOTH FORM:" in data
         assert "CONTACT RATIO" not in data
         assert "RANGE ONLY" not in data
         assert "MATCH FLANKS" not in data

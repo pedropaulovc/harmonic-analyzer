@@ -65,6 +65,9 @@ def _bisect(function, lo: float, hi: float) -> float:
 
 
 class _TemplateGeometry:
+    # Stock masters carry no relief; only the explicit custom tool may.
+    relief = None
+
     @property
     def module_mm(self) -> float:
         return 25.4 / self.diametral_pitch
@@ -173,8 +176,38 @@ class CutterTemplate(_TemplateGeometry):
 
 
 @dataclass(frozen=True)
+class TrochoidRelief:
+    """Ground undercut relief below the working involute: one point's path.
+
+    A virtual generating point sits R = C - root from the centre of a
+    ``mate_teeth`` mate held C = ``centre_distance_mm`` from the reference
+    axis. As the work turns by phi it traces, in the reference frame,
+    q(phi) = C e^{-i phi} + R e^{i(phase - (1 + k) phi)} with k = N/M, so
+    |q|^2 = C^2 + R^2 - 2 C R cos(phase - k phi - pi). The bottom
+    phase - k phi_b = pi sits tangent on the root circle at polar angle
+    -phi_b, and |q| rises monotonically on the branch phi > phi_b.
+    """
+
+    mate_teeth: int
+    centre_distance_mm: float
+    phase_rad: float
+
+    def __post_init__(self) -> None:
+        if type(self.mate_teeth) is not int or self.mate_teeth < 3:
+            raise ValueError("relief mate must be a physical integer tooth count")
+        _positive(self.centre_distance_mm, "relief centre distance")
+        if not math.isfinite(self.phase_rad):
+            raise ValueError("relief phase must be finite")
+
+
+@dataclass(frozen=True)
 class CustomSixCutter(_TemplateGeometry):
-    """Explicit finite DT6-FORM1 ground tool, never a stock-range selection."""
+    """Explicit finite DT6-FORM1 ground tool, never a stock-range selection.
+
+    Without ``relief`` the root joins the base radially, as on a stock
+    master. With it, the trochoid relief runs from the root circle up to
+    the radius where it rejoins the involute, which then starts there.
+    """
 
     diametral_pitch: float
     pressure_angle_deg: float
@@ -183,6 +216,8 @@ class CustomSixCutter(_TemplateGeometry):
     pitch_tooth_thickness_mm: float
     name: str
     source: str
+    relief: TrochoidRelief | None = None
+    _relief_junction_mm: float = field(default=0.0, init=False, repr=False, compare=False)
 
     @property
     def reference_teeth(self) -> int:
@@ -199,7 +234,86 @@ class CustomSixCutter(_TemplateGeometry):
     def __post_init__(self) -> None:
         if not self.name.strip() or not self.source.strip():
             raise ValueError("custom tool requires explicit name and source")
+        if self.relief is not None:
+            if not isinstance(self.relief, TrochoidRelief):
+                raise TypeError("custom relief must be a TrochoidRelief")
+            _positive(self.root_radius_mm, "reference root radius")
+            if self.root_radius_mm >= self.base_radius_mm:
+                raise ValueError("a relief replaces the below-base connector; root must lie below base")
+            if self.relief.centre_distance_mm <= self.root_radius_mm:
+                raise ValueError("relief generating point must lie beyond the root")
+            object.__setattr__(self, "_relief_junction_mm", self._solve_relief_junction())
         self._validate()
+
+    @property
+    def flank_parameter_min(self) -> float:
+        if self.relief is None:
+            return super().flank_parameter_min
+        return math.sqrt((self._relief_junction_mm / self.base_radius_mm) ** 2 - 1)
+
+    @property
+    def root_half_angle_rad(self) -> float:
+        if self.relief is None:
+            return super().root_half_angle_rad
+        return -self.relief_bottom_parameter
+
+    @property
+    def _relief_ratio(self) -> float:
+        return self.reference_teeth / self.relief.mate_teeth
+
+    @property
+    def relief_point_radius_mm(self) -> float:
+        return self.relief.centre_distance_mm - self.root_radius_mm
+
+    @property
+    def relief_bottom_parameter(self) -> float:
+        return (self.relief.phase_rad - math.pi) / self._relief_ratio
+
+    @property
+    def relief_junction_radius_mm(self) -> float:
+        return self._relief_junction_mm
+
+    @property
+    def relief_junction_parameter(self) -> float:
+        return self.relief_parameter_at_radius(self._relief_junction_mm)
+
+    def relief_point(self, phi: float, side: int = 1) -> tuple[float, float]:
+        if side not in {-1, 1}:
+            raise ValueError("relief side must be -1 or +1")
+        C, R, k = self.relief.centre_distance_mm, self.relief_point_radius_mm, self._relief_ratio
+        g = self.relief.phase_rad - (1 + k) * phi
+        return C * math.cos(phi) + R * math.cos(g), side * (R * math.sin(g) - C * math.sin(phi))
+
+    def relief_derivative(self, phi: float, side: int = 1) -> tuple[float, float]:
+        C, R, k = self.relief.centre_distance_mm, self.relief_point_radius_mm, self._relief_ratio
+        g = self.relief.phase_rad - (1 + k) * phi
+        return (-C * math.sin(phi) + (1 + k) * R * math.sin(g),
+                side * (-C * math.cos(phi) - (1 + k) * R * math.cos(g)))
+
+    def relief_parameter_at_radius(self, radius_mm: float) -> float:
+        """Closed-form inverse of |q| on the rising branch phi >= phi_b."""
+        C, R = self.relief.centre_distance_mm, self.relief_point_radius_mm
+        cosine = (C * C + R * R - radius_mm * radius_mm) / (2 * C * R)
+        if not -1 <= cosine <= 1 + 64 * _EPS:
+            raise ValueError("radius is outside the relief path")
+        return self.relief_bottom_parameter + math.acos(min(1.0, cosine)) / self._relief_ratio
+
+    def relief_half_angle_rad(self, radius_mm: float) -> float:
+        x, y = self.relief_point(self.relief_parameter_at_radius(radius_mm))
+        return math.atan2(y, x)
+
+    def _involute_half_angle_rad(self, radius_mm: float) -> float:
+        u = math.sqrt(max(0.0, (radius_mm / self.base_radius_mm) ** 2 - 1))
+        return self.half_space_base_angle_rad + u - math.atan(u)
+
+    def _solve_relief_junction(self) -> float:
+        def gap(radius):
+            return self.relief_half_angle_rad(radius) - self._involute_half_angle_rad(radius)
+
+        lo, hi = self.base_radius_mm, self.tip_radius_mm
+        if not gap(lo) > 0 > gap(hi):
+            raise ValueError("relief must undercut the base and rejoin the involute below the finite tip")
+        return _bisect(gap, lo, hi)
 
 
 def template_for_teeth(selection_teeth: float, dp: float, pa_deg: float) -> CutterTemplate:
@@ -301,6 +415,10 @@ class NativeSegment:
         if self._shape == "radial":
             k = p.template.half_space_base_angle_rad
             return p.radial_translation_mm + z * math.cos(k), self._side * z * math.sin(k), math.cos(k) * step, self._side * math.sin(k) * step
+        if self._shape == "relief":
+            x, y = p.template.relief_point(z, self._side)
+            dx, dy = p.template.relief_derivative(z, self._side)
+            return x + p.radial_translation_mm, y, dx * step, dy * step
         r = p.template.root_radius_mm
         return p.radial_translation_mm + r * math.cos(z), r * math.sin(z), -r * math.sin(z) * step, r * math.cos(z) * step
 
@@ -353,6 +471,13 @@ class NativeSegment:
             return (abs(p.radial_translation_mm) + r,) + tuple(r * h ** n for n in range(1, 6))
         if self._shape == "radial":
             return abs(p.radial_translation_mm) + max(self._a, self._b), h, 0, 0, 0, 0
+        if self._shape == "relief":
+            t = p.template
+            C, R, k = t.relief.centre_distance_mm, t.relief_point_radius_mm, t._relief_ratio
+            reach = max(math.hypot(*t.relief_point(self._a)), math.hypot(*t.relief_point(self._b)))
+            return (abs(p.radial_translation_mm) + reach,) + tuple(
+                (C + R * (1 + k) ** n) * h ** n for n in range(1, 6)
+            )
         u = max(self._a, self._b)
         rb = p.template.base_radius_mm
         return (abs(p.radial_translation_mm) + rb * math.sqrt(1 + u * u),) + tuple(
@@ -396,6 +521,20 @@ class NativeSegment:
                 value = r * r * (b - a) + T * r * (math.sin(b) - math.sin(a))
             elif self._shape == "radial":
                 value = self._side * T * math.sin(p.template.half_space_base_angle_rad) * (b - a)
+            elif self._shape == "relief":
+                # x y' - y x' = side*(-C^2 - (1+k)R^2 - (2+k)CR cos(P - k phi)).
+                t = p.template
+                C, R, k = t.relief.centre_distance_mm, t.relief_point_radius_mm, t._relief_ratio
+                P = t.relief.phase_rad
+                own = (-C * C - (1 + k) * R * R) * (b - a) + (2 + k) * C * R * (
+                    math.sin(P - k * b) - math.sin(P - k * a)
+                ) / k
+                value = self._side * own + T * (
+                    t.relief_point(b, self._side)[1] - t.relief_point(a, self._side)[1]
+                )
+                # The two terms cancel to the small gap sliver; bound by their size.
+                scale = (C * C + (1 + k) * R * R) * abs(b - a) + 2 * (2 + k) * C * R / k
+                return value, 64 * _EPS * (scale + self._reference_bounds()[0] ** 2)
             else:
                 rb, k = p.template.base_radius_mm, p.template.half_space_base_angle_rad
                 def primitive(u):
@@ -466,7 +605,7 @@ class StockFormProfile:
             raise ValueError("blank tip exceeds FINITE cutter support; upper continuation is forbidden")
         if abs(self._helix_a) * self.blank_radius_mm / self._helix_cos >= 1:
             raise ValueError("normal sweep folds and has no unique transverse inverse")
-        below_base = self.template.root_radius_mm < self.template.base_radius_mm
+        below_base = self.template.root_radius_mm < self.template.base_radius_mm and self.template.relief is None
         base = math.hypot(*self.radial_point(self.template.base_radius_mm)) if below_base else None
         if base is not None and self.blank_radius_mm < base:
             shape = "radial"
@@ -631,13 +770,22 @@ class StockFormProfile:
         if radius <= self.root_radius_max_mm or radius > self.support_radius_max_mm:
             raise ValueError("inspection circle is outside whole-root/finite-flank support")
         rb = self.template.base_radius_mm
-        if self.template.root_radius_mm < rb and radius < math.hypot(*self.radial_point(rb)):
+        if self.template.relief is not None and radius < math.hypot(*self.relief_point(self.template.relief_junction_parameter)):
+            phi = _bisect(lambda z: math.hypot(*self.relief_point(z)) - radius,
+                          self.template.relief_bottom_parameter, self.template.relief_junction_parameter)
+            q = self.relief_point(phi)
+        elif self.template.relief is None and self.template.root_radius_mm < rb and radius < math.hypot(*self.radial_point(rb)):
             r = _bisect(lambda z: math.hypot(*self.radial_point(z)) - radius, self.template.root_radius_mm, rb)
             q = self.radial_point(r)
         else:
             u = _bisect(lambda z: math.hypot(*self.flank_point(z)) - radius, self.template.flank_parameter_min, self.template.flank_parameter_max)
             q = self.flank_point(u)
         return math.atan2(q[1], q[0])
+
+    def relief_point(self, phi: float, side: int = 1) -> tuple[float, float]:
+        if self.template.relief is None:
+            raise ValueError("this cutter has no ground relief")
+        return self.normal_to_transverse(*self.template.relief_point(phi, side))
 
     @property
     def pitch_tooth_thickness_mm(self) -> float:
@@ -673,7 +821,9 @@ class StockFormProfile:
             return True
         if x <= 0:
             return True
-        if rref < self.template.base_radius_mm:
+        if self.template.relief is not None and rref < self.template.relief_junction_radius_mm:
+            width = self.template.relief_half_angle_rad(rref)
+        elif rref < self.template.base_radius_mm:
             width = self.template.half_space_base_angle_rad
         else:
             u = min(self.template.flank_parameter_max, math.sqrt(max(0.0, (rref / self.template.base_radius_mm) ** 2 - 1)))
@@ -709,6 +859,11 @@ class StockFormProfile:
             elif shape == "radial":
                 k = f"({self.template.half_space_base_angle_rad:.17g})"
                 X, Y = f"({T}+{z}*cos({k}))", f"({side}*{z}*sin({k}))"
+            elif shape == "relief":
+                t = self.template
+                C, R = f"({t.relief.centre_distance_mm:.17g})", f"({t.relief_point_radius_mm:.17g})"
+                g = f"(({t.relief.phase_rad:.17g})-({1 + t._relief_ratio:.17g})*{z})"
+                X, Y = f"({T}+{C}*cos({z})+{R}*cos({g}))", f"({side}*({R}*sin({g})-{C}*sin({z})))"
             else:
                 rb = f"({self.template.base_radius_mm:.17g})"
                 phase = f"({self.template.half_space_base_angle_rad:.17g}+{z})"
@@ -728,7 +883,10 @@ class StockFormProfile:
         rb, root = self.template.base_radius_mm, self.template.root_radius_mm
         pieces = []
         label = "Upper" if side == 1 else "Lower"
-        if root < rb:
+        if self.template.relief is not None:
+            pieces.append(self._segment(f"{label}Relief", "relief", "relief", self.template.relief_bottom_parameter,
+                                        self.template.relief_junction_parameter, side=side, scale=scale, rotation=rotation))
+        elif root < rb:
             end = self._tip_parameter if self._tip_shape == "radial" else rb
             if end > root:
                 pieces.append(self._segment(f"{label}BelowBase", "radial", "radial", root, end, side=side, scale=scale, rotation=rotation))
@@ -772,14 +930,15 @@ class StockFormProfile:
         Main authors the two flanks first (each base -> tip), then the lower
         closing ray, the clearance arc and the upper closing ray, then the floor
         from the upper flank's foot round to the lower's. The stock loop maps
-        onto that role for role; only the upper flank runs the other way.
+        onto that role for role; only the upper flank runs the other way. A
+        ground relief takes the below-base connector's place in the floor.
         """
         loop = {s.name: s for s in self.native_segments(unit_scale, clearance_radius_mm)}
         if "UpperFiniteFlank" not in loop:
             raise ValueError("stock gap has no finite involute flank to author first")
         upper_flank = next(s for s in self._branch_segments(1, True, scale=unit_scale) if s.name == "UpperFiniteFlank")
         order = ("LowerFiniteFlank", "UpperFiniteFlank", "LowerClosingRay", "ClearanceArc",
-                 "UpperClosingRay", "UpperBelowBase", "RootArc", "LowerBelowBase")
+                 "UpperClosingRay", "UpperBelowBase", "UpperRelief", "RootArc", "LowerBelowBase", "LowerRelief")
         return tuple(upper_flank if name == "UpperFiniteFlank" else loop[name] for name in order if name in loop)
 
     def gap_polygon(self, samples_per_segment: int = 128) -> tuple[tuple[float, float], ...]:
@@ -912,7 +1071,7 @@ def translation_for_pitch_tooth_thickness(
         lambda y: angle(y) - theta, ymin, ymax
     )
     k, rb = template.half_space_base_angle_rad, template.base_radius_mm
-    if template.root_radius_mm < rb and Y < rb * math.sin(k):
+    if template.relief is None and template.root_radius_mm < rb and Y < rb * math.sin(k):
         radius = Y / math.sin(k)
         xref = radius * math.cos(k)
     else:

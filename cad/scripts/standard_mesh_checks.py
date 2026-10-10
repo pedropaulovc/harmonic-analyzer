@@ -48,6 +48,9 @@ class PlaneGear:
     tip_radius: float
     root_radius_max: float
     pitch_thickness: float  # circular, on ``pitch_radius``
+    # True-involute start (TIF). Contact cannot run below it: a ground relief
+    # under the working involute ends the path there. 0 = from the base circle.
+    form_radius: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -79,12 +82,16 @@ def plane_gear(profile: StockFormProfile, module_mm: float, *, radius_growth: fl
     converts its transverse pitch thickness to that section (cos helix).
     """
     pitch = profile.teeth * module_mm / 2.0
+    template = profile.template
+    form = (math.hypot(*profile.relief_point(template.relief_junction_parameter))
+            if template.relief is not None else 0.0)
     return PlaneGear(
         profile.teeth,
         pitch + radius_growth,
         profile.blank_radius_mm + radius_growth,
         profile.root_radius_max_mm + radius_growth,
         profile.pitch_tooth_thickness_mm * thickness_scale,
+        form + radius_growth if form else 0.0,
     )
 
 
@@ -98,8 +105,12 @@ def _operating_angle(a: PlaneGear, b: PlaneGear, centre: float, alpha: float) ->
 def contact_ratio(a: PlaneGear, b: PlaneGear, centre: float, alpha: float, module_mm: float) -> float:
     alpha_w = _operating_angle(a, b, centre, alpha)
     rba, rbb = a.pitch_radius * math.cos(alpha), b.pitch_radius * math.cos(alpha)
-    approach = math.sqrt(a.tip_radius**2 - rba**2) + math.sqrt(b.tip_radius**2 - rbb**2)
-    return (approach - centre * math.sin(alpha_w)) / (math.pi * module_mm * math.cos(alpha))
+    line = centre * math.sin(alpha_w)
+    # Each tip's reach along the line of action, cut back where it would meet
+    # the mate below the mate's true-involute start.
+    reach_a = min(math.sqrt(a.tip_radius**2 - rba**2), line - math.sqrt(max(b.form_radius, rbb)**2 - rbb**2))
+    reach_b = min(math.sqrt(b.tip_radius**2 - rbb**2), line - math.sqrt(max(a.form_radius, rba)**2 - rba**2))
+    return (reach_a + reach_b - line) / (math.pi * module_mm * math.cos(alpha))
 
 
 def interference_margin(a: PlaneGear, b: PlaneGear, centre: float, alpha: float) -> float:

@@ -271,7 +271,8 @@ async def test_nonwhitelisted_sketch_stays_strict(sketch_logs) -> None:
 def test_stock_gaps_are_authored_in_mains_cut_tooth_gap_order(teeth) -> None:
     """Every stock gap (drum, alignment pinion, each cone row) follows main's
     _gear.cut_tooth_gap: flanks base->tip first, lower ray, clearance arc,
-    upper ray, then the floor from the upper foot to the lower foot."""
+    upper ray, then the floor from the upper foot to the lower foot. T006's
+    DT6-FORM1 trochoid relief takes the below-base lines' place in the floor."""
     import dt_alignment_pinion_spec
     import dt_cone_gear_spec
     import dt_cylinder_gear_spec
@@ -285,11 +286,14 @@ def test_stock_gaps_are_authored_in_mains_cut_tooth_gap_order(teeth) -> None:
         ordered = profile.cut_order_native_segments()
         names = [s.name for s in ordered]
         roles = ["LowerFiniteFlank", "UpperFiniteFlank", "LowerClosingRay", "ClearanceArc",
-                 "UpperClosingRay", "UpperBelowBase", "RootArc", "LowerBelowBase"]
+                 "UpperClosingRay", "UpperBelowBase", "UpperRelief", "RootArc",
+                 "LowerBelowBase", "LowerRelief"]
         assert names == [r for r in roles if r in {s.name for s in loop}]
         by = {s.name: s for s in ordered}
-        lower_foot = by.get("LowerBelowBase", by["RootArc"]).end_mm
-        upper_foot = by.get("UpperBelowBase", by["RootArc"]).start_mm
+        upper_floor = by.get("UpperBelowBase", by.get("UpperRelief"))
+        lower_floor = by.get("LowerBelowBase", by.get("LowerRelief"))
+        lower_foot = (lower_floor or by["RootArc"]).end_mm
+        upper_foot = (upper_floor or by["RootArc"]).start_mm
         joints = [
             (lower_foot, by["LowerFiniteFlank"].start_mm),
             (by["LowerFiniteFlank"].end_mm, by["LowerClosingRay"].start_mm),
@@ -298,8 +302,8 @@ def test_stock_gaps_are_authored_in_mains_cut_tooth_gap_order(teeth) -> None:
             (by["UpperClosingRay"].end_mm, by["UpperFiniteFlank"].end_mm),
             (by["UpperFiniteFlank"].start_mm, upper_foot),
         ]
-        if "UpperBelowBase" in by:
-            joints += [(by["UpperBelowBase"].end_mm, by["RootArc"].start_mm),
-                       (by["RootArc"].end_mm, by["LowerBelowBase"].start_mm)]
+        if upper_floor is not None:
+            joints += [(upper_floor.end_mm, by["RootArc"].start_mm),
+                       (by["RootArc"].end_mm, lower_floor.start_mm)]
         for a, b in joints:
             assert a == pytest.approx(b, abs=1e-9)

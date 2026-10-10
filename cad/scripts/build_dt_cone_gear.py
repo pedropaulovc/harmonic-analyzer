@@ -70,6 +70,8 @@ from dt_cone_gear_spec import (
     floor_radius_max_mm,
     material_specification,
     stock_form_profile,
+    blank_dia_band,
+    tooth_thickness_band,
 )
 from _common import (
     OUT_PNG,
@@ -339,6 +341,44 @@ def _assert_gap_floor_limits(adapter: Any, configuration: str, teeth: int) -> No
     _telemetry.success(
         f"{configuration}: gap-floor limits {floor_limits_mm(teeth)} mm"
     )
+
+
+def _set_custom_six_bands(adapter: Any) -> None:
+    """Write T006's own blank and tooth-thickness bands into T006 only.
+
+    The shared bilateral bands are already on BlankDia and ToothThickness;
+    ``SetValues2`` with swSetValue_InSpecificConfigurations and the one name
+    overrides them in T006 without activating it (the FloorDia LIMIT form).
+    The active configuration must still read the shared band; the T006 sheet
+    reads its own back after save and reopen (draw_dt_cone_gear).
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    for feature, name, shared, own in (
+        ("BlankProfile", "BlankDia", BLANK_DIA_BAND, blank_dia_band(6)),
+        (TOOTH_REFERENCE_SKETCH, "ToothThickness", TOOTH_THICKNESS_BAND, tooth_thickness_band(6)),
+    ):
+        _display, dimension = _named_dimension(adapter, feature, name)
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        lower, upper = deviations(own)
+        names = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, ["T006"])
+        if not bool(tolerance.SetValues2(
+            lower / 1000.0, upper / 1000.0, _SET_IN_SPECIFIC_CONFIGURATIONS, names
+        )):
+            raise RuntimeError(f"{name}@T006: SetValues2 rejected the band {own} mm")
+        observed = (
+            float(tolerance.GetMinValue()) * 1000.0,
+            float(tolerance.GetMaxValue()) * 1000.0,
+        )
+        if any(abs(o - e) > 1e-6 for o, e in zip(observed, deviations(shared))):
+            raise RuntimeError(
+                f"{name}: the T006 band reached the active configuration: {observed} mm"
+            )
+    _telemetry.success(
+        f"T006 bands: blank {blank_dia_band(6)}, tooth thickness {tooth_thickness_band(6)} mm"
+    )
+
 
 
 def _blank_reference_sketches(adapter: Any) -> None:
@@ -1454,6 +1494,7 @@ async def build(adapter) -> dict[str, str]:
         "ToothThickness",
         *deviations(TOOTH_THICKNESS_BAND),
     )
+    _set_custom_six_bands(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,

@@ -57,6 +57,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import deviations
 from _layout_audit import arc_segments
 from _surface_finish import surface_finish_by_key
 from build_dt_cone_gear import (
@@ -71,6 +72,8 @@ from dt_cone_gear_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     bore_dia_mm,
+    blank_dia_band,
+    tooth_thickness_band,
     bore_flat_offset_mm,
     floor_limits_mm,
     outside_dia_mm,
@@ -375,7 +378,7 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     crop = bore_view_crop_radius(teeth)
     x, y = BORE_VIEW_CENTER
     return {
-        "BoreCutDia": (x - 0.020, y + crop + 0.006),
+        "BoreCutDia": (x - 0.022, y + crop + 0.006),
         "BoreAF": (
             x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
             y - crop - BORE_VIEW_AF_DROP,
@@ -449,10 +452,11 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
-def _assert_sheet_floor_limits(
+def _assert_sheet_bands(
     adapter: Any, annotations: list[Any], configuration: str, teeth: int
 ) -> None:
-    """Prove the sheet's gap-floor dimension carries THIS configuration's limits.
+    """Prove the sheet's gap-floor, blank and tooth-thickness dimensions carry
+    THIS configuration's bands.
 
     One model dimension holds twenty LIMIT bands; the imported display
     dimension reads the band of its view's referenced configuration from the
@@ -484,6 +488,38 @@ def _assert_sheet_floor_limits(
         )
     _telemetry.success(
         f"{configuration}: sheet gap-floor limits {floor_limits_mm(teeth)} mm"
+    )
+    # T006 carries its own blank and tooth-thickness bands in its
+    # configuration only; every sheet reads its own back the same way.
+    for name, band in (
+        ("BlankDia", blank_dia_band(teeth)),
+        ("ToothThickness", tooth_thickness_band(teeth)),
+    ):
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{configuration}: expected one {name} on the sheet, found {len(matches)}"
+            )
+        display = _early_bound(
+            _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        tolerance = _early_bound(
+            _early_bound(display.GetDimension2(0), "IDimension").Tolerance,
+            "IDimensionTolerance",
+        )
+        observed = (
+            float(tolerance.GetMinValue()) * 1000.0,
+            float(tolerance.GetMaxValue()) * 1000.0,
+        )
+        expected = deviations(band)
+        if any(abs(o - e) > 1e-6 for o, e in zip(observed, expected)):
+            raise RuntimeError(
+                f"{configuration}: sheet {name} reads {observed} mm, expected {expected} mm"
+            )
+    _telemetry.success(
+        f"{configuration}: sheet blank {blank_dia_band(teeth)} and tooth-thickness "
+        f"{tooth_thickness_band(teeth)} bands"
     )
 
 
@@ -970,7 +1006,7 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} front",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-        _assert_sheet_floor_limits(adapter, front_annotations, configuration, teeth)
+        _assert_sheet_bands(adapter, front_annotations, configuration, teeth)
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,

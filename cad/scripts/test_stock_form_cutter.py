@@ -11,6 +11,7 @@ from stock_form_cutter import (
     CutterTemplate,
     CustomSixCutter,
     StockFormProfile,
+    TrochoidRelief,
     template_for_teeth,
     translation_for_pitch_tooth_thickness,
     translation_for_tangent_span,
@@ -390,6 +391,39 @@ def test_custom_six_is_named_finite_raised_root_not_stock():
         StockFormProfile(6, c, 1.951, 0)
 
 
+def test_trochoid_relief_runs_from_the_root_circle_onto_the_involute():
+    centre, phase, root = 33.4175, 3.1349391482414, 1.10
+    args = (48, 20, root, 2.25, .872, "DT6-FORM1", "control")
+    plain = CustomSixCutter(*args)
+    c = CustomSixCutter(*args, relief=TrochoidRelief(120, centre, phase))
+    ratio = 6 / 120
+
+    def trochoid(phi):
+        # Independent complex form of the mate-tip path in the N6 frame.
+        z = centre * complex(math.cos(phi), -math.sin(phi))
+        g = phase - (1 + ratio) * phi
+        return z + (centre - root) * complex(math.cos(g), math.sin(g))
+
+    bottom, junction = c.relief_bottom_parameter, c.relief_junction_parameter
+    assert abs(trochoid(bottom)) == pytest.approx(root, abs=1e-12)
+    for phi in (bottom, junction, (bottom + junction) / 2):
+        z = trochoid(phi)
+        assert c.relief_point(phi) == pytest.approx((z.real, z.imag), abs=1e-12)
+    # The relief hands over to the working involute at its first parameter.
+    assert abs(trochoid(junction)) == pytest.approx(c.relief_junction_radius_mm, abs=1e-12)
+    assert c.relief_point(junction) == pytest.approx(c.flank_point(c.flank_parameter_min), abs=1e-9)
+    assert plain.base_radius_mm < c.relief_junction_radius_mm < c.pitch_radius_mm
+    p = StockFormProfile(6, c, 2.155, 0)
+    polygon = list(p.gap_polygon(4000))
+    assert _shoelace(polygon) == pytest.approx(p.gap_area_mm2, abs=1e-6)
+    assert p.gap_area_mm2 > StockFormProfile(6, plain, 2.155, 0).gap_area_mm2
+    point = c.relief_point((bottom + junction) / 2)
+    assert p.contains_material(*_rotate(point, 1e-4))
+    assert not p.contains_material(*_rotate(point, -1e-4))
+    kinds = [s.kind for s in p.native_segments()]
+    assert kinds.count("relief") == 2 and "below_base" not in kinds
+
+
 def test_wrong_actual_count_material_oracle_is_discriminated():
     actual = _profile(120, 55)
     ideal = StockFormProfile(135, CutterTemplate(135, 48, 20), 135 * 25.4 / 96, 0)
@@ -559,7 +593,10 @@ def test_translated_120_turned_blank_span_corner_roundtrip(delta_T, monkeypatch)
 
 def test_span_inverse_refuses_contact_past_finite_master_support():
     c = CutterTemplate(12, 48, 20)
+    # Four of twelve teeth put the tangent contact at u = pi/3 - (half-space
+    # base angle), beyond the finite master's last flank parameter.
+    assert math.pi * 4 / 12 - c.half_space_base_angle_rad > c.flank_parameter_max
     with pytest.raises(ValueError, match="finite flank"):
         translation_for_tangent_span(
-            12, c, 10, 3, translation_bounds_mm=(0, .01)
+            12, c, 10, 4, translation_bounds_mm=(0, .01)
         )
