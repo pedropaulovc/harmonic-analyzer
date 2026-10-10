@@ -5,6 +5,8 @@ native Hole Wizard callouts define the orthogonal taps, including blind full
 thread and drill depths. Every controlling dimension is imported unchanged.
 Hole-mouth points convert the shared millimetre frame to COM metres before
 projection; the cover-side *Back view reverses X, not the coordinate units.
+The *Bottom view is turned 180 degrees to preserve that X direction and
+show the true third-angle underside; its current transform locates the tap.
 Native callout positions centre their text; reserve the full two-line tap
 instruction inside the print border and keep the thumb callout off the title.
 """
@@ -12,16 +14,17 @@ instruction inside the print border and keep the thumb callout off the title.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
 import ms_stop_spec as part
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs, add_native_hole_callout, add_property_linked_note,
     finalize_drawing, model_point_in_view,
-    new_project_drawing, read_required_properties, set_dimension_callouts,
+    new_project_drawing, read_required_properties, rebuild_drawing, set_dimension_callouts,
     set_hidden_lines_removed, stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -57,6 +60,18 @@ BOTTOM_KEEP = {
 DIMENSION_CALLOUTS = {"RoofChamferSize": "BOTH ROOF ENDS", "RoofChamferAngle": "BOTH ROOF ENDS"}
 
 
+def _orient_bottom_view(adapter: Any, view: Any) -> None:
+    """Make *Bottom the third-angle underside of the displayed *Back face."""
+    native = _early_bound(view, "IView")
+    native.Angle = math.pi
+    rebuild_drawing(adapter, label="stop block underside orientation")
+    applied = float(native.Angle)
+    if not math.isfinite(applied) or abs(math.remainder(applied - math.pi, math.tau)) > 1e-9:
+        raise RuntimeError(
+            f"stop block underside rotation did not take: {applied!r} rad, expected pi"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source stop block missing: {SOURCE}")
@@ -75,6 +90,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER, scale=SHEET_SCALE)
     right = place_view(adapter, str(SOURCE), "*Left", *RIGHT_CENTER, scale=SHEET_SCALE)
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=SHEET_SCALE)
+    _orient_bottom_view(adapter, bottom)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2.0, 1.0))
     annotations = []
     for view, keep, label in ((front, FRONT_KEEP, "cover face"),

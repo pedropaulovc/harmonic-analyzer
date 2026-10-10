@@ -2,7 +2,7 @@ ms-stick:
   number: MHA-MS-001
   material: C26000 brass, half-hard
   material_specification: C26000 brass, half-hard
-  finish: polished
+  finish: "polished brass; black-fill all engraving with flat black enamel, wipe-filled and cured before final polish"
   quantity: 1
   tolerance_class: plate_profile
   process: "machined (brass)"

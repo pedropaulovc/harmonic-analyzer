@@ -163,11 +163,12 @@ def test_no_com_in_spec_or_render_time_size_overrides(module) -> None:
 class _StopViewTransform:
     """4:1 orthographic affine map, centred on the part's bounding box."""
 
-    def __init__(self, orientation, position, scale, model_center):
+    def __init__(self, orientation, position, scale, model_center, angle=0.0):
         self.orientation = orientation
         self.position = position
         self.scale = scale[0] / scale[1]
         self.model_center = model_center
+        self.angle = angle
 
     def apply(self, xyz):
         x, y, z = (value - center for value, center in zip(
@@ -175,10 +176,76 @@ class _StopViewTransform:
         ))
         sx, sy = self.position
         if self.orientation == "*Back":
-            return (sx - self.scale * x, sy + self.scale * y, -self.scale * z)
-        if self.orientation == "*Bottom":
-            return (sx + self.scale * x, sy + self.scale * z, -self.scale * y)
-        raise AssertionError(f"unexpected hole-mouth view: {self.orientation}")
+            horizontal, vertical, depth = -x, y, -z
+        elif self.orientation == "*Bottom":
+            horizontal, vertical, depth = x, z, -y
+        elif self.orientation == "*Left":
+            horizontal, vertical, depth = z, y, -x
+        else:
+            raise AssertionError(f"unexpected orthographic view: {self.orientation}")
+        cosine, sine = math.cos(self.angle), math.sin(self.angle)
+        return (
+            sx + self.scale * (cosine * horizontal - sine * vertical),
+            sy + self.scale * (sine * horizontal + cosine * vertical),
+            self.scale * depth,
+        )
+
+
+class _StopView:
+    """Expose the native IView properties; an Angle put has no success retval."""
+
+    def __init__(self, orientation, position, scale, model_center, *, rotation_readback=None):
+        self.orientation = orientation
+        self.Position = position
+        self.ScaleRatio = scale
+        self.model_center = model_center
+        self.rotation_readback = rotation_readback
+        self.angle_puts = []
+        self._angle = 0.0
+
+    @property
+    def Angle(self):  # noqa: N802 - COM property name
+        return self._angle
+
+    @Angle.setter
+    def Angle(self, value):  # noqa: N802 - COM property name
+        self.angle_puts.append(value)
+        # Refusal is a recorded put whose authoritative readback stays wrong.
+        self._angle = value if self.rotation_readback is None else self.rotation_readback
+
+    @property
+    def ModelToViewTransform(self):  # noqa: N802 - COM property name
+        return _StopViewTransform(
+            self.orientation, self.Position, self.ScaleRatio, self.model_center, self.Angle
+        )
+
+
+@pytest.mark.parametrize("readback", [math.pi, -math.pi, 3.0 * math.pi])
+def test_bottom_rotation_accepts_equivalent_native_half_turns(readback) -> None:
+    view = _StopView("*Bottom", block_drawing.BOTTOM_CENTER, (4.0, 1.0), (0.0, 0.0, 0.0),
+                     rotation_readback=readback)
+    rebuilds = []
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(
+        EditRebuild3=lambda: rebuilds.append(True) or True
+    ))
+    block_drawing._orient_bottom_view(adapter, view)
+    assert view.angle_puts == [math.pi]
+    assert rebuilds == [True]
+    origin = view.ModelToViewTransform.apply((0.0, 0.0, 0.0))
+    east = view.ModelToViewTransform.apply((0.001, 0.0, 0.0))
+    rear = view.ModelToViewTransform.apply((0.0, 0.0, 0.001))
+    assert east[0] < origin[0] and east[1] == pytest.approx(origin[1])
+    assert rear[1] < origin[1] and rear[0] == pytest.approx(origin[0])
+
+
+@pytest.mark.parametrize("readback", [0.0, math.pi / 2.0, math.nan, math.inf])
+def test_bottom_rotation_refuses_unapplied_or_invalid_native_readback(readback) -> None:
+    view = _StopView("*Bottom", block_drawing.BOTTOM_CENTER, (4.0, 1.0), (0.0, 0.0, 0.0),
+                     rotation_readback=readback)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    with pytest.raises(RuntimeError, match="underside rotation did not take"):
+        block_drawing._orient_bottom_view(adapter, view)
+    assert view.angle_puts == [math.pi]
 
 
 class _StopMathPoint:
@@ -205,7 +272,7 @@ class _StopMathUtility:
     (block_drawing, [
         ("two cover blind taps", "*Back", (0.004425, 0.004, 0.0), (0.1993, 0.1728)),
         ("thumbscrew tap through floor", "*Bottom",
-         (0.0116305, 0.0, 0.0042), (0.179522, 0.0748)),
+         (0.0116305, 0.0, 0.0042), (0.170478, 0.0852)),
     ]),
     (plate_drawing, [
         ("two cover clearance holes", "*Back", (0.0047, 0.004, -0.001), (0.1982, 0.1578)),
@@ -227,7 +294,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         return SimpleNamespace(is_success=True, data=None)
 
     adapter = SimpleNamespace(
-        currentModel=object(), open_model=open_model,
+        currentModel=SimpleNamespace(EditRebuild3=lambda: True), open_model=open_model,
         swApp=SimpleNamespace(GetMathUtility=lambda: utility),
     )
     model_center = (
@@ -240,12 +307,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
 
     def place_view(adapter, path, orientation, x, y, *, scale):
         assert path == str(source)
-        view = SimpleNamespace(
-            orientation=orientation, Position=(x, y), ScaleRatio=scale,
-            ModelToViewTransform=_StopViewTransform(
-                orientation, (x, y), scale, model_center
-            ),
-        )
+        view = _StopView(orientation, (x, y), scale, model_center)
         views[orientation] = view
         return view
 
@@ -277,6 +339,30 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     monkeypatch.setattr(drawing, "add_native_hole_callout", add_callout)
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
+    # The displayed cover face is *Back: +X goes left, +Y goes up. Its
+    # third-angle right view is unrotated *Left (+Z right, +Y up); its
+    # third-angle underside must retain -X and send +Z down, not up.
+    front, right = views["*Back"], views["*Left"]
+    assert front.Position[1] == right.Position[1]
+    center = model_center
+    east = (center[0] + 0.001, center[1], center[2])
+    high = (center[0], center[1] + 0.001, center[2])
+    rear = (center[0], center[1], center[2] + 0.001)
+    front_map, right_map = front.ModelToViewTransform, right.ModelToViewTransform
+    assert front_map.apply(east)[0] < front_map.apply(center)[0]
+    assert front_map.apply(high)[1] > front_map.apply(center)[1]
+    assert right_map.apply(rear)[0] > right_map.apply(center)[0]
+    assert right_map.apply(high)[1] == pytest.approx(front_map.apply(high)[1])
+    if drawing is block_drawing:
+        bottom = views["*Bottom"]
+        bottom_map = bottom.ModelToViewTransform
+        assert bottom.Position[0] == front.Position[0]
+        assert bottom.Position[1] < front.Position[1]
+        assert bottom_map.apply(east)[0] == pytest.approx(front_map.apply(east)[0])
+        assert bottom_map.apply(rear)[1] < bottom_map.apply(center)[1]
+        for x in (0.0, spec.BLOCK_LENGTH / 1000.0):
+            point = (x, center[1], center[2])
+            assert bottom_map.apply(point)[0] == pytest.approx(front_map.apply(point)[0])
     # Capture the entire block build before checking: the second (thumb) pick
     # must remain covered even when the preceding plate pick used wrong units.
     assert len(utility.points) == len(callouts) == len(cases)

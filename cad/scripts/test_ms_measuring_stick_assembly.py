@@ -490,10 +490,22 @@ def test_reference_dimensions_follow_the_spec() -> None:
 
 
 @pytest.mark.parametrize(
+    "dimension_types",
+    (
+        (2, 11), (11, 2),
+        (3, 11), (11, 3),
+        (0, 11), (11, 0),
+        (12, 11), (11, 12),
+        ("refused", 11), (11, "refused"),
+    ),
+)
+@pytest.mark.parametrize(
     "defect",
     (None, "absent component", "duplicate component", "missing edge", "duplicate edge"),
 )
-def test_reference_dimensions_select_owned_visible_end_edges(monkeypatch, defect) -> None:
+def test_reference_dimensions_select_owned_visible_end_edges(
+    monkeypatch, defect, dimension_types
+) -> None:
     """Exercise the resolver and shared selection, never a sheet hit-test."""
     selected = []
     selections = []
@@ -524,10 +536,23 @@ def test_reference_dimensions_select_owned_visible_end_edges(monkeypatch, defect
             self.value = value
             self.text = {}
             self.readbacks = []
+            self.dimension_type = dimension_types[len(displays)]
+            self.value_reads = 0
+
+        @property
+        def Type2(self):
+            if self.dimension_type == "refused":
+                raise RuntimeError("native dimension type getter refused")
+            return self.dimension_type
+
+        @property
+        def SystemValue(self):
+            self.value_reads += 1
+            return self.value
 
         def GetDimension2(self, index):
             assert index == 0
-            return SimpleNamespace(SystemValue=self.value)
+            return self
 
         def GetAnnotation(self):
             return SimpleNamespace(GetSpecificAnnotation=lambda: self)
@@ -671,6 +696,27 @@ def test_reference_dimensions_select_owned_visible_end_edges(monkeypatch, defect
         assert selections == []
         assert displays == []
         return
+    invalid_index = next(
+        (index for index, kind in enumerate(dimension_types) if kind not in (2, 11)),
+        None,
+    )
+    if invalid_index is not None:
+        # Values deliberately match the requested lengths even for angular
+        # dimensions: a value-only guard cannot detect this defect.
+        label = drawing.REFERENCE_DIMENSIONS[invalid_index][0]
+        kind = dimension_types[invalid_index]
+        message = (
+            "native dimension type getter refused"
+            if kind == "refused"
+            else f"measuring-stick {label}: expected a linear dimension, got type {kind}"
+        )
+        with pytest.raises(RuntimeError, match=message):
+            drawing._add_reference_dimensions(adapter, front)
+        assert len(displays) == invalid_index + 1
+        assert displays[-1].value_reads == 0
+        assert displays[-1].text == {}
+        assert not hasattr(displays[-1], "precision")
+        return
     drawing._add_reference_dimensions(adapter, front)
     assert [(edge, append) for edge, append, view in selections] == [
         (start, False), (end, True), (start, False), (near, True)
@@ -679,6 +725,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(monkeypatch, defect
         [200.0, spec.REFERENCE_STOP_FACE]
     )
     for display, (_, _, callout) in zip(displays, drawing.REFERENCE_DIMENSIONS):
+        assert display.value_reads == 1
         assert display.text[1] == "("
         assert display.text[2] == ")"
         assert {1, 2} <= set(display.readbacks)

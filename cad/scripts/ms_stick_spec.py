@@ -3,6 +3,8 @@ r"""Pure model/drawing contract for the unchanged graduated brass stick.
 The 200 x 8 x 3 bar, grooves and numeral DXF retain their existing geometry.
 The scale is configured in amplitude.yaml and read once by ms_stick_geom.
 Model dimensions own the manufacturing values, bands and decimal places.
+The release supplies the engraved native/STEP model and its ruled-face/detail
+drawings, not the generated build-input DXF. Refer numeral outlines to that model.
 """
 
 from __future__ import annotations
@@ -88,7 +90,7 @@ DRAWING_TOLERANCES = {
     "NumeralXGap": NUMERAL_TOLERANCE_MM,
     "NumeralYGap": NUMERAL_TOLERANCE_MM,
 }
-DRAWING_NOTES = "NUMERAL OUTLINES PER SUPPLIED MS-STICK-NUMERALS.DXF"
+DRAWING_NOTES = "NUMERAL OUTLINES PER SUPPLIED MODEL"
 FRONT_VIEW_NOTE = "RULED FACE SCALE 1:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
