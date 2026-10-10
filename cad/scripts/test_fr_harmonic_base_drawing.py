@@ -1967,11 +1967,12 @@ def test_underside_pads_sheet_names_each_pad_and_lug_level() -> None:
         "pinion-block pads level": "2X PADS TO SHALLOW LEVEL",
         "cross-tap lugs level": "4X LUGS TO\nSHALLOW LEVEL",
     }
-    # Each leader tip lands on its group's front pad or lug, 1 mm inside it
-    # and clear of the rib the block pad runs into.
+    # Each leader tip lands on its group's front pad or lug: the block pad's
+    # ON its front edge, east of the corner its 2X 16.0 extension line leaves
+    # and clear of the rib it runs into; the lug's 1 mm inside it.
     _text, _xy, (x, z) = sheet.PADS_LEVEL_NOTES["pinion-block pads level"]
     block0 = part.BLOCK_PAD_SHAPES[0]
-    assert block0[1] + 1.0 < x < part.CROSS_RIB_SHAPE[1] - 1.0 and block0[3] + 1.0 < z < block0[4] - 1.0
+    assert block0[1] + 5.0 < x < part.CROSS_RIB_SHAPE[1] - 1.0 and z == block0[3]
     _text, _xy, (x, z) = sheet.PADS_LEVEL_NOTES["cross-tap lugs level"]
     assert any(s[1] + 1.0 < x < s[2] - 1.0 and s[3] + 1.0 < z < s[4] - 1.0 for s in part.CROSS_TAP_LUG_SHAPES)
     # The words are section B-B's level captions.
@@ -2015,14 +2016,17 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
         sheet.PADS_NOTE_XY[0] + max(map(len, rows)) * _NOTE_CHAR_MM / 1000.0,
         sheet.PADS_NOTE_XY[1],
     )
-    # The level callouts: note-sized rows centred under their dimension text.
-    callouts = {}
+    # The level callouts: rows centred under their dimension text, 5.8 mm a
+    # row (bp5 render), the dimension line 0.6 mm under the last row.
+    callout_row, underline_gap = 0.0058, 0.0006
+    callouts, dimension_line_y = {}, {}
     for name, text in sheet.PADS_CALLOUTS.items():
         rows = text.split("\n")
         x, y = sheet.UNDERSIDE_PADS_KEEP[name]
-        half_w = max(map(len, rows)) * _NOTE_CHAR_MM / 2000.0
-        top = y - _DIM_TEXT_H_M / 2.0
-        callouts[f"{name} callout"] = (x - half_w, top - len(rows) * _NOTE_LINE_MM / 1000.0, x + half_w, top)
+        half_w = max(map(len, rows)) * _DIM_CHAR_M / 2.0
+        bottom = y - len(rows) * callout_row - _DIM_TEXT_H_M / 2.0
+        callouts[f"{name} callout"] = (x - half_w, bottom, x + half_w, y - _DIM_TEXT_H_M / 2.0)
+        dimension_line_y[name] = bottom - underline_gap
     # The level pointer notes, each leader from the note's side nearer its tip.
     level_notes, leaders = {}, {}
     for label, (text, (x, y), tip_mm) in sheet.PADS_LEVEL_NOTES.items():
@@ -2071,18 +2075,6 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
         # Inside its own span, between X0 and the station.
         assert vy + _DIM_TEXT_H_M < ty < datum[1] - _DIM_TEXT_H_M, name
         lines[name] = [((vx, vy), (tx - over, vy)), ((tx, datum[1]), (tx, vy))]
-    # The foot boss's Y baseline runs inside the view: its extension lines
-    # run east from X0 Y0 (along the rear edge) and west from the boss centre
-    # to its dimension line.
-    (fx, fy) = vertices["FootBossY"]
-    tx, ty = sheet.UNDERSIDE_PADS_KEEP["FootBossY"]
-    assert datum[0] < tx < fx and fy < ty < datum[1], "FootBossY"
-    lines["FootBossY"] = [
-        (datum, (tx + over, datum[1])),
-        ((fx, fy), (tx - over, fy)),
-        ((tx, fy), (tx, datum[1])),
-    ]
-    assert set(sheet.PADS_INLINE_TEXT_MM) == {"FootBossY"}
     lock = part.LOCK_PAD_SHAPE
     ped0 = part.PEDESTAL_PAD_SHAPES[0]
     block0 = part.BLOCK_PAD_SHAPES[0]
@@ -2094,12 +2086,14 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
         "PedestalPad0Width": (ped0[1], ped0[2], ped0[3], "across"),
     }.items():
         tx, ty = sheet.UNDERSIDE_PADS_KEEP[name]
+        line_y = dimension_line_y.get(name, ty)
         (ax, ay), (bx, _by) = sheet._pads_xy(x0, z), sheet._pads_xy(x1, z)
-        reach = ty + math.copysign(over, ty - ay)
+        reach = line_y + math.copysign(over, line_y - ay)
+        left = min(ax, callouts.get(f"{name} callout", boxes[name])[0], boxes[name][0])
         lines[name] = [
             ((ax, ay), (ax, reach)),
             ((bx, ay), (bx, reach)),
-            ((min(ax, tx), ty), (max(bx, tx), ty)),
+            ((left, line_y), (max(bx, tx), line_y)),
         ]
     for name, (x, z0, z1) in {
         "PedestalPadLength": (ped0[1], ped0[3], ped0[4]),
@@ -2125,14 +2119,22 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
                 continue
             for segment in segments:
                 assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
-    # A callout clears every line, its own dimension's too; a level note's
-    # leader clears every text but its own note, and every dimension line.
+    # A callout clears every line but its own dimension line, which runs
+    # under it; a level note clears every line and leader but its own.
     for name, box in {**callouts, **level_notes}.items():
         for other, segments in {**lines, **leaders}.items():
-            if other == name:
+            if other in (name, name.removesuffix(" callout")):
                 continue
             for segment in segments:
                 assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
+    # Each callout dimension's text block stands clear of the other's
+    # extension lines (bp5: the lock pad's ran through "2X 16.0").
+    for name in sheet.PADS_CALLOUTS:
+        block = (*callouts[f"{name} callout"][:3], boxes[name][3])
+        for other in sheet.PADS_CALLOUTS:
+            if other != name:
+                for segment in lines[other]:
+                    assert _segment_box_gap(segment, block) > 0.0015, (name, other, segment)
     for label, (leader,) in leaders.items():
         for name, box in {"note": note, **boxes, **callouts}.items():
             assert _segment_box_gap(leader, box) > 0.001, (label, name)
@@ -2152,7 +2154,7 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
         part.CROSS_RIB_SHAPE,
     )
     scale = sheet._PADS_M_PER_MM
-    for name in (*sheet.PADS_SIZE_TEXT_MM, *sheet.PADS_INLINE_TEXT_MM):
+    for name in sheet.PADS_SIZE_TEXT_MM:
         x0, z0, x1, z1 = (
             (boxes[name][0] - sheet.PADS_CENTER[0]) / scale - 2.0,
             (boxes[name][1] - sheet.PADS_CENTER[1]) / scale - 2.0,

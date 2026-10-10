@@ -78,7 +78,6 @@ from build_fr_harmonic_base import (
     DEEP_BOSS_SHAPES,
     FOOT_SCREW_HOLE_DIA,
     FOOT_SCREW_XZ,
-    HANGING_BOSS_DIA,
     HOLD_DOWN_TAP_DRILL_DIA,
     HOLE_XZ,
     LOCK_KNOB_XZ,
@@ -955,9 +954,9 @@ UNDERSIDE_SECTION_CALLOUTS = {
 # shortest innermost, so no extension line crosses a dimension line.
 PADS_SCALE = (1.0, 2.0)
 _PADS_M_PER_MM = PADS_SCALE[0] / PADS_SCALE[1] / 1000.0
-# The view's 228.6 x 143.6 mm sit right of the eight Y columns and under the
+# The view's 228.6 x 143.6 mm sit right of the nine Y columns and under the
 # seven X rows, its bottom edge 9.7 mm above the title block.
-PADS_CENTER = (0.2183, 0.1475)
+PADS_CENTER = (0.2253, 0.1475)
 
 
 def _pads_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -975,7 +974,6 @@ PADS_BASELINE_ROW_M = 0.0058
 _LOCK_PAD = LOCK_PAD_SHAPE
 _FRONT_PEDESTAL_PAD = PEDESTAL_PAD_SHAPES[0]
 _FRONT_BLOCK_PAD = BLOCK_PAD_SHAPES[0]
-_FOOT_BOSS_XZ = FOOT_SCREW_XZ[0]
 # X rows, innermost first: (name, machine X of the text's centre). The lugs'
 # 39.6 is shorter than its "2X" text, which reads just past its witness line.
 # The foot boss's extension line rises 1.75 mm west of the rear block pad's.
@@ -992,29 +990,21 @@ PADS_X_ROWS = (
 # below X0; sheet mm). Each pitch clears the wider neighbouring text from the
 # next dimension line by 2.5 mm; the depths step down column by column, so
 # neighbouring texts never share a row, each inside its own span and clear of
-# every longer column's extension line (stations 19.3, 24.1, 34.3, 69.3, then
-# 109.3 on).
+# every longer column's extension line (stations 19.3, 24.1, 33.6, 34.3, 69.3,
+# then 109.3 on). The foot boss's extension line runs 0.7 mm over the rear
+# lugs' (their fronts stand 1.4 mm in front of the boss centre), its arrow on
+# its own line above theirs.
 PADS_Y_COLUMNS = (
     ("PedestalPad1Y", 8.0, 6.0),
     ("BlockPad1Y", 15.5, 14.0),
-    ("Lug1Y", 26.75, 28.0),
-    ("LongRibY", 38.0, 36.0),
-    ("Lug0Y", 50.5, 45.0),
-    ("PedestalPad0Y", 63.0, 55.0),
-    ("BlockPad0Y", 71.75, 65.0),
-    ("LockPadY", 80.5, 75.0),
+    ("FootBossY", 23.0, 21.0),
+    ("Lug1Y", 34.25, 28.0),
+    ("LongRibY", 45.5, 36.0),
+    ("Lug0Y", 58.0, 45.0),
+    ("PedestalPad0Y", 70.5, 55.0),
+    ("BlockPad0Y", 79.25, 65.0),
+    ("LockPadY", 88.0, 75.0),
 )
-# The foot boss's Y baseline runs inside the view, machine (X, Z) of its
-# text: as a column its extension line would run 0.7 mm from the rear lugs'
-# (their fronts stand 1.4 mm in front of the boss centre) and over the rear
-# west lug. So it drops between the rear pedestal pad and the boss, its text
-# above that pad; its extension line from X0 Y0 runs along the flange's edge.
-PADS_INLINE_TEXT_MM = {
-    "FootBossY": (
-        (_FRONT_PEDESTAL_PAD[2] + _FOOT_BOSS_XZ[0] - HANGING_BOSS_DIA / 2.0) / 2.0,
-        115.0,
-    ),
-}
 # Sizes, machine (X, Z) of each text. In the pocket's open air: the pedestal
 # pad's length rises from its west side and the block pad's width rises from
 # its west side, a row above the length. Outside, either one's extension
@@ -1036,12 +1026,14 @@ PADS_SIZE_TEXT_MM = {
     ),
 }
 # The lock and front pedestal pads' widths read below the view (machine X, Z
-# of each text), outside the silhouette, both left of their spans and of the
-# title block: the pedestal pad's a row under the lock pad's extension lines,
-# each level callout (PADS_CALLOUTS) clear of the other's.
+# of each text), outside the silhouette, in one column left of the lock pad
+# and of the title block. A dimension with a callout runs its line under the
+# callout's last row, so each text block stands over its own dimension line:
+# the lock pad's first, the pedestal pad's under it, below the lock pad's
+# extension lines.
 PADS_SIZE_BELOW_MM = {
-    "LockPadWidth": (_LOCK_PAD[1] - 56.5, BOTTOM_FRONT_Z - 15.4),
-    "PedestalPad0Width": (_FRONT_PEDESTAL_PAD[1] - 32.2, BOTTOM_FRONT_Z - 31.4),
+    "LockPadWidth": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 10.6),
+    "PedestalPad0Width": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 50.2),
 }
 
 
@@ -1058,7 +1050,10 @@ def _cast_level(shapes: tuple, *, deep: bool) -> str:
 # callouts named no pad), worded as section B-B captions its 12.0 and 28.0.
 # The pad sizes below the view carry it as callouts; the block pads and the
 # lugs, whose sizes read inside the view or are not printed, take pointer
-# notes below the view -- the block pads' in the band over the title block.
+# notes below the view -- the block pads' in the band over the title block,
+# its arrow ON the front pad's front edge, east of the corner where the
+# 2X 16.0's extension line leaves it (bp5: through the edge, it read as
+# crossing that line).
 # The builder hangs the lugs to the shallow level (CrossTapLugs' LugBottom
 # is driven by "ShallowBossBottom"; CROSS_TAP_LUG_WALLS reckons from it).
 PADS_CALLOUTS = {
@@ -1070,7 +1065,7 @@ PADS_LEVEL_NOTES = {
     "pinion-block pads level": (
         f"{len(BLOCK_PAD_SHAPES)}X PADS TO {_cast_level(BLOCK_PAD_SHAPES, deep=False)}",
         (0.222, 0.0735),
-        (-20.0, (_FRONT_BLOCK_PAD[3] + _FRONT_BLOCK_PAD[4]) / 2.0),
+        (-20.0, _FRONT_BLOCK_PAD[3]),
     ),
     "cross-tap lugs level": (
         f"{len(CROSS_TAP_LUG_SHAPES)}X LUGS TO\nSHALLOW LEVEL",
@@ -1095,11 +1090,7 @@ UNDERSIDE_PADS_KEEP = {
     },
     **{
         name: _pads_xy(*xz)
-        for name, xz in (
-            *PADS_INLINE_TEXT_MM.items(),
-            *PADS_SIZE_TEXT_MM.items(),
-            *PADS_SIZE_BELOW_MM.items(),
-        )
+        for name, xz in (*PADS_SIZE_TEXT_MM.items(), *PADS_SIZE_BELOW_MM.items())
     },
 }
 # Below the Y columns, left of the title block: the view's scale, the
