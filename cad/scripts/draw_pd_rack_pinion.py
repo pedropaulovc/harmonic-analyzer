@@ -203,7 +203,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Manufacturing Notes",
             TOOTH_SPACE_CALLOUT_PROPERTY,
-            "Tooth Cut Features",
         ),
         required=(
             "Number",
@@ -213,7 +212,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Manufacturing Notes",
             TOOTH_SPACE_CALLOUT_PROPERTY,
-            "Tooth Cut Features",
         ),
     )
     require_source_control(
@@ -297,8 +295,7 @@ async def build(adapter: Any) -> dict[str, str]:
         profile=STOCK_PROFILE,
         actual_pin_diameter_mm=TOOTH_SPACE_GAUGE_PIN_DIA_MM,
         rotate_rad=math.pi / TEETH + TOOTH_SPACE_GAP_INDEX * 2.0 * math.pi / TEETH,
-        axial_stations_mm=(FACE_WIDTH, 0.0),
-        tooth_features=tuple(properties["Tooth Cut Features"].splitlines()),
+        axial_station_mm=FACE_WIDTH,
         property_name=TOOTH_SPACE_CALLOUT_PROPERTY,
         note_xy=TOOTH_SPACE_CALLOUT_XY,
     )

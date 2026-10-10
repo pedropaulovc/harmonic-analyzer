@@ -327,7 +327,6 @@ def test_native_builder_consumes_one_full_axial_profile_and_physical_inspection(
         "'Gear Data'": "GEAR_DATA",
         "'Manufacturing Notes'": "MANUFACTURING_NOTES",
         "TOOTH_SPACE_CALLOUT_PROPERTY": "TOOTH_SPACE_CALLOUT",
-        "'Tooth Cut Features'": "'\\n'.join(disc.tooth_features)",
     }
 
 
@@ -575,8 +574,7 @@ def test_tooth_space_control_is_a_model_linked_physical_flank_callout() -> None:
         "profile": "STOCK_PROFILE",
         "actual_pin_diameter_mm": "TOOTH_SPACE_GAUGE_PIN_DIA_MM",
         "rotate_rad": "math.pi / TEETH + TOOTH_SPACE_GAP_INDEX * 2.0 * math.pi / TEETH",
-        "axial_stations_mm": "(FACE_WIDTH, 0.0)",
-        "tooth_features": "tuple(properties['Tooth Cut Features'].splitlines())",
+        "axial_station_mm": "FACE_WIDTH",
         "property_name": "TOOTH_SPACE_CALLOUT_PROPERTY",
         "note_xy": "TOOTH_SPACE_CALLOUT_XY",
     }

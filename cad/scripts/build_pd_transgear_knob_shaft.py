@@ -868,7 +868,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes": "\n".join((DRAWING_NOTES, CORE_FLAT_TOOL_REACH_NOTE)),
             "Root Acceptance": ROOT_ACCEPTANCE,
             TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
-            "Tooth Cut Features": "\n".join(disc.tooth_features),
         },
     )
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features + end_features)

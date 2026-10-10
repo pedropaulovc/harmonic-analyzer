@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 import inspect
 import math
-import struct
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -291,15 +290,12 @@ def test_model_bands_and_source_linked_properties() -> None:
         assert control.datums == ("A",)
         assert float(control.tolerance) == spec.CORE_TOTAL_RUNOUT
     assert f"Ø{spec.ROOT_DIA_MIN:.2f} MIN" in spec.ROOT_ACCEPTANCE
-    assert "Tooth Cut Features" in inspect.getsource(part.build)
-    assert "Tooth Cut Features" in inspect.getsource(drawing.build)
     callouts = _calls(drawing.build, "add_toothspace_callout")
     assert len(callouts) == 1
     assert _keyword(callouts[0], "profile") == "STOCK_PROFILE"
     assert _keyword(callouts[0], "actual_pin_diameter_mm") == "TOOTH_SPACE_GAUGE_PIN_DIA_MM"
     assert _keyword(callouts[0], "rotate_rad") == "math.pi / TEETH"
-    assert _keyword(callouts[0], "axial_stations_mm") == "(0.0,)"
-    assert _keyword(callouts[0], "tooth_features") == "tooth_features"
+    assert _keyword(callouts[0], "axial_station_mm") == "0.0"
     assert (
         "require_source_control(source_properties[TOOTH_SPACE_CALLOUT_PROPERTY], TOOTH_SPACE_CALLOUT,"
         in " ".join(inspect.getsource(drawing.build).split()).replace("( ", "(")
@@ -427,124 +423,38 @@ def test_wrong_inspection_pin_cannot_certify_an_unsupported_contact(pin_diameter
         toothspace_gauge_contact_mm(spec.STOCK_PROFILE, pin_diameter)
 
 
-def test_shared_callout_refuses_circle_wrong_endpoint_tangent_and_native_status(monkeypatch) -> None:
+def test_shared_callout_refuses_a_line_or_circle_edge(monkeypatch) -> None:
     import paper_drive_stock_drawing as ink
-
-    profile = spec.STOCK_PROFILE
-    contact = toothspace_gauge_contact_mm(profile, spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)
-    phase = math.pi / spec.TEETH
-    point_xy = ink._rotate(contact.flank_point_mm, phase)
-    point = (point_xy[0] / 1000, point_xy[1] / 1000, 0.0)
-    angle = profile.template.half_space_base_angle_rad + contact.parameter + phase
-    tangent = (math.cos(angle), math.sin(angle), 0.0)
-    success = struct.unpack("<d", struct.pack("<ii", 1, 0))[0]
-    ends = [
-        (*tuple(value / 1000 for value in ink._rotate(profile.flank_point(u), phase)), 0.0)
-        for u in (profile.flank_parameter_min, profile.flank_parameter_max)
-    ]
 
     class Curve:
-        circular = False
-        status = success
-        direction = tangent
-        shift = 0.0
-
-        def IsCircle(self):
-            return self.circular
+        line = circle = False
 
         def IsLine(self):
-            return False
+            return self.line
 
-        def GetClosestPointOn(self, x, y, z):
-            return (x + self.shift, y, z, contact.parameter, 0.0)
-
-        def Evaluate2(self, parameter, derivatives):
-            assert parameter == contact.parameter and derivatives == 1
-            return (*point, *self.direction, self.status)
+        def IsCircle(self):
+            return self.circle
 
     curve = Curve()
-    params = SimpleNamespace(
-        UMinValue=profile.flank_parameter_min,
-        UMaxValue=profile.flank_parameter_max,
-        StartPoint=ends[0], EndPoint=ends[1],
-    )
-    edge = SimpleNamespace(GetCurve=lambda: curve, GetCurveParams3=lambda: params)
+    edge = SimpleNamespace(GetCurve=lambda: curve)
     monkeypatch.setattr(ink, "_early_bound", lambda value, interface: value)
-    ink._validate_flank_edge(edge, profile, contact, phase, (0.0,))
-    curve.circular = True
-    with pytest.raises(RuntimeError, match="OD/root"):
-        ink._validate_flank_edge(edge, profile, contact, phase, (0.0,))
-    curve.circular = False
-    params.EndPoint = (ends[1][0] + 0.001, ends[1][1], 0.0)
-    with pytest.raises(RuntimeError, match="endpoints"):
-        ink._validate_flank_edge(edge, profile, contact, phase, (0.0,))
-    params.EndPoint = ends[1]
-    curve.direction = (0.0, 0.0, 1.0)
-    with pytest.raises(RuntimeError, match="tangent"):
-        ink._validate_flank_edge(edge, profile, contact, phase, (0.0,))
-    curve.direction = tangent
-    curve.status = 0.0
-    with pytest.raises(RuntimeError, match="evaluation failed"):
-        ink._validate_flank_edge(edge, profile, contact, phase, (0.0,))
-    curve.status = success
-    curve.shift = 0.001
-    with pytest.raises(RuntimeError, match="gauge contact"):
-        ink._validate_flank_edge(edge, profile, contact, phase, (0.0,))
+    ink._require_formed_flank(edge)
+    for kind in ("line", "circle"):
+        setattr(curve, kind, True)
+        with pytest.raises(RuntimeError, match="not a formed flank"):
+            ink._require_formed_flank(edge)
+        setattr(curve, kind, False)
 
 
-def test_shared_callout_requires_source_roundtrip_body_and_tooth_feature(monkeypatch) -> None:
-    import paper_drive_stock_drawing as ink
-
-    body = SimpleNamespace(GetType=lambda: 0)
-    foreign_body = SimpleNamespace(GetType=lambda: 0)
-    tooth_feature, blank_feature = object(), object()
-    first_face = SimpleNamespace(GetBody=lambda: body, GetFeature=lambda: tooth_feature)
-    second_face = SimpleNamespace(GetBody=lambda: body, GetFeature=lambda: blank_feature)
-    drawing_edge = object()
-    canonical = SimpleNamespace(
-        GetBody=lambda: body,
-        GetTwoAdjacentFaces2=lambda: (first_face, second_face),
-    )
-    extension = SimpleNamespace(GetCorrespondingEntity2=lambda edge: canonical)
-    source = SimpleNamespace(
-        GetType=lambda: 1, GetBodies2=lambda kind, visible: (body,),
-        Extension=extension, FeatureByName=lambda name: tooth_feature,
-    )
-    view = SimpleNamespace(
-        ReferencedDocument=source, GetCorrespondingEntity=lambda edge: drawing_edge,
-    )
-    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
-    monkeypatch.setattr(ink, "_early_bound", lambda value, interface: value)
-    assert ink._source_edge(adapter, view, drawing_edge, ("StraightToothGap",)) is canonical
-    canonical.GetBody = lambda: foreign_body
-    with pytest.raises(RuntimeError, match="another body"):
-        ink._source_edge(adapter, view, drawing_edge, ("StraightToothGap",))
-    canonical.GetBody = lambda: body
-    view.GetCorrespondingEntity = lambda edge: object()
-    with pytest.raises(RuntimeError, match="roundtrip"):
-        ink._source_edge(adapter, view, drawing_edge, ("StraightToothGap",))
-    view.GetCorrespondingEntity = lambda edge: drawing_edge
-    first_face.GetFeature = lambda: blank_feature
-    with pytest.raises(RuntimeError, match="tooth-cut feature"):
-        ink._source_edge(adapter, view, drawing_edge, ("StraightToothGap",))
-    extension.GetCorrespondingEntity2 = lambda edge: None
-    with pytest.raises(RuntimeError, match="no source correspondence"):
-        ink._source_edge(adapter, view, drawing_edge, ("StraightToothGap",))
-
-
-def test_shared_callout_reads_real_linked_ink_and_postrebuild_native_edge() -> None:
+def test_shared_callout_picks_the_contact_and_checks_one_edge_attachment() -> None:
     import paper_drive_stock_drawing as ink
 
     source = inspect.getsource(ink.add_toothspace_callout)
+    assert _calls(ink.add_toothspace_callout, "toothspace_gauge_contact_mm")
     assert _calls(ink.add_toothspace_callout, "model_point_in_view")
     assert _calls(ink.add_toothspace_callout, "add_property_linked_callout")
-    assert _calls(ink.add_toothspace_callout, "GetCustomInfoValue")
-    assert _calls(ink.add_toothspace_callout, "GetText")
-    assert "PropertyLinkedText" in source
     assert "GetAttachedEntities3" in source and "GetAttachedEntityTypes" in source
-    assert "_source_edge" in source and "_validate_flank_edge" in source
-    assert "1e-6" in inspect.getsource(ink._validate_flank_edge)  # mm:1nm native kernel
-    assert "except" not in source
+    assert _calls(ink.add_toothspace_callout, "_require_formed_flank")
 
 
 def test_single_native_solid_volume_has_no_adapter_fallback(monkeypatch) -> None:

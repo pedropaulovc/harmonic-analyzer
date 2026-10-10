@@ -290,7 +290,6 @@ async def build(adapter) -> dict[str, str]:
             "Gear Data": GEAR_DATA,
             "Manufacturing Notes": MANUFACTURING_NOTES,
             TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
-            "Tooth Cut Features": "\n".join(disc.tooth_features),
         },
     )
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)

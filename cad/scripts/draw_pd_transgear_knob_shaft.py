@@ -222,7 +222,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Root Acceptance",
             TOOTH_SPACE_CALLOUT_PROPERTY,
-            "Tooth Cut Features",
         ),
         required=(
             "Number",
@@ -233,14 +232,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Root Acceptance",
             TOOTH_SPACE_CALLOUT_PROPERTY,
-            "Tooth Cut Features",
         ),
     )
     require_source_control(
         source_properties[TOOTH_SPACE_CALLOUT_PROPERTY], TOOTH_SPACE_CALLOUT,
         label="knob shaft toothspace grade",
     )
-    tooth_features = tuple(source_properties["Tooth Cut Features"].splitlines())
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -353,8 +350,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_toothspace_callout(
         adapter, front, profile=STOCK_PROFILE,
         actual_pin_diameter_mm=TOOTH_SPACE_GAUGE_PIN_DIA_MM,
-        rotate_rad=math.pi / TEETH, axial_stations_mm=(0.0,),
-        tooth_features=tooth_features, property_name=TOOTH_SPACE_CALLOUT_PROPERTY,
+        rotate_rad=math.pi / TEETH, axial_station_mm=0.0,
+        property_name=TOOTH_SPACE_CALLOUT_PROPERTY,
         note_xy=TOOTHSPACE_NOTE_XY,
     )
     add_property_linked_note(
