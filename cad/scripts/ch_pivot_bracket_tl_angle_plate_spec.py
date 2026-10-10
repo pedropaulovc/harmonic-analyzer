@@ -18,13 +18,17 @@ Z -PLATE_WIDTH..0 and the upright Y BASE_THICK..PLATE_HEIGHT by
 Z -UPRIGHT_THICK..0. The inventory's fixture frame (bracket plan setup frame
 TC: front upright face Y=0, plate behind the part on +Y, Z up with Z0 the
 bracket's faced outer face) is a rigid copy of it:
-TC = (x - PLATE_LENGTH/2, -z, y - (PLATE_HEIGHT + PART_PROUD)).
-The ledge's model frame is this one translated by
+TC = (x - PLATE_LENGTH/2, -z, y - (PLATE_HEIGHT + PART_PROUD[c])) for
+configuration c: the N bracket's longer foot raises its faced outer face, and
+so its Z0, N_RAISE higher than the S one's. The ledge's model frame is this one translated by
 (PLATE_LENGTH/2 - ledge width/2, BLOCK_HEIGHT, 0).
 """
 
 from __future__ import annotations
 
+import math
+
+import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_spec as bracket
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
@@ -39,15 +43,36 @@ BASE_THICK = 12.7
 UPRIGHT_THICK = 12.7
 CENTRE_X = PLATE_LENGTH / 2.0
 
-# The S4 stack, from the table up. The bracket's faced outer face stands
-# PART_PROUD above the plate top, so its foot free end (FOOT_LEN below that
-# face) lands at LEDGE_TOP_Y; the ledge stands on a 1-2-3 block's 2 in side
-# while its screws are tightened. 4 mm, not 2: the prechips bracket plan's
-# S4 op 10 facing cutter overhangs the plate side at the faced outer face
-# and passed only 2.0 over the upright at 2 mm (review blocker BR-B1).
-PART_PROUD = 4.0
+# The S4 stack, from the table up. The bracket's foot free end rests on the
+# ledge top at LEDGE_TOP_Y, so its faced outer face (FOOT_LEN above that)
+# stands PART_PROUD above the plate top; the ledge stands on a 1-2-3 block's
+# 2 in side while its screws are tightened. At least 4 mm, not 2: the
+# prechips bracket plan's S4 op 10 facing cutter overhangs the plate side at
+# the faced outer face and passed only 2.0 over the upright at 2 mm (review
+# blocker BR-B1). MHA-CH-008's two configurations differ only in foot length
+# (both feet end flush with the support), so one ledge serves both: sized
+# for the shorter S foot, it stands the N bracket N_RAISE prouder, which only
+# widens the cutter's margin over the upright. The plan touches Z on the part.
+# The ledge prints its height at one place, so the stack is built on that
+# printed height, rounded up off the 4 mm floor.
+LEDGE_CONFIG = "S"
+PART_PROUD_MIN = 4.0
 BLOCK_HEIGHT = 50.8
-LEDGE_TOP_Y = PLATE_HEIGHT + PART_PROUD - bracket.FOOT_LEN  # 68.7
+_LEDGE_HEIGHT_MIN = (
+    PLATE_HEIGHT + PART_PROUD_MIN - sides.FOOT_LEN[LEDGE_CONFIG] - BLOCK_HEIGHT
+)
+_LEDGE_HEIGHT = math.ceil(round(_LEDGE_HEIGHT_MIN * 10.0, 6)) / 10.0
+LEDGE_TOP_Y = round(BLOCK_HEIGHT + _LEDGE_HEIGHT, 6)  # 77.3
+PART_PROUD = {
+    name: LEDGE_TOP_Y + foot_len - PLATE_HEIGHT
+    for name, foot_len in sides.FOOT_LEN.items()
+}  # S 4.04, N 5.74
+N_RAISE = PART_PROUD["N"] - PART_PROUD[LEDGE_CONFIG]  # 1.70
+if (
+    min(PART_PROUD.values()) != PART_PROUD[LEDGE_CONFIG]
+    or PART_PROUD[LEDGE_CONFIG] < PART_PROUD_MIN
+):
+    raise AssertionError("the ledge must stand the shorter foot's bracket 4 mm proud")
 
 # Ledge screws: two #10-24 x 5/8 SHCS (shop-to-shop UNC, fastener policy) at
 # 9.0 under the ledge top, 10.0 apart about the plate centre: wide enough that
@@ -70,18 +95,28 @@ SCREW_HEAD_ECCENTRICITY_MAX = 0.006 * 25.4 / 2.0  # 0.0762
 SCREW_HEAD_GAP_MIN = 0.3
 SCREW_HALF_PITCH = 5.0
 SCREW_BELOW_LEDGE_TOP = 9.0
-SCREW_Y = LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP  # 59.7
+SCREW_Y = round(LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP, 6)  # 68.3
 TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 
 # Bridge studs: 3/8-16 studs through letter-X clearance holes, 40.0 apart
-# about the centre. The bridge bar lies on the foot top at the prechips S4
-# hold's Setup Z -17.5 (17.5 under the bracket's faced outer face, its
-# lower edge just above the foot end), so the studs are 13.5 under the plate top.
+# about the centre. The bridge bar lies on the foot top in the free run both
+# configurations share: from the S ear's face (EAR_T under its faced outer
+# face) to the common foot end on the ledge, where the ledge's front face
+# carries on flush with the foot top. That run's centre is out of reach (its
+# stud hole would break the upright's top wall), so the studs stand 7.4 under
+# the plate top, leaving that wall 2.3 (81.8 would leave 2.01):
+# STUD_BELOW_PART_TOP under each configuration's outer face (the prechips S4
+# hold's Setup Z, S -11.44, N -13.14). A bar up to 2 * (11.44 - EAR_T) = 10.9
+# wide clears the S ear.
 STUD_DIA = 9.525
 STUD_SPEC = HoleSpec("drilled_letter", "X")
 STUD_HALF_PITCH = 20.0
-STUD_BELOW_PART_TOP = 17.5
-STUD_Y = PLATE_HEIGHT + PART_PROUD - STUD_BELOW_PART_TOP  # 75.4
+STUD_Y = 81.5
+STUD_BELOW_PART_TOP = {
+    name: PLATE_HEIGHT + proud - STUD_Y for name, proud in PART_PROUD.items()
+}
+if not bracket.EAR_T < STUD_BELOW_PART_TOP[LEDGE_CONFIG] < sides.FOOT_LEN[LEDGE_CONFIG]:
+    raise AssertionError("the bridge studs' line is off the feet's shared free run")
 STUD_X = (CENTRE_X - STUD_HALF_PITCH, CENTRE_X + STUD_HALF_PITCH)
 STUD_NUT_DIA = 16.5  # 3/8-16 hex nut envelope (inventory bridge row)
 
@@ -175,7 +210,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                     "LEDGE_TOP_Y",
                     "PLATE_HEIGHT",
                     ("ch_pivot_bracket_spec", "FOOT_W"),
-                    ("ch_pivot_bracket_spec", "FOOT_LEN"),
+                    ("ch_pivot_bracket_sides", "FOOT_LEN"),
                 ),
             ),
         },

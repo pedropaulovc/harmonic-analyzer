@@ -115,7 +115,7 @@ def _fitup_steps() -> str:
             f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS. "
             f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
             f"{ROCKER_SPRING_SET:.2f} BLADE BESIDE THE SPRING, BANK PUSHED NORTH. "
-            f"CLAMP, TRANSFER ITS SEATS INTO THE {support} RAIL, SCREW DOWN, "
+            f"CLAMP, TRANSFER ITS SEAT INTO THE {support} RAIL, SCREW DOWN, "
             "PULL THE BLADE."
         ),
         "shaft-cut-to-fit": (

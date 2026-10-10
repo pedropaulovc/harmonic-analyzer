@@ -5,7 +5,7 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each retained by a stock eyebolt threaded into the plate.
-174 components (8 * CHANNELS + 14):
+172 components (8 * CHANNELS + 12):
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
@@ -20,11 +20,12 @@ the M6.8 mirror layer is gone).
   228.6 shaft clipped the west columns at top level, M6.5)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
   black foot-and-ear brackets on the rocker-arm-support's top, 78 either
-  side of the stack centre so both feet sit ON the support (the old chrome
-  pivot-ball-mount pair is retired -- photo-refuted, and its south pillar
-  stood 19 mm past the support's end in mid-air)) + pedestal-hold-down-screw
-  x4 (MHA-VN-032, two down through each foot into the support rail's
-  transferred #8-32 seats -- rocker_bracket_seat_layout)
+  side of the stack centre (the old chrome pivot-ball-mount pair is retired
+  -- photo-refuted, and its south pillar stood 19 mm past the support's end
+  in mid-air); since the 2026-10-09 sketch both feet run OUTBOARD, flush with
+  the support's end faces, as MHA-CH-008's S and N configurations) +
+  pedestal-hold-down-screw x2 (MHA-VN-032, one down through each foot into
+  the support's transferred #8-32 seat -- rocker_bracket_seat_layout)
 * fulcrum-keeper x2 + frame-side-screw x2 (the black shaft-END brackets on
   the top-frame west rail top face -- ch17 p.40 bottom-left / ch30 p008;
   ball centres (199.9, 1061.4, 3.088 +- 88.75), foot screws down into the
@@ -355,10 +356,10 @@ CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
 # #1292): the rocker bank's retention stack, from rocker_bank_layout. The
 # north ear's inner face is the datum the shaft's shoulder bears on; the
 # MHA-VN-053 spring between the south ear and the MHA-CH-009 washer on hub 0
-# preloads the bank and shaft north onto it. Feet inside the rocker-arm-
-# support's +-88.9 top (it is the only stand; the old south "A-frame" is gone).
+# preloads the bank and shaft north onto it. Feet outboard to the rocker-arm-
+# support's +-88.9 end faces (it is the only stand; the old south "A-frame" is
+# gone).
 from rocker_bank_layout import (  # noqa: E402
-    PIVOT_BRACKET_Z,
     PIVOT_SHAFT_NORTH_Z,
     ROCKER_SPRING_Z,
     SHOULDER_Z,
@@ -367,6 +368,7 @@ from rocker_bank_layout import (  # noqa: E402
     hub_mid_z,
 )
 from ch_pivot_shaft_spec import JOURNAL_LENGTH as _PIVOT_JOURNAL  # noqa: E402
+from ch_pivot_shaft_spec import SHAFT_DIA as _PIVOT_SHAFT_DIA  # noqa: E402
 
 # The pivot shaft's origin is its NORTH cylinder end (its body runs -Z).
 PIVOT_SHAFT_Z = PIVOT_SHAFT_NORTH_Z
@@ -403,14 +405,14 @@ if abs(ROCKER_SPRING_Z[1] - ROCKER_SPRING_Z[0] - _rocker_spring.MODEL_HEIGHT) > 
     raise AssertionError("rocker bank spring is not its installed envelope")
 if abs(ROCKER_SPRING_Z[1] - SOUTH_WASHER_Z[0]) > 1e-9:
     raise AssertionError("rocker bank spring's north face is not on the washer")
-# Bracket hold-downs (#743 PR2): two MHA-VN-032 (#8-32 x 3/4 fillister) per
-# bracket, through its #8 close-clearance foot holes into the support rail's
-# transferred seats. rocker_bracket_seat_layout owns the seats and their
-# worst-case stack; here the screw it assumed must be the part placed, the
-# brackets must stand on the support's centreline, each head must sit on its
-# foot, and the hole must clear the screw's under-head junction fillet (P/10
-# in the fillister recipe, diag_mcmaster_fillister), which a #19 caught
-# (r743-3C).
+# Bracket hold-downs (#743 PR2): one MHA-VN-032 (#8-32 x 3/4 fillister) per
+# bracket, through its #8 close-clearance foot hole into the support's
+# transferred seat. rocker_bracket_seat_layout owns the seats and their
+# worst-case stack, ch_pivot_bracket_sides the head's clearance to the ear;
+# here the screw they assumed must be the part placed, the brackets must stand
+# on the support's centreline, each head must sit on its foot, and the hole
+# must clear the screw's under-head junction fillet (P/10 in the fillister
+# recipe, diag_mcmaster_fillister), which a #19 caught (r743-3C).
 from vn_pedestal_hold_down_screw_spec import (  # noqa: E402
     _PITCH as _HDSCREW_PITCH,
     HEAD_DIA as _HDSCREW_HEAD_DIA,
@@ -418,12 +420,10 @@ from vn_pedestal_hold_down_screw_spec import (  # noqa: E402
     THREAD as _HDSCREW_THREAD,
 )
 from ch_pivot_bracket_spec import (  # noqa: E402
-    EAR_T as _BRACKET_EAR_T,
-    FOOT_Z1 as _BRACKET_FOOT_Z1,
     HOLD_DOWN_HOLE_SPEC as _BRACKET_HOLE_SPEC,
     HOLE_DIA as _BRACKET_HOLE_DIA,
-    HOLE_Z as _BRACKET_HOLE_Z,
 )
+import ch_pivot_bracket_sides as _bracket_sides  # noqa: E402
 from fr_rocker_arm_support_spec import SUPPORT_WORLD_X as _SUPPORT_WORLD_X  # noqa: E402
 from rocker_bracket_seat_layout import (  # noqa: E402
     SCREW_LENGTH as _SEAT_SCREW_LENGTH,
@@ -449,10 +449,15 @@ if _BRACKET_HOLE_SPEC.kind != "clearance" or not (
         "bracket foot hole does not pass the #8 screw and its junction fillet"
         " under its head"
     )
-if min(_BRACKET_HOLE_Z) - _HDSCREW_HEAD_DIA / 2.0 < _BRACKET_EAR_T / 2.0 or (
-    max(_BRACKET_HOLE_Z) + _HDSCREW_HEAD_DIA / 2.0 > _BRACKET_FOOT_Z1
+if any(
+    _bracket_sides.HOLE_Z[name] + _HDSCREW_HEAD_DIA / 2.0 > _bracket_sides.FOOT_Z1[name]
+    for name in _bracket_sides.CONFIGURATIONS
 ):
-    raise AssertionError("a bracket hold-down head overhangs its foot")
+    raise AssertionError("a bracket hold-down head overhangs its foot end")
+if [z for _x, z in BRACKET_SCREW_XZ] != [
+    _bracket_sides.HOLE_MACHINE_Z[name] for name in _bracket_sides.CONFIGURATIONS
+]:
+    raise AssertionError("the hold-down screws are not over the brackets' holes")
 RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
 # dropped the rail top 4.5 -- the ball-mount seats and the whole fulcrum chain
 # follow)
@@ -489,7 +494,7 @@ from stock_anchor_geom import ANCHOR_9489T111  # noqa: E402
 # face is the unambiguous concentric reference -- it is the only geometry at this
 # radius in the inter-channel gap (the shaft is Ø6.35, the OD Ø10/Ø12).
 from _hole_spec import blind_cut_dia_mm  # noqa: E402
-from ch_rocker_arm_spec import HUB_DIA as ROCKER_HUB_DIA, HUB_LENGTH as ROCKER_HUB_LENGTH  # noqa: E402
+from ch_rocker_arm_spec import HUB_LENGTH as ROCKER_HUB_LENGTH  # noqa: E402
 from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB_LENGTH  # noqa: E402
 from ch_pivot_bracket_spec import FOOT_H as PIVOT_BRACKET_FOOT_H  # noqa: E402
 
@@ -988,21 +993,23 @@ async def build(adapter) -> dict[str, str]:
     # this subassembly, so each is datum-located (three orthogonal plane
     # distances), not fixed -- the #110 idiom. Both seat on the rocker-arm-
     # support's top (y 228.6). The part is an L (2026-09-02, ch14 p.27/28):
-    # its foot runs from the ear toward local +Z, INBOARD under the outer
-    # arms (the support leaves only 4 mm of apex outboard of the north ear),
-    # so the south bracket (inboard = +Z) is IDENTITY and the north one is
-    # turned Ry180 about its own origin -- the bore stays on the pivot axis
-    # at (PIVOT[0], 253.8, mount_z) exactly, the foot flips to -Z.
-    for mount_z in PIVOT_BRACKET_Z:
-        inboard_pos_z = mount_z < _STACK_MID_Z
+    # its foot runs from the ear toward local +Z, OUTBOARD to the support's
+    # end face (2026-10-09 sketch), so the north bracket (outboard = +Z) is
+    # IDENTITY and the south one is turned Ry180 about its own origin -- the
+    # bore stays on the pivot axis at (PIVOT[0], 253.8, mount_z) exactly, the
+    # foot flips to -Z. Each side places its own configuration (foot length).
+    for name in _bracket_sides.CONFIGURATIONS:
+        mount_z = _bracket_sides.MOUNT_Z[name]
+        foot_pos_z = _bracket_sides.OUTBOARD_SIGN[name] > 0.0
         mount = await place_component(
             adapter,
             "ch-pivot-bracket",
             [PIVOT[0], SUPPORT_APEX_Y, mount_z],
-            [0.0, 0.0, 0.0] if inboard_pos_z else [0.0, 180.0, 0.0],
-            IDENTITY if inboard_pos_z else ROT_Y_180,
+            [0.0, 0.0, 0.0] if foot_pos_z else [0.0, 180.0, 0.0],
+            IDENTITY if foot_pos_z else ROT_Y_180,
             ground=False,
-            label=f"pivot-bracket rocker z{mount_z:+.0f}",
+            configuration=name,
+            label=f"pivot-bracket {name} z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
     # South thrust washer (MHA-CH-009): on the shaft against rocker 0's hub.
@@ -1030,7 +1037,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await _locate_to_datum(adapter, rocker_spring)
     # Bracket hold-downs (MHA-VN-032): head down on each bracket foot's top,
-    # over the rail seat rocker_bracket_seat_layout derived from its hole.
+    # over the seat rocker_bracket_seat_layout derived from its hole.
     # Free-space here (the support is the frame's), datum-located likewise.
     for screw_x, screw_z in BRACKET_SCREW_XZ:
         hold_down = await place_component(
@@ -1095,12 +1102,14 @@ async def build(adapter) -> dict[str, str]:
     rod_by_channel: dict[int, str] = {}
     if abs(ROCKER_HUB_LENGTH - PITCH) > 1e-6 or abs(LEVER_HUB_LENGTH - PITCH) > 1e-6:
         raise RuntimeError("hub lengths must equal the station pitch")
-    _hub_bottom = PIVOT[1] - ROCKER_HUB_DIA / 2.0
+    # The feet run outboard from the ears' inner faces, so no rocker hub
+    # stands over them; the pivot shaft's domed ends past the ears do.
+    _shaft_bottom = PIVOT[1] - _PIVOT_SHAFT_DIA / 2.0
     _foot_top = SUPPORT_APEX_Y + PIVOT_BRACKET_FOOT_H
-    if _hub_bottom - _foot_top < 0.25:
+    if _shaft_bottom - _foot_top < 0.25:
         raise RuntimeError(
-            f"rocker hubs (bottom {_hub_bottom:.2f}) reach the pivot-bracket feet"
-            f" (top {_foot_top:.2f})"
+            f"pivot shaft ends (bottom {_shaft_bottom:.2f}) reach the pivot-bracket"
+            f" feet (top {_foot_top:.2f})"
         )
 
     # Per-channel chain: the four moving parts are inserted on-solution

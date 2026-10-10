@@ -7,7 +7,7 @@ import re
 import pytest
 
 import _config
-import ch_pivot_bracket_spec as bracket
+import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_tl_angle_plate_spec as spec
 import draw_ch_pivot_bracket_tl_angle_plate as drawing
 import export_features
@@ -103,7 +103,8 @@ def test_bracket_seat_lies_on_the_upright_face_above_the_ledge() -> None:
     seat = _features()["seat_face"]
     low, high = seat["bounds"]["y"]
     assert spec.BASE_THICK < low < high <= spec.PLATE_HEIGHT
-    assert abs((high - low) - (bracket.FOOT_LEN - spec.PART_PROUD)) < 1e-9
+    config = spec.LEDGE_CONFIG
+    assert abs((high - low) - (sides.FOOT_LEN[config] - spec.PART_PROUD[config])) < 1e-9
     x_low, x_high = seat["bounds"]["x"]
     assert 0.0 < x_low and x_high < spec.PLATE_LENGTH
 

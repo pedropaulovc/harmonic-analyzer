@@ -16,7 +16,8 @@ its back face (the face that seats on the upright). +X along the ledge, +Y up,
 It is the angle plate's model frame translated by
 (PLATE_LENGTH/2 - LEDGE_WIDTH/2, BLOCK_HEIGHT, 0), so the inventory's fixture
 frame (bracket plan setup frame TC) is
-TC = (x - LEDGE_WIDTH/2, -z, y + BLOCK_HEIGHT - (PLATE_HEIGHT + PART_PROUD)).
+TC = (x - LEDGE_WIDTH/2, -z, y + BLOCK_HEIGHT - (PLATE_HEIGHT + PART_PROUD[c]))
+for bracket configuration c (both stand on this one ledge).
 """
 
 from __future__ import annotations
@@ -34,7 +35,8 @@ from _printed_tolerance import drilled_oversize_mm
 # general tolerance; its ends stay clear of the bridge's stud nuts.
 LEDGE_WIDTH = 22.6
 LEDGE_THICK = bracket.FOOT_H  # 6.0
-LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)  # 17.9
+# 26.5, under the shorter S foot
+LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)
 SIZE_PLACES = 1
 if LEDGE_WIDTH < bracket.FOOT_W:
     raise AssertionError("ledge narrower than the bracket foot it carries")
@@ -49,7 +51,7 @@ HOLE_X = (
     round(LEDGE_WIDTH / 2.0 - plate.SCREW_HALF_PITCH, 6),
     round(LEDGE_WIDTH / 2.0 + plate.SCREW_HALF_PITCH, 6),
 )
-HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 8.9
+HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 17.5
 HOLE_X_PLACES = 1
 HOLE_Y_PLACES = 1
 HOLE_DIA = blind_cut_dia_mm(CLEARANCE_SPEC)
@@ -105,11 +107,11 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "plane": ({"frame": "model", "axis": "y", "value": LEDGE_HEIGHT}, ("LEDGE_HEIGHT",)),
             "height": (
                 limits(LEDGE_HEIGHT, SIZE_PLACES),
-                ("LEDGE_HEIGHT", "SIZE_PLACES", ("ch_pivot_bracket_spec", "FOOT_LEN")),
+                ("LEDGE_HEIGHT", "SIZE_PLACES", ("ch_pivot_bracket_sides", "FOOT_LEN")),
             ),
             "height_nominal": (
                 LEDGE_HEIGHT,
-                ("LEDGE_HEIGHT", ("ch_pivot_bracket_spec", "FOOT_LEN")),
+                ("LEDGE_HEIGHT", ("ch_pivot_bracket_sides", "FOOT_LEN")),
             ),
             "height_from": ("block_face", ("__frame__",)),
             "width": (limits(LEDGE_WIDTH, SIZE_PLACES), ("LEDGE_WIDTH", ("ch_pivot_bracket_spec", "FOOT_W"))),
