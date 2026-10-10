@@ -233,7 +233,7 @@ fixed_jaw = "against the V-blocks"
 jaws_along = "bar axis"
 parallels = "not_applicable"
 jaw_above_parallels_mm = "not_applicable"
-stop = "north dome base rim touched off with the edge finder, M2 X0"  # author's choice
+stop = "north dome apex touched off with the edge finder on the bar axis, set M2 X-1.5"  # author's choice
 clamp = "close the vise on the V-blocks by hand; check the bar cannot roll"  # author's choice
 note = "No stick-out: the bar lies along the vise in V-blocks, not cantilevered from a chuck."
 
@@ -245,9 +245,9 @@ runout_limit_mm = "unknown"  # no parallelism tolerance on the drawing; sweep th
 
 [setups.zero.x]
 feature = "north_dome"
-edge_mm = 0.0
+edge_mm = -1.5               # the apex sits 1.5 past the base rim (M2 X0); the rim has no -x face to find
 from = "-x"
-method = "edge_find"         # author's choice: edge finder on the dome's base rim
+method = "edge_find"         # author's choice: edge finder on the dome apex, on the bar axis
 tool = "edge-finder"
 check_jog_mm = 10.0
 
