@@ -208,7 +208,7 @@ _COM_LOCK = FileLock(str(_COM_LOCK_PATH))
 _COM_SEAT_POLL_S = 30.0
 # Set in the environment while the seat is held (inherited by the COM subprocess via
 # ``_telemetry.inject_env``): a COM build launched under doit WITHOUT it trips the
-# ``_com`` guard loud -- the runtime successor to the removed spine tripwire.
+# ``_session.run_build`` guard loud -- the runtime successor to the removed spine tripwire.
 _COM_SEAT_HELD_ENV = "HARMONIC_COM_SEAT"
 
 
@@ -242,7 +242,7 @@ def _com_seat(label: str):
     While blocked it logs the current holder every ``_COM_SEAT_POLL_S`` so a wedged
     seat is diagnosable rather than a silent hang. Sets ``HARMONIC_COM_SEAT`` in this
     process's environment (inherited by the COM subprocess) so a COM build launched
-    WITHOUT the seat trips ``_com``'s guard loud -- the runtime successor to the
+    WITHOUT the seat trips ``_session.run_build``'s guard loud -- the runtime successor to the
     removed ``_assert_spine_complete`` tripwire. Reentrancy-safe (``filelock`` counts
     same-process acquisitions), though no COM action nests it.
 
@@ -3430,13 +3430,14 @@ def task_check():
             # hard-exits the COM subprocess (releasing the seat via the doit
             # parent); a hung SW window only warns. Pure python, injectable
             # probes -- so the fatal/log-only contract can't silently regress.
-            # _session.py is a dep because the gate also pins the INTEGRATION
-            # (run_build arms/disarms the watchdog): an edit that drops those
-            # calls must re-run this gate, not reuse the old stamp (codex #344).
+            # The test's closure (_session, _paths, _com, ...) is a dep because
+            # the gate also pins the INTEGRATION (run_build arms/disarms the
+            # watchdog, CAD_ROOT steers seat parking): an edit there must re-run
+            # this gate, not reuse the old stamp (codex #344).
             "file_dep": [
+                *module_deps_of(SCRIPTS_DIR / "test_watchdog.py"),
                 str((SCRIPTS_DIR / "_watchdog.py").resolve()),
                 str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                str((SCRIPTS_DIR / "_session.py").resolve()),
                 # run_build's teardown (seat parking) lives in the recipe-inert
                 # module, which no module_deps_of closure reaches.
                 str((SCRIPTS_DIR / "_seat_forensics.py").resolve()),

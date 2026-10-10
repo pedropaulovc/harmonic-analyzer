@@ -125,8 +125,6 @@ READS: dict[str, frozenset[str]] = {
             "_resident_output_documents",
         }
     ),
-    # Negative controls name the real save module but may never read it.
-    "_part_save": frozenset(),
     "_sketch_closure": frozenset({"_sketch_state"}),
     "_telemetry": frozenset(),  # skipped from recipes itself; any use is fine
     "_watchdog": frozenset(),
@@ -381,6 +379,8 @@ def test_the_rules_catch_what_they_claim(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.setitem(INERT, "_fake_inert", fake)
+    # A real save module the fake may import but never read.
+    monkeypatch.setitem(READS, "_part_save", frozenset())
     with pytest.raises(AssertionError, match="Add3"):
         test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
     with pytest.raises(AssertionError, match="SystemValue"):

@@ -21,6 +21,8 @@ else:
     import _script_paths  # noqa: F401
 import _session
 import _sketch
+import _sketch_chains
+import _sketch_rectangle
 import _telemetry
 import build_pd_transgear_removable as btr
 
@@ -50,7 +52,9 @@ async def _patched(adapter, ref1, ref2, kind, value, label):
         raise
 
 
-_sketch.dimension_between = _patched
+# Every module that binds the helper by name, so no caller bypasses the dump.
+for _module in (_sketch, _sketch_chains, _sketch_rectangle):
+    _module.dimension_between = _patched
 
 if __name__ == "__main__":
     sys.exit(_session.run_build(btr.build))

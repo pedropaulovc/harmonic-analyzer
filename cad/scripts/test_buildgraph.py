@@ -2025,8 +2025,6 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
     import subprocess
 
     import _source_identity
-    import _paths
-    import _session
     import _config
 
     # Never execute a developer's hooks, filters, signer, or filesystem monitor.
@@ -2072,12 +2070,8 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
     monkeypatch.setattr(_config, "release_revision", lambda: "v9")
 
     monkeypatch.setattr(_source_identity, "CAD_ROOT", origin)
-    monkeypatch.setattr(_paths, "CAD_ROOT", origin)
-    monkeypatch.setattr(_session, "CAD_ROOT", origin)
     full_id = _source_identity._build_id()
     monkeypatch.setattr(_source_identity, "CAD_ROOT", leaf)
-    monkeypatch.setattr(_paths, "CAD_ROOT", leaf)
-    monkeypatch.setattr(_session, "CAD_ROOT", leaf)
     leaf_id = _source_identity._build_id()
 
     assert full_id == leaf_id == "v9"

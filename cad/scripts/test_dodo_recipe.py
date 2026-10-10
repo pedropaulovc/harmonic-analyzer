@@ -232,8 +232,8 @@ _DRAWING_OWN_ROW_READERS = {
     # part_properties(name): the name arrives from a caller, pinned below to
     # build_<own part>.py's PART_NAME.
     "_part_properties.py",
-    # save_part_and_images(adapter, name) forwards to part_properties(name):
-    # the same caller-supplied part name, not a foreign registry row.
+    # save_part_and_images(adapter, name) forwards its caller's part name to
+    # part_properties(name), which the dynamic-row scan sees here.
     "_part_save.py",
     # apply_drawing_properties(adapter, name): same callers, same pin.
     "_drawing_marks.py",
@@ -1483,7 +1483,7 @@ def test_seat_part_order_diverges_across_seats(monkeypatch):
 
 def test_com_seat_acquires_sets_env_and_releases(tmp_path, monkeypatch):
     """``_com_seat`` acquires the machine-global file lock, marks the seat held via
-    HARMONIC_COM_SEAT (inherited by the COM subprocess -> _com's tripwire), and
+    HARMONIC_COM_SEAT (inherited by the COM subprocess -> _session.run_build's tripwire), and
     releases both on exit. Lock path is overridable so the test never touches the
     real %PROGRAMDATA% lock."""
     monkeypatch.setenv("HARMONIC_COM_LOCK", str(tmp_path / "seat.lock"))

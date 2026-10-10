@@ -25,7 +25,6 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-import _part_properties
 import _paths
 import _session
 import _seat_forensics  # noqa: E402
@@ -582,7 +581,6 @@ def test_a_temp_directory_inside_this_checkout_is_never_the_park_target(
     checkout = tmp_path / "workspace"
     inside = checkout / "cad" / "out"
     inside.mkdir(parents=True)
-    monkeypatch.setattr(_part_properties, "CAD_ROOT", checkout / "cad")
     monkeypatch.setattr(_paths, "CAD_ROOT", checkout / "cad")
     monkeypatch.setattr(_session, "CAD_ROOT", checkout / "cad")
     monkeypatch.setattr(_seat_forensics.tempfile, "gettempdir", lambda: str(inside))
@@ -614,7 +612,6 @@ def test_a_sibling_source_root_is_not_a_park_target_either(
     sibling = work_root / "sources" / "bbb" / "workspace"
     (mine / "cad").mkdir(parents=True)
     sibling.mkdir(parents=True)
-    monkeypatch.setattr(_part_properties, "CAD_ROOT", mine / "cad")
     monkeypatch.setattr(_paths, "CAD_ROOT", mine / "cad")
     monkeypatch.setattr(_session, "CAD_ROOT", mine / "cad")
     monkeypatch.setenv("FARM_WORK_ROOT", str(work_root))
