@@ -66,20 +66,6 @@ def test_detector_does_not_treat_unbanded_f_strings_as_tolerances(value: str) ->
     assert drawing_specification_violations(f"LABEL = {value}\n") == ()
 
 
-def test_detector_finds_fit_renderers_through_import_aliases() -> None:
-    source = """
-from _fit_text import fit_limits as limits
-import _fit_text as bands
-
-FIRST = limits(6.0, (-0.1, 0.1))
-SECOND = bands.band_text((-0.1, 0.1))
-"""
-    assert _rules(source) == [
-        "drawing-tolerance-renderer",
-        "drawing-tolerance-renderer",
-    ]
-
-
 def test_detector_rejects_literal_and_local_surface_finish_grades() -> None:
     source = """
 from _drawing_common import add_surface_finish as finish

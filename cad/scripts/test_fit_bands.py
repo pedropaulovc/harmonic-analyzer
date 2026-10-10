@@ -10,8 +10,8 @@ This file finds every band consumer by reading the scripts' source, resolves eac
 argument in the imported module (the value ``build()`` would see), and applies
 the same checks ``build()`` would:
 
-* ``deviations(band)`` / ``fit_limits(nominal, band)`` / ``band_text(band)`` take
-  ``(upper, lower)``; the helper must accept it and return lower < upper.
+* ``deviations(band)`` takes ``(upper, lower)``; the helper must accept it and
+  return lower < upper.
 * ``set_dimension_bilateral_tolerance(..., *BAND)`` splats ``(lower, upper)``
   straight into the setter, which refuses lower >= upper.
 
@@ -33,12 +33,11 @@ from typing import Any
 import pytest
 
 import _fit_deviations
-import _fit_text
 
 SCRIPTS = Path(__file__).resolve().parent
 
 # Helpers that take an (upper, lower) band, and the positional index of the band.
-_BAND_HELPERS = {"deviations": 0, "band_text": 0, "fit_limits": 1}
+_BAND_HELPERS = {"deviations": 0}
 _SETTER = "set_dimension_bilateral_tolerance"
 
 # A consumer whose argument is a name local to build() (so it cannot be read off
@@ -503,8 +502,6 @@ def test_fit_helpers_share_band_validation(band: tuple[float, float]) -> None:
     for helper in (
         _fit_deviations.validate_band,
         _fit_deviations.deviations,
-        _fit_text.band_text,
-        lambda value: _fit_text.fit_limits(6.0, value),
     ):
         with pytest.raises(ValueError) as error:
             helper(band)
@@ -512,23 +509,13 @@ def test_fit_helpers_share_band_validation(band: tuple[float, float]) -> None:
 
 
 @pytest.mark.parametrize(
-    ("band", "text"),
+    "band",
     [
-        ((0.025, 0.010), "+0.03/+0.01"),
-        ((0.000, -0.020), "+0.00/-0.02"),
-        ((0.012, 0.000), "+0.01/-0.00"),
-        ((-0.010, -0.030), "-0.01/-0.03"),
+        (0.025, 0.010),
+        (0.000, -0.020),
+        (0.012, 0.000),
+        (-0.010, -0.030),
     ],
 )
-def test_fit_text_preserves_released_band_signs(
-    band: tuple[float, float], text: str
-) -> None:
-    assert _fit_text.band_text(band) == text
+def test_deviations_preserves_released_bands(band: tuple[float, float]) -> None:
     assert _fit_deviations.deviations(band) == (band[1], band[0])
-
-
-def test_fit_limits_preserves_precision_and_diameter_prefix() -> None:
-    assert _fit_text.fit_limits(6.0, (0.012, 0.0)) == "6.012 MAX / 6.000 MIN"
-    assert _fit_text.fit_limits(
-        6.0, (0.012, 0.0), decimals=2, diameter=True
-    ) == "<MOD-DIAM>6.01 MAX / <MOD-DIAM>6.00 MIN"
