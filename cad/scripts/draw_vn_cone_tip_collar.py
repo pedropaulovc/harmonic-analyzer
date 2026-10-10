@@ -73,13 +73,39 @@ TAP_KEEP = {
 TAP_POSITION_FRAME_XY = (TAP_CENTER[0] + 0.0213, TAP_CENTER[1] + 0.0058)
 TAP_CALLOUT_XY = (TAP_CENTER[0] + 0.0553, TAP_CENTER[1] - 0.0062)
 TAP_NOTE_XY = (TAP_CENTER[0] - 0.030, TAP_CENTER[1] + 0.025)
-BORE_CENTER = (0.350, 0.080)
-BORE_KEEP = {"BoreDia": (0.310, 0.110)}
-# Left of the crop circle (x 329.4 mm) and over the title block (top y 66):
-# at (318, 44) mm the note stood 4.8 mm inside the title block (run 14).
-BORE_NOTE_XY = (0.272, 0.082)
-SCREW_CENTER = (0.170, 0.165)
-SCREW_KEEP = {"DogDia": (0.075, 0.200), "DogLength": (0.096, 0.116)}
+# Between the turning view and the isometric, clear of the title block: at
+# (350, 80) mm the 40:1 crop circle (radius 20.6 mm) ran 6.6 mm down into it,
+# over the title text (run 16 at b760a440c). BoreDia reads up-right, clear
+# of CollarDia's lower extension line (y 136 mm, x <= 251); the note under
+# the circle, centred on it.
+BORE_CENTER = (0.300, 0.110)
+BORE_KEEP = {"BoreDia": (BORE_CENTER[0] + 0.035, BORE_CENTER[1] + 0.032)}
+BORE_NOTE_XY = (BORE_CENTER[0] - 0.025, BORE_CENTER[1] - 0.026)
+# Sheet 2 views are centred on the SCREW, not on the view box: the views are
+# placed in Default, whose box holds the collar too, and the SetScrew
+# configuration then left the screw 85 mm right of where its view was placed,
+# with the end view's hex drawn over the screw's own thread (run 16).
+SCREW_SCALE = 20
+SCREW_MID_MM = (
+    spec.SET_SCREW_SEAT_RADIUS + spec.SET_SCREW_LENGTH / 2.0, spec.TAP_STATION, 0.0,
+)
+SCREW_CENTER = (0.170, 0.190)
+SCREW_END_CENTER = (0.315, SCREW_CENTER[1])
+# Under the end view, its label under it (59 x 4.3 mm, left/top corner).
+SCREW_ISO_CENTER = (0.330, 0.118)
+SCREW_ISO_NOTE_XY = (SCREW_ISO_CENTER[0] - 0.0295, SCREW_ISO_CENTER[1] - 0.012)
+DOG_LEFT_X = SCREW_CENTER[0] - spec.SET_SCREW_LENGTH * SCREW_SCALE / 2000.0
+THREAD_LEFT_X = DOG_LEFT_X + spec.DOG_LENGTH * SCREW_SCALE / 1000.0
+# DogDia's text (and the edge callout above it) reads wholly over its upper
+# extension line: placed across both (y +/-2 mm) its own dimension line ran
+# up through the callout and the value (run 16). Its box spans -6.6..+7.3 mm
+# of the text point. DogLength reads left of its extension lines, under.
+SCREW_KEEP = {
+    "DogDia": (DOG_LEFT_X - 0.020, SCREW_CENTER[1] + 0.013),
+    "DogLength": (DOG_LEFT_X - 0.020, SCREW_CENTER[1] - 0.040),
+}
+DATUM_D_XY = (THREAD_LEFT_X + 0.003, SCREW_CENTER[1] + 0.003)
+DOG_RUNOUT_XY = (DOG_LEFT_X - 0.040, SCREW_CENTER[1] - 0.027)
 # The dog's edge-break limit, printed above DogDia.  One line: SolidWorks
 # stores an above callout's line break but prints none of it (main's
 # pd_transgear drawings; the cone shaft's torque corners at
@@ -212,6 +238,22 @@ def _assert_functional_dimension_types(adapter, annotations):
         raise RuntimeError(f"collar functional location/root limit lost native types: {observed}")
 
 
+def _centre_view(adapter, view, model_mm, sheet_xy, *, label):
+    """Move ``view`` so the model point ``model_mm`` lands on ``sheet_xy``."""
+    view = _early_bound(view, "IView")
+    model = tuple(value / 1000.0 for value in model_mm)
+    at = model_point_in_view(adapter, view, model, label=label)
+    position = tuple(float(value) for value in view.Position)
+    if not view.SetViewPosition(double_array([
+        position[i] + sheet_xy[i] - at[i] for i in range(2)
+    ]), False):
+        raise RuntimeError(f"cannot centre {label}")
+    rebuild_drawing(adapter, label=f"{label} position")
+    at = model_point_in_view(adapter, view, model, label=f"{label} readback")
+    if math.dist(at, sheet_xy) > 1e-4:
+        raise RuntimeError(f"{label} did not remain centred")
+
+
 def _bore_view(adapter):
     """Native circular crop, using the existing cone/arbor drawing sequence."""
     view = _early_bound(place_view(
@@ -220,16 +262,7 @@ def _bore_view(adapter):
     _configuration(adapter, (view,), "Collar")
     if tuple(float(value) for value in view.ScaleRatio) != tuple(spec.BORE_VIEW_SCALE):
         raise RuntimeError("collar bore view lost its source scale")
-    axis = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label="collar bore axis")
-    position = tuple(float(value) for value in view.Position)
-    if not view.SetViewPosition(double_array([
-        position[i] + BORE_CENTER[i] - axis[i] for i in range(2)
-    ]), False):
-        raise RuntimeError("cannot centre collar bore view")
-    rebuild_drawing(adapter, label="collar bore view position")
-    axis = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label="collar bore axis readback")
-    if math.dist(axis, BORE_CENTER) > 1e-4:
-        raise RuntimeError("collar bore axis did not remain centred")
+    _centre_view(adapter, view, (0.0, 0.0, 0.0), BORE_CENTER, label="collar bore axis")
     draw = adapter.currentModel
     if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
         raise RuntimeError("cannot activate collar bore crop")
@@ -375,11 +408,18 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not ddoc.ActivateSheet("SetScrew"):
         raise RuntimeError("cannot activate ground screw sheet")
-    screw = place_view(adapter, str(SOURCE), "*Front", *SCREW_CENTER, scale=(20, 1))
-    screw_end = place_view(adapter, str(SOURCE), "*Right", 0.305, SCREW_CENTER[1], scale=(20, 1))
-    screw_iso = place_view(adapter, str(SOURCE), "*Isometric", 0.345, 0.235, scale=(2, 1))
+    screw = place_view(adapter, str(SOURCE), "*Front", *SCREW_CENTER, scale=(SCREW_SCALE, 1))
+    screw_end = place_view(
+        adapter, str(SOURCE), "*Right", *SCREW_END_CENTER, scale=(SCREW_SCALE, 1),
+    )
+    screw_iso = place_view(adapter, str(SOURCE), "*Isometric", *SCREW_ISO_CENTER, scale=(2, 1))
     _configuration(adapter, (screw, screw_end, screw_iso), "SetScrew")
-    for view in (screw, screw_end, screw_iso):
+    for view, centre, name in (
+        (screw, SCREW_CENTER, "ground screw side view"),
+        (screw_end, SCREW_END_CENTER, "ground screw end view"),
+        (screw_iso, SCREW_ISO_CENTER, "ground screw isometric"),
+    ):
+        _centre_view(adapter, view, SCREW_MID_MM, centre, label=name)
         set_hidden_lines_removed(adapter, view)
     marks = curate_view_dimensions(adapter, screw, keep=SCREW_KEEP,
                                   view_label="ground stock screw", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
@@ -408,11 +448,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         placements={
             "datum:D": PmiDrawingPlacement(
-                view=screw, position=(0.203, 0.203),
+                view=screw, position=DATUM_D_XY,
                 entity=screw_faces["datum:D"], attachment_type="FACE",
             ),
             "ground_dog_runout": PmiDrawingPlacement(
-                view=screw, position=(0.046, 0.161),
+                view=screw, position=DOG_RUNOUT_XY,
                 entity=screw_faces["ground_dog_runout"], attachment_type="FACE",
                 # Mid-length, half a radius off the axis: inside the dog
                 # face's projection, not on its silhouette, where a
@@ -429,7 +469,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="ground dog relative to retained stock thread",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.080)
-    add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.210)
+    add_property_linked_note(adapter, "Isometric View Note", *SCREW_ISO_NOTE_XY)
     for sheet in SHEET_NAMES:
         if not ddoc.ActivateSheet(sheet):
             raise RuntimeError(f"cannot audit collar package sheet {sheet}")
