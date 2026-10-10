@@ -463,6 +463,16 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _smooth_annulus_limit_mm3(
         3.9, 3.874, 7.9375
     ),
+    # The two MHA-VN-054 dowels (vn_transgear_arm_plate_locating_pin_spec,
+    # Ø2.0 model) pressed into the arm's Ø1.995 blind reams
+    # (pd_transgear_arm_geometry) over their 6.0 - 1.70 proud insertion: the
+    # press. They slip in the plate's Ø2.015 holes, so that pair has no row.
+    **_numbered_pairs(
+        "vn-transgear-arm-plate-locating-pin",
+        range(1, 3),
+        "pd-transgear-arm",
+        _smooth_annulus_limit_mm3(2.0, 1.995, 6.0 - 1.70),
+    ),
     # MHA-PD-020 (pd_transgear_pivot_spacer_spec, Ø4.727 ream) pressed on the
     # MHA-VN-041 Ø4.7625 shoulder over its whole 5.5 length (R9-71): the press.
     frozenset(("pd-transgear-pivot-spacer-1", "vn-transgear-pivot-screw-1")): (

@@ -203,6 +203,24 @@ def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:
         assert _pair(pin, "pd-transgear-knob-shaft-1") not in allowed
 
 
+def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
+    """MHA-VN-054 presses into the arm's blind reams over its insertion
+    (length less proud), short of the floor, and slips in the plate."""
+    import vn_transgear_arm_plate_locating_pin_spec as dowel
+
+    allowed = _allowed()
+    insertion = dowel.LENGTH - dowel.PROUD_MM
+    assert dowel.DIA > arm.LOCATOR_HOLE_DIA_MM
+    assert insertion < arm.LOCATOR_BLIND_DEPTH_MM
+    assert dowel.DIA <= plate.LOCATOR_HOLE_DIA_MM
+    limit = _annulus(dowel.DIA, arm.LOCATOR_HOLE_DIA_MM, insertion)
+    for n in (1, 2):
+        pin = f"vn-transgear-arm-plate-locating-pin-{n}"
+        assert allowed[_pair(pin, "pd-transgear-arm-1")] == pytest.approx(limit)
+        assert _pair(pin, "pd-transgear-arm-plate-1") not in allowed
+
+
+
 def test_pressed_and_slip_joints_without_a_row_do_not_overlap() -> None:
     """A row-less joint is modelled line to line or clear; a spec that turns
     one into a press needs a row here."""

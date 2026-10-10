@@ -39,10 +39,9 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_drive_collar_spec import (
-    BODY_BLANK_LENGTH_MIN,
+    BODY_SUPPLY_NOTE,
     BORE_CALLOUT,
     BORE_ENTRY_BREAK_CALLOUT,
-    BODY_LENGTH_CALLOUT,
     FLAT_ORIENTATION,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -50,10 +49,9 @@ from pd_transgear_drive_collar_spec import (
     LENGTH,
     OD,
     OVERALL_LENGTH,
-    PILOT_BLANK_LENGTH_MIN,
+    PILOT_SUPPLY_NOTE,
     PILOT_DIA,
     PILOT_LENGTH,
-    PILOT_LENGTH_CALLOUT,
     PIN_CIRCLE_RADIUS,
     PIN_HOLE_CALLOUT,
 )
@@ -155,18 +153,8 @@ PILOT_NOTE = 3
 BODY_NOTE = 4
 FIT_NOTES = "\n".join(
     (
-        _numbered(
-            PILOT_NOTE,
-            f"PILOT: SUPPLY {PILOT_BLANK_LENGTH_MIN:.2f} MIN; "
-            f"{PILOT_LENGTH_CALLOUT.replace(chr(10), ', ')}, "
-            f"PER {step_ref(FIT_STEP_KEY)}.",
-        ),
-        _numbered(
-            BODY_NOTE,
-            f"BODY: SUPPLY {BODY_BLANK_LENGTH_MIN:.3f} MIN; "
-            f"{BODY_LENGTH_CALLOUT.replace(chr(10), ', ')}, "
-            f"PER {step_ref(BODY_FIT_STEP_KEY)}.",
-        ),
+        _numbered(PILOT_NOTE, f"{PILOT_SUPPLY_NOTE}, PER {step_ref(FIT_STEP_KEY)}."),
+        _numbered(BODY_NOTE, f"{BODY_SUPPLY_NOTE}, PER {step_ref(BODY_FIT_STEP_KEY)}."),
     )
 )
 DIMENSION_CALLOUTS_BELOW = {
