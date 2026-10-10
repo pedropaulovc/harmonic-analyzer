@@ -594,6 +594,16 @@ PILOT_LENGTH_CALLOUT = (
     f"SET AT ASSEMBLY {PILOT_LENGTH_FITTED_MIN:.2f}-{PILOT_LENGTH_FITTED_MAX:.2f}"
     "\nFACED TO FIT"
 )
+# The sheet's numbered fitted-length notes: supply length, then the
+# requirement; the sheet appends the step that sets each.
+PILOT_SUPPLY_NOTE = (
+    f"PILOT: SUPPLY {PILOT_BLANK_LENGTH_MIN:.2f} MIN; "
+    f"{PILOT_LENGTH_CALLOUT.replace(chr(10), ', ')}"
+)
+BODY_SUPPLY_NOTE = (
+    f"BODY: SUPPLY {BODY_BLANK_LENGTH_MIN:.3f} MIN; "
+    f"{BODY_LENGTH_CALLOUT.replace(chr(10), ', ')}"
+)
 PILOT_PROUD_TEXT = f"{PILOT_PROUD_RANGE[0]:.2f} TO {PILOT_PROUD_RANGE[1]:.2f}"
 # The widest line the sheet's notes block holds (its layout test).
 FIT_UP_NOTE_WIDTH = 66
