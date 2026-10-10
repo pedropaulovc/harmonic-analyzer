@@ -833,15 +833,12 @@ async def _reopen_assembly_rest_pose(adapter: Any, name: str, sldasm: Path) -> N
         check(f"activate {REST}", await adapter.set_active_configuration(REST))
 
 
-# The assemblies that carry the roller chain: their builds pass the authored
-# wheel mounts to check_no_interference (541011de0), so the soundness gate must
-# too, or every chain-link-on-sprocket mesh contact reads as interference.
-_CHAIN_ASSEMBLIES = frozenset({"pd-paper-drive", "ha-harmonic-analyzer"})
-
-
 def _soundness_chain_mounts(name: str) -> Any:
-    """The chain-wrapped wheels' mounts for a chain-carrying assembly, else None."""
-    if name not in _CHAIN_ASSEMBLIES:
+    """The authored wheel mounts for an assembly whose contract says it carries
+    the roller chain, else None: its build passes them to check_no_interference
+    (541011de0), so the soundness gate must too, or every chain-link-on-sprocket
+    mesh contact reads as interference."""
+    if not assembly_contract(name).carries_chain:
         return None
     return mounted_wheels()
 
