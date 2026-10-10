@@ -84,6 +84,7 @@ from ms_stick_spec import (
     DRAWING_PRECISION,
     DRAWING_TOLERANCES,
     DRAWING_NOTES,
+    SCALE_END_NOTE,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     HALF_TICK_LENGTH,
@@ -570,6 +571,7 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Scale End Note": SCALE_END_NOTE,
         },
     )
     _hide_manufacturing_chords(adapter)

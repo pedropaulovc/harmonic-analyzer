@@ -21,10 +21,10 @@ import _telemetry
 import ms_stick_spec as part
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
-    DrawingOutputs, add_property_linked_note, create_blank_drawing_sheets,
-    finalize_drawing, model_point_in_view, new_project_drawing,
+    DrawingOutputs, add_note, add_property_linked_callout, add_property_linked_note,
+    create_blank_drawing_sheets, finalize_drawing, model_point_in_view, new_project_drawing,
     read_required_properties, set_dimension_callouts, set_hidden_lines_removed,
-    rebuild_drawing, stamp_drawing_summary, view_name,
+    rebuild_drawing, stamp_drawing_summary, view_name, property_link,
 )
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -39,27 +39,28 @@ OUTPUTS = DrawingOutputs(slddrw=SPEC.outputs["slddrw"], pdf=SPEC.outputs["pdf"],
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_NAMES = ("BAR", "GRADUATIONS", "TICK LENGTHS", "ENGRAVING")
 SHEET_SCALE = (1.0, 1.0)
-FRONT_CENTER = (0.145, 0.190)
-TOP_CENTER = (FRONT_CENTER[0], 0.125)
-ISO_CENTER = (0.335, 0.160)
+FRONT_CENTER = (0.155, 0.175)
+TOP_CENTER = (FRONT_CENTER[0], 0.110)
+ISO_CENTER = (0.335, 0.145)
 DETAIL_PARENT_CENTER = (0.230, 0.245)
 DETAIL_CENTER = (0.180, 0.140)
 DETAIL_SCALE = (6.0, 1.0)
 DETAIL_RADIUS_MM = 9.0
-DEPTH_PARENT_CENTER = (0.330, 0.245)
-DEPTH_CENTER = (0.330, 0.160)
+DEPTH_PARENT_CENTER = (0.330, 0.210)
+DEPTH_CENTER = (0.330, 0.125)
 DEPTH_RADIUS_MM = 2.0
-NUMERAL_PARENT_CENTER = (0.130, 0.245)
-NUMERAL_CENTER = (0.140, 0.170)
-NUMERAL_RADIUS_MM = 3.5
+NUMERAL_PARENT_CENTER = (0.130, 0.210)
+NUMERAL_CENTER = (0.140, 0.135)
+# The fence includes the real full-tick endpoint and both numeral gap anchors.
+NUMERAL_RADIUS_MM = 7.0
 FRONT_KEEP = {
-    "BodyLength": (0.145, 0.220), "BodyWidth": (0.265, 0.190),
-    "ScaleStartX": (0.075, 0.165),
+    "BodyLength": (0.155, 0.205), "BodyWidth": (0.275, 0.175),
+    "ScaleStartX": (0.180, 0.150),
 }
-TOP_KEEP = {"BodyThickness": (0.265, 0.145)}
+TOP_KEEP = {"BodyThickness": (0.275, 0.130)}
 DETAIL_KEEP = {
     "FullTickPitch": (0.180, 0.218),
-    "MinorTickPitch": (0.145, 0.085),
+    "MinorTickPitch": (0.075, 0.085),
 }
 # Local fences keep extension lines beside their tick; D excludes tick zero.
 LENGTH_DETAILS = (
@@ -74,19 +75,20 @@ LENGTH_DETAILS = (
      {"HalfTickLength": (0.300, 0.185)}, 4.0),
 )
 NUMERAL_KEEP = {
-    "NumeralHeight": (0.145, 0.218),
-    "NumeralXGap": (0.095, 0.120),
-    "NumeralYGap": (0.095, 0.190),
+    "NumeralHeight": (0.145, 0.183),
+    "NumeralXGap": (0.075, 0.170),
+    "NumeralYGap": (0.075, 0.155),
 }
-DEPTH_KEEP = {"TickDepth": (0.330, 0.215)}
+DEPTH_KEEP = {"TickDepth": (0.330, 0.180)}
 DIMENSION_CALLOUTS = {
+    "ScaleStartX": "SCALE ZERO CENTRELINE",
     "Tick0Width": "ALL GRADUATIONS",
     "TickDepth": "ALL ENGRAVING\nSQUARE-BOTTOM GROOVES",
     "FullTickLength": "FULL TICKS",
     "MinorTickLength": "MINOR TICKS",
     "HalfTickLength": "HALF-DIVISION TICK",
-    "FullTickPitch": "FULL TICKS\nNONCUMULATIVE FROM SCALE ZERO",
-    "MinorTickPitch": "MINOR TICKS\nNONCUMULATIVE FROM SCALE ZERO",
+    "FullTickPitch": "FULL TICK CENTRELINES\nNONCUMULATIVE FROM SCALE ZERO",
+    "MinorTickPitch": "MINOR TICK CENTRELINES\nNONCUMULATIVE FROM SCALE ZERO",
     "NumeralHeight": "NUMERAL HEIGHT",
     "NumeralXGap": "NUMERAL TO TICK EDGE",
     "NumeralYGap": "NUMERAL TO FULL-TICK END",
@@ -160,7 +162,8 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open measuring stick", await adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
-                  "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note")
+                  "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
+                  "Scale End Note")
     read_required_properties(source_model, properties, required=properties)
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout)
@@ -184,9 +187,16 @@ async def build(adapter: Any) -> dict[str, str]:
     for view, keep, label in ((front, FRONT_KEEP, "ruled bar"), (top, TOP_KEEP, "bar edge")):
         annotations += curate_view_dimensions(adapter, view, keep=keep, view_label=label,
                                                dimensions_by_feature=part.DRAWING_DIMENSIONS)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.045, 0.085)
-    add_property_linked_note(adapter, "Front View Note", 0.045, 0.153)
-    add_property_linked_note(adapter, "Isometric View Note", 0.285, 0.110)
+    add_note(adapter, property_link("Manufacturing Notes") + " REV " + property_link("Revision"),
+             0.045, 0.075)
+    add_property_linked_note(adapter, "Front View Note", 0.055, 0.135)
+    add_property_linked_note(adapter, "Isometric View Note", 0.285, 0.095)
+    scale_end = model_point_in_view(
+        adapter, front, (part.BODY_LENGTH / 1000.0, part.BODY_WIDTH / 2000.0, 0.0),
+        label="scale end edge")
+    add_property_linked_callout(
+        adapter, front, property_name="Scale End Note", edge_xy=scale_end,
+        note_xy=(0.290, 0.225))
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate engraving sheet")

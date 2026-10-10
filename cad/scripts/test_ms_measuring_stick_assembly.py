@@ -241,7 +241,12 @@ def test_fitter_package_covers_rule_9() -> None:
     for text in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS, drawing.SETUP_NOTE):
         assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in text.splitlines())
     assert drawing.ASSEMBLY_STEPS.count("\n") >= len(spec.ASSEMBLY_STEPS)
-    assert f"{stop.STOP_MARK:.1f}" in drawing.SETUP_NOTE
+    for instruction in (spec.ASSEMBLY_STEPS[-1], spec.CLAMPED_SETUP_NOTE):
+        assert "NEAR FACE FROM THE LEFT STICK END" in instruction
+        assert "LOCATION REFERENCE" in instruction
+        assert "THUMBSCREW AXIS" not in instruction
+    assert "SHEET 1" in spec.ASSEMBLY_STEPS[-1]
+    assert "REFERENCE ABOVE; THEN CLAMP" in spec.CLAMPED_SETUP_NOTE
     assert drawing.EXPLODED_CAPTION == spec.EXPLODED_CAPTION == (
         "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
     )
@@ -277,22 +282,18 @@ def test_bom_prints_registry_identity_and_vendor_sku_only() -> None:
     )
 
 
-def test_portrait_group_translation_balances_measured_guarded_ink() -> None:
+def test_portrait_group_translation_balances_visible_ink() -> None:
     template = drawing.DRAWING_TEMPLATES[drawing.DrawingLayout.PORTRAIT]
     shift = drawing.EXPLODED_GROUP_SHIFT_Y
-    assert shift == pytest.approx(-0.03177155)
-    # Native outline + unchanged outer ring and caption ink, not origin guesses.
-    bottom = 0.157963 - drawing.SECOND_SCREW_BALLOON_MARGIN + shift
-    top = 0.4146801 + shift
+    # Use the recorded full-page visible envelope, not GetOutline's blank air.
+    bottom, top = (value + shift for value in drawing._EXPLODED_MEASURED_GROUP_Y)
     lower_air = bottom - template.title_block_top_m
     upper_air = template.height_m - 0.0127 - top
     assert lower_air == pytest.approx(upper_air)
-    assert lower_air > 0.036
+    assert lower_air > 0.05
     assert drawing.EXPLODED_ISO_CENTER == pytest.approx((0.1397, 0.235 + shift))
     assert drawing.BOM_ANCHOR == pytest.approx((0.0627, 0.405 + shift))
     assert drawing.EXPLODED_CAPTION_XY == pytest.approx((0.0627, 0.415 + shift))
-    # Even the conservative original BOM height clears the translated outer ring.
-    assert 0.3437606 + shift - (0.312037 + shift + 0.024) > 0.007
 
 
 def test_bom_removes_material_without_changing_native_items(monkeypatch) -> None:

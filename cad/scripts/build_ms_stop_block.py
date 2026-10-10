@@ -22,7 +22,10 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _holes import wizard_holes
-from ms_stop_geom import author_hole_precision, hide_location_references, location_reference, roof_reference
+from ms_stop_geom import (
+    author_hole_precision, hide_location_references, location_reference,
+    roof_reference, window_width_reference,
+)
 
 PART_NAME = "ms-stop-block"
 MATERIAL = "Brass"
@@ -114,6 +117,7 @@ async def build(adapter) -> dict[str, str]:
         names=("PlateLeftFromEnd", "PlateFromHeadFace", "PlateRightFromEnd"),
     )
     jobs += await roof_reference(adapter)
+    jobs += await window_width_reference(adapter)
     await force_rebuild(adapter)
     for name, expression in jobs:
         await drive_dimension(adapter, name, expression)
@@ -123,6 +127,7 @@ async def build(adapter) -> dict[str, str]:
     lower, upper = spec.WINDOW_SIZE_TOLERANCE_MM
     set_dimension_bilateral_tolerance(adapter, "WindowProfile", "WindowHeight", lower, upper)
     set_dimension_bilateral_tolerance(adapter, "Window", "WindowWidth", lower, upper)
+    set_dimension_bilateral_tolerance(adapter, "ReferenceWindowWidth", "WindowWidth", lower, upper)
     for name in spec.PLATE_LOCATION_DIMENSIONS:
         set_dimension_symmetric_tolerance(
             adapter, "PlateLocationReference", name, spec.PLATE_HOLE_POSITION_TOLERANCE_MM,
@@ -138,6 +143,7 @@ async def build(adapter) -> dict[str, str]:
     })
     hide_location_references(adapter, (
         "ThumbLocationReference", "PlateLocationReference", "RoofThicknessReference",
+        "ReferenceWindowWidth",
     ))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)

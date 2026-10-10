@@ -54,13 +54,14 @@ DIMENSION_CALLOUTS = {
     "RoofChamferSize": "2 CORNERS",
     "PilotDrillDiameter": (
         "PILOT; MATCH-DRILL WITH\n"
-        f"MS-STOP-BLOCK ({_config.parts('ms-stop-block')['number']}) CLAMPED IN PLACE"
+        f"MS-STOP-BLOCK ({_config.parts('ms-stop-block')['number']})\n"
+        "CLAMPED IN PLACE"
     ),
 }
 
 
 def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
-    """Print the real model-owned pilot diameter, not a fictitious finished edge."""
+    """Keep the model diameter's leader on the concentric, earlier pilot step."""
     annotation = next(
         item for item in annotations
         if dimension_name(adapter, item) == "PilotDrillDiameter"
@@ -69,12 +70,9 @@ def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
     native = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if int(native.Type2) != 6:  # swDiameterDimension
         raise RuntimeError("match-drill pilot is not a native model diameter")
-    # This hidden construction circle is the process size, not final geometry;
-    # the actual opened-hole callout below supplies the finished-edge leader.
-    native.WitnessVisibility = 3  # swWitnessLineNone
-    native.LeaderVisibility = 3  # swLeaderLineNone
-    if int(native.WitnessVisibility) != 3 or int(native.LeaderVisibility) != 3:
-        raise RuntimeError("pilot construction-circle witness/leader suppression did not persist")
+    # The importer shows this construction circle inside the opened clearance.
+    # Its native diameter leader identifies the earlier PILOT step; THEN OPEN
+    # below remains associated with the actual finished clearance edge.
     definition = str(native.GetText(5) or "")
     prefix = f"2X {definition}"
     native.SetText(1, prefix)

@@ -50,6 +50,26 @@ async def location_reference(
     name_dimensions(adapter, feature, list(names))
 
 
+@_telemetry.traced("sketch.stop_window_width")
+async def window_width_reference(adapter: Any) -> list[tuple[str, str]]:
+    """Own the rebate span on its real roof edge, not the cut-depth vector.
+
+    Right-plane local X is -Z. The chord therefore runs from the cover's
+    Z=0 edge to the rebate's Z=WindowWidth edge at the roof station. It is
+    construction-only: editing the shared globals moves both cut and witness.
+    """
+    feature = "ReferenceWindowWidth"
+    await location_reference(
+        adapter, feature=feature, plane="Right",
+        spans=(-spec.WINDOW_WIDTH,), station=spec.WINDOW_Y_MAX,
+        names=("WindowWidth", "WindowRoofStation"),
+    )
+    return [
+        (f"WindowWidth@{feature}", '"WindowWidth"'),
+        (f"WindowRoofStation@{feature}", '"BlockHeight" - "RoofThickness"'),
+    ]
+
+
 @_telemetry.traced("appearance.stop_reference_sketches")
 def hide_location_references(adapter: Any, names: tuple[str, ...]) -> None:
     model = _early_bound(adapter.currentModel, "IPartDoc")
@@ -125,15 +145,17 @@ async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
 async def pilot_drill_reference(adapter: Any) -> list[tuple[str, str]]:
     """Own the earlier match-drill size without changing the finished clearance.
 
-    The final cover only has the opened clearance holes. A hidden construction
-    circle carries the pilot's native diameter and precision, so the print
-    cannot silently turn a typed process size into a second specification.
+    The final cover only has the opened clearance holes. The construction
+    circle sits concentrically inside an actual clearance, representing the
+    earlier PILOT step before THEN OPEN, not another finished edge. Its native
+    diameter and precision remain model-owned when the drawing shows the sketch.
     """
     feature = "PilotDrillReference"
     dimensions = SketchDims()
     check(feature, await adapter.create_sketch("Front"))
     circle = await define_circle(
-        adapter, 0.0, 0.0, spec.PLATE_TAP_DRILL_DIA / 2.0, feature,
+        adapter, spec.PLATE_HOLE_XS[0], spec.PLATE_HOLE_Y,
+        spec.PLATE_TAP_DRILL_DIA / 2.0, feature,
         dims=dimensions, names=(None, None, "PilotDrillDiameter"),
         drives=(None, None, '"PilotDrillDiameter"'),
     )
