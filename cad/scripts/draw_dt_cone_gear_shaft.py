@@ -74,6 +74,7 @@ from _drawing_leaders import (
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _layout_geometry import estimate_text_box
 from _surface_finish import surface_finish_by_key
+from cone_shaft_land_bands import TERMINAL_FLAT_EDGE_BREAK_MAX
 from dt_cone_gear_shaft_spec import (
     COLLAR_DIA,
     COLLAR_END_STATION,
@@ -87,7 +88,6 @@ from dt_cone_gear_shaft_spec import (
     SECTION_ENDS,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
-    TORQUE_CORNER_CALLOUT,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
@@ -298,9 +298,10 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # on the thinnest land, is shorter.  The four stand in two rows right of the
 # side view, under the pictorial, each over its caption, the bottom row's
 # captions above the title block (x > 0.216, y < 0.066).  D's across-flat
-# carries the torque-corner callout, whose ink reaches 55.3 mm left of D's
-# centre (section D (0.3377..0.4161) at f68549253), so C stands left of A's
-# column, its cell clear of that callout and of the side view's big end.
+# carries the torque-corner callout, centred over D's text and
+# TORQUE_CALLOUT_REACH either side of it, so D stands between C-C's outline
+# and the right border; C stands left of A's column, its cell clear of that
+# callout and of the side view's big end.
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
@@ -331,7 +332,7 @@ D_SECTIONS = (
         TIP_DETAIL_STATION_MM + 8.0,
         CutParent.TIP_DETAIL,
         0.0155,
-        (0.393, 0.100),
+        (0.3846, 0.100),
         (20, 1),
     ),
 )
@@ -340,10 +341,38 @@ D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
-# The terminal land's across-flat with its torque-corner callout reached
-# 55.3 mm left of its text and 8.7 mm above it (section D's measured ink,
-# leaf drawing:dt_cone_gear_shaft at f68549253).
-TORQUE_CALLOUT_REACH = (0.0553, 0.0087)
+# The terminal flat's two long torque corners stay sharp in the model; their
+# break limit is a drawing requirement, printed above the terminal
+# across-flat.  One line: SolidWorks stores an above callout's line break but
+# prints none of it (run 20261010T071427837Z: the two-line
+# "TORQUE CORNERS:\nSTONE BURR ONLY" was in COM, not in the PDF; the layout
+# audit found it text-unmatched, as main's pd_transgear drawings found).
+# Stoning is named because it matches the number.
+TORQUE_CORNER_CALLOUT = f"STONE CORNERS {TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX"
+# An above callout is centred on its dimension's text, set as one run: that
+# 40-character run read 110.6 mm wide in COM (Sec4AF's 0.3377..0.4483 at
+# 20261010T071427837Z) and 8.7 mm above the text position (f68549253).
+TORQUE_CALLOUT_CHAR_WIDTH = 0.1106243 / 40
+TORQUE_CALLOUT_REACH = (len(TORQUE_CORNER_CALLOUT) * TORQUE_CALLOUT_CHAR_WIDTH / 2.0, 0.0087)
+# Section C-C's native outline, (0.2597..0.3503) x (0.0682..0.1318) at
+# 20261010T071427837Z, which the layout audit holds text off.
+SECTION_C_OUTLINE_RIGHT = 0.3503
+
+
+def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
+    """Refuse an above-callout SolidWorks would keep but not print.
+
+    A line break in the above compartment is stored (``GetDisplayData`` reads
+    it back) yet nothing of the callout reaches the PDF (main's
+    draw_pd_transgear_thumbnut; this sheet's torque corners at
+    20261010T071427837Z), while one-line above callouts print.
+    """
+    broken = sorted(name for name, text in callouts.items() if "\n" in text)
+    if broken:
+        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
+    return callouts
+
+
 # A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf
 # for c8b0aad); each is hung SECTION_CAPTION_GAP under its section's ink.
 SECTION_CAPTION_SIZE = (0.046, 0.017)
@@ -1062,7 +1091,10 @@ def _add_d_sections(
             # The terminal flat's torque corners stay sharp in the model; the
             # break limit rides above that flat's own across-flat value.
             set_dimension_callouts(
-                adapter, [across_flat], {name: TORQUE_CORNER_CALLOUT}, location="above"
+                adapter,
+                [across_flat],
+                _printable_above_callouts({name: TORQUE_CORNER_CALLOUT}),
+                location="above",
             )
         placed.append(PlacedSection(section, view, face, across_flat, caption, centre_marks))
     return placed

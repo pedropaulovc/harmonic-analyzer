@@ -104,10 +104,15 @@ def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
     assert "InsertFeatureChamfer" not in source
     assert "TerminalTorqueEdge" not in source
     assert "TerminalFlatEdgeBreak" not in dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS
-    callout = dt_cone_gear_shaft_spec.TORQUE_CORNER_CALLOUT
+    callout = drawing.TORQUE_CORNER_CALLOUT
     assert f"{lands.TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX" in callout
+    # Run 20261010T071427837Z: the two-line above callout was in COM but not
+    # in the PDF.  One line, behind main's printable-above guard.
+    assert drawing._printable_above_callouts({"Sec4AF": callout})
+    with pytest.raises(RuntimeError, match="do not print"):
+        drawing._printable_above_callouts({"Sec4AF": "TORQUE CORNERS:\nSTONE"})
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert drawing_source.count("TORQUE_CORNER_CALLOUT") == 2  # import + one use
+    assert "_printable_above_callouts({name: TORQUE_CORNER_CALLOUT})" in drawing_source
     assert "TerminalTorqueEdge" not in drawing.D_SECTION_KEEP
 
 
@@ -671,20 +676,22 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
         text_x, text_y = drawing.D_SECTION_KEEP[f"Sec{section.land}AF"]
         assert text_x == x and text_y > y + half, section
         # The terminal land's across-flat carries the torque-corner callout,
-        # whose measured ink widens its cell (f68549253: D crowded C).
-        reach_x, reach_y = (
-            drawing.TORQUE_CALLOUT_REACH if section.land == max(spec.FLAT_LANDS) else (0.0, 0.005)
-        )
+        # centred on its text (20261010T071427837Z: the run reached 6.9 mm
+        # past the right border, and over C-C's outline).
+        terminal = section.land == max(spec.FLAT_LANDS)
+        reach_x, reach_y = drawing.TORQUE_CALLOUT_REACH if terminal else (0.0, 0.005)
         cell = (
             min(x - caption_w / 2.0, text_x - reach_x),
             y - half - drawing.SECTION_CAPTION_GAP - caption_h,
-            x + caption_w / 2.0,
+            max(x + caption_w / 2.0, text_x + reach_x),
             text_y + reach_y,
         )
         assert cell[0] > big_end + 0.02, section
-        assert margin <= cell[0] and cell[2] <= template.width_m - margin, section
+        assert margin <= cell[0] and cell[2] <= template.width_m - margin - CLEAR_GAP_M, section
         assert margin <= cell[1] and cell[3] <= template.height_m - margin, section
         assert cell[1] > template.title_block_top_m, section
+        if terminal:
+            assert text_x - reach_x > drawing.SECTION_C_OUTLINE_RIGHT + CLEAR_GAP_M
         cells.append(cell)
     for index, a in enumerate(cells):
         for b in cells[index + 1 :]:

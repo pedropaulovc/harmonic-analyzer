@@ -233,6 +233,52 @@ def test_corner_arc_station_is_the_fillet_centre_in_model_space() -> None:
     assert "station_xy" not in source and "corner_fillet_centre_mm" in source
 
 
+def test_r12_corner_arrow_lands_at_its_arc_middle() -> None:
+    """Run 20261010T072401692Z: CornerSER's fixed shelf put its arrow at
+    183.3 deg about the R12 centre, past the arc's 178 deg end, on the east
+    edge.  The text now derives from the arc's middle; the old station is
+    the positive control."""
+    px, py = drawing.PROFILE_PIVOT_XY
+    corners = {c[0]: c for c in part.PLATE_CORNERS}
+    index = [c[0] for c in part.PLATE_CORNERS].index("SE")
+    _label, vx, vz, radius = corners["SE"]
+    cx, cz = drawing.corner_fillet_centre_mm("SE")
+    centre = (px + cx * 0.0005, py - cz * 0.0005)
+
+    def sheet_angle(x, z):
+        return math.degrees(math.atan2(-(z - cz), x - cx)) % 360.0
+
+    # The arc's ends are the tangent points on the two edges into the vertex.
+    ends = []
+    for _n, nx, nz, _r in (
+        part.PLATE_CORNERS[index - 1], part.PLATE_CORNERS[(index + 1) % 4]
+    ):
+        length = math.hypot(nx - vx, nz - vz)
+        ux, uz = (nx - vx) / length, (nz - vz) / length
+        t = (cx - vx) * ux + (cz - vz) * uz
+        ends.append(sheet_angle(vx + t * ux, vz + t * uz))
+    low, high = sorted(ends)
+    assert high - low < 180.0
+
+    def arrow_angle(text_xy):
+        knee = (
+            text_xy[0] + drawing.RADIUS_KNEE_FROM_TEXT[0],
+            text_xy[1] + drawing.RADIUS_KNEE_FROM_TEXT[1],
+        )
+        return math.degrees(math.atan2(knee[1] - centre[1], knee[0] - centre[0])) % 360.0
+
+    text = drawing.PROFILE_KEEP["CornerSER"]
+    assert arrow_angle(text) == pytest.approx((low + high) / 2.0, abs=1e-6)
+    assert not low <= arrow_angle((0.040, 0.2435)) <= high
+    # R12.0 is 11.7 x 3.9 mm round its position (run 20261009T172850508Z):
+    # above the 223.4 south witness, below the 24.0 dimension line (2.6 mm
+    # under its text), and left of the 24.0 east extension line.
+    south_witness_y = py - min(c[2] for c in part.PLATE_CORNERS) * 0.0005
+    assert text[1] - 0.00195 > south_witness_y + 0.0015
+    assert text[1] + 0.00195 < drawing.PROFILE_KEEP["SouthEastX"][1] - 0.0026 - 0.0015
+    assert text[0] + 0.00585 < px + vx * 0.0005 - 0.002
+
+
 def test_disengaged_collar_margin_survives_general_bands() -> None:
     """Linear worst case at .X plate outline and .XX base holes keeps 2.0 mm (U27)."""
     general, base_axis = 0.8, 0.51
