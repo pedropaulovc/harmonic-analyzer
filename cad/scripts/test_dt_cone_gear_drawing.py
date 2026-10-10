@@ -708,6 +708,43 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         ]
 
 
+def test_settled_clock_check_refuses_outside_arrow_stubs() -> None:
+    """Run 20261010T073917031Z's arc readbacks (sheet mm): T006's clock drew
+    one arc between its legs, broken by its text; T120's, its arrows left
+    smart, drew two 10 deg stubs outside them and no arc. The clock is forced
+    arrows-inside, and finalize re-reads every sheet's arcs after settling."""
+
+    def arc(vertex, radius, start, end):
+        steps = 12
+        return (
+            vertex,
+            [
+                (
+                    vertex[0] + radius * math.cos(math.radians(start + (end - start) * i / steps)),
+                    vertex[1] + radius * math.sin(math.radians(start + (end - start) * i / steps)),
+                )
+                for i in range(steps + 1)
+            ],
+        )
+
+    good_vertex = (0.05292, 0.060)
+    good = [arc(good_vertex, 0.04642, 0.0, 11.0), arc(good_vertex, 0.04642, 18.0, 90.0)]
+    assert drawing.clock_arc_faults(good, good_vertex) == []
+    bad_vertex = (0.068, 0.060)
+    bad = [arc(bad_vertex, 0.03503, -10.2, 0.0), arc(bad_vertex, 0.03503, 90.0, 100.2)]
+    faults = drawing.clock_arc_faults(bad, bad_vertex)
+    assert any("outside the quadrant" in fault for fault in faults)
+    assert any("sweep" in fault for fault in faults)
+    assert drawing.clock_arc_faults([], bad_vertex) == ["no arc"]
+    assert drawing.ARROWS_INSIDE == 0  # swDimensionArrowsSide_e.swDimArrowsInside
+    assert "display.ArrowSide = ARROWS_INSIDE" in inspect.getsource(
+        drawing._sweep_clock_right_of_flat
+    )
+    assert "settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),)" in (
+        inspect.getsource(drawing.build)
+    )
+
+
 def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
     """The layout's arrow length is the drawing's own, not a remembered one."""
 

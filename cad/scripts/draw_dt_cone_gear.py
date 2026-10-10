@@ -186,6 +186,19 @@ BORE_CLOCK_TEXT_HALF_WIDTH = 0.025
 BORE_CLOCK_TEXT_HALF_HEIGHT = 0.006
 BORE_CLOCK_TEXT_GAP = 0.002
 BORE_CLOCK_ARROW_LENGTH = 0.0036
+# swDimensionArrowsSide_e.swDimArrowsInside, set rather than left to the
+# document's smart arrows (main's draw_dt_cone_tip_block form). Left smart,
+# the clock read whole at the sweep (0-14.6 and 24.2-90 deg about the
+# vertex at 35.0 mm) but the settling rebuild drew it with its arrows
+# outside on every sheet whose arc is that short (T018-T120, run
+# 20261010T073917031Z): two 10 deg stubs beyond the legs, no arc between
+# them. At 46.4 mm (T006/T012) smart arrows stayed inside.
+ARROWS_INSIDE = 0
+# A settled clock's arcs reach both legs within this, and sweep at least
+# CLOCK_MIN_SWEEP_DEG between them (the text gap is the rest; T006 swept
+# 0-11 and 18-90 deg in that run, 83 deg).
+CLOCK_LEG_TOL_DEG = 1.0
+CLOCK_MIN_SWEEP_DEG = 45.0
 # The bore axis must land within 0.1 mm of BORE_VIEW_CENTER after the move
 # (draw_amplitude_bar's detail tolerance), and the title within 1 mm.
 BORE_VIEW_POSITION_TOL_M = 1e-4
@@ -721,6 +734,60 @@ def _crop_bore_view(
         raise RuntimeError(f"{label} lost {lost} to its crop; it holds {sorted(after)}")
 
 
+def clock_arc_faults(
+    arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
+    vertex: tuple[float, float],
+) -> list[str]:
+    """Why a flat clock's drawn arcs do not read as one 90 deg arc between
+    its legs: centred on the flat/axis crossing, inside the quadrant right of
+    the flat and above the axis, reaching both legs and sweeping most of the
+    way between them. Empty when they do."""
+    if not arcs:
+        return ["no arc"]
+    faults = []
+    angles = []
+    for centre, points in arcs:
+        if math.dist(centre, vertex) > CLOCK_ARC_CENTRE_TOL:
+            faults.append(f"arc centred {math.dist(centre, vertex) * 1000:.2f} mm off the vertex")
+        ends = [
+            math.degrees(math.atan2(py - vertex[1], px - vertex[0]))
+            for px, py in (points[0], points[-1])
+        ]
+        angles.append((min(ends), max(ends)))
+    stray = [
+        point
+        for _centre, points in arcs
+        for point in points
+        if point[0] < vertex[0] - CLOCK_ARC_OVERRUN or point[1] < vertex[1] - CLOCK_ARC_OVERRUN
+    ]
+    if stray:
+        faults.append(f"{len(stray)} point(s) outside the quadrant")
+    low = min(a for a, _b in angles)
+    high = max(b for _a, b in angles)
+    if abs(low) > CLOCK_LEG_TOL_DEG or abs(high - 90.0) > CLOCK_LEG_TOL_DEG:
+        faults.append(f"arcs end at {low:.1f}..{high:.1f} deg, not on the legs")
+    swept = sum(b - a for a, b in angles)
+    if swept < CLOCK_MIN_SWEEP_DEG:
+        faults.append(f"arcs sweep {swept:.1f} deg")
+    return faults
+
+
+def _assert_settled_clocks(adapter: Any, clocks: list[tuple[str, Any, int]]) -> None:
+    """After finalize's settling rebuild, every sheet's flat clock still draws
+    one arc between its legs (run 20261010T073917031Z: read whole at the
+    sweep, drawn as two outside stubs in the PDF on T018-T120)."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    faults = []
+    for configuration, display, teeth in clocks:
+        if not ddoc.ActivateSheet(configuration):
+            raise RuntimeError(f"failed to activate {configuration} for its settled clock")
+        found = clock_arc_faults(_clock_arcs(display), bore_flat_vertex(teeth))
+        if found:
+            faults.append(f"{configuration}: {'; '.join(found)}")
+    if faults:
+        raise RuntimeError("flat clock arcs after the settling rebuild:\n" + "\n".join(faults))
+
+
 def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[float, float]]]]:
     """The clock dimension's drawn arcs as (centre, tessellated points), in
     sheet metres, read the way the layout audit reads them."""
@@ -738,7 +805,7 @@ def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[floa
 
 def _sweep_clock_right_of_flat(
     adapter: Any, view: Any, annotations: list[Any], teeth: int, *, label: str
-) -> None:
+) -> Any:
     """Flip the imported flat clock until its arc sweeps only the quadrant
     right of the flat and above the axis, then re-seat its text there.
 
@@ -757,6 +824,9 @@ def _sweep_clock_right_of_flat(
     annotation = clocks[0]
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    display.ArrowSide = ARROWS_INSIDE
+    if int(display.ArrowSide) != ARROWS_INSIDE:
+        raise RuntimeError(f"{label}: the flat clock did not keep its arrows inside")
     selection_name = str(display.GetNameForSelection() or "")
     if not selection_name:
         raise RuntimeError(f"{label}: the flat clock has no selection name")
@@ -824,7 +894,9 @@ def _sweep_clock_right_of_flat(
                 f"{math.degrees(imported):.4f} to {math.degrees(measured):.4f} deg"
             )
         if not stray:
-            return
+            if int(display.ArrowSide) != ARROWS_INSIDE:
+                raise RuntimeError(f"{label}: {flips} put the clock's arrows outside")
+            return display
     raise RuntimeError(
         f"{label}: flat clock arc still leaves the quadrant right of the flat and "
         f"above the axis after {flips}; first stray points "
@@ -1012,6 +1084,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
+    clocks: list[tuple[str, Any, int]] = []
     for sheet_index, teeth in enumerate(CONFIGURATION_TEETH, start=1):
         configuration = f"T{teeth:03d}"
         view_scale = SHEET_SCALES[configuration]
@@ -1053,9 +1126,10 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} bore",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-        _sweep_clock_right_of_flat(
+        clock = _sweep_clock_right_of_flat(
             adapter, bore_view, bore_annotations, teeth, label=f"{configuration} bore view"
         )
+        clocks.append((configuration, clock, teeth))
         _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
         # The part saves both authoring sketches hidden; the front view shows
         # them again for their dimensions (the side and iso views show the
@@ -1175,6 +1249,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales=SHEET_SCALES,
+        settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),),
     )
 
 
