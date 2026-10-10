@@ -680,6 +680,33 @@ def test_check_band_rejects_inverted_and_zero_width_bands(
         _check_band("synthetic", band, order)
 
 
+@pytest.mark.parametrize(
+    ("source", "replacement"),
+    [
+        ("REAM_H7", (0.017, 0.002)),
+        ("SHAFT_G6_3_TO_6_MM", (-0.006, -0.015)),
+    ],
+)
+def test_measured_close_running_clearance_tracks_shared_bands(
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    replacement: tuple[float, float],
+) -> None:
+    hole_lower, hole_upper = _fit_limits.deviations(_fit_limits.REAM_H7)
+    shaft_lower, shaft_upper = _fit_limits.deviations(_fit_limits.SHAFT_G6_3_TO_6_MM)
+    expected = hole_lower - shaft_upper, hole_upper - shaft_lower
+    assert _fit_limits.measured_close_running_clearance_mm() == pytest.approx(expected)
+    assert 0.0 < expected[0] < expected[1]
+
+    # Change each input independently: a copied clearance literal cannot pass.
+    monkeypatch.setattr(_fit_limits, source, replacement)
+    hole_lower, hole_upper = _fit_limits.deviations(_fit_limits.REAM_H7)
+    shaft_lower, shaft_upper = _fit_limits.deviations(_fit_limits.SHAFT_G6_3_TO_6_MM)
+    changed = hole_lower - shaft_upper, hole_upper - shaft_lower
+    assert changed != expected
+    assert _fit_limits.measured_close_running_clearance_mm() == pytest.approx(changed)
+
+
 @pytest.mark.parametrize("grade", ("standard", "contact_critical"))
 def test_gear_tip_grade_reads_its_shared_configuration(grade: str) -> None:
     import _config
