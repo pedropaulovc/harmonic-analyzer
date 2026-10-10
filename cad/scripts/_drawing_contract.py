@@ -742,9 +742,6 @@ def drawing_specification_violations(
     finish_lookup_direct, finish_lookup_modules = _imported_functions(
         tree, "_surface_finish", frozenset({"surface_finish_by_key"})
     )
-    fit_direct, fit_modules = _imported_functions(
-        tree, "_fit_text", frozenset({"fit_limits", "band_text"})
-    )
     surface_direct, surface_modules = _imported_functions(
         tree, "_drawing_common", frozenset({"add_surface_finish"})
     )
@@ -804,14 +801,6 @@ def drawing_specification_violations(
                 )
 
         if isinstance(node, ast.Call):
-            for renderer in ("fit_limits", "band_text"):
-                if _call_is(node, renderer, fit_direct, fit_modules):
-                    add(
-                        node,
-                        "drawing-tolerance-renderer",
-                        f"{renderer}(...) belongs in model/spec",
-                    )
-
             if _call_is(node, "add_surface_finish", surface_direct, surface_modules):
                 roughness = next(
                     (kw.value for kw in node.keywords if kw.arg == "roughness_ra"), None

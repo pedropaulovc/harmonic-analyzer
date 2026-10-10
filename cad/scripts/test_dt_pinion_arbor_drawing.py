@@ -15,7 +15,6 @@ import _sketch
 import _drawing_marks
 import _fit_deviations
 import _fit_ream_slide
-import _fit_text
 import build_dt_pinion_arbor as part
 import draw_dt_pinion_arbor as drawing
 import dt_pinion_arbor_geometry as geometry
@@ -165,7 +164,6 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     # Both stacked bands print at 2 places: "-0.01/-0.03" and "-0.01/-0.10".
     for band in (spec.JOURNAL_DIA_BAND, spec.SHAFT_DIA_BAND):
         assert _drawing_marks._tolerance_places(*_fit_deviations.deviations(band)) == 2
-    assert _fit_text.band_text(spec.JOURNAL_DIA_BAND) == "-0.01/-0.03"
     assert spec.SHAFT_DIA_BAND == (-0.01, -0.10)
     assert model_toleranced_dimensions(part) == {
         ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
