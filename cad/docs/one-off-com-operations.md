@@ -251,30 +251,36 @@ holds nothing from a supervised run.
 category, exit code and log blob. The workflow id is
 `leaf:<task>:<64-hex cache key>:<clamped timeout>s`
 (`_farm.workflow_id`; for a keyless `check:` leaf the key slot is the first 16
-characters of the requested commit). From the pool checkout:
+characters of the requested commit). Protocol 5 also records the owning
+`build_id`, distinct from a supervised launch's `farm_run`. Resolve the
+coordinator reservation before inspecting an execution. From the pool checkout:
 
 ```powershell
-uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py status "leaf:part:dt_cone_gear:<64hex>:900s"
-uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py logs   "leaf:part:dt_cone_gear:<64hex>:900s"
+uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py leaf-status --build-id "<build-id>" --workflow-id "leaf:part:dt_cone_gear:<64hex>:900s" --json
+uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py status --run-id "<bound-run-id>" "leaf:part:dt_cone_gear:<64hex>:900s"
+uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py logs "leaf:part:dt_cone_gear:<64hex>:900s"
 ```
 
-The submitter logs each ID twice: `Farm workflow requested: <id>` immediately
-before the start call, and `Farm workflow attached: <id>` once the server has
-acknowledged it. A requested ID with no attached line marks the window in which
-the server may already own the workflow while the submitter died, and it is the
-only case where retrying the identical invocation is safe — after an
-authenticated `NOT_FOUND`, never after an authentication, network or CLI
-failure. Follow a leaf that is still running with `farm.py logs "<id>"
---follow`, and add `--json` to `status` when you want to read the verdict
-programmatically.
+The submitter logs each ID twice, with `build_id`: `Farm workflow requested:
+<id>` before submitting the coordinator reservation, and `Farm workflow attached:
+<id>` after obtaining its exact run binding. It also durably records requests
+before submission. A requested ID with no attached line may already be accepted
+but still unbound; workflow `NOT_FOUND` does not settle that reservation.
+Reconcile it through `leaf-status`, including after an uncertain submission
+response. Authentication, network or CLI failures never prove absence.
+Follow a leaf that is still running with `farm.py logs "<id>" --follow`, and
+use exact-run `status --json` for a programmatic execution verdict.
 
-Stopping a local submitter cancels nothing: leaves share their workflow by ID
-(`USE_EXISTING`), so only `farm.py cancel` cancels. Recovering an interrupted
-run therefore means querying *every* requested and attached ID in that run's
-log, not one representative leaf, and resuming with the commit, targets, leaf
-budget and cache environment unchanged — for a supervised launch, the ones in
-its run record, not whatever the caller's worktree holds now; the budget is
-part of the workflow ID. The full procedure is in
+Stopping a local submitter cancels no remote leaf. Its parent lease expires
+after 120 seconds without renewal; this blocks new admissions but does not
+discard accepted reservations or prove physical drain. Explicit cancellation
+closes the owning build and reconciles every requested reservation before
+cancelling an exact bound run, never merely the reusable workflow ID.
+Recovering an interrupted run therefore means accounting for *every* request,
+not one representative leaf. A new invocation creates a fresh build ID; retain
+the commit, targets, leaf budget and cache environment — for a supervised
+launch, those in its run record, not the caller's current worktree. The budget
+remains part of the canonical workflow ID. The full procedure is in
 [supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
 
 **A failure OUTSIDE the recipe has no leaf log.** `farm.py logs` needs

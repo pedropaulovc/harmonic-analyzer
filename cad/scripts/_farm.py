@@ -1,6 +1,6 @@
 """Farm executor: dispatch one cache-missing doit leaf to the SolidWorks build farm.
 
-The constants, ``LeafRequest``/``LeafResult`` and ``workflow_id`` below mirror
+The constants and frozen wire types below mirror
 ``solidworks-pool/agent/contract.py`` field-for-field; ``FARM_PROTOCOL_VERSION``
 mirrors ``agent/protocol.py`` and guards drift between the two repos (a mismatch
 fails admission on the farm). This module must never import the pool package.
@@ -14,6 +14,7 @@ certificate and the bearer token (``Authorization: Bearer <jwt>``).
 
 from __future__ import annotations
 
+import _thread
 import asyncio
 import getpass
 import hashlib
@@ -21,27 +22,38 @@ import json
 import os
 import socket
 import subprocess
+import threading
+import time
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
+from uuid import uuid4
 
 import _telemetry
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-FARM_PROTOCOL_VERSION = 4
+FARM_PROTOCOL_VERSION = 5
 
-TASK_QUEUE_CONTROL = "solidworks-control"  # BuildLeaf workflow tasks
+TASK_QUEUE_CONTROL = "solidworks-control"  # coordinator and BuildLeaf workflows
 TASK_QUEUE_COM = "solidworks-com"  # build_leaf activity tasks
 WORKFLOW_BUILD_LEAF = "BuildLeaf"
+WORKFLOW_BUILD_FIFO = "BuildFifo"
+WORKFLOW_BUILD_FIFO_ID = "solidworks-build-fifo"
 ACTIVITY_BUILD_LEAF = "build_leaf"
 NAMESPACE = "solidworks"
 
 CONFIG_ENV = "SOLIDWORKS_POOL_CONFIG"
 DEFAULT_CONFIG_PATH = Path.home() / ".solidworks-pool" / "config.json"
-EXECUTION_TIMEOUT = timedelta(hours=8)
+FIFO_HEARTBEAT_INTERVAL_S = 15
+FIFO_PRODUCER_LEASE_S = 120
+FIFO_RPC_TIMEOUT_S = 10
+STATUS_POLL_INTERVAL_S = 1
+# Consecutive read-outage budget only; this never acknowledges producer ownership.
+FIFO_LEAF_STATUS_RETRY_S = 120
 LEAF_TIMEOUT_DEFAULT_S = 15 * 60
 LEAF_TIMEOUT_MIN_S = 60
 LEAF_TIMEOUT_MAX_S = 3 * 3600
@@ -55,6 +67,7 @@ class LeafRequest:
     cache_key: str | None  # 64-hex expected buildcache key; None only for check:*
     traceparent: str | None
     submitter: str  # f"{user}@{host}", UI summary only
+    build_id: str
     leaf_timeout_s: int | None = None  # per-attempt budget; None takes the default
 
 
@@ -73,6 +86,105 @@ class LeafResult:
     # publish_log), mirroring the pool contract; a phase never entered is absent.
     # Defaulted so a worker that predates the field still decodes.
     phase_ms: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class RegisterBuild:
+    build_id: str
+    submitter: str
+    display_name: str
+
+
+@dataclass(frozen=True)
+class HeartbeatBuild:
+    build_id: str
+    sequence: int
+
+
+@dataclass(frozen=True)
+class CloseBuild:
+    build_id: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class BuildKey:
+    build_id: str
+
+
+@dataclass(frozen=True)
+class BuildStatus:
+    build_id: str
+    fifo_ordinal: int
+    producer_state: str
+    ownership_state: str
+    lease_deadline: str
+    outstanding_leaf_count: int
+    unconfirmed_attempt_count: int
+
+
+@dataclass(frozen=True)
+class SubmitLeaf:
+    request: LeafRequest
+    farm_run: str | None
+
+
+@dataclass(frozen=True)
+class LeafKey:
+    build_id: str
+    workflow_id: str
+
+
+@dataclass(frozen=True)
+class LeafBinding:
+    build_id: str
+    workflow_id: str
+    run_id: str
+
+
+@dataclass(frozen=True)
+class LeafAttempt:
+    binding: LeafBinding
+    activity_id: str
+    attempt: int
+    worker_id: str
+
+
+@dataclass(frozen=True)
+class AttemptAdmission:
+    state: Literal["admitted", "drained", "denied"]
+    reason: str | None
+
+
+@dataclass(frozen=True)
+class LeafStatus:
+    key: LeafKey
+    state: str
+    binding: LeafBinding | None
+    unconfirmed_attempts: list[LeafAttempt]
+    error_code: str | None = None
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class ConfirmAttemptDrained:
+    attempt: LeafAttempt
+    evidence: str
+
+
+@dataclass(frozen=True)
+class ConfirmReservationDrained:
+    key: LeafKey
+    evidence: str
+    run_id: str | None = None
+
+
+@dataclass(frozen=True)
+class FifoStatus:
+    active: BuildStatus | None
+    waiting: list[BuildStatus]
+    draining: list[BuildStatus]
+    capacity_error: str | None = None
 
 
 def clamp_leaf_timeout_s(requested: int | None) -> int:
@@ -295,6 +407,359 @@ def submitter() -> str:
     return f"{getpass.getuser()}@{socket.gethostname()}"
 
 
+class BuildOwnershipError(RuntimeError):
+    """The producer cannot prove it still owns admission to the build farm."""
+
+
+def _build_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + "-" + uuid4().hex
+
+
+async def _connect_client(identity: str):
+    # Keep Temporal's Rust bridge out of local builds and offline check workers.
+    from temporalio.client import Client
+    from temporalio.service import TLSConfig
+
+    config = load_config()
+    address = config["temporal_address"]
+    return await Client.connect(
+        address,
+        namespace=config["namespace"],
+        api_key=Path(config["token"]).read_text(encoding="ascii").strip(),
+        tls=TLSConfig(
+            server_root_ca_cert=Path(config["ca_cert"]).read_bytes(),
+            domain=address.rsplit(":", 1)[0],
+            client_cert=Path(config["client_cert"]).read_bytes(),
+            client_private_key=Path(config["client_key"]).read_bytes(),
+        ),
+        identity=identity,
+    )
+
+
+async def _fifo_handle(client):
+    from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
+
+    await asyncio.wait_for(
+        client.start_workflow(
+            WORKFLOW_BUILD_FIFO,
+            id=WORKFLOW_BUILD_FIFO_ID,
+            task_queue=TASK_QUEUE_CONTROL,
+            id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        ),
+        timeout=FIFO_RPC_TIMEOUT_S,
+    )
+    # Deliberately no coordinator run pin: continue-as-new preserves ownership.
+    return client.get_workflow_handle(WORKFLOW_BUILD_FIFO_ID)
+
+
+async def _rpc_update(handle, name: str, arg, result_type, operation: str):
+    # Stable, bounded IDs make an uncertain RPC safe to reconcile or repeat.
+    update_id = "fifo:" + hashlib.sha256(operation.encode("utf-8")).hexdigest()
+    return await asyncio.wait_for(
+        handle.execute_update(
+            name,
+            arg,
+            id=update_id,
+            result_type=result_type,
+            rpc_timeout=timedelta(seconds=FIFO_RPC_TIMEOUT_S),
+        ),
+        timeout=FIFO_RPC_TIMEOUT_S,
+    )
+
+
+async def _rpc_query(handle, name: str, arg, result_type):
+    return await asyncio.wait_for(
+        handle.query(
+            name,
+            arg,
+            result_type=result_type,
+            rpc_timeout=timedelta(seconds=FIFO_RPC_TIMEOUT_S),
+        ),
+        timeout=FIFO_RPC_TIMEOUT_S,
+    )
+
+
+def _is_transient_fifo_error(exc: Exception) -> bool:
+    from temporalio.client import WorkflowUpdateRPCTimeoutOrCancelledError
+    from temporalio.service import RPCError, RPCStatusCode
+
+    if isinstance(exc, RPCError):
+        return exc.status in {
+            RPCStatusCode.CANCELLED,
+            RPCStatusCode.UNKNOWN,
+            RPCStatusCode.DEADLINE_EXCEEDED,
+            RPCStatusCode.RESOURCE_EXHAUSTED,
+            RPCStatusCode.ABORTED,
+            RPCStatusCode.INTERNAL,
+            RPCStatusCode.UNAVAILABLE,
+        }
+    return isinstance(
+        exc, (TimeoutError, ConnectionError, WorkflowUpdateRPCTimeoutOrCancelledError)
+    )
+
+
+async def _reserved_leaf_status(handle, key: LeafKey) -> LeafStatus:
+    """Reconcile the same accepted reservation through a bounded read outage.
+
+    Action workers have no acknowledged parent lease. This independent monotonic
+    budget bounds only consecutive transient read failures, including an RPC in
+    flight. A successful reserved reply may begin another read-outage budget.
+    """
+    deadline = time.monotonic() + FIFO_LEAF_STATUS_RETRY_S
+    last_error = None
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(
+                f"leaf reservation status unavailable for {FIFO_LEAF_STATUS_RETRY_S}s: "
+                f"{key.workflow_id}; accepted work remains under the coordinator"
+            ) from last_error
+        try:
+            return await asyncio.wait_for(
+                _rpc_query(handle, "leaf_status", key, LeafStatus), timeout=remaining
+            )
+        except Exception as exc:
+            if not _is_transient_fifo_error(exc):
+                raise
+            last_error = exc
+            await asyncio.sleep(
+                min(STATUS_POLL_INTERVAL_S, max(0, deadline - time.monotonic()))
+            )
+
+
+def producer_build(display_name: str):
+    """The parent-only ownership seam, entered only after valid preflight."""
+    return _ProducerBuild(_display_name(display_name))
+
+
+class _ProducerBuild:
+    """One parent thread owns the client, renewal loop and normal close.
+
+    Spawned doit workers inherit only the build ID, never the renewal thread.
+    Lease-bounded transient retries keep the same registration and update ID.
+    Ownership loss stops local scheduling; accepted reservations still drain
+    under the coordinator rather than being cancelled by this context.
+    """
+
+    def __init__(self, display_name: str):
+        self.build_id = _build_id()
+        self.display_name = display_name
+        self._ready = threading.Event()
+        self._stop = threading.Event()
+        self._failure: BaseException | None = None
+        self._executing = False
+        self._reason = "finished"
+        self._previous_id: str | None = None
+        self._lease_deadline: float | None = None
+        self._lease_wall: datetime | None = None
+        self._thread = threading.Thread(
+            target=self._run, name="farm-build-lease", daemon=True
+        )
+
+    def __enter__(self):
+        self._previous_id = os.environ.get("HARMONIC_FARM_BUILD_ID")
+        os.environ["HARMONIC_FARM_BUILD_ID"] = self.build_id
+        try:
+            _record_build(self.build_id)
+            self._thread.start()
+            # Windows CPython 3.12/3.13 needs finite waits to deliver Ctrl-C.
+            while not self._ready.wait(timeout=1):
+                pass
+            if self._failure is not None:
+                raise BuildOwnershipError(
+                    f"build {self.build_id} ownership failed: {self._failure}"
+                ) from self._failure
+            self._executing = True
+            # A failure can race the transition from waiting to task execution.
+            self.check()
+            return self
+        except BaseException as exc:
+            self._executing = False
+            self._reason = "cancelled" if isinstance(exc, KeyboardInterrupt) else "failed"
+            self._stop.set()
+            if self._thread.ident is not None:
+                self._thread.join()
+            self._restore_env()
+            raise
+
+    def finish(self, success: bool) -> None:
+        self._reason = "finished" if success else "failed"
+
+    def check(self) -> None:
+        if self._failure is not None:
+            raise BuildOwnershipError(
+                f"build {self.build_id} ownership lost: {self._failure}"
+            ) from self._failure
+
+    def __exit__(self, exc_type, exc, traceback):
+        self._executing = False
+        if exc is not None:
+            self._reason = "cancelled" if isinstance(exc, KeyboardInterrupt) else "failed"
+        if self._failure is not None:
+            self._reason = "failed"
+        self._stop.set()
+        try:
+            self._thread.join()
+        finally:
+            self._restore_env()
+        if exc is None or isinstance(exc, KeyboardInterrupt):
+            self.check()
+        return False
+
+    def _restore_env(self) -> None:
+        if self._previous_id is None:
+            os.environ.pop("HARMONIC_FARM_BUILD_ID", None)
+        else:
+            os.environ["HARMONIC_FARM_BUILD_ID"] = self._previous_id
+
+    def _fail(self, exc: BaseException) -> None:
+        if self._failure is None:
+            self._failure = exc
+            self._ready.set()
+            if self._executing:
+                # Doit's main thread may be waiting for spawned action workers.
+                # Stop the parent, not their shared remote workflow executions.
+                _thread.interrupt_main()
+
+    def _run(self) -> None:
+        try:
+            asyncio.run(self._serve())
+        except BaseException as exc:
+            self._fail(exc)
+
+    def _lease_remaining(self) -> float:
+        if self._lease_deadline is None:
+            raise BuildOwnershipError("producer has no acknowledged lease")
+        remaining = self._lease_deadline - time.monotonic()
+        if remaining <= 0:
+            raise BuildOwnershipError("producer's acknowledged lease expired")
+        return remaining
+
+    def _accept_status(
+        self, status: BuildStatus, *, active: bool, renewed: bool = False
+    ) -> bool:
+        if self._lease_deadline is not None:
+            self._lease_remaining()
+        deadline = datetime.fromisoformat(status.lease_deadline.replace("Z", "+00:00"))
+        if (
+            status.build_id != self.build_id
+            or status.producer_state != "open"
+            or status.ownership_state not in {"waiting", "active"}
+            or (active and status.ownership_state != "active")
+            or deadline.tzinfo is None
+            or deadline <= datetime.now(timezone.utc)
+        ):
+            raise BuildOwnershipError(
+                f"coordinator refused build {self.build_id}: "
+                f"{status.producer_state}/{status.ownership_state}"
+            )
+        if self._lease_wall is None or (renewed and deadline > self._lease_wall):
+            self._lease_wall = deadline
+            self._lease_deadline = time.monotonic() + (
+                deadline - datetime.now(timezone.utc)
+            ).total_seconds()
+        # Polls and duplicate heartbeats never extend the acknowledged lease.
+        self._lease_remaining()
+        return status.ownership_state == "active"
+
+    async def _leased_rpc(self, call, *args) -> BuildStatus | None:
+        """Retry uncertain transport results, never a coordinator refusal.
+
+        Every retry is bounded by the last acknowledged lease. The caller keeps
+        the same heartbeat sequence and operation ID until it gets an answer.
+        """
+        while not self._stop.is_set():
+            remaining = self._lease_remaining()
+            try:
+                return await asyncio.wait_for(call(*args), timeout=remaining)
+            except Exception as exc:
+                if not _is_transient_fifo_error(exc):
+                    raise
+                remaining = self._lease_remaining()
+                if not self._stop.is_set():
+                    await asyncio.sleep(min(STATUS_POLL_INTERVAL_S, remaining))
+        return None
+
+    async def _serve(self) -> None:
+        handle = None
+        try:
+            client = await asyncio.wait_for(
+                _connect_client(submitter()), timeout=FIFO_RPC_TIMEOUT_S
+            )
+            handle = await _fifo_handle(client)
+            status = await _rpc_update(
+                handle,
+                "register_build",
+                RegisterBuild(self.build_id, submitter(), self.display_name),
+                BuildStatus,
+                f"register:{self.build_id}",
+            )
+            active = self._accept_status(status, active=False)
+            _telemetry.info(
+                f"Farm build registered: {self.build_id}",
+                build_id=self.build_id,
+                fifo_ordinal=status.fifo_ordinal,
+                ownership_state=status.ownership_state,
+            )
+            heartbeat_due = time.monotonic() + FIFO_HEARTBEAT_INTERVAL_S
+            sequence = 0
+            while not self._stop.is_set():
+                self._lease_remaining()
+                if active:
+                    self._ready.set()
+                if time.monotonic() >= heartbeat_due:
+                    sequence += 1
+                    status = await self._leased_rpc(
+                        _rpc_update,
+                        handle,
+                        "heartbeat_build",
+                        HeartbeatBuild(self.build_id, sequence),
+                        BuildStatus,
+                        f"heartbeat:{self.build_id}:{sequence}",
+                    )
+                    if status is None:
+                        break
+                    active = self._accept_status(status, active=active, renewed=True)
+                    heartbeat_due = time.monotonic() + FIFO_HEARTBEAT_INTERVAL_S
+                elif not active:
+                    status = await self._leased_rpc(
+                        _rpc_query,
+                        handle,
+                        "build_status",
+                        BuildKey(self.build_id),
+                        BuildStatus,
+                    )
+                    if status is None:
+                        break
+                    active = self._accept_status(status, active=False)
+                await asyncio.sleep(
+                    min(STATUS_POLL_INTERVAL_S, self._lease_remaining())
+                )
+        except BaseException as exc:
+            self._reason = "failed"
+            self._fail(exc)
+        finally:
+            if handle is not None:
+                try:
+                    await _rpc_update(
+                        handle,
+                        "close_build",
+                        CloseBuild(self.build_id, self._reason),
+                        BuildStatus,
+                        f"close:{self.build_id}:{self._reason}",
+                    )
+                except Exception as exc:
+                    # No new local work remains. Server lease expiry fences an
+                    # unacknowledged close; it cannot change the command result
+                    # or erase any ownership failure already recorded above.
+                    _telemetry.warn(
+                        f"Farm build close unacknowledged: {self.build_id}: {exc}; "
+                        "the producer lease will expire",
+                        build_id=self.build_id,
+                    )
+
+
 def leaf_timeout_s() -> int | None:
     """The per-attempt budget this run asks for, or ``None`` for the default.
 
@@ -335,6 +800,7 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
             cache_key=cache_key,
             traceparent=_telemetry.inject_env().get("TRACEPARENT"),
             submitter=submitter(),
+            build_id=_required_build_id(),
             leaf_timeout_s=leaf_timeout_s(),
         )
         budget = clamp_leaf_timeout_s(request.leaf_timeout_s)
@@ -353,27 +819,47 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
         return result
 
 
-def _record_request(task: str, wf_id: str) -> None:
-    """Name this workflow in the launcher run's request directory, if any.
-
-    scripts/farm-run.ps1 exports ``HARMONIC_FARM_REQUESTS``. Its own copy of
-    this process's output can lose the last lines when -Cancel stops it, so
-    -Cancel also reads these files, written straight from here before the
-    workflow can exist. One file per workflow, renamed into place, so parallel
-    doit workers never share a handle and a reader never sees half a file. A
-    write that fails fails the leaf before dispatch: an unnamed leaf could
-    outlive a cancel.
-    """
+def _record_json(name: str, value: dict) -> None:
     directory = os.environ.get("HARMONIC_FARM_REQUESTS")
     if not directory:
         return
-    name = hashlib.sha256(wf_id.encode("utf-8")).hexdigest()[:32]
     path = Path(directory) / f"{name}.json"
     staging = path.with_name(f"{name}.{os.getpid()}.tmp")
-    staging.write_text(
-        json.dumps({"task": task, "workflow_id": wf_id}), encoding="utf-8"
-    )
+    staging.write_text(json.dumps(value), encoding="utf-8")
     os.replace(staging, path)
+
+
+def _record_build(build_id: str) -> None:
+    # Before registration: even an accepted RPC whose response is lost is named.
+    _record_json(
+        "build", {"build_id": build_id, "farm_run": os.environ.get("HARMONIC_FARM_RUN")}
+    )
+
+
+def _required_build_id() -> str:
+    build_id = os.environ.get("HARMONIC_FARM_BUILD_ID")
+    if not build_id:
+        raise BuildOwnershipError("farm task has no parent build ownership")
+    return build_id
+
+
+def _record_request(task: str, wf_id: str) -> None:
+    """Name a reservation before acceptance, even if launcher output is lost.
+
+    One atomic file per canonical workflow keeps parallel action processes
+    independent. A failed write fails dispatch: an unnamed reservation could
+    otherwise outlive explicit launcher cancellation.
+    """
+    name = hashlib.sha256(wf_id.encode("utf-8")).hexdigest()[:32]
+    _record_json(
+        name,
+        {
+            "task": task,
+            "workflow_id": wf_id,
+            "build_id": _required_build_id(),
+            "farm_run": os.environ.get("HARMONIC_FARM_RUN"),
+        },
+    )
 
 
 def _display_name(label: str | None = None) -> str:
@@ -404,68 +890,67 @@ def _display_name(label: str | None = None) -> str:
 
 
 async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
-    display_name = _display_name()
-    # temporalio loads a Rust bridge; import it only when a leaf is dispatched so
-    # local builds and the offline check:* workers never pay for it.
-    from temporalio.client import Client, WorkflowFailureError
-    from temporalio.common import WorkflowIDConflictPolicy
+    _display_name()
+    if request.build_id != _required_build_id():
+        raise BuildOwnershipError("leaf build ID does not match parent ownership")
+    from temporalio.client import WorkflowFailureError
     from temporalio.exceptions import CancelledError
-    from temporalio.service import TLSConfig
 
-    config = load_config()
-    address = config["temporal_address"]
-    client = await Client.connect(
-        address,
-        namespace=config["namespace"],
-        api_key=Path(config["token"]).read_text(encoding="ascii").strip(),
-        tls=TLSConfig(
-            server_root_ca_cert=Path(config["ca_cert"]).read_bytes(),
-            domain=address.rsplit(":", 1)[0],
-            client_cert=Path(config["client_cert"]).read_bytes(),
-            client_private_key=Path(config["client_key"]).read_bytes(),
-        ),
-        identity=request.submitter,
+    client = await asyncio.wait_for(
+        _connect_client(request.submitter), timeout=FIFO_RPC_TIMEOUT_S
     )
-    _telemetry.info(
-        f"Farm workflow requested: {wf_id}",
-        workflow_id=wf_id,
-        task=request.task,
-        commit=request.commit,
-    )
+    coordinator = await _fifo_handle(client)
+    identity = {
+        "workflow_id": wf_id,
+        "task": request.task,
+        "commit": request.commit,
+        "build_id": request.build_id,
+    }
+    _telemetry.info(f"Farm workflow requested: {wf_id}", **identity)
     _record_request(request.task, wf_id)
-    # A memo is written only by the start that creates the execution; an
-    # attach (USE_EXISTING) leaves the creator's. The request records above say
-    # this run asked for the leaf; only the memo says its own run created it
-    # (farm.py status --json reports it as farm_run). The display label likewise
-    # remains the creator's when another session attaches to this shared ID.
-    farm_run = os.environ.get("HARMONIC_FARM_RUN")
-    memo = {"display_name": display_name}
-    if farm_run:
-        memo["farm_run"] = farm_run
-    handle = await client.start_workflow(
-        WORKFLOW_BUILD_LEAF,
-        request,
-        id=wf_id,
-        task_queue=TASK_QUEUE_CONTROL,
-        result_type=LeafResult,
-        id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
-        execution_timeout=EXECUTION_TIMEOUT,
-        memo=memo,
+    # Only the coordinator can reserve and start a leaf. Creator metadata stays
+    # on the run it starts; attaching to a canonical ID never rewrites the memo.
+    key = LeafKey(request.build_id, wf_id)
+    status = await _rpc_update(
+        coordinator,
+        "submit_leaf",
+        SubmitLeaf(request, os.environ.get("HARMONIC_FARM_RUN")),
+        LeafStatus,
+        f"submit:{request.build_id}:{wf_id}",
     )
-    _telemetry.info(
-        f"Farm workflow attached: {wf_id}",
-        workflow_id=wf_id,
-        task=request.task,
-        commit=request.commit,
+    while True:
+        if status.key != key:
+            raise BuildOwnershipError("coordinator returned a foreign leaf reservation")
+        if status.error_code or status.state == "recovery_required":
+            raise BuildOwnershipError(
+                f"leaf reservation requires operator recovery "
+                f"[{status.error_code or 'recovery_required'}]: "
+                f"{status.error or wf_id}"
+            )
+        if status.state not in {
+            "reserved", "bound", "admitted", "terminal", "drained", "missing_closed"
+        }:
+            raise BuildOwnershipError("coordinator returned an invalid leaf reservation state")
+        binding = status.binding
+        if binding is not None:
+            if (
+                binding.build_id != request.build_id
+                or binding.workflow_id != wf_id
+                or not binding.run_id
+            ):
+                raise BuildOwnershipError("coordinator returned a foreign leaf binding")
+            break
+        if status.state != "reserved":
+            raise BuildOwnershipError("accepted leaf closed without a proven run binding")
+        await asyncio.sleep(STATUS_POLL_INTERVAL_S)
+        status = await _reserved_leaf_status(coordinator, key)
+    handle = client.get_workflow_handle(
+        wf_id, run_id=binding.run_id, result_type=LeafResult
     )
-    _telemetry.event(
-        "farm.attached",
-        workflow_id=wf_id,
-        task=request.task,
-        commit=request.commit,
-    )
+    _telemetry.info(f"Farm workflow attached: {wf_id}", **identity)
+    _telemetry.event("farm.attached", **identity)
     try:
-        return await handle.result()
+        return await handle.result(follow_runs=False)
     except WorkflowFailureError as exc:
         if not isinstance(exc.cause, CancelledError):
             raise
