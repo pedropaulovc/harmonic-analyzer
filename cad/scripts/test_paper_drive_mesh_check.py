@@ -20,13 +20,16 @@ def test_both_meshes_pass_the_standard_gates() -> None:
 
 def test_reducer_centre_sits_inside_its_derived_window() -> None:
     # pd_rack_pinion_spec states the window: the interference point at the
-    # tight extreme bounds it below, CR 1.2 at the minimum tips above.
+    # tight extreme (centre less the 0.05 TIR shift) bounds it below, CR 1.2
+    # at the minimum tips above. The centre is the window's midpoint.
     centre = disc.CENTRE_DISTANCE
-    assert mesh.reducer_mesh(35.052).interference_margin_min_mm >= 0.0
-    assert mesh.reducer_mesh(35.050).interference_margin_min_mm < 0.0
+    assert mesh.reducer_runout_shift_mm() == pytest.approx(0.05)
+    assert mesh.reducer_mesh(35.097).interference_margin_min_mm >= 0.0
+    assert mesh.reducer_mesh(35.096).interference_margin_min_mm < 0.0
     assert mesh.reducer_mesh(35.105).contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
     assert mesh.reducer_mesh(35.106).contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
-    assert 35.052 < centre < 35.105
+    assert centre == pytest.approx((35.097 + 35.105) / 2.0)
+    assert mesh.reducer_mesh(centre).failures() == []
     # The superseded 35.183 centre fails the contact-ratio gate.
     assert "contact ratio" in " ".join(mesh.reducer_mesh(35.183).failures())
 

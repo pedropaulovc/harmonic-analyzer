@@ -92,9 +92,12 @@ ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
 BORE_FINISH_POSITION = (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] - 0.082)
 GEAR_DATA_XY = (0.018, 0.262)
 GEAR_DATA_CHAR_HEIGHT = 0.0022
-# Four rows use the clear upper-right lane, above all physical gear views.
-TOOTH_SPACE_CALLOUT_XY = (0.230, 0.260)
-TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035  # standard note font; four control rows
+# Three rows use the clear upper-right lane, above all physical gear views.
+# x 0.262, not 0.230: run 12's leader from 0.230 down to the gap-18 flank
+# (237.7, 201.5 mm) ran 3.6 mm through the ToothSpan text [228-245, 226-230
+# mm]; from 0.262 it passes that text 3 mm to its right.
+TOOTH_SPACE_CALLOUT_XY = (0.262, 0.260)
+TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035  # standard note font
 TOOTH_SPACE_GAP_INDEX = 18  # actual upper-right flank under the control-note lane
 
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0

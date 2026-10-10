@@ -216,7 +216,9 @@ def test_gear_data_block_specifies_the_actual_finite_tooth_system() -> None:
     assert spec.TOOTH_THICKNESS == spec.STOCK_PROFILE.pitch_tooth_thickness_mm
     assert part.GEAR_DATA == data
     assert "FINITE TRANSLATED STOCK FORM, NOT x" in data
-    assert "VENDOR-CERTIFIED" in spec.DRAWING_NOTES
+    # A shop note states the requirement, not the method or design history.
+    assert spec.DRAWING_NOTES == spec.BORE_FRONT_CHAMFER_NOTE
+    assert "CERTIFIED" not in data and "PREMISE" not in data
     assert not hasattr(spec, "PROFILE_SHIFT")
     assert not hasattr(spec, "MESH_PINION_PROFILE_SHIFT")
     assert "PROFILE SHIFT" not in data
@@ -344,12 +346,11 @@ def test_disc_pitch_index_uses_actual_reference_and_live_quality_readers() -> No
     assert spec.PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM == uncertainty > 0.0
     assert spec.PITCH_INDEX_STATIONS == tuple(range(121))
     assert spec.TOOTH_SPACE_CALLOUT.splitlines() == [
-        f"TOOTH SPACE RADIAL INDICATOR TIR {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.3f} "
-        "MAX TO FEED BORE A (ASSY)",
-        f"PITCH INDEX RANGE+2U {spec.PITCH_INDEX_DEVIATION_MM} mm MAX AT REF Ø63.500",
-        f"ALL SPACES + WRAP; ABS POSITION U {uncertainty} mm MAX",
-        "CERTIFIED PIN Ø1.000 mm; ALL 120 SPACES",
+        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO FEED BORE A (ASSY)",
+        "Ø1.000 PIN, ALL 120 SPACES",
+        f"INDEX RANGE {spec.PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     ]
+    assert "U " not in spec.TOOTH_SPACE_CALLOUT  # uncertainty is method, not printed
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     for field, getter in (
         ("PITCH_INDEX_DEVIATION_MM", "pinion_pitch_index_deviation_mm"),
@@ -418,7 +419,7 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM == 1.0
     from _gear_quality import toothspace_runout_tir_mm
 
-    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.005
+    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     grade = next(
         node for node in tree.body if isinstance(node, ast.Assign)
@@ -445,15 +446,13 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert drawing.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert inspection.splitlines()[0] == (
-        f"TOOTH SPACE RADIAL INDICATOR TIR {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.3f} "
-        "MAX TO FEED BORE A (ASSY)"
+        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO FEED BORE A (ASSY)"
     )
-    assert len(inspection.splitlines()) == 4
+    assert len(inspection.splitlines()) == 3
     assert max(map(len, inspection.splitlines())) <= 70
-    assert "MAX TO A" not in inspection  # local part A is only the 13.1 pilot
-    assert "CRITICAL; ASSEMBLED RUNNING-BORE DATUM" in spec.GEAR_DATA
-    assert "1.000; ACTUAL CERTIFIED DIA" in spec.GEAR_DATA
-    assert "EACH OF ALL 120 SPACES; FIXED RADIAL STATION" in spec.GEAR_DATA
+    assert "TO A" not in inspection  # local part A is only the 13.1 pilot
+    # The sheet states the requirement; the method and history stay off it.
+    assert not any(word in inspection + spec.GEAR_DATA for word in ("CERTIFIED", "PREMISE"))
     assert not any(word in inspection for word in ("TRANSFER", "LOCK", "MATCH-MARK"))
 
 
@@ -557,7 +556,7 @@ def test_saved_crlf_control_passes_and_a_changed_line_is_refused() -> None:
 
     saved = spec.TOOTH_SPACE_CALLOUT.replace("\n", "\r\n")
     require_source_control(saved, spec.TOOTH_SPACE_CALLOUT, label="rack pinion")
-    stale = saved.replace("0.005", "0.010")
+    stale = saved.replace("0.05 TIR", "0.10 TIR")
     with pytest.raises(RuntimeError, match="differs from the current specification"):
         require_source_control(stale, spec.TOOTH_SPACE_CALLOUT, label="rack pinion")
 

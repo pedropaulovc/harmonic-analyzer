@@ -36,14 +36,12 @@ from typing import Any, Callable, Iterable, Sequence
 
 import _chain as chain
 import _config
+import _gear_quality as quality
 import _telemetry
-import paper_drive_geom as paper_geometry
-import paper_drive_arm_registration as registration
 import pd_latch_hook_geometry as hook_geometry
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
 import pd_platen_guide_spec as platen_guide
-import pd_platen_rack_spec as platen_rack
 import pd_platen_spec as platen
 import pd_rack_pinion_spec as disc
 import pd_transgear_arm_geometry as arm_geometry
@@ -750,10 +748,11 @@ def _uncross_ring(
 # Sheet 1's isometric balloons what sheets 2 and 3 do not show: the chain,
 # and the spare T18 on the base deck (the third removable inserted), whose
 # item sheet 2 balloons on the mounted knob wheel.
+SPARE_INSTANCE = "pd-transgear-removable-3"
 ASSEMBLED_BALLOON_ANCHORS = {
     "vn-chain-inner-link": BalloonAnchor(),
     "vn-chain-outer-link": BalloonAnchor(),
-    "pd-transgear-removable": BalloonAnchor(instance="pd-transgear-removable-3"),
+    "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
 # Sheet 3's exploded view balloons every family it shows.
 PLATEN_BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in explode.SHOWN_STEMS}
@@ -990,12 +989,10 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "BOTH COLUMNS; TIGHTEN."
         ),
         "rack-soldered": (
-            f"CHECK THE {_N['pd-platen-rack']} RACK'S FLANK LIMIT: "
-            f"{platen_rack.rack_flank_inspection_procedure_text()} "
             f"SOFT-SOLDER THE {_N['pd-platen-rack']} RACK TO THE {_N['pd-platen']} "
             "PLATEN'S BACK, TEETH DOWN, ENDS FLUSH WITH THE PLATEN'S, CRESTS "
             f"{steps.RACK_CREST_TEXT} BELOW "
-            "ITS BOTTOM EDGE."
+            "ITS BOTTOM EDGE. SIGHT ALONG IT: TEETH STRAIGHT, NO SOLDER IN THE GAPS."
         ),
         "guides-screwed": (
             f"SCREW THE {len(platen.GUIDE_HOLE_Y)} {_N['pd-platen-guide']} GUIDES TO "
@@ -1031,9 +1028,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "ARM'S REAMED HOLE FROM THE REAR TILL ITS HEAD SEATS ON THE ARM."
         ),
         "arm-plate-located": (
-            f"LOCATE {_N['pd-transgear-arm']} AND {_N['pd-transgear-arm-plate']} "
-            "IN THE CRITICAL S-K JIG AT THE GEAR PLANE PER THEIR DRAWINGS; "
-            "MATCH-DRILL AND REAM THE LOCATING HOLES TO THEIR SEPARATE SPECIFIED FITS. "
+            f"CLAMP {_N['pd-transgear-arm']} AND {_N['pd-transgear-arm-plate']} "
+            "TOGETHER IN THE S-K JIG PER THEIR DRAWINGS; "
+            "MATCH-DRILL AND REAM THE LOCATING HOLES. "
             f"PRESS {TRANSGEAR_QUANTITIES['vn-transgear-arm-plate-locating-pin']} "
             f"{_N['vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
             f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
@@ -1045,29 +1042,25 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"FIT {TRANSGEAR_QUANTITIES['vn-transgear-arm-plate-screw']} "
             f"{_N['vn-transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH TAPS; "
             "SNUG BOTH, THEN TIGHTEN THEM IN TURN. DOWELS LOCATE; SCREWS CLAMP ONLY. "
-            f"{registration.ARM_PLATE_ACCEPTANCE_TEXT}"
+            "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS, NO DAYLIGHT "
+            "UNDER IT. RE-CHECK AFTER EVERY REMOVAL."
         ),
         "arm-plate-screws-cut": (
-            "BENCH-FIT THE ACTUAL MATCHED ARM/PLATE AND BOTH SCREWS; "
-            "REMOVE FOR PRE-CUT OFF MECHANISM, BEFORE THE GUIDE-LOCK SWEEP. "
-            f"CUT BOTH {_N['vn-transgear-arm-plate-screw']} TIPS FLUSH TO "
-            f"{joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S FRONT "
-            f"FACE; BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}. "
-            "REFIT AFTER CUTTING; "
-            "REASSEMBLE THE SAME MATCHED HARDWARE BEFORE PIVOTING THE HANGER."
+            f"TAKE BOTH {_N['vn-transgear-arm-plate-screw']} SCREWS OUT; CUT THEIR "
+            f"TIPS FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S "
+            f"FRONT FACE; BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}. "
+            "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER."
         ),
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
-        # fixed in the bar; the MHA-VN-049 spring holds the arm on it. The
-        # actual free-fall fit check below is not a loaded-engagement proof;
-        # loaded motion requires the complete source-derived physical qualifier.
+        # fixed in the bar; the MHA-VN-049 spring holds the arm on it.
         "hanger-pivoted": (
             f"{_N['vn-transgear-pivot-spring']} SPRING, THEN ARM, ON THE "
             f"{_N['vn-transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR; PRESS "
             f"THE {_N['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE SHOULDER, "
             "FLUSH WITH ITS END ON A FLAT. SEAT IT IN THE "
             f"{_N['pd-support-bar']} BAR'S BLIND TAP WITH LOW-STRENGTH THREADLOCKER; "
-            "THE ARM FALLS FREELY. KEEP THE SCREW PAIRED WITH THE ARM WHOSE PIVOT "
-            "BORE WAS REAMED TO ITS MEASURED STRAIGHT SHOULDER."
+            "THE ARM FALLS FREELY. THE ARM'S PIVOT BORE IS REAMED TO THIS SCREW: "
+            "KEEP THEM TOGETHER."
         ),
         "disc-cluster-assembled": (
             f"FIT THE {_N['pd-rack-pinion']} DISC ON THE {_N['pd-transgear-disc-hub']} "
@@ -1080,14 +1073,14 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "REFIT."
         ),
         "disc-taps-transferred": (
-            f"ON THE {_N['pd-transgear-feed-pinion']} RUNNING-BORE MANDREL, "
-            "READ THE SAME CERTIFIED PIN RADIALLY IN EACH SPACE AT MID-FACE, "
-            "AT A FIXED INDICATOR STATION. "
-            f"MATCH-CENTRE DISC AND SEAT ITS FACE SQUARE PER {_N['pd-rack-pinion']} "
-            "TOOTH-SPACE INSPECTION. SPOT-DRILL THE DISC THROUGH THE "
+            "MOUNT THE CLUSTER ON A MANDREL IN THE "
+            f"{_N['pd-transgear-feed-pinion']} BORE. WITH THE {_N['pd-rack-pinion']} "
+            "PIN IN EACH TOOTH SPACE IN TURN, TAP THE DISC CENTRAL, FACE SQUARE, "
+            f"TILL THE DIAL READS {quality.toothspace_runout_tir_mm():.2f} TIR MAX. "
+            "SPOT-DRILL THE DISC THROUGH THE "
             f"{hub_geometry.SCREW_COUNT} FLANGE HOLES; DRILL AND TAP {disc_screw.THREAD}. "
             f"FIX WITH {hub_geometry.SCREW_COUNT} {_N['vn-transgear-disc-screw']} SCREWS. "
-            f"LOCK SCREWS; RECHECK ALL {disc.TEETH} SPACES PER {_N['pd-rack-pinion']}; "
+            f"LOCK SCREWS; RECHECK ALL {disc.TEETH} SPACES; "
             "THEN MATCH-MARK DISC AND HUB."
         ),
         "disc-screws-cut": (
@@ -1133,8 +1126,6 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "PIN HOLE IS NOT YET DRILLED."
         ),
         "hanger-meshed": (
-            f"REQUIRE THE {_N['pd-platen-rack']} ACTUAL RACK RECEIVING RECORD "
-            "PER ITS PART SHEET/TRAVELER BEFORE ENGAGING; INDEX-ONLY READINGS ARE NOT ADMISSION. "
             f"SWING THE HANGER UP TILL THE {_N['pd-transgear-feed-pinion']} TEETH "
             f"ENTER THE {_N['pd-platen-rack']} RACK. ALIGN A FEED TOOTH CENTRE "
             "DIRECTLY BELOW A RACK SPACE CENTRE. KNOB HELD, SET "
@@ -1157,14 +1148,20 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"LOWER EDGE ON THE {_N['vn-transgear-latch-pin']} PIN, THEN TIGHTEN "
             "THE SCREWS. UNCLAMP, LATCH, RE-RUN THE DEFINED ENGAGED-FEED WINDOW."
         ),
-        "loaded-rack-geometry-checked": paper_geometry.feed_loaded_geometry_inspection_text(),
+        "loaded-rack-geometry-checked": (
+            "HANGER LATCHED, KNOB HELD. WITH PAPER LOADED, RUN THE PLATEN THROUGH "
+            "THE WHOLE ENGAGED WINDOW: NO TIGHT SPOT, SHAKE AT EVERY TOOTH; ARM, "
+            "HOOK AND PLATEN STAY SEATED. ELSE RE-SEAT THE RACK OR GUIDES."
+        ),
         "fitup-pose-set": (
             "HANGER LATCHED. PULL THE CRANK SHAFT FORWARD; PUSH THE KNOB SHAFT "
             f"REARWARD ({teeth} ON THE "
             f"RING, RING ON THE HUB). SLIDE THE COLLAR BACK AGAINST THE {teeth}; "
             f"{sprocket.KNOB_CONFIG} AND THUMBNUT ON FINGER-TIGHT, "
-            f"{steps.KNOB_HELD_BACK_TEXT}. "
-            + paper_geometry.reducer_setup_clock_inspection_text()
+            f"{steps.KNOB_HELD_BACK_TEXT}. TURN THE DISC SO A {teeth} GAP FACES S "
+            f"AND A {disc.TEETH}T TOOTH FACES K, WITHIN "
+            f"{quality.reducer_setup_clock_deviation_mm():.2f} AT THE PITCH CIRCLE. "
+            "TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH."
         ),
         "front-bushing-faced-to-fit": (
             f"CLUSTER, HUB AND DISC FORWARD, FEEL m ({teeth} TO DISC). FACE THE "
@@ -1201,9 +1198,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "collar-disc-air-inspected": (
             "CHAIN OFF. REMOVE THE TRIAL PLATEN, KEEPING THE ARM HELD IN ITS "
             "OPERATING LATCH POSE. "
-            f"{collar.COLLAR_DISC_AIR_PHRASE} "
+            f"{collar.COLLAR_DISC_AIR_PHRASE}; "
             f"ONE DISC TURN = {disc.TEETH / KNOB_TEETH:g} KNOB TURNS. "
-            "REFIT THE PLATEN AND LOCK THE ASSEMBLY; RE-CHECK ACTUAL OVERLAP AIR "
+            "REFIT THE PLATEN AND LOCK THE ASSEMBLY; RE-CHECK THE OVERLAP AIR "
             "AND RACK MESH. ELSE REPORT."
         ),
         "fitup-accepted": (
@@ -1690,22 +1687,36 @@ def _isolate_instances(
     on the deck; this isolates per instance, as draw_drive_train_assembly
     does, and reads the visibility back.
     """
+    _set_instance_visibility(adapter, view, names, shown=True, label=label)
+
+
+def _hide_instances(
+    adapter: Any, view: Any, names: frozenset[str], *, label: str
+) -> None:
+    """Hide exactly the named top-level instances; show every other one."""
+    _set_instance_visibility(adapter, view, names, shown=False, label=label)
+
+
+def _set_instance_visibility(
+    adapter: Any, view: Any, names: frozenset[str], *, shown: bool, label: str
+) -> None:
+    """Named instances take ``shown``, the rest the opposite; all must exist."""
     view = _early_bound(view, "IView")
     root = view.RootDrawingComponent2(False)
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
     root = _early_bound(root, "IDrawingComponent")
-    shown: set[str] = set()
+    found: set[str] = set()
     for raw in tuple(root.GetChildren() or ()):
         drawing_component = _early_bound(raw, "IDrawingComponent")
         raw_name = str(drawing_component.Name or "")
         name = raw_name.split("@", 1)[0].replace("\\", "/").rsplit("/", 1)[-1]
-        visible = name in names
-        drawing_component.Visible = visible
-        if visible:
-            shown.add(name)
-    rebuild_drawing(adapter, label=f"{label} isolation")
-    missing = sorted(names - shown)
+        named = name in names
+        drawing_component.Visible = named == shown
+        if named:
+            found.add(name)
+    rebuild_drawing(adapter, label=f"{label} visibility")
+    missing = sorted(names - found)
     if missing:
         raise RuntimeError(f"{label}: instances not in the view: {missing!r}")
 
@@ -1727,6 +1738,14 @@ def _place_assembled_sheet(adapter: Any) -> Any:
         apply_view_configuration(
             adapter, view, role=role, label=f"paper drive {orientation}"
         )
+        if orientation != "*Isometric":
+            # Lying flat on the deck, the spare T18 shows edge-on in the
+            # front and right views as a bare unlabelled bar; the isometric
+            # shows and balloons it (eye pass of PD run 11).
+            _hide_instances(
+                adapter, view, frozenset({SPARE_INSTANCE}),
+                label=f"paper drive {orientation} spare",
+            )
     label = "sheet 1 isometric"
     scale, outline = step_down_to_fit(
         _native_outline_at(adapter, view, ASSEMBLED_SCALE, label=label),

@@ -216,9 +216,9 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     for value in (f"{spec.FULL_DEPTH:.3f}", f"{spec.CUTTER_RUNOUT_MAX:.2f}"):
         assert value not in spec.DRAWING_NOTES, value
-    assert spec.CUTTER_NOTE in lines
-    assert len(lines) <= 4 and max(len(line) for line in lines) <= 70
-    assert f"\u00d8{spec.CUTTER_DIA_MAX_IN:.2f} in MAX" in spec.CUTTER_NOTE
+    # A shop note states requirements only: the cutter is method.
+    assert lines == [spec.TOOTH_EDGE_NOTE, spec.FLAT_WALL_NOTE]
+    assert max(len(line) for line in lines) <= 70
     # One-line names, printed before the value on its own row.
     for prefix in (spec.FULL_DEPTH_PREFIX, spec.CUTTER_RUNOUT_PREFIX):
         assert "\n" not in prefix and prefix.endswith(" ")
@@ -667,8 +667,7 @@ def test_tangent_span_is_real_supported_flank_inspection() -> None:
     assert spec.SPAN_NOMINAL + spec.SPAN_BAND[1] == pytest.approx(lower)
     assert spec.SPAN_NOMINAL + spec.SPAN_BAND[0] == pytest.approx(upper)
     assert spec.SPAN_TOL_TYPE == 3
-    assert spec.SPAN_ORIENTATION in spec.DRAWING_NOTES
-    assert "NORMAL TO SPANNED-TOOTH BISECTOR; MAXIMUM READING" in spec.SPAN_ORIENTATION
+    assert "BISECTOR" not in spec.DRAWING_NOTES  # method, not requirement
     assert part.author_span is stock_native.author_span
     assert part.apply_span_limits is stock_native.apply_span_limits
 
@@ -713,8 +712,7 @@ def test_certified_single_pin_contacts_real_finite_flanks() -> None:
     for invalid_diameter in (0.0, -spec.TOOTHSPACE_GAUGE_DIA_MM, math.inf, math.nan):
         with pytest.raises(ValueError):
             toothspace_gauge_contact_mm(spec.STOCK_PROFILE, invalid_diameter)
-    assert "FIXED RADIAL STATION, EACH SPACE" in spec.GEAR_DATA
-    assert "CERTIFIED ACTUAL DIAMETER" in spec.GEAR_DATA
+    assert "CERTIFIED" not in spec.GEAR_DATA and "STATION" not in spec.GEAR_DATA
 
 
 def test_toothspace_control_is_source_owned_and_feature_local() -> None:
@@ -724,10 +722,11 @@ def test_toothspace_control_is_source_owned_and_feature_local() -> None:
     assert part.TOOTH_SPACE_CALLOUT is spec.TOOTH_SPACE_CALLOUT
     assert part.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
     assert drawing.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
-    assert f"TIR {grade} mm MAX TO {spec.BORE_DATUM}" in spec.TOOTH_SPACE_CALLOUT
-    assert f"ALL {spec.TEETH} SPACES" in spec.TOOTH_SPACE_CALLOUT
-    assert f"\u00d8{spec.TOOTHSPACE_GAUGE_DIA_IN:.4f} in" in spec.TOOTH_SPACE_CALLOUT
-    assert len(spec.TOOTH_SPACE_CALLOUT.splitlines()) == 4
+    assert spec.TOOTH_SPACE_CALLOUT.splitlines() == [
+        f"TOOTH SPACE RUNOUT {grade:.2f} TIR TO {spec.BORE_DATUM}",
+        f"\u00d8{spec.TOOTHSPACE_GAUGE_DIA_IN:.4f} in PIN, ALL {spec.TEETH} SPACES",
+        f"INDEX RANGE {spec.PITCH_INDEX_DEVIATION_MM:.2f} MAX",
+    ]
     assert max(map(len, spec.TOOTH_SPACE_CALLOUT.splitlines())) <= 70
     assert "CANDIDATE" not in spec.TOOTH_SPACE_CALLOUT
     assert "TIR" not in spec.DRAWING_NOTES
@@ -764,8 +763,15 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
     assert rear.ymax + 0.010 < caption_bottom
     # The rear-face extension lines stand right of the view and its leader.
     assert rear.xmax < drawing._side_x(0.0)
-    caption = _note_box(drawing.REAR_CAPTION, drawing.REAR_CAPTION_XY)
-    assert caption.ymax < rear.ymin and caption.ymin > bottom
+    # Run 12: the outline runs ~6 mm past the tip circle, so the caption is
+    # hung below the measured outline, not at a fixed point.
+    assert "_place_rear_caption(adapter, rear)" in source
+    placer = inspect.getsource(drawing._place_rear_caption)
+    assert "GetOutline" in placer and "GetExtent" in placer
+    assert drawing.CAPTION_SETTLE_M >= 0.0006
+    outline_bottom = cy - drawing.HALF_OD - 0.0065  # run 12's measured margin
+    caption_height = 0.0047
+    assert outline_bottom - drawing.REAR_CAPTION_GAP_M - caption_height - drawing.CAPTION_SETTLE_M > bottom
     # *Back mirrors model x. The chosen gap's contact sits on the view's upper
     # side, its flank facing up-left into its own gap, toward the callout.
     assert 0 <= drawing.TOOTH_SPACE_GAP_INDEX < spec.TEETH
@@ -789,10 +795,9 @@ def test_pitch_index_control_uses_quality_and_actual_reference_circle() -> None:
     assert spec.PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM == uncertainty
     assert spec.PITCH_INDEX_REFERENCE_RADIUS_MM == spec.PITCH_DIA / 2.0
     assert spec.PITCH_INDEX_STATIONS == tuple(range(spec.TEETH + 1))
-    assert f"PITCH INDEX RANGE+2U {grade} mm MAX" in spec.TOOTH_SPACE_CALLOUT
-    assert f"AT REF \u00d8{spec.PITCH_DIA:.3f}" in spec.TOOTH_SPACE_CALLOUT
-    assert f"ABS POSITION U {uncertainty} mm MAX" in spec.TOOTH_SPACE_CALLOUT
-    assert "ALL SPACES + WRAP" in spec.TOOTH_SPACE_CALLOUT
+    assert f"INDEX RANGE {grade:.2f} MAX" in spec.TOOTH_SPACE_CALLOUT
+    # Uncertainty and the measuring method are internal, never printed.
+    assert "U " not in spec.TOOTH_SPACE_CALLOUT and "WRAP" not in spec.TOOTH_SPACE_CALLOUT
     assert "PITCH INDEX" not in spec.DRAWING_NOTES
 
 

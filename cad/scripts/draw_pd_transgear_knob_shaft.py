@@ -141,14 +141,17 @@ _CUTTER_TEXT_INSET = 0.040
 SIDE_KEEP: dict[str, tuple[float, float]] = {
     "OutsideDia": ((F_X + PINION_REAR_X) / 2.0, _ABOVE_Y),
     "CoreDia": ((F_X + CORE_END_X) / 2.0, _ABOVE_Y + 0.010),
-    "ReliefDia": ((CORE_END_X + THREAD_END_X) / 2.0, _ABOVE_Y + 0.024),
+    # Run 12: from the relief's mid the hung text's shoulder started left of
+    # F's witness line (214.4) and ran through the front-neck frame. Four
+    # fifths along the relief it starts right of F, above that frame.
+    "ReliefDia": ((CORE_END_X + 4.0 * THREAD_END_X) / 5.0, _ABOVE_Y + 0.0265),
     # A Ø's line stands at its point; right of the view's centre the text
     # hangs LEFT of it (the 12T's and core's, run 20261001T085006647Z), and
     # the blank's banded text and shoulder run 27.5 mm (19e33c6c2: from the
-    # blank's mid the shoulder crossed the relief's line).  12.5 mm in from
-    # the chamfer the shoulder starts 10.7 mm right of the relief's line and
-    # the line stays 12.5 mm off the thread callout's leader to the chamfer.
-    "ThreadBlankDia": (CHAMFER_START_X - 0.0125, _ABOVE_Y),
+    # blank's mid the shoulder crossed the relief's line).  9 mm in from the
+    # chamfer the line stands clear of the core runout frame below the text
+    # and stays 9 mm off the thread callout's leader to the chamfer.
+    "ThreadBlankDia": (CHAMFER_START_X - 0.009, _ABOVE_Y),
     "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0, _ABOVE_Y),
     "FaceWidth": ((F_X + PINION_REAR_X) / 2.0, _ROW_Y[4]),
     "CoreFront": ((F_X + CORE_END_X) / 2.0, _ROW_Y[0]),
@@ -166,7 +169,8 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - HALF_OD),
 }
 END_KEEP: dict[str, tuple[float, float]] = {
-    "RootEnvelope": (FRONT_CENTER[0] - 0.023, FRONT_CENTER[1] - HALF_OD - 0.021),
+    # Right of the side view's TipStation witness line (x TIP_X) at its row.
+    "RootEnvelope": (FRONT_CENTER[0] - 0.019, FRONT_CENTER[1] - HALF_OD - 0.021),
     "ToothSpan": (FRONT_CENTER[0] + 0.029, FRONT_CENTER[1] + HALF_OD + 0.021),
 }
 DIMENSION_CALLOUTS_BELOW = {"TipChamfer": CHAMFER_CALLOUT}
@@ -185,7 +189,8 @@ JOURNAL_FINISH_ATTACH = (
 CORE_FINISH_PICK = (
     _sheet_x((CORE_FRONT_Z + CORE_REAR_Z) / 2.0), _sheet_y(CORE_DIA / 2.0)
 )
-CORE_FINISH_SYMBOL = (F_X + 0.010, SIDE_CENTER[1] + HALF_OD + 0.004)
+# Right of the front-neck frame's leader, which climbs past the core's left.
+CORE_FINISH_SYMBOL = (F_X + 0.0115, SIDE_CENTER[1] + HALF_OD + 0.004)
 # A point on the journal's face for the turning axis.
 CENTERLINE_PICK = ((PINION_REAR_X + REAR_X) / 2.0, SIDE_CENTER[1] + 0.003)
 GEAR_DATA_XY = (0.016, 0.262)
@@ -194,7 +199,14 @@ GEAR_DATA_CHAR_HEIGHT = 0.0025
 NOTES_XY = (0.016, 0.070)
 ROOT_ACCEPTANCE_XY = (0.286, 0.103)
 DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
-CORE_RUNOUT_FRAME = (F_X + 0.072, SIDE_CENTER[1] + HALF_OD + 0.038)
+# The core frame sits low over the thread blank, under the blank's Ø text;
+# its leader runs under the core finish symbol to the core's front quarter
+# (run 12: from above it crossed the blank's Ø and thread callout texts).
+CORE_RUNOUT_LANDING = (
+    _sheet_x(CORE_REAR_Z + 0.75 * (CORE_FRONT_Z - CORE_REAR_Z)),
+    _sheet_y(CORE_DIA / 2.0),
+)
+CORE_RUNOUT_FRAME = (THREAD_END_X + 0.0066, SIDE_CENTER[1] + 0.0155)
 # Each frame's leader landing on its surface's upper outline, and the frame.
 # The neck's straight floor is 0.3 mm long between its two 0.05 corner tori
 # (0.9 mm of sheet), so a silhouette hit-test there landed on a neighbour
@@ -202,13 +214,16 @@ CORE_RUNOUT_FRAME = (F_X + 0.072, SIDE_CENTER[1] + HALF_OD + 0.038)
 # finishes, each frame attaches to the model FACE its spec control names,
 # resolved on the referenced part, at this landing.
 CONTROL_ATTACHMENTS = {
-    "core_total_runout": (CORE_FINISH_PICK, CORE_RUNOUT_FRAME),
+    "core_total_runout": (CORE_RUNOUT_LANDING, CORE_RUNOUT_FRAME),
     "front_neck_total_runout": (
         (_sheet_x(-FRONT_RELIEF_WIDTH / 2.0), _sheet_y(FRONT_RELIEF_DIA / 2.0)),
-        (F_X - 0.021, SIDE_CENTER[1] + HALF_OD + 0.038),
+        # Left of the neck, so the leader's shoulder ends right of it and the
+        # leg climbs steeply, left of the core finish symbol's leader.
+        (F_X - 0.026, SIDE_CENTER[1] + HALF_OD + 0.038),
     ),
 }
-TOOTHSPACE_NOTE_XY = (0.298, 0.258)
+# Right of FlatToolRadius's text: the leader drops nearly straight to the gap.
+TOOTHSPACE_NOTE_XY = (0.322, 0.258)
 
 
 async def build(adapter: Any) -> dict[str, str]:

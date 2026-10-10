@@ -108,11 +108,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      the user's gear-tooth and bore-to-shaft critical classes, not a general
      permission to add frames to shafts.
      The tooth-pattern indicator requirement is a feature-local,
-     model-property-linked callout, for example `TOOTH SPACE RADIAL
-     INDICATOR TIR 0.005 MAX TO A`, using the configured critical grade.
+     model-property-linked callout, for example `TOOTH SPACE RUNOUT 0.05
+     TIR TO A`, using the configured critical grade.
      Attach it to a real finite tooth flank, name the actual running datum,
-     and keep calibrated-pin/all-spaces metadata in Gear Data. It is not
-     a circular-runout frame on the blank OD and not a multi-line
+     and keep the pin size and all-spaces line in the same callout. It is
+     not a circular-runout frame on the blank OD and not a multi-line
      inspection procedure in Manufacturing Notes. On the disc sheet,
      distinguish the assembled feed-bore datum from the disc's own pilot.
    - **paper reducer location** — the transgear arm and arm plate's locating
@@ -125,14 +125,13 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      the configured controls needed at the actual projected gear and chain
      planes. Name those planes and reachable datum features; neither screw
      clearance nor assumed countersink centring is a location control.
-   - **purchased paper rack acceptance** — the MHA-PD-005 rack may carry
-     incoming over-pins span limits for local pitch and cumulative index,
-     and an assembly face/axis-skew check, derived from the remaining
-     paper-feed error and backlash budgets. These are incoming acceptance
-     requirements, not a claim about the commercial supplier's accuracy;
-     reject racks that fail. Keep numerical limits in the shared functional
-     source and inspection details in the assembly procedure, not a generic
-     multi-line Manufacturing Notes block.
+   - **purchased paper rack acceptance** — the MHA-PD-005 rack sheet carries
+     only its two incoming stock sizes (stock height and face width MAX)
+     and the purchased-rack line. Its pitch accuracy is the catalogue
+     part's; the assembly checks the running mesh over the whole engaged
+     window (no tight spot, shake at every tooth). Keep numerical limits in
+     the shared functional source, not a generic multi-line Manufacturing
+     Notes block.
 
    Everything else — frames, bases, crank parts, handles, knobs, brackets,
    blocks, pedestals, shafts, bushings, gears, screws — carries **no frames

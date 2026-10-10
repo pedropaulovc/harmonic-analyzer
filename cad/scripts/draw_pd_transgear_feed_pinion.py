@@ -22,6 +22,7 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import move_annotation
 from _drawing_common import (
     DrawingOutputs,
     add_feature_control_frame,
@@ -103,10 +104,15 @@ ISO_CENTER = (0.367, 0.214)
 # pick there found a flank 0.23 mm off the contact. So the callout lands on
 # a rear-face view in the free lane below the section, left of the title
 # block (left edge 216 mm, top 66 mm) and under the section caption
-# (bottom ~78 mm); a caption names it.
+# (bottom ~78 mm); a caption names it, hung centred below the view's
+# measured outline (run 12: at a fixed point it overlapped the outline by
+# 2.4 mm; the outline runs 6 mm past the tip circle).
 REAR_CENTER = (0.165, 0.046)
 REAR_CAPTION = "VIEW FROM REAR FACE"
 REAR_CAPTION_XY = (REAR_CENTER[0] - 0.020, REAR_CENTER[1] - 0.0215)
+REAR_CAPTION_GAP_M = 0.002
+# INote.GetExtent reads ~0.3 mm apart between sessions; settle within twice.
+CAPTION_SETTLE_M = 0.0006
 # Every gap is the patterned seed. Gap 3 (model 105 deg) mirrors to the rear
 # view's upper side, where the contact flank faces up-left into its own gap,
 # toward the callout lane, so the leader arrives through air.
@@ -199,9 +205,14 @@ GEAR_DATA_CHAR_HEIGHT = 0.0025
 BORE_FIT_NOTE = (0.016, 0.193)
 BORE_FIT_CHAR_HEIGHT = 0.0022
 # Separate radial-runout and relative-index controls share one source-linked
-# callout on the real finite tooth flank, not the OD. Its four short rows use
-# the standard 3.5 mm font in the lane above the manufacturing notes.
-TOOTH_SPACE_CALLOUT_XY = (0.016, 0.102)
+# callout on the real finite tooth flank, not the OD. Its three rows use the
+# standard 3.5 mm font; at x 50 mm its lower-right corner stands up-left of
+# the rear-view contact, inside the flank's open quarter (run 12: at 16 mm
+# the shorter callout's leader arrived from behind the flank).
+TOOTH_SPACE_CALLOUT_XY = (0.050, 0.102)
+# The manufacturing notes stand below the callout's leader (run 12: at
+# y 70 mm they overlapped the leader's extent down to the 60 mm landing).
+NOTES_XY = (0.016, 0.056)
 TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035
 BORE_FIT_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(135.0)),
@@ -309,6 +320,40 @@ def _assert_note_inside_border(note: Any, label: str) -> None:
         )
 
 
+def _place_rear_caption(adapter: Any, view: Any) -> None:
+    """Hang the rear view's caption, centred, below the view's measured outline.
+
+    Both boxes are measured (``IView.GetOutline``, ``INote.GetExtent``), as
+    main's draw_dt_cone_gear_shaft places its view captions. The sheet scale
+    is pinned first so finalization re-applying it cannot move the view
+    after this readback."""
+    sheet = _early_bound(
+        _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
+    )
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError("cannot pin the sheet scale before the rear view caption")
+    outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+    target = ((outline[0] + outline[2]) / 2.0, outline[1] - REAR_CAPTION_GAP_M)
+    raw_note = add_note(adapter, REAR_CAPTION, *REAR_CAPTION_XY)
+    if raw_note is None:
+        raise RuntimeError("the rear view caption was not inserted")
+    note = _early_bound(raw_note, "INote")
+    for _attempt in range(4):
+        extent = tuple(float(value) for value in note.GetExtent())
+        error = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
+        if max(abs(error[0]), abs(error[1])) < CAPTION_SETTLE_M:
+            break
+        move_annotation(adapter, note.GetAnnotation(), *error, label="rear view caption")
+    else:
+        raise RuntimeError(
+            f"rear view caption stayed at {extent}, its top centre requested at {target}"
+        )
+    if extent[1] < SHEET_INNER_BORDER[1]:
+        raise RuntimeError(f"rear view caption {extent} left the inner border")
+    _telemetry.info(f"rear view caption: outline {outline}, extent {extent}")
+
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -375,7 +420,7 @@ async def build(adapter: Any) -> dict[str, str]:
     rear = place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=VIEW_SCALE)
     for view in (front, right, iso, rear):
         set_hidden_lines_removed(adapter, view)
-    add_note(adapter, REAR_CAPTION, *REAR_CAPTION_XY)
+    _place_rear_caption(adapter, rear)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -462,7 +507,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Gear Data", *GEAR_DATA_XY, char_height=GEAR_DATA_CHAR_HEIGHT
     )
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.070, char_height=0.0025
+        adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.0025
     )
     toothspace_callout = add_toothspace_callout(
         adapter, rear, profile=STOCK_PROFILE,

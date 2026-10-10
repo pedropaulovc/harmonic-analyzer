@@ -91,7 +91,7 @@ def test_span_is_actual_finite_contact_and_printed_limits_are_inverted() -> None
         a, b = span_contact_points_mm(profile, 2)
         assert math.dist(a, b) == pytest.approx(actual, abs=1e-10)
     assert spec.SPAN_PREFIX == "CONTROL SPAN 2 TEETH "
-    assert "BISECTOR" in spec.SPAN_ORIENTATION and "MAXIMUM" in spec.SPAN_ORIENTATION
+    assert "BISECTOR" not in spec.DRAWING_NOTES  # method, not requirement
     # Rounded limits, not the old provisional setting band, define acceptance.
     lo, hi = spec.RADIAL_SETTING_LIMITS
     assert lo < spec.RADIAL_SETTING < hi
@@ -130,8 +130,8 @@ def test_front_core_and_actual_rear_terminal_window() -> None:
 
 
 def test_real_d_core_thread_and_six_mm_g6_source() -> None:
-    assert spec.CORE_DIA == 4.9 and spec.CORE_DIA_BAND == (0.0, -0.008)
-    assert spec.CORE_FLAT_FROM_AXIS == 2.15 and spec.CORE_FLAT_BAND == (0.0, -0.015)
+    assert spec.CORE_DIA == 4.85 and spec.CORE_DIA_BAND == (0.0, -0.008)
+    assert spec.CORE_FLAT_FROM_AXIS == 2.125 and spec.CORE_FLAT_BAND == (0.0, -0.015)
     assert spec.JOURNAL_DIA == 6.0 and spec.JOURNAL_DIA_BAND == (-0.004, -0.012)
     assert spec.THREAD == "#8-32" and spec.THREAD_CALLOUT == "#8-32 UNC"
     assert spec.RELIEF_DIA_MAX < spec.THREAD_ROOT_2A_MIN
@@ -190,7 +190,7 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert "CoreFlatProfile" in source and "FlatToAxis" in source and "FlatEnd" in source
     assert _calls(part._cut_core_flat, "_native_arc")
     assert _calls(part._create_sketch, "suppress_dimension_input")
-    assert spec.FRONT_RELIEF_DIA == 4.0
+    assert spec.FRONT_RELIEF_DIA == 3.95
     assert spec.FRONT_RELIEF_WIDTH == 0.4
     assert spec.FRONT_CORNER_RADIUS == 0.05
     assert spec.FRONT_CORNER_RADIUS_MAX == 0.1
@@ -202,9 +202,10 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert spec.FRONT_RELIEF_WIDTH_MIN - 0.170 >= 0.100 - 1e-12
     # .XXX general ±.130 on the terminal could overrun F; not equivalent.
     assert 0.110 - 0.130 < 0.0
-    # The old4.050 neck misses the adopted full-relative-axis D-plane charge.
-    assert 2.150 - 0.015 - ((4.050 + 0.130) / 2 + 0.050) < 0.0
-    assert 2.150 - 0.015 - ((spec.FRONT_RELIEF_DIA + 0.130) / 2 + 0.050) > 0.0
+    # The old 4.050 neck misses the adopted full-relative-axis D-plane charge.
+    flat_min = spec.CORE_FLAT_FROM_AXIS + min(spec.CORE_FLAT_BAND)
+    assert flat_min - ((4.050 + 0.130) / 2 + 0.050) < 0.0
+    assert flat_min - ((spec.FRONT_RELIEF_DIA + 0.130) / 2 + 0.050) > 0.0
 
 
 def test_neck_radius_is_real_equal_tangent_geometry_not_a_dummy_carrier() -> None:
@@ -325,12 +326,12 @@ def test_supported_certified_pin_inspects_all_actual_finite_corners() -> None:
 def test_indicator_grade_has_one_live_source_and_span_does_not_certify_eccentricity() -> None:
     from _gear_quality import toothspace_runout_tir_mm
 
-    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.005
-    assert spec.TOOTH_SPACE_CALLOUT.splitlines()[0] == "TOOTH SPACE RADIAL INDICATOR TIR 0.005 MAX TO A"
+    assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
+    assert spec.TOOTH_SPACE_CALLOUT.splitlines()[0] == "TOOTH SPACE RUNOUT 0.05 TIR TO A"
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert all(word not in spec.TOOTH_SPACE_CALLOUT for word in ("CANDIDATE", "TODO", "GATE"))
     contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)
-    eccentricity = 0.004
+    eccentricity = 0.04
     a, b = span_contact_points_mm(spec.STOCK_PROFILE, spec.SPAN_TEETH)
     tree = ast.parse(inspect.getsource(spec))
     grade_assignments = [
@@ -362,11 +363,11 @@ def test_native_inspection_callout_keeps_live_index_and_certified_pin_rows() -> 
     contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)
     assert spec.PITCH_INDEX_REFERENCE_RADIUS_MM != pytest.approx(contact.center_radius_mm)
     assert spec.TOOTH_SPACE_CALLOUT.splitlines() == [
-        f"TOOTH SPACE RADIAL INDICATOR TIR {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.3f} MAX TO A",
-        f"PITCH INDEX RANGE+2U {spec.PITCH_INDEX_DEVIATION_MM} mm MAX AT REF Ø{spec.PITCH_DIA:.3f}",
-        f"ALL SPACES + WRAP; ABS POSITION U {spec.PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM} mm MAX",
-        f"CERTIFIED PIN Ø{spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} mm; ALL {spec.TEETH} SPACES",
+        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A",
+        f"Ø{spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {spec.TEETH} SPACES",
+        f"INDEX RANGE {spec.PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     ]
+    assert "U " not in spec.TOOTH_SPACE_CALLOUT  # uncertainty is method, not printed
     tree = ast.parse(inspect.getsource(spec))
     for field, getter in (
         ("PITCH_INDEX_DEVIATION_MM", "pinion_pitch_index_deviation_mm"),

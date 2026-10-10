@@ -5,7 +5,7 @@ closure.  ``build_pd_transgear_drive_collar`` marks and tolerances exactly
 ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model and
 ``draw_pd_transgear_drive_collar`` keeps exactly the same names.
 
-The actual D-bore slides over the knob shaft's Ø4.900 h6 solid D-core.
+The actual D-bore slides over the knob shaft's Ø4.850 h6 solid D-core.
 The D-flat carries torque; there is no rear slot or front spring pin.
 The existing Ø17.5 body is supplied long and its REAR FACE is faced at
 assembly until the removable T24 meets the unchanged chain-plane setting,
@@ -151,11 +151,12 @@ if not PILOT_LENGTH_FITTED_MIN <= PILOT_LENGTH <= PILOT_LENGTH_FITTED_MAX:
 BORE_DIA = CORE_DIA + 0.010
 BORE_DIA_BAND = REAM_H7
 BORE_DIA_PLACES = 3
-# Actual model midpoint, not the old basic2.150 outside its positive band.
-FLAT_LIMITS = (2.170, 2.185)
+# Actual model midpoint, not a basic flat outside its positive band. Moved in
+# 0.025 with the knob core radius (4.900 -> 4.850, 0.05 tooth-space TIR).
+FLAT_LIMITS = (2.145, 2.160)
 FLAT_TO_AXIS = sum(FLAT_LIMITS) / 2.0
 FLAT_BAND = (FLAT_LIMITS[1] - FLAT_TO_AXIS, FLAT_LIMITS[0] - FLAT_TO_AXIS)
-FLAT_TOL_TYPE = 3  # native LIMIT, three-place2.170..2.185
+FLAT_TOL_TYPE = 3  # native LIMIT, three-place 2.145..2.160
 FLAT_PLACES = 3
 FLAT_CLEARANCE = (
     FLAT_TO_AXIS + min(FLAT_BAND) - (CORE_FLAT_FROM_AXIS + max(CORE_FLAT_BAND)),
@@ -584,8 +585,8 @@ if CHAIN_OFFSET_MARGIN < 0.0:
 # Physical spatial acceptance, not the cluster's analytic plane fit window.
 COLLAR_DISC_AIR_MIN = 0.10
 COLLAR_DISC_AIR_PHRASE = (
-    f"COLLAR TO DISC AIR {COLLAR_DISC_AIR_MIN:.2f} MIN AT THE OVERLAP OVER "
-    "ONE FULL DISC TURN; ALL RADIAL/TILT AND AXIAL PLAY BIASED TO CLOSE THE AIR"
+    "PUSH THE DISC AND COLLAR TOWARD EACH OTHER AND TURN THE DISC ONE FULL "
+    f"TURN: COLLAR TO DISC AIR {COLLAR_DISC_AIR_MIN:.2f} MIN AT THE OVERLAP"
 )
 
 # The pilot's length: faced at assembly, its requirement printed with the

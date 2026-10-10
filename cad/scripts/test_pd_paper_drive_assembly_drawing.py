@@ -1,5 +1,6 @@
 """Offline contracts for the paper-drive assembly and its drawing (MHA-PD-000)."""
 
+import inspect
 import math
 import re
 from itertools import product
@@ -295,9 +296,8 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    assert "CRITICAL S-K JIG AT THE GEAR PLANE" in located
-    assert "MATCH-DRILL AND REAM" in located
-    assert "SEPARATE SPECIFIED FITS" in located
+    assert "TOGETHER IN THE S-K JIG PER THEIR DRAWINGS" in located
+    assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
         f"{plate_locating_pin.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
@@ -306,15 +306,13 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     fitted = _step_body("arm-plate-fitted")
     assert "PLATE ON THE LOCATING DOWELS" in fitted
     assert "DOWELS LOCATE; SCREWS CLAMP ONLY" in fitted
-    # The matched acceptance moved here from the part sheets (policy rule 6).
-    assert "ACTUAL GEAR-PLANE S-K POSE WITHIN DIA 0.050 RFS" in fitted
-    assert "X/Y RANGE + 2X GAUGE UNCERTAINTY 0.0707 MAX, FULL TRAVEL 0.100 MAX" in fitted
-    assert "PLUS UNCERTAINTY, 0.005 MAX" in fitted
-    assert "RE-ACCEPT AFTER EVERY REMOVAL OR PIN REPLACEMENT" in fitted
+    # One ordinary hand check; no gauge budget or load qualification text.
+    assert "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS" in fitted
+    assert "RE-CHECK AFTER EVERY REMOVAL" in fitted
+    for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
+        assert method not in fitted
     assert "COUNTERSINK" not in fitted
-    assert "PIVOT BORE WAS REAMED TO ITS MEASURED STRAIGHT SHOULDER" in _step_body(
-        "hanger-pivoted"
-    )
+    assert "PIVOT BORE IS REAMED TO THIS SCREW" in _step_body("hanger-pivoted")
     assert steps.step_number("arm-plate-located") + 1 == steps.step_number("arm-plate-fitted")
 
 
@@ -850,7 +848,8 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     assert " ".join(collar.COLLAR_DISC_AIR_PHRASE.split()) in inspected
     assert f"ONE DISC TURN = {disc.TEETH / knob_shaft.TEETH:g} KNOB TURNS" in inspected
     assert "REFIT THE PLATEN AND LOCK THE ASSEMBLY" in inspected
-    assert "RE-CHECK ACTUAL OVERLAP AIR AND RACK MESH" in inspected
+    assert "RE-CHECK THE OVERLAP AIR AND RACK MESH" in inspected
+    assert "BIASED" not in inspected
     assert steps.COLLAR_DISC_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
     assert "AT OVERLAP AFTER REFITTING AND LOCKING" in _step_body("fitup-accepted")
     keys = (
@@ -1032,17 +1031,18 @@ def test_the_hub_is_faced_to_the_nose_before_the_disc_is_tapped() -> None:
 
 
 def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark() -> None:
-    """Pilot fit and a free span do not certify the assembled tooth-space datum."""
+    """Pilot fit and a free span do not centre the assembled tooth spaces."""
     transferred = _step_body("disc-taps-transferred")
-    assert f"{drawing._N['pd-transgear-feed-pinion']} RUNNING-BORE MANDREL" in transferred
-    assert f"PER {drawing._N['pd-rack-pinion']} TOOTH-SPACE INSPECTION" in transferred
-    assert "SEAT ITS FACE SQUARE" in transferred
     assert (
-        "READ THE SAME CERTIFIED PIN RADIALLY IN EACH SPACE AT MID-FACE, "
-        "AT A FIXED INDICATOR STATION."
-    ) in transferred
+        f"MANDREL IN THE {drawing._N['pd-transgear-feed-pinion']} BORE" in transferred
+    )
+    assert f"WITH THE {drawing._N['pd-rack-pinion']} PIN IN EACH TOOTH SPACE" in transferred
+    tir = drawing.quality.toothspace_runout_tir_mm()
+    assert f"TILL THE DIAL READS {tir:.2f} TIR MAX" in transferred
+    for method in ("CERTIFIED", "RUNNING-BORE", "INDICATOR STATION", "INSPECTION"):
+        assert method not in transferred
     ordered_actions = (
-        "MATCH-CENTRE DISC",
+        "TAP THE DISC CENTRAL",
         "SPOT-DRILL THE DISC",
         "LOCK SCREWS",
         f"RECHECK ALL {disc.TEETH} SPACES",
@@ -1054,16 +1054,16 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
 
 
 def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
-    """R9-44: bench-fit, remove for off-mechanism pre-cut before the lock
-    sweep, then refit the same matched hardware."""
+    """R9-44: cut off the mechanism, then refit the same screws before the
+    hanger is pivoted."""
     order = ["arm-plate-fitted", "arm-plate-screws-cut", "hanger-pivoted"]
     numbers = [steps.step_number(key) for key in order]
     assert numbers == list(range(numbers[0], numbers[0] + 3))
     body = _step_body("arm-plate-screws-cut")
-    assert "BENCH-FIT THE ACTUAL MATCHED ARM/PLATE AND BOTH SCREWS" in body
-    assert "REMOVE FOR PRE-CUT OFF MECHANISM, BEFORE THE GUIDE-LOCK SWEEP" in body
-    assert "REFIT AFTER CUTTING" in body
-    assert "REASSEMBLE THE SAME MATCHED HARDWARE BEFORE PIVOTING THE HANGER" in body
+    assert body.startswith(
+        f"TAKE BOTH {_number('vn-transgear-arm-plate-screw')} SCREWS OUT"
+    )
+    assert "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER" in body
     limit = f"FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD"
     assert limit in body
     assert f"BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}" in body
@@ -1164,7 +1164,12 @@ def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
     repeated = {stem for stem in ballooned if ballooned.count(stem) > 1}
     assert repeated == {"pd-transgear-removable"}
     spare = drawing.ASSEMBLED_BALLOON_ANCHORS["pd-transgear-removable"].instance
-    assert spare == "pd-transgear-removable-3"
+    assert spare == drawing.SPARE_INSTANCE == "pd-transgear-removable-3"
+    # Edge-on in the front and right views the spare is a bare bar: hidden
+    # there, shown and ballooned on the isometric only.
+    source = inspect.getsource(drawing._place_assembled_sheet)
+    assert 'if orientation != "*Isometric":' in source
+    assert "_hide_instances(" in source and "SPARE_INSTANCE" in source
     for caption in drawing.ASSEMBLED_CAPTIONS.values():
         assert "T18 SPARE, STORED LOOSE" in " ".join(caption.split())
 
@@ -1433,10 +1438,10 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert "ITS PIN HOLE IS NOT YET DRILLED" in fit
     mesh = " ".join(text["hanger-meshed"].split())
     assert mesh.startswith(
-        f"REQUIRE THE {_number('pd-platen-rack')} ACTUAL RACK RECEIVING RECORD"
+        f"SWING THE HANGER UP TILL THE {_number('pd-transgear-feed-pinion')} TEETH"
     )
-    assert "PER ITS PART SHEET/TRAVELER BEFORE ENGAGING" in mesh
-    assert "INDEX-ONLY READINGS ARE NOT ADMISSION" in mesh
+    for method in ("RECEIVING RECORD", "ADMISSION", "TRAVELER"):
+        assert method not in mesh
     assert "ALIGN A FEED TOOTH CENTRE DIRECTLY BELOW A RACK SPACE CENTRE" in mesh
     assert f"SET {steps.RACK_DATUM_BACKLASH_TEXT} PLATEN SHAKE AT THAT DATUM" in mesh
     assert "(DIAL ALONG THE RACK)" in mesh
@@ -1460,38 +1465,31 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert hook.endswith("UNCLAMP, LATCH, RE-RUN THE DEFINED ENGAGED-FEED WINDOW.")
 
 
-def test_the_loaded_full_recording_stroke_preserves_one_physical_setup_and_zero() -> None:
+def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:
     body = _step_body("loaded-rack-geometry-checked")
-    assert body == " ".join(paper_geometry.feed_loaded_geometry_inspection_text().split())
-    assert "ENTIRE LOCATED RECORDING STROKE WITHIN THE PRINTED ENGAGED WINDOW" in body
-    assert "POSITIVE-LOADED TOOTH-CENTRED SETUP GEOMETRY" in body
-    assert "GUIDE/SUPPORT STRAIGHTNESS AND PLATEN ROCKING" in body
-    assert "REJECT AN EXCESS" in body
-    assert "HOOK LOWER BEARING AND PLATEN Y SUPPORT SEATED" in body
-    assert "ONE LOADED SETUP AND ONE PAPER ZERO" in body
-    assert "DO NOT RE-ZERO AT EACH STATION OR LOAD" in body
+    assert body.startswith("HANGER LATCHED, KNOB HELD.")
+    assert "WITH PAPER LOADED, RUN THE PLATEN THROUGH THE WHOLE ENGAGED WINDOW" in body
+    assert "NO TIGHT SPOT, SHAKE AT EVERY TOOTH" in body
+    for method in ("UNCERTAINTY", "RE-ZERO", "DATUM", "REJECT"):
+        assert method not in body
     assert steps.step_number("hook-pin-hole-match-drilled") < steps.step_number(
         "loaded-rack-geometry-checked"
     ) < steps.step_number("fitup-pose-set")
     assert drawing.FITUP_CHAIN_KEY == "loaded-rack-geometry-checked"
 
 
-def test_the_actual_assembled_reducer_clock_is_not_rezeroed_per_load_or_phase() -> None:
+def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
     body = _step_body("fitup-pose-set")
-    clock = " ".join(paper_geometry.reducer_setup_clock_inspection_text().split())
-    assert body.endswith(clock)
     assert body.startswith("HANGER LATCHED.")
     assert steps.KNOB_HELD_BACK_TEXT in body
-    assert "ACTUAL S-K GEAR-PLANE AXES IN THE MATCHED LOADED SETUP" in clock
-    assert "INTEGRAL 12T GAP BISECTOR TOWARD S" in clock
-    assert "120T TOOTH BISECTOR TOWARD K" in clock
-    assert "ACTUAL FORMED FLANKS" in clock
-    assert "AT EACH GEAR'S OWN REFERENCE RADIUS" in clock
-    assert "ABSOLUTE SETUP-CLOCK ERROR INCLUDING CALIBRATION UNCERTAINTY" in clock
-    assert "REJECT AN EXCESS" in clock
-    assert "ONE MATCHED CLOCK DATUM" in clock
-    assert "RUNNING PHASES AND POSITIVE LOADS" in clock
-    assert "DO NOT RE-CLOCK OR RE-ZERO PER LOAD" in clock
+    clock = drawing.quality.reducer_setup_clock_deviation_mm()
+    assert (
+        f"TURN THE DISC SO A {knob_shaft.TEETH}T GAP FACES S AND A {disc.TEETH}T "
+        f"TOOTH FACES K, WITHIN {clock:.2f} AT THE PITCH CIRCLE"
+    ) in body
+    assert body.endswith("TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH.")
+    for method in ("UNCERTAINTY", "RE-ZERO", "RE-CLOCK", "ABSOLUTE", "REJECT"):
+        assert method not in body
     assert steps.step_number("knob-stack-fitted") < steps.step_number("fitup-pose-set")
     assert steps.step_number("fitup-pose-set") < steps.step_number("chain-closed")
 

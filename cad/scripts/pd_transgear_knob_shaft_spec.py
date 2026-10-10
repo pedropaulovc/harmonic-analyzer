@@ -8,13 +8,13 @@ closure.  ``build_pd_transgear_knob_shaft`` marks and tolerances exactly
 One turned SAE1018 shaft carries a standard-depth 12T48DP PA20 integral
 pinion cut by the finite TTC #8 stock form (10-289-488, Ø44.45 cutter).
 The gear front F and every chain/cup station remain unchanged.  Its front
-Ø4.900 h6 solid D-core drives the matching brass D-collar without a cross
+Ø4.850 h6 solid D-core drives the matching brass D-collar without a cross
 hole.  The collar's fitted rear face bears directly on F; the #8-32 stud
 and same-outer custom thumbnut clamp it there, while the removable T24
 still floats on the existing pilot and is driven by the two axial dowels.
 The thread relief carries clamp, not torque.
 
-The Ø6 g6 rear journal runs in the plate's Ø6 H7 bore.  The loose Ø6.1-bore
+The Ø6 g6 rear journal runs in the plate's Ø6 H7 bore.  The loose Ø6.05-bore
 thrust ring retains its 5.2 length and bears on the actual rear tooth ends.
 True finite disk endcuts run out within that ring, not in the active plate
 bearing.  The rear cup is still set on the existing end-float feeler and
@@ -127,7 +127,6 @@ SPAN_BAND = (SPAN_LIMITS[1] - SPAN_NOMINAL, SPAN_LIMITS[0] - SPAN_NOMINAL)
 SPAN_DEVIATIONS = deviations(SPAN_BAND)
 SPAN_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 SPAN_PREFIX = f"CONTROL SPAN {SPAN_TEETH} TEETH "
-SPAN_ORIENTATION = "NORMAL TO SPANNED-TOOTH BISECTOR; MAXIMUM READING."
 _SPAN_SENSITIVITY = 2.0 * math.sin(math.pi * SPAN_TEETH / TEETH)
 _SPAN_ROUNDING_ALLOWANCE = (
     10**-SPAN_PLACES + 4.0 * _SPAN_GEOMETRY_ERROR
@@ -225,10 +224,13 @@ TIP_STATION = 23.9
 TIP_STATION_PLACES = 2
 
 # --- Solid D-core; no gear bore and no transverse torque hole ---------------
-CORE_DIA = 4.900
+# 4.850, not 4.900: the 0.05 tooth-space TIR (Main ruling 2026-10-10) costs
+# the finite cutter 0.0225 of radial air over the core; 4.850 restores
+# FRONT_CORE_AIR_MIN above its 0.035 floor (0.0385).
+CORE_DIA = 4.850
 CORE_DIA_BAND = (0.0, -0.008)  # ISO h6, over 3 THROUGH 6 mm
 CORE_DIA_PLACES = 3
-CORE_FLAT_FROM_AXIS = 2.150
+CORE_FLAT_FROM_AXIS = 2.125  # moves in with the core radius (4.900 -> 4.850)
 CORE_FLAT_BAND = (0.0, -0.015)
 CORE_FLAT_PLACES = 3
 # The drawing's frames print these strings; the turned-shaft grade is the
@@ -282,10 +284,9 @@ TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(c.tip_air_mm for c in _GAUGE_CORNERS)
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
-        f"TOOTH SPACE RADIAL INDICATOR TIR {TOOTH_SPACE_RUNOUT_TIR_MM:.3f} MAX TO A",
-        f"PITCH INDEX RANGE+2U {PITCH_INDEX_DEVIATION_MM} mm MAX AT REF Ø{PITCH_DIA:.3f}",
-        f"ALL SPACES + WRAP; ABS POSITION U {PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM} mm MAX",
-        f"CERTIFIED PIN Ø{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} mm; ALL {TEETH} SPACES",
+        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A",
+        f"\u00d8{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {TEETH} SPACES",
+        f"INDEX RANGE {PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     )
 )
 _GAUGE_CONTACT = toothspace_gauge_contact_mm(STOCK_PROFILE, TOOTH_SPACE_GAUGE_PIN_DIA_MM)
@@ -302,7 +303,9 @@ CORE_FRONT_FROM_F = 5.25
 CORE_FRONT_FROM_F_PLACES = 3
 
 # Ordinary turned undercut at F: no tiny-radius grade or front disk cut.
-FRONT_RELIEF_DIA = 4.000
+# 3.950, not 4.000: pays the 0.05 tooth-space TIR's extra 0.0225 radius and
+# keeps FRONT_NECK_AIR_MIN above its 0.320 floor (0.3235).
+FRONT_RELIEF_DIA = 3.950
 FRONT_RELIEF_DIA_PLACES = 3
 FRONT_RELIEF_WIDTH = 0.400
 FRONT_RELIEF_WIDTH_PLACES = 3
@@ -342,8 +345,7 @@ CORE_FLAT_REACH_PAST_SHOULDER_MIN = (
     FRONT_RELIEF_WIDTH_MIN - max(CORE_FLAT_CUT_END_LIMITS)
 )
 CORE_FLAT_TOOL_REACH_NOTE = (
-    "FLAT TOOL REACH .10 MIN PAST ACTUAL CORE SHOULDER; .05 MIN SHORT OF F. "
-    "FLAT END LIMIT IS THE FOREMOST PHYSICAL POINT, INCLUDING TOOL ROUNDING."
+    "FLAT TOOL REACH .10 MIN PAST ACTUAL CORE SHOULDER; .05 MIN SHORT OF F."
 )
 FRONT_RELIEF_AREA_MIN = math.pi * FRONT_RELIEF_DIA_MIN**2 / 4.0
 if (
@@ -464,7 +466,10 @@ if not CORE_DIA < JOURNAL_DIA < OUTSIDE_DIA:
 # --- Actual finite Ø44.45 stock disk, both axial terminal positions ---------
 FULL_DEPTH = 4.65
 FULL_DEPTH_PLACES = 3
-CUTTER_RUNOUT_MAX = 10.5
+# 10.6, not 10.5: the 0.05 tooth-space TIR raises the worst rear disk chord
+# end to F + 9.589; the printed limit keeps its 1.0 margin over that end and
+# stays 0.32 short of the plate hub bore (F + 10.92 worst).
+CUTTER_RUNOUT_MAX = 10.6
 CUTTER_RUNOUT_PLACES = 2
 CUTTER_DIA = 44.45
 CUTTER_ARBOR_BORE = 22.225
@@ -481,11 +486,6 @@ if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
     raise AssertionError("the run-out limit does not print at its places")
 FULL_DEPTH_PREFIX = "12T FULL DEPTH "
 CUTTER_RUNOUT_PREFIX = "CUTTER RUN-OUT "
-CUTTER_NOTE = (
-    f"TTC {CUTTER_SKU}, STOCK #{CUTTER_NUMBER}, {DIAMETRAL_PITCH:g}DP PA20; "
-    f"TRUE FINITE GROUND FORM, CUTTER Ø{CUTTER_DIA:.2f}, ARBOR Ø{CUTTER_ARBOR_BORE:.3f}. "
-    "TERMINAL CENTRES AT F AND FULL DEPTH; NO END-MILL SLOT SUBSTITUTE."
-)
 
 
 def cutter_runout(cutter_dia: float, rise: float) -> float:
@@ -727,25 +727,24 @@ GEAR_DATA = gear_data_note(
         ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("CUTTER RADIAL SETTING (mm, REF)", f"{RADIAL_SETTING:+.3f}"),
-        ("CONTROL", f"NATIVE PARALLEL-TANGENT SPAN {SPAN_TEETH} TEETH; MAXIMUM READING"),
+        ("CONTROL", f"NATIVE PARALLEL-TANGENT SPAN {SPAN_TEETH} TEETH"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
         ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
         ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{TOOTH_THICKNESS:.3f}"),
         ("TOOTH FORM", "RIGID TRANSLATION OF FINITE STOCK #8 / TEMPLATE 12"),
         ("CUTTER RANGE", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
         ("QUALITY CLASS", "CONTACT CRITICAL"),
-        ("INSPECTION PIN", f"SAME CERTIFIED {TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} mm NOM; ACTUAL DIA"),
-        ("INSPECTION", f"EACH {TEETH} TOOTHSPACES; FIXED RADIAL STATION"),
-        ("UNCERTAINTY", "PIN / INDICATOR / DATUM INCLUDED IN TIR"),
         ("MATES WITH", f"DISC {DISC_NUMBER}, {DISC_TEETH}T"),
     ]
 )
 
 # The title block's 0.25 edge break is a sixth of this fine tooth's whole
-# depth, so the sheet carries the one part-specific exception it needs.
+# depth, so the sheet carries the one part-specific exception it needs. A
+# shop note states the requirement, not the cutter or method (Main ruling
+# 2026-10-10); the cutter lives in the gear data block.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 DRAWING_NOTES = "\n".join((
-    TOOTH_EDGE_NOTE, CUTTER_NOTE,
+    TOOTH_EDGE_NOTE,
     "FRONT D-CORE SOLID; COLLAR REAR FACE BEARS ON F. NO FRONT CROSS HOLE.",
 ))
 

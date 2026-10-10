@@ -139,7 +139,6 @@ SPAN_BAND = (SPAN_LIMITS[1] - SPAN_NOMINAL, SPAN_LIMITS[0] - SPAN_NOMINAL)
 SPAN_DEVIATIONS = deviations(SPAN_BAND)
 SPAN_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 SPAN_PREFIX = f"SPAN {SPAN_TEETH} TEETH "
-SPAN_ORIENTATION = "NORMAL TO SPANNED-TOOTH BISECTOR; MAXIMUM READING."
 _SPAN_SENSITIVITY = 2.0 * math.sin(math.pi * SPAN_TEETH / TEETH)
 _SPAN_ROUNDING_ALLOWANCE = (
     10**-SPAN_PLACES + 4.0 * _SPAN_GEOMETRY_ERROR
@@ -284,10 +283,9 @@ BORE_DATUM = "A"
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
-        f"TOOTH SPACE RADIAL INDICATOR TIR {TOOTH_SPACE_RUNOUT_TIR_MM} mm MAX TO {BORE_DATUM}",
-        f"PITCH INDEX RANGE+2U {PITCH_INDEX_DEVIATION_MM} mm MAX AT REF \u00d8{PITCH_DIA:.3f}",
-        f"ALL SPACES + WRAP; ABS POSITION U {PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM} mm MAX",
-        f"CERTIFIED PIN \u00d8{TOOTHSPACE_GAUGE_DIA_IN:.4f} in; ALL {TEETH} SPACES",
+        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO {BORE_DATUM}",
+        f"\u00d8{TOOTHSPACE_GAUGE_DIA_IN:.4f} in PIN, ALL {TEETH} SPACES",
+        f"INDEX RANGE {PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     )
 )
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
@@ -385,7 +383,6 @@ if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
     raise AssertionError("the run-out limit does not print at its places")
 FULL_DEPTH_PREFIX = "12T FULL DEPTH "
 CUTTER_RUNOUT_PREFIX = "CUTTER RUN-OUT "
-CUTTER_NOTE = f"FINITE #{CUTTER_NUMBER} FORM; CUTTER \u00d8{CUTTER_DIA_MAX_IN:.2f} in MAX."
 # Numerical interval widths, not manufacturing tolerance or runout grades.
 ENDCUT_VOLUME_ERROR_MM3 = 0.02
 STEP_SEAT_AREA_ERROR_MM2 = 0.002
@@ -640,8 +637,6 @@ GEAR_DATA = gear_data_note(
             f"{CUTTER_TEMPLATE.reference_teeth}T MASTER",
         ),
         ("CONTACT CLASS", f"{GEAR_CONTACT_CLASS.upper()}; FINITE FLANK/TIP"),
-        ("TOOTHSPACE INDICATOR", f"BORE {BORE_DATUM}; FIXED RADIAL STATION, EACH SPACE"),
-        ("GAUGE PIN DIA (in)", f"{TOOTHSPACE_GAUGE_DIA_IN:.4f}; CERTIFIED ACTUAL DIAMETER"),
         ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
     ]
 )
@@ -650,7 +645,7 @@ GEAR_DATA = gear_data_note(
 # and the tooth ends seat the hub's spigot.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 # Named exception: MHA-PD-010 flat wall (drawing-simplicity-policy.md, "Named exceptions").
+# A shop note states the requirement, not the measuring method or the cutter
+# choice (Main ruling 2026-10-10): the run-out length is dimensioned.
 FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."
-DRAWING_NOTES = "\n".join(
-    (TOOTH_EDGE_NOTE, CUTTER_NOTE, FLAT_WALL_NOTE, SPAN_ORIENTATION)
-)
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, FLAT_WALL_NOTE))

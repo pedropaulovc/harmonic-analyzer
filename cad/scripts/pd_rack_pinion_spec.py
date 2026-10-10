@@ -116,7 +116,6 @@ SPAN_BAND = (SPAN_LIMITS[1] - SPAN_NOMINAL, SPAN_LIMITS[0] - SPAN_NOMINAL)
 SPAN_DEVIATIONS = deviations(SPAN_BAND)
 SPAN_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 SPAN_PREFIX = f"SPAN {SPAN_TEETH} TEETH "
-SPAN_ORIENTATION = "NORMAL TO SPANNED-TOOTH BISECTOR; MAXIMUM READING."
 _SPAN_SENSITIVITY = 2.0 * math.sin(math.pi * SPAN_TEETH / TEETH)
 _SPAN_ROUNDING_ALLOWANCE = (
     10**-SPAN_PLACES + 4.0 * _SPAN_GEOMETRY_ERROR
@@ -245,19 +244,22 @@ TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(contact.tip_air_mm for contact in _GAUGE_
 # The physical reducer's assembled axis datum, set from the closed-form
 # checks in paper_drive_mesh_check.reducer_mesh over the printed bands:
 # knob-pinion and disc tooth thickness at the pitch circle (the
-# manufactured_profiles corners) and both tooth-space runouts of 0.005 TIR,
-# which together move the working centre by (0.005 + 0.005)/2 = 0.005.
-# The usable window is 35.052..35.105 mm:
-#   - below 35.052 the largest disc tip reaches past the knob pinion's
-#     interference point (its base-circle tangency) at the tight extreme;
+# manufactured_profiles corners) and both tooth-space runouts of 0.05 TIR,
+# which together move the working centre by (0.05 + 0.05)/2 = 0.05.
+# Bisecting those two gates gives the usable window 35.097..35.105 mm:
+#   - below 35.097 the largest disc tip reaches past the knob pinion's
+#     interference point (its base-circle tangency) at the tight extreme
+#     (35.097 - 0.05);
 #   - above 35.105 the contact ratio at the minimum tips (7.38 and 64.44 OD)
 #     falls below 1.2.
-# Backlash stays positive from 34.964 up. 35.080 sits mid-window and gives
-# CR 1.245, backlash 0.087..0.120, root clearance 0.264 (AGMA fine-pitch
-# floor 0.157) and an interference margin of 0.080 mm.
+# 35.101 is the window's midpoint (Main ruling 2026-10-10: the design takes
+# an ordinary 0.05 TIR; 35.080 admitted only 0.005). It gives CR 1.207,
+# backlash 0.069 at the tight extreme and 0.170 at the loose one, root
+# clearance 0.240 (AGMA fine-pitch floor 0.157) and an interference margin
+# of 0.012 mm.
 MESH_PINION_TEETH = 12
 MESH_ANGLE_DEG = -168.0
-CENTRE_DISTANCE = 35.080
+CENTRE_DISTANCE = 35.101
 STANDARD_CENTRE_DISTANCE = (TEETH + MESH_PINION_TEETH) * MODULE_MM / 2.0
 CENTRE_EXTENSION = CENTRE_DISTANCE - STANDARD_CENTRE_DISTANCE
 
@@ -435,32 +437,21 @@ GEAR_DATA = gear_data_note(
             f"{ROOT_ENVELOPE_DIA_MM[0]:.3f}-{ROOT_ENVELOPE_DIA_MM[1]:.3f}",
         ),
         ("TOOTH FORM", "FINITE TRANSLATED STOCK FORM, NOT x"),
-        ("GROUND ROOT PREMISE", f"{DEDENDUM_FACTOR:g}m; RADIAL BELOW BASE"),
-        ("GROUND DEPTH PREMISE (mm, REF)", f"{GROUND_WHOLE_DEPTH_PREMISE_MM:.3f} (2.25m)"),
-        ("TOOTH-SPACE QUALITY CLASS", "CRITICAL; ASSEMBLED RUNNING-BORE DATUM"),
-        ("INSPECTION PIN (mm)", f"{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f}; ACTUAL CERTIFIED DIA"),
-        ("TOOTH-SPACE INDICATION", f"EACH OF ALL {TEETH} SPACES; FIXED RADIAL STATION"),
     ]
 )
 
 # The teeth are stated by the gear data block; the build appends the disc
 # screw's engagement line (vn_transgear_disc_screw_spec imports this module).
-DRAWING_NOTES = "\n".join(
-    (
-        SPAN_ORIENTATION,
-        "SPAN/ROOT: AXIS, NOT OD. GROUND DEPTH NOT VENDOR-CERTIFIED.",
-        BORE_FRONT_CHAMFER_NOTE,
-    )
-)
+# A shop note states the requirement, not the measuring method or the design
+# history (Main ruling 2026-10-10).
+DRAWING_NOTES = BORE_FRONT_CHAMFER_NOTE
 
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
-        f"TOOTH SPACE RADIAL INDICATOR TIR {TOOTH_SPACE_RUNOUT_TIR_MM:.3f} "
-        "MAX TO FEED BORE A (ASSY)",
-        f"PITCH INDEX RANGE+2U {PITCH_INDEX_DEVIATION_MM} mm MAX AT REF Ø{PITCH_DIA:.3f}",
-        f"ALL SPACES + WRAP; ABS POSITION U {PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM} mm MAX",
-        f"CERTIFIED PIN Ø{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} mm; ALL {TEETH} SPACES",
+        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO FEED BORE A (ASSY)",
+        f"\u00d8{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {TEETH} SPACES",
+        f"INDEX RANGE {PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     )
 )
 
