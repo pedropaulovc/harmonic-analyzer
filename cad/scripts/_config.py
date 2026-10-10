@@ -55,11 +55,22 @@ def _doc(name: str) -> dict[str, Any]:
                     entries.update(_load(p))
             return {**defaults, "parts": entries}
         if name == "tolerances":
+            # The cache key narrows fit('<g>') to tolerances/<g>.yaml, so a
+            # group defined in any other file would be read but not keyed.
             agg = dict(_load(split_dir / "_base.yaml"))
+            if "fits" in agg:
+                raise ValueError(f"{split_dir / '_base.yaml'} must not define fits")
             fits: dict[str, Any] = {}
             for p in sorted(split_dir.glob("*.yaml")):
-                if p.name != "_base.yaml":
-                    fits.update(_load(p))
+                if p.name == "_base.yaml":
+                    continue
+                group = _load(p)
+                if set(group) != {p.stem}:
+                    raise ValueError(
+                        f"{p} must define exactly the fit group {p.stem!r}, "
+                        f"found {sorted(group)}"
+                    )
+                fits.update(group)
             return {**agg, "fits": fits}
     path = CONFIG_DIR / f"{name}.yaml"
     if not path.exists():

@@ -3088,6 +3088,14 @@ def test_fit_guard_uses_task_recipe_config_dependencies():
             and Path(dep).stem != "_base"
         }
         assert dodo._fit_groups_env(task) == ",".join(sorted(groups))
+    # The drive train and its crank pinion read these groups through literal
+    # fit() calls; an empty guard here would refuse a real build.
+    assert dodo._fit_groups_env("assembly:dt_drive_train") == (
+        "cone_drum_oblique_mesh,crank_mesh,gear_mesh,shaft_in_bushing"
+    )
+    assert dodo._fit_groups_env("part:dt_crank_pinion") == (
+        "crank_mesh,gear_mesh,shaft_in_bushing"
+    )
     assert dodo._fit_groups_env("check:config") is None
     with pytest.raises(ValueError, match="fit groups are unknown"):
         dodo._fit_groups_env("part:no_such_part")

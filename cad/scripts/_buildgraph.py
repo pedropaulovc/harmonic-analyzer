@@ -1903,6 +1903,17 @@ def _part_registry_names() -> frozenset[str]:
     )
 
 
+@functools.lru_cache(maxsize=1)
+def _tolerance_groups() -> frozenset[str]:
+    """Fit-group stems (``tolerances/<group>.yaml`` minus the units _base)."""
+    d = CONFIG_DIR / "tolerances"
+    return (
+        frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_base")
+        if d.is_dir()
+        else frozenset()
+    )
+
+
 def _doc_family_tokens(doc: str) -> frozenset[str] | None:
     """The token(s) covering a whole doc by name (for provenance/_doc): the split
     docs map to their family glob, single-file docs to their file. None = unknown
@@ -1922,12 +1933,7 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
     """Resolve a family accessor at one call site. ``arg`` is the literal first-arg
     string, or None when there is no positional arg OR it is non-literal."""
     if accessor == "fit":
-        groups = {
-            p.stem
-            for p in (CONFIG_DIR / "tolerances").glob("*.yaml")
-            if p.stem != "_base"
-        }
-        if arg in groups:
+        if arg in _tolerance_groups():
             return frozenset({f"tolerances/{arg}.yaml"})
         return frozenset({"tolerances/*"})
     if accessor == "machine":

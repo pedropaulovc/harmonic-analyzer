@@ -64,3 +64,37 @@ def test_tolerance_document_aggregation_and_fit_guard(monkeypatch) -> None:
         _config.fit("gear_mesh")
     monkeypatch.delenv("HARMONIC_FIT_GROUPS")
     assert _config.fit("crank_mesh") == groups["crank_mesh"]
+
+
+@pytest.mark.parametrize(
+    ("filename", "text", "message"),
+    [
+        (
+            "gear_mesh.yaml",
+            "gear_mesh: {}\ncrank_mesh: {c2c_slack_mm: 9.99}\n",
+            "exactly the fit group",
+        ),
+        ("_base.yaml", "units: mm\nfits: {crank_mesh: {}}\n", "must not define fits"),
+    ],
+)
+def test_tolerance_files_cannot_define_a_group_their_cache_key_omits(
+    monkeypatch, tmp_path, filename, text, message
+) -> None:
+    """fit('<g>') is keyed on tolerances/<g>.yaml alone; a group shadowed from
+    any other file would change the build without changing its key."""
+    import _config
+
+    tolerances = tmp_path / "tolerances"
+    tolerances.mkdir()
+    (tolerances / "_base.yaml").write_text("units: mm\n", encoding="utf-8")
+    (tolerances / "crank_mesh.yaml").write_text(
+        "crank_mesh: {c2c_slack_mm: 0.25}\n", encoding="utf-8"
+    )
+    (tolerances / filename).write_text(text, encoding="utf-8")
+    monkeypatch.setattr(_config, "CONFIG_DIR", tmp_path)
+    _config._doc.cache_clear()
+    try:
+        with pytest.raises(ValueError, match=message):
+            _config._doc("tolerances")
+    finally:
+        _config._doc.cache_clear()
