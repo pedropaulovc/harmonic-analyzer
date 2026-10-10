@@ -79,6 +79,12 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " blank_dia_band(12), tooth_thickness_band(12))",
         "each",
     ),
+    # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth)
+    ("_cone_gear_readback", "band"): (
+        "(blank_dia_band(6), tooth_thickness_band(6),"
+        " blank_dia_band(12), tooth_thickness_band(12))",
+        "each",
+    ),
 }
 
 # Consumer modules that cannot be imported without SolidWorks, with the reason.

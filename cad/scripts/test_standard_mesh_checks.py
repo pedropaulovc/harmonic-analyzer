@@ -15,7 +15,7 @@ Named exceptions:
   centre range and at least 0.02 backlash at the closing corner; its contact
   ratio is reported.
 * The alignment pinion is a fit-up mesh: its contact ratio is reported, not
-  gated (tolerances.yaml gear_tip note).
+  gated (tolerances/gear_tip.yaml note).
 """
 from __future__ import annotations
 

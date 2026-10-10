@@ -505,9 +505,11 @@ def test_pattern_notch_is_an_untoleranced_reference_with_no_method_text() -> Non
         assert not hasattr(spec, gone) and not hasattr(drawing, gone)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "INSPECT" not in source and "GetText(3)" not in source
-    assert "drum_tooth_to_cam_notch_clock_deg" not in (
-        Path(spec.__file__).parents[1] / "config" / "tolerances.yaml"
-    ).read_text(encoding="utf-8")
+    tolerances = Path(spec.__file__).parents[1] / "config" / "tolerances"
+    assert all(
+        "drum_tooth_to_cam_notch_clock_deg" not in group.read_text(encoding="utf-8")
+        for group in tolerances.glob("*.yaml")
+    )
 
 
 def test_pattern_notch_drawing_consumes_pure_specification() -> None:

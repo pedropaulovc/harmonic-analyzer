@@ -1699,7 +1699,7 @@ def test_config_files_track_real_reads():
     cone = config_files_of(SCRIPTS_DIR / "build_dt_cone_gear.py")
     assert "machine/gear_train.yaml" in cone
     assert "machine/cone_incline.yaml" in cone, "face width follows the cone seat pitch"
-    assert "tolerances.yaml" in cone, (
+    assert "tolerances/cone_drum_oblique_mesh.yaml" in cone, (
         "stamped mesh screen uses edge slack/journal float"
     )
     assert "machine/channels.yaml" not in cone, (

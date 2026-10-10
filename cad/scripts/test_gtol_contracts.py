@@ -521,7 +521,7 @@ def projected_native(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr(_native_projected_zone, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_part_pmi, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        _part_pmi, "_resolve_faces", lambda *_args: {"projected_axis": object()}
+        _part_pmi, "resolve_faces", lambda *_args: {"projected_axis": object()}
     )
     monkeypatch.setattr(_part_pmi, "_select_face", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(_part_pmi, "_verify_attachment", lambda *_args, **_kwargs: None)

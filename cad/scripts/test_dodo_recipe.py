@@ -2188,14 +2188,16 @@ def test_config_deps_are_fine_grained():
 
     # Face width is floor(SEAT_PITCH * 1e4) / 1e4: SEAT_PITCH depends on DP
     # and nominal drum-seat length, hence gear_train + cone_incline. The stamped
-    # contact-ratio screen needs tolerances for oblique edge slack and journal
-    # float: c_deep=(N_cone*M + PD_drum)/2 + edge_slack, then opening/runout.
+    # contact-ratio screen needs the cone_drum_oblique_mesh group for edge slack
+    # and journal float: c_deep=(N_cone*M + PD_drum)/2 + edge_slack, then
+    # opening/runout; the drum tip band comes from the gear_tip group.
     # World station_z0 and active_count cancel; channels.yaml remains unread.
     cone = dodo._config_deps(scripts / "build_dt_cone_gear.py", "dt_cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
         "machine/cone_incline.yaml",
-        "tolerances.yaml",
+        "tolerances/cone_drum_oblique_mesh.yaml",
+        "tolerances/gear_tip.yaml",
         "parts/dt-cone-gear.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
@@ -3119,12 +3121,14 @@ def test_fit_guard_uses_task_recipe_config_dependencies():
         }
         assert dodo._fit_groups_env(task) == ",".join(sorted(groups))
     # The drive train and its crank pinion read these groups through literal
-    # fit() calls; an empty guard here would refuse a real build.
+    # fit() calls; an empty guard here would refuse a real build. The inch
+    # cone and drum tips read gear_tip; the crank gears sit on cone_line's
+    # stations, so the pinion also reads the cone mesh's edge slack.
     assert dodo._fit_groups_env("assembly:dt_drive_train") == (
-        "cone_drum_oblique_mesh,crank_mesh,gear_mesh,shaft_in_bushing"
+        "cone_drum_oblique_mesh,crank_mesh,gear_tip,shaft_in_bushing"
     )
     assert dodo._fit_groups_env("part:dt_crank_pinion") == (
-        "crank_mesh,gear_mesh,shaft_in_bushing"
+        "cone_drum_oblique_mesh,crank_mesh,gear_mesh,shaft_in_bushing"
     )
     assert dodo._fit_groups_env("check:config") is None
     with pytest.raises(ValueError, match="fit groups are unknown"):
