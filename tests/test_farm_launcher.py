@@ -1768,9 +1768,14 @@ def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> No
             _tracking(fixture, "-Status", "-Tag", "reused"),
             fixture["environment"],
         )
+        # This fixture has no pending start RPC: the workflow is stably absent.
+        # Still exercise both not-found queries, without the farm's 30 s grace.
         _run_launcher(
             fixture,
-            _tracking(fixture, "-Cancel", "-Tag", "reused", "-Why", "reused pid"),
+            _tracking(
+                fixture, "-Cancel", "-Tag", "reused", "-Why", "reused pid",
+                "-SettleSeconds", "0",
+            ),
             fixture["environment"],
         )
         survived = reused.poll() is None
@@ -1897,7 +1902,7 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     log_directory.mkdir()
     extra = [] if names is None else [str(log_directory / names)]
     started = time.time()
-    parent = subprocess.run(
+    parent = subprocess.Popen(
         [
             sys.executable,
             "-c",
@@ -1906,16 +1911,35 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
             "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
             "stderr=subprocess.DEVNULL).pid)",
         ],
-        check=True,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        timeout=HANG_GUARD_S,
     )
-    child = int(parent.stdout)
+    output, errors = parent.communicate(timeout=HANG_GUARD_S)
+    assert parent.returncode == 0, (output, errors)
+    assert not _process_alive(parent.pid)
+    child = int(output)
+
+    # Keep this exact sleeper's handle: cleanup must not kill a different
+    # process if the sleeper exits and its numeric PID is later reused.
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
+    kernel32.TerminateProcess.restype = wintypes.BOOL
+    kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.OpenProcess(0x100001, False, child)  # SYNCHRONIZE | TERMINATE
+    assert handle, ctypes.get_last_error()
     try:
         _write_run_record(
             fixture,
-            pid=_dead_parent_pid(child),
+            pid=parent.pid,
             tag="reused",
             workflow=LEAF_NUT,
             argv=["uv", "-c", recorded_code],
@@ -1928,31 +1952,18 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
             fixture["environment"],
         )
     finally:
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(child)], capture_output=True
-        )
+        try:
+            # TerminateProcess may report it already exited; waiting on the
+            # retained handle checks completion without reopening its PID.
+            kernel32.TerminateProcess(handle, 1)
+            assert kernel32.WaitForSingleObject(handle, HANG_GUARD_S * 1000) == 0
+        finally:
+            kernel32.CloseHandle(handle)
 
     assert status.returncode == 0, status.stderr
     report = json.loads(status.stdout)
     assert report["state"] == "launcher-died"
     assert (child in report["launcher"]["orphaned_processes"]) is orphaned
-
-
-def _dead_parent_pid(child: int) -> int:
-    listed = subprocess.run(
-        [
-            "pwsh.exe",
-            "-NoProfile",
-            "-Command",
-            f"(Get-CimInstance Win32_Process -Filter 'ProcessId={child}').ParentProcessId",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    parent = int(listed.stdout)
-    assert not _process_alive(parent)
-    return parent
 
 
 def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
@@ -2166,9 +2177,14 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
     ) == "built\n"
     assert not Path(running["snapshot"]).exists()
 
+    # LEAF_NUT remains absent in the synchronous fixture; no start can land
+    # during the production grace period on this idempotent cancellation.
     again = _run_launcher(
         fixture,
-        _tracking(fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "twice"),
+        _tracking(
+            fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "twice",
+            "-SettleSeconds", "0",
+        ),
         fixture["environment"],
     )
     assert again.returncode == 0
@@ -2382,9 +2398,14 @@ def test_cancel_keeps_outputs_the_launcher_moved_before_it_died(
             _tracking(fixture, "-Status", "-Tag", "race"),
             fixture["environment"],
         )
+        # The synchronous fixture never created these workflows; publication
+        # recovery does not need the real farm's pending-start grace period.
         cancel = _run_launcher(
             fixture,
-            _tracking(fixture, "-Cancel", "-Tag", "race", "-Why", "raced cleanup"),
+            _tracking(
+                fixture, "-Cancel", "-Tag", "race", "-Why", "raced cleanup",
+                "-SettleSeconds", "0",
+            ),
             fixture["environment"],
         )
     finally:
