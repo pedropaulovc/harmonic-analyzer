@@ -86,13 +86,13 @@ def test_numerals_sit_in_the_ruled_band_clear_of_every_tick():
     for k, numeral in enumerate(numerals):
         x0, y0, x1, y1 = dxf.bbox(numeral)
         assert 0.0 < x0 and x1 < part.BODY_LENGTH, (k, x0, x1)
-        assert 0.0 < y0 and y1 <= band_top + 1e-9, (k, y0, y1)
+        assert 0.0 < y0 and abs(y1 - band_top) < 1e-9, (k, y0, y1)
         tick = gen.tick_x(k)
         if k < part.DIVISION_COUNT - 1:
-            assert x0 >= tick + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM - 1e-9, (k, x0)
+            assert abs(x0 - (tick + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM)) < 1e-9, (k, x0)
             assert x0 < tick + part.DIVISION_SPACING / 2.0, (k, x0)  # next to ITS tick
         else:
-            assert x1 <= tick - part.TICK_WIDTH / 2.0 - part.NUMERAL_GAP_MM + 1e-9, (k, x1)
+            assert abs(x1 - (tick - part.TICK_WIDTH / 2.0 - part.NUMERAL_GAP_MM)) < 1e-9, (k, x1)
         for tx0, ty0, tx1, ty1 in ticks:
             overlaps = x0 < tx1 and tx0 < x1 and y0 < ty1 and ty0 < y1
             assert not overlaps, f"numeral {k} bbox overlaps a tick at x={tx0:.2f}"

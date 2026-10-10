@@ -1,7 +1,7 @@
-r"""Pure model/drawing contract for the unchanged graduated brass stick.
+r"""Pure model/drawing contract for the graduated brass stick.
 
-The 200 x 8 x 3 bar, grooves and numeral DXF retain their existing geometry.
-The scale is configured in amplitude.yaml and read once by ms_stick_geom.
+The 2026-10-10 user Option B ruling keeps the 200 x 8 x 3 blank and
+groove geometry, shifting the whole scale and numeral DXF 1.00 mm left.
 Model dimensions own the manufacturing values, bands and decimal places.
 The release supplies the engraved native/STEP model and its ruled-face/detail
 drawings, not the generated build-input DXF. Refer numeral outlines to that model.
@@ -22,7 +22,7 @@ from ms_stick_geom import (
 BODY_LENGTH = 200.0
 BODY_WIDTH = 8.0
 BODY_THICKNESS = 3.0
-SCALE_END_MARGIN = 0.5
+SCALE_END_MARGIN = 1.5
 SCALE_START_X = BODY_LENGTH - SCALE_SPAN - SCALE_END_MARGIN
 TICK_WIDTH = 0.4
 TICK_LENGTH = 3.0
@@ -35,13 +35,13 @@ NUMERAL_HEIGHT_MM = 2.0
 NUMERAL_GAP_MM = 0.6
 NUMERAL_ROTATION_DEG = 90
 NUMERAL_AREA_MM2 = 13.108
-NUMERALS_BBOX = (58.300, 1.393, 198.700, 4.400)
+NUMERALS_BBOX = (57.300, 1.393, 197.700, 4.400)
 
 # Width and thickness govern the running clearance in the 8.4 x 3.4 stop
 # window; engraving position accuracy is noncumulative along the scale.
-# The 2026-10-10 stock-length ruling keeps nominal geometry and the complete last
-# tick: routine +/-0.1 facing gives a 199.90 minimum against a 199.825 maximum
-# groove edge. A one-place title-block band would erase that graduation.
+# The 2026-10-10 user Option B ruling keeps the complete last tick:
+# routine +/-0.1 facing gives a 199.90 minimum against a 198.825 maximum
+# groove edge, leaving 1.075 mm worst-case land (1.30 mm nominal).
 # Depth only holds enamel: its loose band leaves 2.3 mm of stock at worst case
 # (minimum thickness minus maximum depth), above the 2.0 mm web target.
 BODY_LENGTH_TOLERANCE_MM = 0.1
@@ -97,7 +97,11 @@ DRAWING_TOLERANCES = {
     "NumeralYGap": NUMERAL_TOLERANCE_MM,
 }
 DRAWING_NOTES = "NUMERAL OUTLINES: ms-stick.SLDPRT"
-SCALE_END_NOTE = "SCALE END: DEBURR ONLY;\nDO NOT BREAK EDGE INTO GRADUATIONS"
+NUMERAL_PLACEMENT_NOTE = (
+    "NUMERALS 0-9 RIGHT OF FULL TICKS;\n"
+    "10 LEFT OF FINAL FULL TICK.\n"
+    "BOTH USE SHOWN GAPS"
+)
 FRONT_VIEW_NOTE = "RULED FACE SCALE 1:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
