@@ -49,6 +49,9 @@ _EXPECTED = {
     "vn-transgear-pivot-spring": (("9715K43",), "MHA-VN-049", 1),
     "vn-cylinder-bank-spring": (("9714K392",), "MHA-VN-052", 1),
     "vn-rocker-bank-spring": (("9714K24",), "MHA-VN-053", 1),
+    "vn-wheel-axle-nut": (("92671A005",), "MHA-VN-025", 2),
+    "vn-wheel-axle-back-washer": (("92916A480",), "MHA-VN-054", 1),
+    "vn-wheel-axle-front-washer": (("92916A250",), "MHA-VN-055", 1),
     "vn-spring-hook": (("9489T111",), "MHA-VN-012", 20),
     "vn-tube-frame-cap": (("9275K141",), "MHA-VN-028", 4),
 }

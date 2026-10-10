@@ -1048,6 +1048,27 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_wheel_axle_nut",
+        part="vn_wheel_axle_nut",
+        artifact_stem="vn-wheel-axle-nut",
+        script_name="draw_vn_wheel_axle_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_wheel_axle_back_washer",
+        part="vn_wheel_axle_back_washer",
+        artifact_stem="vn-wheel-axle-back-washer",
+        script_name="draw_vn_wheel_axle_back_washer.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_wheel_axle_front_washer",
+        part="vn_wheel_axle_front_washer",
+        artifact_stem="vn-wheel-axle-front-washer",
+        script_name="draw_vn_wheel_axle_front_washer.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_transgear_arm",
         part="pd_transgear_arm",
         artifact_stem="pd-transgear-arm",

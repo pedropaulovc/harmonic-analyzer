@@ -274,6 +274,27 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Wave Disc Spring",
         "9714K24",
     ),
+    # MHA-VN-025 / -054 / -055 (mg wheel rev 10): the magnifying wheel's
+    # brass #4-40 nut and locknut and the two brass washers either side of
+    # its hub.
+    "vn-wheel-axle-nut": _stock(
+        "vn-wheel-axle-nut",
+        "Brass Hex Nut",
+        "92671A005",
+        material="Brass",
+    ),
+    "vn-wheel-axle-back-washer": _stock(
+        "vn-wheel-axle-back-washer",
+        "Brass Washer for Number 10 Screw Size",
+        "92916A480",
+        material="Brass",
+    ),
+    "vn-wheel-axle-front-washer": _stock(
+        "vn-wheel-axle-front-washer",
+        "Brass Washer for Number 4 Screw Size",
+        "92916A250",
+        material="Brass",
+    ),
     "vn-tube-frame-cap": _stock(
         "vn-tube-frame-cap",
         "Metal Round Cap",
