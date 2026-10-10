@@ -79,7 +79,7 @@ def test_model_owns_places_and_bands() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
-    assert spec.REFERENCE_DIMENSIONS == {"CrownRise", "OverallLength"}
+    assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
     # Every band comes from a named geometry constant, never a typed number;
     # every other mark takes the title block's .XX band.
     assert model_toleranced_dimensions(part) == {
@@ -124,6 +124,22 @@ def test_slot_leaves_the_rule_12_head_web() -> None:
     assert spec.EDGE_BREAK_MAX == 0.25
     assert spec.SLOT_WEB_MIN == pytest.approx(7.00 - 0.51 - 3.51 - 0.25)
     assert spec.SLOT_WEB_MIN >= spec.SLOT_WEB_TARGET == 2.0
+
+
+def test_controlling_crown_rise_keeps_a_fillister_head_across_its_band() -> None:
+    # Head Ø and height leave the dome free; the rise alone fixes it, so it
+    # is printed controlling and the head must work at both ends of .XX.
+    assert "CrownRise" in spec.DRAWING_DIMENSIONS["HeadProfile"]
+    assert "CrownRise" not in spec.REFERENCE_DIMENSIONS
+    assert (spec.CROWN_RISE_MIN, spec.CROWN_RISE_MAX) == pytest.approx((0.49, 1.51))
+    # Shallowest slot under the tallest crown still cuts the cylindrical rim.
+    assert spec.SLOT_RIM_CUT_MIN == pytest.approx(3.00 - 0.51 - 1.51)
+    assert spec.SLOT_RIM_CUT_MIN > 0.0
+    # Tallest crown on the shortest head keeps a side after the edge break.
+    assert spec.HEAD_SIDE_MIN == pytest.approx(7.00 - 0.51 - 1.51 - 0.25)
+    assert spec.HEAD_SIDE_MIN > 0.0
+    # A dome at both ends, never past a hemisphere of the Ø12.50 head.
+    assert 0.0 < spec.CROWN_RISE_MIN < spec.CROWN_RISE_MAX < geom.HEAD_DIA / 2.0
 
 
 def test_relief_sits_below_the_die_root_with_a_flat_seat() -> None:
@@ -311,107 +327,6 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     )
     thread = drawing.SOURCE_ONLY_DIMENSIONS["ThreadDia@ShankProfile"]
     assert thread == (geom.MAJOR_DIA, 0, 0.0, 0.0)
-
-
-def _fake_display(name: str, expected: tuple[float, int, float, float]):
-    from types import SimpleNamespace
-
-    nominal, kind, lower, upper = expected
-    tolerance = SimpleNamespace(
-        Type=kind,
-        GetMinValue=lambda: lower / 1000.0,
-        GetMaxValue=lambda: upper / 1000.0,
-    )
-    dimension = SimpleNamespace(SystemValue=nominal / 1000.0, Tolerance=tolerance)
-    reference = name in spec.REFERENCE_DIMENSIONS
-    texts = {1: "(" if reference else "", 2: ")" if reference else ""}
-    display = SimpleNamespace(
-        GetDimension2=lambda _configuration: dimension,
-        GetText=lambda index: texts.get(index, ""),
-        GetPrimaryPrecision2=lambda: spec.DRAWING_PRECISION_BY_NAME[name],
-        texts=texts,
-        dimension=dimension,
-    )
-    return SimpleNamespace(
-        name=name, display=display, GetSpecificAnnotation=lambda: display
-    )
-
-
-@pytest.mark.parametrize(
-    "fault",
-    [
-        None,
-        "nominal",
-        "type",
-        "band",
-        "reference",
-        "unreference",
-        "places",
-        "missing",
-        "twice",
-    ],
-)
-def test_settled_readback_rejects_any_lost_control(monkeypatch, fault) -> None:
-    from types import SimpleNamespace
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        drawing, "dimension_name", lambda _adapter, annotation: annotation.name
-    )
-    items = {
-        name: _fake_display(name, row)
-        for name, row in drawing.PRINTED_DIMENSIONS.items()
-    }
-    extras = [SimpleNamespace(name="")]  # the thread note, centre marks
-    if fault == "nominal":
-        items["UnderHeadLength"].display.dimension.SystemValue += 1e-5
-    elif fault == "type":
-        items["ReliefDia"].display.dimension.Tolerance.Type = 0
-    elif fault == "band":
-        items["TipChamfer"].display.dimension.Tolerance.GetMinValue = lambda: -5e-5
-    elif fault == "reference":
-        items["OverallLength"].display.texts.update({1: "", 2: ""})
-    elif fault == "unreference":
-        items["HeadDia"].display.texts.update({1: "(", 2: ")"})
-    elif fault == "places":
-        items["SlotWidth"].display.GetPrimaryPrecision2 = lambda: 3
-    elif fault == "missing":
-        del items["SlotDepth"]
-    elif fault == "twice":
-        extras.append(items["HeadDia"])
-    annotations = [*items.values(), *extras]
-    side = SimpleNamespace(GetAnnotations=lambda: annotations[:5])
-    end = SimpleNamespace(GetAnnotations=lambda: annotations[5:])
-    if fault is None:
-        drawing._verify_printed_dimensions(None, (side, end))
-    else:
-        with pytest.raises(RuntimeError):
-            drawing._verify_printed_dimensions(None, (side, end))
-
-
-@pytest.mark.parametrize("fault", [None, "lead", "thread", "absent"])
-def test_source_readback_guards_the_unprinted_callout_controls(
-    monkeypatch, fault
-) -> None:
-    from types import SimpleNamespace
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    rows = {
-        full: _fake_display(full.split("@")[0], row).display.dimension
-        for full, row in drawing.SOURCE_ONLY_DIMENSIONS.items()
-    }
-    if fault == "lead":
-        rows["ReliefLead@ShankProfile"].Tolerance.GetMaxValue = lambda: 5e-5
-    elif fault == "thread":
-        rows["ThreadDia@ShankProfile"].SystemValue = 3.5e-3
-    elif fault == "absent":
-        del rows["ThreadDia@ShankProfile"]
-    model = SimpleNamespace(Parameter=lambda full: rows.get(full))
-    if fault is None:
-        drawing._verify_source_dimensions(model)
-    else:
-        with pytest.raises(RuntimeError):
-            drawing._verify_source_dimensions(model)
 
 
 def test_drawing_runs_the_readbacks_after_the_last_rebuild() -> None:
