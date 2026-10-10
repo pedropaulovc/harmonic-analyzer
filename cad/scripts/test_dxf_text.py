@@ -1,19 +1,19 @@
 """Offline guards for the measuring stick's engraved-numerals DXF.
 
-The tracked ``cad/references/ha-measuring-stick-numerals.dxf`` is a GENERATED
-asset (``gen_stick_numerals_dxf``); the build imports it blind and only
+The tracked ``cad/references/ms-stick-numerals.dxf`` is a GENERATED
+asset (``gen_ms_stick_numerals_dxf``); the build imports it blind and only
 bound-checks the removed volume on the live seat. These tests keep the file,
-the generator and the build script's pinned constants in step without
+the generator and the pure model dimensional contract in step without
 SolidWorks: the file regenerates byte-identical, parses back as closed
 LWPOLYLINEs with the expected loop census, lands inside the ruled band clear
-of every tick, and matches the area/bbox the build asserts against.
+of every tick, and matches the model-owned pinned area/bbox.
 """
 
 from __future__ import annotations
 
 import _dxf_text as dxf
-import build_ha_measuring_stick as part
-import gen_stick_numerals_dxf as gen
+import ms_stick_spec as part
+import gen_ms_stick_numerals_dxf as gen
 
 EXPECTED_OUTER_LOOPS = 12  # glyph bodies: 0 1 2 3 4 5 6 7 8 9 + the "1" and "0" of 10
 EXPECTED_INNER_LOOPS = 7  # counters: 0, 4, 6, 8 (x2), 9, and the 0 of 10
@@ -24,7 +24,7 @@ def _read() -> str:
 
 
 def _tick_rects() -> list[tuple[float, float, float, float]]:
-    """Every engraved tick as (x0, y0, x1, y1), from the build's own layout."""
+    """Every engraved tick as (x0, y0, x1, y1), from the pure model layout."""
     half = part.TICK_WIDTH / 2.0
     rects = []
     for k in range(part.DIVISION_COUNT):
@@ -45,8 +45,8 @@ def test_dxf_is_tracked_and_regenerates_byte_identical():
     assert part.NUMERALS_DXF.is_file(), part.NUMERALS_DXF
     on_disk = dxf.normalize_newlines(part.NUMERALS_DXF.read_bytes())
     assert on_disk == gen.render(), (
-        "ha-measuring-stick-numerals.dxf drifted from gen_stick_numerals_dxf -- "
-        "re-run `uv run python cad/scripts/gen_stick_numerals_dxf.py` and commit"
+        "ms-stick-numerals.dxf drifted from gen_ms_stick_numerals_dxf -- "
+        "re-run `uv run python cad/scripts/gen_ms_stick_numerals_dxf.py` and commit"
     )
 
 

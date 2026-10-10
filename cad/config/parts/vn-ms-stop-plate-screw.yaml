@@ -1,0 +1,13 @@
+vn-ms-stop-plate-screw:
+  title: Brass Fillister Head Slotted Screw
+  number: MHA-VN-054
+  stock_name: Brass Fillister Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [90114A124]
+  material: Brass
+  material_specification: Brass, McMaster-Carr 90114A124
+  finish: plain
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

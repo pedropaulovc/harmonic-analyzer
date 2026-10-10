@@ -38,7 +38,7 @@ These need a decision before a module can be written for them:
 | `fr-rocker-arm-support`, `ch-connecting-rod` | Cast or cut from bar? (Both benign as bar.) |
 | `vn-counter-spring`, `vn-channel-spring-installed` ×20 | Wind your own (a module) or specify to a spring house (a procurement task)? |
 | `vn-chain-inner-link` / `vn-chain-outer-link` / `pd-chain-sprocket` | Make the roller chain or buy it? |
-| `ha-measuring-stick` | Hand stamping — a small module of its own, or a paragraph? |
+| `ms-stick` | Hand stamping — a small module of its own, or a paragraph? |
 
 ## Coverage check
 

@@ -951,9 +951,9 @@ sections:
         - stated
         - high
       - - Scale span (10 divisions)
-        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end); numerals 0-10 engraved 2.0 high, turned 90° with their tops toward the 10 end, 0.6 past each full tick (2026-09-02, `ha-measuring-stick-numerals.dxf`)
+        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end); numerals 0-10 engraved 2.0 high, turned 90° with their tops toward the 10 end, 0.6 past each full tick (2026-09-02, `ms-stick-numerals.dxf`)
         - '5.59'
-        - 'pp.34–37 plates re-read 2026-09 (the earlier 80 mm was a low read): the ruling runs ~0.71 of the 200 bar with tenths between the numbered ticks; close to the 146.05 half-arm (ch.14), so the face is near 1:1 mm — see notes (`build_ha_measuring_stick.py`)'
+        - 'pp.34–37 plates re-read 2026-09 (the earlier 80 mm was a low read): the ruling runs ~0.71 of the 200 bar with tenths between the numbered ticks; close to the 146.05 half-arm (ch.14), so the face is near 1:1 mm — see notes (`build_ms_stick.py`)'
         - scaled
         - med
       - - Body thickness
@@ -962,12 +962,12 @@ sections:
         - pp. 34–35 photo proportion
         - scaled
         - low
-      - - Stop block (2026-09)
-        - 'black 12 mm cube with a closed 8.4 × 3.4 window for the bar (floor 4.0 up) and a Ø7 × 3.5 knurled thumbscrew UNDERNEATH (2026-09-02, p.34: square block, screw below); parked at the 2 mark, so the stick stands propped on the block 7.95 above the deck'
+      - - Stop (re-derived 2026-10-09)
+        - 'two-piece brass stop, blackened: a 21 (along the stick) × 11 (across) × 14.1 (thumbscrew axis) block `ms-stop-block` with an 8.4 × 3.4 window milled open into its plate-side face (window 8.6..12.0 above the head face; roof 2.1 between the window and the roof face, 1×45° chamfers on the roof''s two end edges, opposite wall 2.6), closed by a 21 × 14.1 × 1.00 plate `ms-stop-plate` on two #2-56 brass fillister screws (McMaster 90114A124, at 3.5 and 17.5 along the stick, 4.0 above the head face; holes match-drilled through the paired plate and block in one pilot pass, plate opened to Ø2.4 clearance, block bottoming-tapped blind from the mating face, full thread 6.3 / drill 7.8); a #4-40 thumbscrew (91882A221) tapped up from the head face at 10.5 along / 4.2 across (8.6 wall) clamps the 8 × 3 stick against the roof; parked at the 2.0 mark'
         - —
-        - 'pp.34–35: the sliding/locking stop the text names sits on the bar as a small dark block with a bright screw head (`build_ha_measuring_stick_stop.py`)'
+        - 'ch16 `page001_img01.jpeg` (assembled, 5.65 px/mm), `page001_img02.jpeg` (plate face up), `page001_img04.png` (plate face with 2 slotted screws, window open to the plate side), `page002_img05.png` (in use, head below); approved sketch 2026-10-09 (`stop_rederive_v2.png`); roof 2.1 / height 14.1 is the user''s option B ruling of 2026-10-09 (`stop_roof_options_v1.png`, the 2.0 roof of the sketch thickened for the routine ±0.51 chamfer-to-window margin) (`ms_stop_spec.py`, `ms-measuring-stick` sub-assembly). Replaces the 2026-09 12 mm cube with the screw underneath.'
         - scaled
-        - low
+        - med
   - prose: |2
 
       Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
