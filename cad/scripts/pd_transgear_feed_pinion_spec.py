@@ -83,9 +83,6 @@ CUTTER_TEMPLATE = CutterTemplate(12, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
 CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
 CUTTER_TOOTH_RANGE = CUTTER_TEMPLATE.teeth_range
 MODULE_MM = CUTTER_TEMPLATE.module_mm
-ADDENDUM_FACTOR = (
-    CUTTER_TEMPLATE.tip_radius_mm - CUTTER_TEMPLATE.pitch_radius_mm
-) / MODULE_MM
 DEDENDUM_FACTOR = (
     CUTTER_TEMPLATE.pitch_radius_mm - CUTTER_TEMPLATE.root_radius_mm
 ) / MODULE_MM
@@ -611,32 +608,21 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
-# Rule 6 tooth-system data: a rigidly translated finite #8 template, not x.
-# Native tip/root/face dimensions retain their ownership on the section.
+# What a machinist needs to cut and check the teeth; design parameters stay
+# in this module (Main ruling 2026-10-10).
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        (
-            "TOTAL TEMPLATE TRANSLATION s (mm, REF)",
-            f"{RADIAL_SETTING:.3f}",
-        ),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.3f}"),
         ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{TOOTH_THICKNESS:.3f}"),
+        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
+        ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
         (
-            "MASTER ha*/hf*",
-            f"{ADDENDUM_FACTOR:.2f} / {DEDENDUM_FACTOR:.2f}",
+            f"SPAN OVER {SPAN_TEETH} TEETH",
+            f"{min(SPAN_LIMITS):.{SPAN_PLACES}f}-{max(SPAN_LIMITS):.{SPAN_PLACES}f}",
         ),
-        ("THICKNESS INSPECTION", f"NATIVE SPAN OVER {SPAN_TEETH} TEETH"),
-        ("TOOTH FORM", "FINITE TRANSLATED STOCK FORM, NOT x"),
-        (
-            "CUTTER TEMPLATE",
-            f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T; "
-            f"{CUTTER_TEMPLATE.reference_teeth}T MASTER",
-        ),
-        ("CONTACT CLASS", f"{GEAR_CONTACT_CLASS.upper()}; FINITE FLANK/TIP"),
         ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
     ]
 )

@@ -718,22 +718,21 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 
 DISC_NUMBER = "MHA-PD-006"
 DISC_TEETH = DISC.TEETH
-# Tooth system inputs are REF. The native span and accepted tip limits, not a
-# generating-rack x or circular-thickness surrogate, control the real cutter.
+# What a machinist needs to cut and check the teeth; design parameters stay
+# in this module (Main ruling 2026-10-10).
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("CUTTER RADIAL SETTING (mm, REF)", f"{RADIAL_SETTING:+.3f}"),
-        ("CONTROL", f"NATIVE PARALLEL-TANGENT SPAN {SPAN_TEETH} TEETH"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
         ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{TOOTH_THICKNESS:.3f}"),
-        ("TOOTH FORM", "RIGID TRANSLATION OF FINITE STOCK #8 / TEMPLATE 12"),
-        ("CUTTER RANGE", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
-        ("QUALITY CLASS", "CONTACT CRITICAL"),
+        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
+        ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
+        (
+            f"SPAN OVER {SPAN_TEETH} TEETH",
+            f"{min(SPAN_LIMITS):.{SPAN_PLACES}f}-{max(SPAN_LIMITS):.{SPAN_PLACES}f}",
+        ),
         ("MATES WITH", f"DISC {DISC_NUMBER}, {DISC_TEETH}T"),
     ]
 )

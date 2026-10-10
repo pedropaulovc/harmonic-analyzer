@@ -72,7 +72,18 @@ def test_native_stock_source_is_the_selected_12t_48dp_master() -> None:
     assert spec.CUTTER_SKU == "10-289-488"
     assert part.STOCK_PROFILE is profile
     assert "PROFILE SHIFT" not in spec.GEAR_DATA
-    assert "RIGID TRANSLATION" in spec.GEAR_DATA
+    lower, upper = sorted(spec.SPAN_LIMITS)
+    assert spec.GEAR_DATA.splitlines()[1:] == [
+        "NUMBER OF TEETH:  12",
+        "DIAMETRAL PITCH:  48.00",
+        "PRESSURE ANGLE:  20.0 DEG",
+        f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
+        f"CIRCULAR THICKNESS AT PD (mm, REF):  {spec.TOOTH_THICKNESS:.3f}",
+        f"WHOLE DEPTH (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
+        "CUTTER:  #8, 12-13T",
+        f"SPAN OVER 2 TEETH:  {lower:.4f}-{upper:.4f}",
+        "MATES WITH:  DISC MHA-PD-006, 120T",
+    ]
 
 
 def test_span_is_actual_finite_contact_and_printed_limits_are_inverted() -> None:

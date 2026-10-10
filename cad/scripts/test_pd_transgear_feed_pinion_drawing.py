@@ -633,23 +633,25 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         assert profile.blank_radius_mm <= profile.support_radius_max_mm
         assert profile.tip_land_mm >= 0.25 * spec.MODULE_MM
         assert 2.0 * profile.root_radius_min_mm >= spec.ROOT_DIA_MIN
+    lower, upper = sorted(spec.SPAN_LIMITS)
     for label, value in (
         ("NUMBER OF TEETH", f"{spec.TEETH}"),
         ("DIAMETRAL PITCH", f"{spec.DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("TOTAL TEMPLATE TRANSLATION s (mm, REF)", f"{spec.RADIAL_SETTING:.3f}"),
+        ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.3f}"),
         ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{spec.TOOTH_THICKNESS:.3f}"),
-        ("THICKNESS INSPECTION", f"NATIVE SPAN OVER {spec.SPAN_TEETH} TEETH"),
+        ("WHOLE DEPTH (mm, REF)", f"{spec.WHOLE_DEPTH:.3f}"),
         (
-            "CUTTER TEMPLATE",
+            "CUTTER",
             f"#{spec.CUTTER_NUMBER}, "
-            f"{spec.CUTTER_TOOTH_RANGE[0]}-{spec.CUTTER_TOOTH_RANGE[1]}T; "
-            f"{spec.CUTTER_TEMPLATE.reference_teeth}T MASTER",
+            f"{spec.CUTTER_TOOTH_RANGE[0]}-{spec.CUTTER_TOOTH_RANGE[1]}T",
         ),
+        (f"SPAN OVER {spec.SPAN_TEETH} TEETH", f"{lower:.4f}-{upper:.4f}"),
+        ("MATES WITH", f"PLATEN RACK {spec.RACK_NUMBER}"),
     ):
         assert f"{label}:  {value}" in spec.GEAR_DATA
+    assert len(spec.GEAR_DATA.splitlines()) == 10
     assert "PROFILE SHIFT" not in spec.GEAR_DATA
-    assert "FINITE TRANSLATED STOCK FORM, NOT x" in spec.GEAR_DATA
     assert part.GEAR_DATA == spec.GEAR_DATA
 
 
@@ -731,7 +733,6 @@ def test_toothspace_control_is_source_owned_and_feature_local() -> None:
     assert "CANDIDATE" not in spec.TOOTH_SPACE_CALLOUT
     assert "TIR" not in spec.DRAWING_NOTES
     assert len(spec.DRAWING_NOTES.splitlines()) <= 4
-    assert spec.GEAR_CONTACT_CLASS.upper() in spec.GEAR_DATA
     assert drawing.add_toothspace_callout is stock_drawing.add_toothspace_callout
     assert drawing.STOCK_PROFILE is spec.STOCK_PROFILE
     assert drawing.TOOTHSPACE_GAUGE_DIA_MM == spec.TOOTHSPACE_GAUGE_DIA_MM

@@ -418,25 +418,23 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
+KNOB_NUMBER = "MHA-PD-008"
+# What a machinist needs to cut and check the teeth; design parameters stay
+# in this module (Main ruling 2026-10-10).
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        (
-            "CUTTER TEMPLATE",
-            f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T; "
-            f"{CUTTER_REFERENCE_TEETH}T MASTER",
-        ),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("TOTAL TOOL TRANSLATION T (mm, REF)", f"{RADIAL_SETTING:.3f}"),
-        ("THICKNESS INSPECTION", f"NATIVE SPAN OVER {SPAN_TEETH} TEETH"),
         ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{TOOTH_THICKNESS:.3f}"),
+        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
+        ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
         (
-            "AXIS ROOT ENVELOPE DIA (mm, REF)",
-            f"{ROOT_ENVELOPE_DIA_MM[0]:.3f}-{ROOT_ENVELOPE_DIA_MM[1]:.3f}",
+            f"SPAN OVER {SPAN_TEETH} TEETH",
+            f"{min(SPAN_LIMITS):.{SPAN_PLACES}f}-{max(SPAN_LIMITS):.{SPAN_PLACES}f}",
         ),
-        ("TOOTH FORM", "FINITE TRANSLATED STOCK FORM, NOT x"),
+        ("MATES WITH", f"KNOB SHAFT {KNOB_NUMBER}, {MESH_PINION_TEETH}T"),
     ]
 )
 

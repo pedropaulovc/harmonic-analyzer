@@ -188,34 +188,31 @@ def test_tap_callout_carries_both_mouth_breaks_and_transfer() -> None:
         drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""})
 
 
-def test_gear_data_block_specifies_the_actual_finite_tooth_system() -> None:
+def test_gear_data_block_is_what_the_machinist_needs() -> None:
     data = spec.GEAR_DATA
+    lower, upper = sorted(spec.SPAN_LIMITS)
     for label, value in (
         ("NUMBER OF TEETH", "120"),
         ("DIAMETRAL PITCH", "48.00"),
         ("PRESSURE ANGLE", "20.0 DEG"),
-        ("TOTAL TOOL TRANSLATION T (mm, REF)", f"{spec.RADIAL_SETTING:.3f}"),
         ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.2f}"),
         ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{spec.TOOTH_THICKNESS:.3f}"),
-        ("THICKNESS INSPECTION", f"NATIVE SPAN OVER {spec.SPAN_TEETH} TEETH"),
+        ("WHOLE DEPTH (mm, REF)", f"{spec.WHOLE_DEPTH:.3f}"),
         (
-            "CUTTER TEMPLATE",
+            "CUTTER",
             f"#{spec.CUTTER_NUMBER}, "
-            f"{spec.CUTTER_TOOTH_RANGE[0]}-{spec.CUTTER_TOOTH_RANGE[1]}T; "
-            f"{spec.CUTTER_REFERENCE_TEETH}T MASTER",
+            f"{spec.CUTTER_TOOTH_RANGE[0]}-{spec.CUTTER_TOOTH_RANGE[1]}T",
         ),
-        (
-            "AXIS ROOT ENVELOPE DIA (mm, REF)",
-            f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
-        ),
+        (f"SPAN OVER {spec.SPAN_TEETH} TEETH", f"{lower:.4f}-{upper:.4f}"),
+        ("MATES WITH", f"KNOB SHAFT MHA-PD-008, {spec.MESH_PINION_TEETH}T"),
     ):
         assert f"{label}:  {value}" in data
+    assert len(data.splitlines()) == 10
     assert spec.CUTTER_NUMBER == 2
     assert spec.CUTTER_REFERENCE_TEETH == 55 != spec.TEETH == 120
     assert spec.CUTTER_TOOTH_RANGE == (55, 134)
     assert spec.TOOTH_THICKNESS == spec.STOCK_PROFILE.pitch_tooth_thickness_mm
     assert part.GEAR_DATA == data
-    assert "FINITE TRANSLATED STOCK FORM, NOT x" in data
     # A shop note states the requirement, not the method or design history.
     assert spec.DRAWING_NOTES == spec.BORE_FRONT_CHAMFER_NOTE
     assert "CERTIFIED" not in data and "PREMISE" not in data
