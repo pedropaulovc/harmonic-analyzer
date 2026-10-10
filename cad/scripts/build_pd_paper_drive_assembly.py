@@ -832,13 +832,11 @@ for _screw, _tap_x, _hole_x in zip(
 # Mesh phasing. build_fixed_gear seeds the disc with a TOOTH centred on local
 # +X, and its teeth repeat every 3 deg: MESH_ANGLE is a multiple of that, so
 # the disc keeps identity spin with a tooth along the S -> K line. The knob
-# shaft's integral 12T has a GAP at GAP_AZIMUTH_DEG (a tooth on local +X); it
-# is spun so a gap faces back along that line.
+# shaft's integral 12T has a GAP at GAP_AZIMUTH_DEG (a tooth on local +X); the
+# spec's FRONT_STACK_PHASE_DEG spins it so a gap faces back along that line.
 THIRD_GAMMA = 360.0 / THIRD_TEETH  # 30
 _MESH_AZ = 180.0 + MESH_ANGLE_DEG  # 12: from the knob axis toward the stud
-THIRD_PHASE_DEG = (_MESH_AZ - KNOB_SPEC.GAP_AZIMUTH_DEG) % THIRD_GAMMA  # 27
-if THIRD_PHASE_DEG > THIRD_GAMMA / 2.0:
-    THIRD_PHASE_DEG -= THIRD_GAMMA  # -3: nearest representative
+THIRD_PHASE_DEG = KNOB_SPEC.FRONT_STACK_PHASE_DEG  # -3: nearest representative
 # Rigidly clock the complete mounted front stack to the actual integral
 # shaft. Spare inventory and the intentionally visual native chain are separate.
 KNOB_FRONT_STACK_ROT = rot_z_rows(THIRD_PHASE_DEG)
