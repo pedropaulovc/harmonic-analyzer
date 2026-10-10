@@ -267,10 +267,30 @@ def export_snapshot(
     )
     fillister_module = types.ModuleType("diagnostics.diag_mcmaster_fillister")
     fillister_module.__file__ = str(fillister_path)
-    cross_spec = identity_map.import_module(cad, "vn_frame_cross_screw_spec")
-    for name in ("SHANK_DIA", "SHANK_LEN", "HEAD_H", "HEAD_DIA", "PITCH"):
-        fillister_module.__dict__[name] = getattr(cross_spec, name)
-    # Pinned-commit assignment AST; references the injected cross-screw constants.
+    # Resolve the table's pure-spec bindings from this exact archived revision,
+    # including aliases used by later supplier rows. Importing the COM recipe
+    # itself would pull unrelated telemetry/Windows machinery into the exporter.
+    required_names = {
+        node.id for node in ast.walk(fillister_assignment.value)
+        if isinstance(node, ast.Name)
+    }
+    for statement in fillister_tree.body:
+        if not isinstance(statement, ast.ImportFrom) or not statement.module:
+            continue
+        if statement.level or not statement.module.endswith("_spec"):
+            continue
+        aliases = [
+            alias for alias in statement.names
+            if (alias.asname or alias.name) in required_names
+        ]
+        if not aliases:
+            continue
+        spec_module = identity_map.import_module(cad, statement.module)
+        for alias in aliases:
+            fillister_module.__dict__[alias.asname or alias.name] = getattr(
+                spec_module, alias.name
+            )
+    # Pinned-commit assignment AST; all referenced supplier constants are bound.
     fillister_code = compile(
         ast.Module(body=[fillister_assignment], type_ignores=[]),
         str(fillister_path),

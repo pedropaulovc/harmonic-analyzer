@@ -103,7 +103,7 @@ The table covers 153 part families (the 151 current families plus the two retire
 
 Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws.
 
-Superseded identities (recorded in the map's `revision_changes`) are likewise lookup keys only: `ha-measuring-stick` MHA-HA-001 became `ms-stick` MHA-MS-001 and `ha-measuring-stick-stop` MHA-HA-002 became `ms-stop-block` MHA-MS-002 on 2026-10-09, so the `measuring-stick` rows below carry their MS Numbers and the HA part Numbers are never reissued. The released v39 web model predates the MS category and keeps its release-pinned identities until the next model release.
+The measuring-stick cutover is recorded here and in the current registries, not in the sealed release identity map: `ha-measuring-stick` MHA-HA-001 became `ms-stick` MHA-MS-001 and `ha-measuring-stick-stop` MHA-HA-002 became `ms-stop-block` MHA-MS-002 on 2026-10-09, so the `measuring-stick` rows below carry their MS Numbers and the HA part Numbers are never reissued. `cad/config/identity-migration-map.json` retains its released v39 bytes for provenance and release pairing; the v39 web model keeps its release-pinned identities until the next model release.
 
 | Kind | Old stem | Canonical stem | Old Number | Current Number |
 |---|---|---|---|---|
