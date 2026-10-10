@@ -173,13 +173,18 @@ ASSEMBLED_ISO_SCALE = (1.0, 3.0)
 REFERENCE_ISO_SCALE = (1.0, 8.0)
 # At 1:3 the bank and rig explodes filled about a fifth of their sheets (Fable
 # review of baseline-5); the cone-crank ring already spans ~170 x 150 mm there.
-# The bank still filled a small fraction of its sheet at 1:2 (r9 Fable review);
-# at 2:3 its ~145 x 107 mm outline plus the balloon ring fits the 395 x 176 field.
+# The bank still filled a small fraction of its sheet at 1:2 (r9 Fable review),
+# and at 2:3 its ~169 x 141 mm outline plus the balloon ring fit the 395 x 176
+# field. The inch cylinder gears grew it to 169.9 x 145.0 mm at 2:3
+# (0d454fa91), a 179.0 mm ring: 2:3 no longer fits, and stepping down to 1:2
+# would switch the view off 'Default' after its explode, which the fit
+# refuses. So the bank is placed at 1:2: Default Simplified from the start,
+# a ~127 x 109 mm outline and a 143 mm ring.
 # The rig cannot grow: its ~116 mm-tall outline plus ring already nears 176.
 # Each is the cluster's PREFERRED scale: the build places the view there and
 # steps down CLUSTER_SCALE_LADDER until its balloon ring fits (cluster_ring_scale).
 CLUSTER_SCALES: dict[Cluster, tuple[float, float]] = {
-    "cylinder-bank": (2.0, 3.0),
+    "cylinder-bank": (1.0, 2.0),
     "cone-crank": (1.0, 3.0),
     "pinion-rig": (1.0, 2.0),
 }
