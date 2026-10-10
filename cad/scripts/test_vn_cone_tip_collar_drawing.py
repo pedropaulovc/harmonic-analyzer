@@ -235,10 +235,10 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
     assert set(spec.DRAWING_DIMENSIONS) == set(spec.DRAWING_PRECISION)
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         assert names == set(spec.DRAWING_PRECISION[feature])
-    assert set(drawing.SCREW_KEEP) == {"DogDia", "DogLength", "DogEdge"}
+    assert set(drawing.SCREW_KEEP) == {"DogDia", "DogLength"}
     assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) | set(drawing.BORE_KEEP) == {
         "CollarDia", "NoseDia", "BoreDia", "FlatDistance",
-        "CollarWidth", "CollarEdge", "NoseLength", "ShoulderRadius",
+        "CollarWidth", "NoseLength", "ShoulderRadius",
     }
     assert set(drawing.TAP_KEEP) == {"TapStation", "TapRootLimit"}
     assert spec.BORE_DIA * spec.BORE_VIEW_SCALE[0] / spec.BORE_VIEW_SCALE[1] >= 28.0
@@ -258,6 +258,11 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
     assert "author_part_pmi" in source
     assert "build_purchased_fastener_drawing" not in drawing_source
     assert "set_dimension_precision" not in drawing_source
+    # Edges stay sharp in the model: the title block covers the collar's
+    # breaks, and the dog's tighter limit is printed once on its diameter.
+    assert "add_chamfer" not in source
+    assert spec.DOG_EDGE_CALLOUT == f"EDGE BREAK {spec.DOG_EDGE_BREAK:.2f} MAX"
+    assert '{"DogDia": spec.DOG_EDGE_CALLOUT}' in drawing_source
 
 
 def test_blind_tap_qualifier_retains_native_depth_variables():

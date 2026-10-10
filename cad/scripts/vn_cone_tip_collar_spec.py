@@ -7,7 +7,7 @@ the existing set-screw mechanism and is turned from 3/4-inch steel bar.
 Its screw is genuine 94355A213, #2-56 x
 5/16-inch 18-8 stainless, with the flat tip ground to the native dog geometry.
 The supplier specifies the 0.035-inch hex, but not its depth or edge breaks.
-The model uses ASME's minimum key engagement and nominal factory breaks;
+The model uses ASME's minimum key engagement and leaves every edge sharp;
 those retained stock details are not rework dimensions on this print.
 
 The collar axis is +Y, south face y=0, north face y=WIDTH. The radial screw
@@ -90,8 +90,9 @@ WIDTH_BAND_MM = TIP_COLLAR_WIDTH_BAND_MM
 TAP_STATION = TIP_COLLAR_TAP_STATION_MM
 SHOULDER_ROOT_RADIUS = 0.25
 SHOULDER_ROOT_BAND = (0.0, -SHOULDER_ROOT_RADIUS)
+# The title block's free-edge break: the wall, thread and contact budgets
+# book it, but the model leaves the edges sharp (the title block prints it).
 EDGE_BREAK = TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM
-EDGE_BREAK_BAND = (0.0, -EDGE_BREAK)
 FLAT_DISTANCE = 7.0
 ROUTINE_BAND_MM = printed_band_mm(2)
 WALL_TARGET_MM = 2.0
@@ -111,15 +112,17 @@ SET_SCREW_LENGTH = 5.0 * IN / 16.0
 SET_SCREW_LENGTH_BAND_MM = 0.01 * IN  # ASME B18.3 Table 14 note (11), L <= 0.63 in
 SET_SCREW_SOCKET_AF = 0.035 * IN
 SET_SCREW_SOCKET_DEPTH = 0.060 * IN  # Table 14 #2 minimum key engagement; not vendor-exact
-SET_SCREW_END_BREAK = 0.7 * SET_SCREW_PITCH  # nominal factory depiction, below the root
 SET_SCREW_END_FACE_MIN_ANGLE_DEG = 30.0  # Table 14 note (1): socket-face chamfer 30..45 deg
 SET_SCREW_FACTORY_POINT_MIN_DIA = 0.039 * IN  # Table 14 #2 flat-point P MIN
 SET_SCREW_FACTORY_POINT_MIN_ANGLE_DEG = 45.0  # Table 14 note (2), length >= B
 DOG_DIA = TIP_SCREW_DOG_DIA_MM
 DOG_DIA_BAND = TIP_SCREW_DOG_DIA_BAND
 DOG_LENGTH = TIP_SCREW_DOG_LENGTH_MM
+# The title block's R0.25 exceeds the Ø0.20 dog's radius and would remove its
+# ground face; 0.02 keeps Ø0.15 of face at the dog's least Ø0.19. Printed
+# under the dog Ø; the model's dog edge stays sharp.
 DOG_EDGE_BREAK = 0.02
-DOG_EDGE_BAND = (0.0, -DOG_EDGE_BREAK)
+DOG_EDGE_CALLOUT = f"EDGE BREAK {DOG_EDGE_BREAK:.2f} MAX"
 # Coordinates in the collar's frame. The loaded collar centre moves toward
 # +X; its bore seats on the shaft's retained -X BACK arc. The dog consequently
 # advances by that nonzero displacement rather than hovering above the flat.
@@ -373,8 +376,8 @@ _MALE_FULL_START_MAX = (
 )
 # The supplied socket-end face must exist outside the hex; at the smallest
 # permitted chamfer angle its axial loss cannot exceed this radial envelope.
-# This bounds the other male thread end without pretending the factory
-# chamfer is the nominal model depiction above.
+# This bounds the other male thread end; the model leaves the factory
+# chamfer out.
 _STOCK_FACE_CHAMFER_MAX = (
     (SET_SCREW_MAJOR_DIA - SET_SCREW_SOCKET_AF) / 2.0
     / math.tan(math.radians(SET_SCREW_END_FACE_MIN_ANGLE_DEG))
@@ -450,26 +453,22 @@ DRAWING_DIMENSIONS = {
     "BodyProfile": {"CollarDia"},
     "BodyPlane": {"NoseLength"},
     "Ring": {"CollarWidth"},
-    "RingEdgeBreak": {"CollarEdge"},
     "ShoulderRoot": {"ShoulderRadius"},
     "MountFlatProfile": {"FlatDistance"},
     "SetScrewTap": {"TapStation"},
     "TapRootGauge": {"TapRootLimit"},
     "SetScrewProfile": {"DogDia", "DogLength"},
-    "DogEdgeBreak": {"DogEdge"},
 }
 DRAWING_PRECISION = {
     "RingProfile": {"NoseDia": 2, "BoreDia": TERMINAL_DIA_PLACES},
     "BodyProfile": {"CollarDia": 2},
     "BodyPlane": {"NoseLength": 2},
-    "RingEdgeBreak": {"CollarEdge": 2},
     "ShoulderRoot": {"ShoulderRadius": 2},
     "Ring": {"CollarWidth": 2},
     "MountFlatProfile": {"FlatDistance": 2},
     "SetScrewTap": {"TapStation": 2},
     "TapRootGauge": {"TapRootLimit": 2},
     "SetScrewProfile": {"DogDia": 2, "DogLength": 2},
-    "DogEdgeBreak": {"DogEdge": 2},
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places for names in DRAWING_PRECISION.values() for name, places in names.items()

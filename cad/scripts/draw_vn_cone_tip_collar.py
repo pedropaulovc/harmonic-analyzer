@@ -47,15 +47,14 @@ TAP_SCALE = spec.RADIAL_TAP_VIEW_SCALE
 ISO_CENTER = (0.345, 0.210)
 END_KEEP = {"CollarDia": (0.030, 0.130), "NoseDia": (0.027, 0.165),
             "FlatDistance": (0.080, 0.112)}
-SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarEdge": (0.275, 0.120),
+SIDE_KEEP = {"CollarWidth": (0.205, 0.110),
              "NoseLength": (0.182, 0.218), "ShoulderRadius": (0.282, 0.205)}
 OD_ON_SIDE = (0.250, SIDE_CENTER[1])
 TAP_KEEP = {"TapStation": (0.184, 0.266), "TapRootLimit": (0.250, 0.272)}
 BORE_CENTER = (0.350, 0.080)
 BORE_KEEP = {"BoreDia": (0.310, 0.110)}
 SCREW_CENTER = (0.170, 0.165)
-SCREW_KEEP = {"DogDia": (0.075, 0.200), "DogLength": (0.096, 0.116),
-              "DogEdge": (0.060, 0.235)}
+SCREW_KEEP = {"DogDia": (0.075, 0.200), "DogLength": (0.096, 0.116)}
 
 
 def _configuration(adapter, views, name):
@@ -229,7 +228,6 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("collar end view has no single OD donor")
     moved = _move_od(adapter, donors[0], end, side)
     marks = [a for a in end_marks if dimension_name(adapter, a) != "CollarDia"] + side_marks + [moved]
-    set_dimension_callouts(adapter, marks, {"CollarEdge": "ALL FREE COLLAR EDGES"})
     assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)
     tap_marks = curate_view_dimensions(
         adapter, tap, keep=TAP_KEEP, view_label="collar radial process controls",
@@ -247,7 +245,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
 
     tap_rim = point(
-        tap, (spec.FLAT_DISTANCE, spec.TAP_STATION, spec.TAP_DRILL_DIA / 2.0 + spec.EDGE_BREAK),
+        tap, (spec.FLAT_DISTANCE, spec.TAP_STATION, spec.TAP_DRILL_DIA / 2.0),
         "collar tap outer mouth",
     )
     project_part_pmi(
@@ -300,7 +298,8 @@ async def build(adapter: Any) -> dict[str, str]:
     marks = curate_view_dimensions(adapter, screw, keep=SCREW_KEEP,
                                   view_label="ground stock screw", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, marks, {"DogEdge": "EDGE BREAK"})
+    # Above the value: the freed lane where the old break dimension stood.
+    set_dimension_callouts(adapter, marks, {"DogDia": spec.DOG_EDGE_CALLOUT}, location="above")
     project_part_pmi(
         adapter,
         placements={

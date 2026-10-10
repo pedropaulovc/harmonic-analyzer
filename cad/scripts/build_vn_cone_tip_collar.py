@@ -38,11 +38,11 @@ PART_NAME = "vn-cone-tip-collar"
 MATERIAL = "Plain Carbon Steel"
 CONFIGURATIONS = ("Default", "Collar", "SetScrew")
 COLLAR_FEATURES = (
-    "Ring", "BodyPlane", "Body", "RingEdgeBreak", "ShoulderRoot",
-    "MountFlat", "FlatEdgeBreak", "SetScrewTap", "TapMouthBreak",
+    "Ring", "BodyPlane", "Body", "ShoulderRoot",
+    "MountFlat", "SetScrewTap",
     "TapRootPlane", "TapRootGauge",
 )
-SCREW_FEATURES = ("SetScrew", "DogEdgeBreak", "StockEndBreak", "HexSocket")
+SCREW_FEATURES = ("SetScrew", "HexSocket")
 
 
 def _plane(adapter, name, offset, *, base="Top Plane"):
@@ -96,15 +96,6 @@ async def _ring(adapter, jobs):
         spec.OUTER_DIA**2 - spec.NOSE_DIA**2
     ) * (spec.WIDTH - spec.NOSE_LENGTH)
     await volume_check(adapter, "stepped collar annulus", expected, 0.005 * expected)
-    check("ring edge breaks", await adapter.add_chamfer(
-        spec.EDGE_BREAK,
-        [[spec.BORE_MODEL_DIA_MM / 2.0, y, 0.0] for y in (0.0, spec.WIDTH)]
-        + [[spec.NOSE_DIA / 2.0, 0.0, 0.0]]
-        + [[spec.OUTER_DIA / 2.0, y, 0.0] for y in (spec.NOSE_LENGTH, spec.WIDTH)],
-    ))
-    name_last_feature(adapter, "RingEdgeBreak")
-    name_dimensions(adapter, "RingEdgeBreak", ["CollarEdge"])
-    jobs.append(("CollarEdge@RingEdgeBreak", '"CollarEdge"'))
     check("turned shoulder tool root", await adapter.add_fillet(
         spec.SHOULDER_ROOT_RADIUS, [[spec.NOSE_DIA / 2.0, spec.NOSE_LENGTH, 0.0]],
     ))
@@ -134,15 +125,6 @@ async def _ring(adapter, jobs):
         depth=spec.OUTER_DIA, both_directions=True,
     )))
     name_last_feature(adapter, "MountFlat")
-    flat_corner = math.sqrt((spec.OUTER_DIA / 2.0)**2 - spec.FLAT_DISTANCE**2)
-    check("mount flat edge breaks", await adapter.add_chamfer(
-        spec.EDGE_BREAK,
-        [[spec.FLAT_DISTANCE, y, 0.0] for y in (spec.NOSE_LENGTH, spec.WIDTH)]
-        + [[spec.FLAT_DISTANCE, spec.TAP_STATION, z] for z in (-flat_corner, flat_corner)],
-    ))
-    name_last_feature(adapter, "FlatEdgeBreak")
-    name_dimensions(adapter, "FlatEdgeBreak", ["FlatEdge"])
-    jobs.append(("FlatEdge@FlatEdgeBreak", '"CollarEdge"'))
     hole = wizard_holes(
         adapter, spec.SET_SCREW_HOLE, [(spec.FLAT_DISTANCE, spec.TAP_STATION, 0.0)],
         (1.0, 0.0, 0.0), "collar set screw", name="SetScrewTap",
@@ -150,13 +132,6 @@ async def _ring(adapter, jobs):
         placement_dims=[((None, None), ("TapStation", '"TapStation"'))],
     )
     jobs.extend(hole.placement_drive_jobs)
-    check("radial tap mouth break", await adapter.add_chamfer(
-        spec.EDGE_BREAK,
-        [[spec.FLAT_DISTANCE, spec.TAP_STATION + hole.hole_dia_mm / 2.0, 0.0]],
-    ))
-    name_last_feature(adapter, "TapMouthBreak")
-    name_dimensions(adapter, "TapMouthBreak", ["TapEdge"])
-    jobs.append(("TapEdge@TapMouthBreak", '"CollarEdge"'))
     # A manufacturing limit, not a fictional physical root cut: 2B alone has
     # no root MAX. This source-native gauge dimension controls the tap tool's
     # permitted envelope and is projected as MAX TAP ROOT on the drawing.
@@ -214,20 +189,13 @@ async def _screw(adapter, jobs):
         angle=360.0, merge_result=False,
     )))
     name_last_feature(adapter, "SetScrew")
-    check("ground dog edge break", await adapter.add_chamfer(
-        spec.DOG_EDGE_BREAK, [[x, y + dog_r, 0.0]],
-    ))
-    name_last_feature(adapter, "DogEdgeBreak")
-    name_dimensions(adapter, "DogEdgeBreak", ["DogEdge"])
-    check("supplied socket-end break", await adapter.add_chamfer(
-        spec.SET_SCREW_END_BREAK, [[end, y + screw_r, 0.0]],
-    ))
-    name_last_feature(adapter, "StockEndBreak")
+    # Edges stay sharp in the model: the title block's break covers the
+    # collar, and the dog's tighter limit is a printed callout on its Ø.
     # A native external thread keeps the stock thread identity on the model.
     check("stock screw thread", await adapter.add_thread(AddThreadParameters(
-        edge_point=[end - spec.SET_SCREW_END_BREAK, y + screw_r, 0.0], standard="ansi_inch",
+        edge_point=[end, y + screw_r, 0.0], standard="ansi_inch",
         size=spec.SET_SCREW_THREAD, end_type="blind",
-        depth=spec.SET_SCREW_LENGTH - spec.DOG_LENGTH - spec.SET_SCREW_END_BREAK,
+        depth=spec.SET_SCREW_LENGTH - spec.DOG_LENGTH,
     )))
     _plane(adapter, "SocketFace", end, base="Right Plane")
     check("stock socket sketch", await adapter.create_sketch("SocketFace"))
@@ -311,7 +279,7 @@ async def build(adapter) -> dict[str, str]:
                         ("TapStation", spec.TAP_STATION),
                         ("CollarWidth", spec.WIDTH), ("FlatDistance", spec.FLAT_DISTANCE),
                         ("DogDia", spec.DOG_DIA), ("DogLength", spec.DOG_LENGTH),
-                        ("CollarEdge", spec.EDGE_BREAK), ("TapRootLimit", spec.THREAD_ENVELOPE_DIA)):
+                        ("TapRootLimit", spec.THREAD_ENVELOPE_DIA)):
         await set_global(adapter, name, f"{value}mm")
     jobs = []
     await _ring(adapter, jobs)
@@ -333,9 +301,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "InstalledShaftAxis")
     set_dimension_bilateral_tolerance(adapter, "RingProfile", "BoreDia", *deviations(spec.BORE_MODEL_DIA_BAND))
     set_dimension_bilateral_tolerance(adapter, "SetScrewProfile", "DogDia", *deviations(spec.DOG_DIA_BAND))
-    set_dimension_bilateral_tolerance(adapter, "RingEdgeBreak", "CollarEdge", *deviations(spec.EDGE_BREAK_BAND))
     set_dimension_bilateral_tolerance(adapter, "ShoulderRoot", "ShoulderRadius", *deviations(spec.SHOULDER_ROOT_BAND))
-    set_dimension_bilateral_tolerance(adapter, "DogEdgeBreak", "DogEdge", *deviations(spec.DOG_EDGE_BAND))
     _functional_dimension_types(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
