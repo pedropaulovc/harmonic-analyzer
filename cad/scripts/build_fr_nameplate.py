@@ -181,6 +181,11 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "OutlineProfile")
+    # A boss extrude takes its profile from the open or PRE-SELECTED sketch only
+    # (unlike the cut path, it never looks up the last ProfileFeature), and the
+    # DXF import leaves its sketch closed and unselected: farm leaf 2026-10-10
+    # failed "Failed to create extrusion feature" right here without this select.
+    check("select outline profile", await adapter.select_feature("OutlineProfile"))
     check(
         "extrude plate",
         # Extrude the body in -Z so the decorated z=0 face (where the field recess,
