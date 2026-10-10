@@ -77,6 +77,7 @@ from _common import (
     OUT_PNG,
     OUT_SLDPRT,
     SketchDims,
+    _com_invoke,
     _early_bound,
     _read_member,
     apply_custom_properties,
@@ -98,7 +99,11 @@ from _common import (
     volume_check,
 )
 from _gear import equation_curve
-from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
+from _visibility import (
+    assert_reference_geometry_hidden,
+    assert_reference_geometry_hidden_in_every_configuration,
+    blank_reference_geometry,
+)
 
 # Equation-parser/unit guards are reused, not their historical ideal profiles.
 
@@ -401,6 +406,20 @@ def _blank_reference_sketches(adapter: Any) -> None:
             )
 
 
+_SW_DISPLAY_ANNOTATIONS = 31  # swUserPreferenceToggle_e.swDisplayAnnotations
+_SW_DETAILING_NO_OPTION = 0  # swUserPreferenceOption_e.swDetailingNoOptionSpecified
+
+
+def _display_model_annotations(adapter: Any, shown: bool) -> None:
+    """Show or hide the part's model annotations in every view, and prove it."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    toggle = (_SW_DISPLAY_ANNOTATIONS, _SW_DETAILING_NO_OPTION)
+    extension.SetUserPreferenceToggle(*toggle, shown)
+    if bool(extension.GetUserPreferenceToggle(*toggle)) != shown:
+        raise RuntimeError(f"cone-gear model annotations did not set displayed={shown}")
+
+
 def _active_configuration(model: Any) -> Any:
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     return _early_bound(manager.ActiveConfiguration, "IConfiguration")
@@ -430,51 +449,69 @@ def _expected_configuration_volume(teeth: int) -> float:
     ) * FACE_WIDTH
 
 
+def _exit_face(body: Any) -> Any:
+    """Return the gear's planar end face farther from the Front sketch plane.
+
+    The gap cuts are sketched on Front and extruded through, so this is the
+    face every cut exits: a cut that stopped short leaves it unbroken.
+    """
+    caps: list[tuple[float, Any]] = []
+    for face in _com_invoke(body, "IBody2", "GetFaces") or ():
+        box = tuple(float(v) * 1000.0 for v in (_com_invoke(face, "IFace2", "GetBox") or ()))
+        if len(box) == 6 and abs(box[5] - box[2]) < 0.01:
+            caps.append((box[2], face))
+    if len(caps) != 2 or abs(abs(caps[0][0] - caps[1][0]) - FACE_WIDTH) > 0.01:
+        raise RuntimeError(
+            f"expected two end faces {FACE_WIDTH} apart, found z={[z for z, _ in caps]}"
+        )
+    return max(caps, key=lambda cap: abs(cap[0]))[1]
+
+
 def _native_root_envelope_mm(body: Any, *, teeth: int) -> tuple[float, float, int]:
-    """Read each translated root arc from the solid, including its radial extrema.
+    """Read each root arc on the exit face, including its radial extrema.
 
     Endpoint pairs identify the actual persisted root edges, not a presumed
     circle at T+root. The edge's closest point to the gear axis supplies MIN;
     endpoints and the symmetric arc midpoint supply MAX. Rotated copies use
-    the physical N and the explicit pi/N gap clock.
+    the physical N and the explicit pi/N gap clock. The cuts are straight
+    extrusions, so the exit face carries every gap's root once; each edge
+    costs two raw round trips (GetCurve, then GetCurveParams2, which reads
+    the curve GetCurve generated) and each root two closest-point reads.
     """
     profile = stock_form_profile(teeth)
     root = next(segment for segment in profile.native_segments(
         unit_scale=1.0, clearance_radius_mm=R_CLEAR_MM
     ) if segment.kind == "root_arc")
+    canonical = (root.point(0.0), root.point(0.5), root.point(1.0))
+    gaps = []
+    for index in range(teeth):
+        angle = (2 * index + 1) * math.pi / teeth
+        cosine, sine = math.cos(angle), math.sin(angle)
+        gaps.append(tuple(
+            (cosine * x - sine * y, sine * x + cosine * y) for x, y in canonical
+        ))
     roots: list[tuple[float, float]] = []
-    for raw_edge in tuple(_early_bound(body, "IBody2").GetEdges() or ()):
-        edge = _early_bound(raw_edge, "IEdge")
-        vertices = (edge.GetStartVertex(), edge.GetEndVertex())
-        if any(vertex is None for vertex in vertices):
+    for edge in _com_invoke(_exit_face(body), "IFace2", "GetEdges") or ():
+        if _com_invoke(edge, "IEdge", "GetCurve") is None:
             continue
-        points = tuple(tuple(float(v) * 1000.0 for v in
-            _early_bound(vertex, "IVertex").GetPoint()) for vertex in vertices)
-        start, end = points
-        if abs(start[2] - end[2]) > 1e-6:
-            continue
-        for index in range(teeth):
-            angle = (2 * index + 1) * math.pi / teeth
-            cosine, sine = math.cos(angle), math.sin(angle)
-
-            def rotated(t: float) -> tuple[float, float]:
-                x, y = root.point(t)
-                return cosine * x - sine * y, sine * x + cosine * y
-
-            expected = (rotated(0.0), rotated(1.0))
-            matches = any(
-                max(math.dist(start[:2], pair[0]), math.dist(end[:2], pair[1])) < 0.002
-                for pair in (expected, tuple(reversed(expected)))
-            )
-            if not matches:
+        params = tuple(float(v) * 1000.0 for v in
+            (_com_invoke(edge, "IEdge", "GetCurveParams2") or ())[:6])
+        if len(params) < 6:
+            raise RuntimeError(f"T{teeth:03d}: unreadable native exit-face edge")
+        start, end = params[:3], params[3:6]
+        for first, midpoint, last in gaps:
+            if not any(
+                max(math.dist(start[:2], a), math.dist(end[:2], b)) < 0.002
+                for a, b in ((first, last), (last, first))
+            ):
                 continue
-            closest = tuple(float(v) * 1000.0 for v in
-                edge.GetClosestPointOn(0.0, 0.0, start[2] / 1000.0))
-            midpoint = rotated(0.5)
-            native_midpoint = tuple(float(v) * 1000.0 for v in
-                edge.GetClosestPointOn(
-                    midpoint[0] / 1000.0, midpoint[1] / 1000.0, start[2] / 1000.0
-                ))
+            closest = tuple(float(v) * 1000.0 for v in _com_invoke(
+                edge, "IEdge", "GetClosestPointOn", 0.0, 0.0, start[2] / 1000.0
+            ))
+            native_midpoint = tuple(float(v) * 1000.0 for v in _com_invoke(
+                edge, "IEdge", "GetClosestPointOn",
+                midpoint[0] / 1000.0, midpoint[1] / 1000.0, start[2] / 1000.0,
+            ))
             if len(closest) < 3 or len(native_midpoint) < 3:
                 raise RuntimeError(f"T{teeth:03d}: unreadable native root edge")
             if math.dist(native_midpoint[:2], midpoint) > 0.002:
@@ -484,8 +521,10 @@ def _native_root_envelope_mm(body: Any, *, teeth: int) -> tuple[float, float, in
                 max(math.hypot(*point[:2]) for point in (start, end, native_midpoint)),
             ))
             break
-    if len(roots) < teeth:
-        raise RuntimeError(f"T{teeth:03d}: only {len(roots)} native root arcs for {teeth} teeth")
+    if len(roots) != teeth:
+        raise RuntimeError(
+            f"T{teeth:03d}: {len(roots)} native root arcs on the exit face for {teeth} teeth"
+        )
     return min(value[0] for value in roots), max(value[1] for value in roots), len(roots)
 
 
@@ -506,13 +545,17 @@ def _configuration_definition_state(
         if name in wanted:
             equations[name] = (equation, float(equation_manager.Value(index)))
 
+    from solidworks_mcp.adapters.com_variant import null_variant
+
+    if str(_active_configuration(model).Name) != configuration:
+        raise RuntimeError(f"{configuration}: not active for the definition state")
     feature_states: dict[str, tuple[bool, int, bool]] = {}
     for name in tooth_features(int(configuration[1:])):
         raw = part.FeatureByName(name)
         if raw is None:
             raise RuntimeError(f"{configuration}: diagnostic feature {name} missing")
         feature = _early_bound(raw, "IFeature")
-        states = feature.IsSuppressed2(3, [configuration])
+        states = feature.IsSuppressed2(1, null_variant())
         if not isinstance(states, (list, tuple)):
             states = (states,)
         error_result = feature.GetErrorCode2()
@@ -546,8 +589,16 @@ async def _configuration_topology(
     teeth: int,
     *,
     phase: str,
+    measure_roots: bool,
 ) -> tuple[float, str, tuple[str, ...]]:
-    """Measure one configuration's real pattern and solid-body topology."""
+    """Measure one configuration's real pattern and solid-body topology.
+
+    ``measure_roots`` adds the native root-arc envelope and bore-web gate,
+    which costs a COM round trip per exit-face edge; the build reads it once,
+    on the saved part reopened from disk.
+    """
+    from solidworks_mcp.adapters.com_variant import null_variant
+
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     active = _activate_configuration(model, configuration)
     part = _early_bound(model, "IPartDoc")
@@ -556,7 +607,9 @@ async def _configuration_topology(
     if raw_pattern is None:
         raise RuntimeError(f"{configuration}: {pattern_name} is missing")
     pattern = _early_bound(raw_pattern, "IFeature")
-    states = pattern.IsSuppressed2(3, [configuration])
+    # Active-configuration reads only: IsSuppressed2(3, [name]) answers None
+    # for every feature (7e88be269 farm log), so it cannot fail a check.
+    states = pattern.IsSuppressed2(1, null_variant())
     if not isinstance(states, (list, tuple)):
         states = (states,)
     suppressed = len(states) != 1 or bool(states[0])
@@ -578,15 +631,10 @@ async def _configuration_topology(
         else 0
     )
     feature_issues: list[str] = []
-    # Read every row the way the suppression sweep verified it: in the ACTIVE
-    # configuration (IsSuppressed2(1, null)). The specific-configuration form
-    # (3, [name]) disagreed with it on foreign rows after the sweep (probes
-    # 3-9) while the T006 body measured exactly; both are logged once.
-    from solidworks_mcp.adapters.com_variant import null_variant
-
+    # Every row is read in the ACTIVE configuration (IsSuppressed2(1, null)),
+    # the way the suppression sweep set and verified it.
     if str(_active_configuration(model).Name) != configuration:
         raise RuntimeError(f"{configuration}: not active for the suppression audit")
-    mode_disagreements: list[str] = []
     for row_teeth in CONFIGURATION_TEETH:
         for feature_name in tooth_features(row_teeth):
             raw_feature = part.FeatureByName(feature_name)
@@ -596,10 +644,6 @@ async def _configuration_topology(
             feature = _early_bound(raw_feature, "IFeature")
             answer = feature.IsSuppressed2(1, null_variant())
             answer = answer if isinstance(answer, (list, tuple)) else (answer,)
-            named = feature.IsSuppressed2(3, [configuration])
-            named = named if isinstance(named, (list, tuple)) else (named,)
-            if tuple(map(bool, named)) != tuple(map(bool, answer)):
-                mode_disagreements.append(f"{feature_name}: active={answer!r} named={named!r}")
             if len(answer) != 1 or bool(answer[0]) != (row_teeth != teeth):
                 feature_issues.append(f"{feature_name}: wrong suppression in {configuration}")
             if row_teeth == teeth:
@@ -610,11 +654,6 @@ async def _configuration_topology(
                     feature_issues.append(
                         f"{feature_name}: native error {error[0]}, warning={bool(error[1])}"
                     )
-    if mode_disagreements:
-        _telemetry.info(
-            f"{phase} {configuration}: IsSuppressed2 active vs named readback differs on "
-            f"{len(mode_disagreements)} features: {mode_disagreements[:6]!r}"
-        )
     raw_sketch = part.FeatureByName(tooth_features(teeth)[0])
     if raw_sketch is not None:
         raw_specific = _early_bound(raw_sketch, "IFeature").GetSpecificFeature2()
@@ -631,8 +670,8 @@ async def _configuration_topology(
             )
     root_observation = ""
     root_issues: list[str] = []
-    if len(bodies) == 1:
-        native_min, native_max, root_edges = _native_root_envelope_mm(bodies[0], teeth=teeth)
+    if measure_roots and len(bodies) == 1:
+        native_min, native_max, root_edges = _native_root_envelope_mm(part, teeth=teeth)
         expected_min, expected_max = floor_radius_min_mm(teeth), floor_radius_max_mm(teeth)
         maximum_bore_radius = (bore_dia_mm(teeth) + BORE_DIA_BAND[0]) / 2.0
         minimum_web = native_min - maximum_bore_radius
@@ -752,6 +791,7 @@ async def assert_saved_configuration_topology(
                 configuration,
                 teeth,
                 phase=f"{phase} post-activation-rebuild",
+                measure_roots=True,
             )
         except Exception as exc:
             failures.append(f"{configuration}: {exc}")
@@ -855,8 +895,9 @@ def _restrict_to_configuration(adapter: Any, teeth: int) -> None:
             raise RuntimeError(f"{selected}: cannot suppress {name} in {others}")
 
 
-def _suppress_other_rows_in_each_configuration(adapter: Any) -> None:
-    """Suppress every other row's sketch/cut/pattern with the target active.
+def _suppress_rows_and_hide_references(adapter: Any, pattern_axis: str) -> None:
+    """With each configuration active, suppress the other rows and hide the
+    construction geometry.
 
     ``_restrict_to_configuration`` specifies the other configurations from the
     row being authored. Probe 3 (187ab61f2) read T012..T120 back unsuppressed
@@ -865,6 +906,12 @@ def _suppress_other_rows_in_each_configuration(adapter: Any) -> None:
     So, like the ferrule and the tip-collar builds, each configuration is
     activated and suppresses the foreign rows in this configuration only,
     dependents before parents, and each state is read back.
+
+    Hide/show is per configuration too: blanked with T120 active only, the
+    pattern axis and the two authoring sketches rendered in T006..T114
+    (7e88be269 farm images), and would in any assembly placing those rows.
+    The probes 7 and 8 that seemed to tie a per-configuration blank to
+    unsuppressed rows read IsSuppressed2(3, [name]), which answers None.
     """
     from solidworks_mcp.adapters.com_variant import null_variant
 
@@ -888,7 +935,12 @@ def _suppress_other_rows_in_each_configuration(adapter: Any) -> None:
                 states = feature.IsSuppressed2(1, null_variant())
                 if not isinstance(states, (list, tuple)) or len(states) != 1 or states[0] is not True:
                     raise RuntimeError(f"{name}: suppression did not persist in {configuration}")
-    _telemetry.success("foreign tooth rows suppressed with each configuration active")
+        blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
+        _blank_reference_sketches(adapter)
+    _telemetry.success(
+        "foreign tooth rows suppressed and construction geometry hidden "
+        "with each configuration active"
+    )
 
 
 def require_complete_stock_family() -> None:
@@ -1307,14 +1359,8 @@ async def build(adapter) -> dict[str, str]:
             teeth * (0.01 * removed - area_error),
         )
         _restrict_to_configuration(adapter, teeth)
-    _suppress_other_rows_in_each_configuration(adapter)
+    _suppress_rows_and_hide_references(adapter, pattern_axis)
     check("activate T120 for native PMI", await adapter.set_active_configuration("T120"))
-    # The pattern axis is hidden with T120 active, as on main, where T120 was
-    # the last authored row: hidden in the sweep's last configuration (probe
-    # 4, 5710714ee) it still saved shown in T120, and hidden with every
-    # configuration active, before or after the sweep (probes 7 and 8), it
-    # left T012..T120 reading unsuppressed in T006.
-    blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
 
     # Author before the existing 20-configuration regeneration sweep.  This is
     # the live regression gate for the model-owned symbol: a face-attached
@@ -1324,11 +1370,10 @@ async def build(adapter) -> dict[str, str]:
     # Establish the final path once while T120 is active. The per-configuration
     # sweep can then use IModelDoc2.Save3 directly; the adapter's in-place save
     # deliberately adds AvoidRebuildOnSave, which live probes proved does not
-    # persist rebuilt inactive-configuration bodies.  The two authoring
-    # sketches go hidden first, so no saved image or placing assembly draws
-    # them.  This part saves itself rather than through save_part_and_images,
-    # so it runs that helper's construction-geometry check here.
-    _blank_reference_sketches(adapter)
+    # persist rebuilt inactive-configuration bodies.  The axis and the two
+    # authoring sketches are already hidden in every configuration; this part
+    # saves itself, so it runs save_part_and_images' check here (T120), and
+    # the saved part, reopened, proves every configuration.
     assert_reference_geometry_hidden(adapter, PART_NAME)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
@@ -1341,6 +1386,10 @@ async def build(adapter) -> dict[str, str]:
     png_dir.mkdir(parents=True, exist_ok=True)
     artefacts: dict[str, str] = {}
     volumes: dict[str, float] = {}
+    # The bore's model-owned Ra symbol rendered in the T006 image (7e88be269).
+    # As on the harmonic base, images are taken with model annotations hidden
+    # and the part is saved with them shown.
+    _display_model_annotations(adapter, False)
     for name, teeth in CONFIGS:
         activation = await adapter.set_active_configuration(name)
         check(f"activate {name}", activation)
@@ -1369,6 +1418,8 @@ async def build(adapter) -> dict[str, str]:
             name,
             teeth,
             phase="pre-save",
+            # The saved part's reopened audit reads the roots and bore webs.
+            measure_roots=False,
         )
         if issues:
             raise RuntimeError(f"{observation}; issues={issues!r}")
@@ -1530,7 +1581,25 @@ async def build(adapter) -> dict[str, str]:
                 "Material Specification": material_specification(teeth),
             },
         )
-    artefacts.update(await save_part_and_images(adapter, PART_NAME))
+    _display_model_annotations(adapter, True)
+    artefacts.update(await save_part_and_images(adapter, PART_NAME, views=()))
+    # derive_simplified_on_saved_part closes this document without saving, so
+    # the hidden-annotation toggle never reaches the saved part.
+    _display_model_annotations(adapter, False)
+    image = (png_dir / f"{PART_NAME}_isometric.png").resolve()
+    check(
+        "export_image isometric (annotations hidden)",
+        await adapter.export_image(
+            {
+                "file_path": str(image),
+                "format_type": "png",
+                "width": 1600,
+                "height": 1000,
+                "view_orientation": "isometric",
+            }
+        ),
+    )
+    artefacts["isometric"] = str(image)
     part_path = artefacts["part"]
     # Each T-configuration's derived "<T> Simplified" (teeth suppressed) is
     # what the drive-train drawing's small line views print; it inherits the
@@ -1551,6 +1620,9 @@ async def build(adapter) -> dict[str, str]:
     check("reopen saved cone-gear", await adapter.open_model(part_path))
     assert_saved_configurations_regenerate(adapter, PART_NAME)
     await assert_saved_configuration_topology(adapter, phase="reopened")
+    # Hide/show is per configuration: every saved configuration, the derived
+    # simplified ones included, is read with itself active.
+    assert_reference_geometry_hidden_in_every_configuration(adapter, PART_NAME)
     assert_simplified_configurations(
         adapter, PART_NAME, SIMPLIFIED_FEATURES_BY_CONFIGURATION, placed
     )

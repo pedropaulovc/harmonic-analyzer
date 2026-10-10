@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
 from pathlib import Path
@@ -264,12 +265,7 @@ def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.Mon
         unit_scale=1.0, clearance_radius_mm=part.R_CLEAR_MM
     ) if segment.kind == "root_arc")
 
-    class Vertex:
-        def __init__(self, point: tuple[float, float]) -> None:
-            self.point = point
-
-        def GetPoint(self) -> tuple[float, float, float]:
-            return self.point[0] / 1000.0, self.point[1] / 1000.0, 0.0
+    z = part.FACE_WIDTH / 1000.0
 
     class Edge:
         def __init__(self, index: int) -> None:
@@ -281,11 +277,12 @@ def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.Mon
                 self.points.append((cosine * x - sine * y, sine * x + cosine * y))
             self.queries = []
 
-        def GetStartVertex(self) -> Vertex:
-            return Vertex(self.points[0])
+        def GetCurve(self) -> object:
+            return object()
 
-        def GetEndVertex(self) -> Vertex:
-            return Vertex(self.points[-1])
+        def GetCurveParams2(self) -> tuple[float, ...]:
+            (x0, y0), (x1, y1) = self.points[0], self.points[-1]
+            return x0 / 1000.0, y0 / 1000.0, z, x1 / 1000.0, y1 / 1000.0, z, 0.0, 1.0
 
         def GetClosestPointOn(self, x: float, y: float, z: float) -> tuple[float, ...]:
             self.queries.append((x, y, z))
@@ -295,8 +292,29 @@ def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.Mon
                 point = self.points[1]
             return point[0] / 1000.0, point[1] / 1000.0, z, 0.0, 0.0
 
+    class Line:
+        """A tooth-flank edge: it runs along the gear axis, never a root."""
+
+        def GetCurve(self) -> object:
+            return object()
+
+        def GetCurveParams2(self) -> tuple[float, ...]:
+            return 0.004, 0.0, 0.0, 0.004, 0.0, z, 0.0, 1.0
+
+    class Face:
+        def __init__(self, z_mm: float, edges: list) -> None:
+            self.z, self.edges = z_mm / 1000.0, edges
+
+        def GetBox(self) -> tuple[float, ...]:
+            return -0.01, -0.01, self.z, 0.01, 0.01, self.z
+
+        def GetEdges(self) -> list:
+            return self.edges
+
     edges = [Edge(index) for index in range(profile.teeth)]
-    body = type("Body", (), {"GetEdges": lambda self: edges})()
+    flank = type("Flank", (), {"GetBox": lambda self: (-0.01, -0.01, 0.0, 0.01, 0.01, z)})()
+    faces = [Face(0.0, []), flank, Face(part.FACE_WIDTH, [Line(), *edges])]
+    body = type("Body", (), {"GetFaces": lambda self: faces})()
     monkeypatch.setattr(part, "stock_form_profile", lambda _teeth: profile)
     minimum, maximum, count = part._native_root_envelope_mm(body, teeth=profile.teeth)
     assert count == profile.teeth
@@ -304,6 +322,10 @@ def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.Mon
     assert maximum == pytest.approx(profile.root_radius_max_mm)
     assert minimum < maximum
     assert all(len(edge.queries) == 2 for edge in edges)
+    # A gap that did not cut through leaves its root off the far face.
+    faces[-1].edges.pop()
+    with pytest.raises(RuntimeError, match="native root arcs on the exit face"):
+        part._native_root_envelope_mm(body, teeth=profile.teeth)
 
 
 def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:
@@ -704,9 +726,19 @@ def test_the_part_saves_both_authoring_sketches_hidden() -> None:
     assert model.blanked == sketches
     source = Path(part.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
-    assert body.index("_blank_reference_sketches(adapter)") < body.index(
+    assert body.index("_suppress_rows_and_hide_references(adapter, pattern_axis)") < body.index(
         "await adapter.save_file("
     )
+    # Hide/show is per configuration (7e88be269 T006 image): the axis and both
+    # sketches are blanked inside the loop that activates each configuration,
+    # and the reopened part is gated in every configuration.
+    helper = inspect.getsource(part._suppress_rows_and_hide_references)
+    loop = helper[helper.index("for configuration in"):]
+    assert "_activate_configuration(model, configuration)" in loop
+    assert 'blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))' in loop
+    assert "_blank_reference_sketches(adapter)" in loop
+    assert "blank_reference_geometry(" not in body
+    assert "assert_reference_geometry_hidden_in_every_configuration(adapter, PART_NAME)" in body
 
 
 def test_a_blank_that_does_not_take_fails_the_part_build() -> None:

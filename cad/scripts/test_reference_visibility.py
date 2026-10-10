@@ -277,6 +277,51 @@ def test_an_assembly_level_shown_sketch_fails() -> None:
         _visibility.assert_reference_geometry_hidden(_adapter(model), "asm")
 
 
+class _ConfiguredModel:
+    """Hide/show is per configuration: each one reports its own shown set."""
+
+    def __init__(self, shown: dict[str, list[tuple[str, str]]], active: str) -> None:
+        self.shown, self.active, self.shows = shown, active, []
+
+    def GetConfigurationNames(self) -> tuple[str, ...]:
+        return tuple(self.shown)
+
+    def ShowConfiguration2(self, name: str) -> bool:
+        self.shows.append(name)
+        self.active = name
+        return True
+
+
+def test_every_configuration_is_checked_with_itself_active(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """7e88be269: the cone gear's axis, blanked with T120 active, passed the
+    active-configuration check and rendered in T006."""
+    model = _ConfiguredModel(
+        {"T006": [("Axis1", "axis")], "T012": [], "T120": []}, active="T120"
+    )
+    monkeypatch.setattr(
+        _common, "active_configuration_name", lambda _adapter, _model=None: model.active
+    )
+    monkeypatch.setattr(
+        _visibility,
+        "visible_reference_geometry",
+        lambda m, _label="": list(m.shown[m.active]),
+    )
+    adapter = SimpleNamespace(currentModel=model)
+    with pytest.raises(RuntimeError, match=r"\[T006\].*axis 'Axis1'") as caught:
+        _visibility.assert_reference_geometry_hidden_in_every_configuration(adapter, "cone")
+    assert "[T012]" not in str(caught.value)
+    assert model.shows == ["T006", "T012", "T120"]
+    assert model.active == "T120"
+
+    model.shown["T006"] = []
+    model.shows.clear()
+    _visibility.assert_reference_geometry_hidden_in_every_configuration(adapter, "cone")
+    assert model.active == "T120"
+
+
+
 def test_an_allowance_admits_its_sketch_and_nothing_else() -> None:
     model = _part_tree(
         _Feature("StationReference", "ProfileFeature", SHOWN),
