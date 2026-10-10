@@ -14,7 +14,8 @@ import math
 import _config
 import dt_cylinder_gear_shaft_spec as arbor
 
-from _fit_limits import deviations, gear_tip_band_mm
+from _fit_limits import deviations
+from _gear_fit_limits import gear_tip_band_mm
 from _printed_tolerance import printed_deviations
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -125,7 +126,7 @@ PATTERN_NOTCH_SHOP_CANDIDATE_DEG = 0.02
 
 def pattern_notch_clock_grade_deg() -> float:
     """Read the post-F4 published drum pattern-to-CAM-NOTCH half-width lazily."""
-    from _fit_limits import SourceDomainUnknown, drum_tooth_to_cam_notch_clock_deg
+    from _gear_fit_limits import SourceDomainUnknown, drum_tooth_to_cam_notch_clock_deg
 
     grade = drum_tooth_to_cam_notch_clock_deg()
     if grade < PATTERN_NOTCH_SHOP_CANDIDATE_DEG:

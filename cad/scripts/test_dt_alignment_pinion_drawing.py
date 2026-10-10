@@ -14,7 +14,7 @@ import _config
 import dt_alignment_pinion_spec as spec
 import dt_pinion_arbor_geometry as arbor_geometry
 import dt_pinion_arbor_spec as arbor
-from _fit_limits import gear_tip_band_mm
+from _gear_fit_limits import gear_tip_band_mm
 
 
 def test_gear_data_block_preserves_the_actual_finite_stock_profile() -> None:

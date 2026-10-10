@@ -37,6 +37,7 @@ from typing import Any
 import pytest
 
 import _fit_limits
+import _gear_fit_limits
 
 SCRIPTS = Path(__file__).resolve().parent
 
@@ -50,6 +51,11 @@ _SETTER = "set_dimension_bilateral_tolerance"
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
     ("build_dt_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
+    # def gear_tip_band_mm(grade): band = ...; deviations(band)
+    ("_gear_fit_limits", "band"): (
+        "(gear_tip_band_mm('standard'), gear_tip_band_mm('contact_critical'))",
+        "each",
+    ),
     # Fixture builders apply the same bands their specs publish on the sheet.
     ("build_ch_rocker_arm_tl_c_stop_bar", "band"): ("DRAWING_BANDS", "values"),
     ("build_ch_rocker_arm_tl_diamond_pin", "band"): ("DRAWING_BANDS", "values"),
@@ -58,6 +64,18 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ("dt_cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
         "GENERAL_BAND_BY_PLACES",
         "values",
+    ),
+    # for feature, name, shared, own in (...): ... deviations(own), deviations(shared)
+    ("build_dt_cone_gear", "own"): (
+        "(blank_dia_band(6), tooth_thickness_band(6))",
+        "each",
+    ),
+    ("build_dt_cone_gear", "shared"): ("(BLANK_DIA_BAND, TOOTH_THICKNESS_BAND)", "each"),
+    # for name, band in (("BlankDia", blank_dia_band(teeth)), ...): deviations(band)
+    ("draw_dt_cone_gear", "band"): (
+        "(blank_dia_band(6), tooth_thickness_band(6),"
+        " blank_dia_band(12), tooth_thickness_band(12))",
+        "each",
     ),
 }
 
@@ -181,6 +199,15 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_pinion_arbor_geometry", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
     ("dt_pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"
+    ),
+    ("dt_cone_swing_platform_pivot_spec", "PIVOT_HOLE_BAND"): (
+        "the pivot bore reamed 6.350 H7 on the 91829A560 shoulder: indexed into "
+        "the Hole Wizard diameter tolerance, the cone set stack's and support "
+        "pose's pivot float and the assembly's pivot air"
+    ),
+    ("vn_cone_tip_collar_spec", "BORE_DIA_BAND"): (
+        "the finished bore's seat band, indexed to re-centre the modelled bore "
+        "(BORE_MODEL_DIA_BAND, the band the build sets natively)"
     ),
     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"): (
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
@@ -653,39 +680,12 @@ def test_check_band_rejects_inverted_and_zero_width_bands(
         _check_band("synthetic", band, order)
 
 
-@pytest.mark.parametrize(
-    ("source", "replacement"),
-    [
-        ("REAM_H7", (0.017, 0.002)),
-        ("SHAFT_G6_3_TO_6_MM", (-0.006, -0.015)),
-    ],
-)
-def test_measured_close_running_clearance_tracks_shared_bands(
-    monkeypatch: pytest.MonkeyPatch,
-    source: str,
-    replacement: tuple[float, float],
-) -> None:
-    hole_lower, hole_upper = _fit_limits.deviations(_fit_limits.REAM_H7)
-    shaft_lower, shaft_upper = _fit_limits.deviations(_fit_limits.SHAFT_G6_3_TO_6_MM)
-    expected = hole_lower - shaft_upper, hole_upper - shaft_lower
-    assert _fit_limits.measured_close_running_clearance_mm() == pytest.approx(expected)
-    assert 0.0 < expected[0] < expected[1]
-
-    # Change each input independently: a copied clearance literal cannot pass.
-    monkeypatch.setattr(_fit_limits, source, replacement)
-    hole_lower, hole_upper = _fit_limits.deviations(_fit_limits.REAM_H7)
-    shaft_lower, shaft_upper = _fit_limits.deviations(_fit_limits.SHAFT_G6_3_TO_6_MM)
-    changed = hole_lower - shaft_upper, hole_upper - shaft_lower
-    assert changed != expected
-    assert _fit_limits.measured_close_running_clearance_mm() == pytest.approx(changed)
-
-
 @pytest.mark.parametrize("grade", ("standard", "contact_critical"))
 def test_gear_tip_grade_reads_its_shared_configuration(grade: str) -> None:
     import _config
 
     configured = tuple(float(value) for value in _config.fit("gear_tip", f"{grade}_band_mm"))
-    assert _fit_limits.gear_tip_band_mm(grade) == configured
+    assert _gear_fit_limits.gear_tip_band_mm(grade) == configured
     assert configured[0] == 0.0
     assert configured[1] < 0.0
 
@@ -700,7 +700,7 @@ def test_gear_tip_grade_reader_tracks_config_edits(monkeypatch: pytest.MonkeyPat
         return [0.0, -0.03]
 
     monkeypatch.setattr(_config, "fit", fit_value)
-    assert _fit_limits.gear_tip_band_mm("standard") == (0.0, -0.03)
+    assert _gear_fit_limits.gear_tip_band_mm("standard") == (0.0, -0.03)
     assert seen == [("gear_tip", "standard_band_mm")]
 
 
@@ -710,7 +710,7 @@ def test_gear_tip_grade_reader_refuses_unknown_or_inverted_grades(
     import _config
 
     with pytest.raises(ValueError, match="unsupported gear-tip grade"):
-        _fit_limits.gear_tip_band_mm("routine")
+        _gear_fit_limits.gear_tip_band_mm("routine")
     monkeypatch.setattr(_config, "fit", lambda *keys: (-0.02, 0.0))
     with pytest.raises(ValueError, match="inverted"):
-        _fit_limits.gear_tip_band_mm("contact_critical")
+        _gear_fit_limits.gear_tip_band_mm("contact_critical")

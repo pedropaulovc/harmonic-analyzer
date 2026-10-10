@@ -14,7 +14,7 @@ import pytest
 import _config
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-from _fit_limits import gear_tip_band_mm
+from _gear_fit_limits import gear_tip_band_mm
 import build_dt_cylinder_gear as part
 import dt_cylinder_gear_notes as notes
 import dt_cylinder_gear_shaft_spec as arbor
@@ -503,7 +503,7 @@ def test_pattern_notch_native_locator_is_a_separate_basic_reference() -> None:
 
 
 def test_pattern_notch_grade_has_no_missing_source_fallback(monkeypatch) -> None:
-    import _fit_limits as supplier
+    import _gear_fit_limits as supplier
 
     def missing():
         raise supplier.SourceDomainUnknown("actual published pattern clock is UNKNOWN")
@@ -519,7 +519,7 @@ def test_pattern_notch_grade_has_no_missing_source_fallback(monkeypatch) -> None
 
 @pytest.mark.parametrize("grade", (0.02, 0.031))
 def test_pattern_notch_grade_reads_only_the_published_supplier(monkeypatch, grade) -> None:
-    import _fit_limits as supplier
+    import _gear_fit_limits as supplier
 
     monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: grade)
     assert spec.pattern_notch_clock_grade_deg() == grade
@@ -530,7 +530,7 @@ def test_pattern_notch_grade_reads_only_the_published_supplier(monkeypatch, grad
 
 
 def test_pattern_notch_grade_reports_a_tighter_admission_without_drawing(monkeypatch) -> None:
-    import _fit_limits as supplier
+    import _gear_fit_limits as supplier
 
     monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: 0.019)
     with pytest.raises(
@@ -663,7 +663,7 @@ def _pattern_bindings(monkeypatch):
 def test_pattern_notch_basic_and_critical_text_use_native_readback(
     monkeypatch, grade
 ) -> None:
-    import _fit_limits as supplier
+    import _gear_fit_limits as supplier
 
     monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: grade)
     adapter = _pattern_bindings(monkeypatch)
@@ -687,7 +687,7 @@ def test_pattern_notch_basic_and_critical_text_use_native_readback(
     ),
 )
 def test_pattern_notch_control_refuses_non_authoritative_native_state(monkeypatch, fault) -> None:
-    import _fit_limits as supplier
+    import _gear_fit_limits as supplier
 
     monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: 0.02)
     adapter = _pattern_bindings(monkeypatch)
@@ -699,7 +699,7 @@ def test_pattern_notch_control_refuses_non_authoritative_native_state(monkeypatc
 
 @pytest.mark.parametrize("count", (0, 2))
 def test_pattern_notch_control_requires_one_named_locator(monkeypatch, count) -> None:
-    import _fit_limits as supplier
+    import _gear_fit_limits as supplier
 
     monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: 0.02)
     adapter = _pattern_bindings(monkeypatch)

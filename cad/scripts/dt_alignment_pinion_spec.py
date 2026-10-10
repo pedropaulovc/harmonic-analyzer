@@ -12,7 +12,8 @@ import math
 import _config
 import dt_cylinder_gear_spec as drum
 
-from _fit_limits import deviations, gear_tip_band_mm
+from _fit_limits import deviations
+from _gear_fit_limits import gear_tip_band_mm
 from _printed_tolerance import printed_deviations
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
