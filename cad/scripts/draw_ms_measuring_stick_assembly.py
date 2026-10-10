@@ -22,6 +22,8 @@ from typing import Any, Callable
 import _config
 import _telemetry
 import ms_measuring_stick_assembly_spec as spec
+import ms_stick_spec as stick
+import ms_stop_spec as stop
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
@@ -29,6 +31,7 @@ from _drawing_common import (
     BalloonAnchor,
     DrawingOutputs,
     ViewRole,
+    _edge_endpoint_key,
     add_component_bom_balloons,
     add_edge_dimension,
     apply_view_configuration,
@@ -46,6 +49,7 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
     set_reference_dimension,
     set_view_exploded_state,
+    visible_component_entities,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_simplified import simplified_name
@@ -497,6 +501,61 @@ def _assert_dimension_ink_on_sheet(display: Any, *, label: str) -> None:
         )
 
 
+def _reference_end_edge(
+    adapter: Any,
+    view: Any,
+    *,
+    component_stem: str,
+    point_mm: tuple[float, float, float],
+    label: str,
+) -> Any:
+    """Resolve one owned visible line in its component-local model frame.
+
+    Sheet hit-tests cannot distinguish a 3-mm end from its neighbouring long
+    edges. Keep the native edge handle, and require the intended visible face
+    and an exact point within the line's own span instead of a nearest pick.
+    """
+    view = _early_bound(view, "IView")
+    components = []
+    for raw_component in tuple(view.GetVisibleComponents() or ()):
+        component = _early_bound(raw_component, "IComponent2")
+        path = str(component.GetPathName() or "").replace("\\", "/")
+        if Path(path).stem == component_stem:
+            components.append(component)
+    if len(components) != 1:
+        raise RuntimeError(
+            f"{label}: expected one visible {component_stem!r} component, "
+            f"found {len(components)}"
+        )
+    matches = []
+    for raw_edge in visible_component_entities(view, components[0], 1):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if curve is None or not curve.IsLine():
+            continue
+        key = _edge_endpoint_key(adapter, edge)
+        if key is None:
+            continue
+        start = tuple(value * 1000.0 for value in key[:3])
+        end = tuple(value * 1000.0 for value in key[3:])
+        vector = tuple(b - a for a, b in zip(start, end))
+        length_sq = sum(value * value for value in vector)
+        if length_sq == 0.0:
+            continue
+        t = sum((p - a) * v for p, a, v in zip(point_mm, start, vector)) / length_sq
+        if not -1e-6 <= t <= 1.0 + 1e-6:
+            continue
+        error = sum((p - a - t * v) ** 2 for p, a, v in zip(point_mm, start, vector))
+        if error <= 1e-8:
+            matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: expected one exact visible line through {point_mm!r} "
+            f"on {component_stem!r}, found {len(matches)}"
+        )
+    return matches[0]
+
+
 def _add_reference_dimensions(adapter: Any, front: Any) -> None:
     """Overall length and the stop position as parenthesized REFERENCE
     dimensions across the front view's edges: both stick ends, and the
@@ -517,6 +576,28 @@ def _add_reference_dimensions(adapter: Any, front: Any) -> None:
         label="measuring-stick reference-dimension picks",
         names=names,
     )
+    start_edge, end_edge, stop_edge = (
+        _reference_end_edge(
+            adapter, front, component_stem=component_stem, point_mm=point, label=name
+        )
+        for component_stem, point, name in (
+            (spec.STICK, (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS / 2.0), names[0]),
+            (
+                spec.STICK,
+                (stick.BODY_LENGTH, stick.BODY_WIDTH, stick.BODY_THICKNESS / 2.0),
+                names[1],
+            ),
+            (
+                spec.BLOCK,
+                (0.0, spec.STICK_BOTTOM_Y / 2.0, stop.BLOCK_DEPTH),
+                names[2],
+            ),
+        )
+    )
+    entities = {
+        "overall length": (start_edge, end_edge),
+        "stop position": (start_edge, stop_edge),
+    }
     picks = {
         "overall length": (
             stick_start,
@@ -540,6 +621,7 @@ def _add_reference_dimensions(adapter: Any, front: Any) -> None:
                 text_xy=text_xy,
                 label=f"measuring-stick {label} reference",
                 orientation="horizontal",
+                entities=entities[label],
             ),
             "IDisplayDimension",
         )

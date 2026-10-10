@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 
 import _config
+import _drawing_common as drawing_common
 import _hole_spec
 import _interference_contracts as contracts
 import build_ha_harmonic_analyzer_assembly as top
@@ -303,6 +305,205 @@ def test_reference_dimensions_follow_the_spec() -> None:
         < drawing.OVERALL_LENGTH_TEXT_Y
         < drawing.TOP_CENTER[1]
     )
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (None, "absent component", "duplicate component", "missing edge", "duplicate edge"),
+)
+def test_reference_dimensions_select_owned_visible_end_edges(monkeypatch, defect) -> None:
+    """Exercise the resolver and shared selection, never a sheet hit-test."""
+    selected = []
+    selections = []
+    displays = []
+
+    class Edge:
+        def __init__(self, start, end, assembly_x):
+            self.endpoints = tuple(v / 1000.0 for v in (*start, *end))
+            self.assembly_x = assembly_x
+
+        def GetCurve(self):
+            return SimpleNamespace(IsLine=lambda: True)
+
+        def GetCurveParams2(self):
+            return self.endpoints
+
+        def Select4(self, append, data):
+            assert data.View is front
+            if not append:
+                selected.clear()
+            assert self not in selected
+            selected.append(self)
+            selections.append((self, append, data.View))
+            return True
+
+    class Display:
+        def __init__(self, value):
+            self.value = value
+            self.text = {}
+            self.readbacks = []
+
+        def GetDimension2(self, index):
+            assert index == 0
+            return SimpleNamespace(SystemValue=self.value)
+
+        def GetAnnotation(self):
+            return SimpleNamespace(GetSpecificAnnotation=lambda: self)
+
+        def SetText(self, index, text):
+            self.text[index] = text
+
+        def GetText(self, index):
+            self.readbacks.append(index)
+            return self.text.get(index, "")
+
+        def SetPrecision3(self, precision, *rest):
+            assert rest == (-1, -1, -1)
+            self.precision = precision
+
+        def GetPrimaryPrecision2(self):
+            return self.precision
+
+    class Draw:
+        Extension = SimpleNamespace(
+            SelectByID2=lambda *args: pytest.fail("coordinate hit-test used")
+        )
+        SelectionManager = SimpleNamespace(
+            CreateSelectData=lambda: SimpleNamespace(View=None),
+            GetSelectedObjectCount2=lambda mark: len(selected),
+        )
+
+        def ActivateView(self, name):
+            assert name == "Front"
+            return True
+
+        def ClearSelection2(self, all_marks):
+            selected.clear()
+
+        def AddHorizontalDimension2(self, x, y, z):
+            assert len(selected) == 2
+            assert z == 0.0
+            expected_y = (
+                drawing.OVERALL_LENGTH_TEXT_Y if not displays
+                else drawing.STOP_POSITION_TEXT_Y
+            )
+            assert y == expected_y
+            assert x == pytest.approx(
+                drawing.FRONT_CENTER[0]
+                + sum(edge.assembly_x for edge in selected) / 2000.0
+            )
+            display = Display(
+                abs(selected[1].assembly_x - selected[0].assembly_x) / 1000.0
+            )
+            displays.append(display)
+            return display
+
+    start = Edge(
+        (0.0, stick.BODY_WIDTH, 0.0),
+        (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS),
+        spec.STICK_X_MIN,
+    )
+    end = Edge(
+        (stick.BODY_LENGTH, stick.BODY_WIDTH, 0.0),
+        (stick.BODY_LENGTH, stick.BODY_WIDTH, stick.BODY_THICKNESS),
+        spec.STICK_X_MAX,
+    )
+    near = Edge(
+        (0.0, 0.0, stop.BLOCK_DEPTH),
+        (0.0, stop.BLOCK_HEIGHT - stop.ROOF_END_CHAMFER, stop.BLOCK_DEPTH),
+        spec.BLOCK_ORIGIN[0],
+    )
+    distractor = Edge(
+        (0.0, stick.BODY_WIDTH, 0.0),
+        (stick.BODY_LENGTH, stick.BODY_WIDTH, 0.0),
+        spec.STICK_X_MIN,
+    )
+    hidden_face = Edge(
+        (0.0, 0.0, 0.0), (0.0, 0.0, stick.BODY_THICKNESS), spec.STICK_X_MIN
+    )
+    stick_component = SimpleNamespace(
+        GetPathName=lambda: f"C:\\models\\{spec.STICK}.SLDPRT",
+        edges=(distractor, hidden_face, end, start),
+    )
+    block_component = SimpleNamespace(
+        GetPathName=lambda: f"C:\\models\\{spec.BLOCK}.SLDPRT", edges=(near,)
+    )
+    front = SimpleNamespace(
+        GetVisibleComponents=lambda: (block_component, stick_component)
+    )
+    adapter = SimpleNamespace(
+        currentModel=Draw(), _attempt=lambda operation, **kwargs: operation()
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(
+        drawing_common._sw_type_info, "early_bound_or_flag",
+        lambda value, *args: value,
+    )
+    monkeypatch.setattr(
+        drawing, "visible_component_entities",
+        lambda view, component, kind: component.edges,
+    )
+    monkeypatch.setattr(drawing_common, "view_name", lambda adapter, view: "Front")
+    monkeypatch.setattr(drawing_common, "rebuild_drawing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        drawing_common, "_projection_frame", lambda adapter, view: (None, None)
+    )
+
+    def project(utility, transform, xyz, **kwargs):
+        assert xyz[2] == 0.0
+        assert xyz[0] in (
+            spec.STICK_X_MIN / 1000.0,
+            spec.STICK_X_MAX / 1000.0,
+            spec.BLOCK_ORIGIN[0] / 1000.0,
+        )
+        return drawing.FRONT_CENTER[0] + xyz[0], drawing.FRONT_CENTER[1] + xyz[1]
+
+    monkeypatch.setattr(drawing_common, "_project_through", project)
+    monkeypatch.setattr(drawing, "_assert_dimension_ink_on_sheet", lambda *a, **kw: None)
+    if defect is not None:
+        if defect == "absent component":
+            front.GetVisibleComponents = lambda: (block_component,)
+            message = "expected one visible.*found 0"
+        elif defect == "duplicate component":
+            duplicate_component = SimpleNamespace(
+                GetPathName=stick_component.GetPathName, edges=stick_component.edges
+            )
+            front.GetVisibleComponents = lambda: (
+                block_component, stick_component, duplicate_component
+            )
+            message = "expected one visible.*found 2"
+        elif defect == "missing edge":
+            stick_component.edges = (distractor, hidden_face, end)
+            message = "expected one exact visible line.*found 0"
+        else:
+            duplicate_edge = Edge(
+                (0.0, stick.BODY_WIDTH, 0.0),
+                (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS),
+                spec.STICK_X_MIN,
+            )
+            stick_component.edges = (*stick_component.edges, duplicate_edge)
+            message = "expected one exact visible line.*found 2"
+        with pytest.raises(RuntimeError, match=message):
+            drawing._add_reference_dimensions(adapter, front)
+        assert selections == []
+        assert displays == []
+        return
+    drawing._add_reference_dimensions(adapter, front)
+    assert [(edge, append) for edge, append, view in selections] == [
+        (start, False), (end, True), (start, False), (near, True)
+    ]
+    assert [display.value * 1000.0 for display in displays] == pytest.approx(
+        [200.0, spec.REFERENCE_STOP_FACE]
+    )
+    for display, (_, _, callout) in zip(displays, drawing.REFERENCE_DIMENSIONS):
+        assert display.text[1] == "("
+        assert display.text[2] == ")"
+        assert {1, 2} <= set(display.readbacks)
+        assert display.precision == spec.DRAWING_REFERENCE_PRECISION
+        if callout:
+            assert display.text[4] == callout
+            assert 4 in display.readbacks
 
 
 def _iso_hull(box) -> list[tuple[float, float]]:
