@@ -99,6 +99,8 @@ RIGHT_KEEP = {
     "SpokeAxial": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] - 0.020),
     "GrooveR": (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.060),
     "GrooveBottomDia": (RIGHT_CENTER[0] + 0.040, RIGHT_CENTER[1] + 0.035),
+    # The rim-bore round, top left, between the groove and the hub.
+    "CastRoundR": (RIGHT_CENTER[0] - 0.028, RIGHT_CENTER[1] + 0.038),
 }
 DIMENSION_CALLOUTS = {
     "BoreDiaDim": "THRU - REAM",
@@ -106,6 +108,7 @@ DIMENSION_CALLOUTS = {
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",
     "RimFilletR": "12X",
+    "CastRoundR": "2X RIM BORE EDGES",
     "Tie1HoleDia": "THRU - TIE 1",
     "Tie2HoleDia": "TIE 2, GROOVE TO RIM BORE",
 }

@@ -64,6 +64,7 @@ from _visibility import blank_reference_geometry
 from mg_magnifying_wheel_geom import (
     BORE_BAND,
     BORE_DIA,
+    CAST_ROUND_BAND,
     CAST_ROUND_R,
     GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
@@ -856,6 +857,9 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "Tie2Profile", "Tie2HoleDia", *deviations(TIE_HOLE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "RimRounds", "CastRoundR", *deviations(CAST_ROUND_BAND)
     )
     set_dimension_symmetric_tolerance(adapter, "Tie1Profile", "Tie1Y", TIE_POSITION_TOL)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

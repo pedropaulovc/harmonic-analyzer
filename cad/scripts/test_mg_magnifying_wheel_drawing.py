@@ -75,6 +75,7 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
         ("BoreProfile", "BoreDiaDim"): "*deviations(BORE_BAND)",
         ("Tie1Profile", "Tie1HoleDia"): "*deviations(TIE_HOLE_BAND)",
         ("Tie2Profile", "Tie2HoleDia"): "*deviations(TIE_HOLE_BAND)",
+        ("RimRounds", "CastRoundR"): "*deviations(CAST_ROUND_BAND)",
         ("Tie1Profile", "Tie1Y"): "TIE_POSITION_TOL",
     }
 
@@ -84,6 +85,11 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert min(spec.WALLS.values()) >= spec.MIN_WALL == 2.0
     assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.706, abs=1e-3)
     assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.088, abs=1e-3)
+    # TIE 2 breaks into the bore at mid-width: its ligament ends at the R1 MAX
+    # rim-bore rounds, which the sheet now prints.
+    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.025, abs=1e-3)
+    assert geom.CAST_ROUND_BAND == (0.0, -0.5)
+    assert spec.DRAWING_DIMENSIONS["RimRounds"] == {"CastRoundR"}
     # At 4:30 (-45) the worst printed casting leaves TIE 2 about a 1.2 wall.
     assert geom.TIE2_CLOCK_DEG == -43.0
     # The 0.8 pen wire seats at every printed groove corner.
@@ -161,5 +167,9 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("mg-magnifying-wheel")
     assert config["material"] == config["material_specification"]
-    assert config["finish"] == "black paint"
+    # Paint never reaches a fitted or wire-bearing surface (policy rule 1).
+    assert config["finish"] == (
+        "BLACK ENAMEL; MASK BORE, SPIGOT, FACED HUB ENDS AND TURNED RIM WITH "
+        "ITS GROOVE; OIL BARE MACHINED SURFACES"
+    )
     assert int(config["quantity"]) == 1

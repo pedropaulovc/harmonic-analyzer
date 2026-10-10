@@ -23,6 +23,8 @@ from _printed_tolerance import angular_band_deg, printed_band_mm
 from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     BORE_BAND,
     BORE_DIA,
+    CAST_ROUND_BAND,
+    CAST_ROUND_R,
     GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
     GROOVE_R,
@@ -53,8 +55,9 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The face view carries the rim, bore, spoke, fillet and tie
-# dimensions; the side view carries the hub profile, the groove and the spoke
-# thickness.  The rim's axial width is added on the sheet. ---
+# dimensions; the side view carries the hub profile, the groove, the rim-bore
+# rounds and the spoke thickness.  The rim's axial width is added on the
+# sheet. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RimProfile": {"RimOuterDiaDim", "RimInnerDiaDim"},
     "SpokeProfile": {"SpokeRootWidth", "SpokeTipWidth"},
@@ -63,6 +66,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDiaDim"},
     "HubFillets": {"HubFilletR"},
     "RimFillets": {"RimFilletR"},
+    "RimRounds": {"CastRoundR"},
     "GrooveProfile": {"GrooveR", "GrooveBottomDia"},
     "Tie1Profile": {"Tie1Y", "Tie1HoleDia"},
     "Tie2Profile": {"Tie2HoleDia", "Tie2Angle"},
@@ -84,6 +88,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BoreProfile": {"BoreDiaDim": 3},
     "HubFillets": {"HubFilletR": 1},
     "RimFillets": {"RimFilletR": 1},
+    "RimRounds": {"CastRoundR": 1},
     "GrooveProfile": {"GrooveR": 2, "GrooveBottomDia": 2},
     "Tie1Profile": {"Tie1Y": 2, "Tie1HoleDia": 2},
     "Tie2Profile": {"Tie2HoleDia": 2, "Tie2Angle": 0},
@@ -174,8 +179,9 @@ TIE2_SPOKE_WALL = (
     )
     - _TIE_R_MAX
 )
-# TIE 2 to the rim's side faces.
-TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - _TIE_R_MAX
+# TIE 2 to the rim's side faces: it breaks into the bore at mid-width, where
+# the faces end at the rim-bore rounds' tangent line.
+TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - (CAST_ROUND_R + CAST_ROUND_BAND[0]) - _TIE_R_MAX
 # Spigot to bore, and the groove floor to the rim ID.
 SPIGOT_WALL = (SPIGOT_DIA + SPIGOT_BAND[1] - BORE_DIA - BORE_BAND[0]) / 2.0
 GROOVE_FLOOR_WALL = (GROOVE_BOTTOM_DIA + GROOVE_BOTTOM_BAND[1] - _RIM_ID[1]) / 2.0
@@ -185,7 +191,7 @@ WALLS = {
     "tie1_to_hub_fillet": TIE1_FILLET_WALL,  # 2.088
     "tie1_to_bore": TIE1_BORE_WALL,  # 6.870
     "tie2_to_rim_fillet": TIE2_SPOKE_WALL,  # 2.706
-    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 3.025
+    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.025
     "spigot_to_bore": SPIGOT_WALL,  # 4.854
     "groove_floor": GROOVE_FLOOR_WALL,  # 4.350
 }

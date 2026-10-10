@@ -76,7 +76,12 @@ SPOKE_X0 = HUB_DIA / 2.0 - SPOKE_OVERLAP  # 11.5
 SPOKE_X1 = RIM_INNER_DIA / 2.0 + SPOKE_OVERLAP  # 45.0
 HUB_FILLET_R = 3.0
 RIM_FILLET_R = 4.0
-CAST_ROUND_R = 1.0  # the rim's inner edges
+# The rim bore's two edges (the spoke faces stay sharp). R1 at most: TIE 2
+# breaks into the bore at mid-width, so a bigger round eats its ligament to
+# the rim side faces (mg_magnifying_wheel_spec). The pattern round is the
+# maximum; it only comes out smaller.
+CAST_ROUND_R = 1.0
+CAST_ROUND_BAND = (0.0, -0.5)
 
 # --- wire ties ---------------------------------------------------------------------
 TIE_HOLE_DIA = 1.0
