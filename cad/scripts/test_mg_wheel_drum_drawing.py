@@ -51,11 +51,16 @@ def test_every_size_carries_its_band_on_the_model() -> None:
     assert spec.DRAWING_PRECISION["RingProfile"]["DrumBore"] == 3
 
 
-def test_drum_presses_on_the_wheel_spigot_flush() -> None:
+def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
     # H7 bore on the p6 spigot: never a clearance at any band corner.
     assert spec.DRUM_BORE == wheel_geom.SPIGOT_DIA
     assert spec.DRUM_BORE_BAND[0] <= wheel_geom.SPIGOT_BAND[1]
+    # Nominally flush; the drum's minus-only length against the spigot's
+    # plus-only length keeps its face at or under the spigot face.
     assert spec.DRUM_LEN == wheel_geom.SPIGOT_LEN
+    assert spec.DRUM_LEN_BAND == (0.0, -0.10)
+    assert wheel_geom.SPIGOT_LEN_BAND == (0.10, 0.0)
+    assert min(wheel_geom.DRUM_RECESS) >= 0.0
     assert (
         part.V_DRUM
         == math.pi

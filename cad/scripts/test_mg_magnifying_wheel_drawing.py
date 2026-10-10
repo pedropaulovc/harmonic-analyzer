@@ -69,11 +69,28 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
         ("HubProfile", "HubDia"): "*deviations(HUB_DIA_BAND)",
         ("HubProfile", "HubLength"): "*deviations(HUB_LEN_BAND)",
         ("HubProfile", "SpigotDia"): "*deviations(SPIGOT_BAND)",
+        ("HubProfile", "SpigotLength"): "*deviations(SPIGOT_LEN_BAND)",
+        ("GrooveProfile", "GrooveR"): "*deviations(GROOVE_R_BAND)",
+        ("GrooveProfile", "GrooveBottomDia"): "*deviations(GROOVE_BOTTOM_BAND)",
         ("BoreProfile", "BoreDiaDim"): "*deviations(BORE_BAND)",
         ("Tie1Profile", "Tie1HoleDia"): "*deviations(TIE_HOLE_BAND)",
         ("Tie2Profile", "Tie2HoleDia"): "*deviations(TIE_HOLE_BAND)",
         ("Tie1Profile", "Tie1Y"): "TIE_POSITION_TOL",
     }
+
+
+def test_walls_and_groove_hold_at_the_printed_bands() -> None:
+    spec = mg_magnifying_wheel_spec
+    assert min(spec.WALLS.values()) >= spec.MIN_WALL == 2.0
+    assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.706, abs=1e-3)
+    assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.088, abs=1e-3)
+    # At 4:30 (-45) the worst printed casting leaves TIE 2 about a 1.2 wall.
+    assert geom.TIE2_CLOCK_DEG == -43.0
+    # The 0.8 pen wire seats at every printed groove corner.
+    assert spec.GROOVE_WIDTH_MIN == pytest.approx(1.0)
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.895)
+    # The drum, minus-only against the plus-only spigot, is never proud.
+    assert geom.DRUM_RECESS == pytest.approx((0.0, 0.2))
 
 
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
@@ -105,7 +122,7 @@ def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
     cross = p_in[0] * p_out[1] - p_in[1] * p_out[0]
     assert cross == pytest.approx(0.0, abs=1e-9)  # the axis passes the origin
     assert q_in[1] == pytest.approx(p_in[1])  # the inner end runs horizontal
-    assert part._TIE2_ANGLE == pytest.approx(45.0)
+    assert part._TIE2_ANGLE == pytest.approx(43.0)
     assert (p_out[0] ** 2 + p_out[1] ** 2) ** 0.5 > geom.GROOVE_BOTTOM_DIA / 2.0
     assert (q_out[0] ** 2 + q_out[1] ** 2) ** 0.5 < geom.RIM_OUTER_DIA / 2.0
 

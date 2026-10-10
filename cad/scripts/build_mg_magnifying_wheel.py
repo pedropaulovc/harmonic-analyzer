@@ -65,8 +65,10 @@ from mg_magnifying_wheel_geom import (
     BORE_BAND,
     BORE_DIA,
     CAST_ROUND_R,
+    GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
     GROOVE_R,
+    GROOVE_R_BAND,
     HUB_BACK_Z,
     HUB_DIA,
     HUB_DIA_BAND,
@@ -83,6 +85,7 @@ from mg_magnifying_wheel_geom import (
     SPIGOT_BAND,
     SPIGOT_DIA,
     SPIGOT_LEN,
+    SPIGOT_LEN_BAND,
     SPOKE_AXIAL,
     SPOKE_COUNT,
     SPOKE_OVERLAP,
@@ -835,6 +838,15 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "HubProfile", "SpigotDia", *deviations(SPIGOT_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "HubProfile", "SpigotLength", *deviations(SPIGOT_LEN_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "GrooveProfile", "GrooveR", *deviations(GROOVE_R_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "GrooveProfile", "GrooveBottomDia", *deviations(GROOVE_BOTTOM_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDiaDim", *deviations(BORE_BAND)

@@ -1,9 +1,9 @@
 r"""Reproduction script: magnifying-wheel drum (MHA-MG-010; 1 used).
 
 The brass ring the lever wire wraps (book ch. 21, p.53 shows the wheel's brass
-hub drum): pressed on the wheel's Ø14.5 spigot, its front face flush with the
-spigot's. Its wire-centre radius sets the wheel's magnification
-(``mg_wheel_drum_geom``).
+hub drum): pressed on the wheel's Ø14.5 spigot up to the boss, its front face
+never proud of the spigot's (``mg_magnifying_wheel_geom.DRUM_RECESS``). Its
+wire-centre radius sets the wheel's magnification (``mg_wheel_drum_geom``).
 
 Layout: Front-plane annulus at the origin, extruded mid-plane (the drum's own
 mid-plane on the Front plane); the assembly places it at the wheel's
