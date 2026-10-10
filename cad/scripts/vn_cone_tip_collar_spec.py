@@ -120,9 +120,9 @@ DOG_DIA_BAND = TIP_SCREW_DOG_DIA_BAND
 DOG_LENGTH = TIP_SCREW_DOG_LENGTH_MM
 # The title block's R0.25 exceeds the Ø0.20 dog's radius and would remove its
 # ground face; 0.02 keeps Ø0.15 of face at the dog's least Ø0.19. Printed
-# under the dog Ø; the model's dog edge stays sharp.
+# above the dog Ø; the model's dog edge stays sharp.
 DOG_EDGE_BREAK = 0.02
-DOG_EDGE_CALLOUT = f"EDGE BREAK {DOG_EDGE_BREAK:.2f} MAX"
+DOG_EDGE_CALLOUT = f"DOG EDGE:\nSTONE BURR ONLY, {DOG_EDGE_BREAK:.2f} MAX"
 # Coordinates in the collar's frame. The loaded collar centre moves toward
 # +X; its bore seats on the shaft's retained -X BACK arc. The dog consequently
 # advances by that nonzero displacement rather than hovering above the flat.

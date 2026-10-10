@@ -261,7 +261,9 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
     # Edges stay sharp in the model: the title block covers the collar's
     # breaks, and the dog's tighter limit is printed once on its diameter.
     assert "add_chamfer" not in source
-    assert spec.DOG_EDGE_CALLOUT == f"EDGE BREAK {spec.DOG_EDGE_BREAK:.2f} MAX"
+    assert spec.DOG_EDGE_CALLOUT.replace("\n", " ") == (
+        f"DOG EDGE: STONE BURR ONLY, {spec.DOG_EDGE_BREAK:.2f} MAX"
+    )
     assert '{"DogDia": spec.DOG_EDGE_CALLOUT}' in drawing_source
 
 
