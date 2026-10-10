@@ -148,6 +148,10 @@ COLLAR_STOCK_CALLOUT = (
 # The same break on the post's journal rims, the ring's other bounding edge;
 # the post sheet prints it with the journal size.
 POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
+# The terminal flat's two long torque corners stay sharp in the model; their
+# break limit is a drawing requirement, printed above the terminal across-flat
+# (draw_dt_cone_gear_shaft).  cone_shaft_land_bands derives the number.
+TORQUE_CORNER_CALLOUT = f"TORQUE CORNERS\nBREAK {TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX"
 
 # Station layout.  Every cone gear station was laid out on a 6.5 reference
 # face one exact-tracking seat pitch (dt_cone_gear_spec.SEAT_PITCH) from the next;
@@ -390,7 +394,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec2FlatProfile": {"Sec2AF"},
     "Sec3FlatProfile": {"Sec3AF"},
     "Sec4FlatProfile": {"Sec4AF"},
-    "TerminalFlatEdgeBreak": {"TerminalTorqueEdge"},
     "ShoulderFillets": {"ShoulderR"},
     "CollarProfile": {"CollarDia"},
     "Collar": {"CollarWidth"},
@@ -441,7 +444,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec2FlatProfile": {"Sec2AF": LAND_AF_PLACES[2]},
     "Sec3FlatProfile": {"Sec3AF": LAND_AF_PLACES[3]},
     "Sec4FlatProfile": {"Sec4AF": LAND_AF_PLACES[4]},
-    "TerminalFlatEdgeBreak": {"TerminalTorqueEdge": 3},
     "ShoulderFillets": {"ShoulderR": 2},
     "CollarProfile": {"CollarDia": 2},
     "Collar": {"CollarWidth": 3},

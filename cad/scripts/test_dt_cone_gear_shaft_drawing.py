@@ -80,11 +80,9 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     }
 
 
-def test_terminal_torque_edge_is_the_single_functional_maximum():
+def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
     lands = cone_shaft_land_bands
     assert dt_cone_gear_shaft_spec.TERMINAL_FLAT_EDGE_BREAK_MAX is lands.TERMINAL_FLAT_EDGE_BREAK_MAX
-    assert lands.TERMINAL_FLAT_EDGE_BREAK_MAX == 0.020
-    assert lands.TERMINAL_FLAT_EDGE_BREAK_MAX <= 0.030  # Main ruling E.
     radius = (lands.TERMINAL_DIA_MM + lands.RUNNING_DIA_BAND[1]) / 2.0
     flat = lands.SECTION_FLAT_AF[-1] - radius
     half_chord = math.sqrt(radius**2 - flat**2)
@@ -93,34 +91,24 @@ def test_terminal_torque_edge_is_the_single_functional_maximum():
         + lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM + lands.TIP_SCREW_DOG_AXIS_OFFSET_MM
     )
     assert half_chord - lands.TERMINAL_FLAT_EDGE_BREAK_MAX > dog
-    # The general title-block edge cannot be silently modelled as sharp.
+    # The title block's R0.25 would eat the dog's flat: the override is real,
+    # and no break above the land radius less the dog budget fits at all.
     assert half_chord - 0.25 < dog
+    assert lands.TERMINAL_FLAT_EDGE_BREAK_MAX <= radius - dog
     assert lands.TERMINAL_REQUIRED_HALF_CHORD_MM == pytest.approx(
         dog + lands.TERMINAL_FLAT_EDGE_BREAK_MAX
     )
-    assert "TerminalTorqueEdge" in drawing.D_SECTION_KEEP
-
-
-@pytest.mark.parametrize("setback", [0.0, 0.025, float("nan")])
-def test_native_terminal_corner_audit_refuses_wrong_actual_geometry(monkeypatch, setback):
-    from types import SimpleNamespace
-
-    land = len(part.SECTIONS) - 1
-    offset = part.FLAT_OFFSETS[land]
-    half_chord = math.sqrt((part.SECTION_DIAS[land] / 2.0)**2 - offset**2)
-    middle = (part.SECTION_ENDS[land - 1] + part.SECTION_ENDS[land]) / 2.0
-    faces = []
-    for side in (-1, 1):
-        plane = (
-            math.sqrt(0.5), side * math.sqrt(0.5), 0.0,
-            offset / 1000.0, side * (half_chord - setback) / 1000.0, middle / 1000.0,
-        )
-        surface = SimpleNamespace(IsPlane=lambda: True, PlaneParams=plane)
-        faces.append(SimpleNamespace(GetSurface=lambda value=surface: value))
-    monkeypatch.setattr(part, "_early_bound", lambda value, _type: value)
-    monkeypatch.setattr(part, "_feature_by_name", lambda *_args: SimpleNamespace(GetFaces=lambda: faces))
-    with pytest.raises(RuntimeError, match="native plane parameters|source MAX setbacks"):
-        part._assert_terminal_torque_corners(object())
+    # The model keeps the corners sharp; the limit is printed once, above the
+    # terminal across-flat.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "InsertFeatureChamfer" not in source
+    assert "TerminalTorqueEdge" not in source
+    assert "TerminalFlatEdgeBreak" not in dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS
+    callout = dt_cone_gear_shaft_spec.TORQUE_CORNER_CALLOUT
+    assert f"{lands.TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX" in callout
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert drawing_source.count("TORQUE_CORNER_CALLOUT") == 2  # import + one use
+    assert "TerminalTorqueEdge" not in drawing.D_SECTION_KEEP
 
 
 def test_display_precision_is_owned_by_the_part() -> None:
@@ -157,7 +145,6 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec2AF": 3,
         "Sec3AF": 3,
         "Sec4AF": 3,
-        "TerminalTorqueEdge": 3,
         "ShoulderR": 2,
         # #914: the collar web is the 64T's station toward MHA-DT-005, so it
         # prints .XXX (crank_boss_rim).  The collar diameter is the bar's as
@@ -1347,7 +1334,6 @@ def _stubbed_build(monkeypatch):
     ``record`` calls) and how many drives existed when the gate ran."""
     import asyncio
     import inspect
-    from types import SimpleNamespace
     from unittest.mock import AsyncMock, MagicMock
 
     stubs = {}
@@ -1379,19 +1365,6 @@ def _stubbed_build(monkeypatch):
         "_assert_stations_single_owned",
         lambda _a: gated_after.append(len(stubs["drive_dimension"].call_args_list)),
     )
-    # The terminal torque edge's native display/tolerance pair: the build
-    # writes the 2X prefix and MAX type, then reads both back.
-    texts: dict[int, str] = {}
-    torque_display = SimpleNamespace(
-        SetText=lambda where, text: texts.__setitem__(5 if where == 1 else where, text),
-        GetText=lambda where: texts.get(where, ""),
-    )
-    torque_edge = SimpleNamespace(Tolerance=SimpleNamespace(Type=0))
-    monkeypatch.setattr(
-        part, "_named_dimension", lambda _a, _f, _d: (torque_display, torque_edge)
-    )
-    monkeypatch.setattr(part, "_early_bound", lambda raw, _interface: raw)
-    monkeypatch.setattr(part, "_assert_terminal_torque_corners", lambda _a: None)
     adapter = AsyncMock()
     asyncio.run(part.build(adapter))
     return adapter, stubs, sketch_dims, gated_after

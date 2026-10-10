@@ -87,6 +87,7 @@ from dt_cone_gear_shaft_spec import (
     SECTION_ENDS,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
+    TORQUE_CORNER_CALLOUT,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
@@ -336,7 +337,6 @@ D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
-D_SECTION_KEEP["TerminalTorqueEdge"] = (0.380, 0.140)
 # A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf
 # for c8b0aad); each is hung SECTION_CAPTION_GAP under its section's ink.
 SECTION_CAPTION_SIZE = (0.046, 0.017)
@@ -702,7 +702,6 @@ class PlacedSection(NamedTuple):
     across_flat: Any
     caption: Box
     centre_marks: dict[str, Box]
-    torque_edge: Any | None = None
 
 
 def _axis_sign(adapter: Any, side: Any) -> int:
@@ -1034,8 +1033,6 @@ def _add_d_sections(
         _prepare_d_section(adapter, view, section)
         name = f"Sec{section.land}AF"
         keep = {name: D_SECTION_KEEP[name]}
-        if section.land == max(FLAT_LANDS):
-            keep["TerminalTorqueEdge"] = D_SECTION_KEEP["TerminalTorqueEdge"]
         dimensions = curate_view_dimensions(
             adapter,
             view,
@@ -1045,7 +1042,6 @@ def _add_d_sections(
         )
         by_name = {dimension_name(adapter, dimension): dimension for dimension in dimensions}
         across_flat = by_name[name]
-        torque_edge = by_name.get("TerminalTorqueEdge")
         centre_marks = _trim_centre_mark(adapter, view, section)
         face = _section_face(adapter, view, section, sign)
         caption = _place_view_caption(
@@ -1055,9 +1051,13 @@ def _add_d_sections(
             CaptionAnchor.TOP_CENTRE,
             label=f"section {section.label} caption",
         )
-        placed.append(
-            PlacedSection(section, view, face, across_flat, caption, centre_marks, torque_edge)
-        )
+        if section.land == max(FLAT_LANDS):
+            # The terminal flat's torque corners stay sharp in the model; the
+            # break limit rides above that flat's own across-flat value.
+            set_dimension_callouts(
+                adapter, [across_flat], {name: TORQUE_CORNER_CALLOUT}, location="above"
+            )
+        placed.append(PlacedSection(section, view, face, across_flat, caption, centre_marks))
     return placed
 
 
@@ -1235,10 +1235,6 @@ def _prove_section_layout(
             f"{label} caption": placed.caption,
             **placed.centre_marks,
         }
-        if placed.torque_edge is not None:
-            cell[f"{label} terminal torque-edge MAX"] = _dimension_text_box(
-                placed.torque_edge, f"{label} terminal torque-edge MAX",
-            )
         require_clear(
             f"{label} caption",
             placed.caption,

@@ -65,7 +65,6 @@ from _common import (
     IN,
     SketchDims,
     _early_bound,
-    _feature_by_name,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
@@ -84,7 +83,6 @@ from _common import (
     set_global,
 )
 from _drawing_marks import (
-    _named_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -115,10 +113,8 @@ from dt_cone_gear_shaft_spec import (
     SECTION_ORIGINS,
     SECTIONS,
     SURFACE_FINISHES,
-    TERMINAL_FLAT_EDGE_BREAK_MAX,
     validate_gear_loading_clearances,
 )
-from solidworks_mcp.adapters.solidworks.features import _select_edge_points
 from solidworks_mcp.adapters.com_variant import double_array
 
 PART_NAME = "dt-cone-gear-shaft"
@@ -182,7 +178,6 @@ async def build(adapter) -> dict[str, str]:
         await set_global(adapter, f"SecEnd{i}", f"{SECTION_KNOBS[i]}mm")
     await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
     await set_global(adapter, "CollarWidth", f"{COLLAR_THICKNESS}mm")
-    await set_global(adapter, "TerminalTorqueEdge", f"{TERMINAL_FLAT_EDGE_BREAK_MAX}mm")
     for i in FLAT_LANDS:
         await set_global(adapter, f"SecAF{i}", f"{SECTION_FLAT_AF[i]}mm")
 
@@ -367,25 +362,6 @@ async def build(adapter) -> dict[str, str]:
     # Three R0.10 roots add ~0.1 mm^3 to a ~13000 mm^3 shaft: this checks
     # that the fillet did not eat a land, not that it moved the number.
     await volume_check(adapter, "step fillets", volume, 0.005 * volume)
-    # Only the two long terminal torque corners: the ordinary other-land
-    # edge grade remains unchanged. Tangent propagation must not travel round
-    # either journal end or a shoulder's bearing perimeter.
-    terminal = len(SECTIONS) - 1
-    offset = FLAT_OFFSETS[terminal]
-    half_chord = math.sqrt((SECTION_DIAS[terminal] / 2.0)**2 - offset**2)
-    middle = (SECTION_ENDS[terminal - 1] + SECTION_ENDS[terminal]) / 2.0
-    _select_edge_points(adapter, [[offset, side * half_chord, middle] for side in (-1.0, 1.0)])
-    # The D corner is not 90 degrees. The generic 45-degree helper cannot
-    # guarantee which face receives its distance; use equal-distance legs.
-    manager = _early_bound(adapter.currentModel.FeatureManager, "IFeatureManager")
-    feature = manager.InsertFeatureChamfer(
-        0, 2 | 16, 0.0, 0.0, TERMINAL_FLAT_EDGE_BREAK_MAX / 1000.0, 0.0, 0.0, 0.0,
-    )
-    if feature is None:
-        raise RuntimeError("native equal-distance terminal torque chamfer failed")
-    name_last_feature(adapter, "TerminalFlatEdgeBreak")
-    dimension = name_dimensions(adapter, "TerminalFlatEdgeBreak", ["TerminalTorqueEdge"])[0]
-    drive_jobs.append((dimension, '"TerminalTorqueEdge"'))
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -421,15 +397,6 @@ async def build(adapter) -> dict[str, str]:
             f"Sec{land}AF",
             *deviations(FLAT_AF_BAND),
         )
-    _display, torque_edge = _named_dimension(adapter, "TerminalFlatEdgeBreak", "TerminalTorqueEdge")
-    tolerance = _early_bound(torque_edge.Tolerance, "IDimensionTolerance")
-    _display.SetText(1, "2X ")
-    if str(_display.GetText(5) or "") != "2X ":
-        raise RuntimeError("terminal torque-corner native quantity prefix did not persist")
-    tolerance.Type = 6  # swTolMAX, not the routine title-block linear grade.
-    if int(tolerance.Type) != 6:
-        raise RuntimeError("terminal torque-corner native MAX did not persist")
-    _assert_terminal_torque_corners(adapter)
     # Display precision is model-owned too (drawing-simplicity policy rule 2).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
@@ -440,39 +407,6 @@ async def build(adapter) -> dict[str, str]:
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
-
-
-def _assert_terminal_torque_corners(adapter):
-    """Read both real chamfer planes and their setbacks along the contact flat."""
-    terminal = len(SECTIONS) - 1
-    offset = FLAT_OFFSETS[terminal]
-    half_chord = math.sqrt((SECTION_DIAS[terminal] / 2.0)**2 - offset**2)
-    middle = (SECTION_ENDS[terminal - 1] + SECTION_ENDS[terminal]) / 2.0
-    measured = {}
-    feature = _feature_by_name(adapter, "TerminalFlatEdgeBreak")
-    for raw in feature.GetFaces() or ():
-        face = _early_bound(raw, "IFace2")
-        surface = _early_bound(face.GetSurface(), "ISurface")
-        if surface is None or not surface.IsPlane():
-            continue
-        values = tuple(float(value) for value in surface.PlaneParams)
-        if len(values) != 6 or not all(math.isfinite(value) for value in values):
-            raise RuntimeError("terminal corner has invalid native plane parameters")
-        nx, ny, nz, *point_m = values
-        if abs(nz) > 1e-8 or abs(nx) < 1e-6 or abs(ny) < 1e-6:
-            continue
-        plane = sum(a * b * 1000.0 for a, b in zip((nx, ny, nz), point_m, strict=True))
-        y_at_flat = (plane - nx * offset - nz * middle) / ny
-        side = 1 if y_at_flat > 0.0 else -1
-        setback = half_chord - abs(y_at_flat)
-        if side in measured and abs(measured[side] - setback) > 1e-6:
-            raise RuntimeError("terminal corner has inconsistent native contact setbacks")
-        measured[side] = setback
-    if set(measured) != {-1, 1} or any(
-        abs(value - TERMINAL_FLAT_EDGE_BREAK_MAX) > 1e-6 for value in measured.values()
-    ):
-        raise RuntimeError(f"terminal native torque breaks are not the two source MAX setbacks: {measured}")
-    _telemetry.info(f"Terminal whole-dog native torque-corner setbacks: {measured}")
 
 
 def _flat_start_station(land: int) -> float:

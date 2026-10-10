@@ -87,6 +87,11 @@ TIP_SCREW_REQUIRED_FULL_ENGAGEMENT_MM = 1.5 * TIP_SCREW_MAJOR_DIA_MM
 TIP_SCREW_THREAD_RADIAL_PLAY_MM = (0.0772 - 0.0728) * MM_PER_IN / 2.0
 # Main ruling E: the terminal torque corners need this functional MAX for
 # whole-dog contact. It consumes the former 0.020 side reserve ONCE.
+# It overrides the title block's R0.25 corner because the #2-56 dog's
+# projected radius, collar float and axis offset (0.364) need the flat's
+# half-chord; on the Ø0.794 land at its least (Ø0.774) no flat position leaves
+# more than 0.387 - 0.364 = 0.022 for a break, so 0.02 (a stoned burr, not a chamfer) is the
+# largest printable hundredth. Drawing requirement only: the model stays sharp.
 TERMINAL_FLAT_EDGE_BREAK_MAX = 0.020
 # Collar geometry governing the loaded bore/contact span; the collar spec
 # consumes these readers so the terminal retention law cannot fork its width.
