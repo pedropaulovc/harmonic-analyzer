@@ -11,11 +11,17 @@ corner screws -- stations derived from the plate's own hole pattern through
 its mount transform (``fr_nameplate_spec``), so the plate, the base and the
 frame's screws can never drift apart.
 
-Finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes): C3.18
-x 45 breaks on the eight vertical plan corners, C1.59 x 45 breaks on both
-plates' exposed top rims and the underside rim, and the R0.50 pad-to-flange
-root fillet note 1 caps -- the one internal wall junction on the part
-(ch06/ch30 photos: every exposed plate edge reads softened, none sharp).
+Black deck and underside pocket (user ruling 2026-10-09, ch30 p002/p003/p006
+and ch26 p.71 photos): the black panel is a machined pad DECK_RISE proud of
+the green casting top, which carries the four column sockets on its land;
+underneath, one cored pocket inside a perimeter wall, crossed by two relieved
+ribs, with bosses round the sockets and hanging under every blind deck seat.
+
+Finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes): rounded
+full-height plan corners, C1.59 x 45 breaks on both plates' exposed top rims
+and the underside rim, a C0.79 break on the deck, the R0.50 pad-to-flange
+root fillet note 1 caps, and casting fillets on the pocket's reentrant
+junctions (ch06/ch30 photos: every exposed plate edge reads softened).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 6" — annotated (high) footprint,
 legacy thicknesses (photo-verify note).
@@ -33,6 +39,9 @@ from __future__ import annotations
 
 import math
 import sys
+from dataclasses import dataclass, replace
+
+import numpy as np
 
 from _common import (
     CASTING_GREEN,
@@ -46,6 +55,7 @@ from _common import (
     bbox_extent_check,
     blank_reference_sketches,
     check,
+    define_centered_rectangle,
     define_circle,
     define_rectilinear_chain,
     dimension_between,
@@ -85,13 +95,30 @@ from fr_harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
     BOTTOM_WIDTH,
+    CASTING_FILLET_R,
     COLUMN_SOCKET_XZ,
     COLUMN_X,
+    DECK_CORNER_R,
+    DECK_EDGE_BREAK,
+    DECK_HALF_X,
+    DECK_HALF_Z,
+    DECK_LENGTH,
+    DECK_RISE,
+    DECK_WIDTH,
+    DEEP_BOSS_BOTTOM_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    LIP_H,
-    LIP_W,
+    GREEN_TOP,
+    HANGING_BOSS_MIN_DIA,
     PART_SURFACE_FINISHES,
+    POCKET_CEILING_Y,
+    POCKET_HALF_X,
+    POCKET_HALF_Z,
+    POCKET_WALL,
+    RIB_RELIEF,
+    RIB_THICKNESS,
+    SHALLOW_BOSS_BOTTOM_Y,
+    SOCKET_BOSS_DIA,
     SOCKET_BORE_FINISHES,
     SPOTFACE_DEPTH_BAND_MM,
     STACK_HEIGHT,
@@ -217,7 +244,7 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 # thicknesses come from the legacy HarmonicBase.cs (photo-verify M2 note). The
 # DEPTH deliberately no longer follows the 28 cm callout: fr_harmonic_base_spec
 # widens the pad to 274.5 (slab 287.2, same 0.25 in reveal per side) so the
-# socket-to-rim deck land is equal on both axes -- asserted below, because
+# socket-to-pad-edge land is equal on both axes -- asserted below, because
 # only this module knows the column stations.
 IN = 25.4
 
@@ -246,50 +273,40 @@ HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 # cannot be measured with hobby-shop kit (it needs an optical comparator or a
 # radius gauge under magnification), so the sheet carries no radius callout
 # and the deck cutter's own corner defines it (2026-09 review). Every
-# mechanism hole sits >= 26 from every plate edge; the closest seats to a rim
-# are the nameplate taps (NAMEPLATE_SCREW_XZ), Ø2.26 at 12.5 in from the pad
-# side and 5.5 inside the raised rim's inner wall -- still far clear of the
-# 1.59 breaks, so no break touches a rim or seat.
+# mechanism hole sits >= 26 from every plate edge; the closest seats to a deck
+# edge are the nameplate taps (NAMEPLATE_SCREW_XZ), Ø2.26 about 8 inside the
+# deck's west edge -- clear of its 0.79 break, so no break touches a seat.
 # Plan corners are ROUNDED, not chamfered (2026-09 photo re-derive): every
 # ch30 plate (p002/p003 front corners, p006 rear) shows the casting's vertical
 # corners as one large radius running the full height, flange and pad
 # together. 7/8 in on the flange; the pad's radius is 1/4 in smaller so the
-# two arcs stay concentric across the 1/4 in reveal, and the raised rim's
-# inner corners follow LIP_W further in.
+# two arcs stay concentric across the 1/4 in reveal.
 FLANGE_CORNER_R = 0.875 * IN  # 22.225
 PAD_CORNER_R = FLANGE_CORNER_R - (BOTTOM_LENGTH - TOP_LENGTH) / 2.0  # 15.875
 RIM_CHAMFER = 0.0625 * IN  # 1.5875 legs, top rims + underside rim
 PAD_ROOT_R = 0.5  # pad-to-flange root fillet; modelled, never called out
 
-# Raised rim + black deck (2026-09 photo re-derive). Every plate that shows
-# the base top -- ch11 p.21 (crank close-up), ch13 p.25 (cylinder-gear front),
-# ch30 p002/p003/p006 -- reads it as a BLACK panel framed by a green lip
-# standing a few mm proud of it, flush with the pad sides. The lip is a
-# LIP_H-tall ring LIP_W wide on the pad's chamfered outline; the deck it
-# frames stays at the pad top (STACK_HEIGHT), so nothing mounted on the base
-# moves. The deck face is painted PANEL_BLACK at the FACE level (part and
-# body stay casting green); the lip's inner edge clears the closest deck
-# occupants by >= 1.0 -- the tube-frame column sockets (wall at |z| 124.75,
-# now 5.5 clear after the pad widening) and the nameplate's plate corner
-# (x 214.25, 1.0 clear, the binding case).
-# LIP_W / LIP_H live in fr_harmonic_base_spec (the drawing's side view needs the
-# rim top for its silhouette pick).
-RIM_INNER_R = PAD_CORNER_R - LIP_W  # 8.875: the deck pocket's plan corners
+# Black deck + green land (user ruling 2026-10-09; ch11 p.21, ch13 p.25 and
+# ch30 p002/p003/p006 show a BLACK panel on the green casting top). The raised
+# rim of the 2026-09 re-derive is gone: the panel is a machined pad DECK_RISE
+# proud of the green top, centred on it, so the nameplate and every seat stay
+# on the deck at STACK_HEIGHT while the column sockets open on the green land.
+# The deck face is painted PANEL_BLACK at the FACE level (part and body stay
+# casting green). DECK_* live in fr_harmonic_base_spec.
 
 # Stamped serial number (2026-09-02, ch26 p.70 page001_img02/03): a hand-stamped
-# "2" on the bright machined rim top beside the nameplate's +Z end. Cut from
-# the vendored closed-region DXF (gen_base_serial_dxf.py regenerates it from
-# these constants) on a plane at the rim top, SERIAL_DEPTH deep. It sits on
-# the +X lip (the long-side rim the nameplate hugs), centred across LIP_W.
+# "2" on the bright machined deck. Cut from the vendored closed-region DXF
+# (gen_base_serial_dxf.py regenerates it from these constants) on a plane at
+# the deck top, SERIAL_DEPTH deep. Since the 2026-10-09 ruling it sits in the
+# deck's north-west (+X, +Z) corner, SERIAL_INSET in from both deck edges --
+# clear of the nameplate on the deck's west end and of the corner's break.
 SERIAL_TEXT = "2"
-SERIAL_HEIGHT_MM = 3.5  # p.70 macro: ~half the lip width (low)
+SERIAL_HEIGHT_MM = 3.5  # p.70 macro: a small hand stamp
 SERIAL_DEPTH = 0.3  # a stamp, not an engraving
-SERIAL_XZ = (
-    TOP_LENGTH / 2.0 - LIP_W / 2.0,
-    62.0,
-)  # (218.75, 62): lip centre, 12 past the plate end
+SERIAL_INSET = 6.0
+SERIAL_XZ = (DECK_HALF_X - SERIAL_INSET, DECK_HALF_Z - SERIAL_INSET)  # (161.0, 124.25)
 SERIAL_MIRROR_Y = (
-    False  # flip if the seat's rim-top sketch frame reads the glyph mirrored
+    False  # flip if the seat's deck-top sketch frame reads the glyph mirrored
 )
 SERIAL_DXF = REFERENCES_DIR / "base-serial.dxf"
 SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph area)
@@ -412,7 +429,8 @@ PEDESTAL_SCREW_HOLE_DEPTH = 16.0
 PEDESTAL_SCREW_DRILL_DEPTH = 19.5
 # A transferred seat lands where the fitted pedestal stands, within the
 # study's +-2 x / +-5 z fit-up bound of nominal; the wall checks book it.
-PEDESTAL_TRANSFER_ENVELOPE = math.hypot(2.0, 5.0)
+PEDESTAL_TRANSFER_XZ = (2.0, 5.0)
+PEDESTAL_TRANSFER_ENVELOPE = math.hypot(*PEDESTAL_TRANSFER_XZ)
 
 # Maker's nameplate seats: stations and depths in fr_harmonic_base_fasteners.
 # The plate lies flat on the deck, so its seats are cut from the deck face.
@@ -425,8 +443,9 @@ if fr_nameplate_spec.MOUNT_NORMAL != (0.0, 1.0, 0.0):
     raise AssertionError(
         f"nameplate front normal {fr_nameplate_spec.MOUNT_NORMAL} is not the deck's +Y"
     )
-# The whole plate (its four corners, both faces) must land on the deck INSIDE
-# the raised rim's inner wall, or the seats would be cut through the lip.
+# The whole plate (its bounding corners, both faces) must lie flat on the
+# raised deck, inside its edge break by >= 1.0, or a corner would overhang the
+# step down to the green land (user ruling 2026-10-09: 4.0 inside the west edge).
 _NAMEPLATE_CORNERS_XZ = tuple(
     (pt[0], pt[2])
     for pt in (
@@ -435,14 +454,14 @@ _NAMEPLATE_CORNERS_XZ = tuple(
         for y in (0.0, fr_nameplate_spec.PLATE_HEIGHT)
     )
 )
-NAMEPLATE_RIM_CLEARANCE = min(
-    min(TOP_LENGTH / 2.0 - LIP_W - abs(x), TOP_WIDTH / 2.0 - LIP_W - abs(z))
-    for x, z in _NAMEPLATE_CORNERS_XZ
+NAMEPLATE_DECK_CLEARANCE = min(
+    min(DECK_HALF_X - abs(x), DECK_HALF_Z - abs(z)) for x, z in _NAMEPLATE_CORNERS_XZ
 )
-if NAMEPLATE_RIM_CLEARANCE < 1.0:
+if NAMEPLATE_DECK_CLEARANCE - DECK_EDGE_BREAK < 1.0:
     raise AssertionError(
-        f"nameplate footprint {_NAMEPLATE_CORNERS_XZ} clears the rim's inner wall by "
-        f"only {NAMEPLATE_RIM_CLEARANCE:.2f} (need >= 1.0)"
+        f"nameplate footprint {_NAMEPLATE_CORNERS_XZ} sits only "
+        f"{NAMEPLATE_DECK_CLEARANCE:.2f} inside the deck edge (need >= 1.0 past "
+        f"its {DECK_EDGE_BREAK:.2f} break)"
     )
 
 # Native tapped seats. Physical thread compatibility is carried by each named
@@ -525,7 +544,7 @@ FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)
 PEDESTAL_SCREW_HOLE_DIA = blind_cut_dia_mm(PEDESTAL_SEAT_SPEC)
 NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)
 
-# Socket cylinders occupy Y=25.4..50.8, overlapping the deepest vertical-seat
+# Socket cylinders occupy Y=25.4..47.8, overlapping the deepest vertical-seat
 # envelopes. Check plan walls against every known base cavity, not just the
 # visually nearest nameplate holes.
 COLUMN_SOCKET_NEAREST_OCCUPANT_WALL = min(
@@ -547,29 +566,38 @@ if COLUMN_SOCKET_NEAREST_OCCUPANT_WALL < 1.0:
     raise AssertionError(
         "base column socket leaves less than 1 mm wall to another base cavity"
     )
-# Nominal model-space land; its worst case is proven below. TOP_WIDTH is
-# sized so this land is EQUAL on both axes: the 2026-09 blind machinist
-# review rejected the former 10.5 in pad, whose 1.6 mm land in Z could not
-# survive the coordinate stack while every table dimension stayed in
-# tolerance.
+# Nominal model-space land from each bore to the pad edge, on the green top
+# the sockets open on (user ruling 2026-10-09). Its worst case is proven
+# below. TOP_WIDTH is sized so this land is EQUAL on both axes: the 2026-09
+# blind machinist review rejected the former 10.5 in pad, whose land in Z
+# could not survive the coordinate stack while every table dimension stayed
+# in tolerance.
 COLUMN_SOCKET_LAND_X = min(
-    TOP_LENGTH / 2.0 - LIP_W - abs(x) - COLUMN_SOCKET_DIAMETER / 2.0
+    TOP_LENGTH / 2.0 - abs(x) - COLUMN_SOCKET_DIAMETER / 2.0
     for x, _z in COLUMN_SOCKET_XZ
 )
 COLUMN_SOCKET_LAND_Z = min(
-    TOP_WIDTH / 2.0 - LIP_W - abs(z) - COLUMN_SOCKET_DIAMETER / 2.0
+    TOP_WIDTH / 2.0 - abs(z) - COLUMN_SOCKET_DIAMETER / 2.0
     for _x, z in COLUMN_SOCKET_XZ
 )
-COLUMN_SOCKET_RIM_CLEARANCE = min(COLUMN_SOCKET_LAND_X, COLUMN_SOCKET_LAND_Z)
 if abs(COLUMN_SOCKET_LAND_X - COLUMN_SOCKET_LAND_Z) > 1e-9:
     raise AssertionError(
-        "base deck land is not equal on both axes: "
+        "base socket land is not equal on both axes: "
         f"x={COLUMN_SOCKET_LAND_X}, z={COLUMN_SOCKET_LAND_Z}"
     )
-if COLUMN_SOCKET_RIM_CLEARANCE < 1.0:
-    raise AssertionError("base column socket crowds the raised rim")
+# The sockets stand on the green land, clear of the raised deck's side wall:
+# a positive gap along either axis separates bore and deck.
+COLUMN_SOCKET_DECK_GAP = min(
+    max(
+        abs(x) - COLUMN_SOCKET_DIAMETER / 2.0 - DECK_HALF_X,
+        abs(z) - COLUMN_SOCKET_DIAMETER / 2.0 - DECK_HALF_Z,
+    )
+    for x, z in COLUMN_SOCKET_XZ
+)
+if COLUMN_SOCKET_DECK_GAP < 1.0:
+    raise AssertionError("base column socket crowds the raised deck")
 
-# The finished deck land between each bore and the rim inner face must stay
+# The finished land between each bore and the pad edge's break must stay
 # 1.0 wide and continuous (2026-09 blind machinist review). It used to be
 # a sheet note ("1.0 MIN ... AFTER MATCHING AND EDGE BREAK"), which put a
 # dimension in a note (hb-render-4 eye pass); the stack below proves every
@@ -580,7 +608,7 @@ COLUMN_SOCKET_LAND_MIN = 1.0
 def _general_band_mm() -> float:
     """The title block's .X band: the loosest general tolerance it defines.
 
-    The lengths and rim width print one place; the hole-table coordinates
+    The lengths print one place; the hole-table coordinates
     print at least one, so this band bounds every location term.
     """
     return title_block_band_mm("linear_1pl")
@@ -592,14 +620,14 @@ def _edge_break_mm() -> float:
 
 
 def column_socket_land_stack(nominal: float) -> dict[str, float]:
-    """Worst-case finished deck land from a bore to the rim inner face.
+    """Worst-case finished green land from a bore to the pad edge's break.
 
     One axis, from its owning sources. The table locates the bore from the
-    flange edge; the rim inner face sits LIP_W in from the pad edge, and
-    the pad edge's place on the flange follows from the two printed plate
-    lengths, each of which moves one edge by half its band. The bore is
-    matched to its tube up to COLUMN_SOCKET_MATCH_BORE_MAX, and both land
-    edges take the title block's largest edge break.
+    flange edge; the pad edge's place on the flange follows from the two
+    printed plate lengths, each of which moves one edge by half its band.
+    The bore is matched to its tube up to COLUMN_SOCKET_MATCH_BORE_MAX and
+    takes the title block's largest edge break; the pad edge carries the
+    modelled top-rim chamfer, whose printed leg may run a full band long.
     """
     band = _general_band_mm()
     edge_break = _edge_break_mm()
@@ -607,11 +635,10 @@ def column_socket_land_stack(nominal: float) -> dict[str, float]:
         "nominal": nominal,
         "flange length": -band / 2.0,
         "pad length": -band / 2.0,
-        "rim width": -band,
         "bore location": -band,
         "matched bore": -(COLUMN_SOCKET_MATCH_BORE_MAX - COLUMN_SOCKET_DIAMETER) / 2.0,
         "bore edge break": -edge_break,
-        "rim edge break": -edge_break,
+        "pad edge chamfer": -(RIM_CHAMFER + band),
     }
 
 
@@ -643,7 +670,7 @@ COLUMN_SOCKET_BREAK_EVEN_BORE = min(
 for _axis, _stack in COLUMN_SOCKET_LAND_STACKS.items():
     if sum(_stack.values()) < COLUMN_SOCKET_LAND_MIN:
         raise AssertionError(
-            f"base deck land ({_axis}), worst case: {_stack_text(_stack)} "
+            f"base socket land ({_axis}), worst case: {_stack_text(_stack)} "
             f"< {COLUMN_SOCKET_LAND_MIN}; break-even matched bore "
             f"{column_socket_break_even_bore(_stack):.2f} is under the "
             f"{COLUMN_SOCKET_MATCH_BORE_MAX} ceiling"
@@ -721,18 +748,306 @@ for _label, _seat, _engagement in (
 ):
     require_blind_seat_fit(_label, _seat, _engagement)
 
-# Include each blind drill's deeper cylindrical cut and separate 118-degree
-# point in the upper-pad wall checks. Full-height cavity envelopes
-# conservatively bound every neighboring bore, irrespective of start face.
-PIVOT_DRILL_BOTTOM_WALL = (
-    TOP_THICKNESS
-    - PIVOT_SEAT_SPEC.depth_mm
-    - PIVOT_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
+# Underside pocket (user ruling 2026-10-09). Every blind deck seat drills
+# deeper than the POCKET_SKIN under the deck could back, so each seat group
+# hangs a cast boss from the pocket ceiling down to one of two cast levels.
+# One size serves every seat: max(HANGING_BOSS_MIN_DIA, 2.5 x the largest
+# tap drill). Round where a seat stands alone; where seats crowd each other
+# or the wall, a pad of the same width covers the group (the pinion-block
+# pairs, whose round bosses would leave a 1.0 core between them), the
+# transferred pedestal seats' fit-up envelope, or ties the seat to the wall
+# (the cone lock, whose round boss would leave a 5.2 core).
+_HANGING_DRILL_DIAS = (
+    HOLD_DOWN_TAP_DRILL_DIA,
+    PIVOT_SCREW_HOLE_DIA,
+    LOCK_SCREW_HOLE_DIA,
+    STOP_SCREW_HOLE_DIA,
+    BLOCK_SCREW_HOLE_DIA,
+    FOOT_SCREW_HOLE_DIA,
+    PEDESTAL_SCREW_HOLE_DIA,
+    NAMEPLATE_SCREW_HOLE_DIA,
 )
-if PIVOT_DRILL_BOTTOM_WALL < 1.5 * PIVOT_SCREW_HOLE_DIA:
+HANGING_BOSS_DIA = max(HANGING_BOSS_MIN_DIA, 2.5 * max(_HANGING_DRILL_DIAS))  # 16.0
+HANGING_BOSS_HALF = HANGING_BOSS_DIA / 2.0
+# The pinion-block pads run from one pair's outer seat to the other's, a boss
+# radius past each; the pedestal pads cover the +-5 z transfer envelope.
+BLOCK_PAD_LENGTH = (
+    max(x for x, _z in BLOCK_SCREW_XZ)
+    - min(x for x, _z in BLOCK_SCREW_XZ)
+    + HANGING_BOSS_DIA
+)  # 33.0
+PEDESTAL_PAD_LENGTH = 26.0
+# The cone-lock pad runs from a boss radius past the seat into the mid-wall.
+LOCK_PAD_WALL_Z = -(POCKET_HALF_Z + POCKET_WALL / 2.0)
+# Ribs and lugs end mid-wall, so a +-0.8 shift of the pocket outline never
+# opens a slot between them and the wall.
+RIB_HALF_LENGTH_X = POCKET_HALF_X + POCKET_WALL / 2.0
+RIB_HALF_LENGTH_Z = POCKET_HALF_Z + POCKET_WALL / 2.0
+
+
+@dataclass(frozen=True)
+class HangingSeat:
+    """One blind seat group and the cast boss or pad backing it."""
+
+    label: str
+    seat: HoleSpec
+    stations: tuple[tuple[float, float], ...]
+    boss_bottom_y: float
+    # Boss metal from each seat axis in x / z, and the seat's own fit-up
+    # envelope (transferred seats land anywhere inside it).
+    half_x: float = HANGING_BOSS_HALF
+    half_z: float = HANGING_BOSS_HALF
+    envelope: tuple[float, float] = (0.0, 0.0)
+
+    @property
+    def drill_dia(self) -> float:
+        return blind_cut_dia_mm(self.seat)
+
+    @property
+    def tip_y(self) -> float:
+        """Height of the drill point's tip: the cylinder AND the 118-degree point."""
+        return STACK_HEIGHT - self.seat.depth_mm - self.drill_dia / 2.0 * DRILL_POINT_H
+
+    @property
+    def floor_wall(self) -> float:
+        """Metal under the drill tip, down to the boss bottom."""
+        return self.tip_y - self.boss_bottom_y
+
+    @property
+    def side_wall(self) -> float:
+        """Thinnest boss wall beside the drill, anywhere in the envelope."""
+        return (
+            min(self.half_x - self.envelope[0], self.half_z - self.envelope[1])
+            - self.drill_dia / 2.0
+        )
+
+
+# Each seat ends on the SHALLOW level when that still backs its drill tip,
+# else on the DEEP one. The spring foot is the one exception: its round boss
+# would cross the north pinion-block pad in the same shallow sketch, so it
+# hangs to the deep level, which backs it all the more.
+HANGING_SEATS = (
+    HangingSeat("rocker support", HOLD_DOWN_SEAT_SPEC, HOLE_XZ, DEEP_BOSS_BOTTOM_Y),
+    HangingSeat(
+        "cone pivot", PIVOT_SEAT_SPEC, (PIVOT_SCREW_XZ,), SHALLOW_BOSS_BOTTOM_Y
+    ),
+    HangingSeat("cone lock", LOCK_SEAT_SPEC, (LOCK_KNOB_XZ,), DEEP_BOSS_BOTTOM_Y),
+    HangingSeat("swing stop", STOP_SEAT_SPEC, (STOP_SCREW_XZ,), SHALLOW_BOSS_BOTTOM_Y),
+    HangingSeat("pinion block", BLOCK_SEAT_SPEC, BLOCK_SCREW_XZ, SHALLOW_BOSS_BOTTOM_Y),
+    HangingSeat("spring foot", FOOT_SEAT_SPEC, FOOT_SCREW_XZ, DEEP_BOSS_BOTTOM_Y),
+    HangingSeat(
+        "pedestal hold-down",
+        PEDESTAL_SEAT_SPEC,
+        PEDESTAL_SCREW_XZ,
+        DEEP_BOSS_BOTTOM_Y,
+        half_z=PEDESTAL_PAD_LENGTH / 2.0,
+        envelope=PEDESTAL_TRANSFER_XZ,
+    ),
+    HangingSeat(
+        "nameplate", NAMEPLATE_SEAT_SPEC, NAMEPLATE_SCREW_XZ, SHALLOW_BOSS_BOTTOM_Y
+    ),
+)
+
+
+def require_hanging_boss(seat: HangingSeat) -> None:
+    """Back one blind seat at the printed worst case (policy rule 12).
+
+    Under the tip: 1.5 thread diameters at nominal, and the 2.0 wall target
+    once the printed depth runs deep and the cast level runs high by their
+    bands. Beside the drill: the 2.0 target once the boss outline (.X size,
+    half its band per side) and the seat location (.X) both run against it.
+    """
+    band = _general_band_mm()
+    major = THREAD_MAJOR_MM[seat.seat.size]
+    if not RIB_RELIEF <= seat.boss_bottom_y < POCKET_CEILING_Y:
+        raise AssertionError(f"{seat.label}: boss bottom outside the pocket")
+    if seat.floor_wall < 1.5 * major - 1e-9:
+        raise AssertionError(
+            f"{seat.label}: {seat.floor_wall:.2f} under the drill tip is less than "
+            f"1.5D ({1.5 * major:.2f}) above its boss bottom"
+        )
+    if seat.floor_wall - SEAT_DEPTH_BAND - band < 2.0 - 1e-9:
+        raise AssertionError(
+            f"{seat.label}: boss floor under the drill tip thins under 2.0 at the "
+            "worst case"
+        )
+    if seat.side_wall - band - band / 2.0 < 2.0 - 1e-9:
+        raise AssertionError(
+            f"{seat.label}: boss side wall {seat.side_wall:.2f} thins under 2.0 at "
+            "the worst case"
+        )
+
+
+def _shallow_level_backs(seat: HangingSeat) -> bool:
+    try:
+        require_hanging_boss(replace(seat, boss_bottom_y=SHALLOW_BOSS_BOTTOM_Y))
+    except AssertionError:
+        return False
+    return True
+
+
+for _hanging in HANGING_SEATS:
+    require_hanging_boss(_hanging)
+    if (
+        _hanging.boss_bottom_y != SHALLOW_BOSS_BOTTOM_Y
+        and _hanging.label != "spring foot"
+        and _shallow_level_backs(_hanging)
+    ):
+        raise AssertionError(f"{_hanging.label}: the shallow level already backs it")
+HANGING_SEAT_WALLS = {
+    seat.label: {"floor": seat.floor_wall, "side": seat.side_wall}
+    for seat in HANGING_SEATS
+}
+_HANGING_BY_LABEL = {seat.label: seat for seat in HANGING_SEATS}
+PIVOT_DRILL_BOTTOM_WALL = _HANGING_BY_LABEL["cone pivot"].floor_wall
+LOCK_DRILL_BOTTOM_WALL = _HANGING_BY_LABEL["cone lock"].floor_wall
+STOP_DRILL_BOTTOM_WALL = _HANGING_BY_LABEL["swing stop"].floor_wall
+PEDESTAL_DRILL_BOTTOM_WALL = _HANGING_BY_LABEL["pedestal hold-down"].floor_wall
+
+# The #10-32 cross taps run from the pad's front/rear faces through the
+# socket and on past the Ø41.5 socket boss, so each ends in a lug hung from
+# the ceiling to the shallow level: from the tap axis's far side (a boss
+# radius off it) out into the mid-wall, and from the socket centre inward a
+# lug length that keeps 1.5D past the drill tip.
+CROSS_TAP_LUG_WIDTH = 27.0  # x: 189.0 -> 216.0, 5.75 into the 12.0 wall
+CROSS_TAP_LUG_LENGTH = 37.0  # z: 112.0 -> 75.0
+CROSS_TAP_LUG_INNER_X = COLUMN_X - HANGING_BOSS_HALF
+CROSS_TAP_LUG_INNER_Z = abs(FRAME_FRONT_COLUMN_Z) - CROSS_TAP_LUG_LENGTH
+_CROSS_TAP_MAJOR = THREAD_MAJOR_MM[BASE_CROSS_TAP_SPEC.size]
+CROSS_TAP_TIP_Z = (
+    BASE_SCREW_SEAT_Z
+    - CASTING_TAP_DRILL_DEPTH
+    - BASE_CROSS_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
+)
+CROSS_TAP_LUG_WALLS = {
+    "past tip": CROSS_TAP_TIP_Z - CROSS_TAP_LUG_INNER_Z,
+    "under drill": BASE_SCREW_Y
+    - BASE_CROSS_TAP_DRILL_DIA / 2.0
+    - SHALLOW_BOSS_BOTTOM_Y,
+    "beside drill": COLUMN_X - CROSS_TAP_LUG_INNER_X - BASE_CROSS_TAP_DRILL_DIA / 2.0,
+}
+if not (
+    POCKET_HALF_X + 1.0
+    < CROSS_TAP_LUG_INNER_X + CROSS_TAP_LUG_WIDTH
+    < TOP_LENGTH / 2.0 - 1.0
+):
+    raise AssertionError("cross-tap lug must end inside the pocket wall")
+if CROSS_TAP_LUG_WALLS["past tip"] < 1.5 * _CROSS_TAP_MAJOR:
+    raise AssertionError("cross-tap lug ends less than 1.5D past the drill tip")
+if min(CROSS_TAP_LUG_WALLS.values()) - 1.5 * _general_band_mm() < 2.0:
+    raise AssertionError("cross-tap lug wall thins under 2.0 at the worst case")
+
+# The socket bosses: 1/2 x (boss - bore) of wall round each bore, and the
+# boss swallows the pocket's plan corner, so the pocket needs no corner radius.
+SOCKET_BOSS_WALL = (SOCKET_BOSS_DIA - COLUMN_SOCKET_DIAMETER) / 2.0
+if (
+    SOCKET_BOSS_WALL
+    - (COLUMN_SOCKET_MATCH_BORE_MAX - COLUMN_SOCKET_DIAMETER) / 2.0
+    - _general_band_mm()
+    < 2.0
+):
+    raise AssertionError("socket boss wall thins under 2.0 at the worst case")
+for _x, _z in COLUMN_SOCKET_XZ:
+    if (
+        math.hypot(POCKET_HALF_X - abs(_x), POCKET_HALF_Z - abs(_z))
+        >= SOCKET_BOSS_DIA / 2.0
+    ):
+        raise AssertionError("socket boss no longer covers the pocket's plan corner")
+# Under the deck and under the green land, the ceiling keeps a full skin.
+if min(POCKET_CEILING_Y - BASE_SCREW_Y, GREEN_TOP - POCKET_CEILING_Y) < 0.0:
     raise AssertionError(
-        "cone-pivot drill leaves less than 1.5 diameters of upper-pad wall"
+        "pocket ceiling below the cross-tap axis or above the green land"
     )
+
+# The pocket's hanging features in plan, machine (x, z): ("disc", x, z, r)
+# or ("rect", x0, x1, z0, z1). The build sketches exactly these; the volume
+# checks, the paint areas and the drawing read them from here.
+PocketShape = tuple
+
+
+def _disc(xz: tuple[float, float], radius: float) -> PocketShape:
+    return ("disc", xz[0], xz[1], radius)
+
+
+def _rect(x_span: tuple[float, float], z_span: tuple[float, float]) -> PocketShape:
+    return ("rect", *sorted(x_span), *sorted(z_span))
+
+
+SOCKET_BOSS_SHAPES = tuple(_disc(xz, SOCKET_BOSS_DIA / 2.0) for xz in COLUMN_SOCKET_XZ)
+LONG_RIB_SHAPE = _rect(
+    (-RIB_HALF_LENGTH_X, RIB_HALF_LENGTH_X), (-RIB_THICKNESS / 2.0, RIB_THICKNESS / 2.0)
+)
+CROSS_RIB_SHAPE = _rect(
+    (-RIB_THICKNESS / 2.0, RIB_THICKNESS / 2.0), (-RIB_HALF_LENGTH_Z, RIB_HALF_LENGTH_Z)
+)
+DEEP_BOSS_CENTRES = (*HOLE_XZ, *FOOT_SCREW_XZ)
+LOCK_PAD_SHAPE = _rect(
+    (LOCK_KNOB_XZ[0] - HANGING_BOSS_HALF, LOCK_KNOB_XZ[0] + HANGING_BOSS_HALF),
+    (LOCK_PAD_WALL_Z, LOCK_KNOB_XZ[1] + HANGING_BOSS_HALF),
+)
+PEDESTAL_PAD_SHAPES = tuple(
+    _rect(
+        (x - HANGING_BOSS_HALF, x + HANGING_BOSS_HALF),
+        (z - PEDESTAL_PAD_LENGTH / 2.0, z + PEDESTAL_PAD_LENGTH / 2.0),
+    )
+    for x, z in PEDESTAL_SCREW_XZ
+)
+DEEP_BOSS_SHAPES = (
+    *(_disc(xz, HANGING_BOSS_HALF) for xz in DEEP_BOSS_CENTRES),
+    LOCK_PAD_SHAPE,
+    *PEDESTAL_PAD_SHAPES,
+)
+SHALLOW_BOSS_CENTRES = (PIVOT_SCREW_XZ, STOP_SCREW_XZ, *NAMEPLATE_SCREW_XZ)
+BLOCK_PAD_SHAPES = tuple(
+    _rect(
+        (
+            min(x for x, _z in BLOCK_SCREW_XZ) - HANGING_BOSS_HALF,
+            max(x for x, _z in BLOCK_SCREW_XZ) + HANGING_BOSS_HALF,
+        ),
+        (z - HANGING_BOSS_HALF, z + HANGING_BOSS_HALF),
+    )
+    for z in sorted({z for _x, z in BLOCK_SCREW_XZ})
+)
+SHALLOW_BOSS_SHAPES = (
+    *(_disc(xz, HANGING_BOSS_HALF) for xz in SHALLOW_BOSS_CENTRES),
+    *BLOCK_PAD_SHAPES,
+)
+CROSS_TAP_LUG_SHAPES = tuple(
+    _rect(
+        (
+            math.copysign(CROSS_TAP_LUG_INNER_X, x),
+            math.copysign(CROSS_TAP_LUG_INNER_X + CROSS_TAP_LUG_WIDTH, x),
+        ),
+        (z - math.copysign(CROSS_TAP_LUG_LENGTH, z), z),
+    )
+    for x, z in COLUMN_SOCKET_XZ
+)
+for _seat in HANGING_SEATS:
+    _shapes = (
+        DEEP_BOSS_SHAPES
+        if _seat.boss_bottom_y == DEEP_BOSS_BOTTOM_Y
+        else SHALLOW_BOSS_SHAPES
+    )
+    for _sx, _sz in _seat.stations:
+        if not any(
+            (
+                shape[0] == "disc"
+                and math.dist((_sx, _sz), shape[1:3]) < 1e-9
+                and shape[3] >= _seat.half_x
+            )
+            or (
+                shape[0] == "rect"
+                and min(_sx - shape[1], shape[2] - _sx) >= _seat.half_x - 1e-9
+                and min(_sz - shape[3], shape[4] - _sz) >= _seat.half_z - 1e-9
+            )
+            for shape in _shapes
+        ):
+            raise AssertionError(
+                f"{_seat.label} seat ({_sx:.2f}, {_sz:.2f}) has no hanging boss "
+                "of its half-size on its level"
+            )
+
+# Every other vertical cavity keeps a full drill diameter of plan wall.
 PIVOT_NEAREST_CAVITY_WALL = min(
     math.dist(PIVOT_SCREW_XZ, xz) - (PIVOT_SCREW_HOLE_DIA + dia) / 2.0
     for points, dia in (
@@ -749,16 +1064,8 @@ PIVOT_NEAREST_CAVITY_WALL = min(
 if PIVOT_NEAREST_CAVITY_WALL < PIVOT_SCREW_HOLE_DIA:
     raise AssertionError("cone-pivot drill crowds another base cavity")
 
-# The deeper lock drill must remain in the solid upper pad and clear every
-# other vertical cavity. Bounding the hold-down thread-major envelopes over
-# their full height catches wall breakout rather than only tap-drill overlap.
-LOCK_DRILL_BOTTOM_WALL = (
-    TOP_THICKNESS - LOCK_SCREW_DRILL_DEPTH - LOCK_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
-)
-if LOCK_DRILL_BOTTOM_WALL < 1.5 * LOCK_SCREW_HOLE_DIA:
-    raise AssertionError(
-        "cone-lock drill leaves less than 1.5 diameters of upper-pad wall"
-    )
+# Bounding the hold-down thread-major envelopes over their full height
+# catches wall breakout rather than only tap-drill overlap.
 LOCK_NEAREST_CAVITY_WALL = min(
     math.dist(LOCK_KNOB_XZ, xz) - (LOCK_SCREW_HOLE_DIA + dia) / 2.0
     for points, dia in (
@@ -775,13 +1082,6 @@ LOCK_NEAREST_CAVITY_WALL = min(
 if LOCK_NEAREST_CAVITY_WALL < LOCK_SCREW_HOLE_DIA:
     raise AssertionError("cone-lock drill crowds another base cavity")
 
-STOP_DRILL_BOTTOM_WALL = (
-    TOP_THICKNESS - STOP_SCREW_DRILL_DEPTH - STOP_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
-)
-if STOP_DRILL_BOTTOM_WALL < 1.5 * STOP_SCREW_HOLE_DIA:
-    raise AssertionError(
-        "swing-stop drill leaves less than 1.5 diameters of upper-pad wall"
-    )
 STOP_NEAREST_CAVITY_WALL = min(
     math.dist(STOP_SCREW_XZ, xz) - (STOP_SCREW_HOLE_DIA + dia) / 2.0
     for points, dia in (
@@ -798,17 +1098,8 @@ STOP_NEAREST_CAVITY_WALL = min(
 if STOP_NEAREST_CAVITY_WALL < STOP_SCREW_HOLE_DIA:
     raise AssertionError("swing-stop drill crowds another base cavity")
 
-# The transferred pedestal seats: bottom wall, and every neighbouring cavity
-# and the rim's inner face with the seat anywhere in its fit-up envelope.
-PEDESTAL_DRILL_BOTTOM_WALL = (
-    TOP_THICKNESS
-    - PEDESTAL_SCREW_DRILL_DEPTH
-    - PEDESTAL_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
-)
-if PEDESTAL_DRILL_BOTTOM_WALL < 1.5 * PEDESTAL_SCREW_HOLE_DIA:
-    raise AssertionError(
-        "pedestal hold-down drill leaves less than 1.5 diameters of upper-pad wall"
-    )
+# The transferred pedestal seats: every neighbouring cavity and the deck's
+# edge with the seat anywhere in its fit-up envelope.
 PEDESTAL_NEAREST_CAVITY_WALL = (
     min(
         math.dist(seat, xz) - (PEDESTAL_SCREW_HOLE_DIA + dia) / 2.0
@@ -829,13 +1120,13 @@ PEDESTAL_NEAREST_CAVITY_WALL = (
 )
 if PEDESTAL_NEAREST_CAVITY_WALL < PEDESTAL_SCREW_HOLE_DIA:
     raise AssertionError("a transferred pedestal seat can crowd another base cavity")
-PEDESTAL_RIM_LAND = (
-    min(TOP_WIDTH / 2.0 - LIP_W - abs(z) for _x, z in PEDESTAL_SCREW_XZ)
+PEDESTAL_DECK_LAND = (
+    min(DECK_HALF_Z - abs(z) for _x, z in PEDESTAL_SCREW_XZ)
     - PEDESTAL_SCREW_HOLE_DIA / 2.0
-    - 5.0  # the z half of the fit-up envelope
+    - PEDESTAL_TRANSFER_XZ[1]
 )
-if PEDESTAL_RIM_LAND < PEDESTAL_SCREW_HOLE_DIA:
-    raise AssertionError("a transferred pedestal seat can crowd the raised rim")
+if PEDESTAL_DECK_LAND < PEDESTAL_SCREW_HOLE_DIA:
+    raise AssertionError("a transferred pedestal seat can crowd the deck edge")
 
 MM3_PER_IN3 = IN**3
 
@@ -889,6 +1180,126 @@ def _corner_removal(corner_r: float, height: float) -> float:
     """Volume four plan-corner fillets of corner_r remove from a height-tall
     rectangular prism (or ADD when the corners are reentrant)."""
     return 4.0 * _fillet_section_area(corner_r) * height
+
+
+def _rounded_rect_area(length: float, width: float, corner_r: float) -> float:
+    """Plan area of a length x width rectangle with corner_r plan corners."""
+    return length * width - 4.0 * _fillet_section_area(corner_r)
+
+
+def _disc_rect_area(
+    centre: tuple[float, float],
+    radius: float,
+    x_span: tuple[float, float],
+    z_span: tuple[float, float],
+) -> float:
+    """Plan area a disc shares with an axis-aligned rectangle (chord sum)."""
+    cx, cz = centre
+    x0, x1 = max(x_span[0], cx - radius), min(x_span[1], cx + radius)
+    if x1 <= x0:
+        return 0.0
+    x = np.linspace(x0, x1, 20001)
+    half = np.sqrt(np.clip(radius * radius - (x - cx) ** 2, 0.0, None))
+    chord = np.clip(
+        np.minimum(cz + half, z_span[1]) - np.maximum(cz - half, z_span[0]), 0.0, None
+    )
+    return float(np.trapezoid(chord, x))
+
+
+def _boss_wall_fillet_area(boss_r: float, inset: float, fillet_r: float) -> float:
+    """Plan area one fillet adds where a vertical boss meets a pocket wall.
+
+    The boss centre sits ``inset`` (< boss_r) inside the wall face. With the
+    centre at the origin and the face on v = inset, the polygon origin ->
+    fillet centre -> wall tangent -> boss/wall corner holds the fillet's
+    material plus one sector of each circle.
+    """
+    cu = math.sqrt((boss_r + fillet_r) ** 2 - (inset - fillet_r) ** 2)
+    cv = inset - fillet_r
+    wu = math.sqrt(boss_r**2 - inset**2)
+    polygon = 0.5 * abs(cu * inset - cv * cu + cu * inset - inset * wu)
+    boss_sector = math.atan2(inset, wu) - math.atan2(cv, cu)
+    fillet_sector = math.acos(-cv / math.hypot(cu, cv))
+    return polygon - 0.5 * boss_r**2 * boss_sector - 0.5 * fillet_r**2 * fillet_sector
+
+
+POCKET_PLAN_AREA = 4.0 * POCKET_HALF_X * POCKET_HALF_Z
+_POCKET_SPAN_X = (-POCKET_HALF_X, POCKET_HALF_X)
+_POCKET_SPAN_Z = (-POCKET_HALF_Z, POCKET_HALF_Z)
+
+
+def _socket_boss_pocket_areas() -> list[float]:
+    """Each socket boss's plan area inside the pocket (the rest is wall)."""
+    return [
+        _disc_rect_area(xz, SOCKET_BOSS_DIA / 2.0, _POCKET_SPAN_X, _POCKET_SPAN_Z)
+        for xz in COLUMN_SOCKET_XZ
+    ]
+
+
+def _pocket_fillet_areas() -> list[float]:
+    """The eight boss-to-wall fillets: each socket boss meets one end wall
+    and one side wall."""
+    return [
+        _boss_wall_fillet_area(SOCKET_BOSS_DIA / 2.0, inset, CASTING_FILLET_R)
+        for x, z in COLUMN_SOCKET_XZ
+        for inset in (POCKET_HALF_X - abs(x), POCKET_HALF_Z - abs(z))
+    ]
+
+
+def _span_overlap(a: tuple[float, float], b: tuple[float, float]) -> float:
+    return max(0.0, min(a[1], b[1]) - max(a[0], b[0]))
+
+
+def _clip_to_pocket(rect: PocketShape) -> PocketShape:
+    _kind, x0, x1, z0, z1 = rect
+    return (
+        "rect",
+        max(x0, -POCKET_HALF_X),
+        min(x1, POCKET_HALF_X),
+        max(z0, -POCKET_HALF_Z),
+        min(z1, POCKET_HALF_Z),
+    )
+
+
+def _pocket_shape_overlap(a: PocketShape, b: PocketShape) -> float:
+    """Plan area two hanging shapes share INSIDE the pocket opening."""
+    if a[0] == "disc" and b[0] == "disc":
+        if math.dist(a[1:3], b[1:3]) < a[3] + b[3]:
+            raise AssertionError(f"round pocket bosses {a} and {b} overlap")
+        return 0.0
+    if a[0] == "rect" and b[0] == "rect":
+        a, b = _clip_to_pocket(a), _clip_to_pocket(b)
+        return _span_overlap(a[1:3], b[1:3]) * _span_overlap(a[3:5], b[3:5])
+    disc, rect = (a, b) if a[0] == "disc" else (b, a)
+    rect = _clip_to_pocket(rect)
+    return _disc_rect_area(disc[1:3], disc[3], rect[1:3], rect[3:5])
+
+
+_POCKET_SHAPE: PocketShape = ("rect", *_POCKET_SPAN_X, *_POCKET_SPAN_Z)
+
+
+def hanging_volume(
+    shapes: tuple[PocketShape, ...],
+    earlier: tuple[PocketShape, ...],
+    bottom_y: float,
+) -> float:
+    """Volume one hanging feature adds from ``bottom_y`` to the ceiling.
+
+    Its in-pocket plan area less what the ``earlier`` features (all reaching
+    at least as low) already fill there. Shapes of one sketch never overlap,
+    and no new shape sits where two earlier ones cross (the ribs' crossing
+    is the only such place, and nothing hangs there).
+    """
+    for i, shape in enumerate(shapes):
+        for other in shapes[i + 1 :]:
+            if _pocket_shape_overlap(shape, other) > 0.0:
+                raise AssertionError(
+                    f"one sketch's pocket shapes overlap: {shape}, {other}"
+                )
+    area = sum(_pocket_shape_overlap(shape, _POCKET_SHAPE) for shape in shapes) - sum(
+        _pocket_shape_overlap(shape, prior) for shape in shapes for prior in earlier
+    )
+    return area * (POCKET_CEILING_Y - bottom_y)
 
 
 async def _define_fixed_edge_rectangle(
@@ -962,9 +1373,28 @@ async def _paint_machined_faces_black(adapter) -> None:
     flange_side_height = BOTTOM_THICKNESS - 2.0 * RIM_CHAMFER
     flange_end_width = BOTTOM_WIDTH - 2.0 * FLANGE_CORNER_R
     flange_face_width = BOTTOM_LENGTH - 2.0 * FLANGE_CORNER_R
+    # The deck's flat ends where its break starts; the underside is the
+    # perimeter foot inside the underside break: the flange outline less the
+    # pocket opening, plus the socket bosses and pocket fillets that come
+    # down flush with it. Seat openings and the stamp are well inside the band.
+    deck_flat = _rounded_rect_area(
+        DECK_LENGTH - 2.0 * DECK_EDGE_BREAK,
+        DECK_WIDTH - 2.0 * DECK_EDGE_BREAK,
+        DECK_CORNER_R - DECK_EDGE_BREAK,
+    )
+    foot = (
+        _rounded_rect_area(
+            BOTTOM_LENGTH - 2.0 * RIM_CHAMFER,
+            BOTTOM_WIDTH - 2.0 * RIM_CHAMFER,
+            FLANGE_CORNER_R - RIM_CHAMFER,
+        )
+        - POCKET_PLAN_AREA
+        + sum(_socket_boss_pocket_areas())
+        + sum(_pocket_fillet_areas())
+    )
     expected_areas = {
-        "deck": (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W) * 1e-6,
-        "underside": BOTTOM_LENGTH * BOTTOM_WIDTH * 1e-6,
+        "deck": deck_flat * 1e-6,
+        "underside": foot * 1e-6,
         "flange_west": flange_end_width * flange_side_height * 1e-6,
         "flange_east": flange_end_width * flange_side_height * 1e-6,
         "flange_rear": flange_face_width * flange_side_height * 1e-6,
@@ -1001,7 +1431,7 @@ async def _paint_machined_faces_black(adapter) -> None:
         _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
 
 
-REFERENCE_SKETCHES = ("RimWidthReference", "HeightReference", "CrossTapReference")
+REFERENCE_SKETCHES = ("HeightReference", "CrossTapReference")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1025,6 +1455,24 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TopLength", f"{TOP_LENGTH}mm")
     await set_global(adapter, "TopWidth", f"{TOP_WIDTH}mm")
     await set_global(adapter, "TopThickness", f"{TOP_THICKNESS}mm")
+    await set_global(adapter, "DeckRise", f"{DECK_RISE}mm")
+    await set_global(adapter, "DeckLength", f"{DECK_LENGTH}mm")
+    await set_global(adapter, "DeckWidth", f"{DECK_WIDTH}mm")
+    await set_global(adapter, "PocketWall", f"{POCKET_WALL}mm")
+    await set_global(adapter, "PocketSkin", f"{STACK_HEIGHT - POCKET_CEILING_Y}mm")
+    await set_global(
+        adapter, "PocketDepth", '"BottomThickness" + "TopThickness" - "PocketSkin"'
+    )
+    await set_global(adapter, "RibThickness", f"{RIB_THICKNESS}mm")
+    await set_global(adapter, "RibRelief", f"{RIB_RELIEF}mm")
+    await set_global(adapter, "SocketBossDia", f"{SOCKET_BOSS_DIA}mm")
+    await set_global(adapter, "HangingBossDia", f"{HANGING_BOSS_DIA}mm")
+    await set_global(adapter, "DeepBossBottom", f"{DEEP_BOSS_BOTTOM_Y}mm")
+    await set_global(adapter, "ShallowBossBottom", f"{SHALLOW_BOSS_BOTTOM_Y}mm")
+    await set_global(adapter, "BlockPadLength", f"{BLOCK_PAD_LENGTH}mm")
+    await set_global(adapter, "PedestalPadLength", f"{PEDESTAL_PAD_LENGTH}mm")
+    await set_global(adapter, "LugWidth", f"{CROSS_TAP_LUG_WIDTH}mm")
+    await set_global(adapter, "LugLength", f"{CROSS_TAP_LUG_LENGTH}mm")
     await set_global(adapter, "ColumnX", f"{COLUMN_X}mm")
     await set_global(adapter, "ColumnZ", f"{abs(FRAME_FRONT_COLUMN_Z)}mm")
     await set_global(adapter, "SocketDia", f"{COLUMN_SOCKET_DIAMETER}mm")
@@ -1093,12 +1541,389 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch top", await adapter.exit_sketch())
     name_last_feature(adapter, "TopProfile")
     drive_jobs += top.apply(adapter, "TopProfile")
-    extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
+    # The pad stops at the green land; the deck rises from it below.
+    extrude_at_offset(adapter, GREEN_TOP - BOTTOM_THICKNESS, BOTTOM_THICKNESS)
     name_last_feature(adapter, "TopPlate")
-    top_thickness_dim = name_dimensions(adapter, "TopPlate", ["TopThickness"])
-    drive_jobs.append((top_thickness_dim[0], '"TopThickness"'))
-    _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
+    pad_height_dim = name_dimensions(adapter, "TopPlate", ["PadHeight"])
+    _verify_named_dimension(adapter, "PadHeight@TopPlate", GREEN_TOP - BOTTOM_THICKNESS)
+    drive_jobs.append((pad_height_dim[0], '"TopThickness" - "DeckRise"'))
+    after = await _volume(adapter)
+    _telemetry.info(f"volume after top plate: {after:.1f} mm^3")
+
+    # Black deck (user ruling 2026-10-09, see DECK_RISE): a DECK_LENGTH x
+    # DECK_WIDTH pad centred on the pad, boss-extruded from the green land so
+    # its depth dimension IS the printed rise. Every deck seat is cut after it,
+    # so each starts on the deck face.
+    deck = SketchDims()
+    check("create_sketch deck", await adapter.create_sketch("Top"))
+    await _define_fixed_edge_rectangle(
+        adapter,
+        half_x=DECK_HALF_X,
+        front_z=-DECK_HALF_Z,
+        rear_z=DECK_HALF_Z,
+        label="deck",
+        dims=deck,
+        width_name="DeckLen",
+        depth_name="DeckWid",
+        width_drive='"DeckLength"',
+        depth_drive='"DeckWidth"',
+        half_x_drive='"DeckLength" / 2',
+        rear_z_drive='"DeckWidth" / 2',
+    )
+    await ensure_fully_defined(adapter, "deck sketch")
+    check("exit_sketch deck", await adapter.exit_sketch())
+    name_last_feature(adapter, "DeckProfile")
+    drive_jobs += deck.apply(adapter, "DeckProfile")
+    extrude_at_offset(adapter, DECK_RISE, GREEN_TOP)
+    name_last_feature(adapter, "Deck")
+    deck_dims = name_dimensions(adapter, "Deck", ["DeckRise", "DeckStart"])
+    _verify_named_dimension(adapter, "DeckRise@Deck", DECK_RISE)
+    _verify_named_dimension(adapter, "DeckStart@Deck", GREEN_TOP)
+    drive_jobs += [
+        (deck_dims[0], '"DeckRise"'),
+        (deck_dims[1], '"BottomThickness" + "TopThickness" - "DeckRise"'),
+    ]
+    v_deck = DECK_LENGTH * DECK_WIDTH * DECK_RISE
+    after = await volume_check(adapter, "deck", after + v_deck, 0.002 * v_deck + 5.0)
     total = STACK_HEIGHT
+
+    # Underside pocket (same ruling, see POCKET_WALL): one cored pocket cut up
+    # from the underside to the ceiling, then the bosses, ribs and lugs grown
+    # back down into it from the ceiling, deepest-reaching first. All of it
+    # precedes the seats, so every hole still cuts solid metal and keeps its
+    # analytic volume. Each hanging feature's volume is its in-pocket plan
+    # area (hanging_volume) over its height.
+    pocket = SketchDims()
+    check("create_sketch pocket", await adapter.create_sketch("Top"))
+    await _define_fixed_edge_rectangle(
+        adapter,
+        half_x=POCKET_HALF_X,
+        front_z=-POCKET_HALF_Z,
+        rear_z=POCKET_HALF_Z,
+        label="pocket",
+        dims=pocket,
+        width_name="PocketLen",
+        depth_name="PocketWid",
+        width_drive='"TopLength" - 2 * "PocketWall"',
+        depth_drive='"TopWidth" - 2 * "PocketWall"',
+        half_x_drive='"TopLength" / 2 - "PocketWall"',
+        rear_z_drive='"TopWidth" / 2 - "PocketWall"',
+    )
+    await ensure_fully_defined(adapter, "pocket sketch")
+    check("exit_sketch pocket", await adapter.exit_sketch())
+    name_last_feature(adapter, "PocketProfile")
+    drive_jobs += pocket.apply(adapter, "PocketProfile")
+    # The Top plane IS the underside, so the cut runs up (+Y) into the part.
+    check(
+        "cut underside pocket",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=POCKET_CEILING_Y, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "Pocket")
+    pocket_depth_dim = name_dimensions(adapter, "Pocket", ["PocketDepth"])
+    _verify_named_dimension(adapter, "PocketDepth@Pocket", POCKET_CEILING_Y)
+    drive_jobs.append((pocket_depth_dim[0], '"PocketDepth"'))
+    v_pocket = POCKET_PLAN_AREA * POCKET_CEILING_Y
+    after = await volume_check(
+        adapter, "underside pocket", after - v_pocket, 0.002 * v_pocket + 10.0
+    )
+
+    # Full-height bosses round the four sockets, merged into the walls; each
+    # swallows a pocket corner, so the pocket needs no plan-corner radius.
+    socket_bosses = SketchDims()
+    check("create_sketch socket bosses", await adapter.create_sketch("Top"))
+    for i, (x, z) in enumerate(COLUMN_SOCKET_XZ):
+        await define_circle(
+            adapter,
+            x,
+            -z,
+            SOCKET_BOSS_DIA / 2.0,
+            f"socket boss ({x:+.0f}, {z:+.0f})",
+            dims=socket_bosses,
+            names=(
+                f"SocketBoss{i}X",
+                f"SocketBoss{i}Z",
+                "SocketBossDia" if i == 0 else f"SocketBoss{i}Dia",
+            ),
+            drives=('"ColumnX"', '"ColumnZ"', '"SocketBossDia"'),
+        )
+    await ensure_fully_defined(adapter, "socket boss sketch")
+    check("exit_sketch socket bosses", await adapter.exit_sketch())
+    name_last_feature(adapter, "SocketBossProfile")
+    drive_jobs += socket_bosses.apply(adapter, "SocketBossProfile")
+    check(
+        "extrude socket bosses",
+        await adapter.create_extrusion(ExtrusionParameters(depth=POCKET_CEILING_Y)),
+    )
+    name_last_feature(adapter, "SocketBosses")
+    boss_height_dim = name_dimensions(adapter, "SocketBosses", ["SocketBossHeight"])
+    drive_jobs.append((boss_height_dim[0], '"PocketDepth"'))
+    hung: tuple[PocketShape, ...] = ()
+    v_hang = hanging_volume(SOCKET_BOSS_SHAPES, hung, 0.0)
+    hung += SOCKET_BOSS_SHAPES
+    after = await volume_check(
+        adapter, "socket bosses", after + v_hang, 0.005 * v_hang + 10.0
+    )
+
+    # Two ribs on the centre lines, RIB_RELIEF clear of the bench and ending
+    # mid-wall. Each is an offset-start boss, so its start offset IS the relief.
+    for tag, rib_shape, label, half_x, half_z, names, drives in (
+        (
+            "LongRib",
+            LONG_RIB_SHAPE,
+            "long rib (z = 0)",
+            RIB_HALF_LENGTH_X,
+            RIB_THICKNESS / 2.0,
+            ("LongRibLength", "LongRibThickness"),
+            ('"TopLength" - "PocketWall"', '"RibThickness"'),
+        ),
+        (
+            "CrossRib",
+            CROSS_RIB_SHAPE,
+            "cross rib (x = 0)",
+            RIB_THICKNESS / 2.0,
+            RIB_HALF_LENGTH_Z,
+            ("CrossRibThickness", "CrossRibLength"),
+            ('"RibThickness"', '"TopWidth" - "PocketWall"'),
+        ),
+    ):
+        rib = SketchDims()
+        check(f"create_sketch {label}", await adapter.create_sketch("Top"))
+        await define_centered_rectangle(
+            adapter,
+            half_x,
+            half_z,
+            label,
+            dims=rib,
+            name_width=names[0],
+            name_depth=names[1],
+            drive_width=drives[0],
+            drive_depth=drives[1],
+        )
+        await ensure_fully_defined(adapter, f"{label} sketch")
+        check(f"exit_sketch {label}", await adapter.exit_sketch())
+        name_last_feature(adapter, f"{tag}Profile")
+        drive_jobs += rib.apply(adapter, f"{tag}Profile")
+        extrude_at_offset(adapter, POCKET_CEILING_Y - RIB_RELIEF, RIB_RELIEF)
+        name_last_feature(adapter, tag)
+        # The sheet's section B-B cuts at constant x and so slices the LONG
+        # rib: that rib carries the printed RibRelief.
+        relief_name = "RibRelief" if tag == "LongRib" else f"{tag}Relief"
+        rib_dims = name_dimensions(adapter, tag, [f"{tag}Height", relief_name])
+        _verify_named_dimension(
+            adapter, f"{tag}Height@{tag}", POCKET_CEILING_Y - RIB_RELIEF
+        )
+        _verify_named_dimension(adapter, f"{relief_name}@{tag}", RIB_RELIEF)
+        drive_jobs += [
+            (rib_dims[0], '"PocketDepth" - "RibRelief"'),
+            (rib_dims[1], '"RibRelief"'),
+        ]
+        v_hang = hanging_volume((rib_shape,), hung, RIB_RELIEF)
+        hung += (rib_shape,)
+        after = await volume_check(
+            adapter, label, after + v_hang, 0.005 * v_hang + 10.0
+        )
+
+    # Hanging bosses under the blind deck seats and the lugs under the cross
+    # taps (HANGING_SEATS, CROSS_TAP_LUG_SHAPES): one sketch per cast level.
+    async def _pad(
+        dims: SketchDims,
+        shape: PocketShape,
+        label: str,
+        names: list[str | None],
+        drives: list[str | None],
+    ) -> None:
+        """Sketch one rect shape: x size, then z size, from its NW corner."""
+        _kind, x0, x1, z0, z1 = shape
+        points = [(x0, -z1), (x1, -z1), (x1, -z0), (x0, -z0)]
+        lines = await add_line_chain(adapter, points)
+        await define_rectilinear_chain(
+            adapter, lines, points, label=label, dims=dims, names=names, drives=drives
+        )
+
+    async def _hanging_feature(
+        tag: str,
+        profile: str,
+        shapes: tuple[PocketShape, ...],
+        bottom_y: float,
+        bottom_name: str,
+        bottom_drive: str,
+        sketch_shapes,
+    ) -> float:
+        sketch = SketchDims()
+        check(f"create_sketch {tag}", await adapter.create_sketch("Top"))
+        await sketch_shapes(sketch)
+        await ensure_fully_defined(adapter, f"{tag} sketch")
+        check(f"exit_sketch {tag}", await adapter.exit_sketch())
+        name_last_feature(adapter, profile)
+        drive_jobs.extend(sketch.apply(adapter, profile))
+        extrude_at_offset(adapter, POCKET_CEILING_Y - bottom_y, bottom_y)
+        name_last_feature(adapter, tag)
+        dims = name_dimensions(adapter, tag, [f"{tag}Height", bottom_name])
+        _verify_named_dimension(
+            adapter, f"{tag}Height@{tag}", POCKET_CEILING_Y - bottom_y
+        )
+        _verify_named_dimension(adapter, f"{bottom_name}@{tag}", bottom_y)
+        drive_jobs.extend(
+            [
+                (dims[0], f'"PocketDepth" - "{bottom_drive}"'),
+                (dims[1], f'"{bottom_drive}"'),
+            ]
+        )
+        nonlocal hung
+        volume = hanging_volume(shapes, hung, bottom_y)
+        hung += shapes
+        return volume
+
+    async def _deep_sketch(sketch: SketchDims) -> None:
+        for i, (x, z) in enumerate(DEEP_BOSS_CENTRES):
+            await define_circle(
+                adapter,
+                x,
+                -z,
+                HANGING_BOSS_HALF,
+                f"deep boss ({x:+.1f}, {z:+.1f})",
+                dims=sketch,
+                names=(
+                    f"DeepBoss{i}X",
+                    f"DeepBoss{i}Z",
+                    "HangingBossDia" if i == 0 else f"DeepBoss{i}Dia",
+                ),
+                drives=(None, None, '"HangingBossDia"'),
+            )
+        await _pad(
+            sketch,
+            LOCK_PAD_SHAPE,
+            "cone-lock pad",
+            ["LockPadWidth", "LockPadLength"],
+            ['"HangingBossDia"', None],
+        )
+        for i, shape in enumerate(PEDESTAL_PAD_SHAPES):
+            await _pad(
+                sketch,
+                shape,
+                f"pedestal pad {i}",
+                [
+                    f"PedestalPad{i}Width",
+                    "PedestalPadLength" if i == 0 else f"PedestalPad{i}Length",
+                ],
+                ['"HangingBossDia"', '"PedestalPadLength"'],
+            )
+
+    v_hang = await _hanging_feature(
+        "DeepBosses",
+        "DeepBossProfile",
+        DEEP_BOSS_SHAPES,
+        DEEP_BOSS_BOTTOM_Y,
+        "DeepBossBottom",
+        "DeepBossBottom",
+        _deep_sketch,
+    )
+    after = await volume_check(
+        adapter, "deep bosses", after + v_hang, 0.005 * v_hang + 10.0
+    )
+
+    async def _shallow_sketch(sketch: SketchDims) -> None:
+        for i, (x, z) in enumerate(SHALLOW_BOSS_CENTRES):
+            await define_circle(
+                adapter,
+                x,
+                -z,
+                HANGING_BOSS_HALF,
+                f"shallow boss ({x:+.1f}, {z:+.1f})",
+                dims=sketch,
+                names=(f"ShallowBoss{i}X", f"ShallowBoss{i}Z", f"ShallowBoss{i}Dia"),
+                drives=(None, None, '"HangingBossDia"'),
+            )
+        for i, shape in enumerate(BLOCK_PAD_SHAPES):
+            await _pad(
+                sketch,
+                shape,
+                f"pinion-block pad {i}",
+                [
+                    "BlockPadLength" if i == 0 else f"BlockPad{i}Length",
+                    f"BlockPad{i}Width",
+                ],
+                ['"BlockPadLength"', '"HangingBossDia"'],
+            )
+
+    v_hang = await _hanging_feature(
+        "ShallowBosses",
+        "ShallowBossProfile",
+        SHALLOW_BOSS_SHAPES,
+        SHALLOW_BOSS_BOTTOM_Y,
+        "ShallowBossBottom",
+        "ShallowBossBottom",
+        _shallow_sketch,
+    )
+    after = await volume_check(
+        adapter, "shallow bosses", after + v_hang, 0.005 * v_hang + 10.0
+    )
+
+    async def _lug_sketch(sketch: SketchDims) -> None:
+        for i, shape in enumerate(CROSS_TAP_LUG_SHAPES):
+            await _pad(
+                sketch,
+                shape,
+                f"cross-tap lug {i}",
+                [
+                    "LugWidth" if i == 0 else f"Lug{i}Width",
+                    "LugLength" if i == 0 else f"Lug{i}Length",
+                ],
+                ['"LugWidth"', '"LugLength"'],
+            )
+
+    v_hang = await _hanging_feature(
+        "CrossTapLugs",
+        "CrossTapLugProfile",
+        CROSS_TAP_LUG_SHAPES,
+        SHALLOW_BOSS_BOTTOM_Y,
+        "LugBottom",
+        "ShallowBossBottom",
+        _lug_sketch,
+    )
+    after = await volume_check(
+        adapter, "cross-tap lugs", after + v_hang, 0.005 * v_hang + 10.0
+    )
+
+    # Casting fillets on the eight socket-boss-to-wall junctions (the
+    # pocket's only reentrant vertical edges that run to the underside). The
+    # end-wall junctions run up only to the lug bottom, the lug covering them
+    # above; the side-wall junctions run the full pocket depth.
+    boss_r = SOCKET_BOSS_DIA / 2.0
+    fillet_picks: list[list[float]] = []
+    fillet_heights: list[float] = []
+    for x, z in COLUMN_SOCKET_XZ:
+        sx, sz = math.copysign(1.0, x), math.copysign(1.0, z)
+        end_inset = POCKET_HALF_X - abs(x)
+        side_inset = POCKET_HALF_Z - abs(z)
+        fillet_picks += [
+            [
+                sx * POCKET_HALF_X,
+                SHALLOW_BOSS_BOTTOM_Y / 2.0,
+                z - sz * math.sqrt(boss_r**2 - end_inset**2),
+            ],
+            [
+                x - sx * math.sqrt(boss_r**2 - side_inset**2),
+                POCKET_CEILING_Y / 2.0,
+                sz * POCKET_HALF_Z,
+            ],
+        ]
+        fillet_heights += [SHALLOW_BOSS_BOTTOM_Y, POCKET_CEILING_Y]
+    check(
+        "fillet pocket boss junctions",
+        await adapter.add_fillet(CASTING_FILLET_R, fillet_picks, propagate=False),
+    )
+    name_last_feature(adapter, "PocketFillets")
+    name_dimensions(adapter, "PocketFillets", ["PocketFilletRadius"])
+    v_fillets = sum(
+        area * height
+        for area, height in zip(_pocket_fillet_areas(), fillet_heights, strict=True)
+    )
+    after = await volume_check(
+        adapter, "pocket fillets", after + v_fillets, 0.05 * v_fillets + 5.0
+    )
 
     # Four blind native 1/4-20 UNC-2B seats from the support deck. The screws
     # bear on their vendor-modeled under-head washer faces and pass through
@@ -1139,10 +1964,9 @@ async def build(adapter) -> dict[str, str]:
     # stop, block, foot, and nameplate screws thread into their named tapped
     # seats; the platform swings on the pivot screw's shoulder. A blind wizard
     # hole ends in a 118-degree drill point, so the analytic expectation
-    # includes cylinder plus point. The nameplate seats are cut from the same
-    # deck face the plate lies on (NAMEPLATE_SCREW_XZ derivation above), before
-    # the rim would become the +Y face at the pad outline and confuse the
-    # face walk.
+    # includes cylinder plus point. Every seat, the nameplate's included,
+    # stands on the raised deck, so each is cut from the deck face (y =
+    # STACK_HEIGHT) into the boss hanging under it.
     for tag, spec, xz, label in (
         (
             "PivotSeat",
@@ -1204,14 +2028,15 @@ async def build(adapter) -> dict[str, str]:
             )
         after = after_cut
 
-    # Four blind column sockets from the deck, nominal Ø25.50: production
-    # bores are matched to their assigned actual MHA-FR-003 tubes, so the
-    # drawing prints the size as reference only.
+    # Four blind column sockets from the green land beside the deck, nominal
+    # Ø25.50: production bores are matched to their assigned actual MHA-FR-003
+    # tubes, so the drawing prints the size as reference only. Each bottoms
+    # inside its full-height socket boss.
     socket_plane = check(
         "create_plane column socket mouths",
         await adapter.create_plane(
             CreatePlaneParameters(
-                mode="offset", base_plane="Top Plane", offset=STACK_HEIGHT
+                mode="offset", base_plane="Top Plane", offset=GREEN_TOP
             )
         ),
     )
@@ -1350,56 +2175,15 @@ async def build(adapter) -> dict[str, str]:
             0.015 * v_cross + 3.0,
         )
 
-    # Raised rim FIRST (2026-09 photo re-derive, see LIP_W): one ring feature
-    # -- outer rectangle on the pad's plan outline, inner rectangle LIP_W in --
-    # boss-extruded from the pad's top face, so it merges into the pad and its
-    # outer faces continue the pad sides. The extrude starts ON that face (it
-    # used to start 1.0 below it) because its depth dimension IS the rim step
-    # the drawing prints: policy rule 2 puts the printed nominal in the model,
-    # and a depth carrying a merge allowance is not the value the shop holds.
-    # Same solid either way -- the allowance lay inside existing material.
-    # Net material: the ring over LIP_H. Top-plane sketch: (x, y) -> (X, -Z).
-    half_x, half_z = TOP_LENGTH / 2.0, TOP_WIDTH / 2.0
-    outer_pts = [
-        (-half_x, -half_z),
-        (half_x, -half_z),
-        (half_x, half_z),
-        (-half_x, half_z),
-    ]
-    inner_pts = [
-        (-half_x + LIP_W, -half_z + LIP_W),
-        (half_x - LIP_W, -half_z + LIP_W),
-        (half_x - LIP_W, half_z - LIP_W),
-        (-half_x + LIP_W, half_z - LIP_W),
-    ]
-    check("create_sketch rim", await adapter.create_sketch("Top"))
-    outer_lines = await add_line_chain(adapter, outer_pts)
-    inner_lines = await add_line_chain(adapter, inner_pts)
-    await define_rectilinear_chain(adapter, outer_lines, outer_pts, label="rim outer")
-    await define_rectilinear_chain(adapter, inner_lines, inner_pts, label="rim inner")
-    await ensure_fully_defined(adapter, "rim sketch")
-    check("exit_sketch rim", await adapter.exit_sketch())
-    name_last_feature(adapter, "RimProfile")
-    extrude_at_offset(adapter, LIP_H, total)
-    name_last_feature(adapter, "Rim")
-    name_dimensions(adapter, "Rim", ["RimHeight"])
-    _verify_named_dimension(adapter, "RimHeight@Rim", LIP_H)
-    a_ring = TOP_LENGTH * TOP_WIDTH - (TOP_LENGTH - 2.0 * LIP_W) * (
-        TOP_WIDTH - 2.0 * LIP_W
-    )
-    v_lip = a_ring * LIP_H
-    after = await volume_check(adapter, "raised rim", after + v_lip, 0.01 * v_lip + 5.0)
-    deck_top = total + LIP_H
-
-    # Plan corners: one full-height radius per plate. The pad + rim FIRST (one
-    # merged side face, so one edge from the flange top to the rim top) at
+    # Plan corners: one full-height radius per plate. The pad FIRST (one side
+    # face, so one edge from the flange top to the green land) at
     # PAD_CORNER_R, then the flange's four vertical corner edges at the
     # concentric FLANGE_CORNER_R -- in that order: the flange arc passes 0.19
     # inside the pad's square corner, so filleting the flange while the pad
     # corner is still square has to cut the pad and SolidWorks refuses
     # ("Failed to create fillet", seat build); rounded first, the pad corner
-    # sits 6.35 inside the flange arc. Then the rim's four reentrant inner
-    # corners at RIM_INNER_R so the lip stays LIP_W wide round the corner.
+    # sits 6.35 inside the flange arc. Then the deck's four corners at
+    # DECK_CORNER_R (the photographed panel reads round-cornered).
     check(
         "fillet pad plan corners",
         await adapter.add_fillet(
@@ -1407,7 +2191,7 @@ async def build(adapter) -> dict[str, str]:
             [
                 [
                     sx * TOP_LENGTH / 2.0,
-                    (BOTTOM_THICKNESS + deck_top) / 2.0,
+                    (BOTTOM_THICKNESS + GREEN_TOP) / 2.0,
                     sz * TOP_WIDTH / 2.0,
                 ]
                 for sx in (-1.0, 1.0)
@@ -1417,7 +2201,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "PadCorners")
     name_dimensions(adapter, "PadCorners", ["PadCornerRadius"])
-    v_pad_corners = _corner_removal(PAD_CORNER_R, deck_top - BOTTOM_THICKNESS)
+    v_pad_corners = _corner_removal(PAD_CORNER_R, GREEN_TOP - BOTTOM_THICKNESS)
     after = await volume_check(
         adapter, "pad plan corners", after - v_pad_corners, 0.01 * v_pad_corners + 2.0
     )
@@ -1446,25 +2230,24 @@ async def build(adapter) -> dict[str, str]:
         0.01 * v_flange_corners + 2.0,
     )
     check(
-        "fillet rim inner corners",
+        "fillet deck plan corners",
         await adapter.add_fillet(
-            RIM_INNER_R,
+            DECK_CORNER_R,
             [
-                [
-                    sx * (TOP_LENGTH / 2.0 - LIP_W),
-                    total + LIP_H / 2.0,
-                    sz * (TOP_WIDTH / 2.0 - LIP_W),
-                ]
+                [sx * DECK_HALF_X, GREEN_TOP + DECK_RISE / 2.0, sz * DECK_HALF_Z]
                 for sx in (-1.0, 1.0)
                 for sz in (-1.0, 1.0)
             ],
         ),
     )
-    name_last_feature(adapter, "RimInnerCorners")
-    name_dimensions(adapter, "RimInnerCorners", ["RimInnerCornerRadius"])
-    v_rim_corners = _corner_removal(RIM_INNER_R, LIP_H)  # reentrant: ADDS
+    name_last_feature(adapter, "DeckCorners")
+    name_dimensions(adapter, "DeckCorners", ["DeckCornerRadius"])
+    v_deck_corners = _corner_removal(DECK_CORNER_R, DECK_RISE)
     after = await volume_check(
-        adapter, "rim inner corners", after + v_rim_corners, 0.05 * v_rim_corners + 2.0
+        adapter,
+        "deck plan corners",
+        after - v_deck_corners,
+        0.02 * v_deck_corners + 2.0,
     )
 
     def _rim_points(
@@ -1483,7 +2266,7 @@ async def build(adapter) -> dict[str, str]:
         ]
 
     # Top rims: 1/16 in x 45-degree breaks on the flange's reveal rim and the
-    # raised rim's top outer perimeter.
+    # pad's outer edge round the green land.
     check(
         "chamfer top rims",
         await adapter.add_chamfer(
@@ -1494,7 +2277,7 @@ async def build(adapter) -> dict[str, str]:
                 BOTTOM_WIDTH / 2.0,
                 FLANGE_CORNER_R,
             )
-            + _rim_points(TOP_LENGTH / 2.0, deck_top, TOP_WIDTH / 2.0, PAD_CORNER_R),
+            + _rim_points(TOP_LENGTH / 2.0, GREEN_TOP, TOP_WIDTH / 2.0, PAD_CORNER_R),
         ),
     )
     name_last_feature(adapter, "TopRimBreaks")
@@ -1506,6 +2289,26 @@ async def build(adapter) -> dict[str, str]:
     )
     after = await volume_check(
         adapter, "top rim breaks", after - v_rims, 0.02 * v_rims + 5.0
+    )
+
+    # Deck edge: a 1/32 in x 45-degree break round the deck's top loop, half
+    # the plates' rim break, so most of the DECK_RISE step stays square.
+    check(
+        "chamfer deck edge",
+        await adapter.add_chamfer(
+            DECK_EDGE_BREAK,
+            _rim_points(DECK_HALF_X, STACK_HEIGHT, DECK_HALF_Z, DECK_CORNER_R),
+        ),
+    )
+    name_last_feature(adapter, "DeckEdgeBreak")
+    name_dimensions(adapter, "DeckEdgeBreak", ["DeckEdgeChamfer"])
+    v_deck_break = (
+        DECK_EDGE_BREAK**2
+        / 2.0
+        * _plan_perimeter(DECK_LENGTH, DECK_WIDTH, DECK_CORNER_R)
+    )
+    after = await volume_check(
+        adapter, "deck edge break", after - v_deck_break, 0.02 * v_deck_break + 2.0
     )
 
     # Underside rim: the same 1/16 in break around the bottom face perimeter.
@@ -1545,17 +2348,17 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pad root fillet", after + v_root, 0.05 * v_root + 3.0
     )
 
-    # Stamped serial "2" on the rim top: import the closed-region DXF onto a
-    # plane at the rim top (STACK_HEIGHT + LIP_H) and cut it mid-plane both ways
-    # (the up side cuts air), removing net-area x SERIAL_DEPTH -- bounded like
-    # the nameplate engraving (no closed form for the traced glyph).
+    # Stamped serial "2" in the deck's NW corner: import the closed-region DXF
+    # onto a plane at the deck top (STACK_HEIGHT) and cut it mid-plane both
+    # ways (the up side cuts air), removing net-area x SERIAL_DEPTH -- bounded
+    # like the nameplate engraving (no closed form for the traced glyph).
     if not SERIAL_DXF.is_file():
         raise RuntimeError(f"serial DXF not found: {SERIAL_DXF}")
     serial_plane = check(
-        "create_plane rim top",
+        "create_plane deck top",
         await adapter.create_plane(
             CreatePlaneParameters(
-                mode="offset", base_plane="Top Plane", offset=STACK_HEIGHT + LIP_H
+                mode="offset", base_plane="Top Plane", offset=STACK_HEIGHT
             )
         ),
     )
@@ -1600,66 +2403,35 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven base (equations neutral)", after, 0.005 * after)
 
-    # Two REFERENCE sketches. The rim width and the flange-to-rim height are
-    # manufacturing values the sheet prints, so policy rule 2 says the model
-    # owns them -- but neither is any feature's dimension: the rim ring's
-    # width is the gap between two loops of one profile, and the 40.6 spans
-    # three features. Each therefore gets a hidden one-line sketch whose
-    # single driving dimension IS the value, marked for drawing like any
-    # other. Both are construction lines, and both are BLANKED once built:
+    # REFERENCE sketches. The flange-to-deck height is a manufacturing value
+    # the sheet prints, so policy rule 2 says the model owns it -- but it is
+    # no feature's dimension: the 38.1 spans three features. It therefore
+    # gets a hidden one-line sketch whose single driving dimension IS the
+    # value, marked for drawing like any other. The line is construction and
+    # BLANKED once built:
     # shown, the height line stood as a tick with two endpoint dots on the
     # base's end face in every assembly render (top iso, asm round d60107b3).
     # A blanked sketch's dimensions never reach a plain InsertModelAnnotations3
     # (the first build failed with "geometry top view is missing model
     # dimensions: ['RimWidth']"), so draw_fr_harmonic_base imports them through
     # _drawing_hidden_sketches.curate_view_dimensions, which shows each owner
-    # sketch in its own view only.
-    check("create_sketch rim-width reference", await adapter.create_sketch("Top"))
-    # Direct-to-DB for the geometry: this line lies ON the sketch X axis and
-    # runs horizontally, so creation-time inference would snap in exactly the
-    # relations the explicit ones below add and leave the sketch OVER-defined.
-    set_sketch_direct_db(adapter, True)
-    rim_ref = check(
-        "rim width reference line",
-        await adapter.add_line(TOP_LENGTH / 2.0, 0.0, TOP_LENGTH / 2.0 - LIP_W, 0.0),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, rim_ref)
-    check(
-        "rim width reference horizontal",
-        await adapter.add_sketch_constraint(rim_ref, None, "horizontal"),
-    )
-    await dimension_between(
-        adapter,
-        f"{rim_ref}.start",
-        f"{rim_ref}.end",
-        "horizontal_distance",
-        LIP_W,
-        "rim width reference",
-    )
-    await anchor_point_to_origin(
-        adapter, f"{rim_ref}.start", TOP_LENGTH / 2.0, 0.0, "rim width reference"
-    )
-    await ensure_fully_defined(adapter, "rim width reference sketch")
-    check("exit_sketch rim-width reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "RimWidthReference")
-    name_dimensions(adapter, "RimWidthReference", ["RimWidth"])
-    _verify_named_dimension(adapter, "RimWidth@RimWidthReference", LIP_W)
+    # sketch in its own view only. The pocket wall needs no such sketch: the
+    # sheet prints the pocket's own PocketLen/PocketWid in the bottom view.
 
     # On the left silhouette (x = -BOTTOM_LENGTH/2), where the front view's
-    # flange-to-rim dimension has always drawn its witness lines.
+    # flange-to-deck dimension has always drawn its witness lines.
     check("create_sketch height reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     height_ref = check(
-        "flange-to-rim reference line",
+        "flange-to-deck reference line",
         await adapter.add_line(
-            -BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, -BOTTOM_LENGTH / 2.0, deck_top
+            -BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, -BOTTOM_LENGTH / 2.0, STACK_HEIGHT
         ),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, height_ref)
     check(
-        "flange-to-rim reference vertical",
+        "flange-to-deck reference vertical",
         await adapter.add_sketch_constraint(height_ref, None, "vertical"),
     )
     await dimension_between(
@@ -1667,23 +2439,21 @@ async def build(adapter) -> dict[str, str]:
         f"{height_ref}.start",
         f"{height_ref}.end",
         "vertical_distance",
-        deck_top - BOTTOM_THICKNESS,
-        "flange-to-rim reference",
+        TOP_THICKNESS,
+        "flange-to-deck reference",
     )
     await anchor_point_to_origin(
         adapter,
         f"{height_ref}.start",
         -BOTTOM_LENGTH / 2.0,
         BOTTOM_THICKNESS,
-        "flange-to-rim reference",
+        "flange-to-deck reference",
     )
-    await ensure_fully_defined(adapter, "flange-to-rim reference sketch")
+    await ensure_fully_defined(adapter, "flange-to-deck reference sketch")
     check("exit_sketch height reference", await adapter.exit_sketch())
     name_last_feature(adapter, "HeightReference")
-    name_dimensions(adapter, "HeightReference", ["FlangeToRim"])
-    _verify_named_dimension(
-        adapter, "FlangeToRim@HeightReference", deck_top - BOTTOM_THICKNESS
-    )
+    name_dimensions(adapter, "HeightReference", ["FlangeToDeck"])
+    _verify_named_dimension(adapter, "FlangeToDeck@HeightReference", TOP_THICKNESS)
 
     # The cross-tap X stations, chained from the flange's west face (the hole
     # table's X0) to the first tap and on to the second, along the tap axis.

@@ -259,7 +259,7 @@ def test_tip_stays_inside_the_adjuster_cup_vertically() -> None:
 
 def test_west_edge_is_proven_over_the_whole_swing() -> None:
     """Main, I31 item 8: the north-west edge keeps the arbor pedestals, the
-    base lip and every other base seat clear from engaged to disengaged."""
+    base pad edge and every other base seat clear from engaged to disengaged."""
     import build_dt_drive_train_assembly as bdt
 
     assert bdt.SWING_ANGLES[0] == 0.0
@@ -267,7 +267,7 @@ def test_west_edge_is_proven_over_the_whole_swing() -> None:
     sweep = bdt.SWING_SWEEP
     assert sweep["south arbor pedestal"] >= 2.0
     assert sweep["north arbor pedestal"] >= 0.25
-    assert min(v for k, v in sweep.items() if k.endswith("inside the lip")) >= 0.0
+    assert min(v for k, v in sweep.items() if k.endswith("over the base")) >= 0.0
     assert all(isinstance(value, float) for value in sweep.values())
     gap, occupant = bdt.SWING_NEAREST_OCCUPANT
     assert gap == min(clear for clear, _swing in bdt.SWING_OCCUPANT_CLEARANCE.values())
