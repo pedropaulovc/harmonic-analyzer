@@ -2189,7 +2189,7 @@ def test_config_deps_are_fine_grained():
     # The cone-gear part reads gear_train (through ``involute_gear``), its own
     # registry row, title-block properties and the global release.  Its bore
     # and tooth-thickness bands are cone-specific constants in
-    # ``cone_gear_spec`` (U38/U42), so ``tolerances.yaml`` is not an input.
+    # ``cone_gear_spec`` (U38/U42), so tolerance fit groups are not inputs.
     cone = dodo._config_deps(scripts / "build_dt_cone_gear.py", "dt_cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
@@ -2235,8 +2235,8 @@ def test_config_deps_are_fine_grained():
     # Assembly title stamping is a separate contract: every released assembly
     # drawing owns TOL_* properties and therefore tracks title_block.yaml, but
     # that must not imply ownership of part-registry rows or the part template.
-    # tolerances.yaml (fit classes) stays out of frame.
-    assert "tolerances.yaml" not in frame_recipe, frame_recipe
+    # Tolerance fit classes stay out of frame.
+    assert not any(path.startswith("tolerances/") for path in frame_recipe), frame_recipe
     assert "title_block.yaml" in frame_recipe, frame_recipe
     assert "release.yaml" in frame_recipe, frame_recipe
     channel_recipe = _rel(dodo._recipe_files("ch_channel"), cfg)
@@ -3059,12 +3059,59 @@ def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
         return type("Done", (), {"returncode": 0})()
 
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
+    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "inherited-must-not-leak")
     monkeypatch.setattr(dodo.subprocess, "run", fake_run)
     assert dodo._run_subprocess(["x"], "part:vn_frame_side_screw") == 0
     assert seen["HARMONIC_FASTENER_ROWS"] == "vn-frame-side-screw"
+    assert seen["HARMONIC_FIT_GROUPS"] == dodo._fit_groups_env("part:vn_frame_side_screw")
     seen.clear()
     assert dodo._run_subprocess(["x"], "check:math") == 0
     assert "HARMONIC_FASTENER_ROWS" not in seen
+    assert "HARMONIC_FIT_GROUPS" not in seen
+
+
+def test_fit_guard_uses_task_recipe_config_dependencies():
+    dodo = _load_dodo()
+    for task, deps in (
+        (
+            "part:dt_cone_gear",
+            dodo._part_file_deps(
+                dodo.SCRIPTS_DIR / "build_dt_cone_gear.py", "dt_cone_gear"
+            ),
+        ),
+        ("assembly:dt_drive_train", dodo._recipe_files("dt_drive_train")),
+        ("drawing:vn_frame_side_screw", dodo._drawing_file_deps("vn_frame_side_screw")),
+    ):
+        groups = {
+            Path(dep).stem for dep in deps
+            if Path(dep).parent == (dodo.CONFIG_DIR / "tolerances").resolve()
+            and Path(dep).stem != "_base"
+        }
+        assert dodo._fit_groups_env(task) == ",".join(sorted(groups))
+    # The drive train and its crank pinion read these groups through literal
+    # fit() calls; an empty guard here would refuse a real build.
+    assert dodo._fit_groups_env("assembly:dt_drive_train") == (
+        "cone_drum_oblique_mesh,crank_mesh,gear_mesh,shaft_in_bushing"
+    )
+    assert dodo._fit_groups_env("part:dt_crank_pinion") == (
+        "crank_mesh,gear_mesh,shaft_in_bushing"
+    )
+    assert dodo._fit_groups_env("check:config") is None
+    with pytest.raises(ValueError, match="fit groups are unknown"):
+        dodo._fit_groups_env("part:no_such_part")
+
+
+def test_fit_config_dependencies_expand_conservatively(tmp_path):
+    dodo = _load_dodo()
+    script = tmp_path / "fit_probe.py"
+    script.write_text("import _config\nvalue = _config.fit('gear_mesh', 'backlash_mm')\n")
+    assert dodo._config_deps(script) == [
+        str((dodo.CONFIG_DIR / "tolerances" / "gear_mesh.yaml").resolve())
+    ]
+    script = tmp_path / "dynamic_fit_probe.py"
+    script.write_text("import _config\nreader = _config.fit\nvalue = reader(group)\n")
+    assert set(dodo._config_deps(script)) == set(dodo.tolerance_family_files())
+    assert str((dodo.CONFIG_DIR / "tolerances" / "_base.yaml").resolve()) in dodo._config_deps(script)
 
 
 def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
@@ -3093,7 +3140,8 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     # Prime the task's rows from the real recipe, then stub the recipe so the
     # injected hook (no such file) is never read.
     dodo._fastener_rows_env(f"assembly:{stem}")
-    monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: [])
+    deps = dodo._recipe_files(stem)
+    monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: deps)
     monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
     monkeypatch.setattr(dodo, "POST_ASSEMBLY", {stem: ("hook_probe.py",)})
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
@@ -3110,6 +3158,7 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda _stem: None)
     monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
+    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "inherited-must-not-leak")
 
     dodo.build_or_refresh(stem, [], [], [str(target)])
 
@@ -3122,6 +3171,7 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     keying the guard on the label dropped it for every assembly build. The guard
     is keyed on the doit task instead, whatever the display label says."""
     dodo = _load_dodo()
+    fit_groups = dodo._fit_groups_env("assembly:pn_pen")
     launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "pn_pen", mode=mode)
 
     scripts = [name for name, _env in launched]
@@ -3131,6 +3181,7 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
         assert scripts == ["refresh_assembly.py"]
     for name, env in launched:
         assert env.get("HARMONIC_FASTENER_ROWS") == "vn-pen-set-screw", name
+        assert env.get("HARMONIC_FIT_GROUPS") == fit_groups, name
 
 
 @pytest.mark.parametrize(

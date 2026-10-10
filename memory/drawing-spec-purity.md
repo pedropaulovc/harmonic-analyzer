@@ -1,6 +1,6 @@
 ---
 name: drawing-spec-purity
-description: "A draw_*.py holds LAYOUT only. Tolerance bands go on the MODEL dimension (set_dimension_*_tolerance); Ra grades come from _surface_finish; fit bands from _fit_limits via deviations(). Callout text is FROZEN — SetText survives a unit switch and lies."
+description: "A draw_*.py holds LAYOUT only. Tolerance bands go on the MODEL dimension (set_dimension_*_tolerance); Ra grades come from _surface_finish; fit classes from _fit_ream_slide / _fit_shaft_h / _fit_ream_h7 via _fit_deviations.deviations(). Callout text is FROZEN — SetText survives a unit switch and lies."
 metadata:
   type: project
 ---
@@ -39,7 +39,7 @@ verified, `SetValues` in METERS internally — shipped in
 `DIMENSION_CALLOUTS = {}`) and `build_vn_fillister_screw.py`. Everything else
 leaked its bands into callout text. Propagating it, not building it, is the fix.
 
-**Transposition trap — use `_fit_limits.deviations(band)`.** `_fit_limits`
+**Transposition trap — use `_fit_deviations.deviations(band)`.** Named fit
 bands are written `(upper, lower)` (how a print quotes a fit, ASME Y14.5
 §2.3.2); `set_dimension_bilateral_tolerance` takes
 `(lower_deviation_mm, upper_deviation_mm)`. Both orderings type-check and a
@@ -48,14 +48,14 @@ transposes; no call site may do it by hand.
 
 **Catalogs, not per-part constants.** 42 `roughness_ra` literals across 39
 sheets expressed a TWO-value vocabulary → `_surface_finish.py` (`GROUND` 0.8,
-`MACHINED` 1.6 µm), a pure-data sibling of `_fit_limits` importable from both
+`MACHINED` 1.6 µm), a pure-data sibling of `_fit_deviations` importable from both
 tiers without tripping `check:partiso`. Creating 39 per-spec constants would
 have institutionalised the duplication at 39 new addresses.
 
-**Move the value and its NOTE in the same commit** — use `_fit_limits.band_text`. The `*_spec.py`
+**Move the value and its NOTE in the same commit** — use `_fit_text.band_text`. The `*_spec.py`
 `DRAWING_NOTES` are a second copy: the nominal is f-stringed while the band
 beside it is hardcoded (`f"{HANDLE_LENGTH:.2f}+0.00/-0.25"`). Render the note
-from the same constant via `_fit_limits.band_text(band)`, and PROVE the rendered
+from the same constant via `_fit_text.band_text(band)`, and PROVE the rendered
 text is byte-identical before and after — that is what makes the relocation a
 refactor rather than a print change. `band_text` deliberately keeps a nil
 deviation's SIGN (`-0.00`), which is what the released sheets print; Y14.5

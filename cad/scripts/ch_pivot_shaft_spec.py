@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 
-from _fit_limits import SHAFT_H
+from _fit_shaft_h import SHAFT_H
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from ch_pivot_bracket_spec import EAR_T

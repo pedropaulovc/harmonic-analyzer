@@ -602,13 +602,13 @@ def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None
 
 
 def test_spotface_band_reaches_the_setter_unchanged() -> None:
-    # The band now reads (upper, lower) like every _fit_limits band and goes
+    # The band now reads (upper, lower) like every named fit band and goes
     # through deviations(); the setter must still receive (lower, upper) =
     # (0.0, +0.5), so the printed limits cannot move.
     import ast
     from pathlib import Path
 
-    from _fit_limits import deviations
+    from _fit_deviations import deviations
 
     assert fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM == (0.5, 0.0)
     assert deviations(fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM) == (0.0, 0.5)

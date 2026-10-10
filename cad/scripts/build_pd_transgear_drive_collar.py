@@ -68,7 +68,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _visibility import blank_reference_geometry
 from pd_transgear_drive_collar_spec import (
     BORE_DIA,

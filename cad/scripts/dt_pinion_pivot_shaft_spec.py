@@ -10,7 +10,7 @@ keeps in lockstep (``test_dt_pinion_pivot_shaft_drawing.py``).
 
 from __future__ import annotations
 
-from _fit_limits import SHAFT_H
+from _fit_shaft_h import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import vn_pinion_strap_pin_spec as _strap_pin

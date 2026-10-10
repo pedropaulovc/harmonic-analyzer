@@ -90,7 +90,7 @@ from _holes import (
     blind_hole_volume_mm3,
     wizard_holes,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import _resolve_faces, author_part_pmi
 from fr_harmonic_base_spec import (
     BOTTOM_LENGTH,

@@ -63,7 +63,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rod_pivot_pin_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
 from ch_rod_pivot_pin_spec import (

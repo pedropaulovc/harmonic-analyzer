@@ -44,7 +44,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_bore_band_is_a_slip_fit_on_the_lift_rod() -> None:
     # U36: the pin carries the torque, so the bore only slides on the h-band
     # rod.  Codex P2 (#844): the repo's REAM_SLIDE band, never line-to-line.
-    from _fit_limits import REAM_SLIDE, SHAFT_H
+    from _fit_ream_slide import REAM_SLIDE
+    from _fit_shaft_h import SHAFT_H
     from dt_pinion_lift_rod_spec import ROD_DIA
 
     assert dt_pinion_lever_spec.BORE_BAND == REAM_SLIDE

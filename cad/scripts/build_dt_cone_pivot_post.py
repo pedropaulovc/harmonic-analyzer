@@ -57,7 +57,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _holes import HoleSpec, wizard_holes
 from _named_views import octant_rotation
 from _part_pmi import author_part_pmi

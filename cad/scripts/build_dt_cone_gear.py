@@ -104,7 +104,7 @@ from _drawing_marks import (
     set_dimension_symmetric_angular_tolerance,
 )
 from _drawing_simplified import assert_simplified_configurations, derive_simplified_on_saved_part
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _part_pmi import author_part_pmi
 from dt_cone_gear_notes import drawing_notes, gear_data

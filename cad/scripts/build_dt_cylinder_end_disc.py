@@ -48,7 +48,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from dt_cylinder_end_disc_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,

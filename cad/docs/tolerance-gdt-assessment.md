@@ -111,7 +111,7 @@ counter-spring post is gouged by its own set screw. None of these need a tight n
 
 ## 3. What's already covered, and the three gaps
 
-**Covered today** (`tolerances.yaml` + Gate-E audit + analytic asserts in the build scripts):
+**Covered today** (`tolerances/` + Gate-E audit + analytic asserts in the build scripts):
 
 - Three general linear grades — `machined_block` ±0.10, `plate_profile` ±0.20,
   `visual_noncritical` ±0.50.
@@ -384,7 +384,7 @@ v3.3.0; **DimXpert is included with every SOLIDWORKS license — confirmed for t
 1. **Size ± tolerances on the driving dimensions.** Where a build script already sets a feature's
    driving dimension (bore Ø, journal Ø, length), additionally stamp its grade's tolerance:
    `IDimension.SetToleranceType` (e.g. bilateral) + **`IDimension.SetToleranceValues(max, min)`** for
-   the numeric ± (read from `tolerances.yaml`). **Not `SetToleranceFitValues`** — that one is marked
+   the numeric ± (read from `tolerances/`). **Not `SetToleranceFitValues`** — that one is marked
    *obsolete* in the API and takes fit-class *strings* (`"H7"`), not numeric values, so it won't
    stamp `±0.025`; the modern numeric path is `SetToleranceValues` / `IDimensionTolerance`. These are
    exactly the dimensions a drawing pulls via
@@ -432,7 +432,7 @@ alongside `apply_custom_properties` / `apply_material`, driven by the new `criti
 
 Concretely:
 
-**`tolerances.yaml`** — add three blocks:
+**`tolerances/`** — add three blocks:
 
 ```yaml
 general:
@@ -498,7 +498,7 @@ invariant*, not just presence of fields:
    is **unsatisfiable as written** and must not be enabled until the grade/band are co-designed —
    either **widen the band to ≥ 0.10** or **add a tighter grade** (each fitted feature ≤ ±0.0125 to
    live inside a 0.05-wide band). **Gate this check on the Finding 1/2 reconciliation** (one decision,
-   recorded in `tolerances.yaml`); enabling it before then fails every otherwise-compliant pair.
+   recorded in `tolerances/`); enabling it before then fails every otherwise-compliant pair.
 3. Geometric/finish class names must resolve in the new blocks (same pattern as the existing
    `tolerance_class` / `fit_class` resolution).
 
@@ -577,7 +577,7 @@ so supplying them is the single highest-value contribution this supplement makes
 - **Consistent with the repo philosophy + single source of truth.** Drawings become **generated
   artifacts** (`cad/out/drawings/<dashed>.PDF`), scripted from the config — not hand-drawn — exactly
   like the renders/STL/STEP. Because the tolerances are embedded in the model from the YAML,
-  editing a fit in `tolerances.yaml` and rebuilding updates the SLDPRT PMI **and** every drawing in
+  editing a fit in `tolerances/<group>.yaml` and rebuilding updates the SLDPRT PMI **and** every drawing in
   one pass; nothing dead-ends in metadata.
 - **Scope by tier.** Generate drawings for the **Tier-1 precision-critical parts first** (the ~10
   in §6/§9), which carry the `precision` grade, runout, finish, and critical-feature notes; then

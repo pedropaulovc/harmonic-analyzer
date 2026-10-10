@@ -57,7 +57,7 @@ import _config
 import pd_rack_pinion_spec as DISC
 import transgear_cluster_fit as FIT
 import pd_transgear_feed_pinion_spec as SLEEVE
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 from pd_transgear_disc_hub_geometry import (

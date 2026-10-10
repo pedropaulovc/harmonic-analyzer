@@ -57,7 +57,7 @@ from _drawing_marks import (
     _named_dimension,
 )
 from _fastener_catalog import fastener
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_40923898 import build_40923898
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES

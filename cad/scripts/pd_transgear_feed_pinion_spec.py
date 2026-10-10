@@ -35,7 +35,7 @@ import math
 
 import pd_rack_pinion_spec
 import pd_transgear_pin_spec
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _gtol_spec import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl

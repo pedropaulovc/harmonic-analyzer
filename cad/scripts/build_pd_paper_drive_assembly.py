@@ -217,7 +217,7 @@ from build_pd_guide_lock import (  # noqa: E402
 # The printed bands the lock-station sweep judges the platen's lock stack at:
 # the same spec constants the guide and lock builds author on their model
 # dimensions, so the sheets and the sweep read one source.
-from _fit_limits import deviations  # noqa: E402
+from _fit_deviations import deviations  # noqa: E402
 from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
 from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,

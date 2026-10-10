@@ -58,7 +58,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _drawing_simplified import save_simplified_part
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _gear import build_fixed_gear
 from _part_pmi import author_part_pmi
 from dt_alignment_pinion_spec import (

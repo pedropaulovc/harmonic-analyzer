@@ -2075,7 +2075,7 @@ def verify_tolerance_audit(report: Report) -> None:
     Reconciles the parts.yaml registry against the parts the build scripts
     actually save, and asserts every part carries the custom-property fields
     (material / tolerance class / process) with class names that resolve in
-    tolerances.yaml. Writes ``cad/out/reports/tolerance_audit.csv`` whether or
+    tolerances/. Writes ``cad/out/reports/tolerance_audit.csv`` whether or
     not the gates pass, so the artifact always reflects the current state.
     """
     rows, problems = _audit_rows()

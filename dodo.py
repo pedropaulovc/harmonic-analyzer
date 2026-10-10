@@ -119,6 +119,7 @@ from _buildgraph import (  # noqa: E402
     fastener_rows_selected,
     is_racy_mtime,
     machine_family_files,
+    tolerance_family_files,
     module_deps_of,
     part_row_files,
     part_scripts,
@@ -370,8 +371,8 @@ def _seat_part_order() -> list[str]:
 # doit's stock MD5Checker hashes RAW FILE BYTES, so a comment-only or reflow edit
 # to a SHARED config (every part lists cad/config/*.yaml as a file_dep) flips that
 # file's md5 and marks EVERY dependent part stale -> a spurious full rebuild. This
-# bit us once: a provenance-comment retarget in tolerances.yaml (value unchanged)
-# rebuilt 75 parts. ContentChecker digests the *parsed* YAML instead -- key order
+# bit us once: a provenance-comment retarget in the former monolithic tolerance
+# config (value unchanged) rebuilt 75 parts. ContentChecker digests the *parsed* YAML instead -- key order
 # preserved, comments and formatting discarded -- so only a real data change
 # invalidates. Non-YAML deps (.py, .SLDPRT) fall through to the exact stock md5,
 # so their stored state stays valid across the switch.
@@ -683,8 +684,8 @@ def _run_subprocess(
 
     ``label`` is the display name; ``task`` is the doit task the subprocess works
     for (default: ``label``, which already is one for most callers). The fastener
-    guard is keyed on ``task``, so a FULL/REFRESH/hook subprocess with a display
-    label still gets its assembly's rows."""
+    and fit-group guards are keyed on ``task``, so a FULL/REFRESH/hook subprocess
+    with a display label still gets its assembly's read sets."""
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
@@ -693,6 +694,10 @@ def _run_subprocess(
     fastener_rows = _fastener_rows_env(task or label)
     if fastener_rows is not None:
         env["HARMONIC_FASTENER_ROWS"] = fastener_rows
+    env.pop("HARMONIC_FIT_GROUPS", None)
+    fit_groups = _fit_groups_env(task or label)
+    if fit_groups is not None:
+        env["HARMONIC_FIT_GROUPS"] = fit_groups
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
     # the build's warning-by-default policy while preserving an explicit override.
     env.setdefault("LOGURU_LEVEL", _external_console_level())
@@ -1122,6 +1127,8 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
     for tok in tokens:
         if tok == "machine/*":
             out.update(machine_family_files())
+        elif tok == "tolerances/*":
+            out.update(tolerance_family_files())
         elif tok == "parts/*":
             out.update(_expand_parts_token(stem, kind, script))
         elif tok == "title_block":
@@ -1839,6 +1846,33 @@ def _fastener_rows_env(task: str) -> str | None:
             raise ValueError(f"{task!r} names no {family} task; its fastener rows are unknown")
     rows = _FASTENER_ROWS.get(task)
     return None if rows is None else ",".join(sorted(rows))
+
+
+def _fit_groups_env(task: str) -> str | None:
+    """Guard fit reads with the same concrete config files folded by the task.
+
+    Like the fastener guard, recompute in doit workers and leave unnarrowed
+    tasks unrestricted. Empty selections refuse every fit group.
+    """
+    if not task or any(ch.isspace() for ch in task):
+        raise ValueError(f"{task!r} is not a doit task name; its fit groups are unknown")
+    family, _, stem = task.partition(":")
+    if family == "part" and stem in part_stems():
+        deps = _part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem)
+    elif family == "assembly" and stem in ASSEMBLY_ORDER:
+        deps = _recipe_files(stem)
+    elif family == "drawing" and stem in DRAWINGS_BY_NAME:
+        deps = _drawing_file_deps(stem)
+    elif family in ("part", "assembly", "drawing"):
+        raise ValueError(f"{task!r} names no {family} task; its fit groups are unknown")
+    else:
+        return None
+    tolerance_dir = _resolved(CONFIG_DIR / "tolerances")
+    groups = {
+        Path(dep).stem for dep in deps
+        if _resolved(Path(dep).parent) == tolerance_dir and Path(dep).stem != "_base"
+    }
+    return ",".join(sorted(groups))
 
 
 def _drawing_file_deps(stem: str) -> list[str]:

@@ -98,7 +98,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _gear import volume_check
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry

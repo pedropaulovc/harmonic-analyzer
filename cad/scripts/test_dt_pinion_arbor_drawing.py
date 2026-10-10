@@ -13,7 +13,9 @@ import pytest
 import _common
 
 import _drawing_marks
-import _fit_limits
+import _fit_deviations
+import _fit_ream_slide
+import _fit_text
 import build_dt_pinion_arbor as part
 import draw_dt_pinion_arbor as drawing
 import dt_pinion_arbor_geometry as geometry
@@ -162,8 +164,8 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert spec.JOURNAL_DIA_BAND == (-0.01, -0.03)
     # Both stacked bands print at 2 places: "-0.01/-0.03" and "-0.01/-0.10".
     for band in (spec.JOURNAL_DIA_BAND, spec.SHAFT_DIA_BAND):
-        assert _drawing_marks._tolerance_places(*_fit_limits.deviations(band)) == 2
-    assert _fit_limits.band_text(spec.JOURNAL_DIA_BAND) == "-0.01/-0.03"
+        assert _drawing_marks._tolerance_places(*_fit_deviations.deviations(band)) == 2
+    assert _fit_text.band_text(spec.JOURNAL_DIA_BAND) == "-0.01/-0.03"
     assert spec.SHAFT_DIA_BAND == (-0.01, -0.10)
     assert model_toleranced_dimensions(part) == {
         ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
@@ -215,7 +217,7 @@ def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
     journal_upper, journal_lower = spec.JOURNAL_DIA_BAND
     strap_upper, strap_lower = strap.ARBOR_BORE_BAND
     # Running fit of each land in its MHA-DT-014 REAM_SLIDE bore.
-    assert strap.ARBOR_BORE_BAND is _fit_limits.REAM_SLIDE
+    assert strap.ARBOR_BORE_BAND is _fit_ream_slide.REAM_SLIDE
     assert strap_lower - journal_upper == pytest.approx(0.020)
     assert strap_upper - journal_lower == pytest.approx(0.055)
     # Every bore slides on from the back crown, so no zone may exceed 8.00.

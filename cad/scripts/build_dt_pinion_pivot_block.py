@@ -53,7 +53,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi

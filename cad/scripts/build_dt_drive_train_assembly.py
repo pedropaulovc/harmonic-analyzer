@@ -420,7 +420,7 @@ ADD16 = 25.4 / DP_CRANK_CUTTER  # both gears' addendum: one cutter
 # FRAME-FIXED (#906, Main 2026-09-26): nothing in the frame moves for the
 # single-cutter pair. The v2 casting's crank axis and the 64T station keep the
 # centre distance the fixed-post DP was solved for -- both radii at the
-# transverse DP plus tolerances.yaml's 0.25 slack -- and the smaller 16T
+# transverse DP plus tolerances/crank_mesh.yaml's 0.25 slack -- and the smaller 16T
 # inherits the difference as slack: 0.423, still engaged 1.5 deep.
 MESH16_C2C = (
     R64
@@ -573,7 +573,7 @@ from dt_crank_arm_spec import (  # noqa: E402
     ARM_C2C,
     ARM_THICKNESS,
 )
-from _fit_limits import deviations  # noqa: E402
+from _fit_deviations import deviations  # noqa: E402
 import _chain  # noqa: E402
 import vn_crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
 import dt_crank_seat_washer_spec as SEAT_WASHER  # noqa: E402

@@ -1820,13 +1820,14 @@ def _data_literals(text: str) -> tuple[str, ...]:
 # row, or even the 98 KB narrative dimensions.yaml that NO part reads) marked all
 # ~76 parts stale -> a ~25 min full rebuild on the single SolidWorks seat.
 #
-# The two largest data files are SPLIT into per-concern files (see _config.py,
-# which re-aggregates them transparently), so the dependency can be per-subsystem
-# / per-part rather than per-file:
+# Machine, part-registry and tolerance data are SPLIT into per-concern files
+# (see _config.py, which re-aggregates them transparently), so dependencies can
+# be per-subsystem, per-part or per-fit-group rather than per-document:
 # ``config_files_of`` returns config-relative TOKENS: a concrete path
 # (``"channels.yaml"``, ``"machine/gear_train.yaml"``, ``"parts/dt-cone-gear.yaml"``)
-# or one of four dynamic tokens -- ``"machine/*"`` (whole machine family, for a
-# dynamic subsystem), ``"parts/*"`` (whole parts registry, for the dynamic part
+# or dynamic tokens -- ``"machine/*"`` (whole machine family, for a dynamic
+# subsystem), ``"tolerances/*"`` (whole tolerance family for dynamic/unknown fit
+# groups or escaped fit references), ``"parts/*"`` (whole registry, for the part
 # name in ``_common.part_properties``), ``"title_block"`` (title_block.yaml,
 # but only for tasks that stamp part properties), ``"assemblies/*"`` (the
 # per-assembly contracts, for any closure reaching ``_assembly_contract``),
@@ -1846,7 +1847,6 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
     "poses": frozenset({"poses.yaml"}),
     "active_count": frozenset({"machine/channels.yaml"}),
     "active_channels": frozenset({"channels.yaml", "machine/channels.yaml"}),
-    "fit": frozenset({"tolerances.yaml"}),
     "release_revision": frozenset({"release.yaml"}),
     # title_block is read by the TOL_* stamping (_common.part_properties,
     # _assembly.assembly_title_properties) and, for geometry, by the modules in
@@ -1863,9 +1863,10 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
 # Accessors whose file(s) are named by their FIRST positional argument:
 #   machine(<subsystem>, ...) -> machine/<subsystem>.yaml   (dynamic -> machine/*)
 #   parts(<dashed-name>)      -> parts/<name>.yaml+_defaults (dynamic -> parts/*)
+#   fit(<group>, ...)        -> tolerances/<group>.yaml (dynamic -> tolerances/*)
 #   provenance/_doc(<doc>)    -> that doc's file family      (dynamic -> "**")
 _FAMILY_ACCESSORS: frozenset[str] = frozenset(
-    {"machine", "parts", "provenance", "_doc"}
+    {"machine", "parts", "fit", "provenance", "_doc"}
 )
 
 
@@ -1876,7 +1877,7 @@ class _UnknownConfigUse(Exception):
 
 @functools.lru_cache(maxsize=1)
 def _top_level_docs() -> frozenset[str]:
-    """Single-file config doc stems (channels, tolerances, materials, dimensions)."""
+    """Single-file config doc stems (channels, materials, dimensions)."""
     return frozenset(p.stem for p in CONFIG_DIR.glob("*.yaml"))
 
 
@@ -1902,6 +1903,17 @@ def _part_registry_names() -> frozenset[str]:
     )
 
 
+@functools.lru_cache(maxsize=1)
+def _tolerance_groups() -> frozenset[str]:
+    """Fit-group stems (``tolerances/<group>.yaml`` minus the units _base)."""
+    d = CONFIG_DIR / "tolerances"
+    return (
+        frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_base")
+        if d.is_dir()
+        else frozenset()
+    )
+
+
 def _doc_family_tokens(doc: str) -> frozenset[str] | None:
     """The token(s) covering a whole doc by name (for provenance/_doc): the split
     docs map to their family glob, single-file docs to their file. None = unknown
@@ -1910,6 +1922,8 @@ def _doc_family_tokens(doc: str) -> frozenset[str] | None:
         return frozenset({"machine/*"})
     if doc == "parts":
         return frozenset({"parts/*"})
+    if doc == "tolerances":
+        return frozenset({"tolerances/*"})
     if doc in _top_level_docs():
         return frozenset({f"{doc}.yaml"})
     return None
@@ -1918,6 +1932,10 @@ def _doc_family_tokens(doc: str) -> frozenset[str] | None:
 def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
     """Resolve a family accessor at one call site. ``arg`` is the literal first-arg
     string, or None when there is no positional arg OR it is non-literal."""
+    if accessor == "fit":
+        if arg in _tolerance_groups():
+            return frozenset({f"tolerances/{arg}.yaml"})
+        return frozenset({"tolerances/*"})
     if accessor == "machine":
         if arg is None:
             return frozenset({"machine/*"})  # dynamic subsystem -> whole family
@@ -2033,6 +2051,9 @@ def _config_tokens_in_source(path: Path) -> frozenset[str]:
         raise _UnknownConfigUse
     tokens: set[str] = set()
     for attr, use, argument in references:
+        if attr == "fit" and use is _ConfigUse.REFERENCE:
+            tokens.add("tolerances/*")
+            continue
         if attr in _FIXED_ACCESSOR_TOKENS:
             tokens |= _FIXED_ACCESSOR_TOKENS[attr]
             continue
@@ -2079,6 +2100,13 @@ def machine_family_files() -> list[str]:
     """Every machine/*.yaml (incl _base) -- the ``"machine/*"`` expansion."""
     d = CONFIG_DIR / "machine"
     return sorted(str(_resolved(p)) for p in d.glob("*.yaml")) if d.is_dir() else []
+
+
+def tolerance_family_files() -> list[str]:
+    """Every tolerance group plus units/general base; whole-family expansion."""
+    return sorted(
+        str(_resolved(p)) for p in (CONFIG_DIR / "tolerances").glob("*.yaml")
+    )
 
 
 def parts_registry_files() -> list[str]:
