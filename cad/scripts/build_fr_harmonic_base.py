@@ -55,7 +55,6 @@ from _common import (
     bbox_extent_check,
     blank_reference_sketches,
     check,
-    define_centered_rectangle,
     define_circle,
     define_rectilinear_chain,
     dimension_between,
@@ -1690,16 +1689,27 @@ async def build(adapter) -> dict[str, str]:
     ):
         rib = SketchDims()
         check(f"create_sketch {label}", await adapter.create_sketch("Top"))
-        await define_centered_rectangle(
+        # A line chain, not define_centered_rectangle: that native center
+        # rectangle runs sketch inference, and the cross rib's 131.25 ends
+        # snapped to the deck edges at 130.25 seen through the Top plane
+        # (farm leaf 2026-10-10: depth read back 260.5, the dimension became
+        # driven, and the CrossRibLength equation failed the rebuild).
+        points = [
+            (-half_x, -half_z),
+            (half_x, -half_z),
+            (half_x, half_z),
+            (-half_x, half_z),
+        ]
+        lines = await add_line_chain(adapter, points)
+        await define_rectilinear_chain(
             adapter,
-            half_x,
-            half_z,
-            label,
+            lines,
+            points,
+            label=label,
             dims=rib,
-            name_width=names[0],
-            name_depth=names[1],
-            drive_width=drives[0],
-            drive_depth=drives[1],
+            names=[*names, *(f"{n}Half" for n in names)],
+            # Anchor dims (x, z) hold the rib centred as its spans change.
+            drives=[*drives, *(f"({d}) / 2" for d in drives)],
         )
         await ensure_fully_defined(adapter, f"{label} sketch")
         check(f"exit_sketch {label}", await adapter.exit_sketch())
