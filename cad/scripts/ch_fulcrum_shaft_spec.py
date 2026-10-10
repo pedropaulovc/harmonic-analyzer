@@ -70,8 +70,10 @@ FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.875: the set screw's cup seat above the 
 # below). ---
 _BAND_BY_PLACES = {1: 0.8, 2: 0.51, 3: 0.13}
 _FLAT_LENGTH_MIN = FLAT_LENGTH - _BAND_BY_PLACES[1]
-_FLAT_DEPTH_MIN = FLAT_DEPTH - _BAND_BY_PLACES[3]  # AcrossFlat at its maximum
 _SHAFT_R_MIN = (SHAFT_DIA + SHAFT_DIA_BAND[1]) / 2.0
+# Least depth: the smallest printed shaft diameter less the largest AcrossFlat
+# (the print controls those two, never the depth itself).
+_FLAT_DEPTH_MIN = 2.0 * _SHAFT_R_MIN - (ACROSS_FLAT + _BAND_BY_PLACES[3])
 # The shallowest flat must still be wider than the set screw's thread, so its
 # cup burr lands on the flat and the shaft withdraws past the bore.
 FLAT_CHORD_MIN = 2.0 * sqrt(2.0 * _SHAFT_R_MIN * _FLAT_DEPTH_MIN - _FLAT_DEPTH_MIN**2)

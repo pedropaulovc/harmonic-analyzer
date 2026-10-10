@@ -50,6 +50,20 @@ def test_flats_sit_under_the_keeper_taps() -> None:
     assert spec.FLAT_CHORD_MIN > spec.SET_SCREW_MAJOR_DIA
 
 
+def test_flat_chord_guard_is_the_least_chord_over_printed_band_corners() -> None:
+    # The print controls ShaftDia and AcrossFlat, never the depth, so the
+    # shallowest flat comes from their band corners together.
+    spec = ch_fulcrum_shaft_spec
+    chords = []
+    for dia_dev in spec.SHAFT_DIA_BAND:
+        for af_dev in (-0.13, 0.13):
+            r = (spec.SHAFT_DIA + dia_dev) / 2.0
+            depth = 2.0 * r - (spec.ACROSS_FLAT + af_dev)
+            chords.append(2.0 * math.sqrt(2.0 * r * depth - depth**2))
+    assert math.isclose(spec.FLAT_CHORD_MIN, min(chords))
+    assert min(chords) > spec.SET_SCREW_MAJOR_DIA
+
+
 def test_flat_pair_is_located_from_the_end() -> None:
     # The print locates the -Z flat's outer edge off its dome tip and the +Z
     # flat by the like-edge pitch; both at .XXX keep one shaft station that
