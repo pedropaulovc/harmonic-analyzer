@@ -60,10 +60,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_audit import arc_segments
 from _surface_finish import surface_finish_by_key
-from build_dt_cone_gear import (
-    assert_saved_configuration_topology,
-    gap_floor_deviations_mm,
-)
+from _cone_gear_readback import assert_saved_configuration_topology
 from dt_cone_gear_spec import (
     BORE_SURFACE_FINISHES,
     CONFIGURATION_TEETH,
@@ -73,6 +70,7 @@ from dt_cone_gear_spec import (
     bore_dia_mm,
     bore_flat_offset_mm,
     floor_limits_mm,
+    gap_floor_deviations_mm,
     outside_dia_mm,
     tooth_thickness_mm,
 )

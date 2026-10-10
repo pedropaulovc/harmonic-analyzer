@@ -1187,14 +1187,14 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     from _buildgraph import part_stems, references_of
     from _drawing_registry import DRAWINGS_BY_NAME
     from _fastener_catalog import FASTENERS
-    from _stock_fastener import STOCK_RECIPES
+    from _test_stock_recipes import discovered_recipes
     from diagnostics import diag_build_98296A027 as recipe
 
     assert part.SPEC is FASTENERS["vn-pinion-strap-pin"]
     assert part.SPEC.skus == ("98296A027",)
     source = inspect.getsource(part)
     assert 'sku="98296A027"' in source and "author=build_98296A027" in source
-    assert STOCK_RECIPES["98296A027"].module == "diagnostics.diag_build_98296A027"
+    assert discovered_recipes()["98296A027"].module == "diagnostics.diag_build_98296A027"
     assert (recipe.PIN_OD, recipe.PIN_LEN) == (pin.PIN_DIA, pin.PIN_LEN)
     assert math.isclose(pin.WALL_T, 0.012 * 25.4)
     assert math.isclose(recipe.PIN_ID, pin.PIN_DIA - 2.0 * pin.WALL_T)

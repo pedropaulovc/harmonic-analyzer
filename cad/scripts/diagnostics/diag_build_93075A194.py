@@ -28,6 +28,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     check,
@@ -42,14 +44,17 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut,
 )
 
-HX_MAJOR_R = 4.1656 / 2.0
-HX_LEN = 12.7
-HX_HW = 6.35            # across flats
-HX_HH = 2.794
-HX_PITCH = 0.79375
-HX_UNDERSIDE = 4.953    # vendor origin sits mid-shank
+from _mcmaster_93075a194 import (  # noqa: E402
+    HX_MAJOR_R,
+    HX_LEN,
+    HX_HW,
+    HX_HH,
+    HX_PITCH,
+    HX_UNDERSIDE,
+)
 
 
+@stock_recipe("93075A194", threaded=True)
 async def build_93075A194(adapter, truth=None):
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)

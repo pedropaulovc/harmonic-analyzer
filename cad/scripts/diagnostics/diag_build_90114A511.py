@@ -25,6 +25,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     check,
@@ -40,15 +42,18 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut,
 )
 
-BF_MAJOR_R = 2.8448 / 2.0
-BF_LEN = 6.35
-BF_HH = 2.7178
-BF_HEAD_R = 4.6482 / 2.0
-BF_PITCH = 0.635
-BF_SLOT_W = 0.9906   # Slot Width@Sketch1
-BF_SLOT_D = 1.2192   # Slot Depth@Sketch1
+from _mcmaster_90114a511 import (  # noqa: E402
+    BF_MAJOR_R,
+    BF_LEN,
+    BF_HH,
+    BF_HEAD_R,
+    BF_PITCH,
+    BF_SLOT_W,
+    BF_SLOT_D,
+)
 
 
+@stock_recipe("90114A511", threaded=True)
 async def build_90114A511(adapter, truth=None):
     from _common import add_line_chain
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane

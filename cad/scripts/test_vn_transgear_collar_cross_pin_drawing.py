@@ -13,7 +13,7 @@ import build_vn_transgear_collar_cross_pin as part
 import vn_transgear_collar_cross_pin_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_98296A027 as strap_pin_recipe
 from diagnostics import diag_build_98296A026 as recipe
 
@@ -38,7 +38,7 @@ def test_catalogue_row_is_the_registered_mcmaster_spring_pin() -> None:
     assert stock.stock_name == row["stock_name"]
     assert row["number"] == "MHA-VN-037"
     assert spec.SKU in row["material_specification"]
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_98296A026
     assert metadata.threaded is False

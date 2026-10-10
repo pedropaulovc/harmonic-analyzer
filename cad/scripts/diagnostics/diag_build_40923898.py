@@ -24,13 +24,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
+from _msc_40923898 import FILLISTER_SIZE  # noqa: E402
 from diagnostics.diag_mcmaster_fillister import build_fillister  # noqa: E402
 
 PART_NO = "40923898"
 
 
+@stock_recipe("40923898", threaded=True)
 async def build_40923898(adapter, truth=None):
-    await build_fillister(adapter, PART_NO)
+    await build_fillister(adapter, PART_NO, FILLISTER_SIZE)
 
 
 async def build_catalog(adapter) -> dict[str, str]:

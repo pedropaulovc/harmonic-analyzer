@@ -52,7 +52,7 @@ from _drawing_common import (
     sheet_drawable_region,
     visible_component_entities,
 )
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
 from fr_frame_attachment_spec import (

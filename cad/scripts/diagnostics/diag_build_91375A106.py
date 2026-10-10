@@ -52,6 +52,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 from _common import (  # noqa: E402
     check,
     name_last_feature,
@@ -166,6 +168,7 @@ if ROOT_R <= hex_corner_r():
     raise ValueError("91375A106 thread root reaches the hex socket")
 
 
+@stock_recipe("91375A106", threaded=True)
 async def build_91375A106(adapter, truth=None):
     from _common import _early_bound, _feature_by_name, _read_member, add_line_chain
     from solidworks_mcp.adapters.base import RevolveParameters

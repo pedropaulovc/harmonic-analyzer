@@ -14,9 +14,9 @@ import sys
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
-from diagnostics.diag_build_92240A539 import build_92240A539
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_92240A540 import build_92240A540
-from vn_lag_screw_spec import LENGTHS_MM, SPECIFIED_SKU
+from vn_lag_screw_spec import SPECIFIED_SKU
 
 PART_NAME = "vn-lag-screw"
 SPEC = fastener(PART_NAME)
@@ -28,20 +28,15 @@ if SKU != SPECIFIED_SKU:
         f"lag-screw catalog row names {SKU}, but vn_lag_screw_spec sizes the frame "
         f"and base seats for {SPECIFIED_SKU}; change both together"
     )
-# Each SKU's replay recipe.
-REPLAYS = {
-    "92240A539": (LENGTHS_MM["92240A539"], build_92240A539),
-    "92240A540": (LENGTHS_MM["92240A540"], build_92240A540),
-}
-_REPLAY = REPLAYS[SKU][1]
 
 
 async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(SKU, _REPLAY),),
+        components=(StockComponent(SKU, build_92240A540),),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
     )
 
 

@@ -825,7 +825,7 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     of MHA-VN-018 and Main's ruling (a)."""
     import _config
     from _fastener_catalog import fastener
-    from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+    from _mcmaster_91794a112 import FILLISTER_SIZE
 
     config = _config.parts("vn-cone-tip-pinch-screw")
     assert config["supplier_skus"] == ["91794A112"]
@@ -836,9 +836,9 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     assert " STEEL" not in notes
     assert fastener("vn-cone-tip-pinch-screw").skus == ("91794A112",)
     assert fastener("vn-cone-tip-pinch-screw").material == "AISI 304"
-    assert FILLISTER_SIZES["91794A112"][1] == dt_cone_tip_block_spec.PINCH_SCREW_LENGTH
+    assert FILLISTER_SIZE[1] == dt_cone_tip_block_spec.PINCH_SCREW_LENGTH
     assert dt_cone_tip_block_spec.PINCH_SCREW_SKU == "91794A112"
-    assert "90280A110" not in FILLISTER_SIZES
+    assert "90280A110" not in fastener("vn-cone-tip-pinch-screw").skus
 
 
 # Run 1 (d09c2b9eb leaf dump, c2-dumps/cone-tip-block-d09c2b9eb.json.gz):

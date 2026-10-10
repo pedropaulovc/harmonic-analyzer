@@ -1439,20 +1439,11 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_ch_channel_assembly.py", "build_ch_fulcrum_keeper"): (
         "dtrefactor: reads CBORE_DEPTH_MM, FOOT_H"
     ),
-    ("build_dt_drive_train_assembly.py", "build_dt_alignment_pinion"): (
-        "dtrefactor: reads BORE_DIA"
-    ),
     ("build_dt_drive_train_assembly.py", "build_dt_arbor_pedestal"): (
         "dtrefactor: reads FOOT_HEIGHT, FOOT_WIDTH, SCREW_Z"
     ),
     ("build_dt_drive_train_assembly.py", "build_dt_cone_pivot_post"): (
         "dtrefactor: reads BLOCK_DIA, BORE_HEIGHT, CONE_BOSS_LENGTH, CRANK_BORE_HEIGHT, CRANK_BOSS_LENGTH, CRANK_BOSS_START_Z"
-    ),
-    ("build_dt_drive_train_assembly.py", "build_vn_cone_tip_adjuster"): (
-        "dtrefactor: reads BODY_LEN, CUP_DEPTH, CUP_DIA, THREAD"
-    ),
-    ("build_dt_drive_train_assembly.py", "build_vn_cone_tip_pinch_screw"): (
-        "dtrefactor: reads SHANK_LEN, THREAD"
     ),
     ("build_dt_drive_train_assembly.py", "build_dt_crankshaft"): (
         "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_PINION, SHAFT_LENGTH"
@@ -1462,9 +1453,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ),
     ("build_dt_drive_train_assembly.py", "build_fr_harmonic_base"): (
         "dtrefactor: reads BLOCK_SCREW_HOLE_DEPTH, BLOCK_SCREW_XZ, BLOCK_SEAT_SPEC, FOOT_SCREW_HOLE_DEPTH, FOOT_SCREW_XZ, FOOT_SEAT_SPEC, LOCK_KNOB_XZ, LOCK_SEAT_SPEC, LOCK_STUD_ENGAGEMENT, PEDESTAL_SCREW_HOLE_DEPTH, PEDESTAL_SCREW_XZ, PEDESTAL_SEAT_SPEC, PIVOT_SCREW_XZ, PIVOT_SEAT_SPEC, STOP_SCREW_XZ, STOP_SEAT_SPEC, SWING_HARDWARE_GEOMETRY, require_blind_seat_fit"
-    ),
-    ("build_fr_frame_assembly.py", "build_vn_gooseneck_set_screw"): (
-        "dtrefactor: reads SHANK_LEN"
     ),
     ("build_fr_frame_assembly.py", "build_fr_top_frame"): (
         "dtrefactor: reads SIDE_TAP_SPEC"
@@ -1477,9 +1465,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ),
     ("build_kinematic_probe.py", "build_pd_paper_drive_assembly"): (
         "dtrefactor: reads CHAIN_CRANK_CENTRE, DISC_TEETH, FEED_PD, KNOB_SHAFT_XY, NET_RACK_TRAVEL_PER_CRANK_REV, SPARE_GEAR_POS, THIRD_TEETH"
-    ),
-    ("build_mg_magnifier_assembly.py", "build_vn_thumb_screw"): (
-        "dtrefactor: reads HEAD_STACK_LEN, SHANK_LEN"
     ),
     ("build_mobility_probe.py", "build_motion_study"): (
         "dtrefactor: reads ANGLE, DISTANCE, _family, _iter_mates, _real_parts"
@@ -1508,26 +1493,14 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_pd_paper_drive_assembly.py", "build_pd_platen_paper"): (
         "dtrefactor: reads PAPER_HEIGHT, PAPER_WIDTH"
     ),
-    ("build_pd_paper_drive_assembly.py", "build_pd_platen_rack"): (
-        "dtrefactor: reads ADDENDUM, BAR_HEIGHT, BAR_LENGTH, FIRST_GAP_X, PITCH"
-    ),
-    ("build_pd_paper_drive_assembly.py", "build_pd_rack_pinion"): (
-        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
-    ),
     ("build_pd_paper_drive_assembly.py", "build_pd_support_bar"): (
         "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X"
-    ),
-    ("build_pd_paper_drive_assembly.py", "build_pd_transgear_feed_pinion"): (
-        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
     ),
     ("build_pn_pen_assembly.py", "build_pn_pen_frame"): (
         "dtrefactor: reads FRAME_DEPTH, OUTER_HEIGHT, OUTER_WIDTH, RAIL_END, RAIL_SIDE"
     ),
     ("build_pn_pen_assembly.py", "build_pn_pen_hanger"): (
         "dtrefactor: reads SCREW_HOLE_XY, STRAP_Z"
-    ),
-    ("build_pn_pen_assembly.py", "build_vn_pen_set_screw"): (
-        "dtrefactor: reads HEAD_STACK_LEN, SHANK_DIA, SHANK_LEN, TIP_CHAMFER"
     ),
     ("build_sm_summing_assembly.py", "build_sm_knife_mount"): (
         "dtrefactor: reads CASTING_UNDERSIDE_Y, MOUNT_GAP"

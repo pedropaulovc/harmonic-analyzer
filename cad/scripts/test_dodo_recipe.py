@@ -237,9 +237,6 @@ _DRAWING_OWN_ROW_READERS = {
     # _config.parts(stock.part_name) after the source identity check
     # (spec.source.stem == stock.part_name).
     "_purchased_fastener_drawing.py",
-    # save_simplified_part(adapter, name, ...) forwards to save_part_and_images:
-    # same callers, same pin.
-    "_drawing_simplified.py",
 }
 # Registry-reading helper -> index of its part-name argument.
 _OWN_ROW_HELPERS = {
@@ -3021,9 +3018,8 @@ def test_check_gates_depend_on_everything_they_execute():
 
 
 def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
-    """A catalogued part, its drawing and an assembly that imports a fastener
-    script's constants depend on a per-task digest of only the rows they read,
-    and the build subprocess is told exactly those rows."""
+    """Catalogue readers carry only their rows; pure-dimension consumers carry
+    no catalogue digest, and the build subprocess is told exactly the rows read."""
     dodo = _load_dodo()
     catalog = str(dodo._FASTENER_CATALOG)
     part = dodo._part_file_deps(
@@ -3034,7 +3030,6 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
     for label, deps in (
         ("part-vn_frame_side_screw", part),
         ("drawing-vn_frame_side_screw", drawing),
-        ("assembly-pn_pen", assembly),
     ):
         assert catalog not in deps, label
         assert any(
@@ -3044,9 +3039,10 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
         ), label
     assert dodo._fastener_rows_env("part:vn_frame_side_screw") == "vn-frame-side-screw"
     assert dodo._fastener_rows_env("drawing:vn_frame_side_screw") == "vn-frame-side-screw"
-    # pen's closure imports build_vn_pen_set_screw for its constants; that module's
-    # fastener("vn-pen-set-screw") runs on import.
-    assert dodo._fastener_rows_env("assembly:pn_pen") == "vn-pen-set-screw"
+    # The pen reads the pure SKU dimensions, not the stock builder's catalogue row.
+    assert catalog not in assembly
+    assert not any(Path(dep).parent.name == ".fastener-catalog" for dep in assembly)
+    assert dodo._fastener_rows_env("assembly:pn_pen") is None
     assert dodo._fastener_rows_env("check:math") is None
 
 
@@ -3171,6 +3167,11 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     keying the guard on the label dropped it for every assembly build. The guard
     is keyed on the doit task instead, whatever the display label says."""
     dodo = _load_dodo()
+    # Exercise a narrowed assembly's guard plumbing independently of the pen's
+    # now-pure dimension closure (its actual no-row contract is tested above).
+    monkeypatch.setitem(
+        dodo._FASTENER_ROWS, "assembly:pn_pen", frozenset({"vn-pen-set-screw"})
+    )
     fit_groups = dodo._fit_groups_env("assembly:pn_pen")
     launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "pn_pen", mode=mode)
 

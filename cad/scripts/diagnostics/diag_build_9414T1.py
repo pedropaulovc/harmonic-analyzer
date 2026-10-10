@@ -45,6 +45,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
 from _common import check, name_last_feature, volume_check  # noqa: E402
 from vn_cone_tip_collar_spec import (  # noqa: E402
@@ -151,6 +153,7 @@ async def _revolve_about_screw_axis(adapter, label: str, points, *, is_cut: bool
     name_last_feature(adapter, label)
 
 
+@stock_recipe("9414T1", threaded=False)
 async def build_9414T1(adapter, truth=None, *, cup_radius: float = SET_SCREW_CUP_RADIUS):
     from _common import _early_bound, _feature_by_name, _read_member, add_line_chain
     from solidworks_mcp.adapters.base import RevolveParameters

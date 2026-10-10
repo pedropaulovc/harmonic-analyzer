@@ -44,7 +44,7 @@ from _common import (
     set_global,
     set_sketch_direct_db,
 )
-from _drawing_simplified import save_simplified_part
+from _simplified_part import save_simplified_part
 from _gear import volume_check
 
 PART_NAME = "pd-chain-sprocket"
