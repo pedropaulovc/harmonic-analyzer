@@ -1,14 +1,15 @@
 r"""Reproduction script: magnifying-wheel axle (book ch. 21, pp. 50-51).
 
 A plain pin from 3/16 drill rod (mg_wheel_axle_spec): pressed into the
-mg-wheel-bar's reamed bore, back end flush with the bar's back face; the
+mg-wheel-bar's reamed bore until the shank stands the press gauge off the
+bar's front face, the back end then about flush with its back face; the
 magnifying wheel runs on the shank; the front end is a #4-40 thread for the
 nut and locknut, finished with a domed tip. ``mg_wheel_group`` sizes the
 lengths against the whole stack.
 
 Layout: pin axis local +Y, origin on the bar's FRONT face (the assembly's
-d = 0); back end y = BACK_Y (-9), shank to STEP_Y, thread to THREAD_END_Y,
-dome to TIP_Y. The assembly mates Axis1 and the Front Plane.
+d = 0); back end y = BACK_Y (-9), shank to STEP_Y (the gauge), thread to
+THREAD_END_Y, dome to TIP_Y. The assembly mates Axis1 and the Front Plane.
 
 Built as ONE Front-plane revolve (PinProfile -> Pin): every printed diameter
 and length is a named dimension in that sketch, so the drawing inserts them
@@ -63,13 +64,13 @@ from mg_wheel_axle_spec import (
     PIN_DIA,
     PIN_DIA_TOL,
     PIN_LEN,
+    PRESS_GAUGE,
     SHANK_LEN,
     SHANK_LEN_BAND,
     STEP_Y,
-    THREAD_END,
-    THREAD_END_BAND,
     THREAD_END_Y,
     THREAD_LEN,
+    THREAD_LEN_BAND,
     THREAD_MAJOR,
     TIP_Y,
 )
@@ -99,7 +100,7 @@ async def build(adapter) -> dict[str, str]:
         ("ThreadDia", THREAD_MAJOR),
         ("ThreadLength", THREAD_LEN),
         ("DomeHeight", DOME_H),
-        ("BarDepth", -BACK_Y),
+        ("PressGauge", PRESS_GAUGE),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -145,7 +146,7 @@ async def build(adapter) -> dict[str, str]:
     await anchor_point_to_origin(
         adapter, f"{back_end}.start", 0.0, BACK_Y, "pin back end"
     )
-    profile.record("BackEnd", '"BarDepth"')
+    profile.record("BackEnd", '"ShankLength" - "PressGauge"')
     await add_diametric_linear_dimension(
         adapter, axis, shank, (PIN_R + 4.0, (BACK_Y + STEP_Y) / 2.0), "PinDia"
     )
@@ -163,17 +164,13 @@ async def build(adapter) -> dict[str, str]:
         "ThreadDia",
     )
     profile.record("ThreadDia", '"ThreadDia"')
-    # Thread end and overall, both from the back end's outer corner (where the
-    # drawing's extension lines rise).
-    await dimension_between(
-        adapter,
-        f"{shank}.start",
-        f"{thread}.end",
-        "vertical_distance",
-        THREAD_END,
-        "thread end",
+    check(
+        "thread length",
+        await adapter.add_sketch_dimension(thread, None, "linear", THREAD_LEN),
     )
-    profile.record("ThreadEnd", '"ShankLength" + "ThreadLength"')
+    profile.record("ThreadLength", '"ThreadLength"')
+    # Overall from the back end's outer corner (where the drawing's extension
+    # lines rise).
     await dimension_between(
         adapter,
         f"{shank}.start",
@@ -221,7 +218,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PinProfile", "ShankLength", *deviations(SHANK_LEN_BAND)
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "ThreadEnd", *deviations(THREAD_END_BAND)
+        adapter, "PinProfile", "ThreadLength", *deviations(THREAD_LEN_BAND)
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

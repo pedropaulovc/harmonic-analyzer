@@ -6,4 +6,4 @@ mg-wheel-axle:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "cut from 3/16 drill rod; thread and domed tip turned; pressed into the wheel bar at assembly"
+  process: "cut from 3/16 drill rod; thread and domed tip turned; pressed into the wheel bar to its gauge from the front face at assembly"

@@ -30,7 +30,7 @@ A few millimetres of summing-lever travel become a few centimetres of pen travel
 
 ## What will fight you
 
-The book's wheel is two coaxial wheels, 100 mm and 20 mm, so the ratio is fixed at 5. The reproduction is a cast-iron wheel whose hub spigot carries a pressed brass drum Ø18.9; measured at the wire centres (rim groove r 49.2, drum r 9.85) the ratio is 4.995. The wheel runs on a 3/16 drill-rod pin pressed flush into the wheel bar, between a brass #10 washer and a brass #4 washer, held by a #4-40 nut and jam nut; set the endshake to 0.05–0.15 with the nut. The lever's magnification is set by sliding the vertical rod, so it is continuously variable up to 4.
+The book's wheel is two coaxial wheels, 100 mm and 20 mm, so the ratio is fixed at 5. The reproduction is a cast-iron wheel whose hub spigot carries a pressed brass drum Ø18.9; measured at the wire centres (rim groove r 49.2, drum r 9.85) the ratio is 4.995. The wheel runs on a 3/16 drill-rod pin pressed into the wheel bar to a gauge from its front face (back end about flush), between a brass #10 washer and a brass #4 washer, held by a #4-40 nut and jam nut; set the endshake to 0.05–0.15 with the nut. The lever's magnification is set by sliding the vertical rod, so it is continuously variable up to 4.
 
 ## Making each part
 

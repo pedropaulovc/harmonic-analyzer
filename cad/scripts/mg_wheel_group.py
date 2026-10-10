@@ -8,7 +8,8 @@ edit that breaks the stack fails the assembly at import.
 Axial stations ``d`` run from the wheel bar's FRONT face toward the pen
 (machine z = BAR_FRONT_Z - d): bar -9..0, back washer, wheel hub (spokes'
 mid-plane at d 8), endshake, front washer, nut, locknut, then the pin's thread
-end and domed tip. The pin is flush with the bar's back face.
+end and domed tip. The pin is pressed to a gauge from the bar's front face,
+its back end about flush with the back face.
 """
 
 from __future__ import annotations
@@ -44,11 +45,18 @@ if not math.isclose(SPOKE_MID_D, 8.0):
     raise AssertionError(
         f"spoke mid-plane moved to d {SPOKE_MID_D}; the pen line is at 8"
     )
-if not math.isclose(-_pin.BACK_Y, _bar.BAR_DEPTH):
-    raise AssertionError("the pin's back end must be flush with the bar's back face")
 
 # --- stack corners (the printed and catalogue bands) -----------------------------------
-_BAR_DEPTH = (_bar.BAR_DEPTH - 0.10, _bar.BAR_DEPTH + 0.10)
+# The pin is pressed to a gauge from the bar's FRONT face, so the bar's depth
+# is not in the stack; it sets only where the back end lands.
+_GAUGE = (
+    _pin.PRESS_GAUGE - _pin.PRESS_GAUGE_TOL,
+    _pin.PRESS_GAUGE + _pin.PRESS_GAUGE_TOL,
+)
+_BAR_DEPTH = (
+    _bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[1],
+    _bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[0],
+)
 _BACK = (_back.THICKNESS_MIN, _back.THICKNESS_MAX)
 _HUB = (
     _wheel.HUB_LEN + _wheel.HUB_LEN_BAND[1],
@@ -58,26 +66,34 @@ _SHANK = (
     _pin.SHANK_LEN + _pin.SHANK_LEN_BAND[1],
     _pin.SHANK_LEN + _pin.SHANK_LEN_BAND[0],
 )
-_THREAD_END = (
-    _pin.THREAD_END + _pin.THREAD_END_BAND[1],
-    _pin.THREAD_END + _pin.THREAD_END_BAND[0],
+_THREAD = (
+    _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[1],
+    _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[0],
 )
 _FRONT = (_front.THICKNESS_MIN, _front.THICKNESS_MAX)
-_NUTS = 2.0 * _nut.THICKNESS
+_NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 
+# The back end: at most the bar's depth band proud of its back face, at most
+# 0.30 sunk in it.
+BACK_END_PROUD_MAX = _SHANK[1] - _GAUGE[0] - _BAR_DEPTH[0]  # 0.10
+BACK_END_SUNK_MAX = _BAR_DEPTH[1] - (_SHANK[0] - _GAUGE[1])  # 0.30
+if BACK_END_PROUD_MAX > _bar.BAR_DEPTH_BAND[0] + 1e-9:
+    raise AssertionError(f"pin back end {BACK_END_PROUD_MAX:.3f} proud of the bar")
+if BACK_END_SUNK_MAX > 0.30 + 1e-9:
+    raise AssertionError(f"pin back end {BACK_END_SUNK_MAX:.3f} sunk in the bar")
 # (a) The pin's shank-to-thread step stays inside the hub's front face, so the
 # wheel runs on the full shank and the front washer sits on the thread.
-STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - (-_BAR_DEPTH[0] + _SHANK[1])  # 0.587
+STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - _GAUGE[1]  # 0.687
 # (b) The locknut is fully threaded: the thread runs past its outer face.
-LOCKNUT_THREAD_MARGIN = (-_BAR_DEPTH[1] + _THREAD_END[0]) - (
-    _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS
-)  # 0.033
+LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0]) - (
+    _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
+)  # 0.017
 # (c) Only the dome and a little thread stand past the locknut.
-THREAD_PAST_LOCKNUT_LIMIT = 1.35
-THREAD_PAST_LOCKNUT_MAX = (-_BAR_DEPTH[0] + _THREAD_END[1]) - (
-    _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS
-)  # 1.344
-THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 0.687
+THREAD_PAST_LOCKNUT_LIMIT = 1.8
+THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + _THREAD[1]) - (
+    _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]
+)  # 1.787
+THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 0.837
 if STEP_INSIDE_HUB <= 0.0:
     raise AssertionError(f"pin step clears the hub front face: {STEP_INSIDE_HUB:.4f}")
 if LOCKNUT_THREAD_MARGIN < 0.0:
@@ -127,9 +143,9 @@ CCW_MAX_DEG = math.degrees(PEN_UP_MAX / _wheel.RIM_WIRE_R)  # 48.7
 
 WRAP_MARGIN_DEG = 30.0  # wire left on its wheel at either end of the travel
 # Pen wire: from the 3 o'clock tangent counter-clockwise, up over the top, to
-# TIE 2 at 4:30. Turning clockwise unwinds it.
-PEN_WIRE_WRAP_DEG = 360.0 + _wheel.TIE2_CLOCK_DEG  # 315
-PEN_WIRE_WRAP_LEFT_DEG = PEN_WIRE_WRAP_DEG - CW_MAX_DEG  # 269.9
+# TIE 2 at about 4:30. Turning clockwise unwinds it.
+PEN_WIRE_WRAP_DEG = 360.0 + _wheel.TIE2_CLOCK_DEG  # 317
+PEN_WIRE_WRAP_LEFT_DEG = PEN_WIRE_WRAP_DEG - CW_MAX_DEG  # 271.9
 # Lever wire: from its drum tangent clockwise down to TIE 1 at 6 o'clock.
 # Turning counter-clockwise (pen up: the lever pulls) unwinds it.
 LEVER_WIRE_WRAP_DEG = _lever.TANGENT_CLOCK_DEG - _wheel.TIE1_CLOCK_DEG  # 107.7

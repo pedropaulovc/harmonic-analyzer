@@ -14,6 +14,7 @@ from __future__ import annotations
 from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
     AXLE_BORE_BAND,
     AXLE_BORE_DIA,
+    AXLE_BORE_POSITION_TOL,
     AXLE_BORE_X,
     BAR_DEPTH,
     BAR_LENGTH,
@@ -34,16 +35,19 @@ _LEFT_END = -BAR_LENGTH / 2.0
 AXLE_BORE_STATION = AXLE_BORE_X - _LEFT_END  # 61.0
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The bar depth (9) is added on the sheet across the right-view
-# section.  The reamed axle bore is a sketch-cut whose diameter (with its
-# reamer band) and station from the left end are model dimensions; the three
-# screw bores are native Hole Wizard clearance holes, quoted in the notes,
-# never fake marked dimensions. ---
+# print shows.  The bar depth is the extrude's named depth, banded because the
+# wheel axle's back end lands within it of the back face (mg_wheel_group).
+# The reamed axle bore is a sketch-cut whose diameter (with its reamer band)
+# and station from the left end are model dimensions; the three screw bores
+# are native Hole Wizard clearance holes, quoted in the notes, never fake
+# marked dimensions. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {"Length", "Side"},
+    "Bar": {"BarDepth"},
     "AxleBoreProfile": {"AxleBoreDia", "AxleBoreStation"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "Bar": {"BarDepth": 2},
     "AxleBoreProfile": {"AxleBoreDia": 4, "AxleBoreStation": 2},
 }
 
@@ -52,7 +56,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # constants, never duplicated as literals) + the front-view centre marks.
 DRAWING_NOTES = "\n".join(
     (
-        "ALL BORES THRU ON THE MID-HEIGHT CENTRELINE, SQUARE TO THE BACK FACE.",
+        "ALL BORES THRU ON THE MID-HEIGHT CENTRELINE "
+        f"+/-{AXLE_BORE_POSITION_TOL:.2f}, SQUARE TO THE BACK FACE.",
         f"2X {CLAMP_HOLE_SPEC.size} {CLAMP_HOLE_SPEC.fit.upper()} CLEARANCE "
         f"Ø{CLAMP_HOLE_DIA:.3f} FOR THE COLUMN-CLAMP SCREWS (MHA-SH-002).",
         f"1X {PEN_HANGER_HOLE_SPEC.size} {PEN_HANGER_HOLE_SPEC.fit.upper()} "

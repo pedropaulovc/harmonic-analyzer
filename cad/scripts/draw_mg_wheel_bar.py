@@ -24,7 +24,6 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
@@ -81,7 +80,10 @@ FRONT_KEEP = {
     "AxleBoreStation": ((LEFT_END + AXLE_BORE_SHEET_X) / 2.0, FRONT_CENTER[1] + 0.018),
     "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.020, FRONT_CENTER[1] + 0.032),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+# The bar depth (the extrude's banded model dimension) under the end view.
+RIGHT_KEEP = {
+    "BarDepth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - BAR_SIDE / 2000.0 - 0.014),
+}
 DIMENSION_CALLOUTS = {"AxleBoreDia": "THRU - REAM"}
 DRAWING_PRECISION_BY_NAME = {
     name: places
@@ -90,7 +92,6 @@ DRAWING_PRECISION_BY_NAME = {
 }
 
 RIGHT_HALF_Z = BAR_DEPTH * SHEET_SCALE[0] / 2000.0
-RIGHT_HALF_Y = BAR_SIDE * SHEET_SCALE[0] / 2000.0
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -143,34 +144,26 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter,
-        front,
-        keep=FRONT_KEEP,
-        view_label="front",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    curate_view_dimensions(
-        adapter,
-        right,
-        keep=RIGHT_KEEP,
-        view_label="right",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            front,
+            keep=FRONT_KEEP,
+            view_label="front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            right,
+            keep=RIGHT_KEEP,
+            view_label="right",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+    ]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to wheel-bar bores")
-
-    # Bar depth (9): dimension the right view's flat front/back faces.
-    add_edge_dimension(
-        adapter,
-        right,
-        p0=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        p1=(RIGHT_CENTER[0] + RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - RIGHT_HALF_Y - 0.014),
-        label="bar-depth overall",
-    )
 
     # The reamed axle bore carries its Ø and station from the left end
     # (FRONT_KEEP). The three screw bores show as circles with the ASME centre

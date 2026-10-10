@@ -19,7 +19,7 @@ axle (+53) and the pen-hanger strap top with margin.
 
 Holes (all along local Z, the machine front-back axis):
 * 1x reamed axle bore at local (AXLE_BORE_X, 0) = machine x WHEEL_X, the
-  mg-wheel-axle pressed in flush with the back face (mg_wheel_bar_geom).
+  mg-wheel-axle pressed in to a gauge from the front face (mg_wheel_axle_spec).
 * 2x O4.4 clamp-screw through-holes flanking the column at local
   x 70.5 / 105.5 (the column line crosses the bar at local +88 =
   column +197 - centre +109; ears at +-17.5,
@@ -52,6 +52,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -77,6 +78,7 @@ from mg_wheel_bar_geom import (
     AXLE_BORE_DIA,
     AXLE_BORE_X,
     BAR_DEPTH,
+    BAR_DEPTH_BAND,
     BAR_LENGTH,
     BAR_SIDE,
     BAR_SIDE_BAND,
@@ -117,9 +119,8 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations): the section, the bar length, and the
     # screw holes (diameters + X stations). The mm suffix is load-bearing --
     # this is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 200 = 200 in). BAR_DEPTH is the extrude
-    # DEPTH (a feature parameter, not a sketch dim), so BarDepth is on record
-    # for the GUI but the depth itself is static, matching the exemplars.
+    # document units (an unsuffixed 200 = 200 in). BarDepth drives the bar
+    # extrude's depth, a named feature dimension the drawing prints.
     # (The old ScrewHoleDia/ScrewHoleX/ClampHoleDia knobs are gone: the holes are
     # now native Hole Wizard features whose diameters come from the clearance
     # tables and whose positions are the literal photo stations.)
@@ -160,6 +161,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Bar")
+    bar_depth = name_dimensions(adapter, "Bar", ["BarDepth"])
+    drive_jobs.append((bar_depth[0], '"BarDepth"'))
 
     expected = BAR_LENGTH * BAR_SIDE * BAR_DEPTH
     await volume_check(adapter, "bar", expected, 0.005 * expected)
@@ -278,6 +281,9 @@ async def build(adapter) -> dict[str, str]:
     # print's dimensions and stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(
         adapter, "BarProfile", "Side", *deviations(BAR_SIDE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Bar", "BarDepth", *deviations(BAR_DEPTH_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "AxleBoreProfile", "AxleBoreDia", *deviations(AXLE_BORE_BAND)

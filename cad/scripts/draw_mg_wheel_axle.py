@@ -48,7 +48,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Every view prints at the sheet scale, so none needs a caption. 4:1 lays the
-# 36.5 pin 146 mm long and its 3/16 shank 19 mm across.
+# 36.55 pin 146 mm long and its 3/16 shank 19 mm across.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -71,13 +71,14 @@ STEP_X = _sheet_x(STEP_Y)
 THREAD_END_X = _sheet_x(THREAD_END_Y)
 TIP_X = _sheet_x(TIP_Y)
 
-# Rows below the profile, 15 mm apart, every length from the back end (the
-# pressed end, flush with the bar's back face). Diameters on the profile.
-_ROW_Y = (SIDE_CENTER[1] - 0.025, SIDE_CENTER[1] - 0.040, SIDE_CENTER[1] - 0.055)
+# Rows below the profile, 15 mm apart: the shank from the back end chained to
+# the thread from the step (the press gauge's datum), then the overall.
+# Diameters on the profile.
+_ROW_Y = (SIDE_CENTER[1] - 0.025, SIDE_CENTER[1] - 0.040)
 SIDE_KEEP = {
     "ShankLength": ((BACK_X + STEP_X) / 2.0, _ROW_Y[0]),
-    "ThreadEnd": ((BACK_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
-    "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[2]),
+    "ThreadLength": ((STEP_X + THREAD_END_X) / 2.0, _ROW_Y[0]),
+    "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[1]),
     # The shank's dimension line crosses the shank near the step.
     "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.030),
     # Below-right of the tip, clear of the thread callout above it.

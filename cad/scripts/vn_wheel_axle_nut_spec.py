@@ -26,7 +26,10 @@ SKU = "92671A005"
 COUNT = 2  # nut + locknut
 THREAD = "#4-40"
 ACROSS_FLATS = 0.25 * MM_PER_IN  # 6.35
-THICKNESS = 3.0 / 32.0 * MM_PER_IN  # 2.38125
+THICKNESS = 3.0 / 32.0 * MM_PER_IN  # 2.38125, modelled
+# The stack proofs take the ASME B18.6.3 #4 hex machine-screw nut band.
+THICKNESS_MIN = 0.087 * MM_PER_IN  # 2.2098
+THICKNESS_MAX = 0.098 * MM_PER_IN  # 2.4892
 BORE_DIA = THREAD_MAJOR_MM[THREAD]  # 2.845
 ACROSS_CORNERS = ACROSS_FLATS / math.cos(math.radians(30.0))  # 7.332
 

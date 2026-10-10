@@ -28,17 +28,19 @@ def test_required_drawing_paths() -> None:
 def test_spec_values_are_the_drill_rod_pin() -> None:
     assert spec.PIN_DIA == pytest.approx(4.7625)
     assert spec.PIN_DIA_TOL == 0.005
-    assert spec.SHANK_LEN == 28.5
+    assert spec.SHANK_LEN == 28.4
     assert spec.THREAD == "#4-40"
     assert spec.THREAD_MAJOR == pytest.approx(2.845, abs=1e-3)
-    assert spec.THREAD_LEN == 7.2
-    assert spec.THREAD_END == pytest.approx(35.7)
-    assert spec.PIN_LEN == pytest.approx(36.5)
+    assert spec.THREAD_LEN == 7.35
+    assert spec.THREAD_END == pytest.approx(35.75)
+    assert spec.PIN_LEN == pytest.approx(36.55)
     assert spec.DOME_R == pytest.approx(1.665, abs=1e-3)
-    # The back end is flush with the bar's back face; origin on its front face.
-    assert spec.BACK_Y == -mg_wheel_bar_geom.BAR_DEPTH == -9.0
+    # Pressed to the gauge from the bar's front face (the origin); the back
+    # end then sits 0.10 inside the bar's back face.
+    assert spec.PRESS_GAUGE == spec.STEP_Y == 19.5
+    assert spec.BACK_Y == pytest.approx(-mg_wheel_bar_geom.BAR_DEPTH + 0.10)
     assert (spec.STEP_Y, spec.THREAD_END_Y, spec.TIP_Y) == pytest.approx(
-        (19.5, 26.7, 27.5)
+        (19.5, 26.85, 27.65)
     )
 
 
@@ -46,7 +48,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) == marked
-    assert marked == {"PinDia", "ShankLength", "ThreadEnd", "PinLength", "DomeR"}
+    assert marked == {"PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"}
     assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
     assert drawing.DRAWING_PRECISION_BY_NAME == spec.DRAWING_PRECISION["PinProfile"]
 
@@ -60,7 +62,7 @@ def test_pin_is_one_front_plane_revolve() -> None:
     assert "create_extrusion(" not in source
     # Axis1 on local Y and the Front Plane carry the assembly mates.
     assert 'name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0' in source
-    for name in ("PinDia", "ShankLength", "ThreadEnd", "PinLength", "DomeR"):
+    for name in ("PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"):
         assert re.search(rf'profile\.record\(\s*"{name}"', source), name
     v = (
         math.pi * (spec.PIN_DIA / 2.0) ** 2 * spec.SHANK_LEN
@@ -74,11 +76,11 @@ def test_tolerances_are_native_on_the_model() -> None:
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "PinDia"): "PIN_DIA_TOL",
         ("PinProfile", "ShankLength"): "*deviations(SHANK_LEN_BAND)",
-        ("PinProfile", "ThreadEnd"): "*deviations(THREAD_END_BAND)",
+        ("PinProfile", "ThreadLength"): "*deviations(THREAD_LEN_BAND)",
     }
     assert set(spec.DRAWING_BANDS) == {
         ("PinProfile", "ShankLength"),
-        ("PinProfile", "ThreadEnd"),
+        ("PinProfile", "ThreadLength"),
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
@@ -109,6 +111,8 @@ def test_thread_callout_and_notes() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     notes = spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
+    assert "19.50 +/-0.05" in notes
+    assert "FROM FRONT FACE (BACK END ~FLUSH)" in notes
     assert "DEBURR" not in notes
     assert "X.XX" not in notes
 
@@ -137,11 +141,16 @@ def test_part_stamps_make_critical_properties() -> None:
 
 def test_wheel_group_stack_fits_the_pin() -> None:
     assert group.STEP_INSIDE_HUB > 0.0
-    assert group.STEP_INSIDE_HUB == pytest.approx(0.587, abs=1e-3)
+    assert group.STEP_INSIDE_HUB == pytest.approx(0.6866, abs=1e-3)
     assert group.LOCKNUT_THREAD_MARGIN >= 0.0
-    assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.0325, abs=1e-3)
-    assert group.THREAD_PAST_LOCKNUT_MAX <= 1.35
-    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(1.3437, abs=1e-3)
+    assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.0166, abs=1e-3)
+    assert group.THREAD_PAST_LOCKNUT_MAX <= group.THREAD_PAST_LOCKNUT_LIMIT == 1.8
+    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(1.7866, abs=1e-3)
+    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(0.8375, abs=1e-3)
+    # Pressed to the gauge, the back end is within the bar's depth band of
+    # the back face.
+    assert group.BACK_END_PROUD_MAX == pytest.approx(0.10)
+    assert group.BACK_END_SUNK_MAX == pytest.approx(0.30)
     assert group.SPOKE_MID_D == pytest.approx(8.0)
     assert group.WHEEL_MID_Z == -146.9
 

@@ -600,9 +600,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # --- magnifying wheel ----------------------------------------------------
-    # Rx(-90): the pin's +Y axis points -Z (back end flush with the bar back
-    # face, origin on the bar front face). The pin is structure (fixed, pressed
-    # in the bar's reamed bore); the wheel spins on its shank (revolute).
+    # Rx(-90): the pin's +Y axis points -Z (pressed to its gauge from the bar
+    # front face, the origin; back end about flush). The pin is structure
+    # (fixed, pressed in the bar's reamed bore); the wheel spins on its shank
+    # (revolute).
     ax = await place_component(
         adapter,
         "mg-wheel-axle",

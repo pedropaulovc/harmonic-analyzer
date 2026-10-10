@@ -79,7 +79,7 @@ def test_bores_are_note_based_with_center_marks() -> None:
     # sizes + X-stations and the front-view centre marks locate them.
     assert source.count("add_native_hole_callout(") == 0
     assert source.count("add_datum_feature(") == 1
-    assert source.count("add_edge_dimension(") == 1  # bar depth only
+    assert source.count("add_edge_dimension(") == 0  # the depth is native
     assert "auto_center_marks(" in source
     # The station note is computed from the geom constants, never duplicated.
     assert "HOLE STATIONS FROM THE LEFT END" in mg_wheel_bar_spec.DRAWING_NOTES
@@ -107,10 +107,15 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
         "AxleBoreDia",
         "AxleBoreStation",
     }
-    assert set(drawing.DRAWING_PRECISION_BY_NAME) == {"AxleBoreDia", "AxleBoreStation"}
+    assert set(drawing.DRAWING_PRECISION_BY_NAME) == {
+        "AxleBoreDia",
+        "AxleBoreStation",
+        "BarDepth",
+    }
     assert drawing.DIMENSION_CALLOUTS == {"AxleBoreDia": "THRU - REAM"}
     assert model_toleranced_dimensions(part) == {
         ("BarProfile", "Side"): "*deviations(BAR_SIDE_BAND)",
+        ("Bar", "BarDepth"): "*deviations(BAR_DEPTH_BAND)",
         ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -118,10 +123,17 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
     assert 'name_last_feature(adapter, "AxleBore")' in source
     assert "create_cut_extrude(" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
+    assert 'name_dimensions(adapter, "Bar", ["BarDepth"])' in source
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)" in sheet
+
+
+def test_axle_bore_height_band_is_printed() -> None:
+    import mg_wheel_bar_geom as geom
+
     assert (
-        "set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)"
-        in sheet
+        f"MID-HEIGHT CENTRELINE +/-{geom.AXLE_BORE_POSITION_TOL:.2f}"
+        in mg_wheel_bar_spec.DRAWING_NOTES
     )
 
 
