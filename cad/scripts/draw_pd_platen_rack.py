@@ -75,9 +75,15 @@ END_KEEP = {
 }
 INCOMING_INSPECTION_XY = (0.020, 0.263)
 GEAR_DATA_XY = (0.020, 0.254)
-FLANK_INSPECTION_XY = (0.020, 0.223)
+# One-line requirement (option (c)) ending at x ~48, left of the first gap
+# flank at x ~55: SolidWorks takes the leader from the nearer, right end,
+# so it runs down-right clear of its own text and left of the Length
+# dimension line's start.
+FLANK_INSPECTION_XY = (0.016, 0.214)
 NOTES_XY = (0.020, 0.073)
-END_NOTE_XY = (0.299, 0.169)
+# Centred under the 4:1 end view (axis x ~0.355), between the BackerDepth
+# dimension line (y ~0.0795) and the title block top (y 0.066).
+END_NOTE_XY = (0.330, 0.074)
 ISO_NOTE_XY = (0.104, 0.077)
 
 

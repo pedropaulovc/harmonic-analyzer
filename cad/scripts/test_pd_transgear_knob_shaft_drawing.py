@@ -300,7 +300,10 @@ def test_model_bands_and_source_linked_properties() -> None:
     assert _keyword(callouts[0], "rotate_rad") == "math.pi / TEETH"
     assert _keyword(callouts[0], "axial_stations_mm") == "(0.0,)"
     assert _keyword(callouts[0], "tooth_features") == "tooth_features"
-    assert "source_properties[TOOTH_SPACE_CALLOUT_PROPERTY] != TOOTH_SPACE_CALLOUT" in inspect.getsource(drawing.build)
+    assert (
+        "require_source_control(source_properties[TOOTH_SPACE_CALLOUT_PROPERTY], TOOTH_SPACE_CALLOUT,"
+        in " ".join(inspect.getsource(drawing.build).split()).replace("( ", "(")
+    )
 
 def test_supported_certified_pin_inspects_all_actual_finite_corners() -> None:
     pin_diameter = spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM

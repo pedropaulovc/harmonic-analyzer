@@ -39,7 +39,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
 from _rack_bore_finish import add_rack_bore_finish
-from paper_drive_stock_drawing import add_toothspace_callout
+from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_rack_pinion_spec import (
     BORE_CALLOUT,
     BORE_FIT_CALLOUT,
@@ -216,8 +216,10 @@ async def build(adapter: Any) -> dict[str, str]:
             "Tooth Cut Features",
         ),
     )
-    if properties[TOOTH_SPACE_CALLOUT_PROPERTY] != TOOTH_SPACE_CALLOUT:
-        raise RuntimeError("rack-pinion source tooth-space control differs from current specification")
+    require_source_control(
+        properties[TOOTH_SPACE_CALLOUT_PROPERTY], TOOTH_SPACE_CALLOUT,
+        label="rack-pinion tooth-space control",
+    )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )

@@ -160,8 +160,11 @@ GEOMETRIC_CONTROLS += (
 # The dowel engagement pays the arm's mouth break, which is tighter than the
 # title block's edge break; MHA-PD-000 says the dowels locate and the screws
 # only clamp, so the callout does not repeat it (policy rule 6).
+# Three short lines: at two, the break line's width put its left end over
+# the sheet border (run 20261010T001620278Z).
 LOCATOR_CALLOUT = (
-    f"2X REAM THRU\nBREAK EDGE {PLATE.ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
+    "2X REAM THRU\nBREAK EDGE\n"
+    f"{PLATE.ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
 )
 
 # The bore is the knob shaft's running surface (policy rule 5): MACHINED, on

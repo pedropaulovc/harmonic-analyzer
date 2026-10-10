@@ -239,13 +239,13 @@ LATCH_PIN_PRESS_PRINTED = (
     math.floor(LATCH_PIN_PRESS_INTERFERENCE[0] * 1e4 + 1e-6) / 1e4,
     math.ceil(LATCH_PIN_PRESS_INTERFERENCE[1] * 1e4 - 1e-6) / 1e4,
 )  # 0.0025, 0.0177
-# The pin goes in to the hole's flat floor, which sets its proud length.
-# Three lines no wider than before: the callout's right edge sits inside the
-# border and its top under the stock thickness text.
+# Three lines as the pin bore's: the operation, the mating pin, the press.
+# Pressing it to the floor is MHA-PD-000's latch-pin-pressed step (policy
+# option (c)); the callout stands below the end view, inside the border.
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "BLIND FLAT-BOTTOM REAM",
-        f"PRESS PIN {LATCH_PIN_NUMBER} TO FLOOR",
+        f"PRESS FIT PIN {LATCH_PIN_NUMBER}",
         f"{LATCH_PIN_PRESS_PRINTED[0]:.4f}/{LATCH_PIN_PRESS_PRINTED[1]:.4f}"
         " INTERFERENCE",
     )
@@ -283,12 +283,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "SpotFaceDia": SPOT_FACE_DIA_PLACES,
         "FloorDepth": SPOT_FACE_FLOOR_PLACES,
     },
+    # The reducer offsets print at the stations' .XXX: each BASIC rounds by
+    # <= 0.0005, so the 35.080 centre distance they compose moves <= 0.0007
+    # (backlash 2 tan 20 x 0.0007 = 0.0005), under 2 % of the feed stud's
+    # Ø0.050 position zone.  Six places asked for nothing the mesh needs.
     "StationReference": {
         "PinStation": STATION_PLACES,
         "PlateTapStation1": STATION_PLACES,
         "PlateTapStation2": STATION_PLACES,
-        "ReducerDeltaX": 6,
-        "ReducerDeltaY": 6,
+        "ReducerDeltaX": STATION_PLACES,
+        "ReducerDeltaY": STATION_PLACES,
     },
     "PinHoleProfile": {
         "PinHoleDia": PIN_HOLE_DIA_PLACES,

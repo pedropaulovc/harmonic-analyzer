@@ -43,7 +43,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
 from _surface_finish import surface_finish_by_key
-from paper_drive_stock_drawing import add_toothspace_callout
+from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
     BORE_DIA,
@@ -323,8 +323,10 @@ async def build(adapter: Any) -> dict[str, str]:
             "Tooth Cut Features",
         ),
     )
-    if source_properties[TOOTH_SPACE_CALLOUT_PROPERTY] != TOOTH_SPACE_CALLOUT:
-        raise RuntimeError("source toothspace/index inspection control is stale for configured limits")
+    require_source_control(
+        source_properties[TOOTH_SPACE_CALLOUT_PROPERTY], TOOTH_SPACE_CALLOUT,
+        label="feed pinion toothspace/index control",
+    )
     tooth_features = tuple(source_properties["Tooth Cut Features"].splitlines())
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout

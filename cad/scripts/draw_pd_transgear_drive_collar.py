@@ -97,13 +97,16 @@ _PILOT_X = _SEAT_X + PILOT_LENGTH * _S / 1000.0
 # bore). So each text stands where that whole line is clear: the bore's up
 # and right of the bore, between the pins and right of section line A; the
 # dimensioned (+Y) pin hole's up and left of that hole, outside the part. The
-# flat's size stands right of the view, its stacked limits between its
-# witness lines and its matched-fit line under them, clear of the section.
+# flat's size stands right of the view BELOW its witness lines, the matched-
+# fit line under it: between them its arrows sit outside the 8.7 mm span
+# and their tails struck both (run 20261010T001620278Z). The bore's text
+# stands 4 mm lower and the rear entry break 3 mm higher than that run, where
+# the bore's tolerance printed on the break's underline.
 _BORE_TEXT_HALF = 0.017
 _PIN_TEXT_HALF = 0.022
 END_KEEP = {
-    "BoreDia": (END_CENTER[0] + 0.040 + _BORE_TEXT_HALF, END_CENTER[1] + 0.030),
-    "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.025, END_CENTER[1] - 0.0044),
+    "BoreDia": (END_CENTER[0] + 0.040 + _BORE_TEXT_HALF, END_CENTER[1] + 0.026),
+    "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.025, END_CENTER[1] - 0.0215),
     "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.055),
     "PinPosY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] + PIN_R / 2.0),
     "PinNegY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] - PIN_R / 2.0),
@@ -122,7 +125,7 @@ SIDE_KEEP = {
     "CollarLength": ((_REAR_X + _SEAT_X) / 2.0 - 0.003, _LENGTH_ROW_Y),
     "CollarDia": (_PILOT_X + 0.047, SIDE_CENTER[1]),
     "PilotDia": (_PILOT_X + 0.014, SIDE_CENTER[1]),
-    "BoreEntryBreak": (_REAR_X - 0.035, SIDE_CENTER[1] + HALF_OD + 0.012),
+    "BoreEntryBreak": (_REAR_X - 0.035, SIDE_CENTER[1] + HALF_OD + 0.015),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
 # Physical annular end-face picks, outside the actual rear entry relief and

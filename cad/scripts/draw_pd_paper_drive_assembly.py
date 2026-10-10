@@ -43,6 +43,7 @@ import pd_latch_hook_geometry as hook_geometry
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
 import pd_platen_guide_spec as platen_guide
+import pd_platen_rack_spec as platen_rack
 import pd_platen_spec as platen
 import pd_rack_pinion_spec as disc
 import pd_transgear_arm_geometry as arm_geometry
@@ -965,6 +966,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "BOTH COLUMNS; TIGHTEN."
         ),
         "rack-soldered": (
+            f"CHECK THE {_N['pd-platen-rack']} RACK'S FLANK LIMIT: "
+            f"{platen_rack.rack_flank_inspection_procedure_text()} "
             f"SOFT-SOLDER THE {_N['pd-platen-rack']} RACK TO THE {_N['pd-platen']} "
             "PLATEN'S BACK, TEETH DOWN, ENDS FLUSH WITH THE PLATEN'S, CRESTS "
             f"{steps.RACK_CREST_TEXT} BELOW "
