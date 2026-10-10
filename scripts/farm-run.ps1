@@ -2143,15 +2143,38 @@ catch {
     [System.Console]::Error.WriteLine($diagnostic)
 }
 
+$refreshFailure = $null
 if ($startupRecordWritten) {
-    $runRecord = (Get-RunStatus -RecordPath $recordPath).record
+    try {
+        $runRecord = (Get-RunStatus -RecordPath $recordPath).record
+    }
+    catch {
+        # The original record still describes this launch, but cannot prove
+        # the current durable build identity. Keep it for the terminal marker,
+        # never as authority to remove the snapshot or settle farm work.
+        $refreshFailure = "run status refresh failed; snapshot kept: $($_.Exception.Message)"
+    }
 }
 
 try {
-    $cleanup = Complete-Snapshot `
-        -Worktree $resolvedWorktree `
-        -SnapshotPath $snapshotPath `
-        -OutputsPath $outputsPath
+    if ($null -ne $refreshFailure) {
+        $snapshotOutputs = Join-Path $snapshotPath 'cad\out'
+        $cleanup = [ordered]@{
+            outputs = if (Test-Path -LiteralPath $snapshotOutputs -PathType Container) { $snapshotOutputs } else { $null }
+            outputs_preserved = $false
+            # Intentionally retained, not a failed attempt to move outputs:
+            # metadata uncertainty must not overwrite the actual build exit.
+            outputs_stranded = $false
+            snapshot_removed = -not (Test-Path -LiteralPath $snapshotPath)
+            cleanup_errors = @($refreshFailure)
+        }
+    }
+    else {
+        $cleanup = Complete-Snapshot `
+            -Worktree $resolvedWorktree `
+            -SnapshotPath $snapshotPath `
+            -OutputsPath $outputsPath
+    }
 }
 catch {
     # Never let cleanup cost the terminal record.

@@ -187,6 +187,13 @@ still run in parallel according to `-n`. Ownership stays open through local
 actions and dependency gaps: an empty leaf queue does not let another build
 overtake it.
 
+The supported runtime is Python 3.12–3.14 (`pyproject.toml` and `uv.lock`);
+`.python-version` selects 3.14 for development rather than narrowing that
+contract. Queued ownership uses finite one-second event waits so Windows
+Python 3.12/3.13 can deliver Ctrl-C. Cancellation joins the parent renewal thread,
+closes the named build even if registration's reply was still uncertain, and
+restores the inherited build-ID environment without entering the scheduler.
+
 Only the parent renews ownership, every 15 seconds on an independent background
 thread, while waiting and while active. Spawned action processes inherit
 `HARMONIC_FARM_BUILD_ID` but do not renew the lease. The coordinator's 120-second
@@ -216,6 +223,18 @@ surface.
 `state: "recovery_required"` with typed `error_code` and `error` fields. The
 producer fails the affected action rather than polling forever or attaching to
 a binding whose recovery failed. These reservations remain fail-closed.
+
+Once a leaf reservation is accepted but not yet bound, transient transport
+failures reading `leaf_status` retry the same `LeafKey` for at most 120 consecutive
+seconds, including any RPC in progress. A successful reserved reply starts a new
+read-outage budget; healthy startup polling is not given a total time limit.
+This independent monotonic transport budget is not an acknowledged producer
+lease: only the parent renews ownership and the coordinator fences native
+admissions. Reconciliation never resubmits, starts or cancels the canonical leaf.
+Foreign keys/bindings, recovery-required status, invalid states and definitive
+RPC refusals fail immediately. Exhausting the read budget fails the local action
+without discarding the accepted reservation or manufacturing a result.
+
 For a settled failed reservation, an operator can supply independently checked
 physical-drain evidence with `farm.py confirm-reservation-drained --build-id <id>
 --workflow-id <wf> --evidence <text>`. An unbound reservation must omit `--run-id`.
@@ -401,6 +420,12 @@ it exists (`succeeded`, `failed` or `cancelled`), otherwise `running` while the
 recorded `pid` is alive (a PID reused by a process that started after the run is
 not the launcher), otherwise **`launcher-died`** — the launcher is gone and wrote
 no `.done`.
+
+If the final run-record refresh fails, the launcher still writes `.done` with
+the actual build outcome and reports the refresh error in `cleanup_errors`.
+It keeps the snapshot and records its output path instead of authorizing cleanup
+from stale identity data. Corrupt or conflicting metadata may still make
+`-Status` refuse the record; repair that metadata before using it for cancellation.
 
 - **`-Status`** prints one JSON object: `state`, `exit_code`, `launcher`
   (`pid`, `alive`, and for a dead launcher the `orphaned_processes` it left —

@@ -320,6 +320,23 @@ if release:
     while not Path(release).exists() and time.monotonic() < deadline:
         time.sleep(0.05)
 record(build_py_at_exit=Path("build.py").read_text(encoding="utf-8"))
+refresh_failure = os.environ.get("UV_STUB_REFRESH_FAILURE")
+if refresh_failure:
+    # Corrupt durable metadata only after the fake build has finished. The
+    # real launcher's post-build Get-RunStatus must fail, without any farm RPC.
+    requests = Path(os.environ["HARMONIC_FARM_REQUESTS"])
+    run_path = requests.parent / (os.environ["HARMONIC_FARM_RUN"] + ".run.json")
+    if refresh_failure == "invalid_json":
+        run_path.write_text("{invalid", encoding="utf-8")
+    elif refresh_failure == "identity_mismatch":
+        run = json.loads(run_path.read_text(encoding="utf-8-sig"))
+        run["build_id"] = "fixture-record-build"
+        run_path.write_text(json.dumps(run), encoding="utf-8")
+        (requests / "build.json").write_text(
+            json.dumps({"build_id": "fixture-request-build"}), encoding="utf-8"
+        )
+    else:
+        raise AssertionError(refresh_failure)
 raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
 """,
         encoding="utf-8",
@@ -1253,6 +1270,39 @@ def test_native_failure_preserves_exit_and_writes_a_failed_terminal_record(
         _record(marker)["state"] == "succeeded"
         for marker in log_directory.glob("*.done")
     )
+
+
+@pytest.mark.parametrize("exit_code", [0, 23])
+@pytest.mark.parametrize("refresh_failure", ["invalid_json", "identity_mismatch"])
+def test_status_refresh_failure_preserves_terminal_result_and_snapshot(
+    tmp_path: Path, exit_code: int, refresh_failure: str,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_EXIT"] = str(exit_code)
+    environment["UV_STUB_REFRESH_FAILURE"] = refresh_failure
+
+    result = _run_launcher(fixture, _command(fixture, "part:pen_rod"), environment)
+
+    assert result.returncode == exit_code, (result.stdout, result.stderr)
+    log_directory = Path(fixture["log_directory"])
+    finished = _record(_only(log_directory, "*.done"))
+    assert finished["exit_code"] == exit_code
+    assert finished["state"] == ("succeeded" if exit_code == 0 else "failed")
+    assert finished["run_id"] == Path(finished["done"]).stem
+    snapshot = Path(finished["snapshot"])
+    assert finished["snapshot_removed"] is False
+    assert snapshot.is_dir()
+    assert finished["outputs_preserved"] is False
+    assert Path(finished["outputs"]) == snapshot / "cad" / "out"
+    assert (Path(finished["outputs"]) / "reports" / "stub-output.txt").read_text(
+        encoding="utf-8"
+    ) == "built\n"
+    assert not list(log_directory.glob("*.out"))
+    # Unknown durable identity must not close/cancel any farm work. The fake
+    # farm records close-build calls in its state and cancel calls separately.
+    assert _record(Path(fixture["farm_state"])) == {}
+    assert not Path(fixture["farm_cancels"]).exists()
 
 
 def test_wrapper_failure_after_startup_writes_a_failed_terminal_record(

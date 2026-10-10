@@ -1,7 +1,7 @@
 """Real FIFO producer ownership with a fake, guarded Temporal boundary.
 
 No native work, credentials, live service, or parent interrupt is allowed here.
-The one child process is an isolated Python environment/thread-name probe.
+Child processes probe inheritance and deliver SIGINT only inside their own PID.
 """
 
 import asyncio
@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 import threading
+import textwrap
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -361,6 +362,134 @@ def test_waiting_registration_renews_without_entering_scheduler_then_activation_
     _assert_close(control, registration.build_id, "finished")
     assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
     assert not _guarded_process[1].is_set()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows lock waits have distinct signal behavior")
+@pytest.mark.parametrize("registration", ["waiting", "accepted-reply-pending"])
+def test_windows_sigint_while_entering_closes_accepted_build_and_restores_environment(
+    _guarded_process, tmp_path, registration
+):
+    # A real Python SIGINT is queued from the isolated child's background thread.
+    # No console broadcast, parent interrupt, credentials or native leaf is used.
+    # On 3.12/3.13 an indefinite Event.wait leaves this child blocked until killed.
+    source = textwrap.dedent(
+        """
+        import asyncio
+        import json
+        import os
+        import signal
+        import sys
+        from datetime import datetime, timedelta, timezone
+
+        sys.path.insert(0, sys.argv[1])
+        import _farm
+        from temporalio.client import Client
+
+        def refuse(*args, **kwargs):
+            raise AssertionError("isolated signal probe attempted live farm access")
+
+        Client.connect = refuse
+        _farm.load_config = refuse
+        _farm.FIFO_RPC_TIMEOUT_S = 4
+        _farm.FIFO_HEARTBEAT_INTERVAL_S = 60
+        _farm.STATUS_POLL_INTERVAL_S = 0.002
+        _farm._telemetry.info = lambda *args, **kwargs: None
+        _farm._telemetry.warn = lambda *args, **kwargs: None
+        previous_id = os.environ["HARMONIC_FARM_BUILD_ID"]
+        owner = _farm.producer_build("Windows SIGINT test")
+        updates = []
+
+        class Control:
+            def status(self, state="open"):
+                return _farm.BuildStatus(
+                    owner.build_id, 7, state, "waiting",
+                    (datetime.now(timezone.utc) + timedelta(seconds=120)).isoformat(),
+                    2, 1,
+                )
+
+            async def execute_update(self, name, arg, **options):
+                updates.append((name, getattr(arg, "reason", None)))
+                assert arg.build_id == owner.build_id
+                if name == "register_build":
+                    asyncio.get_running_loop().call_later(
+                        0.05, signal.raise_signal, signal.SIGINT
+                    )
+                    if sys.argv[2] == "accepted-reply-pending":
+                        # The fake accepted registration, but withholds its reply
+                        # until the real producer's cancellation cleanup starts.
+                        while not owner._stop.is_set():
+                            await asyncio.sleep(0.002)
+                    return self.status()
+                assert name == "close_build", "signal probe unexpectedly renewed"
+                return self.status("closed")
+
+            async def query(self, name, arg, **options):
+                assert name == "build_status"
+                assert arg == _farm.BuildKey(owner.build_id)
+                return self.status()
+
+            async def cancel(self):
+                raise AssertionError("local SIGINT cancelled remote work")
+
+        control = Control()
+
+        class FakeClient:
+            async def start_workflow(self, name, **options):
+                assert name == _farm.WORKFLOW_BUILD_FIFO, "signal probe started a leaf"
+                assert options["id"] == _farm.WORKFLOW_BUILD_FIFO_ID
+                return control
+
+            def get_workflow_handle(self, workflow_id, **options):
+                assert workflow_id == _farm.WORKFLOW_BUILD_FIFO_ID
+                assert options == {}
+                return control
+
+        async def connect(identity):
+            return FakeClient()
+
+        _farm._connect_client = connect
+        entered = False
+        interrupted = False
+        try:
+            with owner:
+                entered = True
+        except KeyboardInterrupt:
+            interrupted = True
+        print(json.dumps({
+            "entered": entered,
+            "interrupted": interrupted,
+            "updates": updates,
+            "thread_alive": owner._thread.is_alive(),
+            "restored": os.environ.get("HARMONIC_FARM_BUILD_ID") == previous_id,
+            "build_id": owner.build_id,
+        }))
+        """
+    )
+    child = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            source,
+            str(REPO_ROOT / "cad" / "scripts"),
+            registration,
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=WAIT_S + 5,
+    )
+    outcome = json.loads(child.stdout)
+    assert outcome["interrupted"]
+    assert not outcome["entered"], "cancelled waiting build entered the scheduler"
+    assert not outcome["thread_alive"], "cancelled producer left a renewal thread"
+    assert outcome["restored"]
+    assert outcome["updates"] == [["register_build", None], ["close_build", "cancelled"]]
+    assert json.loads((_guarded_process[0] / "build.json").read_text("utf-8")) == {
+        "build_id": outcome["build_id"], "farm_run": FARM_RUN,
+    }
+    assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
 
 def test_active_local_action_gap_renews_and_spawned_child_inherits_only_build_identity(
@@ -927,96 +1056,288 @@ def test_retrying_uncertain_heartbeat_reuses_update_id_and_does_not_reset_sequen
     assert calls[0][2]["result_type"] is _farm.BuildStatus
 
 
+class _LeafControl:
+    """Accepted reservation and exact result behind the real dispatch RPC helpers."""
+
+    def __init__(self, requests):
+        self.requests = requests
+        self.request = _farm.LeafRequest(
+            farm_protocol_version=5,
+            commit="c" * 40,
+            task="part:pen_rod",
+            cache_key="k" * 64,
+            traceparent=None,
+            submitter="test@submitter",
+            build_id=INHERITED_BUILD_ID,
+        )
+        self.workflow_id = _farm.workflow_id(
+            self.request.task, self.request.cache_key, self.request.commit, 900
+        )
+        self.key = _farm.LeafKey(self.request.build_id, self.workflow_id)
+        self.binding = _farm.LeafBinding(self.request.build_id, self.workflow_id, "exact-run")
+        self.reserved = _farm.LeafStatus(self.key, "reserved", None, [])
+        self.bound = _farm.LeafStatus(self.key, "bound", self.binding, [])
+        self.result_value = _farm.LeafResult(
+            "succeeded", 0, "test-worker", 1, True, "test/log", None, None
+        )
+        self.updates = []
+        self.queries = []
+        self.starts = []
+        self.handles = []
+        self.cancellations = []
+        self.start_error = None
+        self.responses = []
+        self.fallback = self.bound
+        self.query_hook = None
+        self.result_reads = 0
+
+    async def connect(self, identity):
+        assert identity == self.request.submitter
+        return _LeafClient(self)
+
+    async def execute_update(self, name, arg, **options):
+        assert name == "submit_leaf"
+        assert arg == _farm.SubmitLeaf(self.request, FARM_RUN)
+        assert options["result_type"] is _farm.LeafStatus
+        assert options["rpc_timeout"] == timedelta(seconds=_farm.FIFO_RPC_TIMEOUT_S)
+        assert options["id"] == "fifo:" + hashlib.sha256(
+            f"submit:{self.key.build_id}:{self.key.workflow_id}".encode()
+        ).hexdigest()
+        self.updates.append((name, arg, options))
+        records = [json.loads(path.read_text("utf-8")) for path in self.requests.iterdir()]
+        assert records == [{
+            "task": self.request.task, "workflow_id": self.workflow_id,
+            "build_id": self.request.build_id, "farm_run": FARM_RUN,
+        }]
+        return self.reserved
+
+    async def query(self, name, arg, **options):
+        assert name == "leaf_status"
+        assert arg == self.key
+        assert options["result_type"] is _farm.LeafStatus
+        assert options["rpc_timeout"] == timedelta(seconds=_farm.FIFO_RPC_TIMEOUT_S)
+        self.queries.append((name, arg, options))
+        if self.query_hook is not None:
+            await self.query_hook()
+        response = self.responses.pop(0) if self.responses else self.fallback
+        if isinstance(response, BaseException):
+            raise response
+        return response
+
+    async def result(self, *, follow_runs):
+        assert follow_runs is False
+        self.result_reads += 1
+        return self.result_value
+
+    async def cancel(self):
+        self.cancellations.append(True)
+        raise AssertionError("consumer cancelled accepted remote work")
+
+    def assert_dispatch_safety(self, *, attached=False):
+        assert len(self.updates) == 1, "reconciliation resubmitted accepted work"
+        assert len(self.starts) == 1, "consumer restarted a workflow"
+        expected = [(_farm.WORKFLOW_BUILD_FIFO_ID, {})]
+        if attached:
+            expected.append((self.workflow_id, {
+                "run_id": self.binding.run_id, "result_type": _farm.LeafResult,
+            }))
+        assert self.handles == expected
+        assert self.cancellations == []
+        assert self.result_reads == int(attached)
+        assert all(arg is self.queries[0][1] for _name, arg, _options in self.queries)
+
+
+class _LeafClient(_Client):
+    def get_workflow_handle(self, workflow_id, **options):
+        if workflow_id == _farm.WORKFLOW_BUILD_FIFO_ID:
+            return super().get_workflow_handle(workflow_id, **options)
+        self.control.handles.append((workflow_id, options))
+        assert workflow_id == self.control.workflow_id
+        assert options == {
+            "run_id": self.control.binding.run_id, "result_type": _farm.LeafResult,
+        }
+        return self.control
+
+
+@pytest.fixture
+def leaf_control(_guarded_process, monkeypatch):
+    fake = _LeafControl(_guarded_process[0])
+    monkeypatch.setattr(_farm, "_connect_client", fake.connect)
+    return fake
+
+
 def test_accepted_unbound_dispatch_keeps_polling_and_local_cancel_preserves_reservation(
-    _guarded_process, monkeypatch
+    leaf_control
 ):
-    requests = _guarded_process[0]
-    request = _farm.LeafRequest(
-        farm_protocol_version=5,
-        commit="c" * 40,
-        task="part:pen_rod",
-        cache_key="k" * 64,
-        traceparent=None,
-        submitter="test@submitter",
-        build_id=INHERITED_BUILD_ID,
-    )
-    workflow_id = _farm.workflow_id(request.task, request.cache_key, request.commit, 900)
-    key = _farm.LeafKey(request.build_id, workflow_id)
-    calls = {"updates": [], "queries": [], "handles": [], "cancel": [], "start": []}
+    fake = leaf_control
+    fake.fallback = fake.reserved
 
     async def exercise():
         queried_twice = asyncio.Event()
         never_bound = asyncio.Event()
 
-        class Handle:
-            async def execute_update(self, name, arg, **options):
-                assert name == "submit_leaf"
-                assert arg == _farm.SubmitLeaf(request, FARM_RUN)
-                calls["updates"].append((name, arg, options))
-                records = [json.loads(path.read_text("utf-8")) for path in requests.iterdir()]
-                assert records == [{
-                    "task": request.task,
-                    "workflow_id": workflow_id,
-                    "build_id": request.build_id,
-                    "farm_run": FARM_RUN,
-                }]
-                return _farm.LeafStatus(key, "reserved", None, [])
+        async def query_hook():
+            if len(fake.queries) == 2:
+                queried_twice.set()
+                await never_bound.wait()
 
-            async def query(self, name, arg, **options):
-                assert name == "leaf_status"
-                assert arg == key
-                assert options["result_type"] is _farm.LeafStatus
-                calls["queries"].append((name, arg, options))
-                if len(calls["queries"]) == 2:
-                    queried_twice.set()
-                    await never_bound.wait()
-                return _farm.LeafStatus(key, "reserved", None, [])
-
-            async def cancel(self):
-                calls["cancel"].append(True)
-
-            async def result(self):
-                raise AssertionError("accepted-unbound reservation has no run to await")
-
-        class Client:
-            async def start_workflow(self, *args, **options):
-                from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
-
-                assert args == (_farm.WORKFLOW_BUILD_FIFO,)
-                assert options == {
-                    "id": _farm.WORKFLOW_BUILD_FIFO_ID,
-                    "task_queue": _farm.TASK_QUEUE_CONTROL,
-                    "id_conflict_policy": WorkflowIDConflictPolicy.USE_EXISTING,
-                    "id_reuse_policy": WorkflowIDReusePolicy.REJECT_DUPLICATE,
-                }
-                calls["start"].append((args, options))
-                return Handle()
-
-            def get_workflow_handle(self, workflow_id, **options):
-                calls["handles"].append((workflow_id, options))
-                assert workflow_id == _farm.WORKFLOW_BUILD_FIFO_ID
-                assert options == {}
-                return Handle()
-
-        async def connect(identity):
-            assert identity == request.submitter
-            return Client()
-
-        monkeypatch.setattr(_farm, "_connect_client", connect)
-        dispatch = asyncio.create_task(_farm._dispatch(request, workflow_id))
+        fake.query_hook = query_hook
+        dispatch = asyncio.create_task(_farm._dispatch(fake.request, fake.workflow_id))
         try:
             await asyncio.wait_for(queried_twice.wait(), timeout=WAIT_S)
             assert not dispatch.done()
-            assert len(calls["updates"]) == 1, "polling must not resubmit or start a leaf"
-            assert calls["handles"] == [(_farm.WORKFLOW_BUILD_FIFO_ID, {})]
+            fake.assert_dispatch_safety()
         finally:
             dispatch.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await dispatch
 
     asyncio.run(exercise())
-    assert calls["cancel"] == []
-    assert len(calls["queries"]) == 2
-    assert len(calls["start"]) == 1
-    [record_path] = requests.iterdir()
-    assert json.loads(record_path.read_text("utf-8"))["build_id"] == request.build_id
+    fake.assert_dispatch_safety()
+    assert len(fake.queries) == 2
+
+
+def test_healthy_reserved_reads_have_no_total_startup_deadline(leaf_control, monkeypatch):
+    fake = leaf_control
+    monkeypatch.setattr(_farm, "FIFO_LEAF_STATUS_RETRY_S", 0.05)
+    monkeypatch.setattr(_farm, "STATUS_POLL_INTERVAL_S", 0.05)
+    fake.responses = [fake.reserved, fake.reserved, fake.reserved, fake.bound]
+
+    async def exercise():
+        return await asyncio.wait_for(
+            _farm._dispatch(fake.request, fake.workflow_id), timeout=WAIT_S
+        )
+
+    result = asyncio.run(exercise())
+
+    assert result is fake.result_value
+    assert len(fake.queries) == 4
+    fake.assert_dispatch_safety(attached=True)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["timeout", "connection", "CANCELLED", "UNKNOWN", "DEADLINE_EXCEEDED",
+     "RESOURCE_EXHAUSTED", "ABORTED", "INTERNAL", "UNAVAILABLE"],
+)
+def test_reserved_leaf_transient_reads_recover_the_exact_result_without_resubmission(
+    leaf_control, fault
+):
+    from temporalio.service import RPCError, RPCStatusCode
+
+    fake = leaf_control
+    if fault == "timeout":
+        outage = TimeoutError("accepted leaf status reply lost")
+    elif fault == "connection":
+        outage = ConnectionError("temporary connection loss")
+    else:
+        outage = RPCError("temporary frontend failure", getattr(RPCStatusCode, fault), b"")
+    fake.responses = [outage, outage, fake.reserved, outage, fake.bound]
+
+    result = asyncio.run(_farm._dispatch(fake.request, fake.workflow_id))
+
+    assert result is fake.result_value
+    assert len(fake.queries) == 5
+    fake.assert_dispatch_safety(attached=True)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["foreign-key", "foreign-build", "foreign-workflow", "empty-run", "recovery",
+     "bound-error", "reserved-error", "invalid-state", "closed-unbound",
+     "UNAUTHENTICATED", "PERMISSION_DENIED", "NOT_FOUND", "INVALID_ARGUMENT",
+     "ownership-error", "query-error"],
+)
+def test_reserved_leaf_reconciliation_never_retries_definitive_errors_after_an_outage(
+    leaf_control, fault
+):
+    from temporalio.service import RPCError, RPCStatusCode
+
+    fake = leaf_control
+    if fault in {"UNAUTHENTICATED", "PERMISSION_DENIED", "NOT_FOUND", "INVALID_ARGUMENT"}:
+        refusal = RPCError("definitive query refusal", getattr(RPCStatusCode, fault), b"")
+        expected_type, expected_message = RPCError, "definitive query refusal"
+    elif fault in {"ownership-error", "query-error"}:
+        expected_type = _farm.BuildOwnershipError if fault == "ownership-error" else RuntimeError
+        expected_message = "definitive refusal"
+        refusal = expected_type(expected_message)
+    else:
+        expected_type = _farm.BuildOwnershipError
+        if fault == "foreign-key":
+            refusal = replace(fake.bound, key=replace(fake.key, build_id="foreign"))
+            expected_message = "foreign leaf reservation"
+        elif fault in {"foreign-build", "foreign-workflow", "empty-run"}:
+            changes = {
+                "foreign-build": {"build_id": "foreign"},
+                "foreign-workflow": {"workflow_id": "foreign"},
+                "empty-run": {"run_id": ""},
+            }[fault]
+            refusal = replace(fake.bound, binding=replace(fake.binding, **changes))
+            expected_message = "foreign leaf binding"
+        elif fault in {"recovery", "bound-error", "reserved-error"}:
+            status = fake.bound if fault == "bound-error" else fake.reserved
+            refusal = replace(
+                status,
+                state="recovery_required" if fault == "recovery" else status.state,
+                error_code=None if fault == "recovery" else "fifo_observation_failed",
+                error="history needs operator evidence",
+            )
+            expected_message = "operator recovery"
+        elif fault == "invalid-state":
+            refusal = replace(fake.bound, state="not-a-reservation-state")
+            expected_message = "invalid leaf reservation state"
+        else:
+            refusal = replace(fake.reserved, state="missing_closed")
+            expected_message = "closed without a proven run binding"
+    fake.responses = [ConnectionError("temporary outage"), refusal]
+
+    with pytest.raises(expected_type, match=expected_message) as error:
+        asyncio.run(_farm._dispatch(fake.request, fake.workflow_id))
+
+    if isinstance(refusal, BaseException):
+        assert error.value is refusal
+    assert len(fake.queries) == 2, "definitive status or refusal was retried"
+    fake.assert_dispatch_safety()
+
+
+@pytest.mark.parametrize("outage", ["repeated-failure", "hung-query"])
+def test_reserved_leaf_read_outage_budget_bounds_retries_and_inflight_query(
+    leaf_control, monkeypatch, outage
+):
+    fake = leaf_control
+    gate = _AsyncGate()
+    monkeypatch.setattr(_farm, "FIFO_LEAF_STATUS_RETRY_S", 0.05)
+    monkeypatch.setattr(_farm, "FIFO_RPC_TIMEOUT_S", 4)
+    if outage == "hung-query":
+        fake.query_hook = gate.wait
+    else:
+        fake.fallback = ConnectionError("frontend remains unavailable")
+
+    async def exercise():
+        with pytest.raises(TimeoutError, match="accepted work remains under the coordinator"):
+            # This outer bound makes a missing independent budget fail quickly.
+            await asyncio.wait_for(
+                _farm._dispatch(fake.request, fake.workflow_id), timeout=1
+            )
+
+    asyncio.run(exercise())
+    if outage == "hung-query":
+        assert gate.entered.is_set()
+        assert gate.cancelled.is_set(), "in-progress read exceeded its monotonic budget"
+        assert not gate.released.is_set()
+        assert len(fake.queries) == 1
+    else:
+        assert len(fake.queries) > 1
+    fake.assert_dispatch_safety()
+
+
+def test_reserved_leaf_query_cancellation_propagates_without_read_retry(leaf_control):
+    fake = leaf_control
+    cancellation = asyncio.CancelledError("local action cancelled")
+    fake.responses = [ConnectionError("temporary outage"), cancellation]
+
+    with pytest.raises(asyncio.CancelledError, match="local action cancelled"):
+        asyncio.run(_farm._dispatch(fake.request, fake.workflow_id))
+
+    assert len(fake.queries) == 2
+    fake.assert_dispatch_safety()

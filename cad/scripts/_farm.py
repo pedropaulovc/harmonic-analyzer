@@ -52,6 +52,8 @@ FIFO_HEARTBEAT_INTERVAL_S = 15
 FIFO_PRODUCER_LEASE_S = 120
 FIFO_RPC_TIMEOUT_S = 10
 STATUS_POLL_INTERVAL_S = 1
+# Consecutive read-outage budget only; this never acknowledges producer ownership.
+FIFO_LEAF_STATUS_RETRY_S = 120
 LEAF_TIMEOUT_DEFAULT_S = 15 * 60
 LEAF_TIMEOUT_MIN_S = 60
 LEAF_TIMEOUT_MAX_S = 3 * 3600
@@ -478,6 +480,54 @@ async def _rpc_query(handle, name: str, arg, result_type):
     )
 
 
+def _is_transient_fifo_error(exc: Exception) -> bool:
+    from temporalio.client import WorkflowUpdateRPCTimeoutOrCancelledError
+    from temporalio.service import RPCError, RPCStatusCode
+
+    if isinstance(exc, RPCError):
+        return exc.status in {
+            RPCStatusCode.CANCELLED,
+            RPCStatusCode.UNKNOWN,
+            RPCStatusCode.DEADLINE_EXCEEDED,
+            RPCStatusCode.RESOURCE_EXHAUSTED,
+            RPCStatusCode.ABORTED,
+            RPCStatusCode.INTERNAL,
+            RPCStatusCode.UNAVAILABLE,
+        }
+    return isinstance(
+        exc, (TimeoutError, ConnectionError, WorkflowUpdateRPCTimeoutOrCancelledError)
+    )
+
+
+async def _reserved_leaf_status(handle, key: LeafKey) -> LeafStatus:
+    """Reconcile the same accepted reservation through a bounded read outage.
+
+    Action workers have no acknowledged parent lease. This independent monotonic
+    budget bounds only consecutive transient read failures, including an RPC in
+    flight. A successful reserved reply may begin another read-outage budget.
+    """
+    deadline = time.monotonic() + FIFO_LEAF_STATUS_RETRY_S
+    last_error = None
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(
+                f"leaf reservation status unavailable for {FIFO_LEAF_STATUS_RETRY_S}s: "
+                f"{key.workflow_id}; accepted work remains under the coordinator"
+            ) from last_error
+        try:
+            return await asyncio.wait_for(
+                _rpc_query(handle, "leaf_status", key, LeafStatus), timeout=remaining
+            )
+        except Exception as exc:
+            if not _is_transient_fifo_error(exc):
+                raise
+            last_error = exc
+            await asyncio.sleep(
+                min(STATUS_POLL_INTERVAL_S, max(0, deadline - time.monotonic()))
+            )
+
+
 def producer_build(display_name: str):
     """The parent-only ownership seam, entered only after valid preflight."""
     return _ProducerBuild(_display_name(display_name))
@@ -513,7 +563,9 @@ class _ProducerBuild:
         try:
             _record_build(self.build_id)
             self._thread.start()
-            self._ready.wait()
+            # Windows CPython 3.12/3.13 needs finite waits to deliver Ctrl-C.
+            while not self._ready.wait(timeout=1):
+                pass
             if self._failure is not None:
                 raise BuildOwnershipError(
                     f"build {self.build_id} ownership failed: {self._failure}"
@@ -617,28 +669,12 @@ class _ProducerBuild:
         Every retry is bounded by the last acknowledged lease. The caller keeps
         the same heartbeat sequence and operation ID until it gets an answer.
         """
-        from temporalio.client import WorkflowUpdateRPCTimeoutOrCancelledError
-        from temporalio.service import RPCError, RPCStatusCode
-
         while not self._stop.is_set():
             remaining = self._lease_remaining()
             try:
                 return await asyncio.wait_for(call(*args), timeout=remaining)
-            except (
-                TimeoutError,
-                ConnectionError,
-                WorkflowUpdateRPCTimeoutOrCancelledError,
-                RPCError,
-            ) as exc:
-                if isinstance(exc, RPCError) and exc.status not in {
-                    RPCStatusCode.CANCELLED,
-                    RPCStatusCode.UNKNOWN,
-                    RPCStatusCode.DEADLINE_EXCEEDED,
-                    RPCStatusCode.RESOURCE_EXHAUSTED,
-                    RPCStatusCode.ABORTED,
-                    RPCStatusCode.INTERNAL,
-                    RPCStatusCode.UNAVAILABLE,
-                }:
+            except Exception as exc:
+                if not _is_transient_fifo_error(exc):
                     raise
                 remaining = self._lease_remaining()
                 if not self._stop.is_set():
@@ -907,7 +943,7 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         if status.state != "reserved":
             raise BuildOwnershipError("accepted leaf closed without a proven run binding")
         await asyncio.sleep(STATUS_POLL_INTERVAL_S)
-        status = await _rpc_query(coordinator, "leaf_status", key, LeafStatus)
+        status = await _reserved_leaf_status(coordinator, key)
     handle = client.get_workflow_handle(
         wf_id, run_id=binding.run_id, result_type=LeafResult
     )
