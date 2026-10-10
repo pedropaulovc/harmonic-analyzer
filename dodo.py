@@ -3293,15 +3293,26 @@ def task_check():
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
         },
         "nameplate": {
-            # Guards the vendored engraving DXF the nameplate build imports; the
-            # DXF is now the source of truth (the re-traced coordinate loops are
-            # retired), so the gate depends on the file + its integrity test.
+            # The plate outline, notched field and engraving are all vendored
+            # geometry; any contour or its pinned area/bbox must invalidate this
+            # SolidWorks-free integrity gate.
             "file_dep": [
                 str((SCRIPTS_DIR / "test_fr_nameplate_geometry.py").resolve()),
                 str((SCRIPTS_DIR / "fr_nameplate_spec.py").resolve()),
+                str((SCRIPTS_DIR / "build_fr_nameplate.py").resolve()),
                 str(
                     (
                         REPO_ROOT / "cad" / "references" / "fr-nameplate-engraving.dxf"
+                    ).resolve()
+                ),
+                str(
+                    (
+                        REPO_ROOT / "cad" / "references" / "fr-nameplate-outline.dxf"
+                    ).resolve()
+                ),
+                str(
+                    (
+                        REPO_ROOT / "cad" / "references" / "fr-nameplate-field.dxf"
                     ).resolve()
                 ),
             ],

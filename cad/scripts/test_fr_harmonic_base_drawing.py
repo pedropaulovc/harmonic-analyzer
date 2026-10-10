@@ -131,8 +131,12 @@ def test_pivot_drill_keeps_its_point_inside_the_pad_and_clear_of_cavities() -> N
     assert part.PIVOT_SEAT_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(10.30)
     assert part.PIVOT_SEAT_SPEC.depth_mm == pytest.approx(13.45)
     radius = part.PIVOT_SCREW_HOLE_DIA / 2.0
+    # The seat is cut from the deck into the shallow boss hung under it.
     assert part.PIVOT_DRILL_BOTTOM_WALL == pytest.approx(
-        part.TOP_THICKNESS - part.PIVOT_SEAT_SPEC.depth_mm - radius * DRILL_POINT_H
+        part.STACK_HEIGHT
+        - part.PIVOT_SEAT_SPEC.depth_mm
+        - radius * DRILL_POINT_H
+        - part.SHALLOW_BOSS_BOTTOM_Y
     )
     assert part.PIVOT_DRILL_BOTTOM_WALL >= 1.5 * part.PIVOT_SCREW_HOLE_DIA
     assert part.PIVOT_NEAREST_CAVITY_WALL >= part.PIVOT_SCREW_HOLE_DIA
@@ -156,7 +160,10 @@ def test_cone_lock_seats_on_plate_and_bare_base_with_useful_threads() -> None:
     drill_tip_depth = (
         part.LOCK_SEAT_SPEC.depth_mm + part.LOCK_SCREW_HOLE_DIA / 2.0 * DRILL_POINT_H
     )
-    assert part.TOP_THICKNESS - drill_tip_depth >= 1.5 * part.LOCK_SCREW_HOLE_DIA
+    assert part.LOCK_DRILL_BOTTOM_WALL == pytest.approx(
+        part.STACK_HEIGHT - drill_tip_depth - part.DEEP_BOSS_BOTTOM_Y
+    )
+    assert part.LOCK_DRILL_BOTTOM_WALL >= 1.5 * part.LOCK_SCREW_HOLE_DIA
     assert part.LOCK_NEAREST_CAVITY_WALL >= part.LOCK_SCREW_HOLE_DIA
     # Volume includes the added drilling length AND its terminal point.
     radius = part.LOCK_SCREW_HOLE_DIA / 2.0
@@ -241,20 +248,18 @@ def test_nameplate_seats_are_derived_from_the_plate_mount() -> None:
     assert fr_nameplate_spec.MOUNT_BACK_Y == pytest.approx(fr_harmonic_base_spec.STACK_HEIGHT)
     assert fr_nameplate_spec.MOUNT_NORMAL == (0.0, 1.0, 0.0)
     assert part.NAMEPLATE_SCREW_XZ == fr_nameplate_spec.MOUNT_HOLE_XZ
-    assert set(part.NAMEPLATE_SCREW_XZ) == {
-        (209.75, 45.5),
-        (209.75, -45.5),
-        (163.75, 45.5),
-        (163.75, -45.5),
-    }
-    # No mechanism shift applies (the plate anchors to the pad edge): the
-    # stations are the pure mount-transform image of the plate holes.
+    # No mechanism shift applies (the plate anchors to the deck's west edge):
+    # the stations are the pure mount-transform image of the plate holes.
     assert part.NAMEPLATE_SCREW_XZ == tuple(
         (fr_nameplate_spec.MOUNT_POS[0] - y, fr_nameplate_spec.MOUNT_POS[2] - x)
         for x, y in fr_nameplate_spec.SCREW_XY
     )
-    # Inside the raised rim's inner wall by >= 1.0.
-    assert part.NAMEPLATE_RIM_CLEARANCE == pytest.approx(1.0)
+    # The plate's west edge sits 4.0 inside the deck's west edge (user ruling
+    # 2026-10-09), the binding side of its footprint.
+    assert part.NAMEPLATE_DECK_CLEARANCE == pytest.approx(
+        fr_harmonic_base_spec.DECK_HALF_X - fr_nameplate_spec.MOUNT_POS[0]
+    )
+    assert part.NAMEPLATE_DECK_CLEARANCE == pytest.approx(4.0)
     # The purchased 1/4-inch screw passes through the plate without bottoming
     # in the usable thread, independently of the deeper tap-drill runout.
     engagement = SHANK_LEN - fr_nameplate_spec.PLATE_THICKNESS
@@ -384,10 +389,10 @@ def _socket_bore_geometry(x_mm: float, z_mm: float):
         outward_normal=None,
         box=(
             x_mm / 1000.0 - radius,
-            (part.STACK_HEIGHT - part.COLUMN_SOCKET_DEPTH) / 1000.0,
+            (fr_harmonic_base_spec.GREEN_TOP - part.COLUMN_SOCKET_DEPTH) / 1000.0,
             z_mm / 1000.0 - radius,
             x_mm / 1000.0 + radius,
-            part.STACK_HEIGHT / 1000.0,
+            fr_harmonic_base_spec.GREEN_TOP / 1000.0,
             z_mm / 1000.0 + radius,
         ),
     )
@@ -430,8 +435,9 @@ def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
     """The sheet's one socket symbol leads to the INNER wall of the socket that
     section A-A puts in the upper half of the sheet, at a height that keeps the
     arrowhead inside the bore and clear of both the window the cross tap opens
-    through that wall and the deck outline -- the first placement sat 1 mm (on
-    paper) from the cross tap's cosmetic thread and read as the tap's."""
+    through that wall and the socket's mouth on the green land -- the first
+    placement sat 1 mm (on paper) from the cross tap's cosmetic thread and read
+    as the tap's."""
     import draw_fr_harmonic_base as sheet
 
     x_mm, y_mm, z_mm = sheet.SOCKET_LEADER_POINT_MM
@@ -445,9 +451,13 @@ def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
     )
     assert abs(z_mm) < abs(station_z)
     tap_clearance = abs(y_mm - part.BASE_SCREW_Y) - part.BASE_CROSS_TAP_DRILL_DIA / 2.0
-    deck_clearance = part.STACK_HEIGHT - y_mm
-    assert min(tap_clearance, deck_clearance) > 4.0
-    assert y_mm > part.STACK_HEIGHT - part.COLUMN_SOCKET_DEPTH
+    mouth_clearance = fr_harmonic_base_spec.GREEN_TOP - y_mm
+    # The 2026-10-09 deck redesign opened the socket on the green land, 3.0
+    # below the deck the old 4 mm margins measured to, leaving 7.68 mm of
+    # wall between the window and the mouth: the point splits it evenly.
+    assert tap_clearance == pytest.approx(mouth_clearance)
+    assert min(tap_clearance, mouth_clearance) > 3.8
+    assert y_mm > fr_harmonic_base_spec.GREEN_TOP - part.COLUMN_SOCKET_DEPTH
 
 
 def test_transferred_pinion_block_seats_print_no_station() -> None:
@@ -549,11 +559,14 @@ def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None
         call
         for call in calls
         if getattr(call.func, "id", None) == "place_view"
-        and any(isinstance(arg, ast.Constant) and arg.value == "*Top" for arg in call.args)
+        and any(
+            isinstance(arg, ast.Constant) and arg.value in ("*Top", "*Bottom")
+            for arg in call.args
+        )
     ]
     assert len(plan_views) == len(sheet.PLAN_VIEWS)
     assert sheet.TAPPED_HOLE_NOTES == len(build_features) * len(sheet.PLAN_VIEWS)
-    assert sheet.TAPPED_HOLE_NOTES == 16
+    assert sheet.TAPPED_HOLE_NOTES == 32
 
     finalize = [call for call in calls if getattr(call.func, "id", None) == "finalize_drawing"]
     assert len(finalize) == 1
@@ -1288,25 +1301,81 @@ def test_cross_tap_x_is_a_chained_model_dimension_on_the_front_view() -> None:
 def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:
     # hb-render-4 eye pass: the 1.0 MIN land note put a dimension in a note.
     assert not hasattr(fr_harmonic_base_spec, "DRAWING_NOTES")
+    # The bore now opens on the green land and reaches the pad's outer edge,
+    # whose 1/16 in break (and its general band) is the land's last bite.
     for stack in part.COLUMN_SOCKET_LAND_STACKS.values():
         assert stack == pytest.approx({
-            "nominal": 5.5,
+            "nominal": 12.5,
             "flange length": -0.4,
             "pad length": -0.4,
-            "rim width": -0.8,
             "bore location": -0.8,
             "matched bore": -0.25,
             "bore edge break": -0.25,
-            "rim edge break": -0.25,
+            "pad edge chamfer": -2.3875,
         })
-        assert sum(stack.values()) == pytest.approx(2.35)
+        assert sum(stack.values()) == pytest.approx(8.0125)
     # The same stack on the rejected 1.6 mm pad land would fail the 1.0 MIN.
     assert sum(part.column_socket_land_stack(1.6).values()) < part.COLUMN_SOCKET_LAND_MIN
     # Main's rider: the Ø26.0 ceiling is a functional judgement, so the
     # stack reports how much bore the land could still absorb.
-    assert part.COLUMN_SOCKET_BREAK_EVEN_BORE == pytest.approx(28.7)
+    assert part.COLUMN_SOCKET_BREAK_EVEN_BORE == pytest.approx(40.025)
     rejected = part.column_socket_land_stack(1.6)
     assert part.column_socket_break_even_bore(rejected) < part.COLUMN_SOCKET_MATCH_BORE_MAX
+
+
+def test_underside_pocket_backs_every_deck_seat_at_the_worst_case() -> None:
+    """User ruling 2026-10-09: the base is cored from below. Every blind deck
+    seat ends in a boss hung from the pocket ceiling, on the shallow level
+    unless that level cannot back it, and every wall holds policy rule 12."""
+    spec = fr_harmonic_base_spec
+    assert spec.POCKET_HALF_X == pytest.approx(spec.TOP_LENGTH / 2.0 - spec.POCKET_WALL)
+    assert spec.POCKET_HALF_Z == pytest.approx(spec.TOP_WIDTH / 2.0 - spec.POCKET_WALL)
+    assert spec.STACK_HEIGHT - spec.POCKET_CEILING_Y == pytest.approx(spec.POCKET_SKIN)
+    labels = {seat.label for seat in part.HANGING_SEATS}
+    assert labels == {
+        "rocker support",
+        "cone pivot",
+        "cone lock",
+        "swing stop",
+        "pinion block",
+        "spring foot",
+        "pedestal hold-down",
+        "nameplate",
+    }
+    for seat in part.HANGING_SEATS:
+        part.require_hanging_boss(seat)
+    # The deep seats really need the deep level (the spring foot sits deep
+    # only because its boss would cross the north pinion-block pad).
+    for label in ("rocker support", "cone lock", "pedestal hold-down"):
+        seat = next(s for s in part.HANGING_SEATS if s.label == label)
+        with pytest.raises(AssertionError):
+            part.require_hanging_boss(
+                replace(seat, boss_bottom_y=spec.SHALLOW_BOSS_BOTTOM_Y)
+            )
+    band = part._general_band_mm()
+    assert min(part.CROSS_TAP_LUG_WALLS.values()) - 1.5 * band >= 2.0
+    assert (
+        part.CROSS_TAP_LUG_WALLS["past tip"]
+        >= 1.5 * part.THREAD_MAJOR_MM[part.BASE_CROSS_TAP_SPEC.size]
+    )
+    assert part.SOCKET_BOSS_WALL == pytest.approx(8.0)
+
+
+def test_hanging_volume_refuses_overlapping_shapes_in_one_sketch() -> None:
+    disc = ("disc", 0.0, 50.0, 8.0)
+    with pytest.raises(AssertionError, match="overlap"):
+        part.hanging_volume((disc, ("disc", 10.0, 50.0, 8.0)), (), 28.0)
+    # A shape on an earlier, deeper rib adds only its own plan area.
+    on_rib = ("disc", 100.0, 0.0, 8.0)
+    alone = part.hanging_volume((on_rib,), (), 28.0)
+    assert alone == pytest.approx(
+        math.pi * 64.0 * (part.POCKET_CEILING_Y - 28.0), rel=1e-6
+    )
+    shared = part.hanging_volume((on_rib,), (part.LONG_RIB_SHAPE,), 28.0)
+    assert alone - shared == pytest.approx(
+        part._disc_rect_area((100.0, 0.0), 8.0, (-216.25, 216.25), (-5.0, 5.0))
+        * (part.POCKET_CEILING_Y - 28.0)
+    )
 
 
 def test_stamped_id_leader_clears_the_socket_bores() -> None:
@@ -1315,12 +1384,15 @@ def test_stamped_id_leader_clears_the_socket_bores() -> None:
     # put it on hb-render-5 (the last line's right end) and ends on the serial.
     import draw_fr_harmonic_base as sheet
 
-    def clearance(anchor: tuple[float, float]) -> float:
+    def leader(anchor: tuple[float, float], serial_xz: tuple[float, float]):
         start = (
             anchor[0] + sheet.SERIAL_LEADER_START_OFFSET_M[0],
             anchor[1] + sheet.SERIAL_LEADER_START_OFFSET_M[1],
         )
-        tip = sheet._plan_xy(*part.SERIAL_XZ)
+        return start, sheet._plan_xy(*serial_xz)
+
+    def clearance(anchor: tuple[float, float], serial_xz: tuple[float, float]) -> float:
+        start, tip = leader(anchor, serial_xz)
         dx, dy = tip[0] - start[0], tip[1] - start[1]
         gaps = []
         for x, z in part.COLUMN_SOCKET_XZ:
@@ -1333,9 +1405,25 @@ def test_stamped_id_leader_clears_the_socket_bores() -> None:
             )
         return min(gaps)
 
-    assert clearance((0.125, 0.130)) < 0.0  # the reviewed sheet: through A3
-    assert sheet.SERIAL_NOTE_XY == (0.080, 0.130)
-    assert clearance(sheet.SERIAL_NOTE_XY) >= 0.004
+    # The reviewed sheet: through A3, to the serial on the old +X rim.
+    assert clearance((0.125, 0.130), (218.75, 62.0)) < 0.0
+    assert sheet.SERIAL_NOTE_XY == (0.100, 0.135)
+    assert clearance(sheet.SERIAL_NOTE_XY, part.SERIAL_XZ) >= 0.004
+    # The serial sits in the deck's NW corner, so the leader climbs across the
+    # flange, pad and deck lower edges. Each width dimension right of the plan
+    # starts its lower witness line where that edge's straight run ends at its
+    # corner radius; the leader crosses every edge at least 1.5 mm left of it.
+    start, tip = leader(sheet.SERIAL_NOTE_XY, part.SERIAL_XZ)
+    for half_x, half_z, corner in (
+        (part.DECK_HALF_X, part.DECK_HALF_Z, part.DECK_CORNER_R),
+        (part.TOP_LENGTH / 2.0, part.TOP_WIDTH / 2.0, part.PAD_CORNER_R),
+        (part.BOTTOM_LENGTH / 2.0, part.BOTTOM_WIDTH / 2.0, part.FLANGE_CORNER_R),
+    ):
+        witness_x, edge_y = sheet._plan_xy(half_x - corner, half_z)
+        assert start[1] < edge_y < tip[1]
+        rise = (edge_y - start[1]) / (tip[1] - start[1])
+        crossing_x = start[0] + (tip[0] - start[0]) * rise
+        assert crossing_x <= witness_x - 0.0015, (half_x, crossing_x, witness_x)
 
 
 # The depths each seat printed before the 2026-09-25 machinist review sized
@@ -1431,13 +1519,14 @@ def test_specified_hold_down_screw_fits_a_derived_seat_without_the_blocker() -> 
         part.HOLD_DOWN_SEAT_SPEC, depth_mm=drill, overrides_mm={"ThreadDepth": thread}
     )
     part.require_blind_seat_fit("specified rocker support", seat, engagement)
-    # The deeper drill still leaves the upper pad 1.5 drill diameters of wall
-    # under its point at the printed high limit.
+    # The deeper drill still leaves the deep boss under the deck 1.5 drill
+    # diameters of wall under its point at the printed high limit.
     tap_drill = part.HOLD_DOWN_TAP_DRILL_DIA
     floor = (
-        part.TOP_THICKNESS
+        part.STACK_HEIGHT
         - (drill + part.SEAT_DEPTH_BAND)
         - tap_drill / 2.0 * part.DRILL_POINT_H
+        - part.DEEP_BOSS_BOTTOM_Y
     )
     assert floor >= 1.5 * tap_drill
 
@@ -1522,8 +1611,8 @@ def test_flange_finish_fits_sheet_1_left_of_the_plan_with_named_margins() -> Non
         # R22.2 FLANGE corner callout above it: its two-row block hangs from
         # (0.040, 0.215) down to ~0.2104 (hb-render-5 sheet 1).
         "flange corner radius callout": 0.2104 - box[3],
-        # The stamped-ID note below the plan starts at x 0.080, y 0.130.
-        "stamped-ID note": box[1] - sheet.SERIAL_NOTE_XY[1],
+        # The stamped-ID note below the plan now starts right of this row.
+        "stamped-ID note": sheet.SERIAL_NOTE_XY[0] - box[2],
     }
     assert {name: gap for name, gap in margins.items() if gap < FLANGE_FINISH_MIN_MARGIN_M} == {}
     # The leader lands on the straight west edge (inside its R22.2 corners),
@@ -1532,6 +1621,603 @@ def test_flange_finish_fits_sheet_1_left_of_the_plan_with_named_margins() -> Non
     straight = fr_harmonic_base_spec.BOTTOM_WIDTH / 2.0 - part.FLANGE_CORNER_R
     assert abs(sheet.FLANGE_FINISH_ATTACH_Z_MM) < straight
     assert attach[1] < y
+
+
+def _pocket_shape_covers(shape: tuple, x: float, z: float) -> bool:
+    if shape[0] == "disc":
+        return math.hypot(x - shape[1], z - shape[2]) <= shape[3]
+    return shape[1] <= x <= shape[2] and shape[3] <= z <= shape[4]
+
+
+def test_underside_section_cuts_both_boss_heights_clear_of_every_bore() -> None:
+    # B-B shows DeepBossBottom and ShallowBossBottom on bosses it actually
+    # cuts, so its line must cross one of each -- and no hole, whose thread
+    # would clutter the cut, and no socket boss, which fills the pocket.
+    import draw_fr_harmonic_base as sheet
+
+    x = sheet.UNDERSIDE_CUT_X
+    assert x == pytest.approx(-28.67, abs=0.01)
+    assert sheet._CUT_BAND[0] < x < sheet._CUT_BAND[1]
+    for shapes in (part.DEEP_BOSS_SHAPES, part.SHALLOW_BOSS_SHAPES):
+        assert any(sheet._x_span(s)[0] < x < sheet._x_span(s)[1] for s in shapes)
+    assert all(abs(x - hx) > d / 2.0 for hx, _z, d in sheet.ALL_HOLES)
+    assert all(abs(x - s[1]) > s[3] for s in part.SOCKET_BOSS_SHAPES)
+    rib_x0, rib_x1 = sheet._x_span(part.LONG_RIB_SHAPE)
+    assert rib_x0 < x < rib_x1
+
+
+def test_underside_section_texts_sit_in_open_air() -> None:
+    # Rule 8: dimension text outside silhouettes. The ceiling height sits in
+    # the pocket's open air at the cut; the others left of the underside,
+    # each level caption (DEEP/SHALLOW LEVEL) clear of the bench face.
+    import draw_fr_harmonic_base as sheet
+
+    x = sheet.UNDERSIDE_CUT_X
+    spec = fr_harmonic_base_spec
+    bottoms = (
+        *((s, 0.0) for s in part.SOCKET_BOSS_SHAPES),
+        (part.LONG_RIB_SHAPE, spec.RIB_RELIEF),
+        (part.CROSS_RIB_SHAPE, spec.RIB_RELIEF),
+        *((s, spec.DEEP_BOSS_BOTTOM_Y) for s in part.DEEP_BOSS_SHAPES),
+        *((s, spec.SHALLOW_BOSS_BOTTOM_Y) for s in part.SHALLOW_BOSS_SHAPES),
+        *((s, spec.SHALLOW_BOSS_BOTTOM_Y) for s in part.CROSS_TAP_LUG_SHAPES),
+    )
+    for name in ("PocketDepth",):
+        y, z = sheet.UNDERSIDE_SECTION_TEXT_MM[name]
+        assert 0.0 < y < fr_harmonic_base_spec.POCKET_CEILING_Y, name
+        # A 2.5 mm text row is 5 mm of model at 1:2; keep 3 mm either side.
+        assert abs(z) + 3.0 < fr_harmonic_base_spec.POCKET_HALF_Z, name
+        for dz in (-3.0, 0.0, 3.0):
+            covering = [b for s, b in bottoms if _pocket_shape_covers(s, x, z + dz)]
+            assert all(y + 3.0 < b for b in covering), (name, dz, covering)
+    num, den = sheet.UNDERSIDE_SECTION_SCALE
+    for name in ("DeepBossBottom", "RibRelief", "ShallowBossBottom"):
+        y = sheet.UNDERSIDE_SECTION_TEXT_MM[name][0]
+        rows = ["00.0", *sheet.UNDERSIDE_SECTION_CALLOUTS.get(name, "").split("\n")]
+        half_w_mm = max(map(len, rows)) * _DIM_CHAR_M * 1000.0 / 2.0
+        assert half_w_mm + 2.0 < -y * num / den, name
+    assert set(sheet.UNDERSIDE_SECTION_CALLOUTS) <= set(sheet.UNDERSIDE_SECTION_TEXT_MM)
+
+
+def test_underside_sheet_views_fit_the_border_clear_of_each_other() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    assert sheet.SHEET_NAMES[2] == "UNDERSIDE"
+    bottom = (
+        *sheet._bottom_xy(
+            -fr_harmonic_base_spec.BOTTOM_LENGTH / 2.0,
+            fr_harmonic_base_spec.BOTTOM_FRONT_Z,
+        ),
+        *sheet._bottom_xy(
+            fr_harmonic_base_spec.BOTTOM_LENGTH / 2.0,
+            fr_harmonic_base_spec.BOTTOM_REAR_Z,
+        ),
+    )
+    cut_x = sheet._bottom_xy(sheet.UNDERSIDE_CUT_X, 0.0)[0]
+    assert bottom[0] < cut_x < bottom[2]
+    # B-B turned clockwise: machine +Y right, Z along the sheet's height, at
+    # its scale, with the outside texts at UNDERSIDE_OUTSIDE_Y_MM left of it.
+    num, den = sheet.UNDERSIDE_SECTION_SCALE
+    s = num / den / 1000.0
+    cx, cy = sheet.UNDERSIDE_SECTION_CENTER
+    half_h = fr_harmonic_base_spec.STACK_HEIGHT * s / 2.0
+    half_z = fr_harmonic_base_spec.BOTTOM_REAR_Z * s
+    # The outside texts' widest row: the level captions under 12.0 and 28.0.
+    widest = max(
+        len(row)
+        for text in sheet.UNDERSIDE_SECTION_CALLOUTS.values()
+        for row in text.split("\n")
+    )
+    section = (
+        cx - half_h + sheet.UNDERSIDE_OUTSIDE_Y_MM * s - widest * _DIM_CHAR_M / 2.0,
+        cy - half_z,
+        cx + half_h,
+        cy + half_z,
+    )
+    assert section[0] - bottom[2] > 0.020
+    assert section[0] > SHEET_FRAME_INNER_X_M
+    assert section[3] < 0.2794 - 0.0127
+    # bp3 render: "SECTION B-B / ROTATED 90 DEG CW SCALE 1:2" hangs 31.2 mm
+    # under the cut's lowest edge; at y 0.160 it ran into the title block.
+    caption_drop = 0.0312
+    assert section[1] - caption_drop > 0.066 + 0.002  # title block top
+
+
+def test_underside_round_boss_diameters_name_their_level_and_holes() -> None:
+    # bp3 machinist review: one "11X ROUND BOSSES" callout read every boss as
+    # shallow (28.0) and found 2.2 mm under E1-E4's drills. One diameter per
+    # cast level names the holes it backs and the level, which section B-B
+    # prints under the model's own DeepBossBottom and ShallowBossBottom.
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    seats = {seat.label: seat for seat in part.HANGING_SEATS}
+    for label in ("rocker support", "spring foot"):
+        assert seats[label].boss_bottom_y == spec.DEEP_BOSS_BOTTOM_Y, label
+    for label in ("cone pivot", "swing stop", "nameplate"):
+        assert seats[label].boss_bottom_y == spec.SHALLOW_BOSS_BOTTOM_Y, label
+    assert part.DEEP_BOSS_CENTRES == (*part.HOLE_XZ, *part.FOOT_SCREW_XZ)
+    assert part.SHALLOW_BOSS_CENTRES == (
+        part.PIVOT_SCREW_XZ,
+        part.STOP_SCREW_XZ,
+        *part.NAMEPLATE_SCREW_XZ,
+    )
+    callouts = sheet.UNDERSIDE_BOTTOM_CALLOUTS
+    assert callouts["HangingBossDia"] == "5X BOSSES UNDER\nE1-E4, MHA-DT-024\nTO DEEP LEVEL"
+    assert callouts["ShallowBoss4Dia"] == "6X BOSSES UNDER\nB1, D1, F1-F4\nTO SHALLOW LEVEL"
+    assert sheet.UNDERSIDE_SECTION_CALLOUTS == {
+        "DeepBossBottom": "DEEP\nLEVEL",
+        "ShallowBossBottom": "SHALLOW\nLEVEL",
+    }
+    # The leaders land on E1's boss and the rear-west nameplate tap's, both
+    # in the view's top-right quarter (+Z up), so they drop from the texts.
+    e1 = part.HOLE_XZ[0]
+    rear_west_plate = part.SHALLOW_BOSS_CENTRES[4]
+    assert e1[1] > 0.0 and rear_west_plate[1] > 0.0
+    assert rear_west_plate == min(
+        (xz for xz in part.NAMEPLATE_SCREW_XZ if xz[1] > 0.0), key=lambda xz: xz[0]
+    )
+    # Sheet-3 texts above the view: inside the border, clear of the view, of
+    # each other and of the view's note.
+    keep = sheet.UNDERSIDE_BOTTOM_KEEP
+    view_top = sheet._bottom_xy(0.0, spec.BOTTOM_REAR_Z)[1]
+    boxes = {}
+    for name, value in (
+        ("CrossRibThickness", "10.0"),
+        ("HangingBossDia", "D16.0"),
+        ("ShallowBoss4Dia", "D16.0"),
+    ):
+        rows = [value, *callouts[name].split("\n")]
+        x, y = keep[name]
+        half_w = max(map(len, rows)) * _NOTE_CHAR_MM / 2000.0
+        half_h = len(rows) * _NOTE_LINE_MM / 2000.0
+        boxes[name] = (x - half_w, y - half_h, x + half_w, y + half_h)
+        assert boxes[name][1] > view_top + 0.010, name
+        assert boxes[name][3] < _BORDER_INNER_M[3] - 0.002, name
+    nx, ny = sheet.UNDERSIDE_BOTTOM_NOTE_XY
+    boxes["note"] = (nx, ny - _NOTE_LINE_MM / 1000.0, nx + 21 * _NOTE_CHAR_MM / 1000.0, ny)
+    for a in boxes:
+        for b in boxes:
+            if a < b:
+                assert _box_gap(boxes[a], boxes[b]) > 0.0015, (a, b)
+    # The cross rib's text reads west of the rib, clear above the B arrow.
+    rib_west = sheet._bottom_xy(part.CROSS_RIB_SHAPE[1], 0.0)[0]
+    assert boxes["CrossRibThickness"][2] < rib_west - 0.005
+
+
+def test_drawing_keeps_partition_the_part_precision_map() -> None:
+    # assert_imported_precision proves every printed dimension at the end of
+    # the build; the seven keeps must name each map entry exactly once.
+    import draw_fr_harmonic_base as sheet
+
+    keeps = (
+        sheet.GEOMETRY_TOP_KEEP,
+        sheet.SIDE_KEEP,
+        sheet.HOLE_TOP_KEEP,
+        sheet.SECTION_KEEP,
+        sheet.HOLE_SIDE_KEEP,
+        sheet.UNDERSIDE_BOTTOM_KEEP,
+        sheet.UNDERSIDE_PADS_KEEP,
+        sheet.UNDERSIDE_SECTION_TEXT_MM,
+    )
+    names = [name for keep in keeps for name in keep]
+    assert len(names) == len(set(names))
+    assert set(names) == set(fr_harmonic_base_spec.DRAWING_PRECISION_BY_NAME)
+    assert set(sheet.UNDERSIDE_BOTTOM_CALLOUTS) <= set(sheet.UNDERSIDE_BOTTOM_KEEP)
+
+
+# Sheet text as boxes: 3.5 mm rows, and a generous 2.5 mm a character.
+_DIM_TEXT_H_M = 0.0035
+_DIM_CHAR_M = 0.0025
+_BORDER_INNER_M = (0.0127, 0.0127, 0.4191, 0.2667)
+_TITLE_BLOCK_M = (0.216, 0.0, 0.4318, 0.066)
+
+
+def _box_gap(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    """Clear distance between two (x0, y0, x1, y1) boxes; 0 when they touch."""
+    dx = max(a[0] - b[2], b[0] - a[2], 0.0)
+    dy = max(a[1] - b[3], b[1] - a[3], 0.0)
+    return math.hypot(dx, dy)
+
+
+def _segment_box_gap(segment: tuple[tuple[float, float], ...], box: tuple[float, ...]) -> float:
+    (x0, y0), (x1, y1) = segment
+    return min(
+        _box_gap((x, y, x, y), box)
+        for t in (i / 400.0 for i in range(401))
+        for x, y in [(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)]
+    )
+
+
+def _pads_vertices() -> dict[str, tuple[float, float]]:
+    """Machine (X, Z) of the point each sheet-4 baseline dimension reaches."""
+    lock = part.LOCK_PAD_SHAPE
+    ped0, ped1 = part.PEDESTAL_PAD_SHAPES
+    block0, block1 = part.BLOCK_PAD_SHAPES
+    lug0, lug1, _lug2, lug3 = part.CROSS_TAP_LUG_SHAPES
+    long_rib, cross_rib = part.LONG_RIB_SHAPE, part.CROSS_RIB_SHAPE
+    (foot,) = part.FOOT_SCREW_XZ
+    return {
+        "Lug1X": (lug1[2], lug1[3]),
+        "LockPadX": (lock[1], lock[4]),
+        "PedestalPad1X": (ped1[1], ped1[4]),
+        "BlockPad1X": (block1[1], block1[4]),
+        "CrossRibX": (cross_rib[1], cross_rib[4]),
+        "Lug3X": (lug3[1], lug3[3]),
+        "PedestalPad1Y": (ped1[1], ped1[4]),
+        "BlockPad1Y": (block1[1], block1[4]),
+        "Lug1Y": (lug1[2], lug1[3]),
+        "LongRibY": (long_rib[1], long_rib[4]),
+        "Lug0Y": (lug0[2], lug0[4]),
+        "PedestalPad0Y": (ped0[1], ped0[4]),
+        "BlockPad0Y": (block0[1], block0[3]),
+        "LockPadY": (lock[1], lock[4]),
+        "FootBossX": foot,
+        "FootBossY": foot,
+    }
+
+
+def _pads_printed() -> dict[str, float]:
+    spec = fr_harmonic_base_spec
+    lock = part.LOCK_PAD_SHAPE
+    ped0 = part.PEDESTAL_PAD_SHAPES[0]
+    block0 = part.BLOCK_PAD_SHAPES[0]
+    printed = {
+        name: (x + spec.BOTTOM_LENGTH / 2.0) if name.endswith("X") else (spec.BOTTOM_REAR_Z - z)
+        for name, (x, z) in _pads_vertices().items()
+    }
+    printed |= {
+        "LockPadWidth": lock[2] - lock[1],
+        "PedestalPadLength": ped0[4] - ped0[3],
+        "PedestalPad0Width": ped0[2] - ped0[1],
+        "BlockPad0Width": block0[4] - block0[3],
+    }
+    return printed
+
+
+def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
+    # Codex P2 on #1310: the 33 mm block pads, 26 mm pedestal pads, cone-lock
+    # pad and 27 x 37 mm lugs printed no size or place; the bp3 machinist
+    # review: nor did the ribs or the MHA-DT-024 foot boss. Sheet 4 prints
+    # them from the hole table's X0 Y0, shortest baseline innermost.
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    assert sheet.SHEET_NAMES[3] == "UNDERSIDE-PADS"
+    marked = {name for names in spec.UNDERSIDE_PAD_DIMENSIONS.values() for name in names}
+    assert set(sheet.UNDERSIDE_PADS_KEEP) == marked
+    for feature, names in spec.UNDERSIDE_PAD_DIMENSIONS.items():
+        assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
+    assert {feature for feature, _name in spec.UNDERSIDE_PAD_PREFIXES} <= set(
+        spec.UNDERSIDE_PAD_DIMENSIONS
+    )
+    assert {name for _feature, name in spec.UNDERSIDE_PAD_PREFIXES} <= marked
+    printed = {name: round(value, 1) for name, value in _pads_printed().items()}
+    assert printed == {
+        "Lug1X": 39.6,
+        "LockPadX": 120.5,
+        "PedestalPad1X": 160.2,
+        "BlockPad1X": 197.7,
+        "CrossRibX": 223.6,
+        "Lug3X": 417.6,
+        "PedestalPad1Y": 38.5,
+        "BlockPad1Y": 48.3,
+        "Lug1Y": 68.6,
+        "LongRibY": 138.6,
+        "Lug0Y": 218.6,
+        "PedestalPad0Y": 221.6,
+        "BlockPad0Y": 237.2,
+        "LockPadY": 247.6,
+        "FootBossX": 194.2,
+        "FootBossY": 67.2,
+        "LockPadWidth": 16.0,
+        "PedestalPadLength": 26.0,
+        "PedestalPad0Width": 16.0,
+        "BlockPad0Width": 16.0,
+    }
+    # The table's X0 Y0 is the flange's rear-west corner, top left here.
+    assert sheet.PADS_DATUM == pytest.approx(
+        sheet._pads_xy(-spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z)
+    )
+    for baselines in (sheet.PADS_X_ROWS, sheet.PADS_Y_COLUMNS):
+        values = [printed[name] for name, *_ in baselines]
+        assert values == sorted(values)
+
+
+def test_underside_pads_sheet_names_each_pad_and_lug_level() -> None:
+    # bp4 machinist review: the rect pads' and the lugs' cast levels were not
+    # assigned; section B-B cuts only the block pads and the foot boss. Each
+    # group names the level the builder hangs it to, in section B-B's words.
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    assert {part.LOCK_PAD_SHAPE, *part.PEDESTAL_PAD_SHAPES} <= set(part.DEEP_BOSS_SHAPES)
+    assert set(part.BLOCK_PAD_SHAPES) <= set(part.SHALLOW_BOSS_SHAPES)
+    # The lugs are their own feature, hung to the shallow level.
+    source = inspect.getsource(part)
+    assert (
+        '"CrossTapLugs",\n        "CrossTapLugProfile",\n        CROSS_TAP_LUG_SHAPES,\n'
+        "        SHALLOW_BOSS_BOTTOM_Y,\n"
+    ) in source
+    assert sheet.PADS_CALLOUTS == {
+        "LockPadWidth": "PAD TO\nDEEP LEVEL",
+        "PedestalPad0Width": "PADS TO\nDEEP LEVEL",
+    }
+    assert set(sheet.PADS_CALLOUTS) <= set(sheet.PADS_SIZE_BELOW_MM)
+    texts = {label: text for label, (text, _xy, _tip) in sheet.PADS_LEVEL_NOTES.items()}
+    assert texts == {
+        "pinion-block pads level": "2X PADS TO SHALLOW LEVEL",
+        "cross-tap lugs level": "4X LUGS TO\nSHALLOW LEVEL",
+    }
+    # Each leader tip lands on its group's front pad or lug: the block pad's
+    # ON its front edge, east of the corner its 2X 16.0 extension line leaves
+    # and clear of the rib it runs into; the lug's 1 mm inside it.
+    _text, _xy, (x, z) = sheet.PADS_LEVEL_NOTES["pinion-block pads level"]
+    block0 = part.BLOCK_PAD_SHAPES[0]
+    assert block0[1] + 5.0 < x < part.CROSS_RIB_SHAPE[1] - 1.0 and z == block0[3]
+    _text, _xy, (x, z) = sheet.PADS_LEVEL_NOTES["cross-tap lugs level"]
+    assert any(s[1] + 1.0 < x < s[2] - 1.0 and s[3] + 1.0 < z < s[4] - 1.0 for s in part.CROSS_TAP_LUG_SHAPES)
+    # The words are section B-B's level captions.
+    for text in (*sheet.PADS_CALLOUTS.values(), *texts.values()):
+        level = text.replace("\n", " ").split(" TO ")[-1]
+        assert level.replace(" ", "\n") in sheet.UNDERSIDE_SECTION_CALLOUTS.values()
+
+
+def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    prefixes = {name: prefix for (_f, name), prefix in spec.UNDERSIDE_PAD_PREFIXES.items()}
+    printed = _pads_printed()
+    # A vertical size whose text reads beyond its span hangs the text WEST of
+    # its dimension line (at the keep X) over a shoulder line, as measured on
+    # the 13f1ca261 sheet-4 render: 1.3 mm from the line, 2.3 mm a glyph
+    # ("2X 26.0" 15.9 mm, "2X 16.0" 15.6 mm), the shoulder 0.8 mm under the
+    # text and 1.3 mm past its far end.
+    hanging = ("PedestalPadLength", "BlockPad0Width")
+    hang_gap, glyph, shoulder_drop = 0.0013, 0.0023, 0.0008
+    boxes = {}
+    for name, (x, y) in sheet.UNDERSIDE_PADS_KEEP.items():
+        chars = len(f"{prefixes.get(name, '')}{printed[name]:.1f}")
+        if name in hanging:
+            right = x - hang_gap
+            boxes[name] = (right - chars * glyph, y - _DIM_TEXT_H_M / 2.0, right, y + _DIM_TEXT_H_M / 2.0)
+            continue
+        half_w = chars * _DIM_CHAR_M / 2.0
+        boxes[name] = (x - half_w, y - _DIM_TEXT_H_M / 2.0, x + half_w, y + _DIM_TEXT_H_M / 2.0)
+    view = (
+        *sheet._pads_xy(-spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_FRONT_Z),
+        *sheet._pads_xy(spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z),
+    )
+    # Sheet 4 notes: one view, its texts and the caption all inside the
+    # border, off the title block.
+    rows = sheet.PADS_NOTE.split("\n")
+    note = (
+        sheet.PADS_NOTE_XY[0],
+        sheet.PADS_NOTE_XY[1] - len(rows) * _NOTE_LINE_MM / 1000.0,
+        sheet.PADS_NOTE_XY[0] + max(map(len, rows)) * _NOTE_CHAR_MM / 1000.0,
+        sheet.PADS_NOTE_XY[1],
+    )
+    # The level callouts: rows centred under their dimension text, 5.8 mm a
+    # row (bp5 render), the dimension line 0.6 mm under the last row.
+    callout_row, underline_gap = 0.0058, 0.0006
+    callouts, dimension_line_y = {}, {}
+    for name, text in sheet.PADS_CALLOUTS.items():
+        rows = text.split("\n")
+        x, y = sheet.UNDERSIDE_PADS_KEEP[name]
+        half_w = max(map(len, rows)) * _DIM_CHAR_M / 2.0
+        bottom = y - len(rows) * callout_row - _DIM_TEXT_H_M / 2.0
+        callouts[f"{name} callout"] = (x - half_w, bottom, x + half_w, y - _DIM_TEXT_H_M / 2.0)
+        dimension_line_y[name] = bottom - underline_gap
+    # The level pointer notes, each leader from the note's side nearer its tip.
+    level_notes, leaders = {}, {}
+    for label, (text, (x, y), tip_mm) in sheet.PADS_LEVEL_NOTES.items():
+        rows = text.split("\n")
+        box = (
+            x,
+            y - len(rows) * _NOTE_LINE_MM / 1000.0,
+            x + max(map(len, rows)) * _NOTE_CHAR_MM / 1000.0,
+            y,
+        )
+        level_notes[label] = box
+        tip = sheet._pads_xy(*tip_mm)
+        side = box[0] if abs(tip[0] - box[0]) < abs(tip[0] - box[2]) else box[2]
+        assert not box[0] < tip[0] < box[2], label
+        leaders[label] = [((side, (box[1] + box[3]) / 2.0), tip)]
+        # The tip lands on its feature, inside the view.
+        assert view[0] < tip[0] < view[2] and view[1] < tip[1] < view[3], label
+    for label, box in {"view": view, "note": note, **boxes, **callouts, **level_notes}.items():
+        assert _BORDER_INNER_M[0] + 0.002 < box[0], label
+        assert _BORDER_INNER_M[1] + 0.002 < box[1], label
+        assert box[2] < _BORDER_INNER_M[2] - 0.002, label
+        assert box[3] < _BORDER_INNER_M[3] - 0.002, label
+        assert _box_gap(box, _TITLE_BLOCK_M) > 0.002, label
+    baselines = {name for name, *_ in (*sheet.PADS_X_ROWS, *sheet.PADS_Y_COLUMNS)}
+    for name in baselines:
+        assert _box_gap(boxes[name], view) > 0.002, name
+    for label, box in {**callouts, **level_notes}.items():
+        assert _box_gap(box, view) > 0.002, label
+    labelled = {"note": note, **boxes, **callouts, **level_notes}
+    for a in labelled:
+        for b in labelled:
+            if a < b and not (a.startswith(b) or b.startswith(a)):
+                assert _box_gap(labelled[a], labelled[b]) > 0.0015, (a, b)
+
+    # Every printed line: the baselines' extension and dimension lines, and
+    # the sizes' (extension lines run 2 mm past their dimension line).
+    over = 0.002
+    datum = sheet.PADS_DATUM
+    vertices = {name: sheet._pads_xy(*xz) for name, xz in _pads_vertices().items()}
+    lines: dict[str, list[tuple[tuple[float, float], tuple[float, float]]]] = {}
+    for name, _x in sheet.PADS_X_ROWS:
+        (vx, vy), (tx, ty) = vertices[name], sheet.UNDERSIDE_PADS_KEEP[name]
+        lines[name] = [((vx, vy), (vx, ty + over)), ((datum[0], ty), (max(vx, tx), ty))]
+    for name, *_ in sheet.PADS_Y_COLUMNS:
+        (vx, vy), (tx, ty) = vertices[name], sheet.UNDERSIDE_PADS_KEEP[name]
+        # Inside its own span, between X0 and the station.
+        assert vy + _DIM_TEXT_H_M < ty < datum[1] - _DIM_TEXT_H_M, name
+        lines[name] = [((vx, vy), (tx - over, vy)), ((tx, datum[1]), (tx, vy))]
+    lock = part.LOCK_PAD_SHAPE
+    ped0 = part.PEDESTAL_PAD_SHAPES[0]
+    block0 = part.BLOCK_PAD_SHAPES[0]
+    # bp3 machinist review: the horizontal sizes read outside the silhouette.
+    for name in sheet.PADS_SIZE_BELOW_MM:
+        assert boxes[name][3] < view[1] - 0.002, name
+    for name, (x0, x1, z, side) in {
+        "LockPadWidth": (lock[1], lock[2], lock[4], "across"),
+        "PedestalPad0Width": (ped0[1], ped0[2], ped0[3], "across"),
+    }.items():
+        tx, ty = sheet.UNDERSIDE_PADS_KEEP[name]
+        line_y = dimension_line_y.get(name, ty)
+        (ax, ay), (bx, _by) = sheet._pads_xy(x0, z), sheet._pads_xy(x1, z)
+        reach = line_y + math.copysign(over, line_y - ay)
+        left = min(ax, callouts.get(f"{name} callout", boxes[name])[0], boxes[name][0])
+        lines[name] = [
+            ((ax, ay), (ax, reach)),
+            ((bx, ay), (bx, reach)),
+            ((left, line_y), (max(bx, tx), line_y)),
+        ]
+    for name, (x, z0, z1) in {
+        "PedestalPadLength": (ped0[1], ped0[3], ped0[4]),
+        "BlockPad0Width": (block0[1], block0[3], block0[4]),
+    }.items():
+        tx, ty = sheet.UNDERSIDE_PADS_KEEP[name]
+        (ax, ay), (_bx, by) = sheet._pads_xy(x, z0), sheet._pads_xy(x, z1)
+        # Beyond the span (so hung), west of the measured side.
+        assert ty - _DIM_TEXT_H_M / 2.0 - shoulder_drop > max(ay, by), name
+        assert tx < ax, name
+        shoulder_y = ty - _DIM_TEXT_H_M / 2.0 - shoulder_drop
+        reach = tx + math.copysign(over, tx - ax)
+        lines[name] = [
+            ((ax, ay), (reach, ay)),
+            ((ax, by), (reach, by)),
+            ((tx, min(ay, shoulder_y)), (tx, max(by, shoulder_y))),
+            ((boxes[name][0] - hang_gap, shoulder_y), (tx, shoulder_y)),
+        ]
+    assert set(lines) == set(boxes)
+    for name, box in boxes.items():
+        for other, segments in lines.items():
+            if other == name:
+                continue
+            for segment in segments:
+                assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
+    # A callout clears every line but its own dimension line, which runs
+    # under it; a level note clears every line and leader but its own.
+    for name, box in {**callouts, **level_notes}.items():
+        for other, segments in {**lines, **leaders}.items():
+            if other in (name, name.removesuffix(" callout")):
+                continue
+            for segment in segments:
+                assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
+    # Each callout dimension's text block stands clear of the other's
+    # extension lines (bp5: the lock pad's ran through "2X 16.0").
+    for name in sheet.PADS_CALLOUTS:
+        block = (*callouts[f"{name} callout"][:3], boxes[name][3])
+        for other in sheet.PADS_CALLOUTS:
+            if other != name:
+                for segment in lines[other]:
+                    assert _segment_box_gap(segment, block) > 0.0015, (name, other, segment)
+    for label, (leader,) in leaders.items():
+        for name, box in {"note": note, **boxes, **callouts}.items():
+            assert _segment_box_gap(leader, box) > 0.001, (label, name)
+        for other, segments in lines.items():
+            for (x0, y0), (x1, y1) in segments:
+                line_box = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+                assert _segment_box_gap(leader, line_box) > 0.0005, (label, other)
+
+    # The in-view texts read in the pocket's open air, clear of every boss,
+    # pad, lug and rib by 2 mm of model.
+    solids = (
+        *part.DEEP_BOSS_SHAPES,
+        *part.SHALLOW_BOSS_SHAPES,
+        *part.CROSS_TAP_LUG_SHAPES,
+        *part.SOCKET_BOSS_SHAPES,
+        part.LONG_RIB_SHAPE,
+        part.CROSS_RIB_SHAPE,
+    )
+    scale = sheet._PADS_M_PER_MM
+    for name in sheet.PADS_SIZE_TEXT_MM:
+        x0, z0, x1, z1 = (
+            (boxes[name][0] - sheet.PADS_CENTER[0]) / scale - 2.0,
+            (boxes[name][1] - sheet.PADS_CENTER[1]) / scale - 2.0,
+            (boxes[name][2] - sheet.PADS_CENTER[0]) / scale + 2.0,
+            (boxes[name][3] - sheet.PADS_CENTER[1]) / scale + 2.0,
+        )
+        assert -spec.POCKET_HALF_X < x0 and x1 < spec.POCKET_HALF_X, name
+        assert -spec.POCKET_HALF_Z < z0 and z1 < spec.POCKET_HALF_Z, name
+        for shape in solids:
+            if shape[0] == "disc":
+                nearest = (min(max(shape[1], x0), x1), min(max(shape[2], z0), z1))
+                assert math.dist(nearest, shape[1:3]) > shape[3], (name, shape)
+            else:
+                assert x1 < shape[1] or shape[2] < x0 or z1 < shape[3] or shape[4] < z0, (
+                    name,
+                    shape,
+                )
+
+
+def test_nameplate_tags_read_clear_of_section_a_and_of_every_other_tag() -> None:
+    # ec323b4eb leaf: F3's and F4's leaders crossed section line A and each
+    # other; ab1f78504 leaf: the tags stacked in one column within a row pitch
+    # of each other and of E4 (enforced merged-blocks). The west tags read in
+    # the four-tap quad, the east tags between the deck's east edge and
+    # section line A; any two tags whose columns overlap stand a row pitch
+    # (1.543 text heights, 5.4 mm at 3.5 mm) apart.
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    half_h = sheet._HOLE_TAG_HALF_HEIGHT_M
+    tag_w = 2 * _DIM_CHAR_M
+    row_pitch = 5.556 / 3.5 * 2 * half_h
+    section_x = sheet._plan_xy(spec.COLUMN_X, 0.0, center=sheet.HOLE_TOP_CENTER)[0]
+    deck_east = sheet._plan_xy(part.DECK_HALF_X, 0.0, center=sheet.HOLE_TOP_CENTER)[0]
+    centre_x = sum(x for x, _ in part.NAMEPLATE_SCREW_XZ) / len(part.NAMEPLATE_SCREW_XZ)
+    taps = [
+        sheet._plan_xy(x, z, center=sheet.HOLE_TOP_CENTER) for x, z in part.NAMEPLATE_SCREW_XZ
+    ]
+    tags = []
+    for (x, z), tap in zip(part.NAMEPLATE_SCREW_XZ, taps, strict=True):
+        table = (x + spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z - z)
+        left, top = sheet._nameplate_tag_position(table)
+        box = (left, top - 2 * half_h, left + tag_w, top)
+        if x > centre_x:
+            assert deck_east + 0.001 < box[0] and box[2] < section_x - 0.001
+        else:
+            assert tap[0] < box[0] and box[2] < deck_east - 0.001
+        # The leader leaves the box's west side and ends on its tap; judged
+        # to 1 mm short of the centre, where the arrowhead lands on the tap.
+        start = (box[0], top - half_h)
+        length = math.dist(start, tap)
+        end = tuple(s + (t - s) * (length - 0.001) / length for s, t in zip(start, tap))
+        tags.append((box, (start, end)))
+    assert sheet._nameplate_tag_position((0.0, 0.0)) is None
+    others = [
+        (x, y - 2 * half_h, x + tag_w, y) for x, y in sheet.HOLE_TAG_POSITIONS.values()
+    ]
+    radius = part.NAMEPLATE_SCREW_HOLE_DIA * sheet.VIEW_SCALE / 2000.0
+    boxes = [box for box, _ in tags] + others
+    for other in others:
+        for hole in taps:
+            assert _box_gap(other, (hole[0], hole[1], hole[0], hole[1])) > radius + 0.0008, other
+    for i, (box, leader) in enumerate(tags):
+        for hole in taps:
+            assert _box_gap(box, (hole[0], hole[1], hole[0], hole[1])) > radius + 0.0008
+        for j, other in enumerate(boxes):
+            if j == i:
+                continue
+            assert _segment_box_gap(leader, other) > 0.0003, (i, other)
+            if min(box[2], other[2]) > max(box[0], other[0]):  # one column
+                gap = max(box[1] - other[3], other[1] - box[3])
+                assert gap > row_pitch + 0.0003, (i, other, gap)
+        for _other_box, other_leader in tags[i + 1 :]:
+            (ax, ay), (bx, by) = leader
+            (cx, cy), (dx, dy) = other_leader
+            cross = lambda px, py, qx, qy, rx, ry: (qx - px) * (ry - py) - (qy - py) * (rx - px)  # noqa: E731
+            assert not (
+                cross(ax, ay, bx, by, cx, cy) * cross(ax, ay, bx, by, dx, dy) < 0
+                and cross(cx, cy, dx, dy, ax, ay) * cross(cx, cy, dx, dy, bx, by) < 0
+            )
 
 
 def test_rig_callouts_name_the_rig_set_note() -> None:
@@ -1648,9 +2334,5 @@ def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
     assert "def _hide_reference_sketches" not in source
     assert source.count(blank) == 1
-    assert part.REFERENCE_SKETCHES == (
-        "RimWidthReference",
-        "HeightReference",
-        "CrossTapReference",
-    )
+    assert part.REFERENCE_SKETCHES == ("HeightReference", "CrossTapReference")
     assert hasattr(_common.blank_reference_sketches, "__wrapped__")

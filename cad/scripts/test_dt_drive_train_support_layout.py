@@ -698,8 +698,8 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     )
     # 21.06 at the 11.5 head (afe7ea283): its crown sits 0.5 further forward.
     assert drive._GRIP_HEAD_Z[0] - (drive.CRANK_ARM_Z0 + drive.ARM_THICKNESS) >= 21.0
-    # The base rim still stands far past the rod's reach and every seat.
-    assert base.TOP_WIDTH / 2.0 - base.LIP_W - RIG.BACK_BLOCK_OUTER_Z >= 25.0
+    # The base deck's north edge still stands far past the rod's reach.
+    assert base.DECK_HALF_Z - RIG.BACK_BLOCK_OUTER_Z >= 25.0
 
 
 def test_crank_seat_stack_keeps_its_air_and_fits_the_washer(monkeypatch) -> None:
@@ -994,9 +994,9 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
     assert (drive.LIFT_X - rod_r) - (drive.X_DRUM + ped.FOOT_WIDTH / 2.0) >= 25.0
     # The rocker-arm support ends short of the back block's outer face.
     assert SUPPORT_WORLD_Z + SUPPORT_HALF_MACHINE_Z < band[0]
-    # The base deck lies under the rod; its north rim is far past the reach.
+    # The base deck lies under the rod; its north edge is far past the reach.
     assert drive.LIFT_Y - rod_r - drive.Y_BASE_TOP >= 5.0
-    assert base.TOP_WIDTH / 2.0 - base.LIP_W - band[1] >= 25.0
+    assert base.DECK_HALF_Z - band[1] >= 25.0
     # Nothing else in the pinion rig runs past the back block's outer face.
     assert math.isclose(
         drive.PIVOT_SHAFT_Z0 + rig.TORQUE_SHAFT_LEN,

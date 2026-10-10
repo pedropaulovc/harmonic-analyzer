@@ -14,24 +14,23 @@ others:
   ``MOUNT_EULER`` / ``MOUNT_ROWS``, formerly its own ``NAMEPLATE_*``) and the
   screw stations it drops the four ``vn-fillister-screw`` components onto.
 
-Mount transform (book ch. 26 pp. 70-71; photogrammetry 195527397 / 195530756 /
-195532820; ch. 30 eight views): the 100 x 55 brass plate lies FLAT on the base
-deck, decorated side up, on the EAST (+X) face, centred front-back between the
-two east columns and read by an operator standing at that face.
+Mount transform (user ruling 2026-10-09; ch. 26 p.71 and ch. 30 p002/p003/p006):
+the brass plate's outline IS the traced DXF outer edge, uniformly enlarged to
+100 mm wide (height about 45.33 mm). It lies FLAT on the WEST (+X) end of the
+black base deck, decorated side up, read by an operator standing west of it.
 
 The part's decorated face is its FRONT face (+Z local; ``build_fr_nameplate``
 extrudes the body in -Z so the engraving is frontmost and reads with no
-mirror). ``MOUNT_ROWS`` (euler [-90, 90, 0]) lays it flat on the EAST face:
+mirror). ``MOUNT_ROWS`` (euler [-90, 90, 0]) lays it flat on the WEST end:
 local +Z (decorated front) -> +Y so the engraving faces up; local +Y (text
 height) -> -X so the text top faces the machine interior and reads upright to
-an east operator; local +X (text length, 100) -> -Z so the line runs
+a west operator; local +X (text length, 100) -> -Z so the line runs
 front-back; the 1.5 body (local -Z) drops onto the deck. The placed point is
 the part origin CORNER (decorated face, x=0/y=0): Y 52.3 lays the decorated
 face on top with the 1.5 body resting on the deck (50.8); Z 50 centres the
-100 mm line at z 0 between the east columns (z +/-112); X 214.25 sets the
-plate's east edge 1.0 inside the raised rim's inner wall (pad edge 222.25
-minus the 7.0 lip), span x 159.25..214.25 -- east of the rocker-arm-support
-(x 28..117) and clear of the east columns.
+100 mm line at z 0; X 163.0 sets the plate's west edge 4.0 inside the black
+deck's west edge at x 167.0. The plate spans x about 117.67..163.0, clear of
+the rocker-arm-support foot at x 41.15..104.65.
 
 Row convention (``_transforms.rows_from_euler`` / ``assert_component_placed``):
 ``MOUNT_ROWS[i]`` is the machine image of local axis ``i``, so a plate-local
@@ -41,25 +40,36 @@ asserts the literal rows against ``rows_from_euler(MOUNT_EULER)`` at import.
 
 from __future__ import annotations
 
+# --- Photo-traced DXF measurements BEFORE the 2026-10-09 rebake (mm). ---
+# The brief's 39.892 was rounded; preserve the measured outer-loop height and
+# uniformly scale every contour. These data need no DXF/CAD dependency at import.
+DXF_OUTER_ORIGIN = (5.999999999999993, 7.5538435420827525)
+DXF_OUTER_WIDTH = 88.0
+DXF_OUTER_HEIGHT = 39.8923129158345
+DXF_SCALE = 100.0 / DXF_OUTER_WIDTH
+DXF_SCREW_XY = (
+    (9.566587580494442, 11.120346180985667),
+    (90.43341063179248, 11.120530788933703),
+    (9.566585942787817, 43.87947345273603),
+    (90.43340909641734, 43.879661102671),
+)
+
 # --- Plate envelope (build_fr_nameplate owns the rest of the plate geometry). ---
-PLATE_WIDTH = 100.0  # DIMENSIONS.md ch26: stated 100 mm (p.70, high)
-PLATE_HEIGHT = 55.0  # DIMENSIONS.md ch26: stated 55 mm (p.70, high)
+PLATE_WIDTH = DXF_OUTER_WIDTH * DXF_SCALE
+PLATE_HEIGHT = DXF_OUTER_HEIGHT * DXF_SCALE
 PLATE_THICKNESS = 1.5  # thin brass plate; p.71 edge read (low)
 
-# Four corner mounting screws (ch26 p.71 macro: one brass slotted round-head
-# screw per corner, heads riding the pinstripe corners) in the raised border
-# band. The screws are the shared #4-40 brass ``vn-fillister-screw``; the plate
-# carries #4 CLOSE clearance holes, the base the blind #4-40 taps.
-SCREW_INSET = 4.5
-SCREW_XY = (
-    (SCREW_INSET, SCREW_INSET),
-    (PLATE_WIDTH - SCREW_INSET, SCREW_INSET),
-    (SCREW_INSET, PLATE_HEIGHT - SCREW_INSET),
-    (PLATE_WIDTH - SCREW_INSET, PLATE_HEIGHT - SCREW_INSET),
+# Four slotted screw-head marks in the traced DXF, measured at each mark's
+# combined contour bbox centre. Preserve their slight asymmetry rather than a
+# single nominal inset: each #4 CLOSE hole coincides with its traced head mark.
+# The raised border's notches keep the heads off the recessed field.
+SCREW_XY = tuple(
+    ((x - DXF_OUTER_ORIGIN[0]) * DXF_SCALE, (y - DXF_OUTER_ORIGIN[1]) * DXF_SCALE)
+    for x, y in DXF_SCREW_XY
 )
 
 # --- Mount transform in the machine frame (see the module docstring). ---
-MOUNT_POS = [214.25, 52.3, 50.0]
+MOUNT_POS = [163.0, 52.3, 50.0]
 MOUNT_EULER = [-90.0, 90.0, 0.0]
 MOUNT_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 
@@ -80,10 +90,9 @@ MOUNT_NORMAL = tuple(MOUNT_ROWS[2])
 # plate lies horizontal (MOUNT_NORMAL is +Y).
 MOUNT_FRONT_Y = MOUNT_POS[1]
 MOUNT_BACK_Y = mount_point((0.0, 0.0, -PLATE_THICKNESS))[1]  # 50.8
-# The four screw axes in the machine frame -- the plate-local corner stations
-# mapped through the mount rows (x = 214.25 - y_local, z = 50 - x_local):
-# (209.75, 45.5), (209.75, -45.5), (163.75, 45.5), (163.75, -45.5). These are
-# the base's tapped-seat stations; each axis runs along -Y into the deck.
+# The four screw axes in the machine frame -- the plate-local DXF marks mapped
+# through the mount rows (x = MOUNT_POS[0] - y_local, z = MOUNT_POS[2] - x_local).
+# These are the base's tapped-seat stations; each axis runs along -Y into the deck.
 MOUNT_HOLE_XZ = tuple(
     (pt[0], pt[2]) for pt in (mount_point((x, y, 0.0)) for x, y in SCREW_XY)
 )

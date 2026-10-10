@@ -98,8 +98,10 @@ sections:
       HarmonicBase.cs bottom plate 18.0" × 11.0" (within rounding of the cm callouts).
       DESIGN DEPARTURE (2026-09-15): the modelled base is 457.2 × 287.2 (pad
       444.5 × 274.5), i.e. +7.8 mm deeper than the 28 cm callout, so the four
-      column sockets keep an equal 5.5 mm deck land to the rim on both axes
-      (the photographed 11.0" plate leaves only 1.6 mm in Z at the ±112 column
+      column sockets keep an equal land on both axes -- 5.5 mm to the 2026-09
+      rim; since the user ruling of 2026-10-09 the rim is gone and each socket
+      opens on the green land, 12.5 mm to the pad edge (the photographed
+      11.0" plate leaves only 1.6 mm in Z at the ±112 column
       stations, which manufacturing tolerances could consume). The columns stay
       at the photographed stations; only the base plate grew. Source of truth:
       `cad/scripts/fr_harmonic_base_spec.py` (TOP_WIDTH derivation).
