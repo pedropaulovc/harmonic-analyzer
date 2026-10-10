@@ -286,6 +286,12 @@ def test_model_bands_and_source_linked_properties() -> None:
     controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
     assert set(drawing.CONTROL_ATTACHMENTS) == set(controls)
     assert drawing.CONTROL_ATTACHMENTS["core_total_runout"][0] != drawing.CONTROL_ATTACHMENTS["front_neck_total_runout"][0]
+    # Run 10: a silhouette hit-test on the 0.3 mm neck floor took a neighbour.
+    frames = _calls(drawing.build, "add_feature_control_frame")
+    assert len(frames) == 1
+    assert _keyword(frames[0], "entity_type") == "'FACE'"
+    assert _keyword(frames[0], "entity") == "control_faces[key]"
+    assert _keyword(frames[0], "leader_attach_xy") == "landing"
     for key, control in controls.items():
         assert control.datums == ("A",)
         assert float(control.tolerance) == spec.CORE_TOTAL_RUNOUT
@@ -423,11 +429,14 @@ def test_wrong_inspection_pin_cannot_certify_an_unsupported_contact(pin_diameter
         toothspace_gauge_contact_mm(spec.STOCK_PROFILE, pin_diameter)
 
 
-def test_shared_callout_refuses_a_line_or_circle_edge(monkeypatch) -> None:
+def test_shared_callout_refuses_a_line_circle_or_off_contact_edge(monkeypatch) -> None:
     import paper_drive_stock_drawing as ink
+
+    contact = (2.5, 1.5)
 
     class Curve:
         line = circle = False
+        shift_m = 0.0
 
         def IsLine(self):
             return self.line
@@ -435,15 +444,45 @@ def test_shared_callout_refuses_a_line_or_circle_edge(monkeypatch) -> None:
         def IsCircle(self):
             return self.circle
 
+        def GetClosestPointOn(self, x, y, z):
+            # A planar end-face edge at z = 5.9 mm, whatever station is asked.
+            return (x + self.shift_m, y, 0.0059, 0.0, 0.0)
+
     curve = Curve()
     edge = SimpleNamespace(GetCurve=lambda: curve)
     monkeypatch.setattr(ink, "_early_bound", lambda value, interface: value)
-    ink._require_formed_flank(edge)
+    ink._require_formed_flank(edge, contact, 0.0)
     for kind in ("line", "circle"):
         setattr(curve, kind, True)
         with pytest.raises(RuntimeError, match="not a formed flank"):
-            ink._require_formed_flank(edge)
+            ink._require_formed_flank(edge, contact, 0.0)
         setattr(curve, kind, False)
+    curve.shift_m = 0.02e-3  # a neighbouring formed edge 0.02 mm off
+    with pytest.raises(RuntimeError, match=r"passes 0\.0200 mm from the gauge contact"):
+        ink._require_formed_flank(edge, contact, 0.0)
+
+
+@pytest.mark.parametrize(
+    ("spec_module", "pin_name"),
+    [
+        ("pd_rack_pinion_spec", "TOOTH_SPACE_GAUGE_PIN_DIA_MM"),
+        ("pd_transgear_feed_pinion_spec", "TOOTHSPACE_GAUGE_DIA_MM"),
+        ("pd_transgear_knob_shaft_spec", "TOOTH_SPACE_GAUGE_PIN_DIA_MM"),
+    ],
+)
+def test_flank_ends_lie_far_outside_the_contact_tolerance(spec_module: str, pin_name: str) -> None:
+    """Root-fillet and tip edges meet the flank only at its ends; each end
+    must sit over 20x the contact tolerance from the gauge contact."""
+    import importlib
+
+    import paper_drive_stock_drawing as ink
+
+    owner = importlib.import_module(spec_module)
+    profile = owner.STOCK_PROFILE
+    contact = toothspace_gauge_contact_mm(profile, getattr(owner, pin_name))
+    for parameter in (profile.flank_parameter_min, profile.flank_parameter_max):
+        end = profile.flank_point(parameter)
+        assert math.dist(contact.flank_point_mm, end) > 20.0 * ink.CONTACT_TOLERANCE_MM
 
 
 def test_shared_callout_picks_the_contact_and_checks_one_edge_attachment() -> None:
