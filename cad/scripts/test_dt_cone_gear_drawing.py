@@ -102,7 +102,7 @@ def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
     assert (
         '"BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)' in source
     )
-    assert "_set_custom_six_bands(adapter)" in source
+    assert "_set_configuration_bands(adapter)" in source
 
 
 def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
@@ -794,6 +794,34 @@ def test_a_rejected_configuration_limit_fails_the_part_build(
     _patch_floor_dimension(monkeypatch, _FakeTolerance(accept=False))
     with pytest.raises(RuntimeError, match="FloorDia@T006: SetValues2 rejected"):
         part._set_gap_floor_limits(object())
+
+
+def test_every_configuration_stores_its_own_blank_and_thickness_band(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """part:dt_cone_gear at 039e557da: the T006-only write's immediate readback
+    returned T006's band. The FloorDia form instead: all twenty written, T006
+    its own, then each read back in the reopened audit with itself active."""
+    tolerances = {"BlankDia": _FakeTolerance(), "ToothThickness": _FakeTolerance()}
+
+    def named(_adapter: object, _feature: str, name: str) -> tuple[object, object]:
+        return object(), type("Dimension", (), {"Tolerance": tolerances[name]})()
+
+    monkeypatch.setattr(part, "_named_dimension", named)
+    part._set_configuration_bands(object())
+    for name, band_for in (
+        ("BlankDia", spec.blank_dia_band),
+        ("ToothThickness", spec.tooth_thickness_band),
+    ):
+        calls = tolerances[name].calls
+        assert [call[3] for call in calls] == [[c] for c, _ in part.CONFIGS]
+        for (lower, upper, which, _names), (_c, teeth) in zip(calls, part.CONFIGS, strict=True):
+            assert which == 3
+            upper_mm, lower_mm = band_for(teeth)
+            assert (lower * 1000.0, upper * 1000.0) == pytest.approx((lower_mm, upper_mm))
+    source = inspect.getsource(part.assert_saved_configuration_topology)
+    assert "_assert_configuration_bands(adapter, configuration, teeth)" in source
+    assert "GetMinValue" not in inspect.getsource(part._set_configuration_bands)
 
 
 def test_only_the_front_view_shows_the_authoring_sketches() -> None:

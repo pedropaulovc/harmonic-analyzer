@@ -65,12 +65,12 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         "GENERAL_BAND_BY_PLACES",
         "values",
     ),
-    # for feature, name, shared, own in (...): ... deviations(own), deviations(shared)
-    ("build_dt_cone_gear", "own"): (
-        "(blank_dia_band(6), tooth_thickness_band(6))",
+    # for configuration, teeth in CONFIGS: band = band_for(teeth); deviations(band)
+    ("build_dt_cone_gear", "band"): (
+        "(blank_dia_band(6), tooth_thickness_band(6),"
+        " blank_dia_band(12), tooth_thickness_band(12))",
         "each",
     ),
-    ("build_dt_cone_gear", "shared"): ("(BLANK_DIA_BAND, TOOTH_THICKNESS_BAND)", "each"),
     # for name, band in (("BlankDia", blank_dia_band(teeth)), ...): deviations(band)
     ("draw_dt_cone_gear", "band"): (
         "(blank_dia_band(6), tooth_thickness_band(6),"

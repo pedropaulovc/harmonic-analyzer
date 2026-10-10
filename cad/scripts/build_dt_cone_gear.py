@@ -152,6 +152,7 @@ SIMPLIFIED_FEATURES = tuple(
 SIMPLIFIED_FEATURES_BY_CONFIGURATION = {
     f"T{teeth:03d}": tooth_features(teeth)[1:] for teeth in CONFIGURATION_TEETH
 }
+_TOL_BILAT = 2  # swTolType_e.swTolBILAT
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 _SET_IN_SPECIFIC_CONFIGURATIONS = 3  # swSetValueInConfiguration_e
 _VISIBILITY_HIDDEN = 1  # swVisibilityState_e
@@ -348,40 +349,68 @@ def _assert_gap_floor_limits(adapter: Any, configuration: str, teeth: int) -> No
     )
 
 
-def _set_custom_six_bands(adapter: Any) -> None:
-    """Write T006's own blank and tooth-thickness bands into T006 only.
+# The two bilateral bands T006 overrides (the named exception); every other
+# configuration carries the shared band.
+_BANDED_DIMENSIONS = (
+    ("BlankProfile", "BlankDia", blank_dia_band),
+    (TOOTH_REFERENCE_SKETCH, "ToothThickness", tooth_thickness_band),
+)
 
-    The shared bilateral bands are already on BlankDia and ToothThickness;
-    ``SetValues2`` with swSetValue_InSpecificConfigurations and the one name
-    overrides them in T006 without activating it (the FloorDia LIMIT form).
-    The active configuration must still read the shared band; the T006 sheet
-    reads its own back after save and reopen (draw_dt_cone_gear).
+
+def _set_configuration_bands(adapter: Any) -> None:
+    """Store each configuration's blank and tooth-thickness band.
+
+    The FloorDia form (``_set_gap_floor_limits``): one ``SetValues2`` with
+    swSetValue_InSpecificConfigurations per configuration, all twenty, T006
+    its own band and the rest the shared one. No readback here: the
+    just-written tolerance object answers with what was written, not with the
+    active configuration's band (part:dt_cone_gear at 039e557da). The reopened
+    audit reads each back with its configuration active
+    (``_assert_configuration_bands``).
     """
     import pythoncom
     from win32com.client import VARIANT
 
-    for feature, name, shared, own in (
-        ("BlankProfile", "BlankDia", BLANK_DIA_BAND, blank_dia_band(6)),
-        (TOOTH_REFERENCE_SKETCH, "ToothThickness", TOOTH_THICKNESS_BAND, tooth_thickness_band(6)),
-    ):
+    for feature, name, band_for in _BANDED_DIMENSIONS:
         _display, dimension = _named_dimension(adapter, feature, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        lower, upper = deviations(own)
-        names = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, ["T006"])
-        if not bool(tolerance.SetValues2(
-            lower / 1000.0, upper / 1000.0, _SET_IN_SPECIFIC_CONFIGURATIONS, names
-        )):
-            raise RuntimeError(f"{name}@T006: SetValues2 rejected the band {own} mm")
+        for configuration, teeth in CONFIGS:
+            band = band_for(teeth)
+            lower, upper = deviations(band)
+            names = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, [configuration])
+            if not bool(tolerance.SetValues2(
+                lower / 1000.0, upper / 1000.0, _SET_IN_SPECIFIC_CONFIGURATIONS, names
+            )):
+                raise RuntimeError(
+                    f"{name}@{configuration}: SetValues2 rejected the band {band} mm"
+                )
+    _telemetry.success(
+        f"BlankDia and ToothThickness bands set in {len(CONFIGS)} configurations "
+        f"(T006: blank {blank_dia_band(6)}, tooth thickness {tooth_thickness_band(6)} mm)"
+    )
+
+
+def _assert_configuration_bands(adapter: Any, configuration: str, teeth: int) -> None:
+    """Read FloorDia, BlankDia and ToothThickness back in the active configuration."""
+    _assert_gap_floor_limits(adapter, configuration, teeth)
+    for feature, name, band_for in _BANDED_DIMENSIONS:
+        _display, dimension = _named_dimension(adapter, feature, name)
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        kind = int(tolerance.Type)
         observed = (
             float(tolerance.GetMinValue()) * 1000.0,
             float(tolerance.GetMaxValue()) * 1000.0,
         )
-        if any(abs(o - e) > 1e-6 for o, e in zip(observed, deviations(shared))):
+        band = band_for(teeth)
+        expected = deviations(band)
+        if kind != _TOL_BILAT or any(abs(o - e) > 1e-6 for o, e in zip(observed, expected)):
             raise RuntimeError(
-                f"{name}: the T006 band reached the active configuration: {observed} mm"
+                f"{configuration}: {name} tolerance reads type {kind} {observed} mm, "
+                f"expected bilateral {expected} mm"
             )
     _telemetry.success(
-        f"T006 bands: blank {blank_dia_band(6)}, tooth thickness {tooth_thickness_band(6)} mm"
+        f"{configuration}: blank {blank_dia_band(teeth)} and tooth-thickness "
+        f"{tooth_thickness_band(teeth)} bands"
     )
 
 
@@ -793,6 +822,8 @@ async def assert_saved_configuration_topology(
                 phase=f"{phase} post-activation-rebuild",
                 measure_roots=True,
             )
+            # Each configuration's own tolerance bands, read with it active.
+            _assert_configuration_bands(adapter, configuration, teeth)
         except Exception as exc:
             failures.append(f"{configuration}: {exc}")
             continue
@@ -1545,7 +1576,7 @@ async def build(adapter) -> dict[str, str]:
         "ToothThickness",
         *deviations(TOOTH_THICKNESS_BAND),
     )
-    _set_custom_six_bands(adapter)
+    _set_configuration_bands(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,

@@ -435,8 +435,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 BLANK_DIA_BAND = (0.0, -0.05)
 # T006 keeps its own bands (the named exception, user ruling 2026-10-10):
 # DT6-FORM1's relief leaves no flank for a tooth thicker than the tool, and a
-# thinner or smaller T006 loses the tip land. build_dt_cone_gear writes them
-# into the T006 configuration only (IDimensionTolerance.SetValues2).
+# thinner or smaller T006 loses the tip land. build_dt_cone_gear writes every
+# configuration's band into that configuration (IDimensionTolerance.SetValues2).
 CUSTOM_SIX_TOOTH_THICKNESS_BAND = (0.0, -0.04)
 CUSTOM_SIX_BLANK_DIA_BAND = (0.0, -0.02)
 
