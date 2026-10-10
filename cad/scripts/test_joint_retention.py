@@ -308,6 +308,7 @@ def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:
     assert "TIGHTEN" not in rocker_fitup
     assert "TIGHTEN" in fulcrum_fitup
     assert "STAKE" in fulcrum_fitup
+    assert jr._config.parts("vn-arbor-set-screw")["number"] not in fulcrum_fitup
 
     def unlocked(rulings) -> set[str]:
         findings = jr.audit(

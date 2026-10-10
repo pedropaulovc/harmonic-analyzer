@@ -205,10 +205,11 @@ _COMPONENT_BAND = {
     "ch-channel": (
         8 * _N_CH + 17 - 6,
         8 * _N_CH + 17 + 6,
-    ),  # N=20 -> (171,183), expected 177
-    # 2026-10-10: #1307 one hold-down per pivot bracket, two fulcrum crown
-    # set screws; #1317 retains both thrust washers and the wave spring,
-    # with two pivot-arbor apex set screws locating the pivot shaft.
+    ),  # N=20 -> (171,183), expected 177 (#948 ruling R: + MHA-VN-053)
+    # (measured 164 pre-remount; 2026-08-02: -2 lever ball-mounts +2 fulcrum
+    # keepers +2 keeper foot screws nets +2; 2026-10-10: #1307 one hold-down
+    # per pivot bracket -2; #1317 +2 pivot-arbor apex set screws, both thrust
+    # washers and the wave spring; +2 MHA-VN-055 fulcrum crown set screws)
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
     "sm-summing": (11, 13),  # ch 18-19, measured 8 (knife-stay removed: never
