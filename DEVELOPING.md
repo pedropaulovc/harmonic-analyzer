@@ -19,8 +19,10 @@ uv run --locked python -m pytest -q --durations=50 --junitxml=<outside-worktree>
 ```
 
 The configured suite covers `cad/scripts`, `cad/comparisons/tools` and `tests`,
-including offline diagnostic tests. To include the web Python tests, first run
-`npm ci` in `web`, then use:
+including offline diagnostic tests. To include the web Python tests, prepare the
+dependencies and approved model cache using the
+[fresh-checkout instructions](web/README.md#fresh-checkout-tests-and-approved-model-cache),
+then use:
 
 ```text
 uv run --locked --group web python -m pytest . -q --durations=50 --junitxml=<outside-worktree>/all-pytest.xml
