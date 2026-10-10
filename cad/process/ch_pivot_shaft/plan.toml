@@ -219,7 +219,7 @@ stock_in = "S1"
 [setups.stock_state]
 od_mm = 6.35
 top_z = 3.175                # bar top = axis + 6.35/2 (zero.z below)
-note = "Along M2 X the north dome's apex sits at X-1.5, past X0 on its base rim; the supply end, uncut, at X173.5."
+note = "Along M2 X the north dome's apex sits at X-1.5, past X0 on its base rim; the supply end, uncut, at X172.5."
 
 [setups.stock_state.local_thickness]
 # no holes on this part
