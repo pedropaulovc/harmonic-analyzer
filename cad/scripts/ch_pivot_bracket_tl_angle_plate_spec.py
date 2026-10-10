@@ -92,7 +92,7 @@ if (
     raise AssertionError("the ledge must stand the shorter foot's bracket 4 mm proud at worst case")
 
 # Ledge screws: two #10-24 x 5/8 SHCS (shop-to-shop UNC, fastener policy) at
-# 9.0 under the ledge top, 10.0 apart about the plate centre: wide enough that
+# 10.5 under the ledge top, 10.0 apart about the plate centre: wide enough that
 # the two heads stay clear with the ledge's holes at their worst one-place
 # stations (asserted in the ledge spec). The taps are
 # spotted through the ledge's own holes with the ledge standing on its block,
@@ -111,8 +111,8 @@ SCREW_HEAD_ECCENTRICITY_MAX = 0.006 * 25.4 / 2.0  # 0.0762
 # authored daylight margin over contact at the worst printed pitch.
 SCREW_HEAD_GAP_MIN = 0.3
 SCREW_HALF_PITCH = 5.0
-SCREW_BELOW_LEDGE_TOP = 9.0
-SCREW_Y = round(LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP, 6)  # 69.5
+SCREW_BELOW_LEDGE_TOP = 10.5
+SCREW_Y = round(LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP, 6)  # 68.0
 TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 
 # Bridge studs: 3/8-16 studs through letter-X clearance holes, 40.0 apart
@@ -224,6 +224,27 @@ if STUD_TOP_WALL_MIN < 2.0:
     raise AssertionError(
         f"the stud holes leave {STUD_TOP_WALL_MIN:.2f} under the upright's top"
         " edge at the exported worst case, under the 2.0 wall"
+    )
+# The bridge bar (the inventory clamping kit's 1/2 in bar, centred on the
+# stud row) lies on the foot top and the ledge's front face, over the two
+# ledge screw heads that stand off that face between the studs. Its lower
+# edge must clear the heads with the stud row at its one-place low limit,
+# the ledge holes (stationed from the ledge bottom on its block) at their
+# high limit and each head at its eccentricity (local Codex review of
+# 86bd09c32: the 9.0 screw row overlapped the bar by 0.7).
+BRIDGE_WIDTH = 12.7
+BRIDGE_HEAD_GAP_MIN = 0.3
+BRIDGE_HEAD_GAP = (
+    _station(STUD_Y)[0]
+    - BRIDGE_WIDTH / 2.0
+    - (BLOCK_HEIGHT + _station(round(SCREW_Y - BLOCK_HEIGHT, 6))[1])
+    - SCREW_HEAD_DIA_MAX / 2.0
+    - SCREW_HEAD_ECCENTRICITY_MAX
+)
+if BRIDGE_HEAD_GAP < BRIDGE_HEAD_GAP_MIN:
+    raise AssertionError(
+        f"the bridge bar clears the ledge screw heads by {BRIDGE_HEAD_GAP:.2f}"
+        " at worst case, under the 0.3 daylight margin"
     )
 EXPORT_FEATURES: dict[str, ExportFeature] = {
     "seat_face": ExportFeature(

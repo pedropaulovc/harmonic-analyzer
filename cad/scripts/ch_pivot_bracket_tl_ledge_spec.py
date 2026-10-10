@@ -43,7 +43,7 @@ if LEDGE_WIDTH < bracket.FOOT_W:
 if limits(LEDGE_WIDTH, SIZE_PLACES)[1] / 2.0 >= plate.STUD_HALF_PITCH - plate.STUD_NUT_DIA / 2.0:
     raise AssertionError("ledge end reaches a bridge stud nut")
 
-# Two #5 screw holes, 9.0 under the top, on the upright's tap pitch. The taps
+# Two #5 screw holes, 10.5 under the top, on the upright's tap pitch. The taps
 # are spotted through these holes, so their stations only have to keep the
 # walls, all at the general one-place tolerance.
 CLEARANCE_SPEC = plate.LEDGE_CLEARANCE_SPEC
@@ -51,7 +51,7 @@ HOLE_X = (
     round(LEDGE_WIDTH / 2.0 - plate.SCREW_HALF_PITCH, 6),
     round(LEDGE_WIDTH / 2.0 + plate.SCREW_HALF_PITCH, 6),
 )
-HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 18.7
+HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 17.2
 HOLE_X_PLACES = 1
 HOLE_Y_PLACES = 1
 HOLE_DIA = blind_cut_dia_mm(CLEARANCE_SPEC)
