@@ -6,9 +6,11 @@ lies on the reworked angle plate's upright (MHA-CH-008-TL-02) and its foot
 free end rests on this 1018 block, screwed to the upright by two
 #10-24 x 5/8 SHCS through #5 holes. The ledge top carries the downward
 facing and drilling load; S4 indicates the foot edge and touches Z on the
-part, so the ledge is a plain stop. Fitting: the ledge stands on a 1-2-3
-block on the table, back face flat on the upright, and the upright's taps
-are spotted through its two holes before it is screwed down.
+part (its faced outer face, in the plane of the ear's inboard face, which the
+hold-down station is given from), so the ledge is a plain stop. Fitting: the
+ledge stands on a 1-2-3 block on the table, back face flat on the upright,
+and the upright's taps are spotted through its two holes before it is
+screwed down.
 
 Frame (model, mm): origin at the ledge's left end, on its bottom face and in
 its back face (the face that seats on the upright). +X along the ledge, +Y up,
@@ -35,7 +37,7 @@ from _printed_tolerance import drilled_oversize_mm
 # general tolerance; its ends stay clear of the bridge's stud nuts.
 LEDGE_WIDTH = 22.6
 LEDGE_THICK = bracket.FOOT_H  # 6.0
-# 27.7, under the shorter S foot at the stack's worst case (angle-plate spec)
+# 26.9, under the shorter S foot at the stack's worst case (angle-plate spec)
 LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)
 SIZE_PLACES = 1
 if LEDGE_WIDTH < bracket.FOOT_W:
@@ -51,7 +53,7 @@ HOLE_X = (
     round(LEDGE_WIDTH / 2.0 - plate.SCREW_HALF_PITCH, 6),
     round(LEDGE_WIDTH / 2.0 + plate.SCREW_HALF_PITCH, 6),
 )
-HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 17.2
+HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 16.4
 HOLE_X_PLACES = 1
 HOLE_Y_PLACES = 1
 HOLE_DIA = blind_cut_dia_mm(CLEARANCE_SPEC)

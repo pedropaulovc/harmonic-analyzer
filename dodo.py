@@ -3127,6 +3127,7 @@ def task_check():
         SCRIPTS_DIR / "test_define_circle.py",
         SCRIPTS_DIR / "test_rocker_bank_layout.py",
         SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
+        SCRIPTS_DIR / "test_ch_pivot_bracket_spec.py",
         SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",
         # The amplitude bar's pressed MHA-CH-011 pin: its worst-case press,
         # running fit and flush-end gap budget, pinned to their sources.

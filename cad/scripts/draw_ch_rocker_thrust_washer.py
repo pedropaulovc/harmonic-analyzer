@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the rocker-bank south thrust washer (MHA-CH-009)."""
+r"""Create the manufacturing drawing for the rocker-bank thrust washer (MHA-CH-009)."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A O10.2 x 1/16 washer: 4:1 keeps both diameters and the thickness legible
+# A O10.2 x 1/32 washer: 4:1 keeps both diameters and the thickness legible
 # without crowding the landscape sheet.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
@@ -68,15 +68,16 @@ RIGHT_KEEP = {
     "DiscThick": (0.235, 0.225),
 }
 
-# The faces carry no finish symbol (Main 2026-09-26): they are the 1/16
+# The faces carry no finish symbol (Main 2026-09-26): they are the stock
 # sheet's as supplied, and the title block's surface row is a process
 # statement, not a roughness number, so nothing reimposes one.
 
 
 def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
-    """Print the thickness as the stock's: "1/16 (1.59) STOCK".
+    """Print the thickness as the stock's, e.g. "1/32 (0.79) STOCK".
 
-    The washer is cut from 1/16 in stock (user ruling, 2026-09-26), so the
+    The washer is cut from 1/32 in stock (user, 2026-10-10; the stock ruling
+    2026-09-26), so the
     mill's tolerance governs the thickness, not the .XX row. Prefix and
     suffix, not a whole-text override: the value between them stays the
     model's dimension at its model-owned places, and the parentheses mark it

@@ -1,12 +1,13 @@
-r"""Reproduction script: rocker-bank south thrust washer (MHA-CH-009; #743 PR2; 1 used).
+r"""Reproduction script: rocker-bank thrust washer (MHA-CH-009; #743 PR2; 2 used).
 
-The steel washer on the pivot shaft between rocker 0's hub and the south
-pivot-bracket ear: cut from 1/16 in stock at the rocker hub's O.D., it stands
-the ear off the ch0 amplitude bar (``ch_rocker_thrust_washer_spec``). The MHA-VN-053 preload
-spring sits between it and the south ear (#948 ruling R; ``rocker_bank_layout``).
+The steel washer on the pivot shaft at each end of the rocker stack: between
+hub 19 and the north pivot-bracket ear (the bank's datum), and between hub 0
+and the MHA-VN-053 preload spring at the south ear (#948 ruling R; user,
+2026-10-10; ``rocker_bank_layout``). Cut from 1/32 in stock at the rocker
+hub's O.D. (``ch_rocker_thrust_washer_spec``).
 
 Layout: Front-plane annulus at the origin (OD, bore) extruded +Z by the
-thickness. The channel assembly slips it on the shaft against hub 0.
+thickness. The channel assembly slips one on the shaft against each end hub.
 
 Run (SolidWorks already open)::
 
@@ -52,7 +53,7 @@ from ch_rocker_thrust_washer_spec import (
 from ch_rocker_thrust_washer_spec import BORE_DIA as BORE_DIA
 
 PART_NAME = "ch-rocker-thrust-washer"
-MATERIAL = "Plain Carbon Steel"  # 1/16 in 1008 cold-rolled sheet
+MATERIAL = "Plain Carbon Steel"  # 1008 cold-rolled sheet (spec MATERIAL_SPECIFICATION)
 
 DISC_DIA = OD
 DISC_THICK = THICKNESS
@@ -129,7 +130,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # No face finish (Main 2026-09-26): the faces are the 1/16 sheet's as
+    # No face finish (Main 2026-09-26): the faces are the sheet's as
     # supplied, so a roughness callout could only force the facing the stock
     # ruling avoids.
     apply_drawing_properties(adapter, PART_NAME)

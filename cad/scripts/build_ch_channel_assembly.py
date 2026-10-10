@@ -5,17 +5,18 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each retained by a stock eyebolt threaded into the plate.
-172 components (8 * CHANNELS + 12):
+175 components (8 * CHANNELS + 15):
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
 
-* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z; #743 PR2: an
-  integral shoulder on the north ear's inner face, the cylinder spanning
-  both ears, each end domed -- rocker_bank_layout)
-* rocker-thrust-washer x1 (MHA-CH-009, between rocker 0's hub and the south
-  ear) + vn-rocker-bank-spring x1 (MHA-VN-053, the wave disc spring between
-  the washer and the south ear that preloads the bank north; #948 ruling R)
+* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z; a plain rod whose
+  cylinder spans both ears' outer faces, each end domed, held axially and in
+  rotation by two set screws on flats milled at the ears -- rocker_bank_layout)
+* rocker-thrust-washer x2 (MHA-CH-009: north, between rocker 19's hub and the
+  north ear, the bank's datum; south, on rocker 0's hub) +
+  vn-rocker-bank-spring x1 (MHA-VN-053, the wave disc spring between the
+  south washer and the south ear that preloads the bank north; #948 ruling R)
   + fulcrum-shaft x1 (lever bank at (199.9, 1061.4), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
@@ -25,7 +26,9 @@ the M6.8 mirror layer is gone).
   in mid-air); since the 2026-10-09 sketch both feet run OUTBOARD, flush with
   the support's end faces, as MHA-CH-008's S and N configurations) +
   pedestal-hold-down-screw x2 (MHA-VN-032, one down through each foot into
-  the support's transferred #8-32 seat -- rocker_bracket_seat_layout)
+  the support's transferred #8-32 seat -- rocker_bracket_seat_layout) +
+  vn-arbor-set-screw x2 (MHA-VN-034, one down through each MHA-CH-008 ear's
+  apex onto the shaft's flat)
 * fulcrum-keeper x2 + frame-side-screw x2 (the black shaft-END brackets on
   the top-frame west rail top face -- ch17 p.40 bottom-left / ch30 p008;
   ball centres (199.9, 1061.4, 3.088 +- 88.75), foot screws down into the
@@ -95,9 +98,9 @@ the lever reads under-constrained WITH it (coupled, magnifier-wheel
 style, not separately freed). Far-side mate flips are caught by
 reading back the origin and re-adding flipped. Saved state: every
 component fixed, fully defined or coupled-free, zero interference
-(face-flush and tangent contacts allowed; the bar pivot pins' modelled
-press in the bars' reamed holes is the one volume-bounded exception,
-_interference_contracts).
+(face-flush and tangent contacts allowed; the rod and bar pivot pins'
+modelled press in their reamed holes and the apex set screws' threads in
+the ears' taps are the volume-bounded exceptions, _interference_contracts).
 
 Only the SEED channels are authored mate-by-mate: channel 0 (the global
 Z anchor) plus the first channel >= 1 of each distinct amplitude value.
@@ -352,23 +355,28 @@ LEVER_THICKNESS = 3.0
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
 CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
-# Rocker pivot brackets, shaft, south washer and spring (#948 ruling R, PR
-# #1292): the rocker bank's retention stack, from rocker_bank_layout. The
-# north ear's inner face is the datum the shaft's shoulder bears on; the
-# MHA-VN-053 spring between the south ear and the MHA-CH-009 washer on hub 0
-# preloads the bank and shaft north onto it. Feet outboard to the rocker-arm-
-# support's +-88.9 end faces (it is the only stand; the old south "A-frame" is
-# gone).
+# Rocker pivot brackets, shaft, washers, spring and set screws (#948 ruling R,
+# PR #1292; user, 2026-10-10): the rocker bank's retention stack, from
+# rocker_bank_layout. Hub 19 bears on the north MHA-CH-009 washer, which bears
+# on the north ear's inner face, the bank's datum; the MHA-VN-053 spring
+# between the south ear and the south washer on hub 0 preloads the bank north
+# onto it. The plain shaft is held by one MHA-VN-034 set screw per ear on a
+# flat. Feet outboard to the rocker-arm-support's +-88.9 end faces (it is the
+# only stand; the old south "A-frame" is gone).
 from rocker_bank_layout import (  # noqa: E402
+    NORTH_EAR_INNER_Z,
+    NORTH_WASHER_Z,
+    PIVOT_BRACKET_Z,
+    PIVOT_SHAFT_FLAT_STATIONS,
     PIVOT_SHAFT_NORTH_Z,
     ROCKER_SPRING_Z,
-    SHOULDER_Z,
     SOUTH_WASHER_Z,
     STACK_MID_Z as _STACK_MID_Z,
     hub_mid_z,
 )
-from ch_pivot_shaft_spec import JOURNAL_LENGTH as _PIVOT_JOURNAL  # noqa: E402
+from ch_pivot_shaft_spec import FLAT_DEPTH as _PIVOT_FLAT_DEPTH  # noqa: E402
 from ch_pivot_shaft_spec import SHAFT_DIA as _PIVOT_SHAFT_DIA  # noqa: E402
+import ch_pivot_bracket_spec as _bracket_spec  # noqa: E402
 
 # The pivot shaft's origin is its NORTH cylinder end (its body runs -Z).
 PIVOT_SHAFT_Z = PIVOT_SHAFT_NORTH_Z
@@ -380,22 +388,39 @@ if any(abs(hub_mid_z(j) - (Z0 + PITCH * j + ARM_MID_DZ)) > 1e-9 for j in (0, 19)
     raise AssertionError(
         "rocker_bank_layout's hub stations are not the channel stations"
     )
-# The shaft is the fixed seed, so a wrong origin would fail silently.
-if abs(PIVOT_SHAFT_Z - _PIVOT_JOURNAL - SHOULDER_Z[1]) > 1e-9:
-    raise AssertionError("pivot shaft shoulder is not on the north ear's inner face")
-# Likewise the datum-located south washer: its part runs z 0..THICKNESS from
-# its origin (a Front-plane annulus extruded +Z), so IDENTITY at
-# SOUTH_WASHER_Z[0] must put its north face on hub 0's south face.
+# The shaft is the fixed seed, so a wrong origin would fail silently: its
+# north end is flush with the north ear's outer face.
+if abs(PIVOT_SHAFT_Z - (PIVOT_BRACKET_Z[1] + _bracket_spec.EAR_T / 2.0)) > 1e-9:
+    raise AssertionError("pivot shaft's north end is not flush with the north ear")
+# Each flat (a station from the north end, the body running -Z) lies under its
+# ear's apex set screw, on the ear's mid-plane.
+if any(
+    abs(PIVOT_SHAFT_Z - station - ear_z) > 1e-9
+    for station, ear_z in zip(PIVOT_SHAFT_FLAT_STATIONS, PIVOT_BRACKET_Z, strict=True)
+):
+    raise AssertionError("a pivot shaft flat is not under its ear's set screw")
+# The datum-located washers: the part runs z 0..THICKNESS from its origin (a
+# Front-plane annulus extruded +Z), so IDENTITY at each washer's z0 puts the
+# south one's north face on hub 0's south face, and the north one between hub
+# 19's north face and the north ear's inner face.
 from ch_rocker_arm_spec import HUB_LENGTH as _ROCKER_HUB_LENGTH  # noqa: E402
 from ch_rocker_thrust_washer_spec import THICKNESS as _WASHER_THICK  # noqa: E402
 
-if abs(SOUTH_WASHER_Z[1] - SOUTH_WASHER_Z[0] - _WASHER_THICK) > 1e-9:
-    raise AssertionError(
-        "south thrust washer is not ch_rocker_thrust_washer_spec's thickness"
-    )
+for _washer_z in (SOUTH_WASHER_Z, NORTH_WASHER_Z):
+    if abs(_washer_z[1] - _washer_z[0] - _WASHER_THICK) > 1e-9:
+        raise AssertionError(
+            "a thrust washer is not ch_rocker_thrust_washer_spec's thickness"
+        )
 if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
     raise AssertionError(
         "south thrust washer's north face is not on hub 0's south face"
+    )
+if (
+    abs(NORTH_WASHER_Z[0] - (hub_mid_z(19) + _ROCKER_HUB_LENGTH / 2.0)) > 1e-9
+    or abs(NORTH_WASHER_Z[1] - NORTH_EAR_INNER_Z) > 1e-9
+):
+    raise AssertionError(
+        "north thrust washer is not between hub 19 and the north ear"
     )
 # The spring's part runs z 0..MODEL_HEIGHT from its origin (axis +Z), so
 # IDENTITY at ROCKER_SPRING_Z[0] fills the south ear to washer envelope.
@@ -405,6 +430,35 @@ if abs(ROCKER_SPRING_Z[1] - ROCKER_SPRING_Z[0] - _rocker_spring.MODEL_HEIGHT) > 
     raise AssertionError("rocker bank spring is not its installed envelope")
 if abs(ROCKER_SPRING_Z[1] - SOUTH_WASHER_Z[0]) > 1e-9:
     raise AssertionError("rocker bank spring's north face is not on the washer")
+# Apex set screws (MHA-VN-034, user 2026-10-10): the part's cup end is its
+# origin and its axis +Y (build_vn_arbor_set_screw, the drive train's IDENTITY
+# placement), so IDENTITY at the flat's height drops each one down through its
+# ear's apex tap onto the flat. The shaft is the concentric seed, so the cup
+# sits on the MODELLED flat, as the arbor's screws sit on the modelled arbor
+# top (build_dt_drive_train_assembly SET_SCREW_TIP_Y). IDENTITY keeps the
+# shaft's part +Y, its flats, on machine +Y.
+from vn_arbor_set_screw_spec import LENGTH as _SET_SCREW_LEN  # noqa: E402
+from vn_arbor_set_screw_spec import THREAD as _SET_SCREW_THREAD  # noqa: E402
+
+if _SET_SCREW_THREAD != _bracket_spec.SET_SCREW_THREAD:
+    raise AssertionError("the ears' apex tap is not the MHA-VN-034 thread")
+SET_SCREW_TIP_Y = PIVOT[1] + _PIVOT_SHAFT_DIA / 2.0 - _PIVOT_FLAT_DEPTH
+if abs(SUPPORT_APEX_Y + _bracket_spec.BORE_H - PIVOT[1]) > 1e-9:
+    raise AssertionError("pivot bracket bore is off the rocker pivot axis")
+# In service the screw drives the shaft down onto the bore's bottom, so the
+# installed cup sits this far below the modelled one.
+SET_SCREW_SHAFT_DROP = (_bracket_spec.BORE_DIA - _PIVOT_SHAFT_DIA) / 2.0
+# Each socket stands proud of its ear's arch top (modelled; installed less the
+# drop). Axially the screw lies inside its ear, the tap's worst-case walls to
+# both faces (ch_pivot_bracket_spec.SET_SCREW_WALLS_MIN) being positive, so the
+# ch0 / ch19 amplitude bars, which stay outside the ears' z bands, pass it as
+# they pass the ears.
+SET_SCREW_PROUD = SET_SCREW_TIP_Y + _SET_SCREW_LEN - (
+    SUPPORT_APEX_Y + _bracket_spec.EAR_TOP_Y
+)
+SET_SCREW_PROUD_INSTALLED = SET_SCREW_PROUD - SET_SCREW_SHAFT_DROP
+if min(_bracket_spec.SET_SCREW_WALLS_MIN.values()) <= 0.0:
+    raise AssertionError("an apex set screw breaks out of its ear's faces")
 # Bracket hold-downs (#743 PR2): one MHA-VN-032 (#8-32 x 3/4 fillister) per
 # bracket, through its #8 close-clearance foot hole into the support's
 # transferred seat. rocker_bracket_seat_layout owns the seats and their
@@ -1012,18 +1066,35 @@ async def build(adapter) -> dict[str, str]:
             label=f"pivot-bracket {name} z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
-    # South thrust washer (MHA-CH-009): on the shaft against rocker 0's hub.
-    # Free-space structure here, datum-located like the brackets.
-    washer = await place_component(
-        adapter,
-        "ch-rocker-thrust-washer",
-        [PIVOT[0], PIVOT[1], SOUTH_WASHER_Z[0]],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        ground=False,
-        label="rocker-thrust-washer south",
-    )
-    await _locate_to_datum(adapter, washer)
+    # Apex set screws (MHA-VN-034): one per ear, on its mid-plane, cup down on
+    # the shaft's flat. Placed in the brackets' order (south first), so screw
+    # n is in bracket n (_interference_contracts names the pairs).
+    for name in _bracket_sides.CONFIGURATIONS:
+        screw_z = _bracket_sides.MOUNT_Z[name]
+        set_screw = await place_component(
+            adapter,
+            "vn-arbor-set-screw",
+            [PIVOT[0], SET_SCREW_TIP_Y, screw_z],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"pivot-bracket set screw {name} z{screw_z:+.1f}",
+        )
+        await _locate_to_datum(adapter, set_screw)
+    # Thrust washers (MHA-CH-009): south on the shaft against rocker 0's hub,
+    # north between rocker 19's hub and the north ear. Free-space structure
+    # here, datum-located like the brackets.
+    for washer_z, side in ((SOUTH_WASHER_Z, "south"), (NORTH_WASHER_Z, "north")):
+        washer = await place_component(
+            adapter,
+            "ch-rocker-thrust-washer",
+            [PIVOT[0], PIVOT[1], washer_z[0]],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"rocker-thrust-washer {side}",
+        )
+        await _locate_to_datum(adapter, washer)
     # Rocker bank spring (MHA-VN-053, #948 ruling R): coaxial on the shaft,
     # south face on the south ear's inner face, north face on the washer.
     rocker_spring = await place_component(
@@ -1966,7 +2037,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     write_dof_manifest(ASM_NAME)
-    # The pins' modelled press in the bars' reams is the one intended overlap.
+    # The pins' modelled press in their reams and the set screws' threads in
+    # the ears' taps are the intended overlaps.
     check_no_interference(adapter, allowed_pairs=allowed_interference_pairs(ASM_NAME))
     # Title-block identity for the assembly drawing (draw_ch_channel_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
