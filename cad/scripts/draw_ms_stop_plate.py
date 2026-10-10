@@ -15,12 +15,13 @@ import argparse
 import sys
 from typing import Any
 
+import _config
 import _telemetry
 import ms_stop_spec as part
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs, add_native_hole_callout, add_property_linked_note,
-    finalize_drawing, model_point_in_view,
+    dimension_name, finalize_drawing, model_point_in_view,
     new_project_drawing, read_required_properties, set_dimension_callouts,
     set_hidden_lines_removed, stamp_drawing_summary,
 )
@@ -40,13 +41,45 @@ RIGHT_CENTER = (0.310, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.090)
 FRONT_KEEP = {
     "PlateLength": (0.175, 0.235), "PlateHeight": (0.105, 0.170),
-    "RoofChamferSize": (0.110, 0.245), "RoofChamferAngle": (0.230, 0.245),
+    "RoofChamferSize": (0.257, 0.229), "RoofChamferAngle": (0.236, 0.211),
     "PlateLeftFromEnd": (0.175, 0.115),
     "PlateRightFromEnd": (0.175, 0.095),
-    "PlateFromHeadFace": (0.245, 0.150),
+    "PlateFromHeadFace": (0.115, 0.148),
+    "PilotDrillDiameter": (0.066, 0.245),
 }
 RIGHT_KEEP = {"PlateThickness": (0.310, 0.225)}
-DIMENSION_CALLOUTS = {"RoofChamferSize": "BOTH ROOF ENDS", "RoofChamferAngle": "BOTH ROOF ENDS"}
+DIMENSION_CALLOUTS = {
+    # Moving the native size to the right removes the full-width witness
+    # line that looked like a long-edge bevel. Both native values stay live.
+    "RoofChamferSize": "2 CORNERS",
+    "PilotDrillDiameter": (
+        "PILOT; MATCH-DRILL WITH\n"
+        f"MS-STOP-BLOCK ({_config.parts('ms-stop-block')['number']}) CLAMPED IN PLACE"
+    ),
+}
+
+
+def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
+    """Print the real model-owned pilot diameter, not a fictitious finished edge."""
+    annotation = next(
+        item for item in annotations
+        if dimension_name(adapter, item) == "PilotDrillDiameter"
+    )
+    annotation = _early_bound(annotation, "IAnnotation")
+    native = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if int(native.Type2) != 6:  # swDiameterDimension
+        raise RuntimeError("match-drill pilot is not a native model diameter")
+    # This hidden construction circle is the process size, not final geometry;
+    # the actual opened-hole callout below supplies the finished-edge leader.
+    native.WitnessVisibility = 3  # swWitnessLineNone
+    native.LeaderVisibility = 3  # swLeaderLineNone
+    if int(native.WitnessVisibility) != 3 or int(native.LeaderVisibility) != 3:
+        raise RuntimeError("pilot construction-circle witness/leader suppression did not persist")
+    definition = str(native.GetText(5) or "")
+    prefix = f"2X {definition}"
+    native.SetText(1, prefix)
+    if str(native.GetText(5) or "") != prefix:
+        raise RuntimeError("native pilot quantity prefix did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -74,14 +107,16 @@ async def build(adapter: Any) -> dict[str, str]:
                                                dimensions_by_feature=part.PLATE_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _style_pilot_diameter(adapter, annotations)
     edge = model_point_in_view(
         adapter, front, (
-            (part.PLATE_HOLE_XS[0] + part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
+            (part.PLATE_HOLE_XS[1] + part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MIN / 1000.0,
         ), label="plate clearance mouth")
-    # Keep the entire leader above the lower hole-location dimension texts.
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.115, 0.128),
-                           label="two cover clearance holes", process="2X MATCH-DRILL; THEN OPEN")
+    # Left-sheet hole and upper-left text keep the leader clear of its mate,
+    # the hole baselines, and the vertical overall-height dimension text.
+    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.070, 0.215),
+                           label="two cover clearance holes", process="THEN OPEN")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")
     assert_manufacturing_dimensions(

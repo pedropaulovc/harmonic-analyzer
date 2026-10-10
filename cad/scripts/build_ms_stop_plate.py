@@ -21,7 +21,10 @@ from _drawing_marks import (
     mark_dimensions_for_drawing, set_dimension_symmetric_tolerance,
 )
 from _holes import wizard_holes
-from ms_stop_geom import author_hole_precision, hide_location_references, location_reference
+from ms_stop_geom import (
+    author_hole_precision, hide_location_references, location_reference,
+    pilot_drill_reference,
+)
 
 PART_NAME = "ms-stop-plate"
 MATERIAL = "Brass"
@@ -37,6 +40,7 @@ async def build(adapter) -> dict[str, str]:
         ("PlateLength", spec.BLOCK_LENGTH), ("PlateHeight", spec.BLOCK_HEIGHT),
         ("PlateThickness", spec.PLATE_THICKNESS),
         ("RoofChamferSize", spec.ROOF_END_CHAMFER),
+        ("PilotDrillDiameter", spec.PLATE_TAP_DRILL_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
     dims = SketchDims()
@@ -75,6 +79,7 @@ async def build(adapter) -> dict[str, str]:
         spans=spec.PLATE_HOLE_XS, station=spec.PLATE_HOLE_Y,
         names=("PlateLeftFromEnd", "PlateFromHeadFace", "PlateRightFromEnd"),
     )
+    jobs += await pilot_drill_reference(adapter)
     await force_rebuild(adapter)
     for name, expression in jobs:
         await drive_dimension(adapter, name, expression)
@@ -93,10 +98,10 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(adapter, PART_NAME, {
-        "Manufacturing Notes": spec.DRAWING_NOTES,
+        "Manufacturing Notes": spec.PLATE_DRAWING_NOTES,
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
     })
-    hide_location_references(adapter, ("PlateLocationReference",))
+    hide_location_references(adapter, ("PlateLocationReference", "PilotDrillReference"))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)

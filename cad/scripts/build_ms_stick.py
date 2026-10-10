@@ -200,7 +200,6 @@ async def _manufacturing_chords(adapter, drive_jobs: list[tuple[str, str]]) -> N
     glyph_y = BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM
     bindings = {
         "ScaleStartReference": (scale_x, None, edge_y),
-        "ScaleEndReference": ('"ScaleEndMargin"', '"BodyLength" - "ScaleEndMargin"', edge_y),
         "FullLengthReference": ('"TickLength"', scale_x, '"BodyWidth" - "TickLength"'),
         "MinorLengthReference": (
             '"MinorTickLength"',
@@ -281,8 +280,8 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this is
     # an INCH document and the equation manager reads BARE numbers in document
     # units (an unsuffixed 200 = 200 in, a 25.4x blow-up). ScaleStartX is a
-    # DERIVED global (centres the 80 mm scale on the bar), referencing the others
-    # as an equation string. DivisionSpacing drives the linear-pattern spacing, a
+    # DERIVED global (locates the configured scale short of the right end),
+    # referencing the others as an equation string. DivisionSpacing drives the
     # FEATURE parameter -- a knob with nothing in the deferred sketch-dim batch,
     # like an extrude depth (matches the exemplars).
     await set_global(adapter, "BodyLength", f"{BODY_LENGTH}mm")

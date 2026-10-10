@@ -2,8 +2,8 @@ r"""Create the three-sheet measuring-stick fitter package (MHA-MS-000).
 
 Sheet 1 shows the stick clamped at its stop mark (front and top at full size)
 with the overall and stop-position REFERENCE dimensions, a section through
-the thumbscrew axis, and the clamp and finish notes; sheet 2 the
-builder-owned ``MS_EXPLODED`` presentation with the BOM (numbers, material,
+the thumbscrew axis, and the clamp setup note; sheet 2 the
+builder-owned ``MS_EXPLODED`` presentation with the BOM (numbers, descriptions,
 vendor SKU, quantity) and a balloon on every component, both plate screws
 included; sheet 3 the finished isometric beside the assembly order and
 checks. Every text, pose and reference value comes from
@@ -101,7 +101,7 @@ TITLE_BLOCK = (
 # Sheet 1: the 200-long stick at full size, top view above the front
 # (third-angle), and the clamp section beside them, magnified so the window,
 # roof and thumbscrew tip read. The two reference dimensions run in the gap
-# between front and top, the clamp and finish notes below the front.
+# between front and top, the clamp setup note below the front.
 FRONT_CENTER = (0.135, 0.190)
 TOP_CENTER = (0.135, 0.248)
 CLAMP_SECTION_CENTER = (0.340, 0.165)
@@ -110,31 +110,42 @@ CLAMP_SECTION_LABEL = "A"
 STOP_POSITION_TEXT_Y = 0.214
 OVERALL_LENGTH_TEXT_Y = 0.227
 SETUP_NOTE_XY = (0.030, 0.160)
-FINISH_NOTE_XY = (0.030, 0.118)
 SETUP_NOTE_WIDTH = 52  # characters; default-format note text
 
 # Sheet 2 alone is portrait: the native full-size exploded outline plus its
-# unchanged 24 mm balloon ring is taller than landscape's title-clear band.
-# Centre the measured outline, not the assembly origin, below the BOM.
-EXPLODED_ISO_CENTER = (0.1397, 0.235)
+# unchanged 24 mm balloon ring is 202.0739 mm high; landscape has 200.7 mm
+# above the title block. Retain 1:1 and translate the whole portrait group.
+# ace062816 native audit: outline y=157.963..312.037 mm at centre 235 mm;
+# conservative ring bottom=133.963 mm, caption ink top=414.6801 mm.
+# Equalise air above the title block and below the upper border; balloons
+# are generated only after recentering, so both rings share this translation.
+_EXPLODED_TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.PORTRAIT]
+_EXPLODED_MEASURED_GROUP_Y = (0.133963, 0.4146801)
+EXPLODED_GROUP_SHIFT_Y = (
+    _EXPLODED_TEMPLATE.title_block_top_m
+    + _EXPLODED_TEMPLATE.height_m - 0.0127
+    - sum(_EXPLODED_MEASURED_GROUP_Y)
+) / 2.0
+EXPLODED_ISO_CENTER = (_EXPLODED_TEMPLATE.width_m / 2.0, 0.235 + EXPLODED_GROUP_SHIFT_Y)
 BALLOON_MARGIN = 0.012
 SECOND_SCREW_BALLOON_MARGIN = 0.024
-BOM_ANCHOR = (0.018, 0.405)
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
     "part": 0.026,
     "description": 0.080,
-    "material": 0.058,
     "sku": 0.024,
     "quantity": 0.012,
 }
-BOM_MATERIAL_TITLE = "MATERIAL"
 BOM_SKU_TITLE = "VENDOR SKU"
 MADE_PART_SKU = "-"
 BOM_ROW_HEIGHT = 0.006
-EXPLODED_CAPTION = "EXPLODED - ASSEMBLE IN REVERSE ORDER, SEE SHEET 3"
-# Native wrapped BOM rows end at 343.8 mm, so use the clear strip above its top.
-EXPLODED_CAPTION_XY = (0.018, 0.415)
+BOM_ANCHOR = (
+    (_EXPLODED_TEMPLATE.width_m - sum(BOM_COLUMN_WIDTHS.values())) / 2.0,
+    0.405 + EXPLODED_GROUP_SHIFT_Y,
+)
+EXPLODED_CAPTION = spec.EXPLODED_CAPTION
+# Preserve the measured caption/table air; centre the narrower five-column BOM.
+EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.415 + EXPLODED_GROUP_SHIFT_Y)
 
 # Sheet 3: the order and checks down the left; the finished isometric right.
 ASSEMBLY_ISO_CENTER = (0.315, 0.170)
@@ -155,8 +166,7 @@ PART_ROWS = {
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")
 BOM_PART_NUMBERS = {stem: str(row["number"]) for stem, row in PART_ROWS.items()}
-# The registry owns material and vendor SKU; the BOM prints them verbatim.
-BOM_MATERIALS = {stem: str(row["material"]).upper() for stem, row in PART_ROWS.items()}
+# The registry owns part numbers and vendor SKU; components own material/finish.
 BOM_SKUS = {
     stem: " / ".join(str(sku) for sku in row.get("supplier_skus") or ()) or MADE_PART_SKU
     for stem, row in PART_ROWS.items()
@@ -186,17 +196,6 @@ SECOND_SCREW_BALLOON_ANCHORS = {
     spec.PLATE_SCREW: BalloonAnchor(instance=PLATE_SCREW_INSTANCES[1])
 }
 
-# Finish, from the registry rows: the pair is finished together after it is
-# match-drilled (step 1), so a fitter never mixes covers between stops.
-_BLOCK_FINISH = str(PART_ROWS[spec.BLOCK]["finish"]).upper()
-if str(PART_ROWS[spec.PLATE]["finish"]).upper() != _BLOCK_FINISH:
-    raise AssertionError("the stop block and its cover plate share one finish")
-FINISH_NOTE_TEXT = (
-    f"FINISH - {spec.BOM_DESCRIPTIONS[spec.BLOCK]} AND "
-    f"{spec.BOM_DESCRIPTIONS[spec.PLATE]}: {_BLOCK_FINISH}, FINISHED TOGETHER "
-    f"AS ONE PAIR AFTER STEP 1. {spec.BOM_DESCRIPTIONS[spec.STICK]}: "
-    f"{str(PART_ROWS[spec.STICK]['finish']).upper()}. SCREWS: AS PURCHASED."
-)
 
 # Reference dimensions on the front view: (label, expected mm, callout below).
 REFERENCE_DIMENSIONS = (
@@ -230,7 +229,6 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
 
 
 SETUP_NOTE = _wrapped((spec.CLAMPED_SETUP_NOTE,), width=SETUP_NOTE_WIDTH)
-FINISH_NOTE = _wrapped((FINISH_NOTE_TEXT,), width=SETUP_NOTE_WIDTH)
 ASSEMBLY_STEPS = _wrapped(
     spec.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
@@ -385,8 +383,8 @@ def _bom_column(
 
 def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     """Rewrite part numbers, prove identities/descriptions/quantities, add the
-    registry's MATERIAL and VENDOR SKU columns after DESCRIPTION; return
-    (stem, item number) in BOM order."""
+    registry's VENDOR SKU column after DESCRIPTION; return (stem, item number)
+    in BOM order. Material and finish remain on component drawings."""
     table = _early_bound(table, "ITableAnnotation")
     contents = _bom_cells(table)
     rows = len(contents)
@@ -397,7 +395,7 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
             f"{len(BOM_COMPONENTS) + 1} rows and at least four columns"
         )
     header = contents[0]
-    for title in (BOM_MATERIAL_TITLE, BOM_SKU_TITLE):
+    for title in ("MATERIAL", BOM_SKU_TITLE):
         if title in (cell.upper() for cell in header):
             raise RuntimeError(f"measuring-stick BOM template already has {title!r}")
     item_column = _bom_column(header, lambda cell: cell.startswith("ITEM NO"), "ITEM NO.")
@@ -445,25 +443,20 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
                 f"expected {BOM_QUANTITIES[stem]}"
             )
 
-    # User-defined columns, written row by row from the registry: the parts
-    # carry no SKU property, and the made parts print MADE_PART_SKU.
-    for offset, (title, values) in enumerate(
-        ((BOM_MATERIAL_TITLE, BOM_MATERIALS), (BOM_SKU_TITLE, BOM_SKUS))
+    # The parts carry no SKU property; made parts print MADE_PART_SKU.
+    if not table.InsertColumn2(
+        _INSERT_COLUMN_AFTER, description_column, BOM_SKU_TITLE, _INSERT_COLUMN_DEFAULT_WIDTH
     ):
-        after = description_column + offset
-        if not table.InsertColumn2(
-            _INSERT_COLUMN_AFTER, after, title, _INSERT_COLUMN_DEFAULT_WIDTH
-        ):
-            raise RuntimeError(f"measuring-stick BOM refused the {title} column")
-        column = after + 1
-        if not table.SetColumnTitle2(column, title, False):
-            raise RuntimeError(f"measuring-stick BOM {title} column title did not set")
-        for stem, (row_index, *_rest) in actual.items():
-            if not table.IsCellTextEditable(row_index, column):
-                raise RuntimeError(
-                    f"measuring-stick BOM {title} cell for {stem!r} is locked"
-                )
-            table.SetText2(row_index, column, False, values[stem])
+        raise RuntimeError("measuring-stick BOM refused the VENDOR SKU column")
+    column = description_column + 1
+    if not table.SetColumnTitle2(column, BOM_SKU_TITLE, False):
+        raise RuntimeError("measuring-stick BOM VENDOR SKU column title did not set")
+    for stem, (row_index, *_rest) in actual.items():
+        if not table.IsCellTextEditable(row_index, column):
+            raise RuntimeError(
+                f"measuring-stick BOM VENDOR SKU cell for {stem!r} is locked"
+            )
+        table.SetText2(row_index, column, False, BOM_SKUS[stem])
 
     header = _bom_cells(table)[0]
     widths = {
@@ -471,9 +464,6 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
         "part": _bom_column(header, lambda cell: cell == "PART NUMBER", "PART NUMBER"),
         "description": _bom_column(
             header, lambda cell: cell == "DESCRIPTION", "DESCRIPTION"
-        ),
-        "material": _bom_column(
-            header, lambda cell: cell == BOM_MATERIAL_TITLE, BOM_MATERIAL_TITLE
         ),
         "sku": _bom_column(header, lambda cell: cell == BOM_SKU_TITLE, BOM_SKU_TITLE),
         "quantity": _bom_column(header, lambda cell: cell.startswith("QTY"), "QTY."),
@@ -492,7 +482,6 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     for stem, (row_index, *_rest) in actual.items():
         expected = {
             "part": BOM_PART_NUMBERS[stem],
-            "material": BOM_MATERIALS[stem],
             "sku": BOM_SKUS[stem],
         }
         for key, text in expected.items():
@@ -694,7 +683,7 @@ def _add_reference_dimensions(adapter: Any, front: Any) -> None:
 def _place_clamped_sheet(adapter: Any) -> None:
     """Front and top at full size with the overall and stop-position
     references, section A-A through the thumbscrew axis (the stick against
-    the roof, the tip on its underside), and the clamp and finish notes."""
+    the roof, the tip on its underside), and the clamp setup note."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
@@ -727,13 +716,10 @@ def _place_clamped_sheet(adapter: Any) -> None:
     _add_note_block(
         adapter, SHEET_NAMES[0], SETUP_NOTE, SETUP_NOTE_XY, label="clamped-setup note"
     )
-    _add_note_block(
-        adapter, SHEET_NAMES[0], FINISH_NOTE, FINISH_NOTE_XY, label="finish note"
-    )
 
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
-    """The exploded isometric, its BOM (with material and vendor SKU) and one
+    """The exploded isometric, its BOM (with vendor SKU) and one
     balloon per component -- both plate screws included; returns the check
     that proves every balloon again after the last rebuild."""
     _activate_sheet(adapter, SHEET_NAMES[1])

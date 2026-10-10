@@ -127,6 +127,8 @@ EXPLODE_STEPS = (
 )
 
 # --- Fitter package text ------------------------------------------------------
+EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
+# Components own material and finish; no assembly coating operation is required.
 # The fitter's order; the explode above runs steps 2-5 backwards. Each line
 # names the parts as the BOM's DESCRIPTION column does. The block and its
 # cover are a match-drilled pair (step 1): neither is interchangeable.

@@ -98,17 +98,14 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
     assert spec.PLATE_HOLE_POSITION_TOLERANCE_MM == 0.1
     assert all(block_point[:2] == plate_point[:2] for block_point, plate_point
                in zip(spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_HOLE_POINTS, strict=True))
-    assert "MATCH-DRILL" in spec.DRAWING_NOTES
-    assert "CLAMPED TOGETHER" in spec.DRAWING_NOTES
-    assert "OPEN PLATE CLEARANCE AFTER PILOT" in spec.DRAWING_NOTES
-    assert "BOTTOMING-TAP BLOCK" in spec.DRAWING_NOTES
-    assert "NOT INTERCHANGEABLE" in spec.DRAWING_NOTES
-    assert "BLIND DEPTHS FROM BLOCK MATING FACE" in spec.DRAWING_NOTES
-    for drawing in (block_drawing, plate_drawing):
-        source = Path(drawing.__file__).read_text(encoding="utf-8")
-        assert '"Manufacturing Notes"' in source
-        assert "2X MATCH-DRILL" in source
-
+    assert len(spec.BLOCK_DRAWING_NOTES.splitlines()) <= 4
+    assert len(spec.PLATE_DRAWING_NOTES.splitlines()) <= 4
+    assert "BLIND" not in spec.PLATE_DRAWING_NOTES
+    assert "BOTTOMING" not in spec.PLATE_DRAWING_NOTES
+    assert "PilotDrillDiameter" in spec.PLATE_DRAWING_DIMENSIONS["PilotDrillReference"]
+    assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
+        spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
+    )
 
 def test_window_keeps_functional_clearance_at_printed_size_limits() -> None:
     window_lower, _window_upper = spec.WINDOW_SIZE_TOLERANCE_MM
@@ -144,7 +141,7 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     assert marked == keeps == set(precision) == set(values)
     assert all(places == 2 for places in precision.values())
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
-    assert not any(character.isdigit() for character in spec.DRAWING_NOTES)
+    assert not any(character.isdigit() for character in spec.BLOCK_DRAWING_NOTES + spec.PLATE_DRAWING_NOTES)
 
 
 @pytest.mark.parametrize("module", [spec, block_drawing, plate_drawing])
@@ -270,12 +267,13 @@ class _StopMathUtility:
 
 @pytest.mark.parametrize("drawing,cases", [
     (block_drawing, [
-        ("two cover blind taps", "*Back", (0.004425, 0.004, 0.0), (0.1993, 0.1728)),
+        ("two cover blind taps", "*Back", (0.018425, 0.004, 0.0), (0.1433, 0.1728)),
         ("thumbscrew tap through floor", "*Bottom",
          (0.0116305, 0.0, 0.0042), (0.170478, 0.0852)),
+        ("cover mating face", "*Left", (0.0105, 0.01255, 0.0), (0.293, 0.207)),
     ]),
     (plate_drawing, [
-        ("two cover clearance holes", "*Back", (0.0047, 0.004, -0.001), (0.1982, 0.1578)),
+        ("two cover clearance holes", "*Back", (0.0187, 0.004, -0.001), (0.1422, 0.1578)),
     ]),
 ], ids=["block-plate-and-subsequent-thumb", "plate-clearance"])
 def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
@@ -327,6 +325,10 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     ):
         monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
     monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *a, **kw: [])
+    if drawing is block_drawing:
+        monkeypatch.setattr(drawing, "_remove_general_thread_class", lambda *a: None)
+    else:
+        monkeypatch.setattr(drawing, "_style_pilot_diameter", lambda *a: None)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *a, **kw: True)
     callouts = []
 
@@ -337,6 +339,13 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         return {"slddrw": str(outputs.slddrw)}
 
     monkeypatch.setattr(drawing, "add_native_hole_callout", add_callout)
+    if drawing is block_drawing:
+        monkeypatch.setattr(
+            drawing, "add_property_linked_callout",
+            lambda adapter, view, *, edge_xy, **kw: callouts.append(
+                (view, edge_xy, "cover mating face")
+            ),
+        )
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
     # The displayed cover face is *Back: +X goes left, +Y goes up. Its
@@ -376,7 +385,13 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         assert xyz == pytest.approx(expected_xyz)
         # These are the actual positive-X drill rims, on the visible mouth
         # face, not the hole centre or the opposite end of the drilled hole.
-        if orientation == "*Bottom":
+        if orientation == "*Left":
+            mouth = (
+                spec.BLOCK_LENGTH / 2.0,
+                spec.WINDOW_Y_MAX + (spec.ROOF_THICKNESS - spec.ROOF_END_CHAMFER) / 2.0,
+                spec.PLATE_Z_MAX,
+            )
+        elif orientation == "*Bottom":
             mouth = (spec.THUMB_AXIS_X + spec.THUMB_TAP_DRILL / 2.0,
                      spec.THUMB_HOLE_POINTS[0][1], spec.THUMB_AXIS_Z)
         else:
@@ -385,7 +400,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
                 if drawing is plate_drawing
                 else (spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_TAP_DRILL_DIA)
             )
-            mouth = (holes[0][0] + diameter / 2.0, holes[0][1], holes[0][2])
+            mouth = (holes[1][0] + diameter / 2.0, holes[1][1], holes[1][2])
         assert xyz == pytest.approx(tuple(value / 1000.0 for value in mouth))
         assert edge_xy == pytest.approx(expected_xy)
         assert abs(edge_xy[0] - view.Position[0]) < 0.043
@@ -399,6 +414,133 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
             transform = view.ModelToViewTransform
             assert transform.apply((0.0, 0.0, 0.0))[0] == pytest.approx(0.217)
             wrong_units_x = transform.apply(mouth)[0]
-            assert wrong_units_x == pytest.approx(
+            assert wrong_units_x < -70.0
+            # The original failing caller picked the other rim. Preserve that
+            # observed negative-X signature as well as the new left-sheet pick.
+            original = (holes[0][0] + diameter / 2.0, holes[0][1], holes[0][2])
+            assert transform.apply(original)[0] == pytest.approx(
                 -18.583 if drawing is plate_drawing else -17.483
             )
+
+
+def test_match_drilling_does_not_eliminate_absolute_end_ligament_limits() -> None:
+    """Matched pair error cancels, but the source axes still locate drilled stock."""
+    from _printed_tolerance import printed_band_mm
+
+    length_band = printed_band_mm(spec.PLATE_DRAWING_PRECISION_BY_NAME["PlateLength"])
+    maximum_drill = spec.PLATE_CLEARANCE_DIA + spec.DRILL_OVERSIZE_MM
+    minimum_end_web = spec.BLOCK_LENGTH - length_band - (
+        spec.PLATE_HOLE_XS[1] + spec.PLATE_HOLE_POSITION_TOLERANCE_MM + maximum_drill / 2.0
+    )
+    assert minimum_end_web >= 1.5
+    assert spec.BLOCK_LENGTH - printed_band_mm(1) - (
+        spec.PLATE_HOLE_XS[1] + spec.PLATE_HOLE_POSITION_TOLERANCE_MM + maximum_drill / 2.0
+    ) < 1.5
+    assert spec.BLOCK_LENGTH - spec.GENERAL_LINEAR_TOLERANCE_MM - (
+        spec.PLATE_HOLE_XS[1] + spec.GENERAL_LINEAR_TOLERANCE_MM
+        + spec.PLATE_SCREW_MAJOR_DIA / 2.0
+    ) < 1.5
+
+
+class _StopDisplay:
+    def __init__(self, prefix, *, hole=True, kind=6, refusal=None):
+        self.prefix = prefix
+        self.hole = hole
+        self.Type2 = kind
+        self.refusal = refusal
+        self._witness_visibility = 0
+        self._leader_visibility = 0
+
+    @property
+    def WitnessVisibility(self):  # noqa: N802 - native property name
+        return self._witness_visibility
+
+    @WitnessVisibility.setter
+    def WitnessVisibility(self, value):
+        if self.refusal != "witness":
+            self._witness_visibility = value
+
+    @property
+    def LeaderVisibility(self):  # noqa: N802 - native property name
+        return self._leader_visibility
+
+    @LeaderVisibility.setter
+    def LeaderVisibility(self, value):
+        if self.refusal != "leader":
+            self._leader_visibility = value
+
+    def IsHoleCallout(self):  # noqa: N802 - COM method name
+        return self.hole
+
+    def GetText(self, which):  # noqa: N802 - COM method name
+        assert which == 5, "resolved prefix text would sever native variables"
+        return self.prefix
+
+    def SetText(self, which, text):  # noqa: N802 - COM method name
+        assert which == 1
+        if self.refusal != "prefix":
+            self.prefix = text
+
+
+@pytest.mark.parametrize("separator", ["-", " ", "", " - "])
+def test_native_class_suppression_preserves_live_thread_drill_and_depth_variables(separator) -> None:
+    definition = (
+        "2X MATCH-DRILL WITH THE MATE\n"
+        f"<hw-threaddesc>{separator}<hw-threadclass> <HOLE-DEPTH><hw-threaddepth>"
+        "\n<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH><hw-holedpth>"
+    )
+    native = _StopDisplay(definition)
+    block_drawing._remove_general_thread_class(native)
+    assert "<hw-threadclass>" not in native.prefix
+    for variable in ("hw-threaddesc", "hw-threaddepth", "hw-tapdrldia", "hw-holedpth"):
+        assert f"<{variable}>" in native.prefix
+    assert "MATCH-DRILL WITH THE MATE" in native.prefix
+    assert native.prefix == definition.replace(f"{separator}<hw-threadclass>", "")
+
+
+@pytest.mark.parametrize("native", [
+    _StopDisplay("<hw-threadclass>", hole=False),
+    _StopDisplay("2B"),
+    _StopDisplay("<hw-threadclass><hw-threadclass>"),
+    _StopDisplay("<hw-threadclass>", refusal="prefix"),
+])
+def test_native_class_suppression_refuses_non_native_unbound_or_rejected_text(native) -> None:
+    with pytest.raises(RuntimeError):
+        block_drawing._remove_general_thread_class(native)
+
+
+@pytest.mark.parametrize("kind", [6, 2, 3, 5])
+def test_pilot_callout_requires_model_diameter_and_hides_only_process_circle_ink(monkeypatch, kind) -> None:
+    native = _StopDisplay("<MOD-DIAM>", hole=False, kind=kind)
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: native)
+    monkeypatch.setattr(plate_drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
+    if kind != 6:
+        with pytest.raises(RuntimeError, match="native model diameter"):
+            plate_drawing._style_pilot_diameter(object(), [annotation])
+        assert native.prefix == "<MOD-DIAM>"
+    else:
+        plate_drawing._style_pilot_diameter(object(), [annotation])
+        assert native.prefix == "2X <MOD-DIAM>"
+        assert native.WitnessVisibility == native.LeaderVisibility == 3
+
+
+@pytest.mark.parametrize("refusal", ["witness", "leader", "prefix"])
+def test_pilot_callout_refuses_unapplied_native_style_or_prefix(monkeypatch, refusal) -> None:
+    native = _StopDisplay("<MOD-DIAM>", hole=False, refusal=refusal)
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: native)
+    monkeypatch.setattr(plate_drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
+    with pytest.raises(RuntimeError, match="did not persist"):
+        plate_drawing._style_pilot_diameter(object(), [annotation])
+
+
+def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
+    import _config
+
+    assert "MS-STOP-PLATE" in block_drawing.COVER_HOLE_PROCESS
+    assert _config.parts("ms-stop-plate")["number"] in block_drawing.COVER_HOLE_PROCESS
+    pilot = plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]
+    assert "MS-STOP-BLOCK" in pilot
+    assert _config.parts("ms-stop-block")["number"] in pilot
+    assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
+        spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
+    )

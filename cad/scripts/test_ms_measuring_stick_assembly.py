@@ -242,26 +242,27 @@ def test_fitter_package_covers_rule_9() -> None:
         assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in text.splitlines())
     assert drawing.ASSEMBLY_STEPS.count("\n") >= len(spec.ASSEMBLY_STEPS)
     assert f"{stop.STOP_MARK:.1f}" in drawing.SETUP_NOTE
-    assert "FINISH" in drawing.FINISH_NOTE
-    assert all(
-        len(line) <= drawing.SETUP_NOTE_WIDTH for line in drawing.FINISH_NOTE.splitlines()
+    assert drawing.EXPLODED_CAPTION == spec.EXPLODED_CAPTION == (
+        "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
     )
+    # Rule 1/6: the component Finish fields, not fitter notes or steps, own finish.
+    assert not any("BLACKEN" in step or "FINISH" in step for step in spec.ASSEMBLY_STEPS)
+    for obsolete in ("FINISH_NOTE", "FINISH_NOTE_TEXT", "FINISH_NOTE_XY", "_BLOCK_FINISH"):
+        assert not hasattr(drawing, obsolete)
 
 
-def test_bom_prints_registry_material_and_vendor_sku() -> None:
+def test_bom_prints_registry_identity_and_vendor_sku_only() -> None:
     assert drawing.BOM_SKUS[spec.PLATE_SCREW] == plate_screw.SKU == "90114A124"
     assert drawing.BOM_SKUS[spec.THUMB_SCREW] == thumb.SKU == "91882A221"
     for stem in (spec.STICK, spec.BLOCK, spec.PLATE):
         assert drawing.BOM_SKUS[stem] == drawing.MADE_PART_SKU
     for stem in spec.QUANTITIES:
         row = _config.parts(stem)
-        assert drawing.BOM_MATERIALS[stem] == str(row["material"]).upper()
         assert drawing.BOM_PART_NUMBERS[stem] == row["number"]
     assert set(drawing.BOM_COLUMN_WIDTHS) == {
         "item",
         "part",
         "description",
-        "material",
         "sku",
         "quantity",
     }
@@ -269,6 +270,91 @@ def test_bom_prints_registry_material_and_vendor_sku() -> None:
     left, right = 0.0127, template.width_m - 0.0127
     assert left <= drawing.BOM_ANCHOR[0]
     assert drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values()) < right
+    assert not hasattr(drawing, "BOM_MATERIALS")
+    assert not hasattr(drawing, "BOM_MATERIAL_TITLE")
+    assert drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values()) / 2 == (
+        pytest.approx(template.width_m / 2)
+    )
+
+
+def test_portrait_group_translation_balances_measured_guarded_ink() -> None:
+    template = drawing.DRAWING_TEMPLATES[drawing.DrawingLayout.PORTRAIT]
+    shift = drawing.EXPLODED_GROUP_SHIFT_Y
+    assert shift == pytest.approx(-0.03177155)
+    # Native outline + unchanged outer ring and caption ink, not origin guesses.
+    bottom = 0.157963 - drawing.SECOND_SCREW_BALLOON_MARGIN + shift
+    top = 0.4146801 + shift
+    lower_air = bottom - template.title_block_top_m
+    upper_air = template.height_m - 0.0127 - top
+    assert lower_air == pytest.approx(upper_air)
+    assert lower_air > 0.036
+    assert drawing.EXPLODED_ISO_CENTER == pytest.approx((0.1397, 0.235 + shift))
+    assert drawing.BOM_ANCHOR == pytest.approx((0.0627, 0.405 + shift))
+    assert drawing.EXPLODED_CAPTION_XY == pytest.approx((0.0627, 0.415 + shift))
+    # Even the conservative original BOM height clears the translated outer ring.
+    assert 0.3437606 + shift - (0.312037 + shift + 0.024) > 0.007
+
+
+def test_bom_removes_material_without_changing_native_items(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    native_order = (spec.BLOCK, spec.PLATE, spec.STICK, spec.THUMB_SCREW, spec.PLATE_SCREW)
+
+    class Table:
+        def __init__(self):
+            self.cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]]
+            self.cells += [
+                [str(item), stem, drawing.BOM_DESCRIPTIONS[stem], str(spec.QUANTITIES[stem])]
+                for item, stem in enumerate(native_order, 1)
+            ]
+
+        @property
+        def RowCount(self):
+            return len(self.cells)
+
+        @property
+        def ColumnCount(self):
+            return len(self.cells[0])
+
+        def DisplayedText(self, row, column):
+            return self.cells[row][column]
+
+        def IsCellTextEditable(self, row, column):
+            return True
+
+        def SetText2(self, row, column, linked, text):
+            assert linked is False
+            self.cells[row][column] = text
+
+        def InsertColumn2(self, where, after, title, width):
+            assert where == drawing._INSERT_COLUMN_AFTER
+            assert width == drawing._INSERT_COLUMN_DEFAULT_WIDTH
+            assert after == 2 and title == "VENDOR SKU"
+            for row in self.cells:
+                row.insert(after + 1, "")
+            return True
+
+        def SetColumnTitle2(self, column, title, linked):
+            assert linked is False
+            self.cells[0][column] = title
+            return True
+
+        def SetColumnWidth(self, column, width, options):
+            assert options == 0
+            return width
+
+        def SetRowHeight(self, row, height, options):
+            assert height == drawing.BOM_ROW_HEIGHT and options == 0
+
+    table = Table()
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    items = drawing._validate_bom(adapter, table)
+    assert dict(items) == {stem: str(item) for item, stem in enumerate(native_order, 1)}
+    assert table.cells[0] == ["ITEM NO.", "PART NUMBER", "DESCRIPTION", "VENDOR SKU", "QTY."]
+    for row, stem in zip(table.cells[1:], native_order):
+        assert row[1:] == [
+            drawing.BOM_PART_NUMBERS[stem], drawing.BOM_DESCRIPTIONS[stem],
+            drawing.BOM_SKUS[stem], str(spec.QUANTITIES[stem]),
+        ]
 
 
 def test_every_component_instance_carries_a_balloon() -> None:
@@ -331,8 +417,8 @@ def test_measured_exploded_outline_recenters_and_fits_only_portrait(monkeypatch)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: rebuilt.append(True)))
     drawing._center_view_outline(adapter, view, drawing.EXPLODED_ISO_CENTER, label="exploded")
     assert view.Position == pytest.approx((
-        0.300 + 0.1397 - (before[0] + before[2]) / 2,
-        0.145 + 0.235 - (before[1] + before[3]) / 2,
+        0.300 + drawing.EXPLODED_ISO_CENTER[0] - (before[0] + before[2]) / 2,
+        0.145 + drawing.EXPLODED_ISO_CENTER[1] - (before[1] + before[3]) / 2,
     ))
     assert rebuilt == [True]
     drawing._assert_view_on_sheet(
