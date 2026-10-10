@@ -1668,86 +1668,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, "socket bosses", after + v_hang, 0.005 * v_hang + 10.0
     )
 
-    # Two ribs on the centre lines, RIB_RELIEF clear of the bench and ending
-    # mid-wall. Each is an offset-start boss, so its start offset IS the relief.
-    for tag, rib_shape, label, half_x, half_z, names, drives in (
-        (
-            "LongRib",
-            LONG_RIB_SHAPE,
-            "long rib (z = 0)",
-            RIB_HALF_LENGTH_X,
-            RIB_THICKNESS / 2.0,
-            ("LongRibLength", "LongRibThickness"),
-            ('"TopLength" - "PocketWall"', '"RibThickness"'),
-        ),
-        (
-            "CrossRib",
-            CROSS_RIB_SHAPE,
-            "cross rib (x = 0)",
-            RIB_THICKNESS / 2.0,
-            RIB_HALF_LENGTH_Z,
-            ("CrossRibThickness", "CrossRibLength"),
-            ('"RibThickness"', '"TopWidth" - "PocketWall"'),
-        ),
-    ):
-        rib = SketchDims()
-        check(f"create_sketch {label}", await adapter.create_sketch("Top"))
-        # A line chain, not define_centered_rectangle: that native center
-        # rectangle runs sketch inference, and the cross rib's 131.25 ends
-        # snapped to the deck edges at 130.25 seen through the Top plane
-        # (farm leaf 2026-10-10: depth read back 260.5, the dimension became
-        # driven, and the CrossRibLength equation failed the rebuild).
-        points = [
-            (-half_x, -half_z),
-            (half_x, -half_z),
-            (half_x, half_z),
-            (-half_x, half_z),
-        ]
-        lines = await add_line_chain(adapter, points)
-        await define_rectilinear_chain(
-            adapter,
-            lines,
-            points,
-            label=label,
-            dims=rib,
-            names=[*names, *(f"{n}Half" for n in names)],
-            # Anchor dims (x, z) hold the rib centred as its spans change.
-            drives=[*drives, *(f"({d}) / 2" for d in drives)],
-        )
-        await ensure_fully_defined(adapter, f"{label} sketch")
-        check(f"exit_sketch {label}", await adapter.exit_sketch())
-        name_last_feature(adapter, f"{tag}Profile")
-        drive_jobs += rib.apply(adapter, f"{tag}Profile")
-        extrude_at_offset(adapter, POCKET_CEILING_Y - RIB_RELIEF, RIB_RELIEF)
-        name_last_feature(adapter, tag)
-        # The sheet's section B-B cuts at constant x and so slices the LONG
-        # rib: that rib carries the printed RibRelief.
-        relief_name = "RibRelief" if tag == "LongRib" else f"{tag}Relief"
-        rib_dims = name_dimensions(adapter, tag, [f"{tag}Height", relief_name])
-        _verify_named_dimension(
-            adapter, f"{tag}Height@{tag}", POCKET_CEILING_Y - RIB_RELIEF
-        )
-        _verify_named_dimension(adapter, f"{relief_name}@{tag}", RIB_RELIEF)
-        drive_jobs += [
-            (rib_dims[0], '"PocketDepth" - "RibRelief"'),
-            (rib_dims[1], '"RibRelief"'),
-        ]
-        v_hang = hanging_volume((rib_shape,), hung, RIB_RELIEF)
-        hung += (rib_shape,)
-        after = await volume_check(
-            adapter, label, after + v_hang, 0.005 * v_hang + 10.0
-        )
-
-    # Hanging bosses under the blind deck seats and the lugs under the cross
-    # taps (HANGING_SEATS, CROSS_TAP_LUG_SHAPES): one sketch per cast level.
-    #
-    # The rect pads and the lugs stand under seats the hole table does not
-    # locate (transfer seats) or under cross taps, so the drawing places them
-    # from the table's own X0 Y0: the flange's rear-west theoretical sharp
-    # corner, one datum per view (drawing policy rule 7). Each sketch carries
-    # that corner as a point, and every such feature is dimensioned FROM it,
-    # so the printed locations are these sketches' own driving dims (Codex P2
-    # on #1310: the pads printed no size or place).
+    # The rect pads, the lugs, the ribs and the spring-foot boss stand under
+    # seats the hole table does not locate (transfer seats, cross taps) or
+    # under none, so the drawing places them from the table's own X0 Y0: the
+    # flange's rear-west theoretical sharp corner, one datum per view (drawing
+    # policy rule 7). Each sketch carries that corner as a point, and every
+    # such feature is dimensioned FROM it, so the printed locations are these
+    # sketches' own driving dims (Codex P2 on #1310: the pads printed no size
+    # or place; machinist review: nor did the ribs or the MHA-DT-024 boss).
     async def _table_origin(dims: SketchDims, tag: str) -> str:
         """Add and anchor this sketch's X0 Y0 point; return its entity id."""
         manager = adapter.currentSketchManager
@@ -1784,6 +1712,7 @@ async def build(adapter) -> dict[str, str]:
         *,
         origin: str,
         location: tuple[str, str],
+        location_drives: tuple[str | None, str | None] = (None, None),
         corner: int = 0,
         sizes: tuple[int, int] = (0, 1),
     ) -> None:
@@ -1815,9 +1744,82 @@ async def build(adapter) -> dict[str, str]:
             *_from_origin(*points[corner]),
             f"{label} from X0 Y0",
         )
-        dims.record(location[0])
-        dims.record(location[1])
+        dims.record(location[0], location_drives[0])
+        dims.record(location[1], location_drives[1])
 
+    # Two ribs on the centre lines, RIB_RELIEF clear of the bench and ending
+    # mid-wall. Each is an offset-start boss, so its start offset IS the relief.
+    # Each rib's NW corner is placed from X0 Y0 (CrossRibX locates the cross
+    # rib's west face, LongRibY the long rib's rear face), driven to hold the
+    # rib centred as the flange and the pocket change.
+    for tag, rib_shape, label, names, drives, location_drives in (
+        (
+            "LongRib",
+            LONG_RIB_SHAPE,
+            "long rib (z = 0)",
+            ("LongRibLength", "LongRibThickness"),
+            ('"TopLength" - "PocketWall"', '"RibThickness"'),
+            (
+                '("BottomLength" - ("TopLength" - "PocketWall")) / 2',
+                '("BottomWidth" - "RibThickness") / 2',
+            ),
+        ),
+        (
+            "CrossRib",
+            CROSS_RIB_SHAPE,
+            "cross rib (x = 0)",
+            ("CrossRibThickness", "CrossRibLength"),
+            ('"RibThickness"', '"TopWidth" - "PocketWall"'),
+            (
+                '("BottomLength" - "RibThickness") / 2',
+                '("BottomWidth" - ("TopWidth" - "PocketWall")) / 2',
+            ),
+        ),
+    ):
+        rib = SketchDims()
+        check(f"create_sketch {label}", await adapter.create_sketch("Top"))
+        origin = await _table_origin(rib, tag)
+        # A line chain (_pad), not define_centered_rectangle: that native
+        # center rectangle runs sketch inference, and the cross rib's 131.25
+        # ends snapped to the deck edges at 130.25 seen through the Top plane
+        # (farm leaf 2026-10-10: depth read back 260.5, the dimension became
+        # driven, and the CrossRibLength equation failed the rebuild).
+        await _pad(
+            rib,
+            rib_shape,
+            label,
+            list(names),
+            list(drives),
+            origin=origin,
+            location=(f"{tag}X", f"{tag}Y"),
+            location_drives=location_drives,
+        )
+        await ensure_fully_defined(adapter, f"{label} sketch")
+        check(f"exit_sketch {label}", await adapter.exit_sketch())
+        name_last_feature(adapter, f"{tag}Profile")
+        drive_jobs += rib.apply(adapter, f"{tag}Profile")
+        extrude_at_offset(adapter, POCKET_CEILING_Y - RIB_RELIEF, RIB_RELIEF)
+        name_last_feature(adapter, tag)
+        # The sheet's section B-B cuts at constant x and so slices the LONG
+        # rib: that rib carries the printed RibRelief.
+        relief_name = "RibRelief" if tag == "LongRib" else f"{tag}Relief"
+        rib_dims = name_dimensions(adapter, tag, [f"{tag}Height", relief_name])
+        _verify_named_dimension(
+            adapter, f"{tag}Height@{tag}", POCKET_CEILING_Y - RIB_RELIEF
+        )
+        _verify_named_dimension(adapter, f"{relief_name}@{tag}", RIB_RELIEF)
+        drive_jobs += [
+            (rib_dims[0], '"PocketDepth" - "RibRelief"'),
+            (rib_dims[1], '"RibRelief"'),
+        ]
+        v_hang = hanging_volume((rib_shape,), hung, RIB_RELIEF)
+        hung += (rib_shape,)
+        after = await volume_check(
+            adapter, label, after + v_hang, 0.005 * v_hang + 10.0
+        )
+
+    # Hanging bosses under the blind deck seats and the lugs under the cross
+    # taps (HANGING_SEATS, CROSS_TAP_LUG_SHAPES): one sketch per cast level.
     async def _hanging_feature(
         tag: str,
         profile: str,
@@ -1855,20 +1857,48 @@ async def build(adapter) -> dict[str, str]:
     async def _deep_sketch(sketch: SketchDims) -> None:
         origin = await _table_origin(sketch, "DeepBoss")
         for i, (x, z) in enumerate(DEEP_BOSS_CENTRES):
-            await define_circle(
+            label = f"deep boss ({x:+.1f}, {z:+.1f})"
+            name_size = "HangingBossDia" if i == 0 else f"DeepBoss{i}Dia"
+            if (x, z) not in FOOT_SCREW_XZ:
+                # Concentric with an E tag's tabled hole: the table locates it.
+                await define_circle(
+                    adapter,
+                    x,
+                    -z,
+                    HANGING_BOSS_HALF,
+                    label,
+                    dims=sketch,
+                    names=(f"DeepBoss{i}X", f"DeepBoss{i}Z", name_size),
+                    drives=(None, None, '"HangingBossDia"'),
+                )
+                continue
+            # Under the transferred MHA-DT-024 foot hole, which the table does
+            # not hold: the boss's own centre is placed from X0 Y0 (FootBossX,
+            # FootBossY), as define_circle would place it from the origin.
+            manager = adapter.currentSketchManager
+            previous = bool(manager.AddToDB)
+            manager.AddToDB = True
+            try:
+                circle = await adapter.add_circle(x, -z, HANGING_BOSS_HALF)
+                check(f"add_circle {label}", circle)
+            finally:
+                manager.AddToDB = previous
+            await anchor_point_to_point(
                 adapter,
-                x,
-                -z,
-                HANGING_BOSS_HALF,
-                f"deep boss ({x:+.1f}, {z:+.1f})",
-                dims=sketch,
-                names=(
-                    f"DeepBoss{i}X",
-                    f"DeepBoss{i}Z",
-                    "HangingBossDia" if i == 0 else f"DeepBoss{i}Dia",
-                ),
-                drives=(None, None, '"HangingBossDia"'),
+                origin,
+                f"{circle.data}.center",
+                *_from_origin(x, -z),
+                f"{label} from X0 Y0",
             )
+            sketch.record("FootBossX")
+            sketch.record("FootBossY")
+            check(
+                f"dimension {label} diameter",
+                await adapter.add_sketch_dimension(
+                    circle.data, None, "diameter", 2.0 * HANGING_BOSS_HALF
+                ),
+            )
+            sketch.record(name_size, '"HangingBossDia"')
         await _pad(
             sketch,
             LOCK_PAD_SHAPE,

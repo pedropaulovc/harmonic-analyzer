@@ -1664,8 +1664,9 @@ def test_underside_section_cuts_both_boss_heights_clear_of_every_bore() -> None:
 
 
 def test_underside_section_texts_sit_in_open_air() -> None:
-    # Rule 8: dimension text outside silhouettes. The two in-pocket texts sit
-    # in the pocket's open air at the cut; the other two below the underside.
+    # Rule 8: dimension text outside silhouettes. The ceiling height sits in
+    # the pocket's open air at the cut; the others left of the underside,
+    # each level caption (DEEP/SHALLOW LEVEL) clear of the bench face.
     import draw_fr_harmonic_base as sheet
 
     x = sheet.UNDERSIDE_CUT_X
@@ -1678,7 +1679,7 @@ def test_underside_section_texts_sit_in_open_air() -> None:
         *((s, spec.SHALLOW_BOSS_BOTTOM_Y) for s in part.SHALLOW_BOSS_SHAPES),
         *((s, spec.SHALLOW_BOSS_BOTTOM_Y) for s in part.CROSS_TAP_LUG_SHAPES),
     )
-    for name in ("PocketDepth", "ShallowBossBottom"):
+    for name in ("PocketDepth",):
         y, z = sheet.UNDERSIDE_SECTION_TEXT_MM[name]
         assert 0.0 < y < fr_harmonic_base_spec.POCKET_CEILING_Y, name
         # A 2.5 mm text row is 5 mm of model at 1:2; keep 3 mm either side.
@@ -1686,8 +1687,13 @@ def test_underside_section_texts_sit_in_open_air() -> None:
         for dz in (-3.0, 0.0, 3.0):
             covering = [b for s, b in bottoms if _pocket_shape_covers(s, x, z + dz)]
             assert all(y + 3.0 < b for b in covering), (name, dz, covering)
-    for name in ("DeepBossBottom", "RibRelief"):
-        assert sheet.UNDERSIDE_SECTION_TEXT_MM[name][0] < 0.0, name
+    num, den = sheet.UNDERSIDE_SECTION_SCALE
+    for name in ("DeepBossBottom", "RibRelief", "ShallowBossBottom"):
+        y = sheet.UNDERSIDE_SECTION_TEXT_MM[name][0]
+        rows = ["00.0", *sheet.UNDERSIDE_SECTION_CALLOUTS.get(name, "").split("\n")]
+        half_w_mm = max(map(len, rows)) * _DIM_CHAR_M * 1000.0 / 2.0
+        assert half_w_mm + 2.0 < -y * num / den, name
+    assert set(sheet.UNDERSIDE_SECTION_CALLOUTS) <= set(sheet.UNDERSIDE_SECTION_TEXT_MM)
 
 
 def test_underside_sheet_views_fit_the_border_clear_of_each_other() -> None:
@@ -1713,8 +1719,14 @@ def test_underside_sheet_views_fit_the_border_clear_of_each_other() -> None:
     cx, cy = sheet.UNDERSIDE_SECTION_CENTER
     half_h = fr_harmonic_base_spec.STACK_HEIGHT * s / 2.0
     half_z = fr_harmonic_base_spec.BOTTOM_REAR_Z * s
+    # The outside texts' widest row: the level captions under 12.0 and 28.0.
+    widest = max(
+        len(row)
+        for text in sheet.UNDERSIDE_SECTION_CALLOUTS.values()
+        for row in text.split("\n")
+    )
     section = (
-        cx - half_h + sheet.UNDERSIDE_OUTSIDE_Y_MM * s - 0.004,
+        cx - half_h + sheet.UNDERSIDE_OUTSIDE_Y_MM * s - widest * _DIM_CHAR_M / 2.0,
         cy - half_z,
         cx + half_h,
         cy + half_z,
@@ -1722,7 +1734,72 @@ def test_underside_sheet_views_fit_the_border_clear_of_each_other() -> None:
     assert section[0] - bottom[2] > 0.020
     assert section[0] > SHEET_FRAME_INNER_X_M
     assert section[3] < 0.2794 - 0.0127
-    assert section[1] > 0.066  # title block top
+    # bp3 render: "SECTION B-B / ROTATED 90 DEG CW SCALE 1:2" hangs 31.2 mm
+    # under the cut's lowest edge; at y 0.160 it ran into the title block.
+    caption_drop = 0.0312
+    assert section[1] - caption_drop > 0.066 + 0.002  # title block top
+
+
+def test_underside_round_boss_diameters_name_their_level_and_holes() -> None:
+    # bp3 machinist review: one "11X ROUND BOSSES" callout read every boss as
+    # shallow (28.0) and found 2.2 mm under E1-E4's drills. One diameter per
+    # cast level names the holes it backs and the level, which section B-B
+    # prints under the model's own DeepBossBottom and ShallowBossBottom.
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    seats = {seat.label: seat for seat in part.HANGING_SEATS}
+    for label in ("rocker support", "spring foot"):
+        assert seats[label].boss_bottom_y == spec.DEEP_BOSS_BOTTOM_Y, label
+    for label in ("cone pivot", "swing stop", "nameplate"):
+        assert seats[label].boss_bottom_y == spec.SHALLOW_BOSS_BOTTOM_Y, label
+    assert part.DEEP_BOSS_CENTRES == (*part.HOLE_XZ, *part.FOOT_SCREW_XZ)
+    assert part.SHALLOW_BOSS_CENTRES == (
+        part.PIVOT_SCREW_XZ,
+        part.STOP_SCREW_XZ,
+        *part.NAMEPLATE_SCREW_XZ,
+    )
+    callouts = sheet.UNDERSIDE_BOTTOM_CALLOUTS
+    assert callouts["HangingBossDia"] == "5X BOSSES UNDER\nE1-E4, MHA-DT-024\nTO DEEP LEVEL"
+    assert callouts["ShallowBoss4Dia"] == "6X BOSSES UNDER\nB1, D1, F1-F4\nTO SHALLOW LEVEL"
+    assert sheet.UNDERSIDE_SECTION_CALLOUTS == {
+        "DeepBossBottom": "DEEP\nLEVEL",
+        "ShallowBossBottom": "SHALLOW\nLEVEL",
+    }
+    # The leaders land on E1's boss and the rear-west nameplate tap's, both
+    # in the view's top-right quarter (+Z up), so they drop from the texts.
+    e1 = part.HOLE_XZ[0]
+    rear_west_plate = part.SHALLOW_BOSS_CENTRES[4]
+    assert e1[1] > 0.0 and rear_west_plate[1] > 0.0
+    assert rear_west_plate == min(
+        (xz for xz in part.NAMEPLATE_SCREW_XZ if xz[1] > 0.0), key=lambda xz: xz[0]
+    )
+    # Sheet-3 texts above the view: inside the border, clear of the view, of
+    # each other and of the view's note.
+    keep = sheet.UNDERSIDE_BOTTOM_KEEP
+    view_top = sheet._bottom_xy(0.0, spec.BOTTOM_REAR_Z)[1]
+    boxes = {}
+    for name, value in (
+        ("CrossRibThickness", "10.0"),
+        ("HangingBossDia", "D16.0"),
+        ("ShallowBoss4Dia", "D16.0"),
+    ):
+        rows = [value, *callouts[name].split("\n")]
+        x, y = keep[name]
+        half_w = max(map(len, rows)) * _NOTE_CHAR_MM / 2000.0
+        half_h = len(rows) * _NOTE_LINE_MM / 2000.0
+        boxes[name] = (x - half_w, y - half_h, x + half_w, y + half_h)
+        assert boxes[name][1] > view_top + 0.010, name
+        assert boxes[name][3] < _BORDER_INNER_M[3] - 0.002, name
+    nx, ny = sheet.UNDERSIDE_BOTTOM_NOTE_XY
+    boxes["note"] = (nx, ny - _NOTE_LINE_MM / 1000.0, nx + 21 * _NOTE_CHAR_MM / 1000.0, ny)
+    for a in boxes:
+        for b in boxes:
+            if a < b:
+                assert _box_gap(boxes[a], boxes[b]) > 0.0015, (a, b)
+    # The cross rib's text reads west of the rib, clear above the B arrow.
+    rib_west = sheet._bottom_xy(part.CROSS_RIB_SHAPE[1], 0.0)[0]
+    assert boxes["CrossRibThickness"][2] < rib_west - 0.005
 
 
 def test_drawing_keeps_partition_the_part_precision_map() -> None:
@@ -1770,24 +1847,30 @@ def _segment_box_gap(segment: tuple[tuple[float, float], ...], box: tuple[float,
 
 
 def _pads_vertices() -> dict[str, tuple[float, float]]:
-    """Machine (X, Z) of the vertex each sheet-4 baseline dimension reaches."""
+    """Machine (X, Z) of the point each sheet-4 baseline dimension reaches."""
     lock = part.LOCK_PAD_SHAPE
     ped0, ped1 = part.PEDESTAL_PAD_SHAPES
     block0, block1 = part.BLOCK_PAD_SHAPES
     lug0, lug1, _lug2, lug3 = part.CROSS_TAP_LUG_SHAPES
+    long_rib, cross_rib = part.LONG_RIB_SHAPE, part.CROSS_RIB_SHAPE
+    (foot,) = part.FOOT_SCREW_XZ
     return {
         "Lug1X": (lug1[2], lug1[3]),
         "LockPadX": (lock[1], lock[4]),
         "PedestalPad1X": (ped1[1], ped1[4]),
         "BlockPad1X": (block1[1], block1[4]),
+        "CrossRibX": (cross_rib[1], cross_rib[4]),
         "Lug3X": (lug3[1], lug3[3]),
         "PedestalPad1Y": (ped1[1], ped1[4]),
         "BlockPad1Y": (block1[1], block1[4]),
         "Lug1Y": (lug1[2], lug1[3]),
+        "LongRibY": (long_rib[1], long_rib[4]),
         "Lug0Y": (lug0[2], lug0[4]),
         "PedestalPad0Y": (ped0[1], ped0[4]),
         "BlockPad0Y": (block0[1], block0[3]),
         "LockPadY": (lock[1], lock[4]),
+        "FootBossX": foot,
+        "FootBossY": foot,
     }
 
 
@@ -1811,8 +1894,9 @@ def _pads_printed() -> dict[str, float]:
 
 def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
     # Codex P2 on #1310: the 33 mm block pads, 26 mm pedestal pads, cone-lock
-    # pad and 27 x 37 mm lugs printed no size or place. Sheet 4 prints them
-    # from the hole table's X0 Y0, shortest baseline innermost.
+    # pad and 27 x 37 mm lugs printed no size or place; the bp3 machinist
+    # review: nor did the ribs or the MHA-DT-024 foot boss. Sheet 4 prints
+    # them from the hole table's X0 Y0, shortest baseline innermost.
     import draw_fr_harmonic_base as sheet
 
     spec = fr_harmonic_base_spec
@@ -1831,14 +1915,18 @@ def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
         "LockPadX": 120.5,
         "PedestalPad1X": 160.2,
         "BlockPad1X": 197.7,
+        "CrossRibX": 223.6,
         "Lug3X": 417.6,
         "PedestalPad1Y": 38.5,
         "BlockPad1Y": 48.3,
         "Lug1Y": 68.6,
+        "LongRibY": 138.6,
         "Lug0Y": 218.6,
         "PedestalPad0Y": 221.6,
         "BlockPad0Y": 237.2,
         "LockPadY": 247.6,
+        "FootBossX": 194.2,
+        "FootBossY": 67.2,
         "LockPadWidth": 16.0,
         "PedestalPadLength": 26.0,
         "PedestalPad0Width": 16.0,
@@ -1917,9 +2005,32 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
         # Inside its own span, between X0 and the station.
         assert vy + _DIM_TEXT_H_M < ty < datum[1] - _DIM_TEXT_H_M, name
         lines[name] = [((vx, vy), (tx - over, vy)), ((tx, datum[1]), (tx, vy))]
+    # The foot boss's baselines run inside the view: the X one's extension
+    # lines drop from X0 Y0 (along the flange's west edge) and from the boss
+    # centre to its dimension line; the Y one's run east from X0 Y0 (along the
+    # rear edge) and west from the centre to its dimension line.
+    (fx, fy) = vertices["FootBossX"]
+    tx, ty = sheet.UNDERSIDE_PADS_KEEP["FootBossX"]
+    assert datum[0] < tx < fx and ty < fy, "FootBossX"
+    lines["FootBossX"] = [
+        (datum, (datum[0], ty - over)),
+        ((fx, fy), (fx, ty - over)),
+        ((datum[0], ty), (fx, ty)),
+    ]
+    tx, ty = sheet.UNDERSIDE_PADS_KEEP["FootBossY"]
+    assert datum[0] < tx < fx and fy < ty < datum[1], "FootBossY"
+    lines["FootBossY"] = [
+        (datum, (tx + over, datum[1])),
+        ((fx, fy), (tx - over, fy)),
+        ((tx, fy), (tx, datum[1])),
+    ]
+    assert set(sheet.PADS_INLINE_TEXT_MM) == {"FootBossX", "FootBossY"}
     lock = part.LOCK_PAD_SHAPE
     ped0 = part.PEDESTAL_PAD_SHAPES[0]
     block0 = part.BLOCK_PAD_SHAPES[0]
+    # bp3 machinist review: the horizontal sizes read outside the silhouette.
+    for name in sheet.PADS_SIZE_BELOW_MM:
+        assert boxes[name][3] < view[1] - 0.002, name
     for name, (x0, x1, z, side) in {
         "LockPadWidth": (lock[1], lock[2], lock[4], "across"),
         "PedestalPad0Width": (ped0[1], ped0[2], ped0[3], "across"),
@@ -1957,8 +2068,8 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
             for segment in segments:
                 assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
 
-    # The sizes read in the pocket's open air, clear of every boss, pad, lug
-    # and rib by 2 mm of model.
+    # The in-view texts read in the pocket's open air, clear of every boss,
+    # pad, lug and rib by 2 mm of model.
     solids = (
         *part.DEEP_BOSS_SHAPES,
         *part.SHALLOW_BOSS_SHAPES,
@@ -1968,7 +2079,7 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
         part.CROSS_RIB_SHAPE,
     )
     scale = sheet._PADS_M_PER_MM
-    for name in sheet.PADS_SIZE_TEXT_MM:
+    for name in (*sheet.PADS_SIZE_TEXT_MM, *sheet.PADS_INLINE_TEXT_MM):
         x0, z0, x1, z1 = (
             (boxes[name][0] - sheet.PADS_CENTER[0]) / scale - 2.0,
             (boxes[name][1] - sheet.PADS_CENTER[1]) / scale - 2.0,
