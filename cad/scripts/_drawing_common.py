@@ -1074,7 +1074,7 @@ def add_feature_control_frame(
         applied_signature = _gtol_frame_signature(applied)
     except ValueError as exc:
         raise RuntimeError(
-            f"invalid feature-control frame XML readback ({label}): {exc}"
+            f"feature-control frame did not persist ({label}): invalid XML readback: {exc}"
         ) from exc
     if translated and applied_signature.translated != tuple(translated):
         raise RuntimeError(

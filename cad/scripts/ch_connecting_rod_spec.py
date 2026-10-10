@@ -76,7 +76,7 @@ FORK_TINE_MATCH = 0.10
 # The flat slot floor (the crotch) below the pin centre. The arm's curved
 # bottom edge dips into the slot as the arm turns on the pin; the floor clears
 # it by 1.0 MIN at the printed worst case of both parts through the solved
-# swing (ch_rod_pivot_pin_spec.BUDGET: 1.21 worst, 3.30 nominal).
+# swing (ch_rod_pivot_pin_spec.BUDGET: 1.20 worst).
 FORK_CROTCH_BELOW_PIN = 9.75
 # The fork boss's root step onto the shank. The bridge below the slot floor
 # (ForkBossLength less SlotDepth, both .XX from the crown top) keeps 2.0 MIN.

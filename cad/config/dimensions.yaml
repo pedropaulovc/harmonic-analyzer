@@ -496,7 +496,7 @@ sections:
         - derived from matched fit
         - med
       - - Cylinder arbor length
-        - 164.58 mm cylindrical strap-to-strap span; 167.58 mm including two domes
+        - 165.08 mm cylindrical strap-to-strap span; 168.08 mm including two domes
         - —
         - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: full depth of both 10 mm pedestal straps, each dome 1.5 mm proud. The earlier ~200 mm estimate was derived from the photo-scale stack, not a current cut length.'
         - derived from current bank layout
@@ -619,7 +619,7 @@ sections:
         - 'cone_line exact tracking retains sin i = 1.5875/7.0565 and tan(cone half-angle) = 1.5875/6.875611681880 = tan i, making the drum-side generator parallel to the drum axis. GEAR_AXIS_SHIFT = −33.114642580298 mm; dt_cone_gear_shaft_spec.gear_faces owns touching solid faces. Earlier y = 90.518 was the lower-axis layout.'
         - low
       - - Cylinder arbor (stationary)
-        - 'x = −60.393602135, y = 95.25; cylindrical span z −81.518912220..+83.061087780 (164.58 mm), domes 1.5 mm proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
+        - 'x = −60.393602135, y = 95.25; cylindrical span z −82.018912220..+83.061087780 (165.08 mm), domes 1.5 mm proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
         - ch30 GT supplies historical topology; cone_line and cylinder_bank_layout own current placement and strap-to-strap cut length
         - med (derived current layout)
       - - Cylinder gear j

@@ -218,7 +218,7 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
     drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * SHAFT_RADIUS**2 * SHAFT_LENGTH
-    # expected: pi * 4.7625^2 * 164.58 = ~11,727 mm^3
+    # expected: pi * 4.7625^2 * 165.08 = ~11,763 mm^3
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
     # Both ends domed into the photographed bright caps (#743).
     _dome_end(adapter, 0.0, "SouthDome")

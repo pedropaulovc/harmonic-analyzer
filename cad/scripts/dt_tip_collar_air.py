@@ -304,8 +304,9 @@ def projection_closure_terms_mm(
     terms["actual manufactured thrust/washer full-face form"] = face_form * min(
         1.0, abs(normal[2])+math.sin(theta),
     )
-    # G19 can only shuttle SOUTH off the actual north thrust datum.
-    terms["bank retained end-play south travel"] = bank.BANK_END_PLAY[1] * max(0.0, -normal[2])
+    # No end-play term: MHA-VN-052 preloads the bank north onto its thrust
+    # datum (#948 ruling R, cylinder_bank_layout), so G19 has no free axial
+    # travel to shuttle south.
     # The observer pays the ACTUAL correlated stroke/motion support. A is an
     # upper signed material-closing coefficient across the whole axis/P1 cap,
     # not merely the nominal -axis·normal. Never independently max-add q again.
