@@ -661,6 +661,26 @@ BAR_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.35 - 3.20)
 # Channel j's pin and rod are both its (j + 1)th instance, as the bar pin's
 # are; test_ch_rod_pivot_fit pins the literals to the pin spec.
 ROD_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.075 - 2.625)
+# The MHA-VN-034 #4-40 apex set screws (user, 2026-10-10), one down through
+# each MHA-CH-008 ear's R8 arch into its Ø6.5 bore, the tap cut at its drill.
+# The thread's major envelope crosses no longer a metal column than the arch
+# radius less the bore's height at the envelope's edge, so the smooth annulus
+# over that column bounds the overlap; the cup on the modelled shaft flat is
+# contact, as the arbor's screws on the arbor. Screw n is placed with bracket
+# n (south first). Literals (arch radius, bore), like the rows above, so every
+# assembly does not re-key on the bracket spec; test_ch_channel_assembly_drawing
+# pins them to ch_pivot_bracket_spec. #911: re-pin to the measured overlap x
+# 1.10 from the first channel leaf.
+PIVOT_EAR_ARCH_AND_BORE = (8.0, 6.5)
+_PIVOT_EAR_TAP_COLUMN = PIVOT_EAR_ARCH_AND_BORE[0] - math.sqrt(
+    (PIVOT_EAR_ARCH_AND_BORE[1] / 2.0) ** 2
+    - (THREAD_MAJOR_MM[_ARBOR_SET_SCREW_THREAD] / 2.0) ** 2
+)
+PIVOT_EAR_SET_SCREW_LIMIT = _smooth_annulus_limit_mm3(
+    THREAD_MAJOR_MM[_ARBOR_SET_SCREW_THREAD],
+    TAP_DRILL_MM[_ARBOR_SET_SCREW_THREAD],
+    _PIVOT_EAR_TAP_COLUMN,
+)
 _CHANNEL_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "ch-bar-pivot-pin",
@@ -674,6 +694,13 @@ _CHANNEL_ALLOWED_PAIRS = {
         range(1, 21),
         "ch-connecting-rod",
         _smooth_annulus_limit_mm3(*ROD_PIVOT_PIN_PRESS),
+        second_number=None,
+    ),
+    **_numbered_pairs(
+        "vn-arbor-set-screw",
+        range(1, 3),
+        "ch-pivot-bracket",
+        PIVOT_EAR_SET_SCREW_LIMIT,
         second_number=None,
     ),
 }

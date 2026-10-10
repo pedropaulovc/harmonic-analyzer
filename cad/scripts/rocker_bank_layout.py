@@ -15,20 +15,23 @@ The bank is a SOLID STACK: each MHA-CH-006 arm's integral hub is one station
 pitch long, and neighbouring hubs bear face on face. #948 ruling R (PR #1292)
 preloads it with a keeper spring, reversing #743 Q4 (Reading 1, "no keeper"):
 
-* The pivot shaft's integral O10 x 1.5 SHOULDER bears on the NORTH bracket
-  ear's inner face, and hub 19 bears on the shoulder. That ear is the bank's
-  axial datum: fit-up offsets its DRO target by the measured shoulder's
-  deviation from nominal (MIC_RESIDUAL is what is left of that band).
-* The SOUTH bracket is set off the MHA-CH-009 thrust washer on hub 0 by one
+* Hub 19 bears on a MHA-CH-009 thrust washer against the NORTH bracket
+  ear's inner face (user, 2026-10-10: the shaft's shoulder is gone and the
+  washer, kept, goes at both ends). That ear is the bank's axial datum:
+  fit-up offsets its DRO target by the measured north washer's deviation
+  from nominal (MIC_RESIDUAL is what is left of that band), as the cylinder
+  bank does for its back washer.
+* The SOUTH bracket is set off the thrust washer on hub 0 by one
   ROCKER_SPRING_SET blade, and the MHA-VN-053 wave spring
-  (``vn_rocker_bank_spring_spec``) squeezed in that gap holds the stack and
-  the shaft's shoulder north on the datum ear: the bank has no end play and
-  the shaft no float.
+  (``vn_rocker_bank_spring_spec``) squeezed in that gap holds the stack north
+  on the datum ear: the bank has no end play.
 * Each hub's length is +0.05/0 on its print, and a fit-up acceptance on the
   measured 20-arm stack caps the cumulative excess (STACK_L20_ACCEPT,
   +0.10/0, #948 ruling R).
-* The shaft's cylinder spans both ears' outer faces, and each end is domed
-  proud of its ear.
+* The shaft is a plain rod whose cylinder spans both ears' outer faces, each
+  end domed proud of its ear. One #4-40 set screw down through each ear's
+  arch apex bites a flat milled on the shaft at that ear's mid-plane, so the
+  screws hold the shaft both axially and in rotation, flats up.
 
 The set-blade and preload rules are the cylinder bank's, restated here
 because the rocker bank has its own spring; ``test_rocker_bank_layout`` pins
@@ -111,14 +114,15 @@ if _spring.OD + _spring.OD_BAND[0] > _washer.OD:
         "the rocker-bank spring's OD stands proud of the hub and washer"
     )
 
-# Fit-up compensation (#948 ruling R): the fitter mics the shaft's shoulder and
-# offsets the north ear's DRO target by (measured - nominal), so the shoulder's
-# band leaves the chain and only the micrometer reading's residual stays.
+# Fit-up compensation (#948 ruling R): the fitter mics the north thrust washer
+# and offsets the north ear's DRO target by (measured - nominal), so the
+# washer's band leaves the chain and only the micrometer reading's residual
+# stays.
 MIC_RESIDUAL = 0.013  # half a thou: one micrometer reading
 NORTH_EAR_LOCATE_BAND = 0.10  # DRO edge-find on the ear's inner face
 NORTH_DATUM_STACK = {
     "north ear DRO locate": NORTH_EAR_LOCATE_BAND,
-    "shaft shoulder, mic-compensated": MIC_RESIDUAL,
+    "north washer, mic-compensated": MIC_RESIDUAL,
 }
 
 # --- stack length acceptance ---------------------------------------------------
@@ -133,10 +137,10 @@ STACK_L20_ACCEPT = (
 if HUB_LENGTH_BAND[1] < 0.0:
     raise AssertionError("a short hub cannot be fixed at fit-up; keep the band +/0")
 
-# --- north: shoulder against the datum ear ------------------------------------
+# --- north: hub 19, washer, datum ear ----------------------------------------------
 HUB19_NORTH_FACE_Z = hub_mid_z(COUNT - 1) + HUB_LENGTH / 2.0
-SHOULDER_Z = (HUB19_NORTH_FACE_Z, HUB19_NORTH_FACE_Z + _shaft.SHOULDER_LENGTH)
-NORTH_EAR_INNER_Z = SHOULDER_Z[1]
+NORTH_WASHER_Z = (HUB19_NORTH_FACE_Z, HUB19_NORTH_FACE_Z + _washer.THICKNESS)
+NORTH_EAR_INNER_Z = NORTH_WASHER_Z[1]
 NORTH_EAR_OUTER_Z = NORTH_EAR_INNER_Z + _bracket.EAR_T
 
 # --- south: washer, spring, set ear -----------------------------------------------
@@ -154,26 +158,71 @@ PIVOT_BRACKET_Z = (
 )
 
 # --- the pivot shaft -----------------------------------------------------------
-# Its cylinder spans both ears' outer faces (the fitter's measurement); the
-# shoulder sits one ear thickness in from the north end. The part's origin is
-# that north end.
+# Its cylinder spans both ears' outer faces (the fitter's measurement). The
+# part's origin is the north end, set flush with the north ear's outer face.
 PIVOT_SHAFT_LENGTH = NORTH_EAR_OUTER_Z - SOUTH_EAR_OUTER_Z
 PIVOT_SHAFT_SOUTH_Z = SOUTH_EAR_OUTER_Z
 PIVOT_SHAFT_NORTH_Z = NORTH_EAR_OUTER_Z
-NORTH_JOURNAL_LENGTH = _shaft.JOURNAL_LENGTH
 PIVOT_SHAFT_OVERALL_LENGTH = PIVOT_SHAFT_LENGTH + 2.0 * _shaft.DOME_HEIGHT
 # The plain (south) end is cut flush with the south ear's outer face to 0.5
-# proud, then domed: the spring holds the shoulder on the north ear, so the
-# shaft never floats and its apex stands at most this far south of the ear.
+# proud, then domed: the set screws hold the shaft, so its apex stands at
+# most this far south of the ear.
 PLAIN_END_CUT_BAND = (0.5, 0.0)  # (upper, lower) past the south ear's outer face
 SOUTH_APEX_REACH_MAX = PLAIN_END_CUT_BAND[0] + _shaft.DOME_HEIGHT
-if abs(PIVOT_SHAFT_NORTH_Z - NORTH_JOURNAL_LENGTH - SHOULDER_Z[1]) > 1e-9:
-    raise AssertionError("the shaft's shoulder is not on the north ear's inner face")
+
+# Set-screw flats (user, 2026-10-10): one under each ear's apex screw, at the
+# ear's mid-plane, as stations from the shaft's north end (south, north).
+PIVOT_SHAFT_FLAT_STATIONS = (
+    PIVOT_SHAFT_NORTH_Z - PIVOT_BRACKET_Z[0],
+    PIVOT_SHAFT_NORTH_Z - PIVOT_BRACKET_Z[1],
+)
+if abs(PIVOT_SHAFT_FLAT_STATIONS[1] - _shaft.NORTH_FLAT_STATION) > 1e-9:
+    raise AssertionError("the north flat is not under the north ear's set screw")
+# Where each flat may sit off its screw at fit-up: the shaft's north end set
+# flush by straightedge, and at the south ear the stack's acceptance excess,
+# the spring blade's set error and both washers' stock bands (the north one
+# moves the datum ear with the shaft's flush end, the south one the blade-set
+# ear), which move the south ear along the shaft.
+SHAFT_FLUSH_SET_BAND = 0.25
+_WASHER_DEV = (
+    _washer.STOCK_THICKNESS_RANGE[0] - _washer.THICKNESS,
+    _washer.STOCK_THICKNESS_RANGE[1] - _washer.THICKNESS,
+)
+SOUTH_EAR_SET_RANGE = (
+    -(STACK_L20_ACCEPT_BAND[0] + ROCKER_SPRING_SET_BAND + 2.0 * _WASHER_DEV[1]),
+    ROCKER_SPRING_SET_BAND - 2.0 * _WASHER_DEV[0],
+)
+FLAT_OFFSET_MAX = (
+    SHAFT_FLUSH_SET_BAND + max(abs(v) for v in SOUTH_EAR_SET_RANGE),
+    SHAFT_FLUSH_SET_BAND,
+)  # (south, north)
+# How far a flat may run from its ear's mid-plane before a hub's bore rides
+# over its edge: half the thinnest ear, the thinnest washer, and at the south
+# ear the shortest spring set. Under the ear, the washer and the spring the
+# flat is harmless (none of them runs on the shaft).
+FLAT_RUN_MAX = (
+    (_bracket.EAR_T - _bracket.EAR_T_BAND) / 2.0
+    + _washer.STOCK_THICKNESS_RANGE[0]
+    + ROCKER_SPRING_HEIGHT[0],
+    (_bracket.EAR_T - _bracket.EAR_T_BAND) / 2.0 + _washer.STOCK_THICKNESS_RANGE[0],
+)  # (south, north)
+for _offset, _run_max in zip(FLAT_OFFSET_MAX, FLAT_RUN_MAX, strict=True):
+    _reach = _offset + _shaft.FLAT_STATION_BAND + _bracket.SET_SCREW_STATION_BAND
+    # The cup lands wholly on the flat...
+    if _reach + _shaft.SET_SCREW_CUP_DIA / 2.0 > _shaft.FLAT_LENGTH_RANGE[0] / 2.0:
+        raise AssertionError("a set-screw cup runs off its flat at worst case")
+    # ...and no hub rides over the flat's edge.
+    if (
+        _offset + _shaft.FLAT_STATION_BAND + _shaft.FLAT_LENGTH_RANGE[1] / 2.0
+        > _run_max - RUNNING_FLOOR
+    ):
+        raise AssertionError("a shaft flat runs under a rocker hub at worst case")
 
 # The ch0 / ch19 amplitude bar's nominal axial air to the ear it faces: the
-# stand-off, plus the hub's half-length, less the bar's half-width (the bar
-# straddles its plate).
-BAR_TO_THRUST_EAR = _shaft.SHOULDER_LENGTH + HUB_LENGTH / 2.0 - _bar.BAR_WIDTH / 2.0
+# thrust washer's stand-off plus the hub's half-length, less the bar's
+# half-width (the bar straddles its plate). The north side is the closer (the
+# south one adds the spring's set).
+BAR_TO_THRUST_EAR = _washer.THICKNESS + HUB_LENGTH / 2.0 - _bar.BAR_WIDTH / 2.0
 
 __all__ = [
     "ARM_MID_DZ",
@@ -182,19 +231,22 @@ __all__ = [
     "FEELER_STEP",
     "HUB0_SOUTH_FACE_Z",
     "HUB19_NORTH_FACE_Z",
+    "FLAT_OFFSET_MAX",
+    "FLAT_RUN_MAX",
     "MARGIN_SPARE",
     "MIC_RESIDUAL",
     "NORTH_DATUM_STACK",
     "NORTH_EAR_LOCATE_BAND",
     "NORTH_EAR_INNER_Z",
     "NORTH_EAR_OUTER_Z",
-    "NORTH_JOURNAL_LENGTH",
+    "NORTH_WASHER_Z",
     "PITCH",
     "PLAIN_END_CUT_BAND",
     "PIVOT_BRACKET_Z",
     "PIVOT_SHAFT_LENGTH",
     "PIVOT_SHAFT_NORTH_Z",
     "PIVOT_SHAFT_OVERALL_LENGTH",
+    "PIVOT_SHAFT_FLAT_STATIONS",
     "PIVOT_SHAFT_SOUTH_Z",
     "PRELOAD_LIMITS",
     "ROCKER_PRELOAD",
@@ -203,10 +255,11 @@ __all__ = [
     "ROCKER_SPRING_SET_BAND",
     "ROCKER_SPRING_Z",
     "RUNNING_FLOOR",
-    "SHOULDER_Z",
+    "SHAFT_FLUSH_SET_BAND",
     "SOUTH_EAR_INNER_Z",
     "SOUTH_APEX_REACH_MAX",
     "SOUTH_EAR_OUTER_Z",
+    "SOUTH_EAR_SET_RANGE",
     "SOUTH_WASHER_Z",
     "STACK_L20",
     "STACK_L20_ACCEPT",
