@@ -79,7 +79,8 @@ async def build(adapter: Any) -> dict[str, str]:
             (part.PLATE_HOLE_XS[0] + part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MIN / 1000.0,
         ), label="plate clearance mouth")
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.115, 0.075),
+    # Keep the entire leader above the lower hole-location dimension texts.
+    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.115, 0.128),
                            label="two cover clearance holes", process="2X MATCH-DRILL; THEN OPEN")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")

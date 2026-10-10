@@ -271,9 +271,15 @@ def test_build_projects_metre_scale_fence_and_section_points(
     assert end_x > (spec.SCALE_START_X + spec.TICK_WIDTH / 2.0) / 1000.0
     assert len(sections) == 1
     section_view, arguments = sections[0]
-    assert section_view is detail
-    assert arguments["line_start"] == pytest.approx((0.1302, 0.140))
-    assert arguments["line_end"] == pytest.approx((0.1446, 0.140))
+    assert section_view is views[-1]
+    assert section_view is not detail
+    assert section_view.Position == drawing.DETAIL_PARENT_CENTER
+    assert section_view.ScaleRatio == (1.0, 2.0)
+    assert arguments["line_start"] == pytest.approx((0.20815, 0.23875))
+    assert arguments["line_end"] == pytest.approx((0.20935, 0.23875))
+    assert arguments["line_end"][0] - arguments["line_start"][0] == pytest.approx(
+        (end_x - start_x) * section_view.ScaleRatio[0] / section_view.ScaleRatio[1],
+    )
     assert arguments["view_xy"] == drawing.SECTION_CENTER
     assert arguments["section_label"] == "B"
     assert arguments["scale"] == drawing.DETAIL_SCALE

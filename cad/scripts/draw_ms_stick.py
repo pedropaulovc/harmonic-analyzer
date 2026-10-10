@@ -186,14 +186,16 @@ async def build(adapter: Any) -> dict[str, str]:
     # material either side of its finite width to show the square-bottom profile.
     section_y = (part.BODY_WIDTH - part.TICK_LENGTH / 2.0) / 1000.0
     start = model_point_in_view(
-        adapter, detail,
+        adapter, parent,
         ((part.SCALE_START_X - part.TICK_WIDTH / 2.0 - 1.0) / 1000.0, section_y, 0.0),
         label="engraving section start")
     end = model_point_in_view(
-        adapter, detail,
+        adapter, parent,
         ((part.SCALE_START_X + part.TICK_WIDTH / 2.0 + 1.0) / 1000.0, section_y, 0.0),
         label="engraving section end")
-    section = create_section_view(adapter, detail, line_start=start, line_end=end,
+    # Feature-owned cut depths use a section of the projected view directly,
+    # like the working top-frame sections, not a section of a derived detail.
+    section = create_section_view(adapter, parent, line_start=start, line_end=end,
                                   view_xy=SECTION_CENTER, section_label="B", scale=DETAIL_SCALE,
                                   partial=True, label="square-bottom engraving depth")
     cut = _early_bound(_early_bound(section, "IView").GetSection(), "IDrSection")
