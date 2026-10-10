@@ -40,34 +40,34 @@ SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(slddrw=SPEC.outputs["slddrw"], pdf=SPEC.outputs["pdf"], png=SPEC.outputs["png"])
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
-FRONT_CENTER = (0.175, 0.185)
+FRONT_CENTER = (0.155, 0.185)
 RIGHT_CENTER = (0.315, FRONT_CENTER[1])
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.080)
 # Native 2:1 outline is 56.4 x 60.3 mm; fit above the title and below the end view.
 ISO_CENTER = (0.360, 0.119)
 FRONT_KEEP = {
-    "BlockLength": (0.175, 0.235), "BlockHeight": (0.105, 0.185),
-    "RoofChamferSize": (0.247, 0.240), "RoofChamferAngle": (0.240, 0.220),
-    "PlateLeftFromEnd": (0.175, 0.140),
-    "PlateRightFromEnd": (0.175, 0.122),
-    "PlateFromHeadFace": (0.115, 0.163),
+    "BlockLength": (0.155, 0.235), "BlockHeight": (0.085, 0.185),
+    "RoofChamferSize": (0.227, 0.240), "RoofChamferAngle": (0.207, 0.220),
+    "PlateLeftFromEnd": (0.155, 0.140),
+    "PlateRightFromEnd": (0.155, 0.122),
+    "PlateFromHeadFace": (0.100, 0.163),
 }
 RIGHT_KEEP = {
     "BlockDepth": (0.315, 0.235), "WindowWidth": (0.315, 0.130),
-    "WindowHeight": (0.365, 0.198), "RoofThickness": (0.275, 0.215),
+    "WindowHeight": (0.365, 0.198), "RoofThickness": (0.350, 0.215),
 }
 BOTTOM_KEEP = {
-    "ThumbFromEnd": (0.175, 0.038), "ThumbFromPlate": (0.110, 0.080),
+    "ThumbFromEnd": (0.175, 0.038), "ThumbFromPlate": (0.090, 0.080),
 }
 # Native horizontal size witnesses end at this corner rather than spanning
 # the view; the shorter angle arc stays below the overall length dimension.
-DIMENSION_CALLOUTS = {"RoofChamferSize": "2 CORNERS"}
+DIMENSION_CALLOUTS = {"RoofChamferSize": "2 CORNERS", "WindowWidth": "OPEN REBATE"}
 # The title block owns the general internal thread class. Keep Hole Wizard's
 # variable definitions, not the resolved text that would freeze drill/depths.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 COVER_HOLE_PROCESS = (
     "2X MATCH-DRILL WITH MS-STOP-PLATE\n"
-    f"{_config.parts('ms-stop-plate')['number']} CLAMPED; BOTTOMING TAP\n"
+    f"{_config.parts('ms-stop-plate')['number']} CLAMPED\n"
 )
 
 
@@ -137,7 +137,7 @@ async def build(adapter: Any) -> dict[str, str]:
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
     plate_callout = add_native_hole_callout(
-        adapter, front, edge_xy=plate_edge, callout_xy=(0.072, 0.230),
+        adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.138),
         label="two cover blind taps",
         process=COVER_HOLE_PROCESS,
     )
@@ -148,7 +148,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0.0, part.THUMB_AXIS_Z / 1000.0,
         ), label="thumb tap mouth")
     thumb_callout = add_native_hole_callout(
-        adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.270, 0.070),
+        adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.060, 0.063),
         label="thumbscrew tap through floor",
     )
     _remove_general_thread_class(thumb_callout)
@@ -161,7 +161,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_callout(
         adapter, right, property_name="Mating Face Note",
-        edge_xy=mating_edge, note_xy=(0.250, 0.260),
+        edge_xy=mating_edge, note_xy=(0.220, 0.210),
     )
     for view in (front, bottom):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):

@@ -115,12 +115,17 @@ SETUP_NOTE_WIDTH = 52  # characters; default-format note text
 # Sheet 2 alone is portrait: the native full-size exploded outline plus its
 # unchanged 24 mm balloon ring is 202.0739 mm high; landscape has 200.7 mm
 # above the title block. Retain 1:1 and translate the whole portrait group.
-# ace062816 native audit: outline y=157.963..312.037 mm at centre 235 mm;
-# conservative ring bottom=133.963 mm, caption ink top=414.6801 mm.
-# Equalise air above the title block and below the upper border; balloons
-# are generated only after recentering, so both rings share this translation.
+# dfd8c30ee native sheet 2 full-page ink: lowest balloon 4 ~136.6 mm,
+# caption top 383.2265 mm, versus usable y=66..419.1 mm. Its visible
+# centre is 259.91325 mm, 17.36325 mm above the usable centre. GetOutline
+# includes undrawn space; retain it for containment, not visible balance.
+# Undo the previous placement shift when expressing this measured ink in
+# the original 235 mm view-centre frame. Balloons follow the moved view.
 _EXPLODED_TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.PORTRAIT]
-_EXPLODED_MEASURED_GROUP_Y = (0.133963, 0.4146801)
+_EXPLODED_MEASURED_GROUP_Y = (
+    0.1366 + 0.03177155,
+    0.3832265 + 0.03177155,
+)
 EXPLODED_GROUP_SHIFT_Y = (
     _EXPLODED_TEMPLATE.title_block_top_m
     + _EXPLODED_TEMPLATE.height_m - 0.0127

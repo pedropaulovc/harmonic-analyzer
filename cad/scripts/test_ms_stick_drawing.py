@@ -380,7 +380,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     for name in (
         "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
         "set_dimension_callouts", "assert_manufacturing_dimensions", "add_property_linked_note",
-        "rebuild_drawing",
+        "rebuild_drawing", "add_note", "add_property_linked_callout",
     ):
         monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
     monkeypatch.setattr(
@@ -402,7 +402,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
     assert source.read_bytes() == b"offline source sentinel"
-    assert len(utility.points) == 18  # three transforms per fence, no floating labels
+    assert len(utility.points) == 19  # fence transforms plus the native scale-end attachment
     expected = [
         ("A", "GRADUATIONS", drawing.DETAIL_CENTER, drawing.DETAIL_RADIUS_MM,
          ((spec.SCALE_START_X + spec.DIVISION_SPACING / 2.0) / 1000.0, spec.BODY_WIDTH / 2000.0, 0.0),
@@ -426,12 +426,12 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         assert detail.Position == xy
         assert parent.ScaleRatio == (1.0, 2.0)
         assert tuple(getattr(detail.ScaleRatio, "value", detail.ScaleRatio)) == drawing.DETAIL_SCALE
-        assert utility.points[3 * index] == pytest.approx(model_xyz)
+        assert utility.points[3 * index + 1] == pytest.approx(model_xyz)
         projected = parent.ModelToViewTransform.apply(model_xyz)
         center = (projected[0], projected[1], 0.0)
         rim = (center[0] + radius / 2000.0, center[1], 0.0)
-        assert utility.points[3 * index + 1] == pytest.approx(center)
-        assert utility.points[3 * index + 2] == pytest.approx(rim)
+        assert utility.points[3 * index + 2] == pytest.approx(center)
+        assert utility.points[3 * index + 3] == pytest.approx(rim)
         assert circles[index] == pytest.approx(
             (*sketch_transform.apply(center), *sketch_transform.apply(rim)))
         assert letters[index] == (label, (center[0], center[1] + 0.015))
@@ -447,6 +447,32 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert all(view.Angle == pytest.approx(math.pi)
                for view in placements if view.Orientation == "*Back")
     assert placements[0].Position[0] == placements[1].Position[0]
+
+
+def test_graduation_location_chords_terminate_at_groove_centres() -> None:
+    zero = spec.REFERENCE_DIMENSIONS["ScaleStartReference"]
+    assert zero[2] == (spec.SCALE_START_X, spec.BODY_WIDTH)
+    for feature, spacing in (
+        ("FullPitchReference", spec.DIVISION_SPACING),
+        ("MinorPitchReference", spec.MINOR_SPACING),
+    ):
+        _, start, end = spec.REFERENCE_DIMENSIONS[feature]
+        assert start == zero[2]
+        assert end == (spec.SCALE_START_X + spacing, spec.BODY_WIDTH)
+    assert spec.DRAWING_NOTES.endswith("ms-stick.SLDPRT")
+    assert spec.SCALE_END_NOTE == (
+        "SCALE END: DEBURR ONLY;\nDO NOT BREAK EDGE INTO GRADUATIONS"
+    )
+
+
+def test_numeral_fence_contains_real_full_tick_endpoint() -> None:
+    centre = (
+        spec.SCALE_START_X + spec.TICK_WIDTH / 2.0
+        + spec.NUMERAL_GAP_MM + spec.NUMERAL_HEIGHT_MM / 2.0,
+        spec.BODY_WIDTH - spec.TICK_LENGTH - spec.NUMERAL_GAP_MM,
+    )
+    endpoint = (spec.SCALE_START_X, spec.BODY_WIDTH - spec.TICK_LENGTH)
+    assert math.dist(centre, endpoint) < drawing.NUMERAL_RADIUS_MM / 2.0
 
 
 def test_local_length_fences_include_owned_ticks_without_cross_strip_routing() -> None:

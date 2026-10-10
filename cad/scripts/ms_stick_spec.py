@@ -53,8 +53,8 @@ GRADUATION_LENGTH_TOLERANCE_MM = 0.1
 NUMERAL_TOLERANCE_MM = 0.1
 
 # Construction chords use the actual finished edge and actual groove/glyph
-# extents. The print locates the scale from the left end only; ScaleEndMargin
-# remains an editable model global, not a closing manufacturing requirement.
+# extents. ScaleStartX and both pitch chords terminate at true groove centres,
+# never at either side of the finite-width cut. ScaleEndMargin stays unprinted.
 REFERENCE_DIMENSIONS = {
     "ScaleStartReference": ("ScaleStartX", (0.0, BODY_WIDTH), (SCALE_START_X, BODY_WIDTH)),
     "FullLengthReference": ("FullTickLength", (SCALE_START_X, BODY_WIDTH - TICK_LENGTH), (SCALE_START_X, BODY_WIDTH)),
@@ -96,7 +96,8 @@ DRAWING_TOLERANCES = {
     "NumeralXGap": NUMERAL_TOLERANCE_MM,
     "NumeralYGap": NUMERAL_TOLERANCE_MM,
 }
-DRAWING_NOTES = "NUMERAL OUTLINES PER SUPPLIED MODEL"
+DRAWING_NOTES = "NUMERAL OUTLINES: ms-stick.SLDPRT"
+SCALE_END_NOTE = "SCALE END: DEBURR ONLY;\nDO NOT BREAK EDGE INTO GRADUATIONS"
 FRONT_VIEW_NOTE = "RULED FACE SCALE 1:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
