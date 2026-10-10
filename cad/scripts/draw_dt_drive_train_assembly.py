@@ -28,9 +28,9 @@ from typing import Any, Callable, Literal, NamedTuple, Sequence
 import _config
 import _seat_forensics
 import _telemetry
-import ch_pivot_shaft_spec as pivot_shaft
 import cone_line
 import cone_set_stack as set_stack
+import ch_rocker_thrust_washer_spec as rocker_washer
 import cylinder_bank_layout as bank
 import dt_mesh_checks as mesh_checks
 import dt_drive_train_steps as steps
@@ -799,26 +799,22 @@ BANK_STEPS = _note_text(
         # is the rocker bank's axial datum (rocker_bank_layout), set here on
         # the 9A DRO zero so the cams and the rocker stations share one datum.
         # Y is the hole-table rear-face distance of the ear inner face,
-        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 72.039, held to the
-        # NORTH_EAR_LOCATE_BAND edge-find. #948 ruling R (PR #1292): the
-        # target moves north (LESS Y) by the miced shoulder's excess,
-        # S - 1.500, so hub 19 stays at nominal. Channel assembly MHA-CH-000
-        # cites this step by key (channel_steps.NORTH_BRACKET_SET_REF).
+        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 72.749, held to the
+        # NORTH_EAR_LOCATE_BAND edge-find. Hub 19 bears on the north MHA-CH-009
+        # washer against that face (user, 2026-10-10), so the target moves
+        # north (LESS Y) by the miced washer's excess, W - 0.790, and hub 19
+        # stays at nominal. The plain shaft threads through the set ear, so
+        # the bracket stays screwed down. Channel assembly MHA-CH-000 cites
+        # this step by key (channel_steps.NORTH_BRACKET_SET_REF).
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-005 SCREWED DOWN ON THE BASE"
         " (FRAME ASSEMBLY MHA-FR-000 STEP 8),",
         "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE MHA-FR-005",
-        "   RAIL, FOOT TO THE BACK. MIC THE MHA-CH-005 SHOULDER, S. SET ITS EAR",
+        "   RAIL, FOOT TO THE BACK. MIC ONE MHA-CH-009, W. SET THE EAR",
         f"   INNER FACE TO Y {NORTH_EAR_Y_LIMITS} LESS "
-        f"(S - {pivot_shaft.SHOULDER_LENGTH:.3f});",
+        f"(W - {rocker_washer.THICKNESS:.3f});",
         "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FOOT PER THE MHA-FR-005 SEAT",
-        "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
-        # Main's ruling (option i): the shaft's integral shoulder cannot pass
-        # the north ear, so the bracket comes off again and MHA-CH-000 threads
-        # the shaft from the north and refits it on these seats, rechecking Y
-        # on this DRO zero -- which must survive until its cut-to-fit refit.
-        "   UNSCREW IT AND LIFT IT OFF; KEEP THE BASE ON THE MILL, DRO ZEROED,",
-        f"   THROUGH {channel_step_ref('shaft-cut-to-fit')}."
-        f" {channel_step_ref('north-ear-datum')} REFITS IT OVER THE SHAFT.",
+        "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y. KEEP THAT MHA-CH-009",
+        f"   FOR THE NORTH END OF {channel_step_ref('north-ear-datum')}.",
         # NBSP keeps the continuation pointer on one printed line.
         f"   PINION\u00a0RIG:\u00a0CONT.\u00a0ON\u00a0SHEET {FIT_SHEET}.",
     )

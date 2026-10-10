@@ -238,6 +238,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the finished bore's seat band, indexed to re-centre the modelled bore "
         "(BORE_MODEL_DIA_BAND, the band the build sets natively)"
     ),
+    ("ch_rocker_thrust_washer_spec", "BORE_BAND"): (
+        "the title block's drilled-hole row, indexed for the washer's wall "
+        "floor and the spring-on-face check (not printed on the bore)"
+    ),
     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"): (
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
         "sets it natively on PivotDia"

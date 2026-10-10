@@ -80,8 +80,28 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     shaft = exporter.requirement_manifest("ch_pivot_shaft")
     assert "length" not in shaft["features"]["pivot_bearing"]["requirements"]
     assert shaft["datums"] == {}
-    assert shaft["features"]["north_relief"]["dia"] == [5.57, 5.83]
-    assert shaft["features"]["pivot_journal"]["length"] == [5.2, 6.8]
+    assert set(shaft["features"]) == {"pivot_bearing", "north_flat", "south_flat", "north_dome", "south_dome"}
+    assert shaft["features"]["pivot_bearing"]["requirements"] == ["dia", "finish_ra"]
+
+
+def test_shaft_flats_are_coplanar_faces_named_by_their_stations() -> None:
+    shaft = exporter.shaft
+    features = exporter.requirement_manifest("ch_pivot_shaft")["features"]
+    selectors = exporter.feature_selectors("ch_pivot_shaft")
+    flat_y = shaft.FLAT_AF - shaft.SHAFT_DIA / 2
+    half_chord = shaft.flat_chord(shaft.FLAT_DEPTH) / 2
+    for side, station in zip(("south", "north"), exporter.bank.PIVOT_SHAFT_FLAT_STATIONS):
+        name = f"{side}_flat"
+        assert features[name]["kind"] == "face"
+        assert features[name]["station_nominal"] == station
+        assert features[name]["height_nominal"] == shaft.FLAT_AF
+        assert selectors[name][0].contains_z_mm == -station
+        box = (
+            -half_chord / 1000, flat_y / 1000, (-station - shaft.FLAT_LENGTH / 2) / 1000,
+            half_chord / 1000, flat_y / 1000, (-station + shaft.FLAT_LENGTH / 2) / 1000,
+        )
+        face = FaceGeometry(None, 4001, (0, 1, 0, 0, flat_y / 1000, -station / 1000), (0, 1, 0), box)
+        assert _owners("ch_pivot_shaft", face) == [name]
 
 
 def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_positive_tip() -> None:
@@ -106,17 +126,6 @@ def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_positive_
     assert "datum" not in manifest["features"]["profile_outer"]
     assert "datum" not in manifest["features"]["strap_faces"]
     assert "datum" not in manifest["features"]["tip_land_neg_x"]
-
-
-def test_shaft_finish_applies_only_to_south_shoulder_not_north_seat() -> None:
-    shaft = exporter.shaft
-    features = exporter.requirement_manifest("ch_pivot_shaft")["features"]
-    assert _owners("ch_pivot_shaft", _plane((0, 0, 1), (0, 0, -shaft.JOURNAL_LENGTH))) == ["shoulder_north_face"]
-    assert _owners("ch_pivot_shaft", _plane((0, 0, -1), (0, 0, shaft.SHOULDER_SOUTH_Z_MM))) == ["shoulder_thrust"]
-    assert features["shoulder_north_face"]["length"] == features["shoulder_thrust"]["length"] == [0.99, 2.01]
-    assert features["shoulder_north_face"]["requirements"] == ["length"]
-    assert "finish_ra" not in features["shoulder_north_face"]
-    assert features["shoulder_thrust"]["finish_ra"] == 1.6
 
 
 def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
@@ -193,31 +202,18 @@ def test_mount_stations_lie_in_their_own_signed_bands_and_mirror() -> None:
     assert west["station"] == [-value for value in reversed(east["station"])]
 
 
-def _plane_z(face) -> float:
-    assert face.normal[:2] == (0, 0) and abs(face.normal[2]) == 1
-    return face.offset_mm * face.normal[2]
-
-
-def test_shaft_axial_extents_tile_the_turned_axis_with_reliefs_overlaid_at_the_shoulder() -> None:
+def test_shaft_axial_extents_tile_the_turned_axis() -> None:
     features = exporter.requirement_manifest("ch_pivot_shaft")["features"]
     selectors = exporter.feature_selectors("ch_pivot_shaft")
-    order = ("south_dome", "pivot_bearing", "shoulder_od", "pivot_journal", "north_dome")
-    spans = {name: features[name]["z_mm"] for name in (*order, "north_relief", "south_relief")}
+    order = ("south_dome", "pivot_bearing", "north_dome")
+    spans = {name: features[name]["z_mm"] for name in order}
     assert all(features[name]["frame"] == "model" and low < high for name, (low, high) in spans.items())
     for below, above in zip(order, order[1:]):
         assert spans[below][1] == pytest.approx(spans[above][0]), (below, above)
-    # The shoulder's two faces bound it and the O.D.s either side.
-    assert _plane_z(selectors["shoulder_north_face"][0]) == pytest.approx(spans["shoulder_od"][1])
-    assert _plane_z(selectors["shoulder_thrust"][0]) == pytest.approx(spans["shoulder_od"][0])
-    # Each relief lies inside its O.D., flush against one shoulder face and
-    # ending at its own step face; every named patch lies inside its span.
-    for groove, host, shoulder_end, step_end in (("north_relief", "pivot_journal", 0, 1), ("south_relief", "pivot_bearing", 1, 0)):
-        assert spans[host][0] <= spans[groove][0] < spans[groove][1] <= spans[host][1]
-        assert spans[groove][shoulder_end] == pytest.approx(spans["shoulder_od"][1 - shoulder_end])
-        assert spans[groove][step_end] == pytest.approx(_plane_z(selectors[groove][1]))
-    for name in ("pivot_bearing", "pivot_journal", "north_relief", "south_relief"):
-        low, high = spans[name]
-        assert low < selectors[name][0].contains_z_mm < high, name
+    # The O.D. runs the whole cylinder; its named patch lies inside it.
+    assert spans["pivot_bearing"] == pytest.approx([-exporter.bank.PIVOT_SHAFT_LENGTH, 0.0])
+    low, high = spans["pivot_bearing"]
+    assert low < selectors["pivot_bearing"][0].contains_z_mm < high
     # Domes run from the end circle of the O.D. to the sphere's apex.
     for name, apex_index, base_index in (("north_dome", 1, 0), ("south_dome", 0, 1)):
         sphere = selectors[name][0]

@@ -145,7 +145,9 @@ Catalog specifications checked on September 10, 2026:
   Evidence SHA-256: native SLDPRT
   `0257bc44e4273a32536e58829d52ec552e04b631a472ae080a067f29b38eac39`.
 - [91375A106](https://www.mcmaster.com/91375A106/), selected for MHA-VN-034
-  (#743), is a black-oxide alloy steel hex socket cup-point set screw:
+  (#743; since 2026-10-10 also one in each MHA-CH-008 pivot-bracket ear's
+  apex, on the rocker pivot shaft's flat), is a black-oxide alloy steel hex
+  socket cup-point set screw:
   #4-40 UNC class 3A, 1/4 in long, Rockwell C45, 0.050 in hex drive. Its
   supplied SolidWorks model was harvested read-only on September 26, 2026:
   volume 25.8601 mm^3, area 95.038 mm^2, 28 faces
@@ -586,8 +588,8 @@ Catalog specifications checked on September 10, 2026:
   the working point taken as linear [INFERENCE]); the part carries the
   library's `Plain Carbon Steel`.
 - [9714K24](https://www.mcmaster.com/9714K24/) (`vn-rocker-bank-spring`,
-  MHA-VN-053, one) sits on the MHA-CH-005 pivot shaft between the MHA-CH-009
-  washer and the south MHA-CH-008 ear, set by a 0.60 blade, and holds the
+  MHA-VN-053, one) sits on the MHA-CH-005 pivot shaft between the south
+  MHA-CH-009 washer and the south MHA-CH-008 ear, set by a 0.60 blade, and holds the
   20-hub stack north on its datum. Its page was read live on October 9, 2026:
   Wave Disc Spring, high-carbon steel, stackable; ID 0.265 in -0.02/+0.01, OD
   0.367 in -0.02/+0.01, thickness 0.006 in, height 0.03 in (free); compressed

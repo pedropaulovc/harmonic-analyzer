@@ -8,7 +8,7 @@ from _fastener_catalog import FASTENERS
 
 _EXPECTED = {
     # Stable production stem: (supplier SKU(s), MHA number, fleet quantity).
-    "vn-arbor-set-screw": (("91375A106",), "MHA-VN-034", 2),
+    "vn-arbor-set-screw": (("91375A106",), "MHA-VN-034", 4),  # 2 arbor, 2 pivot ear
     "vn-boss-hook": (("9490T1",), "MHA-VN-001", 1),
     "vn-clamp-screw": (("90280A201",), "MHA-VN-021", 6),
     "vn-cone-lock-knob": (("93585A190",), "MHA-VN-013", 1),

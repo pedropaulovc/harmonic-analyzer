@@ -1,14 +1,46 @@
 # Developing — local workflow notes
 
 Practical, machine-local development notes that don't belong in `AGENTS.md`
-(orientation) or the per-topic policy docs. Right now: supervised farm launches
-and the remote build cache.
+(orientation) or the per-topic policy docs: local pytest timing, supervised farm
+launches and the remote build cache.
 
 Running ONE SolidWorks operation by hand (this checkout has no local seat, so it
 goes to the farm)? Read
 [`cad/docs/one-off-com-operations.md`](cad/docs/one-off-com-operations.md) first
 — it is the decision tree, the seat/cache invariants and the evidence trail for
 an ad-hoc COM operation, and it links back here for cache detail.
+
+## Local pytest timing
+
+Run the CAD and pipeline suite serially for comparable timings:
+
+```text
+uv run --locked python -m pytest -q --durations=50 --junitxml=<outside-worktree>/cad-pytest.xml
+```
+
+The configured suite covers `cad/scripts`, `cad/comparisons/tools` and `tests`,
+including offline diagnostic tests. To include the web Python tests, prepare the
+dependencies and approved model cache using the
+[fresh-checkout instructions](web/README.md#fresh-checkout-tests-and-approved-model-cache),
+then use:
+
+```text
+uv run --locked --group web python -m pytest . -q --durations=50 --junitxml=<outside-worktree>/all-pytest.xml
+```
+
+Use an isolated worktree at a recorded commit and the same environment for
+before/after runs. JUnit case times include fixture setup and teardown; a shared
+fixture's cost is charged to its first consumer. Collection and session overhead
+remain part of the suite wall time. Telemetry appends to that worktree's ignored
+`cad/out/reports/telemetry`, and the root conftest isolates the buildgraph facts
+cache in a temporary directory. Keep `NOSW_GUARD` enabled and leave
+`HARMONIC_BUILDGRAPH_CACHE` unset. The vendored `SolidworksMCP-python` tests are
+excluded because they can take the farm's SolidWorks licence.
+
+Reuse source facts only within an unchanged-source scan, or immutable baseline
+bytes for private mutation fixtures. Keep each case's writable checkout, task
+state and invalidation checks isolated. Error-budget timings must retain the
+configured draws, seeds, reference cases and numerical acceptance checks.
 
 ## Supervised farm launches
 
@@ -1081,7 +1113,7 @@ remain mandatory parent farm gates; document-unit getters alone cannot waive the
 The source-only `test_native_projected_zone.py` covers these native getter shapes,
 raw evidence, honest unqualified status, reload refusal/fresh-handle semantics,
 multi-sheet annotation enumeration and read-only-open cleanup. Existing
-`test_gtol_spec.py` also covers canonical writer capture and ordinary-path bypass.
+`test_gtol_contracts.py` also covers canonical writer capture and ordinary-path bypass.
 These authored tests are pending parent centralized checks and native farm proof.
 
 ## Native equation-curve stock gaps

@@ -230,6 +230,15 @@ RULINGS: dict[str, Ruling] = {
             "flange sweeps r ~23 inside the chain band (plates' inner edge r 21.2)"
         ),
     ),
+    "U-MHA-VN-034-channel-threadlocker": Ruling(
+        joint="ch-channel/pivot-bracket-apex-set-screw",
+        granted=(
+            "user, 2026-10-10, joint-specific rule-9 ruling relayed on PR #1317's Codex review: "
+            "waived; light spring preload and small hub drag; Loctite 222. Each MHA-VN-034 goes "
+            "in snug on its flat with Loctite 222 (removable threadlocker), as the MHA-VN-041 "
+            "pivot screw keeps its low-strength threadlocker"
+        ),
+    ),
 }
 
 
@@ -554,7 +563,8 @@ def main() -> int:
 THREADED_PARTS: frozenset[str] = frozenset(
     {
         "dt_arbor_pedestal",  # #4-40 UNC-2B apex tap through the crown (receiver of MHA-VN-034); its #8 ledge hole is clearance only
-        "vn_arbor_set_screw",  # #4-40 UNC-2A x 1/4 cup-point set screw (McMaster 91375A106), member into arbor_pedestal
+        "vn_arbor_set_screw",  # #4-40 UNC-2A x 1/4 cup-point set screw (McMaster 91375A106), member into arbor_pedestal and pivot_bracket
+        "ch_pivot_bracket",  # #4-40 UNC-2B apex tap through the ear's arch into the bore (receiver of MHA-VN-034); #8 foot hole is clearance only
         "vn_boss_hook",  # #10-24 UNC (McMaster 9490T1 open-eye eyebolt), member into the summing-lever boss tap
         "vn_clamp_screw",  # #8-32 UNC (McMaster 90280A201), member into column_clamp_back: 2 in magnifier, 4 in paper_drive
         "sh_column_clamp_back",  # #8-32 UNC tapped ear holes, receiver of clamp_screw (magnifier and paper_drive)
@@ -676,14 +686,13 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_pinion_pivot_shaft",  # plain shaft, cross-pinned to the straps by MHA-VN-033
         "dt_pinion_spring",  # #4 clearance foot hole; clamped by foot_screw MHA-VN-020 (top-level row)
         "vn_pinion_strap_pin",  # 1/16 spring pin
-        "ch_pivot_bracket",  # #8 close-clearance foot hole, reamed ear cross-bore; no taps
-        "ch_pivot_shaft",  # plain Ø10 shaft, integral shoulder, domed plain end; "NO FLATS"
+        "ch_pivot_shaft",  # plain Ø6.35 rod, domed both ends, two set-screw flats; no thread
         "pd_platen_clip",  # #4 clearance holes only (build_pd_platen_clip); clamped by fillister_screw
         "pd_platen_paper",  # paper sheet, no thread
         "pd_platen_rack",  # soft-soldered to the platen back (A06 rack-soldered); no holes, no thread
         "ch_rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
         "ch_rod_pivot_pin",  # MHA-CH-010 5/64 drill-rod pin, pressed into the fork's reamed tines, ends dressed flush (rod-forks-pinned); no thread
-        "ch_rocker_thrust_washer",  # 1/16 sheet washer, plain bore
+        "ch_rocker_thrust_washer",  # 1/32 sheet washer, plain bore (north and south)
         "pd_transgear_arm_plate",  # MHA-PD-019: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
         "vn_transgear_collar_cross_pin",  # MHA-VN-037 1/16 slotted spring pin through the drive collar slot and shaft core
         "vn_transgear_knob_cup_pin",  # MHA-VN-048 1/16 slotted spring pin through the knob cup and the shaft's journal
@@ -1225,7 +1234,32 @@ JOINTS: tuple[Joint, ...] = (
             "~L5582-5601; build_dt_pinion_pivot_block.py SCREW_HOLE_SPEC"
         ),
     ),
-    # --- channel (MHA-CH-000): its screws into frame parts (nothing threads inside the bank) ---
+    # --- channel (MHA-CH-000): the apex set screws, and its screws into frame parts ---
+    Joint(
+        id="ch-channel/pivot-bracket-apex-set-screw",
+        assembly="ch_channel",
+        member="vn_arbor_set_screw",
+        receiver="ch_pivot_bracket",
+        thread="#4-40 UNC",
+        quantity=2,
+        installed_at="set-screws-driven",
+        exposure=Exposure.OSCILLATING,
+        exposure_reason=(
+            "Each screw's cup on its flat is all that holds the plain MHA-CH-005 shaft in its ear, axially and "
+            "in rotation; the 20 MHA-CH-006 hubs rock on that shaft with every cam turn, so their journal drag, "
+            "which reverses each stroke, reaches the screw through the flat it bears on"
+        ),
+        axial_capture="cup point snugged on a flat milled on MHA-CH-005 under the ear's apex tap; screw rides only its own #4-40 thread in the R8 arch wall",
+        lock=Lock.THREADLOCKER_ONLY,
+        lock_step="set-screws-driven",
+        exception="U-MHA-VN-034-channel-threadlocker",
+        evidence=(
+            "draw_ch_channel_assembly.py _fitup_steps 'set-screws-driven' ('RUN ONE MHA-VN-034 DOWN EACH APEX TAP "
+            "ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG.'); build_ch_channel_assembly.py apex set screw "
+            "placement (SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) "
+            "and SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH)"
+        ),
+    ),
     Joint(
         id="ha-harmonic-analyzer/north-pivot-bracket-hold-down",
         assembly="ha_harmonic_analyzer",
@@ -1252,8 +1286,8 @@ JOINTS: tuple[Joint, ...] = (
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header (MHA-VN-032, #8-32 x 3/4 fillister, one per foot); "
             "vn_pedestal_hold_down_screw_spec.THREAD; rocker_bracket_seat_layout.SEAT_SPEC (tapped_bottoming #8-32 2B); "
             "draw_dt_drive_train_assembly.py BANK_STEPS step north-pivot-bracket-set (MHA-DT-000 STEP 10: 'DRILL AND TAP THE RAIL "
-            "THROUGH ITS FOOT ... UNSCREW IT AND LIFT IT OFF'); draw_ch_channel_assembly.py step north-ear-datum (MHA-CH-000 "
-            "STEP 3: 'SLIDE THE ... EAR SOUTH OVER THE NORTH JOURNAL, SCREW IT DOWN AND RECHECK ITS S-OFFSET Y'); "
+            "THROUGH ITS FOOT ... SCREW IT DOWN AND RECHECK Y'), left screwed down while draw_ch_channel_assembly.py step "
+            "north-ear-datum pushes the plain shaft south through the ear; "
             "ch_channel_assembly_steps.NORTH_BRACKET_SET_REF; "
             "config parts/vn-pedestal-hold-down-screw.yaml (90280A197)"
         ),
@@ -1284,9 +1318,8 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
             "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-spring-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS SEAT ... "
-            "SCREW DOWN, PULL THE BLADE'), left screwed down through 'shaft-cut-to-fit' (STEP 6: 'UNSCREW THE NORTH ... "
-            "AND SLIDE IT OFF NORTH; DRAW THE SHAFT NORTH ... REFIT AS STEP 3; "
-            "SOUTH EAR LEFT AT ITS STEP 5 SETTING')"
+            "SCREW DOWN, PULL THE BLADE'), left screwed down through 'shaft-cut-to-fit' (STEP 6: 'DRAW IT OUT NORTH ... "
+            "REFIT AS STEP 3, WASHERS AND SPRING IN PLACE; SOUTH EAR AT ITS STEP 5 SETTING')"
         ),
     ),
     Joint(
@@ -2009,6 +2042,9 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     ),
     "ha-harmonic-analyzer/pinion-block-hold-down": Occurrence(
         "ha_harmonic_analyzer", "build_dt_drive_train_assembly.py", '"vn-slotted-screw"'
+    ),
+    "ch-channel/pivot-bracket-apex-set-screw": Occurrence(
+        "ch_channel", "build_ch_channel_assembly.py", '"vn-arbor-set-screw"'
     ),
     "ha-harmonic-analyzer/north-pivot-bracket-hold-down": Occurrence(
         "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "north-ear-datum"

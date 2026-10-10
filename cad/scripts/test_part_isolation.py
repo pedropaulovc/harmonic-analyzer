@@ -109,12 +109,15 @@ def _scan_set(script: Path) -> list[Path]:
 def _offenders(scripts, forbidden: frozenset[str]) -> dict[str, set[str]]:
     """Map each build script (or transitively-imported helper) to the forbidden
     submodule modules it directly imports."""
+    # The same shared helper appears in many closures. Its direct imports are
+    # unchanged during this scan, and offenders are reported per source rather
+    # than per consumer, so parse the union once without dropping any closure.
+    sources = {source for script in scripts for source in _scan_set(script)}
     out: dict[str, set[str]] = {}
-    for script in scripts:
-        for f in _scan_set(script):
-            hit = _hits(_imported_modules(f), forbidden)
-            if hit:
-                out.setdefault(f.name, set()).update(hit)
+    for source in sorted(sources):
+        hit = _hits(_imported_modules(source), forbidden)
+        if hit:
+            out.setdefault(source.name, set()).update(hit)
     return out
 
 

@@ -1768,9 +1768,14 @@ def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> No
             _tracking(fixture, "-Status", "-Tag", "reused"),
             fixture["environment"],
         )
+        # This fixture has no pending start RPC: the workflow is stably absent.
+        # Still exercise both not-found queries, without the farm's 30 s grace.
         _run_launcher(
             fixture,
-            _tracking(fixture, "-Cancel", "-Tag", "reused", "-Why", "reused pid"),
+            _tracking(
+                fixture, "-Cancel", "-Tag", "reused", "-Why", "reused pid",
+                "-SettleSeconds", "0",
+            ),
             fixture["environment"],
         )
         survived = reused.poll() is None
@@ -2166,9 +2171,14 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
     ) == "built\n"
     assert not Path(running["snapshot"]).exists()
 
+    # LEAF_NUT remains absent in the synchronous fixture; no start can land
+    # during the production grace period on this idempotent cancellation.
     again = _run_launcher(
         fixture,
-        _tracking(fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "twice"),
+        _tracking(
+            fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "twice",
+            "-SettleSeconds", "0",
+        ),
         fixture["environment"],
     )
     assert again.returncode == 0
@@ -2382,9 +2392,14 @@ def test_cancel_keeps_outputs_the_launcher_moved_before_it_died(
             _tracking(fixture, "-Status", "-Tag", "race"),
             fixture["environment"],
         )
+        # The synchronous fixture never created these workflows; publication
+        # recovery does not need the real farm's pending-start grace period.
         cancel = _run_launcher(
             fixture,
-            _tracking(fixture, "-Cancel", "-Tag", "race", "-Why", "raced cleanup"),
+            _tracking(
+                fixture, "-Cancel", "-Tag", "race", "-Why", "raced cleanup",
+                "-SettleSeconds", "0",
+            ),
             fixture["environment"],
         )
     finally:

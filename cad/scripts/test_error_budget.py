@@ -996,6 +996,161 @@ def test_cycle_table_always_ends_at_the_travel_stop(nom):
     assert eb.read_table(odd)[0].shape == t.stations.shape
 
 
+@pytest.mark.parametrize(
+    "deviations",
+    [
+        {},
+        {"ecc": 0.05, "pin_x": -0.05, "pin_y": 0.05},
+        {
+            "bar_pin_arm": 0.05,
+            "hook_arm": -0.05,
+            "hook_skew": 0.0005,
+            "cam_home_deg": 1.5,
+        },
+    ],
+)
+def test_shared_table_rocker_matches_original_station_loop(nom, deviations):
+    """Reusing a rocker solve preserves the original exact waveform formula."""
+    machine = dataclasses.replace(
+        nom,
+        d_max=88.1,
+        **{field: getattr(nom, field) + delta for field, delta in deviations.items()},
+    )
+    stations = np.array([0.0, 0.125, 44.0, 88.05, machine.d_max])
+    grid = eb._READ_GRID
+    grid_before, stations_before = grid.copy(), stations.copy()
+
+    def original_hook(d):
+        # Original scalar-station path: independently solve the rocker each
+        # time, then evaluate the pre-extraction contact and lever equations.
+        tr = eb.rocker_angle(grid, machine)
+        k0x, k0y = eb.rest_contact(d, machine)
+        kx = k0x * np.cos(tr) - k0y * np.sin(tr)
+        ky = k0x * np.sin(tr) + k0y * np.cos(tr)
+        beta = eb._bisect(
+            lambda b: eb._lever_pin_gap(kx, ky, b, machine), -0.4, 0.4, grid.size
+        )
+        s, c = np.sin(beta), np.cos(beta)
+        tx = kx - (machine.contact_dx * c - machine.contact_dy * s) + machine.bar_len * s
+        ty = ky - (machine.contact_dx * s + machine.contact_dy * c) + machine.bar_len * c
+        phi = np.arctan2(ty - machine.fulcrum_dy, machine.fulcrum_dx - tx)
+        return machine.hook_arm * np.sin(phi + machine.hook_skew)
+
+    expected = np.array([original_hook(float(d)) for d in stations])
+    np.testing.assert_array_equal(eb._cycles_at(stations, machine), expected)
+    np.testing.assert_array_equal(
+        np.array([eb.hook_displacement(grid, float(d), machine) for d in stations]),
+        expected,
+    )
+    tr = eb.rocker_angle(grid, machine)
+    tr_before = tr.copy()
+    np.testing.assert_array_equal(
+        eb._hook_displacement_at_rocker(grid, tr, float(stations[2]), machine),
+        expected[2],
+    )
+    np.testing.assert_array_equal(tr, tr_before)
+    np.testing.assert_array_equal(grid, grid_before)
+    np.testing.assert_array_equal(stations, stations_before)
+
+
+def test_shared_cycle_brackets_preserve_boundaries_and_do_not_mutate_tables():
+    """Shared lookup matches an independent station-first scalar interpolator."""
+    stations = np.array([0.0, 0.25, 0.5, 0.6])  # short final station interval
+    cycles = np.arange(32, dtype=float).reshape(4, 8)
+    cycles = cycles * np.array([1.0, -0.5, 2.0, -1.0])[:, None]
+    derivative = cycles[:, ::-1] * 0.375 + np.array([2.0, -5.0, 3.0, 1.0])[:, None]
+    zeros = np.zeros(len(stations))
+    tables = (
+        eb.CycleTable(stations, cycles, cycles.mean(axis=1), zeros, zeros),
+        eb.CycleTable(
+            stations.copy(), derivative, derivative.mean(axis=1), zeros, zeros
+        ),
+    )
+    d = np.array([-0.1, 0.0, 0.125, 0.25, 0.4, 0.5, 0.55, 0.6, 0.9])[:, None, None]
+    period = 2.0 * math.pi
+    angles = np.array(
+        [
+            -2.0 * period - 0.1,
+            -period,
+            -math.pi / 4.0,
+            0.0,
+            math.pi / 4.0,
+            3.0 * math.pi / 8.0,
+            np.nextafter(period, 0.0),
+            period,
+            4.0 * period + 0.123,
+        ]
+    )
+    alpha = angles[None, :, None] + np.array([-0.37, 0.0, 0.29])[None, None, :]
+    inputs_before = (d.copy(), alpha.copy())
+    arrays = [
+        array
+        for table in tables
+        for array in (table.stations, table.cycles, table.mean, table.read, table.kappa)
+    ]
+    arrays_before = [array.copy() for array in arrays]
+    brackets = tables[0]._sample_brackets(d, alpha)
+    assert brackets[0].shape == d.shape
+    assert brackets[1].shape == d.shape  # station work is not repeated per angle
+
+    def oracle(table, station, angle):
+        # Interpolate each angle column along the station axis first, including
+        # np.interp's endpoint clamps; then wrap a final copy of angle zero.
+        row = [
+            np.interp(station, table.stations, column)
+            for column in table.cycles.T
+        ]
+        grid = np.arange(len(row) + 1) * period / len(row)
+        return np.interp(angle % period, grid, [*row, row[0]])
+
+    full_d, full_alpha = np.broadcast_arrays(d, alpha)
+    for table in tables:
+        expected = np.empty(full_d.shape)
+        for index in np.ndindex(expected.shape):
+            expected[index] = oracle(table, full_d[index], full_alpha[index])
+        shared = table._sample_with_brackets(brackets)
+        np.testing.assert_allclose(shared, expected, rtol=0.0, atol=1e-12)
+        np.testing.assert_array_equal(shared, table.sample(d, alpha))
+        np.testing.assert_allclose(
+            table.sample(0.55, angles),
+            [oracle(table, 0.55, angle) for angle in angles],
+            rtol=0.0,
+            atol=1e-12,
+        )
+    for actual, before in zip((d, alpha), inputs_before):
+        np.testing.assert_array_equal(actual, before)
+    for actual, before in zip(arrays, arrays_before):
+        np.testing.assert_array_equal(actual, before)
+
+
+@pytest.mark.parametrize("different_grid", ["stations", "angles"])
+def test_read_draws_rejects_derivative_tables_on_a_different_grid(different_grid):
+    """A derivative cannot silently reuse indices for a different cycle grid."""
+    stations = np.array([0.0, 0.25, 0.4])
+    zeros = np.zeros(len(stations))
+    t = eb.CycleTable(stations, np.ones((3, 8)), zeros, zeros, zeros)
+    other_stations = stations.copy()
+    if different_grid == "stations":
+        other_stations[1] += 0.01
+    columns = 9 if different_grid == "angles" else 8
+    derivative = eb.CycleTable(
+        other_stations, np.ones((3, columns)), zeros, zeros, zeros
+    )
+    x = np.ones(eb.N_ELEMENTS)
+    gains = x[None, :]
+    with pytest.raises(ValueError, match="same station and angle grid"):
+        eb._read_draws(
+            x,
+            t,
+            gains,
+            np.zeros_like(gains),
+            np.full_like(gains, 0.2),
+            x,
+            np.zeros_like(x),
+            {"ecc": (derivative, gains)},
+        )
+
+
 def test_idle_bars_are_physically_live_in_the_monte_carlo(nom):
     """A bar at the stick zero still moves (~0.028 of a full-scale bar), so a
     gain deviation on an IDLE channel must move the reading -- the nominal lift
