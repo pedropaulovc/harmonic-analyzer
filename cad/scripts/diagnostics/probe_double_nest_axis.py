@@ -30,7 +30,13 @@ from pathlib import Path
 from solidworks_mcp.adapters.com_variant import null_callout
 
 import _telemetry
-from _common import OUT_SLDASM, _flag, _read_member, log
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log
+from _com import _flag, _read_member
+from _paths import OUT_SLDASM
 
 
 def _features(model):

@@ -171,7 +171,7 @@ def _calls(path: str) -> dict[str, ast.Call]:
 
 
 def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _common
+    import _part_properties
     import _drawing_marks
 
     required = ast.literal_eval(
@@ -181,7 +181,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
             if k.arg == "required"
         )
     )
-    carried = dict(_common.part_properties(part.PART_NAME))
+    carried = dict(_part_properties.part_properties(part.PART_NAME))
     stamp = _calls(part.__file__)["apply_drawing_properties"]
     assert [ast.unparse(a) for a in stamp.args] == [
         "adapter",

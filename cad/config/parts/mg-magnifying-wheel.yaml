@@ -1,8 +1,8 @@
 mg-magnifying-wheel:
   number: MHA-MG-005
   material_family: ferrous_noncritical
-  finish: black paint; rim edge machined bright
+  finish: BLACK ENAMEL; MASK BORE, SPIGOT, FACED HUB ENDS AND TURNED RIM WITH ITS GROOVE; OIL BARE MACHINED SURFACES
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "machined from solid stock or casting"
+  process: "gray-iron casting: face and turn the boss and drum spigot, ream the bore, turn the rim and its wire groove, drill the two tie holes"

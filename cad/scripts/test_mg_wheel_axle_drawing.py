@@ -1,13 +1,19 @@
-"""Offline contracts for the wheel-axle drawing."""
+"""Offline contracts for the wheel-axle drawing and the wheel group it sizes."""
 
 from __future__ import annotations
 
+import math
+import re
 from pathlib import Path
 
-import build_mg_magnifying_wheel
+import pytest
+
 import build_mg_wheel_axle as part
 import draw_mg_wheel_axle as drawing
-import mg_wheel_axle_spec
+import mg_magnifying_wheel_geom
+import mg_wheel_axle_spec as spec
+import mg_wheel_bar_geom
+import mg_wheel_group as group
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -19,91 +25,109 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["mg_wheel_axle"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is mg_wheel_axle_spec.DRAWING_DIMENSIONS
-    marked = set().union(*mg_wheel_axle_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.END_KEEP)
-    assert kept == marked
-    assert (
-        drawing.FLANGE_DIA,
-        drawing.FLANGE_LEN,
-        drawing.STUD_DIA,
-        drawing.STUD_LEN,
-        drawing.COLLAR_DIA,
-        drawing.COLLAR_LEN,
-    ) == (
-        mg_wheel_axle_spec.FLANGE_DIA,
-        mg_wheel_axle_spec.FLANGE_LEN,
-        mg_wheel_axle_spec.STUD_DIA,
-        mg_wheel_axle_spec.STUD_LEN,
-        mg_wheel_axle_spec.COLLAR_DIA,
-        mg_wheel_axle_spec.COLLAR_LEN,
+def test_spec_values_are_the_drill_rod_pin() -> None:
+    assert spec.PIN_DIA == pytest.approx(4.7625)
+    assert spec.PIN_DIA_TOL == 0.005
+    assert spec.SHANK_LEN == 28.4
+    assert spec.THREAD == "#4-40"
+    assert spec.THREAD_MAJOR == pytest.approx(2.845, abs=1e-3)
+    assert spec.THREAD_LEN == 7.97
+    assert spec.THREAD_END == pytest.approx(36.37)
+    assert spec.PIN_LEN == pytest.approx(37.17)
+    # Full thread only: 1.5 pitches of die run-out at the step, one pitch
+    # cut short by the dome.
+    assert spec.THREAD_PITCH == pytest.approx(0.635)
+    assert spec.FULL_THREAD_START_Y == pytest.approx(19.5 + 1.5 * 0.635)
+    assert spec.FULL_THREAD_END_Y == pytest.approx(27.47 - 0.635)
+    assert spec.DOME_R == pytest.approx(1.665, abs=1e-3)
+    # Pressed to the gauge from the bar's front face (the origin); the back
+    # end then sits 0.10 inside the bar's back face.
+    assert spec.PRESS_GAUGE == spec.STEP_Y == 19.5
+    assert spec.BACK_Y == pytest.approx(-mg_wheel_bar_geom.BAR_DEPTH + 0.10)
+    assert (spec.STEP_Y, spec.THREAD_END_Y, spec.TIP_Y) == pytest.approx(
+        (19.5, 27.47, 28.27)
     )
 
 
-def test_washer_and_nut_stack_stays_at_the_wheel_hub_end() -> None:
-    spec = mg_wheel_axle_spec
-    assert spec.WASHER_START == spec.FLANGE_LEN + spec.WHEEL_HUB_RIDE == 13.0
-    nut_start = spec.WASHER_START + spec.COLLAR_LEN
-    assert nut_start == 14.0
-    assert nut_start + spec.NUT_H == 17.0
-    assert spec.FLANGE_LEN + spec.STUD_LEN - (nut_start + spec.NUT_H) == 3.0
+def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
+    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert set(drawing.SIDE_KEEP) == marked
+    assert marked == {"PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"}
+    assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
+    assert drawing.DRAWING_PRECISION_BY_NAME == spec.DRAWING_PRECISION["PinProfile"]
 
 
-def test_stud_callout_keeps_wheel_bore_running_clearance() -> None:
-    # The magnifying wheel's bore is nominal-on-nominal with the stud, so the
-    # running clearance comes entirely from the stud's model-owned band.
-    assert build_mg_magnifying_wheel.BORE_DIA == mg_wheel_axle_spec.STUD_DIA
-    assert drawing.DIMENSION_CALLOUTS == {}
-    assert mg_wheel_axle_spec.STUD_DIA_BAND == (-0.02, -0.05)
+def test_pin_is_one_front_plane_revolve() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert source.count("create_revolve(") == 1
+    assert 'create_sketch("Front")' in source
+    assert 'name_last_feature(adapter, "PinProfile")' in source
+    assert 'name_last_feature(adapter, "Pin")' in source
+    assert "create_extrusion(" not in source
+    # Axis1 on local Y and the Front Plane carry the assembly mates.
+    assert 'name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0' in source
+    for name in ("PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"):
+        assert re.search(rf'profile\.record\(\s*"{name}"', source), name
+    v = (
+        math.pi * (spec.PIN_DIA / 2.0) ** 2 * spec.SHANK_LEN
+        + math.pi * (spec.THREAD_MAJOR / 2.0) ** 2 * spec.THREAD_LEN
+        + math.pi * spec.DOME_H**2 * (3.0 * spec.DOME_R - spec.DOME_H) / 3.0
+    )
+    assert part.V_TOTAL == pytest.approx(v)
+
+
+def test_tolerances_are_native_on_the_model() -> None:
     assert model_toleranced_dimensions(part) == {
-        ("StudProfile", "StudDia"): "*deviations(STUD_DIA_BAND)"
+        ("PinProfile", "PinDia"): "PIN_DIA_TOL",
+        ("PinProfile", "ShankLength"): "*deviations(SHANK_LEN_BAND)",
+        ("PinProfile", "ThreadLength"): "*deviations(THREAD_LEN_BAND)",
     }
-    clearance_min = build_mg_magnifying_wheel.BORE_DIA - (mg_wheel_axle_spec.STUD_DIA - 0.02)
-    clearance_max = build_mg_magnifying_wheel.BORE_DIA - (mg_wheel_axle_spec.STUD_DIA - 0.05)
-    assert round(clearance_min, 2) == 0.02
-    assert round(clearance_max, 2) == 0.05
-    notes = mg_wheel_axle_spec.DRAWING_NOTES
-    # Deburr/edge-break is a title-block note; repeating it here would duplicate it.
+    assert set(spec.DRAWING_BANDS) == {
+        ("PinProfile", "ShankLength"),
+        ("PinProfile", "ThreadLength"),
+    }
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
+
+
+def test_no_pmi_or_surface_finish() -> None:
+    for module in (part, drawing):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        for token in (
+            "author_part_pmi",
+            "project_part_pmi",
+            "add_surface_finish",
+            "add_feature_control_frame(",
+            "add_datum_feature(",
+            "GEOMETRIC_CONTROLS",
+            "PART_DATUMS",
+        ):
+            assert token not in source, (module.__name__, token)
+    for name in ("GEOMETRIC_CONTROLS", "PART_DATUMS", "SURFACE_FINISHES"):
+        assert not hasattr(spec, name)
+
+
+def test_thread_callout_and_notes() -> None:
+    assert spec.THREAD_CALLOUT == "#4-40 UNC"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_attached_note(") == 1
+    assert "text=THREAD_CALLOUT" in source
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    notes = spec.DRAWING_NOTES
+    assert 1 <= len(notes.splitlines()) <= 4
+    assert "19.50 +/-0.05" in notes
+    assert "FROM FRONT FACE (BACK END ~FLUSH)" in notes
     assert "DEBURR" not in notes
     assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "def _manufacturing_notes" not in source
-
-
-def test_native_gdt_controls_axle_orientation_coaxiality_and_finish() -> None:
-    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
-    from mg_wheel_axle_spec import GEOMETRIC_CONTROLS, PART_DATUMS
-
-    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
-    assert set(by_key) == {"stud_perpendicularity", "collar_runout"}
-    assert by_key["stud_perpendicularity"].characteristic == "perpendicularity"
-    assert by_key["stud_perpendicularity"].tolerance == "0.05"
-    assert by_key["stud_perpendicularity"].datums == ("A",)
-    assert by_key["stud_perpendicularity"].tolerance_zone == "diametral"
-    assert by_key["collar_runout"].characteristic == "circular_runout"
-    assert by_key["collar_runout"].tolerance == "0.05"
-    assert by_key["collar_runout"].datums == ("B",)
-    bearing_y = mg_wheel_axle_spec.FLANGE_LEN + mg_wheel_axle_spec.WHEEL_HUB_RIDE / 2.0
-    assert by_key["stud_perpendicularity"].face.contains_y_mm == bearing_y
-    assert PART_DATUMS[1].face.contains_y_mm == bearing_y
-    assert tuple(datum.letter for datum in PART_DATUMS) == ("A", "B")
-
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(" in part_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "project_part_pmi(" in source
-    assert "controls=GEOMETRIC_CONTROLS" in source
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
-    assert source.count("add_surface_finish(") == 1
 
 
 def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (3.0, 1.0)
+    assert drawing.SHEET_SCALE == (4.0, 1.0)
+    assert drawing.VIEW_SCALE == (4, 1)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(3, 1)") == 3
+    assert source.count("scale=VIEW_SCALE") == 2
+    assert drawing.SIDE_VIEW_ANGLE == -math.pi / 2.0
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -113,24 +137,55 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("mg-wheel-axle")
-    assert "1018" in str(config["material_specification"])
+    assert "drill rod" in str(config["material_specification"])
+    assert "3/16" in str(config["material_specification"])
     assert config["finish"]
+    assert config["process"]
     assert int(config["quantity"]) == 1
 
 
-def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
-    (control,) = mg_wheel_axle_spec.SURFACE_FINISHES
-    assert control.key == "stud_bearing"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == mg_wheel_axle_spec.STUD_DIA
-    assert control.face.contains_y_mm == (
-        mg_wheel_axle_spec.FLANGE_LEN + mg_wheel_axle_spec.WHEEL_HUB_RIDE / 2.0
+def test_wheel_group_stack_fits_the_pin() -> None:
+    assert group.STEP_INSIDE_HUB > 0.0
+    assert group.STEP_INSIDE_HUB == pytest.approx(0.6866, abs=1e-3)
+    # (b) on FULL thread: the dome's incomplete pitch is not counted, and the
+    # first nut stays clear of the die run-out at the step.
+    assert group.LOCKNUT_THREAD_MARGIN >= 0.0
+    assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.0016, abs=1e-3)
+    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.2413, abs=1e-3)
+    assert group.THREAD_PAST_LOCKNUT_MAX <= group.THREAD_PAST_LOCKNUT_LIMIT == 2.5
+    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(2.4066, abs=1e-3)
+    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.4575, abs=1e-3)
+    # Pressed to the gauge, the back end is within the bar's depth band of
+    # the back face.
+    assert group.BACK_END_PROUD_MAX == pytest.approx(0.10)
+    assert group.BACK_END_SUNK_MAX == pytest.approx(0.30)
+    assert group.SPOKE_MID_D == pytest.approx(8.0)
+    assert group.WHEEL_MID_Z == -146.9
+
+
+def test_pin_fits_are_press_in_the_bar_and_running_in_the_wheel() -> None:
+    assert min(group.BAR_PRESS) > 0.0
+    assert min(group.HUB_RUNNING) > 0.0
+    assert mg_magnifying_wheel_geom.BORE_DIA > spec.PIN_DIA + spec.PIN_DIA_TOL
+    assert mg_wheel_bar_geom.AXLE_BORE_DIA + mg_wheel_bar_geom.AXLE_BORE_BAND[0] < (
+        spec.PIN_DIA - spec.PIN_DIA_TOL
     )
-    part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert (
-        'control=surface_finish_by_key(SURFACE_FINISHES,"stud_bearing")'
-        in sheet_source
+
+
+def test_pen_travel_literals_match_their_source_modules() -> None:
+    import _config
+    import build_pd_paper_drive_assembly as paper
+    import build_pn_pen_assembly as pen
+
+    assert group.MARKER_TIP_REST_Y == pen.MARKER_POS[1]
+    assert group.PAPER_BOTTOM_Y == pytest.approx(
+        paper.PLATE_Y0 + paper.PLATE_HEIGHT - paper.PAPER_HEIGHT - 3.0
     )
-    assert "roughness_ra=" not in sheet_source
+    assert group.PAPER_TOP_Y == pytest.approx(group.PAPER_BOTTOM_Y + paper.PAPER_HEIGHT)
+    # The 3.0 is the sheet's top margin under the plate's top edge.
+    paper_source = Path(paper.__file__).read_text(encoding="utf-8")
+    assert re.search(r"paper_top_margin = \(?\s*3\.0\b", paper_source)
+    assert "PLATE_Y0 + PLATE_HEIGHT - PAPER_HEIGHT - paper_top_margin" in paper_source
+    half_trace = float(_config.machine("output", "pen_trace_half_mm"))
+    assert half_trace == 15.0
+    assert half_trace <= min(group.PEN_DOWN_MAX, group.PEN_UP_MAX)

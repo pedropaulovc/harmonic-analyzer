@@ -6,8 +6,8 @@ import math
 from typing import Literal
 
 import _config
-from _fit_limits import deviations
-from _gtol_spec import PlanarFace
+from _fit_deviations import deviations
+from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 
@@ -126,7 +126,7 @@ _DRILLED_HOLE_PLUS_MM = float(
 )
 _BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM, 3: _GENERAL_3PL_MM}
 # The title block's general bands as (upper, lower) fit bands, so every stack
-# below reads its limits through _fit_limits.deviations like any other band.
+# below reads its limits through _fit_deviations.deviations like any other band.
 GENERAL_BAND_BY_PLACES = {
     places: (band, -band) for places, band in _BAND_BY_PLACES.items()
 }

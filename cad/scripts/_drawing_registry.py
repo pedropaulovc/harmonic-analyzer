@@ -320,6 +320,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="mg_wheel_drum",
+        part="mg_wheel_drum",
+        artifact_stem="mg-wheel-drum",
+        script_name="draw_mg_wheel_drum.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="mg_magnifying_bracket",
         part="mg_magnifying_bracket",
         artifact_stem="mg-magnifying-bracket",
@@ -1045,6 +1052,27 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="vn_rocker_bank_spring",
         artifact_stem="vn-rocker-bank-spring",
         script_name="draw_vn_rocker_bank_spring.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_wheel_axle_nut",
+        part="vn_wheel_axle_nut",
+        artifact_stem="vn-wheel-axle-nut",
+        script_name="draw_vn_wheel_axle_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_wheel_axle_back_washer",
+        part="vn_wheel_axle_back_washer",
+        artifact_stem="vn-wheel-axle-back-washer",
+        script_name="draw_vn_wheel_axle_back_washer.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_wheel_axle_front_washer",
+        part="vn_wheel_axle_front_washer",
+        artifact_stem="vn-wheel-axle-front-washer",
+        script_name="draw_vn_wheel_axle_front_washer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

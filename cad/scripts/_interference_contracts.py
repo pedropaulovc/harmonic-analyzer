@@ -282,6 +282,12 @@ _MAGNIFIER_ALLOWED_PAIRS = {
     frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 3.9
     ),
+    # MHA-MG-007 drill-rod pin (Ø4.7625, mg_wheel_axle_spec.PIN_DIA) pressed in
+    # the wheel bar's Ø4.7371 reamed bore (mg_wheel_bar_geom.AXLE_BORE_DIA)
+    # through the bar's 9.0 depth: the press.
+    frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _smooth_annulus_limit_mm3(
+        4.7625, 4.7371, 9.0
+    ),
 }
 
 _COUNTER_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(

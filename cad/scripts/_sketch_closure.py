@@ -14,7 +14,9 @@ import contextlib
 from collections.abc import Callable, Sequence
 from typing import Any
 
-import _common
+import _com
+import _feature_tree
+import _session
 import _telemetry
 
 
@@ -54,17 +56,17 @@ def _resolve_sketch(adapter: Any, sketch: Any | None) -> tuple[Any | None, str]:
     model = adapter.currentModel
     if model is None:
         return None, ""
-    name = sketch or _common.feature_name_by_type(adapter, "ProfileFeature")
+    name = sketch or _feature_tree.feature_name_by_type(adapter, "ProfileFeature")
     if not name:
         active = adapter._attempt(
-            lambda: _common._read_member(model, "GetActiveSketch2"), default=None
+            lambda: _com._read_member(model, "GetActiveSketch2"), default=None
         )
         return active, ""
-    feature = adapter._attempt(lambda: _common._feature_by_name(adapter, str(name)), default=None)
+    feature = adapter._attempt(lambda: _feature_tree._feature_by_name(adapter, str(name)), default=None)
     if feature is None:
         return None, str(name)
     resolved = adapter._attempt(
-        lambda: _common._read_member(feature, "GetSpecificFeature2"), default=None
+        lambda: _com._read_member(feature, "GetSpecificFeature2"), default=None
     )
     return resolved, str(name)
 
@@ -82,7 +84,7 @@ def _point_census(sketch: Any) -> dict[str, Any]:
     points = list(sketch.GetSketchPoints2() or [])
     places: list[tuple[float, float, float]] = []
     for point in points:
-        coords = tuple(_common._read_member(point, axis) for axis in ("X", "Y", "Z"))
+        coords = tuple(_com._read_member(point, axis) for axis in ("X", "Y", "Z"))
         if all(isinstance(value, (int, float)) for value in coords):
             quantum = _COINCIDENT_TOL_M
             places.append(
@@ -277,5 +279,5 @@ def record_sketch_closure(
     else:
         _telemetry.success(summary, **short)
     with contextlib.suppress(Exception):
-        _telemetry.event("sketch.closure", **_common._attributes_of(short))
+        _telemetry.event("sketch.closure", **_session._attributes_of(short))
     return verdict

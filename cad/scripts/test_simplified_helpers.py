@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 import _assembly
-import _drawing_simplified
+import _simplified_part
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -17,12 +17,8 @@ from _drawing_common import (
     set_view_exploded_state,
     view_configuration,
 )
-from _drawing_simplified import (
-    child_bom_identity,
-    is_simplified,
-    simplified_comment,
-    simplified_name,
-)
+from _simplified_bom import child_bom_identity
+from _simplified_names import is_simplified, simplified_comment, simplified_name
 
 WIREFRAME, HLV, HLR, SHADED, SHADED_EDGES = 0, 1, 2, 3, 7
 FACETED_WIREFRAME, FACETED_HLV, FACETED_HLR = 4, 5, 6
@@ -274,7 +270,7 @@ def test_a_linked_configurations_simplified_child_prints_the_root_name() -> None
     root = FakeConfiguration("Default", source=CONFIGURATION)
     linked = FakeConfiguration("T24", root, source=PARENT)
     child = FakeConfiguration("T24 Simplified", linked)
-    _drawing_simplified._copy_bom_identity(FakeModel(root, linked, child), "T24", child.Name)
+    _simplified_part._copy_bom_identity(FakeModel(root, linked, child), "T24", child.Name)
     assert (child.BOMPartNoSource, child.AlternateName, child.UseAlternateNameInBOM) == (
         USER,
         "Default",
@@ -837,7 +833,7 @@ def _cone_gear() -> FakePart:
 
 def test_only_the_named_parents_are_simplified_and_keep_their_teeth() -> None:
     part = _cone_gear()
-    children = _drawing_simplified.add_simplified_configurations(
+    children = _simplified_part.add_simplified_configurations(
         _part_adapter(part), "dt-cone-gear", TEETH, ["T006", "T120"]
     )
     assert children == ["T006 Simplified", "T120 Simplified"]
@@ -850,7 +846,7 @@ def test_only_the_named_parents_are_simplified_and_keep_their_teeth() -> None:
 def test_a_parent_that_already_lacks_the_features_is_refused_before_deriving() -> None:
     part = _cone_gear()
     with pytest.raises(RuntimeError, match=r"already suppressed: \['ToothGapCut in Default'"):
-        _drawing_simplified.add_simplified_configurations(_part_adapter(part), "dt-cone-gear", TEETH)
+        _simplified_part.add_simplified_configurations(_part_adapter(part), "dt-cone-gear", TEETH)
     assert part.GetConfigurationNames() == ["Default", "T006", "T120"]
 
 
@@ -859,15 +855,15 @@ def test_a_child_suppression_that_reaches_its_parent_fails_the_readback() -> Non
     with pytest.raises(
         RuntimeError, match=r"ToothGapCut: suppressed in \(Default, Default Simplified\) reads \(True, True\)"
     ):
-        _drawing_simplified.add_simplified_configurations(_part_adapter(part), "fixture", TEETH)
+        _simplified_part.add_simplified_configurations(_part_adapter(part), "fixture", TEETH)
 
 
 def test_a_simplified_child_of_an_unnamed_configuration_is_an_orphan() -> None:
     part = _cone_gear()
     adapter = _part_adapter(part)
-    _drawing_simplified.add_simplified_configurations(adapter, "dt-cone-gear", TEETH, ["T006", "T120"])
+    _simplified_part.add_simplified_configurations(adapter, "dt-cone-gear", TEETH, ["T006", "T120"])
     part.ConfigurationManager.AddConfiguration2("Default Simplified", "", "", 0, "Default", "", False)
     with pytest.raises(RuntimeError, match=r"orphan simplified configurations \['Default Simplified'\]"):
-        _drawing_simplified.assert_simplified_configurations(
+        _simplified_part.assert_simplified_configurations(
             adapter, "dt-cone-gear", TEETH, ["T006", "T120"]
         )

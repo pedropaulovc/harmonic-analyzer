@@ -14,7 +14,7 @@ import build_vn_rocker_bank_spring as part
 import vn_rocker_bank_spring_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_9714K24 as recipe
 
 STEM = "vn-rocker-bank-spring"
@@ -36,7 +36,7 @@ def test_catalogue_row_is_the_registered_mcmaster_wave_spring() -> None:
     assert stock.material == row["material"] == part.MATERIAL
     assert row["number"] == NUMBER
     assert int(row["quantity"]) == spec.COUNT == 1
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is getattr(recipe, BUILD)
     assert metadata.threaded is False

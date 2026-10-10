@@ -1,7 +1,16 @@
 vn-wheel-axle-nut:
+  title: Wheel Axle Nut
   number: MHA-VN-025
-  material: Plain Carbon Steel
-  finish: "bright"
-  tolerance_class: visual_noncritical
-  quantity: 1
-  process: "commercial hex nut (thread not modelled)"
+  stock_name: Brass Hex Nut
+  supplier: McMaster-Carr
+  supplier_skus: [92671A005]
+  material: Brass
+  material_specification: "Brass hex nut, #4-40, 1/4 AF x 3/32; McMaster-Carr 92671A005"
+  finish: plain; no coating
+  installation_notes: |-
+    INSTALLATION - ON THE MG-WHEEL-AXLE #4-40 END, OUTSIDE MHA-VN-055.
+    RUN THE FIRST NUT DOWN UNTIL THE WHEEL TURNS FREE WITHOUT RATTLE
+    (0.05-0.15), THEN LOCK WITH THE SECOND NUT.
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased

@@ -23,7 +23,7 @@ from typing import Any
 import _telemetry
 import dt_cone_pivot_post_spec as post
 import crank_boss_rim
-from _common import _early_bound
+from _com import _early_bound
 
 GEAR_COMPONENT = "dt-crank-drive-gear-1"
 POST_COMPONENT = "dt-cone-pivot-post-1"

@@ -1,0 +1,15 @@
+vn-wheel-axle-back-washer:
+  title: Wheel Axle Back Washer
+  number: MHA-VN-054
+  stock_name: Brass Washer for Number 10 Screw Size
+  supplier: McMaster-Carr
+  supplier_skus: [92916A480]
+  material: Brass
+  material_specification: "Brass washer, #10, 0.200 ID x 0.438 OD; McMaster-Carr 92916A480"
+  finish: plain; no coating
+  installation_notes: |-
+    INSTALLATION - ON THE MG-WHEEL-AXLE, BETWEEN THE MG-WHEEL-BAR
+    FRONT FACE AND THE MAGNIFYING WHEEL HUB.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

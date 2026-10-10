@@ -32,13 +32,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     assert_profile_closed,
@@ -53,14 +57,16 @@ from diagnostics.sketch_profile import (  # noqa: E402
     Segment,
     minor_arc,
 )
+from _mcmaster_99607a213 import (  # noqa: E402
+    TS_HEAD_H,
+    TS_HEAD_R,
+    TS_LEN,
+    TS_MAJOR_R,
+    TS_PITCH,
+    TS_SH_H,
+    TS_SH_R,
+)
 
-TS_MAJOR_R = 2.8448 / 2.0
-TS_PITCH = 0.635
-TS_LEN = 15.875
-TS_SH_R = 5.953125 / 2.0
-TS_SH_H = 3.175
-TS_HEAD_R = 7.540625 / 2.0
-TS_HEAD_H = 3.175
 
 # --- flare lens (Cut-Revolve1) -----------------------------------------------
 # The vendor's equations: D1 = ShoulderLen * 0.2 = 0.635 sets the axial span,
@@ -96,9 +102,11 @@ def flare_profile() -> tuple[Segment, ...]:
     )
 
 
+@stock_recipe("99607A213", threaded=True)
 async def build_99607A213(adapter, truth=None):
-    from _common import (add_line_chain, _early_bound, _feature_by_name,
-                         _read_member)
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
+    from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import (mass_properties, no_sketch_inference,
                                    split_at_plane)
     from solidworks_mcp.adapters.base import (CircularPatternParameters,

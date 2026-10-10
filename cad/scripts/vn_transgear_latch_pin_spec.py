@@ -14,7 +14,7 @@ dowel's length grade are counted; the 7/8 length of the same series, in a
 deeper hole, passes it (``transgear_hanger_joints``).
 
 Catalogue: 1/8 x 7/8 alloy-steel dowel, Round x Chamfer ends; the size row
-and the family's diameter band are ``diagnostics.diag_mcmaster_dowel``'s.
+and the family's diameter band are ``_mcmaster_98381a474``'s.
 [INFERENCE] The SKU is the 7/8 length of the 1/8 series, not yet read live,
 and its end forms are the 98381A473 vendor model's (harvested 2026-09-30):
 the chamfered end a flat Ø2.921 face and a cone 16 deg to the axis, 0.443
@@ -30,20 +30,19 @@ at PRESS_DEPTH inside the arm's end face.
 
 from __future__ import annotations
 
-from diagnostics.diag_mcmaster_dowel import (
+from _mcmaster_98381a474 import (
     DIA_BAND_IN,
-    DOWEL_ENDS,
-    DOWEL_SIZES,
+    ENDS,
+    DOWEL_SIZE,
     MM_PER_IN,
 )
 
 SKU = "98381A474"
-DIA, LENGTH = DOWEL_SIZES[SKU]  # 3.175 x 22.225
+DIA, LENGTH = DOWEL_SIZE  # 3.175 x 22.225
 # Catalogue diameter band over nominal, mm, as (upper, lower) deviations:
 # +0.00762 / +0.00254 (the catalogue row lists it low-first).
 DIA_BAND = tuple(band * MM_PER_IN for band in reversed(DIA_BAND_IN))
 DIA_MAX = DIA + max(DIA_BAND)
-ENDS = DOWEL_ENDS[SKU]
 # The pressed end's chamfer: the length of it that grips nothing.
 CHAMFER_LEN = ENDS.chamfer_len(DIA)  # 0.443
 # The lead end's round: where the full diameter stops short of the tip.

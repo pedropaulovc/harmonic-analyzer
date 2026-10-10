@@ -71,7 +71,7 @@ explicitly instead of inheriting seat inference" (2026-09-17 23:10 -0700 =
 06:10Z 2026-09-18): it declares `SEAT_SKETCH_BASELINE` with
 `swSketchAutomaticRelations`, `swSketchInferFromModel` and `swSketchInference`
 all **True** and now RESTORES that declared constant on exit (the old code
-latched and restored whatever it observed), and `_stock_fastener.py:469+`
+latched and restored whatever it observed), and `_stock_fastener.build_stock_fastener`
 calls `assert_seat_sketch_baseline` for every component. Those are
 APPLICATION-level toggles: they outlive the document, the recipe and the leaf.
 Seats had been drifting with inference OFF, which accidentally protected every

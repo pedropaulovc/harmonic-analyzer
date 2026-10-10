@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import sys
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from dt_cone_gear_shaft_spec import FLAT_LANDS, FLAT_OFFSETS

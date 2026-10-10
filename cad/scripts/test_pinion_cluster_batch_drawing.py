@@ -445,6 +445,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
                 2.8448, 2.261, 3.9
             ),
+            # MHA-MG-007 3/16 drill-rod pin pressed through the wheel bar's
+            # reamed .1865 bore, the bar's 9.0 depth.
+            frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _annulus_limit(
+                4.7625, 4.7371, 9.0
+            ),
         },
         "sm-summing": {
             # Stock 91251A157: #6-32 major, #36 drill, 8.10 nominal reach.

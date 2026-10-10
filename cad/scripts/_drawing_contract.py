@@ -117,6 +117,10 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_pd_transgear_knob_shaft.py",
         "draw_pd_latch_hook.py",
         "draw_fr_tube_frame.py",
+        "draw_mg_magnifying_wheel.py",
+        "draw_mg_wheel_drum.py",
+        "draw_mg_wheel_axle.py",
+        "draw_mg_wheel_bar.py",
     }
 )
 _PRECISION_SETTERS = frozenset({"set_dimension_precision"})
@@ -743,7 +747,7 @@ def drawing_specification_violations(
         tree, "_surface_finish", frozenset({"surface_finish_by_key"})
     )
     fit_direct, fit_modules = _imported_functions(
-        tree, "_fit_limits", frozenset({"fit_limits", "band_text"})
+        tree, "_fit_text", frozenset({"fit_limits", "band_text"})
     )
     surface_direct, surface_modules = _imported_functions(
         tree, "_drawing_common", frozenset({"add_surface_finish"})

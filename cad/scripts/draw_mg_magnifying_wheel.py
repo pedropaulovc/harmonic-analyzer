@@ -1,11 +1,11 @@
 r"""Create the curated machinist drawing for the magnifying wheel.
 
-A Ø100 spoked cast wheel with a Ø20 grooved hub drum (the 5x ratio) on six
-straight spokes and a Ø5 axle bore.  The wheel axis is local +Z, so the FRONT
-view is the face (rim / hub / spokes / bore, all real circular edges) and the
-RIGHT view is the edge section carrying the rim + hub axial widths.  The face
-diameters ride the auto-imported profile marks; the axial widths are added
-across the section, the spoke section + count are noted.
+A Ø100 cast-iron spider: six tapered spokes, a grooved rim, a Ø25 boss with
+the Ø14.5 drum spigot, a reamed axle bore and two wire-tie holes.  The wheel
+axis is local +Z, so the FRONT view is the face (rim, spokes, fillets, bore,
+ties) and the RIGHT view is the side elevation carrying the hub profile, the
+groove and the axial widths.  Every size rides the part's marked dimensions;
+only the rim's axial width is added on the sheet.
 
 Run with SolidWorks open::
 
@@ -18,35 +18,34 @@ import argparse
 import sys
 from typing import Any
 
-from mg_magnifying_wheel_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _check import check
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_edge_dimension,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
+    assert_dimension_measures,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    scan_view_edges,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import surface_finish_by_key
 from mg_magnifying_wheel_spec import (
-    BORE_DIA,
-    HUB_AXIAL,
-    HUB_DIA,
+    CAST_ROUND_R,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     RIM_AXIAL,
+    RIM_INNER_DIA,
     RIM_OUTER_DIA,
-    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -72,25 +71,62 @@ RIGHT_CENTER = (0.255, 0.150)
 ISO_CENTER = (0.350, 0.150)
 
 _RIM_R = RIM_OUTER_DIA * SHEET_SCALE[0] / 2000.0
-_HUB_R = HUB_DIA * SHEET_SCALE[0] / 2000.0
 
+DRAWING_PRECISION_BY_NAME = {
+    name: digits
+    for names in DRAWING_PRECISION.values()
+    for name, digits in names.items()
+}
+
+# Face view: text in the windows between the spokes (spokes at 0, 60, ... deg).
 FRONT_KEEP = {
     "RimOuterDiaDim": (
         FRONT_CENTER[0] - _RIM_R - 0.028,
         FRONT_CENTER[1] + _RIM_R + 0.006,
     ),
-    "HubDiaDim": (FRONT_CENTER[0] + _HUB_R + 0.030, FRONT_CENTER[1] - 0.006),
-    "BoreDiaDim": (FRONT_CENTER[0] - _HUB_R - 0.030, FRONT_CENTER[1] + 0.004),
-    "SpokeWidthDim": (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + _HUB_R + 0.020),
+    "RimInnerDiaDim": (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + _RIM_R + 0.012),
+    "BoreDiaDim": (FRONT_CENTER[0] + 0.024, FRONT_CENTER[1] + 0.014),
+    "HubFilletR": (FRONT_CENTER[0] - 0.024, FRONT_CENTER[1] + 0.014),
+    "RimFilletR": (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + 0.036),
+    "SpokeRootWidth": (FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] - 0.012),
+    "SpokeTipWidth": (FRONT_CENTER[0] + 0.040, FRONT_CENTER[1] - 0.014),
+    "Tie1Y": (FRONT_CENTER[0] - 0.008, FRONT_CENTER[1] - 0.022),
+    "Tie1HoleDia": (FRONT_CENTER[0] + 0.008, FRONT_CENTER[1] - 0.034),
+    "Tie2Angle": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] - 0.014),
+    "Tie2HoleDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] - 0.050),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+# Side view: sheet right = model -Z (the pen side, where the spigot stands).
+RIGHT_KEEP = {
+    "HubDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + 0.020),
+    "SpigotDia": (RIGHT_CENTER[0] + 0.032, RIGHT_CENTER[1] + 0.016),
+    "HubBackZ": (RIGHT_CENTER[0] - 0.012, RIGHT_CENTER[1] - 0.060),
+    "SpigotLength": (RIGHT_CENTER[0] + 0.010, RIGHT_CENTER[1] - 0.060),
+    "HubLength": (RIGHT_CENTER[0] + 0.003, RIGHT_CENTER[1] - 0.070),
+    "SpokeAxial": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] - 0.020),
+    "GrooveR": (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.060),
+    "GrooveBottomDia": (RIGHT_CENTER[0] + 0.040, RIGHT_CENTER[1] + 0.035),
+    # The rim-bore round, top left, between the groove and the hub.
+    "CastRoundR": (RIGHT_CENTER[0] - 0.028, RIGHT_CENTER[1] + 0.038),
+}
 DIMENSION_CALLOUTS = {
     "BoreDiaDim": "THRU - REAM",
-    "SpokeWidthDim": "6X SPOKE",
+    "SpokeRootWidth": "6X ROOT",
+    "SpokeTipWidth": "6X TIP",
+    "HubFilletR": "12X",
+    "RimFilletR": "12X",
+    "CastRoundR": "2X RIM BORE EDGES",
+    "Tie1HoleDia": "THRU - TIE 1",
+    "Tie2HoleDia": "TIE 2, GROOVE TO RIM BORE",
 }
 
-RIGHT_HALF_HUB = HUB_AXIAL * SHEET_SCALE[0] / 2000.0
 RIGHT_HALF_RIM = RIM_AXIAL * SHEET_SCALE[0] / 2000.0
+# The rim's axial width spans its two OD corner circles (r = RIM_OUTER_DIA/2 at
+# z = +/-RIM_AXIAL/2; the rim is extruded both ways off the mid-plane). Edge-on
+# in the side view each is a vertical line; the coordinate picks ride their
+# mid-span, between the rim-bore round's tangent (r 45) and the OD (r 50), the
+# only band where the OD circle stands alone on that line.
+_RIM_FACE_MID_Y = (RIM_INNER_DIA / 2.0 + CAST_ROUND_R + RIM_OUTER_DIA / 2.0) / 2000.0
+_RIM_AXIS = (0.0, 0.0, 1.0)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -131,7 +167,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Magnifying Wheel Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "magnifying wheel; cast pulley; six spokes",
+            3: "magnifying wheel; cast-iron spider; six spokes",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -144,75 +180,60 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            front,
+            keep=FRONT_KEEP,
+            view_label="front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            right,
+            keep=RIGHT_KEEP,
+            view_label="right",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+    ]
+    # Decimal places (and so the general-tolerance row each dimension claims)
+    # are authored on the part; the sheet only proves the import kept them.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to wheel bore")
 
-    # Axial widths across the right-view section: hub drum length (10) at the
-    # centre, rim width (8) up at the rim.
-    add_edge_dimension(
-        adapter,
-        right,
-        p0=(RIGHT_CENTER[0] - RIGHT_HALF_HUB, RIGHT_CENTER[1]),
-        p1=(RIGHT_CENTER[0] + RIGHT_HALF_HUB, RIGHT_CENTER[1]),
-        # text clear right of the section (round 1: it sat on the hub band)
-        text_xy=(RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.024),
-        label="hub-drum axial length",
+    # The rim's axial width across the side view, up at the rim. The two OD
+    # corner circles are selected as native entities: a coordinate hit-test
+    # at the corner where each edge-on circle ends on the OD silhouette found
+    # no edge on farm run 4 (85a5d462d), and the side view's asymmetric hub
+    # (HUB_FRONT_Z..HUB_BACK_Z) means its origin need not sit on RIGHT_CENTER.
+    right_edges = scan_view_edges(right, label="wheel right rim corners")
+    rim_corners = tuple(
+        right_edges.circle_at(
+            (0.0, 0.0, z),
+            RIM_OUTER_DIA / 2.0,
+            axis=_RIM_AXIS,
+            label=f"rim OD corner at z={z:+g}",
+        ).edge
+        for z in (RIM_AXIAL / 2.0, -RIM_AXIAL / 2.0)
     )
-    add_edge_dimension(
+    rim_width = add_edge_dimension(
         adapter,
         right,
-        p0=(RIGHT_CENTER[0] - RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_R),
-        p1=(RIGHT_CENTER[0] + RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_R),
+        p0=(RIGHT_CENTER[0] - RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_FACE_MID_Y),
+        p1=(RIGHT_CENTER[0] + RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_FACE_MID_Y),
         text_xy=(RIGHT_CENTER[0] + 0.028, RIGHT_CENTER[1] + _RIM_R),
         label="rim axial width",
+        orientation="horizontal",
+        entities=rim_corners,
     )
-
-    # Datum A = the axle BORE rim (round 1: the old pick landed on the hub OD,
-    # so the rotational datum read as the drum, not the functional bore).
-    # SolidWorks restricts this axis-attached tag and normalizes the intended
-    # sheet point inward -- and the normalized distance is NOT repeatable
-    # across from-scratch part rebuilds (observed 3.572 mm, then 3.718 mm from
-    # the same byte-identical scripts). Keep ~0.28 mm of annotation-only slack
-    # over the largest observation; this never relaxes the part geometry or
-    # GD&T contract.
-    add_datum_feature(
+    assert_dimension_measures(
         adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0),
-        symbol_xy=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] + 0.016),
-        datum="A",
-        label="axle bore axis",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        # The runout hangs on the FRONT view's Ø100 rim circle -- a real model
-        # edge. The side view's top run is a cylinder SILHOUETTE, not an EDGE:
-        # every non-corner pick there fails (builds 4-5), and the selectable
-        # corner read ambiguously (round 1). 30 deg off top so the pick clears
-        # the vertical centreline and the Ø100 leader.
-        edge_xy=(FRONT_CENTER[0] + _RIM_R * 0.5, FRONT_CENTER[1] + _RIM_R * 0.866),
-        frame_xy=(FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] + _RIM_R + 0.012),
-        characteristic="circular_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["rim runout to the bore"],
-        datums=("A",),
-        label="rim runout to the bore",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        # Land at -60 deg, mid-window between the -30/-90 spokes, and hang the
-        # symbol radially below-right of the rim: the old up-right leader ran
-        # through datum A's tag (layout audit).
-        edge_xy=(FRONT_CENTER[0] + _HUB_R * 0.5, FRONT_CENTER[1] - _HUB_R * 0.866),
-        symbol_xy=(FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.065),
-        control=surface_finish_by_key(SURFACE_FINISHES, "hub_drum"),
-        label="hub drum finish",
+        rim_width,
+        expected_mm=RIM_AXIAL,
+        label="rim axial width",
+        entities=rim_corners,
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)

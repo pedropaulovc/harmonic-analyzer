@@ -35,6 +35,9 @@ The screws, and the small parts that do not belong anywhere else.
 | `vn-transgear-knob-drive-pin` | TODO | TODO | TODO |
 | `vn-transgear-knob-cup-pin` | TODO | TODO | TODO |
 | `vn-gooseneck-set-screw` | TODO | TODO | TODO |
+| `vn-wheel-axle-nut` | 2 | brass | McMaster 92671A005, #4-40 hex (nut + jam nut) |
+| `vn-wheel-axle-back-washer` | 1 | brass | McMaster 92916A480, #10 |
+| `vn-wheel-axle-front-washer` | 1 | brass | McMaster 92916A250, #4 |
 | `pd-guide-lock` | TODO | TODO | TODO |
 | `sh-column-clamp-front` | TODO | TODO | TODO |
 | `sh-column-clamp-back` | TODO | TODO | TODO |

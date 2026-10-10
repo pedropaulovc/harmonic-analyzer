@@ -26,12 +26,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     insert_helix,
@@ -39,18 +43,22 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     replica_main,
     thread_sweep_cut,
 )
+from _mcmaster_91410a538 import (  # noqa: E402
+    SQ_CHAMFER_DEG,
+    SQ_CUP_RIM_R,
+    SQ_HH,
+    SQ_LEN,
+    SQ_MAJOR_R,
+    SQ_PITCH,
+)
 
-SQ_MAJOR_R = 6.35 / 2.0
-SQ_LEN = 15.875
-SQ_HH = 4.7625
-SQ_PITCH = 1.27
-SQ_CUP_RIM_R = 1.739789   # Sketch2 solved rim; 45/59 deg from its dims
-SQ_CHAMFER_DEG = 75.0     # head chamfer cones (Sketch3 D1/D2)
 
 
+@stock_recipe("91410A538", threaded=True)
 async def build_91410A538(adapter, truth=None):
-    from _common import (add_line_chain, _early_bound, _feature_by_name,
-                         _read_member)
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
+    from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import RevolveParameters
 

@@ -32,18 +32,13 @@ from _chain import (
     PLATE_THICK,
     ROLLER_R,
 )
-from _common import (
-    BAR_STEEL,
-    apply_color,
-    apply_material,
-    check,
-    define_circle,
-    ensure_fully_defined,
-    extrude_at_offset,
-    report_mass_properties,
-    save_part_and_images,
-    set_sketch_direct_db,
-)
+from _appearance import BAR_STEEL, apply_color, apply_material
+from _check import check
+from _extrude import extrude_at_offset
+from _part_checks import report_mass_properties
+from _part_save import save_part_and_images
+from _sketch import ensure_fully_defined, set_sketch_direct_db
+from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 
 import _telemetry
@@ -52,7 +47,7 @@ import _telemetry
 async def _sketch_plate(adapter: Any, hole_r: float) -> None:
     """Front-plane obround side-plate outline (one LINK_PITCH long) with a
     clearance hole at each pin station; fully defined, ready to extrude."""
-    from _common import anchor_point_to_origin
+    from _sketch import anchor_point_to_origin
 
     p, h = LINK_PITCH, PLATE_HALF_H
     check("create_sketch plate", await adapter.create_sketch("Front"))

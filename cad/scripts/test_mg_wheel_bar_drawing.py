@@ -9,6 +9,7 @@ import pytest
 import build_mg_wheel_bar as part
 import draw_mg_wheel_bar as drawing
 import mg_wheel_bar_spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -78,10 +79,69 @@ def test_bores_are_note_based_with_center_marks() -> None:
     # sizes + X-stations and the front-view centre marks locate them.
     assert source.count("add_native_hole_callout(") == 0
     assert source.count("add_datum_feature(") == 1
-    assert source.count("add_edge_dimension(") == 1  # bar depth only
+    assert source.count("add_edge_dimension(") == 0  # the depth is native
     assert "auto_center_marks(" in source
     # The station note is computed from the geom constants, never duplicated.
     assert "HOLE STATIONS FROM THE LEFT END" in mg_wheel_bar_spec.DRAWING_NOTES
+
+
+def test_axle_bore_sits_under_the_wheel_with_a_two_mm_wall() -> None:
+    import mg_wheel_bar_geom as geom
+
+    assert geom.AXLE_BORE_X == -56.0 == geom.WHEEL_X - geom.WHEEL_BAR_X0
+    assert mg_wheel_bar_spec.AXLE_BORE_STATION == 61.0
+    assert (
+        mg_wheel_bar_spec.AXLE_BORE_STATION == geom.AXLE_BORE_X + geom.BAR_LENGTH / 2.0
+    )
+    worst_wall = (
+        (geom.BAR_SIDE + geom.BAR_SIDE_BAND[1]) / 2.0
+        - geom.AXLE_BORE_POSITION_TOL
+        - (geom.AXLE_BORE_DIA + geom.AXLE_BORE_BAND[0]) / 2.0
+    )
+    assert worst_wall == pytest.approx(geom.AXLE_BORE_WALL)
+    assert worst_wall >= 2.0
+
+
+def test_axle_bore_is_a_marked_reamed_cut() -> None:
+    assert mg_wheel_bar_spec.DRAWING_DIMENSIONS["AxleBoreProfile"] == {
+        "AxleBoreDia",
+        "AxleBoreStation",
+    }
+    assert set(drawing.DRAWING_PRECISION_BY_NAME) == {
+        "AxleBoreDia",
+        "AxleBoreStation",
+        "BarDepth",
+    }
+    assert drawing.DIMENSION_CALLOUTS == {"AxleBoreDia": "THRU - REAM"}
+    assert model_toleranced_dimensions(part) == {
+        ("BarProfile", "Side"): "*deviations(BAR_SIDE_BAND)",
+        ("Bar", "BarDepth"): "*deviations(BAR_DEPTH_BAND)",
+        ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
+    }
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'name_last_feature(adapter, "AxleBoreProfile")' in source
+    assert 'name_last_feature(adapter, "AxleBore")' in source
+    assert "create_cut_extrude(" in source
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
+    assert 'name_dimensions(adapter, "Bar", ["BarDepth"])' in source
+    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)" in sheet
+
+
+def test_axle_bore_height_band_is_printed() -> None:
+    import mg_wheel_bar_geom as geom
+
+    assert (
+        f"MID-HEIGHT CENTRELINE +/-{geom.AXLE_BORE_POSITION_TOL:.2f}"
+        in mg_wheel_bar_spec.DRAWING_NOTES
+    )
+
+
+def test_notes_stay_short() -> None:
+    lines = mg_wheel_bar_spec.DRAWING_NOTES.splitlines()
+    assert 1 <= len(lines) <= 4
+    assert all(len(line) <= 80 for line in lines)
+    assert "DATUM" not in mg_wheel_bar_spec.DRAWING_NOTES
 
 
 def test_part_stamps_make_critical_properties() -> None:

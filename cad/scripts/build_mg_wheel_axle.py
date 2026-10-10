@@ -1,20 +1,19 @@
 r"""Reproduction script: magnifying-wheel axle (book ch. 21, pp. 50-51).
 
-The stud that mounts the magnifying wheel on its support bar: a flange
-seated on the bar's front face, a O5 stud the wheel's bore rides, and a
-washer at the wheel hub's outboard face under a hex nut (2026-09-02, ch21
-p.51: the nut is the separate wheel-axle-nut part; the O9 x 1 collar here
-is the washer).
+A plain pin from 3/16 drill rod (mg_wheel_axle_spec): pressed into the
+mg-wheel-bar's reamed bore until the shank stands the press gauge off the
+bar's front face, the back end then about flush with its back face; the
+magnifying wheel runs on the shank; the front end is a #4-40 thread for the
+nut and locknut, finished with a domed tip. ``mg_wheel_group`` sizes the
+lengths against the whole stack.
 
-Layout: axle axis +Y from the origin at the flange's bar-side face; the
-assembly rotates it so +Y points -Z (machine front). Flange y 0..3,
-stud 3..20, wheel hub rides 3..13, washer 13..14, nut 14..17 (assembly), tip 3 proud. Dimensions:
-cad/DIMENSIONS.md ch. 21 (M6.4, low).
+Layout: pin axis local +Y, origin on the bar's FRONT face (the assembly's
+d = 0); back end y = BACK_Y (-9), shank to STEP_Y (the gauge), thread to
+THREAD_END_Y, dome to TIP_Y. The assembly mates Axis1 and the Front Plane.
 
-Built as three coaxial extrusions off the Top plane (flange disc, stud,
-washer) rather than one revolved profile, so every manufacturing
-diameter and length is a first-class named dimension the curated drawing
-inserts as a model item (see mg_wheel_axle_spec.DRAWING_DIMENSIONS).
+Built as ONE Front-plane revolve (PinProfile -> Pin): every printed diameter
+and length is a named dimension in that sketch, so the drawing inserts them
+as model items (mg_wheel_axle_spec.DRAWING_DIMENSIONS).
 
 Run (SolidWorks already open)::
 
@@ -26,185 +25,175 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    apply_material,
-    check,
-    define_circle,
-    drive_dimension,
+    add_line_chain,
+    anchor_point_to_origin,
+    dimension_between,
     ensure_fully_defined,
-    extrude_at_offset,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
+    set_sketch_direct_db,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
-from _part_pmi import author_part_pmi
+from _fit_deviations import deviations
 from mg_wheel_axle_spec import (
-    COLLAR_DIA,
-    COLLAR_LEN,
+    BACK_Y,
+    DOME_H,
+    DOME_R,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    FLANGE_DIA,
-    FLANGE_LEN,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
-    STUD_DIA,
-    STUD_DIA_BAND,
-    WASHER_START,
-    WHEEL_HUB_RIDE,
-    STUD_LEN,
-    SURFACE_FINISHES,
+    DRAWING_PRECISION,
+    PIN_DIA,
+    PIN_DIA_TOL,
+    PIN_LEN,
+    PRESS_GAUGE,
+    SHANK_LEN,
+    SHANK_LEN_BAND,
+    STEP_Y,
+    THREAD_END_Y,
+    THREAD_LEN,
+    THREAD_LEN_BAND,
+    THREAD_MAJOR,
+    TIP_Y,
 )
 
 PART_NAME = "mg-wheel-axle"
-MATERIAL = "Plain Carbon Steel"
-
-_V_FLANGE = math.pi * (FLANGE_DIA / 2.0) ** 2 * FLANGE_LEN
-_V_STUD = math.pi * (STUD_DIA / 2.0) ** 2 * STUD_LEN
-_V_COLLAR = math.pi * ((COLLAR_DIA / 2.0) ** 2 - (STUD_DIA / 2.0) ** 2) * COLLAR_LEN
-_V_TOTAL = _V_FLANGE + _V_STUD + _V_COLLAR
-
-
-async def _assert_axle_com(adapter, label: str) -> None:
-    """Pin the stack's direction: every extrusion must run +Y off the flange.
-
-    Volume alone cannot tell a flipped extrusion (same material either side of
-    the sketch plane), so assert the centre of mass sits on the axis at the
-    analytic height of the flange->stud->collar stack.
-    """
-    res = await adapter.get_mass_properties()
-    if not res.is_success:
-        raise RuntimeError(f"{label}: get_mass_properties failed: {res.error}")
-    com = [float(v) for v in res.data.center_of_mass]
-    com_y = (
-        _V_FLANGE * FLANGE_LEN / 2.0
-        + _V_STUD * (FLANGE_LEN + STUD_LEN / 2.0)
-        + _V_COLLAR * (WASHER_START + COLLAR_LEN / 2.0)
-    ) / _V_TOTAL
-    if abs(com[0]) > 0.05 or abs(com[2]) > 0.05 or abs(com[1] - com_y) > 0.2:
-        raise RuntimeError(
-            f"{label}: centre of mass {com} is off the +Y stack "
-            f"(expected [0, {com_y:.3f}, 0])"
-        )
+MATERIAL = "Plain Carbon Steel"  # drill rod, as the fleet's other drill-rod pins
+PIN_R = PIN_DIA / 2.0
+THREAD_R = THREAD_MAJOR / 2.0
+V_SHANK = math.pi * PIN_R**2 * SHANK_LEN
+V_THREAD = math.pi * THREAD_R**2 * THREAD_LEN
+V_DOME = math.pi * DOME_H**2 * (3.0 * DOME_R - DOME_H) / 3.0
+V_TOTAL = V_SHANK + V_THREAD + V_DOME
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the three stepped diameters + the
-    # three axial lengths. The mm suffix is load-bearing -- this is an INCH
-    # document and the equation manager reads BARE numbers in document units
-    # (an unsuffixed 14 = 14 in). Each profile/feature dim below is driven from
-    # these via the deferred drive batch.
-    await set_global(adapter, "FlangeDia", f"{FLANGE_DIA}mm")
-    await set_global(adapter, "FlangeLen", f"{FLANGE_LEN}mm")
-    await set_global(adapter, "StudDia", f"{STUD_DIA}mm")
-    await set_global(adapter, "StudLen", f"{STUD_LEN}mm")
-    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
-    await set_global(adapter, "CollarLen", f"{COLLAR_LEN}mm")
-    await set_global(adapter, "WheelHubRide", f"{WHEEL_HUB_RIDE}mm")
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
+    # is an INCH document and the equation manager reads BARE numbers in
+    # document units. Each profile dim below is driven from these via the
+    # deferred drive batch.
+    for name, value in (
+        ("PinDia", PIN_DIA),
+        ("ShankLength", SHANK_LEN),
+        ("ThreadDia", THREAD_MAJOR),
+        ("ThreadLength", THREAD_LEN),
+        ("DomeHeight", DOME_H),
+        ("PressGauge", PRESS_GAUGE),
+    ):
+        await set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Flange: O35 disc on the Top plane (normal +Y), y 0..3. On-axis circle,
-    # so define_circle emits only the diameter dim.
-    flange = SketchDims()
-    check("create_sketch flange", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        FLANGE_DIA / 2.0,
-        "flange section",
-        dims=flange,
-        names=(None, None, "FlangeDia"),
-        drives=(None, None, '"FlangeDia"'),
-    )
-    await ensure_fully_defined(adapter, "flange sketch")
-    check("exit_sketch flange", await adapter.exit_sketch())
-    name_last_feature(adapter, "FlangeProfile")
-    drive_jobs += flange.apply(adapter, "FlangeProfile")
-    check(
-        "extrude flange",
-        await adapter.create_extrusion(ExtrusionParameters(depth=FLANGE_LEN)),
-    )
-    name_last_feature(adapter, "Flange")
-    flange_dims = name_dimensions(adapter, "Flange", ["FlangeLength"])
-    drive_jobs += [(flange_dims[0], '"FlangeLen"')]
-    await volume_check(adapter, "flange", _V_FLANGE, 0.005 * _V_FLANGE)
-
-    # Stud: O5 bearing run from the flange face to the tip (y 3..20), started
-    # at an offset so its length dim IS the flange-face -> tip length. The
-    # start offset is a NAMED dim driven from "FlangeLen" (not a baked-in
-    # literal), so editing FlangeLen in SolidWorks keeps the stud rooted on
-    # the flange face and preserves the flange-face -> tip contract.
-    stud = SketchDims()
-    check("create_sketch stud", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        STUD_DIA / 2.0,
-        "stud section",
-        dims=stud,
-        names=(None, None, "StudDia"),
-        drives=(None, None, '"StudDia"'),
-    )
-    await ensure_fully_defined(adapter, "stud sketch")
-    check("exit_sketch stud", await adapter.exit_sketch())
-    name_last_feature(adapter, "StudProfile")
-    drive_jobs += stud.apply(adapter, "StudProfile")
-    extrude_at_offset(adapter, STUD_LEN, FLANGE_LEN)
-    name_last_feature(adapter, "Stud")
-    # dim[0] = blind depth (StudLen); dim[1] = start offset (flange face).
-    stud_dims = name_dimensions(adapter, "Stud", ["StudLength", "StudStart"])
-    drive_jobs += [(stud_dims[0], '"StudLen"'), (stud_dims[1], '"FlangeLen"')]
-    await volume_check(adapter, "flange+stud", _V_FLANGE + _V_STUD, 0.005 * _V_STUD)
-
-    # Washer: O9 retainer at the wheel-hub end (y 13..14). Its start offset is
-    # driven from "FlangeLen" + "WheelHubRide", independently of the stud tip,
-    # so lengthening the stud cannot move the washer away from the wheel.
-    collar = SketchDims()
-    check("create_sketch collar", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        COLLAR_DIA / 2.0,
-        "collar section",
-        dims=collar,
-        names=(None, None, "CollarDia"),
-        drives=(None, None, '"CollarDia"'),
-    )
-    await ensure_fully_defined(adapter, "collar sketch")
-    check("exit_sketch collar", await adapter.exit_sketch())
-    name_last_feature(adapter, "CollarProfile")
-    drive_jobs += collar.apply(adapter, "CollarProfile")
-    extrude_at_offset(adapter, COLLAR_LEN, WASHER_START)
-    name_last_feature(adapter, "Collar")
-    # dim[0] = blind depth (CollarLen); dim[1] = start offset (hub ride end).
-    collar_dims = name_dimensions(adapter, "Collar", ["CollarLength", "CollarStart"])
-    drive_jobs += [
-        (collar_dims[0], '"CollarLen"'),
-        (collar_dims[1], '"FlangeLen" + "WheelHubRide"'),
+    # Half-section about local +Y (Front sketch u, v = model x, y): flat back
+    # end, shank, step, thread at the basic major, spherical dome to the tip.
+    profile = SketchDims()
+    check("create_sketch pin profile", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    axis = check("pin axis", await adapter.add_centerline(0.0, BACK_Y, 0.0, TIP_Y))
+    points = [
+        (0.0, BACK_Y),
+        (PIN_R, BACK_Y),
+        (PIN_R, STEP_Y),
+        (THREAD_R, STEP_Y),
+        (THREAD_R, THREAD_END_Y),
     ]
-    await volume_check(adapter, "axle", _V_TOTAL, 0.005 * _V_TOTAL)
-    await _assert_axle_com(adapter, "axle")
+    back_end, shank, step, thread = await add_line_chain(adapter, points, close=False)
+    dome = check(
+        "dome arc",
+        await adapter.add_arc(0.0, TIP_Y - DOME_R, THREAD_R, THREAD_END_Y, 0.0, TIP_Y),
+    )
+    closure = check("pin closure", await adapter.add_line(0.0, TIP_Y, 0.0, BACK_Y))
+    set_sketch_direct_db(adapter, False)
+    for label, first, second in (
+        ("thread-dome", f"{thread}.end", f"{dome}.start"),
+        ("dome-closure", f"{dome}.end", f"{closure}.start"),
+        ("closure-back", f"{closure}.end", f"{back_end}.start"),
+        ("axis start", f"{axis}.start", f"{back_end}.start"),
+        ("axis end", f"{axis}.end", f"{dome}.end"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+    for label, entity, relation in (
+        ("back end", back_end, "horizontal"),
+        ("shank", shank, "vertical"),
+        ("step", step, "horizontal"),
+        ("thread", thread, "vertical"),
+        ("closure", closure, "vertical"),
+        ("axis", axis, "vertical"),
+    ):
+        check(label, await adapter.add_sketch_constraint(entity, None, relation))
+    await anchor_point_to_origin(
+        adapter, f"{back_end}.start", 0.0, BACK_Y, "pin back end"
+    )
+    profile.record("BackEnd", '"ShankLength" - "PressGauge"')
+    await add_diametric_linear_dimension(
+        adapter, axis, shank, (PIN_R + 4.0, (BACK_Y + STEP_Y) / 2.0), "PinDia"
+    )
+    profile.record("PinDia", '"PinDia"')
+    check(
+        "shank length",
+        await adapter.add_sketch_dimension(shank, None, "linear", SHANK_LEN),
+    )
+    profile.record("ShankLength", '"ShankLength"')
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        thread,
+        (THREAD_R + 4.0, (STEP_Y + THREAD_END_Y) / 2.0),
+        "ThreadDia",
+    )
+    profile.record("ThreadDia", '"ThreadDia"')
+    check(
+        "thread length",
+        await adapter.add_sketch_dimension(thread, None, "linear", THREAD_LEN),
+    )
+    profile.record("ThreadLength", '"ThreadLength"')
+    # Overall from the back end's outer corner (where the drawing's extension
+    # lines rise).
+    await dimension_between(
+        adapter,
+        f"{shank}.start",
+        f"{closure}.start",
+        "vertical_distance",
+        PIN_LEN,
+        "pin length",
+    )
+    profile.record("PinLength", '"ShankLength" + "ThreadLength" + "DomeHeight"')
+    check(
+        "dome radius",
+        await adapter.add_sketch_dimension(dome, None, "radial", DOME_R),
+    )
+    profile.record(
+        "DomeR",
+        '("ThreadDia" / 2 * "ThreadDia" / 2 + "DomeHeight" * "DomeHeight") '
+        '/ (2 * "DomeHeight")',
+    )
+    await ensure_fully_defined(adapter, "pin profile")
+    check("exit_sketch pin profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinProfile")
+    drive_jobs += profile.apply(adapter, "PinProfile")
+    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Pin")
+    await volume_check(adapter, "pin", V_TOTAL, 0.005 * V_TOTAL)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -213,29 +202,26 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven axle (equations neutral)", _V_TOTAL, 0.005 * _V_TOTAL
+        adapter, "driven pin (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
-    await _assert_axle_com(adapter, "driven axle (equations neutral)")
 
-    # Named stud axis (local Y through the origin = the stack axis) so the
-    # magnifying wheel revolves on it in the M6 mated-DOF assembly.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "stud axis")
+    # Named pin axis (local Y through the origin) so the magnifying wheel
+    # revolves on it in the mated-DOF assembly (Axis1).
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pin axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_symmetric_tolerance(adapter, "PinProfile", "PinDia", PIN_DIA_TOL)
     set_dimension_bilateral_tolerance(
-        adapter, "StudProfile", "StudDia", *deviations(STUD_DIA_BAND)
+        adapter, "PinProfile", "ShankLength", *deviations(SHANK_LEN_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "PinProfile", "ThreadLength", *deviations(THREAD_LEN_BAND)
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(
-        adapter,
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
-    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,
         PART_NAME,

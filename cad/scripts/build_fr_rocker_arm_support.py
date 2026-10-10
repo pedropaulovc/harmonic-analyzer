@@ -81,27 +81,22 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    CASTING_GREEN,
+from _appearance import CASTING_GREEN, apply_color, apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
-    apply_color,
-    apply_material,
-    check,
-    define_centered_rectangle,
-    define_polygon_chain,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain
+from _sketch_rectangle import define_centered_rectangle
 from _holes import blind_hole_volume_mm3, wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,

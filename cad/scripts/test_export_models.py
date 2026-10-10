@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import _common
+import _part_save
 import export_models
 
 
@@ -667,7 +667,7 @@ def test_routine_view_cleanup_preserves_configuration_renders(tmp_path: Path) ->
     for path in (generic_iso, stale_front, stale_top, configured):
         path.write_bytes(b"png")
 
-    _common._prune_stale_part_views(tmp_path, part, ["isometric"])
+    _part_save._prune_stale_part_views(tmp_path, part, ["isometric"])
 
     assert generic_iso.exists()
     assert configured.exists()

@@ -2,29 +2,30 @@ r"""Reproduction script: lever wire -- WIRE 1 of the amplification chain (book
 ch. 20-21, pp. 46-53).
 
 The steel wire that hangs from the output fixture on the magnifying lever's
-vertical rod and wraps the magnifying wheel's 20 mm grooved brass hub (ch. 20
-p. 48: "the output fixture rides on it and the wire to the magnifying wheel
-hooks below"; ch. 21 p. 51 shows it riding the hub groove). Modeled as the
+vertical rod and wraps the brass drum (MHA-MG-010, Ø18.9) pressed on the
+magnifying wheel's front spigot (ch. 20 p. 48: "the output fixture rides on
+it and the wire to the magnifying wheel hooks below"; ch. 21 p. 51 shows it
+riding the hub). Modeled as the
 STRAIGHT REST-POSE RUN only -- a plain cylinder from the fixture's cross-hole
-mouth to the XY-tangent point on the hub groove. The hub wrap, the hook/knot
+mouth to the XY-tangent point on the drum. The drum wrap, the hook/knot
 at the fixture and the wire's compliance are NOT modeled (the kinematic
 coupling stays a Motion-study gear mate -- cad/docs/motion-policy.md); every
 surface stands >= 0.25 off its neighbour so the interference gate reads zero
-(the binding pair is the axle flange's back-face edge vs the spoke fronts --
-see the HUB_END_Z note below).
+(mg_lever_wire_geom.RUN_GAPS: the run vs the rim, spoke and boss pen-side
+faces, and the drum-end z inside the drum's span).
 
 Endpoint derivation lives in the drawing-free ``mg_lever_wire_geom`` module (the
 part's length is the distance between them); ``build_mg_magnifier_assembly``
 imports ``WIRE_START``/``WIRE_END``/``WIRE_LEN`` from THERE and asserts them
 against its own layout anchors, so a layout move fails loud instead of
 leaving a floating wire -- while this script's drawing-contract imports stay
-out of the assembly/wheel recipe closures. The hub-end Z sits in the clear
-axial lane between the wheel-axle flange back face (-141.9) and the spoke
-front faces (-144.9).
+out of the assembly/wheel recipe closures. The drum-end Z (DRUM_END_Z
+-154.91) is the drum's axial middle, between the boss front face (-150.41)
+and the spigot front end (-159.41).
 
 The wire is also the CARRIER of the WIRE-1 coupling: ``YokePlane``, a named
 reference plane parallel to Top (perpendicular to the wire axis) through the
-wheel's hub-pitch yoke point (``YOKE_POINT``). The magnifying wheel's
+wheel's drum-pitch yoke point (``YOKE_POINT``). The magnifying wheel's
 ``WireYokePoint`` is held COINCIDENT to it (the scotch-yoke primitive the
 Motion study's WIRE 2 already proved SolidWorks enforces), so the wheel's
 spin is tied to the lever group's travel along the wire axis -- the
@@ -36,8 +37,8 @@ Dimensions: cad/config/dimensions.yaml ch. 20-21 -- wire dia photo-scaled
 (the book wire is hair-thin; 0.8 keeps it renderable, low confidence).
 
 Layout: wire axis along +Y from the origin (the assembly turns it onto the
-HUB->HOOK direction -- the part ORIGIN is the HUB end, so the Top plane and
-its YokePlane offset sit at the hub-end tangency), length ``WIRE_LEN``.
+DRUM->HOOK direction -- the part ORIGIN is the DRUM end, so the Top plane and
+its YokePlane offset sit at the drum-end tangency), length ``WIRE_LEN``.
 
 Run (SolidWorks already open)::
 
@@ -49,22 +50,17 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    SketchDims,
-    apply_material,
-    check,
-    define_circle,
-    drive_dimension,
-    ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
-)
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, ensure_fully_defined
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -79,7 +75,7 @@ from mg_lever_wire_spec import (
 )
 
 PART_NAME = "mg-lever-wire"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 # The endpoint/yoke SOLVER lives in the drawing-free ``mg_lever_wire_geom`` module
 # (codex #360): the wheel + assembly import the anchors from THERE, so this
@@ -141,7 +137,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven lever wire (equations neutral)", v_wire, 0.005 * v_wire)
 
     # YokePlane: the WIRE-1 coupling plane, parallel to Top (perpendicular to
-    # the wire axis) through the wheel's hub-pitch yoke point -- see module
+    # the wire axis) through the wheel's drum-pitch yoke point -- see module
     # docstring. Blanked so the infinite plane never renders in assemblies.
     check(
         "create_plane YokePlane",
@@ -162,7 +158,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "HookPoint")
 
-    # HubPoint: the HUB-end face centre (= the part origin), same arc-centre
+    # HubPoint: the DRUM-end face centre (= the part origin), same arc-centre
     # idiom on the bottom edge. The assembly's wire-SWING park driver pins this
     # point's distance to a machine plane: the swing lever arm is the whole
     # wire length, so the driver is well-conditioned where the old
@@ -180,7 +176,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, (("HookPoint", "DATUMPOINT"), ("HubPoint", "DATUMPOINT"))
     )
 
-    # Named centreline axis (local Y): the hub STAND-OFF mate holds this axis
+    # Named centreline axis (local Y): the drum STAND-OFF mate holds this axis
     # at the offset-tangency distance from the wheel's Axis1 (axis-axis
     # distance -- skew lines have ONE minimal distance, so no far-side flip,
     # and name selection survives solver motion, unlike a point-picked face).

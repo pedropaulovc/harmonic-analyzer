@@ -1,0 +1,15 @@
+vn-wheel-axle-front-washer:
+  title: Wheel Axle Front Washer
+  number: MHA-VN-055
+  stock_name: Brass Washer for Number 4 Screw Size
+  supplier: McMaster-Carr
+  supplier_skus: [92916A250]
+  material: Brass
+  material_specification: "Brass washer, #4, 0.120 ID x 0.281 OD; McMaster-Carr 92916A250"
+  finish: plain; no coating
+  installation_notes: |-
+    INSTALLATION - ON THE MG-WHEEL-AXLE #4-40 END, BETWEEN THE
+    MAGNIFYING WHEEL SPIGOT AND THE FIRST MHA-VN-025 NUT.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

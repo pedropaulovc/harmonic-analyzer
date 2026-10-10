@@ -11,8 +11,8 @@ marked-dimension map keeps the part marks and drawing keeps in lockstep
 from __future__ import annotations
 
 import _config
-from _fit_limits import REAM_H7
-from _gtol_spec import SphereFace
+from _fit_ream_h7 import REAM_H7
+from _gtol_sphere import SphereFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_cam_pin_geometry import (
     CAP_RADIUS as CAP_RADIUS,
