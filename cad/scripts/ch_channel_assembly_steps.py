@@ -34,6 +34,7 @@ SEQUENCE: tuple[str, ...] = (
     "south-washer-fitted",
     "south-bracket-spring-set",
     "shaft-cut-to-fit",
+    "set-screws-driven",
     "preload-accepted",
 )
 

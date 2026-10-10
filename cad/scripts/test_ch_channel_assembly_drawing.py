@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from _assembly_contract import assembly_contract
 import _config
@@ -110,11 +111,9 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
         # ... and that drive-train step names the pinning step it relies on.
         (fitup_number, steps.RODS_PINNED_REF): "ROD FORK TO ITS",
         (fitup_number, f"{frame_number} STEP 8"): f"{support} ON DECK",
-        # The north bracket comes off again at the drive-train step that sets
-        # it: the channel sheet threads the shaft and refits it, and the DRO
-        # zero must last through the cut-to-fit refit.
-        (fitup_number, steps.step_ref("north-ear-datum")): "THREAD THE",
-        (fitup_number, steps.step_ref("shaft-cut-to-fit")): "CUT THE PLAIN END",
+        # The drive-train step that sets the north bracket keeps the miced
+        # north washer for the channel sheet's threading of the shaft.
+        (fitup_number, steps.step_ref("north-ear-datum")): "PUSH THE",
     }
     found = set()
     for sheet, bodies in sheets.items():
@@ -127,12 +126,15 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     north_label = str(dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY))
     north = sheets[fitup_number][north_label]
     assert "EAR INNER FACE TO Y" in north and "DRO STILL ZEROED AS 9A" in north
-    # The shoulder cannot pass the set ear: the bracket comes off again, and
-    # the channel sheet threads the shaft from the north and rechecks its Y.
-    assert "UNSCREW IT AND LIFT IT OFF" in north
+    # The plain shaft threads through the set ear: the bracket stays down,
+    # and the channel sheet threads the shaft and the miced washer from the
+    # north.
+    assert "LIFT IT OFF" not in north
+    assert "MIC ONE MHA-CH-009, W" in north
     north_ear = _step_body("north-ear-datum")
-    assert "BODY FIRST FROM THE NORTH" in north_ear
-    assert f"RECHECK ITS S-OFFSET Y AS {steps.NORTH_BRACKET_SET_REF}" in north_ear
+    washer = _config.parts("ch-rocker-thrust-washer")["number"]
+    assert "UNCUT END FIRST" in north_ear and "SOUTH THROUGH THE EAR" in north_ear
+    assert f"ITS MICED {washer}" in north_ear
     # Positive control: the step before it is the bank's end play, not the ear.
     assert f"NORTH {bracket}" not in sheets[fitup_number]["9F"]
     # It follows 9F, the bank's last sub-step, on the bank sheet: the rig's
@@ -169,7 +171,7 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     assert "PULL THE BLADE" in setting
     accept = _step_body("preload-accepted")
     assert "PUSHED SOUTH," in accept
-    assert "SPRING BACK ONTO THE NORTH EAR" in accept
+    assert "THE BANK SPRINGS BACK ONTO THE NORTH WASHER" in accept
     assert f"STEP {steps.step_number('south-bracket-spring-set')}" in accept
     stack = _step_body("rocker-stack-accepted")
     assert f"{bank.STACK_L20_ACCEPT[0]:.2f} TO {bank.STACK_L20_ACCEPT[1]:.2f}" in stack
@@ -250,20 +252,67 @@ def test_the_shaft_supplied_long_is_cut_to_fit_before_the_preload_is_accepted() 
     assert f"CUT THE PLAIN END {cut} PAST THE SCRIBE" in body
     assert f"DOME IT {shaft.DOME_HEIGHT:.1f}" in body
     assert "SCRIBE" in body.split("CUT")[0] and "SOUTH EAR'S OUTER FACE" in body
-    # The integral shoulder passes neither ear nor a hub, and the pinned rods
-    # hold the arms at their stations: the shaft comes out only northward with
-    # the north bracket off, and goes back by the threading of the north-ear
-    # step, the south bracket staying down at its spring setting.
-    assert "UNSCREW THE NORTH" in body and "DRAW THE SHAFT NORTH" in body
+    # The pinned rods hold the arms at their stations: the plain shaft comes
+    # out northward through the set north ear and goes back by the threading
+    # of the north-ear step, the south bracket staying down at its spring
+    # setting.
+    assert "NORTH END FLUSH WITH ITS EAR" in body.split("SCRIBE")[0]
+    assert "DRAW IT OUT NORTH" in body and "UNSCREW THE NORTH" not in body
     assert "EACH ARM LEFT HANGING ON ITS ROD" in body
-    # The refit re-threads the washer and spring the draw-out caught: the
-    # first pass fits them after the shaft (CodeRabbit, PR #1292).
+    # The refit re-threads the washers and spring the draw-out caught.
     assert (
-        f"REFIT AS STEP {steps.step_number('north-ear-datum')}, WASHER AND SPRING"
-        " THREADED ON PAST HUB 0;"
+        f"REFIT AS STEP {steps.step_number('north-ear-datum')}, WASHERS AND SPRING"
+        " IN PLACE;"
     ) in body
     assert f"SOUTH EAR AT ITS STEP {steps.step_number('south-bracket-spring-set')} SETTING" in body
-    assert "CATCH WASHER AND SPRING" in body
+    assert "CATCH WASHERS AND SPRING" in body
     assert "UNSCREW THE SOUTH" not in body
     # Positive control: no other step mentions the cut.
     assert "SCRIBE" not in _step_body("south-bracket-spring-set")
+
+
+def test_the_set_screws_go_in_after_the_cut_and_print_the_engagement_fact() -> None:
+    """User, 2026-10-10: one MHA-VN-034 down each ear's apex tap onto the
+    plain shaft's flat, once the shaft is cut and refitted, before the preload
+    is accepted. The step prints the bracket spec's engagement fact, the
+    named exception, from the spec, never typed."""
+    import ch_pivot_bracket_spec as bracket_spec
+
+    set_screw = _config.parts("vn-arbor-set-screw")["number"]
+    key = "set-screws-driven"
+    number = steps.step_number(key)
+    assert steps.step_number("shaft-cut-to-fit") < number
+    assert number < steps.step_number("preload-accepted")
+    body = _step_body(key)
+    assert f"RUN ONE {set_screw} DOWN EACH APEX TAP ONTO ITS FLAT" in body
+    assert "FLATS UP" in body and "NORTH FIRST" in body
+    assert body.endswith(" ".join(bracket_spec.SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT.split()))
+    # Positive control: no other step fits the set screws or prints the fact.
+    for other in steps.SEQUENCE:
+        if other != key:
+            assert set_screw not in _step_body(other)
+    assert drawing.FITUP_STEPS.count("ENGAGEMENT") == 1
+    source = Path(drawing.__file__).read_text(encoding="utf-8").splitlines()
+    emit = next(
+        i for i, line in enumerate(source) if "{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}" in line
+    )
+    assert source[emit - 1].strip() == (
+        "# Named exception: MHA-CH-008 set-screw engagement "
+        '(drawing-simplicity-policy.md, "Named exceptions").'
+    )
+
+
+def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
+    """_interference_contracts restates the ear's arch radius and bore as
+    literals (every assembly imports it); they must be the bracket spec's,
+    and the screws' thread its apex tap's."""
+    import _interference_contracts as ic
+    import ch_pivot_bracket_spec as bracket_spec
+    import vn_arbor_set_screw_spec as screw_spec
+
+    assert ic.PIVOT_EAR_ARCH_AND_BORE == (bracket_spec.EAR_ARCH_R, bracket_spec.BORE_DIA)
+    assert screw_spec.THREAD == bracket_spec.SET_SCREW_THREAD
+    pairs = ic.allowed_interference_pairs("ch-channel")
+    for n in (1, 2):
+        pair = frozenset((f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
+        assert pairs[pair] == ic.PIVOT_EAR_SET_SCREW_LIMIT

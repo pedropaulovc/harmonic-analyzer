@@ -122,7 +122,7 @@ SOURCE_MAP = {
         (("RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0", 'datum="B"'),),
     ),
     "right_view_frame": (
-        "harmonic-analyzer/cad/scripts/draw_ch_pivot_shaft.py:66-70",
+        "harmonic-analyzer/cad/scripts/draw_ch_pivot_shaft.py:59-61",
         (('"*Right"', "Model -Z runs to the sheet's right"),),
     ),
     "rocker_datum_c": (
@@ -396,22 +396,13 @@ def feature_selectors(stem: str) -> dict[str, tuple[FaceSpec, ...]]:
             "profile_outer": (CylinderFace(2 * rocker.R_BOTTOM), right[1], tips[1]),
         }
     if stem == "ch_pivot_shaft":
-        north = -shaft.JOURNAL_LENGTH
-        south = shaft.SHOULDER_SOUTH_Z_MM
         return {
             "pivot_bearing": (shaft.SURFACE_FINISHES[0].face,),
-            "pivot_journal": (shaft.SURFACE_FINISHES[1].face,),
-            "shoulder_od": (CylinderFace(shaft.SHOULDER_DIA),),
-            "shoulder_north_face": (PlanarFace((0, 0, 1), north),),
-            "shoulder_thrust": (shaft.SURFACE_FINISHES[2].face,),
-            "north_relief": (
-                CylinderFace(shaft.RELIEF_DIA, contains_z_mm=north + shaft.RELIEF_WIDTH / 2),
-                PlanarFace((0, 0, -1), -(north + shaft.RELIEF_WIDTH)),
-            ),
-            "south_relief": (
-                CylinderFace(shaft.RELIEF_DIA, contains_z_mm=south - shaft.RELIEF_WIDTH / 2),
-                PlanarFace((0, 0, 1), south - shaft.RELIEF_WIDTH),
-            ),
+            # Both flats face +Y on one plane; each is named by its station.
+            **{
+                f"{side}_flat": (PlanarFace((0, 1, 0), shaft.FLAT_AF - shaft.SHAFT_DIA / 2, contains_z_mm=-station),)
+                for side, station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, strict=True)
+            },
             "north_dome": (SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, shaft.DOME_HEIGHT - shaft.DOME_SPHERE_RADIUS)),),
             "south_dome": (SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, -bank.PIVOT_SHAFT_LENGTH + shaft.DOME_SPHERE_RADIUS - shaft.DOME_HEIGHT)),),
         }
@@ -547,54 +538,32 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
 def _shaft_features() -> dict[str, dict[str, Any]]:
     p = shaft.DRAWING_PRECISION_BY_NAME
     result = {}
-    for name, probe, length in (
-        ("pivot_bearing", shaft.BODY_PROBE_Z_MM, None),
-        ("pivot_journal", shaft.JOURNAL_PROBE_Z_MM, shaft.JOURNAL_LENGTH),
-    ):
-        fields = {
-            "at": ([0.0, 0.0, probe], ("BODY_PROBE_Z_MM" if length is None else "JOURNAL_PROBE_Z_MM",)),
-            "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
-            "dia": (_band(shaft.SHAFT_DIA, p["ShaftDia"], shaft.SHAFT_DIA_BAND), ("SHAFT_DIA", "SHAFT_DIA_BAND")),
-            "dia_nominal": (shaft.SHAFT_DIA, ("SHAFT_DIA",)),
-            "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        }
-        requirements = ["dia", "finish_ra"]
-        precision = {"dia": p["ShaftDia"], "finish_ra": 1}
-        if length is not None:
-            fields["length"] = (_band(length, p["JournalLength"]), ("JOURNAL_LENGTH",))
-            fields["length_nominal"] = (length, ("JOURNAL_LENGTH",))
-            requirements.append("length")
-            precision["length"] = p["JournalLength"]
-        else:
-            fields["length_ref"] = (bank.PIVOT_SHAFT_LENGTH, ("LENGTH_CALLOUT",))
-            fields["note"] = (shaft.LENGTH_CALLOUT, ("LENGTH_CALLOUT",))
-        result[name] = _feature(shaft, "shaft", requirements, fields, precision=precision)
-    result["pivot_bearing"]["cite"]["length_ref"] += _cite(bank, "PIVOT_SHAFT_LENGTH")
-    result["shoulder_od"] = _feature(shaft, "boss", ["dia"], {
-        "dia": (_band(shaft.SHOULDER_DIA, p["ShoulderDia"]), ("SHOULDER_DIA",)),
-        "dia_nominal": (shaft.SHOULDER_DIA, ("SHOULDER_DIA",)),
-    }, precision={"dia": p["ShoulderDia"]})
-    result["shoulder_north_face"] = _feature(shaft, "face", ["length"], {
-        "length": (_band(shaft.SHOULDER_LENGTH, p["ShoulderLength"]), ("SHOULDER_LENGTH",)),
-        "length_nominal": (shaft.SHOULDER_LENGTH, ("SHOULDER_LENGTH",)),
-        "plane": ({"frame": "model", "axis": "z", "value": -shaft.JOURNAL_LENGTH}, ("JOURNAL_LENGTH",)),
-    }, precision={"length": p["ShoulderLength"]})
-    result["shoulder_thrust"] = _feature(shaft, "face", ["length", "finish_ra"], {
-        "length": (_band(shaft.SHOULDER_LENGTH, p["ShoulderLength"]), ("SHOULDER_LENGTH",)),
-        "length_nominal": (shaft.SHOULDER_LENGTH, ("SHOULDER_LENGTH",)),
-        "upper_z": (-shaft.JOURNAL_LENGTH, ("JOURNAL_LENGTH",)),
-        "lower_z": (shaft.SHOULDER_SOUTH_Z_MM, ("SHOULDER_SOUTH_Z_MM",)),
+    result["pivot_bearing"] = _feature(shaft, "shaft", ["dia", "finish_ra"], {
+        "at": ([0.0, 0.0, shaft.BODY_PROBE_Z_MM], ("BODY_PROBE_Z_MM",)),
+        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "dia": (_band(shaft.SHAFT_DIA, p["ShaftDia"], shaft.SHAFT_DIA_BAND), ("SHAFT_DIA", "SHAFT_DIA_BAND")),
+        "dia_nominal": (shaft.SHAFT_DIA, ("SHAFT_DIA",)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        "plane": ({"frame": "model", "axis": "z", "value": shaft.SHOULDER_SOUTH_Z_MM}, ("SHOULDER_SOUTH_Z_MM",)),
-    }, precision={"length": p["ShoulderLength"], "finish_ra": 1})
-    for name, z in (("north_relief", -shaft.JOURNAL_LENGTH + shaft.RELIEF_WIDTH / 2), ("south_relief", shaft.SHOULDER_SOUTH_Z_MM - shaft.RELIEF_WIDTH / 2)):
-        result[name] = _feature(shaft, "groove", ["dia", "width"], {
-            "dia": (_band(shaft.RELIEF_DIA, p["ReliefDia"]), ("RELIEF_DIA",)),
-            "dia_nominal": (shaft.RELIEF_DIA, ("RELIEF_DIA",)),
-            "width": (_band(shaft.RELIEF_WIDTH, p["ReliefWidth"]), ("RELIEF_WIDTH",)),
-            "width_nominal": (shaft.RELIEF_WIDTH, ("RELIEF_WIDTH",)),
-            "at": ([0.0, 0.0, z], ("JOURNAL_LENGTH", "SHOULDER_LENGTH", "RELIEF_WIDTH")),
-        }, precision={"dia": p["ReliefDia"], "width": p["ReliefWidth"]})
+        "length_ref": (bank.PIVOT_SHAFT_LENGTH, ("LENGTH_CALLOUT",)),
+        "note": (shaft.LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
+    }, precision={"dia": p["ShaftDia"], "finish_ra": 1})
+    result["pivot_bearing"]["cite"]["length_ref"] += _cite(bank, "PIVOT_SHAFT_LENGTH")
+    # The set-screw flats: milled faces on +Y, stations from the north end.
+    for side, station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, strict=True):
+        dimension = f"{side.capitalize()}FlatStation"
+        result[f"{side}_flat"] = _feature(shaft, "face", ["height", "length", "station"], {
+            # The across-flats: the flat's height over the round opposite it.
+            "height": (_band(shaft.FLAT_AF, p["FlatAF"]), ("FLAT_AF",)),
+            "height_nominal": (shaft.FLAT_AF, ("FLAT_AF",)),
+            "height_from": ("pivot_bearing", ("FLAT_AF",)),
+            "length": (_band(shaft.FLAT_LENGTH, p["FlatLength"]), ("FLAT_LENGTH",)),
+            "length_nominal": (shaft.FLAT_LENGTH, ("FLAT_LENGTH",)),
+            "station": (_band(station, p[dimension]), ("NORTH_FLAT_STATION",)),
+            "station_nominal": (station, ("NORTH_FLAT_STATION",)),
+            "plane": ({"frame": "model", "axis": "y", "value": shaft.FLAT_AF - shaft.SHAFT_DIA / 2}, ("FLAT_AF", "SHAFT_DIA")),
+        }, precision={"height": p["FlatAF"], "length": p["FlatLength"], "station": p[dimension]})
+        result[f"{side}_flat"]["cite"]["station"] += _cite(bank, "PIVOT_SHAFT_FLAT_STATIONS")
+        result[f"{side}_flat"]["cite"]["station_nominal"] += _cite(bank, "PIVOT_SHAFT_FLAT_STATIONS")
     for name, z in (("north_dome", 0.0), ("south_dome", -bank.PIVOT_SHAFT_LENGTH)):
         result[name] = _feature(shaft, "dome", ["height"], {
             "height": (_band(shaft.DOME_HEIGHT, p["DomeHeight"]), ("DOME_HEIGHT",)),
@@ -605,19 +574,12 @@ def _shaft_features() -> dict[str, dict[str, Any]]:
         }, precision={"height": p["DomeHeight"]})
     result["south_dome"]["cite"]["base_z"] = _cite(bank, "PIVOT_SHAFT_LENGTH")
     # Model Z is the turned axis, origin at the north end of the cylinder.
-    # Each O.D. spans its drawn length; the relief grooves overlay it at the
-    # shoulder faces, as prechips gives a groove priority over its cylinder.
-    # Each dome rises from a cylinder end to its apex.
-    north, south = -shaft.JOURNAL_LENGTH, shaft.SHOULDER_SOUTH_Z_MM
-    shoulder = ("JOURNAL_LENGTH", "SHOULDER_LENGTH", "SHOULDER_SOUTH_Z_MM")
+    # The O.D. spans the whole cylinder (the set-screw flats are milled, not
+    # turned); each dome rises from a cylinder end to its apex.
     length = bank.PIVOT_SHAFT_LENGTH
     for name, low, high, names, bank_names in (
         ("north_dome", 0.0, shaft.DOME_HEIGHT, ("DOME_HEIGHT",), ()),
-        ("pivot_journal", north, 0.0, ("JOURNAL_LENGTH",), ()),
-        ("north_relief", north, north + shaft.RELIEF_WIDTH, ("JOURNAL_LENGTH", "RELIEF_WIDTH"), ()),
-        ("shoulder_od", south, north, shoulder, ()),
-        ("south_relief", south - shaft.RELIEF_WIDTH, south, (*shoulder, "RELIEF_WIDTH"), ()),
-        ("pivot_bearing", -length, south, shoulder, ("PIVOT_SHAFT_LENGTH",)),
+        ("pivot_bearing", -length, 0.0, (), ("PIVOT_SHAFT_LENGTH",)),
         ("south_dome", -length - shaft.DOME_HEIGHT, -length, ("DOME_HEIGHT",), ("PIVOT_SHAFT_LENGTH",)),
     ):
         _z_mm(result[name], low, high, [*_cite(shaft, *names), *_cite(bank, *bank_names)])
