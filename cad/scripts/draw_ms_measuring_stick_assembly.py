@@ -129,7 +129,8 @@ BOM_SKU_TITLE = "VENDOR SKU"
 MADE_PART_SKU = "-"
 BOM_ROW_HEIGHT = 0.006
 EXPLODED_CAPTION = "EXPLODED - ASSEMBLE IN REVERSE ORDER, SEE SHEET 3"
-EXPLODED_CAPTION_XY = (0.018, 0.354)
+# Native wrapped BOM rows end at 343.8 mm, so use the clear strip above its top.
+EXPLODED_CAPTION_XY = (0.018, 0.415)
 
 # Sheet 3: the order and checks down the left; the finished isometric right.
 ASSEMBLY_ISO_CENTER = (0.315, 0.170)
