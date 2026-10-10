@@ -2300,6 +2300,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "export_features",
         "fr_harmonic_base_fasteners",
         "fr_top_frame_spec",
+        "sm_gooseneck_spring_joint",
+        "sm_gooseneck_spring_screw_spec",
         "sm_knife_mount_spec",
         "vn_guide_lock_screw_spec",
         "vn_post_mount_screw_spec",
