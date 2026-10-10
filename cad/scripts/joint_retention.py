@@ -230,6 +230,15 @@ RULINGS: dict[str, Ruling] = {
             "flange sweeps r ~23 inside the chain band (plates' inner edge r 21.2)"
         ),
     ),
+    "U-MHA-VN-034-channel-threadlocker": Ruling(
+        joint="ch-channel/pivot-bracket-apex-set-screw",
+        granted=(
+            "user, 2026-10-10, joint-specific rule-9 ruling relayed on PR #1317's Codex review: "
+            "waived; light spring preload and small hub drag; Loctite 222. Each MHA-VN-034 goes "
+            "in snug on its flat with Loctite 222 (removable threadlocker), as the MHA-VN-041 "
+            "pivot screw keeps its low-strength threadlocker"
+        ),
+    ),
 }
 
 
@@ -1235,16 +1244,15 @@ JOINTS: tuple[Joint, ...] = (
             "in rotation; the 20 MHA-CH-006 hubs rock on that shaft with every cam turn, so their journal drag, "
             "which reverses each stroke, reaches the screw through the flat it bears on"
         ),
-        axial_capture="cup point tightened on a flat milled on MHA-CH-005 under the ear's apex tap; screw rides only its own #4-40 thread in the R8 arch wall",
-        lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
+        axial_capture="cup point snugged on a flat milled on MHA-CH-005 under the ear's apex tap; screw rides only its own #4-40 thread in the R8 arch wall",
+        lock=Lock.THREADLOCKER_ONLY,
+        lock_step="set-screws-driven",
+        exception="U-MHA-VN-034-channel-threadlocker",
         evidence=(
             "draw_ch_channel_assembly.py _fitup_steps 'set-screws-driven' ('RUN ONE MHA-VN-034 DOWN EACH APEX TAP "
-            "ONTO ITS FLAT, NORTH FIRST; TIGHTEN.'); build_ch_channel_assembly.py apex set screw placement "
-            "(SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) and "
-            "SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH); no threadlocker"
+            "ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG.'); build_ch_channel_assembly.py apex set screw "
+            "placement (SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) "
+            "and SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH)"
         ),
     ),
     Joint(

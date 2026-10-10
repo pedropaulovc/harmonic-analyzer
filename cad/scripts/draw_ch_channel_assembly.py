@@ -126,9 +126,11 @@ def _fitup_steps() -> str:
             f"{DOME_HEIGHT:.1f}. REFIT AS STEP {north_step}, WASHERS AND SPRING "
             f"IN PLACE; SOUTH EAR AT ITS STEP {set_step} SETTING."
         ),
+        # Rule 9 waived for this joint only (joint_retention RULINGS
+        # "U-MHA-VN-034-channel-threadlocker", user 2026-10-10).
         "set-screws-driven": (
             f"NORTH END FLUSH, FLATS UP: RUN ONE {set_screw} DOWN EACH APEX "
-            "TAP ONTO ITS FLAT, NORTH FIRST; TIGHTEN. "
+            "TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. "
             # Named exception: MHA-CH-008 set-screw engagement (drawing-simplicity-policy.md, "Named exceptions").
             f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
         ),

@@ -218,8 +218,8 @@ stock_in = "S1"
 
 [setups.stock_state]
 od_mm = 6.35
-north_end_x = -1.5           # the north dome's apex, past M2 X0
-south_end_x = 173.5          # supply end, uncut
+top_z = 3.175                # bar top = axis + 6.35/2 (zero.z below)
+note = "Along M2 X the north dome's apex sits at X-1.5, past X0 on its base rim; the supply end, uncut, at X173.5."
 
 [setups.stock_state.local_thickness]
 # no holes on this part
@@ -235,7 +235,7 @@ parallels = "not_applicable"
 jaw_above_parallels_mm = "not_applicable"
 stop = "north dome base rim touched off with the edge finder, M2 X0"  # author's choice
 clamp = "close the vise on the V-blocks by hand; check the bar cannot roll"  # author's choice
-stickout_mm = "not_applicable"
+note = "No stick-out: the bar lies along the vise in V-blocks, not cantilevered from a chuck."
 
 [setups.zero.transfer]
 from = "S1"
@@ -268,10 +268,8 @@ feature = "north_flat"
 tool = "endmills-lms-6784"
 holder = "unknown"
 to_z = 2.675                 # flat plane = AF 5.850 - 6.35/2 above the axis
-x_from = 1.5                 # station 4.0 - length 5.0/2
-x_to = 6.5                   # station 4.0 + length 5.0/2
 direction = "positive_setup_x"
-note = "Plunge-free side passes across the bar; flat 5.0 long centred 4.0 from the north end."
+note = "Plunge-free side passes across the bar from M2 X1.5 to X6.5 (station 4.0 -/+ length 5.0/2): flat 5.0 long centred 4.0 from the north end."
 
 [setups.ops.checks]
 height = "micrometers/0-1in"
@@ -285,10 +283,8 @@ feature = "south_flat"
 tool = "endmills-lms-6784"
 holder = "unknown"
 to_z = 2.675
-x_from = 152.81              # station 155.31 - 2.5
-x_to = 157.81                # station 155.31 + 2.5
 direction = "positive_setup_x"
-note = "Same Z as op 10 without moving the knee: the two flats are in line. Station from the north end, not the uncut plain end."
+note = "From M2 X152.81 to X157.81 (station 155.31 -/+ 2.5), at the same Z as op 10 without moving the knee: the two flats are in line. Station from the north end, not the uncut plain end."
 
 [setups.ops.checks]
 height = "micrometers/0-1in"
