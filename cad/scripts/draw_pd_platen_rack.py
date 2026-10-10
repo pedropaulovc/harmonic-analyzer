@@ -57,7 +57,6 @@ SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.190, 0.185)
 TOP_CENTER = (FRONT_CENTER[0], 0.230)
-RIGHT_CENTER = (0.375, FRONT_CENTER[1])
 END_CENTER = (0.355, 0.120)
 END_SCALE = (4, 1)
 ISO_CENTER = (0.155, 0.115)
@@ -80,7 +79,9 @@ GEAR_DATA_XY = (0.020, 0.254)
 # so it runs down-right clear of its own text and left of the Length
 # dimension line's start.
 FLANK_INSPECTION_XY = (0.016, 0.214)
-NOTES_XY = (0.020, 0.073)
+# Under the isometric's label (y ~0.077, run 9 touched its first line), left
+# of the title block (x 0.216) and above the border.
+NOTES_XY = (0.020, 0.064)
 # Centred under the 4:1 end view (axis x ~0.355), between the BackerDepth
 # dimension line (y ~0.0795) and the title block top (y 0.066).
 END_NOTE_XY = (0.330, 0.074)
@@ -230,10 +231,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=END_SCALE)
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, top, right, end):
+    for view in (front, top, end):
         set_hidden_lines_removed(adapter, view)
 
     annotations = [
@@ -263,7 +263,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         add_property_linked_note(adapter, property_name, *position, char_height=0.0025)
     flank_callout = _add_rack_flank_callout(adapter, front)
-    for view in (front, top, right, end):
+    for view in (front, top, end):
         set_hidden_lines_removed(adapter, view)
     return await finalize_drawing(
         adapter,

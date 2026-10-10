@@ -154,13 +154,14 @@ def test_sheet_has_aligned_clean_views_and_a_legible_stepped_end() -> None:
     assert drawing.SPEC.source_kind == "part"
     assert drawing.SPEC.part == "pd_platen_rack"
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
-    assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
     assert drawing.END_SCALE[0] / drawing.END_SCALE[1] > (
         drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
     )
     assert drawing.ISO_SCALE == (1, 2)
     assert drawing.curate_view_dimensions.__module__ == "_drawing_hidden_sketches"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # The 4:1 end view is the only *Right: a 1:1 copy of it duplicated it.
+    assert source.count('"*Right"') == 1
     tree = ast.parse(source)
     orientations = {
         arg.value
