@@ -684,8 +684,10 @@ def crank_axis_global_xy_bounds(z_mm: float, angle_deg: float = 0.0, *, relative
     if not relative_to_base:
         bands[0] += printed_band_mm(base.DRAWING_PRECISION_BY_NAME["BottomLen"]) / 2.0
         bands[2] += printed_band_mm(base.DRAWING_PRECISION_BY_NAME["BottomWid"]) / 2.0
+        # The deck top's printed chain from the underside (#1310): the flange
+        # thickness, then FlangeToDeck up to the deck the post seats on.
         bands[1] += sum(printed_band_mm(base.DRAWING_PRECISION_BY_NAME[name])
-                        for name in ("BottomThickness", "FlangeToRim", "RimHeight"))
+                        for name in ("BottomThickness", "FlangeToDeck"))
     boss_places = post.DRAWING_PRECISION_BY_NAME["CrankBossLen"]
     boss_min = round(post.CRANK_BOSS_LENGTH, boss_places) - printed_band_mm(boss_places)
     # The FCF fixes crank relative to cone datum A and foot B, NOT relative
