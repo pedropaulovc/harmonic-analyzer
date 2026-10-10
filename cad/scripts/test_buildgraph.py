@@ -1663,6 +1663,24 @@ def test_data_deps_of_keeps_missing_referenced_artefact():
         script.unlink()
 
 
+def test_data_deps_of_ignores_prose_naming_a_dxf():
+    """A drawing note that mentions a DXF is not a data dependency: only the bare
+    filename literal is (part:ms_stick failed on the farm when the note string
+    "NUMERAL OUTLINES PER SUPPLIED MS-STICK-NUMERALS.DXF" became a file_dep)."""
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".py", dir=SCRIPTS_DIR, delete=False
+    ) as fh:
+        fh.write(
+            'PATH = REFERENCES_DIR / "real-xyz.dxf"\n'
+            'NOTE = "OUTLINES PER SUPPLIED REAL-XYZ.DXF"\n'
+        )
+        script = Path(fh.name)
+    try:
+        assert [Path(d).name for d in data_deps_of(script)] == ["real-xyz.dxf"]
+    finally:
+        script.unlink()
+
+
 def test_data_deps_of_follows_a_same_tick_rewrite():
     """Source texts are memoized per process, but an edit must still move the
     graph: once the script names new.dxf, a stale old.dxf edge would leave the
