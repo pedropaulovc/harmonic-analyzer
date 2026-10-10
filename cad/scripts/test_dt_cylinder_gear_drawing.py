@@ -550,20 +550,18 @@ class _PatternDisplay:
     def __init__(self, fault=None):
         self.fault = fault
         self.dimension = None if fault == "null_dimension" else _PatternDimension(fault)
-        self._parentheses = False
+        self.text = {}
 
     @property
     def Type2(self):
         return 2 if self.fault == "linear" else 3
 
-    @property
-    def ShowParenthesis(self):
-        return self._parentheses
-
-    @ShowParenthesis.setter
-    def ShowParenthesis(self, value):
+    def SetText(self, part, text):
         if self.fault != "parentheses_unmoved":
-            self._parentheses = value
+            self.text[part] = text
+
+    def GetText(self, part):
+        return self.text.get(part, "")
 
     def GetDimension2(self, index):
         assert index == 0
@@ -583,7 +581,13 @@ def _pattern_bindings(monkeypatch):
     monkeypatch.setattr(
         drawing, "dimension_name", lambda adapter, annotation: "PatternNotchPhase"
     )
-    return SimpleNamespace()
+    import _drawing_common
+
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda value, *_names: value
+    )
+    monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda adapter, label: None)
+    return SimpleNamespace(_attempt=lambda fn, default=None: fn())
 
 
 def test_pattern_notch_prints_as_a_parenthesized_reference(monkeypatch) -> None:
@@ -591,7 +595,8 @@ def test_pattern_notch_prints_as_a_parenthesized_reference(monkeypatch) -> None:
     annotation = _PatternAnnotation()
     display = drawing._pattern_notch_reference(adapter, [annotation])
     assert display is annotation.display
-    assert display.ShowParenthesis is True
+    # Main's reference form, as (Ø9.575): f68549253's ShowParenthesis printed 90°.
+    assert (display.GetText(1), display.GetText(2)) == ("(", ")")
 
 
 @pytest.mark.parametrize(
