@@ -50,6 +50,7 @@ from _common import (
     _early_bound,
     add_line_chain,
     anchor_point_to_origin,
+    anchor_point_to_point,
     apply_color,
     apply_material,
     bbox_extent_check,
@@ -79,6 +80,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_prefix,
 )
 from _holes import (
     DRILL_POINT_H,
@@ -124,6 +126,7 @@ from fr_harmonic_base_spec import (
     TOP_LENGTH,
     TOP_THICKNESS,
     TOP_WIDTH,
+    UNDERSIDE_PAD_PREFIXES,
 )
 import fr_nameplate_spec
 from dt_cone_pivot_post_installation import (
@@ -1737,20 +1740,83 @@ async def build(adapter) -> dict[str, str]:
 
     # Hanging bosses under the blind deck seats and the lugs under the cross
     # taps (HANGING_SEATS, CROSS_TAP_LUG_SHAPES): one sketch per cast level.
+    #
+    # The rect pads and the lugs stand under seats the hole table does not
+    # locate (transfer seats) or under cross taps, so the drawing places them
+    # from the table's own X0 Y0: the flange's rear-west theoretical sharp
+    # corner, one datum per view (drawing policy rule 7). Each sketch carries
+    # that corner as a point, and every such feature is dimensioned FROM it,
+    # so the printed locations are these sketches' own driving dims (Codex P2
+    # on #1310: the pads printed no size or place).
+    async def _table_origin(dims: SketchDims, tag: str) -> str:
+        """Add and anchor this sketch's X0 Y0 point; return its entity id."""
+        manager = adapter.currentSketchManager
+        previous = bool(manager.AddToDB)
+        # Inference would snap the point onto the flange profile's corner,
+        # adding a relation that over-defines the anchor dims below.
+        manager.AddToDB = True
+        try:
+            raw = manager.CreatePoint(
+                -BOTTOM_LENGTH / 2000.0, -BOTTOM_WIDTH / 2000.0, 0.0
+            )
+        finally:
+            manager.AddToDB = previous
+        if raw is None:
+            raise RuntimeError(f"{tag}: X0 Y0 point creation failed")
+        origin = adapter._register_sketch_entity("Point", raw)
+        await anchor_point_to_origin(
+            adapter, origin, -BOTTOM_LENGTH / 2.0, -BOTTOM_WIDTH / 2.0, f"{tag} X0 Y0"
+        )
+        dims.record(f"{tag}OriginX", '"BottomLength" / 2')
+        dims.record(f"{tag}OriginY", '"BottomWidth" / 2')
+        return origin
+
+    def _from_origin(x: float, sketch_y: float) -> tuple[float, float]:
+        """Hole-table (X, Y) of a Top-plane sketch point (sketch y = -z)."""
+        return x + BOTTOM_LENGTH / 2.0, sketch_y + BOTTOM_WIDTH / 2.0
+
     async def _pad(
         dims: SketchDims,
         shape: PocketShape,
         label: str,
         names: list[str | None],
         drives: list[str | None],
+        *,
+        origin: str,
+        location: tuple[str, str],
+        corner: int = 0,
+        sizes: tuple[int, int] = (0, 1),
     ) -> None:
-        """Sketch one rect shape: x size, then z size, from its NW corner."""
+        """Sketch one rect shape: x size on line ``sizes[0]``, then z size on
+        line ``sizes[1]`` (each the side the drawing can see), then vertex
+        ``corner`` (default the NW one, nearest X0 Y0) at its table X and Y."""
         _kind, x0, x1, z0, z1 = shape
         points = [(x0, -z1), (x1, -z1), (x1, -z0), (x0, -z0)]
         lines = await add_line_chain(adapter, points)
-        await define_rectilinear_chain(
-            adapter, lines, points, label=label, dims=dims, names=names, drives=drives
+        directions = ("horizontal", "vertical", "horizontal", "vertical")
+        for line, direction in zip(lines, directions, strict=True):
+            check(
+                f"{label} {direction} {line}",
+                await adapter.add_sketch_constraint(line, None, direction),
+            )
+        # One size per direction; H/V and closure supply the other two sides.
+        for line, kind, span, name, drive in (
+            (lines[sizes[0]], "horizontal_distance", x1 - x0, names[0], drives[0]),
+            (lines[sizes[1]], "vertical_distance", z1 - z0, names[1], drives[1]),
+        ):
+            await dimension_between(
+                adapter, f"{line}.start", f"{line}.end", kind, span, f"{label} {line}"
+            )
+            dims.record(name, drive)
+        await anchor_point_to_point(
+            adapter,
+            origin,
+            f"{lines[corner]}.start",
+            *_from_origin(*points[corner]),
+            f"{label} from X0 Y0",
         )
+        dims.record(location[0])
+        dims.record(location[1])
 
     async def _hanging_feature(
         tag: str,
@@ -1787,6 +1853,7 @@ async def build(adapter) -> dict[str, str]:
         return volume
 
     async def _deep_sketch(sketch: SketchDims) -> None:
+        origin = await _table_origin(sketch, "DeepBoss")
         for i, (x, z) in enumerate(DEEP_BOSS_CENTRES):
             await define_circle(
                 adapter,
@@ -1808,6 +1875,8 @@ async def build(adapter) -> dict[str, str]:
             "cone-lock pad",
             ["LockPadWidth", "LockPadLength"],
             ['"HangingBossDia"', None],
+            origin=origin,
+            location=("LockPadX", "LockPadY"),
         )
         for i, shape in enumerate(PEDESTAL_PAD_SHAPES):
             await _pad(
@@ -1819,6 +1888,11 @@ async def build(adapter) -> dict[str, str]:
                     "PedestalPadLength" if i == 0 else f"PedestalPad{i}Length",
                 ],
                 ['"HangingBossDia"', '"PedestalPadLength"'],
+                origin=origin,
+                location=(f"PedestalPad{i}X", f"PedestalPad{i}Y"),
+                # The front edge and the west side: the lock pad's end and
+                # the front block pad's Y line keep the others' air.
+                sizes=(2, 3),
             )
 
     v_hang = await _hanging_feature(
@@ -1835,6 +1909,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     async def _shallow_sketch(sketch: SketchDims) -> None:
+        origin = await _table_origin(sketch, "ShallowBoss")
         for i, (x, z) in enumerate(SHALLOW_BOSS_CENTRES):
             await define_circle(
                 adapter,
@@ -1856,6 +1931,13 @@ async def build(adapter) -> dict[str, str]:
                     f"BlockPad{i}Width",
                 ],
                 ['"BlockPadLength"', '"HangingBossDia"'],
+                origin=origin,
+                location=(f"BlockPad{i}X", f"BlockPad{i}Y"),
+                # The front pad's Y from its front edge: its back edge lies
+                # 0.4 from the front pedestal pad's. The width on the west
+                # side, the east end standing in the cross rib.
+                corner=3 if i == 0 else 0,
+                sizes=(0, 3),
             )
 
     v_hang = await _hanging_feature(
@@ -1872,7 +1954,13 @@ async def build(adapter) -> dict[str, str]:
     )
 
     async def _lug_sketch(sketch: SketchDims) -> None:
+        origin = await _table_origin(sketch, "Lug")
         for i, shape in enumerate(CROSS_TAP_LUG_SHAPES):
+            _kind, x0, x1, z0, z1 = shape
+            points = [(x0, -z1), (x1, -z1), (x1, -z0), (x0, -z0)]
+            # A lug's outer end and outer side merge into the wall and the
+            # socket boss; only its inner corner stands in the open pocket.
+            inner = min(range(4), key=lambda k: (abs(points[k][0]), abs(points[k][1])))
             await _pad(
                 sketch,
                 shape,
@@ -1882,6 +1970,9 @@ async def build(adapter) -> dict[str, str]:
                     "LugLength" if i == 0 else f"Lug{i}Length",
                 ],
                 ['"LugWidth"', '"LugLength"'],
+                origin=origin,
+                location=(f"Lug{i}X", f"Lug{i}Y"),
+                corner=inner,
             )
 
     v_hang = await _hanging_feature(
@@ -2554,6 +2645,10 @@ async def build(adapter) -> dict[str, str]:
         "SpotFaceDepth",
         *deviations(SPOTFACE_DEPTH_BAND_MM),
     )
+    # A pair's shared size or coordinate prints once, as "2X": the count is
+    # specification, so the part owns it like the places.
+    for (feature_name, dimension_name), prefix in UNDERSIDE_PAD_PREFIXES.items():
+        set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     author_part_pmi(adapter, surface_finishes=PART_SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
     return await _save_with_annotation_free_render(adapter)

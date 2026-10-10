@@ -589,7 +589,7 @@ def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None
     ]
     assert len(plan_views) == len(sheet.PLAN_VIEWS)
     assert sheet.TAPPED_HOLE_NOTES == len(build_features) * len(sheet.PLAN_VIEWS)
-    assert sheet.TAPPED_HOLE_NOTES == 24
+    assert sheet.TAPPED_HOLE_NOTES == 32
 
     finalize = [call for call in calls if getattr(call.func, "id", None) == "finalize_drawing"]
     assert len(finalize) == 1
@@ -1727,7 +1727,7 @@ def test_underside_sheet_views_fit_the_border_clear_of_each_other() -> None:
 
 def test_drawing_keeps_partition_the_part_precision_map() -> None:
     # assert_imported_precision proves every printed dimension at the end of
-    # the build; the six keeps must name each map entry exactly once.
+    # the build; the seven keeps must name each map entry exactly once.
     import draw_fr_harmonic_base as sheet
 
     keeps = (
@@ -1737,12 +1737,285 @@ def test_drawing_keeps_partition_the_part_precision_map() -> None:
         sheet.SECTION_KEEP,
         sheet.HOLE_SIDE_KEEP,
         sheet.UNDERSIDE_BOTTOM_KEEP,
+        sheet.UNDERSIDE_PADS_KEEP,
         sheet.UNDERSIDE_SECTION_TEXT_MM,
     )
     names = [name for keep in keeps for name in keep]
     assert len(names) == len(set(names))
     assert set(names) == set(fr_harmonic_base_spec.DRAWING_PRECISION_BY_NAME)
     assert set(sheet.UNDERSIDE_BOTTOM_CALLOUTS) <= set(sheet.UNDERSIDE_BOTTOM_KEEP)
+
+
+# Sheet text as boxes: 3.5 mm rows, and a generous 2.5 mm a character.
+_DIM_TEXT_H_M = 0.0035
+_DIM_CHAR_M = 0.0025
+_BORDER_INNER_M = (0.0127, 0.0127, 0.4191, 0.2667)
+_TITLE_BLOCK_M = (0.216, 0.0, 0.4318, 0.066)
+
+
+def _box_gap(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    """Clear distance between two (x0, y0, x1, y1) boxes; 0 when they touch."""
+    dx = max(a[0] - b[2], b[0] - a[2], 0.0)
+    dy = max(a[1] - b[3], b[1] - a[3], 0.0)
+    return math.hypot(dx, dy)
+
+
+def _segment_box_gap(segment: tuple[tuple[float, float], ...], box: tuple[float, ...]) -> float:
+    (x0, y0), (x1, y1) = segment
+    return min(
+        _box_gap((x, y, x, y), box)
+        for t in (i / 400.0 for i in range(401))
+        for x, y in [(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)]
+    )
+
+
+def _pads_vertices() -> dict[str, tuple[float, float]]:
+    """Machine (X, Z) of the vertex each sheet-4 baseline dimension reaches."""
+    lock = part.LOCK_PAD_SHAPE
+    ped0, ped1 = part.PEDESTAL_PAD_SHAPES
+    block0, block1 = part.BLOCK_PAD_SHAPES
+    lug0, lug1, _lug2, lug3 = part.CROSS_TAP_LUG_SHAPES
+    return {
+        "Lug1X": (lug1[2], lug1[3]),
+        "LockPadX": (lock[1], lock[4]),
+        "PedestalPad1X": (ped1[1], ped1[4]),
+        "BlockPad1X": (block1[1], block1[4]),
+        "Lug3X": (lug3[1], lug3[3]),
+        "PedestalPad1Y": (ped1[1], ped1[4]),
+        "BlockPad1Y": (block1[1], block1[4]),
+        "Lug1Y": (lug1[2], lug1[3]),
+        "Lug0Y": (lug0[2], lug0[4]),
+        "PedestalPad0Y": (ped0[1], ped0[4]),
+        "BlockPad0Y": (block0[1], block0[3]),
+        "LockPadY": (lock[1], lock[4]),
+    }
+
+
+def _pads_printed() -> dict[str, float]:
+    spec = fr_harmonic_base_spec
+    lock = part.LOCK_PAD_SHAPE
+    ped0 = part.PEDESTAL_PAD_SHAPES[0]
+    block0 = part.BLOCK_PAD_SHAPES[0]
+    printed = {
+        name: (x + spec.BOTTOM_LENGTH / 2.0) if name.endswith("X") else (spec.BOTTOM_REAR_Z - z)
+        for name, (x, z) in _pads_vertices().items()
+    }
+    printed |= {
+        "LockPadWidth": lock[2] - lock[1],
+        "PedestalPadLength": ped0[4] - ped0[3],
+        "PedestalPad0Width": ped0[2] - ped0[1],
+        "BlockPad0Width": block0[4] - block0[3],
+    }
+    return printed
+
+
+def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
+    # Codex P2 on #1310: the 33 mm block pads, 26 mm pedestal pads, cone-lock
+    # pad and 27 x 37 mm lugs printed no size or place. Sheet 4 prints them
+    # from the hole table's X0 Y0, shortest baseline innermost.
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    assert sheet.SHEET_NAMES[3] == "UNDERSIDE-PADS"
+    marked = {name for names in spec.UNDERSIDE_PAD_DIMENSIONS.values() for name in names}
+    assert set(sheet.UNDERSIDE_PADS_KEEP) == marked
+    for feature, names in spec.UNDERSIDE_PAD_DIMENSIONS.items():
+        assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
+    assert {feature for feature, _name in spec.UNDERSIDE_PAD_PREFIXES} <= set(
+        spec.UNDERSIDE_PAD_DIMENSIONS
+    )
+    assert {name for _feature, name in spec.UNDERSIDE_PAD_PREFIXES} <= marked
+    printed = {name: round(value, 1) for name, value in _pads_printed().items()}
+    assert printed == {
+        "Lug1X": 39.6,
+        "LockPadX": 120.5,
+        "PedestalPad1X": 160.2,
+        "BlockPad1X": 197.7,
+        "Lug3X": 417.6,
+        "PedestalPad1Y": 38.5,
+        "BlockPad1Y": 48.3,
+        "Lug1Y": 68.6,
+        "Lug0Y": 218.6,
+        "PedestalPad0Y": 221.6,
+        "BlockPad0Y": 237.2,
+        "LockPadY": 247.6,
+        "LockPadWidth": 16.0,
+        "PedestalPadLength": 26.0,
+        "PedestalPad0Width": 16.0,
+        "BlockPad0Width": 16.0,
+    }
+    # The table's X0 Y0 is the flange's rear-west corner, top left here.
+    assert sheet.PADS_DATUM == pytest.approx(
+        sheet._pads_xy(-spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z)
+    )
+    for baselines in (sheet.PADS_X_ROWS, sheet.PADS_Y_COLUMNS):
+        values = [printed[name] for name, *_ in baselines]
+        assert values == sorted(values)
+
+
+def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    prefixes = {name: prefix for (_f, name), prefix in spec.UNDERSIDE_PAD_PREFIXES.items()}
+    printed = _pads_printed()
+    boxes = {}
+    for name, (x, y) in sheet.UNDERSIDE_PADS_KEEP.items():
+        half_w = len(f"{prefixes.get(name, '')}{printed[name]:.1f}") * _DIM_CHAR_M / 2.0
+        boxes[name] = (x - half_w, y - _DIM_TEXT_H_M / 2.0, x + half_w, y + _DIM_TEXT_H_M / 2.0)
+    view = (
+        *sheet._pads_xy(-spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_FRONT_Z),
+        *sheet._pads_xy(spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z),
+    )
+    # Sheet 4 notes: one view, its texts and the caption all inside the
+    # border, off the title block.
+    rows = sheet.PADS_NOTE.split("\n")
+    note = (
+        sheet.PADS_NOTE_XY[0],
+        sheet.PADS_NOTE_XY[1] - len(rows) * _NOTE_LINE_MM / 1000.0,
+        sheet.PADS_NOTE_XY[0] + max(map(len, rows)) * _NOTE_CHAR_MM / 1000.0,
+        sheet.PADS_NOTE_XY[1],
+    )
+    for label, box in {"view": view, "note": note, **boxes}.items():
+        assert _BORDER_INNER_M[0] + 0.002 < box[0], label
+        assert _BORDER_INNER_M[1] + 0.002 < box[1], label
+        assert box[2] < _BORDER_INNER_M[2] - 0.002, label
+        assert box[3] < _BORDER_INNER_M[3] - 0.002, label
+        assert _box_gap(box, _TITLE_BLOCK_M) > 0.002, label
+    baselines = {name for name, *_ in (*sheet.PADS_X_ROWS, *sheet.PADS_Y_COLUMNS)}
+    for name in baselines:
+        assert _box_gap(boxes[name], view) > 0.002, name
+    labelled = {"note": note, **boxes}
+    for a in labelled:
+        for b in labelled:
+            if a < b:
+                assert _box_gap(labelled[a], labelled[b]) > 0.0015, (a, b)
+
+    # Every printed line: the baselines' extension and dimension lines, and
+    # the sizes' (extension lines run 2 mm past their dimension line).
+    over = 0.002
+    datum = sheet.PADS_DATUM
+    vertices = {name: sheet._pads_xy(*xz) for name, xz in _pads_vertices().items()}
+    lines: dict[str, list[tuple[tuple[float, float], tuple[float, float]]]] = {}
+    for name, _x in sheet.PADS_X_ROWS:
+        (vx, vy), (tx, ty) = vertices[name], sheet.UNDERSIDE_PADS_KEEP[name]
+        lines[name] = [((vx, vy), (vx, ty + over)), ((datum[0], ty), (max(vx, tx), ty))]
+    for name, *_ in sheet.PADS_Y_COLUMNS:
+        (vx, vy), (tx, ty) = vertices[name], sheet.UNDERSIDE_PADS_KEEP[name]
+        # Inside its own span, between X0 and the station.
+        assert vy + _DIM_TEXT_H_M < ty < datum[1] - _DIM_TEXT_H_M, name
+        lines[name] = [((vx, vy), (tx - over, vy)), ((tx, datum[1]), (tx, vy))]
+    lock = part.LOCK_PAD_SHAPE
+    ped0 = part.PEDESTAL_PAD_SHAPES[0]
+    block0 = part.BLOCK_PAD_SHAPES[0]
+    for name, (x0, x1, z, side) in {
+        "LockPadWidth": (lock[1], lock[2], lock[4], "across"),
+        "PedestalPad0Width": (ped0[1], ped0[2], ped0[3], "across"),
+    }.items():
+        tx, ty = sheet.UNDERSIDE_PADS_KEEP[name]
+        (ax, ay), (bx, _by) = sheet._pads_xy(x0, z), sheet._pads_xy(x1, z)
+        reach = ty + math.copysign(over, ty - ay)
+        lines[name] = [
+            ((ax, ay), (ax, reach)),
+            ((bx, ay), (bx, reach)),
+            ((min(ax, tx), ty), (max(bx, tx), ty)),
+        ]
+    for name, (x, z0, z1) in {
+        "PedestalPadLength": (ped0[1], ped0[3], ped0[4]),
+        "BlockPad0Width": (block0[1], block0[3], block0[4]),
+    }.items():
+        tx, ty = sheet.UNDERSIDE_PADS_KEEP[name]
+        (ax, ay), (_bx, by) = sheet._pads_xy(x, z0), sheet._pads_xy(x, z1)
+        reach = tx + math.copysign(over, tx - ax)
+        lines[name] = [
+            ((ax, ay), (reach, ay)),
+            ((ax, by), (reach, by)),
+            ((tx, min(ay, ty)), (tx, max(by, ty))),
+        ]
+    assert set(lines) == set(boxes)
+    for name, box in boxes.items():
+        for other, segments in lines.items():
+            if other == name:
+                continue
+            for segment in segments:
+                assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
+
+    # The sizes read in the pocket's open air, clear of every boss, pad, lug
+    # and rib by 2 mm of model.
+    solids = (
+        *part.DEEP_BOSS_SHAPES,
+        *part.SHALLOW_BOSS_SHAPES,
+        *part.CROSS_TAP_LUG_SHAPES,
+        *part.SOCKET_BOSS_SHAPES,
+        part.LONG_RIB_SHAPE,
+        part.CROSS_RIB_SHAPE,
+    )
+    scale = sheet._PADS_M_PER_MM
+    for name in sheet.PADS_SIZE_TEXT_MM:
+        x0, z0, x1, z1 = (
+            (boxes[name][0] - sheet.PADS_CENTER[0]) / scale - 2.0,
+            (boxes[name][1] - sheet.PADS_CENTER[1]) / scale - 2.0,
+            (boxes[name][2] - sheet.PADS_CENTER[0]) / scale + 2.0,
+            (boxes[name][3] - sheet.PADS_CENTER[1]) / scale + 2.0,
+        )
+        assert -spec.POCKET_HALF_X < x0 and x1 < spec.POCKET_HALF_X, name
+        assert -spec.POCKET_HALF_Z < z0 and z1 < spec.POCKET_HALF_Z, name
+        for shape in solids:
+            if shape[0] == "disc":
+                nearest = (min(max(shape[1], x0), x1), min(max(shape[2], z0), z1))
+                assert math.dist(nearest, shape[1:3]) > shape[3], (name, shape)
+            else:
+                assert x1 < shape[1] or shape[2] < x0 or z1 < shape[3] or shape[4] < z0, (
+                    name,
+                    shape,
+                )
+
+
+def test_nameplate_tags_stay_inside_their_quad_clear_of_section_a() -> None:
+    # ec323b4eb leaf: F3's and F4's leaders crossed section line A and each
+    # other (enforced layout audit). Every nameplate tag now reads inside the
+    # four-tap quad, west of the deck's east edge.
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    half_h = sheet._HOLE_TAG_HALF_HEIGHT_M
+    tag_w = 2 * _DIM_CHAR_M
+    section_x = sheet._plan_xy(spec.COLUMN_X, 0.0, center=sheet.HOLE_TOP_CENTER)[0]
+    deck_east = sheet._plan_xy(part.DECK_HALF_X, 0.0, center=sheet.HOLE_TOP_CENTER)[0]
+    taps = [
+        sheet._plan_xy(x, z, center=sheet.HOLE_TOP_CENTER) for x, z in part.NAMEPLATE_SCREW_XZ
+    ]
+    tags = []
+    for (x, z), tap in zip(part.NAMEPLATE_SCREW_XZ, taps, strict=True):
+        table = (x + spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z - z)
+        left, top = sheet._nameplate_tag_position(table)
+        tags.append(((left, top - 2 * half_h, left + tag_w, top), tap))
+    assert sheet._nameplate_tag_position((0.0, 0.0)) is None
+    others = {
+        tag: (x, y - 2 * half_h, x + tag_w, y)
+        for tag, (x, y) in sheet.HOLE_TAG_POSITIONS.items()
+    }
+    radius = part.NAMEPLATE_SCREW_HOLE_DIA * sheet.VIEW_SCALE / 2000.0
+    for i, (box, tap) in enumerate(tags):
+        assert box[2] < deck_east - 0.001 < section_x
+        for tag, other in others.items():
+            assert _box_gap(box, other) > 0.0015, tag
+        for hole in taps:
+            assert _box_gap(box, (hole[0], hole[1], hole[0], hole[1])) > radius + 0.0008
+        for other_box, other_tap in tags[i + 1 :]:
+            assert _box_gap(box, other_box) > 0.0015
+            # Leaders, box middle to tap: no crossing, no leader through a box.
+            leader = (((box[0] + box[2]) / 2, (box[1] + box[3]) / 2), tap)
+            other_leader = (((other_box[0] + other_box[2]) / 2, (other_box[1] + other_box[3]) / 2), other_tap)
+            assert _segment_box_gap(leader, other_box) > 0.0005
+            assert _segment_box_gap(other_leader, box) > 0.0005
+            (ax, ay), (bx, by) = leader
+            (cx, cy), (dx, dy) = other_leader
+            cross = lambda px, py, qx, qy, rx, ry: (qx - px) * (ry - py) - (qy - py) * (rx - px)  # noqa: E731
+            assert not (
+                cross(ax, ay, bx, by, cx, cy) * cross(ax, ay, bx, by, dx, dy) < 0
+                and cross(cx, cy, dx, dy, ax, ay) * cross(cx, cy, dx, dy, bx, by) < 0
+            )
 
 
 def test_rig_callouts_name_the_rig_set_note() -> None:

@@ -175,6 +175,38 @@ SOCKET_BORE_FINISHES = tuple(
 )
 PART_SURFACE_FINISHES = (*SURFACE_FINISHES, *SOCKET_BORE_FINISHES)
 
+# The underside's rect pads and cross-tap lugs stand under seats the hole
+# table does not locate (transfer seats, cross taps), so their sizes and their
+# places from the table's X0 Y0 are model dims too (Codex P2 on #1310). Each
+# pair shares its size and one coordinate, so one pad of the pair carries the
+# shared dim (UNDERSIDE_PAD_PREFIXES prints it 2X) and each pad its own other
+# one. Not marked: what the casting cannot show -- the lock pad's and the
+# lugs' outer ends and the lugs' widths run into the wall and the socket
+# bosses, the block pads' east ends into the cross rib.
+UNDERSIDE_PAD_DIMENSIONS: dict[str, tuple[str, ...]] = {
+    "DeepBossProfile": (
+        "LockPadWidth",
+        "LockPadX",
+        "LockPadY",
+        "PedestalPad0Width",
+        "PedestalPadLength",
+        "PedestalPad1X",
+        "PedestalPad0Y",
+        "PedestalPad1Y",
+    ),
+    "ShallowBossProfile": ("BlockPad0Width", "BlockPad1X", "BlockPad0Y", "BlockPad1Y"),
+    "CrossTapLugProfile": ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y"),
+}
+UNDERSIDE_PAD_PREFIXES: dict[tuple[str, str], str] = {
+    (feature, name): "2X "
+    for feature, names in (
+        ("DeepBossProfile", ("PedestalPad0Width", "PedestalPadLength", "PedestalPad1X")),
+        ("ShallowBossProfile", ("BlockPad0Width", "BlockPad1X")),
+        ("CrossTapLugProfile", ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y")),
+    )
+    for name in names
+}
+
 # Mark every dimension the drawing imports. Policy rule 2: a printed nominal
 # whose decimal places state a tolerance is a MODEL dimension, so the deck
 # extent and rise, the flange-to-deck height, the 45-degree edge breaks, the
@@ -204,7 +236,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LongRibProfile": {"LongRibThickness"},
     "CrossRibProfile": {"CrossRibThickness"},
     "LongRib": {"RibRelief"},
-    "DeepBossProfile": {"HangingBossDia"},
+    "DeepBossProfile": {
+        "HangingBossDia",
+        *UNDERSIDE_PAD_DIMENSIONS["DeepBossProfile"],
+    },
+    "ShallowBossProfile": set(UNDERSIDE_PAD_DIMENSIONS["ShallowBossProfile"]),
+    "CrossTapLugProfile": set(UNDERSIDE_PAD_DIMENSIONS["CrossTapLugProfile"]),
     "DeepBosses": {"DeepBossBottom"},
     "ShallowBosses": {"ShallowBossBottom"},
     "PocketFillets": {"PocketFilletRadius"},
@@ -242,7 +279,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LongRibProfile": {"LongRibThickness": 1},
     "CrossRibProfile": {"CrossRibThickness": 1},
     "LongRib": {"RibRelief": 1},
-    "DeepBossProfile": {"HangingBossDia": 1},
+    "DeepBossProfile": {
+        "HangingBossDia": 1,
+        **dict.fromkeys(UNDERSIDE_PAD_DIMENSIONS["DeepBossProfile"], 1),
+    },
+    "ShallowBossProfile": dict.fromkeys(
+        UNDERSIDE_PAD_DIMENSIONS["ShallowBossProfile"], 1
+    ),
+    "CrossTapLugProfile": dict.fromkeys(
+        UNDERSIDE_PAD_DIMENSIONS["CrossTapLugProfile"], 1
+    ),
     "DeepBosses": {"DeepBossBottom": 1},
     "ShallowBosses": {"ShallowBossBottom": 1},
     "PocketFillets": {"PocketFilletRadius": 1},
