@@ -97,7 +97,7 @@ def test_shaft_flats_are_coplanar_faces_named_by_their_stations() -> None:
             -half_chord / 1000, flat_y / 1000, (-station - shaft.FLAT_LENGTH / 2) / 1000,
             half_chord / 1000, flat_y / 1000, (-station + shaft.FLAT_LENGTH / 2) / 1000,
         )
-        face = _FaceGeometry(None, 4001, (0, 1, 0, 0, flat_y / 1000, -station / 1000), (0, 1, 0), box)
+        face = FaceGeometry(None, 4001, (0, 1, 0, 0, flat_y / 1000, -station / 1000), (0, 1, 0), box)
         assert _owners("ch_pivot_shaft", face) == [name]
 
 
