@@ -42,7 +42,8 @@ import math
 import pd_rack_pinion_spec as DISC
 import _config
 
-from _fit_limits import SHAFT_G6_3_TO_6_MM, deviations, gear_tip_band_mm
+from _fit_limits import SHAFT_G6_3_TO_6_MM, deviations
+from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import (
     pinion_pitch_index_deviation_mm,
     pitch_index_measurement_uncertainty_mm,

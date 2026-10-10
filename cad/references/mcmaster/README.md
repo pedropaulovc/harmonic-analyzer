@@ -422,7 +422,7 @@ Catalog specifications checked on September 10, 2026:
   long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no
   replica gate.
-- [93600A189](https://www.mcmaster.com/93600A189/), MHA-VN-051, quantity two,
+- [93600A189](https://www.mcmaster.com/93600A189/), MHA-VN-054, quantity two,
   was read live on October 9, 2026 in isolated Chromium (HTTP 200): passivated
   316 stainless, ISO 2338-m6, diameter 2.002–2.008 mm, nominal length 6 mm,
   both ends chamfered. The supplier does not publish a length or chamfer

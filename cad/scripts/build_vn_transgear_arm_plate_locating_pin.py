@@ -1,4 +1,4 @@
-"""Purchased MHA-VN-051: two McMaster 93600A189 arm/plate locating dowels.
+"""Purchased MHA-VN-054: two McMaster 93600A189 arm/plate locating dowels.
 
 Catalogue-only nominal cylinder, not a vendor end-form replica.
 Axis +Y, first end y=0; ScrewAxis is the existing stock mate convention.

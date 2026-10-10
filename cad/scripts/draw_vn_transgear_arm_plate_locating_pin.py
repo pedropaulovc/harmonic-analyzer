@@ -1,4 +1,4 @@
-"""Purchased reference drawing for MHA-VN-051 McMaster 93600A189."""
+"""Purchased reference drawing for MHA-VN-054 McMaster 93600A189."""
 from __future__ import annotations
 
 import argparse

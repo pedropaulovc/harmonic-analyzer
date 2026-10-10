@@ -27,7 +27,6 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -35,6 +34,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
