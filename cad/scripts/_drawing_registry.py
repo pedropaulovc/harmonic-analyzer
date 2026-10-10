@@ -880,6 +880,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_gooseneck_spring_screw",
+        part="vn_gooseneck_spring_screw",
+        artifact_stem="vn-gooseneck-spring-screw",
+        script_name="draw_vn_gooseneck_spring_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_latch_hook",
         part="pd_latch_hook",
         artifact_stem="pd-latch-hook",

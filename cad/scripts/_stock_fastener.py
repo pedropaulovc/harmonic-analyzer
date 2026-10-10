@@ -1,4 +1,4 @@
-"""Build production stock fasteners from verified McMaster geometry recipes."""
+"""Build production stock fasteners from reusable McMaster geometry recipes."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ THREAD_FEATURE = "ThreadGroove"
 
 @dataclass(frozen=True, slots=True)
 class RecipeMetadata:
-    """Static import metadata for one verified diagnostic recipe.
+    """Static import metadata for one native diagnostic recipe.
 
     ``threaded`` declares that the recipe cuts a modeled helical thread named
     ``THREAD_FEATURE``; the stock build requires the feature to match, so a
@@ -67,6 +67,9 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         ),
         "90280A201": RecipeMetadata(
             "diagnostics.diag_build_90280A201", "build_90280A201", threaded=True
+        ),
+        "90280A583": RecipeMetadata(
+            "diagnostics.diag_build_90280A583", "build_90280A583", threaded=True
         ),
         "91255A148": RecipeMetadata(
             "diagnostics.diag_build_91255A148", "build_91255A148", threaded=True

@@ -27,6 +27,7 @@ recipes:
 | 90280A197 | `vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `vn-clamp-screw`, `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A583 | `vn-gooseneck-spring-screw` | Zinc-Plated Steel Fillister Head Slotted Screw |
 | 90280A837 | `vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | — (diagnostic recipe; a former `vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
@@ -67,6 +68,53 @@ recipes:
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
+
+Live catalog evidence read on October 10, 2026:
+
+- [90280A583](https://www.mcmaster.com/90280A583/), the one-inch candidate
+  for the MHA-VN-054 gooseneck counter-spring screw, is a zinc-plated steel
+  slotted fillister screw, 5/16-18 UNC x 1 in (25.4 mm under-head length),
+  fully threaded, with 60,000 psi tensile strength and a package quantity
+  of 25. The live
+  [5/16-18 fillister product table](https://www.mcmaster.com/products/screws/rounded-head-style~fillister/thread-size~5-16-18/)
+  was read on October 10, 2026; the catalog evidence is recorded in
+  `C:/src/dt-logs/gooseneck-fillister/mcmaster-skus.md`. The one-inch candidate
+  length disposition replaces its provisional three-quarter-inch choice;
+  installed joint geometry is pending user choice after the identified
+  counter-spring coil-to-tube clash. This candidate is not an approved
+  installed-joint design.
+  Nominal major diameter is 0.3125 in (7.9375 mm), head diameter 0.518 in
+  (13.1572 mm), head height 0.295 in (7.493 mm), and pitch 25.4/18 mm.
+  The 0.76 mm screw-length-minus allowance is a conservative installation
+  stack assumption, not a published McMaster tolerance.
+  [90280A581](https://www.mcmaster.com/90280A581/), the same zinc-plated
+  5/16-18 head with a 3/4 in (19.05 mm) shank, was rejected: its worst-case
+  full-thread reach fails after the conservative length-minus and
+  incomplete-end-thread allowances. The candidate through-plug installation
+  would put the screw tip inside the hollow arm; usable engagement is governed
+  by the receiver's full-thread depth, not simply under-head length less
+  the spring-eye gap.
+  The 1/4-20 head's 0.414 in diameter retains the 1330K524 spring's
+  9.4996 mm eye by only 0.51 mm radially, below the 1.0 mm requirement;
+  a 3/8-16 shank is 9.525 mm and cannot pass the eye. The candidate
+  5/16-18 size gives 1.83 mm nominal radial head retention and 0.78 mm
+  nominal radial shank clearance in that eye.
+  `vn_gooseneck_spring_screw_spec.py` owns the stock dimensions, and
+  `diagnostics.diag_build_90280A583` reuses the native fillister family.
+  The supplied `90280A583_Steel Narrow Fillister Head Slotted Screws.SLDPRT`
+  is stored locally as `90280A583.SLDPRT` in this gitignored reference
+  directory. Its parametric family replay must pass the native diagnostic
+  comparison before release. That comparison is **PENDING — requires
+  SolidWorks**; no native comparison has been performed.
+  The catalog sizes alone do not establish the derived slot, spherical dome,
+  tip chamfer, thread/runout or CAD frame, so these remain family assumptions,
+  **not vendor-equivalence verified**. Read-only source harvest with
+  `diagnostics/diag_dump_part.py` precedes the comparison entry point
+  `diagnostics/diag_build_90280A583.py`.
+  Evidence SHA-256: native SLDPRT
+  `0dc0d65fd278d30f741fe6f24ca929f91dc79c5a1a0420861bcbc49bffa255b7`.
+  The production stock frame remains head +Y, shank -Y, with the under-head
+  junction at Y=0.
 
 Live catalog verification on October 8, 2026:
 

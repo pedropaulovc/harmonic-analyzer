@@ -1,0 +1,13 @@
+vn-gooseneck-spring-screw:
+  title: Zinc-Plated Steel Fillister Head Slotted Screw
+  number: MHA-VN-054
+  stock_name: Zinc-Plated Steel Fillister Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [90280A583]
+  material: Plain Carbon Steel
+  material_specification: Zinc-plated steel, 60,000 psi tensile strength, McMaster-Carr 90280A583
+  finish: zinc plated
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

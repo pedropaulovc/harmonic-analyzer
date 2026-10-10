@@ -3,7 +3,12 @@ the 91794A112 stainless fillister screw on the same #4-40 head.
 
 The vendor drives every derived number off 5 named dims via equations,
 reproduced here. The 90280A837 and 91794A112 extensions await their native
-comparison:
+comparison.
+
+The catalog-only 91794A077 size and the 90280A583 extension reuse these laws;
+their derived slot, dome, thread/runout and vendor-frame mapping are not
+vendor-equivalence verified. 90280A583 has a supplied native model, but its
+SolidWorks diagnostic comparison is pending.
 
 - slot width = HeadDia*0.135, slot depth = width*1.5 (from the dome apex)
 - head cylinder band = HeadHeight*0.8; dome = spherical cap (centre on
@@ -45,6 +50,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut,
 )
 from vn_frame_cross_screw_spec import HEAD_DIA, HEAD_H, PITCH, SHANK_DIA, SHANK_LEN
+import vn_gooseneck_spring_screw_spec as gooseneck_screw  # noqa: E402
 
 FILLISTER_SIZES = {
     # part:        (major dia, length, head height, head dia, pitch)
@@ -53,6 +59,16 @@ FILLISTER_SIZES = {
     "90280A197": (4.1656, 19.05, 3.9624, 6.858, 0.79375),
     "90280A199": (4.1656, 25.4, 3.9624, 6.858, 0.79375),
     "90280A201": (4.1656, 31.75, 3.9624, 6.858, 0.79375),
+    # Zinc-plated steel 5/16-18 x 1, live catalog read 2026-10-10.
+    # Pure stock specification owns the sizes; native comparison against the
+    # supplied vendor model is pending, so family details remain unverified.
+    "90280A583": (
+        gooseneck_screw.MAJOR_DIA,
+        gooseneck_screw.LENGTH,
+        gooseneck_screw.HEAD_H,
+        gooseneck_screw.HEAD_DIA,
+        gooseneck_screw.PITCH,
+    ),
     "90280A837": (SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, PITCH),
     # 18-8 stainless fillister, the same 0.183 x 0.107 #4-40 head (McMaster
     # 91794A product table, read 2026-09-25).
