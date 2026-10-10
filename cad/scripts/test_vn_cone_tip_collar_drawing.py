@@ -794,3 +794,15 @@ def test_all_land_physical_limit_readers_share_native_print_precision(section, n
     else:
         with pytest.raises(ValueError, match="no finished across-flat"):
             lands.land_finished_af_limits_mm(section)
+
+
+def test_each_view_asserts_only_the_precision_it_keeps() -> None:
+    # 027369849: each view asserted the whole map and failed on names that
+    # live on other views or the screw sheet.
+    keeps = (drawing.END_KEEP.keys() | drawing.SIDE_KEEP.keys(), drawing.TAP_KEEP.keys(),
+             drawing.BORE_KEEP.keys(), drawing.SCREW_KEEP.keys())
+    for keep in keeps:
+        assert set(drawing._precision(keep)) == set(keep)
+    source = inspect.getsource(drawing)
+    assert "assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)" not in source
+    assert source.count(", _precision(") == 4

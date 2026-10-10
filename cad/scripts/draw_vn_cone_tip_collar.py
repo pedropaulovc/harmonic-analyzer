@@ -72,6 +72,12 @@ def _horizontal_axis(adapter, view):
     rebuild_drawing(adapter, label="collar turning orientation")
 
 
+def _precision(keep):
+    """The part-authored places of only the names this view keeps
+    (main's per-view form, draw_ch_connecting_rod)."""
+    return {name: spec.DRAWING_PRECISION_BY_NAME[name] for name in keep}
+
+
 def _require_full_thread_callout(display):
     """Qualify the native thread-depth variable without typing a thread size."""
     definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
@@ -157,7 +163,7 @@ def _bore_view(adapter):
         adapter, view, keep=BORE_KEEP, view_label="collar enlarged bore",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
-    assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, marks, _precision(BORE_KEEP))
     set_dimension_callouts(adapter, marks, {"BoreDia": "REAM THRU"})
     add_property_linked_note(adapter, "Bore View Note", BORE_CENTER[0] - 0.032, 0.044)
     return view
@@ -199,12 +205,12 @@ async def build(adapter: Any) -> dict[str, str]:
     side_marks = curate_view_dimensions(adapter, side, keep=SIDE_KEEP,
                                        view_label="collar turning view", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     marks = end_marks + side_marks
-    assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, marks, _precision(END_KEEP | SIDE_KEEP))
     tap_marks = curate_view_dimensions(
         adapter, tap, keep=TAP_KEEP, view_label="collar radial process controls",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
-    assert_imported_precision(adapter, tap_marks, spec.DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, tap_marks, _precision(TAP_KEEP))
     _assert_functional_dimension_types(adapter, tap_marks)
     set_dimension_callouts(adapter, tap_marks, {"TapRootLimit": "TAP ROOT"})
     # Source geometry is asymmetric and the views are rotated: use the native
@@ -268,7 +274,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     marks = curate_view_dimensions(adapter, screw, keep=SCREW_KEEP,
                                   view_label="ground stock screw", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
-    assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, marks, _precision(SCREW_KEEP))
     # Above the value: the freed lane where the old break dimension stood.
     set_dimension_callouts(adapter, marks, {"DogDia": spec.DOG_EDGE_CALLOUT}, location="above")
     project_part_pmi(
