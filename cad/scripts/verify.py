@@ -103,6 +103,7 @@ from _assembly_postbuild import (
     author_dof_drives,
     load_dof_manifest,
 )
+from _chain_mounts import mounted_wheels
 from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
 from _common import (  # component iteration helpers (read-only)
@@ -832,6 +833,19 @@ async def _reopen_assembly_rest_pose(adapter: Any, name: str, sldasm: Path) -> N
         check(f"activate {REST}", await adapter.set_active_configuration(REST))
 
 
+# The assemblies that carry the roller chain: their builds pass the authored
+# wheel mounts to check_no_interference (541011de0), so the soundness gate must
+# too, or every chain-link-on-sprocket mesh contact reads as interference.
+_CHAIN_ASSEMBLIES = frozenset({"pd-paper-drive", "ha-harmonic-analyzer"})
+
+
+def _soundness_chain_mounts(name: str) -> Any:
+    """The chain-wrapped wheels' mounts for a chain-carrying assembly, else None."""
+    if name not in _CHAIN_ASSEMBLIES:
+        return None
+    return mounted_wheels()
+
+
 def _run_soundness_battery(
     adapter: Any, name: str, report: Report, rebuilt: Any
 ) -> None:
@@ -879,6 +893,7 @@ def _run_soundness_battery(
         lambda: check_no_interference(
             adapter,
             allowed_pairs=allowed_interference_pairs(name),
+            chain_mounts=_soundness_chain_mounts(name),
         ),
     )
     if name in ("ch-channel", "sm-summing"):
@@ -1016,6 +1031,7 @@ async def _verify_static_one(
         lambda: check_no_interference(
             adapter,
             allowed_pairs=allowed_interference_pairs(name),
+            chain_mounts=_soundness_chain_mounts(name),
         ),
     )
     if name in ("ch-channel", "sm-summing"):

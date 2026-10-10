@@ -516,3 +516,40 @@ def test_link_contacts_and_allowed_pairs_keep_their_aggregate_behavior(
     assert attributes["chain_mesh_contacts"] == 1
     assert attributes["bounded_contacts"] == (1 if pair_total < 1.0 else 0)
     assert adapter.currentModel.manager.releases == 1
+
+
+def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch) -> None:
+    """PD run 10: verify_soundness:pd_paper_drive read 34 link-on-sprocket mesh
+    contacts as interference because verify.py's soundness gates never passed
+    the mounts the assembly builds pass (541011de0)."""
+    import inspect
+
+    import verify
+
+    seen: dict[str, object] = {}
+
+    def fake_check(_adapter, *, allowed_pairs, chain_mounts=None):
+        seen["mounts"] = chain_mounts
+
+    class _Report:
+        def __init__(self) -> None:
+            self.gates: dict[str, object] = {}
+
+        def gate(self, label, fn) -> None:
+            self.gates[label] = fn
+
+    monkeypatch.setattr(verify, "check_no_interference", fake_check)
+    monkeypatch.setattr(verify, "_expected_free_dof", lambda _name: None)
+    for name, expected in (
+        ("pd-paper-drive", mounted_wheels()),
+        ("ha-harmonic-analyzer", mounted_wheels()),
+        ("ch-channel", None),
+    ):
+        report = _Report()
+        verify._run_soundness_battery(object(), name, report, rebuilt=None)
+        report.gates[f"{name}:interference-free"]()
+        assert seen.pop("mounts") == expected
+    # The static suite's own copy of the gate passes the same mounts.
+    assert "chain_mounts=_soundness_chain_mounts(name)" in inspect.getsource(
+        verify._verify_static_one
+    )
