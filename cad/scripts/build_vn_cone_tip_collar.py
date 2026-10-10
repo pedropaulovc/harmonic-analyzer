@@ -39,7 +39,7 @@ PART_NAME = "vn-cone-tip-collar"
 MATERIAL = "Plain Carbon Steel"
 CONFIGURATIONS = ("Default", "Collar", "SetScrew")
 COLLAR_FEATURES = (
-    "Ring", "BodyPlane", "Body", "ShoulderRoot",
+    "Ring", "Body", "ShoulderRoot",
     "MountFlat", "SetScrewTap",
     "TapRootPlane", "TapRootGauge",
 )
@@ -54,7 +54,7 @@ def _plane(adapter, name, offset, *, base="Top Plane"):
 
 
 async def _ring(adapter, jobs):
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     dims = SketchDims()
     check("ring sketch", await adapter.create_sketch("Top"))
@@ -72,27 +72,40 @@ async def _ring(adapter, jobs):
     jobs.append((name_dimensions(adapter, "Ring", ["CollarWidth"])[0], '"CollarWidth"'))
     nose_area = math.pi / 4.0 * (spec.NOSE_DIA**2 - spec.BORE_MODEL_DIA_MM**2)
     await volume_check(adapter, "nose annulus", nose_area * spec.WIDTH, 0.005 * nose_area * spec.WIDTH)
-    _plane(adapter, "BodyPlane", spec.NOSE_LENGTH)
-    jobs.append((name_dimensions(adapter, "BodyPlane", ["NoseLength"])[0], '"NoseLength"'))
-    check("large body sketch", await adapter.create_sketch("BodyPlane"))
+    # The body step is a turned profile, as main's turned parts are: its
+    # NoseLength is a sketch dimension the drawing imports (a reference
+    # plane's offset is not importable, drawing:vn_cone_tip_collar at
+    # 437cb0842). The axis centreline is fixed as in build_vn_post_mount_screw;
+    # the step's inner edge lies on the ring's OD and is driven by it.
+    nose_r, outer_r = spec.NOSE_DIA / 2.0, spec.OUTER_DIA / 2.0
+    points = [(nose_r, spec.NOSE_LENGTH), (outer_r, spec.NOSE_LENGTH),
+              (outer_r, spec.WIDTH), (nose_r, spec.WIDTH)]
+    check("large body sketch", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    axis = check("collar axis", await adapter.add_centerline(0.0, 0.0, 0.0, spec.WIDTH))
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    check("fix collar axis", await adapter.add_sketch_constraint(axis, None, "fix"))
+    for index, line in enumerate(lines):
+        direction = "horizontal" if index % 2 == 0 else "vertical"
+        check("body profile direction", await adapter.add_sketch_constraint(line, None, direction))
     dims = SketchDims()
-    for name, dia, expression in (
-        ("CollarDia", spec.OUTER_DIA, '"CollarDia"'),
-        ("BodyBoreDia", spec.BORE_MODEL_DIA_MM, '"BoreDia"'),
-    ):
-        await define_circle(
-            adapter, 0.0, 0.0, dia / 2.0, name, dims=dims,
-            names=(None, None, name), drives=(None, None, expression),
-        )
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[1], (outer_r / 2.0, spec.WIDTH + 2.0), "CollarDia",
+    )
+    dims.record("CollarDia", '"CollarDia"')
+    await anchor_point_to_origin(adapter, f"{lines[0]}.start", nose_r, spec.NOSE_LENGTH, "shoulder root corner")
+    dims.record("BodyInnerRadius", '"NoseDia" / 2')
+    dims.record("NoseLength", '"NoseLength"')
+    await dimension_between(adapter, f"{lines[1]}.start", f"{lines[1]}.end",
+                            "vertical_distance", spec.WIDTH - spec.NOSE_LENGTH, "body width")
+    dims.record("BodyWidth", '"CollarWidth" - "NoseLength"')
     await ensure_fully_defined(adapter, "large collar body")
     check("exit body", await adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     jobs.extend(dims.apply(adapter, "BodyProfile"))
-    check("merge large body", await adapter.create_extrusion(ExtrusionParameters(
-        depth=spec.WIDTH - spec.NOSE_LENGTH,
-    )))
+    check("merge large body", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Body")
-    jobs.append((name_dimensions(adapter, "Body", ["BodyWidth"])[0], '"CollarWidth" - "NoseLength"'))
     expected = nose_area * spec.WIDTH + math.pi / 4.0 * (
         spec.OUTER_DIA**2 - spec.NOSE_DIA**2
     ) * (spec.WIDTH - spec.NOSE_LENGTH)
@@ -345,7 +358,7 @@ async def build(adapter) -> dict[str, str]:
     blank_sketch_feature(model, _feature_by_name(adapter, "TapRootGauge"), "tap root limit gauge")
     blank_reference_geometry(adapter, (
         ("ScrewAxis", "AXIS"), ("InstalledShaftAxis", "AXIS"), ("SocketFace", "PLANE"),
-        ("TapRootPlane", "PLANE"), ("BodyPlane", "PLANE"),
+        ("TapRootPlane", "PLANE"),
     ))
     await report_mass_properties(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)

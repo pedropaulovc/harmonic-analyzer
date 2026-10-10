@@ -450,8 +450,7 @@ RADIAL_TAP_VIEW_NOTE = (
 )
 DRAWING_DIMENSIONS = {
     "RingProfile": {"NoseDia", "BoreDia"},
-    "BodyProfile": {"CollarDia"},
-    "BodyPlane": {"NoseLength"},
+    "BodyProfile": {"CollarDia", "NoseLength"},
     "Ring": {"CollarWidth"},
     "ShoulderRoot": {"ShoulderRadius"},
     "MountFlatProfile": {"FlatDistance"},
@@ -461,8 +460,7 @@ DRAWING_DIMENSIONS = {
 }
 DRAWING_PRECISION = {
     "RingProfile": {"NoseDia": 2, "BoreDia": TERMINAL_DIA_PLACES},
-    "BodyProfile": {"CollarDia": 2},
-    "BodyPlane": {"NoseLength": 2},
+    "BodyProfile": {"CollarDia": 2, "NoseLength": 2},
     "ShoulderRoot": {"ShoulderRadius": 2},
     "Ring": {"CollarWidth": 2},
     "MountFlatProfile": {"FlatDistance": 2},

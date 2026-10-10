@@ -28,7 +28,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import format_findings
 from diagnostics.drawing_layout_audit import audit_document
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["vn_cone_tip_collar"]
@@ -45,11 +44,10 @@ SIDE_CENTER = (0.205, 0.170)
 TAP_CENTER = (SIDE_CENTER[0], 0.240)
 TAP_SCALE = spec.RADIAL_TAP_VIEW_SCALE
 ISO_CENTER = (0.345, 0.210)
-END_KEEP = {"CollarDia": (0.030, 0.130), "NoseDia": (0.027, 0.165),
-            "FlatDistance": (0.080, 0.112)}
-SIDE_KEEP = {"CollarWidth": (0.205, 0.110),
+END_KEEP = {"NoseDia": (0.027, 0.165), "FlatDistance": (0.080, 0.112)}
+# CollarDia is a turned-profile sketch dimension, native to the side view.
+SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarDia": (0.250, SIDE_CENTER[1]),
              "NoseLength": (0.182, 0.218), "ShoulderRadius": (0.282, 0.205)}
-OD_ON_SIDE = (0.250, SIDE_CENTER[1])
 TAP_KEEP = {"TapStation": (0.184, 0.266), "TapRootLimit": (0.250, 0.272)}
 BORE_CENTER = (0.350, 0.080)
 BORE_KEEP = {"BoreDia": (0.310, 0.110)}
@@ -72,29 +70,6 @@ def _horizontal_axis(adapter, view):
     if abs(float(native.Angle) + math.pi / 2.0) > 1e-9:
         raise RuntimeError("collar axis is not horizontal on the turning view")
     rebuild_drawing(adapter, label="collar turning orientation")
-
-
-def _move_od(adapter, annotation, source, target):
-    """Move the end-profile circle dimension to the turning side view."""
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    if not ddoc.ActivateView(view_name(adapter, source)):
-        raise RuntimeError("cannot activate collar OD donor")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    selection = str(display.GetNameForSelection() or "")
-    draw.ClearSelection2(True)
-    if not selection or not draw.Extension.SelectByID2(
-        selection, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0,
-    ):
-        raise RuntimeError("cannot select native collar OD")
-    ddoc.DragModelDimension(view_name(adapter, target), 2, *OD_ON_SIDE, 0.0)
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="collar OD transfer")
-    matches = [_early_bound(a, "IAnnotation") for a in (_early_bound(target, "IView").GetAnnotations() or ())
-               if dimension_name(adapter, _early_bound(a, "IAnnotation")) == "CollarDia"]
-    if len(matches) != 1:
-        raise RuntimeError("native collar OD did not move to the side view")
-    return matches[0]
 
 
 def _require_full_thread_callout(display):
@@ -223,11 +198,7 @@ async def build(adapter: Any) -> dict[str, str]:
                                       view_label="collar end", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     side_marks = curate_view_dimensions(adapter, side, keep=SIDE_KEEP,
                                        view_label="collar turning view", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
-    donors = [a for a in end_marks if dimension_name(adapter, a) == "CollarDia"]
-    if len(donors) != 1:
-        raise RuntimeError("collar end view has no single OD donor")
-    moved = _move_od(adapter, donors[0], end, side)
-    marks = [a for a in end_marks if dimension_name(adapter, a) != "CollarDia"] + side_marks + [moved]
+    marks = end_marks + side_marks
     assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)
     tap_marks = curate_view_dimensions(
         adapter, tap, keep=TAP_KEEP, view_label="collar radial process controls",
