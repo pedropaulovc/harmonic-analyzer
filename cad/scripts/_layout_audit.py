@@ -3453,17 +3453,31 @@ def _datum_seated_on_frame(source: AnnotationGeometry, target: AnnotationGeometr
     frame's text is the triangle's feature, not a neighbour it crowds.  The
     knife mount's datum B on its dowel-pair frame (MHA-SM-002,
     _drawing_common.add_frame_datum_feature) seats its triangle's base on the
-    frame's bottom border, 1.66 mm under the frame's 0.13."""
+    frame's bottom border, 1.66 mm under the frame's 0.13.
+
+    The whole triangle must stay outside the frame's box: seated on a border
+    from outside, every one of its edges comes nearest the frame's text
+    through that border (its slanted edges share the base's corners), while
+    a triangle reaching into the frame does crowd the text and still gates."""
     if source.kind != "datum" or target.kind != "gtol":
         return False
     borders = [s for s in target.segments if s.role == "line"]
+    arrows = [s for s in source.segments if s.role == "arrow"]
+    if not borders or not arrows:
+        return False
+    xmin = min(min(s.x0, s.x1) for s in borders) + COLLINEAR_TOL_M
+    xmax = max(max(s.x0, s.x1) for s in borders) - COLLINEAR_TOL_M
+    ymin = min(min(s.y0, s.y1) for s in borders) + COLLINEAR_TOL_M
+    ymax = max(max(s.y0, s.y1) for s in borders) - COLLINEAR_TOL_M
+    vertices = [(x, y) for arrow in arrows for x, y in ((arrow.x0, arrow.y0), (arrow.x1, arrow.y1))]
+    if any(xmin < x < xmax and ymin < y < ymax for x, y in vertices):
+        return False
     return any(
         all(
             point_segment_distance(end, border) <= COLLINEAR_TOL_M
             for end in ((arrow.x0, arrow.y0), (arrow.x1, arrow.y1))
         )
-        for arrow in source.segments
-        if arrow.role == "arrow"
+        for arrow in arrows
         for border in borders
     )
 

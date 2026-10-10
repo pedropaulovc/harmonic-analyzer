@@ -4130,11 +4130,12 @@ def test_knife_mount_fails_its_leaf_on_every_overlap_kind(monkeypatch, tmp_path,
         _run(live, LayoutAuditMode.REPORT, report, stem="sm-knife-mount")
 
 
-def _knife_mount_datum_b(rise_m: float):
+def _knife_mount_datum_b(rise_m: float, *, into_frame: bool = False):
     """The knife mount's dowel-pair frame DetailItem355 (⌖Ø0.13|A) and its
     datum B tag DetailItem356, display data from farm run
     20261010T022724164Z; the tag raised ``rise_m`` off the frame's bottom
-    border (0 = its triangle seated on it, as printed)."""
+    border (0 = its triangle seated on it, as printed); ``into_frame`` points
+    the seated triangle up, into the frame, instead of down to its leader."""
     from _layout_geometry import AnnotationGeometry, Box, Segment, SheetGeometry
 
     def frame(x0, x1):
@@ -4153,6 +4154,8 @@ def _knife_mount_datum_b(rise_m: float):
         segments=(*frame(0.1466, 0.1536), *frame(0.1536, 0.1697179), *frame(0.1697179, 0.176013)),
     )
     base, apex = 0.212 + rise_m, 0.20955 + rise_m
+    if into_frame:
+        apex = base + (base - apex)
     triangle = ((0.1627065, base), (0.1599065, base), (0.1613065, apex))
     datum = AnnotationGeometry(
         label="datum DetailItem356 'B'",
@@ -4172,16 +4175,19 @@ def test_a_datum_seated_on_its_frame_is_attached_not_near_its_text():
     dowel-pair frame (add_frame_datum_feature), seats its triangle's base on
     the frame's bottom border, 1.66 mm under the frame's 0.13; the audit
     read it as an arrow crowding foreign text.  Raised 0.3 mm off the
-    border into the frame, the same tag is not seated there and gates."""
+    border into the frame, the same tag is not seated there and gates; seated
+    on the border but pointing into the frame, its apex crowds the 0.13 and
+    gates too (CodeRabbit, #1320)."""
     from _layout_audit import find_arrows_near_text
 
     assert find_arrows_near_text(_knife_mount_datum_b(0.0)) == []
-    (finding,) = find_arrows_near_text(_knife_mount_datum_b(0.0003))
-    assert (finding.kind, finding.a, finding.b) == (
-        "arrow-near-text",
-        "datum DetailItem356 'B'",
-        "gtol DetailItem355 '<GTOL-POSI>'",
-    )
+    for sheet in (_knife_mount_datum_b(0.0003), _knife_mount_datum_b(0.0, into_frame=True)):
+        (finding,) = find_arrows_near_text(sheet)
+        assert (finding.kind, finding.a, finding.b) == (
+            "arrow-near-text",
+            "datum DetailItem356 'B'",
+            "gtol DetailItem355 '<GTOL-POSI>'",
+        )
 
 
 _ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
