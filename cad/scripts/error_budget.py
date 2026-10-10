@@ -2372,11 +2372,11 @@ def _main() -> int:
                 "WAIVED: the magnifier's minimum pose (clamp at "
                 f"{mag['lever_radius_min_mm']:.0f} mm from the knife) is not "
                 f"CAD-gated; it scores {', '.join(mag['inputs_at_minimum_pose'])} "
-                f"(offline straight-wire estimate: hook x {est['hook_x_mm']:.0f}, "
-                f"{est['z_clearance_to_rim_face_where_over_ring_mm']:.1f} mm in "
-                f"front of the rim ring, "
-                f"{est['z_clearance_to_spoke_face_where_over_spokes_mm']:.1f} mm in "
-                "front of the spokes) -- closure is conditional on #748"
+                f"(offline straight-wire estimate: hook x {est['hook_x_mm']:.0f}; "
+                "wire surface gaps to the wheel's pen-side faces: rim "
+                f"{est['rim_face_gap_mm']:.2f}, spokes "
+                f"{est['spoke_face_gap_mm']:.2f}, boss "
+                f"{est['boss_face_gap_mm']:.2f} mm) -- closure is conditional on #748"
             )
         print("\nBUDGET:", "closes" if not bad else "; ".join(bad))
     return 0 if not budget_closes(r) else 1
