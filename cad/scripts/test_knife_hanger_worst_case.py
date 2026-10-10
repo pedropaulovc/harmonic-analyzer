@@ -27,30 +27,52 @@ from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 
 def test_the_tap_point_leaves_the_web_over_the_bore_crown() -> None:
     assert knife_mount.STUD_TAP_WEB_MIN == 2.0
-    # 14.62 - 0.10 - 0.015 - 11.00 - 0.813 at the spec's 14.87 top: the
-    # reamed bore's +0.03 and the drill depth's explicit 10.90 +/-0.10.
-    assert knife_mount.STUD_TAP_DRILL_DEPTH_MAX == pytest.approx(11.0)
-    assert knife_mount.STUD_TAP_WEB_WORST == pytest.approx(2.692, abs=5e-4)
+    # 14.62 - 0.10 - 0.015 - 11.67 - 0.813 at the spec's 14.87 top: the
+    # reamed bore's +0.03 and the drill depth's explicit 11.20 +/-0.47.
+    assert knife_mount.STUD_TAP_DRILL_DEPTH_MAX == pytest.approx(11.67)
+    assert knife_mount.STUD_TAP_WEB_WORST == pytest.approx(2.022, abs=5e-4)
     assert knife_mount.STUD_TAP_WEB_WORST >= knife_mount.STUD_TAP_WEB_MIN
-    # The build's exact derived top (14.866) is what gets cut: 2.688.
+    # The build's exact derived top (14.866) is what gets cut: 2.018.
     built = knife_mount.tap_web_worst(
         build_sm_knife_mount.BLK_TOP,
         knife_mount.STUD_TAP_DRILL_DEPTH,
         knife_mount.STUD_TAP_DIA,
     )
-    assert built == pytest.approx(2.688, abs=5e-4)
+    assert built == pytest.approx(2.018, abs=5e-4)
     assert built >= knife_mount.STUD_TAP_WEB_MIN
+    # The band is the loosest that fits: 0.01 more and the shallowest drill
+    # (10.72) runs under one pitch past the deepest thread (9.93); 0.02 more
+    # and the deepest drill (11.69) breaks the 2.0 web at the built top.
+    wider = knife_mount.STUD_TAP_DRILL_DEPTH_BAND + 0.01
+    deepest_thread = (
+        knife_mount.STUD_TAP_THREAD_DEPTH + knife_mount.STUD_TAP_THREAD_DEPTH_BAND
+    )
+    assert (
+        knife_mount.STUD_TAP_DRILL_DEPTH - wider - deepest_thread
+        < knife_mount.STUD_PITCH
+    )
+    assert (
+        knife_mount.tap_web_worst(
+            build_sm_knife_mount.BLK_TOP,
+            knife_mount.STUD_TAP_DRILL_DEPTH,
+            knife_mount.STUD_TAP_DIA,
+            drill_band=wider + 0.01,
+        )
+        < knife_mount.STUD_TAP_WEB_MIN
+    )
 
 
 def test_the_tap_drill_runs_a_pitch_past_the_full_thread() -> None:
     # Machinist review B2: a bottoming tap needs the drill to run past the
-    # full thread.  Shallowest drill (10.80) less deepest thread (9.75):
-    # 1.05, at least one 32 TPI pitch (0.794).
-    assert knife_mount.STUD_TAP_THREAD_DEPTH == 9.7
-    assert knife_mount.STUD_TAP_THREAD_DEPTH_BAND == 0.05
-    assert knife_mount.STUD_TAP_DRILL_DEPTH == 10.9
-    assert knife_mount.STUD_TAP_DRILL_DEPTH_BAND == 0.10
-    assert knife_mount.STUD_TAP_RUNOUT_MIN == pytest.approx(1.05)
+    # full thread.  Shallowest drill (10.73) less deepest thread (9.93):
+    # 0.80, at least one 32 TPI pitch (0.794).  The thread is at the title
+    # block's general .XX (2026-10-10 ruling); the drill carries the loosest
+    # band the web and the runout leave (0.964 of room, under .XX's 1.02).
+    assert knife_mount.STUD_TAP_THREAD_DEPTH == 9.42
+    assert knife_mount.STUD_TAP_THREAD_DEPTH_BAND == knife_mount._XX == 0.51
+    assert knife_mount.STUD_TAP_DRILL_DEPTH == 11.2
+    assert knife_mount.STUD_TAP_DRILL_DEPTH_BAND == 0.47
+    assert knife_mount.STUD_TAP_RUNOUT_MIN == pytest.approx(0.80)
     assert knife_mount.STUD_TAP_RUNOUT_MIN == pytest.approx(
         knife_mount.STUD_TAP_DRILL_DEPTH
         - knife_mount.STUD_TAP_DRILL_DEPTH_BAND
@@ -91,10 +113,11 @@ def test_the_screw_reach_holds_engagement_and_stays_in_the_thread() -> None:
     assert asm.HANGER_ENGAGEMENT_MIN == pytest.approx(5.49, abs=5e-3)
     assert asm.HANGER_ENGAGEMENT_FLOOR == pytest.approx(1.5 * screw.SHANK_DIA)
     assert asm.HANGER_ENGAGEMENT_MIN >= asm.HANGER_ENGAGEMENT_FLOOR
-    # Tip: r_max under the shallowest full thread, 8.90 <= 9.65 (0.75 clear).
-    assert knife_mount.STUD_TAP_THREAD_DEPTH_MIN == pytest.approx(9.65)
+    # Tip: r_max under the shallowest full thread, 8.90 <= 8.91 (0.01 clear);
+    # the screw (91251A157, 1-1/2) is unchanged.
+    assert knife_mount.STUD_TAP_THREAD_DEPTH_MIN == pytest.approx(8.91)
     assert asm.HANGER_REACH_MAX <= knife_mount.STUD_TAP_THREAD_DEPTH_MIN
-    assert asm.HANGER_TIP_CLEARANCE == pytest.approx(0.75)
+    assert asm.HANGER_TIP_CLEARANCE == pytest.approx(0.01)
     # The partial thread covers the longest reach: 19.05 >= 8.90.
     assert screw.THREAD_LENGTH >= asm.HANGER_REACH_MAX
     # The screw clears the crossbar's #6 hole: 4.318 - 3.505.

@@ -26,7 +26,7 @@ import math
 
 import _config
 import vn_knife_mount_dowel_spec as DOWEL
-from _gtol_spec import CylinderFace
+from _gtol_spec import CylinderFace, PlanarFace
 from _hole_spec import DRILL_POINT_H, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from sm_summing_lever_spec import HEX_H, HEX_W
@@ -39,8 +39,11 @@ BLK_TOP = 14.87  # local block top (clamped to the top-frame casting underside)
 BLK_BOT = -14.75  # local block bottom (BORE_CY - R_BORE - 3.0 wall)
 BORE_CY = -5.75  # bore centre below the ridge origin (TopClear 0.25 - R_BORE)
 
+# The knife bore's reamed seat and the top seat (datum A), which the screw
+# clamps to the casting underside and the dowels key: both Ra 1.6.
 SURFACE_FINISHES = (
     SurfaceFinishControl("knife_bore", MACHINED_UM, CylinderFace(2.0 * R_BORE)),
+    SurfaceFinishControl("top_seat", MACHINED_UM, PlanarFace((0.0, 1.0, 0.0), BLK_TOP)),
 )
 
 # --- Knife-hanger screw tap and anti-rotation dowel holes (top seat) ---------
@@ -64,17 +67,19 @@ BLOCK_HEIGHT_PRINTED = round(BLK_TOP - BLK_BOT, BLOCK_SIZE_PLACES)  # 29.6
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-bore position": "0.20",
-    "knife-bore orientation refinement": "0.05",
+    "knife-bore perpendicularity": "0.05",
     "knife-hanger tap position": "0.10",
     "dowel hole pattern position": "0.13",
 }
-# The bore's composite position (policy rule 3, knife-edge system): the upper
-# tier locates it Ø0.20 to the top seat (datum A) and the dowel pattern
-# (datum B); the lower tier refines its orientation -- tilt and yaw -- to
-# Ø0.05 to the same A|B.
+# The bore (policy rule 3, knife-edge system): ⌖Ø0.20 locates it to the top
+# seat (datum A) and the dowel pattern (datum B); a stacked ⊥Ø0.05|B holds
+# its axis square to the plane of the dowel axes.  That one Ø zone bounds
+# both the yaw off the dowel line (the rock budget's far-end offset) and the
+# tilt; a ∥ to A would bound the tilt only, in a two-plane zone, leaving the
+# yaw free.
 KNIFE_BORE_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-bore position"])
 KNIFE_BORE_ORIENTATION_TOL = float(
-    GEOMETRIC_TOLERANCES_MM["knife-bore orientation refinement"]
+    GEOMETRIC_TOLERANCES_MM["knife-bore perpendicularity"]
 )
 # The #6-32 tap's position to the top seat and the dowel pattern (A|B): the
 # screw axis the crossbar's #6 clearance hole must float round
@@ -123,7 +128,7 @@ def free_rock_deg(
 # nominal 8.080 x 10.268 trunnion in the nominal Ø12 against the far-end
 # offset t across the 14 deep bore: t 0 -> 8.92 deg, 0.05 -> 8.44, 0.10 ->
 # 7.96, 0.18 -> 7.17.  The rule-12 budget -- the trunnion's .XXX section and
-# the bore's .XX size at their band limits, t the Ø0.05 tier plus the dowel
+# the bore's .XX size at their band limits, t the ⊥Ø0.05 zone plus the dowel
 # yaw across the deepest .X block -- is
 # ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.16 in
 # the reamed bore), which owns the crossbar's slip terms.  Ø0.05 is also the bedding
@@ -133,17 +138,20 @@ KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # MHA-VN-024, a stock #6-32 socket head cap screw down through the crossbar,
 # threads into a bottoming tap on the bore's vertical centreline at
-# mid-depth.  The drill runs 1.2 past the full thread (>= 1.5 P for the
-# bottoming tap's chamfer).  Both depths carry explicit bands on the
-# sheet's hole callout (the MHA-SM-003 bracket-tap precedent,
-# ``magnifying_bracket_joint_layout``): .XX's +/-0.51 on both left only
-# 10.39 - 10.21 = 0.18 of drill past the deepest full thread, under one
-# pitch for the tap's lead (blind machinist review, 2026-10-09).
+# mid-depth.  The full thread prints 9.42 at the title block's .XX
+# (+/-0.51, 2026-10-10 ruling: the depths return to general tolerance where
+# the stack allows): its shallowest, 8.91, still takes the screw's longest
+# reach, 8.90 (``build_sm_summing_assembly.HANGER_TIP_CLEARANCE``).  Between
+# that thread's deepest limit plus one pitch (9.93 + 0.794 = 10.724) and the
+# deepest drill the 2.0 crown web allows (14.501 - 2.0 - 0.813 = 11.688 at
+# the built top) the drill keeps 0.964 of room, under the 1.02 a .XX band
+# takes; its depth carries the loosest band that fits, 11.20 +/-0.47, on the
+# sheet's hole callout (the MHA-SM-003 bracket-tap precedent).
 STUD_THREAD = "#6-32"
-STUD_TAP_DRILL_DEPTH = 10.9
-STUD_TAP_THREAD_DEPTH = 9.7
-STUD_TAP_THREAD_DEPTH_BAND = 0.05
-STUD_TAP_DRILL_DEPTH_BAND = 0.10
+STUD_TAP_DRILL_DEPTH = 11.2
+STUD_TAP_THREAD_DEPTH = 9.42
+STUD_TAP_THREAD_DEPTH_BAND = _XX  # general, the title block's .XX
+STUD_TAP_DRILL_DEPTH_BAND = 0.47
 STUD_TAP_SPEC = HoleSpec(
     "tapped_bottoming",
     STUD_THREAD,
@@ -161,7 +169,7 @@ if STUD_TAP_RUNOUT < 1.5 * STUD_PITCH:
         f" under 1.5 P ({1.5 * STUD_PITCH:.3f})"
     )
 # At the bands' adverse limits the drill still runs past the deepest full
-# thread by at least one pitch, the bottoming tap's lead: 10.80 - 9.75 = 1.05.
+# thread by at least one pitch, the bottoming tap's lead: 10.73 - 9.93 = 0.80.
 STUD_TAP_RUNOUT_MIN = (STUD_TAP_DRILL_DEPTH - STUD_TAP_DRILL_DEPTH_BAND) - (
     STUD_TAP_THREAD_DEPTH + STUD_TAP_THREAD_DEPTH_BAND
 )
@@ -172,11 +180,11 @@ if STUD_TAP_RUNOUT_MIN < STUD_PITCH:
     )
 # The metal the tap's drill point leaves over the bore crown, every band at
 # its worst (the drill depth's band, the largest reamed bore, the bore's
-# position zone KNIFE_BORE_POSITION_TOL): 14.62 - 0.10 - 0.015 - 11.00 -
-# 0.813 = 2.69.
+# position zone KNIFE_BORE_POSITION_TOL): 14.62 - 0.10 - 0.015 - 11.67 -
+# 0.813 = 2.02.
 STUD_TAP_WEB_MIN = 2.0
 STUD_TAP_POINT_H = STUD_TAP_DIA / 2.0 * DRILL_POINT_H  # 0.813
-STUD_TAP_DRILL_DEPTH_MAX = STUD_TAP_DRILL_DEPTH + STUD_TAP_DRILL_DEPTH_BAND  # 11.00
+STUD_TAP_DRILL_DEPTH_MAX = STUD_TAP_DRILL_DEPTH + STUD_TAP_DRILL_DEPTH_BAND  # 11.67
 BORE_CROWN_DEPTH_MIN = (
     BORE_CROWN_DEPTH - KNIFE_BORE_POSITION_TOL / 2.0 - max(BORE_DIA_BAND) / 2.0
 )
@@ -212,7 +220,7 @@ if STUD_TAP_WEB_WORST < STUD_TAP_WEB_MIN:
         f" crown at worst case, under {STUD_TAP_WEB_MIN}"
     )
 # The full thread the screw can use, at the shallowest printed thread depth.
-STUD_TAP_THREAD_DEPTH_MIN = STUD_TAP_THREAD_DEPTH - STUD_TAP_THREAD_DEPTH_BAND  # 9.65
+STUD_TAP_THREAD_DEPTH_MIN = STUD_TAP_THREAD_DEPTH - STUD_TAP_THREAD_DEPTH_BAND  # 8.91
 
 # MHA-VN-051 dowels: two blind flat-bottom reamed holes in the top seat at
 # DOWEL.HANGER_OFFSET either side of the tap axis along local X, at mid-depth.

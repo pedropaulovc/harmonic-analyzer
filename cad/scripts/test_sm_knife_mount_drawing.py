@@ -15,30 +15,55 @@ from _drawing_registry import DRAWINGS_BY_NAME
 
 def test_knife_seat_bore_finish_is_part_owned_and_consumed_by_key() -> None:
     # Policy rule 5: the knife SEAT carries MACHINED_UM (1.6); GROUND_UM (0.8)
-    # is for the knife edge itself, which is the lever trunnion's ridge.
-    (control,) = sm_knife_mount_spec.SURFACE_FINISHES
+    # is for the knife edge itself, which is the lever trunnion's ridge.  The
+    # top seat, datum A, carries the same 1.6 (2026-10-10 ruling).
+    control, top_seat = sm_knife_mount_spec.SURFACE_FINISHES
     assert control.key == "knife_bore"
     assert control.roughness_um == sm_knife_mount_spec.MACHINED_UM == 1.6
     assert control.face.diameter_mm == 2.0 * sm_knife_mount_spec.R_BORE
+    assert top_seat.key == "top_seat"
+    assert top_seat.roughness_um == sm_knife_mount_spec.MACHINED_UM
+    assert top_seat.face.normal == (0.0, 1.0, 0.0)
+    assert top_seat.face.offset_mm == sm_knife_mount_spec.BLK_TOP
+    # The built top (14.866) is inside the face match.
+    assert abs(part.BLK_TOP - top_seat.face.offset_mm) < top_seat.face.tolerance_mm
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     assert 'surface_finish_by_key(SURFACE_FINISHES, "knife_bore")' in drawing_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "top_seat")' in drawing_source
     assert "roughness_ra=" not in drawing_source
     # The fleet's finish height (62 of 75 finish symbols print at 2.5 mm):
     # at the document default the Ra 1.6 printed 6.35 mm, twice the sheet's
     # 3.5 mm notes (farm run 20261009T171439353Z).
     import ast
 
-    (finish,) = (
+    finishes = [
         call
         for call in ast.walk(ast.parse(drawing_source))
         if isinstance(call, ast.Call)
         and getattr(call.func, "id", "") == "add_surface_finish"
-    )
-    keywords = {keyword.arg: ast.literal_eval(keyword.value) for keyword in finish.keywords
-                if keyword.arg in {"label", "char_height"}}
-    assert keywords == {"label": "knife bore finish", "char_height": 0.0025}
+    ]
+    keywords = [
+        {
+            keyword.arg: ast.literal_eval(keyword.value)
+            for keyword in finish.keywords
+            if keyword.arg in {"label", "char_height"}
+        }
+        for finish in finishes
+    ]
+    assert keywords == [
+        {"label": "knife bore finish", "char_height": 0.0025},
+        {"label": "top seat finish", "char_height": 0.0025},
+    ]
+    # The seat's symbol stands over the right view's top edge, its leader
+    # landing on that edge.
+    edge_x, edge_y = drawing.TOP_SEAT_FINISH_EDGE_XY
+    symbol_x, symbol_y = drawing.TOP_SEAT_FINISH_XY
+    assert edge_y == pytest.approx(drawing._front_y(sm_knife_mount_spec.BLK_TOP))
+    assert abs(edge_x - drawing.RIGHT_CENTER[0]) < drawing.RIGHT_HALF_Z
+    assert abs(symbol_x - drawing.RIGHT_CENTER[0]) < drawing.RIGHT_HALF_Z
+    assert symbol_y > edge_y
 
 
 def test_required_drawing_paths() -> None:
@@ -333,20 +358,31 @@ def test_native_gdt_and_bore_geometry() -> None:
     assert source.index("assert_frame_datums_defined(") > source.index(
         "add_frame_datum_feature("
     )
-    # The pair's frame to A, the bore's composite frame and the tap's frame
-    # to A|B.
+    # The pair's frame to A, the bore's and the tap's frames to A|B; under
+    # the bore's position, a stacked (not composite) ⊥Ø0.05 to B
+    # (2026-10-10 ruling: one Ø zone bounds the yaw the rock budget takes).
     assert source.count("add_feature_control_frame(") == 3
     assert source.count('characteristic="position"') == 3
     assert source.count('datums=("A",)') == 1
     assert source.count('datums=("A", "B")') == 2
-    assert source.count("composite_lower=(") == 1
+    assert "composite_lower" not in source
+    bore_frame = source[source.index("# The bore: Ø0.20 located to A|B") :]
+    bore_frame = bore_frame[: bore_frame.index("bore_basic = ")]
+    assert (
+        "        lower_frame=(\n"
+        '            "perpendicularity",\n'
+        '            GEOMETRIC_TOLERANCES_MM["knife-bore perpendicularity"],\n'
+        '            ("B",),\n'
+        "        ),\n"
+    ) in bore_frame
     assert 'GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"]' in source
     assert sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM == {
         "knife-bore position": "0.20",
-        "knife-bore orientation refinement": "0.05",
+        "knife-bore perpendicularity": "0.05",
         "knife-hanger tap position": "0.10",
         "dowel hole pattern position": "0.13",
     }
+    assert sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL == 0.05
     # Sheet-added: the block depth, the dowel span, the tap axis's station
     # from a dowel axis and the bore centre's height under A (all BASIC), and
     # the pattern's two face locations; the
@@ -432,42 +468,52 @@ def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
 
 def test_tap_callout_bands_its_depths_with_a_pitch_of_runout() -> None:
     # Machinist review B2: the bottoming tap needs drill past the full
-    # thread.  Both depths carry explicit bands on the native callout (the
-    # summing-lever bracket-tap precedent); at their adverse limits the drill
-    # still runs 1.05 past the thread, over one 0.794 pitch.
+    # thread.  The full thread prints 9.42 under the title block's .XX
+    # (2026-10-10 ruling); the drill carries the loosest band the 2.0 crown
+    # web and one 0.794 pitch of runout leave, 11.20 +/-0.47, on the native
+    # callout (the summing-lever bracket-tap precedent).
     assert drawing.TAP_CALLOUT_DEPTH_BANDS == {
-        "hw-threaddepth": (9.7, 0.05),
-        "hw-tapdrldepth": (10.9, 0.10),
+        "hw-threaddepth": (9.42, None),
+        "hw-tapdrldepth": (11.2, 0.47),
     }
+    assert drawing.TAP_THREAD_DEPTH_PLACES == 2
     assert sm_knife_mount_spec.STUD_TAP_RUNOUT_MIN >= sm_knife_mount_spec.STUD_PITCH
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "tap_callout = add_native_hole_callout(" in source
     assert "_band_tap_callout_depths(tap_callout)" in source
+    assert '{"hw-threaddepth": TAP_THREAD_DEPTH_PLACES}' in source
     body = source[source.index("def _band_tap_callout_depths(") :]
     body = body[: body.index("\ndef ")]
     assert "variable.ToleranceType = 4" in body
+    assert "variable.ToleranceType = 0" in body
     assert "if required:" in body
 
 
 def test_hidden_threads_and_restated_hidden_lines_are_gone() -> None:
     # Machinist review: the right view's dashed tap, dowel and bore restated
-    # the front view and A-A, and A-A printed the tap's thread dashed.  The
-    # right view is hidden-lines-removed, its thread annotation on a hidden
-    # layer; A-A's thread on a visible thin continuous layer, and none moved
-    # there fails the build.
+    # the front view and A-A, and A-A printed the tap's thread dashed; the
+    # top view's dashed cross-bore and the front view's dashed blind holes
+    # restated the front view, the callouts and A-A (2026-10-10 ruling).
+    # Every view is hidden-lines-removed, the front and right views' thread
+    # annotations on a hidden layer; A-A's thread on a visible thin
+    # continuous layer, and none moved there fails the build.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for view in (iso, right):\n        set_hidden_lines_removed(adapter, view)" in source
-    assert "for view in (front, top):\n        set_hidden_lines_visible(adapter, view)" in source
+    assert (
+        "for view in (iso, right, front, top):\n"
+        "        set_hidden_lines_removed(adapter, view)"
+    ) in source
+    assert "set_hidden_lines_visible" not in source
     assert drawing.SECTION_THREAD_LAYER != drawing.HIDDEN_THREAD_LAYER
     section_call = source[source.index("    if not _layer_cosmetic_threads(\n        adapter,\n        section,") :]
-    section_call = section_call[: section_call.index("    _layer_cosmetic_threads(\n        adapter,\n        right,")]
+    hidden_loop = 'for view, view_label in ((front, "front"), (right, "right")):'
+    section_call = section_call[: section_call.index(hidden_loop)]
     assert "layer_name=SECTION_THREAD_LAYER" in section_call
     assert "visible=True" in section_call
     assert "raise RuntimeError" in section_call
-    right_call = source[source.index("    _layer_cosmetic_threads(\n        adapter,\n        right,") :]
-    right_call = right_call[: right_call.index(")\n") + 2]
-    assert "layer_name=HIDDEN_THREAD_LAYER" in right_call
-    assert "visible=False" in right_call
+    hidden_call = source[source.index(hidden_loop) :]
+    hidden_call = hidden_call[: hidden_call.index("        )\n") + 10]
+    assert "layer_name=HIDDEN_THREAD_LAYER" in hidden_call
+    assert "visible=False" in hidden_call
 
 
 def test_the_pattern_is_located_from_the_side_and_front_faces() -> None:
@@ -499,7 +545,7 @@ def test_the_pattern_is_located_from_the_side_and_front_faces() -> None:
 
 
 def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
-    # Machinist review (2026-10-10): the tap frame and the bore's composite
+    # Machinist review (2026-10-10): the tap frame and the bore's frames
     # reference B, but their offset from B was only the implied centre.  The
     # tap axis, run on through the bore's centre in section A-A, stands BASIC
     # 6.350 from the -X dowel axis; its boxed value parks left of that axis,

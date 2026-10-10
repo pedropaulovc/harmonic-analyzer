@@ -926,16 +926,15 @@ def add_feature_control_frame(
     entity: Any | None = None,
     leader_attach_xy: tuple[float, float] | None = None,
     translated: Sequence[str] = (),
-    composite_lower: tuple[str, Sequence[str]] | None = None,
+    lower_frame: tuple[str, str, Sequence[str]] | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
     ``translated`` names datum references printed with the translation
-    modifier (``_gtol_spec.gtol_frame_xml``).  ``composite_lower`` is the
-    lower tier ``(tolerance, datums)`` of a composite frame: a second frame of
-    the same characteristic (``IGtol.AddFrame``) joined to the first by
-    ``IGtol.SetCompositeFrame2(True, 1)`` (both frames must share the symbol),
-    proved by ``GetCompositeFrame2(1)`` and each frame's XML read back.
+    modifier (``_gtol_spec.gtol_frame_xml``).  ``lower_frame`` is a second,
+    stacked frame ``(characteristic, tolerance, datums)`` on the same leader
+    (``IGtol.AddFrame``), printed with its own symbol -- not composite
+    (``GetCompositeFrame2(1)`` must read False) -- its XML read back.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.  Only the kinds
@@ -987,7 +986,6 @@ def add_feature_control_frame(
         "SetLeader",
         "IsAttached",
         "GetLeaderCount",
-        "SetCompositeFrame2",
         "GetCompositeFrame2",
     )
     frame_count = int(gtol.GetFrameCount() or 0)
@@ -1055,26 +1053,28 @@ def add_feature_control_frame(
         )
     if int(gtol.GetFormat()) != 2:  # swGtolFormatType_e.GTOL_SW2022 (current)
         raise RuntimeError(f"feature-control frame remained in old format ({label})")
-    if composite_lower is not None:
-        lower_tolerance, lower_datums = composite_lower
+    if lower_frame is not None:
+        lower_characteristic, lower_tolerance, lower_datums = lower_frame
         if not gtol.AddFrame() or int(gtol.GetFrameCount() or 0) != 2:
-            raise RuntimeError(f"failed to add the composite lower tier ({label})")
+            raise RuntimeError(f"failed to add the stacked lower frame ({label})")
         lower = _sw_type_info.early_bound_or_flag(
             gtol.GetFrame(2), "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
         )
         lower_xml = _gtol_frame_xml(
-            characteristic, lower_tolerance, datums=lower_datums, diameter=diameter
+            lower_characteristic, lower_tolerance, datums=lower_datums, diameter=diameter
         )
         if not lower.SetSymbolXml(lower_xml):
             raise RuntimeError(
-                f"SOLIDWORKS rejected the composite lower-tier XML ({label})"
+                f"SOLIDWORKS rejected the stacked lower-frame XML ({label})"
             )
-        gtol.SetCompositeFrame2(True, 1)
-        if not gtol.GetCompositeFrame2(1):
-            raise RuntimeError(f"feature-control frame is not composite ({label})")
+        if gtol.GetCompositeFrame2(1):
+            raise RuntimeError(f"stacked frames read back composite ({label})")
         lower_applied = str(lower.GetSymbolXml() or "")
-        if lower_tolerance not in lower_applied:
-            raise RuntimeError(f"composite lower tier did not persist ({label})")
+        if (
+            _GTOL_SYMBOLS[lower_characteristic] not in lower_applied
+            or lower_tolerance not in lower_applied
+        ):
+            raise RuntimeError(f"stacked lower frame did not persist ({label})")
     if quantity:
         if not gtol.InsertBelowFrameTextAt(1, quantity):
             raise RuntimeError(f"failed to add feature quantity {quantity!r} ({label})")
