@@ -3,6 +3,8 @@ r"""Manufacturing drawing of the open-rebate brass stop block.
 The cover-side view and end view show the rebate in solid lines. Standard
 native Hole Wizard callouts define the orthogonal taps, including blind full
 thread and drill depths. Every controlling dimension is imported unchanged.
+Hole-mouth points convert the shared millimetre frame to COM metres before
+projection; the cover-side *Back view reverses X, not the coordinate units.
 """
 
 from __future__ import annotations
@@ -81,13 +83,17 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     plate_edge = model_point_in_view(
-        adapter, front, (part.PLATE_HOLE_XS[0] + part.PLATE_TAP_DRILL_DIA / 2.0,
-                         part.PLATE_HOLE_Y, part.PLATE_Z_MAX), label="plate tap mouth")
+        adapter, front, (
+            (part.PLATE_HOLE_XS[0] + part.PLATE_TAP_DRILL_DIA / 2.0) / 1000.0,
+            part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
+        ), label="plate tap mouth")
     add_native_hole_callout(adapter, front, edge_xy=plate_edge, callout_xy=(0.030, 0.105),
                            label="two cover blind taps", process="2X MATCH-DRILL; THEN BOTTOMING TAP")
     thumb_edge = model_point_in_view(
-        adapter, bottom, (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0,
-                          0.0, part.THUMB_AXIS_Z), label="thumb tap mouth")
+        adapter, bottom, (
+            (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0) / 1000.0,
+            0.0, part.THUMB_AXIS_Z / 1000.0,
+        ), label="thumb tap mouth")
     add_native_hole_callout(adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.235, 0.045),
                            label="thumbscrew tap through floor")
     for view in (front, bottom):

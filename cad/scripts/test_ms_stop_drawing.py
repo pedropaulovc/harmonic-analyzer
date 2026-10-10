@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import ast
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import _drawing_common as drawing_common
 import build_ms_stop_block as block
 import build_ms_stop_plate as plate
 import draw_ms_stop_block as block_drawing
@@ -155,3 +158,161 @@ def test_no_com_in_spec_or_render_time_size_overrides(module) -> None:
                  for node in ast.walk(tree) if isinstance(node, ast.Call)
                  and isinstance(node.func, (ast.Attribute, ast.Name))}
         assert not calls & {"SetPrecision3", "set_dimension_precision", "SetValues", "set_hole_callout_precision", "add_gdt_frame", "add_datum_tag"}
+
+
+class _StopViewTransform:
+    """4:1 orthographic affine map, centred on the part's bounding box."""
+
+    def __init__(self, orientation, position, scale, model_center):
+        self.orientation = orientation
+        self.position = position
+        self.scale = scale[0] / scale[1]
+        self.model_center = model_center
+
+    def apply(self, xyz):
+        x, y, z = (value - center for value, center in zip(
+            xyz, self.model_center, strict=True
+        ))
+        sx, sy = self.position
+        if self.orientation == "*Back":
+            return (sx - self.scale * x, sy + self.scale * y, -self.scale * z)
+        if self.orientation == "*Bottom":
+            return (sx + self.scale * x, sy + self.scale * z, -self.scale * y)
+        raise AssertionError(f"unexpected hole-mouth view: {self.orientation}")
+
+
+class _StopMathPoint:
+    def __init__(self, xyz):
+        self.ArrayData = tuple(xyz)
+
+    def MultiplyTransform(self, transform):  # noqa: N802 - COM member name
+        return _StopMathPoint(transform.apply(self.ArrayData))
+
+
+class _StopMathUtility:
+    def __init__(self):
+        self.points = []
+
+    def CreatePoint(self, values):  # noqa: N802 - COM member name
+        # Keep the real double_array marshaling, including its no-pywin32
+        # fallback. No COM server is instantiated by constructing a VARIANT.
+        xyz = tuple(getattr(values, "value", values))
+        self.points.append(xyz)
+        return _StopMathPoint(xyz)
+
+
+@pytest.mark.parametrize("drawing,cases", [
+    (block_drawing, [
+        ("two cover blind taps", "*Back", (0.004425, 0.004, 0.0), (0.1993, 0.1728)),
+        ("thumbscrew tap through floor", "*Bottom",
+         (0.0116305, 0.0, 0.0042), (0.179522, 0.0748)),
+    ]),
+    (plate_drawing, [
+        ("two cover clearance holes", "*Back", (0.0047, 0.004, -0.001), (0.1982, 0.1578)),
+    ]),
+], ids=["block-plate-and-subsequent-thumb", "plate-clearance"])
+def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
+    monkeypatch, tmp_path, drawing, cases
+) -> None:
+    """Exercise both builds' real projection and callout handoff, not native
+    edge selection. The fake seat supplies only known affine math and replaces
+    unrelated drawing setup/import/export; it never launches SolidWorks."""
+    source = tmp_path / f"{drawing.PART_STEM}.SLDPRT"
+    source.write_bytes(b"offline source sentinel")
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    utility = _StopMathUtility()
+
+    async def open_model(path):
+        assert path == str(source)
+        return SimpleNamespace(is_success=True, data=None)
+
+    adapter = SimpleNamespace(
+        currentModel=object(), open_model=open_model,
+        swApp=SimpleNamespace(GetMathUtility=lambda: utility),
+    )
+    model_center = (
+        spec.BLOCK_LENGTH / 2000.0,
+        spec.BLOCK_HEIGHT / 2000.0,
+        (spec.PLATE_Z_MIN + spec.PLATE_Z_MAX) / 2000.0
+        if drawing is plate_drawing else spec.BLOCK_DEPTH / 2000.0,
+    )
+    views = {}
+
+    def place_view(adapter, path, orientation, x, y, *, scale):
+        assert path == str(source)
+        view = SimpleNamespace(
+            orientation=orientation, Position=(x, y), ScaleRatio=scale,
+            ModelToViewTransform=_StopViewTransform(
+                orientation, (x, y), scale, model_center
+            ),
+        )
+        views[orientation] = view
+        return view
+
+    def invoke(obj, _interface, member, *args):
+        value = getattr(obj, member)
+        return value(*args) if callable(value) else value
+
+    # Leave model_point_in_view, _projection_frame and _project_through intact.
+    # Only replace their raw dispatch boundary with the fake object's members.
+    monkeypatch.setattr(drawing_common, "_com_invoke", invoke)
+    monkeypatch.setattr(drawing, "place_view", place_view)
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *a, **kw: (object(), object()))
+    for name in (
+        "read_required_properties", "stamp_drawing_summary",
+        "set_hidden_lines_removed", "set_dimension_callouts",
+        "assert_manufacturing_dimensions", "add_property_linked_note",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *a, **kw: [])
+    monkeypatch.setattr(drawing, "auto_center_marks", lambda *a, **kw: True)
+    callouts = []
+
+    def add_callout(adapter, view, *, edge_xy, callout_xy, label, process=None):
+        callouts.append((view, edge_xy, label))
+
+    async def finalize(adapter, outputs, **kwargs):
+        return {"slddrw": str(outputs.slddrw)}
+
+    monkeypatch.setattr(drawing, "add_native_hole_callout", add_callout)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
+    # Capture the entire block build before checking: the second (thumb) pick
+    # must remain covered even when the preceding plate pick used wrong units.
+    assert len(utility.points) == len(callouts) == len(cases)
+    for xyz, (view, edge_xy, label), case in zip(
+        utility.points, callouts, cases, strict=True
+    ):
+        expected_label, orientation, expected_xyz, expected_xy = case
+        assert label == expected_label
+        assert view is views[orientation]
+        assert view.ScaleRatio == (4.0, 1.0)
+        assert xyz == pytest.approx(expected_xyz)
+        # These are the actual positive-X drill rims, on the visible mouth
+        # face, not the hole centre or the opposite end of the drilled hole.
+        if orientation == "*Bottom":
+            mouth = (spec.THUMB_AXIS_X + spec.THUMB_TAP_DRILL / 2.0,
+                     spec.THUMB_HOLE_POINTS[0][1], spec.THUMB_AXIS_Z)
+        else:
+            holes, diameter = (
+                (spec.PLATE_HOLE_POINTS, spec.PLATE_CLEARANCE_DIA)
+                if drawing is plate_drawing
+                else (spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_TAP_DRILL_DIA)
+            )
+            mouth = (holes[0][0] + diameter / 2.0, holes[0][1], holes[0][2])
+        assert xyz == pytest.approx(tuple(value / 1000.0 for value in mouth))
+        assert edge_xy == pytest.approx(expected_xy)
+        assert abs(edge_xy[0] - view.Position[0]) < 0.043
+        assert abs(edge_xy[1] - view.Position[1]) < 0.029
+        assert 0.0 < edge_xy[0] < 0.4318
+        assert 0.0 < edge_xy[1] < 0.2794
+        if orientation == "*Back":
+            # The real failure was millimetres fed to metre math: at 4:1
+            # Back reverses X around a shifted origin (~0.217), producing
+            # -17.483 for the block or -18.583 for the cover, far off sheet.
+            transform = view.ModelToViewTransform
+            assert transform.apply((0.0, 0.0, 0.0))[0] == pytest.approx(0.217)
+            wrong_units_x = transform.apply(mouth)[0]
+            assert wrong_units_x == pytest.approx(
+                -18.583 if drawing is plate_drawing else -17.483
+            )

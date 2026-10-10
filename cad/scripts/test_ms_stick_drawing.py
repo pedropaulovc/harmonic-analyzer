@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import ast
+import math
+from contextlib import nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import _drawing_common as drawing_common
 import build_ms_stick as builder
 import draw_ms_stick as drawing
 import ms_stick_spec as spec
@@ -83,3 +88,154 @@ def test_spec_is_pure_and_drawing_never_reauthors_dimensions() -> None:
              and isinstance(node.func, (ast.Attribute, ast.Name))}
     assert not calls & {"SetPrecision3", "set_dimension_precision", "SetValues", "set_basic_dimensions", "add_gdt_frame", "add_datum_tag"}
     assert not any(character.isdigit() for character in spec.DRAWING_NOTES)
+
+
+class _StickAffine:
+    def __init__(self, factors, offsets):
+        self.factors = factors
+        self.offsets = offsets
+
+    def apply(self, xyz):
+        return tuple(factor * value + offset for factor, value, offset in zip(
+            self.factors, xyz, self.offsets, strict=True
+        ))
+
+
+class _StickMathPoint:
+    def __init__(self, xyz):
+        self.ArrayData = tuple(xyz)
+
+    def MultiplyTransform(self, transform):  # noqa: N802 - COM member name
+        return _StickMathPoint(transform.apply(self.ArrayData))
+
+
+class _StickMathUtility:
+    def __init__(self):
+        self.points = []
+
+    def CreatePoint(self, values):  # noqa: N802 - COM member name
+        xyz = tuple(getattr(values, "value", values))
+        self.points.append(xyz)
+        return _StickMathPoint(xyz)
+
+
+def test_build_projects_metre_scale_fence_and_section_points(monkeypatch, tmp_path) -> None:
+    """Run the real callers and projection math without opening a COM seat."""
+    source = tmp_path / "ms-stick.SLDPRT"
+    source.write_bytes(b"offline source sentinel")
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    utility = _StickMathUtility()
+    circles, notes, sections, views = [], [], [], []
+    sketch_transform = _StickAffine((2.0, -3.0, 1.0), (0.03, 0.04, 0.02))
+
+    def make_view(position, scale, center_x):
+        ratio = scale[0] / scale[1]
+        # Back followed by the recipe's pi rotation: +X and -Y on sheet.
+        view = SimpleNamespace(
+            Position=position, ScaleRatio=scale, Angle=0.0,
+            GetName2=lambda: "offline-view",
+            GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=sketch_transform),
+            ModelToViewTransform=_StickAffine(
+                (ratio, -ratio, -ratio),
+                (position[0] - ratio * center_x, position[1] + ratio * 0.004, 0.0),
+            ),
+        )
+        views.append(view)
+        return view
+
+    detail = make_view(drawing.DETAIL_CENTER, drawing.DETAIL_SCALE, 0.0646)
+
+    def circle(*points):
+        circles.append(points)
+        return object()
+
+    def create_detail(*args):
+        assert args == (*drawing.DETAIL_CENTER, 0.0, 0, *drawing.DETAIL_SCALE,
+                        "A", 1, True, False, False, 5)
+        return detail
+
+    document = SimpleNamespace(
+        ActivateSheet=lambda name: True, ActivateView=lambda name: True,
+        ClearSelection2=lambda clear: None, EditRebuild3=lambda: True,
+        SketchManager=SimpleNamespace(CreateCircle=circle),
+        CreateDetailViewAt4=create_detail,
+    )
+
+    async def open_model(path):
+        assert path == str(source)
+        return SimpleNamespace(is_success=True, data=None)
+
+    adapter = SimpleNamespace(
+        currentModel=object(), open_model=open_model,
+        swApp=SimpleNamespace(GetMathUtility=lambda: utility),
+    )
+
+    def new_drawing(*args, **kwargs):
+        adapter.currentModel = document
+        return document, object()
+
+    def place_view(adapter, path, orientation, x, y, *, scale):
+        assert path == str(source)
+        assert orientation in ("*Back", "*Top", "*Isometric")
+        return make_view((x, y), scale, 0.1)
+
+    def invoke(obj, _interface, member, *args):
+        value = getattr(obj, member)
+        return value(*args) if callable(value) else value
+
+    # Preserve model_point_in_view and its real projection internals; replace
+    # only raw COM dispatch and early binding with the fake geometry members.
+    monkeypatch.setattr(drawing_common, "_com_invoke", invoke)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
+    monkeypatch.setattr(drawing, "place_view", place_view)
+    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.GetName2())
+    for name in (
+        "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
+        "set_hidden_lines_removed", "set_dimension_callouts", "assert_manufacturing_dimensions",
+        "add_property_linked_note",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *args, **kwargs: [])
+    monkeypatch.setattr(drawing, "part_sketches_shown", lambda *args, **kwargs: nullcontext())
+
+    def note(adapter, text, x, y):
+        notes.append((text, x, y))
+        return object()
+
+    def section(adapter, view, **kwargs):
+        sections.append((view, kwargs))
+        return object()
+
+    async def finalize(adapter, outputs, **kwargs):
+        return {"slddrw": str(outputs.slddrw)}
+
+    monkeypatch.setattr(drawing, "add_note", note)
+    monkeypatch.setattr(drawing, "create_section_view", section)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
+    assert len(utility.points) == 16
+    assert len(notes) == 11
+    for value, (xyz, (text, x, y)) in enumerate(zip(
+        utility.points[:11], notes, strict=True
+    )):
+        assert xyz == pytest.approx((0.0575 + value * 0.0142, 0.008, 0.0))
+        assert text == str(value)
+        assert (x, y) == pytest.approx((0.0795 + value * 0.0142, 0.201))
+    assert utility.points[11] == pytest.approx((0.0646, 0.004, 0.0))
+    assert utility.points[12] == pytest.approx((0.2123, 0.240, 0.0))
+    assert utility.points[13] == pytest.approx((0.2188, 0.240, 0.0))
+    assert len(circles) == 1
+    assert circles[0] == pytest.approx((0.4546, -0.680, 0.02, 0.4676, -0.680, 0.02))
+    assert utility.points[14] == pytest.approx((0.0575, -0.001, 0.0))
+    assert utility.points[15] == pytest.approx((0.0575, 0.009, 0.0))
+    assert len(sections) == 1
+    section_view, arguments = sections[0]
+    assert section_view is detail
+    assert arguments["line_start"] == pytest.approx((0.1374, 0.185))
+    assert arguments["line_end"] == pytest.approx((0.1374, 0.125))
+    assert arguments["view_xy"] == drawing.SECTION_CENTER
+    assert arguments["section_label"] == "B"
+    assert arguments["scale"] == drawing.DETAIL_SCALE
+    assert views[1].Angle == views[-1].Angle == pytest.approx(math.pi)
+    assert tuple(getattr(detail.ScaleRatio, "value", detail.ScaleRatio)) == drawing.DETAIL_SCALE
