@@ -103,11 +103,11 @@ def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
 
 
 def test_the_pair_reamer_reaches_and_sizes_the_bores() -> None:
-    # One pass through both lugs: a 12 in long-series 0.2513 chucking reamer,
-    # made to order (Super Tool 9458EL finishes .2211-.2530 to +.0001/+.0005
-    # in, 12 OAL, 1-1/2 flute, .2193 shank), gripped 1 in, carries its whole
-    # flute past the far lug's outer face, 154.0 from the near one. Its
-    # nominal sits under the band floor; the toleranced reamer lies inside.
+    # One pass through both lugs: a 12 in long-series 0.2514 chucking reamer,
+    # made to order (Super Tool catalogue 2026 p.59, 9458EL: .2211-.2530,
+    # 12 OAL, 1-1/2 flute, .2193 shank, NAS 897 Type C; p.42: +.0002/-.0000
+    # in), gripped 1 in, carries its whole flute past the far lug's outer
+    # face, 154.0 from the near one; the toleranced reamer lies in the band.
     keeper = ch_fulcrum_keeper_spec
     assert keeper.KEEPER_OUTER_FACE_SPAN_MM == 154.0
     assert keeper.PAIR_REAMER_OAL_IN == 12.0
@@ -116,16 +116,15 @@ def test_the_pair_reamer_reaches_and_sizes_the_bores() -> None:
     assert round(keeper.PAIR_REAMER_REACH_MARGIN_MM, 1) == 87.3
     # An 8 in OAL reamer would not carry the flute through.
     assert (8.0 - 1.0 - 1.5) * 25.4 < 154.0
-    assert keeper.PAIR_REAMER_DIA_IN == 0.2513
+    assert keeper.PAIR_REAMER_DIA_IN == 0.2514
     low, high = (
         (keeper.PAIR_REAMER_DIA_IN + plus) * 25.4 - keeper.BORE_DIA
-        for plus in (0.0001, 0.0005)
+        for plus in (0.0, 0.0002)
     )
     assert math.isclose(keeper.PAIR_REAMER_RANGE_MM[0], low)
     assert math.isclose(keeper.PAIR_REAMER_RANGE_MM[1], high)
-    assert (round(low, 4), round(high, 4)) == (0.0356, 0.0457)
+    assert (round(low, 5), round(high, 5)) == (0.03556, 0.04064)
     assert keeper.BORE_DIA_BAND[1] <= low < high <= keeper.BORE_DIA_BAND[0]
-    assert keeper.PAIR_REAMER_DIA_IN * 25.4 - keeper.BORE_DIA < keeper.BORE_DIA_BAND[1]
 
 
 def test_installed_set_screw_meets_rule_12() -> None:

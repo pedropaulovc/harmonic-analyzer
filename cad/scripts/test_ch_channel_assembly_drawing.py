@@ -237,7 +237,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert f"CLAMP BOTH {number}, FEET OUTBOARD ON ONE FLAT" in reamed
     assert f"INNER LUG FACES {rear - front:.{places}f} APART" in reamed
     assert "BORE AXIS PARALLEL TO THE FLAT" in reamed
-    assert "DRILL AND REAM BOTH IN ONE PASS, 12 IN 0.2513 REAMER" in reamed
+    assert "DRILL AND REAM BOTH IN ONE PASS, 12 IN 0.2514 REAMER" in reamed
     assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
     assert "ROUND EACH CROWN ON ITS BORE" in reamed
     assert (

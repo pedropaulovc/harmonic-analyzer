@@ -47,6 +47,8 @@ FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
 RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
 HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
+FLANGE_THICKNESS_MM = 8.0  # final top flange, including under the faced seats
+FLANGE_THICKNESS_PLACES = 1
 BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
 BOSS_DIA = (
     45.0  # user ruling: all four upper/lower bosses clear the outward keeper feet
@@ -63,7 +65,6 @@ GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
 KEEPER_SEAT_EDGE_MARGIN_MM = 0.10
 KEEPER_SEAT_WIDTH_MM = KEEPER_WIDTH + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
 KEEPER_SEAT_LENGTH_MM = KEEPER_CONTACT_LENGTH_MM + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
-KEEPER_SEAT_HEIGHT_MM = HALF_H - CAP_RECESS_FLOOR_Y
 KEEPER_SEAT_CENTRES_XZ = tuple(
     (
         COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM,
@@ -216,9 +217,9 @@ HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
 # --- Machining-required surfaces ---------------------------------------------
 #
 # These nine faces own native finish controls. The two keeper-seat regions
-# instead carry the bounded facing/common-zone instruction below: existing
+# carry SEAT_UM in the bounded facing/common-zone instruction below: existing
 # PlanarFace bounding-box selectors cannot distinguish those coplanar patches
-# from the residual rail top. No finish is silently assigned to that whole face.
+# from the residual rail top. The locating-seat finish is not a general grade.
 #
 # * The four tube-socket bores take the MHA-FR-003 columns on a match-fitted close
 #   hand-slip; a cast bore wall cannot hold that fit and would score the tube.
@@ -230,7 +231,7 @@ HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
 # commercial machine finish is what the fit needs. The part authors one native
-# symbol per qualified face; each sheet states the requirement ONCE, and the
+# symbol per one of these nine controlled faces; each sheet states it ONCE, and the
 # target text names the family so a single symbol cannot be misread as one
 # instance (harmonic-base FLANGE_PERIMETER_TARGET precedent).
 SOCKET_BORE_TARGET = "TUBE SOCKET BORES, 4X"
@@ -391,7 +392,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "central web width": 1,
     "rail web thickness": 1,
     "front rear flange width": 1,
-    "top flange thickness": 1,
+    "top flange thickness": FLANGE_THICKNESS_PLACES,
     "top rim chamfer": 1,
     "T rail root radius": 1,
     "side rail web thickness": 1,
@@ -435,15 +436,13 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
     "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
-    # Keeper facing: actual contacts set the region size; nominal split-line
-    # footprints are reference only. Height uses the cap-seat precision.
+    # Keeper facing: actual contacts set size/location; split-line dimensions
+    # are references. Final local flange thickness binds the receiver-wall proof.
     "keeper seat width": 1,
     "keeper seat length": 1,
     "keeper seat inner edge from socket": 1,
     "keeper seat end from socket": 1,
-    "keeper seat height above cap floors": DRAWING_PRECISION["CapRecesses"][
-        "CapRecessDepth"
-    ],
+    "keeper seat flange thickness": FLANGE_THICKNESS_PLACES,
 }
 
 # Use the canonical printed-band reader, not the unrounded inch grades.
@@ -469,5 +468,6 @@ DRAWING_NOTES_B = (
     "FACE BOTH KEEPER SEATS IN ONE SETUP.\n"
     f"BOTH SEATS WITHIN ONE COMMON {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f} FLATNESS ZONE.\n"
     f"SIZE TO ACTUAL KEEPER CONTACTS PLUS {KEEPER_SEAT_EDGE_MARGIN_MM:.2f} EACH EDGE.\n"
+    f"KEEPER LOCATING SEATS: Ra {SEAT_UM:.1f} UM.\n"
     "SPLIT-LINE FOOTPRINT DIMENSIONS ARE NOMINAL REFERENCES."
 )

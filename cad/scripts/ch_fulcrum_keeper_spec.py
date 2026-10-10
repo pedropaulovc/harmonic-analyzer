@@ -86,22 +86,23 @@ BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
 BORE_DIA_BAND = (0.050, 0.035)  # (upper, lower)
 KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 142.0
 KEEPER_OUTER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF + LUG_HALF_T)  # 154.0
-# The one-pass reamer: a 0.2513 in long-series chucking reamer, 12 in overall,
-# made to order (Super Tool 9458EL finishes any size in .2211-.2530 to
-# +.0001/+.0005 in, 1-1/2 flute, .2193 shank, 6-1/32 to 12 OAL; L&I's LV533XL
-# shelf range stops at .2500). The toleranced reamer, not its nominal, must
-# lie inside BORE_DIA_BAND. Gripped one inch, its reach must carry the whole
-# flute past the far lug's outer face, and its shank must pass the reamed
-# near bore.
-PAIR_REAMER_DIA_IN = 0.2513
-_PAIR_REAMER_TOLERANCE_IN = (0.0001, 0.0005)  # (lower, upper), over nominal
+# The one-pass reamer: a 0.2514 in long-series chucking reamer, 12 in overall,
+# made to order (Super Tool catalogue 2026 p.59, list 9458EL EDP 645808EL:
+# finished to any size in .2211-.2530, solid carbide, 1-1/2 flute, .2193
+# shank, 6-1/32 to 12 OAL, NAS 897 Type C; p.42: NAS 897 thru .5000 is
+# +.0002/-.0000 in. L&I's LV533XL shelf range stops at .2500). The toleranced
+# reamer, not its nominal, must lie inside BORE_DIA_BAND. Gripped one inch,
+# its reach must carry the whole flute past the far lug's outer face, and its
+# shank must pass the reamed near bore.
+PAIR_REAMER_DIA_IN = 0.2514
+_PAIR_REAMER_TOLERANCE_IN = (0.0, 0.0002)  # (lower, upper), over nominal
 PAIR_REAMER_OAL_IN = 12.0
 _PAIR_REAMER_FLUTE_IN = 1.5
 _PAIR_REAMER_SHANK_MAX_IN = 0.2193
 _PAIR_REAMER_GRIP_IN = 1.0
 PAIR_REAMER_RANGE_MM = tuple(
     (PAIR_REAMER_DIA_IN + plus) * 25.4 - BORE_DIA for plus in _PAIR_REAMER_TOLERANCE_IN
-)  # (+0.0356, +0.0457) over BORE_DIA
+)  # (+0.0356, +0.0406) over BORE_DIA
 PAIR_REAMER_REACH_MARGIN_MM = (
     PAIR_REAMER_OAL_IN - _PAIR_REAMER_GRIP_IN - _PAIR_REAMER_FLUTE_IN
 ) * 25.4 - KEEPER_OUTER_FACE_SPAN_MM  # +87.3

@@ -10,8 +10,8 @@ holds the hub location, true-axis side view and the removed set-pocket
 section; UNDERSIDE holds the underside locator, its enlarged native
 detail and the removed knife-hanger section F-F; KEEPER-SEATS holds the two
 machined keeper foot seats, the nominal split-line footprint and section G-G
-to the cap seat floor.  A group gets its own sheet rather than a crowded
-corner of one:
+through the flange under a faced seat.  A group gets its own sheet rather
+than a crowded corner of one:
 qualifiers then park clear of cutting lines, centrelines and each other.
 Projected top/front pairs stay aligned; removed and section views carry scales.
 Keeper taps transfer from MHA-CH-007 at assembly; their retained station
@@ -151,10 +151,10 @@ from fr_top_frame_spec import (
     HANGER_SLOT_WIDTH_CALLOUT,
     KEEPER_SEAT_BOUNDS_XZ,
     KEEPER_SEAT_CENTRES_XZ,
-    KEEPER_SEAT_HEIGHT_MM,
     KEEPER_SEAT_LENGTH_MM,
     KEEPER_SEAT_WIDTH_MM,
     KEEPER_TAP_CALLOUT_PRECISION,
+    FLANGE_THICKNESS_MM,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -613,9 +613,9 @@ SECTION_LETTER_TEXT_GAP = (
 # both; the REAR seat carries the nominal footprint and its location from the
 # rear socket axis off its own split lines, the dimension lines just outside
 # it or the plan and every value parked right of the plan.
-# Removed section G-G runs along the rail through the FRONT keeper tap axis,
-# the seat's centre line, from beyond the front boss to past the seat, so the
-# seat and the cap seat floor it is held from print in one cut plane.
+# Removed section G-G runs along the rail through the FRONT seat, outboard of
+# its keeper tap, from beyond the front boss to past the seat, so the faced
+# seat and the flat flange underside below it print in one cut plane.
 KEEPER_PLAN_SCALE = SHEET_SCALES["KEEPER-SEATS"]
 KEEPER_PLAN_VIEW_SCALE = KEEPER_PLAN_SCALE[0] / KEEPER_PLAN_SCALE[1]
 KEEPER_PLAN_CENTER = (0.130, 0.170)
@@ -653,38 +653,58 @@ KEEPER_INNER_LINE_XY = (
 KEEPER_INNER_TEXT_XY = (0.264, 0.084)
 KEEPER_SOCKET_QUALIFIER = "FROM SOCKET AXIS"
 KEEPER_SEAT_QUALIFIER = "2X KEEPER SEAT"
-KEEPER_HEIGHT_QUALIFIER = "2X KEEPER SEAT\nABOVE CAP SEAT FLOOR"
-# The part's own seat-facing note (Manufacturing Notes B), under the plan.
-KEEPER_SEAT_NOTE_XY = (0.020, 0.090)
+# The part's own seat-facing note (Manufacturing Notes B, five rows), under
+# the plan: its top a clearance under the inner-edge location row, which runs
+# one line gap below the plan.
+KEEPER_SEAT_NOTE_XY = (
+    0.020,
+    KEEPER_PLAN_CENTER[1]
+    - PLAN_HALF_Z * _KEEPER_PLAN_S
+    - KEEPER_DIM_LINE_GAP
+    - INK_CLEARANCE,
+)
 KEEPER_SEAT_NOTE_HEIGHT = 0.0035
 KEEPER_SECTION_SCALE = (1, 1)
 KEEPER_SECTION_VIEW_SCALE = KEEPER_SECTION_SCALE[0] / KEEPER_SECTION_SCALE[1]
 _KEEPER_SECTION_S = KEEPER_SECTION_VIEW_SCALE / 1000.0
-KEEPER_SECTION_X = KEEPER_SEAT_CENTRES_XZ[0][0]
+# G-G's station: midway between the west web's root-fillet toe, where the
+# flange underside turns flat, and the seats' outer split line.  Inside the
+# faced footprint and outside the nominal root, the plane cuts each faced seat
+# over its flat underside, so the controlling flange thickness hangs on both
+# actual faces, never on the root arc or a construction proxy.  The keeper
+# tap stays inboard of the plane: G-G cuts no thread.
+_KEEPER_ROOT_TOE_X = WEB_OUT_X + ROOT_FILLET_R
+KEEPER_SECTION_X = (_KEEPER_ROOT_TOE_X + KEEPER_SEAT_BOUNDS_XZ[0][1]) / 2.0
+if not all(
+    _KEEPER_ROOT_TOE_X < KEEPER_SECTION_X < xmax
+    for _xmin, xmax, _zmin, _zmax in KEEPER_SEAT_BOUNDS_XZ
+):
+    raise AssertionError("G-G leaves the flat flange underside below the seats")
+if KEEPER_TAP_X + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0 >= KEEPER_SECTION_X:
+    raise AssertionError("G-G reaches the keeper tap")
 # Plain stock each end of G's line runs past what the section shows.
 KEEPER_SECTION_RUNOUT = 6.0
-# Where G-G prints the front socket axis; its rows derive from this point.
-KEEPER_SECTION_SOCKET_XY = (0.333, 0.180)
-# The cut plane stands off the socket axis, so the bore, the cap recess and
-# the boss each cross it as a chord: half-chords in model mm.
-_KEEPER_CUT_OFFSET = KEEPER_SECTION_X - COLUMN_X
-KEEPER_BORE_HALF_CHORD = math.sqrt((BORE_DIA / 2.0) ** 2 - _KEEPER_CUT_OFFSET**2)
-KEEPER_RECESS_HALF_CHORD = math.sqrt(
-    (CAP_RECESS_DIAMETER / 2.0) ** 2 - _KEEPER_CUT_OFFSET**2
+KEEPER_SECTION_END_Z = KEEPER_SEAT_BOUNDS_XZ[0][3] + KEEPER_SECTION_RUNOUT
+# Where G-G prints the front seat's centre on its faced top; every row of the
+# section derives from this point.
+KEEPER_SECTION_SEAT_Z = KEEPER_SEAT_CENTRES_XZ[0][1]
+KEEPER_SECTION_SEAT_XY = (0.355, 0.198)
+# The cut plane stands off the socket axis, so the boss crosses it as a
+# chord: half-chord in model mm.
+KEEPER_BOSS_HALF_CHORD = math.sqrt(
+    (BOSS_DIA / 2.0) ** 2 - (KEEPER_SECTION_X - COLUMN_X) ** 2
 )
-KEEPER_BOSS_HALF_CHORD = math.sqrt((BOSS_DIA / 2.0) ** 2 - _KEEPER_CUT_OFFSET**2)
-# The seat height's dimension line stands in the open bore, halfway from the
-# socket axis to the seat-side wall: the cap floor's witness stays in air and
-# its text leaves up through the recess mouth to park over the section.
-KEEPER_HEIGHT_LINE_XY = (
-    KEEPER_SECTION_SOCKET_XY[0] + KEEPER_BORE_HALF_CHORD / 2.0 * _KEEPER_SECTION_S,
-    KEEPER_SECTION_SOCKET_XY[1]
-    + (CAP_RECESS_FLOOR_Y + HALF_H) / 2.0 * _KEEPER_SECTION_S,
+# The flange thickness's dimension line stands one line gap past the cut's
+# far end, in the air level with the flange, so neither it nor its value
+# lies on hatching; both witnesses run out along their own cut faces.
+KEEPER_FLANGE_LINE_XY = (
+    KEEPER_SECTION_SEAT_XY[0]
+    + (KEEPER_SECTION_END_Z - KEEPER_SECTION_SEAT_Z) * _KEEPER_SECTION_S
+    + KEEPER_DIM_LINE_GAP,
+    KEEPER_SECTION_SEAT_XY[1] - FLANGE_THICKNESS_MM / 2.0 * _KEEPER_SECTION_S,
 )
-KEEPER_HEIGHT_TEXT_XY = (
-    KEEPER_HEIGHT_LINE_XY[0],
-    KEEPER_SECTION_SOCKET_XY[1] + (HALF_H + BOSS_ABOVE) * _KEEPER_SECTION_S + 0.008,
-)
+KEEPER_FLANGE_TEXT_XY = (0.395, 0.192)
+KEEPER_FLANGE_QUALIFIER = "2X FLANGE UNDER\nKEEPER SEAT"
 KEEPER_SECTION_CAPTION_XY = (0.326, 0.151)
 # G's arrows point +X like B's (both cut at constant X, Z turned right), so
 # B's measured arrow-to-letter box is the provisional allowance for G.
@@ -1556,15 +1576,14 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
 def keeper_section_cut_ends() -> tuple[Point, Point]:
     """G-G's cutting line (start, end) as plan-model (X, Z) mm.
 
-    Along the west rail at the front seat's centre line, which is the front
-    keeper tap axis: from beyond the front boss, whose cap seat floor the
-    seat is held from, to past the seat's far split line.  Both arrows point
-    +X, off the plan's right edge where nothing else prints.
+    Along the west rail at ``KEEPER_SECTION_X``, over the front seat's flat
+    flange underside: from beyond the front boss to past the seat's far split
+    line.  Both arrows point +X, off the plan's right edge where nothing else
+    prints.
     """
-    far_end = KEEPER_SEAT_BOUNDS_XZ[0][3]
     return (
         (KEEPER_SECTION_X, -PLAN_HALF_Z - KEEPER_SECTION_RUNOUT),
-        (KEEPER_SECTION_X, far_end + KEEPER_SECTION_RUNOUT),
+        (KEEPER_SECTION_X, KEEPER_SECTION_END_Z),
     )
 
 
@@ -1859,41 +1878,78 @@ def _keeper_seat_split_edge(
     return item.edge
 
 
-def _keeper_seat_cut_edge(
-    edges: ViewEdges, *, label: str
-) -> tuple[Any, tuple[float, float, float]]:
-    """G-G's cut line of the front seat that starts on its socket-side split.
-
-    The cut plane is the seat's centre line, so the seat crosses it as rail
-    top broken by the keeper tap.  The line kept starts exactly on the
-    seat's socket-side split line and stays inside the seat; a top line that
-    ran on into the residual flange would mean the split did not hold.
-    """
-    _xmin, _xmax, near_end, far_end = KEEPER_SEAT_BOUNDS_XZ[0]
-    candidates = []
+def _keeper_section_lines(edges: ViewEdges, y: float) -> list[tuple[Any, float, float]]:
+    """G-G's visible lines lying wholly at model level ``y``, as (item, z0, z1)."""
+    found = []
     for item in edges.lines:
         start, end = item.line
         if any(
-            abs(point[0] - KEEPER_SECTION_X) > 1e-6 or abs(point[1] - HALF_H) > 1e-6
+            abs(point[0] - KEEPER_SECTION_X) > 1e-6 or abs(point[1] - y) > 1e-6
             for point in (start, end)
         ):
             continue
-        low, high = sorted((start[2], end[2]))
-        if abs(low - near_end) <= 1e-4 and high <= far_end + 1e-4:
-            candidates.append(item)
-    if len(candidates) != 1:
-        seen = "; ".join(
-            f"{tuple(round(v, 3) for v in item.line[0])}->"
-            f"{tuple(round(v, 3) for v in item.line[1])}"
-            for item in edges.lines
-            if abs(item.line[0][1] - HALF_H) <= 1e-6
-            and abs(item.line[1][1] - HALF_H) <= 1e-6
-        )
+        found.append((item, *sorted((start[2], end[2]))))
+    return found
+
+
+def _keeper_section_lines_seen(found: list[tuple[Any, float, float]]) -> str:
+    return "; ".join(f"z {low:.3f}->{high:.3f}" for _item, low, high in found)
+
+
+def _keeper_seat_cut_edge(
+    edges: ViewEdges, *, label: str
+) -> tuple[Any, tuple[float, float, float]]:
+    """G-G's cut line of the front seat, split line to split line.
+
+    The plane runs outboard of the keeper tap, so the faced seat crosses it
+    as one unbroken rail-top line.  Exactly one rail-top line may overlap the
+    seat, and it must start and end on the seat's two split lines: a line
+    that ran on into the residual flange would mean the split did not hold.
+    Returns the edge and its point over the seat centre, in model mm.
+    """
+    _xmin, _xmax, near_end, far_end = KEEPER_SEAT_BOUNDS_XZ[0]
+    rail_top = _keeper_section_lines(edges, HALF_H)
+    overlapping = [
+        line
+        for line in rail_top
+        if line[2] > near_end + 1e-4 and line[1] < far_end - 1e-4
+    ]
+    if len(overlapping) != 1 or not (
+        abs(overlapping[0][1] - near_end) <= 1e-4
+        and abs(overlapping[0][2] - far_end) <= 1e-4
+    ):
         raise RuntimeError(
-            f"{label}: expected one seat line from the split at z {near_end:.3f}, "
-            f"found {len(candidates)}; rail-top lines: {seen}"
+            f"{label}: expected one seat line from the split at z {near_end:.3f} "
+            f"to the split at z {far_end:.3f}, found {len(overlapping)}; "
+            f"rail-top lines: {_keeper_section_lines_seen(rail_top)}"
         )
-    return candidates[0].edge, candidates[0].midpoint_mm
+    return overlapping[0][0].edge, (KEEPER_SECTION_X, HALF_H, KEEPER_SECTION_SEAT_Z)
+
+
+def _keeper_flange_underside_edge(
+    edges: ViewEdges, *, label: str
+) -> tuple[Any, tuple[float, float, float]]:
+    """G-G's cut line of the flat flange underside below the whole front seat.
+
+    Outside the root fillet the underside is flat, so one cut line at the
+    flange underside must span the seat from split to split; the flange
+    thickness hangs on it.  Returns the edge and its point under the seat
+    centre, in model mm.
+    """
+    _xmin, _xmax, near_end, far_end = KEEPER_SEAT_BOUNDS_XZ[0]
+    underside = _keeper_section_lines(edges, FLANGE_BOT_Y)
+    spanning = [
+        line
+        for line in underside
+        if line[1] <= near_end + 1e-4 and line[2] >= far_end - 1e-4
+    ]
+    if len(spanning) != 1:
+        raise RuntimeError(
+            f"{label}: expected one flange underside line spanning the seat "
+            f"z {near_end:.3f}->{far_end:.3f}, found {len(spanning)}; "
+            f"underside lines: {_keeper_section_lines_seen(underside)}"
+        )
+    return spanning[0][0].edge, (KEEPER_SECTION_X, FLANGE_BOT_Y, KEEPER_SECTION_SEAT_Z)
 
 
 def _keeper_seat_sheet(adapter: Any, ddoc: Any) -> None:
@@ -1901,9 +1957,10 @@ def _keeper_seat_sheet(adapter: Any, ddoc: Any) -> None:
 
     Nominal footprint and location from the rear seat's split lines and the
     rear socket axis (reference: the part note sizes and places each seat to
-    its actual fitted keeper), the seat height off the cap seat floor in
-    section G-G, and the part's own facing note.  No Ra symbol: a face pick
-    by plane and box would take the residual flange top too.
+    its actual fitted keeper), the controlling final flange thickness under
+    the faced front seat in section G-G, and the part's own facing note,
+    which carries the seats' SEAT_UM finish.  No native Ra symbol: a face
+    pick by plane and box would take the residual flange top too.
     """
     if ddoc.ActivateSheet("KEEPER-SEATS") is not True:
         raise RuntimeError("failed to activate top-frame keeper seat sheet")
@@ -2023,55 +2080,45 @@ def _keeper_seat_sheet(adapter: Any, ddoc: Any) -> None:
         keeper_plan,
         line_start=seat_cut[0],
         line_end=seat_cut[1],
-        view_xy=KEEPER_SECTION_SOCKET_XY,
+        view_xy=KEEPER_SECTION_SEAT_XY,
         section_label="G",
         scale=KEEPER_SECTION_SCALE,
         partial=True,
         label="keeper seat section",
     )
     _orient_cut_section(adapter, seat_section, (0.0, 0.0, 1.0))
+    # Pinned by the faced seat's centre, the point every G-G row derives from.
     _pin_section_profile(
         adapter,
         seat_section,
-        (KEEPER_SECTION_X, 0.0, FRONT_COLUMN_Z),
-        KEEPER_SECTION_SOCKET_XY[0],
-        target_y=KEEPER_SECTION_SOCKET_XY[1],
+        (KEEPER_SECTION_X, HALF_H, KEEPER_SECTION_SEAT_Z),
+        KEEPER_SECTION_SEAT_XY[0],
+        target_y=KEEPER_SECTION_SEAT_XY[1],
         label="G-G",
     )
     set_hidden_lines_removed(adapter, seat_section)
     seat_section_edges = scan_view_edges(seat_section, label="G-G keeper seat section")
-    # The cap seat floor crosses the plane as a 1 mm ledge on each side of
-    # the bore; the one on the seat's side carries the height.
-    cap_floor_edge, cap_floor_point = _cut_face_edge(
-        seat_section_edges,
-        fixed={0: KEEPER_SECTION_X, 1: CAP_RECESS_FLOOR_Y},
-        near=(
-            2,
-            FRONT_COLUMN_Z + (KEEPER_BORE_HALF_CHORD + KEEPER_RECESS_HALF_CHORD) / 2.0,
-            KEEPER_RECESS_HALF_CHORD - KEEPER_BORE_HALF_CHORD,
-        ),
-        label="front cap seat floor",
-    )
     seat_edge, seat_point = _keeper_seat_cut_edge(
         seat_section_edges,
         label="front keeper seat",
     )
+    underside_edge, underside_point = _keeper_flange_underside_edge(
+        seat_section_edges,
+        label="front keeper seat flange underside",
+    )
     _checked_dimension(
         adapter,
         seat_section,
-        p0=cap_floor_point,
+        p0=underside_point,
         p1=seat_point,
-        text_xy=KEEPER_HEIGHT_LINE_XY,
-        label="keeper seat height above cap floors",
-        expected_mm=KEEPER_SEAT_HEIGHT_MM,
+        text_xy=KEEPER_FLANGE_LINE_XY,
+        label="keeper seat flange thickness",
+        expected_mm=FLANGE_THICKNESS_MM,
         orientation="vertical",
-        entities=(cap_floor_edge, seat_edge),
-        suffix=KEEPER_HEIGHT_QUALIFIER,
-        offset_text=KEEPER_HEIGHT_TEXT_XY,
+        entities=(underside_edge, seat_edge),
+        suffix=KEEPER_FLANGE_QUALIFIER,
+        offset_text=KEEPER_FLANGE_TEXT_XY,
     )
-    # The cut runs down the keeper tap's axis; its thread is annotation ink,
-    # as on D-D, and the hole callout on HOLES-SOCKETS specifies it.
-    _hide_cosmetic_threads(adapter, seat_section, label="G-G keeper seat section")
     _assert_section_display(
         adapter,
         seat_section,

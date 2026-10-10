@@ -40,7 +40,7 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     assert spec.SCREW_X == 8.25
     assert spec.KEEPER_SCREW_Z_OFF == spec.KEEPER_Z_OFF + spec.SCREW_X == 82.25
     # Plain reamed bore on the plain Ø6.35 shaft: a running band, cut by one
-    # made-to-order 0.2513 in reamer through both keepers at their installed
+    # made-to-order 0.2514 in reamer through both keepers at their installed
     # spacing, that covers the faced rail seats' flatness (ch_fulcrum_shaft_spec).
     assert spec.BORE_DIA == 6.35
     assert spec.BORE_DIA_BAND == (0.050, 0.035)  # (upper, lower)

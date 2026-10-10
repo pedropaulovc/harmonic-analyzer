@@ -21,8 +21,9 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
 * Two bounded keeper-seat regions on the side-rail TOP FLANGE are faced
   together in one setup, within the keeper-owned common 0.04 flatness zone.
   Each covers the actual 14 x 16.5 complete contact plus 0.10 at each edge;
-  split-line footprints are nominal 14.2 x 16.7 references. Their finished
-  plane stays at the rail top, 11.80 above the machined cap-seat floors.
+  split-line footprints are nominal 14.2 x 16.7 references. The finished
+  local flange below both seats is controlled at 8.0 (.X, minimum 7.2),
+  with Ra 3.2 locating-seat finish; the nominal rail-top plane stays fixed.
 * Integral crossbar 22 wide at x -26..-4 spanning the window along Z,
   flush with BOTH faces (its underside 999.7 is the knife-mount seat
   plane), with 18 x 18 plan gussets at all four rail junctions and, at
@@ -139,6 +140,7 @@ from fr_top_frame_spec import (
     DRAWING_PRECISION,
     DRILL_OVERSIZE,
     DRAWING_REFERENCE_PRECISION,
+    FLANGE_THICKNESS_MM,
     FRONT_COLUMN_Z,
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
@@ -389,7 +391,7 @@ KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +81.746
 # and the crossbar junctions. The corner bosses supply the corner lands. The
 # per-face setback differs by rail family (the rails are 34.2/38.0 wide but
 # share one web thickness).
-FLANGE = 8.0  # top flange band (the only full-thickness band)
+FLANGE = FLANGE_THICKNESS_MM  # final top flange, also below the faced seats
 WEB_T = 13.0  # user ruling: retain loose bands plus realistic deep-drill wander
 RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.6 setback per side-rail face
 RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.5 setback per front/rear-rail face
@@ -652,9 +654,14 @@ KEEPER_MIN_WEB_HALF_WIDTH = (
     round(WEB_T, DRAWING_REFERENCE_PRECISION["side rail web thickness"])
     - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["side rail web thickness"]]
 ) / 2.0
+# The controlling .X dimension on KEEPER-SEATS measures the FINAL local
+# flange under each faced contact. Cap-floor and boss-height bands cannot
+# subtract a second facing allowance from this directly printed minimum.
 KEEPER_MIN_FLANGE_THICKNESS = (
-    round(FLANGE, DRAWING_REFERENCE_PRECISION["top flange thickness"])
-    - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["top flange thickness"]]
+    round(FLANGE, DRAWING_REFERENCE_PRECISION["keeper seat flange thickness"])
+    - PRINTED_LINEAR_BAND_MM[
+        DRAWING_REFERENCE_PRECISION["keeper seat flange thickness"]
+    ]
 )
 KEEPER_MIN_ROOT_RADIUS = (
     round(ROOT_FILLET_R, DRAWING_REFERENCE_PRECISION["T rail root radius"])
