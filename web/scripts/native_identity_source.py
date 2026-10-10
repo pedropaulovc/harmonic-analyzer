@@ -336,6 +336,27 @@ def magnifier_installation(path: Path) -> dict[str, float]:
     }
 
 
+def wheel_wire_pitch_radii(lever_wire, pen_wire) -> tuple[float, float]:
+    """Return an archived release's lever and pen wire-centre pitch radii.
+
+    Both values are wire-centreline radii about the wheel axis, read from the
+    release's own wire geometry modules. ``YOKE_PITCH_R`` is the lever wire's
+    pitch in every release: a Ø20 hub through 81539e53, and the pressed Ø18.9 brass
+    drum after that. The pen side changed schema. Releases through 81539e53 hang the
+    wire off a plain Ø100 rim (``RIM_DIA``). The grooved rim publishes its groove's
+    wire-centre radius as ``RIM_WIRE_R``. Exactly one of the two must be present.
+    """
+    pen = vars(pen_wire)
+    if ("RIM_WIRE_R" in pen) == ("RIM_DIA" in pen):
+        raise ValueError(
+            f"Pen wire source {pen_wire.__name__} must define exactly one of "
+            "RIM_WIRE_R (grooved rim) or RIM_DIA (plain rim)"
+        )
+    rim = pen["RIM_WIRE_R"] if "RIM_WIRE_R" in pen else pen["RIM_DIA"] / 2 + pen["WIRE_DIA"] / 2
+    return lever_wire.YOKE_PITCH_R, rim
+
+
+
 def validate_path_projection(raw_nodes: dict, raw_sha256: str, projection: dict,
                              identity_map: CadIdentityMap) -> tuple[dict, dict]:
     """Validate the CLI association and a complete bijection before using keys."""

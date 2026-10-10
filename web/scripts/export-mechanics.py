@@ -36,6 +36,7 @@ from native_identity_source import (
     magnifier_installation,
     project_model_paths,
     validate_release_pair,
+    wheel_wire_pitch_radii,
 )
 
 
@@ -336,6 +337,7 @@ def export_snapshot(
     mag = modules["mg_magnifying_lever_geom"]
     lw = modules["mg_lever_wire_geom"]
     pw = modules["pn_pen_wire_geom"]
+    hub_pitch, rim_pitch = wheel_wire_pitch_radii(lw, pw)
     paper = modules["paper_drive_geom"]
     removable = modules["pd_transgear_removable_spec"]
     chain = modules["_chain"]
@@ -872,8 +874,8 @@ def export_snapshot(
                 )
                 / 1000,
             ],
-            "hubPitchRadiusMm": lw.HUB_DIA / 2 + lw.WIRE_DIA / 2,
-            "rimPitchRadiusMm": pw.RIM_DIA / 2 + pw.WIRE_DIA / 2,
+            "hubPitchRadiusMm": hub_pitch,
+            "rimPitchRadiusMm": rim_pitch,
             "wireDiameterMm": lw.WIRE_DIA,
             "visualClearanceMm": lw.CLEARANCE,
             "hookMm": lw.WIRE_START,

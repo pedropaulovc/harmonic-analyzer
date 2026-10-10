@@ -258,6 +258,16 @@ pen travel is `-rimPitchRadius * wheelAngle`; `R/r` remains a gain magnitude.
 This taut, non-slip model is an internal mechanical contract, not evidence that
 the film uses the same routing or that a fixture adjustment held other inputs fixed.
 
+Both exporters read the lever and pen wire-centre pitch radii from each archived
+release's own wire modules: `YOKE_PITCH_R` for the lever, and `RIM_WIRE_R` for
+the grooved rim, or `RIM_DIA` for the plain rim before it. The release's visual
+lever-wire contact `hubTangentMm` selects which of the two hook tangents the
+gate's bisection control solves. The wrap sense follows from that geometry, never
+from the runtime's fixed sign. Release `81539e53` rides the hub's minus tangent,
+where the lever and pen tensions turn the wheel the same way. The pressed-drum
+redesign rides the opposing plus tangent. The runtime still fixes the minus
+branch, so the gate refuses that release until `magnifier.ts` is requalified.
+
 Pen travel moves the native rod, v-block, frame, marker and set-screw together.
 The hanger and its screw remain fixed. Source-evidenced setup lifts and yaw use
 qualified rigid-part overrides; the pen wire remains a separately solved run.
