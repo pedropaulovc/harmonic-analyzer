@@ -390,6 +390,7 @@ def test_the_builders_that_create_configurations_are_the_known_six() -> None:
     that derives drawing configurations goes through save_simplified_part,
     which reopens and runs the tripwire itself."""
     assert _configuration_builders() == {
+        "build_ch_pivot_bracket",
         "build_dt_crank_handle_ferrule",
         "build_dt_cone_gear",
         "build_dt_crank_handle_pivot_screw",
