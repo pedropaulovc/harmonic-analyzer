@@ -60,10 +60,19 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 # the stock cut-off: both restate model sizes as references.
 REFERENCE_DIMENSIONS = frozenset({"CrownRise", "OverallLength"})
 
+# Line 3 is the installation step the static-clamp retention relies on
+# (user ruling 2026-09-21: no torque value, no threadlocker). The three-view
+# summing sheet prints no notes until it is built out (policy rule 9), so the
+# fitter reads it here, on the screw's own sheet.
+CLAMP_INSTRUCTION = (
+    "3. AT ASSEMBLY TIGHTEN UNTIL THE MHA-VN-005 UPPER EYE IS CLAMPED\n"
+    "   AND CANNOT SWIVEL; NO THREADLOCKER."
+)
 DRAWING_NOTES = "\n".join(
     (
         "1. CROWN SPHERICAL THROUGH RIM AND APEX.",
         "2. THREAD MATES THE TAPPED END PLUG OF MHA-SM-001.",
+        CLAMP_INSTRUCTION,
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"

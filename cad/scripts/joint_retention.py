@@ -1441,10 +1441,14 @@ JOINTS: tuple[Joint, ...] = (
             "ENGAGEMENT_MIN/HEAD_RETENTION_MIN/EYE_FULL_THREAD_OVERLAP_MIN/"
             "SCREW_REACH/TIP_PROTRUSION_MIN; "
             "build_sm_summing_assembly.py gooseneck spring screw lock_mate "
-            "(CAD restraint, not mechanical locking hardware), UPPER_EYE_CLAMP_NOTES "
-            "stamped as the assembly's Manufacturing Notes property (the legacy "
-            "three-view summing sheet prints no notes until built out, policy rule 9), "
-            "_assert_counter_spring_top_hang"
+            "(CAD restraint, not mechanical locking hardware); the installation "
+            "step is printed as note 3 on the MHA-SM-004 sheet "
+            "(sm_gooseneck_spring_screw_spec.CLAMP_INSTRUCTION, stamped as the "
+            "screw's Manufacturing Notes and property-linked by "
+            "draw_sm_gooseneck_spring_screw) and repeated in the summing "
+            "assembly's Manufacturing Notes property (UPPER_EYE_CLAMP_NOTES; the "
+            "legacy three-view summing sheet prints no notes until built out, "
+            "policy rule 9); _assert_counter_spring_top_hang"
         ),
     ),
     Joint(

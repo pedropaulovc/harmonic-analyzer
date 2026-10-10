@@ -30,8 +30,10 @@ never from the table being replaced, so a stale table cannot bias the new one.
 
 Run on a licensed farm/native seat (the parts must already be built):
 ``ch-channel-lever``, ``vn-spring-hook``, ``vn-boss-hook``, ``sm-gooseneck``
-and ``sm-gooseneck-spring-screw``. The driver builds the supplier spring
-length variants itself; no summing assembly is needed to replace a stale seat::
+and ``sm-gooseneck-spring-screw``. The counter refuses support parts that doit
+would rebuild (``_require_current_support_parts``), so build those two through
+doit first. The driver builds the supplier spring length variants itself; no
+summing assembly is needed to replace a stale seat::
 
     uv run cad/scripts/diagnostics/calibrate_spring_seats.py --presets neutral square --write
 
@@ -321,10 +323,52 @@ async def _build_counter_variant(adapter, name: str, length_mm: float) -> None:
     _close_active_part(adapter)
 
 
+# The saved parts the counter fixture measures as the upper contact; the
+# emitted upper_support certificate states THEIR recipe's geometry.
+_SUPPORT_PART_STEMS = ("sm_gooseneck", "sm_gooseneck_spring_screw")
+
+
+def _require_current_support_parts() -> None:
+    """Refuse to certify ``upper_support`` from stale saved support parts.
+
+    ``counter_upper_support_geometry()`` is computed from the CURRENT source,
+    so it may only label a measurement of parts built from that source.
+    ``place_components_batch`` only checks that the SLDPRTs exist; this reuses
+    verify.py's freshness guard (doit's own ledger and ContentChecker, the
+    same verdict ``doit`` would rebuild on) but fails closed: a missing ledger
+    or a guard error refuses instead of warning.
+    """
+    from verify import _stale_in_db
+
+    ledger = Path(dodo.DOIT_CONFIG["dep_file"])
+    try:
+        db = json.loads(ledger.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(
+            f"cannot prove the counter support parts are current ({ledger}: {exc}); "
+            "build sm-gooseneck and sm-gooseneck-spring-screw through doit first"
+        ) from exc
+    producers = [
+        (
+            f"part:{stem}",
+            dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem),
+            dodo._sldprt(stem),
+        )
+        for stem in _SUPPORT_PART_STEMS
+    ]
+    stale = _stale_in_db(db, producers)
+    if stale:
+        raise RuntimeError(
+            "refusing to certify the counter upper support from stale saved parts "
+            "(rebuild them through doit, then recalibrate): " + "; ".join(stale)
+        )
+
+
 async def _calibrate_counter(
     adapter, preset: str, amplitudes: list[float], report: dict
 ) -> dict:
     """Measure one preset's counter seat; returns the ``presets.<name>.counter`` row."""
+    _require_current_support_parts()
     balance = spring_mounts.solve_bank_balance(amplitudes)
     if not balance.static_balance or balance.counter_pose is None:
         raise RuntimeError(f"{preset}: counter cannot balance the channel bank")

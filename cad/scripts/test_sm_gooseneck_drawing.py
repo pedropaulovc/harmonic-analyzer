@@ -83,6 +83,21 @@ def test_plug_print_uses_physical_size_and_shared_loose_bands() -> None:
     )
     assert "#6-32 UNC-2B THRU PLUG" in notes
     assert "SILVER-BRAZE" in notes
+    # Policy rule 2: a matched fit names its mate and states the clearance.
+    fit = re.search(
+        r"FIT TO THE TUBE BORE AT\s+([\d.]+)-([\d.]+)\s+DIAMETRAL CLEARANCE", notes
+    )
+    assert fit is not None
+    assert (
+        tuple(map(float, fit.groups()))
+        == (
+            joint.BRAZE_CLEARANCE_MIN,
+            joint.BRAZE_CLEARANCE_MAX,
+        )
+        == (0.05, 0.13)
+    )
+    assert "FLUSH WITH ARM END +/-0.10" in notes
+    assert "NO OPEN GAP AT END FACE" in notes
 
 
 def test_weldment_keeps_the_made_screw_in_the_assembly() -> None:

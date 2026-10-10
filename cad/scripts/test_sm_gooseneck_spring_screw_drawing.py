@@ -145,12 +145,27 @@ def test_notes_are_short_and_carry_no_dimension_or_method() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
     for line in lines:
-        # Only the mating part's number is quoted.
-        text = line.split(". ", 1)[1].replace("MHA-SM-001", "")
+        # Only the mating parts' numbers are quoted.
+        text = line.split(". ", 1)[-1]
+        for number in ("MHA-SM-001", "MHA-VN-005"):
+            text = text.replace(number, "")
         assert not any(ch.isdigit() for ch in text), line
-        for word in ("TORQUE", "LOCTITE", "THREADLOCK", "TIGHTEN"):
+        for word in ("TORQUE", "LOCTITE", "N-M", "IN-LB"):
             assert word not in line
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW\nSCALE 2:1"
+
+
+def test_sheet_prints_the_ruled_clamp_instruction() -> None:
+    # The static-clamp retention depends on this step and the three-view
+    # summing sheet prints no notes (rule 9), so the screw sheet carries it.
+    notes = " ".join(spec.DRAWING_NOTES.split())
+    assert spec.CLAMP_INSTRUCTION in spec.DRAWING_NOTES
+    assert (
+        "TIGHTEN UNTIL THE MHA-VN-005 UPPER EYE IS CLAMPED AND CANNOT SWIVEL" in notes
+    )
+    assert notes.endswith("NO THREADLOCKER.")
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"Manufacturing Notes": DRAWING_NOTES' in build
 
 
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
@@ -266,3 +281,140 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "StationReference" in spec.DRAWING_DIMENSIONS
+
+
+def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
+    from _fit_limits import deviations
+
+    printed = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
+    assert set(drawing.PRINTED_DIMENSIONS) == printed
+    bands = {
+        name: row[1:] for name, row in drawing.PRINTED_DIMENSIONS.items() if row[1]
+    }
+    # The builder's exact setter arguments; the drawing reads the geom's
+    # printed-band deviations, equal to well inside the 1e-6 mm readback.
+    assert set(bands) == {"ReliefDia", "TipChamfer"}
+    assert bands["ReliefDia"] == pytest.approx(
+        (4, -geom.RELIEF_DIA_TOL, geom.RELIEF_DIA_TOL), abs=1e-9
+    )
+    assert bands["TipChamfer"] == pytest.approx(
+        (2, *deviations(geom.TIP_CHAMFER_BAND)), abs=1e-9
+    )
+    assert drawing.PRINTED_DIMENSIONS["OverallLength"][0] == pytest.approx(23.0)
+    lead = drawing.SOURCE_ONLY_DIMENSIONS["ReliefLead@ShankProfile"]
+    assert lead == pytest.approx(
+        (geom.RELIEF_LEAD, 4, -geom.RELIEF_LEAD_TOL, geom.RELIEF_LEAD_TOL), abs=1e-9
+    )
+    # The unprinted lead band is exactly what the relief callout states.
+    assert spec.RELIEF_CALLOUT.startswith(
+        f"{lead[0] + lead[2]:.2f}-{lead[0] + lead[3]:.2f} X 45"
+    )
+    thread = drawing.SOURCE_ONLY_DIMENSIONS["ThreadDia@ShankProfile"]
+    assert thread == (geom.MAJOR_DIA, 0, 0.0, 0.0)
+
+
+def _fake_display(name: str, expected: tuple[float, int, float, float]):
+    from types import SimpleNamespace
+
+    nominal, kind, lower, upper = expected
+    tolerance = SimpleNamespace(
+        Type=kind,
+        GetMinValue=lambda: lower / 1000.0,
+        GetMaxValue=lambda: upper / 1000.0,
+    )
+    dimension = SimpleNamespace(SystemValue=nominal / 1000.0, Tolerance=tolerance)
+    reference = name in spec.REFERENCE_DIMENSIONS
+    texts = {1: "(" if reference else "", 2: ")" if reference else ""}
+    display = SimpleNamespace(
+        GetDimension2=lambda _configuration: dimension,
+        GetText=lambda index: texts.get(index, ""),
+        GetPrimaryPrecision2=lambda: spec.DRAWING_PRECISION_BY_NAME[name],
+        texts=texts,
+        dimension=dimension,
+    )
+    return SimpleNamespace(
+        name=name, display=display, GetSpecificAnnotation=lambda: display
+    )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        None,
+        "nominal",
+        "type",
+        "band",
+        "reference",
+        "unreference",
+        "places",
+        "missing",
+        "twice",
+    ],
+)
+def test_settled_readback_rejects_any_lost_control(monkeypatch, fault) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        drawing, "dimension_name", lambda _adapter, annotation: annotation.name
+    )
+    items = {
+        name: _fake_display(name, row)
+        for name, row in drawing.PRINTED_DIMENSIONS.items()
+    }
+    extras = [SimpleNamespace(name="")]  # the thread note, centre marks
+    if fault == "nominal":
+        items["UnderHeadLength"].display.dimension.SystemValue += 1e-5
+    elif fault == "type":
+        items["ReliefDia"].display.dimension.Tolerance.Type = 0
+    elif fault == "band":
+        items["TipChamfer"].display.dimension.Tolerance.GetMinValue = lambda: -5e-5
+    elif fault == "reference":
+        items["OverallLength"].display.texts.update({1: "", 2: ""})
+    elif fault == "unreference":
+        items["HeadDia"].display.texts.update({1: "(", 2: ")"})
+    elif fault == "places":
+        items["SlotWidth"].display.GetPrimaryPrecision2 = lambda: 3
+    elif fault == "missing":
+        del items["SlotDepth"]
+    elif fault == "twice":
+        extras.append(items["HeadDia"])
+    annotations = [*items.values(), *extras]
+    side = SimpleNamespace(GetAnnotations=lambda: annotations[:5])
+    end = SimpleNamespace(GetAnnotations=lambda: annotations[5:])
+    if fault is None:
+        drawing._verify_printed_dimensions(None, (side, end))
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._verify_printed_dimensions(None, (side, end))
+
+
+@pytest.mark.parametrize("fault", [None, "lead", "thread", "absent"])
+def test_source_readback_guards_the_unprinted_callout_controls(
+    monkeypatch, fault
+) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    rows = {
+        full: _fake_display(full.split("@")[0], row).display.dimension
+        for full, row in drawing.SOURCE_ONLY_DIMENSIONS.items()
+    }
+    if fault == "lead":
+        rows["ReliefLead@ShankProfile"].Tolerance.GetMaxValue = lambda: 5e-5
+    elif fault == "thread":
+        rows["ThreadDia@ShankProfile"].SystemValue = 3.5e-3
+    elif fault == "absent":
+        del rows["ThreadDia@ShankProfile"]
+    model = SimpleNamespace(Parameter=lambda full: rows.get(full))
+    if fault is None:
+        drawing._verify_source_dimensions(model)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._verify_source_dimensions(model)
+
+
+def test_drawing_runs_the_readbacks_after_the_last_rebuild() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_verify_source_dimensions(adapter.currentModel)" in source
+    assert "settled_checks=(lambda: _verify_printed_dimensions(" in source

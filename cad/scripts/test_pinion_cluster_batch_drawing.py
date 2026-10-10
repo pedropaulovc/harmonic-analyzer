@@ -336,7 +336,7 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             ),
             # MHA-SM-004 #6-32 major in the #36 drill through the 8.0 end plug.
             frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                3.5052, 2.705, 8.0
+                3.505, 2.705, 8.0
             ),
         }
     )
@@ -486,7 +486,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
             # MHA-SM-004 #6-32 major, #36 drill, 8.0 through-tapped end plug.
             frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
-                3.5052, 2.705, 8.0
+                3.505, 2.705, 8.0
             ),
         },
         "pn-pen": {

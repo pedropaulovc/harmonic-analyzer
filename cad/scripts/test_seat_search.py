@@ -259,3 +259,32 @@ def test_calibrating_every_preset_passes_the_coverage_guard(tmp_path) -> None:
                 source="test",
             )
         )
+
+
+def test_counter_support_certificate_refuses_stale_or_unproven_parts(
+    tmp_path, monkeypatch
+) -> None:
+    """upper_support labels the CURRENT recipe, so the driver refuses to measure
+    support parts doit would rebuild, and refuses when it cannot tell."""
+    import verify
+    from diagnostics import calibrate_spring_seats as driver
+
+    ledger = tmp_path / ".doit.db"
+    monkeypatch.setitem(driver.dodo.DOIT_CONFIG, "dep_file", str(ledger))
+    seen: list[list[str]] = []
+
+    def fake_stale(db, producers):
+        seen.append([task for task, _, _ in producers])
+        return db.get("stale", [])
+
+    monkeypatch.setattr(verify, "_stale_in_db", fake_stale)
+    with pytest.raises(RuntimeError, match="cannot prove the counter support"):
+        driver._require_current_support_parts()
+
+    ledger.write_text('{"stale": ["part:sm_gooseneck_spring_screw: x changed"]}')
+    with pytest.raises(RuntimeError, match="refusing to certify .* stale"):
+        driver._require_current_support_parts()
+
+    ledger.write_text("{}")
+    driver._require_current_support_parts()
+    assert seen[-1] == ["part:sm_gooseneck", "part:sm_gooseneck_spring_screw"]

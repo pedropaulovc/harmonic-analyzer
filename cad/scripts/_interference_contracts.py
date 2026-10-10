@@ -34,9 +34,6 @@ from dt_crank_pin_ring_spec import PIN_PROUD as _PIN_PROUD
 # module, so a crankshaft length or station edit must not re-key them all.
 from dt_crank_hub_geometry import SHAFT_DIA as _CS_DIA
 import sm_summing_lever_spec
-import sm_gooseneck_geom
-import sm_gooseneck_spring_joint as gooseneck_joint
-import sm_gooseneck_spring_screw_geom as gooseneck_screw
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 from fr_frame_attachment_spec import COLUMN_SOCKET_DIAMETER
 from vn_frame_cross_screw_spec import SHANK_DIA as _FRAME_CROSS_DIA
@@ -318,6 +315,12 @@ _KNIFE_DOWEL_PRESS_DEPTH = 9.5
 _KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
     _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_PRESS_DEPTH
 )
+# MHA-SM-004 #6-32 through the #36 tap drill of MHA-SM-001's brazed end plug,
+# over the whole plug length (sm_gooseneck_geom.PLUG_LENGTH): the extra tip
+# reach is in the hollow arm, not more engagement. A literal, test-pinned to
+# its owner like _KNIFE_HANGER_REACH, so a screw or gooseneck edit does not
+# re-key every assembly that imports this module.
+_GOOSENECK_PLUG_LENGTH = 8.0
 _SUMMING_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "vn-knife-hanger-stud",
@@ -339,15 +342,12 @@ _SUMMING_ALLOWED_PAIRS = {
         second_number=2,
     ),
     frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _COUNTER_ANCHOR_THREAD_LIMIT,
-    # Only the made screw's major-thread envelope in the through-tapped
-    # end plug. The extra tip reach is in the hollow arm, not more engagement.
     # Spring/support contact has no allowance and remains independently gated.
-    frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")):
+    frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): (
         _smooth_annulus_limit_mm3(
-            gooseneck_screw.MAJOR_DIA,
-            gooseneck_joint.TAP_DRILL_DIA,
-            sm_gooseneck_geom.PLUG_LENGTH,
-        ),
+            THREAD_MAJOR_MM["#6-32"], TAP_DRILL_MM["#6-32"], _GOOSENECK_PLUG_LENGTH
+        )
+    ),
 }
 
 _PEN_ALLOWED_PAIRS = {

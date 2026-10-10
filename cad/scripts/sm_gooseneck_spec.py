@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import sm_gooseneck_geom
 from sm_gooseneck_spring_joint import (
+    BRAZE_CLEARANCE_MAX,
+    BRAZE_CLEARANCE_MIN,
     DRILL_WANDER_MAX,
     EDGE_BREAK,
     ENGAGEMENT_MIN,
@@ -49,9 +51,11 @@ DRAWING_NOTES = "\n".join(
         "   CENTERLINES COPLANAR (ELEVATION PLANE) WITHIN 1.0.",
         f"3. END PLUG: AISI 1018 <MOD-DIAM>{PLUG_DIA:.2f} +/-{PLUG_DIAMETER_BAND:.2f}",
         f"   X {sm_gooseneck_geom.PLUG_LENGTH:.2f} +/-{PLUG_LENGTH_BAND:.2f};"
+        " FIT TO THE TUBE BORE AT",
+        f"   {BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL CLEARANCE;"
         " FLUSH WITH ARM END +/-0.10.",
         "   SILVER-BRAZE BAg-7 PER AWS A5.8, FULL",
-        "   FAYING-SURFACE PENETRATION.",
+        "   FAYING-SURFACE PENETRATION; NO OPEN GAP AT END FACE.",
         f"4. AFTER BRAZE: {TAP_SPEC.size} UNC-{TAP_SPEC.thread_class} THRU PLUG.",
         f"   THREAD AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f};",
         f"   DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX; SQUARE TO END FACE.",

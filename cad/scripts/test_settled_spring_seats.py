@@ -208,24 +208,26 @@ def test_counter_rejects_nonfinite_gooseneck_origin(isolated_calibration, goosen
         counter_seat()
 
 
-def test_production_old_counter_record_cannot_certify_the_made_support(monkeypatch):
-    presets = _config.machine("springs", "presets")
-    machine = _config.machine
-    for name, preset in presets.items():
-        # Read the historical measured record itself, not a fabricated bad pose.
-        assert (
-            preset["counter"].get("upper_support") != counter_upper_support_geometry()
-        )
+def test_counter_record_without_support_certificate_is_rejected(isolated_calibration):
+    # A record measured before the made support existed carries no
+    # upper_support at all; it must not certify the MHA-SM-004 clamp.
+    _, counter_record = isolated_calibration
+    del counter_record["upper_support"]
 
-        def selected_machine(*keys):
-            if keys == ("amplitude", "preset"):
-                return name
-            return machine(*keys)
+    with pytest.raises(ValueError, match="Stale counter native calibration"):
+        counter_seat()
 
-        monkeypatch.setattr(_config, "machine", selected_machine)
-        monkeypatch.setattr(_config, "amplitudes", lambda: preset["amplitudes_mm"])
-        with pytest.raises(ValueError, match="Stale counter native calibration"):
-            counter_seat()
+
+def test_counter_record_tagged_for_another_support_is_rejected(isolated_calibration):
+    _, counter_record = isolated_calibration
+    counter_record["upper_support"] = {
+        **counter_upper_support_geometry(),
+        "component": "sm-gooseneck",
+        "number": "MHA-SM-001",
+    }
+
+    with pytest.raises(ValueError, match="Stale counter native calibration"):
+        counter_seat()
 
 
 def test_isolated_counter_provenance_identifies_the_whole_made_support(

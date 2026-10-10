@@ -59,3 +59,16 @@ def test_clamped_eye_band_reaches_full_thread_beyond_die_relief() -> None:
     longest_relief = screw.RELIEF_WIDTH + joint.PLUG_LENGTH_BAND
     assert spring.END_OCCUPIED_WIDTH_MM > longest_relief
     assert screw.RELIEF_DIA < screw.MAJOR_DIA < spring.EYE_ID_MM
+
+
+def test_shared_interference_contract_inputs_match_their_owners() -> None:
+    # _interference_contracts keeps the plug pair's inputs narrow (shared
+    # thread tables and a literal plug length) so screw or gooseneck edits do
+    # not re-key every assembly; pin them to their owners here.
+    import _interference_contracts
+    from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
+
+    assert screw.THREAD.split()[0] == joint.TAP_SPEC.size == "#6-32"
+    assert _interference_contracts._GOOSENECK_PLUG_LENGTH == gooseneck.PLUG_LENGTH
+    assert TAP_DRILL_MM["#6-32"] == pytest.approx(joint.TAP_DRILL_DIA)
+    assert THREAD_MAJOR_MM["#6-32"] == pytest.approx(screw.MAJOR_DIA, abs=1e-3)

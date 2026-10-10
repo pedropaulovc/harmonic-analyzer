@@ -22,6 +22,12 @@ PLUG_DIAMETER_BAND = printed_band_mm(2)
 PLUG_LENGTH_BAND = printed_band_mm(2)
 THREAD_AXIS_OFFSET_MAX = 0.15
 DRILL_WANDER_MAX = 0.10
+# The plug is turned to the measured tube bore for a silver-braze (BAg-7)
+# joint: the diametral faying clearance is the mating requirement. The
+# retained Ø band still limits the plug, and the wall budget below uses its
+# lower limit.
+BRAZE_CLEARANCE_MIN = 0.05
+BRAZE_CLEARANCE_MAX = 0.13
 EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 
 # The through tap exits into air; neither tap lead nor screw tip is counted as

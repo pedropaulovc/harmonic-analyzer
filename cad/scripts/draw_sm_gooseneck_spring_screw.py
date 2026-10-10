@@ -21,11 +21,13 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
+from collections.abc import Sequence
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -45,16 +47,26 @@ from _drawing_common import (
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from sm_gooseneck_spring_screw_geom import (
+    CROWN_RISE,
     HEAD_CYL_H,
     HEAD_DIA,
     HEAD_H,
     LENGTH,
     MAJOR_DIA,
+    OVERALL_LENGTH,
     RELIEF_DIA,
+    RELIEF_DIA_LOWER,
+    RELIEF_DIA_UPPER,
     RELIEF_LEAD,
+    RELIEF_LEAD_LOWER,
+    RELIEF_LEAD_UPPER,
     RELIEF_WIDTH,
+    SLOT_DEPTH,
     SLOT_FLOOR_Z,
+    SLOT_WIDTH,
     TIP_CHAMFER,
+    TIP_CHAMFER_LOWER,
+    TIP_CHAMFER_UPPER,
 )
 from sm_gooseneck_spring_screw_spec import (
     CHAMFER_CALLOUT,
@@ -170,6 +182,106 @@ ISO_NOTE_XY = (0.340, 0.180)
 # Bottom-left, above the title-block line, like the other screw sheets.
 NOTES_XY = (0.016, 0.070)
 
+# Policy: native generation verifies persisted values, tolerances and
+# reference state.  swTolType_e: NONE leaves the title block's .XX band, the
+# lathe controls keep the part's own bands.  Each row is (nominal mm,
+# tolerance type, lower deviation mm, upper deviation mm); the deviations of
+# an untoleranced row are not read.
+_TOL_NONE, _TOL_BILATERAL, _TOL_SYMMETRIC = 0, 2, 4
+PRINTED_DIMENSIONS: dict[str, tuple[float, int, float, float]] = {
+    "HeadDia": (HEAD_DIA, _TOL_NONE, 0.0, 0.0),
+    "HeadHeight": (HEAD_H, _TOL_NONE, 0.0, 0.0),
+    "CrownRise": (CROWN_RISE, _TOL_NONE, 0.0, 0.0),
+    "UnderHeadLength": (LENGTH, _TOL_NONE, 0.0, 0.0),
+    "ReliefDia": (RELIEF_DIA, _TOL_SYMMETRIC, RELIEF_DIA_LOWER, RELIEF_DIA_UPPER),
+    "ReliefWidth": (RELIEF_WIDTH, _TOL_NONE, 0.0, 0.0),
+    "TipChamfer": (TIP_CHAMFER, _TOL_BILATERAL, TIP_CHAMFER_LOWER, TIP_CHAMFER_UPPER),
+    "SlotWidth": (SLOT_WIDTH, _TOL_NONE, 0.0, 0.0),
+    "SlotDepth": (SLOT_DEPTH, _TOL_NONE, 0.0, 0.0),
+    "OverallLength": (OVERALL_LENGTH, _TOL_NONE, 0.0, 0.0),
+}
+# Unprinted controls behind the relief-lead and thread callouts: the callout
+# text states their band, so the source part must still carry exactly it.
+SOURCE_ONLY_DIMENSIONS: dict[str, tuple[float, int, float, float]] = {
+    "ReliefLead@ShankProfile": (
+        RELIEF_LEAD,
+        _TOL_SYMMETRIC,
+        RELIEF_LEAD_LOWER,
+        RELIEF_LEAD_UPPER,
+    ),
+    "ThreadDia@ShankProfile": (MAJOR_DIA, _TOL_NONE, 0.0, 0.0),
+}
+
+
+def _check_dimension_state(
+    label: str, dimension: Any, expected: tuple[float, int, float, float]
+) -> None:
+    """Raise unless one native dimension holds its spec nominal and band."""
+    nominal, tolerance_type, lower, upper = expected
+    dimension = _early_bound(dimension, "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    value_mm = float(dimension.SystemValue) * 1000.0
+    if not math.isclose(value_mm, nominal, abs_tol=1e-6):
+        raise RuntimeError(
+            f"MHA-SM-004 {label}: persisted nominal {value_mm!r} mm, spec "
+            f"{nominal!r} mm; rebuild the source part"
+        )
+    if int(tolerance.Type) != tolerance_type:
+        raise RuntimeError(
+            f"MHA-SM-004 {label}: tolerance type {int(tolerance.Type)}, "
+            f"spec {tolerance_type}; rebuild the source part"
+        )
+    if tolerance_type == _TOL_NONE:
+        return
+    band_mm = (
+        float(tolerance.GetMinValue()) * 1000.0,
+        float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    if not all(
+        math.isclose(actual, wanted, abs_tol=1e-6)
+        for actual, wanted in zip(band_mm, (lower, upper), strict=True)
+    ):
+        raise RuntimeError(
+            f"MHA-SM-004 {label}: persisted deviations {band_mm!r} mm, spec "
+            f"{(lower, upper)!r} mm; rebuild the source part"
+        )
+
+
+def _verify_source_dimensions(model: Any) -> None:
+    """The unprinted callout controls, read from the opened source part."""
+    for full_name, expected in SOURCE_ONLY_DIMENSIONS.items():
+        dimension = model.Parameter(full_name)
+        if dimension is None:
+            raise RuntimeError(f"MHA-SM-004 source part lacks {full_name}")
+        _check_dimension_state(full_name, dimension, expected)
+
+
+def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
+    """Re-read every printed size after the last rebuild (settled check)."""
+    found: dict[str, list[Any]] = {name: [] for name in PRINTED_DIMENSIONS}
+    for view in views:
+        for item in _early_bound(view, "IView").GetAnnotations() or ():
+            annotation = _early_bound(item, "IAnnotation")
+            name = dimension_name(adapter, annotation)
+            if name in found:
+                found[name].append(annotation)
+    for name, expected in PRINTED_DIMENSIONS.items():
+        if len(found[name]) != 1:
+            raise RuntimeError(
+                f"MHA-SM-004 sheet prints {name} {len(found[name])} times, not once"
+            )
+        display = _early_bound(
+            found[name][0].GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        _check_dimension_state(name, display.GetDimension2(0), expected)
+        parenthesized = str(display.GetText(1) or "").startswith("(") and str(
+            display.GetText(2) or ""
+        ).endswith(")")
+        if parenthesized != (name in REFERENCE_DIMENSIONS):
+            raise RuntimeError(f"MHA-SM-004 {name}: reference state did not persist")
+        if int(display.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME[name]:
+            raise RuntimeError(f"MHA-SM-004 {name}: display places did not persist")
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -197,6 +309,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
+    _verify_source_dimensions(adapter.currentModel)
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -276,6 +389,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Gooseneck Spring Screw Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(lambda: _verify_printed_dimensions(adapter, (side, end)),),
     )
 
 
