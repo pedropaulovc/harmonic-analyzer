@@ -3,6 +3,8 @@ r"""Two-sheet manufacturing package for the unchanged graduated brass stick.
 BAR gives the envelope and scale stations. GRADUATIONS enlarges a full
 interval, its tenths, longer half tick and numeral; a section gives the real
 square-bottom engraving depth. All sizes, bands and places come from the part.
+Part-spec coordinates are millimetres; model-point projection takes metres.
+Drawing-sheet positions and projected fence coordinates are also metres.
 """
 
 from __future__ import annotations
@@ -88,8 +90,8 @@ def _add_scale_labels(adapter: Any, front: Any) -> None:
     """These are engraved scale values, not invented dimensional annotations."""
     for value in range(part.DIVISION_COUNT):
         x, y = model_point_in_view(
-            adapter, front, (part.SCALE_START_X + value * part.DIVISION_SPACING,
-                             part.BODY_WIDTH, 0.0), label="engraved scale value")
+            adapter, front, ((part.SCALE_START_X + value * part.DIVISION_SPACING) / 1000.0,
+                             part.BODY_WIDTH / 1000.0, 0.0), label="engraved scale value")
         if add_note(adapter, str(value), x, y - 0.010) is None:
             raise RuntimeError(f"failed to label engraved scale value {value}")
 
@@ -104,8 +106,8 @@ def _engraving_detail(adapter: Any, parent: Any) -> Any:
         raise RuntimeError("cannot activate engraving detail parent")
     draw.ClearSelection2(True)
     center = model_point_in_view(
-        adapter, parent, (part.SCALE_START_X + part.DIVISION_SPACING / 2.0,
-                         part.BODY_WIDTH / 2.0, 0.0), label="graduation interval centre")
+        adapter, parent, ((part.SCALE_START_X + part.DIVISION_SPACING / 2.0) / 1000.0,
+                         part.BODY_WIDTH / 2000.0, 0.0), label="graduation interval centre")
     sketch = _early_bound(parent.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -178,9 +180,10 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations += curate_view_dimensions(adapter, detail, keep=DETAIL_KEEP,
                                                view_label="graduation detail",
                                                dimensions_by_feature=part.DRAWING_DIMENSIONS)
-    start = model_point_in_view(adapter, detail, (part.SCALE_START_X, -1.0, 0.0),
+    start = model_point_in_view(adapter, detail, (part.SCALE_START_X / 1000.0, -0.001, 0.0),
                                 label="engraving section start")
-    end = model_point_in_view(adapter, detail, (part.SCALE_START_X, part.BODY_WIDTH + 1.0, 0.0),
+    end = model_point_in_view(adapter, detail,
+                              (part.SCALE_START_X / 1000.0, (part.BODY_WIDTH + 1.0) / 1000.0, 0.0),
                               label="engraving section end")
     section = create_section_view(adapter, detail, line_start=start, line_end=end,
                                   view_xy=SECTION_CENTER, section_label="B", scale=DETAIL_SCALE,

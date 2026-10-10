@@ -3,6 +3,8 @@ r"""Manufacturing drawing of the separate brass stop cover.
 The cover face locates both clearance holes from one finished end and the
 head-side edge. The aligned end view gives thickness; the native clearance
 callout gives the decimal drill size, never merely a screw designation.
+The shared millimetre hole-mouth coordinates convert to COM metres before
+projection into the cover-side *Back view.
 """
 
 from __future__ import annotations
@@ -71,8 +73,10 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     edge = model_point_in_view(
-        adapter, front, (part.PLATE_HOLE_XS[0] + part.PLATE_CLEARANCE_DIA / 2.0,
-                         part.PLATE_HOLE_Y, part.PLATE_Z_MIN), label="plate clearance mouth")
+        adapter, front, (
+            (part.PLATE_HOLE_XS[0] + part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
+            part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MIN / 1000.0,
+        ), label="plate clearance mouth")
     add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.030, 0.055),
                            label="two cover clearance holes", process="2X MATCH-DRILL; THEN OPEN")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
