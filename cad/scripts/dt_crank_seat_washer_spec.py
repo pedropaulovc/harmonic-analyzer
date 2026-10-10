@@ -25,7 +25,7 @@ from __future__ import annotations
 import dt_cone_pivot_post_spec
 import dt_crank_pinion_spec
 import dt_crankshaft_spec
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_crankshaft_spec import COLLAR_DIA, JOURNAL_DIA, JOURNAL_DIA_BAND

@@ -18,11 +18,23 @@ from __future__ import annotations
 import _config
 import vn_knife_hanger_stud_spec as HANGER_SCREW
 import vn_knife_mount_dowel_spec as KNIFE_DOWEL
-from _gtol_spec import CylinderFace, PlanarFace
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
 from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
+from ch_fulcrum_keeper_spec import (
+    FOOT_TIP_X,
+    FULCRUM_KEEPER_CENTRE_Z,
+    KEEPER_FITUP_X_FROM_WEB_MM,
+    KEEPER_SEAT_FLATNESS_BUDGET_MM,
+    KEEPER_SEAT_LENGTH_MM as KEEPER_CONTACT_LENGTH_MM,
+    KEEPER_WIDTH,
+    KEEPER_Z_OFF,
+    LUG_HALF_T,
+)
 
 # --- Machined-surface geometry ------------------------------------------------
 #
@@ -36,11 +48,41 @@ FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
 RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
 HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
+FLANGE_THICKNESS_MM = 8.0  # final top flange, including under the faced seats
+FLANGE_THICKNESS_PLACES = 1
 BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
+BOSS_DIA = (
+    45.0  # user ruling: all four upper/lower bosses clear the outward keeper feet
+)
 BORE_DIA = COLUMN_SOCKET_DIAMETER
 CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
 GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
+
+# Two faced regions on the existing top flange, not raised pads or pockets.
+# Native split lines bound the NOMINAL contact plus its edge allowance;
+# machining matches the actual keeper contacts in the single setup below.
+# The 16.5 contact length includes the lug underside as well as the foot.
+KEEPER_SEAT_EDGE_MARGIN_MM = 0.10
+KEEPER_SEAT_WIDTH_MM = KEEPER_WIDTH + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
+KEEPER_SEAT_LENGTH_MM = KEEPER_CONTACT_LENGTH_MM + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
+KEEPER_SEAT_CENTRES_XZ = tuple(
+    (
+        COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM,
+        FULCRUM_KEEPER_CENTRE_Z
+        + side * (KEEPER_Z_OFF + (FOOT_TIP_X - LUG_HALF_T) / 2.0),
+    )
+    for side in (-1.0, 1.0)
+)
+KEEPER_SEAT_BOUNDS_XZ = tuple(
+    (
+        x - KEEPER_SEAT_WIDTH_MM / 2.0,
+        x + KEEPER_SEAT_WIDTH_MM / 2.0,
+        z - KEEPER_SEAT_LENGTH_MM / 2.0,
+        z + KEEPER_SEAT_LENGTH_MM / 2.0,
+    )
+    for x, z in KEEPER_SEAT_CENTRES_XZ
+)
 
 
 # --- Knife-hanger screw counterbores and dowel slip holes (crossbar) ---------
@@ -175,10 +217,10 @@ HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# Why these nine faces and nothing else. The title block names no grade
-# ("CAST/MACHINED"), so a surface that MUST be cut on an otherwise as-cast
-# casting has to say so on the face (simplicity policy rule 5: what LOCATES the
-# part gets the control).
+# These nine faces own native finish controls. The two keeper-seat regions
+# carry SEAT_UM in the bounded facing/common-zone instruction below: existing
+# PlanarFace bounding-box selectors cannot distinguish those coplanar patches
+# from the residual rail top. The locating-seat finish is not a general grade.
 #
 # * The four tube-socket bores take the MHA-FR-003 columns on a match-fitted close
 #   hand-slip; a cast bore wall cannot hold that fit and would score the tube.
@@ -190,7 +232,7 @@ HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
 # commercial machine finish is what the fit needs. The part authors one native
-# symbol per qualified face; each sheet states the requirement ONCE, and the
+# symbol per one of these nine controlled faces; each sheet states it ONCE, and the
 # target text names the family so a single symbol cannot be misread as one
 # instance (harmonic-base FLANGE_PERIMETER_TARGET precedent).
 SOCKET_BORE_TARGET = "TUBE SOCKET BORES, 4X"
@@ -283,13 +325,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # marks, so ``draw_fr_top_frame`` imports each dimension verbatim and only reads
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
-# One place is this casting's routine band.  The hanger and keeper stations are
-# drilled and tapped clearance features: .X (+/-0.8) is the band they need, and
-# a second place claimed a tolerance nothing on the part requires.  More places
-# appear only where a fit lives there -- the cap recess diameter and depth carry
-# the bilateral bands above, the gooseneck bore prints the clearance a
-# purchased post is set into, and the dowel slip hole and slot width are
-# reamed to their own +/-0.03 band at three places.
+# One place is this casting's routine band. Hanger positions are clearance
+# features drilled under .X (+/-0.8). Keeper positions are model-nominal
+# references only: the frame taps are transferred from the bench-pair-reamed,
+# fit-up-located keeper feet, not independently located to the general band.
+# More places appear only where a fit lives there -- the cap recess diameter
+# and depth carry the bilateral bands above, the gooseneck bore prints the
+# clearance a purchased post is set into, and the dowel slip hole and slot
+# width are reamed to their own +/-0.03 band at three places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
     "WebRing": {"RingHeight": 1},
@@ -350,7 +393,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "central web width": 1,
     "rail web thickness": 1,
     "front rear flange width": 1,
-    "top flange thickness": 1,
+    "top flange thickness": FLANGE_THICKNESS_PLACES,
     "top rim chamfer": 1,
     "T rail root radius": 1,
     "side rail web thickness": 1,
@@ -359,8 +402,9 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # are the one pair of sheet-derived numbers that earns a second place.
     "socket horizontal pitch": 2,
     "socket vertical pitch": 2,
-    # The hole stations, baseline from the socket bore axes (X from the left
-    # pair, Z from the upper pair): drilled positions under the general band.
+    # Hole stations baseline from socket axes (X from the left pair, Z from
+    # the upper pair). Hangers are drilled under the general band; keeper
+    # coordinates are reference-only guides to assembly-transferred taps.
     "hanger x from left sockets": 1,
     "front hanger z from upper sockets": 1,
     "rear hanger z from upper sockets": 1,
@@ -393,8 +437,27 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
     "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
+    # Keeper facing: actual contacts set size/location; split-line dimensions
+    # are references. Final local flange thickness binds the receiver-wall proof.
+    "keeper seat width": 1,
+    "keeper seat length": 1,
+    "keeper seat inner edge from socket": 1,
+    "keeper seat end from socket": 1,
+    "keeper seat flange thickness": FLANGE_THICKNESS_PLACES,
 }
 
+# Use the canonical printed-band reader, not the unrounded inch grades.
+PRINTED_LINEAR_BAND_MM = {places: printed_band_mm(places) for places in (1, 2, 3)}
+PRINTED_DRILLED_HOLE_PLUS_MM = drilled_oversize_mm()
+# Native Hole Wizard variables: diameters retain .XX, blind depths use .X.
+KEEPER_TAP_CALLOUT_PRECISION = {
+    "hw-tapdrldia": 2,
+    "hw-tapdrldepth": 1,
+    "hw-threaddepth": 1,
+}
+# Rule 12 receiver-wall stack: realistic angular drift through the FULL
+# printed cylindrical pilot depth, without relying on a precision drill jig.
+KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit.
 DRAWING_NOTES = (
@@ -402,4 +465,9 @@ DRAWING_NOTES = (
     "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
     "RETAIN CORNER AND ORIENTATION MATCH MARKS."
 )
-DRAWING_NOTES_B = ""
+DRAWING_NOTES_B = (
+    "FACE BOTH KEEPER SEATS IN ONE SETUP.\n"
+    f"BOTH SEATS WITHIN ONE COMMON {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f} FLATNESS ZONE.\n"
+    f"SIZE TO ACTUAL KEEPER CONTACTS PLUS {KEEPER_SEAT_EDGE_MARGIN_MM:.2f} EACH EDGE.\n"
+    f"KEEPER LOCATING SEATS: Ra {SEAT_UM:.1f} UM."
+)

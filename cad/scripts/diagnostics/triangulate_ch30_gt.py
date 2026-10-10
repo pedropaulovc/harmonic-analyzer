@@ -10,10 +10,11 @@ benchmark/ground_truth/`. Solves, jointly:
   parameters. NOTE (2026-08-02 rederive): the GT corner clicks land on the
   corner-BOSS extremes, not the rail faces — the old rail nominal 208/1040.7/123
   looked too small against the pixels precisely because of that, and the solve
-  fed the rederive. New casting nominals: boss extremes x ±223.1 = 197 + Ø52.2/2
-  (photo silhouette read ±223.2), boss top 1040.7; rail outer faces x ±214.1 /
-  z ±131.0, rail top
-  face 1036.2;
+  fed the rederive. The revised 2026-10-10 user ruling reduces all four bosses
+  from the photo-read Ø52.2 to Ø45 to clear the outward keeper feet. Current
+  model boss extremes are x ±219.5 / z ±134.5, top 1040.7; the photo-read
+  silhouette ±223.2 is deliberately NOT the new manufacturing target.
+  Rail faces stay x ±214.1 / z ±131.0, rail top 1036.2.
 * the 3D machine positions of the drive-train features (crank sprocket, cone
   big-end, alignment-pinion ends, cylinder-drum ends).
 
@@ -113,9 +114,9 @@ FEATURE_INIT = {  # world frame (x<0 = drive side)
     "cyl_back": [-54.0, 126.8, 78.0],
 }
 TOP_INIT = [208.0, 1040.7, 123.0]  # init only — the solved TX/TY/TZ follow the
-# GT clicks, i.e. the BOSS-extreme convention (x ±223.1, photo silhouette read
-# ±223.2; boss top 1040.7); the
-# 2026-08-02 casting's rail faces are ±214.1 / ±131.0, top face 1036.2
+# GT clicks, i.e. the historical BOSS-extreme convention (photo x ±223.2,
+# Ø52.2 rederive); the current Ø45 / x ±219.5 / z ±134.5 model intentionally
+# departs from that photo read under the outward-keeper user ruling.
 COL_INIT = [197.0, 112.0]  # column centres (±X, ±Z), model nominal
 TUBE_R = 25.4 / 2.0  # column OD 25.4 (M6.11)
 
@@ -159,10 +160,9 @@ MODEL_NOW = {
     # deferred with the north bearing / helical end gears)
     "pinion_front": (-10.38, 90.518, -144.0),  # tee-handle hub (HANDLE_Z)
     "pinion_back": (-10.38, 90.518, 91.25),  # back stub free end
-    "fr_top_frame": (223.1, 1040.7, 138.1),  # boss-extreme convention (2026-08-02
-    # rederive): x/z = boss extremes 197/112 + Ø52.2/2 (photo silhouette read
-    # ±223.2), y = boss top 1040.7;
-    # rail faces ±214.1 / ±131.0, rail top face 1036.2
+    "fr_top_frame": (219.5, 1040.7, 134.5),  # boss extremes 197/112 + Ø45/2,
+    # user ruling 2026-10-10: intentionally smaller than photo-read Ø52.2;
+    # rail faces remain ±214.1 / ±131.0, rail top face 1036.2.
 }
 
 
@@ -399,10 +399,12 @@ def main() -> int:
     print(f"observations: {len(prob.obs)}  rms px error: {np.sqrt((err**2).mean()):.2f}"
           f"  median: {np.median(err):.2f}  max: {err.max():.2f}")
     print(f"focals: tall {f['tall']:.0f}px  quarter {f['quarter']:.0f}px")
-    print(f"top frame solved: TX ±{top[0]:.1f}±{top_sig[0]:.1f}  "
-          f"TY {top[1]:.1f}±{top_sig[1]:.1f}  TZ ±{top[2]:.1f}±{top_sig[2]:.1f}"
-          f"   (model boss extremes ±223.1 / boss top 1040.7 / z ±138.1;"
-          f" rail faces ±214.1 / top face 1036.2 / ±131)")
+    print(
+        f"top frame solved: TX ±{top[0]:.1f}±{top_sig[0]:.1f}  "
+        f"TY {top[1]:.1f}±{top_sig[1]:.1f}  TZ ±{top[2]:.1f}±{top_sig[2]:.1f}"
+        f"   (model boss extremes ±219.5 / boss top 1040.7 / z ±134.5;"
+        f" rail faces ±214.1 / top face 1036.2 / ±131; user-ruled Ø45, not photo Ø52.2)"
+    )
     print(f"columns solved: X ±{col[0]:.1f}±{col_sig[0]:.1f}  Z ±{col[1]:.1f}±{col_sig[1]:.1f}"
           f"   (model nominal ±197 / ±112)"
           f"   tube-run rms {np.sqrt((tube_res**2).mean()):.1f} px")

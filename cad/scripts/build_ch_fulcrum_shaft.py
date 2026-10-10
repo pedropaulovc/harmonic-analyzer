@@ -1,18 +1,24 @@
-r"""Reproduction script: lever fulcrum shaft (book ch. 17; 1 used).
+r"""Reproduction script: lever fulcrum shaft (MHA-CH-004; book ch. 17; 1 used).
 
-Plain Ø6.35 (1/4") x 182 steel shaft: the top levers' common fulcrum at
-machine (x, y) = (+199.9, 1061.4) (2026-08-02 top-frame rederive: rail top
-1036.2 + ball rise 25.2; was 1065.9). M6.5 split this off the 228.6
-pivot-shaft: the fulcrum line sits on the west column line, and a 228.6
-shaft's tips (z +-114.3) still clip the Ø25.4 columns (tip 3.7 from the
-column axis vs the 12.7 surface; OD rederived from the 8-views, M6.11).
-182 ends the shaft at z +-91, ~5.3 clear of the column surface (was 0.6
-at the old Ø34.925); each end runs 2.25 past its fulcrum-keeper's ball
-centre (z +-88.75), floating in the keeper's Ø6.5 ball bore.
+Plain Ø6.35 (1/4") steel shaft: the top levers' common fulcrum at machine
+(x, y) = (+199.9, 1061.4) (2026-08-02 top-frame rederive: rail top 1036.2 +
+keeper axis rise 25.2). One diameter full length -- no journals, shoulders or
+steps -- through the reamed bores of the two end keepers (MHA-CH-007). Each
+end stands 0.5 past its keeper lug's outer face and finishes in a full
+hemisphere (the bright dome of the ch. 17 p. 40 closeup): 161.35 tip to tip.
+One set-screw flat per end, both on +Y, sits under the keeper's crown tap;
+the two #1-72 cup-point set screws (MHA-VN-055) bearing on them are the
+shaft's only axial and rotational location.
 
-Dimensions: cad/DIMENSIONS.md "Channel & top-frame layout" (med; dia low).
+Dimensions: ``ch_fulcrum_shaft_spec`` (derived from ``ch_fulcrum_keeper_spec``);
+cad/DIMENSIONS.md "Channel & top-frame layout".
 
-Layout: shaft axis along Z, centred (z -91..+91).
+Layout: shaft axis along Z, centred (tips at z +-80.675); flats face +Y. The
+body is ONE Right-plane half-profile (two quarter-arc domes on a straight
+O.D.) revolved about its on-axis close line (the mg_magnifying_lever capsule
+idiom), so the diameter and tip-to-tip length import into the side view; the
+two flats are one mid-plane cut from a second Right-plane sketch that also
+carries the across-flat size.
 
 Run (SolidWorks already open)::
 
@@ -24,90 +30,359 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    apply_material,
-    check,
-    define_circle,
-    drive_dimension,
+    add_line_chain,
+    dimension_between,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
+    set_sketch_direct_db,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_prefix,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from ch_fulcrum_shaft_spec import (
+    ACROSS_FLAT,
+    CYLINDER_HALF,
+    DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     END_VIEW_NOTE,
-    GEOMETRIC_CONTROLS,
+    FLAT_DEPTH,
+    FLAT_FROM_END,
+    FLAT_HEIGHT,
+    FLAT_LENGTH,
+    FLAT_PITCH,
     ISO_VIEW_NOTE,
-    PART_DATUMS,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LENGTH,
+    SHAFT_R,
     SURFACE_FINISHES,
 )
 
 PART_NAME = "ch-fulcrum-shaft"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
+
+TIP = SHAFT_LENGTH / 2.0  # 80.675: dome apex off the centre
+# Capsule: the straight O.D. between the dome centres plus one full sphere.
+V_BODY = (
+    math.pi * SHAFT_R**2 * (SHAFT_LENGTH - SHAFT_DIA) + 4.0 / 3.0 * math.pi * SHAFT_R**3
+)
+# Each flat removes a circular segment FLAT_DEPTH deep along FLAT_LENGTH of
+# the straight O.D. (both lie inside z +-CYLINDER_HALF: the spec pins it).
+_CHORD_OFFSET = SHAFT_R - FLAT_DEPTH
+V_FLAT = FLAT_LENGTH * (
+    SHAFT_R**2 * math.acos(_CHORD_OFFSET / SHAFT_R)
+    - _CHORD_OFFSET * math.sqrt(SHAFT_R**2 - _CHORD_OFFSET**2)
+)
+# Flat rectangles: from the flat up past the O.D.; the cut runs mid-plane
+# across the whole diameter.
+FLAT_RECT_TOP = SHAFT_R + 0.5
+FLAT_CUT_DEPTH = 2.0 * SHAFT_DIA
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry (the setter is
+    on ISketchSegment, not the ISketchLine the registry binds)."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _shaft_profile(adapter) -> list[tuple[str, str]]:
+    """The capsule half-profile, revolved into the body. Constraint accounting
+    (12 point unknowns less the two arcs' equal-radius ties = 10): close line
+    horizontal with the origin at its midpoint (3), O.D. line horizontal (1),
+    each dome centre on the axis (2) and under its O.D. end (2), the
+    tip-to-tip length (1) and the diameter (1)."""
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    dims = SketchDims()
+    check("create_sketch shaft", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "shaft axis centerline", await adapter.add_centerline(-TIP, 0.0, TIP, 0.0)
+    )
+    top = check(
+        "shaft O.D. line",
+        await adapter.add_line(-CYLINDER_HALF, SHAFT_R, CYLINDER_HALF, SHAFT_R),
+    )
+    # add_arc sweeps CCW p1 -> p2: apex -> rim at +u, rim -> apex at -u.
+    cap_pos = check(
+        "shaft +u dome",
+        await adapter.add_arc(CYLINDER_HALF, 0.0, TIP, 0.0, CYLINDER_HALF, SHAFT_R),
+    )
+    close = check("shaft close line", await adapter.add_line(TIP, 0.0, -TIP, 0.0))
+    cap_neg = check(
+        "shaft -u dome",
+        await adapter.add_arc(-CYLINDER_HALF, 0.0, -CYLINDER_HALF, SHAFT_R, -TIP, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "shaft close horizontal",
+        await adapter.add_sketch_constraint(close, None, "horizontal"),
+    )
+    check(
+        "shaft centred on the origin",
+        await adapter.add_sketch_constraint("origin", close, "midpoint"),
+    )
+    check(
+        "shaft O.D. horizontal",
+        await adapter.add_sketch_constraint(top, None, "horizontal"),
+    )
+    for cap, end, tag in ((cap_neg, "start", "-u"), (cap_pos, "end", "+u")):
+        check(
+            f"shaft {tag} dome centre on the axis",
+            await adapter.add_sketch_constraint(
+                f"{cap}.center", "origin", "horizontal_points"
+            ),
+        )
+        check(
+            f"shaft {tag} dome centre under the O.D. end",
+            await adapter.add_sketch_constraint(
+                f"{top}.{end}", f"{cap}.center", "vertical_points"
+            ),
+        )
+    await dimension_between(
+        adapter,
+        f"{close}.start",
+        f"{close}.end",
+        "horizontal_distance",
+        SHAFT_LENGTH,
+        "shaft OverallLength",
+    )
+    dims.record("OverallLength", '"ShaftLength"')
+    await add_diametric_linear_dimension(
+        adapter, axis, top, (0.0, SHAFT_R + 5.0), "ShaftDia"
+    )
+    dims.record("ShaftDia", '"ShaftDia"')
+    await ensure_fully_defined(adapter, "shaft sketch")
+    check("exit_sketch shaft", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShaftProfile")
+    drive_jobs = dims.apply(adapter, "ShaftProfile")
+    check("revolve shaft", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Shaft")
+    return drive_jobs
+
+
+async def _flats(adapter) -> list[tuple[str, str]]:
+    """The two set-screw flats: one mid-plane cut from two rectangles on the
+    Right plane, each from the flat (v = FLAT_HEIGHT) up past the O.D.
+
+    Constraint accounting (16 rectangle + 4 across-flat witness + 4 tip
+    witness unknowns = 24): eight rectangle H/V relations; the +u flat's
+    length and rise; the -u flat's length, rise, FlatFromEnd off the -u dome
+    tip and the like-edge FlatPitch to the +u flat with flat-line alignment;
+    the construction tip witness along the axis from the origin to the -u
+    tip (on the origin, horizontal, ShaftLength/2 long); and the construction
+    witness from the +u flat's -u corner straight down to the far O.D.
+    (vertical, under the corner, its foot ShaftDia/2 below the origin, its
+    top on the axis) whose AcrossFlat dim sets both flats' height."""
+    dims = SketchDims()
+    half = FLAT_LENGTH / 2.0
+    station = FLAT_PITCH / 2.0
+    rect_pos = [
+        (station - half, FLAT_HEIGHT),
+        (station + half, FLAT_HEIGHT),
+        (station + half, FLAT_RECT_TOP),
+        (station - half, FLAT_RECT_TOP),
+    ]
+    rect_neg = [(u - FLAT_PITCH, v) for u, v in rect_pos]
+    check("create_sketch flats", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    lines_pos = await add_line_chain(adapter, rect_pos)
+    lines_neg = await add_line_chain(adapter, rect_neg)
+    witness = check(
+        "flat witness",
+        await adapter.add_line(rect_pos[0][0], -SHAFT_R, rect_pos[0][0], 0.0),
+    )
+    (tip_witness,) = await add_line_chain(
+        adapter, [(0.0, 0.0), (-TIP, 0.0)], close=False
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, witness)
+    _as_construction(adapter, tip_witness)
+    for points, lines in ((rect_pos, lines_pos), (rect_neg, lines_neg)):
+        for i, line in enumerate(lines):
+            (_, v1), (_, v2) = points[i], points[(i + 1) % len(points)]
+            direction = "horizontal" if v1 == v2 else "vertical"
+            check(
+                f"flat {direction} {line}",
+                await adapter.add_sketch_constraint(line, None, direction),
+            )
+    check(
+        "flat witness vertical",
+        await adapter.add_sketch_constraint(witness, None, "vertical"),
+    )
+    check(
+        "tip witness horizontal",
+        await adapter.add_sketch_constraint(tip_witness, None, "horizontal"),
+    )
+    check(
+        "tip witness starts at the origin",
+        await adapter.add_sketch_constraint(
+            f"{tip_witness}.start", "origin", "coincident"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{tip_witness}.start",
+        f"{tip_witness}.end",
+        "horizontal_distance",
+        TIP,
+        "tip witness",
+    )
+    dims.record("TipStation", '"ShaftLength" / 2')
+    flat_pos, rise_pos = lines_pos[0], lines_pos[1]
+    flat_neg, rise_neg = lines_neg[0], lines_neg[1]
+    corner = f"{flat_pos}.start"  # the +u flat's -u edge on the flat line
+    await dimension_between(
+        adapter,
+        corner,
+        f"{flat_pos}.end",
+        "horizontal_distance",
+        FLAT_LENGTH,
+        "FlatLength",
+    )
+    dims.record("FlatLength", '"FlatLength"')
+    await dimension_between(
+        adapter,
+        f"{rise_pos}.start",
+        f"{rise_pos}.end",
+        "vertical_distance",
+        FLAT_RECT_TOP - FLAT_HEIGHT,
+        "flat +u rise",
+    )
+    dims.record("FlatRise")
+    check(
+        "flat witness under the corner",
+        await adapter.add_sketch_constraint(
+            f"{witness}.start", corner, "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        corner,
+        f"{witness}.start",
+        "vertical_distance",
+        ACROSS_FLAT,
+        "AcrossFlat",
+    )
+    dims.record("AcrossFlat", '"ShaftDia" - "FlatDepth"')
+    await dimension_between(
+        adapter,
+        f"{witness}.start",
+        "origin",
+        "vertical_distance",
+        SHAFT_R,
+        "flat witness foot",
+    )
+    dims.record("WitnessFoot", '"ShaftDia" / 2')
+    check(
+        "flat witness top on the axis",
+        await adapter.add_sketch_constraint(
+            f"{witness}.end", "origin", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{flat_neg}.start",
+        f"{flat_neg}.end",
+        "horizontal_distance",
+        FLAT_LENGTH,
+        "-u FlatLength",
+    )
+    dims.record("FlatLengthB", '"FlatLength"')
+    await dimension_between(
+        adapter,
+        f"{rise_neg}.start",
+        f"{rise_neg}.end",
+        "vertical_distance",
+        FLAT_RECT_TOP - FLAT_HEIGHT,
+        "flat -u rise",
+    )
+    dims.record("FlatRiseB")
+    # The -u flat's -u (outer) edge off the -u dome tip: the machinist's
+    # station, from which FlatPitch sets the +u flat.
+    await dimension_between(
+        adapter,
+        f"{tip_witness}.end",
+        f"{flat_neg}.start",
+        "horizontal_distance",
+        FLAT_FROM_END,
+        "FlatFromEnd",
+    )
+    dims.record("FlatFromEnd", '"ShaftLength" / 2 - "FlatPitch" / 2 - "FlatLength" / 2')
+    # Like edge to like edge (each flat's -u end): the flat-centre spacing.
+    await dimension_between(
+        adapter,
+        f"{flat_neg}.start",
+        corner,
+        "horizontal_distance",
+        FLAT_PITCH,
+        "FlatPitch",
+    )
+    dims.record("FlatPitch", '"FlatPitch"')
+    check(
+        "flats on one line",
+        await adapter.add_sketch_constraint(
+            f"{flat_neg}.start", corner, "horizontal_points"
+        ),
+    )
+    await ensure_fully_defined(adapter, "flats sketch")
+    check("exit_sketch flats", await adapter.exit_sketch())
+    name_last_feature(adapter, "FlatProfile")
+    drive_jobs = dims.apply(adapter, "FlatProfile")
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    check(
+        "cut flats",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=FLAT_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "SetScrewFlats")
+    return drive_jobs
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
-
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the shaft diameter and length. The mm
-    # suffix is load-bearing -- this is an INCH document and the equation manager
-    # reads BARE numbers in document units (an unsuffixed 182 = 182 in).
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
+    # is an INCH document and the equation manager reads BARE numbers in
+    # document units (an unsuffixed 161.35 = 161.35 in).
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+    await set_global(adapter, "FlatLength", f"{FLAT_LENGTH}mm")
+    await set_global(adapter, "FlatPitch", f"{FLAT_PITCH}mm")
+    await set_global(adapter, "FlatDepth", f"{FLAT_DEPTH}mm")
 
-    drive_jobs: list[tuple[str, str]] = []
-
-    # Shaft section: an on-axis (origin) circle, so define_circle emits only the
-    # diameter dim -- the centre X/Z slots are relations, recorded but ignored.
-    section = SketchDims()
-    check("create_sketch section", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        SHAFT_DIA / 2.0,
-        "shaft section",
-        dims=section,
-        names=("SectionCx", "SectionCz", "ShaftDia"),
-        drives=(None, None, '"ShaftDia"'),
+    drive_jobs = await _shaft_profile(adapter)
+    volume = await volume_check(adapter, "shaft", V_BODY, 0.005 * V_BODY)
+    drive_jobs += await _flats(adapter)
+    volume = await volume_check(
+        adapter, "set-screw flats", volume - 2.0 * V_FLAT, 0.03 * 2.0 * V_FLAT
     )
-    await ensure_fully_defined(adapter, "section sketch")
-    check("exit_sketch section", await adapter.exit_sketch())
-    name_last_feature(adapter, "SectionProfile")
-    drive_jobs += section.apply(adapter, "SectionProfile")
-    check(
-        "extrude shaft",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=SHAFT_LENGTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "Shaft")
-    depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
-    drive_jobs += [(depth_dim[0], '"ShaftLength"')]
-    v = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
-    await volume_check(adapter, "shaft", v, 0.001 * v)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -115,7 +390,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven shaft (equations neutral)", v, 0.001 * v)
+    await volume_check(
+        adapter, "driven shaft (equations neutral)", volume, 0.001 * volume
+    )
 
     # The levers ride this axis by name.  A point on the O.D. is a
     # view-dependent pick that grazes the silhouette in the standard views,
@@ -126,18 +403,17 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     set_dimension_bilateral_tolerance(
-        adapter, "SectionProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+        adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
     )
+    # Decimal places belong to the model dimension, not to the sheet.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
+        set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(
-        adapter,
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
-    )
+    # The bearing O.D.'s roughness lives on the MODEL as a plain annotation.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

@@ -32,7 +32,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _session import run_build  # noqa: E402
 import _telemetry  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     MCMASTER_DIR,
@@ -49,8 +53,10 @@ from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
 from diagnostics.diag_build_90280A837 import build_90280A837  # noqa: E402
 from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
 from diagnostics.diag_build_91375A106 import build_91375A106  # noqa: E402
+from diagnostics.diag_build_91375A942 import build_91375A942  # noqa: E402
 from diagnostics.diag_build_91255A148 import build_91255A148  # noqa: E402
 from diagnostics.diag_build_91410A538 import build_91410A538  # noqa: E402
+from diagnostics.diag_build_91794A080 import build_91794A080  # noqa: E402
 from diagnostics.diag_build_91794A112 import build_91794A112  # noqa: E402
 from diagnostics.diag_build_91794A055 import build_91794A055  # noqa: E402
 from diagnostics.diag_build_91829A205 import build_91829A205  # noqa: E402
@@ -83,6 +89,7 @@ REGISTRY = {
     "92865A585": build_92865A585,
     "91247A720": build_91247A720,
     "91375A106": build_91375A106,
+    "91375A942": build_91375A942,
     "91255A148": build_91255A148,
     "99607A213": build_99607A213,
     "91882A221": build_91882A221,
@@ -94,6 +101,7 @@ REGISTRY = {
     "90280A199": build_90280A199,
     "90280A201": build_90280A201,
     "90280A837": build_90280A837,
+    "91794A080": build_91794A080,
     "91794A112": build_91794A112,
     "9275K141": build_9275K141,
     "98296A026": build_98296A026,

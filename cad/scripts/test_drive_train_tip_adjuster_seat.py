@@ -13,7 +13,7 @@ import math
 import pytest
 
 import build_dt_drive_train_assembly as bdt
-from build_vn_cone_tip_adjuster import CUP_DEPTH, CUP_DIA
+from _mcmaster_94025a164 import CUP_DEPTH, CUP_DIA
 from dt_cone_gear_shaft_spec import ADJUSTER_EMBED, SECTIONS
 
 

@@ -15,7 +15,7 @@ import build_vn_transgear_retaining_ring as part
 import vn_transgear_retaining_ring_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_97431A260 as recipe
 
 STEM = "vn-transgear-retaining-ring"
@@ -34,7 +34,7 @@ def test_catalogue_row_is_the_replica_gated_mcmaster_ring() -> None:
     assert stock.material == row["material"]
     assert row["number"] == "MHA-VN-047"
     assert int(row["quantity"]) == 1
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_97431A260
     assert metadata.threaded is False

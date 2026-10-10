@@ -23,7 +23,7 @@ recipes:
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90280A194 | `vn-frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A194 | — (diagnostic recipe; a former `vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `vn-clamp-screw`, `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -35,11 +35,13 @@ recipes:
 | 91255A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model; SKU not yet read live) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
+| 91375A942 | `vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | `vn-gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
 | 91790A196 | `vn-transgear-arm-plate-screw` (catalogue-only; no vendor model; SKU not yet read live) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A077 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A080 | `vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A205 | `vn-transgear-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91829A560 | `vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
@@ -67,6 +69,46 @@ recipes:
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
+
+Live catalogue verification on October 9, 2026:
+
+- [91375A942](https://www.mcmaster.com/91375A942/) is selected for the two
+  MHA-VN-055 fulcrum-shaft set screws (one per MHA-CH-007 keeper crown, on
+  the shaft's flat). Its product-detail table required login; the
+  [public #1-72 black-oxide cup-point family table](https://www.mcmaster.com/products/cup-point-set-screws/thread-size~1-72/finish~black-oxide/)
+  and the part's 2-D PDF were read live in a browser on October 9, 2026
+  instead. The title is “Alloy Steel Cup-Tip Set Screw, Black-Oxide, 1-72
+  Thread, 5/32" Long”; its row states length **5/32 in**, drive size
+  **0.035 in**, hardness **Rockwell C45**, package quantity **10**, and
+  package price **$7.43**. The filtered family fields state **Alloy Steel**,
+  **Black Oxide**, **Headless**, **Hex** drive, **UNF**, **Fine** thread
+  spacing, **Unified Standard Class 3A**, **Right Hand**, **ASME B18.3** and
+  **ASTM F912**. The 2-D PDF gives major diameter **0.073 in**, length
+  **0.156 in** and the **0.035 in** hex; it gives no cup dimension, so the
+  cup diameter is the ASME B18.3 #1 maximum, 0.040 in. The #1-72 thread
+  follows the keeper's crown tap (rule 12). 5/32 supersedes the 1/8 in
+  91375A753 (same family row, $9.31/10), whose installed engagement fell
+  to 1.40D at the worst case, under rule 12 (Main ruling A, 2026-10-10);
+  the superseded #6-32 candidate was 91375A182 (#6-32 x 5/32). No vendor
+  model is harvested: `diagnostics.diag_build_91375A942` scales the
+  91375A106 recipe's laws to the #1-72 pitch and the catalogue hex, family
+  assumptions, not verified vendor geometry.
+
+Live catalogue verification on October 10, 2026:
+
+- [91794A080](https://www.mcmaster.com/91794A080/) replaces 90280A110 (and,
+  before it, 90280A194) as the two MHA-VN-022 frame-side screws that hold the
+  fulcrum keepers' feet. The
+  [public #2-56 fillister family table](https://www.mcmaster.com/products/fillister-head-machine-screws/thread-size~2-56/?s=fillister-head-machine-screws)
+  was read live in a browser on October 10, 2026: in the “Stainless Steel
+  Fillister Head Slotted Screws” table, length **7/16 in**, head diameter
+  **0.14 in**, head height **0.083 in**, **Fully Threaded**, tensile strength
+  **70,000 psi**, package quantity **100**. The 90280A steel family has no
+  #2-56 size. The smaller thread follows the transferred top-frame tap: the
+  #4-40 tap left too thin a rule-12 ligament under the keeper foot. The head
+  and thread are the 91794A077 row's, so the shared fillister recipe builds it
+  from the length alone; no vendor SLDPRT has been harvested for it.
+  `diagnostics.diag_build_90280A194` stays as a diagnostic recipe.
 
 Live catalog verification on October 8, 2026:
 
@@ -355,10 +397,12 @@ Catalog specifications checked on September 10, 2026:
   head hex drive screw, #4-40 UNC class 3A, right hand, 1/4 in under the
   head, fully threaded, flat tip, standard-profile head Ø0.213 in x 0.059 in,
   1/16 in hex drive, 140 ksi, Rockwell C39, ASME B18.3 / ASTM F835. The page
-  gives nothing else, so `diag_build_91255A106.py` carries the 91255A148
-  vendor-measured laws over in proportion: flat top 7/5 of the hex, band
-  0.15 of the head height at 10 deg, fillets 0.05, socket floor 0.55, the
-  60 deg countersink. It is catalogue-only: no vendor model is downloaded or
+  gives nothing else, so `diagnostics/diag_mcmaster_button_head.py` and
+  `_button_head_dimensions.py` carry the 91255A148 vendor-measured laws over
+  in proportion: flat top 7/5 of the hex, band 0.15 of the head height at
+  10 deg, fillets 0.05, socket floor 0.55, the 60 deg countersink.
+  `_mcmaster_91255a106.py` and `_mcmaster_91255a108.py` hold their separate
+  SKU dimensions. It is catalogue-only: no vendor model is downloaded or
   kept here, so it has no replica gate, and its standalone diagnostic is a
   catalog-only run. Lost: 91255A105 (3/16 in; shortens the lock stack) and
   18-8 stainless 92949A106 (same head and length, 70 ksi, Rockwell B55;
@@ -368,8 +412,9 @@ Catalog specifications checked on September 10, 2026:
   of the guide's blind tap at the worst case, so the guide's lock receivers
   became through taps and the screw 3/8 in under the head (2.02D at the
   worst case). [INFERENCE] 91255A108 is the 3/8 in length of the same
-  91255A series; its page has not been read live. `diag_build_91255A108.py`
-  builds it with the 91255A106 recipe at that length; it is catalogue-only.
+  91255A series; its page has not been read live. `_mcmaster_91255a108.py`
+  carries that size, and `diag_mcmaster_button_head.py` builds it with the
+  shared laws at that length; it is catalogue-only.
 - [98296A027](https://www.mcmaster.com/98296A027/) was read live on
   September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
   diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,
@@ -387,11 +432,12 @@ Catalog specifications checked on September 10, 2026:
   0.062-0.065 in hole. It is pressed through the knob cup and the knob
   shaft's journal in a hole match-drilled at assembly. No vendor SLDPRT has
   been harvested for it yet.
-- All three spring pins are rows of `diagnostics/diag_mcmaster_spring_pin.py`,
-  which models each as installed, a 1/16 in tube with the catalog wall,
-  without slot or chamfer; `diag_build_98296A026.py`,
-  `diag_build_98296A027.py` and `diag_build_98296A031.py` are its per-size
-  runs.
+- The three spring pins have separate data in `_mcmaster_98296a026.py`,
+  `_mcmaster_98296a027.py` and `_mcmaster_98296a031.py`, passed to
+  `diagnostics/diag_mcmaster_spring_pin.py`. The shared recipe models each
+  as installed, a 1/16 in tube with the catalog wall, without slot or
+  chamfer; `diag_build_98296A026.py`, `diag_build_98296A027.py` and
+  `diag_build_98296A031.py` are its per-size runs.
 - [98381A434](https://www.mcmaster.com/98381A434/) (`vn-crank-seat-drive-pin`,
   MHA-VN-044, crank only) was read live on September 30, 2026: alloy steel dowel pin,
   unplated, 3/32 in diameter (+0.0001 to +0.0003 in), 1/4 in long, end shape

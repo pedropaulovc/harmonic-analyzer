@@ -8,10 +8,14 @@ HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
 cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
 holds the hub location, true-axis side view and the removed set-pocket
 section; UNDERSIDE holds the underside locator, its enlarged native
-detail and the removed knife-hanger section F-F.  A group gets its own
-sheet rather than a crowded corner of one:
+detail and the removed knife-hanger section F-F; KEEPER-SEATS holds the two
+machined keeper foot seats, the nominal split-line footprint and section G-G
+through the flange under a faced seat.  A group gets its own sheet rather
+than a crowded corner of one:
 qualifiers then park clear of cutting lines, centrelines and each other.
 Projected top/front pairs stay aligned; removed and section views carry scales.
+Keeper taps transfer from MHA-CH-007 at assembly; their retained station
+coordinates are reference-only. Hanger station dimensions remain controlling.
 
 Run with SolidWorks open::
 
@@ -27,7 +31,10 @@ from typing import Any
 
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_common import (
     DrawingOutputs,
@@ -67,7 +74,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _part_pmi import _resolve_faces
+from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
 from build_fr_top_frame import (
     BAR_X0,
@@ -145,6 +152,12 @@ from fr_top_frame_spec import (
     HANGER_SLOT_LENGTH_CALLOUT,
     HANGER_SLOT_WIDTH,
     HANGER_SLOT_WIDTH_CALLOUT,
+    KEEPER_SEAT_BOUNDS_XZ,
+    KEEPER_SEAT_CENTRES_XZ,
+    KEEPER_SEAT_LENGTH_MM,
+    KEEPER_SEAT_WIDTH_MM,
+    KEEPER_TAP_CALLOUT_PRECISION,
+    FLANGE_THICKNESS_MM,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -172,6 +185,7 @@ SHEET_NAMES = (
     "CROSS-TAPS",
     "HUB-SET-SCREW",
     "UNDERSIDE",
+    "KEEPER-SEATS",
 )
 SHEET_SCALE = (1.0, 3.0)
 # Sheet scale is a per-sheet property, and the title block's SCALE field
@@ -186,6 +200,7 @@ SHEET_SCALES = {
     "CROSS-TAPS": (1.0, 2.0),
     "HUB-SET-SCREW": SHEET_SCALE,
     "UNDERSIDE": SHEET_SCALE,
+    "KEEPER-SEATS": (1.0, 2.0),
 }
 # The station plan is drawn half size, so its centre-mark axes and label
 # lanes derive from its own scale and never from the title block's.
@@ -193,9 +208,9 @@ DETAIL_TOP_SCALE = SHEET_SCALES["HOLES-SOCKETS"]
 GEOMETRY_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 DETAIL_VIEW_SCALE = DETAIL_TOP_SCALE[0] / DETAIL_TOP_SCALE[1]
 
-# Plan extents including the proud corner bosses (the straight rails alone
-# stop at x +/-214.1 / z +/-131.0): x +/-223.1 -> 446.2 and z +/-138.1 ->
-# 276.2 envelope; the boss stack is 47.3 tall around the 36.5 rail band.
+# Plan extents including the Ø45 corner bosses: the straight rails stop
+# at x +/-214.1 / z +/-131.0, bosses at +/-219.5 / +/-134.5 -> 439 x 269.
+# The boss stack stays 47.3 tall around the unchanged 36.5 rail band.
 PLAN_HALF_X = COLUMN_X + BOSS_DIA / 2.0
 PLAN_HALF_Z = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0
 GEOMETRY_PLAN_HALF_W = PLAN_HALF_X * GEOMETRY_VIEW_SCALE / 1000.0
@@ -242,9 +257,9 @@ GEOMETRY_TOP_CENTER = (0.145, 0.1685)
 GEOMETRY_FRONT_CENTER = (0.145, 0.090)
 
 # Sheet 3: the hole/station plan, centred on the sheet it now fills at
-# 1:2.  The 25.5 sockets and their 52.2 bosses are the features a machinist
-# sets up from, and at 1:3 they were 8.5 mm of paper.
-DETAIL_TOP_CENTER = (0.215, 0.160)
+# 1:2. The Ø25.5 sockets and Ø45 bosses are the setup features; the
+# smaller boss remains 22.5 mm across on paper, the socket 12.75 mm.
+# Its final centre below reserves room for the assembly-transfer callout.
 # The socket Ra symbol reads off the near-side rim of the rear east socket,
 # in the sheet's own empty lower-left corner, so its leader crosses neither
 # the 224.00 pitch lane nor the 4X socket qualifier above the view.
@@ -281,19 +296,84 @@ INK_CLEARANCE = 0.002
 ROUND_OUT = 0.0001
 # The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
 ARROW_HALF_WIDTH = 0.000381
-# RD4's ink about its commanded point, (left, down, right, up), measured on
-# the b49e1 render: the shoulder under "KEEPER TAP 8-32 UNC - 2B v 10.0" runs
-# 38.4 mm left and 36.8 mm right of it, 5.6 mm down; "2X 3.45 v 16.0" tops out
-# 4.6 mm up.  The leader leaves the shoulder's end nearer the hole.
-KEEPER_CALLOUT_EXTENT = (0.0384, 0.0056, 0.0368, 0.0046)
+# Transfer fit-up owns these locations; the nominal model holes and their
+# sheet coordinates are references, not independent inspection requirements.
+# The trailing newline keeps the native thread/drill/depth on separate rows
+# through _drawing_common.compose_hole_callout_prefix.
+TRANSFER_KEEPER_CALLOUT = "TRANSFER FROM MHA-CH-007\nAT ASSEMBLY;\n"
+# Historical RD4 envelope measured on b49e1, NOT a measurement of the new
+# transfer callout. Expand its width for a conservative 3.5 mm per prefix
+# character and its height by two estimated 5.1 mm rows: offline allowances.
+# farm validation must measure the regenerated ink and leader landing.
+_KEEPER_NATIVE_CALLOUT_EXTENT = (0.0384, 0.0056, 0.0368, 0.0046)
+KEEPER_TRANSFER_ROW_PITCH = 0.0051
+KEEPER_TRANSFER_EXTRA_HEIGHT = (
+    TRANSFER_KEEPER_CALLOUT.count("\n") * KEEPER_TRANSFER_ROW_PITCH
+)
+KEEPER_TRANSFER_CHARACTER_WIDTH = 0.0035
+KEEPER_TRANSFER_EXTRA_WIDTH = max(
+    0.0,
+    max(map(len, TRANSFER_KEEPER_CALLOUT.splitlines()))
+    * KEEPER_TRANSFER_CHARACTER_WIDTH
+    - _KEEPER_NATIVE_CALLOUT_EXTENT[0]
+    - _KEEPER_NATIVE_CALLOUT_EXTENT[2],
+)
+KEEPER_CALLOUT_EXTENT = (
+    _KEEPER_NATIVE_CALLOUT_EXTENT[0],
+    _KEEPER_NATIVE_CALLOUT_EXTENT[1],
+    _KEEPER_NATIVE_CALLOUT_EXTENT[2] + KEEPER_TRANSFER_EXTRA_WIDTH,
+    _KEEPER_NATIVE_CALLOUT_EXTENT[3] + KEEPER_TRANSFER_EXTRA_HEIGHT,
+)
+
+
+def _keeper_leader_angle(
+    hole: tuple[float, float], boss: tuple[float, float], boss_r: float
+) -> float:
+    """Steepest lower-right entry clearing the rear boss, in sheet metres."""
+    bx, by = boss[0] - hole[0], boss[1] - hole[1]
+    rho, phi = math.hypot(bx, by), math.atan2(-bx, -by)
+    reach = boss_r + INK_CLEARANCE + ROUND_OUT
+    if reach >= rho:
+        raise ValueError(
+            f"keeper tap stands inside its boss clearance ({rho=}, {reach=})"
+        )
+    return phi + math.acos(reach / rho)
+
+
+# The extra rows lower the shoulder; along the same boss-clear tangent this
+# advances it right by height/tan(angle). Move only this plan left by that
+# advance plus the added width, retaining the previous right-frame clearance.
+KEEPER_TRANSFER_PLAN_SHIFT = (
+    KEEPER_TRANSFER_EXTRA_HEIGHT
+    / math.tan(
+        _keeper_leader_angle(
+            (
+                KEEPER_TAP_X * DETAIL_VIEW_SCALE / 1000.0,
+                -KEEPER_TAP_Z_REAR * DETAIL_VIEW_SCALE / 1000.0,
+            ),
+            (
+                COLUMN_X * DETAIL_VIEW_SCALE / 1000.0,
+                -REAR_COLUMN_Z * DETAIL_VIEW_SCALE / 1000.0,
+            ),
+            BOSS_DIA / 2.0 * DETAIL_VIEW_SCALE / 1000.0,
+        )
+    )
+    + KEEPER_TRANSFER_EXTRA_WIDTH
+)
+DETAIL_TOP_CENTER = (0.215 - KEEPER_TRANSFER_PLAN_SHIFT, 0.160)
+
 # The cap seat symbol's ink right of its leader's bend: "CAP SEAT FLOORS, 4X"
 # and the rule over it end 4.64 mm past the bend (b49e1: bend at x 210.00,
 # text to 214.57, rule to 214.64), rounded outward.
 CAP_SEAT_FINISH_INK_PAST_BEND = 0.0047
-BOSS_ABOVE_RAIL_LINE_XY = (0.3665, 0.1423)
+# Keep the boss-height lane 7.45 mm off A-A's rederived Ø45 boss silhouette.
+BOSS_ABOVE_RAIL_LINE_XY = (
+    DETAIL_SECTION_CENTER[0] + DETAIL_PLAN_HALF_D + 0.00745,
+    DETAIL_SECTION_CENTER[1] + 0.0073,
+)
 # Above the dimension's own upper arrow, not 51 mm below it -- see the
 # boss-height comment in the A-A recipe for what the long leader crossed.
-BOSS_ABOVE_RAIL_TEXT_XY = (0.380, 0.176)
+BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
 
 # Sheet 5: hub location, true-axis side view, removed set-pocket section.
 HUB_TOP_CENTER = (0.145, 0.200)
@@ -465,7 +545,7 @@ HANGER_SLOT_WIDTH_TEXT_XY = (
 HANGER_SLOT_WIDTH_OFFSET_XY = (0.060, 0.137)
 
 # Sheet 1, Section E-E: the side rails and the full-height central web, cut
-# clear of every hole station (keeper taps at z -70.9 / 77.1, hangers at
+# clear of every hole station (keeper taps at z -82.8 / 81.7, hangers at
 # -84.0 / 90.1, corner bosses at z +/-112), so the section carries rail and
 # web stock only.
 SIDE_SECTION_Z = -56.0
@@ -530,6 +610,109 @@ TEXT_CLEARANCE = 0.0015
 SECTION_LETTER_TEXT_GAP = (
     SECTION_LETTER_EXTENTS["B"][2] - SECTION_LETTER_EXTENTS["B"][0] + INK_CLEARANCE + ROUND_OUT
 )
+
+# Sheet 7: the two keeper foot seats, split-line regions of the west rail's
+# existing top flange (faced, not raised or sunk).  The half-size plan shows
+# both; the REAR seat carries the nominal footprint and its location from the
+# rear socket axis off its own split lines, the dimension lines just outside
+# it or the plan and every value parked right of the plan.
+# Removed section G-G runs along the rail through the FRONT seat, outboard of
+# its keeper tap, from beyond the front boss to past the seat, so the faced
+# seat and the flat flange underside below it print in one cut plane.
+KEEPER_PLAN_SCALE = SHEET_SCALES["KEEPER-SEATS"]
+KEEPER_PLAN_VIEW_SCALE = KEEPER_PLAN_SCALE[0] / KEEPER_PLAN_SCALE[1]
+KEEPER_PLAN_CENTER = (0.130, 0.170)
+_KEEPER_PLAN_S = KEEPER_PLAN_VIEW_SCALE / 1000.0  # sheet m per model mm
+# Each footprint dimension line stands this far off the ink it clears: the
+# width line over the seat's split line, the length line past the plan, the
+# inner-edge location line below it.
+KEEPER_DIM_LINE_GAP = 0.004
+KEEPER_LENGTH_LINE_XY = (
+    KEEPER_PLAN_CENTER[0] + PLAN_HALF_X * _KEEPER_PLAN_S + KEEPER_DIM_LINE_GAP,
+    KEEPER_PLAN_CENTER[1] - KEEPER_SEAT_CENTRES_XZ[1][1] * _KEEPER_PLAN_S,
+)
+KEEPER_LENGTH_TEXT_XY = (0.262, 0.128)
+KEEPER_WIDTH_LINE_XY = (
+    KEEPER_PLAN_CENTER[0] + KEEPER_SEAT_CENTRES_XZ[1][0] * _KEEPER_PLAN_S,
+    KEEPER_PLAN_CENTER[1]
+    - KEEPER_SEAT_BOUNDS_XZ[1][2] * _KEEPER_PLAN_S
+    + KEEPER_DIM_LINE_GAP,
+)
+KEEPER_WIDTH_TEXT_XY = (0.262, 0.148)
+# Seat location: the socket-side end split line chains in line with the
+# length (the two share that witness), the inner split line's 2.1 mm of
+# paper runs below the plan, and both values stack under the length's.
+KEEPER_END_LINE_XY = (
+    KEEPER_LENGTH_LINE_XY[0],
+    KEEPER_PLAN_CENTER[1]
+    - (REAR_COLUMN_Z + KEEPER_SEAT_BOUNDS_XZ[1][3]) / 2.0 * _KEEPER_PLAN_S,
+)
+KEEPER_END_TEXT_XY = (0.264, 0.104)
+KEEPER_INNER_LINE_XY = (
+    KEEPER_PLAN_CENTER[0]
+    + (COLUMN_X + KEEPER_SEAT_BOUNDS_XZ[1][0]) / 2.0 * _KEEPER_PLAN_S,
+    KEEPER_PLAN_CENTER[1] - PLAN_HALF_Z * _KEEPER_PLAN_S - KEEPER_DIM_LINE_GAP,
+)
+KEEPER_INNER_TEXT_XY = (0.264, 0.084)
+KEEPER_SOCKET_QUALIFIER = "FROM SOCKET AXIS"
+KEEPER_SEAT_QUALIFIER = "2X KEEPER SEAT"
+# The part's own seat-facing note (Manufacturing Notes B, five rows), under
+# the plan: its top a clearance under the inner-edge location row, which runs
+# one line gap below the plan.
+KEEPER_SEAT_NOTE_XY = (
+    0.020,
+    KEEPER_PLAN_CENTER[1]
+    - PLAN_HALF_Z * _KEEPER_PLAN_S
+    - KEEPER_DIM_LINE_GAP
+    - INK_CLEARANCE,
+)
+KEEPER_SEAT_NOTE_HEIGHT = 0.0035
+KEEPER_SECTION_SCALE = (1, 1)
+KEEPER_SECTION_VIEW_SCALE = KEEPER_SECTION_SCALE[0] / KEEPER_SECTION_SCALE[1]
+_KEEPER_SECTION_S = KEEPER_SECTION_VIEW_SCALE / 1000.0
+# G-G's station: midway between the west web's root-fillet toe, where the
+# flange underside turns flat, and the seats' outer split line.  Inside the
+# faced footprint and outside the nominal root, the plane cuts each faced seat
+# over its flat underside, so the controlling flange thickness hangs on both
+# actual faces, never on the root arc or a construction proxy.  The keeper
+# tap stays inboard of the plane: G-G cuts no thread.
+_KEEPER_ROOT_TOE_X = WEB_OUT_X + ROOT_FILLET_R
+KEEPER_SECTION_X = (_KEEPER_ROOT_TOE_X + KEEPER_SEAT_BOUNDS_XZ[0][1]) / 2.0
+if not all(
+    _KEEPER_ROOT_TOE_X < KEEPER_SECTION_X < xmax
+    for _xmin, xmax, _zmin, _zmax in KEEPER_SEAT_BOUNDS_XZ
+):
+    raise AssertionError("G-G leaves the flat flange underside below the seats")
+if KEEPER_TAP_X + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0 >= KEEPER_SECTION_X:
+    raise AssertionError("G-G reaches the keeper tap")
+# Plain stock each end of G's line runs past what the section shows.
+KEEPER_SECTION_RUNOUT = 6.0
+KEEPER_SECTION_END_Z = KEEPER_SEAT_BOUNDS_XZ[0][3] + KEEPER_SECTION_RUNOUT
+# Where G-G prints the front seat's centre on its faced top; every row of the
+# section derives from this point.
+KEEPER_SECTION_SEAT_Z = KEEPER_SEAT_CENTRES_XZ[0][1]
+KEEPER_SECTION_SEAT_XY = (0.355, 0.198)
+# The cut plane stands off the socket axis, so the boss crosses it as a
+# chord: half-chord in model mm.
+KEEPER_BOSS_HALF_CHORD = math.sqrt(
+    (BOSS_DIA / 2.0) ** 2 - (KEEPER_SECTION_X - COLUMN_X) ** 2
+)
+# The flange thickness's dimension line stands one line gap past the cut's
+# far end, in the air level with the flange, so neither it nor its value
+# lies on hatching; both witnesses run out along their own cut faces.
+KEEPER_FLANGE_LINE_XY = (
+    KEEPER_SECTION_SEAT_XY[0]
+    + (KEEPER_SECTION_END_Z - KEEPER_SECTION_SEAT_Z) * _KEEPER_SECTION_S
+    + KEEPER_DIM_LINE_GAP,
+    KEEPER_SECTION_SEAT_XY[1] - FLANGE_THICKNESS_MM / 2.0 * _KEEPER_SECTION_S,
+)
+KEEPER_FLANGE_TEXT_XY = (0.395, 0.192)
+KEEPER_FLANGE_QUALIFIER = "2X FLANGE UNDER\nKEEPER SEAT"
+KEEPER_SECTION_CAPTION_XY = (0.326, 0.151)
+# G's arrows point +X like B's (both cut at constant X, Z turned right), so
+# B's measured arrow-to-letter box is the provisional allowance for G.
+# An offline allowance: farm validation measures the rendered letter.
+KEEPER_SECTION_LETTER_EXTENT = SECTION_LETTER_EXTENTS["B"]
 
 # Only views drawn at a scale the title block does not state carry a label,
 # and every label sits under its own view - centred where the dimension
@@ -1325,12 +1508,7 @@ def keeper_callout_placement(
     shoulder_y = hole[1] - (INK_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT) - up - down
     # The leader leaves the hole along (cos t, -sin t); its distance to the
     # boss centre is rho cos(t - phi), shrinking as t steepens past phi.
-    bx, by = boss[0] - hole[0], boss[1] - hole[1]
-    rho, phi = math.hypot(bx, by), math.atan2(-bx, -by)
-    reach = boss_r + INK_CLEARANCE + ROUND_OUT
-    if reach >= rho:
-        raise ValueError(f"keeper tap stands inside its boss clearance ({rho=}, {reach=})")
-    steepest = phi + math.acos(reach / rho)
+    steepest = _keeper_leader_angle(hole, boss, boss_r)
     shoulder_x = hole[0] + (hole[1] - shoulder_y) / math.tan(steepest)
     if shoulder_x + left + right + INK_CLEARANCE > SHEET_FRAME[2]:
         raise ValueError(f"keeper callout runs past the frame at x {shoulder_x + left + right:.4f}")
@@ -1377,7 +1555,7 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
         raise ValueError(f"B's outer letter fits its band by {outer_y + b_down - band_low:.4f} m")
     inner_y = center_y - INNER_Z * s + clear - b_down
     # E: the outer letter ends an ink clearance left of the corner boss (and
-    # the (446.2) witness line on its extreme); the inner one starts an ink
+    # the (439.0) witness line on its Ø45 extreme); the inner one starts an ink
     # clearance right of the 18.0 gusset run's outer witness line.
     e0, _e_down, e1, _e_up = SECTION_LETTER_EXTENTS["E"]
     # D: each letter clears the hub rail's face on its own side.
@@ -1398,16 +1576,32 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
     }
 
 
+def keeper_section_cut_ends() -> tuple[Point, Point]:
+    """G-G's cutting line (start, end) as plan-model (X, Z) mm.
+
+    Along the west rail at ``KEEPER_SECTION_X``, over the front seat's flat
+    flange underside: from beyond the front boss to past the seat's far split
+    line.  Both arrows point +X, off the plan's right edge where nothing else
+    prints.
+    """
+    return (
+        (KEEPER_SECTION_X, -PLAN_HALF_Z - KEEPER_SECTION_RUNOUT),
+        (KEEPER_SECTION_X, KEEPER_SECTION_END_Z),
+    )
+
+
 def _pin_section_profile(
     adapter: Any,
     view: Any,
     model_point: tuple[float, float, float],
     target_x: float,
     *,
+    target_y: float | None = None,
     label: str,
 ) -> None:
     """Slide a removed section along the sheet until ``model_point`` (the
-    rail centreline it cuts) prints at ``target_x``.
+    rail centreline it cuts) prints at ``target_x`` -- and at ``target_y``
+    too when given, for a section whose rows are laid out from that point.
 
     A removed section's outline, and so where SolidWorks centres it, grows
     with its cutting line, air included: on leaders955-f542 #955's longer
@@ -1420,7 +1614,10 @@ def _pin_section_profile(
     position = tuple(float(value) for value in view.Position)
     if len(position) != 2:
         raise RuntimeError(f"{label} section has no position")
-    moved = (position[0] + target_x - x, position[1])
+    moved = (
+        position[0] + target_x - x,
+        position[1] + (0.0 if target_y is None else target_y - y),
+    )
     if not view.SetViewPosition(double_array(list(moved)), False):
         raise RuntimeError(f"failed to pin the {label} section's profile")
     rebuild_drawing(adapter, label=f"pin {label} profile")
@@ -1429,10 +1626,11 @@ def _pin_section_profile(
         f"{label} rail centreline pinned {x*1000.0:.2f} -> {pinned_x*1000.0:.2f} mm",
         section_profile=label, from_x_mm=round(x*1000.0, 3), sheet_x_mm=round(pinned_x*1000.0, 3),
     )
-    if abs(pinned_x - target_x) > 0.00005 or abs(pinned_y - y) > 0.00005:
+    row_y = y if target_y is None else target_y
+    if abs(pinned_x - target_x) > 0.00005 or abs(pinned_y - row_y) > 0.00005:
         raise RuntimeError(
             f"{label} section profile prints at ({pinned_x*1000.0:.3f}, {pinned_y*1000.0:.3f}) mm, "
-            f"not at x {target_x*1000.0:.3f} mm on its row"
+            f"not at ({target_x*1000.0:.3f}, {row_y*1000.0:.3f}) mm"
         )
 
 
@@ -1468,7 +1666,7 @@ def _machined_faces(view: Any) -> dict[str, Any]:
     document = _early_bound(
         _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
     )
-    return _resolve_faces(
+    return resolve_faces(
         document, {control.key: control.face for control in SURFACE_FINISHES}
     )
 
@@ -1628,6 +1826,317 @@ def _auto_tapped_hole_notes(adapter: Any) -> dict[str, int]:
     return counts
 
 
+def _socket_bore_circle(edges: ViewEdges, x: float, z: float, *, label: str) -> Any:
+    """A plan's exact bore circle about the socket axis at (``x``, ``z``) mm.
+
+    The socket rim is matched on X/Z only: which of the bore's rims (top or
+    bottom, same X/Z) the plan shows is the view's choice, not the print's.
+    """
+    socket = min(
+        (
+            item
+            for item in edges.circles
+            if abs(item.circle[0] - x) < 1e-4
+            and abs(item.circle[2] - z) < 1e-4
+            and abs(item.circle[6] - BORE_DIA / 2) < 1e-4
+            and abs(item.circle[3])
+            + abs(abs(item.circle[4]) - 1.0)
+            + abs(item.circle[5])
+            < 1e-6
+        ),
+        key=lambda item: item.circle[1],
+        default=None,
+    )
+    if socket is None:
+        raise RuntimeError(f"{label}: no exact socket bore circle at ({x:g}, {z:g}) mm")
+    return socket.edge
+
+
+def _keeper_seat_split_edge(
+    edges: ViewEdges,
+    start: tuple[float, float, float],
+    end: tuple[float, float, float],
+    *,
+    label: str,
+) -> Any:
+    """The plan's split-line edge running exactly ``start``-``end``.
+
+    A seat is a split-line region of the flange top, not a pad, so its
+    outline is the only ink saying where it stops.  Each footprint dimension
+    hangs on one whole boundary edge, proved corner to corner: a split that
+    merged into the residual top, or failed to project, cannot pass.
+    """
+    midpoint = tuple((a + b) / 2.0 for a, b in zip(start, end))
+    item = edges.exact_line_through(midpoint, label=label)
+    first, second = item.line
+    if not any(
+        math.dist(first, a) <= 1e-4 and math.dist(second, b) <= 1e-4
+        for a, b in ((start, end), (end, start))
+    ):
+        raise RuntimeError(
+            f"{label}: the edge through {midpoint} runs {first}->{second}, "
+            f"not the split line {start}->{end}"
+        )
+    return item.edge
+
+
+def _keeper_section_lines(edges: ViewEdges, y: float) -> list[tuple[Any, float, float]]:
+    """G-G's visible lines lying wholly at model level ``y``, as (item, z0, z1)."""
+    found = []
+    for item in edges.lines:
+        start, end = item.line
+        if any(
+            abs(point[0] - KEEPER_SECTION_X) > 1e-6 or abs(point[1] - y) > 1e-6
+            for point in (start, end)
+        ):
+            continue
+        found.append((item, *sorted((start[2], end[2]))))
+    return found
+
+
+def _keeper_section_lines_seen(found: list[tuple[Any, float, float]]) -> str:
+    return "; ".join(f"z {low:.3f}->{high:.3f}" for _item, low, high in found)
+
+
+def _keeper_seat_cut_edge(
+    edges: ViewEdges, *, label: str
+) -> tuple[Any, tuple[float, float, float]]:
+    """G-G's cut line of the front seat, split line to split line.
+
+    The plane runs outboard of the keeper tap, so the faced seat crosses it
+    as one unbroken rail-top line.  Exactly one rail-top line may overlap the
+    seat, and it must start and end on the seat's two split lines: a line
+    that ran on into the residual flange would mean the split did not hold.
+    Returns the edge and its point over the seat centre, in model mm.
+    """
+    _xmin, _xmax, near_end, far_end = KEEPER_SEAT_BOUNDS_XZ[0]
+    rail_top = _keeper_section_lines(edges, HALF_H)
+    overlapping = [
+        line
+        for line in rail_top
+        if line[2] > near_end + 1e-4 and line[1] < far_end - 1e-4
+    ]
+    if len(overlapping) != 1 or not (
+        abs(overlapping[0][1] - near_end) <= 1e-4
+        and abs(overlapping[0][2] - far_end) <= 1e-4
+    ):
+        raise RuntimeError(
+            f"{label}: expected one seat line from the split at z {near_end:.3f} "
+            f"to the split at z {far_end:.3f}, found {len(overlapping)}; "
+            f"rail-top lines: {_keeper_section_lines_seen(rail_top)}"
+        )
+    return overlapping[0][0].edge, (KEEPER_SECTION_X, HALF_H, KEEPER_SECTION_SEAT_Z)
+
+
+def _keeper_flange_underside_edge(
+    edges: ViewEdges, *, label: str
+) -> tuple[Any, tuple[float, float, float]]:
+    """G-G's cut line of the flat flange underside below the whole front seat.
+
+    Outside the root fillet the underside is flat, so one cut line at the
+    flange underside must span the seat from split to split; the flange
+    thickness hangs on it.  Returns the edge and its point under the seat
+    centre, in model mm.
+    """
+    _xmin, _xmax, near_end, far_end = KEEPER_SEAT_BOUNDS_XZ[0]
+    underside = _keeper_section_lines(edges, FLANGE_BOT_Y)
+    spanning = [
+        line
+        for line in underside
+        if line[1] <= near_end + 1e-4 and line[2] >= far_end - 1e-4
+    ]
+    if len(spanning) != 1:
+        raise RuntimeError(
+            f"{label}: expected one flange underside line spanning the seat "
+            f"z {near_end:.3f}->{far_end:.3f}, found {len(spanning)}; "
+            f"underside lines: {_keeper_section_lines_seen(underside)}"
+        )
+    return spanning[0][0].edge, (KEEPER_SECTION_X, FLANGE_BOT_Y, KEEPER_SECTION_SEAT_Z)
+
+
+def _keeper_seat_sheet(adapter: Any, ddoc: Any) -> None:
+    """The two machined keeper foot seats on their own sheet.
+
+    Nominal footprint and location from the rear seat's split lines and the
+    rear socket axis (reference: the part note sizes and places each seat to
+    its actual fitted keeper), the controlling final flange thickness under
+    the faced front seat in section G-G, and the part's own facing note,
+    which carries the seats' SEAT_UM finish.  No native Ra symbol: a face
+    pick by plane and box would take the residual flange top too.
+    """
+    if ddoc.ActivateSheet("KEEPER-SEATS") is not True:
+        raise RuntimeError("failed to activate top-frame keeper seat sheet")
+    keeper_plan = place_view(
+        adapter,
+        str(SOURCE),
+        "*Top",
+        *KEEPER_PLAN_CENTER,
+        scale=KEEPER_PLAN_SCALE,
+    )
+    set_hidden_lines_removed(adapter, keeper_plan)
+    keeper_plan_edges = scan_view_edges(keeper_plan, label="keeper seat plan")
+    xmin, xmax, zmin, zmax = KEEPER_SEAT_BOUNDS_XZ[1]
+    xc, zc = KEEPER_SEAT_CENTRES_XZ[1]
+    length_edges = (
+        _keeper_seat_split_edge(
+            keeper_plan_edges,
+            (xmin, HALF_H, zmin),
+            (xmax, HALF_H, zmin),
+            label="rear keeper seat inboard split line",
+        ),
+        _keeper_seat_split_edge(
+            keeper_plan_edges,
+            (xmin, HALF_H, zmax),
+            (xmax, HALF_H, zmax),
+            label="rear keeper seat socket-side split line",
+        ),
+    )
+    _checked_dimension(
+        adapter,
+        keeper_plan,
+        p0=(xc, HALF_H, zmin),
+        p1=(xc, HALF_H, zmax),
+        text_xy=KEEPER_LENGTH_LINE_XY,
+        label="keeper seat length",
+        expected_mm=KEEPER_SEAT_LENGTH_MM,
+        orientation="vertical",
+        reference=True,
+        entities=length_edges,
+        suffix=KEEPER_SEAT_QUALIFIER,
+        offset_text=KEEPER_LENGTH_TEXT_XY,
+    )
+    width_edges = (
+        _keeper_seat_split_edge(
+            keeper_plan_edges,
+            (xmin, HALF_H, zmin),
+            (xmin, HALF_H, zmax),
+            label="rear keeper seat inner split line",
+        ),
+        _keeper_seat_split_edge(
+            keeper_plan_edges,
+            (xmax, HALF_H, zmin),
+            (xmax, HALF_H, zmax),
+            label="rear keeper seat outer split line",
+        ),
+    )
+    _checked_dimension(
+        adapter,
+        keeper_plan,
+        p0=(xmin, HALF_H, zc),
+        p1=(xmax, HALF_H, zc),
+        text_xy=KEEPER_WIDTH_LINE_XY,
+        label="keeper seat width",
+        expected_mm=KEEPER_SEAT_WIDTH_MM,
+        orientation="horizontal",
+        reference=True,
+        entities=width_edges,
+        suffix=KEEPER_SEAT_QUALIFIER,
+        offset_text=KEEPER_WIDTH_TEXT_XY,
+    )
+    # Location, from the socket axis the keeper stack is fitted around: the
+    # same split-line edges, the bore circle re-anchored to its centre.
+    rear_socket_edge = _socket_bore_circle(
+        keeper_plan_edges, COLUMN_X, REAR_COLUMN_Z, label="keeper seat plan rear socket"
+    )
+    _checked_dimension(
+        adapter,
+        keeper_plan,
+        p0=(COLUMN_X, HALF_H, REAR_COLUMN_Z),
+        p1=(xmin, HALF_H, zc),
+        text_xy=KEEPER_INNER_LINE_XY,
+        label="keeper seat inner edge from socket",
+        expected_mm=COLUMN_X - xmin,
+        orientation="horizontal",
+        center=True,
+        reference=True,
+        entities=(rear_socket_edge, width_edges[0]),
+        suffix=KEEPER_SOCKET_QUALIFIER,
+        offset_text=KEEPER_INNER_TEXT_XY,
+    )
+    _checked_dimension(
+        adapter,
+        keeper_plan,
+        p0=(COLUMN_X, HALF_H, REAR_COLUMN_Z),
+        p1=(xc, HALF_H, zmax),
+        text_xy=KEEPER_END_LINE_XY,
+        label="keeper seat end from socket",
+        expected_mm=REAR_COLUMN_Z - zmax,
+        orientation="vertical",
+        center=True,
+        reference=True,
+        entities=(rear_socket_edge, length_edges[1]),
+        suffix=KEEPER_SOCKET_QUALIFIER,
+        offset_text=KEEPER_END_TEXT_XY,
+    )
+    seat_cut = [
+        model_point_in_view(
+            adapter,
+            keeper_plan,
+            (x / 1000.0, 0.0, z / 1000.0),
+            label="keeper seat section station",
+        )
+        for x, z in keeper_section_cut_ends()
+    ]
+    seat_section = create_section_view(
+        adapter,
+        keeper_plan,
+        line_start=seat_cut[0],
+        line_end=seat_cut[1],
+        view_xy=KEEPER_SECTION_SEAT_XY,
+        section_label="G",
+        scale=KEEPER_SECTION_SCALE,
+        partial=True,
+        label="keeper seat section",
+    )
+    _orient_cut_section(adapter, seat_section, (0.0, 0.0, 1.0))
+    # Pinned by the faced seat's centre, the point every G-G row derives from.
+    _pin_section_profile(
+        adapter,
+        seat_section,
+        (KEEPER_SECTION_X, HALF_H, KEEPER_SECTION_SEAT_Z),
+        KEEPER_SECTION_SEAT_XY[0],
+        target_y=KEEPER_SECTION_SEAT_XY[1],
+        label="G-G",
+    )
+    set_hidden_lines_removed(adapter, seat_section)
+    seat_section_edges = scan_view_edges(seat_section, label="G-G keeper seat section")
+    seat_edge, seat_point = _keeper_seat_cut_edge(
+        seat_section_edges,
+        label="front keeper seat",
+    )
+    underside_edge, underside_point = _keeper_flange_underside_edge(
+        seat_section_edges,
+        label="front keeper seat flange underside",
+    )
+    _checked_dimension(
+        adapter,
+        seat_section,
+        p0=underside_point,
+        p1=seat_point,
+        text_xy=KEEPER_FLANGE_LINE_XY,
+        label="keeper seat flange thickness",
+        expected_mm=FLANGE_THICKNESS_MM,
+        orientation="vertical",
+        entities=(underside_edge, seat_edge),
+        suffix=KEEPER_FLANGE_QUALIFIER,
+        offset_text=KEEPER_FLANGE_TEXT_XY,
+    )
+    _assert_section_display(
+        adapter,
+        seat_section,
+        label="G-G keeper seat section",
+        cut_surface_only=True,
+        removed=True,
+    )
+    _position_view_caption(adapter, seat_section, KEEPER_SECTION_CAPTION_XY)
+    add_property_linked_note(
+        adapter,
+        "Manufacturing Notes B",
+        *KEEPER_SEAT_NOTE_XY,
+        char_height=KEEPER_SEAT_NOTE_HEIGHT,
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1642,6 +2151,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Manufacturing Notes B",
         ),
         required=(
             "Number",
@@ -1649,6 +2159,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Manufacturing Notes B",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -2068,42 +2579,43 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=keeper_edge,
         callout_xy=keeper_callout_xy,
         label="2X fulcrum-keeper blind taps",
-        process="KEEPER TAP",
+        process=TRANSFER_KEEPER_CALLOUT,
     )
-    # Blind depths under the general .X band, not the .XX the native two
-    # places would ask for (codex round 4); the 3.45 drill keeps its places.
+    # Part-spec-authored .XX drill diameter and .X blind depths: these are
+    # also the precision inputs to the published-band receiver proof.
     set_hole_callout_precision(
-        keeper_callout, {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
-        label="keeper tap depths",
+        keeper_callout,
+        KEEPER_TAP_CALLOUT_PRECISION,
+        label="keeper tap sizes and depths",
     )
     upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     hanger_x = HANGER_X
     keeper_drill_r = TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0
-    for p0, p1, expected, xy, orientation, label, suffix in (
+    for p0, p1, expected, xy, orientation, label, suffix, reference in (
         (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_CBORE_DIA/2),
          COLUMN_X + hanger_x, (0.162, 0.240), "horizontal",
-         "hanger x from left sockets", "2X HANGER X"),
+         "hanger x from left sockets", "2X HANGER X", False),
         (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_CBORE_DIA/2),
          STUD_Z_FRONT - FRONT_COLUMN_Z, (0.062, 0.209), "vertical",
-         "front hanger z from upper sockets", "FRONT HANGER Z"),
+         "front hanger z from upper sockets", "FRONT HANGER Z", False),
         (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + HANGER_CBORE_DIA/2),
          STUD_Z_REAR - FRONT_COLUMN_Z, (0.040, 0.165), "vertical",
-         "rear hanger z from upper sockets", "REAR HANGER Z"),
+         "rear hanger z from upper sockets", "REAR HANGER Z", False),
         (upper_left_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
          KEEPER_TAP_X + COLUMN_X, (0.150, 0.0745), "horizontal",
-         "keeper x from left sockets", "KEEPER X"),
+         "keeper x from left sockets", "KEEPER X", True),
         (upper_right_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
          KEEPER_TAP_Z_FRONT - FRONT_COLUMN_Z, (0.350, 0.205), "vertical",
-         "front keeper z from upper sockets", "FRONT KEEPER Z"),
+         "front keeper z from upper sockets", "FRONT KEEPER Z", True),
         (upper_right_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR + keeper_drill_r),
          KEEPER_TAP_Z_REAR - FRONT_COLUMN_Z, (0.372, 0.160), "vertical",
-         "rear keeper z from upper sockets", "REAR KEEPER Z"),
+         "rear keeper z from upper sockets", "REAR KEEPER Z", True),
     ):
         _checked_dimension(
             adapter, detail_top, p0=p0, p1=p1, text_xy=xy, label=label,
             expected_mm=expected, orientation=orientation, center=True,
-            suffix=suffix,
+            suffix=suffix, reference=reference,
         )
     detail_top_note = add_note(adapter, HOLE_STATION_NOTE, *HOLE_STATION_NOTE_XY)
     add_property_linked_note(
@@ -2137,7 +2649,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Rule 7: hidden lines only where they inform.  The cross-taps this
     # elevation calls out are spotfaced from the face it looks at, so the
     # Ø9.0 spotface rim and the tap drill circle inside it are VISIBLE ink
-    # and the 10-32 callout, its 48.00/46.00 depths (text, not drawn) and the
+    # and the 10-32 callout, its native drill/thread depths and the
     # 22.7 tap-axis-below-boss-top dimension keep their attachments without
     # them.  What the dashed lines added was the far end's sockets, cap
     # recesses and hanger counterbores -- none of them dimensioned here, all of
@@ -2402,7 +2914,15 @@ async def build(adapter: Any) -> dict[str, str]:
         0.040,
         0.055,
     )
-    if add_note(adapter, "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-VN-027", 0.040, 0.025) is None:
+    if (
+        add_note(
+            adapter,
+            "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-VN-027",
+            0.040,
+            0.025,
+        )
+        is None
+    ):
         raise RuntimeError("failed to identify section cross-screw relation")
     if not ddoc.ActivateSheet("HUB-SET-SCREW"):
         raise RuntimeError("failed to activate top-frame hub sheet")
@@ -2450,22 +2970,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if add_note(adapter, "HUB LOCATION", 0.107, 0.1435) is None:
         raise RuntimeError("failed to label hub location view")
     hub_top_edges = scan_view_edges(hub_top, label="hub location")
-    # The socket rim is matched on X/Z only: which of the bore's rims (top or
-    # bottom, same X/Z) the plan shows is the view's choice, not the print's.
-    left_socket_edge = min(
-        (
-            item for item in hub_top_edges.circles
-            if abs(item.circle[0]+COLUMN_X) < 1e-4
-            and abs(item.circle[2]-FRONT_COLUMN_Z) < 1e-4
-            and abs(item.circle[6]-BORE_DIA/2) < 1e-4
-            and abs(item.circle[3])+abs(abs(item.circle[4])-1.0)+abs(item.circle[5]) < 1e-6
-        ),
-        key=lambda item: item.circle[1],
-        default=None,
+    left_socket_edge = _socket_bore_circle(
+        hub_top_edges, -COLUMN_X, FRONT_COLUMN_Z, label="hub view left front socket"
     )
-    if left_socket_edge is None:
-        raise RuntimeError("hub view has no exact left front socket circle")
-    left_socket_edge = left_socket_edge.edge
     gooseneck_edge = min(
         hub_top_edges.circles,
         key=lambda item: abs(item.circle[6]-GOOSENECK_BORE_DIA/2)
@@ -2735,6 +3242,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _position_view_caption(adapter, hanger_section, HANGER_SECTION_CAPTION_XY)
     imported_annotations += hanger_dimensions
 
+    _keeper_seat_sheet(adapter, ddoc)
     auto_tapped_notes = _auto_tapped_hole_notes(adapter)
     _telemetry.info(f"automatic tapped-hole notes per view: {auto_tapped_notes}")
     assert_imported_precision(

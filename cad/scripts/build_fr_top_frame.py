@@ -12,11 +12,18 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
 * Side rails (along Z at x +/-197) 34.2 wide -> outer faces x +/-214.1,
   window x +/-179.9. Front/rear rails (along X at z -/+112) 38.0 wide ->
   outer faces z -/+131, window z -/+93.
-* Corner bosses O52.2 spanning y 993.4..1040.7 (proud 4.5 above the rail
-  top, hanging 6.3 below the underside -- ch19 img04 / p002+p006 corner
-  crops), bored O25.5 around the O25.4 columns. Four stock cross screws
-  enter from the front/rear spot seats, clear both tube walls, and continue
-  into the far casting wall through one #10-32 UNF-2B interrupted tap path.
+* Corner bosses O45 spanning y 993.4..1040.7 (proud 4.5 above the rail
+  top, hanging 6.3 below the underside). All four upper/lower bosses use
+  the smaller user-ruled diameter so the outward keeper feet sit flat.
+  The O25.5 column bores and O27.5 cap recesses stay unchanged. Four
+  stock 1-3/4 in cross screws enter the front/rear spot seats and clear
+  both tube walls into the far casting wall/web through #10-32 taps.
+* Two bounded keeper-seat regions on the side-rail TOP FLANGE are faced
+  together in one setup, within the keeper-owned common 0.04 flatness zone.
+  Each covers the actual 14 x 16.5 complete contact plus 0.10 at each edge;
+  split-line footprints are nominal 14.2 x 16.7 references. The finished
+  local flange below both seats is controlled at 8.0 (.X, minimum 7.2),
+  with Ra 3.2 locating-seat finish; the nominal rail-top plane stays fixed.
 * Integral crossbar 22 wide at x -26..-4 spanning the window along Z,
   flush with BOTH faces (its underside 999.7 is the knife-mount seat
   plane), with 18 x 18 plan gussets at all four rail junctions and, at
@@ -29,16 +36,18 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   a 1/4-20 tap through the rib to the bore for the square-head set screw
   (book p.45: "a square-head screw pinches the post in its socket").
 * Webbed faces (T-rail section): an 8-tall full-thickness top flange, then
-  the web thins to 12.7 (0.5 in) centred on each rail and STAYS thin through
-  the bottom edge (ch19 img04/img05 + user read), with full-thickness lands
+  the web thins to 13.0 centred on each rail and STAYS thin through the
+  bottom edge. The former photo-read 12.7 web is thickened for the keeper
+  receivers' printed-band plus drill-wander stack; full-thickness lands remain
   at the bosses, hub rib and crossbar junctions.
 * Finishing (chamfer external, fillet internal): R3 cast fillets along
   the internal web/flange T-roots (both shelves of every rail, ch19
   img04's panel blends), C2 x 45 breaks on the top-face rims -- outer
-  rail rim and both window rims, every edge terminating on a proud
-  corner-boss barrel (the bosses round all eight plan corners natively)
-  -- and C1 x 45 lead-ins on the bore TOP ends only (note 9). The web
-  ring's bottom rim and the boss undersides keep sharp edges.
+  rail rim and both window rims -- and C1 x 45 lead-ins on the bore
+  TOP ends only. The R22.5 bosses bulge 5.4 beyond the side rails and
+  3.5 beyond the front/rear rails, but no longer reach the plan corners
+  (25.56 from their centres): window corners and short outer-corner
+  rim runs remain. The web bottom rim and boss undersides stay sharp.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -52,12 +61,12 @@ restore -> crossbar+gussets -> corner bosses (up/down pair) -> hub boss
 gooseneck bore -> wizard holes (#6 SHCS hanger counterbores) -> dowel
 slip holes -> wizard holes (side-screw taps, set-screw tap, keeper taps)
 -> internal T-root fillets (R3) -> external
-top-rim breaks (C2) -> C1 bore top lead-ins. Wizard holes come after the
-face cuts so every seat face is final; the edge breaks come last so
-they cut final faces.
-Analytic volume checks after every feature;
-the boss/hub/spot-face/tap expectations use small grid integrals (no
-tidy closed form against the webbed solid).
+top-rim breaks (C2) -> C1 bore top lead-ins -> keeper-seat split lines.
+Wizard holes come after the face cuts so every seat face is final; the
+edge breaks and zero-volume split lines follow the solid features.
+Analytic volume checks after every feature; boss additions and top-rim
+breaks use circle-segment formulas, while hub/spot-face/tap expectations
+use small grid integrals against the webbed solid.
 
 Run (SolidWorks already open)::
 
@@ -69,33 +78,28 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    _early_bound,
-    CASTING_GREEN,
+from _appearance import CASTING_GREEN, apply_color, apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import feature_name_by_type, name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
+    _feature_by_name,
     add_line_chain,
     anchor_point_to_origin,
-    apply_color,
-    apply_material,
-    check,
-    define_centered_rectangle,
-    define_circle,
-    define_polygon_chain,
-    define_rectilinear_chain,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
-    force_rebuild,
-    name_last_feature,
-    name_dimensions,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain, define_rectilinear_chain
+from _sketch_circle import define_circle
+from _sketch_rectangle import define_centered_rectangle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -113,11 +117,15 @@ from _holes import (
     find_planar_face,
     wizard_holes,
 )
-from _part_pmi import _resolve_faces, author_part_pmi
+from _gtol_face_resolve import resolve_faces
+from _part_pmi import author_part_pmi
 from _named_views import name_octant_views
+from _gtol_planar import PlanarFace
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from fr_top_frame_spec import (
     BORE_DIA,
     BOSS_ABOVE,
+    BOSS_DIA,
     CAP_RECESS_FLOOR_Y,
     COLUMN_X,
     DRAWING_DIMENSIONS,
@@ -125,6 +133,8 @@ from fr_top_frame_spec import (
     DRAWING_NOTES_B,
     DRAWING_PRECISION,
     DRILL_OVERSIZE,
+    DRAWING_REFERENCE_PRECISION,
+    FLANGE_THICKNESS_MM,
     FRONT_COLUMN_Z,
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
@@ -146,6 +156,15 @@ from fr_top_frame_spec import (
     HANGER_SLOT_WIDTH,
     HANGER_SLOT_WIDTH_BAND,
     HANGER_SLOT_X,
+    KEEPER_TAP_CALLOUT_PRECISION,
+    KEEPER_TAP_DRILL_WANDER_DEG,
+    KEEPER_SEAT_BOUNDS_XZ,
+    KEEPER_SEAT_CENTRES_XZ,
+    KEEPER_SEAT_EDGE_MARGIN_MM,
+    KEEPER_SEAT_LENGTH_MM,
+    KEEPER_SEAT_WIDTH_MM,
+    PRINTED_DRILLED_HOLE_PLUS_MM,
+    PRINTED_LINEAR_BAND_MM,
     REAR_COLUMN_Z,
     RING_HEIGHT,
     SURFACE_FINISHES,
@@ -158,12 +177,34 @@ from fr_frame_attachment_spec import (
     CAP_RECESS_DEPTH,
     CAP_RECESS_DIAMETER,
     CASTING_FULL_THREAD_DEPTH,
-    CASTING_TAP_DRILL_DEPTH,
+    TOP_CASTING_TAP_DRILL_DEPTH,
     SCREW_SPOTFACE_DIAMETER,
     TOP_SCREW_SEAT_Z,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
+from vn_frame_side_screw_spec import SHANK_DIA as KEEPER_SCREW_MAJOR_DIA
+from ch_fulcrum_keeper_spec import (
+    DRAWING_PRECISION as KEEPER_DRAWING_PRECISION,
+    FOOT_L,
+    FOOT_COUNTERBORE_DEPTH_PLACES,
+    FOOT_H,
+    FOOT_SCREW_LENGTH_MM,
+    CBORE_DEPTH_MM,
+    KEEPER_FITUP_X_FROM_WEB_MM,
+    KEEPER_SCREW_TRANSVERSE_BAND_MM,
+    SCREW_FROM_SIDE,
+    KEEPER_FITUP_LOCATION_BAND_MM,
+    KEEPER_FITUP_PLACES,
+    KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
+    LUG_HALF_T,
+    FOOT_TIP_X,
+    FULCRUM_KEEPER_CENTRE_Z,
+    KEEPER_SCREW_Z_OFF,
+    KEEPER_TAP_SPEC,
+    KEEPER_WIDTH,
+    KEEPER_Z_OFF,
+)
 
 import _telemetry
 
@@ -182,7 +223,6 @@ FRAME_CENTER_Z = FRAME_COLUMN_Z_CENTER  # 0.0
 RAIL_W_SIDE = 34.2  # side rails, along Z (GT corner rescale 221.5 -> 214.1)
 RAIL_W_FR = 38.0  # front/rear rails, along X (GT z-corner rescale 137.4 -> 131)
 
-BOSS_DIA = 52.2  # silhouette extremes +/-223.1 in p002/p006
 BOSS_BELOW = 6.3  # boss hang below the underside (p006 read 5.7-7)
 CAP_RECESS_DIAMETER_BAND = (0.20, 0.0)
 CAP_RECESS_DEPTH_BAND = (0.30, 0.0)
@@ -315,7 +355,7 @@ SIDE_TAP_SPEC = HoleSpec(
     "tapped_bottoming",
     "#10-32",
     end="blind",
-    depth_mm=CASTING_TAP_DRILL_DEPTH,
+    depth_mm=TOP_CASTING_TAP_DRILL_DEPTH,
     thread_class="2B",
     overrides_mm={"ThreadDepth": CASTING_FULL_THREAD_DEPTH},
 )
@@ -329,20 +369,12 @@ if CAP_RECESS_FLOOR_Y - SIDE_TAP_DRILL_DIA / 2.0 <= 0.0:
     raise AssertionError("cap recess breaks into the cross-screw drill")
 
 # --- Fulcrum keepers (west rail top face; shaft-end brackets, ch17 p.40) ----
-# Keep 10 mm usable thread for the stock keeper screw's 8.6624 mm insertion.
-# The 36.5 mm rail leaves ample metal for a 16 mm drill: the 6 mm allowance
-# accommodates a standard plug tap's five-pitch lead, including the general
-# depth tolerances, without requiring a bottoming tap.
-KEEPER_TAP_SPEC = HoleSpec(
-    "tapped",
-    "#8-32",
-    end="blind",
-    depth_mm=16.0,
-    overrides_mm={"ThreadDepth": 10.0},
-)
-KEEPER_TAP_X = 199.9  # fulcrum line (build_ch_channel_assembly FULCRUM[0])
-KEEPER_TAP_Z_FRONT = SUMMING_Z - 74.0  # -70.912
-KEEPER_TAP_Z_REAR = SUMMING_Z + 74.0  # +77.088
+# The keeper's pure spec owns both screw station and receiver geometry:
+# #2-56 with 7.6 full thread and 11.5 drill retains a five-pitch plug
+# lead at the sheet's general .X depth band. No assembly recipe dependency.
+KEEPER_TAP_X = COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM  # nominal fulcrum line
+KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -82.754
+KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +81.746
 
 # --- Webbing ----------------------------------------------------------------
 # T-rail section (user-corrected vs ch19 img04): an 8-tall full-thickness top
@@ -353,15 +385,15 @@ KEEPER_TAP_Z_REAR = SUMMING_Z + 74.0  # +77.088
 # and the crossbar junctions. The corner bosses supply the corner lands. The
 # per-face setback differs by rail family (the rails are 34.2/38.0 wide but
 # share one web thickness).
-FLANGE = 8.0  # top flange band (the only full-thickness band)
-WEB_T = 12.7  # 0.5 in web, centred on each rail's centreline
-RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.75 setback per side-rail face
-RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.65 setback per front/rear-rail face
+FLANGE = FLANGE_THICKNESS_MM  # final top flange, also below the faced seats
+WEB_T = 13.0  # user ruling: retain loose bands plus realistic deep-drill wander
+RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.6 setback per side-rail face
+RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.5 setback per front/rear-rail face
 FLANGE_BOT_Y = RING_HEIGHT / 2.0 - FLANGE  # +10.25 (flange underside)
-WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.35
-WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.65
-WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.35
-WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.65
+WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.5
+WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.5
+WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.5
+WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.5
 LAND_X0 = BAR_X0 - GUSSET - 6.0  # -50; crossbar-junction land pads on the
 LAND_X1 = BAR_X1 + GUSSET + 6.0  # +20; front/rear inner faces (6 margin)
 
@@ -411,30 +443,301 @@ for _label, _value in (
         raise AssertionError(f"knife-mount dowel slip {_label}: {_value:.3f}")
 if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
-if (
-    abs(KEEPER_TAP_X - COLUMN_X) + THREAD_MAJOR_MM[KEEPER_TAP_SPEC.size] / 2.0
-    > WEB_T / 2.0
-):
+# The unified tap table rounds its nominal major; the actual stock major
+# must also fit. Use the larger diameter for every receiver-wall guard.
+KEEPER_TAP_THREAD_MAJOR_DIA = max(
+    THREAD_MAJOR_MM[KEEPER_TAP_SPEC.size], KEEPER_SCREW_MAJOR_DIA
+)
+if abs(KEEPER_TAP_X - COLUMN_X) + KEEPER_TAP_THREAD_MAJOR_DIA / 2.0 > WEB_T / 2.0:
     raise AssertionError("keeper taps break out of the west-rail web")
-if not math.isclose(SPOTFACE_PLANE - SPOTFACE_FLOOR, 0.9, abs_tol=1e-9):
-    raise AssertionError("top cross-screw spotface depth drifted")
+SPOTFACE_FULL_SEAT_LIMIT_Z = abs(FRONT_COLUMN_Z) + math.sqrt(
+    (BOSS_DIA / 2.0) ** 2 - (SPOTFACE_DIA / 2.0) ** 2
+)
+SPOTFACE_SEAT_MARGIN = SPOTFACE_FULL_SEAT_LIMIT_Z - SPOTFACE_FLOOR
+# Prove the complete spotface at the PRINTED bands, not only nominal geometry.
+# Boss diameter, spotface diameter and floor offset all print .X: use the
+# smallest barrel, largest seat and most-outboard floor. The offset is from
+# the same socket axis, so socket pitch does not enter this local stack.
+SPOTFACE_MIN_BOSS_RADIUS = (
+    round(BOSS_DIA, DRAWING_PRECISION["BossUpProfile"]["C0Dia"])
+    - PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["BossUpProfile"]["C0Dia"]]
+) / 2.0
+SPOTFACE_MAX_SEAT_RADIUS = (
+    round(SPOTFACE_DIA, DRAWING_PRECISION["SpotFaceRearProfile"]["S1Dia"])
+    + PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["SpotFaceRearProfile"]["S1Dia"]]
+) / 2.0
+SPOTFACE_MAX_FLOOR_OFFSET = (
+    round(
+        SPOTFACE_FLOOR - abs(FRONT_COLUMN_Z),
+        DRAWING_REFERENCE_PRECISION["spotface floor from socket axis"],
+    )
+    + PRINTED_LINEAR_BAND_MM[
+        DRAWING_REFERENCE_PRECISION["spotface floor from socket axis"]
+    ]
+)
+SPOTFACE_PRINTED_SEAT_MARGIN = (
+    math.sqrt(SPOTFACE_MIN_BOSS_RADIUS**2 - SPOTFACE_MAX_SEAT_RADIUS**2)
+    - SPOTFACE_MAX_FLOOR_OFFSET
+)
+if (
+    min(SPOTFACE_SEAT_MARGIN, SPOTFACE_PRINTED_SEAT_MARGIN) < 0.1
+    or SPOTFACE_PLANE <= SPOTFACE_FLOOR
+):
+    raise AssertionError(
+        "top cross-screw spotface loses its full seat at the printed bands"
+    )
 SIDE_TAP_THREAD_MAJOR_DIA = THREAD_MAJOR_MM[SIDE_TAP_SPEC.size]
 SIDE_TAP_THREAD_END_Z = SPOTFACE_FLOOR - CASTING_FULL_THREAD_DEPTH
-SIDE_TAP_MAJOR_FAR_WALL_Z = abs(FRONT_COLUMN_Z) - math.sqrt(
-    (BOSS_DIA / 2.0) ** 2 - (SIDE_TAP_THREAD_MAJOR_DIA / 2.0) ** 2
-)
-SIDE_TAP_THREAD_WALL_MARGIN = SIDE_TAP_THREAD_END_Z - SIDE_TAP_MAJOR_FAR_WALL_Z
 SIDE_TAP_DRILL_POINT_Z = (
-    SPOTFACE_FLOOR - CASTING_TAP_DRILL_DEPTH - SIDE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
+    SPOTFACE_FLOOR
+    - TOP_CASTING_TAP_DRILL_DEPTH
+    - SIDE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
 )
-SIDE_TAP_DRILL_FAR_WALL_Z = abs(FRONT_COLUMN_Z) - BOSS_DIA / 2.0
-SIDE_TAP_DRILL_WALL_MARGIN = SIDE_TAP_DRILL_POINT_Z - SIDE_TAP_DRILL_FAR_WALL_Z
-if SIDE_TAP_THREAD_WALL_MARGIN <= 0.0:
+# The boss's inward edge is NOT a free wall: the centred side-rail web
+# continues inward at full height. For the whole far tap/drill envelope,
+# |x - ColumnX| <= radius < WebT/2 and |y| <= radius < HalfH, so boss ∪
+# web supplies uninterrupted metal beyond both ends. The actual limiting
+# walls are the web's x faces (and its y faces), not z=112-R22.5. Nominal
+# lateral ligaments: thread major 6.5-2.413=4.087; drill 6.5-2.0193=4.4807.
+SIDE_TAP_THREAD_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
+SIDE_TAP_DRILL_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_DRILL_DIA / 2.0
+if min(SIDE_TAP_THREAD_WALL_MARGIN, SIDE_TAP_DRILL_WALL_MARGIN) < 2.0:
+    raise AssertionError("top cross-tap leaves less than 2 mm of side-rail web")
+if not (
+    0.0 < SIDE_TAP_DRILL_POINT_Z < SIDE_TAP_THREAD_END_Z < WEB_IN_Z
+    and max(SIDE_TAP_THREAD_MAJOR_DIA, SIDE_TAP_DRILL_DIA) / 2.0 < HALF_H
+):
     raise AssertionError(
-        "top cross-tap finished-thread major envelope breaks through the far wall"
+        "top cross-tap ends are not contained in the far side-rail web"
     )
-if SIDE_TAP_DRILL_WALL_MARGIN <= 0.0:
-    raise AssertionError("top cross-tap drill point breaks through the far wall")
+# Both complete 14-wide feet clear the proud barrels, not just the tap
+# centres. The bank is centred at -0.504: front is now the tighter end.
+KEEPER_FOOT_TIP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_Z_OFF - FOOT_TIP_X
+KEEPER_FOOT_TIP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_Z_OFF + FOOT_TIP_X
+KEEPER_FOOT_NEAREST_BOSS_X = max(0.0, abs(KEEPER_TAP_X - COLUMN_X) - KEEPER_WIDTH / 2.0)
+KEEPER_FOOT_BOSS_MARGINS = tuple(
+    math.hypot(KEEPER_FOOT_NEAREST_BOSS_X, boss_z - tip_z) - BOSS_DIA / 2.0
+    for boss_z, tip_z in (
+        (FRONT_COLUMN_Z, KEEPER_FOOT_TIP_Z_FRONT),
+        (REAR_COLUMN_Z, KEEPER_FOOT_TIP_Z_REAR),
+    )
+)
+# The bench-pair-reamed keeper INNER faces are DRO-located from the front
+# socket at fit-up, then the frame taps are transferred through their feet.
+# Neither the foot-hole position nor a separate frame-tap station band
+# reaches the foot tip. The real stack is the printed INNER-face station
+# plus its DRO band, full lug thickness, foot length and boss OD; the rear
+# also loses the printed socket-pitch band. Taking zero nearest-X distance
+# is conservative for the complete foot, whatever its X position.
+KEEPER_FOOT_LENGTH_BAND_MM = PRINTED_LINEAR_BAND_MM[
+    KEEPER_DRAWING_PRECISION["FootProfile"]["FootLength"]
+]
+BOSS_DIA_BAND_MM = PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["BossUpProfile"]["C0Dia"]]
+KEEPER_PRINTED_MAX_OUTBOARD_REACH = (
+    round(2.0 * LUG_HALF_T, KEEPER_DRAWING_PRECISION["LugBody"]["LugThickness"])
+    + PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["LugBody"]["LugThickness"]]
+    + round(FOOT_L, KEEPER_DRAWING_PRECISION["FootProfile"]["FootLength"])
+    + KEEPER_FOOT_LENGTH_BAND_MM
+)
+KEEPER_PRINTED_MAX_BOSS_RADIUS = (
+    round(BOSS_DIA, DRAWING_PRECISION["BossUpProfile"]["C0Dia"]) + BOSS_DIA_BAND_MM
+) / 2.0
+KEEPER_PRINTED_MIN_SOCKET_PITCH = (
+    round(
+        REAR_COLUMN_Z - FRONT_COLUMN_Z,
+        DRAWING_REFERENCE_PRECISION["socket vertical pitch"],
+    )
+    - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["socket vertical pitch"]]
+)
+KEEPER_FOOT_PRINTED_BOSS_MARGINS = (
+    round(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0], KEEPER_FITUP_PLACES)
+    - KEEPER_FITUP_LOCATION_BAND_MM
+    - KEEPER_PRINTED_MAX_OUTBOARD_REACH
+    - KEEPER_PRINTED_MAX_BOSS_RADIUS,
+    KEEPER_PRINTED_MIN_SOCKET_PITCH
+    - round(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1], KEEPER_FITUP_PLACES)
+    - KEEPER_FITUP_LOCATION_BAND_MM
+    - KEEPER_PRINTED_MAX_OUTBOARD_REACH
+    - KEEPER_PRINTED_MAX_BOSS_RADIUS,
+)
+KEEPER_FOOT_RAIL_MARGINS = (
+    KEEPER_FOOT_TIP_Z_FRONT + INNER_Z,
+    INNER_Z - KEEPER_FOOT_TIP_Z_REAR,
+)
+KEEPER_TAP_BOSS_MARGINS = tuple(
+    math.hypot(KEEPER_TAP_X - COLUMN_X, boss_z - tap_z)
+    - BOSS_DIA / 2.0
+    - KEEPER_TAP_THREAD_MAJOR_DIA / 2.0
+    for boss_z, tap_z in (
+        (FRONT_COLUMN_Z, KEEPER_TAP_Z_FRONT),
+        (REAR_COLUMN_Z, KEEPER_TAP_Z_REAR),
+    )
+)
+if min(KEEPER_FOOT_BOSS_MARGINS) < 1.0:
+    raise AssertionError("keeper foot-tip-to-boss clearance is below 1 mm")
+if min(KEEPER_FOOT_PRINTED_BOSS_MARGINS) <= 0.0:
+    raise AssertionError("fit-up keeper foot hits a boss at the printed bands")
+if min(*KEEPER_FOOT_RAIL_MARGINS, *KEEPER_TAP_BOSS_MARGINS) <= 0.0:
+    raise AssertionError("keeper foot/tap does not clear the rail corner and boss")
+
+# X is set from the ACTUAL receiver web centre, not the opposite socket;
+# horizontal socket-pitch error therefore does not reach this ligament.
+# The hole is located from a SIDE face: its .XXX band plus half the .X
+# foot-width band both reach the transferred tap centre.
+KEEPER_MIN_FOOT_WIDTH = (
+    round(KEEPER_WIDTH, KEEPER_DRAWING_PRECISION["Foot"]["Depth"])
+    - PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["Foot"]["Depth"]]
+)
+KEEPER_MAX_FOOT_WIDTH = (
+    round(KEEPER_WIDTH, KEEPER_DRAWING_PRECISION["Foot"]["Depth"])
+    + PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["Foot"]["Depth"]]
+)
+
+# Facing covers the ACTUAL complete contact plus its 0.10 edge allowance;
+# the split-line model rectangles are nominal references, not fixed tooling.
+KEEPER_SEAT_PRINTED_BOSS_MARGINS = tuple(
+    margin - KEEPER_SEAT_EDGE_MARGIN_MM for margin in KEEPER_FOOT_PRINTED_BOSS_MARGINS
+)
+KEEPER_SEAT_PRINTED_FLANGE_SIDE_MARGIN = (
+    (
+        round(RAIL_W_SIDE, DRAWING_REFERENCE_PRECISION["side flange width"])
+        - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["side flange width"]]
+    )
+    / 2.0
+    - (
+        abs(round(KEEPER_FITUP_X_FROM_WEB_MM, KEEPER_FITUP_PLACES))
+        + KEEPER_FITUP_LOCATION_BAND_MM
+    )
+    - KEEPER_MAX_FOOT_WIDTH / 2.0
+    - KEEPER_SEAT_EDGE_MARGIN_MM
+)
+# Only the flat portion can carry a faced contact: remove the maximum
+# printed C2 top-rim leg as well as the actual-foot edge allowance.
+KEEPER_SEAT_PRINTED_FLAT_TOP_SIDE_MARGIN = KEEPER_SEAT_PRINTED_FLANGE_SIDE_MARGIN - (
+    round(EDGE_CHAMFER, DRAWING_REFERENCE_PRECISION["top rim chamfer"])
+    + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["top rim chamfer"]]
+)
+if (
+    min(*KEEPER_SEAT_PRINTED_BOSS_MARGINS, KEEPER_SEAT_PRINTED_FLAT_TOP_SIDE_MARGIN)
+    <= 0.0
+):
+    raise AssertionError("keeper faced region escapes the flat top flange")
+
+KEEPER_PRINTED_SIDE_STATION = round(
+    SCREW_FROM_SIDE,
+    KEEPER_DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"],
+)
+KEEPER_MAX_TRANSVERSE_OFFSET = max(
+    abs(
+        KEEPER_PRINTED_SIDE_STATION
+        - KEEPER_SCREW_TRANSVERSE_BAND_MM
+        - KEEPER_MAX_FOOT_WIDTH / 2.0
+    ),
+    abs(
+        KEEPER_PRINTED_SIDE_STATION
+        + KEEPER_SCREW_TRANSVERSE_BAND_MM
+        - KEEPER_MIN_FOOT_WIDTH / 2.0
+    ),
+)
+KEEPER_MAX_WEB_CENTRE_OFFSET = (
+    abs(round(KEEPER_FITUP_X_FROM_WEB_MM, KEEPER_FITUP_PLACES))
+    + KEEPER_FITUP_LOCATION_BAND_MM
+    + KEEPER_MAX_TRANSVERSE_OFFSET
+)
+KEEPER_MIN_WEB_HALF_WIDTH = (
+    round(WEB_T, DRAWING_REFERENCE_PRECISION["side rail web thickness"])
+    - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["side rail web thickness"]]
+) / 2.0
+# The controlling .X dimension on KEEPER-SEATS measures the FINAL local
+# flange under each faced contact. Cap-floor and boss-height bands cannot
+# subtract a second facing allowance from this directly printed minimum.
+KEEPER_MIN_FLANGE_THICKNESS = (
+    round(FLANGE, DRAWING_REFERENCE_PRECISION["keeper seat flange thickness"])
+    - PRINTED_LINEAR_BAND_MM[
+        DRAWING_REFERENCE_PRECISION["keeper seat flange thickness"]
+    ]
+)
+KEEPER_MIN_ROOT_RADIUS = (
+    round(ROOT_FILLET_R, DRAWING_REFERENCE_PRECISION["T rail root radius"])
+    - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["T rail root radius"]]
+)
+KEEPER_MAX_FULL_THREAD_DEPTH = (
+    round(
+        KEEPER_TAP_SPEC.overrides_mm["ThreadDepth"],
+        KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"],
+    )
+    + PRINTED_LINEAR_BAND_MM[KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]]
+)
+KEEPER_MAX_TAP_DRILL_DEPTH = (
+    round(KEEPER_TAP_SPEC.depth_mm, KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldepth"])
+    + PRINTED_LINEAR_BAND_MM[KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldepth"]]
+)
+# Rule 12: budget realistic deep-drill wander over the FULL allowed
+# cylindrical depth, not only the shorter threaded region. Its displacement
+# disk conservatively covers every pilot/thread section and every direction;
+# subtracting its radius from the normal wall distance handles the T-root
+# without an optimistic horizontal projection or a claimed guide operation.
+KEEPER_TAP_AXIS_WANDER_MM = KEEPER_MAX_TAP_DRILL_DEPTH * math.tan(
+    math.radians(KEEPER_TAP_DRILL_WANDER_DEG)
+)
+# The limiting full-thread corner lies next to the quarter-circle T-root.
+# Use its shortest NORMAL distance to that arc, not the larger horizontal
+# section width. Below the arc the same expression becomes the bare web.
+KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER = (
+    math.hypot(
+        KEEPER_MIN_WEB_HALF_WIDTH
+        + KEEPER_MIN_ROOT_RADIUS
+        - KEEPER_MAX_WEB_CENTRE_OFFSET
+        - KEEPER_TAP_THREAD_MAJOR_DIA / 2.0,
+        max(
+            0.0,
+            KEEPER_MIN_FLANGE_THICKNESS
+            + KEEPER_MIN_ROOT_RADIUS
+            - KEEPER_MAX_FULL_THREAD_DEPTH,
+        ),
+    )
+    - KEEPER_MIN_ROOT_RADIUS
+)
+KEEPER_TAP_THREAD_WALL_MARGIN = (
+    KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER - KEEPER_TAP_AXIS_WANDER_MM
+)
+KEEPER_MAX_TAP_DRILL_RADIUS = (
+    round(
+        TAP_DRILL_MM[KEEPER_TAP_SPEC.size],
+        KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldia"],
+    )
+    + PRINTED_DRILLED_HOLE_PLUS_MM
+) / 2.0
+KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER = (
+    KEEPER_MIN_WEB_HALF_WIDTH
+    - KEEPER_MAX_WEB_CENTRE_OFFSET
+    - KEEPER_MAX_TAP_DRILL_RADIUS
+)
+KEEPER_TAP_DRILL_WALL_MARGIN = (
+    KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER - KEEPER_TAP_AXIS_WANDER_MM
+)
+if min(KEEPER_TAP_THREAD_WALL_MARGIN, KEEPER_TAP_DRILL_WALL_MARGIN) < 1.5:
+    raise AssertionError("keeper receiver leaves less than 1.5 mm with drill wander")
+KEEPER_MAX_STOCK_ENTRY = FOOT_SCREW_LENGTH_MM - (
+    (
+        round(FOOT_H, KEEPER_DRAWING_PRECISION["FootProfile"]["FootRise"])
+        - PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["FootProfile"]["FootRise"]]
+    )
+    - (
+        round(CBORE_DEPTH_MM, FOOT_COUNTERBORE_DEPTH_PLACES)
+        + PRINTED_LINEAR_BAND_MM[FOOT_COUNTERBORE_DEPTH_PLACES]
+    )
+)
+KEEPER_MIN_THREAD_TIP_RESERVE = (
+    round(
+        KEEPER_TAP_SPEC.overrides_mm["ThreadDepth"],
+        KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"],
+    )
+    - PRINTED_LINEAR_BAND_MM[KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]]
+    - KEEPER_MAX_STOCK_ENTRY
+)
+if KEEPER_MIN_THREAD_TIP_RESERVE < 0.25:
+    raise AssertionError("keeper foot screw loses its 0.25 mm blind-thread clearance")
 
 
 # --------------------------------------------------------------------------
@@ -460,42 +763,38 @@ def _in_flange_plan(x: float, z: float) -> bool:
     )
 
 
-def _boss_add_volumes() -> tuple[float, float]:
-    """(up, down) volume ONE corner boss extrude pair adds to the T-section.
+def _circle_cap_area(radius: float, offset: float) -> float:
+    """Area beyond a chord ``offset`` from the circle centre."""
+    if offset >= radius:
+        return 0.0
+    return radius**2 * math.acos(offset / radius) - offset * math.sqrt(
+        radius**2 - offset**2
+    )
 
-    Grid over the NE boss circle. Existing material per plan cell: web ring
-    -> full band (-18.25..18.25); flange-only (the web setback crescents) ->
-    10.25..18.25; else empty. BossUp fills y 0..22.75, BossDown 0..-24.55.
-    All four corners match by symmetry (lands/rib/crossbar are far away).
+
+def _boss_add_volumes() -> tuple[float, float]:
+    """Exact (up, down) additions of ONE corner boss to the T-section.
+
+    The centred ring's outer rectangle clips the NE circle quadrant; its
+    inner window clips the equal SW quadrant. Their corner overlaps cancel,
+    leaving circle area minus the two outer-face circular caps. Web material
+    spans the full band, flange-only material spans its top 8 mm, and the
+    remaining caps have no rail material. All four corners match by symmetry.
     """
-    r = BOSS_DIA / 2.0
-    step = 0.05
-    up = down = 0.0
-    x = COLUMN_X - r
-    while x < COLUMN_X + r:
-        xx = x + 0.5 * step
-        dx2 = (xx - COLUMN_X) ** 2
-        if dx2 > r * r:
-            x += step
-            continue
-        half = math.sqrt(r * r - dx2)
-        z = abs(FRONT_COLUMN_Z) - half
-        z_hi = abs(FRONT_COLUMN_Z) + half
-        while z < z_hi:
-            zz = z + 0.5 * step
-            if zz < z_hi:
-                da = step * step
-                if _in_web_plan(xx, zz):
-                    up += (BOSS_ABOVE) * da
-                    down += (BOSS_BELOW) * da
-                elif _in_flange_plan(xx, zz):
-                    up += (HALF_H + BOSS_ABOVE - FLANGE) * da
-                    down += (HALF_H + BOSS_BELOW) * da
-                else:
-                    up += (HALF_H + BOSS_ABOVE) * da
-                    down += (HALF_H + BOSS_BELOW) * da
-            z += step
-        x += step
+    radius = BOSS_DIA / 2.0
+    circle = math.pi * radius**2
+    web = circle - 2.0 * _circle_cap_area(radius, WEB_T / 2.0)
+    flange = (
+        circle
+        - _circle_cap_area(radius, RAIL_W_SIDE / 2.0)
+        - _circle_cap_area(radius, RAIL_W_FR / 2.0)
+    )
+    up = (
+        BOSS_ABOVE * web
+        + (HALF_H + BOSS_ABOVE - FLANGE) * (flange - web)
+        + (HALF_H + BOSS_ABOVE) * (circle - flange)
+    )
+    down = BOSS_BELOW * web + (HALF_H + BOSS_BELOW) * (circle - web)
     return up, down
 
 
@@ -566,7 +865,7 @@ def _hub_underhang_volume() -> float:
 
 
 def _spotface_removal() -> float:
-    """Material one O9 x 0.9 spot-face removes from the boss cylinder."""
+    """Material one O9 spot-face removes from the Ø45 curved boss."""
     r_d = SPOTFACE_DIA / 2.0
     r_b = BOSS_DIA / 2.0
     step = 0.01
@@ -593,7 +892,7 @@ def _side_tap_removal() -> float:
         dd = d + 0.5 * step
         chord = 2.0 * math.sqrt(max(0.0, r_h * r_h - dd * dd))
         bore_span = 2.0 * math.sqrt(max(0.0, r_v * r_v - dd * dd))
-        vol += chord * (CASTING_TAP_DRILL_DEPTH - bore_span) * step
+        vol += chord * (TOP_CASTING_TAP_DRILL_DEPTH - bore_span) * step
         d += step
     # The 118-degree point is wholly beyond the bore in the far wall.
     vol += math.pi / 3.0 * r_h**3 * DRILL_POINT_H
@@ -625,33 +924,72 @@ def _fillet_section_area(r: float) -> float:
 
 
 def _top_rim_removal() -> tuple[float, float]:
-    """(outer, window) volumes the C2 x 45 top-face rim breaks remove.
+    """Exact (outer, window) C2 x 45 removals for the smaller-boss topology.
 
-    The proud corner-boss barrels round ALL EIGHT plan corners natively:
-    each boss centre sits 25.56 from its window corner, inside the 26.1
-    radius, so the Ø52.2 cylinder bulges past the corner and every rim
-    edge -- outer AND window -- terminates on a boss wall (build-proven:
-    a fillet aimed at the "window corner edge" resolved to the boss top
-    rim, removing 4 x 2*pi*a*(r_boss - inset) = 1232 mm^3). Straight runs
-    only: rail inner/outer faces between boss cuts, front/rear faces
-    between boss cut and junction gusset, the four gusset hypotenuses,
-    the two crossbar flanks. The blunt 135-degree gusset vertices and the
-    chamfer ends dying into the boss walls are not modeled -- the check
-    tolerance absorbs them.
+    R22.5 < hypot(17.1, 19) = 25.56: neither window corner nor outer rail
+    corner ends on a boss. Outer faces intersect the barrel only near its
+    centre, leaving four central runs PLUS eight short corner runs. The
+    window rims are uninterrupted up to their square corners. Even their
+    2 mm expanded chamfer corners miss the boss: hypot(15.1, 17) > R22.5.
+    Outer strip areas exclude the proud cylinders analytically; the square
+    outer corners and the windows' 90/135-degree mitres are included.
     """
-    area = EDGE_CHAMFER**2 / 2.0
-    r_boss = BOSS_DIA / 2.0
-    cut_side = math.sqrt(r_boss**2 - (RAIL_W_SIDE / 2.0) ** 2)  # x = +/-InnerX|OuterX
-    cut_fr = math.sqrt(r_boss**2 - (RAIL_W_FR / 2.0) ** 2)  # z = +/-InnerZ|OuterZ
-    side_run = 2.0 * (abs(FRONT_COLUMN_Z) - cut_side)  # one side-face edge
-    fr_full = COLUMN_X - cut_fr  # boss cut to plan centre on a front/rear face
-    outer = area * (2.0 * side_run + 4.0 * fr_full)
-    east_fr = fr_full - (abs(BAR_X0) + GUSSET)
-    west_fr = fr_full - (BAR_X1 + GUSSET)
+    radius = BOSS_DIA / 2.0
+    chamfer = EDGE_CHAMFER
+    a, b = RAIL_W_SIDE / 2.0, RAIL_W_FR / 2.0
+    if not max(a, b) < radius < math.hypot(a - chamfer, b - chamfer):
+        raise AssertionError("top-rim formula requires separate rail/boss plan corners")
+
+    def cap_integral(offset: float) -> float:
+        def primitive(distance: float) -> float:
+            chord = math.sqrt(radius**2 - distance**2)
+            return (
+                radius**2 * (distance * math.acos(distance / radius) - chord)
+                + chord**3 / 3.0
+            )
+
+        return (
+            primitive(offset)
+            - primitive(offset - chamfer)
+            - chamfer * _circle_cap_area(radius, offset)
+        )
+
+    outer_perimeter = 4.0 * (OUTER_X + OUTER_Z)
+    outer = (
+        outer_perimeter * chamfer**2 / 2.0
+        - 4.0 * chamfer**3 / 3.0
+        - 4.0 * (cap_integral(a) + cap_integral(b))
+    )
+    side_run = 2.0 * INNER_Z
+    east_fr = INNER_X - (abs(BAR_X0) + GUSSET)
+    west_fr = INNER_X - (BAR_X1 + GUSSET)
     hyp = GUSSET * math.sqrt(2.0)
-    flank = 2.0 * (INNER_Z - GUSSET)  # one crossbar flank between gussets
-    runs = 2.0 * side_run + 2.0 * east_fr + 2.0 * west_fr + 4.0 * hyp + 2.0 * flank
-    return outer, area * runs
+    flank = 2.0 * (INNER_Z - GUSSET)
+    window_perimeter = (
+        2.0 * side_run + 2.0 * east_fr + 2.0 * west_fr + 4.0 * hyp + 2.0 * flank
+    )
+    # Each six-sided window has two 90-degree and four 135-degree corners.
+    window_mitres = 2.0 * (2.0 + 4.0 * (math.sqrt(2.0) - 1.0))
+    return outer, window_perimeter * chamfer**2 / 2.0 + window_mitres * chamfer**3 / 3.0
+
+
+def _outer_corner_top_edges() -> list[list[float]]:
+    """Midpoints of the eight rim edges outside the Ø45 boss barrels."""
+    side_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (RAIL_W_SIDE / 2.0) ** 2)
+    fr_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (RAIL_W_FR / 2.0) ** 2)
+    return [
+        point
+        for sx in (-1.0, 1.0)
+        for sz in (-1.0, 1.0)
+        for point in (
+            [
+                sx * OUTER_X,
+                HALF_H,
+                sz * (abs(FRONT_COLUMN_Z) + side_cut + OUTER_Z) / 2.0,
+            ],
+            [sx * (COLUMN_X + fr_cut + OUTER_X) / 2.0, HALF_H, sz * OUTER_Z],
+        )
+    ]
 
 
 def _t_root_add() -> float:
@@ -659,7 +997,7 @@ def _t_root_add() -> float:
 
     The reentrant junction where each recessed web face meets the flange
     underside (y +10.25), on BOTH the outer and the window side of every
-    rail. Every web face sits WEB_T/2 = 6.35 off its rail centreline, so
+    rail. Every web face sits WEB_T/2 = 6.5 off its rail centreline, so
     one boss chord covers all four families; the hub rib interrupts both
     east-rail runs, the junction lands interrupt both front/rear WINDOW
     runs. The fillet ends dying into boss barrels / rib / land walls and
@@ -752,14 +1090,14 @@ def _open_underside_sketch(
 def _qualify_machined_faces(adapter) -> None:
     """Area-check every face the surface-finish spec owns.
 
-    ``_resolve_faces`` already proves each spec names exactly ONE face; the
+    ``resolve_faces`` already proves each spec names exactly ONE face; the
     area proves it named the RIGHT one, so a station typo ships a build failure
     instead of a roughness symbol on the wrong surface (build_fr_harmonic_base's
     _paint_machined_faces_black precedent). Expectations are the full analytic
     wall/annulus areas; the 5% band absorbs the cross-screw and set-screw tap
     windows that break into the bores (~1% each) and the C1 bore-top breaks.
     """
-    faces = _resolve_faces(
+    faces = resolve_faces(
         adapter.currentModel,
         {control.key: control.face for control in SURFACE_FINISHES},
     )
@@ -782,6 +1120,99 @@ def _qualify_machined_faces(adapter) -> None:
                 "(minus tap windows and edge breaks)"
             )
         _telemetry.info(f"{key} face qualified ({area:.0f} mm^2)")
+
+
+async def _split_keeper_seats(adapter) -> None:
+    """Bound two faced regions without changing final height or material.
+
+    Reuse the pinion-arbor's projected split-line convention: sketch mark 4,
+    exact parent face mark 1. Finished-part CAD specifies the seat plane;
+    it does not model a cast machining allowance or cut that plane lower.
+    """
+    x, z = KEEPER_SEAT_CENTRES_XZ[0]
+    target = resolve_faces(
+        adapter.currentModel,
+        {
+            "keeper_top": PlanarFace(
+                (0.0, 1.0, 0.0), HALF_H, contains_x_mm=x, contains_z_mm=z
+            )
+        },
+    )["keeper_top"]
+    dims = SketchDims()
+    check("create keeper seat profile", await adapter.create_sketch("Top"))
+    for index, (x0, x1, z0, z1) in enumerate(KEEPER_SEAT_BOUNDS_XZ):
+        points = [(x0, -z1), (x1, -z1), (x1, -z0), (x0, -z0)]
+        lines = await add_line_chain(adapter, points)
+        await define_rectilinear_chain(
+            adapter,
+            lines,
+            points,
+            label=f"keeper seat {index}",
+            dims=dims,
+            names=[
+                f"Seat{index}Width",
+                f"Seat{index}Length",
+                f"Seat{index}X",
+                f"Seat{index}Z",
+            ],
+        )
+    await ensure_fully_defined(adapter, "keeper seat profile")
+    check("exit keeper seat profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "KeeperSeatProfile")
+    dims.apply(adapter, "KeeperSeatProfile")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    if (
+        model.Extension.SelectByID2(
+            "KeeperSeatProfile", "SKETCH", 0.0, 0.0, 0.0, False, 4, null_callout(), 0
+        )
+        is not True
+    ):
+        raise RuntimeError("keeper seats: failed to select the split sketch")
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    selection = _early_bound(manager.CreateSelectData(), "ISelectData")
+    selection.Mark = 1
+    if _early_bound(target, "IEntity").Select4(True, selection) is not True:
+        raise RuntimeError("keeper seats: failed to select the rail top")
+    previous = feature_name_by_type(adapter, "PLine")
+    model.InsertSplitLineProject(False, False)
+    model.ClearSelection2(True)
+    split = feature_name_by_type(adapter, "PLine")
+    if not split or split == previous:
+        raise RuntimeError("keeper seats: projected split line was not created")
+    name_last_feature(adapter, "KeeperSeatFaces")
+    await force_rebuild(adapter)
+
+
+def _qualify_keeper_seat_faces(adapter) -> None:
+    """Prove two coplanar rectangles minus their existing tap openings.
+
+    Face boxes are only coarse station filters (GetBox is approximate);
+    area rejects the residual rail face and the exact-one count proves both
+    local regions exist. No shared planar-selector or PMI changes are needed.
+    """
+    feature = _early_bound(_feature_by_name(adapter, "KeeperSeatFaces"), "IFeature")
+    expected_area = (
+        KEEPER_SEAT_WIDTH_MM * KEEPER_SEAT_LENGTH_MM
+        - math.pi * (TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0) ** 2
+    )
+    counts = [0, 0]
+    for raw in feature.GetFaces() or ():
+        face = _early_bound(raw, "IFace2")
+        box = tuple(float(value) * 1000.0 for value in face.GetBox() or ())
+        if len(box) != 6 or max(abs(box[1] - HALF_H), abs(box[4] - HALF_H)) > 0.1:
+            continue
+        area = float(face.GetArea()) * 1e6
+        if abs(area - expected_area) > 0.01 * expected_area:
+            continue
+        for index, (x, z) in enumerate(KEEPER_SEAT_CENTRES_XZ):
+            if box[0] - 0.1 <= x <= box[3] + 0.1 and box[2] - 0.1 <= z <= box[5] + 0.1:
+                counts[index] += 1
+    if counts != [1, 1]:
+        raise RuntimeError(
+            f"keeper seats: expected one {expected_area:.3f} mm^2 face per seat; got {counts}"
+        )
+    _telemetry.info(f"two keeper seat faces qualified ({expected_area:.3f} mm^2 each)")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -826,7 +1257,7 @@ async def build(adapter) -> dict[str, str]:
     # 1. Web ring: the full-height THIN section (T-rail web) as one annular
     #    extrude -- two nested origin-centred rectangles, the WEB_T-wide web
     #    centred on each rail's centreline (per-face setback: side rails
-    #    10.75, front/rear 12.65).
+    #    10.6, front/rear 12.5).
     web = SketchDims()
     check("create_sketch web ring", await adapter.create_sketch("Top"))
     await define_centered_rectangle(
@@ -869,7 +1300,7 @@ async def build(adapter) -> dict[str, str]:
 
     # 2. Crossbar junction lands: full-thickness pads on the front/rear
     #    inner faces where the crossbar + gussets butt in (x -50..20,
-    #    z +/-(93..105.65)), full height. Sketch z flipped: (x, y) -> (X, -Z).
+    #    z +/-(93..105.5)), full height. Sketch z flipped: (x, y) -> (X, -Z).
     lands = SketchDims()
     check("create_sketch junction lands", await adapter.create_sketch("Top"))
     for k, (z_lo, z_hi) in enumerate(((-WEB_IN_Z, -INNER_Z), (INNER_Z, WEB_IN_Z))):
@@ -1218,8 +1649,8 @@ async def build(adapter) -> dict[str, str]:
     v_pocket = SET_POCKET * SET_POCKET * SET_POCKET_DEPTH
     volume = await volume_check(adapter, "set pocket", volume - v_pocket, 20.0)
 
-    # 9. Side-screw spot-faces: O9 x 0.9 flats on the curved boss z-faces
-    #    (planar seats the tapped holes need).
+    # 9. Side-screw spot-faces: O9 flats at |z|=132.6 on the curved boss
+    #    (1.9 removal on axis; cut plane 134.9 gives a positive 2.3 depth).
     v_spot = _spotface_removal()
     for side, sign, reverse in SIDE_SCREW_FACES:
         spot_plane = check(
@@ -1579,10 +2010,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # 13. Cross-screw taps (#10-32 UNF-2B bottoming): one per boss,
-    #     46 mm full thread in a 48 mm cylindrical drill. Each path starts on
-    #     its spot seat, crosses the near casting wall and column bore, then
-    #     continues through the far casting wall. Opposed holes remain one
-    #     two-position Hole Wizard feature per entry side.
+    #     46.0 mm full thread in a 49.2 mm cylindrical drill. Each path
+    #     starts on its spot seat, crosses the near casting wall and column
+    #     bore, then continues into the far boss/centred side-rail web.
+    #     Opposed holes remain one two-position Hole Wizard feature per side.
     v_side_tap = _side_tap_removal()
     for side, sign, _reverse in SIDE_SCREW_FACES:
         feat = f"SideTaps{side.capitalize()}"
@@ -1619,7 +2050,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "gooseneck set tap", volume - v_set_tap, 0.1 * v_set_tap + 10.0
     )
 
-    # 15. Fulcrum-keeper taps (#8-32 x 10 blind) into the west rail TOP
+    # 15. Fulcrum-keeper taps from the shared keeper spec into the west rail TOP
     wizard_holes(
         adapter,
         KEEPER_TAP_SPEC,
@@ -1646,16 +2077,17 @@ async def build(adapter) -> dict[str, str]:
     #     per uninterrupted run: the hub rib splits both east-rail runs,
     #     the junction lands split both front/rear window runs. The web
     #     ring's BOTTOM rim stays sharp (no low-side breaks).
-    x_shelf_out = COLUMN_X + WEB_T / 2.0  # 203.35
-    x_shelf_in = COLUMN_X - WEB_T / 2.0  # 190.65
-    z_shelf_out = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.35
-    z_shelf_in = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.65
+    x_shelf_out = COLUMN_X + WEB_T / 2.0  # 203.5
+    x_shelf_in = COLUMN_X - WEB_T / 2.0  # 190.5
+    z_shelf_out = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.5
+    z_shelf_in = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.5
     rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0  # -10.41
     rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0  # +16.59
-    east_mid_lo = (-abs(FRONT_COLUMN_Z) + rib_lo) / 2.0  # rib-split run mids
-    east_mid_hi = (rib_hi + abs(FRONT_COLUMN_Z)) / 2.0
-    land_mid_w = (LAND_X0 - COLUMN_X) / 2.0  # land-split window run mids
-    land_mid_e = (LAND_X1 + COLUMN_X) / 2.0
+    root_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (WEB_T / 2.0) ** 2)
+    east_mid_lo = (-abs(FRONT_COLUMN_Z) + root_cut + rib_lo) / 2.0
+    east_mid_hi = (rib_hi + abs(FRONT_COLUMN_Z) - root_cut) / 2.0
+    land_mid_w = (LAND_X0 - COLUMN_X + root_cut) / 2.0
+    land_mid_e = (LAND_X1 + COLUMN_X - root_cut) / 2.0
     check(
         "fillet T-roots",
         await adapter.add_fillet(
@@ -1686,12 +2118,12 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # 17. External top-face rim breaks: C2 x 45 on the outer rail rim and
-    #     both windows' rims (chamfer-for-external-edges convention). Every
-    #     rim edge, outer AND window, terminates on a proud corner-boss
-    #     barrel: the bosses round all eight plan corners natively (their
-    #     centres sit 25.56 from the window corners, inside the 26.1
-    #     radius), so there are no corner edges to treat.
+    #     both windows' rims. The Ø45 bosses no longer reach the rail plan
+    #     corners: window rims meet at real square corners, and each outer
+    #     corner has two short rim edges outside the boss barrel. Select
+    #     those eight edges explicitly as well as the four central runs.
     v_outer, v_window = _top_rim_removal()
+    outer_corner_edges = _outer_corner_top_edges()
     check(
         "chamfer top rims",
         await adapter.add_chamfer(
@@ -1715,7 +2147,8 @@ async def build(adapter) -> dict[str, str]:
                 [BAR_X0 - GUSSET / 2.0, HALF_H, -(INNER_Z - GUSSET / 2.0)],
                 [BAR_X1 + GUSSET / 2.0, HALF_H, INNER_Z - GUSSET / 2.0],
                 [BAR_X1 + GUSSET / 2.0, HALF_H, -(INNER_Z - GUSSET / 2.0)],
-            ],
+            ]
+            + outer_corner_edges,
         ),
     )
     name_last_feature(adapter, "TopRimBreaks")
@@ -1744,6 +2177,13 @@ async def build(adapter) -> dict[str, str]:
     v_breaks = _bore_chamfer_removal()
     volume = await volume_check(
         adapter, "bore top breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
+    )
+
+    # 19. Machined keeper-seat regions on the unchanged rail-top plane.
+    # Split boundaries, not a cut or raised pad: volume and all stacks stay fixed.
+    await _split_keeper_seats(adapter)
+    volume = await volume_check(
+        adapter, "keeper seat split (no material change)", volume, 0.05
     )
 
     # Deferred drive equations: after the whole model + a rebuild exist so
@@ -1801,6 +2241,7 @@ async def build(adapter) -> dict[str, str]:
     # single place a place count is authored (drawing-simplicity rule 2).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _qualify_machined_faces(adapter)
+    _qualify_keeper_seat_faces(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

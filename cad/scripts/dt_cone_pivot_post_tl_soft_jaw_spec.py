@@ -26,7 +26,8 @@ from __future__ import annotations
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_cap_jaw_button_spec as button
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 

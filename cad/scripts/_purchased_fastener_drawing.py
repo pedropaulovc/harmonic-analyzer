@@ -8,7 +8,9 @@ from typing import Any, Literal
 
 import _config
 import _telemetry
-from _common import _early_bound, apply_custom_properties, check
+from _check import check
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
 from _drawing_common import (
     TITLE_BLOCK_TOLERANCE_PROPERTIES,
     DrawingOutputs,
@@ -234,9 +236,14 @@ def _purchased_title_block(
 
 
 async def build_purchased_fastener_drawing(
-    adapter: Any, spec: DrawingSpec
+    adapter: Any, spec: DrawingSpec, *, hidden_lines_removed: bool = False
 ) -> dict[str, str]:
-    """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI."""
+    """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
+
+    ``hidden_lines_removed`` drops the dashed edges from Front/Top/Right too,
+    for a part whose hidden thread and socket edges only clutter them (policy:
+    hidden lines only where they inform).
+    """
     stock = fastener(spec.artifact_stem)
     source = spec.source
 
@@ -260,7 +267,7 @@ async def build_purchased_fastener_drawing(
             )
         expected = {
             "Number": str(registry["number"]),
-            # The PART cell prints the slug (_common.part_properties).
+            # The PART cell prints the slug (_part_properties.part_properties).
             "Title": stock.part_name,
             "Material": str(registry["material"]),
             "Stock Name": stock.stock_name,
@@ -280,6 +287,7 @@ async def build_purchased_fastener_drawing(
         finish=finish,
         installation_notes=installation_notes,
         document_title=str(registry["title"]),
+        hidden_lines_removed=hidden_lines_removed,
     )
 
 
@@ -317,6 +325,7 @@ async def _build_reference_sheet(
     reference_notes: str = "",
     document_title: str | None = None,
     cells: tuple | None = None,
+    hidden_lines_removed: bool = False,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -352,7 +361,7 @@ async def _build_reference_sheet(
             view = _early_bound(
                 place_view(adapter, str(source), name, *center, scale=(1, 1)), "IView"
             )
-            if name == "*Isometric":
+            if name == "*Isometric" or hidden_lines_removed:
                 set_hidden_lines_removed(adapter, view)
             else:
                 set_hidden_lines_visible(adapter, view)

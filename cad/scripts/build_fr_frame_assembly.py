@@ -44,7 +44,7 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   Inserted at its exact authored transform and locked to the fixed base.
 * top-frame x1: the green one-piece casting at mid-plane Y = 1017.95 (side
   rails 34.2 wide / front-rear rails 38 wide x 36.5 tall, band
-  y 999.7..1036.2; corner bosses Ø52.2 rise to 1040.7), bored around the
+  y 999.7..1036.2; corner bosses Ø45 rise to 1040.7), bored around the
   four columns; its east rail (-X) carries the gooseneck hub and its west
   rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
 * tube-frame-cap x4: intact stock McMaster 9275K141 push-on caps seated on the
@@ -95,15 +95,13 @@ from typing import Any
 
 import _telemetry
 
-from _common import (
-    OUT_SLDPRT,
-    _early_bound,
-    apply_custom_properties,
-    check,
-    run_build,
-)
+from _check import check
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _paths import OUT_SLDPRT
+from _session import run_build
 from _drawing_marks import DRAWN_BY
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from _assembly import (
     activate_assembly_contract,
     assembly_title_properties,
@@ -160,7 +158,7 @@ from fr_rocker_arm_support_spec import (
     SUPPORT_WORLD_X,
     SUPPORT_WORLD_Z,
 )
-from build_vn_gooseneck_set_screw import SHANK_LEN as GOOSENECK_SHANK_LEN
+from _mcmaster_91410a538 import SHANK_LEN as GOOSENECK_SHANK_LEN
 from vn_frame_cross_screw_spec import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,

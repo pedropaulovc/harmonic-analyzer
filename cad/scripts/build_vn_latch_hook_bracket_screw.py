@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import sys
 
-from _common import POLISHED_STEEL, run_build
+from _appearance import POLISHED_STEEL
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_90280A108 import build_90280A108
 from vn_latch_hook_bracket_screw_spec import SKU
 
@@ -32,6 +34,7 @@ async def build(adapter) -> dict[str, str]:
             StockComponent(sku=SKU, author=build_90280A108, transform=RigidTransform()),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         color=POLISHED_STEEL,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )

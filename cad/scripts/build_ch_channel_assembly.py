@@ -5,7 +5,7 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each retained by a stock eyebolt threaded into the plate.
-175 components (8 * CHANNELS + 15):
+177 components (8 * CHANNELS + 17):
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
@@ -17,11 +17,11 @@ the M6.8 mirror layer is gone).
   north ear, the bank's datum; south, on rocker 0's hub) +
   vn-rocker-bank-spring x1 (MHA-VN-053, the wave disc spring between the
   south washer and the south ear that preloads the bank north; #948 ruling R)
-  + fulcrum-shaft x1 (lever bank at (199.9, 1061.4), 182 long - the
-  228.6 shaft clipped the west columns at top level, M6.5)
+  + fulcrum-shaft x1 (lever bank at (199.9, 1061.4); plain Ø6.35 x 161.35,
+  domed 0.5 proud of each keeper lug, set-screw flats up)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
-  black foot-and-ear brackets on the rocker-arm-support's top, 78 either
-  side of the stack centre (the old chrome pivot-ball-mount pair is retired
+  black foot-and-ear brackets on the rocker-arm-support's top, at the
+  fit-up-located S/N stations (the old chrome pivot-ball-mount pair is retired
   -- photo-refuted, and its south pillar stood 19 mm past the support's end
   in mid-air); since the 2026-10-09 sketch both feet run OUTBOARD, flush with
   the support's end faces, as MHA-CH-008's S and N configurations) +
@@ -29,11 +29,14 @@ the M6.8 mirror layer is gone).
   the support's transferred #8-32 seat -- rocker_bracket_seat_layout) +
   vn-arbor-set-screw x2 (MHA-VN-034, one down through each MHA-CH-008 ear's
   apex onto the shaft's flat)
-* fulcrum-keeper x2 + frame-side-screw x2 (the black shaft-END brackets on
-  the top-frame west rail top face -- ch17 p.40 bottom-left / ch30 p008;
-  ball centres (199.9, 1061.4, 3.088 +- 88.75), foot screws down into the
-  rail's tapped #8-32 holes at z 3.088 +- 74.0; replaces the photo-refuted
-  chrome baluster lever pair, 2026-08-02)
+* fulcrum-keeper x2 + frame-side-screw x2 + fulcrum-set-screw x2 (the black
+  shaft-END brackets on the top-frame west rail top face -- ch17 p.40
+  bottom-left / ch30 p008; lug mid-planes at (199.9, STACK_MID_Z +- 74.0), the
+  shaft through their reamed bores; one #1-72 cup-point set screw down
+  through each crown onto the shaft's flat (its only axial and rotational
+  location); feet outboard, screwed down into the rail's tapped #2-56 holes
+  at STACK_MID_Z +- 82.25 (the lever-bank mid-plane, z -0.504); replaces
+  the photo-refuted chrome baluster lever pair, 2026-08-02)
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),
@@ -148,14 +151,10 @@ import _config
 import _telemetry
 import channel_kinematics
 import settled_spring_seats
-from _common import (
-    UNDER_CONSTRAINED,
-    _early_bound,
-    apply_custom_properties,
-    check,
-    log,
-    run_build,
-)
+from _check import check, log
+from _com import UNDER_CONSTRAINED, _early_bound
+from _custom_properties import apply_custom_properties
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
@@ -202,9 +201,18 @@ from dt_cone_pivot_post_installation import (
     CHANNEL_Z0,
     MECHANISM_Z_SHIFT,
 )
-from build_ch_fulcrum_keeper import (
+from ch_fulcrum_keeper_spec import (
     CBORE_DEPTH_MM as KEEPER_CBORE_DEPTH,
     FOOT_H as KEEPER_FOOT_H,
+    FULCRUM_KEEPER_CENTRE_Z,
+    KEEPER_SCREW_Z_OFF,
+    KEEPER_Z_OFF,
+    LUG_HALF_T as KEEPER_LUG_HALF_T,
+    SHAFT_AXIS_H as KEEPER_SHAFT_AXIS_H,
+)
+from ch_fulcrum_shaft_spec import (
+    FLAT_HEIGHT as FULCRUM_FLAT_HEIGHT,
+    FLAT_PITCH as FULCRUM_FLAT_PITCH,
 )
 from dt_cylinder_gear_spec import CAM_THICKNESS as CYL_CAM_THICKNESS
 from dt_cylinder_gear_spec import FACE_WIDTH as CYL_FACE_WIDTH
@@ -513,27 +521,49 @@ if [z for _x, z in BRACKET_SCREW_XZ] != [
 ]:
     raise AssertionError("the hold-down screws are not over the brackets' holes")
 RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
-# dropped the rail top 4.5 -- the ball-mount seats and the whole fulcrum chain
+# dropped the rail top 4.5 -- the keeper seats and the whole fulcrum chain
 # follow)
-FULCRUM_SHAFT_Z = CHANNEL_BANK_REAR_SHIFT
-from ch_fulcrum_shaft_spec import SHAFT_LENGTH as FULCRUM_SHAFT_LENGTH  # noqa: E402
-
-FULCRUM_SHAFT_HALF = FULCRUM_SHAFT_LENGTH / 2.0  # 91.0; ends at 3.088 -+ 91
+# The fulcrum shaft and both end keepers centre on the lever bank's mid-plane
+# (ch_fulcrum_keeper_spec, one source with the top frame's keeper taps).
+FULCRUM_SHAFT_Z = FULCRUM_KEEPER_CENTRE_Z
+if abs(FULCRUM_SHAFT_Z - _STACK_MID_Z) > 1e-9:
+    raise AssertionError("fulcrum keeper centre is not the lever bank mid-plane")
 # Part +X (outboard) -> machine +Z for the rear keeper; ROT_Y_POS90 maps
 # +X -> machine -Z for the flipped front keeper.
 ROT_Y_NEG90 = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
 # Fulcrum end keepers (MHA-CH-007) replace the baluster lever pair (the ch17
-# p.40 / ch30 p008 black shaft-END brackets). The keeper's ball centre sits
-# KEEPER_BALL_TO_END inboard of each shaft end, so the Ø6.35 end floats
-# inside its Ø6.5 ball bore with the standard 0.15 diametral clearance.
-KEEPER_BALL_TO_END = 2.25
-KEEPER_Z_OFF = FULCRUM_SHAFT_HALF - KEEPER_BALL_TO_END  # 88.75 off centre
-# Foot screws (frame-side-screw MHA-VN-022): the keeper pad centre is 14.75
-# inboard of its ball centre -> z = FULCRUM_SHAFT_Z +- 74.0. The under-head
-# plane is derived from the keeper foot and its exact flush counterbore; the
-# screws thread the top-frame's tapped #8-32 holes (build_fr_top_frame.py).
-KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF - 14.75  # 74.0
+# p.40 / ch30 p008 black shaft-END brackets). Each lug's inner face must float
+# clear of the end lever hub: the levers sit at hub_mid_z(j) (= z_j +
+# ARM_MID_DZ, asserted above) with their integral hubs one pitch long, so the
+# bank ends half a hub past the end levers (-71.069 / +70.061; floats 0.435).
+from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB_LENGTH  # noqa: E402
+
+KEEPER_HUB_FLOAT_MIN = 0.25
+_LEVER_BANK_Z = (
+    hub_mid_z(0) - LEVER_HUB_LENGTH / 2.0,
+    hub_mid_z(_config.machine("channels", "count") - 1) + LEVER_HUB_LENGTH / 2.0,
+)
+KEEPER_HUB_FLOAT = (
+    _LEVER_BANK_Z[0] - (FULCRUM_SHAFT_Z - KEEPER_Z_OFF + KEEPER_LUG_HALF_T),
+    (FULCRUM_SHAFT_Z + KEEPER_Z_OFF - KEEPER_LUG_HALF_T) - _LEVER_BANK_Z[1],
+)
+if min(KEEPER_HUB_FLOAT) < KEEPER_HUB_FLOAT_MIN:
+    raise AssertionError(
+        f"keeper lug float to the lever-hub bank {KEEPER_HUB_FLOAT} <"
+        f" {KEEPER_HUB_FLOAT_MIN}"
+    )
+# Foot screws (frame-side-screw MHA-VN-022) at the outboard foot centres,
+# KEEPER_SCREW_Z_OFF off the centre. The under-head plane is derived from the
+# keeper foot and its exact flush counterbore; the screws thread the
+# top-frame's tapped #2-56 holes (build_fr_top_frame.py KeeperTaps).
 KEEPER_SCREW_SEAT_H = KEEPER_FOOT_H - KEEPER_CBORE_DEPTH
+# Set screws (MHA-VN-055): cup point down on each shaft flat, on the keeper's
+# crown tap axis (the lug mid-plane, over the shaft axis).
+SET_SCREW_SEAT_Y = FULCRUM[1] + FULCRUM_FLAT_HEIGHT
+if abs(FULCRUM[1] - (RAIL_TOP_Y + KEEPER_SHAFT_AXIS_H)) > 1e-9:
+    raise AssertionError("keeper shaft axis is not on the lever fulcrum line")
+if abs(FULCRUM_FLAT_PITCH / 2.0 - KEEPER_Z_OFF) > 1e-9:
+    raise AssertionError("fulcrum shaft flats are not under the keeper crown taps")
 
 # --- purchased channel springs and retained lower anchors ------------------
 from _spring import build_spring  # noqa: E402
@@ -667,7 +697,7 @@ async def _debug_png(adapter: Any, tag: str) -> None:
     ``cad/out/png/cwm-debug/`` (``HARMONIC_CWM_DEBUG=1`` only)."""
     if not _CWM_DEBUG:
         return
-    from _common import OUT_PNG
+    from _paths import OUT_PNG
 
     out = OUT_PNG / "cwm-debug"
     out.mkdir(parents=True, exist_ok=True)
@@ -1122,14 +1152,16 @@ async def build(adapter) -> dict[str, str]:
         )
         await _locate_to_datum(adapter, hold_down)
     # Fulcrum end keepers (MHA-CH-007): the black shaft-END brackets of the
-    # ch17 p.40 closeup -- an upright lug sockets a ball on each shaft end,
-    # the foot screwed down to the rail top face. Part +X points outboard
-    # along the shaft: the rear (+Z) keeper maps part X -> machine +Z
+    # ch17 p.40 closeup -- an upright lug carries the shaft in its reamed bore,
+    # the outboard foot screwed down to the rail top face. Part +X points
+    # outboard along the shaft: the rear (+Z) keeper maps part X -> machine +Z
     # (Ry -90), the front keeper is the same part flipped (Ry +90). The
     # keepers are GROUNDED at their computed transform (the cosmetic-bank
     # idiom below): _locate_to_datum assumes IDENTITY parts whose planes map
     # same-name, which a Ry+-90 part breaks. The IDENTITY screws are
-    # datum-located like the mounts they accompany.
+    # datum-located like the mounts they accompany: the foot screw head-flush
+    # in its counterbore, the set screw cup-down on the shaft flat under the
+    # crown tap (its part +Y runs cup -> socket, machine +Y).
     for sign, euler, rows in (
         (1.0, [0.0, -90.0, 0.0], ROT_Y_NEG90),
         (-1.0, [0.0, 90.0, 0.0], ROT_Y_POS90),
@@ -1157,6 +1189,16 @@ async def build(adapter) -> dict[str, str]:
             label=f"keeper foot screw z{sign * KEEPER_SCREW_Z_OFF:+.0f}",
         )
         await _locate_to_datum(adapter, screw)
+        set_screw = await place_component(
+            adapter,
+            "vn-fulcrum-set-screw",
+            [FULCRUM[0], SET_SCREW_SEAT_Y, FULCRUM_SHAFT_Z + sign * KEEPER_Z_OFF],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"keeper set screw z{sign * KEEPER_Z_OFF:+.0f}",
+        )
+        await _locate_to_datum(adapter, set_screw)
 
     # No spacer bushings (2026-09-02): the rocker arms and channel levers
     # carry integral hubs one PITCH long, so each channel's rocker takes its

@@ -23,13 +23,13 @@ publishes as ``ScrewAxis`` (Front Plane x Top Plane).  MHA-VN-033's layout.
 
 from __future__ import annotations
 
-from diagnostics.diag_mcmaster_spring_pin import SPRING_PIN_SIZES
-from diagnostics.diag_mcmaster_spring_pin import WALL_T as _CATALOGUE_WALL
+from _mcmaster_98296a026 import SPRING_PIN_SIZE
+from _mcmaster_98296a026 import WALL_T as _CATALOGUE_WALL
 
 INCH = 25.4
 SKU = "98296A026"
 PIN_STANDARD = "ASME B18.8.2"
-PIN_DIA, PIN_LEN = SPRING_PIN_SIZES[SKU]  # 1/16 x 9/16 in
+PIN_DIA, PIN_LEN = SPRING_PIN_SIZE  # 1/16 x 9/16 in
 WALL_T = _CATALOGUE_WALL  # 0.012 in
 # The contract's length band (§1.3): +/-0.015 in.
 PIN_LEN_BAND = 0.015 * INCH

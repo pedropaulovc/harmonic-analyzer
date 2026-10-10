@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 # representative cases by measured volume.
 TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
     "#0-80": 1.191,  # 3/64 drill; not yet re-proved by a live wizard probe
+    "#1-72": 1.511,  # #53 drill; not yet re-proved by a live wizard probe
     "#2-56": 1.778,
     "#3-48": 1.994,
     "#4-40": 2.261,
@@ -32,6 +33,7 @@ TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
 }
 THREAD_MAJOR_MM = {  # basic external-thread major diameters (ASME B1.1)
     "#0-80": 1.524,
+    "#1-72": 1.854,
     "#2-56": 2.184,
     "#3-48": 2.515,
     "#4-40": 2.845,
