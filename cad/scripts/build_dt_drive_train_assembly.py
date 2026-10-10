@@ -3406,26 +3406,25 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # crest's penetration into the swung flank on top of its PRESET (the free form
 # stands PRESET into the parked flank; the model hovers PARKED_AIR off it).
 # Gravity moments of the swing cluster about the pivot, parked then engaged,
-# N.mm; both turn it INTO mesh. Re-measured 2026-10-08 with
+# N.mm; both turn it INTO mesh. Re-measured 2026-10-10 with
 # diagnostics/collect_dt_swing_gravity.py from the seven native STL exports of
-# farm run 20261008T164225457Z-6a2365ac09404a98b9cde46767f8d792 (fb97437).
-# This is the historical measured basis. The finite-stock-profile cutover needs
-# replacement native STL data before release; the frozen fingerprint below must
-# continue refusing changed governing geometry until that report is installed.
+# farm run 20261010T084710772Z-bcad1a8e9e664595b56e918f9cc4f1e4 (0d454fa91),
+# the finite-stock-profile 48DP drum: its weight volume fell 449 mm^3 and the
+# moments 1.0% parked, 4.5% engaged against the 2026-10-08 basis (fb97437).
 # The 1e-5 mm KD-tree seam weld preserves every face; watertightness and winding
 # are checked separately. Centroids use this module's analytic transforms;
 # five weight volumes remain analytic, and drum/brackets use mesh volumes.
 # This preserves #859's hybrid method (03b51bce2), not native COM mass metrology.
 # Brass is 8500 nominal / 8800 corner; steel is 7800 kg/m^3.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
-SWING_GRAVITY_NMM = (14.461309550760282, 25.574227334343778)
-SWING_GRAVITY_CORNER_NMM = (14.748760512092852, 26.075971959169426)
+SWING_GRAVITY_NMM = (14.312953639673118, 24.418432096063757)
+SWING_GRAVITY_CORNER_NMM = (14.595168510026149, 24.893891179679525)
 # The basis those moments were computed at: part -> (count, volume mm^3,
 # density kg/m^3). The measured basis and fingerprint deliberately stay frozen:
 # the support-layout regression names both moment constants when
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
-    "dt-alignment-pinion": (1, 24649.012295126508, 8500.0),
+    "dt-alignment-pinion": (1, 24200.015811223286, 8500.0),
     "dt-pinion-arbor": (1, 13702.959423527212, 7800.0),
     "dt-pinion-pivot-shaft": (1, 5937.0169027658985, 7800.0),
     "dt-pinion-bracket": (2, 4563.672483959315, 7800.0),
@@ -3433,9 +3432,9 @@ SWING_GRAVITY_BASIS = {
     "dt-pinion-handle": (1, 1837.831702350029, 7800.0),
     "dt-pinion-cam-pin": (2, 256.62204310603346, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 468.89889600694056
+SWING_GRAVITY_MASS_G = 465.0824258937632
 # Frozen governing dimensions of the accepted native-STL calibration, never
-# live config aliases. ROOT_DIA is the standard full-depth arc-root diameter.
+# live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
     "dt-alignment-pinion": {
         "TEETH": 32,
@@ -3443,8 +3442,16 @@ SWING_GRAVITY_FINGERPRINT = {
         "PRESSURE_ANGLE_DEG": 20.0,
         "FACE_WIDTH": 143.2,
         "BORE_DIA": 8.0,
-        "ROOT_DIA": 15.610416666666664,
-        "AS_CUT_RADIAL_TOOTH_DEPTH": 1.1906250000000016,
+        "CUTTER_REFERENCE_TEETH": 26,
+        "CUTTER_RADIAL_TRANSLATION_MM": 1.5874999999999986,
+        "PITCH_TOOTH_THICKNESS_MM": 0.8293770709126581,
+        "SUPPORT_OUTSIDE_DIA_MM": 17.979877681931494,
+        "OUTSIDE_DIA": 17.63,
+        "WHOLE_DEPTH": 1.0097916666666675,
+        "MAX_CUT_DEPTH_MM": 1.0111012137912878,
+        "BASE_TANGENT_SPAN": 4.141050235926491,
+        "ROOT_MIN_DIA_MM": 15.607797572417423,
+        "ROOT_MAX_DIA_MM": 15.610416666666664,
     },
     "dt-pinion-bracket": {
         "WIDTH": 15.0,
