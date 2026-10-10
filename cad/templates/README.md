@@ -82,6 +82,15 @@ issue #249.
 `finalize_drawing` requires the `TOL_*` set on the linked model, so a stale
 source part fails before it can save blank tolerance cells.
 
+The cone-pivot-post drawing also checks the linked Finish note's native extent
+against the landscape template's cell rules. In the exported sheet, those rules
+are at x = 215.900 / 308.328 mm and y = 33.584 / 44.485 mm, measured from the
+lower-left sheet origin. Its check rounds these boundaries inward, not outward.
+The linked value starts at about x = 217.8 mm; 218 mm is not the cell's left
+rule. When editing this title block, remeasure all four boundaries and update
+`draw_dt_cone_pivot_post._FINISH_CELL` with its offline containment cases; do
+not move the correctly placed note merely to satisfy an obsolete inset.
+
 The UNIT cell links `$PRP:"UnitOfMeasure"`, SolidWorks' drawing-document unit
 property. SolidWorks updates it when the document unit system changes through
 the status-bar unit picker: MMGS displays `mm`, and IPS displays `in`. The
