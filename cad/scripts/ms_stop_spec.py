@@ -113,6 +113,7 @@ PLATE_DRAWING_DIMENSIONS = {
     "Plate": {"PlateThickness"},
     "RoofChamfers": {"RoofChamferSize", "RoofChamferAngle"},
     "PlateLocationReference": {"PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace"},
+    "PilotDrillReference": {"PilotDrillDiameter"},
 }
 # Functional clamp-joint bands; the axes locate a MATCH-DRILLED pair, not two
 # independently interchangeable patterns. Pilot both parts in one clamped
@@ -132,12 +133,12 @@ PLATE_DRAWING_PRECISION = {
 }
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
-DRAWING_NOTES = (
-    "MATCH-DRILL BLOCK AND PLATE CLAMPED TOGETHER.\n"
-    "OPEN PLATE CLEARANCE AFTER PILOT; BOTTOMING-TAP BLOCK.\n"
+BLOCK_DRAWING_NOTES = (
     "KEEP MATCHED PAIR TOGETHER; NOT INTERCHANGEABLE.\n"
     "BLIND DEPTHS FROM BLOCK MATING FACE."
 )
+PLATE_DRAWING_NOTES = "KEEP MATCHED PAIR TOGETHER; NOT INTERCHANGEABLE."
+BLOCK_MATING_FACE_NOTE = "COVER MATING FACE"
 HOLE_CALLOUT_PRECISION = 2
 WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.1)
 
@@ -163,6 +164,7 @@ PLATE_DRAWING_VALUES_BY_NAME = {
     "RoofChamferSize": ROOF_END_CHAMFER, "RoofChamferAngle": ROOF_CHAMFER_ANGLE,
     "PlateLeftFromEnd": PLATE_HOLE_XS[0], "PlateRightFromEnd": PLATE_HOLE_XS[1],
     "PlateFromHeadFace": PLATE_HOLE_Y,
+    "PilotDrillDiameter": PLATE_TAP_DRILL_DIA,
 }
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 

@@ -7,8 +7,9 @@ from typing import Any
 import _telemetry
 import ms_stop_spec as spec
 from _common import (
-    _early_bound, anchor_point_to_origin, check, dimension_between,
-    ensure_fully_defined, name_dimensions, name_last_feature, set_sketch_direct_db,
+    SketchDims, _early_bound, anchor_point_to_origin, check, define_circle,
+    dimension_between, ensure_fully_defined, name_dimensions, name_last_feature,
+    set_sketch_direct_db,
 )
 from _drawing_marks import set_dimension_display_precision
 from _visibility import blank_sketch_feature
@@ -118,3 +119,29 @@ async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
     return list(zip(names, [
         '"RoofThickness"', '"WindowWidth"', '"BlockHeight" - "RoofThickness"',
     ], strict=True))
+
+
+@_telemetry.traced("sketch.stop_plate_pilot")
+async def pilot_drill_reference(adapter: Any) -> list[tuple[str, str]]:
+    """Own the earlier match-drill size without changing the finished clearance.
+
+    The final cover only has the opened clearance holes. A hidden construction
+    circle carries the pilot's native diameter and precision, so the print
+    cannot silently turn a typed process size into a second specification.
+    """
+    feature = "PilotDrillReference"
+    dimensions = SketchDims()
+    check(feature, await adapter.create_sketch("Front"))
+    circle = await define_circle(
+        adapter, 0.0, 0.0, spec.PLATE_TAP_DRILL_DIA / 2.0, feature,
+        dims=dimensions, names=(None, None, "PilotDrillDiameter"),
+        drives=(None, None, '"PilotDrillDiameter"'),
+    )
+    segment = _early_bound(adapter._sketch_entities[circle], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not segment.ConstructionGeometry:
+        raise RuntimeError("pilot reference construction flag rejected")
+    await ensure_fully_defined(adapter, feature)
+    check(feature, await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    return dimensions.apply(adapter, feature)

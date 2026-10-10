@@ -18,11 +18,13 @@ import math
 import sys
 from typing import Any
 
+import _config
 import _telemetry
 import ms_stop_spec as part
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
-    DrawingOutputs, add_native_hole_callout, add_property_linked_note,
+    DrawingOutputs, add_native_hole_callout, add_property_linked_callout,
+    add_property_linked_note,
     finalize_drawing, model_point_in_view,
     new_project_drawing, read_required_properties, rebuild_drawing, set_dimension_callouts,
     set_hidden_lines_removed, stamp_drawing_summary,
@@ -45,10 +47,10 @@ BOTTOM_CENTER = (FRONT_CENTER[0], 0.080)
 ISO_CENTER = (0.360, 0.119)
 FRONT_KEEP = {
     "BlockLength": (0.175, 0.235), "BlockHeight": (0.105, 0.185),
-    "RoofChamferSize": (0.112, 0.245), "RoofChamferAngle": (0.230, 0.245),
+    "RoofChamferSize": (0.247, 0.240), "RoofChamferAngle": (0.240, 0.220),
     "PlateLeftFromEnd": (0.175, 0.140),
     "PlateRightFromEnd": (0.175, 0.122),
-    "PlateFromHeadFace": (0.240, 0.150),
+    "PlateFromHeadFace": (0.115, 0.163),
 }
 RIGHT_KEEP = {
     "BlockDepth": (0.315, 0.235), "WindowWidth": (0.315, 0.130),
@@ -57,7 +59,35 @@ RIGHT_KEEP = {
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.038), "ThumbFromPlate": (0.110, 0.080),
 }
-DIMENSION_CALLOUTS = {"RoofChamferSize": "BOTH ROOF ENDS", "RoofChamferAngle": "BOTH ROOF ENDS"}
+# Native horizontal size witnesses end at this corner rather than spanning
+# the view; the shorter angle arc stays below the overall length dimension.
+DIMENSION_CALLOUTS = {"RoofChamferSize": "2 CORNERS"}
+# The title block owns the general internal thread class. Keep Hole Wizard's
+# variable definitions, not the resolved text that would freeze drill/depths.
+FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
+COVER_HOLE_PROCESS = (
+    "2X MATCH-DRILL WITH MS-STOP-PLATE\n"
+    f"{_config.parts('ms-stop-plate')['number']} CLAMPED; BOTTOMING TAP\n"
+)
+
+
+def _remove_general_thread_class(display: Any) -> None:
+    """Suppress only the native class token; leave thread/drill variables live."""
+    native = _early_bound(display, "IDisplayDimension")
+    if not native.IsHoleCallout():
+        raise RuntimeError("general thread class removal requires a native hole callout")
+    definition = str(native.GetText(5) or "")  # swDimensionTextPrefixDefinition
+    token = "<hw-threadclass>"
+    if definition.count(token) != 1:
+        raise RuntimeError(f"native tap callout lacks one thread-class variable: {definition!r}")
+    before, _token, after = definition.partition(token)
+    before = before.rstrip(" \t")
+    if before.endswith("-"):
+        before = before[:-1].rstrip(" \t")
+    revised = before + after
+    native.SetText(1, revised)  # swDimensionTextPrefix; void return
+    if str(native.GetText(5) or "") != revised:
+        raise RuntimeError("native tap class-token removal did not persist")
 
 
 def _orient_bottom_view(adapter: Any, view: Any) -> None:
@@ -103,18 +133,36 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     plate_edge = model_point_in_view(
         adapter, front, (
-            (part.PLATE_HOLE_XS[0] + part.PLATE_TAP_DRILL_DIA / 2.0) / 1000.0,
+            (part.PLATE_HOLE_XS[1] + part.PLATE_TAP_DRILL_DIA / 2.0) / 1000.0,
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
-    add_native_hole_callout(adapter, front, edge_xy=plate_edge, callout_xy=(0.125, 0.118),
-                           label="two cover blind taps", process="2X MATCH-DRILL; THEN BOTTOMING TAP")
+    plate_callout = add_native_hole_callout(
+        adapter, front, edge_xy=plate_edge, callout_xy=(0.072, 0.230),
+        label="two cover blind taps",
+        process=COVER_HOLE_PROCESS,
+    )
+    _remove_general_thread_class(plate_callout)
     thumb_edge = model_point_in_view(
         adapter, bottom, (
             (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0) / 1000.0,
             0.0, part.THUMB_AXIS_Z / 1000.0,
         ), label="thumb tap mouth")
-    add_native_hole_callout(adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.070, 0.050),
-                           label="thumbscrew tap through floor")
+    thumb_callout = add_native_hole_callout(
+        adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.270, 0.070),
+        label="thumbscrew tap through floor",
+    )
+    _remove_general_thread_class(thumb_callout)
+    mating_edge = model_point_in_view(
+        adapter, right, (
+            part.BLOCK_LENGTH / 2000.0,
+            (part.WINDOW_Y_MAX + (part.ROOF_THICKNESS - part.ROOF_END_CHAMFER) / 2.0) / 1000.0,
+            part.PLATE_Z_MAX / 1000.0,
+        ), label="cover mating face",
+    )
+    add_property_linked_callout(
+        adapter, right, property_name="Mating Face Note",
+        edge_xy=mating_edge, note_xy=(0.250, 0.260),
+    )
     for view in (front, bottom):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError("stop tap centre marks failed")
@@ -134,7 +182,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.024, 0.036)
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
-                                  scale=SHEET_SCALE, layout=SPEC.layout)
+                                  scale=SHEET_SCALE, layout=SPEC.layout,
+                                  redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,
+                                  expected_redundant_notes=2)
 
 
 if __name__ == "__main__":

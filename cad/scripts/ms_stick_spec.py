@@ -39,18 +39,24 @@ NUMERALS_BBOX = (58.300, 1.393, 198.700, 4.400)
 
 # Width and thickness govern the running clearance in the 8.4 x 3.4 stop
 # window; engraving position accuracy is noncumulative along the scale.
+# The 2026-10-10 stock-length ruling keeps nominal geometry and the complete last
+# tick: routine +/-0.1 facing gives a 199.90 minimum against a 199.825 maximum
+# groove edge. A one-place title-block band would erase that graduation.
+# Depth only holds enamel: its loose band leaves 2.3 mm of stock at worst case
+# (minimum thickness minus maximum depth), above the 2.0 mm web target.
+BODY_LENGTH_TOLERANCE_MM = 0.1
 BODY_FIT_TOLERANCE_MM = 0.1
 GRADUATION_POSITION_TOLERANCE_MM = 0.05
-GRADUATION_WIDTH_DEPTH_TOLERANCE_MM = 0.05
+GRADUATION_WIDTH_TOLERANCE_MM = 0.05
+GRADUATION_DEPTH_TOLERANCE_MM = 0.1
 GRADUATION_LENGTH_TOLERANCE_MM = 0.1
-SCALE_END_MARGIN_TOLERANCE_MM = 0.25
 NUMERAL_TOLERANCE_MM = 0.1
 
 # Construction chords use the actual finished edge and actual groove/glyph
-# extents. They carry sizes which the cut's overhanging profile does not own.
+# extents. The print locates the scale from the left end only; ScaleEndMargin
+# remains an editable model global, not a closing manufacturing requirement.
 REFERENCE_DIMENSIONS = {
     "ScaleStartReference": ("ScaleStartX", (0.0, BODY_WIDTH), (SCALE_START_X, BODY_WIDTH)),
-    "ScaleEndReference": ("ScaleEndMargin", (BODY_LENGTH - SCALE_END_MARGIN, BODY_WIDTH), (BODY_LENGTH, BODY_WIDTH)),
     "FullLengthReference": ("FullTickLength", (SCALE_START_X, BODY_WIDTH - TICK_LENGTH), (SCALE_START_X, BODY_WIDTH)),
     "MinorLengthReference": ("MinorTickLength", (SCALE_START_X + MINOR_SPACING, BODY_WIDTH - MINOR_TICK_LENGTH), (SCALE_START_X + MINOR_SPACING, BODY_WIDTH)),
     "HalfLengthReference": ("HalfTickLength", (SCALE_START_X + DIVISION_SPACING / 2.0, BODY_WIDTH - HALF_TICK_LENGTH), (SCALE_START_X + DIVISION_SPACING / 2.0, BODY_WIDTH)),
@@ -75,12 +81,12 @@ DRAWING_PRECISION_BY_NAME = {
     name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()
 }
 DRAWING_TOLERANCES = {
+    "BodyLength": BODY_LENGTH_TOLERANCE_MM,
     "BodyWidth": BODY_FIT_TOLERANCE_MM,
     "BodyThickness": BODY_FIT_TOLERANCE_MM,
-    "Tick0Width": GRADUATION_WIDTH_DEPTH_TOLERANCE_MM,
-    "TickDepth": GRADUATION_WIDTH_DEPTH_TOLERANCE_MM,
+    "Tick0Width": GRADUATION_WIDTH_TOLERANCE_MM,
+    "TickDepth": GRADUATION_DEPTH_TOLERANCE_MM,
     "ScaleStartX": GRADUATION_POSITION_TOLERANCE_MM,
-    "ScaleEndMargin": SCALE_END_MARGIN_TOLERANCE_MM,
     "FullTickLength": GRADUATION_LENGTH_TOLERANCE_MM,
     "MinorTickLength": GRADUATION_LENGTH_TOLERANCE_MM,
     "HalfTickLength": GRADUATION_LENGTH_TOLERANCE_MM,
