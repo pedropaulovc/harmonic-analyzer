@@ -297,9 +297,9 @@ HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.072)
 # caption).  Its 59.7 x 4.8 mm box, anchored upper-left and centred under
 # the notch plan, clears the 7.0 arrow tip (y 0.1276) above.
 NOTCH_CAPTION_UPPER_LEFT = (NOTCH_CENTER[0] - 0.02985, 0.1255)
-# The pivot on the profile plan, from the NE/NW corner-radius stations below
-# (their fillet centres sit at model (-6.35, -3) and (0.97, -1) mm).
-PROFILE_PIVOT_XY = (0.0718, 0.1377)
+# The pivot on the profile plan, where the farm run at 039e557da landed it
+# (the plate's current outline re-centres the 1:2 view).
+PROFILE_PIVOT_XY = (0.0718, 0.1357)
 
 
 def plate_edge_mm(z_mm: float, side: int) -> float:
@@ -792,6 +792,25 @@ def expected_corner_arcs(feature_name: str) -> int:
     return 2 if _part._north_fillet_relief_overlap(label, radius) > 0.0 else 1
 
 
+def corner_fillet_centre_mm(label: str) -> tuple[float, float]:
+    """Model plan (x, z) of a corner fillet's centre, from the part's own corners.
+
+    The build fillets the sharp ``PLATE_CORNERS`` vertex, so the arc centre
+    lies on the interior bisector, r / sin(theta / 2) from the vertex.
+    """
+    corners = _part.PLATE_CORNERS
+    idx = [corner[0] for corner in corners].index(label)
+    _label, x, z, radius = corners[idx]
+    rays = []
+    for _n, nx, nz, _r in (corners[idx - 1], corners[(idx + 1) % len(corners)]):
+        length = math.hypot(nx - x, nz - z)
+        rays.append(((nx - x) / length, (nz - z) / length))
+    bx, bz = rays[0][0] + rays[1][0], rays[0][1] + rays[1][1]
+    norm = math.hypot(bx, bz)
+    reach = radius / math.sin(_part._corner_theta(label) / 2.0)
+    return (x + bx / norm * reach, z + bz / norm * reach)
+
+
 def check_corner_arc_plan(
     name: str, plan: list[tuple[float, float, float]], expected: int
 ) -> None:
@@ -807,7 +826,7 @@ def check_corner_arc_plan(
 
 def _assert_corner_radius_attachment(
     adapter: Any, view: Any, annotations: list[Any], *,
-    name: str, feature_name: str, radius_m: float, station_xy: tuple[float, float],
+    name: str, feature_name: str, radius_m: float,
 ) -> None:
     """Prove a native radius dimension's arrow lies on its owned visible arc."""
     matches = [item for item in annotations if dimension_name(adapter, item) == name]
@@ -838,6 +857,7 @@ def _assert_corner_radius_attachment(
         raise RuntimeError(f"expected one {name} arrow tip, found {arrows}")
     arrow = arrows[0]
     visible = visible_view_entities(view, 1, label=f"{name} visible corner edges")
+    centre_mm = corner_fillet_centre_mm(feature_name.removeprefix("Corner"))
     candidates = []
     for raw_face in owner.GetFaces() or ():
         face = _early_bound(raw_face, "IFace2")
@@ -855,9 +875,12 @@ def _assert_corner_radius_attachment(
             circle = tuple(float(value) for value in curve.CircleParams)
             if abs(circle[6] - radius_m) > 1e-8:
                 continue
+            # The owned arc's centre must be this corner's, in model space;
+            # sheet stations went stale whenever the plate moved on the sheet.
+            if math.dist((circle[0] * 1000.0, circle[2] * 1000.0), centre_mm) > 0.01:
+                continue
             center = model_point_in_view(adapter, view, circle[:3], label=f"{name} owned circle")
-            if all(abs(center[i] - station_xy[i]) <= 0.001 for i in (0, 1)):
-                candidates.append((edge, circle, center))
+            candidates.append((edge, circle, center))
     # W18 (5db29554, run d9711228): the open pivot relief crosses the NW
     # fillet, so its plan arc is two physical edges on one circle -- one on
     # the 6.35 top, one on the 6.10 relief floor.  Every owned visible arc
@@ -1223,15 +1246,15 @@ async def build(adapter: Any) -> dict[str, str]:
         str(thickness_reference.GetText(2)),
     ) != ("(", ")"):
         raise RuntimeError("stock plate thickness reference state did not persist")
-    for name, feature_name, radius_m, station_xy in (
-        ("CornerSWR", "CornerSW", 0.005, (0.0875, 0.2433)),
-        ("CornerNWR", "CornerNW", 0.008, (0.0723, 0.1382)),
-        ("CornerNER", "CornerNE", 0.010, (0.0686, 0.1392)),
-        ("CornerSER", "CornerSE", 0.012, (0.0660, 0.2398)),
+    for name, feature_name, radius_m in (
+        ("CornerSWR", "CornerSW", 0.005),
+        ("CornerNWR", "CornerNW", 0.008),
+        ("CornerNER", "CornerNE", 0.010),
+        ("CornerSER", "CornerSE", 0.012),
     ):
         _assert_corner_radius_attachment(
             adapter, profile, profile_annotations,
-            name=name, feature_name=feature_name, radius_m=radius_m, station_xy=station_xy,
+            name=name, feature_name=feature_name, radius_m=radius_m,
         )
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")

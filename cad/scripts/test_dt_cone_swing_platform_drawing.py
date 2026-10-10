@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import sys
 import types
@@ -214,6 +215,22 @@ def test_corner_arc_count_follows_the_relief_overlap() -> None:
         drawing.check_corner_arc_plan(
             "CornerNWR", [split[0], (0.0070, 0.007, 0.008)], 2
         )
+
+
+def test_corner_arc_station_is_the_fillet_centre_in_model_space() -> None:
+    """The farm run at 039e557da found 0 CornerSW arcs at a stale sheet station.
+
+    The station is now the model fillet centre: radius r from both edges
+    that meet at the corner, so moving the plate on the sheet cannot stale it.
+    """
+    corners = part.PLATE_CORNERS
+    for index, (label, x, z, radius) in enumerate(corners):
+        cx, cz = drawing.corner_fillet_centre_mm(label)
+        for _n, nx, nz, _r in (corners[index - 1], corners[(index + 1) % len(corners)]):
+            cross = (nx - x) * (cz - z) - (nz - z) * (cx - x)
+            assert abs(cross) / math.hypot(nx - x, nz - z) == pytest.approx(radius)
+    source = inspect.getsource(drawing._assert_corner_radius_attachment)
+    assert "station_xy" not in source and "corner_fillet_centre_mm" in source
 
 
 def test_disengaged_collar_margin_survives_general_bands() -> None:
@@ -578,8 +595,14 @@ def test_holddown_section_arrows_clear_the_profile_plan() -> None:
     arrows, letters = _cc_arrows_and_letters(drawing.HOLDDOWN_SECTION_LINE_X_MM)
     for side, arrow, letter in zip((-1, 1), arrows, letters):
         assert _clears_plate(arrow, side) and _clears_plate(letter, side)
-    r10_leader = ((0.051, 0.139), (0.0686 - 0.00354, 0.1392 - 0.00354))
-    r8_leader = ((0.135, 0.118), (0.0723 + 0.00283, 0.1382 - 0.00283))
+    def arc_tip(label, dx, dy):
+        # Sheet-up is model -z; the leader meets the arc at 45 degrees.
+        cx, cz = drawing.corner_fillet_centre_mm(label)
+        radius = {c[0]: c[3] for c in part.PLATE_CORNERS}[label] * 0.0005 / math.sqrt(2.0)
+        return (px + cx * 0.0005 + dx * radius, py - cz * 0.0005 + dy * radius)
+
+    r10_leader = ((0.051, 0.139), arc_tip("NE", -1.0, -1.0))
+    r8_leader = ((0.135, 0.118), arc_tip("NW", 1.0, -1.0))
     north_edge_y = py - part.NORTH_OVERHANG * 0.0005
     nw_x = px + part.WEST_HALF_N * 0.0005
     nw_extension = ((nw_x, 0.113), (nw_x, north_edge_y))
