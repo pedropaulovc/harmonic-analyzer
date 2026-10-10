@@ -1380,15 +1380,18 @@ async def build(adapter: Any) -> dict[str, str]:
                 ),
             ),
             # The frame sits right of the head between HeadHt's extension
-            # lines, its leader landing on the bore rim at -28 degrees,
-            # between the CRANK BOSS diameter line and the centre-mark arm:
+            # lines, 3.7 mm below the crank axis, so it rides with the head
+            # when the post's height moves (a fixed y=0.138 met HeadHt's lower
+            # witness once the inch-train body grew to 94.7). Its leader lands
+            # on the bore rim at -28 degrees, between the CRANK BOSS diameter
+            # line and the centre-mark arm:
             # from (0.160, 0.128) to the natural lower-left landing it
             # crossed HeadHt's and CrankBossDia's lines (leader-crosses-line,
             # af13).  A sheet-point pick sets the landing; explicit leader
             # placement detached a GTol from its edge (fulcrum 1149f227f).
             "crank_bore_angularity": PmiDrawingPlacement(
                 view=front,
-                position=(0.124, 0.138),
+                position=(0.124, _front_y(CRANK_BORE_HEIGHT) - 0.0037),
                 attachment_xy=(
                     _front_x(CRANK_BORE_DIA / 2.0 * math.cos(math.radians(-28.0))),
                     _front_y(
