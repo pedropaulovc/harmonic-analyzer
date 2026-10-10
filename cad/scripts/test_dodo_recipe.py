@@ -750,6 +750,10 @@ def _assembly_helper_inputs(tmp_path_factory):
                 root if original.is_relative_to(root) else REPO_ROOT
             )
 
+        for task in (*part_tasks.values(), *assembly_tasks.values()):
+            for target in task["targets"]:
+                assert Path(target).resolve().is_relative_to(root), target
+
         return _AssemblyHelperInputs(
             recipes=tuple(
                 (stem, tuple(relative(path) for path in paths))

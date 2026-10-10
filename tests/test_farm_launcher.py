@@ -1904,21 +1904,30 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     started = time.time()
     parent = subprocess.Popen(
         [
-            sys.executable,
+            sys._base_executable,
             "-c",
-            "import subprocess, sys; "
-            f"print(subprocess.Popen([sys.executable, '-c', {SLEEPER!r}, *{extra!r}], "
+            "import json, os, subprocess, sys; "
+            f"child = subprocess.Popen([sys._base_executable, '-c', {SLEEPER!r}, *{extra!r}], "
             "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
-            "stderr=subprocess.DEVNULL).pid)",
+            "stderr=subprocess.DEVNULL); "
+            "print(json.dumps([os.getpid(), child.pid]), flush=True)",
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
-    output, errors = parent.communicate(timeout=HANG_GUARD_S)
+    try:
+        output, errors = parent.communicate(timeout=HANG_GUARD_S)
+    except BaseException:
+        parent.kill()
+        parent.communicate(timeout=HANG_GUARD_S)
+        raise
     assert parent.returncode == 0, (output, errors)
-    assert not _process_alive(parent.pid)
-    child = int(output)
+    parent_pid, child = json.loads(output)
+    # These stdlib-only collaborators use the base executable, not a venv
+    # redirector: the retained handles identify the actual Python processes.
+    assert parent_pid == parent.pid
+    assert not _process_alive(parent_pid)
 
     # Keep this exact sleeper's handle: cleanup must not kill a different
     # process if the sleeper exits and its numeric PID is later reused.
@@ -1939,7 +1948,7 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     try:
         _write_run_record(
             fixture,
-            pid=parent.pid,
+            pid=parent_pid,
             tag="reused",
             workflow=LEAF_NUT,
             argv=["uv", "-c", recorded_code],
