@@ -5,6 +5,8 @@ head-side edge. The aligned end view gives thickness; the native clearance
 callout gives the decimal drill size, never merely a screw designation.
 The shared millimetre hole-mouth coordinates convert to COM metres before
 projection into the cover-side *Back view.
+Native callout positions centre their text; the full drill instruction and
+the linked process notes stay inside the print border, clear of the title.
 """
 
 from __future__ import annotations
@@ -77,7 +79,7 @@ async def build(adapter: Any) -> dict[str, str]:
             (part.PLATE_HOLE_XS[0] + part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MIN / 1000.0,
         ), label="plate clearance mouth")
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.030, 0.055),
+    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.115, 0.075),
                            label="two cover clearance holes", process="2X MATCH-DRILL; THEN OPEN")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")
@@ -93,8 +95,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (front, right):
         set_hidden_lines_removed(adapter, view)
-    add_property_linked_note(adapter, "Isometric View Note", 0.295, 0.055)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.025, 0.023)
+    add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.124)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.024, 0.036)
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Plate Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout)

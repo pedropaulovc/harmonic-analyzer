@@ -5,6 +5,8 @@ native Hole Wizard callouts define the orthogonal taps, including blind full
 thread and drill depths. Every controlling dimension is imported unchanged.
 Hole-mouth points convert the shared millimetre frame to COM metres before
 projection; the cover-side *Back view reverses X, not the coordinate units.
+Native callout positions centre their text; reserve the full two-line tap
+instruction inside the print border and keep the thumb callout off the title.
 """
 
 from __future__ import annotations
@@ -87,14 +89,14 @@ async def build(adapter: Any) -> dict[str, str]:
             (part.PLATE_HOLE_XS[0] + part.PLATE_TAP_DRILL_DIA / 2.0) / 1000.0,
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
-    add_native_hole_callout(adapter, front, edge_xy=plate_edge, callout_xy=(0.030, 0.105),
+    add_native_hole_callout(adapter, front, edge_xy=plate_edge, callout_xy=(0.125, 0.118),
                            label="two cover blind taps", process="2X MATCH-DRILL; THEN BOTTOMING TAP")
     thumb_edge = model_point_in_view(
         adapter, bottom, (
             (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0) / 1000.0,
             0.0, part.THUMB_AXIS_Z / 1000.0,
         ), label="thumb tap mouth")
-    add_native_hole_callout(adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.235, 0.045),
+    add_native_hole_callout(adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.070, 0.050),
                            label="thumbscrew tap through floor")
     for view in (front, bottom):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
@@ -111,8 +113,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
-    add_property_linked_note(adapter, "Isometric View Note", 0.295, 0.055)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.025, 0.023)
+    add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.124)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.024, 0.036)
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout)

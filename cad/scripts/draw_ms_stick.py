@@ -20,7 +20,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs, add_property_linked_note, create_blank_drawing_sheets,
     create_section_view, finalize_drawing, model_point_in_view, new_project_drawing,
-    read_required_properties, set_dimension_callouts, set_hidden_lines_removed,
+    read_required_properties, rebuild_drawing, set_dimension_callouts, set_hidden_lines_removed,
     stamp_drawing_summary, view_name,
 )
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
@@ -180,14 +180,30 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations += curate_view_dimensions(adapter, detail, keep=DETAIL_KEEP,
                                                view_label="graduation detail",
                                                dimensions_by_feature=part.DRAWING_DIMENSIONS)
-    start = model_point_in_view(adapter, detail, (part.SCALE_START_X / 1000.0, -0.001, 0.0),
-                                label="engraving section start")
-    end = model_point_in_view(adapter, detail,
-                              (part.SCALE_START_X / 1000.0, (part.BODY_WIDTH + 1.0) / 1000.0, 0.0),
-                              label="engraving section end")
+    # Front-plane cuts run in Z, like BodyThickness imported in the Top view.
+    # Use that XZ section plane across the seed groove, not a longitudinal YZ
+    # slice down its centre. Cut strictly inside its finished length and include
+    # material either side of its finite width to show the square-bottom profile.
+    section_y = (part.BODY_WIDTH - part.TICK_LENGTH / 2.0) / 1000.0
+    start = model_point_in_view(
+        adapter, detail,
+        ((part.SCALE_START_X - part.TICK_WIDTH / 2.0 - 1.0) / 1000.0, section_y, 0.0),
+        label="engraving section start")
+    end = model_point_in_view(
+        adapter, detail,
+        ((part.SCALE_START_X + part.TICK_WIDTH / 2.0 + 1.0) / 1000.0, section_y, 0.0),
+        label="engraving section end")
     section = create_section_view(adapter, detail, line_start=start, line_end=end,
                                   view_xy=SECTION_CENTER, section_label="B", scale=DETAIL_SCALE,
-                                  label="square-bottom engraving depth")
+                                  partial=True, label="square-bottom engraving depth")
+    cut = _early_bound(_early_bound(section, "IView").GetSection(), "IDrSection")
+    # Native void setter: prove persistence with the dedicated bool readbacks.
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="engraving section cut face")
+    if not bool(cut.GetDisplayOnlySurfaceCut()):
+        raise RuntimeError("engraving section kept geometry beyond the cut")
+    if not bool(cut.GetPartialSection()):
+        raise RuntimeError("engraving section is not a partial section")
     set_hidden_lines_removed(adapter, section)
     annotations += curate_view_dimensions(adapter, section, keep=SECTION_KEEP,
                                            view_label="engraving depth section",
