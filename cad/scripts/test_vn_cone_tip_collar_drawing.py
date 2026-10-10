@@ -261,10 +261,40 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
     # Edges stay sharp in the model: the title block covers the collar's
     # breaks, and the dog's tighter limit is printed once on its diameter.
     assert "add_chamfer" not in source
-    assert spec.DOG_EDGE_CALLOUT.replace("\n", " ") == (
-        f"DOG EDGE: STONE BURR ONLY, {spec.DOG_EDGE_BREAK:.2f} MAX"
-    )
-    assert '{"DogDia": spec.DOG_EDGE_CALLOUT}' in drawing_source
+    # One line: an above callout's line break prints nothing (main's guard).
+    assert drawing.DOG_EDGE_CALLOUT == f"STONE DOG EDGE {spec.DOG_EDGE_BREAK:.2f} MAX"
+    assert drawing._printable_above_callouts({"DogDia": drawing.DOG_EDGE_CALLOUT})
+    with pytest.raises(RuntimeError, match="do not print"):
+        drawing._printable_above_callouts({"DogDia": "DOG EDGE:\nSTONE"})
+    assert '_printable_above_callouts({"DogDia": DOG_EDGE_CALLOUT})' in drawing_source
+    # The screw faces resolve in the configuration the screw views draw.
+    assert "_show_view_configuration(adapter, screw)" in drawing_source
+
+
+def test_screw_faces_resolve_in_the_views_configuration(monkeypatch):
+    """4323e8d1e resolved datum D in Default while the view drew SetScrew."""
+    shown = []
+
+    class Part:
+        active = "Default"
+
+        def ShowConfiguration2(self, name):
+            shown.append(name)
+            self.active = name
+            return True
+
+    part_doc = Part()
+    view = SimpleNamespace(ReferencedDocument=part_doc, ReferencedConfiguration="SetScrew")
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "active_configuration_name", lambda _a, p: p.active)
+    resolved, restore = drawing._show_view_configuration(None, view)
+    assert resolved is part_doc and part_doc.active == "SetScrew"
+    restore()
+    assert shown == ["SetScrew", "Default"] and part_doc.active == "Default"
+    part_doc.ShowConfiguration2 = lambda _name: False
+    with pytest.raises(RuntimeError, match="refused to show SetScrew"):
+        drawing._show_view_configuration(None, view)
+
 
 
 def test_blind_tap_qualifier_retains_native_depth_variables():

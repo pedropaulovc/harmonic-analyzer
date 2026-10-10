@@ -14,7 +14,7 @@ from typing import Any
 
 import _telemetry
 import vn_cone_tip_collar_spec as spec
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, active_configuration_name, check, run_build
 from _drawing_common import (
     DrawingOutputs, PmiDrawingPlacement, add_native_hole_callout, add_property_linked_note,
     assert_imported_precision, create_blank_drawing_sheets,
@@ -55,6 +55,11 @@ BORE_CENTER = (0.350, 0.080)
 BORE_KEEP = {"BoreDia": (0.310, 0.110)}
 SCREW_CENTER = (0.170, 0.165)
 SCREW_KEEP = {"DogDia": (0.075, 0.200), "DogLength": (0.096, 0.116)}
+# The dog's edge-break limit, printed above DogDia.  One line: SolidWorks
+# stores an above callout's line break but prints none of it (main's
+# pd_transgear drawings; the cone shaft's torque corners at
+# 20261010T071427837Z).  Stoning is named because it matches the number.
+DOG_EDGE_CALLOUT = f"STONE DOG EDGE {spec.DOG_EDGE_BREAK:.2f} MAX"
 
 
 def _configuration(adapter, views, name):
@@ -64,6 +69,42 @@ def _configuration(adapter, views, name):
         if str(native.ReferencedConfiguration) != name:
             raise RuntimeError(f"view failed to reference {name}")
     rebuild_drawing(adapter, label=f"collar {name} views")
+
+
+def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
+    """Refuse an above-callout SolidWorks would keep but not print (main's
+    draw_pd_transgear_thumbnut guard: a line break in the above compartment
+    reads back from COM yet nothing of the callout reaches the PDF)."""
+    broken = sorted(name for name, text in callouts.items() if "\n" in text)
+    if broken:
+        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
+    return callouts
+
+
+def _show_view_configuration(adapter, view):
+    """The part ``view`` references, shown in the configuration the view
+    draws, and a callable that restores the part's previous configuration.
+
+    A face resolved in another configuration is another object: resolved in
+    Default (collar and screw bodies) while the screw views draw SetScrew,
+    datum D's FACE pick read back as a different face (farm run at 4323e8d1e:
+    "datum D pick resolved to a face other than the one named")."""
+    native = _early_bound(view, "IView")
+    part = _early_bound(native.ReferencedDocument, "IModelDoc2")
+    wanted = str(native.ReferencedConfiguration)
+    active = active_configuration_name(adapter, part)
+    if active != wanted and not bool(part.ShowConfiguration2(wanted)):
+        raise RuntimeError(f"collar part refused to show {wanted} for its view faces")
+    if active_configuration_name(adapter, part) != wanted:
+        raise RuntimeError(f"collar part did not show {wanted} for its view faces")
+
+    def restore() -> None:
+        if active_configuration_name(adapter, part) != active and not bool(
+            part.ShowConfiguration2(active)
+        ):
+            raise RuntimeError(f"collar part refused to restore {active}")
+
+    return part, restore
 
 
 def _horizontal_axis(adapter, view):
@@ -280,41 +321,51 @@ async def build(adapter: Any) -> dict[str, str]:
                                   view_label="ground stock screw", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     assert_imported_precision(adapter, marks, _precision(SCREW_KEEP))
     # Above the value: the freed lane where the old break dimension stood.
-    set_dimension_callouts(adapter, marks, {"DogDia": spec.DOG_EDGE_CALLOUT}, location="above")
+    set_dimension_callouts(
+        adapter, marks, _printable_above_callouts({"DogDia": DOG_EDGE_CALLOUT}),
+        location="above",
+    )
     # The major and dog diameters draw as a revolve's flank SILHOUETTES, not
     # model edges, so an EDGE pick at their projected points misses (farm run
     # at a0defd137: "failed to select ... datum:D edge at sheet (0.219831,
     # 0.221844)"). Main's form (draw_dt_pinion_cam_pin._crown_face): attach to
     # the part-owned FACE resolved on the referenced part; the projected point
     # stays as the frame's leader landing.
-    screw_faces = _resolve_faces(
-        _early_bound(_early_bound(screw, "IView").ReferencedDocument, "IModelDoc2"),
-        {
-            **{datum.key: datum.face for datum in spec.SCREW_DATUMS},
-            **{control.key: control.face for control in spec.SCREW_CONTROLS},
-        },
-    )
-    project_part_pmi(
-        adapter,
-        placements={
-            "datum:D": PmiDrawingPlacement(
-                view=screw, position=(0.203, 0.203),
-                entity=screw_faces["datum:D"], attachment_type="FACE",
-            ),
-            "ground_dog_runout": PmiDrawingPlacement(
-                view=screw, position=(0.046, 0.161),
-                entity=screw_faces["ground_dog_runout"], attachment_type="FACE",
-                leader_attachment_xy=point(
-                    screw,
-                    (spec.SET_SCREW_SEAT_RADIUS + spec.DOG_LENGTH / 2.0,
-                     spec.TAP_STATION + spec.DOG_DIA / 2.0, 0.0),
-                    "ground dog runout face",
+    part, restore = _show_view_configuration(adapter, screw)
+    try:
+        screw_faces = _resolve_faces(
+            part,
+            {
+                **{datum.key: datum.face for datum in spec.SCREW_DATUMS},
+                **{control.key: control.face for control in spec.SCREW_CONTROLS},
+            },
+        )
+        project_part_pmi(
+            adapter,
+            placements={
+                "datum:D": PmiDrawingPlacement(
+                    view=screw, position=(0.203, 0.203),
+                    entity=screw_faces["datum:D"], attachment_type="FACE",
                 ),
-            ),
-        },
-        datums=spec.SCREW_DATUMS, controls=spec.SCREW_CONTROLS,
-        label="ground dog relative to retained stock thread",
-    )
+                "ground_dog_runout": PmiDrawingPlacement(
+                    view=screw, position=(0.046, 0.161),
+                    entity=screw_faces["ground_dog_runout"], attachment_type="FACE",
+                    # Mid-length, half a radius off the axis: inside the dog
+                    # face's projection, not on its silhouette, where a
+                    # landing could re-solve onto the neighbouring flank.
+                    leader_attachment_xy=point(
+                        screw,
+                        (spec.SET_SCREW_SEAT_RADIUS + spec.DOG_LENGTH / 2.0,
+                         spec.TAP_STATION + spec.DOG_DIA / 4.0, 0.0),
+                        "ground dog runout face",
+                    ),
+                ),
+            },
+            datums=spec.SCREW_DATUMS, controls=spec.SCREW_CONTROLS,
+            label="ground dog relative to retained stock thread",
+        )
+    finally:
+        restore()
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.080)
     add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.210)
     for sheet in SHEET_NAMES:
