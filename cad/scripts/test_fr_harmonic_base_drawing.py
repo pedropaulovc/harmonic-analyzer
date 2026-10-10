@@ -1625,11 +1625,6 @@ def test_flange_finish_fits_sheet_1_left_of_the_plan_with_named_margins() -> Non
         # R22.2 FLANGE corner callout above it: its two-row block hangs from
         # (0.040, 0.215) down to ~0.2104 (hb-render-5 sheet 1).
         "flange corner radius callout": 0.2104 - box[3],
-        # The deck edge-break callout above it: three rows, hanging ~1.5x as
-        # far below its anchor as the two-row flange block hangs below its.
-        "deck edge chamfer callout": sheet.GEOMETRY_TOP_KEEP["DeckEdgeChamfer"][1]
-        - 1.5 * (0.215 - 0.2104)
-        - box[3],
         # The stamped-ID note below the plan now starts right of this row.
         "stamped-ID note": sheet.SERIAL_NOTE_XY[0] - box[2],
     }

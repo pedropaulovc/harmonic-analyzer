@@ -290,10 +290,6 @@ GEOMETRY_TOP_KEEP = {
     # On the top-left deck corner, reading above the pad radius so the two
     # radial leaders do not cross.
     "DeckCornerRadius": (0.062, 0.252),
-    # Left of the plan, between the flange finish symbol's row and the
-    # flange-corner radius: its leader reaches the deck edge across the
-    # flange and pad outlines only.
-    "DeckEdgeChamfer": (0.050, 0.200),
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
@@ -301,6 +297,12 @@ SIDE_KEEP = {
     # Right of the front view, above the deck step it measures at its right
     # end; the 0.75 mm span on paper puts the arrows outside.
     "DeckRise": (0.228, 0.116),
+    # The front view, not the plan: a chamfer dimension imports only where its
+    # edge shows in profile (farm leaf 20261010T064423Z: the plan import
+    # delivered every other plan dimension but this one). Above DeckRise in
+    # the strip right of the front view and below the plan; the serial note
+    # holds the matching strip on the left.
+    "DeckEdgeChamfer": (0.205, 0.138),
 }
 HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
 # Section A-A lays machine +Y across the sheet, so the spotface depth -- a
