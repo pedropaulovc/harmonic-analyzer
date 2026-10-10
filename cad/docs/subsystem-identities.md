@@ -98,7 +98,7 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 ## Identity migration table
 
-The table covers 147 part families and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
+The table covers 148 part families and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
 Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws.
 
@@ -249,6 +249,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | `transgear-retaining-ring` | `vn-transgear-retaining-ring` | MHA-182 | MHA-VN-047 |
 | part | `transgear-knob-cup-pin` | `vn-transgear-knob-cup-pin` | MHA-183 | MHA-VN-048 |
 | part | `transgear-pivot-spring` | `vn-transgear-pivot-spring` | MHA-184 | MHA-VN-049 |
+| part | — | `vn-transgear-arm-plate-locating-pin` | — | MHA-VN-054 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |

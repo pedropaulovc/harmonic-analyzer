@@ -1,4 +1,4 @@
-"""MHA-VN-051: live-sourced McMaster 93600A189 arm/plate locating dowel.
+"""MHA-VN-054: live-sourced McMaster 93600A189 arm/plate locating dowel.
 
 316 stainless steel, passivated, ISO 2338-m6, both ends chamfered. The
 supplier specifies diameter2.002..2.008 and nominal length6mm.
@@ -15,7 +15,7 @@ from __future__ import annotations
 import math
 
 SKU = "93600A189"
-PART_NUMBER = "MHA-VN-051"
+PART_NUMBER = "MHA-VN-054"
 PART_STEM = "vn-transgear-arm-plate-locating-pin"
 ASSEMBLY_QUANTITY = 2
 DIA = 2.0

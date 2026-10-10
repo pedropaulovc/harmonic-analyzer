@@ -29,7 +29,6 @@ from _drawing_common import (
     assert_imported_precision,
     check_drawing_layout,
     create_section_view,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -39,6 +38,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum

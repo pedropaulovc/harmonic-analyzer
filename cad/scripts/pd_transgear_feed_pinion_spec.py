@@ -36,7 +36,8 @@ import math
 
 import pd_rack_pinion_spec
 import pd_transgear_pin_spec
-from _fit_limits import deviations, gear_tip_band_mm
+from _fit_limits import deviations
+from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import (
     pinion_pitch_index_deviation_mm,
     pitch_index_measurement_uncertainty_mm,

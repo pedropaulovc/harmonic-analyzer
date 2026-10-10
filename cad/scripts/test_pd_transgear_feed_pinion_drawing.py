@@ -610,7 +610,7 @@ def test_bore_fit_leader_passes_clear_of_the_finish() -> None:
 
 
 def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
-    from _fit_limits import gear_tip_band_mm
+    from _gear_fit_limits import gear_tip_band_mm
 
     # The independent feed count/master does not follow the reducer's choice.
     source = Path(spec.__file__).read_text(encoding="utf-8")
