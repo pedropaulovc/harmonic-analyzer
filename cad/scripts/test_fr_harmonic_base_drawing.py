@@ -1859,9 +1859,21 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
     spec = fr_harmonic_base_spec
     prefixes = {name: prefix for (_f, name), prefix in spec.UNDERSIDE_PAD_PREFIXES.items()}
     printed = _pads_printed()
+    # A vertical size whose text reads beyond its span hangs the text WEST of
+    # its dimension line (at the keep X) over a shoulder line, as measured on
+    # the 13f1ca261 sheet-4 render: 1.3 mm from the line, 2.3 mm a glyph
+    # ("2X 26.0" 15.9 mm, "2X 16.0" 15.6 mm), the shoulder 0.8 mm under the
+    # text and 1.3 mm past its far end.
+    hanging = ("PedestalPadLength", "BlockPad0Width")
+    hang_gap, glyph, shoulder_drop = 0.0013, 0.0023, 0.0008
     boxes = {}
     for name, (x, y) in sheet.UNDERSIDE_PADS_KEEP.items():
-        half_w = len(f"{prefixes.get(name, '')}{printed[name]:.1f}") * _DIM_CHAR_M / 2.0
+        chars = len(f"{prefixes.get(name, '')}{printed[name]:.1f}")
+        if name in hanging:
+            right = x - hang_gap
+            boxes[name] = (right - chars * glyph, y - _DIM_TEXT_H_M / 2.0, right, y + _DIM_TEXT_H_M / 2.0)
+            continue
+        half_w = chars * _DIM_CHAR_M / 2.0
         boxes[name] = (x - half_w, y - _DIM_TEXT_H_M / 2.0, x + half_w, y + _DIM_TEXT_H_M / 2.0)
     view = (
         *sheet._pads_xy(-spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_FRONT_Z),
@@ -1926,11 +1938,16 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
     }.items():
         tx, ty = sheet.UNDERSIDE_PADS_KEEP[name]
         (ax, ay), (_bx, by) = sheet._pads_xy(x, z0), sheet._pads_xy(x, z1)
+        # Beyond the span (so hung), west of the measured side.
+        assert ty - _DIM_TEXT_H_M / 2.0 - shoulder_drop > max(ay, by), name
+        assert tx < ax, name
+        shoulder_y = ty - _DIM_TEXT_H_M / 2.0 - shoulder_drop
         reach = tx + math.copysign(over, tx - ax)
         lines[name] = [
             ((ax, ay), (reach, ay)),
             ((ax, by), (reach, by)),
-            ((tx, min(ay, ty)), (tx, max(by, ty))),
+            ((tx, min(ay, shoulder_y)), (tx, max(by, shoulder_y))),
+            ((boxes[name][0] - hang_gap, shoulder_y), (tx, shoulder_y)),
         ]
     assert set(lines) == set(boxes)
     for name, box in boxes.items():
@@ -2011,6 +2028,9 @@ def test_nameplate_tags_read_clear_of_section_a_and_of_every_other_tag() -> None
     ]
     radius = part.NAMEPLATE_SCREW_HOLE_DIA * sheet.VIEW_SCALE / 2000.0
     boxes = [box for box, _ in tags] + others
+    for other in others:
+        for hole in taps:
+            assert _box_gap(other, (hole[0], hole[1], hole[0], hole[1])) > radius + 0.0008, other
     for i, (box, leader) in enumerate(tags):
         for hole in taps:
             assert _box_gap(box, (hole[0], hole[1], hole[0], hole[1])) > radius + 0.0008

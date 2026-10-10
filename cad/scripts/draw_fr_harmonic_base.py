@@ -379,7 +379,9 @@ HOLE_TAG_POSITIONS = {
     # with U34c the arbor-pedestal seats followed them, taking the last #4-40
     # rows (the former E) along. The native tags re-letter: the
     # rocker-support taps are now E and the nameplate seats are now F.
-    "E1": (0.306, 0.187),
+    # North-east of its tap, short of E3's tap and west of the nameplate's
+    # rear-west tap, whose mark the former (0.306, 0.187) box sat on.
+    "E1": (0.297, 0.1895),
     "E2": (0.289, 0.206),
     "E3": (0.312, 0.173),
     "E4": (0.312, 0.214),
@@ -977,13 +979,17 @@ PADS_Y_COLUMNS = (
 # 16.0 reads left of it between the front pads' Y lines; the pedestal pad's
 # length rises from its west side and its width drops below its front edge;
 # the block pad's width rises from its west side, a row above the length.
+# A vertical dimension whose text reads beyond its span hangs the text WEST
+# of its dimension line, which runs at the keep X (13f1ca261 render): the
+# pedestal length's line hugs its pad so its "2X 26.0" ends clear of the
+# lock pad's X extension line (at the gap's midpoint it ran through "2X").
 PADS_SIZE_TEXT_MM = {
     "LockPadWidth": (
         _LOCK_PAD[1] - 15.0,
         (_FRONT_BLOCK_PAD[3] + _FRONT_PEDESTAL_PAD[4]) / 2.0,
     ),
     "PedestalPadLength": (
-        (_LOCK_PAD[2] + _FRONT_PEDESTAL_PAD[1]) / 2.0,
+        _FRONT_PEDESTAL_PAD[1] - 1.6,
         _FRONT_PEDESTAL_PAD[4] + 16.0,
     ),
     "PedestalPad0Width": (_FRONT_PEDESTAL_PAD[2] + 22.5, _FRONT_PEDESTAL_PAD[3] - 9.0),
