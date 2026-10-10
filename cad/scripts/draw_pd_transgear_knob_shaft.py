@@ -24,7 +24,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -44,6 +44,7 @@ from _drawing_common import (
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
+from _part_pmi import _resolve_faces
 from _surface_finish import surface_finish_by_key
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_transgear_knob_shaft_spec import (
@@ -194,6 +195,12 @@ NOTES_XY = (0.016, 0.070)
 ROOT_ACCEPTANCE_XY = (0.286, 0.103)
 DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
 CORE_RUNOUT_FRAME = (F_X + 0.072, SIDE_CENTER[1] + HALF_OD + 0.038)
+# Each frame's leader landing on its surface's upper outline, and the frame.
+# The neck's straight floor is 0.3 mm long between its two 0.05 corner tori
+# (0.9 mm of sheet), so a silhouette hit-test there landed on a neighbour
+# (run 10: a type-46 silhouette of another face). Like main's arbor
+# finishes, each frame attaches to the model FACE its spec control names,
+# resolved on the referenced part, at this landing.
 CONTROL_ATTACHMENTS = {
     "core_total_runout": (CORE_FINISH_PICK, CORE_RUNOUT_FRAME),
     "front_neck_total_runout": (
@@ -332,19 +339,24 @@ async def build(adapter: Any) -> dict[str, str]:
     controls = {control.key: control for control in GEOMETRIC_CONTROLS}
     if set(controls) != set(GEOMETRIC_TOLERANCES_MM):
         raise RuntimeError("knob shaft frames do not cover the spec's geometric controls")
+    control_faces = _resolve_faces(
+        _early_bound(_early_bound(side, "IView").ReferencedDocument, "IModelDoc2"),
+        {key: control.face for key, control in controls.items()},
+    )
     for (key,) in (("core_total_runout",), ("front_neck_total_runout",)):
         control = controls[key]
-        edge_xy, frame_xy = CONTROL_ATTACHMENTS[key]
+        landing, frame_xy = CONTROL_ATTACHMENTS[key]
         add_feature_control_frame(
             adapter,
             side,
-            edge_xy=edge_xy,
+            entity=control_faces[key],
+            leader_attach_xy=landing,
             frame_xy=frame_xy,
             characteristic=control.characteristic,
             tolerance=GEOMETRIC_TOLERANCES_MM[key],
             datums=control.datums,
             diameter=control.tolerance_zone == "diametral",
-            entity_type="SILHOUETTE",
+            entity_type="FACE",
             label=control.key,
         )
     add_toothspace_callout(
