@@ -46,7 +46,10 @@ REFERENCES_DIR = SCRIPTS_DIR.parent / "references"
 # FILE so an edit rebuilds the part and busts its remote-cache key -- see
 # data_deps_of, honored by dodo._part_file_deps.
 _DATA_EXTENSIONS = (".dxf", ".dwg")
-_DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECASE)
+# A data-file literal is a bare filename/path: no whitespace. A drawing note such
+# as "NUMERAL OUTLINES PER SUPPLIED MS-STICK-NUMERALS.DXF" also ends in .DXF but
+# is prose, and resolving it as a reference fails the leaf with a missing dep.
+_DATA_LITERAL_RE = re.compile(r"""["']([^"'\s]+\.(?:dxf|dwg))["']""", re.IGNORECASE)
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
 # eight subs, so it is last. doit derives ordering from file_dep, but this tuple
