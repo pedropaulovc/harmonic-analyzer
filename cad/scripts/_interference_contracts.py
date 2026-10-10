@@ -627,11 +627,14 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
             4.1656, 3.454, _PEDESTAL_SCREW_ENGAGEMENT
         ),
     ),
+    # The two #4-40 x 1/2 (12.7) MHA-VN-022 keeper foot screws: the head sits
+    # flush in the 8.0 foot's 2.7178 counterbore, so 12.7 - (8.0 - 2.7178) =
+    # 7.4178 enters the top frame's tap (ch_fulcrum_keeper_spec).
     **_numbered_pairs(
         "ch-channel-1/vn-frame-side-screw",
         range(1, 3),
         "fr-frame-1/fr-top-frame",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 8.6624),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.4178),
     ),
     # #743 PR2: the two #8-32 x 3/4 (19.05) MHA-VN-032 rocker-bracket hold-downs
     # (one per bracket since the 2026-10-09 flip) pass the 6.0 bracket foot
@@ -681,6 +684,7 @@ PIVOT_EAR_SET_SCREW_LIMIT = _smooth_annulus_limit_mm3(
     TAP_DRILL_MM[_ARBOR_SET_SCREW_THREAD],
     _PIVOT_EAR_TAP_COLUMN,
 )
+FULCRUM_SET_SCREW_THREAD = (1.854, 1.511, 3.96875)
 _CHANNEL_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "ch-bar-pivot-pin",
@@ -701,6 +705,19 @@ _CHANNEL_ALLOWED_PAIRS = {
         range(1, 3),
         "ch-pivot-bracket",
         PIVOT_EAR_SET_SCREW_LIMIT,
+        second_number=None,
+    ),
+    # The two MHA-VN-055 #1-72 x 5/32 (3.96875) set screws in the keeper crown
+    # taps (#53 drill, 1.511), bounded over the screw's whole length; rear
+    # keeper and screw are both placed first, so their suffixes match. A
+    # smooth-annulus bound for the first build -- re-pin to the measured
+    # overlap x 1.10 from the first channel leaf. Literals, like the rows
+    # above; test_ch_fulcrum_shaft_drawing pins them to the specs.
+    **_numbered_pairs(
+        "vn-fulcrum-set-screw",
+        range(1, 3),
+        "ch-fulcrum-keeper",
+        _smooth_annulus_limit_mm3(*FULCRUM_SET_SCREW_THREAD),
         second_number=None,
     ),
 }

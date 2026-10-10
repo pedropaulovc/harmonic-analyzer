@@ -63,14 +63,21 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     fulcrum_min = channel.FULCRUM_SHAFT_Z - ch_fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
     fulcrum_max = channel.FULCRUM_SHAFT_Z + ch_fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
     assert fulcrum_min < row_min < row_max < fulcrum_max
-    # The end keepers grip the shaft ENDS: ball centres 2.25 inboard of each
-    # end, feet + screws inboard of the corner-boss lands (2026-08-02 remount).
+    # The end keepers carry the shaft just inboard of its domed ends, their
+    # outboard feet and screws past the lugs; both lugs float clear of the
+    # lever-hub bank, centred on its mid-plane.
     keeper_lo = channel.FULCRUM_SHAFT_Z - channel.KEEPER_Z_OFF
     keeper_hi = channel.FULCRUM_SHAFT_Z + channel.KEEPER_Z_OFF
     assert fulcrum_min < keeper_lo < row_min < row_max < keeper_hi < fulcrum_max
-    assert channel.KEEPER_Z_OFF - channel.KEEPER_SCREW_Z_OFF == 14.75
+    assert channel.KEEPER_SCREW_Z_OFF - channel.KEEPER_Z_OFF == 8.25
+    assert channel.FULCRUM_SHAFT_Z == pytest.approx(rocker_bank_layout.STACK_MID_Z)
+    assert channel.KEEPER_HUB_FLOAT == pytest.approx((0.4346, 0.4346), abs=1e-3)
 
 
-def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
+def test_fulcrum_station_keeps_the_learned_inverted_datum_side() -> None:
+    # The bank-centred station is negative; the learned inversion is
+    # side-independent (the +- keeper screws share one signature), so the
+    # seed is the plain sign rule toggled.
     activate_assembly_contract("ch-channel")
-    assert _seed_flip("ch-fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z)
+    assert channel.FULCRUM_SHAFT_Z < 0.0
+    assert not _seed_flip("ch-fulcrum-shaft-1 datum z d=0.50", channel.FULCRUM_SHAFT_Z)

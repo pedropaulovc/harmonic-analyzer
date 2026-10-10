@@ -9,6 +9,8 @@ import pytest
 
 import _config
 import ch_fulcrum_keeper_spec as keeper
+import rocker_bank_layout as rocker_bank
+import vn_frame_side_screw_spec as keeper_screw
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 import build_fr_top_frame as part
 import draw_fr_top_frame as drawing
@@ -17,7 +19,7 @@ from fr_frame_attachment_spec import (
     CAP_RECESS_DEPTH,
     CAP_RECESS_DIAMETER,
     CASTING_FULL_THREAD_DEPTH,
-    CASTING_TAP_DRILL_DEPTH,
+    TOP_CASTING_TAP_DRILL_DEPTH,
     COLUMN_SOCKET_DIAMETER,
     TOP_SCREW_SEAT_Z,
     TOP_SCREW_Y,
@@ -68,53 +70,152 @@ def test_four_cross_taps_are_bottoming_10_32_with_tooling_lead() -> None:
     assert part.SIDE_TAP_SPEC.kind == "tapped_bottoming"
     assert part.SIDE_TAP_SPEC.size == "#10-32"
     assert part.SIDE_TAP_SPEC.thread_class == "2B"
-    assert part.SIDE_TAP_SPEC.depth_mm == CASTING_TAP_DRILL_DEPTH
+    assert part.SIDE_TAP_SPEC.depth_mm == TOP_CASTING_TAP_DRILL_DEPTH
     assert part.SIDE_TAP_SPEC.overrides_mm["ThreadDepth"] == CASTING_FULL_THREAD_DEPTH
     pitch = 25.4 / 32.0
-    assert CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH >= 2.0 * pitch
+    assert TOP_CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH >= 2.0 * pitch
+    depth_tolerance = float(_config.title_block("linear_1pl")["value_in"]) * 25.4
+    assert (
+        TOP_CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH - 2.0 * depth_tolerance
+        >= 2.0 * pitch
+    )
     assert part.SPOTFACE_FLOOR == TOP_SCREW_SEAT_Z
     full_seat_limit = abs(part.FRONT_COLUMN_Z) + math.sqrt(
         (part.BOSS_DIA / 2.0) ** 2 - (part.SPOTFACE_DIA / 2.0) ** 2
     )
     assert part.SPOTFACE_FLOOR < full_seat_limit
+    assert part.SPOTFACE_PLANE - part.SPOTFACE_FLOOR == pytest.approx(1.0)
+    assert part.SPOTFACE_SEAT_MARGIN == pytest.approx(0.14540768504858193)
 
 
-def test_cross_tap_major_thread_and_drill_point_clear_the_far_wall() -> None:
-    # The major-thread envelope, not the tap-drill cylinder, is the finished
-    # thread breakout check.  The drill point has its own positive-wall guard.
+def test_cross_tap_ends_stay_in_the_real_boss_and_side_web_union() -> None:
+    # The inward boss edge is not a free wall: the full-height side-rail
+    # web continues past it and contains the whole far thread/drill envelope.
     major_dia = 4.826
-    major_far_wall_z = abs(part.FRONT_COLUMN_Z) - math.sqrt(
-        (part.BOSS_DIA / 2.0) ** 2 - (major_dia / 2.0) ** 2
-    )
     thread_end_z = part.SPOTFACE_FLOOR - CASTING_FULL_THREAD_DEPTH
     drill_point_z = (
         part.SPOTFACE_FLOOR
-        - CASTING_TAP_DRILL_DEPTH
+        - TOP_CASTING_TAP_DRILL_DEPTH
         - part.SIDE_TAP_DRILL_DIA / 2.0 * part.DRILL_POINT_H
     )
-    drill_far_wall_z = abs(part.FRONT_COLUMN_Z) - part.BOSS_DIA / 2.0
     assert part.SIDE_TAP_THREAD_MAJOR_DIA == major_dia
-    assert part.SIDE_TAP_MAJOR_FAR_WALL_Z == major_far_wall_z
-    assert part.SIDE_TAP_THREAD_END_Z == thread_end_z
-    assert part.SIDE_TAP_DRILL_POINT_Z == drill_point_z
-    assert part.SIDE_TAP_DRILL_FAR_WALL_Z == drill_far_wall_z
-    assert part.SIDE_TAP_THREAD_WALL_MARGIN > 0.0
-    assert part.SIDE_TAP_DRILL_WALL_MARGIN > 0.0
+    assert part.SIDE_TAP_THREAD_END_Z == pytest.approx(thread_end_z)
+    assert part.SIDE_TAP_DRILL_POINT_Z == pytest.approx(drill_point_z)
+    assert 0.0 < drill_point_z < thread_end_z < part.WEB_IN_Z
+    assert part.SIDE_TAP_THREAD_WALL_MARGIN == pytest.approx(3.937)
+    assert part.SIDE_TAP_DRILL_WALL_MARGIN == pytest.approx(4.3307)
+    assert major_dia / 2.0 < part.HALF_H
+
+
+def test_smaller_bosses_leave_real_plan_corners_and_the_outward_foot_seat() -> None:
+    assert part.BOSS_DIA == spec.BOSS_DIA == 45.0
+    assert part.BORE_DIA == 25.5
+    assert part.CAP_RECESS_DIAMETER == 27.5
+    assert (part.BOSS_DIA - part.CAP_RECESS_DIAMETER) / 2.0 == 8.75
+    assert (
+        math.hypot(part.RAIL_W_SIDE / 2.0, part.RAIL_W_FR / 2.0) > part.BOSS_DIA / 2.0
+    )
+    assert drawing.PLAN_HALF_X == 219.5
+    assert drawing.PLAN_HALF_Z == 134.5
+    assert drawing.PLAN_HALF_X - part.OUTER_X == pytest.approx(5.4)
+    assert drawing.PLAN_HALF_Z - part.OUTER_Z == pytest.approx(3.5)
+    assert (
+        drawing.BOSS_ABOVE_RAIL_LINE_XY[0]
+        - drawing.DETAIL_SECTION_CENTER[0]
+        - drawing.DETAIL_PLAN_HALF_D
+    ) == pytest.approx(0.00745)
+    assert part.FULCRUM_KEEPER_CENTRE_Z == pytest.approx(rocker_bank.STACK_MID_Z)
+    assert part.KEEPER_TAP_Z_FRONT == pytest.approx(
+        keeper.FULCRUM_KEEPER_CENTRE_Z - keeper.KEEPER_SCREW_Z_OFF
+    )
+    assert part.KEEPER_TAP_Z_REAR == pytest.approx(
+        keeper.FULCRUM_KEEPER_CENTRE_Z + keeper.KEEPER_SCREW_Z_OFF
+    )
+    # Contract stations are displayed to three places; do not round the bank.
+    assert part.KEEPER_TAP_Z_FRONT == pytest.approx(-82.754, abs=0.0005)
+    assert part.KEEPER_TAP_Z_REAR == pytest.approx(81.746, abs=0.0005)
+    assert part.KEEPER_FOOT_TIP_Z_FRONT == pytest.approx(-88.004, abs=0.0005)
+    assert part.KEEPER_FOOT_TIP_Z_REAR == pytest.approx(86.996, abs=0.0005)
+    assert part.KEEPER_FOOT_BOSS_MARGINS == pytest.approx((1.496, 2.504), abs=0.0005)
+    assert min(part.KEEPER_FOOT_BOSS_MARGINS) >= 1.0
+    assert part.KEEPER_FOOT_RAIL_MARGINS == pytest.approx((4.996, 6.004), abs=0.0005)
+    assert part.KEEPER_TAP_BOSS_MARGINS == pytest.approx((5.467, 6.470), abs=0.0005)
+
+
+def test_boss_additions_match_an_independent_t_section_area_integral() -> None:
+    # Sample the actual two rectangle rings, not the circle-cap formula.
+    step = 0.05
+    radius = part.BOSS_DIA / 2.0
+    upper = lower = 0.0
+    for i in range(round(2.0 * radius / step)):
+        x = part.COLUMN_X - radius + (i + 0.5) * step
+        for j in range(round(2.0 * radius / step)):
+            z = abs(part.FRONT_COLUMN_Z) - radius + (j + 0.5) * step
+            if (x - part.COLUMN_X) ** 2 + (
+                z - abs(part.FRONT_COLUMN_Z)
+            ) ** 2 > radius**2:
+                continue
+            in_web = (
+                x <= part.WEB_OUT_X
+                and z <= part.WEB_OUT_Z
+                and not (x < part.WEB_IN_X and z < part.WEB_IN_Z)
+            )
+            in_flange = (
+                x <= part.OUTER_X
+                and z <= part.OUTER_Z
+                and not (x < part.INNER_X and z < part.INNER_Z)
+            )
+            upper += (
+                part.HALF_H
+                + part.BOSS_ABOVE
+                - (part.HALF_H if in_web else part.FLANGE if in_flange else 0.0)
+            ) * step**2
+            lower += (
+                part.BOSS_BELOW if in_web else part.HALF_H + part.BOSS_BELOW
+            ) * step**2
+    actual_upper, actual_lower = part._boss_add_volumes()
+    assert actual_upper == pytest.approx(upper, abs=10.0)
+    assert actual_lower == pytest.approx(lower, abs=10.0)
+    assert actual_upper == pytest.approx(19001.990069857347)
+    assert actual_lower == pytest.approx(28755.37161240547)
+
+
+def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
+    outer, window = part._top_rim_removal()
+    assert outer == pytest.approx(2296.176445206839)
+    assert window == pytest.approx(2774.3499756456845)
+    assert part._t_root_add() == pytest.approx(3732.721907110104)
+    points = part._outer_corner_top_edges()
+    assert len(points) == 8
+    for x, y, z in points:
+        assert y == part.HALF_H
+        assert abs(x) == part.OUTER_X or abs(z) == part.OUTER_Z
+        assert (
+            math.hypot(abs(x) - part.COLUMN_X, abs(z) - abs(part.FRONT_COLUMN_Z))
+            > part.BOSS_DIA / 2.0
+        )
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "outer_corner_edges = _outer_corner_top_edges()" in source
+    assert "] + outer_corner_edges" in " ".join(source.split())
 
 
 def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
-    major, length, _, _, pitch = FILLISTER_SIZES["90280A194"]
+    major, length, _, _, pitch = FILLISTER_SIZES[keeper_screw.SKU]
     insertion = length - (keeper.FOOT_H - keeper.CBORE_DEPTH_MM)
     spec = part.KEEPER_TAP_SPEC
     full_thread = spec.overrides_mm.get("ThreadDepth", spec.depth_mm)
-    depth_tolerance = float(_config.title_block("linear_2pl")["value_in"]) * 25.4
+    depth_tolerance = float(_config.title_block("linear_1pl")["value_in"]) * 25.4
 
+    assert spec is keeper.KEEPER_TAP_SPEC
+    assert spec.size == keeper_screw.THREAD == "#4-40"
     assert insertion >= major
-    assert full_thread - insertion >= 0.25
+    assert full_thread - depth_tolerance - insertion >= 0.25
     assert spec.depth_mm - full_thread - 2.0 * depth_tolerance >= 5.0 * pitch
     drill_point = part.TAP_DRILL_MM[spec.size] / 2.0 * part.DRILL_POINT_H
     assert spec.depth_mm + depth_tolerance + drill_point < part.RING_HEIGHT
     assert abs(part.KEEPER_TAP_X - part.COLUMN_X) + major / 2.0 < part.WEB_T / 2.0
+
+
 def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
     # Rule 2: the part owns the decimal places, so a kept model dimension
     # nobody authored places for prints SolidWorks' template default and the
@@ -332,17 +433,18 @@ _SECTION_PLAN = {
 }
 _LETTER_ENDS = ("B-outer", "B-inner", "E-inner", "E-outer", "D-outer", "D-inner")
 # b49e1's cutting-line ends, as the build then typed them, start first.
+_B49E1_BOSS_DIA = 52.2
 _B49E1_CUT_ENDS = {
     "B": (
-        (part.COLUMN_X / 2.0, drawing.PLAN_HALF_Z + 6.0),
+        (part.COLUMN_X / 2.0, abs(part.FRONT_COLUMN_Z) + _B49E1_BOSS_DIA / 2.0 + 6.0),
         (part.COLUMN_X / 2.0, part.INNER_Z - 6.0),
     ),
     "E": (
         (part.BAR_X1 + 6.0, drawing.SIDE_SECTION_Z),
-        (-drawing.PLAN_HALF_X - 6.0, drawing.SIDE_SECTION_Z),
+        (-part.COLUMN_X - _B49E1_BOSS_DIA / 2.0 - 6.0, drawing.SIDE_SECTION_Z),
     ),
     "D": (
-        (-drawing.PLAN_HALF_X - 6.0, part.GOOSENECK_Z),
+        (-part.COLUMN_X - _B49E1_BOSS_DIA / 2.0 - 6.0, part.GOOSENECK_Z),
         (-part.INNER_X + 5.0, part.GOOSENECK_Z),
     ),
 }
@@ -457,7 +559,20 @@ def _segment_ink(what, segment, clearance):
     return (what, lambda box: _box_segment_gap(box, segment), clearance)
 
 
-def _letter_ink(name):
+def _corner_witnesses(boss_dia):
+    """Only the overall-width witness follows the boss's X extreme.
+
+    Rail depth and window-edge witnesses stay on their unchanged faces.
+    Carry the measured witness gap forward, not the old Ø52.2 station.
+    """
+    shift_mm = (_B49E1_BOSS_DIA - boss_dia) / 2.0 * drawing.GEOMETRY_VIEW_SCALE
+    return (
+        tuple((x + shift_mm, y) for x, y in _CORNER_WITNESSES[0]),
+        *_CORNER_WITNESSES[1:],
+    )
+
+
+def _letter_ink(name, *, boss_dia):
     """(what, gap function, clearance) for the ink round one letter: the
     plan's own edges, projected from the model, and the dimension ink b49e1
     printed beside it."""
@@ -489,12 +604,12 @@ def _letter_ink(name):
         )
     if name == "E-outer":
         boss = _plan_point("E", -part.COLUMN_X, part.FRONT_COLUMN_Z)
-        boss_r = part.BOSS_DIA / 2.0 * _PLAN_S
+        boss_r = boss_dia / 2.0 * _PLAN_S
         return (
             ("corner boss", lambda box: max(0.0, _box_point_gap(box, boss) - boss_r), ink),
             *(
                 _segment_ink(f"corner witness {i}", _mm_segment(w), ink)
-                for i, w in enumerate(_CORNER_WITNESSES)
+                for i, w in enumerate(_corner_witnesses(boss_dia))
             ),
         )
     face_x = {"D-outer": -part.OUTER_X, "D-inner": -part.INNER_X}[name]
@@ -502,12 +617,12 @@ def _letter_ink(name):
     return (_segment_ink("hub rail face", face, ink),)
 
 
-def _letter_shortfalls(ends, name):
+def _letter_shortfalls(ends, name, *, boss_dia):
     """The ink a letter stands too close to, with its gap in mm."""
     box = _letter_boxes(ends)[name]
     return {
         what: round(gap(box) * 1000.0, 2)
-        for what, gap, clearance in _letter_ink(name)
+        for what, gap, clearance in _letter_ink(name, boss_dia=boss_dia)
         if gap(box) < clearance
     }
 
@@ -521,7 +636,10 @@ def test_section_letter_model_reproduces_b49e1() -> None:
         assert model[0] <= printed[0] and model[1] <= printed[1], name
         assert model[2] >= printed[2] and model[3] >= printed[3], name
         assert max(abs(m - p) for m, p in zip(model, printed)) < 0.00015, name
-    shortfalls = {name: _letter_shortfalls(_B49E1_CUT_ENDS, name) for name in _LETTER_ENDS}
+    shortfalls = {
+        name: _letter_shortfalls(_B49E1_CUT_ENDS, name, boss_dia=_B49E1_BOSS_DIA)
+        for name in _LETTER_ENDS
+    }
     assert shortfalls["B-outer"]["rail outer edge"] == 0.0
     assert shortfalls["B-outer"]["183.9"] == 0.0
     assert shortfalls["E-outer"]["corner boss"] == 0.0
@@ -534,14 +652,17 @@ def test_section_letter_stands_clear_of_its_ink(name: str) -> None:
     """#955: each cutting-plane letter clears the ink round it by
     INK_CLEARANCE; B's outer letter, centred in its 9.6 mm band, clears the
     rail edge and the 183.9's line by TEXT_CLEARANCE."""
-    assert _letter_shortfalls(drawing.section_cut_ends(), name) == {}
+    assert (
+        _letter_shortfalls(drawing.section_cut_ends(), name, boss_dia=part.BOSS_DIA)
+        == {}
+    )
 
 
 @pytest.mark.parametrize("name", ("B-outer", "B-inner", "E-inner", "E-outer", "D-inner"))
 def test_b49e1_section_letter_is_what_sat_on_ink(name: str) -> None:
     """The same check on b49e1's ends fails for every letter #955 moves off
     ink.  D's outer letter was already 2.2 mm clear; its end only re-derives."""
-    assert _letter_shortfalls(_B49E1_CUT_ENDS, name)
+    assert _letter_shortfalls(_B49E1_CUT_ENDS, name, boss_dia=_B49E1_BOSS_DIA)
 
 
 def test_b_outer_arrow_keeps_off_the_window_width() -> None:

@@ -53,6 +53,9 @@ class RecipeMetadata:
 # fastener depend on every diagnostic geometry module in the build graph.
 STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
     {
+        "90280A110": RecipeMetadata(
+            "diagnostics.diag_build_90280A110", "build_90280A110", threaded=True
+        ),
         "90280A194": RecipeMetadata(
             "diagnostics.diag_build_90280A194", "build_90280A194", threaded=True
         ),
@@ -94,6 +97,9 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         ),
         "91375A106": RecipeMetadata(
             "diagnostics.diag_build_91375A106", "build_91375A106", threaded=True
+        ),
+        "91375A942": RecipeMetadata(
+            "diagnostics.diag_build_91375A942", "build_91375A942", threaded=True
         ),
         "90280A108": RecipeMetadata(
             "diagnostics.diag_build_90280A108", "build_90280A108", threaded=True

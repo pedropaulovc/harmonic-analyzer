@@ -5,11 +5,12 @@ views, dimension layout, hole callout, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The sheet runs at 2:1 (the bracket is ~28 x 32 x 14 with the proud ball);
-the isometric carries an explicit 1:1 override so it stays clear of the
-title block.  Four views: the side profile (front), the plan (top, which
-carries the counterbored screw-hole callout), the end view (right, which
-carries the width / shaft-axis-height / crown stack), and the isometric.
+The sheet runs at 2:1 (the bracket is ~16.5 x 32.2 x 14); the isometric
+carries an explicit 1:1 override so it stays clear of the title block.  Four
+views: the side profile (front), the plan (top, which carries the
+counterbored screw-hole and crown set-screw tap callouts), the end view
+(right, which carries the width / shaft-axis-height / crown / bore stack),
+and the isometric.
 
 Run with SolidWorks open::
 
@@ -31,7 +32,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -39,14 +39,18 @@ from _drawing_common import (
     stamp_drawing_summary,
     visible_view_entities,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 from ch_fulcrum_keeper_spec import (
     CBORE_DIA_MM,
-    FOOT_REACH,
+    CROWN_TOP_Y,
+    DRAWING_DIMENSIONS,
+    FOOT_TIP_X,
     GEOMETRIC_TOLERANCES_MM,
     LUG_HALF_T,
     SCREW_X,
-    SHAFT_AXIS_H,
+    SET_SCREW_HOLE_SPEC,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -69,8 +73,8 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 
 # Sheet layout (meters).  The front (side-profile) view's model bbox is
-# X -23..+4.75 (ball proud of the lug) by Y 0..32.2; at 2:1 that is
-# ~55.5 x 64.4 mm.  Third angle: the plan (top view) rides above the front,
+# X -3..+13.5 (lug inner face to foot tip) by Y 0..32.2; at 2:1 that is
+# ~33 x 64.4 mm.  Third angle: the plan (top view) rides above the front,
 # the end view (right) sits to its right, the isometric top-right.
 FRONT_CENTER = (0.110, 0.130)
 TOP_CENTER = (0.110, 0.228)
@@ -78,8 +82,8 @@ RIGHT_CENTER = (0.225, 0.130)
 ISO_CENTER = (0.330, 0.190)
 
 # Model bbox centres the projected views are laid out around.
-_X_MID = (-FOOT_REACH + 4.75) / 2.0  # -9.125 (ball cap at +4.75)
-_Y_MID = (SHAFT_AXIS_H + 7.0) / 2.0  # 16.1 (crown top 32.2)
+_X_MID = (-LUG_HALF_T + FOOT_TIP_X) / 2.0  # 5.25
+_Y_MID = CROWN_TOP_Y / 2.0  # 16.1 (crown top 32.2)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -122,18 +126,28 @@ SEAT_EDGE_Y = _front_y(0.0)  # the foot seating face (datum A)
 LUG_FACE_X = _front_x(LUG_HALF_T)  # outboard lug face (datum B)
 HOLE_X_SHEET = _front_x(SCREW_X)  # screw-hole station, shared by the top view
 CBORE_R_SHEET = CBORE_DIA_MM * SHEET_SCALE[0] / 2000.0
+# The crown tap seen end-on in the plan, on the lug mid-plane (x = 0).
+TAP_X_SHEET = _front_x(0.0)
+TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
+SET_SCREW_PROCESS = "TAP TO BORE"
 
 # Per-view survivors of the marked-dimension import: parametric name ->
-# sheet position.  The profile pair stacks below the front view; the end
-# view carries the width plus the shaft-axis / crown stack.
+# sheet position.  The front view carries the lug thickness and the crown
+# tap's station off the outer lug face (both stacked above the crown), the
+# foot length below the seat and the foot height right of the foot tip; the
+# end view carries the width plus the shaft-axis / crown stack and the
+# reamed bore.
 FRONT_KEEP = {
-    "FootReach": (0.096, 0.086),
-    "PadLen": (0.084, 0.078),
+    "SetScrewLocation": (_front_x(1.5), 0.170),
+    "LugThickness": (_front_x(0.0), 0.178),
+    "FootLength": (_front_x(SCREW_X), 0.086),
+    "FootRise": (0.140, 0.106),
 }
 RIGHT_KEEP = {
     "Depth": (0.225, 0.172),
-    "ShaftAxisH": (0.196, 0.126),
+    "LugRise": (0.196, 0.126),
     "CrownDia": (0.225, 0.180),
+    "BoreDia": (0.258, 0.156),
 }
 
 
@@ -186,20 +200,37 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    # The tap station is owned by a reference sketch the part saves blanked
+    # (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES); the hidden-owner curate
+    # shows it in the front view that dimensions it.
+    curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
 
     # Native datum/GD&T annotations.  Datum A is the foot seating face (the
-    # part sits on the rail top face and the screw clamps normal to it);
-    # datum B is the outboard lug face (the shaft-end locating plane).
+    # part sits on the rail top face and the screw clamps normal to it),
+    # attached on the END view's edge-on seat line beside the flatness frame:
+    # below the front view the seat line is boxed in by the FootLength extension
+    # lines.  Datum B is the outboard lug face (the foot screw's station).
     add_datum_feature(
         adapter,
-        front,
-        edge_xy=(_front_x(-18.0), SEAT_EDGE_Y),
-        symbol_xy=(_front_x(-18.0), SEAT_EDGE_Y - 0.010),
+        right,
+        edge_xy=(RIGHT_CENTER[0] - 0.006, SEAT_EDGE_Y),
+        symbol_xy=(RIGHT_CENTER[0] - 0.006, SEAT_EDGE_Y - 0.010),
         datum="A",
         label="keeper seating face",
     )
@@ -218,9 +249,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="outboard lug face",
     )
     # Flatness rides the END view's edge-on seat line: in the front view the
-    # seat is boxed in by the PadLen/FootReach extension lines, so any leader
-    # to it crossed them (leader-crosses-line x2).  Attach right of the
-    # ShaftAxisH extension (ends x=224 mm), frame below-right of the view.
+    # seat is boxed in by the FootLength extension lines, so any leader to it
+    # crosses them.  Attach right of the LugRise extension and datum A,
+    # frame below-right of the view.
     add_feature_control_frame(
         adapter,
         right,
@@ -249,6 +280,17 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(HOLE_X_SHEET, TOP_CENTER[1] + CBORE_R_SHEET),
         callout_xy=(0.040, 0.238),
         label="keeper foot screw hole",
+    )
+    # Crown set-screw tap: the plan sees it end-on at the crown top on the
+    # lug mid-plane; its callout sits in the band between the front view
+    # and the plan, left of both.
+    add_native_hole_callout(
+        adapter,
+        top,
+        edge_xy=(TAP_X_SHEET - TAP_R_SHEET, TOP_CENTER[1]),
+        callout_xy=(0.050, 0.200),
+        label="crown set-screw tap",
+        process=SET_SCREW_PROCESS,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
     add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.150)

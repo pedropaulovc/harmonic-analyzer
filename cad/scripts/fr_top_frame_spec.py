@@ -37,6 +37,9 @@ REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
 RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
 HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
 BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
+BOSS_DIA = (
+    45.0  # user ruling: all four upper/lower bosses clear the outward keeper feet
+)
 BORE_DIA = COLUMN_SOCKET_DIAMETER
 CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)

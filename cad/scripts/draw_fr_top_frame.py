@@ -193,9 +193,9 @@ DETAIL_TOP_SCALE = SHEET_SCALES["HOLES-SOCKETS"]
 GEOMETRY_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 DETAIL_VIEW_SCALE = DETAIL_TOP_SCALE[0] / DETAIL_TOP_SCALE[1]
 
-# Plan extents including the proud corner bosses (the straight rails alone
-# stop at x +/-214.1 / z +/-131.0): x +/-223.1 -> 446.2 and z +/-138.1 ->
-# 276.2 envelope; the boss stack is 47.3 tall around the 36.5 rail band.
+# Plan extents including the Ø45 corner bosses: the straight rails stop
+# at x +/-214.1 / z +/-131.0, bosses at +/-219.5 / +/-134.5 -> 439 x 269.
+# The boss stack stays 47.3 tall around the unchanged 36.5 rail band.
 PLAN_HALF_X = COLUMN_X + BOSS_DIA / 2.0
 PLAN_HALF_Z = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0
 GEOMETRY_PLAN_HALF_W = PLAN_HALF_X * GEOMETRY_VIEW_SCALE / 1000.0
@@ -242,8 +242,8 @@ GEOMETRY_TOP_CENTER = (0.145, 0.1685)
 GEOMETRY_FRONT_CENTER = (0.145, 0.090)
 
 # Sheet 3: the hole/station plan, centred on the sheet it now fills at
-# 1:2.  The 25.5 sockets and their 52.2 bosses are the features a machinist
-# sets up from, and at 1:3 they were 8.5 mm of paper.
+# 1:2. The Ø25.5 sockets and Ø45 bosses are the setup features; the
+# smaller boss remains 22.5 mm across on paper, the socket 12.75 mm.
 DETAIL_TOP_CENTER = (0.215, 0.160)
 # The socket Ra symbol reads off the near-side rim of the rear east socket,
 # in the sheet's own empty lower-left corner, so its leader crosses neither
@@ -281,19 +281,23 @@ INK_CLEARANCE = 0.002
 ROUND_OUT = 0.0001
 # The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
 ARROW_HALF_WIDTH = 0.000381
-# RD4's ink about its commanded point, (left, down, right, up), measured on
-# the b49e1 render: the shoulder under "KEEPER TAP 8-32 UNC - 2B v 10.0" runs
-# 38.4 mm left and 36.8 mm right of it, 5.6 mm down; "2X 3.45 v 16.0" tops out
-# 4.6 mm up.  The leader leaves the shoulder's end nearer the hole.
+# Conservative RD4 ink envelope measured on b49e1. The replacement #4-40
+# callout has the same thread/drill text layout and shorter full-depth text;
+# placement retains the measured envelope, and farm layout validation must
+# confirm the regenerated annotation's actual ink and leader landing.
 KEEPER_CALLOUT_EXTENT = (0.0384, 0.0056, 0.0368, 0.0046)
 # The cap seat symbol's ink right of its leader's bend: "CAP SEAT FLOORS, 4X"
 # and the rule over it end 4.64 mm past the bend (b49e1: bend at x 210.00,
 # text to 214.57, rule to 214.64), rounded outward.
 CAP_SEAT_FINISH_INK_PAST_BEND = 0.0047
-BOSS_ABOVE_RAIL_LINE_XY = (0.3665, 0.1423)
+# Keep the boss-height lane 7.45 mm off A-A's rederived Ø45 boss silhouette.
+BOSS_ABOVE_RAIL_LINE_XY = (
+    DETAIL_SECTION_CENTER[0] + DETAIL_PLAN_HALF_D + 0.00745,
+    DETAIL_SECTION_CENTER[1] + 0.0073,
+)
 # Above the dimension's own upper arrow, not 51 mm below it -- see the
 # boss-height comment in the A-A recipe for what the long leader crossed.
-BOSS_ABOVE_RAIL_TEXT_XY = (0.380, 0.176)
+BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
 
 # Sheet 5: hub location, true-axis side view, removed set-pocket section.
 HUB_TOP_CENTER = (0.145, 0.200)
@@ -465,7 +469,7 @@ HANGER_SLOT_WIDTH_TEXT_XY = (
 HANGER_SLOT_WIDTH_OFFSET_XY = (0.060, 0.137)
 
 # Sheet 1, Section E-E: the side rails and the full-height central web, cut
-# clear of every hole station (keeper taps at z -70.9 / 77.1, hangers at
+# clear of every hole station (keeper taps at z -82.8 / 81.7, hangers at
 # -84.0 / 90.1, corner bosses at z +/-112), so the section carries rail and
 # web stock only.
 SIDE_SECTION_Z = -56.0
@@ -1377,7 +1381,7 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
         raise ValueError(f"B's outer letter fits its band by {outer_y + b_down - band_low:.4f} m")
     inner_y = center_y - INNER_Z * s + clear - b_down
     # E: the outer letter ends an ink clearance left of the corner boss (and
-    # the (446.2) witness line on its extreme); the inner one starts an ink
+    # the (439.0) witness line on its Ø45 extreme); the inner one starts an ink
     # clearance right of the 18.0 gusset run's outer witness line.
     e0, _e_down, e1, _e_up = SECTION_LETTER_EXTENTS["E"]
     # D: each letter clears the hub rail's face on its own side.
@@ -2071,7 +2075,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process="KEEPER TAP",
     )
     # Blind depths under the general .X band, not the .XX the native two
-    # places would ask for (codex round 4); the 3.45 drill keeps its places.
+    # places would ask for (codex round 4); the native tap drill keeps its places.
     set_hole_callout_precision(
         keeper_callout, {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
         label="keeper tap depths",
@@ -2137,7 +2141,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Rule 7: hidden lines only where they inform.  The cross-taps this
     # elevation calls out are spotfaced from the face it looks at, so the
     # Ø9.0 spotface rim and the tap drill circle inside it are VISIBLE ink
-    # and the 10-32 callout, its 48.00/46.00 depths (text, not drawn) and the
+    # and the 10-32 callout, its native drill/thread depths and the
     # 22.7 tap-axis-below-boss-top dimension keep their attachments without
     # them.  What the dashed lines added was the far end's sockets, cap
     # recesses and hanger counterbores -- none of them dimensioned here, all of
@@ -2402,7 +2406,15 @@ async def build(adapter: Any) -> dict[str, str]:
         0.040,
         0.055,
     )
-    if add_note(adapter, "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-VN-027", 0.040, 0.025) is None:
+    if (
+        add_note(
+            adapter,
+            "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-VN-027",
+            0.040,
+            0.025,
+        )
+        is None
+    ):
         raise RuntimeError("failed to identify section cross-screw relation")
     if not ddoc.ActivateSheet("HUB-SET-SCREW"):
         raise RuntimeError("failed to activate top-frame hub sheet")

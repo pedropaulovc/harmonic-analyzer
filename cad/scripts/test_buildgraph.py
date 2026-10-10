@@ -115,7 +115,7 @@ _INSERTED_SOURCES = {
     "dt_pinion_pivot_block dt_pinion_pivot_shaft dt_pinion_spring vn_pinion_strap_pin vn_post_mount_screw vn_slotted_screw "
     "vn_swing_stop_screw",
     "ch_channel": "ch_amplitude_bar ch_bar_pivot_pin ch_channel_lever vn_channel_spring_installed ch_connecting_rod "
-    "vn_frame_side_screw ch_fulcrum_keeper ch_fulcrum_shaft vn_pedestal_hold_down_screw ch_pivot_bracket "
+    "vn_frame_side_screw ch_fulcrum_keeper vn_fulcrum_set_screw ch_fulcrum_shaft vn_pedestal_hold_down_screw ch_pivot_bracket "
     "ch_pivot_shaft ch_rocker_arm vn_rocker_bank_spring ch_rocker_thrust_washer ch_rod_pivot_pin vn_spring_hook "
     "vn_arbor_set_screw",
     "sm_summing": "vn_boss_hook vn_counter_spring sm_gooseneck vn_knife_hanger_stud vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
@@ -1437,9 +1437,6 @@ def test_swing_platform_consumers_read_geometry_not_the_builder():
 # only shrinks: an unlisted edge fails, and so does a listed edge that no longer
 # exists.  Each entry is "<owner>: <what it reads>".
 _GRANDFATHERED_BUILDER_EDGES = {
-    ("build_ch_channel_assembly.py", "build_ch_fulcrum_keeper"): (
-        "dtrefactor: reads CBORE_DEPTH_MM, FOOT_H"
-    ),
     ("build_dt_drive_train_assembly.py", "build_dt_alignment_pinion"): (
         "dtrefactor: reads BORE_DIA"
     ),

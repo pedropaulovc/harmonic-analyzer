@@ -19,7 +19,7 @@ def test_cross_screws_clear_tubes_and_engage_both_casting_sides() -> None:
     assert frame.TOP_CROSS_TAP_SPEC.kind == "tapped_bottoming"
     assert frame.TUBE_CROSS_HOLE_DIAMETER > cross_screw.SHANK_DIA
     assert math.isclose(frame.BASE_FAR_CASTING_ENGAGEMENT, 10.70, abs_tol=1e-9)
-    assert math.isclose(frame.TOP_FAR_CASTING_ENGAGEMENT, 6.10, abs_tol=1e-9)
+    assert math.isclose(frame.TOP_FAR_CASTING_ENGAGEMENT, 9.80, abs_tol=1e-9)
     assert (
         min(
             frame.BASE_FAR_CASTING_ENGAGEMENT,

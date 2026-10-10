@@ -12,11 +12,12 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
 * Side rails (along Z at x +/-197) 34.2 wide -> outer faces x +/-214.1,
   window x +/-179.9. Front/rear rails (along X at z -/+112) 38.0 wide ->
   outer faces z -/+131, window z -/+93.
-* Corner bosses O52.2 spanning y 993.4..1040.7 (proud 4.5 above the rail
-  top, hanging 6.3 below the underside -- ch19 img04 / p002+p006 corner
-  crops), bored O25.5 around the O25.4 columns. Four stock cross screws
-  enter from the front/rear spot seats, clear both tube walls, and continue
-  into the far casting wall through one #10-32 UNF-2B interrupted tap path.
+* Corner bosses O45 spanning y 993.4..1040.7 (proud 4.5 above the rail
+  top, hanging 6.3 below the underside). All four upper/lower bosses use
+  the smaller user-ruled diameter so the outward keeper feet sit flat.
+  The O25.5 column bores and O27.5 cap recesses stay unchanged. Four
+  stock 1-3/4 in cross screws enter the front/rear spot seats and clear
+  both tube walls into the far casting wall/web through #10-32 taps.
 * Integral crossbar 22 wide at x -26..-4 spanning the window along Z,
   flush with BOTH faces (its underside 999.7 is the knife-mount seat
   plane), with 18 x 18 plan gussets at all four rail junctions and, at
@@ -35,10 +36,11 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
 * Finishing (chamfer external, fillet internal): R3 cast fillets along
   the internal web/flange T-roots (both shelves of every rail, ch19
   img04's panel blends), C2 x 45 breaks on the top-face rims -- outer
-  rail rim and both window rims, every edge terminating on a proud
-  corner-boss barrel (the bosses round all eight plan corners natively)
-  -- and C1 x 45 lead-ins on the bore TOP ends only (note 9). The web
-  ring's bottom rim and the boss undersides keep sharp edges.
+  rail rim and both window rims -- and C1 x 45 lead-ins on the bore
+  TOP ends only. The R22.5 bosses bulge 5.4 beyond the side rails and
+  3.5 beyond the front/rear rails, but no longer reach the plan corners
+  (25.56 from their centres): window corners and short outer-corner
+  rim runs remain. The web bottom rim and boss undersides stay sharp.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -55,9 +57,9 @@ slip holes -> wizard holes (side-screw taps, set-screw tap, keeper taps)
 top-rim breaks (C2) -> C1 bore top lead-ins. Wizard holes come after the
 face cuts so every seat face is final; the edge breaks come last so
 they cut final faces.
-Analytic volume checks after every feature;
-the boss/hub/spot-face/tap expectations use small grid integrals (no
-tidy closed form against the webbed solid).
+Analytic volume checks after every feature; boss additions and top-rim
+breaks use circle-segment formulas, while hub/spot-face/tap expectations
+use small grid integrals against the webbed solid.
 
 Run (SolidWorks already open)::
 
@@ -118,6 +120,7 @@ from _named_views import name_octant_views
 from fr_top_frame_spec import (
     BORE_DIA,
     BOSS_ABOVE,
+    BOSS_DIA,
     CAP_RECESS_FLOOR_Y,
     COLUMN_X,
     DRAWING_DIMENSIONS,
@@ -158,12 +161,20 @@ from fr_frame_attachment_spec import (
     CAP_RECESS_DEPTH,
     CAP_RECESS_DIAMETER,
     CASTING_FULL_THREAD_DEPTH,
-    CASTING_TAP_DRILL_DEPTH,
+    TOP_CASTING_TAP_DRILL_DEPTH,
     SCREW_SPOTFACE_DIAMETER,
     TOP_SCREW_SEAT_Z,
 )
 from _fit_limits import deviations
 from vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
+from ch_fulcrum_keeper_spec import (
+    FOOT_TIP_X,
+    FULCRUM_KEEPER_CENTRE_Z,
+    KEEPER_SCREW_Z_OFF,
+    KEEPER_TAP_SPEC,
+    KEEPER_WIDTH,
+    KEEPER_Z_OFF,
+)
 
 import _telemetry
 
@@ -182,7 +193,6 @@ FRAME_CENTER_Z = FRAME_COLUMN_Z_CENTER  # 0.0
 RAIL_W_SIDE = 34.2  # side rails, along Z (GT corner rescale 221.5 -> 214.1)
 RAIL_W_FR = 38.0  # front/rear rails, along X (GT z-corner rescale 137.4 -> 131)
 
-BOSS_DIA = 52.2  # silhouette extremes +/-223.1 in p002/p006
 BOSS_BELOW = 6.3  # boss hang below the underside (p006 read 5.7-7)
 CAP_RECESS_DIAMETER_BAND = (0.20, 0.0)
 CAP_RECESS_DEPTH_BAND = (0.30, 0.0)
@@ -315,7 +325,7 @@ SIDE_TAP_SPEC = HoleSpec(
     "tapped_bottoming",
     "#10-32",
     end="blind",
-    depth_mm=CASTING_TAP_DRILL_DEPTH,
+    depth_mm=TOP_CASTING_TAP_DRILL_DEPTH,
     thread_class="2B",
     overrides_mm={"ThreadDepth": CASTING_FULL_THREAD_DEPTH},
 )
@@ -329,20 +339,12 @@ if CAP_RECESS_FLOOR_Y - SIDE_TAP_DRILL_DIA / 2.0 <= 0.0:
     raise AssertionError("cap recess breaks into the cross-screw drill")
 
 # --- Fulcrum keepers (west rail top face; shaft-end brackets, ch17 p.40) ----
-# Keep 10 mm usable thread for the stock keeper screw's 8.6624 mm insertion.
-# The 36.5 mm rail leaves ample metal for a 16 mm drill: the 6 mm allowance
-# accommodates a standard plug tap's five-pitch lead, including the general
-# depth tolerances, without requiring a bottoming tap.
-KEEPER_TAP_SPEC = HoleSpec(
-    "tapped",
-    "#8-32",
-    end="blind",
-    depth_mm=16.0,
-    overrides_mm={"ThreadDepth": 10.0},
-)
+# The keeper's pure spec owns both screw station and receiver geometry:
+# #4-40 with 9 mm full thread and a 14 mm drill leaves a five-pitch plug
+# lead at the sheet's general .X depth band. No assembly recipe dependency.
 KEEPER_TAP_X = 199.9  # fulcrum line (build_ch_channel_assembly FULCRUM[0])
-KEEPER_TAP_Z_FRONT = SUMMING_Z - 74.0  # -70.912
-KEEPER_TAP_Z_REAR = SUMMING_Z + 74.0  # +77.088
+KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -82.754
+KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +81.746
 
 # --- Webbing ----------------------------------------------------------------
 # T-rail section (user-corrected vs ch19 img04): an 8-tall full-thickness top
@@ -416,25 +418,65 @@ if (
     > WEB_T / 2.0
 ):
     raise AssertionError("keeper taps break out of the west-rail web")
-if not math.isclose(SPOTFACE_PLANE - SPOTFACE_FLOOR, 0.9, abs_tol=1e-9):
-    raise AssertionError("top cross-screw spotface depth drifted")
+SPOTFACE_FULL_SEAT_LIMIT_Z = abs(FRONT_COLUMN_Z) + math.sqrt(
+    (BOSS_DIA / 2.0) ** 2 - (SPOTFACE_DIA / 2.0) ** 2
+)
+SPOTFACE_SEAT_MARGIN = SPOTFACE_FULL_SEAT_LIMIT_Z - SPOTFACE_FLOOR
+if SPOTFACE_SEAT_MARGIN < 0.1 or SPOTFACE_PLANE <= SPOTFACE_FLOOR:
+    raise AssertionError("top cross-screw spotface is not fully on boss material")
 SIDE_TAP_THREAD_MAJOR_DIA = THREAD_MAJOR_MM[SIDE_TAP_SPEC.size]
 SIDE_TAP_THREAD_END_Z = SPOTFACE_FLOOR - CASTING_FULL_THREAD_DEPTH
-SIDE_TAP_MAJOR_FAR_WALL_Z = abs(FRONT_COLUMN_Z) - math.sqrt(
-    (BOSS_DIA / 2.0) ** 2 - (SIDE_TAP_THREAD_MAJOR_DIA / 2.0) ** 2
-)
-SIDE_TAP_THREAD_WALL_MARGIN = SIDE_TAP_THREAD_END_Z - SIDE_TAP_MAJOR_FAR_WALL_Z
 SIDE_TAP_DRILL_POINT_Z = (
-    SPOTFACE_FLOOR - CASTING_TAP_DRILL_DEPTH - SIDE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
+    SPOTFACE_FLOOR
+    - TOP_CASTING_TAP_DRILL_DEPTH
+    - SIDE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
 )
-SIDE_TAP_DRILL_FAR_WALL_Z = abs(FRONT_COLUMN_Z) - BOSS_DIA / 2.0
-SIDE_TAP_DRILL_WALL_MARGIN = SIDE_TAP_DRILL_POINT_Z - SIDE_TAP_DRILL_FAR_WALL_Z
-if SIDE_TAP_THREAD_WALL_MARGIN <= 0.0:
+# The boss's inward edge is NOT a free wall: the centred side-rail web
+# continues inward at full height. For the whole far tap/drill envelope,
+# |x - ColumnX| <= radius < WebT/2 and |y| <= radius < HalfH, so boss ∪
+# web supplies uninterrupted metal beyond both ends. The actual limiting
+# walls are the web's x faces (and its y faces), not z=112-R22.5. Nominal
+# lateral ligaments: thread major 6.35-2.413=3.937; drill 6.35-2.0193=4.3307.
+SIDE_TAP_THREAD_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
+SIDE_TAP_DRILL_WALL_MARGIN = WEB_T / 2.0 - SIDE_TAP_DRILL_DIA / 2.0
+if min(SIDE_TAP_THREAD_WALL_MARGIN, SIDE_TAP_DRILL_WALL_MARGIN) < 2.0:
+    raise AssertionError("top cross-tap leaves less than 2 mm of side-rail web")
+if not (
+    0.0 < SIDE_TAP_DRILL_POINT_Z < SIDE_TAP_THREAD_END_Z < WEB_IN_Z
+    and max(SIDE_TAP_THREAD_MAJOR_DIA, SIDE_TAP_DRILL_DIA) / 2.0 < HALF_H
+):
     raise AssertionError(
-        "top cross-tap finished-thread major envelope breaks through the far wall"
+        "top cross-tap ends are not contained in the far side-rail web"
     )
-if SIDE_TAP_DRILL_WALL_MARGIN <= 0.0:
-    raise AssertionError("top cross-tap drill point breaks through the far wall")
+# Both complete 14-wide feet clear the proud barrels, not just the tap
+# centres. The bank is centred at -0.504: front is now the tighter end.
+KEEPER_FOOT_TIP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_Z_OFF - FOOT_TIP_X
+KEEPER_FOOT_TIP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_Z_OFF + FOOT_TIP_X
+KEEPER_FOOT_NEAREST_BOSS_X = max(0.0, abs(KEEPER_TAP_X - COLUMN_X) - KEEPER_WIDTH / 2.0)
+KEEPER_FOOT_BOSS_MARGINS = tuple(
+    math.hypot(KEEPER_FOOT_NEAREST_BOSS_X, boss_z - tip_z) - BOSS_DIA / 2.0
+    for boss_z, tip_z in (
+        (FRONT_COLUMN_Z, KEEPER_FOOT_TIP_Z_FRONT),
+        (REAR_COLUMN_Z, KEEPER_FOOT_TIP_Z_REAR),
+    )
+)
+KEEPER_FOOT_RAIL_MARGINS = (
+    KEEPER_FOOT_TIP_Z_FRONT + INNER_Z,
+    INNER_Z - KEEPER_FOOT_TIP_Z_REAR,
+)
+KEEPER_TAP_BOSS_MARGINS = tuple(
+    math.hypot(KEEPER_TAP_X - COLUMN_X, boss_z - tap_z)
+    - BOSS_DIA / 2.0
+    - THREAD_MAJOR_MM[KEEPER_TAP_SPEC.size] / 2.0
+    for boss_z, tap_z in (
+        (FRONT_COLUMN_Z, KEEPER_TAP_Z_FRONT),
+        (REAR_COLUMN_Z, KEEPER_TAP_Z_REAR),
+    )
+)
+if min(KEEPER_FOOT_BOSS_MARGINS) < 1.0:
+    raise AssertionError("keeper foot-tip-to-boss clearance is below 1 mm")
+if min(*KEEPER_FOOT_RAIL_MARGINS, *KEEPER_TAP_BOSS_MARGINS) <= 0.0:
+    raise AssertionError("keeper foot/tap does not clear the rail corner and boss")
 
 
 # --------------------------------------------------------------------------
@@ -460,42 +502,38 @@ def _in_flange_plan(x: float, z: float) -> bool:
     )
 
 
-def _boss_add_volumes() -> tuple[float, float]:
-    """(up, down) volume ONE corner boss extrude pair adds to the T-section.
+def _circle_cap_area(radius: float, offset: float) -> float:
+    """Area beyond a chord ``offset`` from the circle centre."""
+    if offset >= radius:
+        return 0.0
+    return radius**2 * math.acos(offset / radius) - offset * math.sqrt(
+        radius**2 - offset**2
+    )
 
-    Grid over the NE boss circle. Existing material per plan cell: web ring
-    -> full band (-18.25..18.25); flange-only (the web setback crescents) ->
-    10.25..18.25; else empty. BossUp fills y 0..22.75, BossDown 0..-24.55.
-    All four corners match by symmetry (lands/rib/crossbar are far away).
+
+def _boss_add_volumes() -> tuple[float, float]:
+    """Exact (up, down) additions of ONE corner boss to the T-section.
+
+    The centred ring's outer rectangle clips the NE circle quadrant; its
+    inner window clips the equal SW quadrant. Their corner overlaps cancel,
+    leaving circle area minus the two outer-face circular caps. Web material
+    spans the full band, flange-only material spans its top 8 mm, and the
+    remaining caps have no rail material. All four corners match by symmetry.
     """
-    r = BOSS_DIA / 2.0
-    step = 0.05
-    up = down = 0.0
-    x = COLUMN_X - r
-    while x < COLUMN_X + r:
-        xx = x + 0.5 * step
-        dx2 = (xx - COLUMN_X) ** 2
-        if dx2 > r * r:
-            x += step
-            continue
-        half = math.sqrt(r * r - dx2)
-        z = abs(FRONT_COLUMN_Z) - half
-        z_hi = abs(FRONT_COLUMN_Z) + half
-        while z < z_hi:
-            zz = z + 0.5 * step
-            if zz < z_hi:
-                da = step * step
-                if _in_web_plan(xx, zz):
-                    up += (BOSS_ABOVE) * da
-                    down += (BOSS_BELOW) * da
-                elif _in_flange_plan(xx, zz):
-                    up += (HALF_H + BOSS_ABOVE - FLANGE) * da
-                    down += (HALF_H + BOSS_BELOW) * da
-                else:
-                    up += (HALF_H + BOSS_ABOVE) * da
-                    down += (HALF_H + BOSS_BELOW) * da
-            z += step
-        x += step
+    radius = BOSS_DIA / 2.0
+    circle = math.pi * radius**2
+    web = circle - 2.0 * _circle_cap_area(radius, WEB_T / 2.0)
+    flange = (
+        circle
+        - _circle_cap_area(radius, RAIL_W_SIDE / 2.0)
+        - _circle_cap_area(radius, RAIL_W_FR / 2.0)
+    )
+    up = (
+        BOSS_ABOVE * web
+        + (HALF_H + BOSS_ABOVE - FLANGE) * (flange - web)
+        + (HALF_H + BOSS_ABOVE) * (circle - flange)
+    )
+    down = BOSS_BELOW * web + (HALF_H + BOSS_BELOW) * (circle - web)
     return up, down
 
 
@@ -566,7 +604,7 @@ def _hub_underhang_volume() -> float:
 
 
 def _spotface_removal() -> float:
-    """Material one O9 x 0.9 spot-face removes from the boss cylinder."""
+    """Material one O9 spot-face removes from the Ø45 curved boss."""
     r_d = SPOTFACE_DIA / 2.0
     r_b = BOSS_DIA / 2.0
     step = 0.01
@@ -593,7 +631,7 @@ def _side_tap_removal() -> float:
         dd = d + 0.5 * step
         chord = 2.0 * math.sqrt(max(0.0, r_h * r_h - dd * dd))
         bore_span = 2.0 * math.sqrt(max(0.0, r_v * r_v - dd * dd))
-        vol += chord * (CASTING_TAP_DRILL_DEPTH - bore_span) * step
+        vol += chord * (TOP_CASTING_TAP_DRILL_DEPTH - bore_span) * step
         d += step
     # The 118-degree point is wholly beyond the bore in the far wall.
     vol += math.pi / 3.0 * r_h**3 * DRILL_POINT_H
@@ -625,33 +663,72 @@ def _fillet_section_area(r: float) -> float:
 
 
 def _top_rim_removal() -> tuple[float, float]:
-    """(outer, window) volumes the C2 x 45 top-face rim breaks remove.
+    """Exact (outer, window) C2 x 45 removals for the smaller-boss topology.
 
-    The proud corner-boss barrels round ALL EIGHT plan corners natively:
-    each boss centre sits 25.56 from its window corner, inside the 26.1
-    radius, so the Ø52.2 cylinder bulges past the corner and every rim
-    edge -- outer AND window -- terminates on a boss wall (build-proven:
-    a fillet aimed at the "window corner edge" resolved to the boss top
-    rim, removing 4 x 2*pi*a*(r_boss - inset) = 1232 mm^3). Straight runs
-    only: rail inner/outer faces between boss cuts, front/rear faces
-    between boss cut and junction gusset, the four gusset hypotenuses,
-    the two crossbar flanks. The blunt 135-degree gusset vertices and the
-    chamfer ends dying into the boss walls are not modeled -- the check
-    tolerance absorbs them.
+    R22.5 < hypot(17.1, 19) = 25.56: neither window corner nor outer rail
+    corner ends on a boss. Outer faces intersect the barrel only near its
+    centre, leaving four central runs PLUS eight short corner runs. The
+    window rims are uninterrupted up to their square corners. Even their
+    2 mm expanded chamfer corners miss the boss: hypot(15.1, 17) > R22.5.
+    Outer strip areas exclude the proud cylinders analytically; the square
+    outer corners and the windows' 90/135-degree mitres are included.
     """
-    area = EDGE_CHAMFER**2 / 2.0
-    r_boss = BOSS_DIA / 2.0
-    cut_side = math.sqrt(r_boss**2 - (RAIL_W_SIDE / 2.0) ** 2)  # x = +/-InnerX|OuterX
-    cut_fr = math.sqrt(r_boss**2 - (RAIL_W_FR / 2.0) ** 2)  # z = +/-InnerZ|OuterZ
-    side_run = 2.0 * (abs(FRONT_COLUMN_Z) - cut_side)  # one side-face edge
-    fr_full = COLUMN_X - cut_fr  # boss cut to plan centre on a front/rear face
-    outer = area * (2.0 * side_run + 4.0 * fr_full)
-    east_fr = fr_full - (abs(BAR_X0) + GUSSET)
-    west_fr = fr_full - (BAR_X1 + GUSSET)
+    radius = BOSS_DIA / 2.0
+    chamfer = EDGE_CHAMFER
+    a, b = RAIL_W_SIDE / 2.0, RAIL_W_FR / 2.0
+    if not max(a, b) < radius < math.hypot(a - chamfer, b - chamfer):
+        raise AssertionError("top-rim formula requires separate rail/boss plan corners")
+
+    def cap_integral(offset: float) -> float:
+        def primitive(distance: float) -> float:
+            chord = math.sqrt(radius**2 - distance**2)
+            return (
+                radius**2 * (distance * math.acos(distance / radius) - chord)
+                + chord**3 / 3.0
+            )
+
+        return (
+            primitive(offset)
+            - primitive(offset - chamfer)
+            - chamfer * _circle_cap_area(radius, offset)
+        )
+
+    outer_perimeter = 4.0 * (OUTER_X + OUTER_Z)
+    outer = (
+        outer_perimeter * chamfer**2 / 2.0
+        - 4.0 * chamfer**3 / 3.0
+        - 4.0 * (cap_integral(a) + cap_integral(b))
+    )
+    side_run = 2.0 * INNER_Z
+    east_fr = INNER_X - (abs(BAR_X0) + GUSSET)
+    west_fr = INNER_X - (BAR_X1 + GUSSET)
     hyp = GUSSET * math.sqrt(2.0)
-    flank = 2.0 * (INNER_Z - GUSSET)  # one crossbar flank between gussets
-    runs = 2.0 * side_run + 2.0 * east_fr + 2.0 * west_fr + 4.0 * hyp + 2.0 * flank
-    return outer, area * runs
+    flank = 2.0 * (INNER_Z - GUSSET)
+    window_perimeter = (
+        2.0 * side_run + 2.0 * east_fr + 2.0 * west_fr + 4.0 * hyp + 2.0 * flank
+    )
+    # Each six-sided window has two 90-degree and four 135-degree corners.
+    window_mitres = 2.0 * (2.0 + 4.0 * (math.sqrt(2.0) - 1.0))
+    return outer, window_perimeter * chamfer**2 / 2.0 + window_mitres * chamfer**3 / 3.0
+
+
+def _outer_corner_top_edges() -> list[list[float]]:
+    """Midpoints of the eight rim edges outside the Ø45 boss barrels."""
+    side_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (RAIL_W_SIDE / 2.0) ** 2)
+    fr_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (RAIL_W_FR / 2.0) ** 2)
+    return [
+        point
+        for sx in (-1.0, 1.0)
+        for sz in (-1.0, 1.0)
+        for point in (
+            [
+                sx * OUTER_X,
+                HALF_H,
+                sz * (abs(FRONT_COLUMN_Z) + side_cut + OUTER_Z) / 2.0,
+            ],
+            [sx * (COLUMN_X + fr_cut + OUTER_X) / 2.0, HALF_H, sz * OUTER_Z],
+        )
+    ]
 
 
 def _t_root_add() -> float:
@@ -1218,8 +1295,8 @@ async def build(adapter) -> dict[str, str]:
     v_pocket = SET_POCKET * SET_POCKET * SET_POCKET_DEPTH
     volume = await volume_check(adapter, "set pocket", volume - v_pocket, 20.0)
 
-    # 9. Side-screw spot-faces: O9 x 0.9 flats on the curved boss z-faces
-    #    (planar seats the tapped holes need).
+    # 9. Side-screw spot-faces: O9 flats at |z|=133.9 on the curved boss
+    #    (0.6 removal on axis; cut plane 134.9 gives a positive 1.0 depth).
     v_spot = _spotface_removal()
     for side, sign, reverse in SIDE_SCREW_FACES:
         spot_plane = check(
@@ -1579,10 +1656,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # 13. Cross-screw taps (#10-32 UNF-2B bottoming): one per boss,
-    #     46 mm full thread in a 48 mm cylindrical drill. Each path starts on
-    #     its spot seat, crosses the near casting wall and column bore, then
-    #     continues through the far casting wall. Opposed holes remain one
-    #     two-position Hole Wizard feature per entry side.
+    #     46.0 mm full thread in a 49.2 mm cylindrical drill. Each path
+    #     starts on its spot seat, crosses the near casting wall and column
+    #     bore, then continues into the far boss/centred side-rail web.
+    #     Opposed holes remain one two-position Hole Wizard feature per side.
     v_side_tap = _side_tap_removal()
     for side, sign, _reverse in SIDE_SCREW_FACES:
         feat = f"SideTaps{side.capitalize()}"
@@ -1619,7 +1696,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "gooseneck set tap", volume - v_set_tap, 0.1 * v_set_tap + 10.0
     )
 
-    # 15. Fulcrum-keeper taps (#8-32 x 10 blind) into the west rail TOP
+    # 15. Fulcrum-keeper taps from the shared keeper spec into the west rail TOP
     wizard_holes(
         adapter,
         KEEPER_TAP_SPEC,
@@ -1652,10 +1729,11 @@ async def build(adapter) -> dict[str, str]:
     z_shelf_in = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.65
     rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0  # -10.41
     rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0  # +16.59
-    east_mid_lo = (-abs(FRONT_COLUMN_Z) + rib_lo) / 2.0  # rib-split run mids
-    east_mid_hi = (rib_hi + abs(FRONT_COLUMN_Z)) / 2.0
-    land_mid_w = (LAND_X0 - COLUMN_X) / 2.0  # land-split window run mids
-    land_mid_e = (LAND_X1 + COLUMN_X) / 2.0
+    root_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (WEB_T / 2.0) ** 2)
+    east_mid_lo = (-abs(FRONT_COLUMN_Z) + root_cut + rib_lo) / 2.0
+    east_mid_hi = (rib_hi + abs(FRONT_COLUMN_Z) - root_cut) / 2.0
+    land_mid_w = (LAND_X0 - COLUMN_X + root_cut) / 2.0
+    land_mid_e = (LAND_X1 + COLUMN_X - root_cut) / 2.0
     check(
         "fillet T-roots",
         await adapter.add_fillet(
@@ -1686,12 +1764,12 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # 17. External top-face rim breaks: C2 x 45 on the outer rail rim and
-    #     both windows' rims (chamfer-for-external-edges convention). Every
-    #     rim edge, outer AND window, terminates on a proud corner-boss
-    #     barrel: the bosses round all eight plan corners natively (their
-    #     centres sit 25.56 from the window corners, inside the 26.1
-    #     radius), so there are no corner edges to treat.
+    #     both windows' rims. The Ø45 bosses no longer reach the rail plan
+    #     corners: window rims meet at real square corners, and each outer
+    #     corner has two short rim edges outside the boss barrel. Select
+    #     those eight edges explicitly as well as the four central runs.
     v_outer, v_window = _top_rim_removal()
+    outer_corner_edges = _outer_corner_top_edges()
     check(
         "chamfer top rims",
         await adapter.add_chamfer(
@@ -1715,7 +1793,8 @@ async def build(adapter) -> dict[str, str]:
                 [BAR_X0 - GUSSET / 2.0, HALF_H, -(INNER_Z - GUSSET / 2.0)],
                 [BAR_X1 + GUSSET / 2.0, HALF_H, INNER_Z - GUSSET / 2.0],
                 [BAR_X1 + GUSSET / 2.0, HALF_H, -(INNER_Z - GUSSET / 2.0)],
-            ],
+            ]
+            + outer_corner_edges,
         ),
     )
     name_last_feature(adapter, "TopRimBreaks")

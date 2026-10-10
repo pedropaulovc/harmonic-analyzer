@@ -253,6 +253,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | — | `vn-magnifying-bracket-screw` | — | MHA-VN-050 |
 | part | — | `vn-cylinder-bank-spring` | — | MHA-VN-052 |
 | part | — | `vn-rocker-bank-spring` | — | MHA-VN-053 |
+| part | — | `vn-fulcrum-set-screw` | — | MHA-VN-055 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |

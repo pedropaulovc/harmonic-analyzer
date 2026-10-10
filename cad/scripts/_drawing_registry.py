@@ -1132,6 +1132,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_fulcrum_set_screw",
+        part="vn_fulcrum_set_screw",
+        artifact_stem="vn-fulcrum-set-screw",
+        script_name="draw_vn_fulcrum_set_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_pen_set_screw",
         part="vn_pen_set_screw",
         artifact_stem="vn-pen-set-screw",

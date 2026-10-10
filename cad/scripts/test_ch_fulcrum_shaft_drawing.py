@@ -1,12 +1,14 @@
-"""Offline contracts for the fulcrum-shaft drawing."""
+"""Offline contracts for the fulcrum shaft and its drawing."""
 
 from __future__ import annotations
 
-import pytest
+import math
+from pathlib import Path
 
-import draw_ch_fulcrum_shaft as drawing
+import build_ch_fulcrum_shaft as part
+import ch_fulcrum_keeper_spec
 import ch_fulcrum_shaft_spec
-from _drawing_common import ViewEdge, ViewEdges
+import draw_ch_fulcrum_shaft as drawing
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
@@ -22,51 +24,65 @@ def test_every_marked_model_dimension_is_shown() -> None:
     assert displayed == marked
 
 
-def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
-    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
-    from ch_fulcrum_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS
-
-    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
-    assert set(by_key) == {
-        "bearing_cylindricity",
-        "plus_z_end_perpendicularity",
-        "minus_z_end_perpendicularity",
-    }
-    assert by_key["bearing_cylindricity"].characteristic == "cylindricity"
-    assert by_key["bearing_cylindricity"].tolerance == "0.01"
-    for key in ("plus_z_end_perpendicularity", "minus_z_end_perpendicularity"):
-        assert by_key[key].characteristic == "perpendicularity"
-        assert by_key[key].tolerance == "0.05"
-        assert by_key[key].datums == ("A",)
-    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
+def test_shaft_carries_no_frames_or_datums() -> None:
+    # Policy rule 3: shafts carry no frames and no datums; the domed ends
+    # leave no end face to square anyway.
+    assert not hasattr(ch_fulcrum_shaft_spec, "GEOMETRIC_CONTROLS")
+    assert not hasattr(ch_fulcrum_shaft_spec, "PART_DATUMS")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "project_part_pmi" not in source
 
 
-def test_pmi_rim_resolution_requires_unique_model_geometry() -> None:
-    target = object()
-    opposite_end = object()
-    station = drawing.SHAFT_LENGTH / 2.0
-    radius = drawing.SHAFT_DIA / 2.0
-    target_circle = (0.0, 0.0, station, 0.0, 0.0, 1.0, radius)
-    edges = ViewEdges(
-        label="shaft profile",
-        edges=(
-            ViewEdge(target, None, target_circle, None),
-            ViewEdge(
-                opposite_end,
-                None,
-                (0.0, 0.0, -station, 0.0, 0.0, 1.0, radius),
-                None,
-            ),
-        ),
+def test_plain_shaft_domed_proud_of_each_keeper() -> None:
+    spec = ch_fulcrum_shaft_spec
+    keeper = ch_fulcrum_keeper_spec
+    assert spec.SHAFT_DIA == keeper.BORE_DIA
+    assert spec.CYLINDER_HALF == keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 0.5
+    assert spec.DOME_R == spec.SHAFT_DIA / 2.0
+    assert math.isclose(spec.SHAFT_LENGTH, 161.35)
+
+
+def test_flats_sit_under_the_keeper_taps() -> None:
+    spec = ch_fulcrum_shaft_spec
+    assert spec.FLAT_PITCH == 2.0 * ch_fulcrum_keeper_spec.KEEPER_Z_OFF
+    assert spec.FLAT_DEPTH == 0.3
+    assert math.isclose(spec.ACROSS_FLAT, 6.05)
+    assert spec.FLAT_CHORD_MIN > spec.SET_SCREW_MAJOR_DIA
+    assert spec.FLAT_CUP_CAPTURE > 0.0
+
+
+def test_installed_set_screw_meets_rule_12() -> None:
+    spec = ch_fulcrum_shaft_spec
+    assert spec.SET_SCREW_ENGAGEMENT_D >= 1.5
+    # Below the crown apex at nominal; at most 0.4 proud at the worst case.
+    assert spec.SET_SCREW_PROUD_NOMINAL < 0.0
+    assert spec.SET_SCREW_PROUD_WORST <= 0.4
+
+
+def test_analytic_volumes() -> None:
+    r = ch_fulcrum_shaft_spec.SHAFT_R
+    length = ch_fulcrum_shaft_spec.SHAFT_LENGTH
+    assert math.isclose(
+        part.V_BODY, math.pi * r * r * (length - 2 * r) + 4 / 3 * math.pi * r**3
     )
-    assert drawing._unique_shaft_rim(edges, station, label="plus-Z rim") is target
-    assert (
-        drawing._unique_shaft_rim(edges, -station, label="minus-Z rim") is opposite_end
-    )
+    # One flat: a 0.3-deep segment of the Ø6.35 round, 3.5 long.
+    assert math.isclose(part.V_FLAT, 1.905, abs_tol=0.001)
 
-    ambiguous = ViewEdges(
-        label="ambiguous shaft profile",
-        edges=(*edges.edges, ViewEdge(object(), None, target_circle, None)),
+
+def test_precision_matches_the_marked_dimensions() -> None:
+    spec = ch_fulcrum_shaft_spec
+    assert spec.DRAWING_PRECISION["ShaftProfile"]["ShaftDia"] == 3
+    assert spec.DRAWING_PRECISION["FlatProfile"]["AcrossFlat"] == 3
+    assert len(spec.DRAWING_NOTES.splitlines()) <= 4
+
+
+def test_interference_literals_track_the_set_screw_and_keeper() -> None:
+    import _interference_contracts
+    import vn_fulcrum_set_screw_spec as set_screw
+    from _hole_spec import TAP_DRILL_MM
+
+    assert _interference_contracts.FULCRUM_SET_SCREW_THREAD == (
+        set_screw.MAJOR_DIA,
+        TAP_DRILL_MM[set_screw.THREAD],
+        set_screw.LENGTH,
     )
-    with pytest.raises(RuntimeError, match="expected one visible circle"):
-        drawing._unique_shaft_rim(ambiguous, station, label="plus-Z rim")

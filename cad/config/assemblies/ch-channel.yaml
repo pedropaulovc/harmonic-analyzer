@@ -25,6 +25,11 @@ flip_invert:
   - ch fulcrum shaft datum x
   - ch fulcrum shaft datum y
   - ch fulcrum shaft datum z
+  # MHA-VN-055 keeper set screws, datum-located IDENTITY beside the keeper
+  # foot screws [INFERENCE: same learned side; confirm on the farm build].
+  - vn fulcrum set screw datum x
+  - vn fulcrum set screw datum y
+  - vn fulcrum set screw datum z
   # The old pivot-ball mounts became ch-pivot-bracket 2026-09; same
   # datum-locate idiom and learned sides, keyed by canonical component names.
   - ch pivot bracket datum x

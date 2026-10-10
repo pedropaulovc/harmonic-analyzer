@@ -30,20 +30,74 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 def test_geometry_matches_the_top_frame_contract() -> None:
     # The keeper exists to hold the fulcrum shaft 25.2 above the rail top
-    # face (1061.4 - 1036.2, the 2026-08-02 rederive contract); its underside
-    # relief must clear the 4.5-proud corner-boss land.
-    assert ch_fulcrum_keeper_spec.SHAFT_AXIS_H == 25.2
-    assert ch_fulcrum_keeper_spec.RELIEF_H > 4.5
-    # The Ø6.35 shaft end must float in the ball bore with real clearance.
-    assert ch_fulcrum_keeper_spec.BORE_DIA > 6.35
-    assert ch_fulcrum_keeper_spec.BALL_DIA > ch_fulcrum_keeper_spec.BORE_DIA
+    # face (1061.4 - 1036.2, the 2026-08-02 rederive contract) on a flat
+    # seat: a 6.0 lug with a straight foot running OUTBOARD to x = 13.5.
+    spec = ch_fulcrum_keeper_spec
+    assert spec.SHAFT_AXIS_H == 25.2
+    assert spec.CROWN_DIA == spec.KEEPER_WIDTH == 14.0
+    assert 2.0 * spec.LUG_HALF_T == 6.0
+    assert spec.FOOT_TIP_X == spec.LUG_HALF_T + spec.FOOT_L == 13.5
+    assert spec.SCREW_X == 8.25
+    assert spec.KEEPER_SCREW_Z_OFF == spec.KEEPER_Z_OFF + spec.SCREW_X == 82.25
+    # Plain reamed slide-fit bore on the plain Ø6.35 shaft.
+    assert spec.BORE_DIA == 6.35
+    assert spec.BORE_DIA_BAND == (0.025, 0.010)  # (upper, lower)
+
+
+def test_crown_set_screw_tap_stops_at_the_bore() -> None:
+    spec = ch_fulcrum_keeper_spec
+    assert spec.SET_SCREW_THREAD == "#1-72"
+    assert spec.SET_SCREW_HOLE_SPEC.kind == "tapped"
+    assert spec.SET_SCREW_HOLE_SPEC.end == "through_next"
+    assert spec.CROWN_TOP_Y == spec.SHAFT_AXIS_H + spec.CROWN_DIA / 2.0
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'name="SetScrewTap"' in source
+    # through_next stops at the bore only if the bore is already cut.
+    assert source.index('"cut bore"') < source.index('name="SetScrewTap"')
+
+
+def test_rule_12_worst_case_walls_and_thread() -> None:
+    # Worst case of the printed bands (policy rule 12): >= 1.5D of full
+    # crown thread, >= 1.5 web from the thread major to each lug face and
+    # from the foot counterbore to the foot tip.
+    spec = ch_fulcrum_keeper_spec
+    assert spec.SET_SCREW_ENGAGEMENT_D >= 1.5
+    assert spec.SET_SCREW_WEB_MM >= 1.5
+    assert spec.FOOT_TIP_WALL_MM >= 1.5
+    assert round(spec.SET_SCREW_WEB_MM, 3) == 1.813
+    assert round(spec.FOOT_TIP_WALL_MM, 3) == 1.725
+    # The web is only met with the lug and tap station at three places.
+    assert spec.DRAWING_PRECISION["LugBody"]["LugThickness"] == 3
+    assert spec.DRAWING_PRECISION["SetScrewReference"]["SetScrewLocation"] == 3
+
+
+def test_tap_station_reference_sketch() -> None:
+    assert part.REFERENCE_SKETCHES == ch_fulcrum_keeper_spec.REFERENCE_SKETCHES
+    assert [row[0] for row in part.REFERENCE_LINES] == ["SetScrewReference"]
+    _, plane, dimension, start, end, _, value, _ = part.REFERENCE_LINES[0]
+    assert plane == "Front"
+    assert dimension == "SetScrewLocation"
+    # From the outer lug face (datum B) to the tap axis, on the crown top.
+    assert start == (
+        ch_fulcrum_keeper_spec.LUG_HALF_T,
+        ch_fulcrum_keeper_spec.CROWN_TOP_Y,
+    )
+    assert end == (0.0, ch_fulcrum_keeper_spec.CROWN_TOP_Y)
+    assert value == ch_fulcrum_keeper_spec.LUG_HALF_T
+
+
+def test_keeper_tap_spec_for_the_frame() -> None:
+    tap = ch_fulcrum_keeper_spec.KEEPER_TAP_SPEC
+    assert (tap.kind, tap.size, tap.end) == ("tapped", "#4-40", "blind")
+    assert tap.size == ch_fulcrum_keeper_spec.FOOT_SCREW_THREAD
+    assert tap.overrides_mm["ThreadDepth"] < tap.depth_mm
 
 
 def test_screw_hole_seats_the_frame_side_screw() -> None:
     hole = ch_fulcrum_keeper_spec.SCREW_HOLE_SPEC
     assert part.SCREW_HOLE_SPEC is hole
     assert hole.kind == "counterbore_fillister"
-    assert hole.size == "#8"
+    assert hole.size == "#4"
     assert hole.overrides_mm == {
         "HoleDiameter": ch_fulcrum_keeper_spec.HOLE_DIA_MM,
         "CounterBoreDiameter": ch_fulcrum_keeper_spec.CBORE_DIA_MM,
@@ -71,9 +125,9 @@ def test_outboard_lug_edge_resolver_filters_visible_geometry(monkeypatch) -> Non
     wrong_orientation = object()
     expected = object()
     endpoints = {
-        wrong_x: (0.002, 0.0048, 0.007, 0.002, 0.0252, 0.007),
-        wrong_orientation: (0.003, 0.0252, -0.007, 0.003, 0.0252, 0.007),
-        expected: (0.003, 0.0048, 0.007, 0.003, 0.0252, 0.007),
+        wrong_x: (0.002, 0.008, 0.007, 0.002, 0.0252, 0.007),
+        wrong_orientation: (0.003, 0.008, -0.007, 0.003, 0.008, 0.007),
+        expected: (0.003, 0.008, 0.007, 0.003, 0.0252, 0.007),
     }
 
     class FakeSpan:
@@ -108,25 +162,22 @@ def test_outboard_lug_edge_resolver_filters_visible_geometry(monkeypatch) -> Non
     assert span.attributes["matched"] == 1
 
 
-def test_notes_cover_the_ball_seat_and_the_boss_relief() -> None:
+def test_notes_cover_the_fit_the_tap_and_the_screw() -> None:
     notes = ch_fulcrum_keeper_spec.DRAWING_NOTES
     assert "BLACK OXIDE" in notes
-    assert "Ø9.50 STEEL" in notes
     assert "REAM" in notes
-    assert "CORNER-BOSS LAND" in notes
+    assert "MHA-CH-004" in notes
+    assert "MHA-VN-055" in notes
+    assert "MHA-VN-022" in notes
     assert "2 REQUIRED" in notes
+    assert len(notes.splitlines()) <= 6
 
 
-def test_ball_is_a_separate_pressed_body() -> None:
-    # A merged Ø9.5 sphere in the Ø9.5 socket is a zero-thickness tangent
-    # boolean (equator-circle contact only) -- the ball must stay its own
-    # solid body, like the pinion-handle cross rod.
+def test_keeper_is_one_body_with_no_ball() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "merge_result=False" in source
-    assert 'name_last_feature(adapter, "Ball")' in source
-    # And the wizard screw hole must land while the part is one body (its
-    # placement-face scan reads GetBodies2()[0]).
-    assert source.index('name="FootScrewHole"') < source.index('"revolve ball"')
+    assert "merge_result=False" not in source
+    assert "Ball" not in source
+    assert not hasattr(ch_fulcrum_keeper_spec, "BALL_DIA")
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

@@ -41,6 +41,14 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91375A106",
         material="Alloy Steel",
     ),
+    # The same C45 black-oxide cup point, #1-72 x 5/32, on the fulcrum shaft's
+    # flat in each ch-fulcrum-keeper crown.
+    "vn-fulcrum-set-screw": _stock(
+        "vn-fulcrum-set-screw",
+        "Alloy Steel Cup-Tip Set Screw",
+        "91375A942",
+        material="Alloy Steel",
+    ),
     "vn-clamp-screw": _stock(
         "vn-clamp-screw",
         "Steel Narrow Fillister Head Slotted Screw",
@@ -116,7 +124,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "vn-frame-side-screw": _stock(
         "vn-frame-side-screw",
         "Steel Narrow Fillister Head Slotted Screw",
-        "90280A194",
+        "90280A110",
     ),
     "vn-frame-cross-screw": _stock(
         "vn-frame-cross-screw",

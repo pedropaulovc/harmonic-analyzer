@@ -3,9 +3,9 @@ vn-frame-side-screw:
   number: MHA-VN-022
   stock_name: Steel Narrow Fillister Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [90280A194]
+  supplier_skus: [90280A110]
   material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 90280A194
+  material_specification: Steel, McMaster-Carr 90280A110
   finish: zinc plated
   quantity: 2
   tolerance_class: machined_block
