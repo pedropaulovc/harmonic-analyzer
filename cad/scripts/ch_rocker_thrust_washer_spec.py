@@ -57,7 +57,12 @@ MATERIAL_SPECIFICATION = (
 MATERIAL_TITLE = "1008 CR sheet, ASTM A1008 CS"
 
 BORE_DIA = _BRACKET_BORE_DIA  # slips on the O6.35 pivot shaft
-# Running clearance on the shaft: never under the bore (drilled class).
+# Running clearance on the shaft: never under the bore. The sheet calls it
+# DRILL THRU, so the title block's DRILLED HOLES row is its band and the model
+# carries none (rule 1: a callout never restates the title block; PR #1317
+# machinist review). The layout's wall and clearance stacks read this; the
+# value is that row's (pinned to _config by the tests, so the rocker bank
+# layout does not read the title block).
 BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations
 
 # The wall floor: rule 12's 1.5 over the bore at its largest, with the OD at

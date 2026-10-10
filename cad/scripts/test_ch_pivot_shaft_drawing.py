@@ -282,3 +282,20 @@ def test_detail_a_takes_the_north_flat_and_dome_clear_of_the_profile() -> None:
     # The isometric moved under the profile to make room: right of the notes,
     # left of the title block.
     assert 0.105 < drawing.ISO_NOTE_XY[0] < drawing.ISO_CENTER[0] < 0.216
+
+
+def test_detail_a_texts_stand_clear_of_their_witnesses() -> None:
+    """cd4151166 render: centred on its span, the 4.00 station sat on the
+    flat's near witness, and the circle's letter sat on the bar."""
+    end = drawing._detail_x(0.0)
+    station_x, _ = drawing.DETAIL_KEEP["NorthFlatStation"]
+    half = len(f"{spec.NORTH_FLAT_STATION:.2f}") * drawing.CALLOUT_CHAR_WIDTH / 2.0
+    assert station_x + half < end
+    # The (SR4.1) callout is a row lower, so the two cannot meet.
+    assert drawing.DETAIL_KEEP["Radius"][1] < drawing.DETAIL_KEEP["NorthFlatStation"][1] - 0.010
+    letter_x, letter_y = drawing.DETAIL_LETTER_XY
+    circle_left = drawing.NORTH_END_X - (
+        drawing.DETAIL_FENCE_Z_MM + drawing.DETAIL_RADIUS_MM
+    ) * drawing._MM
+    assert letter_x + 0.0065 < circle_left
+    assert letter_y - 0.0065 > drawing.SHAFT_FLANK_Y

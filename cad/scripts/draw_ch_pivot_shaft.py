@@ -127,6 +127,11 @@ if DETAIL_RADIUS_MM <= abs(DOME_HEIGHT - DETAIL_FENCE_Z_MM) or DETAIL_RADIUS_MM 
     raise AssertionError("DETAIL A's fence must take in the dome tip and the whole flat")
 # The label anchors at its top centre, under the dome's callout.
 DETAIL_LABEL_XY = (DETAIL_CENTER[0], DETAIL_CENTER[1] - _DETAIL_FENCE_R - 0.027)
+# The circle's letter on the profile: up-left of the 6 mm circle, left of the
+# north end's witness line (both station dimensions start there), 2 mm or more
+# off both whichever corner SolidWorks anchors. Left where SolidWorks put it,
+# the 6.35 mm "A" sat on the bar (cd4151166 render).
+DETAIL_LETTER_XY = (NORTH_END_X - 0.014, PROFILE_CENTER[1] + 0.010)
 
 
 def _detail_x(z_mm: float) -> float:
@@ -135,11 +140,12 @@ def _detail_x(z_mm: float) -> float:
 
 
 DETAIL_KEEP = {
-    # The station and the flat's length stack above the fence, each centred
-    # over the span it measures: the station from the end face to the flat's
-    # centre, the length over the flat.
+    # The station and the flat's length stack above the fence. The length is
+    # centred over the flat; the station's text stands left of the end
+    # face's witness: centred on its span it sat on the flat's near witness
+    # (cd4151166 render).
     "NorthFlatStation": (
-        (_detail_x(0.0) + _detail_x(-NORTH_FLAT_STATION)) / 2.0,
+        _left_of_witness(_detail_x(0.0), f"{NORTH_FLAT_STATION:.2f}"),
         DETAIL_CENTER[1] + _DETAIL_FENCE_R + 0.008,
     ),
     "FlatLength": (
@@ -238,6 +244,15 @@ def _north_end_detail(adapter: Any, profile: Any) -> Any:
     actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
     if math.dist(actual, label_xyz) > 1e-8:
         raise RuntimeError(f"the north-end detail label did not persist: {actual}")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one detail circle on the profile, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    circle.SetLabelPosition(*DETAIL_LETTER_XY)
+    draw.EditRebuild3()
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"the detail circle's letter did not persist: {letter}")
     return detail
 
 

@@ -70,8 +70,9 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "DiscThick": (0.235, 0.190),
 }
-# Rule 7: a hole callout states its process; the banded bore is a drilled-class
-# running clearance on the shaft (PR #1317 machinist review).
+# Rule 7: a hole callout states its process. The bore is a drilled running
+# clearance on the shaft, so the title block's DRILLED HOLES row is its band
+# (PR #1317 machinist review).
 BORE_CALLOUT = "DRILL THRU"
 
 # The faces carry no finish symbol (Main 2026-09-26): they are the stock

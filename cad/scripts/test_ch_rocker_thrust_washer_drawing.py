@@ -41,15 +41,17 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     }
 
 
-def test_only_the_bore_is_banded() -> None:
+def test_nothing_is_banded_on_the_model() -> None:
     """The south ear is blade-set off its washer (#948 ruling R) and the north
     washer is miced into the datum ear's DRO target, so its thickness sits in
     no datum chain: it is the stock's, judged at the mill's band by the bar
-    clearance (test_rocker_bank_layout)."""
-    assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "BoreDia"): "*deviations(BORE_BAND)",
-    }
-    assert spec.BORE_BAND[1] == 0.0
+    clearance (test_rocker_bank_layout). The bore prints DRILL THRU, so the
+    title block's DRILLED HOLES row is its band (PR #1317 machinist review:
+    a model +0.1/0 restated it, against rule 1)."""
+    from _printed_tolerance import drilled_oversize_mm
+
+    assert model_toleranced_dimensions(part) == {}
+    assert spec.BORE_BAND == (drilled_oversize_mm(), 0.0)
     assert spec.BORE_DIA - 6.35 > 0.0
 
 

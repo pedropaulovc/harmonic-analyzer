@@ -2,7 +2,7 @@ ch-pivot-shaft:
   number: MHA-CH-005
   material: Plain Carbon Steel
   material_specification: AISI 1018 cold-finished steel shafting, Ø1/4 in
-  finish: as-drawn shafting, domed ends turned, oiled
+  finish: as-drawn shafting, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
