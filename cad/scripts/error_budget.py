@@ -281,7 +281,13 @@ def hook_displacement(theta: np.ndarray, d: float, nom: Nominal) -> np.ndarray:
     spring load normal to the arc, so the foot does not slide) and rides the
     rocker's rotation; the rigid bar re-tilts so its top pin stays on the lever
     circle, and the hook follows the lever."""
-    tr = rocker_angle(theta, nom)
+    return _hook_displacement_at_rocker(theta, rocker_angle(theta, nom), d, nom)
+
+
+def _hook_displacement_at_rocker(
+    theta: np.ndarray, tr: np.ndarray, d: float, nom: Nominal
+) -> np.ndarray:
+    """Station-dependent hook motion using an already-solved rocker cycle."""
     k0x, k0y = rest_contact(d, nom)
     kx = k0x * np.cos(tr) - k0y * np.sin(tr)
     ky = k0x * np.sin(tr) + k0y * np.cos(tr)
@@ -498,14 +504,29 @@ class CycleTable:
         (rad, any real; periodic), broadcast together. Station brackets come
         from the station array itself (the last interval may be short)."""
         d, alpha = np.broadcast_arrays(d, alpha)
+        return self._sample_with_brackets(self._sample_brackets(d, alpha))
+
+    def _sample_brackets(
+        self, d: np.ndarray, alpha: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Lookup indices/fractions, leaving broadcastable station axes small."""
         st = self.stations
         s0 = np.clip(np.searchsorted(st, d, side="right") - 1, 0, len(st) - 2)
         sf = np.clip((d - st[s0]) / (st[s0 + 1] - st[s0]), 0.0, 1.0)
         n = self.cycles.shape[1]
         ai = (alpha % (2.0 * math.pi)) / (2.0 * math.pi) * n
-        a0 = ai.astype(int) % n
-        af = ai - ai.astype(int)
+        a_floor = ai.astype(int)
+        a0 = a_floor % n
+        af = ai - a_floor
         a1 = (a0 + 1) % n
+        return s0, sf, a0, af, a1
+
+    def _sample_with_brackets(
+        self,
+        brackets: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    ) -> np.ndarray:
+        """Apply a per-call lookup shared by tables on the same grid."""
+        s0, sf, a0, af, a1 = brackets
         c = self.cycles
         top = c[s0, a0] * (1.0 - af) + c[s0, a1] * af
         bot = c[s0 + 1, a0] * (1.0 - af) + c[s0 + 1, a1] * af
@@ -524,7 +545,15 @@ def _station_grid(nom: Nominal, step_mm: float) -> np.ndarray:
 
 
 def _cycles_at(stations: np.ndarray, nom: Nominal) -> np.ndarray:
-    return np.array([hook_displacement(_READ_GRID, float(d), nom) for d in stations])
+    # The rocker motion depends on the crank angles and nominal, not the bar
+    # station. Keep its solve local to this table, including deviated nominals.
+    tr = rocker_angle(_READ_GRID, nom)
+    return np.array(
+        [
+            _hook_displacement_at_rocker(_READ_GRID, tr, float(d), nom)
+            for d in stations
+        ]
+    )
 
 
 def cycle_table(nom: Nominal, step_mm: float = 0.25) -> CycleTable:
@@ -1100,10 +1129,19 @@ def _read_draws(
     then s = r0/(S + C2), the kappa correction and the read-vs-set vector with
     the operator's recorded ``x_read``/``kappa``. Returns O_k, shape (draws, K+1)."""
     alpha = HARMONICS[None, None, :] * THETA_K[None, :, None] + phi[:, None, :]
-    u = t.sample(d[:, None, :], alpha)  # draws,k,i
+    # Station indices need no coefficient axis; all derivative tables use the
+    # nominal grid, so the same brackets serve every perturbed waveform.
+    brackets = t._sample_brackets(d[:, None, :], alpha)
+    u = t._sample_with_brackets(brackets)  # draws,k,i
     mean = np.interp(d, t.stations, t.mean)
     for dt, v in (shape or {}).values():
-        u = u + v[:, None, :] * dt.sample(d[:, None, :], alpha)
+        if dt.cycles.shape[1] != t.cycles.shape[1] or not np.array_equal(
+            dt.stations, t.stations
+        ):
+            raise ValueError(
+                "waveform derivatives must use the same station and angle grid"
+            )
+        u = u + v[:, None, :] * dt._sample_with_brackets(brackets)
         mean = mean + v * np.interp(d, dt.stations, dt.mean)
     r = np.einsum("di,dki->dk", g, u)
     zero = np.einsum("di,di->d", g, mean)

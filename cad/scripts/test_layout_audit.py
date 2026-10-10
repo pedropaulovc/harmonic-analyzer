@@ -4096,6 +4096,100 @@ def test_frame_assembly_fails_its_leaf_on_a_leader_printed_through_its_own_ballo
         _run(live, LayoutAuditMode.REPORT, frame, stem="fr-frame-assembly")
 
 
+@pytest.mark.parametrize(
+    ("kind", "fails"),
+    [
+        ("leader-crosses-line", True),
+        ("arrow-near-text", True),
+        ("text-clearance", True),
+        ("leader-crosses-view", True),
+        ("view-edges-missing", False),
+    ],
+)
+def test_knife_mount_fails_its_leaf_on_every_overlap_kind(monkeypatch, tmp_path, kind, fails):
+    """sm-knife-mount enforces every gating kind under REPORT but
+    view-edges-missing, the fleet's line-weight false positive; another
+    drawing only reports the overlap kinds the fleet has not brought to zero."""
+    import _layout_audit
+    from _layout_geometry import Finding
+
+    assert _layout_audit.STEM_ENFORCED_KINDS["sm-knife-mount"] == (
+        _layout_audit.GATING_KINDS - {"view-edges-missing"}
+    )
+    finding = Finding(kind=kind, sheet="Sheet1", a="gtol DetailItem357", b="dim BlockHeight", detail="x")
+    monkeypatch.setattr(_layout_audit, "audit_dump", lambda _dump: [finding])
+    live = _patch_collect(monkeypatch, [_dump()])
+    if kind != "view-edges-missing":
+        assert kind not in _layout_audit.ENFORCED_KINDS
+    _run(live, LayoutAuditMode.REPORT, tmp_path / "other.json")
+    report = tmp_path / "sm-knife-mount.json"
+    if not fails:
+        _run(live, LayoutAuditMode.REPORT, report, stem="sm-knife-mount")
+        return
+    with pytest.raises(RuntimeError, match=rf"(?s)knife-mount .*\[{kind}\]"):
+        _run(live, LayoutAuditMode.REPORT, report, stem="sm-knife-mount")
+
+
+def _knife_mount_datum_b(rise_m: float, *, into_frame: bool = False):
+    """The knife mount's dowel-pair frame DetailItem355 (⌖Ø0.13|A) and its
+    datum B tag DetailItem356, display data from farm run
+    20261010T022724164Z; the tag raised ``rise_m`` off the frame's bottom
+    border (0 = its triangle seated on it, as printed); ``into_frame`` points
+    the seated triangle up, into the frame, instead of down to its leader."""
+    from _layout_geometry import AnnotationGeometry, Box, Segment, SheetGeometry
+
+    def frame(x0, x1):
+        return (
+            Segment(x0, 0.212, x0, 0.219),
+            Segment(x0, 0.219, x1, 0.219),
+            Segment(x1, 0.219, x1, 0.212),
+            Segment(x1, 0.212, x0, 0.212),
+        )
+
+    gtol = AnnotationGeometry(
+        label="gtol DetailItem355 '<GTOL-POSI>'",
+        kind="gtol",
+        owner="Drawing View3",
+        text_boxes=(Box(0.1550, 0.21366, 0.1745, 0.2173),),
+        segments=(*frame(0.1466, 0.1536), *frame(0.1536, 0.1697179), *frame(0.1697179, 0.176013)),
+    )
+    base, apex = 0.212 + rise_m, 0.20955 + rise_m
+    if into_frame:
+        apex = base + (base - apex)
+    triangle = ((0.1627065, base), (0.1599065, base), (0.1613065, apex))
+    datum = AnnotationGeometry(
+        label="datum DetailItem356 'B'",
+        kind="datum",
+        owner="Drawing View3",
+        text_boxes=(Box(0.15997, 0.20072, 0.16265, 0.20422),),
+        segments=(
+            *(Segment(*a, *b, "arrow") for a, b in zip(triangle, (*triangle[1:], triangle[0]))),
+            Segment(0.1613065, apex, 0.1613065, 0.2069981 + rise_m, "leader"),
+        ),
+    )
+    return SheetGeometry("s", SHEET_W, SHEET_H, None, (), (), (gtol, datum), 0.6)
+
+
+def test_a_datum_seated_on_its_frame_is_attached_not_near_its_text():
+    """20261010T022724164Z: the knife mount's datum B, attached to its
+    dowel-pair frame (add_frame_datum_feature), seats its triangle's base on
+    the frame's bottom border, 1.66 mm under the frame's 0.13; the audit
+    read it as an arrow crowding foreign text.  Raised 0.3 mm off the
+    border into the frame, the same tag is not seated there and gates; seated
+    on the border but pointing into the frame, its apex crowds the 0.13 and
+    gates too (CodeRabbit, #1320)."""
+    from _layout_audit import find_arrows_near_text
+
+    assert find_arrows_near_text(_knife_mount_datum_b(0.0)) == []
+    for sheet in (_knife_mount_datum_b(0.0003), _knife_mount_datum_b(0.0, into_frame=True)):
+        (finding,) = find_arrows_near_text(sheet)
+        assert (finding.kind, finding.a, finding.b) == (
+            "arrow-near-text",
+            "datum DetailItem356 'B'",
+            "gtol DetailItem355 '<GTOL-POSI>'",
+        )
+
+
 _ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 # cone_pivot_post's MainBodyHt, display data verbatim from the probe leaf
 # (diag/cone-pivot-origin-probe fc2212cd6, leaf run 20260926T205141966Z): two

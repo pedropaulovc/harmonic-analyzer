@@ -5,7 +5,9 @@ compared against the value saved on the last SUCCESSFUL run -- never from doit's
 injected ``changed`` arg, which is corrupted after an intervening failed task.
 """
 
+import ast
 import contextlib
+from functools import cache
 import importlib.util
 import inspect
 import os
@@ -250,10 +252,8 @@ _OWN_ROW_HELPERS = {
 }
 
 
-def _module_part_name(source: Path) -> str | None:
-    import ast
-
-    for node in ast.parse(source.read_text(encoding="utf-8")).body:
+def _module_part_name(tree: ast.Module) -> str | None:
+    for node in tree.body:
         if (
             isinstance(node, ast.Assign)
             and any(
@@ -265,11 +265,9 @@ def _module_part_name(source: Path) -> str | None:
     return None
 
 
-def _helper_name_arguments(source: Path) -> list[tuple[str, str]]:
-    import ast
-
+def _helper_name_arguments(tree: ast.Module) -> tuple[tuple[str, str], ...]:
     found = []
-    for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+    for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
@@ -280,34 +278,45 @@ def _helper_name_arguments(source: Path) -> list[tuple[str, str]]:
         args = [*node.args[index : index + 1]]
         args += [kw.value for kw in node.keywords if kw.arg == "part_name"]
         found.extend((name, ast.unparse(arg)) for arg in args)
-    return found
+    return tuple(found)
 
 
 def test_drawing_closures_read_no_foreign_dynamic_part_row():
     import _buildgraph as bg
 
     dodo = _load_dodo()
+
+    @cache
+    def source_facts(source: Path):
+        # A shared helper can occur in every drawing closure. Source is unchanged
+        # throughout this scan; cache immutable facts, not a production AST oracle.
+        try:
+            tokens = bg._config_tokens_in_source(source)
+        except bg._UnknownConfigUse:
+            return None  # the whole-config fallback narrows nothing
+        if source.name in _DRAWING_OWN_ROW_READERS:
+            return tokens, (), None  # forwards its caller's name
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        return tokens, _helper_name_arguments(tree), _module_part_name(tree)
+
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
         script = spec.script.resolve()
         own_build = f"build_{spec.part}.py"
         for source in (script, *(Path(path) for path in bg.module_deps_of(script))):
-            try:
-                tokens = bg._config_tokens_in_source(source)
-            except bg._UnknownConfigUse:
-                continue  # the whole-config fallback narrows nothing
+            facts = source_facts(source)
+            if facts is None:
+                continue
+            tokens, calls, part_name = facts
             if "parts/*" in tokens:
                 assert source.name in {*_DRAWING_OWN_ROW_READERS, own_build}, (
                     f"drawing:{stem} reaches a new dynamic registry read in "
                     f"{source.name}; review it against _expand_parts_token"
                 )
-            if source.name in _DRAWING_OWN_ROW_READERS:
-                continue  # forwards its caller's name
-            calls = _helper_name_arguments(source)
             if not calls:
                 continue
             assert source.name == own_build, (stem, source.name, calls)
             assert {arg for _name, arg in calls} == {"PART_NAME"}, (stem, calls)
-            assert _module_part_name(source) == spec.part.replace("_", "-"), stem
+            assert part_name == spec.part.replace("_", "-"), stem
 
 
 @pytest.fixture

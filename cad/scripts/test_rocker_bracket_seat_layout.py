@@ -96,20 +96,21 @@ def test_seats_run_in_solid_iron_on_the_support() -> None:
         assert abs(x) - radius > support.CAV
         assert abs(x) - radius < support.BIG < abs(x) + radius
         assert abs(x) + radius <= support.HALF_Y - seats.EDGE_BREAK
-    assert [round(abs(x), 2) for x in seats.SEAT_LOCAL_X] == [84.08, 83.23]
+    assert [round(abs(x), 2) for x in seats.SEAT_LOCAL_X] == [84.2, 83.88]
 
 
 def test_seat_thread_keeps_the_end_wall_at_the_worst_transferred_position() -> None:
     """Codex P2 (2026-10-09 flip): the south seat's thread sat 2.74 from the
     support's end face nominal and 1.32 at the title-block bands. It is
-    transferred from the bracket's hole, so the bracket's station and foot
-    length bands move it, and the end face moves by half the 177.8's .X band."""
+    transferred from the bracket's hole, whose station is given from the
+    fit-up-set ear face (user, 2026-10-10, option ii), so only the station's
+    band moves it -- not the foot length's -- and the end face moves by half
+    the 177.8's .X band."""
     for x, wall in zip(seats.SEAT_LOCAL_X, seats.END_WALL_MIN, strict=True):
         assert wall == pytest.approx(
             (support.HALF_Y - abs(x))
             - seats.SCREW_MAJOR_DIA / 2.0
             - bracket.STATION_BAND
-            - bracket.FOOT_LEN_BAND
             - seats.LINEAR_1PL / 2.0
         )
         assert wall >= seats.RULE12_WEB_TARGET
@@ -133,8 +134,19 @@ def test_bracket_hole_is_mha_004s_hole_for_the_same_screw() -> None:
 
 def test_bracket_hole_ligaments_keep_the_floor_at_worst_case() -> None:
     for name in sides.CONFIGURATIONS:
-        for ligament in sides.HOLE_LIGAMENTS_MIN[name].values():
+        ligaments = sides.HOLE_LIGAMENTS_MIN[name]
+        for ligament in ligaments.values():
             assert ligament >= bracket.LIGAMENT_FLOOR
+        # The foot end loses the foot length's and the station's bands (both
+        # from the inboard ear face) and half the drill growth.
+        assert ligaments["foot end"] == pytest.approx(
+            sides.FOOT_Z1[name]
+            - sides.HOLE_Z[name]
+            - bracket.HOLE_DIA / 2.0
+            - bracket.FOOT_LEN_BAND
+            - bracket.STATION_BAND
+            - bracket.DRILL_GROWTH / 2.0
+        )
     # Each term at its own band: along the foot the three +/-0.10 lengths,
     # across it the foot's sides at the .XX band the seat stack carries this
     # foot at, the drilled hole at the title block's +0.10/0.
@@ -160,20 +172,46 @@ def test_bracket_lengths_along_the_foot_carry_their_bands_on_the_model() -> None
     }
 
 
-def test_each_foot_ends_flush_with_the_support_and_centres_its_hole() -> None:
+def test_hold_down_station_is_given_from_the_ears_inboard_face() -> None:
+    """User, 2026-10-10 (option ii): the station runs from the face fit-up
+    sets, the S4 hold's Z0, so the model's HoleStation measures from it."""
+    for name in sides.CONFIGURATIONS:
+        assert sides.HOLE_STATION[name] == pytest.approx(
+            sides.HOLE_Z[name] - bracket.FOOT_Z0
+        )
+        assert sides.HOLE_STATION[name] == pytest.approx(
+            sides.HOLE_Z[name] + bracket.EAR_T / 2.0
+        )
+    source = open(bracket_build.__file__, encoding="utf-8").read()
+    assert 'hole.record("HoleDatum", \'"EarT" / 2\')' in source
+    assert 'hole.record("HoleStation", \'"HoleZ" + "EarT" / 2\')' in source
+
+
+def test_each_foot_ends_flush_with_the_support_and_places_its_hole() -> None:
+    """The north hole is centred in its free run; the south run is too short
+    (8-thick ears beside the 1/32 thrust washers), so its hole sits mid-way
+    between the head-to-ear and seat end-wall limits instead."""
     for name in sides.CONFIGURATIONS:
         foot_end = sides.MOUNT_Z[name] + sides.OUTBOARD_SIGN[name] * sides.FOOT_Z1[name]
         support_end = support_spec.SUPPORT_WORLD_Z + sides.OUTBOARD_SIGN[name] * (
             support_spec.SUPPORT_HALF_MACHINE_Z
         )
         assert foot_end == pytest.approx(support_end)
-        assert sides.HOLE_Z[name] - bracket.EAR_T / 2.0 == pytest.approx(
-            sides.FOOT_Z1[name] - sides.HOLE_Z[name]
-        )
+        assert sides.HOLE_Z_MIN <= sides.HOLE_Z[name] <= sides.HOLE_Z_MAX[name]
+    assert sides.HOLE_Z["N"] - bracket.EAR_T / 2.0 == pytest.approx(
+        sides.FOOT_Z1["N"] - sides.HOLE_Z["N"]
+    )
+    assert sides.HOLE_Z["S"] == pytest.approx(
+        (sides.HOLE_Z_MIN + sides.HOLE_Z_MAX["S"]) / 2.0
+    )
     assert sides.OUTBOARD_SIGN == {"S": -1.0, "N": 1.0}
     assert {name: round(value, 2) for name, value in sides.FOOT_LEN.items()} == {
-        "S": 15.64,
-        "N": 17.34,
+        "S": 16.44,
+        "N": 18.05,
+    }
+    assert {name: round(value, 2) for name, value in sides.HOLE_STATION.items()} == {
+        "S": 11.74,
+        "N": 13.02,
     }
 
 
@@ -185,7 +223,6 @@ def test_screw_heads_keep_air_to_the_ear_and_the_foot_end() -> None:
             sides.HOLE_Z[name]
             - head_r
             - bracket.EAR_T / 2.0
-            - bracket.FOOT_LEN_BAND
             - bracket.EAR_T_BAND
             - bracket.STATION_BAND
         )
