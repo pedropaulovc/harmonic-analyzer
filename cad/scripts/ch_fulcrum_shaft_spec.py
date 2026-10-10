@@ -264,8 +264,8 @@ if FLAT_STATION_WINDOW_MM <= 0.0:
     )
 
 # --- The keepers' bores, drilled and reamed through in one pass at their
-# installed spacing (ch_fulcrum_keeper_spec.BORE_PAIR_CALLOUT, MHA-CH-000
-# STEP 8): bored apart, each keeper's .XX LugRise could put the two bores
+# installed spacing (ch_fulcrum_keeper_spec.BORE_PAIR_CALLOUT, assembly step
+# fulcrum-keepers-pair-reamed): bored apart, the .XX LugRise could put the bores
 # BORE_OFFSET_UNPAIRED_MM out of line, past the fit's largest diametral
 # clearance; reamed together they are one straight line, gauged by this
 # shaft in the clamped setup. What remains is the rail under the two feet:

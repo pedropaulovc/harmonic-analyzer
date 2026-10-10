@@ -204,8 +204,7 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
         for n in range(1, 21)
     }
     set_screw_pairs = {
-        frozenset((f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
-        for n in (1, 2)
+        frozenset((f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")) for n in (1, 2)
     } | {
         frozenset((f"vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}"))
         for n in (1, 2)

@@ -96,6 +96,43 @@ def test_shared_module_holds_no_per_assembly_table(module):
     )
 
 
+@pytest.fixture(scope="module")
+def channel_reference_band_expression():
+    tree = ast.parse((SCRIPTS_DIR / "verify.py").read_text(encoding="utf-8"))
+    band = next(
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "_COMPONENT_BAND"
+            for target in node.targets
+        )
+    )
+    channel_band = next(
+        value
+        for key, value in zip(band.keys, band.values)
+        if isinstance(key, ast.Constant) and key.value == "ch-channel"
+    )
+    # Parse/compile once without importing verify's native collaborators.
+    return compile(ast.Expression(channel_band), "verify.py", "eval")
+
+
+@pytest.mark.parametrize("channel_count", (1, 3, 20))
+def test_channel_reference_band_tracks_the_full_retention_stack(
+    channel_count, channel_reference_band_expression
+):
+    actual = eval(
+        channel_reference_band_expression,
+        {"__builtins__": {}, "_N_CH": channel_count},
+    )
+    # Two shafts, two washers, two brackets, two bracket foot screws,
+    # two pivot-arbor screws, two keepers, two keeper foot screws,
+    # two keeper crown screws and one wave spring.
+    fixed_count = 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 1
+    expected = 8 * channel_count + fixed_count
+    assert actual == (expected - 6, expected + 6)
+
+
 def test_stem_keyed_table_detector_sees_a_table(tmp_path):
     probe = tmp_path / "probe.py"
     probe.write_text(

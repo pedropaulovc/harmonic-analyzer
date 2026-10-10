@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 
 import build_ch_fulcrum_keeper as part
+import ch_channel_assembly_steps as steps
 import draw_ch_fulcrum_keeper as drawing
 import ch_fulcrum_keeper_spec
 import _config
@@ -125,7 +126,7 @@ def test_keeper_tap_spec_for_the_frame() -> None:
 
 
 def test_fitup_exports_for_the_top_frame() -> None:
-    # The pair is set by DRO (MHA-CH-000 STEP 9): X off the rail web under
+    # The pair is set by DRO (KEEPERS_SET_KEY): X off the rail web under
     # each lug, Z off the front socket line; the frame taps are transferred.
     spec = ch_fulcrum_keeper_spec
     assert spec.KEEPER_FITUP_LOCATION_BAND_MM == 0.02
@@ -143,10 +144,11 @@ def test_print_carries_no_datums_or_frames_and_cites_the_fitup_steps() -> None:
     assert "add_datum_feature" not in source
     assert "add_feature_control_frame" not in source
     assert not hasattr(ch_fulcrum_keeper_spec, "GEOMETRIC_TOLERANCES_MM")
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"].endswith("PER MHA-CH-000 STEP 8")
-    assert drawing.DIMENSION_CALLOUTS["CrownDia"].endswith("PER MHA-CH-000 STEP 8")
+    pair_ream = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(f"PER {pair_ream}")
+    assert drawing.DIMENSION_CALLOUTS["CrownDia"].endswith(f"PER {pair_ream}")
     assert "STAKE MOUTH 2 PLACES" in drawing.SET_SCREW_PROCESS
-    assert "MHA-CH-000 STEP 10" in drawing.SET_SCREW_PROCESS
+    assert steps.step_ref(steps.SET_SCREWS_STAKED_KEY) in drawing.SET_SCREW_PROCESS
 
 
 def test_screw_hole_seats_the_frame_side_screw() -> None:
@@ -228,7 +230,7 @@ def test_the_auto_tapped_hole_note_is_removed() -> None:
 def test_notes_cover_the_finish_the_tap_and_the_screw() -> None:
     notes = ch_fulcrum_keeper_spec.DRAWING_NOTES
     assert "BLACK OXIDE" in notes
-    # The pair ream is on the bore callout (STEP 8), not a note.
+    # The pair ream is on the bore callout (KEEPERS_PAIR_REAMED_KEY), not a note.
     assert "REAM" not in notes
     assert "MHA-CH-004" in notes
     assert "MHA-VN-055" in notes

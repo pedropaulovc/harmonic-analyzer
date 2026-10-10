@@ -69,9 +69,10 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_DIA / 2.0  # 32.2: the set-screw tap's entry
 # on it. Each keeper prints LugRise at .XX, so two keepers bored apart could
 # sit 2 x 0.51 out of line -- far past any slide clearance, and a reamer only
 # follows the holes it is given. So the two are drilled and reamed through in
-# one pass AT THEIR INSTALLED SPACING (BORE_PAIR_CALLOUT, MHA-CH-000 STEP 8):
-# feet outboard and down on one flat, inner lug faces KEEPER_INNER_FACE_SPAN_MM
-# apart as STEP 9 sets them, the bore axis set parallel to the flat. Both
+# one pass AT THEIR INSTALLED SPACING (BORE_PAIR_CALLOUT,
+# ch_channel_assembly_steps.KEEPERS_PAIR_REAMED_KEY): feet outboard and down on
+# one flat, inner lug faces KEEPER_INNER_FACE_SPAN_MM apart as KEEPERS_SET_KEY
+# sets them, the bore axis set parallel to the flat. Both
 # bores are then one straight line across the whole span, and the acceptance
 # (the actual MHA-CH-004 shaft slides freely through both, still clamped)
 # gauges that line itself. A setup tilt of the line to the flat costs no

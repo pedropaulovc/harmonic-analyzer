@@ -175,14 +175,13 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
-# active_count build-speed knob): channel = 8N + 14 (N×{rocker,rod,rod-pivot-pin,
-# bar,bar-pivot-pin,lever,spring,spring-hook} + pivot shaft + south thrust washer
-# + fulcrum shaft + 2 pivot brackets + 2 bracket hold-down screws + 2 fulcrum
-# keepers + 2 keeper foot screws + 2 keeper set screws + the MHA-VN-053
-# rocker-bank spring; 2026-09-02:
-# the 2 spacer bushings per gap are gone -- integral hubs; 2026-10: + the pressed
-# rod-pivot pin and the pressed bar pivot pin per channel, + the bank spring
-# (#948 ruling R)),
+# active_count build-speed knob): channel = 8N + 17 (N×{rocker,rod,rod-pivot-pin,
+# bar,bar-pivot-pin,lever,spring,spring-hook} + pivot shaft + 2 thrust washers
+# (MHA-CH-009, south and north) + fulcrum shaft + 2 pivot brackets
+# + 2 bracket hold-down screws (MHA-VN-032) + 2 pivot-arbor apex set screws
+# (MHA-VN-034) + 2 fulcrum keepers + 2 keeper foot screws (MHA-VN-022)
+# + 2 keeper crown set screws (MHA-VN-055) + the MHA-VN-053 rocker-bank
+# wave spring; the 2 spacer bushings per gap are gone -- integral hubs),
 # drive-train = 62 + N
 # (full 20-gear cone stack + crank/structure ≈ 33 -- including the cone swing
 # platform + tip block that joined the pivot post in the p1 swing rework, and
@@ -194,7 +193,7 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # hardware 6: lock knob, pivot screw, swing-stop screw, tip
 # bushing/adjuster/pinch screw, MINUS the crank-pedestal the merged column
 # absorbed, + the MHA-VN-052 cylinder-bank spring (#948 ruling R), plus N
-# cylinder gears). At N=20 they give 176 and 82 (measured 164 and 77 pre-PR8 ->
+# cylinder gears). At N=20 they give 177 and 82 (measured 164 and 77 pre-PR8 ->
 # 81 before the pins and springs) and stay correct at N=3.
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
@@ -204,12 +203,12 @@ _COMPONENT_BAND = {
     # #948 ruling R (PR #1292): + the MHA-VN-052 bank spring.
     "dt-drive-train": (62 + _N_CH - 4, 62 + _N_CH + 4),  # N=20 -> (78,86), expected 82
     "ch-channel": (
-        8 * _N_CH + 14 - 6,
-        8 * _N_CH + 14 + 6,
-    ),  # N=20 -> (168,180), expected 174 (#948 ruling R: + MHA-VN-053)
-    # (measured 164 pre-remount; 2026-08-02: -2 lever ball-mounts +2 fulcrum
-    # keepers +2 keeper foot screws nets +2; 2026-10-10: #1307 one hold-down
-    # per rocker pivot bracket -2, +2 MHA-VN-055 keeper set screws)
+        8 * _N_CH + 17 - 6,
+        8 * _N_CH + 17 + 6,
+    ),  # N=20 -> (171,183), expected 177
+    # 2026-10-10: #1307 one hold-down per pivot bracket, two fulcrum crown
+    # set screws; #1317 retains both thrust washers and the wave spring,
+    # with two pivot-arbor apex set screws locating the pivot shaft.
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
     "sm-summing": (11, 13),  # ch 18-19, measured 8 (knife-stay removed: never

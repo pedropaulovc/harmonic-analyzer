@@ -1376,7 +1376,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_ch_channel_assembly.py keeper loop (vn-fulcrum-set-screw on each keeper's crown tap axis); "
             "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next) + DRAWING_NOTES 2; "
-            "draw_ch_fulcrum_keeper.SET_SCREW_PROCESS ('STAKE MOUTH 2 PLACES AT ASSEMBLY PER MHA-CH-000 STEP 10'); "
+            "draw_ch_fulcrum_keeper.SET_SCREW_PROCESS ('STAKE MOUTH 2 PLACES AT ASSEMBLY PER MHA-CH-000 STEP 11'); "
             "draw_ch_channel_assembly.py step fulcrum-set-screws-staked ('TIGHTEN ONE MHA-VN-055 SET SCREW ONTO EACH "
             "FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS'); ch_fulcrum_shaft_spec FLAT_DEPTH / FLAT_PITCH / "
             "FLAT_STATION_WINDOW_MM; config parts/vn-fulcrum-set-screw.yaml (91375A942)"

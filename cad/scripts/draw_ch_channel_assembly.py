@@ -118,11 +118,11 @@ def _fitup_notes() -> tuple[str, str]:
     bracket = _config.parts("ch-pivot-bracket")["number"]
     washer = _config.parts("ch-rocker-thrust-washer")["number"]
     spring = _config.parts("vn-rocker-bank-spring")["number"]
-    set_screw = _config.parts("vn-arbor-set-screw")["number"]
+    pivot_set_screw = _config.parts("vn-arbor-set-screw")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
     keeper = _config.parts("ch-fulcrum-keeper")["number"]
     fulcrum_shaft = _config.parts("ch-fulcrum-shaft")["number"]
-    set_screw = _config.parts("vn-fulcrum-set-screw")["number"]
+    fulcrum_set_screw = _config.parts("vn-fulcrum-set-screw")["number"]
     foot_screw = _config.parts("vn-frame-side-screw")["number"]
     top_frame = _config.parts("fr-top-frame")["number"]
     last = COUNT - 1
@@ -144,7 +144,7 @@ def _fitup_notes() -> tuple[str, str]:
     if abs(LEVER_FULCRUM_XY[0] - COLUMN_X - KEEPER_FITUP_X_FROM_WEB_MM) > 1e-9:
         raise AssertionError("KEEPER_FITUP_X_FROM_WEB_MM is off the fulcrum line")
     front_face, rear_face = KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
-    # The pair is reamed at the spacing STEP 9 sets it to (Main's ruling).
+    # The pair is reamed at the spacing KEEPERS_SET_KEY sets it to (Main's ruling).
     ream_span = rear_face - front_face
     if abs(ream_span - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the pair-ream span is not the fit-up span")
@@ -190,7 +190,7 @@ def _fitup_notes() -> tuple[str, str]:
         # Rule 9 waived for this joint only (joint_retention RULINGS
         # "U-MHA-VN-034-channel-threadlocker", user 2026-10-10).
         "set-screws-driven": (
-            f"NORTH END FLUSH, FLATS UP: RUN ONE {set_screw} DOWN EACH APEX "
+            f"NORTH END FLUSH, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH APEX "
             "TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. "
             # Named exception: MHA-CH-008 set-screw engagement (drawing-simplicity-policy.md, "Named exceptions").
             f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
@@ -219,7 +219,7 @@ def _fitup_notes() -> tuple[str, str]:
         ),
         steps.SET_SCREWS_STAKED_KEY: (
             f"WITH THE LEVER BANK ON IT, SLIDE THE {fulcrum_shaft} SHAFT UNTIL "
-            f"EACH FLAT LIES UNDER ITS CROWN TAP; TIGHTEN ONE {set_screw} SET "
+            f"EACH FLAT LIES UNDER ITS CROWN TAP; TIGHTEN ONE {fulcrum_set_screw} SET "
             "SCREW ONTO EACH FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS."
         ),
     }

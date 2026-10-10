@@ -156,6 +156,14 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
 def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     printed = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_STEPS)]
     assert printed == list(range(1, len(steps.SEQUENCE) + 1))
+    assert len(steps.SEQUENCE) == 11
+    assert steps.SEQUENCE[6:] == (
+        "set-screws-driven",
+        "preload-accepted",
+        steps.KEEPERS_PAIR_REAMED_KEY,
+        steps.KEEPERS_SET_KEY,
+        steps.SET_SCREWS_STAKED_KEY,
+    )
 
 
 def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> None:
@@ -231,7 +239,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     places = keeper.KEEPER_FITUP_PLACES
     front, rear = keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
     reamed = _step_body(steps.KEEPERS_PAIR_REAMED_KEY)
-    # The controlling operation: installed spacing (STEP 9's own two faces),
+    # The controlling operation: installed spacing (KEEPERS_SET_KEY's two faces),
     # one common flat, axis set to it, one pass with a reamer that reaches.
     assert keeper.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(rear - front) == 142.0
     assert f"CLAMP BOTH {number}, FEET OUTBOARD ON ONE FLAT" in reamed

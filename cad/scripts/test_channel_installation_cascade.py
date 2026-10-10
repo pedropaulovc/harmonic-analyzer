@@ -74,6 +74,20 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     assert channel.KEEPER_HUB_FLOAT == pytest.approx((0.4346, 0.4346), abs=1e-3)
 
 
+def test_pivot_retention_keeps_both_washers_and_the_wave_spring() -> None:
+    # The physical full-bank retention stack remains installed even when
+    # CHANNEL_COUNT reduces the number of authored moving channels.
+    south_ear, north_ear = rocker_bank_layout.PIVOT_BRACKET_Z
+    south_washer = channel.SOUTH_WASHER_Z
+    north_washer = channel.NORTH_WASHER_Z
+    assert south_ear < south_washer[0] < south_washer[1]
+    assert south_washer[1] < north_washer[0] < north_washer[1] < north_ear
+    assert channel.ROCKER_SPRING_Z[1] == pytest.approx(south_washer[0])
+    assert channel.ROCKER_SPRING_Z[0] < channel.ROCKER_SPRING_Z[1]
+    assert len(channel.BRACKET_SCREW_XZ) == 2
+    assert len(channel.PIVOT_SHAFT_FLAT_STATIONS) == 2
+
+
 def test_fulcrum_station_keeps_the_learned_inverted_datum_side() -> None:
     # The bank-centred station is negative; the learned inversion is
     # side-independent (the +- keeper screws share one signature), so the

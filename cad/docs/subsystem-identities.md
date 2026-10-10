@@ -20,7 +20,7 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `pd` / `PD` | Paper drive | 24 |
 | `pn` / `PN` | Pen | 6 |
 | `sm` / `SM` | Summing | 3 |
-| `vn` / `VN` | Vendor parts | 51 |
+| `vn` / `VN` | Vendor parts | 52 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence.
@@ -98,7 +98,7 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 ## Identity migration table
 
-The table covers 152 part families (the 150 current families plus the two retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
+The table covers 153 part families (the 150 current families plus the three retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
 Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws.
 
@@ -251,6 +251,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | `transgear-knob-cup-pin` | `vn-transgear-knob-cup-pin` | MHA-183 | MHA-VN-048 |
 | part | `transgear-pivot-spring` | `vn-transgear-pivot-spring` | MHA-184 | MHA-VN-049 |
 | part | — | `vn-magnifying-bracket-screw` | — | MHA-VN-050 |
+| part | — | `vn-knife-mount-dowel` | — | MHA-VN-051 |
 | part | — | `vn-cylinder-bank-spring` | — | MHA-VN-052 |
 | part | — | `vn-rocker-bank-spring` | — | MHA-VN-053 |
 | part | — | `vn-fulcrum-set-screw` | — | MHA-VN-055 |
