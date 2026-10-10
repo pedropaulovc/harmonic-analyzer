@@ -16,7 +16,8 @@ import vn_cone_tip_collar_spec as spec
 from _common import (
     SketchDims, _early_bound, _feature_by_name, active_configuration_name,
     assert_saved_configurations_regenerate,
-    add_line_chain, apply_material, check, define_circle, define_rectilinear_chain, dimension_between,
+    add_line_chain, anchor_point_to_origin, apply_material, check, define_circle,
+    define_rectilinear_chain, dimension_between,
     drive_dimension, ensure_fully_defined, force_rebuild, name_bore_axis,
     name_dimensions, name_last_feature, report_mass_properties, run_build,
     save_part_and_images, set_global, set_sketch_direct_db, volume_check,
@@ -162,17 +163,19 @@ async def _screw(adapter, jobs):
               (x + spec.DOG_LENGTH, y + screw_r), (end, y + screw_r), (end, y)]
     check("ground screw profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    axis = check("screw axis", await adapter.add_centerline(0.0, y, end + 1.0, y))
+    # Main's revolved-pin pattern (build_ch_bar_pivot_pin): the axis runs
+    # exactly the closing edge's endpoints, so they merge and the axis needs
+    # no relation of its own; every profile line is horizontal or vertical,
+    # one corner is anchored to the origin, and the rest are dimensions. The
+    # farm run at f68549253 left the former fixed-line scheme (stock lines and
+    # a longer, unmerged axis fixed) under-defined.
+    axis = check("screw axis", await adapter.add_centerline(x, y, end, y))
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     dims = SketchDims()
-    # The stock envelope is fixed; only the ground dog's actual dimensions
-    # are driving manufacturing dimensions. Fix the stock/profile endpoints,
-    # not the dog itself, then dimension its length and doubled radius.
-    for line in (lines[4], lines[5], axis):
-        check("fix retained stock profile", await adapter.add_sketch_constraint(line, None, "fix"))
-    for index, direction in ((0, "vertical"), (1, "horizontal"), (2, "vertical"), (3, "horizontal")):
-        check("ground profile direction", await adapter.add_sketch_constraint(lines[index], None, direction))
+    for index, line in enumerate(lines):
+        direction = "vertical" if index % 2 == 0 else "horizontal"
+        check("screw profile direction", await adapter.add_sketch_constraint(line, None, direction))
     await dimension_between(adapter, f"{lines[1]}.start", f"{lines[1]}.end",
                             "horizontal_distance", spec.DOG_LENGTH, "ground dog length")
     dims.record("DogLength", '"DogLength"')
@@ -181,6 +184,17 @@ async def _screw(adapter, jobs):
     if abs(float(dim.SystemValue) * 1000.0 - spec.DOG_DIA) > 1e-6:
         raise RuntimeError("ground dog native diameter differs from the contract")
     dims.record("DogDia", '"DogDia"')
+    # The stock screw's own length and major diameter, then its end corner.
+    await dimension_between(adapter, f"{lines[5]}.start", f"{lines[5]}.end",
+                            "horizontal_distance", spec.SET_SCREW_LENGTH, "stock screw length")
+    dims.record("ScrewLength")
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[3], (end - 1.0, y + screw_r + 2.0), "stock screw major diameter"
+    )
+    dims.record("ScrewMajorDia")
+    await anchor_point_to_origin(adapter, f"{lines[5]}.start", end, y, "stock screw end corner")
+    dims.record("ScrewEndStation")
+    dims.record("ScrewAxisStation")
     await ensure_fully_defined(adapter, "ground screw profile")
     check("exit screw profile", await adapter.exit_sketch())
     name_last_feature(adapter, "SetScrewProfile")
