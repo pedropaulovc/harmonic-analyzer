@@ -12,7 +12,7 @@ hold the block's yaw.
 Catalogue: 1/8 x 3/4 alloy-steel dowel, Round x Chamfer ends, diameter
 +0.0001/+0.0003 in, Rockwell C47 min, ASME B18.8.2; the size row, the end
 forms (read off the vendor model ``cad/references/mcmaster/98381A473.SLDPRT``)
-and the diameter band are ``diagnostics.diag_mcmaster_dowel``'s.  No
+and the diameter band are ``vn_transgear_latch_pin_spec``'s.  No
 recommended hole size is stated; the press is the knife mount's own reamed
 hole (``sm_knife_mount_spec.PIN_HOLE_DIA_BAND``), the slip the crossbar's
 (``fr_top_frame_spec.HANGER_PIN_HOLE_DIA``).
@@ -32,7 +32,7 @@ on the knife mount's hole floor.
 from __future__ import annotations
 
 import _config
-from diagnostics.diag_mcmaster_dowel import (
+from vn_transgear_latch_pin_spec import (
     DIA_BAND_IN,
     DOWEL_ENDS,
     DOWEL_SIZES,

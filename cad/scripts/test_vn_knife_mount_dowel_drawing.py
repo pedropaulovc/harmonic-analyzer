@@ -15,7 +15,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_fastener import STOCK_RECIPES
 from diagnostics import diag_build_98381A473 as recipe
-from diagnostics.diag_mcmaster_dowel import MM_PER_IN
+from vn_transgear_latch_pin_spec import MM_PER_IN
 
 STEM = "vn-knife-mount-dowel"
 
@@ -63,7 +63,7 @@ def test_pressed_and_proud_lengths_are_the_whole_pin() -> None:
 
 
 def test_the_chamfered_end_is_the_pressed_end() -> None:
-    from diagnostics.diag_mcmaster_dowel import dowel_section
+    from vn_transgear_latch_pin_spec import dowel_section
 
     section = dowel_section(spec.SKU)
     pressed_face = max(rad for rad, y in section if y == 0.0)
