@@ -2299,10 +2299,13 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "error_budget",
         "export_features",
         "fr_harmonic_base_fasteners",
+        "fr_top_frame_spec",
+        "sm_knife_mount_spec",
         "vn_guide_lock_screw_spec",
         "vn_post_mount_screw_spec",
         "vn_spring_hook_spec",
         "vn_swing_stop_screw_spec",
+        "vn_knife_mount_dowel_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",
     }

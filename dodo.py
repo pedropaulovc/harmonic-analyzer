@@ -3038,6 +3038,9 @@ def task_check():
         # The transgear hanger's screwed joints, pivot head play and the latch
         # pin's press, judged at the printed bands (transgear_hanger_joints).
         SCRIPTS_DIR / "test_transgear_hanger_joints.py",
+        # The #6-32 knife hanger's tap web, screw reach and dowel stack at the
+        # printed bands, and the retired 1/2-13 tap failing the same web formula.
+        SCRIPTS_DIR / "test_knife_hanger_worst_case.py",
         # The paper-drive interference rows re-derived from their owner specs
         # (_interference_contracts writes them as literals).
         SCRIPTS_DIR / "test_pd_paper_drive_interference_contracts.py",

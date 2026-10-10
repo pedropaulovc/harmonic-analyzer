@@ -7,8 +7,9 @@ sheet/template, import, curation, and export behavior lives in
 HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
 cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
 holds the hub location, true-axis side view and the removed set-pocket
-section; UNDERSIDE holds the underside locator and its enlarged native
-detail.  A group gets its own sheet rather than a crowded corner of one:
+section; UNDERSIDE holds the underside locator, its enlarged native
+detail and the removed knife-hanger section F-F.  A group gets its own
+sheet rather than a crowded corner of one:
 qualifiers then park clear of cutting lines, centrelines and each other.
 Projected top/front pairs stay aligned; removed and section views carry scales.
 
@@ -31,6 +32,8 @@ from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_common import (
     DrawingOutputs,
     FaceLabel,
+    add_datum_feature,
+    add_feature_control_frame,
     PictorialView,
     place_pictorial_sheet,
     add_native_hole_callout,
@@ -41,6 +44,7 @@ from _drawing_common import (
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
     set_reference_dimension,
+    set_basic_dimension,
     add_property_linked_note,
     create_section_view,
     create_blank_drawing_sheets,
@@ -49,6 +53,7 @@ from _drawing_common import (
     model_point_in_view,
     offset_dimension_text,
     _select_view_entity,
+    _zoomed_on,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -113,7 +118,10 @@ from build_fr_top_frame import (
     SPOTFACE_DIA,
     SET_TAP_SPEC,
     SIDE_TAP_DRILL_DIA,
-    STUD_HOLE_DIA,
+    HANGER_X,
+    PIN_HOLE_X,
+    SLOT_FLAT,
+    SLOT_X,
     STUD_Z_FRONT,
     STUD_Z_REAR,
     TAP_DRILL_MM,
@@ -123,6 +131,20 @@ from fr_top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    GEOMETRIC_TOLERANCES_MM,
+    HANGER_CBORE_DIA,
+    HANGER_CLEARANCE_DIA,
+    HANGER_GRIP,
+    HANGER_PIN_DEPTH_CALLOUT,
+    HANGER_PIN_HOLE_CALLOUT,
+    HANGER_PIN_HOLE_DEPTH,
+    HANGER_PIN_HOLE_DIA,
+    HANGER_PIN_X,
+    HANGER_SLOT_FROM_ROUND,
+    HANGER_SLOT_LENGTH,
+    HANGER_SLOT_LENGTH_CALLOUT,
+    HANGER_SLOT_WIDTH,
+    HANGER_SLOT_WIDTH_CALLOUT,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -314,6 +336,133 @@ HUB_BOSS_DIA_TEXT_XY = (0.210, 0.100)
 HUB_GUSSET_T_TEXT_XY = (0.300, 0.212)
 HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 LAND_TEXT_OFFSET_XY = (0.155, 0.145)
+# Sheet 6, removed section F-F through the REAR knife-hanger station: the
+# #6 SHCS counterbore, its floor above the crossbar underside (the screw's
+# grip, closing RingHeight with the callout's counterbore depth), the round
+# dowel slip hole +X of it and the dowel slot -X of it, cut along its
+# length.  The cut crosses only the crossbar and its
+# junction gussets, its ends in the window past the gussets' rail-face reach.
+# _orient_cut_section looks along -Z (model X right, Y up), which is sheet-down
+# on the locator, so both letters drop into the open window below the cut
+# rather than onto the rear rail 2.9 mm (model) above it.
+HANGER_SECTION_Z = STUD_Z_REAR
+HANGER_SECTION_GUSSET_REACH = GUSSET - (INNER_Z - HANGER_SECTION_Z)  # 15.148
+HANGER_SECTION_CUT_X = (BAR_X0 - GUSSET - 12.0, BAR_X1 + GUSSET + 12.0)
+HANGER_SECTION_CENTER = (0.120, 0.075)
+HANGER_SECTION_SCALE = (1, 1)
+# The screw axis prints here; the outline centring sets the row (model y 0).
+HANGER_SECTION_PROFILE_X = 0.120
+_HANGER_SECTION_M_PER_MM = HANGER_SECTION_SCALE[0] / HANGER_SECTION_SCALE[1] / 1000.0
+
+
+def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
+    """Sheet point (m) of model (x, y) mm in the pinned section F-F."""
+    return (
+        round(HANGER_SECTION_PROFILE_X + (x - HANGER_X) * _HANGER_SECTION_M_PER_MM, 5),
+        round(HANGER_SECTION_CENTER[1] + y * _HANGER_SECTION_M_PER_MM, 5),
+    )
+
+
+# Left of the profile: the 30.0 floor, its text parked further left on a
+# jog.  Under the slip hole: its size, between short extension lines off the
+# hole walls, its four-line callout parked on a leader in the open band
+# below-right of the section (the dda9a33a8 render printed it across its own
+# extension lines and the underside edge).  Right: the depth the hole and
+# slot share.  Above, between the owned axes: the hole's 6.350 station from
+# the screw axis, its text on a jog to the right, clear of the locator's land
+# text; a row higher, so the two dimension lines never share the hole's
+# extension line at one height, the slot's BASIC 12.700 from the round hole
+# (the slot position frames' true location), its text on a jog to the left,
+# between the counterbore floor's text and the locator's label.  Under the
+# slot, a row below the hole's size so their arrows cannot meet: its length,
+# the text on a jog between the caption and the hole's callout.  The caption
+# takes the empty lower-left corner of the band.
+HANGER_FLOOR_TEXT_XY = _hanger_section_xy(
+    BAR_X0 - HANGER_SECTION_GUSSET_REACH - 8.0, -HALF_H + HANGER_GRIP / 2.0
+)
+HANGER_FLOOR_OFFSET_XY = (0.058, 0.076)
+PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
+PIN_STATION_OFFSET_XY = (0.160, 0.106)
+SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 14.0)
+SLOT_STATION_OFFSET_XY = (0.066, 0.104)
+SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
+SLOT_LENGTH_OFFSET_XY = (0.118, 0.026)
+# The callout block is 65 x 19 mm on that render (3.5 mm text).  Centred
+# here it spans sheet x 0.140..0.205 and y 0.025..0.044: its left edge is
+# 5.7 mm right of the size's outer arrow tail (0.1343), its top 6 mm under
+# the depth's lower arrow tail (0.0504), its right edge 11 mm left of the
+# title block (0.216), and its bottom 12 mm over the border.  The leader
+# runs up-left from the shoulder to the size's dimension line.
+HANGER_PIN_DIA_OFFSET_XY = (0.1725, 0.034)
+HANGER_SECTION_KEEP = {
+    "HangerPinHoleDia": _hanger_section_xy(PIN_HOLE_X, -HALF_H - 6.0),
+    "HangerPinHoleDepth": _hanger_section_xy(
+        BAR_X1 + HANGER_SECTION_GUSSET_REACH + 8.0, -HALF_H + HANGER_PIN_HOLE_DEPTH / 2.0
+    ),
+}
+HANGER_SECTION_CALLOUTS = {
+    "HangerPinHoleDia": HANGER_PIN_HOLE_CALLOUT,
+    "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
+}
+HANGER_SECTION_CAPTION_XY = (0.070, 0.040)
+# Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
+# centre): datum B is the front round dowel hole, its tag low in the window
+# right of the crossbar, past the front slot frame's right end and under its
+# bottom, so its leader runs clear of that frame's text (at (122, 185) mm it
+# ran 7.9 mm through it, farm run 20261009T171439353Z); datum C the rear
+# one, its tag above the rear rail so its leader climbs away from F-F's
+# right arrow.  Each slot's position
+# frame, B|C> in front and C|B> at the rear (the translation modifier frees
+# the slot along the line to the other station's round hole).  The front
+# frame stands in the window left of the crossbar, between its junction
+# gussets and right of detail C's fence.  The rear one stands in the window
+# right of the crossbar, under F-F's right label: left of the crossbar its
+# text sat under both F labels and F-F's left arrow (farm run
+# 20261009T174542021Z: text-clearance 3.87 mm, text-on-line 3.05 mm), and
+# above the labels its leader would cross F-F's cutting line to the slot.
+# Its leader drops from the frame's left end, between the crossbar's right
+# edge and the right arrow, to the slot rim under the cutting line.  The
+# FRONT slot's width (the rear slot lies on F-F's cutting line) runs left of the front gusset, its text on a leader into
+# the band under the front rail, between the locator's label and the
+# land's dimension line.
+_HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
+HANGER_DATUM_SYMBOL_XY = {"B": (0.136, 0.176), "C": (0.130, 0.257)}
+# Each round hole is 1.06 mm across at 1:3, its rim 1.0 mm (sheet) inside
+# the crossbar's +X edge, so the rim is hit-tested zoomed onto a 5 mm square
+# (draw_ch_rocker_arm's pivot-bore datum precedent), where the pick aperture
+# is hundredths of a millimetre.
+HANGER_DATUM_PICK_ZOOM_HALF = 0.0025
+
+
+def hanger_datum_pick(
+    centre: tuple[float, float], symbol_xy: tuple[float, float]
+) -> tuple[float, float]:
+    """The sheet point on a round dowel hole's rim facing its datum tag.
+
+    The view looks along the hole's axis, so the rim prints as a circle of
+    the hole's radius at the view's scale about the projected centre.
+    """
+    dx, dy = symbol_xy[0] - centre[0], symbol_xy[1] - centre[1]
+    reach = math.hypot(dx, dy)
+    radius = HANGER_PIN_HOLE_DIA / 2.0 * _HUB_BOTTOM_M_PER_MM
+    return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
+HANGER_SLOT_FRAME_XY = {"front": (0.078, 0.185), "rear": (0.116, 0.2075)}
+# Each slot frame's printed text box and outline from its frame_xy (sheet m),
+# as farm run 20261009T204136744Z measured them with the translation modifier
+# inline (no vector): rear DetailItem507 at (116, 207.5) mm printed its text
+# [116.9, 202.2]..[148.5, 206.7] mm and a 39.1 x 7.0 mm outline.  The front
+# DetailItem506 prints the same outline and the same first and last text
+# items (only its middle divider sits 1.1 mm left, B being narrower than C),
+# so the same boxes.  Its leader
+# leaves the outline's left end at mid height on a 6.35 mm shoulder.
+HANGER_SLOT_FRAME_TEXT_BOX = (0.0009, -0.0053, 0.0325, -0.0008)
+HANGER_SLOT_FRAME_OUTLINE = (0.0, -0.0070, 0.0391, 0.0)
+HANGER_SLOT_FRAME_SHOULDER = 0.00635
+HANGER_SLOT_WIDTH_TEXT_XY = (
+    HUB_BOTTOM_CENTER[0] + (BAR_X0 - 24.0) * _HUB_BOTTOM_M_PER_MM,
+    HUB_BOTTOM_CENTER[1] + STUD_Z_FRONT * _HUB_BOTTOM_M_PER_MM,
+)
+HANGER_SLOT_WIDTH_OFFSET_XY = (0.060, 0.137)
 
 # Sheet 1, Section E-E: the side rails and the full-height central web, cut
 # clear of every hole station (keeper taps at z -70.9 / 77.1, hangers at
@@ -940,6 +1089,149 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
         removed=True,
     )
     return view
+
+
+def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
+    """A removed section F-F through the rear knife-hanger station.
+
+    Policy rule 7: the counterbore floor and the blind slip hole are interior
+    features, so they are dimensioned where a cut shows them as solid lines,
+    never off hidden lines.  The counterbore itself is fully defined by its
+    callout on sheet 3; this view adds what no callout states -- the floor's
+    height above the crossbar underside (the screw's grip), the slip hole's
+    station from the screw axis, the slot's BASIC station from the slip hole
+    and the slot's length -- and
+    carries the model's own slip hole size, band and the depth hole and slot
+    share.  The slot's width is across this cut; the underside locator
+    carries it.  Returns the view and its imported dimensions.
+    """
+    z = HANGER_SECTION_Z
+    line = [
+        model_point_in_view(
+            adapter, parent_view, (x/1000.0, 0.0, z/1000.0),
+            label="knife-hanger section cutting line",
+        )
+        for x in HANGER_SECTION_CUT_X
+    ]
+    view = create_section_view(
+        adapter, parent_view, line_start=line[0], line_end=line[1],
+        view_xy=HANGER_SECTION_CENTER, section_label="F", scale=HANGER_SECTION_SCALE,
+        partial=True, label="knife-hanger manufacturing section",
+    )
+    _orient_cut_section(adapter, view, (1.0, 0.0, 0.0))
+    set_hidden_lines_removed(adapter, view)
+    # Centre the OUTLINE on the target (a section's position is its cut-plane
+    # origin), then pin the screw axis to its column.
+    outline = tuple(float(value) for value in view.GetOutline())
+    position = tuple(float(value) for value in view.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("knife-hanger section has invalid bounds")
+    target = [
+        position[axis]+HANGER_SECTION_CENTER[axis]-(outline[axis]+outline[axis+2])/2
+        for axis in range(2)
+    ]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position knife-hanger section")
+    rebuild_drawing(adapter, label="_hanger_section")
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if not math.isclose(ratio[0]/ratio[1], HANGER_SECTION_SCALE[0]/HANGER_SECTION_SCALE[1]):
+        raise RuntimeError("knife-hanger section scale did not persist")
+    _pin_section_profile(
+        adapter, view, (HANGER_X, 0.0, z), HANGER_SECTION_PROFILE_X, label="F-F",
+    )
+    axes = _add_view_centerlines(
+        adapter, view,
+        (
+            ((HANGER_X, -HALF_H-2.0, z), (HANGER_X, HALF_H+2.0, z)),
+            ((PIN_HOLE_X, -HALF_H-2.0, z),
+             (PIN_HOLE_X, -HALF_H+HANGER_PIN_HOLE_DEPTH+2.0, z)),
+            ((SLOT_X, -HALF_H-2.0, z),
+             (SLOT_X, -HALF_H+HANGER_PIN_HOLE_DEPTH+2.0, z)),
+        ),
+    )
+    edges = scan_view_edges(view, label="F-F knife-hanger section")
+    # The underside is interrupted by the clearance and slip holes; the
+    # longest run (left of the screw) wins.  The counterbore floor shows as
+    # two short lands either side of the clearance hole: take the left one.
+    underside_edge, underside_point = _cut_face_edge(
+        edges, fixed={1: -HALF_H, 2: z}, label="knife-hanger crossbar underside",
+    )
+    floor_edge, floor_point = _cut_face_edge(
+        edges, fixed={1: -HALF_H+HANGER_GRIP, 2: z},
+        near=(0, HANGER_X-(HANGER_CBORE_DIA+HANGER_CLEARANCE_DIA)/4.0, 0.5),
+        label="knife-hanger counterbore floor",
+    )
+    _checked_dimension(
+        adapter, view,
+        p0=floor_point, p1=underside_point,
+        text_xy=HANGER_FLOOR_TEXT_XY, label="hanger counterbore floor from underside",
+        expected_mm=HANGER_GRIP, orientation="vertical",
+        entities=(floor_edge, underside_edge),
+        suffix="2X CBORE FLOOR\nFROM UNDERSIDE",
+        offset_text=HANGER_FLOOR_OFFSET_XY,
+    )
+    _checked_dimension(
+        adapter, view,
+        p0=(HANGER_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
+        text_xy=PIN_STATION_TEXT_XY, label="dowel hole from hanger axis",
+        expected_mm=HANGER_PIN_X, orientation="horizontal",
+        entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
+        entities=(axes[0], axes[1]),
+        suffix="2X DOWEL HOLE\nFROM SCREW AXIS",
+        offset_text=PIN_STATION_OFFSET_XY,
+    )
+    # The slot's true location for its position frame: BASIC from the round
+    # hole beside it, the bare box like every BASIC on the sheets (a BASIC
+    # keeps no below-text, and its above-text did not print on the
+    # 20261010T001553082Z render: layout audit text-unmatched).
+    slot_station = _checked_dimension(
+        adapter, view,
+        p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
+        text_xy=SLOT_STATION_TEXT_XY, label="dowel slot from dowel hole",
+        expected_mm=HANGER_SLOT_FROM_ROUND, orientation="horizontal",
+        entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
+        entities=(axes[2], axes[1]),
+        offset_text=SLOT_STATION_OFFSET_XY,
+    )
+    set_basic_dimension(adapter, slot_station, label="dowel slot from dowel hole")
+    # The slot's end walls, where the cut runs through both end radii: the
+    # straight run plus one width.
+    slot_ends = [
+        _cut_face_edge(
+            edges, fixed={0: SLOT_X + side * HANGER_SLOT_LENGTH / 2.0, 2: z},
+            label=f"dowel slot {name} end wall",
+        )
+        for side, name in ((-1.0, "outer"), (1.0, "inner"))
+    ]
+    if abs(SLOT_FLAT + HANGER_SLOT_WIDTH - HANGER_SLOT_LENGTH) > 1e-9:
+        raise RuntimeError("dowel slot length is not its run plus one width")
+    _checked_dimension(
+        adapter, view,
+        p0=slot_ends[0][1], p1=slot_ends[1][1],
+        text_xy=SLOT_LENGTH_TEXT_XY, label="dowel slot length",
+        expected_mm=HANGER_SLOT_LENGTH, orientation="horizontal",
+        entities=(slot_ends[0][0], slot_ends[1][0]),
+        suffix=HANGER_SLOT_LENGTH_CALLOUT,
+        offset_text=SLOT_LENGTH_OFFSET_XY,
+    )
+    dimensions = curate_view_dimensions(
+        adapter, view,
+        keep=HANGER_SECTION_KEEP,
+        view_label="knife-hanger section F-F",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(adapter, dimensions, HANGER_SECTION_CALLOUTS)
+    # Four lines cannot stand between extension lines 3.24 apart: park the
+    # text on a leader, clear of the section (rule 8: no text on a line).
+    offset_dimension_text(
+        adapter, dimensions, {"HangerPinHoleDia": HANGER_PIN_DIA_OFFSET_XY}
+    )
+    _assert_section_display(
+        adapter, view, label="F-F knife-hanger section", cut_surface_only=True,
+        removed=True,
+    )
+    return view, dimensions
+
 
 def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
     """Enlarge the native underside; the circular fence is presentation only."""
@@ -1708,15 +2000,18 @@ async def build(adapter: Any) -> dict[str, str]:
         center=True,
         suffix="MATCHES MHA-FR-001",
     )
+    # The counterbore rim (the top-face edge of the wizard feature), not the
+    # clearance hole visible at its floor: the native callout then reads the
+    # whole counterbore -- drill, counterbore diameter and depth.
     stud_edge = model_point_in_view(
         adapter,
         detail_top,
         (
-            ((BAR_X0 + BAR_X1) / 2.0) / 1000.0,
+            HANGER_X / 1000.0,
             HALF_H / 1000.0,
-            (STUD_Z_FRONT + STUD_HOLE_DIA / 2.0) / 1000.0,
+            (STUD_Z_FRONT + HANGER_CBORE_DIA / 2.0) / 1000.0,
         ),
-        label="top-frame hanger-stud hole edge",
+        label="top-frame hanger counterbore rim",
     )
     add_native_hole_callout(
         adapter,
@@ -1725,7 +2020,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Right of the 182.0 hanger-X row's end, so the leader reaches the
         # hole past that row instead of across it (codex round 5).
         callout_xy=(0.262, 0.258),
-        label="2X hanger-stud clearance holes",
+        label="2X #6 SHCS hanger counterbores",
         process="HANGER DRILL",
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
@@ -1783,16 +2078,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
-    hanger_x = (BAR_X0 + BAR_X1) / 2.0
+    hanger_x = HANGER_X
     keeper_drill_r = TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0
     for p0, p1, expected, xy, orientation, label, suffix in (
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + STUD_HOLE_DIA/2),
+        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_CBORE_DIA/2),
          COLUMN_X + hanger_x, (0.162, 0.240), "horizontal",
          "hanger x from left sockets", "2X HANGER X"),
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + STUD_HOLE_DIA/2),
+        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_CBORE_DIA/2),
          STUD_Z_FRONT - FRONT_COLUMN_Z, (0.062, 0.209), "vertical",
          "front hanger z from upper sockets", "FRONT HANGER Z"),
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + STUD_HOLE_DIA/2),
+        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + HANGER_CBORE_DIA/2),
          STUD_Z_REAR - FRONT_COLUMN_Z, (0.040, 0.165), "vertical",
          "rear hanger z from upper sockets", "REAR HANGER Z"),
         (upper_left_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
@@ -1845,7 +2140,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # and the 10-32 callout, its 48.00/46.00 depths (text, not drawn) and the
     # 22.7 tap-axis-below-boss-top dimension keep their attachments without
     # them.  What the dashed lines added was the far end's sockets, cap
-    # recesses and hanger-stud stacks -- none of them dimensioned here, all of
+    # recesses and hanger counterbores -- none of them dimensioned here, all of
     # them cut open by A-A or specified by their own callouts -- crossing the
     # leaders that reach the taps.
     set_hidden_lines_removed(adapter, detail_front)
@@ -2364,6 +2659,63 @@ async def build(adapter: Any) -> dict[str, str]:
         # round 4): pull it out to the right, on a jog, clear of them.
         offset_text=LAND_TEXT_OFFSET_XY,
     )
+    # The knife-hanger dowel pattern: datum B the front round hole, datum C
+    # the rear one; each slot located to the near round hole, free along the
+    # line to the far one (tolerance-gdt-assessment / policy rule 3).  Each
+    # tag is attached by a sheet-point pick on its hole's rim, toward the tag,
+    # proved to be the scanned circle: selected as an edge object, the tag
+    # ignored SetPosition2 and stayed at its default drop, 37.6 mm from its
+    # request (farm run 20261009T164113078Z; layout-tuning lesson h).
+    for datum, station_z in (("B", STUD_Z_FRONT), ("C", STUD_Z_REAR)):
+        round_hole = hub_bottom_edges.circle_at(
+            (PIN_HOLE_X, -HALF_H, station_z), HANGER_PIN_HOLE_DIA/2,
+            axis=(0.0, 1.0, 0.0),
+            label=f"underside locator datum {datum} round dowel hole",
+        ).edge
+        hole_centre = model_point_in_view(
+            adapter, hub_bottom_parent,
+            (PIN_HOLE_X/1000.0, -HALF_H/1000.0, station_z/1000.0),
+            label=f"underside locator datum {datum} round dowel hole centre",
+        )
+        datum_pick = hanger_datum_pick(hole_centre, HANGER_DATUM_SYMBOL_XY[datum])
+        with _zoomed_on(adapter, datum_pick, HANGER_DATUM_PICK_ZOOM_HALF):
+            add_datum_feature(
+                adapter, hub_bottom_parent,
+                edge_xy=datum_pick, expected_entity=round_hole,
+                symbol_xy=HANGER_DATUM_SYMBOL_XY[datum], datum=datum,
+                label=f"knife-hanger round dowel hole datum {datum}",
+            )
+    for station, station_z, datums in (
+        ("front", STUD_Z_FRONT, ("B", "C")),
+        ("rear", STUD_Z_REAR, ("C", "B")),
+    ):
+        add_feature_control_frame(
+            adapter, hub_bottom_parent,
+            edge_entity=hub_bottom_edges.circle_at(
+                (SLOT_X-SLOT_FLAT/2, -HALF_H, station_z), HANGER_SLOT_WIDTH/2,
+                axis=(0.0, 1.0, 0.0),
+                label=f"underside locator {station} dowel slot outer end",
+            ).edge,
+            frame_xy=HANGER_SLOT_FRAME_XY[station],
+            characteristic="position",
+            tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"],
+            datums=datums,
+            translated=datums[1:],
+            label=f"knife-hanger {station} dowel slot position",
+        )
+    slot_dimensions = curate_view_dimensions(
+        adapter, hub_bottom_parent,
+        keep={"HangerSlotWidth": HANGER_SLOT_WIDTH_TEXT_XY},
+        view_label="underside locator dowel slot",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(
+        adapter, slot_dimensions, {"HangerSlotWidth": HANGER_SLOT_WIDTH_CALLOUT}
+    )
+    offset_dimension_text(
+        adapter, slot_dimensions, {"HangerSlotWidth": HANGER_SLOT_WIDTH_OFFSET_XY}
+    )
+    imported_annotations += slot_dimensions
     gusset_z = GOOSENECK_Z + (HUB_GUSSET_HALF_IN+HUB_GUSSET_HALF_OUT)/2
     gusset_y = -HALF_H-HUB_BOSS_DROP/2
     _checked_dimension(
@@ -2379,6 +2731,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # also carries the drop and the ramp angle; repeating it here would be
     # the same length stated twice on two sheets.
     _position_view_caption(adapter, geometry_bottom, HUB_DETAIL_CAPTION_XY)
+    hanger_section, hanger_dimensions = _hanger_section(adapter, hub_bottom_parent)
+    _position_view_caption(adapter, hanger_section, HANGER_SECTION_CAPTION_XY)
+    imported_annotations += hanger_dimensions
 
     auto_tapped_notes = _auto_tapped_hole_notes(adapter)
     _telemetry.info(f"automatic tapped-hole notes per view: {auto_tapped_notes}")

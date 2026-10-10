@@ -33,10 +33,17 @@ SUM_H = 3.0 * MM_PER_IN  # 76.20 summation reach (-X)
 ANCHOR_R = 0.375 * MM_PER_IN  # 9.525 summation-anchor outer radius
 ANCHOR_H = 0.75 * MM_PER_IN  # 19.05 summation-anchor boss height (Y)
 
-# hex knife-edge trunnion (vertex-up).
-HEX_W = 8.653
+# hex knife-edge trunnion (vertex-up).  HEX_W was 8.653 (118.6 deg ridge);
+# narrowed to 8.080 (115.1 deg ridge) so the trunnion still rocks >= 5.0 deg
+# inside the sm-knife-mount Ø12 close bore at the worst case of BOTH parts'
+# bands (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``).  Both section
+# sizes print .XXX, so the title block holds them to HEX_BAND.
+HEX_W = 8.080
 HEX_H = 10.268
+HEX_BAND = 0.13  # title-block .XXX band on HEX_W and HEX_H
 HEX_DEPTH = 21.717
+# Included angle of the knife-edge ridge (the top vertex of the hexagon).
+RIDGE_ANGLE_DEG = 2.0 * math.degrees(math.atan2(HEX_W / 2.0, HEX_H / 4.0))
 
 # Outward normal and plane offset of the upper-right sloping face of the
 # vertex-up hexagon. Its upper endpoint is the +Y knife-edge ridge.

@@ -578,8 +578,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_guide_lock_screw",  # #4-40 button head (McMaster 91255A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
         "vn_hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
-        "vn_knife_hanger_stud",  # 1/2-13 UNC (McMaster 91247A720 hex head x 2), member into the knife-mount top tap
-        "sm_knife_mount",  # 1/2-13 UNC-2B x 12.0 blind tap in the top seat, receiver of the knife-hanger stud
+        "vn_knife_hanger_stud",  # #6-32 UNC (McMaster 91251A157 socket head cap screw x 2), member into the knife-mount top tap
+        "sm_knife_mount",  # #6-32 UNC-2B bottoming tap (9.7 full thread, 10.9 drill) in the top seat, receiver of the knife-hanger screw; two plain reamed dowel holes
         "vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
         "vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-VN-043), member: 2 into the support_bar's #4-40 through taps
         "vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
@@ -652,7 +652,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_guide_lock",  # 1/8 drill holes (R9-49) only; clamped by guide_lock_screw
         "vn_keeper_chain",  # bead chain
         "vn_keeper_chain_link",  # snap loop link
-        "vn_knife_hanger_washer",  # 90126A211 SAE washer, clearance ID
+        "vn_knife_mount_dowel",  # MHA-VN-051 1/8 dowels, two pressed into each knife mount's reamed top-seat holes, slip in the crossbar hole and slot
         "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "mg_lever_wire",  # wire, tied through the fixture cross hole; no thread
         "mg_magnifying_bracket",  # two counterbored normal #2 clearance holes in its front mounting flange; no thread
@@ -716,7 +716,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
     "vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
     "vn_keeper_chain_link": "plain chain link",
-    "vn_knife_hanger_washer": "plain flat washer",
+    "vn_knife_mount_dowel": "dowel pin pressed into a reamed hole",
     "vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
     "vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "vn_transgear_collar_cross_pin": "slotted spring pin in a drilled hole",
@@ -1316,29 +1316,33 @@ JOINTS: tuple[Joint, ...] = (
         assembly="sm_summing",
         member="vn_knife_hanger_stud",
         receiver="sm_knife_mount",
-        thread="1/2-13 UNC",
+        thread="#6-32 UNC",
         quantity=2,
         installed_at="",
-        exposure=Exposure.OSCILLATING,
+        exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "the thread is the only support of the knife-edge bearing block on which the summing lever "
-            "rocks back and forth (freed lever_rock DOF); the block hangs MOUNT_GAP 0.25 below the casting "
-            "underside, so nothing clamps it and the thread engagement (11.3735 mm, asserted) also sets the "
-            "knife height -- rocking friction and reversing lever loads reach the unclamped thread"
+            "clamps the knife-edge bearing block's top seat to the stationary crossbar underside (MOUNT_GAP 0); "
+            "block and casting never move relative to each other. The two pressed MHA-VN-051 dowels, slipped into "
+            "the crossbar's round hole and slot, react any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
+            "acts about machine Z, perpendicular to the vertical (Y) screw, so it reaches the thread only as "
+            "cyclic tension and shear, never as torque about its own axis"
         ),
         axial_capture=(
-            "hex head (91247A720) seated on the knife-hanger washer on the crossbar top; bolt passes the "
-            "crossbar's O13.49 clearance hole and engages 11.37 of the 12.0-deep blind tap; the block is "
-            "NOT drawn up against the casting (0.25 gap), so there is no joint preload"
+            "socket head (91251A157) seated on the crossbar's #6 counterbore floor, HANGER_GRIP 30.0 above "
+            "the underside (no washer); the screw passes the O4.318 clearance hole and reaches 8.10 nominal "
+            "(6.284..8.90 worst case, asserted) into the 9.7 full thread of the #6-32 bottoming tap, drawing "
+            "the block up against the casting"
         ),
-        lock=Lock.NONE,
+        lock=Lock.THREADLOCKER_ONLY,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_sm_summing_assembly.py: module docstring, HANGER_STUD_Y/KNIFE_MOUNT_THREAD_ENGAGEMENT, "
-            "_assert_knife_hanger_stack; build_sm_knife_mount.py: MOUNT_GAP, STUD_TAP_SPEC; "
-            "sm_knife_mount_spec.py DRAWING_NOTES (TAP 1/2-13 UNC-2B X 12.0); vn-knife-hanger-stud.yaml (91247A720)"
+            "build_sm_summing_assembly.py: module docstring, HANGER_STUD_Y/HANGER_REACH_MIN/HANGER_REACH_MAX, "
+            "_assert_knife_hanger_stack; build_sm_knife_mount.py: MOUNT_GAP; sm_knife_mount_spec.py "
+            "STUD_TAP_SPEC/STUD_TAP_THREAD_DEPTH_MIN/PIN_HOLE_X; fr_top_frame_spec.py HANGER_HOLE_SPEC/HANGER_GRIP/"
+            "HANGER_PIN_X; vn_knife_mount_dowel_spec.py; cad/config/parts/vn-knife-hanger-stud.yaml "
+            "(91251A157) installation_notes ('USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.')"
         ),
     ),
     Joint(

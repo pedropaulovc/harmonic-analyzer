@@ -18,6 +18,7 @@ Twenty springs pull on one end, one big spring on the other, and the whole thing
 | `sm-summing-lever` | TODO | TODO | TODO |
 | `sm-knife-mount` ×2 | TODO | TODO | TODO |
 | `vn-knife-hanger-stud` | TODO | TODO | TODO |
+| `vn-knife-mount-dowel` | TODO | TODO | TODO |
 | `vn-boss-hook` | TODO | TODO | TODO |
 | `vn-counter-spring` | TODO | TODO | TODO |
 | `ch-fulcrum-keeper` | TODO | TODO | TODO |

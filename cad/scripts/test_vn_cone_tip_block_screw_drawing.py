@@ -21,6 +21,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _stock_fastener import STOCK_RECIPES
 from diagnostics import diag_build_91251A108 as recipe
 from diagnostics import diag_mcmaster_lib
+from diagnostics import diag_mcmaster_socket_head as socket_head
 
 IN = 25.4
 
@@ -143,16 +144,16 @@ def _record(monkeypatch, author) -> list[tuple]:
         yield
         adapter.log("no_sketch_inference.exit")
 
-    monkeypatch.setattr(recipe, "check", logger("check", True))
-    monkeypatch.setattr(recipe, "name_last_feature", logger("name_last_feature"))
+    monkeypatch.setattr(socket_head, "check", logger("check", True))
+    monkeypatch.setattr(socket_head, "name_last_feature", logger("name_last_feature"))
     async def volume_check(_adapter, label, expected, tol):
         adapter.log("volume_check", (label, expected, tol))
         return expected
 
-    monkeypatch.setattr(recipe, "volume_check", volume_check)
-    monkeypatch.setattr(recipe, "insert_helix", logger("insert_helix"))
-    monkeypatch.setattr(recipe, "offset_plane", logger("offset_plane"))
-    monkeypatch.setattr(recipe, "thread_sweep_cut", logger("thread_sweep_cut"))
+    monkeypatch.setattr(socket_head, "volume_check", volume_check)
+    monkeypatch.setattr(socket_head, "insert_helix", logger("insert_helix"))
+    monkeypatch.setattr(socket_head, "offset_plane", logger("offset_plane"))
+    monkeypatch.setattr(socket_head, "thread_sweep_cut", logger("thread_sweep_cut"))
     monkeypatch.setattr(_common, "add_line_chain", async_logger("add_line_chain"))
     monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(

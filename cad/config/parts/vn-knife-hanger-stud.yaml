@@ -1,12 +1,17 @@
 vn-knife-hanger-stud:
-  title: Knife-Hanger Bolt
+  title: Knife-Hanger Screw
   number: MHA-VN-024
-  stock_name: Medium-Strength Grade 5 Steel Hex Head Screw
+  stock_name: Black-Oxide Alloy Steel Socket Head Screw
   supplier: McMaster-Carr
-  supplier_skus: [91247A720]
-  material: Plain Carbon Steel
-  material_specification: Grade 5 steel, McMaster-Carr 91247A720
-  finish: zinc plated
+  supplier_skus: [91251A157]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A157"
+  finish: black oxide
+  installation_notes: |-
+    INSTALLATION - MHA-FR-002 CROSSBAR COUNTERBORE
+    DROP THROUGH THE CROSSBAR INTO THE MHA-SM-002 TOP-SEAT TAP;
+    HEAD SEATS ON THE COUNTERBORE FLOOR, SEAT DRAWN UP TO THE CROSSBAR.
+    USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance

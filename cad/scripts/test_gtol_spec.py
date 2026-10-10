@@ -11,12 +11,45 @@ from _gtol_spec import (
     GeometricControl,
     PartDatum,
     PlanarFace,
+    TRANSLATION_GLYPH,
     SphereFace,
     TorusFace,
+    gtol_frame_datums,
     gtol_frame_signature,
+    gtol_frame_xml,
+    translation_print_problem,
     validate_part_pmi,
 )
 from _part_pmi import _FaceGeometry, _face_matches
+
+
+
+def test_frame_datums_read_a_composite_lower_tier_without_its_symbol() -> None:
+    # Farm run 20261009T200747541Z: the knife mount's composite lower tier
+    # read back one empty <ToleranceSymbol>; the full signature refuses it,
+    # its datum references do not need it.
+    lower = gtol_frame_xml(
+        "position", "0.05", datums=("A", "B", "C"), translated=("C",), diameter=True
+    ).replace("<ToleranceSymbol>GTOL-POSI</ToleranceSymbol>", "<ToleranceSymbol />")
+    assert "<ToleranceSymbol />" in lower
+    with pytest.raises(ValueError, match="frame XML has 1 tolerance symbols"):
+        gtol_frame_signature(lower)
+    assert gtol_frame_datums(lower) == ("A", "B", "C")
+    with pytest.raises(ValueError, match="invalid feature-control-frame XML"):
+        gtol_frame_datums("<GtolFrame>")
+
+
+def test_frame_signature_reads_the_symbol_code_solidworks_unescapes() -> None:
+    # Farm run 20261009T200747541Z: SetSymbolXml took "C&lt;MOD-TRANS2&gt;"
+    # and GetSymbolXml read it back as "C<MOD-TRANS2>" ("mismatched tag").
+    authored = gtol_frame_xml(
+        "position", "0.05", datums=("B", "C"), translated=("C",)
+    )
+    applied = authored.replace("&lt;", "<").replace("&gt;", ">")
+    assert "<DatumLetter>C<MOD-TRANS2></DatumLetter>" in applied
+    assert gtol_frame_signature(applied) == gtol_frame_signature(authored)
+    assert gtol_frame_signature(applied).translated == ("C",)
+    assert gtol_frame_datums(applied) == ("B", "C")
 
 
 def test_frame_signature_preserves_every_authored_semantic() -> None:
@@ -221,3 +254,59 @@ def test_imported_pmi_placement_requires_one_attachment() -> None:
             attachment_xy=(0.1, 0.1),
             entity=SimpleNamespace(),
         )
+
+
+def test_frame_xml_carries_the_translation_modifier_on_its_datum_only() -> None:
+    xml = gtol_frame_xml(
+        "position", "0.05", datums=("B", "C"), translated=("C",)
+    )
+
+    signature = gtol_frame_signature(xml)
+
+    assert signature.datums == ("B", "C")
+    assert signature.translated == ("C",)
+    plain = gtol_frame_xml("position", "0.05", datums=("B",))
+    assert gtol_frame_signature(plain).translated == ()
+    with pytest.raises(ValueError, match="non-primary datum"):
+        gtol_frame_xml("position", "0.05", datums=("B", "C"), translated=("B",))
+    with pytest.raises(ValueError, match="non-primary datum"):
+        gtol_frame_xml("position", "0.05", datums=("B",), translated=("D",))
+
+
+def test_translation_modifier_is_the_symbol_code_in_its_letter() -> None:
+    # Farm run 20261009T204136744Z printed this XML as "C | B<triangle>"
+    # with no vector; the <Translation> flag printed "[0,0,0]" beside the
+    # triangle (20261009T174542021Z / 20261009T182549169Z) and is not used.
+    from xml.etree import ElementTree
+
+    assert TRANSLATION_GLYPH == "<MOD-TRANS2>"
+    xml = gtol_frame_xml("position", "0.05", datums=("B", "C"), translated=("C",))
+    plain, moved = ElementTree.fromstring(xml).iter("DatumCompartment")
+    shape = [
+        [(child.tag, child.findtext("DatumLetter")) for child in compartment]
+        for compartment in (plain, moved)
+    ]
+    assert shape == [[("DatumDetail", "B")], [("DatumDetail", "C<MOD-TRANS2>")]]
+    # The glyph is XML-escaped text in the letter, not markup.
+    assert "<DatumLetter>C&lt;MOD-TRANS2&gt;</DatumLetter>" in xml
+    assert "Translation" not in xml
+
+
+@pytest.mark.parametrize(
+    ("texts", "problem"),
+    (
+        # Farm run 20261009T174542021Z, rear slot frame DetailItem507.
+        (("<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[0,0,0]"), "translation vector"),
+        (("<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[false,false,false]"), "translation vector"),
+        (("<GTOL-POSI>", "0.05", "C", "B"), "0 translation modifier"),
+        (("<GTOL-POSI>", "0.05", "C", "<MOD-TRANS2>", "B"), "off datum B"),
+        # Farm run 20261009T204136744Z, the same frame, inline.
+        (("<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>"), ""),
+        (("<GTOL-POSI>", "0.05", "C", "B<MOD-TRANS2>"), ""),
+    ),
+)
+def test_translation_prints_the_modifier_after_its_letter(
+    texts: tuple[str, ...], problem: str
+) -> None:
+    found = translation_print_problem(texts, ("B",))
+    assert (problem in found and found) if problem else found == ""
