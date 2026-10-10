@@ -670,11 +670,16 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
         x, y = section.centre
         text_x, text_y = drawing.D_SECTION_KEEP[f"Sec{section.land}AF"]
         assert text_x == x and text_y > y + half, section
+        # The terminal land's across-flat carries the torque-corner callout,
+        # whose measured ink widens its cell (f68549253: D crowded C).
+        reach_x, reach_y = (
+            drawing.TORQUE_CALLOUT_REACH if section.land == max(spec.FLAT_LANDS) else (0.0, 0.005)
+        )
         cell = (
-            x - caption_w / 2.0,
+            min(x - caption_w / 2.0, text_x - reach_x),
             y - half - drawing.SECTION_CAPTION_GAP - caption_h,
             x + caption_w / 2.0,
-            text_y + 0.005,
+            text_y + reach_y,
         )
         assert cell[0] > big_end + 0.02, section
         assert margin <= cell[0] and cell[2] <= template.width_m - margin, section

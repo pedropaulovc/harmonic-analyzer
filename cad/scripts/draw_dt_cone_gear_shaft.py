@@ -295,9 +295,12 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # and B's letters clear land 1 by 3.7 mm.  At the old 24 mm (C on the
 # detail's centre) D's letter crowded C's arrow at 1.7 mm on swmaker00000f.
 # B's reach puts its lower letter 3.5 mm under land 2 and C's matches it; D's,
-# on the thinnest land, is shorter.  The four stand in a 2 x 2
-# grid right of the side view, under the pictorial, each over its caption,
-# the bottom row's captions above the title block (x > 0.216, y < 0.066).
+# on the thinnest land, is shorter.  The four stand in two rows right of the
+# side view, under the pictorial, each over its caption, the bottom row's
+# captions above the title block (x > 0.216, y < 0.066).  D's across-flat
+# carries the torque-corner callout, whose ink reaches 55.3 mm left of D's
+# centre (section D (0.3377..0.4161) at f68549253), so C stands left of A's
+# column, its cell clear of that callout and of the side view's big end.
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
@@ -319,7 +322,7 @@ D_SECTIONS = (
         SECTION_ENDS[3] - 0.8,
         CutParent.TIP_DETAIL,
         0.0210,
-        (0.337, 0.100),
+        (0.305, 0.100),
         (5, 1),
     ),
     DSection(
@@ -337,6 +340,10 @@ D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
+# The terminal land's across-flat with its torque-corner callout reached
+# 55.3 mm left of its text and 8.7 mm above it (section D's measured ink,
+# leaf drawing:dt_cone_gear_shaft at f68549253).
+TORQUE_CALLOUT_REACH = (0.0553, 0.0087)
 # A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf
 # for c8b0aad); each is hung SECTION_CAPTION_GAP under its section's ink.
 SECTION_CAPTION_SIZE = (0.046, 0.017)
