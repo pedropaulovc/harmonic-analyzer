@@ -1941,6 +1941,45 @@ def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
         assert values == sorted(values)
 
 
+def test_underside_pads_sheet_names_each_pad_and_lug_level() -> None:
+    # bp4 machinist review: the rect pads' and the lugs' cast levels were not
+    # assigned; section B-B cuts only the block pads and the foot boss. Each
+    # group names the level the builder hangs it to, in section B-B's words.
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    assert {part.LOCK_PAD_SHAPE, *part.PEDESTAL_PAD_SHAPES} <= set(part.DEEP_BOSS_SHAPES)
+    assert set(part.BLOCK_PAD_SHAPES) <= set(part.SHALLOW_BOSS_SHAPES)
+    # The lugs are their own feature, hung to the shallow level.
+    source = inspect.getsource(part)
+    assert (
+        '"CrossTapLugs",\n        "CrossTapLugProfile",\n        CROSS_TAP_LUG_SHAPES,\n'
+        "        SHALLOW_BOSS_BOTTOM_Y,\n"
+    ) in source
+    assert sheet.PADS_CALLOUTS == {
+        "LockPadWidth": "PAD TO\nDEEP LEVEL",
+        "PedestalPad0Width": "PADS TO\nDEEP LEVEL",
+    }
+    assert set(sheet.PADS_CALLOUTS) <= set(sheet.PADS_SIZE_BELOW_MM)
+    texts = {label: text for label, (text, _xy, _tip) in sheet.PADS_LEVEL_NOTES.items()}
+    assert texts == {
+        "pinion-block pads level": "2X PADS TO SHALLOW LEVEL",
+        "cross-tap lugs level": "4X LUGS TO\nSHALLOW LEVEL",
+    }
+    # Each leader tip lands on its group's front pad or lug, 1 mm inside it
+    # and clear of the rib the block pad runs into.
+    _text, _xy, (x, z) = sheet.PADS_LEVEL_NOTES["pinion-block pads level"]
+    block0 = part.BLOCK_PAD_SHAPES[0]
+    assert block0[1] + 1.0 < x < part.CROSS_RIB_SHAPE[1] - 1.0 and block0[3] + 1.0 < z < block0[4] - 1.0
+    _text, _xy, (x, z) = sheet.PADS_LEVEL_NOTES["cross-tap lugs level"]
+    assert any(s[1] + 1.0 < x < s[2] - 1.0 and s[3] + 1.0 < z < s[4] - 1.0 for s in part.CROSS_TAP_LUG_SHAPES)
+    # The words are section B-B's level captions.
+    for text in (*sheet.PADS_CALLOUTS.values(), *texts.values()):
+        level = text.replace("\n", " ").split(" TO ")[-1]
+        assert level.replace(" ", "\n") in sheet.UNDERSIDE_SECTION_CALLOUTS.values()
+
+
 def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line() -> None:
     import draw_fr_harmonic_base as sheet
 
@@ -1976,7 +2015,32 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
         sheet.PADS_NOTE_XY[0] + max(map(len, rows)) * _NOTE_CHAR_MM / 1000.0,
         sheet.PADS_NOTE_XY[1],
     )
-    for label, box in {"view": view, "note": note, **boxes}.items():
+    # The level callouts: note-sized rows centred under their dimension text.
+    callouts = {}
+    for name, text in sheet.PADS_CALLOUTS.items():
+        rows = text.split("\n")
+        x, y = sheet.UNDERSIDE_PADS_KEEP[name]
+        half_w = max(map(len, rows)) * _NOTE_CHAR_MM / 2000.0
+        top = y - _DIM_TEXT_H_M / 2.0
+        callouts[f"{name} callout"] = (x - half_w, top - len(rows) * _NOTE_LINE_MM / 1000.0, x + half_w, top)
+    # The level pointer notes, each leader from the note's side nearer its tip.
+    level_notes, leaders = {}, {}
+    for label, (text, (x, y), tip_mm) in sheet.PADS_LEVEL_NOTES.items():
+        rows = text.split("\n")
+        box = (
+            x,
+            y - len(rows) * _NOTE_LINE_MM / 1000.0,
+            x + max(map(len, rows)) * _NOTE_CHAR_MM / 1000.0,
+            y,
+        )
+        level_notes[label] = box
+        tip = sheet._pads_xy(*tip_mm)
+        side = box[0] if abs(tip[0] - box[0]) < abs(tip[0] - box[2]) else box[2]
+        assert not box[0] < tip[0] < box[2], label
+        leaders[label] = [((side, (box[1] + box[3]) / 2.0), tip)]
+        # The tip lands on its feature, inside the view.
+        assert view[0] < tip[0] < view[2] and view[1] < tip[1] < view[3], label
+    for label, box in {"view": view, "note": note, **boxes, **callouts, **level_notes}.items():
         assert _BORDER_INNER_M[0] + 0.002 < box[0], label
         assert _BORDER_INNER_M[1] + 0.002 < box[1], label
         assert box[2] < _BORDER_INNER_M[2] - 0.002, label
@@ -1985,10 +2049,12 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
     baselines = {name for name, *_ in (*sheet.PADS_X_ROWS, *sheet.PADS_Y_COLUMNS)}
     for name in baselines:
         assert _box_gap(boxes[name], view) > 0.002, name
-    labelled = {"note": note, **boxes}
+    for label, box in {**callouts, **level_notes}.items():
+        assert _box_gap(box, view) > 0.002, label
+    labelled = {"note": note, **boxes, **callouts, **level_notes}
     for a in labelled:
         for b in labelled:
-            if a < b:
+            if a < b and not (a.startswith(b) or b.startswith(a)):
                 assert _box_gap(labelled[a], labelled[b]) > 0.0015, (a, b)
 
     # Every printed line: the baselines' extension and dimension lines, and
@@ -2005,18 +2071,10 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
         # Inside its own span, between X0 and the station.
         assert vy + _DIM_TEXT_H_M < ty < datum[1] - _DIM_TEXT_H_M, name
         lines[name] = [((vx, vy), (tx - over, vy)), ((tx, datum[1]), (tx, vy))]
-    # The foot boss's baselines run inside the view: the X one's extension
-    # lines drop from X0 Y0 (along the flange's west edge) and from the boss
-    # centre to its dimension line; the Y one's run east from X0 Y0 (along the
-    # rear edge) and west from the centre to its dimension line.
-    (fx, fy) = vertices["FootBossX"]
-    tx, ty = sheet.UNDERSIDE_PADS_KEEP["FootBossX"]
-    assert datum[0] < tx < fx and ty < fy, "FootBossX"
-    lines["FootBossX"] = [
-        (datum, (datum[0], ty - over)),
-        ((fx, fy), (fx, ty - over)),
-        ((datum[0], ty), (fx, ty)),
-    ]
+    # The foot boss's Y baseline runs inside the view: its extension lines
+    # run east from X0 Y0 (along the rear edge) and west from the boss centre
+    # to its dimension line.
+    (fx, fy) = vertices["FootBossY"]
     tx, ty = sheet.UNDERSIDE_PADS_KEEP["FootBossY"]
     assert datum[0] < tx < fx and fy < ty < datum[1], "FootBossY"
     lines["FootBossY"] = [
@@ -2024,7 +2082,7 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
         ((fx, fy), (tx - over, fy)),
         ((tx, fy), (tx, datum[1])),
     ]
-    assert set(sheet.PADS_INLINE_TEXT_MM) == {"FootBossX", "FootBossY"}
+    assert set(sheet.PADS_INLINE_TEXT_MM) == {"FootBossY"}
     lock = part.LOCK_PAD_SHAPE
     ped0 = part.PEDESTAL_PAD_SHAPES[0]
     block0 = part.BLOCK_PAD_SHAPES[0]
@@ -2067,6 +2125,21 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
                 continue
             for segment in segments:
                 assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
+    # A callout clears every line, its own dimension's too; a level note's
+    # leader clears every text but its own note, and every dimension line.
+    for name, box in {**callouts, **level_notes}.items():
+        for other, segments in {**lines, **leaders}.items():
+            if other == name:
+                continue
+            for segment in segments:
+                assert _segment_box_gap(segment, box) > 0.001, (name, other, segment)
+    for label, (leader,) in leaders.items():
+        for name, box in {"note": note, **boxes, **callouts}.items():
+            assert _segment_box_gap(leader, box) > 0.001, (label, name)
+        for other, segments in lines.items():
+            for (x0, y0), (x1, y1) in segments:
+                line_box = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+                assert _segment_box_gap(leader, line_box) > 0.0005, (label, other)
 
     # The in-view texts read in the pocket's open air, clear of every boss,
     # pad, lug and rib by 2 mm of model.
