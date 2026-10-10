@@ -1279,3 +1279,42 @@ def test_crank_step_runs_free_only_after_the_t120_check_closes() -> None:
     )
     free = step.index("BIND")
     assert seat < check < cuts < free < step.index("MATCH-DRILL")
+
+
+def test_pinion_seed_puts_its_gap_on_the_64t_tooth_at_the_pitch_point():
+    """The seed reads the 64T mid-plane pitch-circle point nearest the crank
+    axis. The line of centres it replaced sat 1.68 pinion degrees off and the
+    8e991c4ac assembly interfered (16T/64T 0.46 mm^3)."""
+    import cone_line
+
+    seat = spec._GEAR64_SEAT
+    x_offset = seat[0] - cone_line.X_CRANK
+    rise = cone_line.Y_CRANK - cone_line.Y_DRIVE
+    incline = math.radians(cone_line.INCLINE_DEG)
+    r64 = mate.PITCH_DIA / 2.0
+    alpha64, alpha16 = spec.pitch_point_azimuths(x_offset, rise, cone_line.INCLINE_DEG, r64)
+
+    def miss(alpha_deg):
+        a = math.radians(alpha_deg)
+        return math.hypot(
+            x_offset - r64 * math.cos(a) * math.cos(incline), rise - r64 * math.sin(a)
+        )
+
+    # The nearest point, and its azimuth seen along the crank axis.
+    assert all(miss(alpha64) <= miss(alpha64 + d) for d in (-0.05, -0.001, 0.001, 0.05))
+    a = math.radians(alpha64)
+    assert alpha16 == pytest.approx(math.degrees(math.atan2(
+        rise - r64 * math.sin(a), x_offset - r64 * math.cos(a) * math.cos(incline)
+    )))
+    # Parallel axes: the pitch point is on the line of centres.
+    flat = spec.pitch_point_azimuths(x_offset, rise, 0.0, r64)
+    assert flat == pytest.approx((math.degrees(math.atan2(rise, x_offset)),) * 2)
+    assert spec.PIN_CLOCKING_DEG == pytest.approx(
+        spec.tooth_in_gap_seed_deg(alpha64, alpha16)
+        + _config.machine("gear_train", "crank_mesh_phase_offset_deg")
+    )
+    # Main's 12.5182 deg pair (origin/main b711cfe75 geometry): its exact-solid
+    # seed sweep found the free window [-2.789, -0.215] deg round the
+    # line-of-centres seed 13.5276; the pitch-point seed lands inside it.
+    main = spec.pitch_point_azimuths(6.023998670803664, 39.332, 12.518222183287952, 31.588229336348366)
+    assert -2.789 < spec.tooth_in_gap_seed_deg(*main) - 13.527647012980765 < -0.215

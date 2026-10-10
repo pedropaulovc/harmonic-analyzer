@@ -425,9 +425,10 @@ if not (
 # range; the native interference gate below checks the actual flanks.
 CRANK_MESH_CHECK = crank_mesh.standard_check()
 from cone_stack_end_play import CONE_FLOAT_NORTH  # noqa: E402
-# Contact azimuths (from each gear's centre toward the other axis, in that
-# gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
-# the inclined cone shaft; the 16T plane is a plain machine-Z section.
+# Line-of-centres azimuths (from each gear's centre toward the other axis, in
+# that gear's own plane, ccw from the in-plane horizontal), for the pitch-
+# cylinder contact-z law below. The 64T plane rides the inclined cone shaft;
+# the 16T plane is a plain machine-Z section.
 ALPHA64 = math.degrees(math.atan2(_DY16, _DX16))
 ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))
 # (both horizontal legs run TOWARD the other axis and read positive -- the
@@ -451,22 +452,27 @@ if not math.isclose(
     raise AssertionError("crankshaft pinion seat must match the restored boss-face feeler")
 # The pinion follows the recentered cone/64T row while the photo-anchored crank
 # arm and T12 chain plane remain at their existing stations below.
-# Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
-# keyed at its authored phase (a tooth centred at azimuth 0 -- for the helical
-# teeth that is the MID-FACE azimuth, the twist's symmetry plane), so its
-# nearest tooth leads the contact azimuth by DELTA64; the pinion's gap must
-# sit that same contact arc (64/16 pinion degrees per 64T degree -- the tooth
-# ratio, whatever the two pitch radii) past the contact on ITS side.
+# Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch, at the
+# PITCH POINT: the 64T mid-plane pitch-circle point nearest the crank axis
+# (dt_crank_pinion_spec.pitch_point_azimuths), not the line of centres
+# ALPHA64/ALPHA16 above, which sat 1.68 pinion degrees off it and interfered
+# at 8e991c4ac. The 64T is keyed at its authored phase (a tooth centred at
+# azimuth 0 -- for the helical teeth that is the MID-FACE azimuth), so its
+# nearest tooth leads the pitch point; the pinion's gap sits that same arc
+# (64/16 pinion degrees per 64T degree) past it on ITS side
+# (dt_crank_pinion_spec.tooth_in_gap_seed_deg).
 # gear_train.crank_mesh_phase_offset_deg is the one configured offset from
 # that standard tooth-in-gap seed; the crankshaft's matched-hole clocking
 # (dt_crank_pinion_spec.PIN_CLOCKING_DEG) is checked against it below.
 from dt_crank_pinion_spec import PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG  # noqa: E402
+from dt_crank_pinion_spec import pitch_point_azimuths, tooth_in_gap_seed_deg  # noqa: E402
 
-_TP64 = 360.0 / 64.0
-DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
-PINION_SEED_DEG = (
-    (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0
-) % 22.5 + _config.machine("gear_train", "crank_mesh_phase_offset_deg")
+PITCH_ALPHA64, PITCH_ALPHA16 = pitch_point_azimuths(
+    GEAR64_SEAT[0] - X_CRANK, _DY16, INCLINE_DEG, R64
+)
+PINION_SEED_DEG = tooth_in_gap_seed_deg(PITCH_ALPHA64, PITCH_ALPHA16) + _config.machine(
+    "gear_train", "crank_mesh_phase_offset_deg"
+)
 
 # ARBOR_SOUTH_Z / ARBOR_LENGTH (the cylinder arbor) follow from the pedestal
 # strap faces and are defined with them below (U34b/U34c).

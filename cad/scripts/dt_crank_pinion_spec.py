@@ -408,25 +408,83 @@ if PIN_AXIAL_LIGAMENT_WORST < PIN_AXIAL_LIGAMENT_FLOOR_MM:
     raise AssertionError("match-drilled pin breaks through the boss end at print-worst")
 if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
     raise AssertionError("the pinion boss needs a positive printed shaft-recess range")
-# Tooth-in-gap datum at the contact azimuth, from the placement geometry.
+
+
+def pitch_point_azimuths(
+    x_offset_mm: float, rise_mm: float, incline_deg: float, r64_mm: float
+) -> tuple[float, float]:
+    """(64T, 16T) plane-local azimuths of the 64T mid-plane pitch-circle point
+    nearest the crank axis: the pitch point the tooth-in-gap seed must use.
+
+    ``x_offset_mm`` is the 64T centre's machine x past the crank axis,
+    ``rise_mm`` the crank axis's height over the cone axis. The crank axis is
+    machine z but the 64T plane leans by the incline, so seen along the crank
+    axis the pitch circle is an ellipse (x times cos i), and its nearest point
+    is not on the line of centres. Each azimuth reads from the in-plane
+    horizontal toward the other axis, the seed's chirality-free convention.
+    Minimising |P - crank axis|^2 over the 64T azimuth a gives
+    x cos(i) sin(a) - rise cos(a) + R sin^2(i) sin(a) cos(a) = 0 (Newton from
+    the line-of-centres azimuth).
+    """
+    incline = math.radians(incline_deg)
+    cos_i, sin_i = math.cos(incline), math.sin(incline)
+    alpha = math.atan2(rise_mm, x_offset_mm * cos_i)
+    for _ in range(20):
+        residual = (
+            x_offset_mm * cos_i * math.sin(alpha)
+            - rise_mm * math.cos(alpha)
+            + r64_mm * sin_i**2 * math.sin(alpha) * math.cos(alpha)
+        )
+        slope = (
+            x_offset_mm * cos_i * math.cos(alpha)
+            + rise_mm * math.sin(alpha)
+            + r64_mm * sin_i**2 * math.cos(2.0 * alpha)
+        )
+        step = residual / slope
+        alpha -= step
+        if abs(step) < 1e-14:
+            break
+    alpha16 = math.atan2(
+        rise_mm - r64_mm * math.sin(alpha),
+        x_offset_mm - r64_mm * math.cos(alpha) * cos_i,
+    )
+    return math.degrees(alpha), math.degrees(alpha16)
+
+
+def tooth_in_gap_seed_deg(alpha64_deg: float, alpha16_deg: float) -> float:
+    """Pinion clocking (one 16T pitch) that puts its gap on the 64T tooth
+    nearest the pitch point: the 64T is keyed at its authored phase (a tooth
+    centred at azimuth 0, mid-face for the helix), so its nearest tooth leads
+    the pitch point by delta; the pinion's gap sits that same arc (64/16
+    pinion degrees per 64T degree) past the pitch point on its side."""
+    pitch64 = 360.0 / dt_crank_drive_gear_spec.TEETH
+    delta64 = round(alpha64_deg / pitch64) * pitch64 - alpha64_deg
+    return (
+        (alpha16_deg + 180.0)
+        - delta64 * (dt_crank_drive_gear_spec.TEETH / TEETH)
+        - 360.0 / TEETH / 2.0
+    ) % (360.0 / TEETH)
+
+
+# Tooth-in-gap datum at the pitch point, from the placement geometry.
 # gear_train.crank_mesh_phase_offset_deg is the one configured offset from it.
+# The line-of-centres azimuths this replaced sat 1.68 pinion degrees off the
+# pitch point here: the 8e991c4ac assembly's 16T/64T interference (0.46 and
+# 0.02 mm^3). On main's 12.5182 deg pair the same correction is -1.63 deg,
+# inside the exact-solid free window [-2.789, -0.215] main measured round
+# the old formula (MESH_WINDOW_CENTRE_DEG -1.49).
 _GEAR64_CENTRE_STATION = (
     dt_crank_drive_gear_spec.LAYOUT_CENTRE_STATION
     + dt_cone_pivot_post_installation.GEAR_AXIS_SHIFT
     + dt_crank_drive_gear_spec.CENTRE_SHIFT_NORTH
 )
 _GEAR64_SEAT = cone_line.cone_station(_GEAR64_CENTRE_STATION)
-_DX64 = (_GEAR64_SEAT[0] - cone_line.X_CRANK) * cone_line.COS_I
-_DY64 = cone_line.Y_CRANK - cone_line.Y_DRIVE
-_ALPHA64 = math.degrees(math.atan2(_DY64, _DX64))
-_ALPHA16 = math.degrees(math.atan2(_DY64, _GEAR64_SEAT[0] - cone_line.X_CRANK))
-_TOOTH_PITCH64 = 360.0 / dt_crank_drive_gear_spec.TEETH
-_DELTA64 = round(_ALPHA64 / _TOOTH_PITCH64) * _TOOTH_PITCH64 - _ALPHA64
-_PINION_DATUM_CLOCK_DEG = (
-    (_ALPHA16 + 180.0)
-    - _DELTA64 * (dt_crank_drive_gear_spec.TEETH / TEETH)
-    - 360.0 / TEETH / 2.0
-) % (360.0 / TEETH)
+_PINION_DATUM_CLOCK_DEG = tooth_in_gap_seed_deg(*pitch_point_azimuths(
+    _GEAR64_SEAT[0] - cone_line.X_CRANK,
+    cone_line.Y_CRANK - cone_line.Y_DRIVE,
+    cone_line.INCLINE_DEG,
+    dt_crank_drive_gear_spec.PITCH_DIA / 2.0,
+))
 PIN_CLOCKING_DEG = _PINION_DATUM_CLOCK_DEG + float(
     _config.machine("gear_train", "crank_mesh_phase_offset_deg")
 )
