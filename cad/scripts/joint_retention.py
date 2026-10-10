@@ -1351,15 +1351,13 @@ JOINTS: tuple[Joint, ...] = (
         ),
     ),
     Joint(
-        id="ha-harmonic-analyzer/fulcrum-shaft-set-screw-in-keeper",
-        assembly="ha_harmonic_analyzer",
+        id="ch-channel/fulcrum-shaft-set-screw-in-keeper",
+        assembly="ch_channel",
         member="vn_fulcrum_set_screw",
         receiver="ch_fulcrum_keeper",
         thread="#1-72 UNF",
         quantity=2,
-        installed_at=ch_channel_assembly_steps.step_ref(
-            ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY
-        ),
+        installed_at=ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY,
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the two set screws alone hold the plain fulcrum_shaft axially and in rotation "
@@ -1370,9 +1368,7 @@ JOINTS: tuple[Joint, ...] = (
         lock=Lock.STAKED,
         lock_part="ch_fulcrum_keeper:staked tap mouth",
         lock_binds=("vn_fulcrum_set_screw", "ch_fulcrum_keeper"),
-        lock_step=ch_channel_assembly_steps.step_ref(
-            ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY
-        ),
+        lock_step=ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY,
         evidence=(
             "build_ch_channel_assembly.py keeper loop (vn-fulcrum-set-screw on each keeper's crown tap axis); "
             "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next) + DRAWING_NOTES 2; "
@@ -2086,8 +2082,8 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "ha-harmonic-analyzer/fulcrum-keeper-screw-in-top-frame": Occurrence(
         "ha_harmonic_analyzer", "build_ch_channel_assembly.py", '"vn-frame-side-screw"'
     ),
-    "ha-harmonic-analyzer/fulcrum-shaft-set-screw-in-keeper": Occurrence(
-        "ha_harmonic_analyzer", "build_ch_channel_assembly.py", '"vn-fulcrum-set-screw"'
+    "ch-channel/fulcrum-shaft-set-screw-in-keeper": Occurrence(
+        "ch_channel", "build_ch_channel_assembly.py", '"vn-fulcrum-set-screw"'
     ),
     "ha-harmonic-analyzer/channel-anchor-in-summing-plate": Occurrence(
         "ha_harmonic_analyzer", "build_ch_channel_assembly.py", "direct threaded seat"
