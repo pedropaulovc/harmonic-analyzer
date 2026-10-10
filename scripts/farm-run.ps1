@@ -1339,9 +1339,10 @@ function Stop-RunProcesses {
                     continue
                 }
                 $verified = $true
-                if (-not $holder.HasExited) {
-                    $alive.Add($holder)
-                }
+                # Verified is enough: one that exits from here on is still
+                # this round's, and the stop loop skips Kill() on an exited
+                # holder but records it.
+                $alive.Add($holder)
                 $stopping.Add($holder)
             }
             catch {
@@ -1366,8 +1367,8 @@ function Stop-RunProcesses {
                 [void]$rejected.Add($processId)
             }
         }
-        # In scan order, so the launcher goes first. Alive when pinned and gone
-        # now is stopped by this round, by its own kill or with a parent's.
+        # In scan order, so the launcher goes first. Verified when pinned and
+        # gone now is stopped by this round, by its own kill or with a parent's.
         foreach ($holder in $alive) {
             try {
                 if (-not $holder.HasExited) {
