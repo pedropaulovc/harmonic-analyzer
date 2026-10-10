@@ -34,7 +34,8 @@ import math
 import _config
 import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, TAP_DRILL_MM, HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 

@@ -71,16 +71,16 @@ from _assembly import (  # noqa: E402
     place_component,
     place_components_batch,
 )
-from _common import (  # noqa: E402
-    SPRING_BLACK,
-    _early_bound,
-    apply_color,
-    apply_material,
-    check,
-    force_rebuild,
-    run_build,
-    save_part_and_images,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _appearance import SPRING_BLACK, apply_color, apply_material  # noqa: E402
+from _check import check  # noqa: E402
+from _com import _early_bound  # noqa: E402
+from _part_save import save_part_and_images  # noqa: E402
+from _rebuild import force_rebuild  # noqa: E402
+from _session import run_build  # noqa: E402
 from _cwm import put_component_pose  # noqa: E402
 from _spring import build_spring  # noqa: E402
 from _stock_fastener import _blank_recipe_references  # noqa: E402

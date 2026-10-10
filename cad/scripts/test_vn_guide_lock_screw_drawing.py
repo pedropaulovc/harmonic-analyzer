@@ -10,7 +10,19 @@ from pathlib import Path
 
 import pytest
 
-import _common
+import _appearance
+import _com
+import _custom_properties
+import _dimensions
+import _extrude
+import _feature_tree
+import _part_checks
+import _part_properties
+import _part_save
+import _rebuild
+import _session
+import _sketch
+import _sketch_rectangle
 import _config
 import _telemetry
 import build_vn_guide_lock_screw as part
@@ -21,8 +33,9 @@ import pd_guide_lock_spec as lock
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _hole_spec import blind_cut_dia_mm
-from _stock_fastener import STOCK_RECIPES
-from diagnostics import diag_build_91255A106 as recipe
+from _test_stock_recipes import discovered_recipes
+import _mcmaster_91255a106 as series
+from diagnostics import diag_mcmaster_button_head as recipe
 from diagnostics import diag_build_91255A108 as sku_recipe
 from diagnostics import diag_mcmaster_lib
 
@@ -41,7 +54,7 @@ def test_recipe_is_the_catalogue_screw() -> None:
     assert dims.major_dia == pytest.approx(0.112 * IN)
     assert dims.pitch == pytest.approx(IN / 40.0)
     assert dims.length == pytest.approx(0.375 * IN)
-    assert replace(dims, part_no=recipe.PART_NO, length=0.25 * IN) == recipe.DIMS
+    assert replace(dims, part_no=series.PART_NO, length=0.25 * IN) == series.DIMS
     assert dims.head_dia == pytest.approx(0.213 * IN)
     assert dims.head_h == pytest.approx(0.059 * IN)
     assert dims.hex_af == pytest.approx(IN / 16.0)
@@ -69,7 +82,7 @@ def test_shank_is_the_lock_stack() -> None:
 
 
 def test_button_head_follows_the_91255A148_laws() -> None:
-    d = recipe.DIMS
+    d = series.DIMS
     assert d.flat_top_dia == pytest.approx(1.4 * d.hex_af)
     assert d.band_h == pytest.approx(0.15 * d.head_h)
     assert d.edge_fillet_r == pytest.approx(0.05 * d.head_h)
@@ -81,7 +94,7 @@ def test_button_head_follows_the_91255A148_laws() -> None:
     yc, big_r = d.dome_center_y, d.dome_radius
     assert math.hypot(d.flat_top_dia / 2.0, d.head_h - yc) == pytest.approx(big_r)
     assert math.hypot(d.head_dia / 2.0, d.band_h - yc) == pytest.approx(big_r)
-    assert 0.0 < recipe.bearing_face_dia() < 2.0 * d.bearing_edge_r < d.head_dia
+    assert 0.0 < recipe.bearing_face_dia(d) < 2.0 * d.bearing_edge_r < d.head_dia
 
 
 class _Recorder:
@@ -157,14 +170,43 @@ def _record(monkeypatch) -> list[tuple]:
     monkeypatch.setattr(recipe, "insert_helix", logger("insert_helix"))
     monkeypatch.setattr(recipe, "offset_plane", logger("offset_plane"))
     monkeypatch.setattr(recipe, "thread_sweep_cut", logger("thread_sweep_cut"))
-    monkeypatch.setattr(_common, "add_line_chain", add_line_chain)
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(_sketch_rectangle, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(
-        _common,
+        _dimensions,
         "_feature_by_name",
         lambda _adapter, name: adapter.obj(f"feature {name}"),
     )
-    monkeypatch.setattr(_common, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(
+        _feature_tree,
+        "_feature_by_name",
+        lambda _adapter, name: adapter.obj(f"feature {name}"),
+    )
+    monkeypatch.setattr(
+        _sketch,
+        "_feature_by_name",
+        lambda _adapter, name: adapter.obj(f"feature {name}"),
+    )
+    monkeypatch.setattr(_com, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_custom_properties, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_extrude, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_feature_tree, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_part_properties, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_rebuild, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_session, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_sketch, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_sketch_rectangle, "_read_member", lambda obj, name: getattr(obj, name))
     monkeypatch.setattr(diag_mcmaster_lib, "no_sketch_inference", no_inference)
     monkeypatch.setattr(
         diag_mcmaster_lib,
@@ -217,7 +259,7 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert stock.stock_name == row["stock_name"]
     assert stock.material == row["material"] == part.MATERIAL == "Alloy Steel"
     assert row["number"] == "MHA-VN-046"
-    metadata = STOCK_RECIPES[screw.SKU]
+    metadata = discovered_recipes()[screw.SKU]
     assert metadata.module == sku_recipe.__name__
     assert getattr(sku_recipe, metadata.callable_name) is sku_recipe.build_91255A108
     assert metadata.threaded

@@ -2,7 +2,9 @@ r"""Pure-data dimensional contract shared by the wheel axle and drawing."""
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_controls import GeometricControl, PartDatum
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 

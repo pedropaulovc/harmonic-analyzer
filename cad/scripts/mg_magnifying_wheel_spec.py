@@ -11,7 +11,7 @@ lockstep test, which asserts the part marks and the drawing keeps EXACTLY
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     BORE_DIA,

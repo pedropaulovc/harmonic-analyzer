@@ -3,7 +3,7 @@ r"""Purchased cone pivot screw (McMaster 91829A560) nominals.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: the thread and the head/shoulder/thread dims the harmonic base, the
 drive train and the verify sweep read. The vendor dims are the named constants
-of ``diagnostics/diag_build_91829A560.py`` (SolidWorks-free at import),
+of ``_mcmaster_91829a560.py`` (SolidWorks-free at import),
 exported here through ``__all__``. Consumers read them here, not from
 ``build_vn_cone_pivot_screw``, whose stock build recipe would otherwise ride their
 cache keys (#880).
@@ -12,7 +12,7 @@ cache keys (#880).
 from __future__ import annotations
 
 from _hole_spec import TAP_DRILL_MM
-from diagnostics.diag_build_91829A560 import (
+from _mcmaster_91829a560 import (
     HEAD_DIA,
     HEAD_T,
     SHOULDER_DIA,

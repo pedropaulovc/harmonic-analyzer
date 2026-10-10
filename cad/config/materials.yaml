@@ -4,7 +4,7 @@
 # appearance). `palette` = photo-sampled display-colour overrides applied at
 # body scope AFTER the material (SolidWorks quantises to 8 bit/channel; compare
 # readback with 1/255 tolerance). RGB are 0..1 linear, sampled from the ch30
-# studio plates. See _common.apply_material / apply_color.
+# studio plates. See _appearance.apply_material / apply_color.
 units: mm
 
 palette:                              # name: [r, g, b]

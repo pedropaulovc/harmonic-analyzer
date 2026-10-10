@@ -402,12 +402,12 @@ def _socket_bore_geometry(x_mm: float, z_mm: float):
     the bore's own radius in X and Z and the socket depth in Y, so the specs
     can be resolved offline without a SolidWorks session.
     """
-    from _part_pmi import _SURFACE_CYLINDER, _FaceGeometry
+    from _gtol_face import SURFACE_CYLINDER, FaceGeometry
 
     radius = part.COLUMN_SOCKET_DIAMETER / 2000.0
-    return _FaceGeometry(
+    return FaceGeometry(
         face=None,
-        identity=_SURFACE_CYLINDER,
+        identity=SURFACE_CYLINDER,
         parameters=(x_mm / 1000.0, 0.0, z_mm / 1000.0, 0.0, 1.0, 0.0, radius),
         outward_normal=None,
         box=(
@@ -427,8 +427,7 @@ def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
     build after ten minutes of cutting -- or, worse, print the seat grade
     against the wrong bore. Require a 1:1 station/control match, and hold the
     ambiguity the Z station exists to resolve."""
-    from _gtol_spec import CylinderFace
-    from _part_pmi import _face_matches
+    from _gtol_cylinder import CylinderFace
 
     spec = fr_harmonic_base_spec
     geometries = {
@@ -439,7 +438,7 @@ def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
         matched = [
             station
             for station, geometry in geometries.items()
-            if _face_matches(geometry, control.face)
+            if control.face.matches(geometry)
         ]
         assert matched == [
             station
@@ -450,8 +449,8 @@ def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
         assert control.production_method == spec.SOCKET_BORE_TARGET
     x_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER, contains_x_mm=part.COLUMN_X)
     size_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER)
-    assert sum(_face_matches(g, x_only) for g in geometries.values()) == 2
-    assert sum(_face_matches(g, size_only) for g in geometries.values()) == 4
+    assert sum(x_only.matches(g) for g in geometries.values()) == 2
+    assert sum(size_only.matches(g) for g in geometries.values()) == 4
 
 
 def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
@@ -602,13 +601,13 @@ def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None
 
 
 def test_spotface_band_reaches_the_setter_unchanged() -> None:
-    # The band now reads (upper, lower) like every _fit_limits band and goes
+    # The band now reads (upper, lower) like every named fit band and goes
     # through deviations(); the setter must still receive (lower, upper) =
     # (0.0, +0.5), so the printed limits cannot move.
     import ast
     from pathlib import Path
 
-    from _fit_limits import deviations
+    from _fit_deviations import deviations
 
     assert fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM == (0.5, 0.0)
     assert deviations(fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM) == (0.0, 0.5)
@@ -1523,9 +1522,9 @@ def test_hold_down_is_the_specified_screw() -> None:
 
 
 def test_specified_hold_down_screw_fits_a_derived_seat_without_the_blocker() -> None:
-    import build_vn_lag_screw as screw
+    from vn_lag_screw_spec import LENGTH_MM
 
-    length, _replay = screw.REPLAYS[screw.SPECIFIED_SKU]
+    length = LENGTH_MM
     assert length == 19.05  # 3/4 in under the head
     engagement = length - part.SUPPORT_FOOT_THICKNESS - part.HOLD_DOWN_BEARING_OFFSET
     diameter = part.THREAD_MAJOR_MM[part.HOLD_DOWN_THREAD]
@@ -2311,15 +2310,15 @@ def test_rig_set_note_clears_the_sheet_2_callouts_table_and_views() -> None:
 
 
 def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
-    # Main (restricted review of #858): one blanking helper in _common, traced
+    # Main (restricted review of #858): one blanking helper in _sketch, traced
     # like every other per-operation helper, and no local copy in the base.
     import inspect
 
-    import _common
+    import _sketch
 
     source = inspect.getsource(part)
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
     assert "def _hide_reference_sketches" not in source
     assert source.count(blank) == 1
     assert part.REFERENCE_SKETCHES == ("HeightReference", "CrossTapReference")
-    assert hasattr(_common.blank_reference_sketches, "__wrapped__")
+    assert hasattr(_sketch.blank_reference_sketches, "__wrapped__")

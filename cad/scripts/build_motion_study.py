@@ -57,16 +57,10 @@ import os
 import sys
 
 import _config
-from _common import (
-    OUT_PNG,
-    OUT_SLDASM,
-    _early_bound,
-    _flag,
-    _read_member,
-    check,
-    log,
-    run_build,
-)
+from _check import check, log
+from _com import _early_bound, _flag, _read_member
+from _paths import OUT_PNG, OUT_SLDASM
+from _session import run_build
 from _assembly import (
     coincident_mate,
     component_named_ref,

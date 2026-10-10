@@ -1676,7 +1676,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_mg_magnifier_assembly.py:build ('thumb-screw (clamp)', lock_mate 'thumb-screw locked to clamp'; "
             "docstring 'Documented simplifications'); build_mg_magnifying_clamp.py ScrewHole HoleSpec('tapped','#4-40'); "
-            "mg_magnifying_clamp_spec.py DRAWING_NOTES; diag_mcmaster_thumb.py THUMB_SPECS['91882A221']"
+            "mg_magnifying_clamp_spec.py DRAWING_NOTES; _mcmaster_91882a221.py THUMB_SPEC"
         ),
     ),
     Joint(

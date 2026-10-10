@@ -56,12 +56,9 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    apply_custom_properties,
-    check,
-    log,
-    run_build,
-)
+from _check import check, log
+from _custom_properties import apply_custom_properties
+from _session import run_build
 import settled_spring_seats
 from _drawing_marks import DRAWN_BY
 from _assembly import (

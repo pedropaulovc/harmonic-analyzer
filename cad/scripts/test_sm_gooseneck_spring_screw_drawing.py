@@ -317,7 +317,7 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
 
 
 def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
-    from _fit_limits import deviations
+    from _fit_deviations import deviations
 
     printed = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(drawing.PRINTED_DIMENSIONS) == printed
