@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from _fit_ream_h7 import REAM_H7
 from _fit_ream_slide import REAM_SLIDE
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,

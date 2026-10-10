@@ -52,9 +52,9 @@ from _drawing_common import (
     visible_component_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _hole_spec import blind_cut_dia_mm
-from _part_pmi import _resolve_faces
+from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
 from build_fr_rocker_arm_support import (
     BIG,
@@ -260,7 +260,7 @@ def _seat_entry_edge(view: Any) -> Any:
     """
     model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
     diameter = blind_cut_dia_mm(SEAT_SPEC)
-    face = _resolve_faces(
+    face = resolve_faces(
         model, {"seat": CylinderFace(diameter, contains_x_mm=SEAT_CALLOUT_X_MM)}
     )["seat"]
     matches = []

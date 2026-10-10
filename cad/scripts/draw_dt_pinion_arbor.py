@@ -32,7 +32,7 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import audit_sheet, format_findings
-from _part_pmi import _resolve_faces
+from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
 from dt_pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
 from dt_pinion_arbor_spec import (
@@ -409,7 +409,7 @@ def _journal_finish_picks(
 
     The landing is the land's station on its flank; the face is the one model
     face its part-owned control (``SURFACE_FINISHES``) names, resolved on the
-    part the view references (:func:`_part_pmi._resolve_faces`, exactly one
+    part the view references (:func:`_gtol_face_resolve.resolve_faces`, exactly one
     match per key, as the part build's own PMI pass resolved it) and attached
     as a FACE at that landing.  Neither a hit test nor a silhouette sweep:
     SelectByID2 at the front land's flank (0.25355, 0.166) missed on
@@ -422,7 +422,7 @@ def _journal_finish_picks(
     document = _early_bound(
         _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
     )
-    faces = _resolve_faces(
+    faces = resolve_faces(
         document,
         {
             key: surface_finish_by_key(SURFACE_FINISHES, key).face

@@ -10,7 +10,7 @@ import pytest
 
 import _config
 import _drawing_common
-import _part_pmi
+import _gtol_face
 import build_pd_transgear_pivot_spacer as part
 import draw_pd_transgear_pivot_spacer as drawing
 import pd_transgear_pivot_spacer_spec as spec
@@ -347,7 +347,7 @@ def test_each_frame_finds_the_od_rim_of_its_own_face() -> None:
 def _surface_face(
     identity: int, parameters: tuple[float, ...], *, flipped: bool = False
 ):
-    """A model face as ``_part_pmi._face_geometry`` reads it (metres)."""
+    """A model face as ``_gtol_face_read.face_geometry`` reads it (metres)."""
     surface = SimpleNamespace(
         Identity=identity, PlaneParams=parameters, CylinderParams=parameters
     )
@@ -361,7 +361,7 @@ def _surface_face(
 def _plane(z_mm: float, *, facing: float):
     """The plane square to the spacer axis at ``z_mm``, facing +Z or -Z."""
     return _surface_face(
-        _part_pmi._SURFACE_PLANE,
+        _gtol_face.SURFACE_PLANE,
         (0.0, 0.0, 1.0, 0.0, 0.0, z_mm / 1000.0),
         flipped=facing < 0.0,
     )
@@ -369,7 +369,7 @@ def _plane(z_mm: float, *, facing: float):
 
 def _od_cylinder():
     return _surface_face(
-        _part_pmi._SURFACE_CYLINDER,
+        _gtol_face.SURFACE_CYLINDER,
         (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, spec.OD / 2000.0),
     )
 

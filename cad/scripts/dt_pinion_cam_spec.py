@@ -12,7 +12,7 @@ in lockstep (``test_dt_pinion_cam_drawing.py``).
 from __future__ import annotations
 
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from dt_pinion_lift_rod_spec import ROD_DIA as LIFT_ROD_DIA
 from dt_pinion_lift_rod_spec import ROD_DIA_BAND as LIFT_ROD_DIA_BAND
 from dt_pinion_cam_geometry import (

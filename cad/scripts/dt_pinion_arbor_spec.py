@@ -12,7 +12,7 @@ drawing contract (marks, precision, finishes, notes).
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_arbor_geometry import (
     BACK_CAP_R as BACK_CAP_R,

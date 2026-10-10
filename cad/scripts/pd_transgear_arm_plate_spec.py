@@ -22,7 +22,8 @@ station (``KINK``, read off the book's notch crop) and the rear boss
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_transgear_arm_plate_geometry import (
     BAND_X,

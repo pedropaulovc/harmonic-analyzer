@@ -68,8 +68,9 @@ from _drawing_simplified import save_simplified_part
 from _fit_deviations import deviations
 from _gear import build_fixed_gear, volume_check
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
-from _gtol_spec import CylinderFace
-from _part_pmi import _resolve_faces, author_part_pmi
+from _gtol_cylinder import CylinderFace
+from _gtol_face_resolve import resolve_faces
+from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from dt_crank_pinion_spec import (
     BORE_DIA,
@@ -151,7 +152,7 @@ async def assert_boss_present(adapter, label: str) -> None:
             adapter, f"{label} overall length", "z", OVERALL_LENGTH,
             tol=BOSS_GATE_TOL_MM,
         )
-        _resolve_faces(adapter.currentModel, {f"{label} hub boss": BOSS_GATE_FACE})
+        resolve_faces(adapter.currentModel, {f"{label} hub boss": BOSS_GATE_FACE})
         _telemetry.success(f"{label}: hub boss present")
 
 

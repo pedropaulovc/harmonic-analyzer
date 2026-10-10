@@ -2641,7 +2641,7 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_fastener_catalog.py",
         "test_drawing_specification_purity.py",
         "test_drawing_surface_finish_validation.py",
-        "test_gtol_spec.py",
+        "test_gtol_contracts.py",
         "test_part_owned_geometric_tolerances.py",
         "test_probe_surface_finish_pmi_telemetry.py",
         "test_surface_finish.py",
@@ -3312,7 +3312,9 @@ def isolated_export_keys(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "source",
     [
-        "export_features.py", "_export_feature_faces.py", "_part_pmi.py",
+        "export_features.py", "_export_feature_faces.py", "_gtol_face_read.py",
+        "_gtol_face.py", "_gtol_cylinder.py", "_gtol_planar.py", "_gtol_cone.py",
+        "_gtol_sphere.py",
         "ch_rocker_arm_spec.py", "rocker_bank_layout.py", "draw_ch_rocker_arm.py",
     ],
 )

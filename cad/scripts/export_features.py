@@ -33,7 +33,10 @@ import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
 import rocker_bank_layout as bank
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, FaceSpec, PlanarFace, SphereFace
+from _gtol_cylinder import CylinderFace
+from _gtol_face import FaceSpec
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
 from _printed_tolerance import printed_band_mm
 
 # Parts whose ``<stem>_spec.EXPORT_FEATURES`` declares every requirement feature.
