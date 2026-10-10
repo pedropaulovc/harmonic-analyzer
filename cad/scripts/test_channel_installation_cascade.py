@@ -50,7 +50,7 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
         + channel.LEVER_THICKNESS / 2.0
     )
 
-    # #743 PR2: the pivot shaft's origin is its north (shouldered) end; its
+    # #743 PR2: the pivot shaft's origin is its north end; its
     # cylinder spans both bracket ears (rocker_bank_layout).
     pivot_max = channel.PIVOT_SHAFT_Z
     pivot_min = pivot_max - rocker_bank_layout.PIVOT_SHAFT_LENGTH

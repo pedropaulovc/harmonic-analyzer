@@ -10,10 +10,10 @@ Layout (part frame of ``pd_transgear_arm_plate_geometry``: origin on K at the
 MOUNTING face, the Front Plane, which seats on the arm's rear face; +X/+Y the
 arm's axes; +Z to the rear):
 
-* ``PlateOutline`` (Front plane): the R12.5 end round about K, the +X edge
-  tangent to it, the -X edge down to the kink [INFERENCE] and straight on to
-  tangency with the round, the top edge on the arm's upper edge; extruded
-  ``THICKNESS_OVER_ARM`` toward +Z as ``Plate``.
+* ``PlateOutline`` (Front plane): the R12.5 end round about K, each side edge
+  parallel to the long axis down to its kink [INFERENCE] and straight on to
+  tangency with the round (symmetric about K), the top edge on the arm's
+  upper edge; extruded ``THICKNESS_OVER_ARM`` toward +Z as ``Plate``.
 * ``LowerOutline``: the same outline below the notch line (``NOTCH_RELIEF``
   clear of the arm's lower edge), extruded ``NOTCH_DEPTH`` toward -Z as
   ``LowerSection``; its top edge is the notch face.
@@ -91,7 +91,9 @@ from pd_transgear_arm_plate_geometry import (
     HUB_LENGTH,
     HUB_TO_BOSS,
     KINK,
+    KINK_RIGHT,
     KINK_TANGENT,
+    KINK_TANGENT_RIGHT,
     NOTCH_DEPTH,
     NOTCH_LEFT,
     NOTCH_RIGHT,
@@ -146,20 +148,30 @@ _CSK_APEX_Z = REAR_FACE_Z - _R_CSK / math.tan(math.radians(_CSK_HALF_ANGLE))
 # The notch's inner corner in the section plane (x = 0): the mounting-face
 # point the hub station is measured from.
 _NOTCH_CORNER_Y = notch_face_y(0.0)
-_RIGHT_EDGE_FOOT = (TOP_RIGHT[0], 0.0)  # where the +X edge meets the round
 
 
 def _outline_area(upper_left: tuple[float, float], upper_right: tuple[float, float]):
     """Area of the outline closed by the upper edge ``upper_left`` ->
-    ``upper_right``: the polygon through the edge, the +X foot, K, the kink
-    tangent and the kink, plus the end round's sector from the kink tangent
-    round the bottom to the +X foot."""
-    points = [upper_left, upper_right, _RIGHT_EDGE_FOOT, (0.0, 0.0), KINK_TANGENT, KINK]
+    ``upper_right``: the polygon through the edge, the +X kink and its
+    tangent, K, the -X kink tangent and the -X kink, plus the end round's
+    sector from the -X kink tangent round the bottom to the +X one."""
+    points = [
+        upper_left,
+        upper_right,
+        KINK_RIGHT,
+        KINK_TANGENT_RIGHT,
+        (0.0, 0.0),
+        KINK_TANGENT,
+        KINK,
+    ]
     shoelace = sum(
         x0 * y1 - x1 * y0
         for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1], strict=True)
     )
-    sweep = (-math.atan2(KINK_TANGENT[1], KINK_TANGENT[0])) % (2.0 * math.pi)
+    sweep = (
+        math.atan2(KINK_TANGENT_RIGHT[1], KINK_TANGENT_RIGHT[0])
+        - math.atan2(KINK_TANGENT[1], KINK_TANGENT[0])
+    ) % (2.0 * math.pi)
     return 0.5 * abs(shoelace) + 0.5 * END_R**2 * sweep
 
 
@@ -255,20 +267,24 @@ async def _outline(
     label: str,
 ) -> None:
     """Draw and fully define one outline on the Front plane (sketch x, y =
-    model X, Y): upper edge, +X edge tangent to the end round about K, the
-    round, the kink line tangent to it, the -X edge up to the upper edge.
-    ``names`` maps the roles EndR/Width/LeftY/RightY/KinkY to dimension
-    names; each is driven by the global of the same role."""
+    model X, Y): upper edge, +X edge, +X kink line tangent to the end round
+    about K, the round, the -X kink line tangent to it, the -X edge up to the
+    upper edge.  ``names`` maps the roles EndR/EdgeLeftX/EdgeRightX/LeftY/
+    RightY/KinkY/KinkRightY to dimension names; the edges are driven by half
+    the global ``Width`` and the heights by their ``<role>Drive`` expression
+    when one is given."""
     set_sketch_direct_db(adapter, True)
     upper = check(
         f"{label} upper edge", await adapter.add_line(*upper_left, *upper_right)
     )
-    right = check(
-        f"{label} +X edge", await adapter.add_line(*upper_right, *_RIGHT_EDGE_FOOT)
+    right = check(f"{label} +X edge", await adapter.add_line(*upper_right, *KINK_RIGHT))
+    kink_right = check(
+        f"{label} +X kink line",
+        await adapter.add_line(*KINK_RIGHT, *KINK_TANGENT_RIGHT),
     )
     round_ = check(
         f"{label} end round",
-        await adapter.add_arc(0.0, 0.0, *KINK_TANGENT, *_RIGHT_EDGE_FOOT),
+        await adapter.add_arc(0.0, 0.0, *KINK_TANGENT, *KINK_TANGENT_RIGHT),
     )
     kink = check(f"{label} kink line", await adapter.add_line(*KINK_TANGENT, *KINK))
     left = check(f"{label} -X edge", await adapter.add_line(*KINK, *upper_left))
@@ -279,7 +295,8 @@ async def _outline(
     # The loop's corners: separate entities, so each joint is explicit.
     for p1, p2 in (
         (f"{upper}.end", f"{right}.start"),
-        (f"{right}.end", f"{round_}.end"),
+        (f"{right}.end", f"{kink_right}.start"),
+        (f"{kink_right}.end", f"{round_}.end"),
         (f"{round_}.start", f"{kink}.start"),
         (f"{kink}.end", f"{left}.start"),
         (f"{left}.end", f"{upper}.start"),
@@ -289,7 +306,7 @@ async def _outline(
             await adapter.add_sketch_constraint(p1, p2, "coincident"),
         )
     for relation_label, e1, e2, relation in (
-        ("+X edge tangent", right, round_, "tangent"),
+        ("+X kink line tangent", kink_right, round_, "tangent"),
         ("kink line tangent", round_, kink, "tangent"),
     ):
         check(
@@ -306,19 +323,25 @@ async def _outline(
         await adapter.add_sketch_dimension(round_, None, "radial", END_R),
     )
     dims.record(names["EndR"], '"EndR"')
-    await dimension_between(
-        adapter,
-        f"{upper}.start",
-        f"{upper}.end",
-        "horizontal_distance",
-        WIDTH,
-        f"{label} bar width",
-    )
-    dims.record(names["Width"], '"Width"')
+    # The bar stands centred on K: each side edge half the width from it.
+    for role, ref, value in (
+        ("EdgeLeftX", f"{kink}.end", KINK[0]),
+        ("EdgeRightX", f"{kink_right}.start", KINK_RIGHT[0]),
+    ):
+        await dimension_between(
+            adapter,
+            f"{round_}.center",
+            ref,
+            "horizontal_distance",
+            abs(value),
+            f"{label} {role} from K",
+        )
+        dims.record(names[role], '"Width" / 2')
     for role, ref, value in (
         ("LeftY", f"{upper}.start", upper_left[1]),
         ("RightY", f"{upper}.end", upper_right[1]),
         ("KinkY", f"{kink}.end", KINK[1]),
+        ("KinkRightY", f"{kink_right}.start", KINK_RIGHT[1]),
     ):
         await dimension_between(
             adapter,
@@ -379,13 +402,16 @@ async def build(adapter: Any) -> dict[str, str]:
         TOP_RIGHT,
         {
             "EndR": "EndR",
-            "Width": "Width",
+            "EdgeLeftX": "EdgeLeftX",
+            "EdgeRightX": "EdgeRightX",
             "LeftY": "TopLeftY",
             "LeftYDrive": '"TopLeftY"',
             "RightY": "TopRightY",
             "RightYDrive": '"TopRightY"',
             "KinkY": "KinkY",
             "KinkYDrive": '"KinkY"',
+            "KinkRightY": "KinkRightY",
+            "KinkRightYDrive": '"KinkY"',
         },
         "plate outline",
     )
@@ -422,13 +448,16 @@ async def build(adapter: Any) -> dict[str, str]:
         NOTCH_RIGHT,
         {
             "EndR": "LowerEndR",
-            "Width": "LowerWidth",
+            "EdgeLeftX": "LowerEdgeLeftX",
+            "EdgeRightX": "LowerEdgeRightX",
             "LeftY": "NotchLeftY",
             "LeftYDrive": '"NotchLeftY"',
             "RightY": "NotchRightY",
             "RightYDrive": '"NotchRightY"',
             "KinkY": "LowerKinkY",
             "KinkYDrive": '"KinkY"',
+            "KinkRightY": "LowerKinkRightY",
+            "KinkRightYDrive": '"KinkY"',
         },
         "lower outline",
     )
