@@ -26,11 +26,13 @@ from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
     add_property_linked_note,
+    assert_dimension_measures,
     assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    scan_view_edges,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -38,9 +40,11 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from mg_magnifying_wheel_spec import (
+    CAST_ROUND_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     RIM_AXIAL,
+    RIM_INNER_DIA,
     RIM_OUTER_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -116,6 +120,13 @@ DIMENSION_CALLOUTS = {
 }
 
 RIGHT_HALF_RIM = RIM_AXIAL * SHEET_SCALE[0] / 2000.0
+# The rim's axial width spans its two OD corner circles (r = RIM_OUTER_DIA/2 at
+# z = +/-RIM_AXIAL/2; the rim is extruded both ways off the mid-plane). Edge-on
+# in the side view each is a vertical line; the coordinate picks ride their
+# mid-span, between the rim-bore round's tangent (r 45) and the OD (r 50), the
+# only band where the OD circle stands alone on that line.
+_RIM_FACE_MID_Y = (RIM_INNER_DIA / 2.0 + CAST_ROUND_R + RIM_OUTER_DIA / 2.0) / 2000.0
+_RIM_AXIS = (0.0, 0.0, 1.0)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -192,14 +203,37 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to wheel bore")
 
-    # The rim's axial width across the side view, up at the rim.
-    add_edge_dimension(
+    # The rim's axial width across the side view, up at the rim. The two OD
+    # corner circles are selected as native entities: a coordinate hit-test
+    # at the corner where each edge-on circle ends on the OD silhouette found
+    # no edge on farm run 4 (85a5d462d), and the side view's asymmetric hub
+    # (HUB_FRONT_Z..HUB_BACK_Z) means its origin need not sit on RIGHT_CENTER.
+    right_edges = scan_view_edges(right, label="wheel right rim corners")
+    rim_corners = tuple(
+        right_edges.circle_at(
+            (0.0, 0.0, z),
+            RIM_OUTER_DIA / 2.0,
+            axis=_RIM_AXIS,
+            label=f"rim OD corner at z={z:+g}",
+        ).edge
+        for z in (RIM_AXIAL / 2.0, -RIM_AXIAL / 2.0)
+    )
+    rim_width = add_edge_dimension(
         adapter,
         right,
-        p0=(RIGHT_CENTER[0] - RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_R),
-        p1=(RIGHT_CENTER[0] + RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_R),
+        p0=(RIGHT_CENTER[0] - RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_FACE_MID_Y),
+        p1=(RIGHT_CENTER[0] + RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_FACE_MID_Y),
         text_xy=(RIGHT_CENTER[0] + 0.028, RIGHT_CENTER[1] + _RIM_R),
         label="rim axial width",
+        orientation="horizontal",
+        entities=rim_corners,
+    )
+    assert_dimension_measures(
+        adapter,
+        rim_width,
+        expected_mm=RIM_AXIAL,
+        label="rim axial width",
+        entities=rim_corners,
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
