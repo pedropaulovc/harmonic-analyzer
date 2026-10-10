@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-import _common as common
+import _sketch as sketch
 
 import _drawing_common as drawing_common
 import build_ms_stick as builder
@@ -161,15 +161,15 @@ def test_reference_equations_follow_editable_tick_geometry(monkeypatch) -> None:
 
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(builder, "check", lambda label, value: value)
-    monkeypatch.setattr(common, "check", lambda label, value: value)
+    monkeypatch.setattr(sketch, "check", lambda label, value: value)
     monkeypatch.setattr(builder, "set_sketch_direct_db", lambda *args: None)
     monkeypatch.setattr(builder, "dimension_between", dimension)
-    monkeypatch.setattr(common, "dimension_between", dimension)
+    monkeypatch.setattr(sketch, "dimension_between", dimension)
     monkeypatch.setattr(builder, "ensure_fully_defined", fully_defined)
     monkeypatch.setattr(builder, "name_last_feature", name_feature)
-    monkeypatch.setattr(common, "_feature_by_name", lambda adapter, name: features[name])
-    monkeypatch.setattr(common, "_display_dimensions", lambda feature, name: feature)
-    monkeypatch.setattr(common, "_rename_dimensions", rename)
+    monkeypatch.setattr(sketch, "_feature_by_name", lambda adapter, name: features[name])
+    monkeypatch.setattr(sketch, "_display_dimensions", lambda feature, name: feature)
+    monkeypatch.setattr(sketch, "_rename_dimensions", rename)
     jobs = []
     asyncio.run(builder._manufacturing_chords(adapter, jobs))
     equations = dict(jobs)
@@ -234,8 +234,20 @@ def test_finish_preserves_polish_and_black_enamel_engraving_fill() -> None:
 
 def test_spec_is_pure_and_drawing_never_reauthors_dimensions() -> None:
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
-    imports = [node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
-    assert not any(name.startswith(("build_", "solidworks", "_common", "_drawing")) for name in imports)
+    imports = [
+        name
+        for node in ast.walk(tree)
+        for name in (
+            [node.module or ""] if isinstance(node, ast.ImportFrom)
+            else [alias.name for alias in node.names] if isinstance(node, ast.Import)
+            else []
+        )
+    ]
+    assert not any(name.startswith((
+        "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
+        "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
+        "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
+    )) for name in imports)
     drawing_tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
              for node in ast.walk(drawing_tree) if isinstance(node, ast.Call)

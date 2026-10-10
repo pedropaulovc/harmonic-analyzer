@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from _gtol_spec import FaceSpec
+from _gtol_face import FaceSpec
 from _printed_tolerance import printed_deviations
 
 # A citation source: a declaration in the declaring spec, or (module, declaration).

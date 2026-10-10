@@ -25,10 +25,9 @@ import joint_retention
 import ms_measuring_stick_assembly_spec as spec
 import ms_stick_spec as stick
 import ms_stop_spec as stop
-import vn_ms_stop_plate_screw_spec as plate_screw
-import vn_thumb_screw_spec as thumb
+import _mcmaster_90114a124 as plate_screw
+import _mcmaster_91882a221 as thumb
 from _transforms import rows_from_euler
-from diagnostics.diag_mcmaster_thumb import THUMB_SPECS
 
 SCRIPTS = Path(__file__).resolve().parent
 BUILDER = SCRIPTS / "build_ms_measuring_stick_assembly.py"
@@ -50,7 +49,7 @@ def _image(rows, origin, point):
 
 
 def test_thumb_screw_spec_is_the_recipe_table_row() -> None:
-    row = THUMB_SPECS[thumb.SKU]
+    row = thumb.THUMB_SPEC
     assert thumb.SHANK_DIA == pytest.approx(2.0 * row["major_r"])
     assert thumb.PITCH == pytest.approx(row["pitch"])
     assert thumb.SHANK_LEN == pytest.approx(row["length"])

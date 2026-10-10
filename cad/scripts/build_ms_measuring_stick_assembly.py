@@ -43,9 +43,12 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _assembly_patterns import ensure_global_pattern_axis
-from _common import _early_bound, apply_custom_properties, check, run_build
+from _check import check
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _session import run_build
 from _drawing_marks import DRAWN_BY
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from _interference_contracts import allowed_interference_pairs
 from _transforms import euler_from_rows
 

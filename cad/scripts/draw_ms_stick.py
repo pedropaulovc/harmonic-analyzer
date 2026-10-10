@@ -8,6 +8,11 @@ Native probes import TickDepth in Top but not in a removed cut-only section.
 All sizes, bands and places come from the part; scale is never shrunk to fit.
 Part-spec coordinates are millimetres; model-point projection takes metres.
 Drawing-sheet positions and projected fence coordinates are also metres.
+
+This replaces draw_ha_measuring_stick without a legacy entry point: its
+split-common check, path and session imports live here, while ruled-face
+orientation, source-linked notes and native dimensions retain the current
+four-sheet manufacturing contract.
 """
 
 from __future__ import annotations
@@ -19,7 +24,10 @@ from typing import Any
 
 import _telemetry
 import ms_stick_spec as part
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs, add_note, add_property_linked_callout, add_property_linked_note,
     create_blank_drawing_sheets, finalize_drawing, model_point_in_view, new_project_drawing,

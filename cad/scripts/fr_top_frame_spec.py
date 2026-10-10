@@ -18,7 +18,8 @@ from __future__ import annotations
 import _config
 import vn_knife_hanger_stud_spec as HANGER_SCREW
 import vn_knife_mount_dowel_spec as KNIFE_DOWEL
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z

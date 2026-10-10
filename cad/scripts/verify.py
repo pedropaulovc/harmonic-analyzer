@@ -1,7 +1,7 @@
 r"""Standalone validation harness -- the verify pass IS the test suite.
 
-The build scripts already gate themselves (``_common`` raises on free DOF,
-interference, rebuild errors). ``verify.py`` promotes those gates into one
+The build scripts already gate themselves (``_assembly`` raises on free DOF and
+interference, ``_rebuild`` on rebuild errors). ``verify.py`` promotes those gates into one
 runnable, re-runnable acceptance check that opens an *already-built* assembly
 and proves it is sound, plus the assertions a build script cannot make about
 itself: that the gear ratios in the live model equal the config, and that the
@@ -73,14 +73,10 @@ import gen_dimensions
 import pen_driver
 import truth_model
 import _telemetry
-from _common import (
-    OUT_SLDASM,
-    active_configuration_name,
-    check,
-    discard_open_documents,
-    log,
-    run_build,
-)
+from _check import check, log
+from _paths import OUT_SLDASM
+from _rebuild import active_configuration_name
+from _session import discard_open_documents, run_build
 from _assembly import (
     _export_assembly_images,
     _invalidate_massprops_proof,
@@ -105,10 +101,8 @@ from _assembly_postbuild import (
 )
 from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
-from _common import (  # component iteration helpers (read-only)
-    _early_bound,
-    _read_member,
-)
+# component iteration helpers (read-only)
+from _com import _early_bound, _read_member
 
 # solidworks_mcp internals reused read-only: the live gear-mate ratios are not
 # exposed by any public tool (list_mates returns name/type/suppressed only), so
@@ -2079,7 +2073,7 @@ def verify_tolerance_audit(report: Report) -> None:
     Reconciles the parts.yaml registry against the parts the build scripts
     actually save, and asserts every part carries the custom-property fields
     (material / tolerance class / process) with class names that resolve in
-    tolerances.yaml. Writes ``cad/out/reports/tolerance_audit.csv`` whether or
+    tolerances/. Writes ``cad/out/reports/tolerance_audit.csv`` whether or
     not the gates pass, so the artifact always reflects the current state.
     """
     rows, problems = _audit_rows()

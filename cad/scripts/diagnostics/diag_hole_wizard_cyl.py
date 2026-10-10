@@ -29,7 +29,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
-from _common import check, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _session import run_build  # noqa: E402
 from _holes import NUMBER_DRILL_MM, SW_FM_HOLE_WZD, _STD_ANSI_INCH, _flag  # noqa: E402
 import _telemetry  # noqa: E402
 

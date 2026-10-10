@@ -6,11 +6,15 @@ from typing import Any
 
 import _telemetry
 import ms_stop_spec as spec
-from _common import (
-    SketchDims, _early_bound, anchor_point_to_origin, check, define_circle,
-    dimension_between, ensure_fully_defined, name_dimensions, name_last_feature,
-    set_sketch_direct_db,
+from _check import check
+from _com import _early_bound
+from _dimensions import name_dimensions
+from _feature_tree import name_last_feature
+from _sketch import (
+    SketchDims, anchor_point_to_origin, dimension_between,
+    ensure_fully_defined, set_sketch_direct_db,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import set_dimension_display_precision
 from _visibility import blank_sketch_feature
 

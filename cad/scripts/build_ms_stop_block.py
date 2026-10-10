@@ -2,6 +2,11 @@ r"""Build the blackened brass stop block (approved ch16 sketch, 2026-10-09).
 
 The block frame and envelope are owned by ms_stop_spec. The X-through rebate starts at Z=0;
 ms-stop-plate closes it. All hardware is separate, stock catalogue geometry.
+
+The split-common helper ownership from the retired
+build_ha_measuring_stick_stop recipe is carried into this block, the separate
+cover and ms_stop_geom. Its old steel cube and merged head are not restored:
+the approved brass parts and stock fasteners remain separate.
 Run only through the supervised farm launcher: part:ms_stop_block.
 """
 
@@ -10,12 +15,16 @@ from __future__ import annotations
 import sys
 
 import ms_stop_spec as spec
-from _common import (
-    PANEL_BLACK, SketchDims, add_line_chain, apply_color, apply_material, check,
-    define_rectilinear_chain, drive_dimension, ensure_fully_defined, force_rebuild,
-    name_dimensions, name_last_feature, report_mass_properties, run_build,
-    save_part_and_images, set_global, volume_check,
-)
+from _appearance import PANEL_BLACK, apply_color, apply_material
+from _check import check
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch_chains import define_rectilinear_chain
 from _drawing_marks import (
     apply_drawing_precision, apply_drawing_properties, clear_dimensions_for_drawing,
     mark_dimensions_for_drawing, set_dimension_bilateral_tolerance,

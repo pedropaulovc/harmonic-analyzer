@@ -1,22 +1,18 @@
-"""Specialized, low-fanout feature builders pulled out of _common so their
+"""Specialized, low-fanout feature builders whose
 churn (spring end-hooks, knurled/reeded screw heads, nameplate rounded-rect
 and polyline-loop sketches) invalidates only the few parts that use them,
 not every build. Imports the shared sketch primitives it builds on from
-_common.
+_sketch and _sketch_circle.
 """
 from __future__ import annotations
 
 import math
 from typing import Any
 
-from _common import (
-    anchor_point_to_origin,
-    check,
-    define_circle,
-    ensure_fully_defined,
-    feature_name_by_type,
-    set_sketch_direct_db,
-)
+from _check import check
+from _feature_tree import feature_name_by_type
+from _sketch import anchor_point_to_origin, ensure_fully_defined, set_sketch_direct_db
+from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 
 import _telemetry

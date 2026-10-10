@@ -25,7 +25,7 @@ LATE-BOUND PROBE: this script drives SolidWorks through its own
 ``GetObject``/``Dispatch`` (or a raw ``adapter.currentModel``), NOT the makepy
 wrapper, so its ``[out]`` params land in the ``VT_BYREF`` VARIANTs passed in
 rather than in the return tuple. That is the OPPOSITE of the build path, where
-``_common._early_bound`` guarantees an early-bound object and the outs ride the
+``_com._early_bound`` guarantees an early-bound object and the outs ride the
 return tuple. Both are correct for their binding -- mixing them is the trap that
 reads as "no data" instead of failing. See memory/sw-assembly-mate-diagnostics-api.md.
 """
@@ -38,7 +38,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# This probe used to live in cad/scripts/, where _common was a sibling. Moved
+# This probe used to live in cad/scripts/, where the CAD helpers were siblings. Moved
 # into diagnostics/, sys.path[0] is this directory, so the import below fails
 # with ModuleNotFoundError before reaching SolidWorks -- same insert every other
 # relocated diagnostic carries.
@@ -47,14 +47,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pythoncom  # noqa: E402
 from win32com.client import VARIANT  # noqa: E402
 
-from _common import (  # noqa: E402
-    OUT_SLDASM,
-    _flag,
-    _read_member,
-    check,
-    log,
-    run_build,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _com import _flag, _read_member  # noqa: E402
+from _paths import OUT_SLDASM  # noqa: E402
+from _session import run_build  # noqa: E402
 
 SILENT = 1           # swSaveAsOptions_Silent
 # swSaveAsOptions_SaveReferenced is 4; 8 is AvoidRebuildOnSave (checked against

@@ -232,72 +232,82 @@ def export_snapshot(
 ) -> None:
     snapshot_root = cad.parent
     sys.path.insert(0, str(cad / "scripts"))
-    # This released data table sits in a COM recipe whose unrelated imports
-    # pull telemetry/Windows machinery. Evaluate its exact assignment AST only:
-    # genuine supplier data, no substitute geometry and no COM function stubs.
+    # Historical released data tables sit in COM recipes whose unrelated
+    # imports pull telemetry/Windows machinery. Evaluate exact assignment ASTs
+    # only: genuine supplier data, no substitute geometry or COM function stubs.
     thumb_path = identity_map.source_file(cad, "scripts/diagnostics/diag_mcmaster_thumb.py")
     thumb_tree = ast.parse(thumb_path.read_text(), filename=str(thumb_path))
     thumb_assignment = next(
-        node
-        for node in thumb_tree.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "THUMB_SPECS"
-            for target in node.targets
+        (
+            node
+            for node in thumb_tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "THUMB_SPECS"
+                for target in node.targets
+            )
+        ),
+        None,
+    )
+    if thumb_assignment is not None:
+        thumb_module = types.ModuleType("diagnostics.diag_mcmaster_thumb")
+        thumb_module.__file__ = str(thumb_path)
+        # Pinned-commit assignment AST; not literal_eval-able (dict() calls, arithmetic).
+        thumb_code = compile(
+            ast.Module(body=[thumb_assignment], type_ignores=[]), str(thumb_path), "exec"
         )
-    )
-    thumb_module = types.ModuleType("diagnostics.diag_mcmaster_thumb")
-    thumb_module.__file__ = str(thumb_path)
-    # Pinned-commit assignment AST; not literal_eval-able (dict() calls, arithmetic).
-    thumb_code = compile(
-        ast.Module(body=[thumb_assignment], type_ignores=[]), str(thumb_path), "exec"
-    )
-    exec(thumb_code, thumb_module.__dict__)  # noqa: S102
-    sys.modules[thumb_module.__name__] = thumb_module
+        exec(thumb_code, thumb_module.__dict__)  # noqa: S102
+        sys.modules[thumb_module.__name__] = thumb_module
     fillister_path = identity_map.source_file(cad, "scripts/diagnostics/diag_mcmaster_fillister.py")
     fillister_tree = ast.parse(fillister_path.read_text(), filename=str(fillister_path))
+    # Historical released sources embed this table in the recipe. Current
+    # sources import pure per-SKU dimensions and need no recipe projection.
     fillister_assignment = next(
-        node
-        for node in fillister_tree.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "FILLISTER_SIZES"
-            for target in node.targets
-        )
-    )
-    fillister_module = types.ModuleType("diagnostics.diag_mcmaster_fillister")
-    fillister_module.__file__ = str(fillister_path)
-    # Resolve the table's pure-spec bindings from this exact archived revision,
-    # including aliases used by later supplier rows. Importing the COM recipe
-    # itself would pull unrelated telemetry/Windows machinery into the exporter.
-    required_names = {
-        node.id for node in ast.walk(fillister_assignment.value)
-        if isinstance(node, ast.Name)
-    }
-    for statement in fillister_tree.body:
-        if not isinstance(statement, ast.ImportFrom) or not statement.module:
-            continue
-        if statement.level or not statement.module.endswith("_spec"):
-            continue
-        aliases = [
-            alias for alias in statement.names
-            if (alias.asname or alias.name) in required_names
-        ]
-        if not aliases:
-            continue
-        spec_module = identity_map.import_module(cad, statement.module)
-        for alias in aliases:
-            fillister_module.__dict__[alias.asname or alias.name] = getattr(
-                spec_module, alias.name
+        (
+            node
+            for node in fillister_tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "FILLISTER_SIZES"
+                for target in node.targets
             )
-    # Pinned-commit assignment AST; all referenced supplier constants are bound.
-    fillister_code = compile(
-        ast.Module(body=[fillister_assignment], type_ignores=[]),
-        str(fillister_path),
-        "exec",
+        ),
+        None,
     )
-    exec(fillister_code, fillister_module.__dict__)  # noqa: S102
-    sys.modules[fillister_module.__name__] = fillister_module
+    if fillister_assignment is not None:
+        fillister_module = types.ModuleType("diagnostics.diag_mcmaster_fillister")
+        fillister_module.__file__ = str(fillister_path)
+        # Resolve the table's pure-spec bindings from this exact archived revision,
+        # including aliases used by later supplier rows. Importing the COM recipe
+        # itself would pull unrelated telemetry/Windows machinery into the exporter.
+        required_names = {
+            node.id for node in ast.walk(fillister_assignment.value)
+            if isinstance(node, ast.Name)
+        }
+        for statement in fillister_tree.body:
+            if not isinstance(statement, ast.ImportFrom) or not statement.module:
+                continue
+            if statement.level or not statement.module.endswith("_spec"):
+                continue
+            aliases = [
+                alias for alias in statement.names
+                if (alias.asname or alias.name) in required_names
+            ]
+            if not aliases:
+                continue
+            spec_module = identity_map.import_module(cad, statement.module)
+            for alias in aliases:
+                fillister_module.__dict__[alias.asname or alias.name] = getattr(
+                    spec_module, alias.name
+                )
+        # Pinned-commit assignment AST; all referenced supplier constants are bound.
+        fillister_code = compile(
+            ast.Module(body=[fillister_assignment], type_ignores=[]),
+            str(fillister_path),
+            "exec",
+        )
+        exec(fillister_code, fillister_module.__dict__)  # noqa: S102
+        sys.modules[fillister_module.__name__] = fillister_module
     modules = {
         name: identity_map.import_module(cad, name)
         for name in (

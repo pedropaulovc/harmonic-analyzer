@@ -41,27 +41,22 @@ from __future__ import annotations
 import sys
 
 import _telemetry
-from _common import (
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, dump_dimensions, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import measure_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    drive_dimension,
     dimension_between,
-    dump_dimensions,
     ensure_fully_defined,
-    force_rebuild,
-    measure_check,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
 from _drawing_marks import (
     apply_drawing_properties,
@@ -104,7 +99,7 @@ from ms_stick_spec import (
 from _visibility import blank_sketch_feature
 
 PART_NAME = "ms-stick"
-MATERIAL = "Brass"  # see _common.apply_material docstring
+MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
 
 

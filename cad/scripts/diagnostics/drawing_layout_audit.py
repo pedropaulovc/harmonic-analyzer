@@ -924,7 +924,11 @@ def _attach(adapter: Any, path: Path) -> Any:
     """
     import win32com.client
 
-    from _common import _early_bound
+    if __package__:
+        from . import _script_paths  # noqa: F401
+    else:
+        import _script_paths  # noqa: F401
+    from _com import _early_bound
 
     pythoncom = __import__("pythoncom")
     pythoncom.CoInitialize()

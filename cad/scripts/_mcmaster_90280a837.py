@@ -1,0 +1,12 @@
+"""Pure 90280A837 fillister dimensions; isolate each SKU's cache inputs."""
+
+THREAD = "#10-32"
+THREAD_CLASS = "2A"
+SHANK_DIA = 4.826
+SHANK_LEN = 44.45
+HEAD_DIA = 7.9502
+HEAD_H = 4.572
+PITCH = 0.79375
+
+
+FILLISTER_SIZE = (SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, PITCH)

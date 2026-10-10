@@ -17,13 +17,13 @@ import math
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from vn_ms_stop_plate_screw_spec import (
+from _mcmaster_90114a124 import (
     LENGTH as PLATE_SCREW_LENGTH,
     MAJOR_DIA as PLATE_SCREW_MAJOR_DIA,
     PITCH as PLATE_SCREW_PITCH,
     THREAD as PLATE_SCREW_THREAD,
 )
-from vn_thumb_screw_spec import SHANK_DIA as THUMB_MAJOR_DIA
+from _mcmaster_91882a221 import SHANK_DIA as THUMB_MAJOR_DIA
 
 BLOCK_LENGTH = 21.0
 BLOCK_HEIGHT = 14.1

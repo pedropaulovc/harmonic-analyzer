@@ -21,7 +21,10 @@ from typing import Any
 import _config
 import _telemetry
 import ms_stop_spec as part
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs, add_native_hole_callout, add_property_linked_callout,
     add_property_linked_note,

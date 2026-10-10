@@ -8,7 +8,7 @@ from typing import Any
 
 import _telemetry
 from _assembly import _ledger_record, assert_component_placed, component_transform
-from _common import _early_bound, _read_member
+from _com import _early_bound, _read_member
 from _visibility import blank_reference_geometry
 
 

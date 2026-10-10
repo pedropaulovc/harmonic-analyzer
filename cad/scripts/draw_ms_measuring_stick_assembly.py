@@ -24,7 +24,9 @@ import _telemetry
 import ms_measuring_stick_assembly_spec as spec
 import ms_stick_spec as stick
 import ms_stop_spec as stop
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -51,7 +53,7 @@ from _drawing_common import (
     visible_component_entities,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout

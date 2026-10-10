@@ -17,12 +17,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
+from _mcmaster_91794a112 import FILLISTER_SIZE  # noqa: E402
 from diagnostics.diag_mcmaster_fillister import build_fillister  # noqa: E402
 from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
 
 
+@stock_recipe("91794A112", threaded=True)
 async def build_91794A112(adapter, truth=None):
-    await build_fillister(adapter, "91794A112")
+    await build_fillister(adapter, "91794A112", FILLISTER_SIZE)
 
 
 if __name__ == "__main__":

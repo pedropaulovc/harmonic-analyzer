@@ -12,7 +12,8 @@ import pytest
 
 import _drawing_common as drawing_common
 import _drawing_marks as drawing_marks
-import _common as common
+import _dimensions as dimensions
+import _sketch as sketch
 import ms_stop_geom as stop_geom
 import build_ms_stop_block as block
 import build_ms_stop_plate as plate
@@ -20,7 +21,7 @@ import draw_ms_stop_block as block_drawing
 import draw_ms_stop_plate as plate_drawing
 import ms_stick_spec as stick
 import ms_stop_spec as spec
-import vn_ms_stop_plate_screw_spec as screw
+import _mcmaster_90114a124 as screw
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import DRILL_POINT_H
 
@@ -158,8 +159,20 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
 def test_no_com_in_spec_or_render_time_size_overrides(module) -> None:
     tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
     if module is spec:
-        imports = [node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
-        assert not any(name.startswith(("build_", "solidworks", "_common", "_drawing")) for name in imports)
+        imports = [
+            name
+            for node in ast.walk(tree)
+            for name in (
+                [node.module or ""] if isinstance(node, ast.ImportFrom)
+                else [alias.name for alias in node.names] if isinstance(node, ast.Import)
+                else []
+            )
+        ]
+        assert not any(name.startswith((
+            "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
+            "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
+            "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
+        )) for name in imports)
     else:
         calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
                  for node in ast.walk(tree) if isinstance(node, ast.Call)
@@ -606,9 +619,9 @@ def test_pilot_reference_emits_concentric_native_diameter_and_live_equation(monk
     monkeypatch.setattr(stop_geom, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(stop_geom, "ensure_fully_defined", fully_defined)
     monkeypatch.setattr(stop_geom, "name_last_feature", name_feature)
-    monkeypatch.setattr(common, "_feature_by_name", lambda adapter, name: features[name])
-    monkeypatch.setattr(common, "_display_dimensions", lambda feature, name: feature)
-    monkeypatch.setattr(common, "_rename_dimensions", rename)
+    monkeypatch.setattr(sketch, "_feature_by_name", lambda adapter, name: features[name])
+    monkeypatch.setattr(sketch, "_display_dimensions", lambda feature, name: feature)
+    monkeypatch.setattr(sketch, "_rename_dimensions", rename)
     adapter = Adapter()
     equations = dict(asyncio.run(stop_geom.pilot_drill_reference(adapter)))
     x, y, radius = adapter.circles["circle"]
@@ -728,9 +741,9 @@ def _window_reference_seat(monkeypatch, *, reject_construction=False):
     monkeypatch.setattr(stop_geom, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(stop_geom, "ensure_fully_defined", fully_defined)
     monkeypatch.setattr(stop_geom, "name_last_feature", name_feature)
-    monkeypatch.setattr(common, "_feature_by_name", lambda adapter, name: features[name])
-    monkeypatch.setattr(common, "_display_dimensions", lambda feature, name: feature)
-    monkeypatch.setattr(common, "_rename_dimensions", rename)
+    monkeypatch.setattr(dimensions, "_feature_by_name", lambda adapter, name: features[name])
+    monkeypatch.setattr(dimensions, "_display_dimensions", lambda feature, name: feature)
+    monkeypatch.setattr(dimensions, "_rename_dimensions", rename)
     return Adapter()
 
 

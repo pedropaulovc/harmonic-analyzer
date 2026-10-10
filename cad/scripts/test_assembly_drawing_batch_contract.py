@@ -23,7 +23,7 @@ from _drawing_common import (
     DrawingOutputs,
 )
 from _drawing_registry import DRAWINGS, DrawingLayout
-from test_drawing_simplified import HLR, FakeDrawing, FakeView
+from test_simplified_helpers import HLR, FakeDrawing, FakeView
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -134,8 +134,8 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "ms_measuring_stick_assembly_spec.py",
                     "ms_stop_spec.py",
                     "ms_stick_spec.py",
-                    "vn_thumb_screw_spec.py",
-                    "vn_ms_stop_plate_screw_spec.py",
+                    "_mcmaster_91882a221.py",
+                    "_mcmaster_90114a124.py",
                 )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
