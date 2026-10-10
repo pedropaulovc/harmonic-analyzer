@@ -119,6 +119,32 @@ if farm is not None:
     state_path = Path(os.environ["UV_STUB_FARM"])
     workflows = json.loads(state_path.read_text(encoding="utf-8"))
     command, *rest = sys.argv[farm + 1 :]
+    if command == "close-build":
+        workflows.setdefault("_builds", {})[rest[0]] = {"reason": rest[-1]}
+        state_path.write_text(json.dumps(workflows), encoding="utf-8")
+        print(json.dumps({"build_id": rest[0], "producer_state": "closed"}))
+        raise SystemExit(0)
+    if command == "leaf-status":
+        build_id = rest[rest.index("--build-id") + 1]
+        workflow_id = rest[rest.index("--workflow-id") + 1]
+        reservation = workflows.get("_reservations", {}).get(workflow_id)
+        if reservation is None or reservation["build_id"] != build_id:
+            print("Error: unknown reservation", file=sys.stderr)
+            raise SystemExit(2)
+        pending = reservation.get("_pending_for", 0)
+        if pending:
+            reservation["_pending_for"] -= 1
+        state_path.write_text(json.dumps(workflows), encoding="utf-8")
+        print(json.dumps({
+            "key": {"build_id": build_id, "workflow_id": workflow_id},
+            "state": "reserved" if pending else "bound",
+            "binding": None if pending else {
+                "build_id": build_id, "workflow_id": workflow_id,
+                "run_id": reservation["run_id"],
+            },
+            "unconfirmed_attempts": [],
+        }))
+        raise SystemExit(0)
     workflow = rest[-1]
     absent = workflow in workflows and workflows[workflow].get("_absent_for", 0) > 0
     if absent and command == "status":
@@ -128,6 +154,8 @@ if farm is not None:
         print(f"Error: workflow not found for ID: {workflow}", file=sys.stderr)
         raise SystemExit(2)
     described = workflows[workflow]
+    if "--run-id" in rest:
+        assert rest[rest.index("--run-id") + 1] == described["run_id"]
     if described["status"] == "UNREACHABLE":
         print("Error: failed to connect to the farm", file=sys.stderr)
         raise SystemExit(1)
@@ -2487,3 +2515,104 @@ def test_tracking_resolves_a_drive_root_log_directory(tmp_path: Path) -> None:
     # creating files at the drive root or starting a farm build.
     assert result.returncode == 2
     assert "-Status needs -RunId or -Tag" in result.stderr
+
+
+@pytest.mark.parametrize("reservation", ["delayed", "unknown", "bound-missing", "foreign"])
+def test_fifo_cancel_closes_group_and_reconciles_exact_reservation(
+    tmp_path: Path, reservation: str,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(
+        tmp_path, fixture, f"Farm workflow requested: {LEAF_NUT}\n",
+        "fifo",
+    )
+    build_id = "fixture-build"
+    try:
+        requests = Path(running["requests"])
+        (requests / "build.json").write_text(
+            json.dumps({"build_id": build_id, "farm_run": running["run_id"]}),
+            encoding="utf-8",
+        )
+        state = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
+        state[LEAF_NUT] = {
+            "status": "RUNNING", "run_id": "exact-leaf-run",
+            "farm_run": "foreign-run" if reservation == "foreign" else running["run_id"],
+        }
+        if reservation == "bound-missing":
+            del state[LEAF_NUT]
+        if reservation != "unknown":
+            state["_reservations"] = {
+                LEAF_NUT: {
+                    "build_id": build_id, "run_id": "exact-leaf-run",
+                    "_pending_for": 2 if reservation == "delayed" else 0,
+                },
+            }
+        Path(fixture["farm_state"]).write_text(json.dumps(state), encoding="utf-8")
+        status = _run_launcher(
+            fixture, _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            fixture["environment"],
+        )
+        assert status.returncode == 0, status.stderr
+        assert json.loads(status.stdout)["build_id"] == build_id
+        assert _record(_only(Path(fixture["log_directory"]), "*.run.json"))["build_id"] == build_id
+        cancel = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Cancel", "-RunId", running["run_id"],
+                      "-Why", "reservation test", "-SettleSeconds", "0"),
+            fixture["environment"],
+        )
+        process.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+        process.communicate(timeout=HANG_GUARD_S)
+    state = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
+    assert state["_builds"][build_id]["reason"] == "cancelled"
+    assert "not-found" not in cancel.stdout
+    if reservation in ("unknown", "bound-missing"):
+        assert cancel.returncode == 1, (cancel.stdout, cancel.stderr)
+        assert "unresolved" in cancel.stdout
+        assert not Path(running["done"]).exists()
+        assert not Path(fixture["farm_cancels"]).exists()
+    elif reservation == "foreign":
+        assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+        assert state[LEAF_NUT]["status"] == "RUNNING"
+        assert not Path(fixture["farm_cancels"]).exists()
+        assert "kept-foreign" in cancel.stdout
+    else:
+        assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+        assert "pending reservation" in cancel.stdout
+        assert state[LEAF_NUT]["status"] == "CANCELED"
+        call = json.loads(Path(fixture["farm_cancels"]).read_text(encoding="utf-8"))
+        assert call["argv"][call["argv"].index("--run-id") + 1] == "exact-leaf-run"
+        done = _record(Path(running["done"]))
+        assert done["build_id"] == build_id
+        assert done["cancel"]["workflows"][0]["run_id"] == "exact-leaf-run"
+
+
+def test_fifo_cancel_closes_durable_group_without_any_leaf_or_registration_log(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(tmp_path, fixture, "waiting for FIFO\n", "group")
+    try:
+        (Path(running["requests"]) / "build.json").write_text(
+            json.dumps({"build_id": "waiting-build", "farm_run": running["run_id"]}),
+            encoding="utf-8",
+        )
+        cancel = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Cancel", "-RunId", running["run_id"],
+                      "-Why", "producer waiting", "-SettleSeconds", "0"),
+            fixture["environment"],
+        )
+        process.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+        process.communicate(timeout=HANG_GUARD_S)
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    state = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
+    assert state["_builds"]["waiting-build"]["reason"] == "cancelled"
+    done = _record(Path(running["done"]))
+    assert done["build_id"] == "waiting-build"
+    assert done["cancel"]["workflows"] == []
+    assert not Path(fixture["farm_cancels"]).exists()
