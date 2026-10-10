@@ -55,7 +55,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _configuration_material import require_material_in_every_configuration
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _saved_part_guard import require_saved_drawing_properties

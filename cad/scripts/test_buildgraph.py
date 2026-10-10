@@ -1735,9 +1735,9 @@ def test_config_files_track_real_reads():
 
 def test_config_files_subset_of_known_tokens():
     """Every real script resolves to known tokens (concrete files that exist, or
-    the machine/* | parts/* | title_block | ** dynamic tokens). The set can only
+    the machine/* | tolerances/* | parts/* | title_block | ** dynamic tokens). The set can only
     NARROW the old whole-config dep, never invent a missing-file dependency."""
-    globs = {"machine/*", "parts/*", "title_block", "**"}
+    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**"}
     for stem in part_stems():
         for tok in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"):
             assert tok in globs or (bg.CONFIG_DIR / tok).is_file(), f"{stem}: {tok}"
@@ -1774,8 +1774,8 @@ def test_config_files_resolve_known_forms():
     assert _tokens("import _config\nx = _config.active_count()\n") == frozenset(
         {"machine/channels.yaml"}
     )
-    assert _tokens("import _config\nx = _config.fit('g', 'k')\n") == frozenset(
-        {"tolerances.yaml"}
+    assert _tokens("import _config\nx = _config.fit('gear_mesh', 'k')\n") == frozenset(
+        {"tolerances/gear_mesh.yaml"}
     )
     assert _tokens("import _config\nx = _config.release_revision()\n") == frozenset(
         {"release.yaml"}
@@ -1784,8 +1784,19 @@ def test_config_files_resolve_known_forms():
         {"channels.yaml"}
     )
     assert _tokens("import _config\nx = _config._doc('tolerances')\n") == frozenset(
-        {"tolerances.yaml"}
+        {"tolerances/*"}
     )
+    for expression in (
+        "fit(group, 'k')",
+        "fit('unknown', 'k')",
+        "fit",
+        "fit(group='gear_mesh')",
+    ):
+        assert _tokens(f"import _config\nx = _config.{expression}\n") == frozenset(
+            {"tolerances/*"}
+        )
+    with pytest.raises(bg._UnknownConfigUse):
+        _tokens("import _config\nx = _config.tolerances()\n")
     # a dynamic machine/parts arg widens to the whole family (conservative, not an error).
     assert _tokens("import _config\nx = _config.machine(sub, 'k')\n") == frozenset(
         {"machine/*"}

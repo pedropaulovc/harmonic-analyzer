@@ -54,7 +54,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_prefix,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from dt_pinion_lever_geometry import PIN_HOLE_DIA, ROD_PIN_HOLE_FROM_END
 from dt_pinion_lift_rod_spec import (

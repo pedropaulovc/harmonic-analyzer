@@ -63,7 +63,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _configuration_material import require_material_in_every_configuration
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry

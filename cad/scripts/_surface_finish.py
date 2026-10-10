@@ -1,6 +1,6 @@
 """Shared surface-finish grades for released drawing callouts.
 
-PURE DATA, no SolidWorks/COM imports — the sibling of :mod:`_fit_limits`, and
+PURE DATA, no SolidWorks/COM imports — the sibling of :mod:`_fit_deviations`, and
 importable from BOTH the part tier and the drawing tier without tripping
 ``check:partiso``.
 

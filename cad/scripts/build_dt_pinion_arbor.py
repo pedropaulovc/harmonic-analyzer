@@ -48,7 +48,7 @@ from _drawing_marks import (
     set_dimension_prefix,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _gtol_spec import CylinderFace
 from _part_pmi import _face_geometry, _face_matches, _resolve_faces, author_part_pmi
 from solidworks_mcp.adapters.pywin32_adapter import null_callout

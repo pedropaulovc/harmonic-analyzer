@@ -15,6 +15,7 @@ data lives in YAML.
 from __future__ import annotations
 
 import functools
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -33,11 +34,9 @@ def _load(path: Path) -> dict[str, Any]:
 
 @functools.lru_cache(maxsize=None)
 def _doc(name: str) -> dict[str, Any]:
-    """One config doc as a dict. ``machine`` and ``parts`` are now SPLIT across a
-    directory of per-subsystem / per-part files (so a single value edit invalidates
-    only the parts that read that one file -- see dodo.py); they are re-aggregated
-    here into the exact same shape callers always saw, so every accessor, the
-    verify audit and provenance are unchanged. Other docs are a single file."""
+    """One config doc as a dict. ``machine``, ``parts`` and ``tolerances`` are
+    split across per-concern files to limit cache blast radius; aggregation
+    preserves the exact document shape seen by accessors and audits."""
     split_dir = CONFIG_DIR / name
     if split_dir.is_dir():
         if name == "machine":
@@ -55,6 +54,13 @@ def _doc(name: str) -> dict[str, Any]:
                 if p.name != "_defaults.yaml":
                     entries.update(_load(p))
             return {**defaults, "parts": entries}
+        if name == "tolerances":
+            agg = dict(_load(split_dir / "_base.yaml"))
+            fits: dict[str, Any] = {}
+            for p in sorted(split_dir.glob("*.yaml")):
+                if p.name != "_base.yaml":
+                    fits.update(_load(p))
+            return {**agg, "fits": fits}
     path = CONFIG_DIR / f"{name}.yaml"
     if not path.exists():
         raise FileNotFoundError(f"config file missing: {path}")
@@ -121,7 +127,14 @@ def machine(*keys: str) -> Any:
 
 
 def fit(group: str, *keys: str) -> Any:
-    """A fit value from tolerances.yaml ``fits:``, e.g. ``fit('gear_mesh', 'rack_backlash_mm')``."""
+    """A fit value from ``tolerances/<group>.yaml``, e.g. ``fit('gear_mesh', 'rack_backlash_mm')``."""
+    allowed = os.environ.get("HARMONIC_FIT_GROUPS")
+    if allowed is not None and group not in allowed.split(","):
+        raise KeyError(
+            f"fit group {group!r} is outside this build's cache key "
+            f"(HARMONIC_FIT_GROUPS={allowed!r}); read it through a literal "
+            "fit(...) call so the build graph can see it"
+        )
     node: Any = _doc("tolerances")["fits"][group]
     for key in keys:
         node = node[key]

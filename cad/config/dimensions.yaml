@@ -12,7 +12,7 @@ preamble: |
   > narrative as `prose` properties; `cad/scripts/gen_dimensions.py` renders this
   > view (`--check` gates that the two never drift). The build *inputs* the scripts
   > actually read (tooth counts, pitches, fits, the cone incline) live in the
-  > sibling `machine.yaml` / `channels.yaml` / `tolerances.yaml`; `verify.py`
+  > sibling `machine.yaml` / `channels.yaml` / `tolerances/`; `verify.py`
   > cross-checks those against the dimension rows here. Confidence ladder:
   > annotated → stated → scaled → legacy → derived.
 sections:
@@ -570,7 +570,7 @@ sections:
         - low
       - - Cone mesh grid (X_PITCH)
         - 'every cone gear''s pitch section crosses x = −84.702 at the contact azimuth: X_PITCH is derived from the re-anchored drum x −53.216 and the exact oblique-mesh penetration contract'
-        - 'M6.7 oblique partial engagement (book ch. 12 "partial engagement, distinct wear"): the contact tooth crosses the 3 mm drum face obliquely. The grid shifted ~20 mm inboard from the old +4.49 because the drum radius shrank with the module (tip x 51.65→31.10). FLAG: working depth is now only 1.02 mm (vs 1.69 at DP 30), so the 0.55 edge slack (tolerances.yaml) is large relative to it — the cone/drum mesh penetration needs re-tuning in the Phase 3 rebuild'
+        - 'M6.7 oblique partial engagement (book ch. 12 "partial engagement, distinct wear"): the contact tooth crosses the 3 mm drum face obliquely. The grid shifted ~20 mm inboard from the old +4.49 because the drum radius shrank with the module (tip x 51.65→31.10). FLAG: working depth is now only 1.02 mm (vs 1.69 at DP 30), so the 0.55 edge slack (tolerances/cone_drum_oblique_mesh.yaml) is large relative to it — the cone/drum mesh penetration needs re-tuning in the Phase 3 rebuild'
         - low
       - - Cone big-end (T120) gear centre
         - (x, z) = (−114.564, −25.055) = (X_PITCH − 30.59 cos i, drum plane −31.685 + 30.59 sin i)

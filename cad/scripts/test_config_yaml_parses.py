@@ -39,3 +39,28 @@ def test_every_config_yaml_is_a_declared_pipeline_input() -> None:
     set could break without re-running this gate."""
     declared = {Path(path).resolve() for path in all_config_files()}
     assert set(CONFIG_YAMLS) <= declared
+
+
+def test_tolerance_document_aggregation_and_fit_guard(monkeypatch) -> None:
+    import _config
+
+    base = yaml.safe_load(
+        (CONFIG_DIR / "tolerances" / "_base.yaml").read_text(encoding="utf-8")
+    )
+    groups = {
+        key: value
+        for path in (CONFIG_DIR / "tolerances").glob("*.yaml")
+        if path.stem != "_base"
+        for key, value in yaml.safe_load(path.read_text(encoding="utf-8")).items()
+    }
+    assert _config._doc("tolerances") == {**base, "fits": groups}
+    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "gear_mesh")
+    assert _config.fit("gear_mesh") == groups["gear_mesh"]
+    assert _config.fit("gear_mesh", "rack_backlash_mm") == 0.30
+    with pytest.raises(KeyError, match="outside this build's cache key"):
+        _config.fit("crank_mesh")
+    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "")
+    with pytest.raises(KeyError, match="outside this build's cache key"):
+        _config.fit("gear_mesh")
+    monkeypatch.delenv("HARMONIC_FIT_GROUPS")
+    assert _config.fit("crank_mesh") == groups["crank_mesh"]

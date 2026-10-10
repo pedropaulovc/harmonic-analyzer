@@ -65,7 +65,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _drawing_simplified import save_simplified_part
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _gear import build_fixed_gear, volume_check
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _gtol_spec import CylinderFace

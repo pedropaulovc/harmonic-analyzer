@@ -13,7 +13,7 @@ import build_vn_post_mount_screw as part
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
 import draw_vn_post_mount_screw as drawing
-from _fit_limits import deviations
+from _fit_deviations import deviations
 import vn_post_mount_screw_spec as spec
 from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME

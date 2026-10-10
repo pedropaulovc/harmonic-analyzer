@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 
 import _config
-import _fit_limits
+import _fit_deviations
+import _fit_shaft_h
 import build_ch_pivot_shaft as part
 import draw_ch_pivot_shaft as drawing
 import ch_pivot_bracket_spec
@@ -53,14 +54,14 @@ def test_every_marked_dimension_lands_on_the_side_view() -> None:
 
 
 def test_only_the_running_fit_carries_a_size_band() -> None:
-    assert spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+    assert spec.SHAFT_DIA_BAND is _fit_shaft_h.SHAFT_H
     assert model_toleranced_dimensions(part) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
     }
 
 
 def test_shaft_band_runs_in_the_bracket_bores() -> None:
-    lower, upper = _fit_limits.deviations(spec.SHAFT_DIA_BAND)
+    lower, upper = _fit_deviations.deviations(spec.SHAFT_DIA_BAND)
     clearance_min = ch_pivot_bracket_spec.BORE_DIA - (spec.SHAFT_DIA + upper)
     clearance_max = ch_pivot_bracket_spec.BORE_DIA - (spec.SHAFT_DIA + lower)
     assert round(clearance_min, 2) == 0.15

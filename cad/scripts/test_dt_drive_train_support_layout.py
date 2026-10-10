@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-import _fit_limits
+import _fit_shaft_h
 import _config
 import build_dt_drive_train_assembly as drive
 import pinion_rig_fitup as FITUP
@@ -102,7 +102,7 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     import dt_pinion_spring_geometry as leaf
     import dt_pinion_spring_spec as spring_spec
     import dt_pinion_spring_section as section
-    from _fit_limits import deviations
+    from _fit_deviations import deviations
     from _printed_tolerance import printed_deviations
 
     parked, engaged = drive.SPRING_DEFLECTION
@@ -1123,7 +1123,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # does here (the 1/4 shaft is ruled, the 1/16 pin is the smallest B18.8.2
     # size, the hole band is B18.8.2's window), so the loosest band that clears
     # the 1.5 floor governs.
-    shaft_min = pin.PIVOT_BORE + _fit_limits.SHAFT_H[1]
+    shaft_min = pin.PIVOT_BORE + _fit_shaft_h.SHAFT_H[1]
     assert math.isclose(shaft_min, 6.33, abs_tol=1e-9)
     assert math.isclose(pin.SHAFT_LIGAMENT_CENTRED, (6.33 - 1.6475) / 2.0)
     places = pin.CROSS_HOLE_FROM_BORE_WALL_PLACES

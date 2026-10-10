@@ -71,7 +71,7 @@ from _common import (
     volume_check,
 )
 from sm_summing_lever_spec import HEX_H, HEX_W
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _holes import (
     blind_hole_volume_mm3,
     find_planar_face,

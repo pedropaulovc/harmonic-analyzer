@@ -739,16 +739,32 @@ Each part/assembly depends on ONLY the `cad/config` files it actually reads,
 derived by static analysis of its `_config.<accessor>` calls (`config_files_of`
 in `_buildgraph.py`); `dodo.py` honors it as the file_dep + assembly-recipe set.
 The config is split per-subsystem (`cad/config/machine/<subsystem>.yaml` +
-`_base.yaml`) and per-part (`cad/config/parts/<dashed-name>.yaml` +
-`_defaults.yaml`); `_config._doc` re-aggregates them transparently, so
-accessors/verify/provenance are unchanged. Net: editing one part's registry row
-rebuilds only that part; a `machine channels.active_count` edit (in
-`machine/channels.yaml`) skips the gear parts (they read `machine/gear_train.yaml`);
-the narrative `dimensions.yaml` (read by no part) rebuilds nothing. It is
+`_base.yaml`), per-part (`cad/config/parts/<dashed-name>.yaml` +
+`_defaults.yaml`), and per-fit-group (`cad/config/tolerances/<group>.yaml` +
+`_base.yaml` for units/general classes); `_config._doc` re-aggregates them
+transparently, so accessors/verify/provenance are unchanged. Literal
+`_config.fit("<group>", ...)` reads depend only on that group's file, not the
+general classes; dynamic group reads depend on the whole tolerance family.
+Net: editing one part's registry row rebuilds only that part; a
+`machine channels.active_count` edit (in `machine/channels.yaml`) skips the gear
+parts (they read `machine/gear_train.yaml`); the narrative `dimensions.yaml`
+(read by no part) rebuilds nothing. It is
 CONSERVATIVE — any `_config` use the analyzer can't classify falls back to the
 whole config — so it can only over-rebuild, never skip a real change. Don't add a
 new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
 coverage test fails loud otherwise).
+
+Under doit, `HARMONIC_FIT_GROUPS` carries the fit groups covered by the task's
+config dependencies; `_config.fit` refuses a group outside that set. The
+launcher clears inherited restrictions for unnarrowed tasks, mirroring the
+fastener-row guard. This makes a hidden read fail rather than reuse an artefact
+whose cache key omits the group's input.
+
+Fit helpers are file-granular too: `_fit_deviations.py` owns numerical bands
+and validation, `_fit_ream_slide.py`, `_fit_shaft_h.py`, and `_fit_ream_h7.py`
+own the individual fit classes, and `_fit_text.py` owns drawing text renderers.
+Geometry imports numerical helpers without folding text formatting, and a
+fit-class edit reaches only consumers that import that class.
 
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
 that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF

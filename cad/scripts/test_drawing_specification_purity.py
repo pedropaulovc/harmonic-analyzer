@@ -68,8 +68,8 @@ def test_detector_does_not_treat_unbanded_f_strings_as_tolerances(value: str) ->
 
 def test_detector_finds_fit_renderers_through_import_aliases() -> None:
     source = """
-from _fit_limits import fit_limits as limits
-import _fit_limits as bands
+from _fit_text import fit_limits as limits
+import _fit_text as bands
 
 FIRST = limits(6.0, (-0.1, 0.1))
 SECOND = bands.band_text((-0.1, 0.1))

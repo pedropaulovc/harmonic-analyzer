@@ -59,7 +59,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from cylinder_bank_layout import ARBOR_DOME_HEIGHT, ARBOR_LENGTH
 from dt_cylinder_gear_shaft_spec import (

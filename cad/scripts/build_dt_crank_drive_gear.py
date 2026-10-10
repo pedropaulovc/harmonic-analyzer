@@ -85,7 +85,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _drawing_simplified import save_simplified_part
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
 from dt_crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA

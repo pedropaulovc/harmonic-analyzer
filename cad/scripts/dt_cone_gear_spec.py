@@ -5,7 +5,7 @@ package gives every configuration its own complete sheet: configuration-owned
 tip and bore diameters, common face width, and a native driving tooth-thickness
 dimension with the cone-specific deepened-mesh band.
 
-This module stays free of tolerances.yaml because assemblies import it.  The
+This module stays free of tolerances/ because assemblies import it.  The
 bore bands -- the round bore and its across-flat -- derive from the shaft's
 land bands (cone_shaft_land_bands) through the gear seat fit (gear_seat_fit),
 two small import-free modules; every other band is a cone-specific constant.
@@ -71,7 +71,7 @@ STANDARD_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 # 0.023 mm at the drum pitch line, on T006; <= 0.004 on the rest).
 MESH_BACKLASH_MIN_MM = 0.06
 # (upper, lower) about the modelled mid thickness.  The 0.15 window is the
-# configured cone<->cylinder backlash window (tolerances.yaml gear_mesh
+# configured cone<->cylinder backlash window (tolerances/gear_mesh.yaml
 # 0.05..0.20) that error_budget.yaml's tooth-thickness mesh-lag term is
 # derived from.
 TOOTH_THICKNESS_BAND = (0.075, -0.075)

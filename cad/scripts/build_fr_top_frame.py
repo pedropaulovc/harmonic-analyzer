@@ -162,7 +162,7 @@ from fr_frame_attachment_spec import (
     SCREW_SPOTFACE_DIAMETER,
     TOP_SCREW_SEAT_Z,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
 
 import _telemetry
