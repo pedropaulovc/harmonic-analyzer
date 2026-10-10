@@ -35,7 +35,7 @@ from _printed_tolerance import drilled_oversize_mm
 # general tolerance; its ends stay clear of the bridge's stud nuts.
 LEDGE_WIDTH = 22.6
 LEDGE_THICK = bracket.FOOT_H  # 6.0
-# 26.5, under the shorter S foot
+# 27.7, under the shorter S foot at the stack's worst case (angle-plate spec)
 LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)
 SIZE_PLACES = 1
 if LEDGE_WIDTH < bracket.FOOT_W:
@@ -51,7 +51,7 @@ HOLE_X = (
     round(LEDGE_WIDTH / 2.0 - plate.SCREW_HALF_PITCH, 6),
     round(LEDGE_WIDTH / 2.0 + plate.SCREW_HALF_PITCH, 6),
 )
-HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 17.5
+HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 18.7
 HOLE_X_PLACES = 1
 HOLE_Y_PLACES = 1
 HOLE_DIA = blind_cut_dia_mm(CLEARANCE_SPEC)

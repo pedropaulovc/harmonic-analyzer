@@ -53,26 +53,43 @@ CENTRE_X = PLATE_LENGTH / 2.0
 # (both feet end flush with the support), so one ledge serves both: sized
 # for the shorter S foot, it stands the N bracket N_RAISE prouder, which only
 # widens the cutter's margin over the upright. The plan touches Z on the part.
-# The ledge prints its height at one place, so the stack is built on that
-# printed height, rounded up off the 4 mm floor.
+# The 4 mm floor holds at the stack's worst case (CodeRabbit on 3d649fd90):
+# the ledge at its printed one-place low limit, the S foot at its -0.10, and
+# the plate PLATE_HEIGHT_ALLOWANCE taller than nominal. The plate is bought
+# and its height is reference, never inspected; 0.25 (about 0.010 in) is an
+# assumed allowance for a machined angle plate's height, which also covers
+# the stud row's top wall below.
 LEDGE_CONFIG = "S"
 PART_PROUD_MIN = 4.0
+PLATE_HEIGHT_ALLOWANCE = 0.25
 BLOCK_HEIGHT = 50.8
-_LEDGE_HEIGHT_MIN = (
-    PLATE_HEIGHT + PART_PROUD_MIN - sides.FOOT_LEN[LEDGE_CONFIG] - BLOCK_HEIGHT
+_LEDGE_HEIGHT_FLOOR = (
+    PLATE_HEIGHT
+    + PLATE_HEIGHT_ALLOWANCE
+    + PART_PROUD_MIN
+    - (sides.FOOT_LEN[LEDGE_CONFIG] - bracket.FOOT_LEN_BAND)
+    - BLOCK_HEIGHT
 )
-_LEDGE_HEIGHT = math.ceil(round(_LEDGE_HEIGHT_MIN * 10.0, 6)) / 10.0
-LEDGE_TOP_Y = round(BLOCK_HEIGHT + _LEDGE_HEIGHT, 6)  # 77.3
+_LEDGE_BAND = _LEDGE_HEIGHT_FLOOR - limits(_LEDGE_HEIGHT_FLOOR, 1)[0]
+_LEDGE_HEIGHT = math.ceil(round((_LEDGE_HEIGHT_FLOOR + _LEDGE_BAND) * 10.0, 6)) / 10.0
+LEDGE_TOP_Y = round(BLOCK_HEIGHT + _LEDGE_HEIGHT, 6)  # 78.5
 PART_PROUD = {
     name: LEDGE_TOP_Y + foot_len - PLATE_HEIGHT
     for name, foot_len in sides.FOOT_LEN.items()
-}  # S 4.04, N 5.74
+}  # S 5.24, N 6.94
 N_RAISE = PART_PROUD["N"] - PART_PROUD[LEDGE_CONFIG]  # 1.70
+PART_PROUD_WORST = (
+    BLOCK_HEIGHT
+    + limits(_LEDGE_HEIGHT, 1)[0]
+    + sides.FOOT_LEN[LEDGE_CONFIG]
+    - bracket.FOOT_LEN_BAND
+    - (PLATE_HEIGHT + PLATE_HEIGHT_ALLOWANCE)
+)  # 4.09
 if (
     min(PART_PROUD.values()) != PART_PROUD[LEDGE_CONFIG]
-    or PART_PROUD[LEDGE_CONFIG] < PART_PROUD_MIN
+    or PART_PROUD_WORST < PART_PROUD_MIN
 ):
-    raise AssertionError("the ledge must stand the shorter foot's bracket 4 mm proud")
+    raise AssertionError("the ledge must stand the shorter foot's bracket 4 mm proud at worst case")
 
 # Ledge screws: two #10-24 x 5/8 SHCS (shop-to-shop UNC, fastener policy) at
 # 9.0 under the ledge top, 10.0 apart about the plate centre: wide enough that
@@ -95,7 +112,7 @@ SCREW_HEAD_ECCENTRICITY_MAX = 0.006 * 25.4 / 2.0  # 0.0762
 SCREW_HEAD_GAP_MIN = 0.3
 SCREW_HALF_PITCH = 5.0
 SCREW_BELOW_LEDGE_TOP = 9.0
-SCREW_Y = round(LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP, 6)  # 68.3
+SCREW_Y = round(LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP, 6)  # 69.5
 TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 
 # Bridge studs: 3/8-16 studs through letter-X clearance holes, 40.0 apart
@@ -105,15 +122,16 @@ TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 # carries on flush with the foot top. That run's centre is out of reach (its
 # stud hole would break the upright's top wall), so the studs stand at the
 # highest one-place row whose hole keeps the 2.0 wall at the exported worst
-# case (the row at its .X high limit, the drill at its printed 10.08 +0.10):
-# 81.0, 7.9 under the plate top, leaving 2.01 (81.1 would leave 1.91).
+# case (the row at its .X high limit, the drill at its printed 10.08 +0.10,
+# the plate PLATE_HEIGHT_ALLOWANCE short): 80.7, 8.2 under the nominal plate
+# top, leaving 2.06 (80.8 would leave 1.96).
 # STUD_BELOW_PART_TOP under each configuration's outer face (the prechips S4
-# hold's Setup Z, S -11.94, N -13.64). A bar up to 2 * (11.94 - EAR_T) = 11.8
+# hold's Setup Z, S -13.44, N -15.14). A bar up to 2 * (13.44 - EAR_T) = 14.9
 # wide clears the S ear.
 STUD_DIA = 9.525
 STUD_SPEC = HoleSpec("drilled_letter", "X")
 STUD_HALF_PITCH = 20.0
-STUD_Y = 81.0
+STUD_Y = 80.7
 STUD_BELOW_PART_TOP = {
     name: PLATE_HEIGHT + proud - STUD_Y for name, proud in PART_PROUD.items()
 }
@@ -193,10 +211,12 @@ _DRILLED = (drilled_oversize_mm(), 0.0)
 TAP_DRILL_PLACES = 2
 TAP_DRILL_PRINTED = round(_TAP_DRILL, TAP_DRILL_PLACES)
 # The stud row's wall to the upright's top edge at the bands it exports: the
-# row at its one-place high limit, the hole at its printed drill's high limit
-# (Codex P2 on cc1d22b66: the 81.5 row left 1.51).
+# row at its one-place high limit, the hole at its printed drill's high limit,
+# the plate PLATE_HEIGHT_ALLOWANCE short (Codex P2 on cc1d22b66: the 81.5 row
+# left 1.51; CodeRabbit on 3d649fd90: the bought plate's height is unprinted).
 STUD_TOP_WALL_MIN = (
     PLATE_HEIGHT
+    - PLATE_HEIGHT_ALLOWANCE
     - _station(STUD_Y)[1]
     - limits(STUD_DIA_PRINTED, STUD_DIA_PLACES, _DRILLED)[1] / 2.0
 )

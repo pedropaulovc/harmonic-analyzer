@@ -18,13 +18,15 @@ from _hole_spec import THREAD_MAJOR_MM
 # follow-on 67237b9, examples/inventory/pedro-shop.toml [fixtures.angle-plate]
 # and examples/pivot-bracket/plan.toml [setups.hold]), in Setup frame TC for
 # the S configuration (the shorter foot the ledge is sized for): Z0 is the
-# bracket's faced outer face, 4.04 proud of the plate top. The 2026-10-09
-# flip moved every row; the prechips plan follows these.
-PRECHIPS_PART_PROUD = 4.04
-PRECHIPS_TABLE_Z = -92.94  # base box bottom
-PRECHIPS_LEDGE_Z = (-42.14, -15.64)  # bolted foot-end ledge box, 26.5 high
+# bracket's faced outer face, 5.24 proud of the plate top. The 2026-10-09
+# flip moved every row, and the worst-case 4 mm floor (CodeRabbit on
+# 3d649fd90) raised the ledge and lowered the studs; the prechips plan
+# follows these.
+PRECHIPS_PART_PROUD = 5.24
+PRECHIPS_TABLE_Z = -94.14  # base box bottom
+PRECHIPS_LEDGE_Z = (-43.34, -15.64)  # bolted foot-end ledge box, 27.7 high
 PRECHIPS_SCREW_Z = -24.64  # ledge screws, clearance and tapped holes
-PRECHIPS_STUD_Z = -11.94  # bridge stud holes (the bridge's Setup Z)
+PRECHIPS_STUD_Z = -13.44  # bridge stud holes (the bridge's Setup Z)
 
 
 def _features() -> dict:
@@ -32,8 +34,8 @@ def _features() -> dict:
 
 
 def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
-    """BR-B1 (#1262): the part stands at least 4 mm proud, so the ledge is
-    26.5 high with its holes 17.5 off its bottom, and the plate's taps and studs sit at
+    """BR-B1 (#1262): the part stands at least 4 mm proud at the stack's worst
+    case, so the ledge is 27.7 high with its holes 18.7 off its bottom, and the plate's taps and studs sit at
     the prechips hold's Z rows. Each printed value is held here, independently
     of the specs, and checked with its one-place band."""
     assert round(plate.PART_PROUD[plate.LEDGE_CONFIG], 2) == PRECHIPS_PART_PROUD
@@ -45,7 +47,7 @@ def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
     hole_y = round(PRECHIPS_SCREW_Z - PRECHIPS_LEDGE_Z[0], 1)
     tap_y = round(PRECHIPS_SCREW_Z - PRECHIPS_TABLE_Z, 1)
     stud_y = round(PRECHIPS_STUD_Z - PRECHIPS_TABLE_Z, 1)
-    assert (height, hole_y, tap_y, stud_y) == (26.5, 17.5, 68.3, 81.0)
+    assert (height, hole_y, tap_y, stud_y) == (27.7, 18.7, 69.5, 80.7)
     rest = ledge["foot_rest"]
     assert (rest["height_nominal"], rest["height"]) == (height, limits(height, 1))
     for side in ("left", "right"):

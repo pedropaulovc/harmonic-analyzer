@@ -119,10 +119,12 @@ def test_stud_holes_clear_the_bracket_foot() -> None:
 
 def test_stud_holes_keep_the_top_wall_at_the_exported_worst_case() -> None:
     """Codex P2 on cc1d22b66: the 81.5 row left 1.51 under the upright's top
-    edge with the row and the drill at their exported high limits."""
+    edge with the row and the drill at their exported high limits; CodeRabbit
+    on 3d649fd90: the bought plate may also stand its allowance short."""
     for side in ("left", "right"):
         stud = _features()[f"stud_hole_{side}"]
-        wall = spec.PLATE_HEIGHT - stud["height"][1] - stud["dia"][1] / 2.0
+        plate_min = spec.PLATE_HEIGHT - spec.PLATE_HEIGHT_ALLOWANCE
+        wall = plate_min - stud["height"][1] - stud["dia"][1] / 2.0
         assert wall == pytest.approx(spec.STUD_TOP_WALL_MIN)
         assert wall >= 2.0
 
