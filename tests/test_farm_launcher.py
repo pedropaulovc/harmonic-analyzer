@@ -1922,12 +1922,7 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
         parent.kill()
         parent.communicate(timeout=HANG_GUARD_S)
         raise
-    assert parent.returncode == 0, (output, errors)
     parent_pid, child = json.loads(output)
-    # These stdlib-only collaborators use the base executable, not a venv
-    # redirector: the retained handles identify the actual Python processes.
-    assert parent_pid == parent.pid
-    assert not _process_alive(parent_pid)
 
     # Keep this exact sleeper's handle: cleanup must not kill a different
     # process if the sleeper exits and its numeric PID is later reused.
@@ -1946,6 +1941,11 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     handle = kernel32.OpenProcess(0x100001, False, child)  # SYNCHRONIZE | TERMINATE
     assert handle, ctypes.get_last_error()
     try:
+        assert parent.returncode == 0, (output, errors)
+        # These stdlib-only collaborators use the base executable, not a venv
+        # redirector: the retained handles identify the actual Python processes.
+        assert parent_pid == parent.pid
+        assert not _process_alive(parent_pid)
         _write_run_record(
             fixture,
             pid=parent_pid,

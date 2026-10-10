@@ -16,7 +16,6 @@ import time
 from pathlib import Path
 import sys
 from types import ModuleType
-from typing import NamedTuple
 
 import pytest
 
@@ -705,124 +704,61 @@ def test_execution_identity_tracker_migrates_missing_and_legacy_tokens(tmp_path)
     assert tracker(None, {}) is True
 
 
-class _AssemblyHelperInputs(NamedTuple):
-    """Only immutable source bytes and root-relative dependency/target paths."""
-
-    recipes: tuple[tuple[str, tuple[Path, ...]], ...]
-    part_deps: tuple[tuple[str, tuple[Path, ...]], ...]
-    assembly_deps: tuple[tuple[str, tuple[Path, ...]], ...]
-    targets: tuple[Path, ...]
-    contents: tuple[tuple[Path, bytes | None], ...]
-
-
-@pytest.fixture(scope="module")
-def _assembly_helper_inputs(tmp_path_factory):
-    """Discover the unchanged real source inputs once for the mutation cases."""
-    import _buildgraph
-
-    dodo = _load_dodo()
-    root = tmp_path_factory.mktemp("assembly-helper-inputs").resolve()
-    # Discovery may emit catalog sidecars. Keep even this read-only baseline's
-    # generated inputs in a sandbox; retain neither dodo nor any task dictionaries.
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setenv("HARMONIC_EXECUTOR", "local")
-        patch.setattr(dodo, "CAD_OUT", root / "cad" / "out")
-        patch.setattr(_buildgraph, "CAD_OUT", dodo.CAD_OUT)
-        for tier in ("part", "assembly"):
-            sidecar = root / f".adapter-{tier}.digest"
-            sidecar.write_text(f"fixed {tier} adapter input\n", encoding="utf-8")
-            patch.setattr(
-                dodo, f"_submodule_{tier}_dep", lambda path=str(sidecar): path
-            )
-
-        assembly_recipes = {
-            stem: dodo._recipe_files(stem) for stem in dodo.ASSEMBLY_ORDER
-        }
-        part_tasks = {task["name"]: task for task in dodo.task_part()}
-        assembly_tasks = {task["name"]: task for task in dodo.task_assembly()}
-        sources = {
-            path for recipe in assembly_recipes.values() for path in recipe
-        } | {path for task in part_tasks.values() for path in task["file_dep"]}
-
-        def relative(path):
-            original = Path(path).resolve()
-            return original.relative_to(
-                root if original.is_relative_to(root) else REPO_ROOT
-            )
-
-        for task in (*part_tasks.values(), *assembly_tasks.values()):
-            for target in task["targets"]:
-                assert Path(target).resolve().is_relative_to(root), target
-
-        return _AssemblyHelperInputs(
-            recipes=tuple(
-                (stem, tuple(relative(path) for path in paths))
-                for stem, paths in assembly_recipes.items()
-            ),
-            part_deps=tuple(
-                (stem, tuple(relative(path) for path in task["file_dep"]))
-                for stem, task in part_tasks.items()
-            ),
-            assembly_deps=tuple(
-                (stem, tuple(relative(path) for path in task["file_dep"]))
-                for stem, task in assembly_tasks.items()
-            ),
-            targets=tuple(
-                relative(target)
-                for task in (*part_tasks.values(), *assembly_tasks.values())
-                for target in task["targets"]
-            ),
-            contents=tuple(
-                (
-                    relative(path),
-                    Path(path).read_bytes() if Path(path).exists() else None,
-                )
-                for path in sorted(sources)
-            ),
-        )
-
-
 @pytest.fixture
-def isolated_assembly_helper_keys(tmp_path, monkeypatch, _assembly_helper_inputs):
-    """Copy immutable real inputs into fresh roots with fresh dodo/task state.
+def isolated_assembly_helper_keys(tmp_path, monkeypatch):
+    """Real discovered dependency sets and key functions, copied input bytes only.
 
-    All artifacts, execution tokens, and synthetic adapter dependencies live
-    under this fixture; changing a helper cannot race a concurrent CAD build.
+    Discovery reads source but never native outputs. All artifacts, execution
+    tokens, and synthetic adapter dependencies live under this fixture before
+    task generation; changing a helper cannot race a concurrent CAD build.
     """
     import _buildgraph
 
-    inputs = _assembly_helper_inputs
     dodo = _load_dodo()
-    fixture_root = (tmp_path / "repo").resolve()
+    fixture_root = tmp_path / "repo"
     fixture_root.mkdir()
     monkeypatch.setattr(dodo, "CAD_OUT", fixture_root / "cad" / "out")
     monkeypatch.setattr(_buildgraph, "CAD_OUT", dodo.CAD_OUT)
-    for relative, content in inputs.contents:
-        copied = fixture_root / relative
-        assert copied.resolve().is_relative_to(fixture_root)
-        copied.parent.mkdir(parents=True, exist_ok=True)
-        if content is not None:
-            copied.write_bytes(content)
     for tier in ("part", "assembly"):
         sidecar = fixture_root / f".adapter-{tier}.digest"
-        assert sidecar.is_file(), sidecar
+        sidecar.write_text(f"fixed {tier} adapter input\n", encoding="utf-8")
         monkeypatch.setattr(
             dodo, f"_submodule_{tier}_dep", lambda path=str(sidecar): path
         )
 
-    for relative in inputs.targets:
-        path = fixture_root / relative
-        assert path.resolve().is_relative_to(fixture_root), path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(b"a" * 64 + b"\n")
+    assembly_recipes = {stem: dodo._recipe_files(stem) for stem in dodo.ASSEMBLY_ORDER}
+    part_tasks = {task["name"]: task for task in dodo.task_part()}
+    assembly_tasks = {task["name"]: task for task in dodo.task_assembly()}
+    sources = {path for recipe in assembly_recipes.values() for path in recipe} | {
+        path for task in part_tasks.values() for path in task["file_dep"]
+    }
+    mapped = {}
+    for path in sources:
+        original = Path(path).resolve()
+        if original.is_relative_to(fixture_root):
+            mapped[path] = str(original)
+            continue
+        copied = fixture_root / original.relative_to(REPO_ROOT)
+        assert copied.resolve().is_relative_to(fixture_root.resolve())
+        copied.parent.mkdir(parents=True, exist_ok=True)
+        if original.exists():
+            copied.write_bytes(original.read_bytes())
+        mapped[path] = str(copied)
+
+    for task in [*part_tasks.values(), *assembly_tasks.values()]:
+        for target in task["targets"]:
+            path = Path(target)
+            assert path.resolve().is_relative_to(fixture_root.resolve()), path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"a" * 64 + b"\n")
 
     recipes = {
-        stem: [str(fixture_root / path) for path in paths]
-        for stem, paths in inputs.recipes
+        stem: [mapped[path] for path in paths]
+        for stem, paths in assembly_recipes.items()
     }
     part_deps = {
-        stem: [str(fixture_root / path) for path in paths]
-        for stem, paths in inputs.part_deps
+        stem: [mapped[path] for path in task["file_dep"]]
+        for stem, task in part_tasks.items()
     }
     monkeypatch.setattr(dodo, "_recipe_files", lambda stem: recipes[stem])
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, stem: part_deps[stem])
@@ -830,15 +766,15 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch, _assembly_helper_inputs
     monkeypatch.setattr(dodo._cache, "REPO_ROOT", fixture_root)
     dodo._ARTEFACT_INDEX = None
     dodo._ARTEFACT_DIGEST_MEMO.clear()
-    for stem, paths in inputs.assembly_deps:
+    for stem, task in assembly_tasks.items():
         assert dodo._assembly_file_deps(stem) == [
-            str(fixture_root / path) for path in paths
+            mapped.get(path, path) for path in task["file_dep"]
         ]
 
     def snapshot():
         dodo._ARTEFACT_DIGEST_MEMO.clear()
-        # Generate fresh tasks after redirecting recipe paths; only immutable
-        # dependency/target facts were retained from baseline discovery.
+        # Generate again after redirecting recipe paths; the discovery-time
+        # assembly_tasks above are used only to initialize isolated targets.
         current_assembly_tasks = {task["name"]: task for task in dodo.task_assembly()}
         for stem, task in current_assembly_tasks.items():
             assert task["file_dep"] == dodo._assembly_file_deps(stem)
