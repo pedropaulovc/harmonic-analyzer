@@ -364,14 +364,22 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     """MHA-VN-015 bounds the DISENGAGE swing; the engaged mesh is set at
-    assembly on a feeler and locked by MHA-VN-013, never by the stop."""
+    assembly (cone_set_stack): pedestals snug-loose, shims at T012 and T120,
+    pedestals tightened, then the T120 feeler and MHA-VN-013 -- never the stop."""
+    import cone_set_stack as set_stack
+
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    t012 = f"{set_stack.feeler_gap_mm(12):.2f} AT T012"
+    t120 = f"{set_stack.feeler_gap_mm(120):.2f} AT T120"
     order = [
         check.index("TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012"),
-        check.index("SWING IT BACK IN"),
-        check.index("TIGHTEST OF THE"),
-        check.index("CLOSES ON A FEELER"),
+        check.index("(MHA-VN-032) TO SNUG-LOOSE"),
+        check.index(t012),
+        check.index(t120),
+        check.index("TIGHTEN MHA-VN-032"),
+        check.index(f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-VN-013"),
+        check.index("DO NOT LOOSEN MHA-DT-002 AFTER THIS SET; IF YOU DO, REDO BOTH STEPS"),
     ]
     assert order == sorted(order), check
     assert "RETURN IT TO THE MHA-VN-015" not in check

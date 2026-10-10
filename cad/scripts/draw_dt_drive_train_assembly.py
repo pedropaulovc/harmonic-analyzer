@@ -30,7 +30,9 @@ import _seat_forensics
 import _telemetry
 import ch_connecting_rod_spec as rod
 import cone_line
+import cone_set_stack as set_stack
 import cylinder_bank_layout as bank
+import dt_mesh_checks as mesh_checks
 import dt_drive_train_steps as steps
 import dt_crank_drive_gear_spec as gear64
 import dt_crank_pinion_spec as pinion
@@ -755,7 +757,8 @@ BANK_STEPS = _note_text(
         "   V-BLOCKS ON PARALLELS OFF THE BASE, RODS HANGING FREE. DRILL AND",
         "   TAP AS 9A. PASS THE MANDREL BACK THROUGH THE BACK MHA-DT-002, PUSH",
         "   THE BANK BACK AND PROP IT AS 9B. REFIT THE FRONT MHA-DT-002; RE-SET",
-        "   THE LEAF AND X, TIGHTEN MHA-VN-032 AND RECHECK.",
+        "   THE LEAF AND X, TIGHTEN MHA-VN-032 AND RECHECK. DRO STILL ZEROED,",
+        "   DRILL AND TAP THE MHA-FR-001 PIVOT SEAT PER ITS PRINT NOTE.",
         "9D. MEASURE MHA-DT-002 OUTER FACE TO OUTER FACE. TURN MHA-DT-013: ITS",
         f"   CYLINDER IS THAT SPAN, PLUS A {bank.ARBOR_DOME_HEIGHT:.1f} DOME EACH END (SEE ITS PRINT).",
         "9E. PUSH MHA-DT-013 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
@@ -916,11 +919,23 @@ CHECKS = _note_text(
         f"   {RING_ON_CAM_PERCENT}% OF THE RING WIDTH STAYS ON THE CAM).",
         # MHA-VN-015 is the DISENGAGED stop only (build_cone_swing_platform
         # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
-        # it. The engaged mesh is SET here with MHA-VN-013, not by the stop.
-        "4. CONE SWING (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON MHA-VN-014 TO",
-        "   THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. SWING IT BACK IN UNTIL",
-        "   THE TIGHTEST OF THE {cone_gears} MESHES CLOSES ON A FEELER (OR SHOWS",
-        "   JUST-POSITIVE BACKLASH); HOLD IT THERE AND TIGHTEN MHA-VN-013.",
+        # it. The engaged mesh is SET here with MHA-VN-013, not by the stop:
+        # cone_set_stack (user ruling 2026-10-10). The shims line MHA-DT-013
+        # up with the cone line before the pedestals tighten (Main ruling:
+        # pedestal term booked at zero), then T120 is set on its feeler.
+        "4. CONE SWING SET (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON MHA-VN-014",
+        "   TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. EASE THE MHA-DT-002",
+        "   SCREWS (MHA-VN-032) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS, TIP TO",
+        f"   MHA-DT-012 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
+        f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-VN-032.",
+        f"   SWING IN UNTIL A {set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT;",
+        "   HOLD IT THERE AND TIGHTEN MHA-VN-013. DO NOT LOOSEN MHA-DT-002 AFTER",
+        "   THIS SET; IF YOU DO, REDO BOTH STEPS.",
+        # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
+        # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
+        "   IF T012 BINDS AFTER THE SET (WORST-CORNER OVERLAP "
+        f"{-mesh_checks.cone_check(12).interference_margin_worst_mm:.2f} REF), BACK",
+        "   THE SWING OFF OR STONE THE T012 TIP.",
         "   VERIFY MHA-VN-014 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; SHOULDER FULLY SEATED.",
         "   VERIFY MHA-VN-015 FULL-FORM THREAD ENGAGEMENT "

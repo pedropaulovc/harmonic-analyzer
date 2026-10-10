@@ -283,16 +283,17 @@ if abs(Z_DRUM0 - CHANNEL_Z0) > 1e-9:
 # True-cone incline (M6.7, exact tracking -- see module docstring): SIN_I,
 # COS_I, TAN_I, SEC_I, INCLINE_DEG and SEAT_PITCH come from cone_line.
 
-from dt_cone_gear_spec import BLANK_DIA_BAND as CONE_GEAR_BLANK_DIA_BAND  # noqa: E402
+from dt_cone_gear_spec import blank_dia_band as cone_gear_blank_dia_band  # noqa: E402
 from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH  # noqa: E402
 from dt_cone_gear_spec import FACE_WIDTH_BAND as CONE_GEAR_FACE_WIDTH_BAND  # noqa: E402
 from dt_cone_gear_spec import outside_dia_mm as cone_gear_outside_dia_mm  # noqa: E402
+import alignment_mesh_check  # noqa: E402
 import dt_mesh_checks  # noqa: E402
 
 # Closed-form standard checks of the drum meshes, logged by build(); the
 # native interference/soundness gate checks the real flanks.
 CONE_MESH_CHECKS = dt_mesh_checks.cone_checks()
-ALIGNMENT_MESH_CHECK = dt_mesh_checks.alignment_check()
+ALIGNMENT_MESH_CHECK = alignment_mesh_check.alignment_check()
 
 
 def _cone_tip_radius_max(teeth: int) -> float:
@@ -302,7 +303,7 @@ def _cone_tip_radius_max(teeth: int) -> float:
     not the standard pitch radius + addendum; clearance checks use the
     printed outside diameter at its upper limit.
     """
-    return (cone_gear_outside_dia_mm(teeth) + CONE_GEAR_BLANK_DIA_BAND[0]) / 2.0
+    return (cone_gear_outside_dia_mm(teeth) + cone_gear_blank_dia_band(teeth)[0]) / 2.0
 
 # Cone gear face (dt_cone_gear_spec.FACE_WIDTH = 6.8887: the seat pitch floored
 # to the four places it prints).  The cone set is a SOLID STACK (user ruling
@@ -1014,13 +1015,16 @@ from dt_cone_swing_platform_spec import (  # noqa: E402
     PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
     PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
     PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
-    PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
     POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS,
     POST_MOUNT_SPEC,
     POST_MOUNT_STATION_TOL_MM as PLAT_POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_EDGE_BREAK,
     POST_MOUNT_THREAD_DIA,
 
+)
+from dt_cone_swing_platform_pivot_spec import (  # noqa: E402
+    PIVOT_HOLE_BAND as PLAT_PIVOT_HOLE_BAND,
+    PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
 )
 from vn_post_mount_screw_spec import (  # noqa: E402
     CUT_LENGTH_MM as POST_SCREW_LEN,
@@ -1036,6 +1040,7 @@ from vn_cone_lock_knob_spec import (  # noqa: E402
 from vn_cone_pivot_screw_spec import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
+    SHOULDER_DIA_BAND as PSCREW_SHOULDER_DIA_BAND,
     SHOULDER_LEN as PSCREW_SHOULDER_LEN,
     THREAD as PSCREW_THREAD,
     THREAD_TAIL_LEN as PSCREW_THREAD_TAIL_LEN,
@@ -2455,8 +2460,14 @@ if (
         f"harmonic-base pivot-screw hole {BASE_PIVOT_XZ} != machine swing pivot "
         f"({_PPIVOT[0]!r}, {_PPIVOT[2]!r})"
     )
-if PLAT_PIVOT_HOLE_DIA <= PSCREW_SHOULDER_DIA:
-    raise AssertionError("platform pivot hole does not clear the screw shoulder")
+# The plate's reamed pivot bore runs on the stock shoulder as an H/h location
+# fit: least clearance zero at both maximum-material limits (bore at its
+# minimum, shoulder at its maximum), never negative (cone_set_stack).
+if (
+    PLAT_PIVOT_HOLE_DIA + PLAT_PIVOT_HOLE_BAND[1]
+    < PSCREW_SHOULDER_DIA + PSCREW_SHOULDER_DIA_BAND[0] - 1e-9
+):
+    raise AssertionError("platform pivot bore does not clear the screw shoulder")
 if abs(PSCREW_SHOULDER_LEN - PLAT_PIVOT_BEARING_T - 0.25) > 1e-9:
     raise AssertionError("pivot screw no longer provides 0.25 axial plate clearance")
 if (
@@ -2492,15 +2503,16 @@ POST_BOSS_FACE_AXIAL_BAND_MM = (
     + tip_printed_band_mm(POST_DRAWING_PRECISION["ConeBossLen"]) / 2.0
 )
 # Pivot-screw head vs the block's plain north face: the head stands on its
-# shoulder at PIVOT_STATION and floats in the plate's drilled pivot hole; the
-# north face moves by the hold-down band.  Nothing of the shaft enters, since
-# the block does not follow the tip.
+# shoulder at PIVOT_STATION and floats in the plate's reamed pivot bore by
+# the fit's largest radial play; the north face moves by the hold-down band.
+# Nothing of the shaft enters, since the block does not follow the tip.
 PIVOT_HEAD_AIR = 0.20
 PIVOT_HEAD_NOMINAL_GAP = (
     PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)
 ) - PSCREW_HEAD_DIA / 2.0
 PIVOT_HEAD_FLOAT = (
-    PLAT_PIVOT_HOLE_DIA + _DRILLED_HOLE_PLUS_MM - PSCREW_SHOULDER_DIA
+    PLAT_PIVOT_HOLE_DIA + PLAT_PIVOT_HOLE_BAND[0]
+    - (PSCREW_SHOULDER_DIA + PSCREW_SHOULDER_DIA_BAND[1])
 ) / 2.0
 
 
@@ -4497,13 +4509,13 @@ def _require_collar_pin_in_collar_hole(adapter, pin: str, collar: str) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    for check in (*CONE_MESH_CHECKS, ALIGNMENT_MESH_CHECK, CRANK_MESH_CHECK):
-        _telemetry.info("standard mesh check: " + check.text())
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
+    for mesh_check in (*CONE_MESH_CHECKS, ALIGNMENT_MESH_CHECK, CRANK_MESH_CHECK):
+        _telemetry.info("standard mesh check: " + mesh_check.text())
     for feature, clearance in GEAR64_POST_CLEARANCES.items():
         _telemetry.info(
             f"64T/restored post {feature}: worst clearance {clearance:.4f} "
