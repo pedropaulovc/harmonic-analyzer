@@ -56,12 +56,14 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_prefix,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from ch_fulcrum_shaft_spec import (
     ACROSS_FLAT,
     CYLINDER_HALF,
+    DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -407,6 +409,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # Decimal places belong to the model dimension, not to the sheet.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
+        set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

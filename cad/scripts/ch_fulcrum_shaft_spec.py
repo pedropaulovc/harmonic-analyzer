@@ -142,8 +142,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Decimal places are the tolerance statement (policy rule 2); the model owns
 # them. ShaftDia carries its SHAFT_H band natively; AcrossFlat at .XXX holds
-# FLAT_CHORD_MIN above the set screw's major; FlatFromEnd and FlatPitch at
-# .XXX hold FLAT_STATION_WINDOW_MM open.
+# FLAT_CHORD_MIN above the set screw's major. OverallLength at .XX and
+# FlatFromEnd and FlatPitch at .XXX hold FLAT_STATION_WINDOW_MM (0.14) open;
+# one place looser on any one of them closes it (.X OverallLength -0.15,
+# .XX FlatFromEnd -0.24, .XX FlatPitch -0.13; machinist review r8).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDia": 3, "OverallLength": 2},
     "FlatProfile": {"FlatLength": 1, "FlatFromEnd": 3, "FlatPitch": 3, "AcrossFlat": 3},
@@ -154,6 +156,12 @@ if {
     raise AssertionError(
         "DRAWING_PRECISION and DRAWING_DIMENSIONS must name the same dims"
     )
+# One flat length and one across-flat size govern both flats (the cut sketch
+# carries one of each), so each prints "2X".
+DIMENSION_PREFIXES = {
+    ("FlatProfile", "FlatLength"): "2X ",
+    ("FlatProfile", "AcrossFlat"): "2X ",
+}
 
 
 # --- Flat stations, at the worst case of every printed band and of the

@@ -16,7 +16,12 @@ SPEC = DRAWINGS_BY_NAME["vn_fulcrum_set_screw"]
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    # At 8:1 the #1-72 thread's and the socket's hidden edges filled the
+    # front and right views with dashes that order and install nothing
+    # (machinist review r8); the SKU defines the part.
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, hidden_lines_removed=True
+    )
 
 
 def _parse_args() -> argparse.Namespace:

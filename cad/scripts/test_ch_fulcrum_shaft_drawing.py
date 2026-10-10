@@ -82,6 +82,73 @@ def test_flat_pair_is_located_from_the_end() -> None:
     assert "FlatStation" not in source
 
 
+def _station_window(spec) -> float:
+    return min(
+        spec._worst(spec._sum((1, high), (-1, low)))
+        for high in spec._T_HIGH.values()
+        for low in spec._T_LOW.values()
+    )
+
+
+def test_no_station_dimension_can_drop_a_place(monkeypatch) -> None:
+    # Machinist review r8 asked for .X on 161.35 and .XX on 4.925 / 148.000.
+    # Each one-place loosening, alone, closes the flat-station window (policy
+    # rule 12), so all three keep their places.
+    spec = ch_fulcrum_shaft_spec
+    assert math.isclose(_station_window(spec), spec.FLAT_STATION_WINDOW_MM)
+    assert spec.DRAWING_PRECISION["ShaftProfile"]["OverallLength"] == 2
+    looser = {"length": 0.8, "flat_from_end": 0.51, "flat_pitch": 0.51}
+    closed = {}
+    for key, band in looser.items():
+        with monkeypatch.context() as patch:
+            patch.setitem(spec._STATION_BANDS, key, band)
+            closed[key] = round(_station_window(spec), 3)
+    assert closed == {"length": -0.15, "flat_from_end": -0.24, "flat_pitch": -0.128}
+
+
+def test_both_flats_print_one_length_and_one_across_flat() -> None:
+    # Machinist review r8 (blocker): the left flat had no length. The cut
+    # sketch drives both flats from one FlatLength and one AcrossFlat, so
+    # the part prefixes each "2X" and the drawing imports it.
+    spec = ch_fulcrum_shaft_spec
+    assert spec.DIMENSION_PREFIXES == {
+        ("FlatProfile", "FlatLength"): "2X ",
+        ("FlatProfile", "AcrossFlat"): "2X ",
+    }
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'dims.record("FlatLengthB", \'"FlatLength"\')' in source
+    assert "AcrossFlat dim sets both flats' height" in source
+    assert (
+        "set_dimension_prefix(adapter, feature_name, dimension_name, prefix)" in source
+    )
+    assert source.index("set_dimension_prefix(adapter") < source.index(
+        "clear_dimensions_for_drawing(adapter)"
+    )
+
+
+def test_side_view_texts_stand_clear_of_the_shaft_and_each_other() -> None:
+    # Machinist review r8: the Ø6.350 limit text crossed the silhouette. Ink
+    # extents are r8's printed ones (mm, about the text anchor): the limit
+    # block -3.6..+4.3 tall, 161.35 to +2.0 tall, ~2.1 mm a character.
+    spec = ch_fulcrum_shaft_spec
+    cx, cy = drawing.RIGHT_CENTER
+    keep = drawing.RIGHT_KEEP
+    dia_y = keep["ShaftDia"][1]
+    assert dia_y + 0.0043 + 0.003 <= cy - spec.SHAFT_DIA / 2000.0
+    assert dia_y - 0.0036 - 0.003 >= keep["OverallLength"][1] + 0.0020
+    # "2X 3.5" stands right of its flat, clear of the 148 pitch's extension
+    # line on the flat's other edge; "2X 6.050"'s upper arrow (on its own x)
+    # stays 10 mm right of the flat length's text and dimension line.
+    flat_outer = (
+        cx + (ch_fulcrum_keeper_spec.KEEPER_Z_OFF + spec.FLAT_LENGTH / 2) / 1000
+    )
+    flat_x, flat_y = keep["FlatLength"]
+    half_width = len("2X 3.5") * 0.0021 / 2.0
+    assert flat_x - half_width >= flat_outer + 0.003
+    assert keep["AcrossFlat"][0] - (flat_x + half_width) >= 0.010
+    assert flat_y == keep["FlatFromEnd"][1]
+
+
 def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
     # Bored apart, the two keepers' .XX LugRise bands could put the bores
     # 1.02 out of line, far past the fit; reamed through in one pass at their

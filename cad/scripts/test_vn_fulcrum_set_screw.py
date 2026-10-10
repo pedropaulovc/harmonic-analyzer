@@ -121,6 +121,8 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     assert drawing.SPEC is sheet
     assert sheet.artifact_stem == part.PART_NAME
     assert sheet.source_kind == "part"
-    assert "build_purchased_fastener_drawing" in Path(drawing.__file__).read_text(
-        encoding="utf-8"
-    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "build_purchased_fastener_drawing" in source
+    # Machinist review r8: the 8:1 thread and socket hidden edges cluttered
+    # the front and right views; every orthographic view is HLR.
+    assert "adapter, SPEC, hidden_lines_removed=True" in source

@@ -234,9 +234,14 @@ def _purchased_title_block(
 
 
 async def build_purchased_fastener_drawing(
-    adapter: Any, spec: DrawingSpec
+    adapter: Any, spec: DrawingSpec, *, hidden_lines_removed: bool = False
 ) -> dict[str, str]:
-    """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI."""
+    """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
+
+    ``hidden_lines_removed`` drops the dashed edges from Front/Top/Right too,
+    for a part whose hidden thread and socket edges only clutter them (policy:
+    hidden lines only where they inform).
+    """
     stock = fastener(spec.artifact_stem)
     source = spec.source
 
@@ -280,6 +285,7 @@ async def build_purchased_fastener_drawing(
         finish=finish,
         installation_notes=installation_notes,
         document_title=str(registry["title"]),
+        hidden_lines_removed=hidden_lines_removed,
     )
 
 
@@ -317,6 +323,7 @@ async def _build_reference_sheet(
     reference_notes: str = "",
     document_title: str | None = None,
     cells: tuple | None = None,
+    hidden_lines_removed: bool = False,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -352,7 +359,7 @@ async def _build_reference_sheet(
             view = _early_bound(
                 place_view(adapter, str(source), name, *center, scale=(1, 1)), "IView"
             )
-            if name == "*Isometric":
+            if name == "*Isometric" or hidden_lines_removed:
                 set_hidden_lines_removed(adapter, view)
             else:
                 set_hidden_lines_visible(adapter, view)

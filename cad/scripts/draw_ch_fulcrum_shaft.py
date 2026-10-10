@@ -24,7 +24,6 @@ from _surface_finish import surface_finish_by_key
 from ch_fulcrum_shaft_spec import (
     DRAWING_DIMENSIONS,
     FLAT_FROM_END,
-    FLAT_PITCH,
     SHAFT_DIA,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
@@ -64,19 +63,28 @@ ISO_SCALE = (1, 2)
 # length and the across-flat witness ride the +u flat, and the -u flat's
 # station off the sheet-LEFT dome tip sits at the flat length's height,
 # under the FlatPitch.
-_PLUS_U_FLAT_X = RIGHT_CENTER[0] + FLAT_PITCH / 2000.0
 _TIP_X = RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0
 _MINUS_U_STATION_X = (
     RIGHT_CENTER[0] - (SHAFT_LENGTH / 2.0 - FLAT_FROM_END / 2.0) / 1000.0
 )
+# Machinist review r8: the Ø6.350 limit text sat across the silhouette; it
+# now stands under the shaft, ~3.5 mm clear of both the shaft's lower edge and
+# the 161.35 text below it. The "2X 3.5" (wider than r8's "3.5", which the
+# 148.000 pitch's extension line ran through) stands right of its flat
+# over the dome tip. "2X 6.050" moves right to keep ~10 mm between its upper
+# arrow and that flat length's dimension line.
+SHAFT_DIA_TEXT_DROP = 0.011
+FLAT_LENGTH_TEXT_X = _TIP_X + 0.005
+ACROSS_FLAT_TEXT_X = _TIP_X + 0.022
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 RIGHT_KEEP = {
     "OverallLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.020),
-    "ShaftDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1]),
+    "ShaftDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] - SHAFT_DIA_TEXT_DROP),
+    # Chained, not baselined: 148 is the keeper pitch; a tip baseline stacks 2 bands.
     "FlatPitch": (RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.024),
     "FlatFromEnd": (_MINUS_U_STATION_X, RIGHT_CENTER[1] + 0.013),
-    "FlatLength": (_PLUS_U_FLAT_X, RIGHT_CENTER[1] + 0.013),
-    "AcrossFlat": (_TIP_X + 0.012, RIGHT_CENTER[1]),
+    "FlatLength": (FLAT_LENGTH_TEXT_X, RIGHT_CENTER[1] + 0.013),
+    "AcrossFlat": (ACROSS_FLAT_TEXT_X, RIGHT_CENTER[1]),
 }
 
 
