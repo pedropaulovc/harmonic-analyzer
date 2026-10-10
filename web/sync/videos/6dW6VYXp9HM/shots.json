@@ -1,0 +1,824 @@
+{
+  "videoId": "6dW6VYXp9HM",
+  "sourceSha256": "7f82bb6f133c6dd2ac9d0cdf016ff33c960e94237e1a4e986f6a26c57871b25b",
+  "fps": [
+    30000,
+    1001
+  ],
+  "shots": [
+    {
+      "id": "analysis-00",
+      "start": 0,
+      "end": 1.8351666666666666,
+      "classification": "non-machine",
+      "reason": "Opening title on black; no corresponding physical mechanism.",
+      "views": [],
+      "startFrame": 0,
+      "endFrame": 55
+    },
+    {
+      "id": "analysis-01",
+      "start": 1.8351666666666666,
+      "end": 2.3023000000000002,
+      "classification": "transition",
+      "reason": "Title dissolves into presenter plus visible whole machine; visible geometry is not exempt.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 55,
+      "endFrame": 69
+    },
+    {
+      "id": "analysis-02",
+      "start": 2.3023000000000002,
+      "end": 4.4044,
+      "classification": "machine",
+      "reason": "Whole machine front view beside presenter; title/previous-video graphics do not exempt physical machine.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 69,
+      "endFrame": 132
+    },
+    {
+      "id": "analysis-03",
+      "start": 4.4044,
+      "end": 7.307300000000001,
+      "classification": "machine",
+      "reason": "Presenter rotates the actual machine toward rear; fixed camera relative to studio, changing camera relative to CAD.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 132,
+      "endFrame": 219
+    },
+    {
+      "id": "analysis-04",
+      "start": 7.307300000000001,
+      "end": 12.879533333333333,
+      "classification": "machine",
+      "reason": "Whole machine rear view; spring/bar bank visible, hand intermittently occludes crank/base.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 219,
+      "endFrame": 386
+    },
+    {
+      "id": "analysis-05",
+      "start": 12.879533333333333,
+      "end": 14.2142,
+      "classification": "machine",
+      "reason": "Presenter rotates machine toward front, continuing through side view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 386,
+      "endFrame": 426
+    },
+    {
+      "id": "analysis-06",
+      "start": 14.2142,
+      "end": 33.26656666666667,
+      "classification": "machine",
+      "reason": "Whole machine front held steady; presenter gestures and two explanatory text panels appear.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 426,
+      "endFrame": 997
+    },
+    {
+      "id": "analysis-07",
+      "start": 33.26656666666667,
+      "end": 34.60123333333333,
+      "classification": "machine",
+      "reason": "Presenter rotates machine back toward bar/spring bank; text overlay remains.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 997,
+      "endFrame": 1037
+    },
+    {
+      "id": "analysis-08",
+      "start": 34.60123333333333,
+      "end": 39.27256666666667,
+      "classification": "machine",
+      "reason": "Rear-facing whole machine beside presenter.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1037,
+      "endFrame": 1177
+    },
+    {
+      "id": "analysis-09",
+      "start": 39.27256666666667,
+      "end": 39.70633333333333,
+      "classification": "transition",
+      "reason": "Physical machine fades to a square-wave graph; retain visible-machine requirement during fade.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1177,
+      "endFrame": 1190
+    },
+    {
+      "id": "analysis-10",
+      "start": 39.70633333333333,
+      "end": 64.99826666666667,
+      "classification": "non-machine",
+      "reason": "Square-wave graphics only: changing period, even symmetry, half period and discrete 20-point rocker-bar values; approved hold.",
+      "views": [],
+      "startFrame": 1190,
+      "endFrame": 1948
+    },
+    {
+      "id": "analysis-11",
+      "start": 64.99826666666667,
+      "end": 65.4654,
+      "classification": "transition",
+      "reason": "20-point graphic dissolves onto real spring/amplitude bank close-up.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1948,
+      "endFrame": 1962
+    },
+    {
+      "id": "analysis-12",
+      "start": 65.4654,
+      "end": 71.40466666666667,
+      "classification": "machine",
+      "reason": "Real spring/amplitude bank close-up, hand and measuring stick move over spring carrier/bar setup; white graphic indicates ten high/ten low.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1962,
+      "endFrame": 2140
+    },
+    {
+      "id": "analysis-13",
+      "start": 71.40466666666667,
+      "end": 71.70496666666666,
+      "classification": "transition",
+      "reason": "Spring bank dissolves to real pen/platen; two partially visible physical projections during dissolve.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2140,
+      "endFrame": 2149
+    },
+    {
+      "id": "analysis-14",
+      "start": 71.70496666666666,
+      "end": 79.14573333333334,
+      "classification": "machine",
+      "reason": "Real pen/platen and feed drive drawing sinc; paper moves, pen moves, white paper is not a plot-only exemption.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2149,
+      "endFrame": 2372
+    },
+    {
+      "id": "analysis-15",
+      "start": 79.14573333333334,
+      "end": 79.44603333333333,
+      "classification": "transition",
+      "reason": "Pen/platen dissolves to real side-view crank/cone/channel drive.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2372,
+      "endFrame": 2381
+    },
+    {
+      "id": "analysis-16",
+      "start": 79.44603333333333,
+      "end": 87.02026666666667,
+      "classification": "machine",
+      "reason": "Real hand-cranked side view of cone bank; hand occludes handle and cyclic drive motion remains visible.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2381,
+      "endFrame": 2608
+    },
+    {
+      "id": "analysis-17",
+      "start": 87.02026666666667,
+      "end": 87.55413333333334,
+      "classification": "transition",
+      "reason": "An inserted bar-bank close-up expands to cover side-view crank shot.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2608,
+      "endFrame": 2624
+    },
+    {
+      "id": "analysis-18",
+      "start": 87.55413333333334,
+      "end": 92.42566666666667,
+      "classification": "machine",
+      "reason": "Real bar-bank close-up, numbered20 left to1 right, high/low labels.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2624,
+      "endFrame": 2770
+    },
+    {
+      "id": "analysis-19",
+      "start": 92.42566666666667,
+      "end": 92.9929,
+      "classification": "transition",
+      "reason": "3D page-flip editing effect turns source footage into its horizontal reflection; not a real machine rotation.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2770,
+      "endFrame": 2787
+    },
+    {
+      "id": "analysis-20",
+      "start": 92.9929,
+      "end": 95.86243333333333,
+      "classification": "machine",
+      "reason": "Horizontally mirrored real bar bank; label flipped video and harmonic1 left to20 right identify reflection.",
+      "views": [
+        {
+          "viewId": "bar-bank",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "horizontal-mirror"
+        }
+      ],
+      "startFrame": 2787,
+      "endFrame": 2873
+    },
+    {
+      "id": "analysis-21",
+      "start": 95.86243333333333,
+      "end": 112.3122,
+      "classification": "machine",
+      "reason": "Mirrored bar-bank footage continues after labels fade; reset motion followed by crank0 hold. There is no second unmirror cut.",
+      "views": [
+        {
+          "viewId": "bar-bank",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "horizontal-mirror"
+        }
+      ],
+      "startFrame": 2873,
+      "endFrame": 3366
+    },
+    {
+      "id": "analysis-22",
+      "start": 112.3122,
+      "end": 124.49103333333333,
+      "classification": "machine",
+      "reason": "Mirrored bar bank begins crank sweep; source cosine/crank graphics describe motion but do not replace physical landmarks.",
+      "views": [
+        {
+          "viewId": "bar-bank",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "horizontal-mirror"
+        }
+      ],
+      "startFrame": 3366,
+      "endFrame": 3731
+    },
+    {
+      "id": "analysis-23",
+      "start": 124.49103333333333,
+      "end": 139.80633333333333,
+      "classification": "machine",
+      "reason": "Mirrored real bar bank plus independently filmed native real pen/platen inset; both physical views require independent calibration.",
+      "views": [
+        {
+          "viewId": "bar-bank",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "horizontal-mirror"
+        },
+        {
+          "viewId": "pen-inset",
+          "rectSourcePixels": [
+            516,
+            15,
+            1152,
+            512
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 3731,
+      "endFrame": 4190
+    },
+    {
+      "id": "analysis-24",
+      "start": 139.80633333333333,
+      "end": 140.0399,
+      "classification": "transition",
+      "reason": "Two-view machine composite dissolves to white graph background.",
+      "views": [
+        {
+          "viewId": "bar-bank",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "horizontal-mirror"
+        },
+        {
+          "viewId": "pen-inset",
+          "rectSourcePixels": [
+            516,
+            15,
+            1152,
+            512
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4190,
+      "endFrame": 4197
+    },
+    {
+      "id": "analysis-25",
+      "start": 140.0399,
+      "end": 152.2521,
+      "classification": "non-machine",
+      "reason": "Sinc machine drawing/computer comparison and 20 sample graphics only; approved hold.",
+      "views": [],
+      "startFrame": 4197,
+      "endFrame": 4563
+    },
+    {
+      "id": "analysis-26",
+      "start": 152.2521,
+      "end": 152.61913333333334,
+      "classification": "transition",
+      "reason": "Sinc graph changes background and dissolves onto real spring/amplitude bank.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4563,
+      "endFrame": 4574
+    },
+    {
+      "id": "analysis-27",
+      "start": 152.61913333333334,
+      "end": 166.19936666666666,
+      "classification": "machine",
+      "reason": "Real spring/amplitude bank, sampled sinc coefficients visually mapped by white/yellow graphics; setup manipulated with measuring stick.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4574,
+      "endFrame": 4981
+    },
+    {
+      "id": "analysis-28",
+      "start": 166.19936666666666,
+      "end": 166.49966666666666,
+      "classification": "transition",
+      "reason": "Spring bank dissolves to real pen/platen close-up.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4981,
+      "endFrame": 4990
+    },
+    {
+      "id": "analysis-29",
+      "start": 166.49966666666666,
+      "end": 181.51466666666667,
+      "classification": "machine",
+      "reason": "Real pen/platen drawing near-square output; panning camera and moving paper/pen. Plot visible behind actual pen is not exempt.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4990,
+      "endFrame": 5440
+    },
+    {
+      "id": "analysis-30",
+      "start": 181.51466666666667,
+      "end": 181.81496666666666,
+      "classification": "transition",
+      "reason": "Real pen fades out to its drawing alone.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5440,
+      "endFrame": 5449
+    },
+    {
+      "id": "analysis-31",
+      "start": 181.81496666666666,
+      "end": 183.75023333333334,
+      "classification": "non-machine",
+      "reason": "Square-wave output drawing only, no physical machine; approved hold.",
+      "views": [],
+      "startFrame": 5449,
+      "endFrame": 5507
+    },
+    {
+      "id": "analysis-32",
+      "start": 183.75023333333334,
+      "end": 184.41756666666666,
+      "classification": "transition",
+      "reason": "Drawing dissolves to presenter and whole physical machine.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5507,
+      "endFrame": 5527
+    },
+    {
+      "id": "analysis-33",
+      "start": 184.41756666666666,
+      "end": 187.85433333333333,
+      "classification": "machine",
+      "reason": "Whole physical machine front view beside presenter, stationary mechanism.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5527,
+      "endFrame": 5630
+    },
+    {
+      "id": "analysis-34",
+      "start": 187.85433333333333,
+      "end": 188.32146666666668,
+      "classification": "transition",
+      "reason": "Whole physical machine fades to square/sinc explanation diagrams.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5630,
+      "endFrame": 5644
+    },
+    {
+      "id": "analysis-35",
+      "start": 188.32146666666668,
+      "end": 198.0979,
+      "classification": "non-machine",
+      "reason": "Analysis/synthesis diagram animation on white only; approved hold.",
+      "views": [],
+      "startFrame": 5644,
+      "endFrame": 5937
+    },
+    {
+      "id": "analysis-36",
+      "start": 198.0979,
+      "end": 198.5984,
+      "classification": "transition",
+      "reason": "Diagram dissolves back to presenter and whole machine.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5937,
+      "endFrame": 5952
+    },
+    {
+      "id": "analysis-37",
+      "start": 198.5984,
+      "end": 211.14426666666668,
+      "classification": "machine",
+      "reason": "Whole physical machine front view; book promotion graphics beside it do not exempt machine.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5952,
+      "endFrame": 6328
+    },
+    {
+      "id": "analysis-38",
+      "start": 211.14426666666668,
+      "end": 211.77823333333333,
+      "classification": "transition",
+      "reason": "Presenter/machine fades behind navigation endcard; physical machine is visible only during dissolve.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6328,
+      "endFrame": 6347
+    },
+    {
+      "id": "analysis-39",
+      "start": 211.77823333333333,
+      "end": 239.5393,
+      "classification": "non-machine",
+      "reason": "Navigation endcard and moving deliberately blurred thumbnails; no corresponding identifiable physical pose, approved hold.",
+      "views": [],
+      "startFrame": 6347,
+      "endFrame": 7179
+    },
+    {
+      "id": "analysis-40",
+      "start": 239.5393,
+      "end": 240.0398,
+      "classification": "non-machine",
+      "reason": "Navigation endcard dissolves to credits; approved hold.",
+      "views": [],
+      "startFrame": 7179,
+      "endFrame": 7194
+    },
+    {
+      "id": "analysis-41",
+      "start": 240.0398,
+      "end": 244.541,
+      "classification": "non-machine",
+      "reason": "Credits through video/audio end; approved hold.",
+      "views": [],
+      "startFrame": 7194,
+      "endFrame": 7329
+    }
+  ]
+}

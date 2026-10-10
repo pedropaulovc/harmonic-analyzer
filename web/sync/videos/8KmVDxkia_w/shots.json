@@ -1,0 +1,1505 @@
+{
+  "videoId": "8KmVDxkia_w",
+  "sourceSha256": "da74c5c395c6a797a2a8cb445bc7b58f2b4c2a4a5c91e8568cdb0fc176743cdf",
+  "fps": [
+    24000,
+    1001
+  ],
+  "shots": [
+    {
+      "id": "title",
+      "start": 0,
+      "end": 1.793458333,
+      "classification": "non-machine",
+      "reason": "Opening title only; no corresponding machine.",
+      "views": [],
+      "startFrame": 0,
+      "endFrame": 43
+    },
+    {
+      "id": "intro-fade-title-only",
+      "start": 1.793458333,
+      "end": 1.918583333,
+      "classification": "non-machine",
+      "reason": "Actual decoded source contains no physical-machine photograph at this exposure; no corresponding machine view is required.",
+      "views": [],
+      "startFrame": 43,
+      "endFrame": 46
+    },
+    {
+      "id": "intro-fade",
+      "start": 1.918583333,
+      "end": 2.794458333,
+      "classification": "transition",
+      "reason": "Title crossfades into photographed presenter and complete machine; machine appears during this interval.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 46,
+      "endFrame": 67
+    },
+    {
+      "id": "intro-machine",
+      "start": 2.794458333,
+      "end": 25.984291667,
+      "classification": "machine",
+      "reason": "Stationary live machine beside presenter. Sine, formula and example plots are annotations; machine remains visible and required.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 67,
+      "endFrame": 623
+    },
+    {
+      "id": "presenter-to-spin",
+      "start": 25.984291667,
+      "end": 26.609916667,
+      "classification": "transition",
+      "reason": "Presenter disappears and whole-machine cutout is resized/reframed; genuine machine remains visible.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 623,
+      "endFrame": 638
+    },
+    {
+      "id": "whole-spin-a",
+      "start": 26.609916667,
+      "end": 27.152125,
+      "classification": "machine",
+      "reason": "Photographed whole machine turntable at source left; formula is non-corresponding annotation.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 638,
+      "endFrame": 651
+    },
+    {
+      "id": "crank-inset",
+      "start": 27.152125,
+      "end": 29.404375,
+      "classification": "machine",
+      "reason": "Simultaneous whole-machine turntable plus live crank closeup; inset expands then shrinks along yellow viewport border.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "detail-inset",
+          "rectSourcePixels": [
+            534,
+            33,
+            1347,
+            761
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 651,
+      "endFrame": 705
+    },
+    {
+      "id": "whole-spin-b",
+      "start": 29.404375,
+      "end": 31.698333333,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only, with formula annotation.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 705,
+      "endFrame": 760
+    },
+    {
+      "id": "gear-inset",
+      "start": 31.698333333,
+      "end": 34.78475,
+      "classification": "machine",
+      "reason": "Simultaneous whole-machine turntable plus live cone/cylinder/cam closeup; white cam outline is explanatory annotation over actual part.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "detail-inset",
+          "rectSourcePixels": [
+            534,
+            35,
+            1347,
+            759
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 760,
+      "endFrame": 834
+    },
+    {
+      "id": "whole-spin-c",
+      "start": 34.78475,
+      "end": 36.369666667,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 834,
+      "endFrame": 872
+    },
+    {
+      "id": "rocker-inset",
+      "start": 36.369666667,
+      "end": 42.167125,
+      "classification": "machine",
+      "reason": "Simultaneous whole machine plus actual rocker bank/amplitude bar closeup.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "detail-inset",
+          "rectSourcePixels": [
+            534,
+            35,
+            1347,
+            759
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 872,
+      "endFrame": 1011
+    },
+    {
+      "id": "whole-spin-d",
+      "start": 42.167125,
+      "end": 43.79375,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1011,
+      "endFrame": 1050
+    },
+    {
+      "id": "spring-inset",
+      "start": 43.79375,
+      "end": 48.173125,
+      "classification": "machine",
+      "reason": "Simultaneous whole machine plus photographed upper spring bank and levers.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "detail-inset",
+          "rectSourcePixels": [
+            534,
+            35,
+            1347,
+            759
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1050,
+      "endFrame": 1155
+    },
+    {
+      "id": "whole-spin-e",
+      "start": 48.173125,
+      "end": 51.217833333,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1155,
+      "endFrame": 1228
+    },
+    {
+      "id": "pen-inset",
+      "start": 51.217833333,
+      "end": 56.097708333,
+      "classification": "machine",
+      "reason": "Simultaneous whole machine plus actual pen/platen closeup. Traced waveform is paper content, not ideal mechanical input.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "detail-inset",
+          "rectSourcePixels": [
+            534,
+            35,
+            1347,
+            759
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1228,
+      "endFrame": 1345
+    },
+    {
+      "id": "whole-spin-f",
+      "start": 56.097708333,
+      "end": 60.935875,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1345,
+      "endFrame": 1461
+    },
+    {
+      "id": "cone-overview-zoom",
+      "start": 60.935875,
+      "end": 61.436375,
+      "classification": "transition",
+      "reason": "Actual cone/cylinder overview zooms from inset to full frame; both source views coexist while expanding.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1461,
+      "endFrame": 1473
+    },
+    {
+      "id": "cone-overview",
+      "start": 61.436375,
+      "end": 76.076,
+      "classification": "machine",
+      "reason": "Live cone/cylinder gears, rigid bearings and connecting rods; crank is turned by hand from about71s onward.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1473,
+      "endFrame": 1824
+    },
+    {
+      "id": "gear-macro-zoom",
+      "start": 76.076,
+      "end": 76.534791667,
+      "classification": "transition",
+      "reason": "Live tooth-mesh macro inset expands over cone overview.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1824,
+      "endFrame": 1835
+    },
+    {
+      "id": "gear-macro",
+      "start": 76.534791667,
+      "end": 96.554791667,
+      "classification": "machine",
+      "reason": "Live macro of meshing cone/cylinder teeth. Repeated teeth and motion blur do not uniquely label absolute tooth phase; rates are visibly different.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1835,
+      "endFrame": 2315
+    },
+    {
+      "id": "gear-macro-out",
+      "start": 96.554791667,
+      "end": 96.971875,
+      "classification": "transition",
+      "reason": "Tooth macro shrinks into whole-machine turntable.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2315,
+      "endFrame": 2325
+    },
+    {
+      "id": "whole-spin-g",
+      "start": 96.971875,
+      "end": 99.265833333,
+      "classification": "machine",
+      "reason": "Whole machine only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2325,
+      "endFrame": 2380
+    },
+    {
+      "id": "cam-rod-zoom",
+      "start": 99.265833333,
+      "end": 99.682916667,
+      "classification": "transition",
+      "reason": "Lower machine cam/rod closeup expands over whole-machine turntable.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2380,
+      "endFrame": 2390
+    },
+    {
+      "id": "cam-rod",
+      "start": 99.682916667,
+      "end": 105.105,
+      "classification": "machine",
+      "reason": "Live cam/connecting rod/rocker bank with crank hand. Back-facing station20 is harmonic1; white cam sketch does not replace real part observations.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2390,
+      "endFrame": 2520
+    },
+    {
+      "id": "cam-to-rocker-fade",
+      "start": 105.105,
+      "end": 105.939166667,
+      "classification": "transition",
+      "reason": "Crossfade from lower mechanism into rocker bank; two actual camera perspectives coexist.",
+      "views": [
+        {
+          "viewId": "outgoing",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "incoming",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2520,
+      "endFrame": 2540
+    },
+    {
+      "id": "rocker-bank",
+      "start": 105.939166667,
+      "end": 124.457666667,
+      "classification": "machine",
+      "reason": "Live bank of all20 rocker arms and rods, marked4x playback; animated cosine curves annotate real motion, not a static replacement.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2540,
+      "endFrame": 2984
+    },
+    {
+      "id": "rocker-out",
+      "start": 124.457666667,
+      "end": 124.999875,
+      "classification": "transition",
+      "reason": "Rocker closeup shrinks into whole-machine view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2984,
+      "endFrame": 2997
+    },
+    {
+      "id": "whole-spin-h",
+      "start": 124.999875,
+      "end": 127.335541667,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2997,
+      "endFrame": 3053
+    },
+    {
+      "id": "bar-inset",
+      "start": 127.335541667,
+      "end": 130.547083333,
+      "classification": "machine",
+      "reason": "Whole machine plus lower live long-bar/rocker view; yellow inset rectangle expands.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "detail-inset",
+          "rectSourcePixels": [
+            549,
+            491,
+            1347,
+            556
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 3053,
+      "endFrame": 3130
+    },
+    {
+      "id": "dual-lever-insets",
+      "start": 130.547083333,
+      "end": 174.340833333,
+      "classification": "machine",
+      "reason": "Three simultaneous genuine machine views: whole-machine turntable, upper spring/channel-lever bank, and lower rocker/amplitude-bar bank. Fingers push/release an individual bar, then crank produces coupled motion.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "lower-inset",
+          "rectSourcePixels": [
+            549,
+            491,
+            1347,
+            556
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "upper-inset",
+          "rectSourcePixels": [
+            549,
+            28,
+            1347,
+            442
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 3130,
+      "endFrame": 4180
+    },
+    {
+      "id": "dual-insets-out",
+      "start": 174.340833333,
+      "end": 175.008166667,
+      "classification": "transition",
+      "reason": "Both independently filmed upper/lower live insets shrink into whole-machine view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4180,
+      "endFrame": 4196
+    },
+    {
+      "id": "whole-spin-i",
+      "start": 175.008166667,
+      "end": 177.6775,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4196,
+      "endFrame": 4260
+    },
+    {
+      "id": "summing-side-zoom",
+      "start": 177.6775,
+      "end": 178.178,
+      "classification": "transition",
+      "reason": "Side summing/magnifier closeup expands over whole-machine turntable.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4260,
+      "endFrame": 4272
+    },
+    {
+      "id": "summing-side",
+      "start": 178.178,
+      "end": 190.19,
+      "classification": "machine",
+      "reason": "Actual underside of top frame, moving green summing lever, small spring and brass magnifying lever. Hex fastener is a visible feature, NOT presumed to be the operational knife contact.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4272,
+      "endFrame": 4560
+    },
+    {
+      "id": "summing-side-out",
+      "start": 190.19,
+      "end": 190.815625,
+      "classification": "transition",
+      "reason": "Side summing closeup shrinks into whole-machine view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4560,
+      "endFrame": 4575
+    },
+    {
+      "id": "whole-spin-j",
+      "start": 190.815625,
+      "end": 193.526666667,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4575,
+      "endFrame": 4640
+    },
+    {
+      "id": "top-assembly-zoom",
+      "start": 193.526666667,
+      "end": 194.235708333,
+      "classification": "transition",
+      "reason": "Photographed top assembly with gooseneck/counter-spring enlarges; actual source cutout is partial machine, not a book/plot exemption.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4640,
+      "endFrame": 4657
+    },
+    {
+      "id": "top-assembly",
+      "start": 194.235708333,
+      "end": 197.530666667,
+      "classification": "machine",
+      "reason": "Actual photographed top assembly and gooseneck/counter-spring, whole lower machine outside crop.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4657,
+      "endFrame": 4736
+    },
+    {
+      "id": "top-overhead-fade",
+      "start": 197.530666667,
+      "end": 198.531666667,
+      "classification": "transition",
+      "reason": "Top assembly crossfades to independently photographed overhead view; both real machine images visible during fade.",
+      "views": [
+        {
+          "viewId": "outgoing",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "incoming",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4736,
+      "endFrame": 4760
+    },
+    {
+      "id": "top-overhead",
+      "start": 198.531666667,
+      "end": 206.247708333,
+      "classification": "machine",
+      "reason": "Live overhead of20 upper channel levers/springs, summing lever and crank hand below. Full force-bank state cannot be inferred by substituting ideal sum.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4760,
+      "endFrame": 4945
+    },
+    {
+      "id": "overhead-spring-fade",
+      "start": 206.247708333,
+      "end": 207.165291667,
+      "classification": "transition",
+      "reason": "Crossfade between overhead and upper spring-bank perspectives.",
+      "views": [
+        {
+          "viewId": "outgoing",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "incoming",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4945,
+      "endFrame": 4967
+    },
+    {
+      "id": "spring-bank",
+      "start": 207.165291667,
+      "end": 213.7135,
+      "classification": "machine",
+      "reason": "Live upper bank/summing closeup; all20 springs visible in perspective, with dense overlapping hooks.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4967,
+      "endFrame": 5124
+    },
+    {
+      "id": "spring-bank-out",
+      "start": 213.7135,
+      "end": 214.130583333,
+      "classification": "transition",
+      "reason": "Upper spring bank shrinks into whole-machine turntable.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5124,
+      "endFrame": 5134
+    },
+    {
+      "id": "whole-spin-k",
+      "start": 214.130583333,
+      "end": 217.842625,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5134,
+      "endFrame": 5223
+    },
+    {
+      "id": "summing-side-reprise",
+      "start": 217.842625,
+      "end": 219.427541667,
+      "classification": "machine",
+      "reason": "Whole machine plus expanding side summing/magnifier inset; same source component but independent viewport.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5223,
+      "endFrame": 5261
+    },
+    {
+      "id": "knife-hardware-macro-zoom",
+      "start": 219.427541667,
+      "end": 220.053166667,
+      "classification": "transition",
+      "reason": "Bronze knife suspension/hex hardware macro expands over wider summing/magnifier view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5261,
+      "endFrame": 5276
+    },
+    {
+      "id": "knife-hardware-macro",
+      "start": 220.053166667,
+      "end": 227.852625,
+      "classification": "machine",
+      "reason": "Actual summing lever end, spring and suspension hardware; source1.5mm annotation reports motion scale but is not an observed CAD pivot or substitute for pose.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5276,
+      "endFrame": 5463
+    },
+    {
+      "id": "knife-macro-out",
+      "start": 227.852625,
+      "end": 228.436541667,
+      "classification": "transition",
+      "reason": "Hardware macro shrinks back into whole-machine view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5463,
+      "endFrame": 5477
+    },
+    {
+      "id": "whole-spin-l",
+      "start": 228.436541667,
+      "end": 232.106875,
+      "classification": "machine",
+      "reason": "Whole-machine turntable only.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5477,
+      "endFrame": 5565
+    },
+    {
+      "id": "magnifier-top-zoom",
+      "start": 232.106875,
+      "end": 232.7325,
+      "classification": "transition",
+      "reason": "Top/magnifier front closeup enlarges over whole machine.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5565,
+      "endFrame": 5580
+    },
+    {
+      "id": "magnifier-top",
+      "start": 232.7325,
+      "end": 235.777208333,
+      "classification": "machine",
+      "reason": "Actual top frame and magnifying lever/clamp/vertical output rod.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5580,
+      "endFrame": 5653
+    },
+    {
+      "id": "magnifier-clamp-zoom",
+      "start": 235.777208333,
+      "end": 236.653083333,
+      "classification": "transition",
+      "reason": "Clamp/rod macro expands over top/magnifier view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5653,
+      "endFrame": 5674
+    },
+    {
+      "id": "magnifier-clamp",
+      "start": 236.653083333,
+      "end": 242.075166667,
+      "classification": "machine",
+      "reason": "Live magnifying lever clamp, vertical rod and wire fixture; source6mm annotation is not a fabricated output law.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5674,
+      "endFrame": 5804
+    },
+    {
+      "id": "magnifier-out",
+      "start": 242.075166667,
+      "end": 242.700791667,
+      "classification": "transition",
+      "reason": "Magnifier macro shrinks into actual upper half-machine view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5804,
+      "endFrame": 5819
+    },
+    {
+      "id": "magnifier-half",
+      "start": 242.700791667,
+      "end": 251.334416667,
+      "classification": "machine",
+      "reason": "Actual upper half machine with brass magnifying lever, wire and concentric wheel.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5819,
+      "endFrame": 6026
+    },
+    {
+      "id": "wheel-zoom",
+      "start": 251.334416667,
+      "end": 252.00175,
+      "classification": "transition",
+      "reason": "Actual wheel macro expands over upper half-machine view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6026,
+      "endFrame": 6042
+    },
+    {
+      "id": "wheel-macro",
+      "start": 252.00175,
+      "end": 263.054458333,
+      "classification": "machine",
+      "reason": "Live concentric wheel, fixed axle/bar, wire and rotating spokes. Six repeated spokes create a phase symmetry unless a unique feature remains tracked.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6042,
+      "endFrame": 6307
+    },
+    {
+      "id": "wheel-out",
+      "start": 263.054458333,
+      "end": 263.721791667,
+      "classification": "transition",
+      "reason": "Wheel macro shrinks/reframes to actual wheel/pen/platen view.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6307,
+      "endFrame": 6323
+    },
+    {
+      "id": "wheel-pen",
+      "start": 263.721791667,
+      "end": 269.477541667,
+      "classification": "machine",
+      "reason": "Actual wire/concentric wheel/pen/platen; pen and trace move. Printed/marked waveform alone is not corresponding machine geometry.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6323,
+      "endFrame": 6461
+    },
+    {
+      "id": "lower-crank-zoom",
+      "start": 269.477541667,
+      "end": 270.144875,
+      "classification": "transition",
+      "reason": "Wheel/pen crop reframes into live lower machine/crank scene.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6461,
+      "endFrame": 6477
+    },
+    {
+      "id": "lower-crank",
+      "start": 270.144875,
+      "end": 282.365416667,
+      "classification": "machine",
+      "reason": "Live lower machine with hand turning crank, gearing, rods and translating paper/pen; marked2x playback, not static.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6477,
+      "endFrame": 6770
+    },
+    {
+      "id": "lower-presenter-fade",
+      "start": 282.365416667,
+      "end": 283.408125,
+      "classification": "transition",
+      "reason": "Crossfade from live cranking closeup into presenter and complete machine.",
+      "views": [
+        {
+          "viewId": "outgoing",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "incoming",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6770,
+      "endFrame": 6795
+    },
+    {
+      "id": "final-presenter-machine",
+      "start": 283.408125,
+      "end": 308.266291667,
+      "classification": "machine",
+      "reason": "Complete stationary machine remains visible beside presenter throughout book promotion. Book artwork is not reproduced; its presence does not exempt the simultaneously visible physical machine.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6795,
+      "endFrame": 7391
+    },
+    {
+      "id": "endcard-fade",
+      "start": 308.266291667,
+      "end": 309.309,
+      "classification": "transition",
+      "reason": "Presenter/machine crossfades into endcard grid; underlying machine remains visible until fade finishes.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 7391,
+      "endFrame": 7416
+    },
+    {
+      "id": "endcards",
+      "start": 309.309,
+      "end": 336.711375,
+      "classification": "non-machine",
+      "reason": "blurred endcard thumbnails/credits, no physical machine to match",
+      "reclassifiedFrom": "machine",
+      "views": [],
+      "startFrame": 7416,
+      "endFrame": 8073
+    },
+    {
+      "id": "credits-fade",
+      "start": 336.711375,
+      "end": 338.129458333,
+      "classification": "non-machine",
+      "reason": "blurred endcard thumbnails/credits, no physical machine to match",
+      "reclassifiedFrom": "machine",
+      "views": [],
+      "startFrame": 8073,
+      "endFrame": 8107
+    },
+    {
+      "id": "credits",
+      "start": 338.129458333,
+      "end": 338.212875,
+      "classification": "non-machine",
+      "reason": "blurred endcard thumbnails/credits, no physical machine to match",
+      "reclassifiedFrom": "machine",
+      "views": [],
+      "startFrame": 8107,
+      "endFrame": 8109
+    },
+    {
+      "id": "credits-credits-only",
+      "start": 338.212875,
+      "end": 340.8405,
+      "classification": "non-machine",
+      "reason": "Creator/license credits only; hold last matched physical-machine pose.",
+      "views": [],
+      "startFrame": 8109,
+      "endFrame": 8172
+    },
+    {
+      "id": "credits-to-black",
+      "start": 340.8405,
+      "end": 341.861,
+      "classification": "non-machine",
+      "reason": "Final credits fade to black; hold last matched physical-machine pose.",
+      "views": [],
+      "startFrame": 8172,
+      "endFrame": 8196
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Align video · Harmonic analyzer</title>
+  </head>
+  <body class="align-page">
+    <header class="align-header">
+      <h1>Align video</h1>
+      <label>Video <select id="video-id"><option value="8KmVDxkia_w">Synthesis</option><option value="6dW6VYXp9HM">Analysis</option></select></label>
+      <button id="review-mode" aria-pressed="false" disabled>Review queue</button>
+      <a id="companion-link" href="./?video=synthesis">Companion</a>
+    </header>
+    <main class="align-workspace">
+      <section class="align-view" aria-label="Video and model overlay">
+        <div id="align-stage"><video id="original" preload="auto" muted playsinline></video><canvas id="overlay" tabindex="0" aria-label="Orbit model camera"></canvas></div>
+        <div class="align-transport">
+          <button id="previous-frame" title="Left arrow">Previous frame</button><button id="play">Play</button><button id="next-frame" title="Right arrow">Next frame</button>
+          <label>Time (s) <input id="time" type="number" min="0" step="0.001" value="0" /></label><button id="seek">Seek</button>
+          <input id="scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Video time" />
+          <label>Model opacity <input id="opacity" type="range" min="0" max="1" step="0.01" value="0.5" /></label>
+        </div>
+        <p id="align-status" role="status">Loading video, shot census and model…</p>
+        <p class="hint">Left / right: one frame · Shift: ten frames · Space: play/pause · C: save camera · S: save segment · K: save crank. Review: A accepts + next unreviewed; C saves + stays; Shift+C saves + next; N/P move without saving. Drag to orbit; right-drag to pan; scroll to dolly.</p>
+      </section>
+      <aside class="align-panel">
+        <section id="camera-review" aria-label="Camera review queue" hidden>
+          <p id="review-count" role="status">0 of 0 reviewed</p>
+          <div class="align-actions"><button id="review-previous">Previous (P)</button><button id="review-accept">Accept &amp; next (A)</button><button id="review-next">Next (N)</button></div>
+          <p id="review-source" class="hint"></p>
+          <details><summary>Shot views and saved cameras</summary><ol id="review-list"></ol></details>
+        </section>
+        <label>Shot <select id="shot"></select></label><label>View <select id="view"></select></label>
+        <fieldset class="camera-controls"><legend>Camera</legend>
+          <label class="camera-mode" for="rotate-mode">Rotation mode <select id="rotate-mode"><option value="turntable">turntable (Y-up)</option><option value="free">free (arcball)</option></select></label>
+          <div class="camera-slider">
+            <label for="camera-azimuth">Azimuth (°)</label><output id="camera-azimuth-value" for="camera-azimuth" tabindex="0" aria-label="Azimuth in degrees">0.0</output>
+            <input id="camera-azimuth" type="range" min="-180" max="180" step="0.1" value="0" aria-describedby="camera-control-hint" />
+          </div>
+          <div class="camera-slider">
+            <label for="camera-elevation">Elevation (°)</label><output id="camera-elevation-value" for="camera-elevation" tabindex="0" aria-label="Elevation in degrees">0.0</output>
+            <input id="camera-elevation" type="range" min="-89.9" max="89.9" step="0.1" value="0" aria-describedby="camera-control-hint" />
+          </div>
+          <div class="camera-slider">
+            <label for="camera-roll">Roll (°)</label><output id="camera-roll-value" for="camera-roll" tabindex="0" aria-label="Roll in degrees">0.0</output>
+            <input id="camera-roll" type="range" min="-180" max="180" step="0.1" value="0" aria-describedby="camera-control-hint" />
+          </div>
+          <div class="camera-slider">
+            <label for="camera-distance">Distance (m, log scale)</label><output id="camera-distance-value" for="camera-distance" tabindex="0" aria-label="Camera distance in metres">1.000</output>
+            <input id="camera-distance" type="range" min="-0.7" max="1" step="0.001" value="0" aria-describedby="camera-control-hint" />
+          </div>
+          <div class="camera-slider">
+            <label for="fov">Vertical FOV (°)</label><output id="fov-value" for="fov" tabindex="0" aria-label="Vertical field of view in degrees">35.0</output>
+            <input id="fov" type="range" min="5" max="90" step="0.1" value="35" aria-describedby="camera-control-hint" />
+          </div>
+          <div class="camera-slider">
+            <label for="pp-x">Principal point X (view px)</label><output id="pp-x-value" for="pp-x" tabindex="0" aria-label="Principal point X in view pixels">960.0</output>
+            <input id="pp-x" type="range" min="0" max="1920" step="0.1" value="960" aria-describedby="camera-control-hint" />
+          </div>
+          <div class="camera-slider">
+            <label for="pp-y">Principal point Y (view px)</label><output id="pp-y-value" for="pp-y" tabindex="0" aria-label="Principal point Y in view pixels">540.0</output>
+            <input id="pp-y" type="range" min="0" max="1080" step="0.1" value="540" aria-describedby="camera-control-hint" />
+          </div>
+          <p id="camera-control-hint" class="hint">Double-click the model to set the pivot. Shift-drag for 4× finer adjustment. Mouse and slider edits stay in sync. Use arrow keys on a focused slider.</p>
+          <button id="reset-camera">Reload saved camera</button><button id="save-camera" title="C saves; Shift+C saves and advances to the next unreviewed view">Save camera key at t</button>
+        </fieldset>
+        <fieldset><legend>Setup segment</legend>
+          <label>Segment <select id="segment"></select></label>
+          <label>ID <input id="segment-id" type="text" /></label>
+          <label>Start (s) <input id="segment-start" type="number" min="0" step="0.001" /></label>
+          <label>End (s) <input id="segment-end" type="number" min="0" step="0.001" /></label>
+          <label>Gearing <select id="align-gearing"><option>small-large</option><option>medium-medium</option><option>large-small</option></select></label>
+          <label>Magnification <input id="align-magnification" type="number" step="0.01" /></label>
+          <div id="setup-fields"></div>
+          <button id="save-segment">Save segment init</button>
+        </fieldset>
+        <fieldset><legend>Crank</legend><label>Turns <input id="align-crank" type="number" step="0.001" value="0" /></label><button id="save-crank">Save crank at t</button></fieldset>
+        <details><summary>Twenty channel amplitudes and phases</summary><div id="align-channels"></div></details>
+      </aside>
+    </main>
+    <script type="module" src="/src/align.ts"></script>
+  </body>
+</html>

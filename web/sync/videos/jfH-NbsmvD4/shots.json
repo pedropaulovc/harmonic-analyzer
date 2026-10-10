@@ -1,0 +1,3240 @@
+{
+  "videoId": "jfH-NbsmvD4",
+  "sourceSha256": "6faa1a433d01186fd5b5fa4a3a9085277f6c8cf0027a640139805431ddfa7ae1",
+  "fps": [
+    30000,
+    1001
+  ],
+  "shots": [
+    {
+      "id": "operation-000",
+      "start": 0,
+      "end": 1.4014,
+      "classification": "non-machine",
+      "reason": "Opening typography on black",
+      "views": [],
+      "startFrame": 0,
+      "endFrame": 42
+    },
+    {
+      "id": "operation-001",
+      "start": 1.4014,
+      "end": 2.3023000000000002,
+      "classification": "transition",
+      "reason": "Opening dissolve to presenter and corresponding full machine",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 42,
+      "endFrame": 69
+    },
+    {
+      "id": "operation-002",
+      "start": 2.3023000000000002,
+      "end": 10.8108,
+      "classification": "machine",
+      "reason": "Presenter beside whole machine; title/lower-third overlay does not exempt machine",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 69,
+      "endFrame": 324
+    },
+    {
+      "id": "operation-003",
+      "start": 10.8108,
+      "end": 34.801433333333335,
+      "classification": "machine",
+      "reason": "Setup menu overlays and whole machine; operator turns machine and moves platen",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 324,
+      "endFrame": 1043
+    },
+    {
+      "id": "operation-004",
+      "start": 34.801433333333335,
+      "end": 42.1421,
+      "classification": "machine",
+      "reason": "Amplitude-bar closeup; hand points at individual sliding bar",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1043,
+      "endFrame": 1263
+    },
+    {
+      "id": "operation-005",
+      "start": 42.1421,
+      "end": 43.00963333333333,
+      "classification": "transition",
+      "reason": "Dissolve from amplitude bank to measuring tool",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1263,
+      "endFrame": 1289
+    },
+    {
+      "id": "operation-006",
+      "start": 43.00963333333333,
+      "end": 45.178466666666665,
+      "classification": "machine",
+      "reason": "Detached real graduated measuring stick and adjustable stop on white",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1289,
+      "endFrame": 1354
+    },
+    {
+      "id": "operation-007",
+      "start": 45.178466666666665,
+      "end": 47.48076666666667,
+      "classification": "machine",
+      "reason": "Measuring stick laid across actual rocker-arm bank",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1354,
+      "endFrame": 1423
+    },
+    {
+      "id": "operation-008",
+      "start": 47.48076666666667,
+      "end": 53.420033333333336,
+      "classification": "machine",
+      "reason": "Closeup of actual engraved scale; enlarged scale detail beside original",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1423,
+      "endFrame": 1601
+    },
+    {
+      "id": "operation-009",
+      "start": 53.420033333333336,
+      "end": 58.59186666666667,
+      "classification": "machine",
+      "reason": "Hands slide real stop along measuring stick",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1601,
+      "endFrame": 1756
+    },
+    {
+      "id": "operation-010",
+      "start": 58.59186666666667,
+      "end": 60.927533333333336,
+      "classification": "machine",
+      "reason": "Stop positioned at scale5; actual setting is visible",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1756,
+      "endFrame": 1826
+    },
+    {
+      "id": "operation-011",
+      "start": 60.927533333333336,
+      "end": 66.3663,
+      "classification": "machine",
+      "reason": "Tool placed on rocker arms, amplitude bar pushed to5",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1826,
+      "endFrame": 1989
+    },
+    {
+      "id": "operation-012",
+      "start": 66.3663,
+      "end": 70.2702,
+      "classification": "machine",
+      "reason": "Stop moved from5 to10",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 1989,
+      "endFrame": 2106
+    },
+    {
+      "id": "operation-013",
+      "start": 70.2702,
+      "end": 74.70796666666666,
+      "classification": "machine",
+      "reason": "Amplitude bar moved out to10 using stick",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2106,
+      "endFrame": 2239
+    },
+    {
+      "id": "operation-014",
+      "start": 74.70796666666666,
+      "end": 76.00926666666666,
+      "classification": "transition",
+      "reason": "Dissolve back to whole machine",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2239,
+      "endFrame": 2278
+    },
+    {
+      "id": "operation-015",
+      "start": 76.00926666666666,
+      "end": 83.1831,
+      "classification": "machine",
+      "reason": "Presenter and full physical machine",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2278,
+      "endFrame": 2493
+    },
+    {
+      "id": "operation-016",
+      "start": 83.1831,
+      "end": 83.9839,
+      "classification": "transition",
+      "reason": "Dissolve to amplitude-bank closeup",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2493,
+      "endFrame": 2517
+    },
+    {
+      "id": "operation-017",
+      "start": 83.9839,
+      "end": 93.72696666666667,
+      "classification": "machine",
+      "reason": "Positive and negative coefficient overlays on real amplitude bank",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2517,
+      "endFrame": 2809
+    },
+    {
+      "id": "operation-018",
+      "start": 93.72696666666667,
+      "end": 94.2942,
+      "classification": "transition",
+      "reason": "Fade through black between amplitude and horizontal-scaling chapter",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2809,
+      "endFrame": 2826
+    },
+    {
+      "id": "operation-019",
+      "start": 94.2942,
+      "end": 99.76633333333334,
+      "classification": "machine",
+      "reason": "Whole machine and horizontal-scaling heading",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2826,
+      "endFrame": 2990
+    },
+    {
+      "id": "operation-020",
+      "start": 99.76633333333334,
+      "end": 100.3002,
+      "classification": "transition",
+      "reason": "White dissolve from machine to standalone platen-speed plots",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 2990,
+      "endFrame": 3006
+    },
+    {
+      "id": "operation-021",
+      "start": 100.3002,
+      "end": 106.07263333333333,
+      "classification": "non-machine",
+      "reason": "Standalone drawn plots: no corresponding physical machine",
+      "views": [],
+      "startFrame": 3006,
+      "endFrame": 3179
+    },
+    {
+      "id": "operation-022",
+      "start": 106.07263333333333,
+      "end": 106.8067,
+      "classification": "transition",
+      "reason": "Dissolve from plots to lower machine",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 3179,
+      "endFrame": 3201
+    },
+    {
+      "id": "operation-023",
+      "start": 106.8067,
+      "end": 110.8107,
+      "classification": "machine",
+      "reason": "Lower machine with six-gear labels",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 3201,
+      "endFrame": 3321
+    },
+    {
+      "id": "operation-024",
+      "start": 110.8107,
+      "end": 114.6145,
+      "classification": "machine",
+      "reason": "Crankshaft chainwheel closeup; handle/chain visibly rotate",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 3321,
+      "endFrame": 3435
+    },
+    {
+      "id": "operation-025",
+      "start": 114.6145,
+      "end": 120.25346666666667,
+      "classification": "machine",
+      "reason": "Wide lower-machine chain path",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 3435,
+      "endFrame": 3604
+    },
+    {
+      "id": "operation-026",
+      "start": 120.25346666666667,
+      "end": 126.2261,
+      "classification": "machine",
+      "reason": "Upper chainwheel/reducer closeup with numbered gears",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 3604,
+      "endFrame": 3783
+    },
+    {
+      "id": "operation-027",
+      "start": 126.2261,
+      "end": 135.4353,
+      "classification": "machine",
+      "reason": "Side view of chainwheel and twelve-tooth reducer",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 3783,
+      "endFrame": 4059
+    },
+    {
+      "id": "operation-028",
+      "start": 135.4353,
+      "end": 136.00253333333333,
+      "classification": "transition",
+      "reason": "Side-view to front reducer dissolve",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4059,
+      "endFrame": 4076
+    },
+    {
+      "id": "operation-029",
+      "start": 136.00253333333333,
+      "end": 141.2411,
+      "classification": "machine",
+      "reason": "Reducer front with120-teeth label",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4076,
+      "endFrame": 4233
+    },
+    {
+      "id": "operation-030",
+      "start": 141.2411,
+      "end": 142.00853333333333,
+      "classification": "transition",
+      "reason": "Front reducer to side rack drive dissolve",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4233,
+      "endFrame": 4256
+    },
+    {
+      "id": "operation-031",
+      "start": 142.00853333333333,
+      "end": 154.58776666666668,
+      "classification": "machine",
+      "reason": "Side rack-pinion/reducer closeup",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4256,
+      "endFrame": 4633
+    },
+    {
+      "id": "operation-032",
+      "start": 154.58776666666668,
+      "end": 155.18836666666667,
+      "classification": "transition",
+      "reason": "Reducer to back of platen dissolve",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4633,
+      "endFrame": 4651
+    },
+    {
+      "id": "operation-033",
+      "start": 155.18836666666667,
+      "end": 162.89606666666666,
+      "classification": "machine",
+      "reason": "Back of platen and rack; nearby rocker arms remain visible",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4651,
+      "endFrame": 4882
+    },
+    {
+      "id": "operation-034",
+      "start": 162.89606666666666,
+      "end": 163.99716666666666,
+      "classification": "transition",
+      "reason": "Back-platen to front gear train dissolve",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4882,
+      "endFrame": 4915
+    },
+    {
+      "id": "operation-035",
+      "start": 163.99716666666666,
+      "end": 169.5694,
+      "classification": "machine",
+      "reason": "Front gear train before manual disassembly",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 4915,
+      "endFrame": 5082
+    },
+    {
+      "id": "operation-036",
+      "start": 169.5694,
+      "end": 170.00316666666666,
+      "classification": "transition",
+      "reason": "Wide gear train to crank handle closeup",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5082,
+      "endFrame": 5095
+    },
+    {
+      "id": "operation-037",
+      "start": 170.00316666666666,
+      "end": 176.64313333333334,
+      "classification": "machine",
+      "reason": "Remove tapered crank pin and pull handle off shaft",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5095,
+      "endFrame": 5294
+    },
+    {
+      "id": "operation-038",
+      "start": 176.64313333333334,
+      "end": 178.01116666666667,
+      "classification": "transition",
+      "reason": "Crank handle to upper retaining nut dissolve",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5294,
+      "endFrame": 5335
+    },
+    {
+      "id": "operation-039",
+      "start": 178.01116666666667,
+      "end": 182.51566666666668,
+      "classification": "machine",
+      "reason": "Unscrew upper chainwheel retaining thumbnut",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5335,
+      "endFrame": 5470
+    },
+    {
+      "id": "operation-040",
+      "start": 182.51566666666668,
+      "end": 188.6885,
+      "classification": "machine",
+      "reason": "Front view of carrier unlatched and swung from rack",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5470,
+      "endFrame": 5655
+    },
+    {
+      "id": "operation-041",
+      "start": 188.6885,
+      "end": 189.2891,
+      "classification": "transition",
+      "reason": "Front carrier motion to side view",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5655,
+      "endFrame": 5673
+    },
+    {
+      "id": "operation-042",
+      "start": 189.2891,
+      "end": 195.66213333333334,
+      "classification": "machine",
+      "reason": "Side view of carrier swing; chain visibly becomes slack",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5673,
+      "endFrame": 5864
+    },
+    {
+      "id": "operation-043",
+      "start": 195.66213333333334,
+      "end": 200.9007,
+      "classification": "machine",
+      "reason": "Front view: remove actual loose chain",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 5864,
+      "endFrame": 6021
+    },
+    {
+      "id": "operation-044",
+      "start": 200.9007,
+      "end": 201.40120000000002,
+      "classification": "transition",
+      "reason": "Dissolve from machine to photographs of four real loose chainwheels",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6021,
+      "endFrame": 6036
+    },
+    {
+      "id": "operation-045",
+      "start": 201.40120000000002,
+      "end": 207.27373333333333,
+      "classification": "machine",
+      "reason": "Photographs of real T12,T18,T18,T24 replacement gears",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6036,
+      "endFrame": 6212
+    },
+    {
+      "id": "operation-046",
+      "start": 207.27373333333333,
+      "end": 208.0078,
+      "classification": "transition",
+      "reason": "Gear photograph to crankshaft replacement closeup",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6212,
+      "endFrame": 6234
+    },
+    {
+      "id": "operation-047",
+      "start": 208.0078,
+      "end": 213.74686666666668,
+      "classification": "machine",
+      "reason": "RemoveT18 crank chainwheel, reveal empty shaft, installT12",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6234,
+      "endFrame": 6406
+    },
+    {
+      "id": "operation-048",
+      "start": 213.74686666666668,
+      "end": 214.3141,
+      "classification": "transition",
+      "reason": "Crankshaft gear replacement to upper chainwheel replacement",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6406,
+      "endFrame": 6423
+    },
+    {
+      "id": "operation-049",
+      "start": 214.3141,
+      "end": 219.58603333333335,
+      "classification": "machine",
+      "reason": "RemoveT18 upper chainwheel and installT24",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6423,
+      "endFrame": 6581
+    },
+    {
+      "id": "operation-050",
+      "start": 219.58603333333335,
+      "end": 230.79723333333334,
+      "classification": "machine",
+      "reason": "Reassembly: nut, chain, handle, tapered pin and latch",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6581,
+      "endFrame": 6917
+    },
+    {
+      "id": "operation-051",
+      "start": 230.79723333333334,
+      "end": 233.46656666666667,
+      "classification": "machine",
+      "reason": "Reassembled lower machine stationary",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6917,
+      "endFrame": 6997
+    },
+    {
+      "id": "operation-052",
+      "start": 233.46656666666667,
+      "end": 234.10053333333335,
+      "classification": "transition",
+      "reason": "Fade from lower machine to gearing comparison graphic",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 6997,
+      "endFrame": 7016
+    },
+    {
+      "id": "operation-053",
+      "start": 234.10053333333335,
+      "end": 239.30573333333334,
+      "classification": "machine",
+      "reason": "Real loose chainwheel photographs beside gearing combinations",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 7016,
+      "endFrame": 7172
+    },
+    {
+      "id": "operation-054",
+      "start": 239.30573333333334,
+      "end": 241.00743333333332,
+      "classification": "transition",
+      "reason": "Three corresponding physical-machine platen views fade in",
+      "views": [
+        {
+          "viewId": "large-small",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "medium-medium",
+          "rectSourcePixels": [
+            0,
+            360,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "small-large",
+          "rectSourcePixels": [
+            0,
+            720,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 7172,
+      "endFrame": 7223
+    },
+    {
+      "id": "operation-055",
+      "start": 241.00743333333332,
+      "end": 250.18326666666667,
+      "classification": "machine",
+      "reason": "Three simultaneous real platen/pen views: large-small,medium-medium,small-large",
+      "views": [
+        {
+          "viewId": "large-small",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "medium-medium",
+          "rectSourcePixels": [
+            0,
+            360,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "small-large",
+          "rectSourcePixels": [
+            0,
+            720,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 7223,
+      "endFrame": 7498
+    },
+    {
+      "id": "operation-056",
+      "start": 250.18326666666667,
+      "end": 260.6604,
+      "classification": "machine",
+      "reason": "Top panel reaches half; middle physical panel starts moving",
+      "views": [
+        {
+          "viewId": "large-small",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "medium-medium",
+          "rectSourcePixels": [
+            0,
+            360,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "small-large",
+          "rectSourcePixels": [
+            0,
+            720,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 7498,
+      "endFrame": 7812
+    },
+    {
+      "id": "operation-057",
+      "start": 260.6604,
+      "end": 269.7361333333333,
+      "classification": "machine",
+      "reason": "Top reaches three-quarters; lower physical panel starts moving",
+      "views": [
+        {
+          "viewId": "large-small",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "medium-medium",
+          "rectSourcePixels": [
+            0,
+            360,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "small-large",
+          "rectSourcePixels": [
+            0,
+            720,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 7812,
+      "endFrame": 8084
+    },
+    {
+      "id": "operation-058",
+      "start": 269.7361333333333,
+      "end": 272.5389333333333,
+      "classification": "machine",
+      "reason": "Three physical platen panels finish together",
+      "views": [
+        {
+          "viewId": "large-small",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "medium-medium",
+          "rectSourcePixels": [
+            0,
+            360,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "small-large",
+          "rectSourcePixels": [
+            0,
+            720,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 8084,
+      "endFrame": 8168
+    },
+    {
+      "id": "operation-059",
+      "start": 272.5389333333333,
+      "end": 285.35173333333336,
+      "classification": "machine",
+      "reason": "Physical panels retained with2x/1x/0.5x output overlays",
+      "views": [
+        {
+          "viewId": "large-small",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "medium-medium",
+          "rectSourcePixels": [
+            0,
+            360,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "small-large",
+          "rectSourcePixels": [
+            0,
+            720,
+            1920,
+            360
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 8168,
+      "endFrame": 8552
+    },
+    {
+      "id": "operation-060",
+      "start": 285.35173333333336,
+      "end": 286.3861,
+      "classification": "transition",
+      "reason": "Three-panel gearing comparison fades to presenter",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 8552,
+      "endFrame": 8583
+    },
+    {
+      "id": "operation-061",
+      "start": 286.3861,
+      "end": 294.294,
+      "classification": "machine",
+      "reason": "Presenter/full machine with vertical-scaling heading",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 8583,
+      "endFrame": 8820
+    },
+    {
+      "id": "operation-062",
+      "start": 294.294,
+      "end": 294.9947,
+      "classification": "transition",
+      "reason": "Full machine to magnifying-lever detail",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 8820,
+      "endFrame": 8841
+    },
+    {
+      "id": "operation-063",
+      "start": 294.9947,
+      "end": 303.303,
+      "classification": "machine",
+      "reason": "Top-frame/summing bar/magnifying lever closeup",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 8841,
+      "endFrame": 9090
+    },
+    {
+      "id": "operation-064",
+      "start": 303.303,
+      "end": 305.1048,
+      "classification": "machine",
+      "reason": "Magnifier clamp closeup",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 9090,
+      "endFrame": 9144
+    },
+    {
+      "id": "operation-065",
+      "start": 305.1048,
+      "end": 306.0057,
+      "classification": "transition",
+      "reason": "Clamp detail returns to lever-wide view",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 9144,
+      "endFrame": 9171
+    },
+    {
+      "id": "operation-066",
+      "start": 306.0057,
+      "end": 311.57793333333336,
+      "classification": "machine",
+      "reason": "Move clamp to lever end: maximum amplitude",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 9171,
+      "endFrame": 9338
+    },
+    {
+      "id": "operation-067",
+      "start": 311.57793333333336,
+      "end": 317.5172,
+      "classification": "machine",
+      "reason": "Move clamp about halfway: reduced amplitude",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 9338,
+      "endFrame": 9516
+    },
+    {
+      "id": "operation-068",
+      "start": 317.5172,
+      "end": 324.59093333333334,
+      "classification": "machine",
+      "reason": "Move clamp inward: minimum amplitude",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 9516,
+      "endFrame": 9728
+    },
+    {
+      "id": "operation-069",
+      "start": 324.59093333333334,
+      "end": 325.92560000000003,
+      "classification": "machine",
+      "reason": "Return clamp outward before vertical-offset explanation",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 9728,
+      "endFrame": 9768
+    },
+    {
+      "id": "operation-070",
+      "start": 325.92560000000003,
+      "end": 333.8335,
+      "classification": "machine",
+      "reason": "Perpendicular rod and wire-fixture knob closeup",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 9768,
+      "endFrame": 10005
+    },
+    {
+      "id": "operation-071",
+      "start": 333.8335,
+      "end": 335.8688666666667,
+      "classification": "machine",
+      "reason": "Wire-fixture detail with wire label",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10005,
+      "endFrame": 10066
+    },
+    {
+      "id": "operation-072",
+      "start": 335.8688666666667,
+      "end": 336.80313333333334,
+      "classification": "transition",
+      "reason": "Wire fixture to whole magnifier/wire/pen",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10066,
+      "endFrame": 10094
+    },
+    {
+      "id": "operation-073",
+      "start": 336.80313333333334,
+      "end": 345.81213333333335,
+      "classification": "machine",
+      "reason": "Camera pans down actual wire to magnifying wheel and pen",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10094,
+      "endFrame": 10364
+    },
+    {
+      "id": "operation-074",
+      "start": 345.81213333333335,
+      "end": 347.18016666666665,
+      "classification": "transition",
+      "reason": "Pan ends at platen/pen",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10364,
+      "endFrame": 10405
+    },
+    {
+      "id": "operation-075",
+      "start": 347.18016666666665,
+      "end": 348.01433333333335,
+      "classification": "transition",
+      "reason": "Split-screen magnifier fixture and physical platen/pen introduced",
+      "views": [
+        {
+          "viewId": "wire-fixture",
+          "rectSourcePixels": [
+            0,
+            0,
+            992,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-platen",
+          "rectSourcePixels": [
+            1024,
+            0,
+            896,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10405,
+      "endFrame": 10430
+    },
+    {
+      "id": "operation-076",
+      "start": 348.01433333333335,
+      "end": 352.91923333333335,
+      "classification": "machine",
+      "reason": "Two simultaneous corresponding physical views: offset fixture and pen",
+      "views": [
+        {
+          "viewId": "wire-fixture",
+          "rectSourcePixels": [
+            0,
+            0,
+            992,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-platen",
+          "rectSourcePixels": [
+            1024,
+            0,
+            896,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10430,
+      "endFrame": 10577
+    },
+    {
+      "id": "operation-077",
+      "start": 352.91923333333335,
+      "end": 356.32263333333333,
+      "classification": "machine",
+      "reason": "Operator raises fixture knob; simultaneous pen rises",
+      "views": [
+        {
+          "viewId": "wire-fixture",
+          "rectSourcePixels": [
+            0,
+            0,
+            992,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-platen",
+          "rectSourcePixels": [
+            1024,
+            0,
+            896,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10577,
+      "endFrame": 10679
+    },
+    {
+      "id": "operation-078",
+      "start": 356.32263333333333,
+      "end": 363.6299333333333,
+      "classification": "machine",
+      "reason": "Raised fixture/pen held; high/low labels do not exempt either view",
+      "views": [
+        {
+          "viewId": "wire-fixture",
+          "rectSourcePixels": [
+            0,
+            0,
+            992,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-platen",
+          "rectSourcePixels": [
+            1024,
+            0,
+            896,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10679,
+      "endFrame": 10898
+    },
+    {
+      "id": "operation-079",
+      "start": 363.6299333333333,
+      "end": 364.3973666666667,
+      "classification": "transition",
+      "reason": "Two-panel fixture/pen to full-machine plus wheel closeup",
+      "views": [
+        {
+          "viewId": "wire-fixture",
+          "rectSourcePixels": [
+            0,
+            0,
+            992,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-platen",
+          "rectSourcePixels": [
+            1024,
+            0,
+            896,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10898,
+      "endFrame": 10921
+    },
+    {
+      "id": "operation-080",
+      "start": 364.3973666666667,
+      "end": 374.1738,
+      "classification": "machine",
+      "reason": "Full-machine view and enlarged real wheel view together",
+      "views": [
+        {
+          "viewId": "whole-machine",
+          "rectSourcePixels": [
+            0,
+            0,
+            640,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "wheel-closeup",
+          "rectSourcePixels": [
+            640,
+            0,
+            1280,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 10921,
+      "endFrame": 11214
+    },
+    {
+      "id": "operation-081",
+      "start": 374.1738,
+      "end": 375.0079666666667,
+      "classification": "transition",
+      "reason": "Wheel composite returns to fixture/pen split-screen",
+      "views": [
+        {
+          "viewId": "whole-machine",
+          "rectSourcePixels": [
+            0,
+            0,
+            640,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "wheel-closeup",
+          "rectSourcePixels": [
+            640,
+            0,
+            1280,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "wire-fixture",
+          "rectSourcePixels": [
+            0,
+            0,
+            992,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-platen",
+          "rectSourcePixels": [
+            1024,
+            0,
+            896,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 11214,
+      "endFrame": 11239
+    },
+    {
+      "id": "operation-082",
+      "start": 375.0079666666667,
+      "end": 381.24753333333337,
+      "classification": "machine",
+      "reason": "Fixture/pen split-screen retained",
+      "views": [
+        {
+          "viewId": "wire-fixture",
+          "rectSourcePixels": [
+            0,
+            0,
+            992,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-platen",
+          "rectSourcePixels": [
+            1024,
+            0,
+            896,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 11239,
+      "endFrame": 11426
+    },
+    {
+      "id": "operation-083",
+      "start": 381.24753333333337,
+      "end": 382.41536666666667,
+      "classification": "transition",
+      "reason": "Fade through black to sines/cosines chapter",
+      "views": [
+        {
+          "viewId": "wire-fixture",
+          "rectSourcePixels": [
+            0,
+            0,
+            992,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "pen-platen",
+          "rectSourcePixels": [
+            1024,
+            0,
+            896,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 11426,
+      "endFrame": 11461
+    },
+    {
+      "id": "operation-084",
+      "start": 382.41536666666667,
+      "end": 389.62256666666667,
+      "classification": "machine",
+      "reason": "Presenter/full machine with sine/cosine graph overlays",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 11461,
+      "endFrame": 11677
+    },
+    {
+      "id": "operation-085",
+      "start": 389.62256666666667,
+      "end": 395.4951,
+      "classification": "machine",
+      "reason": "Oblique cone/cylinder/pinion view",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 11677,
+      "endFrame": 11853
+    },
+    {
+      "id": "operation-086",
+      "start": 395.4951,
+      "end": 408.408,
+      "classification": "machine",
+      "reason": "Top-down cone/cylinder meshing view",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 11853,
+      "endFrame": 12240
+    },
+    {
+      "id": "operation-087",
+      "start": 408.408,
+      "end": 409.0086,
+      "classification": "transition",
+      "reason": "Top-down gears dissolve to front cone-lock knob view",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 12240,
+      "endFrame": 12258
+    },
+    {
+      "id": "operation-088",
+      "start": 409.0086,
+      "end": 413.07933333333335,
+      "classification": "machine",
+      "reason": "Unscrew cone-lock knob and swing cone away from cylinder",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 12258,
+      "endFrame": 12380
+    },
+    {
+      "id": "operation-089",
+      "start": 413.07933333333335,
+      "end": 413.6465666666667,
+      "classification": "transition",
+      "reason": "Actual native413.079..413.647 dissolve from front cone to top-down replay, independently inspected at413.213 and413.613; moving source-part observations are not CADrest camera points.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 12380,
+      "endFrame": 12397
+    },
+    {
+      "id": "operation-cone-top-clear",
+      "start": 413.6465666666667,
+      "end": 413.88013333333333,
+      "classification": "machine",
+      "reason": "Top-down replay before post head moves>2sourcepixels from first tracked clearframe; cone numeric datum not calibrated.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 12397,
+      "endFrame": 12404
+    },
+    {
+      "id": "operation-090",
+      "start": 413.88013333333333,
+      "end": 420.7203,
+      "classification": "machine",
+      "reason": "Measured cone replay movement: native post-screw2 leaves initial position>2px at413.880; first within2px of final head position414.948, then holds. Cylinder/pedestal corners remainstationary.",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 12404,
+      "endFrame": 12609
+    },
+    {
+      "id": "operation-091",
+      "start": 420.7203,
+      "end": 421.28753333333333,
+      "classification": "transition",
+      "reason": "Top-down to oblique individual cylinder-notch setup",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 12609,
+      "endFrame": 12626
+    },
+    {
+      "id": "operation-092",
+      "start": 421.28753333333333,
+      "end": 430.79703333333333,
+      "classification": "machine",
+      "reason": "Hands rotate individual cylinder gears independently",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 12626,
+      "endFrame": 12911
+    },
+    {
+      "id": "operation-093",
+      "start": 430.79703333333333,
+      "end": 431.99823333333336,
+      "classification": "transition",
+      "reason": "Individual notch setup to side rocker/cam demonstration",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 12911,
+      "endFrame": 12947
+    },
+    {
+      "id": "operation-094",
+      "start": 431.99823333333336,
+      "end": 435.2681666666667,
+      "classification": "machine",
+      "reason": "Side whole lower machine; individual gear rotation lifts corresponding rocker",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 12947,
+      "endFrame": 13045
+    },
+    {
+      "id": "operation-095",
+      "start": 435.2681666666667,
+      "end": 440.00623333333334,
+      "classification": "machine",
+      "reason": "Side closeup of real gear/connecting rod/rocker",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 13045,
+      "endFrame": 13187
+    },
+    {
+      "id": "operation-096",
+      "start": 440.00623333333334,
+      "end": 445.9121333333333,
+      "classification": "machine",
+      "reason": "Explanatory cam overlay on same visible physical machine",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 13187,
+      "endFrame": 13364
+    },
+    {
+      "id": "operation-097",
+      "start": 445.9121333333333,
+      "end": 457.49036666666666,
+      "classification": "machine",
+      "reason": "Top bank:20x playback of manual independent notch alignment",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 13364,
+      "endFrame": 13711
+    },
+    {
+      "id": "operation-098",
+      "start": 457.49036666666666,
+      "end": 462.59546666666665,
+      "classification": "machine",
+      "reason": "All visible notches aligned; alignment overlay on real gears",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 13711,
+      "endFrame": 13864
+    },
+    {
+      "id": "operation-099",
+      "start": 462.59546666666665,
+      "end": 468.63483333333335,
+      "classification": "machine",
+      "reason": "Oblique pinion/gear set with lever label",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 13864,
+      "endFrame": 14045
+    },
+    {
+      "id": "operation-100",
+      "start": 468.63483333333335,
+      "end": 470.00286666666665,
+      "classification": "machine",
+      "reason": "Front closeup: hand pushes pinion lift lever into engagement",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14045,
+      "endFrame": 14086
+    },
+    {
+      "id": "operation-101",
+      "start": 470.00286666666665,
+      "end": 478.6782,
+      "classification": "machine",
+      "reason": "Cylinder notch side position: sine setting",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14086,
+      "endFrame": 14346
+    },
+    {
+      "id": "operation-102",
+      "start": 478.6782,
+      "end": 480.1129666666667,
+      "classification": "machine",
+      "reason": "Closer pinion/cylinder view",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14346,
+      "endFrame": 14389
+    },
+    {
+      "id": "operation-103",
+      "start": 480.1129666666667,
+      "end": 482.6154666666667,
+      "classification": "machine",
+      "reason": "Operator rotates cylinder bank by90degrees via pinion",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14389,
+      "endFrame": 14464
+    },
+    {
+      "id": "operation-104",
+      "start": 482.6154666666667,
+      "end": 483.4162666666667,
+      "classification": "transition",
+      "reason": "Tighter pinion to wider front view",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14464,
+      "endFrame": 14488
+    },
+    {
+      "id": "operation-105",
+      "start": 483.4162666666667,
+      "end": 487.75393333333335,
+      "classification": "machine",
+      "reason": "Cylinder notch top position: cosine setting",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14488,
+      "endFrame": 14618
+    },
+    {
+      "id": "operation-106",
+      "start": 487.75393333333335,
+      "end": 488.9885,
+      "classification": "transition",
+      "reason": "Front view to oblique notch-reference lines",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14618,
+      "endFrame": 14655
+    },
+    {
+      "id": "operation-107",
+      "start": 488.9885,
+      "end": 499.4322666666667,
+      "classification": "machine",
+      "reason": "Oblique bank view with side/top notch overlays",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14655,
+      "endFrame": 14968
+    },
+    {
+      "id": "operation-108",
+      "start": 499.4322666666667,
+      "end": 499.9995,
+      "classification": "transition",
+      "reason": "Oblique view to side cam/rocker demonstration",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14968,
+      "endFrame": 14985
+    },
+    {
+      "id": "operation-109",
+      "start": 499.9995,
+      "end": 505.8053,
+      "classification": "machine",
+      "reason": "Side physical cam/rod/rocker with overlaid reference cam",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 14985,
+      "endFrame": 15159
+    },
+    {
+      "id": "operation-110",
+      "start": 505.8053,
+      "end": 512.2117000000001,
+      "classification": "machine",
+      "reason": "Physical mechanism remains behind sinusoid overlay",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 15159,
+      "endFrame": 15351
+    },
+    {
+      "id": "operation-111",
+      "start": 512.2117000000001,
+      "end": 519.4189,
+      "classification": "machine",
+      "reason": "Rotate actual gear toward lowest rocker travel; negative-cosine overlay",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 15351,
+      "endFrame": 15567
+    },
+    {
+      "id": "operation-112",
+      "start": 519.4189,
+      "end": 524.8910333333333,
+      "classification": "machine",
+      "reason": "Physical gear/rod at bottom position",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 15567,
+      "endFrame": 15731
+    },
+    {
+      "id": "operation-113",
+      "start": 524.8910333333333,
+      "end": 529.9627666666667,
+      "classification": "machine",
+      "reason": "Physical gear/rod at mid travel; sine overlay",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 15731,
+      "endFrame": 15883
+    },
+    {
+      "id": "operation-114",
+      "start": 529.9627666666667,
+      "end": 530.9971333333333,
+      "classification": "transition",
+      "reason": "Physical cam/rod to square-wave amplitude settings",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 15883,
+      "endFrame": 15914
+    },
+    {
+      "id": "operation-115",
+      "start": 530.9971333333333,
+      "end": 533.5663666666667,
+      "classification": "machine",
+      "reason": "Amplitude-bank settings for square wave visible",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 15914,
+      "endFrame": 15991
+    },
+    {
+      "id": "operation-116",
+      "start": 533.5663666666667,
+      "end": 545.0778666666666,
+      "classification": "machine",
+      "reason": "Physical amplitude-bank inset retained beside output plots",
+      "views": [
+        {
+          "viewId": "amplitude-bank-inset",
+          "rectSourcePixels": [
+            0,
+            0,
+            520,
+            296
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 15991,
+      "endFrame": 16336
+    },
+    {
+      "id": "operation-117",
+      "start": 545.0778666666666,
+      "end": 554.6874666666666,
+      "classification": "machine",
+      "reason": "Same corresponding bank inset plus sine/cosine output plots",
+      "views": [
+        {
+          "viewId": "amplitude-bank-inset",
+          "rectSourcePixels": [
+            0,
+            0,
+            520,
+            296
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 16336,
+      "endFrame": 16624
+    },
+    {
+      "id": "operation-118",
+      "start": 554.6874666666666,
+      "end": 555.2880666666666,
+      "classification": "transition",
+      "reason": "White graphic fades through black to pen chapter",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 16624,
+      "endFrame": 16642
+    },
+    {
+      "id": "operation-119",
+      "start": 555.2880666666666,
+      "end": 560.2930666666667,
+      "classification": "machine",
+      "reason": "Presenter/full machine with pen-mechanism heading",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 16642,
+      "endFrame": 16792
+    },
+    {
+      "id": "operation-120",
+      "start": 560.2930666666667,
+      "end": 564.6307333333333,
+      "classification": "machine",
+      "reason": "Whole physical wheel/pen/platen closeup",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 16792,
+      "endFrame": 16922
+    },
+    {
+      "id": "operation-121",
+      "start": 564.6307333333333,
+      "end": 565.2980666666667,
+      "classification": "transition",
+      "reason": "Whole pen closeup to pen withdrawal detail",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 16922,
+      "endFrame": 16942
+    },
+    {
+      "id": "operation-122",
+      "start": 565.2980666666667,
+      "end": 568.0007666666667,
+      "classification": "machine",
+      "reason": "Operator withdraws pen rod from wire-connected hanger",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 16942,
+      "endFrame": 17023
+    },
+    {
+      "id": "operation-123",
+      "start": 568.0007666666667,
+      "end": 571.5376333333334,
+      "classification": "machine",
+      "reason": "Two physical views: withdrawn pen/rod and top-of-pen wheel connection",
+      "views": [
+        {
+          "viewId": "pen-withdrawal",
+          "rectSourcePixels": [
+            0,
+            0,
+            960,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "wheel-hanger",
+          "rectSourcePixels": [
+            960,
+            0,
+            960,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 17023,
+      "endFrame": 17129
+    },
+    {
+      "id": "operation-124",
+      "start": 571.5376333333334,
+      "end": 572.2049666666667,
+      "classification": "transition",
+      "reason": "Pen withdrawal to detached brass V-block photograph",
+      "views": [
+        {
+          "viewId": "pen-withdrawal",
+          "rectSourcePixels": [
+            0,
+            0,
+            960,
+            1080
+          ],
+          "presentation": "native"
+        },
+        {
+          "viewId": "wheel-hanger",
+          "rectSourcePixels": [
+            960,
+            0,
+            960,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 17129,
+      "endFrame": 17149
+    },
+    {
+      "id": "operation-125",
+      "start": 572.2049666666667,
+      "end": 581.4809,
+      "classification": "machine",
+      "reason": "Real pen V-block and square rod detail",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 17149,
+      "endFrame": 17427
+    },
+    {
+      "id": "operation-126",
+      "start": 581.4809,
+      "end": 587.6871,
+      "classification": "machine",
+      "reason": "Pen frame introduced around real V-block",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 17427,
+      "endFrame": 17613
+    },
+    {
+      "id": "operation-127",
+      "start": 587.6871,
+      "end": 588.9884,
+      "classification": "transition",
+      "reason": "Static pen frame to hand assembly view",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 17613,
+      "endFrame": 17652
+    },
+    {
+      "id": "operation-128",
+      "start": 588.9884,
+      "end": 592.6587333333333,
+      "classification": "machine",
+      "reason": "Hands attach/remove pen frame and screw onto rod/V-block",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 17652,
+      "endFrame": 17762
+    },
+    {
+      "id": "operation-129",
+      "start": 592.6587333333333,
+      "end": 597.9640333333333,
+      "classification": "machine",
+      "reason": "Insert felt pen and tighten lower screw",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 17762,
+      "endFrame": 17921
+    },
+    {
+      "id": "operation-130",
+      "start": 597.9640333333333,
+      "end": 598.9984000000001,
+      "classification": "transition",
+      "reason": "Hand assembly to installed pen orientation",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 17921,
+      "endFrame": 17952
+    },
+    {
+      "id": "operation-131",
+      "start": 598.9984000000001,
+      "end": 611.0104,
+      "classification": "machine",
+      "reason": "Installed pen yaw45degrees; direction-of-travel arrow",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 17952,
+      "endFrame": 18312
+    },
+    {
+      "id": "operation-132",
+      "start": 611.0104,
+      "end": 620.5199,
+      "classification": "machine",
+      "reason": "Actual moving platen/pen writes waveform at45degree setting",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 18312,
+      "endFrame": 18597
+    },
+    {
+      "id": "operation-133",
+      "start": 620.5199,
+      "end": 622.9890333333334,
+      "classification": "machine",
+      "reason": "Hand rotates pen yaw toward nearzero; actual waveform changes",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 18597,
+      "endFrame": 18671
+    },
+    {
+      "id": "operation-134",
+      "start": 622.9890333333334,
+      "end": 633.9666666666667,
+      "classification": "machine",
+      "reason": "Nearzero pen yaw: flattened peaks/troughs on actual plotted trace",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 18671,
+      "endFrame": 19000
+    },
+    {
+      "id": "operation-135",
+      "start": 633.9666666666667,
+      "end": 649.3153333333333,
+      "classification": "machine",
+      "reason": "Pen yaw adjusted to opposite side; actual trace remains visible",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 19000,
+      "endFrame": 19460
+    },
+    {
+      "id": "operation-136",
+      "start": 649.3153333333333,
+      "end": 650.3163333333333,
+      "classification": "transition",
+      "reason": "Pen closeup fades through black to presenter",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 19460,
+      "endFrame": 19490
+    },
+    {
+      "id": "operation-137",
+      "start": 650.3163333333333,
+      "end": 656.4558000000001,
+      "classification": "machine",
+      "reason": "Presenter/full machine closing explanation",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 19490,
+      "endFrame": 19674
+    },
+    {
+      "id": "operation-138",
+      "start": 656.4558000000001,
+      "end": 673.4060666666667,
+      "classification": "machine",
+      "reason": "Whole machine remains beside companion-book overlay",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 19674,
+      "endFrame": 20182
+    },
+    {
+      "id": "operation-139",
+      "start": 673.4060666666667,
+      "end": 674.5071666666666,
+      "classification": "transition",
+      "reason": "Whole machine dissolves to navigation endcard",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 20182,
+      "endFrame": 20215
+    },
+    {
+      "id": "operation-140",
+      "start": 674.5071666666666,
+      "end": 702.9022,
+      "classification": "non-machine",
+      "reason": "Navigation endcard: no corresponding physical-machine pose",
+      "views": [],
+      "startFrame": 20215,
+      "endFrame": 21066
+    },
+    {
+      "id": "operation-141",
+      "start": 702.9022,
+      "end": 704.0033,
+      "classification": "transition",
+      "reason": "Navigation endcard dissolves to credits",
+      "views": [
+        {
+          "viewId": "main",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ],
+          "presentation": "native"
+        }
+      ],
+      "startFrame": 21066,
+      "endFrame": 21099
+    },
+    {
+      "id": "operation-142",
+      "start": 704.0033,
+      "end": 707.061,
+      "classification": "non-machine",
+      "reason": "Credits and final fade to black",
+      "views": [],
+      "startFrame": 21099,
+      "endFrame": 21191
+    }
+  ]
+}
