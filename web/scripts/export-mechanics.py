@@ -333,6 +333,14 @@ def export_snapshot(
     mount = modules["spring_mount_geom"]
     settled = modules["settled_spring_seats"]
     goose = modules["sm_gooseneck_geom"]
+    # Releases before MHA-SM-004 model the counter eye on the gooseneck's
+    # integral screw shank; later trees seat it on the separate made screw's
+    # #6-32 major diameter.
+    counter_screw_dia = (
+        goose.SCREW_SHANK_DIA
+        if hasattr(goose, "SCREW_SHANK_DIA")
+        else identity_map.import_module(cad, "sm_gooseneck_spring_screw_geom").MAJOR_DIA
+    )
     mag = modules["mg_magnifying_lever_geom"]
     lw = modules["mg_lever_wire_geom"]
     pw = modules["pn_pen_wire_geom"]
@@ -825,7 +833,7 @@ def export_snapshot(
             "loopTurns": counter.LOOP_TURNS,
             "loopRiseMm": counter.LOOP_RISE_MM,
             "loopHalfRiseMm": counter.LOOP_HALF_RISE_MM,
-            "screwRadiusMm": goose.SCREW_SHANK_DIA / 2.0,
+            "screwRadiusMm": counter_screw_dia / 2.0,
             "coilOutsideDiameterMm": counter.COIL_OD_MM,
             "wireDiameterMm": counter.WIRE_DIA_MM,
             "coilTurns": counter.COIL_TURNS,
