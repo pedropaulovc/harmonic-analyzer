@@ -137,14 +137,17 @@ from dt_cone_swing_platform_spec import (
     HOLDDOWN_STATION_TOL_MM,
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
-    PIVOT_HOLE_DIA,
-    PIVOT_HOLE_SPEC,
     PIVOT_RELIEF_FIT_REQUIREMENT,
     POST_MOUNT_ENGAGEMENT_NOTE,
     POST_MOUNT_SPEC,
     POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_DIA,
     SURFACE_FINISHES,
+)
+from dt_cone_swing_platform_pivot_spec import (
+    PIVOT_HOLE_BAND,
+    PIVOT_HOLE_DIA,
+    PIVOT_HOLE_SPEC,
 )
 
 PART_NAME = "dt-cone-swing-platform"
@@ -495,19 +498,18 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
-    # Pivot screw clearance hole at the origin: preserve the native Hole
-    # Wizard 1/4 close-clearance feature used by this occasional setup pivot.
-    # There is no measured evidence that its stock shoulder needs a tighter
-    # running-bearing fit, so the title block's DRILLED HOLES +0.10/0 row
-    # governs it; a per-feature band would only restate that row.
+    # Pivot bore at the origin: native Hole Wizard 1/4 drill-size hole,
+    # reamed H7 on the stock shoulder (dt_cone_swing_platform_spec). The band
+    # lives on the feature, so the sheet's REAM callout displays it.
     pivot_dia = PIVOT_HOLE_DIA
     wizard_holes(
         adapter,
         PIVOT_HOLE_SPEC,
         [[0.0, 0.0, 0.0]],
         (0.0, -1.0, 0.0),
-        "pivot screw hole (1/4 clearance)",
+        "pivot bore (1/4 reamed H7)",
         name="PivotHole",
+        dia_tolerance_mm=(-PIVOT_HOLE_BAND[1], PIVOT_HOLE_BAND[0]),
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = await volume_check(

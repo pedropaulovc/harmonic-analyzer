@@ -35,8 +35,6 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
         set(drawing.NOTCH_KEEP),
         set(drawing.SECTION_KEEP),
         set(drawing.DETAIL_KEEP),
-        set(drawing.CRANK_RELIEF_PLAN_KEEP),
-        set(drawing.CRANK_RELIEF_SECTION_KEEP),
     )
     kept = set().union(*view_sets)
     assert kept == marked
@@ -46,14 +44,23 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
 
 
-def test_pivot_preserves_native_close_clearance_hole() -> None:
-    assert spec.PIVOT_HOLE_SPEC.kind == "clearance"
-    assert spec.PIVOT_HOLE_SPEC.size == "1/4"
-    assert spec.PIVOT_HOLE_SPEC.fit == "close"
-    assert spec.PIVOT_HOLE_SPEC.end == "through_all"
-    assert spec.PIVOT_HOLE_DIA == blind_cut_dia_mm(spec.PIVOT_HOLE_SPEC)
-    assert spec.PIVOT_HOLE_DIA == pytest.approx(6.756)
-    assert spec.PIVOT_HOLE_DIA > vn_cone_pivot_screw_spec.SHOULDER_DIA
+def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
+    """Main ruling 2026-10-10: the plate is reamed Ø6.350 H7 on the 6.3246-6.350
+    shoulder, band from config, carried natively on the Hole Wizard feature."""
+    import _config
+
+    import dt_cone_swing_platform_pivot_spec as pivot_spec
+
+    assert pivot_spec.PIVOT_HOLE_SPEC.kind == "drilled_fractional"
+    assert pivot_spec.PIVOT_HOLE_SPEC.size == "1/4"
+    assert pivot_spec.PIVOT_HOLE_SPEC.end == "through_all"
+    assert pivot_spec.PIVOT_HOLE_DIA == blind_cut_dia_mm(pivot_spec.PIVOT_HOLE_SPEC)
+    assert pivot_spec.PIVOT_HOLE_DIA == pytest.approx(6.350)
+    assert pivot_spec.PIVOT_HOLE_BAND == tuple(
+        _config.fit("cone_drum_oblique_mesh", "pivot_bore_band_mm")
+    ) == (0.015, 0.0)
+    shoulder_max = vn_cone_pivot_screw_spec.SHOULDER_DIA + vn_cone_pivot_screw_spec.SHOULDER_DIA_BAND[0]
+    assert pivot_spec.PIVOT_HOLE_DIA + pivot_spec.PIVOT_HOLE_BAND[1] >= shoulder_max
 
 
 def test_post_mount_pattern_is_derived_from_its_mating_post() -> None:
@@ -130,14 +137,19 @@ def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
     assert part.PLATE_T - spec.PIVOT_BEARING_THICKNESS == pytest.approx(
         spec.PIVOT_BEARING_RELIEF_DEPTH
     )
-    assert spec.CRANK_GEAR_PLATFORM_CLEARANCE > 0.5
+    assert spec.crank_gear_platform_clearance() >= 0.5
 
 
 def test_stepped_collar_extension_keeps_post_and_tip_attachment_laws() -> None:
     from dt_cone_swing_platform_crank_axis import CRANK_AXIS_OFF
 
-    assert cone_line.TIP_END_EXTENSION_MM == 7.5
-    assert cone_line.PIVOT_STATION - cone_line.T006_NORTH_FACE == pytest.approx(30.5)
+    # The retained 7.5 extension plus the custom collar body's northward shift.
+    from cone_shaft_land_bands import TIP_COLLAR_BODY_NORTH_SHIFT_MM
+
+    assert cone_line.TIP_END_EXTENSION_MM == 7.5 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
+    assert cone_line.PIVOT_STATION - cone_line.T006_NORTH_FACE == pytest.approx(
+        23.0 + cone_line.TIP_END_EXTENSION_MM
+    )
     assert cone_line.PIVOT_STATION - cone_line.TIP_BLOCK_NORTH_FACE == pytest.approx(
         cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
     )
@@ -602,7 +614,9 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
         "CounterBoreDepth": spec.HOLDDOWN_CBORE_DEPTH,
     }
     assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
-    assert (spec.HOLDDOWN_LOCAL_X, spec.HOLDDOWN_LOCAL_Z) == (-1.0, -10.45)
+    assert spec.HOLDDOWN_LOCAL_X == -1.0
+    assert spec.HOLDDOWN_LOCAL_Z == -cone_line.TIP_BLOCK_PIVOT_OFFSET
+    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-10.45)
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 
@@ -690,7 +704,10 @@ def test_holddown_guards_refuse_a_spec_that_fails_at_print_worst(
 @pytest.mark.parametrize(
     "replacement",
     [
-        ("HOLDDOWN_LOCAL_Z = -10.45", "HOLDDOWN_LOCAL_Z = -6.00"),  # onto the pivot
+        (
+            "HOLDDOWN_LOCAL_Z = -cone_line.TIP_BLOCK_PIVOT_OFFSET",
+            "HOLDDOWN_LOCAL_Z = -6.00",
+        ),  # onto the pivot
         ("HOLDDOWN_LOCAL_X = -1.0", "HOLDDOWN_LOCAL_X = 6.0"),  # to the west edge
     ],
 )

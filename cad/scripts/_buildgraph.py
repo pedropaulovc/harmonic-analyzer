@@ -2292,6 +2292,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_cone_swing_platform_geometry",
         "dt_cone_swing_platform_spec",
         "dt_cone_tip_block_spec",
+        # Drilled-hole row sizes the post, tip and pivot fastener floats.
+        "dt_cone_support_pose",
         "crank_boss_rim",
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",

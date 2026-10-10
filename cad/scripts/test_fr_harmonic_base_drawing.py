@@ -1607,6 +1607,36 @@ def test_rig_set_note_clears_the_sheet_2_callouts_table_and_views() -> None:
     assert "boxes[RIG_SET_NOTE_LABEL] = element.box" in source
 
 
+def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
+    """The pivot seat is held +-0.05 to the MHA-DT-002 seats, in one setup with
+    them (cone_set_stack); the note's offsets are the model's, measured from
+    the nearer seat in table axes (X right, Y = -z), and its box hangs under
+    the RIG SET note clear of the table, views and callouts."""
+    import math
+
+    import draw_fr_harmonic_base as sheet
+
+    near = min(sheet.PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, sheet.PIVOT_SCREW_XZ))
+    dx = sheet.PIVOT_SCREW_XZ[0] - near[0]
+    dy = near[1] - sheet.PIVOT_SCREW_XZ[1]
+    assert f"X {dx:.2f}, Y {dy:.2f} <MOD-PM>0.05" in sheet.PIVOT_SEAT_STEP
+    assert "ONE SETUP" in sheet.PIVOT_SEAT_STEP
+    assert "MHA-DT-002" in sheet.PIVOT_SEAT_STEP
+    lines = sheet.PIVOT_SEAT_STEP.split("\n")
+    x, y = sheet.PIVOT_SEAT_NOTE_XY
+    box = (
+        x,
+        y - len(lines) * _NOTE_LINE_MM / 1000.0,
+        x + max(len(line) for line in lines) * _NOTE_CHAR_MM / 1000.0,
+        y,
+    )
+    obstacles = dict(E0E287C83_OBSTACLES)
+    obstacles.update((f"callout {name}", b) for name, b in HB_RENDER_4_BOXES.items())
+    obstacles["note RIG SET"] = _rig_set_note_box(sheet.RIG_SET_NOTE_XY)
+    assert sheet.find_callout_clashes({"pivot seat note": box}, obstacles) == []
+    assert box[1] > 0.02  # above the frame's inner border
+
+
 def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
     # Main (restricted review of #858): one blanking helper in _common, traced
     # like every other per-operation helper, and no local copy in the base.

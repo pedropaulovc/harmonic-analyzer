@@ -2,12 +2,12 @@ r"""Create the curated machinist drawing for the cone swing platform.
 
 The SLDPRT remains authoritative.  The plan imports the plate outline,
 post-mount pattern, lock notch and corner radii; the native Hole Wizard callout
-defines the pivot clearance hole; section A-A exposes the shallow pivot-head
+defines the reamed pivot bore; section A-A exposes the shallow pivot-head
 relief and plate thickness in solid lines.  Display precision comes from the
 model.
 
-The platform is an asymmetric steel wedge with a 1/4-in close-clearance pivot
-hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
+The platform is an asymmetric steel wedge with a 1/4-in reamed H7 pivot
+bore on the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, four rounded plan corners and the counterbored #4
 clearance hole for the tip block's single hold-down screw, rising from the
 underside (user ruling 2026-09-29).  The three plan views run 1:2 and pivot
@@ -74,12 +74,12 @@ from dt_cone_swing_platform_spec import (
     HOLDDOWN_CLEARANCE_DIA,
     HOLDDOWN_LOCAL_X,
     HOLDDOWN_LOCAL_Z,
-    PIVOT_HOLE_DIA,
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
 )
+from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
 from diagnostics.drawing_layout_audit import collect_document, describe_sheet
 
 
@@ -788,7 +788,7 @@ def expected_corner_arcs(feature_name: str) -> int:
     on where the open relief splits a fillet's top edge.
     """
     label = feature_name.removeprefix("Corner")
-    radius = {corner[0]: corner[3] for corner in _part._CORNERS}[label]
+    radius = {corner[0]: corner[3] for corner in _part.PLATE_CORNERS}[label]
     return 2 if _part._north_fillet_relief_overlap(label, radius) > 0.0 else 1
 
 
@@ -919,7 +919,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Profile View Note",
             "Feature View Note",
             "Notch View Note",
-            "Crank Relief View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
             "Post Mount Engagement",
@@ -932,7 +931,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Profile View Note",
             "Feature View Note",
             "Notch View Note",
-            "Crank Relief View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
             "Post Mount Engagement",
@@ -1149,9 +1147,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         feature,
         callout_xy=(0.215, 0.107),
-        label="pivot close-clearance hole",
+        label="pivot reamed bore",
         edge=pivot_edge,
-        process="DRILL",
+        process="REAM",
     )
     add_native_hole_callout(
         adapter,

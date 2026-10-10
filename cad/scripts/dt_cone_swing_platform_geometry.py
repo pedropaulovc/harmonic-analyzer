@@ -34,7 +34,6 @@ from dt_cone_swing_platform_spec import (
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_BEARING_THICKNESS,
-    PIVOT_HOLE_DIA,
     PLATE_THICKNESS,
     POST_ATTACHMENT_SPACING,
     POST_BLOCK_DIA,
@@ -42,6 +41,7 @@ from dt_cone_swing_platform_spec import (
     POST_MOUNT_TAP_DIA,
     POST_MOUNT_THREAD_DIA,
 )
+from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
 
 PLATE_T = PLATE_THICKNESS  # 1/4" plate
 HALF_WIDTH_N = 16.0  # north (pivot/tip) half-width, EAST side (the lock-slot

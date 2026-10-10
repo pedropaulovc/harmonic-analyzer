@@ -91,6 +91,7 @@ FRACTIONAL_DRILL_MM = {
     "1/8": 3.175,
     "3/16": 4.763,
     "15/64": 5.953,
+    "1/4": 6.350,  # reamed size (cone swing platform pivot bore, H7)
     "5/16": 7.938,
 }
 LETTER_DRILL_MM = {  # letter drills cut diameter exactly

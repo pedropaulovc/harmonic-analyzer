@@ -61,11 +61,6 @@ PIVOT_RELIEF_FIT_REQUIREMENT = (
     "WITH SHOULDER SEATED ON BASE, LOCK KNOB RELEASED:\n"
     "PLATFORM SWINGS FREELY WITH MINIMAL AXIAL PLAY."
 )
-# The platform swings on the stock 1/4-in shoulder, but this occasional setup
-# pivot has no measured need for a close running bearing fit.  Preserve the
-# established native Hole Wizard close-clearance feature and its table size.
-PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
-PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
 
 
 _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))

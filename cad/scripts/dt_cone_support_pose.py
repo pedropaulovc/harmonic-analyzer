@@ -18,6 +18,7 @@ import _config
 import cone_line as line
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_pivot_post_spec as post
+import dt_cone_swing_platform_pivot_spec as plate_pivot
 import dt_cone_swing_platform_spec as plate
 import dt_cone_tip_block_spec as tip
 import dt_crankshaft_spec as crankshaft
@@ -38,7 +39,10 @@ P1_SWEEP_DEG = P1_STOP_ENCLOSURE["angle_interval_deg"]
 _DRILL_PLUS = float(_config.title_block("drilled_hole")["plus_mm"])
 _POST_FLOAT = (post.ATTACHMENT_THRU_DIA + _DRILL_PLUS - plate.POST_MOUNT_THREAD_DIA) / 2.0
 _TIP_FLOAT = (plate.HOLDDOWN_CLEARANCE_DIA + _DRILL_PLUS - THREAD_MAJOR_MM[tip.HOLDDOWN_THREAD]) / 2.0
-_PIVOT_FLOAT = (plate.PIVOT_HOLE_DIA + _DRILL_PLUS - (pivot.SHOULDER_DIA + pivot.SHOULDER_DIA_BAND[1])) / 2.0
+_PIVOT_FLOAT = (
+    plate_pivot.PIVOT_HOLE_DIA + plate_pivot.PIVOT_HOLE_BAND[0]
+    - (pivot.SHOULDER_DIA + pivot.SHOULDER_DIA_BAND[1])
+) / 2.0  # the reamed H7 pivot bore on the stock shoulder
 _JOURNAL_FLOAT = (post.BORE_DIA + post.RUNNING_BORE_BAND[0] - shaft.JOURNAL_DIA - shaft.RUNNING_DIA_BAND[1]) / 2.0
 _SUPPORT_SPAN = shaft.T006_TIP_STATION - line.POST_STATION
 _CRANK_FLOAT = crankshaft.JOURNAL_DIAMETRAL_CLEARANCE_MM[1] / 2.0
