@@ -375,12 +375,13 @@ def _configuration_builders() -> set[str]:
     }
 
 
-def test_the_builders_that_create_configurations_are_the_known_five() -> None:
+def test_the_builders_that_create_configurations_are_the_known_six() -> None:
     """A new multi-configuration builder must fail here until it reopens its
     saved part and runs the tripwire (and joins this set).  Every other builder
     that derives drawing configurations goes through save_simplified_part,
     which reopens and runs the tripwire itself."""
     assert _configuration_builders() == {
+        "build_ch_pivot_bracket",
         "build_dt_crank_handle_ferrule",
         "build_dt_cone_gear",
         "build_dt_crank_handle_pivot_screw",

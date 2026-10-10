@@ -33,27 +33,24 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "PocketRadius",
         "CavityRadius",
         "RimChamferSize",
-        "RailDepth",
     }
     marked = set().union(*support.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked == expected
     assert drawing.DIMENSION_CALLOUTS == {
-        "WinWidth": " POCKET",
+        "WinWidth": "SQ POCKET",
         "PocketRadius": "8X",
         "CavityRadius": "4X",
         "CavWidth": "SQ CAVITY THRU",
         "RimChamferSize": " X 45 DEG\n2 FACES",
     }
     assert drawing.DIMENSION_PRECISION == {
-        **dict.fromkeys(expected - {"PocketRadius", "RimChamferSize", "RailDepth"}, 1),
+        **dict.fromkeys(expected - {"PocketRadius", "RimChamferSize"}, 1),
         "PocketRadius": 2,
         "RimChamferSize": 2,
         "WebThickness": 2,
         "FootThickness": 2,
     }
-    # The rail depth's places are the part's (Codex #936 PRRT_kwDOPHDy386mTMXw).
-    assert drawing.MODEL_OWNED_PRECISION == {"RailDepth": seats.RAIL_DEPTH_PLACES}
 
 
 def test_pocket_and_cavity_reliefs_are_distinct() -> None:
@@ -68,7 +65,7 @@ def test_pocket_and_cavity_reliefs_are_distinct() -> None:
     assert {abs(edge[0]) for edge in support.POCKET_FILLET_EDGES} == {support.BIG}
     assert {edge[1] for edge in support.POCKET_FILLET_EDGES} == {
         -support.BIG,
-        seats.WINDOW_TOP_Y,
+        support.BIG,
     }
     assert all(abs(edge[2]) > support.WEB for edge in support.POCKET_FILLET_EDGES)
 
@@ -441,71 +438,59 @@ def test_section_constants_live_in_the_pure_data_spec() -> None:
         assert getattr(support, name) is getattr(placement, name)
     assert drawing_spec.HALF_Y is section.HALF_Y
     assert frame.LAG_FOOT_THICKNESS is section.FOOT_THICKNESS
-    assert seats.FOOT_THICKNESS is section.FOOT_THICKNESS
     # The base seats key on the foot: it stays exactly the source's 6.35.
     assert section.FOOT_THICKNESS == pytest.approx(6.35)
     assert section.BIG == pytest.approx(82.55)
 
 
-def test_deeper_rail_lowers_only_the_window_top() -> None:
-    assert seats.RAIL_DEPTH == 22.7
-    assert seats.WINDOW_TOP_Y == pytest.approx(66.2)
-    assert seats.WINDOW_BOTTOM_Y == pytest.approx(-support.BIG)
-    assert seats.WINDOW_HEIGHT == pytest.approx(148.75)
-    # 165.1 wide by 148.75 tall: the print no longer calls it square.
-    assert 2.0 * support.BIG - seats.WINDOW_HEIGHT > 10.0
-    assert "SQ" not in drawing.DIMENSION_CALLOUTS["WinWidth"]
-    # The cavity's chamfered top rim stays a web edge under the rail.
-    assert seats.WINDOW_TOP_Y - support.CAV == pytest.approx(2.7)
+def test_window_is_the_source_square_with_rails_as_deep_as_the_foot() -> None:
+    """The 2026-10-09 sketch reverted #743's deeper rail: the window is the
+    source's 165.1 square again, so the top rail, side posts and foot are all
+    one 6.35 frame member, and the print calls the pocket square."""
+    assert support.HALF_Y - support.BIG == pytest.approx(section.FOOT_THICKNESS)
+    assert drawing.DIMENSION_CALLOUTS["WinWidth"] == "SQ POCKET"
+    assert {abs(edge[1]) for edge in support.POCKET_FILLET_EDGES} == {support.BIG}
 
 
-def test_rail_volume_deltas_are_the_closed_forms() -> None:
-    def wall(y: float) -> float:
-        return support.WIDE + (support.NARROW - support.WIDE) * (
-            (y + support.HALF_Y) / (2.0 * support.HALF_Y)
-        )
-
-    # The band WINDOW_TOP_Y..BIG, numerically integrated, per pocket side.
-    steps = 2000
-    dy = (support.BIG - seats.WINDOW_TOP_Y) / steps
-    band = sum(
-        2.0
-        * support.BIG
-        * (wall(seats.WINDOW_TOP_Y + (i + 0.5) * dy) - support.WEB)
-        * dy
-        for i in range(steps)
-    )
-    assert support.RAIL_BAND_VOLUME == pytest.approx(band, rel=1e-9)
+def test_web_volume_deltas_are_the_closed_forms() -> None:
+    """The source casting's native targets plus the 9.525 web's deltas."""
+    growth = support.WEB - support.SOURCE_WEB
+    assert growth == pytest.approx(1.5875)
+    band = ((2.0 * support.BIG) ** 2 - (2.0 * support.CAV) ** 2) * growth
     assert support.WINDOW_CUT1_VOLUME - support.SQUARE_WINDOW_CUT1_VOLUME == (
         pytest.approx(band)
     )
     assert support.WINDOW_CUT2_VOLUME - support.SQUARE_WINDOW_CUT2_VOLUME == (
         pytest.approx(2.0 * band)
     )
-    # Moving four spandrels down to a thicker wall adds material, a little.
-    assert 0.0 < support.TOP_FILLET_SHIFT_VOLUME < 100.0
-    # The rim chamfer runs on four shorter window side edges.
+    spandrel = 1.0 - math.pi / 4.0
+    corner = 4.0 * spandrel * support.FILLET_R**2 * 2.0 * growth
+    pocket = 8.0 * spandrel * support.POCKET_FILLET_R**2 * growth
+    assert (
+        support.CORNER_FILLET_VOLUME - support.SQUARE_CORNER_FILLET_VOLUME
+    ) == pytest.approx(2.0 * band + corner)
+    assert (
+        support.POCKET_FILLET_VOLUME - support.SQUARE_POCKET_FILLET_VOLUME
+    ) == pytest.approx(2.0 * band + corner - pocket)
     removal = support.FOOT_HOLED_VOLUME - support.RIM_CHAMFER_VOLUME
-    assert removal == pytest.approx(
-        support.SQUARE_RIM_CHAMFER_REMOVAL
-        - 4.0 * (support.BIG - seats.WINDOW_TOP_Y) * support.CHAMFER**2 / 2.0
-    )
+    assert removal == pytest.approx(support.SQUARE_RIM_CHAMFER_REMOVAL)
     assert support.BRACKET_SEATS_VOLUME < support.RIM_CHAMFER_VOLUME
 
 
-def test_bracket_seats_sit_under_the_bracket_holes_on_the_rail() -> None:
-    import ch_pivot_bracket_spec as bracket
-    import rocker_bank_layout as bank
+def test_bracket_seats_sit_under_the_bracket_holes() -> None:
+    import ch_pivot_bracket_sides as sides
 
     assert seats.SEAT_SPEC.kind == "tapped_bottoming"
     assert seats.SEAT_SPEC.size == seats.SCREW_THREAD == "#8-32"
     assert seats.SEAT_SPEC.depth_mm == seats.SEAT_DRILL_DEPTH == 18.0
     assert seats.SEAT_SPEC.overrides_mm == {"ThreadDepth": seats.SEAT_THREAD_DEPTH}
     assert seats.SEAT_THREAD_DEPTH == 14.7
-    assert len(seats.SEAT_MACHINE_XZ) == 2 * len(bank.PIVOT_BRACKET_Z)
-    south, north = bank.PIVOT_BRACKET_Z
+    assert len(seats.SEAT_MACHINE_XZ) == len(sides.CONFIGURATIONS) == 2
     assert [z for _, z in seats.SEAT_MACHINE_XZ] == pytest.approx(
-        [south + h for h in bracket.HOLE_Z] + [north - h for h in bracket.HOLE_Z]
+        [
+            sides.MOUNT_Z[name] + sides.OUTBOARD_SIGN[name] * sides.HOLE_Z[name]
+            for name in sides.CONFIGURATIONS
+        ]
     )
     assert {x for x, _ in seats.SEAT_MACHINE_XZ} == {placement.SUPPORT_WORLD_X}
     assert [p[0] for p in support.SEAT_POINTS] == pytest.approx(
@@ -521,24 +506,7 @@ def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
     assert seats.ENGAGEMENT_MIN >= 1.5 * seats.SCREW_MAJOR_DIA
     assert seats.SEAT_THREAD_DEPTH - 0.8 >= seats.SCREW_REACH_MAX + 0.25
     assert seats.SEAT_DRILL_DEPTH - 0.8 >= seats.SEAT_THREAD_DEPTH + 0.8 + 2 * 25.4 / 32
-    assert seats.SEAT_DRILL_BOTTOM_MAX + 0.25 <= seats.RAIL_DEPTH - 0.8
-    assert seats.RAIL_WALL >= 2.0
-
-
-def test_rail_depth_is_a_model_dimension_on_the_section_plane() -> None:
-    """Codex #936 PRRT_kwDOPHDy386mTMXw: the rail depth the seat stack's
-    worst case rests on is a marked WallProfile dimension (the Right-plane
-    trapezoid Section A-A is parallel to), carried at the layout's .X places
-    by the part and only asserted by the sheet."""
-    assert "RailDepth" in support.DRAWING_DIMENSIONS["WallProfile"]
-    assert drawing.RIGHT_KEEP["RailDepth"] == drawing.RAIL_TEXT_XY
-    assert seats.RAIL_DEPTH_PLACES == 1
-    assert round(seats.RAIL_DEPTH, seats.RAIL_DEPTH_PLACES) == seats.RAIL_DEPTH
-    # The construction line it measures to spans the wall at the window top.
-    assert 0.0 < support._wall_half_z_at(seats.WINDOW_TOP_Y) < support.WIDE
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "SetPrecision3(DIMENSION_PRECISION[\"RailDepth\"]" not in source
-    assert 'label="section rail depth"' not in source
+    assert seats.WEB_WALL_MIN >= 2.0
 
 
 def test_rim_chamfer_is_placed_on_the_section_by_a_targeted_import() -> None:
@@ -572,14 +540,12 @@ def test_precision_reaches_every_dimension_exactly_once() -> None:
     """r743-rocker-fix (53cb9ad5b) failed "dimension precision not applied:
     ['RailDepth']": the bulk call covers only imported dimensions, and the
     sheet-made ones (web, foot) set their own after the import. Every
-    DIMENSION_PRECISION name goes through exactly one of the two; the
-    part-owned rail depth goes through neither."""
+    DIMENSION_PRECISION name goes through exactly one of the two."""
     import ast
 
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     bulk = drawing.imported_precision()
     assert set(bulk) == kept & set(drawing.DIMENSION_PRECISION)
-    assert not set(bulk) & set(drawing.MODEL_OWNED_PRECISION)
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     own = {
         node.slice.value
@@ -638,15 +604,10 @@ def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool
     )
 
 
-def test_rim_chamfer_callout_clears_the_rail_depth_text() -> None:
-    """r743-rocker-fix3 ran "X 45 DEG" into the section's 21.0: both sat in the
-    lane between the front view and the section at y ~0.224."""
+def test_rim_chamfer_callout_stays_right_of_the_front_view() -> None:
     # Rendered as three lines: the value, then the callout's two.
     assert drawing.DIMENSION_CALLOUTS["RimChamferSize"] == " X 45 DEG\n2 FACES"
     chamfer = _text_box("1.27\nX 45 DEG\n2 FACES", drawing.RIGHT_KEEP["RimChamferSize"])
-    rail = _text_box(f"{support.RAIL_DEPTH:.1f}", drawing.RAIL_TEXT_XY)
-    assert _boxes_clear(chamfer, rail, 0.003)
-    # ...and stays right of the front view.
     front_right = drawing.FRONT_CENTER[0] + support.HALF_Y * drawing.VIEW_SCALE / 1000
     assert chamfer[0] > front_right + 0.003
 
@@ -715,7 +676,7 @@ def test_stacked_pocket_widths_keep_separate_bands() -> None:
     pass), so the lower text clears the upper dimension by a full line pitch,
     and its own line still stays above the bottom view."""
     cavity = _text_box("127.0\nSQ CAVITY THRU", drawing.FRONT_KEEP["CavWidth"])
-    pocket = _text_box("165.1\nPOCKET", drawing.FRONT_KEEP["WinWidth"])
+    pocket = _text_box("165.1\nSQ POCKET", drawing.FRONT_KEEP["WinWidth"])
     assert pocket[3] + NOTE_LINE_PITCH <= cavity[1]
     bottom_top = drawing.BOTTOM_CENTER[1] + support.WIDE * drawing.VIEW_SCALE / 1000
     assert pocket[1] - NOTE_LINE_PITCH > bottom_top + 0.005
@@ -744,7 +705,6 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
     assert label[0] > front_right + 0.003
     for other in (
         _text_box("16.9", drawing.RIGHT_KEEP["TopSpan"]),
-        _text_box(f"{support.RAIL_DEPTH:.1f}", drawing.RAIL_TEXT_XY),
         _text_box("1.27\nX 45 DEG\n2 FACES", drawing.RIGHT_KEEP["RimChamferSize"]),
         _text_box("177.8", drawing.FRONT_KEEP["Depth"]),
     ):

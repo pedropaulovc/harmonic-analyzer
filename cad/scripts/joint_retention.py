@@ -586,7 +586,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "mg_magnifying_clamp",  # #4-40 UNC-2B tapped ScrewHole (Hole Wizard), receiver of thumb_screw
         "ha_measuring_stick_stop",  # knurled thumbscrew (size not stated) threading up through the block floor, modelled integral (member AND receiver, one component)
         "mg_output_fixture",  # #4-40 UNC tapped cross hole (entry wall), receiver of the 2nd thumb_screw
-        "vn_pedestal_hold_down_screw",  # #8-32 x 3/4 fillister (90280A197, MHA-VN-032), member: 2 arbor-pedestal seats in harmonic_base, 4 pivot-bracket seats in rocker_arm_support
+        "vn_pedestal_hold_down_screw",  # #8-32 x 3/4 fillister (90280A197, MHA-VN-032), member: 2 arbor-pedestal seats in harmonic_base, 2 pivot-bracket seats in rocker_arm_support
         "pn_pen_frame",  # #4-40 UNC-2B tapped hole up through the bottom rail, receiver of pen_set_screw
         "pn_pen_hanger",  # #8-32 tapped hole in the strap, receiver of hanger_screw
         "vn_pen_set_screw",  # #4-40 UNC (McMaster 99607A213 knurled thumb screw), member into the pen-frame rail
@@ -676,7 +676,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_pinion_pivot_shaft",  # plain shaft, cross-pinned to the straps by MHA-VN-033
         "dt_pinion_spring",  # #4 clearance foot hole; clamped by foot_screw MHA-VN-020 (top-level row)
         "vn_pinion_strap_pin",  # 1/16 spring pin
-        "ch_pivot_bracket",  # #8 close-clearance foot holes, reamed ear cross-bore; no taps
+        "ch_pivot_bracket",  # #8 close-clearance foot hole, reamed ear cross-bore; no taps
         "ch_pivot_shaft",  # plain Ø10 shaft, integral shoulder, domed plain end; "NO FLATS"
         "pd_platen_clip",  # #4 clearance holes only (build_pd_platen_clip); clamped by fillister_screw
         "pd_platen_paper",  # paper sheet, no thread
@@ -1227,15 +1227,16 @@ JOINTS: tuple[Joint, ...] = (
         member="vn_pedestal_hold_down_screw",
         receiver="fr_rocker_arm_support",
         thread="#8-32",
-        quantity=2,
+        quantity=1,
         installed_at=ch_channel_assembly_steps.step_ref("north-ear-datum"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the north pivot_bracket foot to the stationary rocker_arm_support "
-            "rail (neither moves in operation); two screws per foot, so any moment "
-            "about one screw's axis is reacted in shear by the other screw and the "
-            "rocker bank's oscillating drag acts about the pivot-shaft axis (Z), "
-            "perpendicular to the vertical screw axes"
+            "rail (neither moves in operation); one screw per foot, but the bracket "
+            "cannot turn about it: the pivot shaft runs through both brackets' ear "
+            "bores, so either bracket's yaw is reacted by the shaft and the other "
+            "bracket's screw, and the rocker bank's oscillating drag acts about the "
+            "pivot-shaft axis (Z), perpendicular to the vertical screw axis"
         ),
         axial_capture="fillister head on the bracket foot top face; thread in a bottoming-tapped #8-32 2B blind seat transferred through the foot",
         lock=Lock.NONE,
@@ -1243,10 +1244,10 @@ JOINTS: tuple[Joint, ...] = (
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header (MHA-VN-032, #8-32 x 3/4 fillister, two per foot); "
+            "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header (MHA-VN-032, #8-32 x 3/4 fillister, one per foot); "
             "vn_pedestal_hold_down_screw_spec.THREAD; rocker_bracket_seat_layout.SEAT_SPEC (tapped_bottoming #8-32 2B); "
             "draw_dt_drive_train_assembly.py BANK_STEPS step north-pivot-bracket-set (MHA-DT-000 STEP 10: 'DRILL AND TAP THE RAIL "
-            "THROUGH ITS FEET ... UNSCREW IT AND LIFT IT OFF'); draw_ch_channel_assembly.py step north-ear-datum (MHA-CH-000 "
+            "THROUGH ITS FOOT ... UNSCREW IT AND LIFT IT OFF'); draw_ch_channel_assembly.py step north-ear-datum (MHA-CH-000 "
             "STEP 3: 'SLIDE THE ... EAR SOUTH OVER THE NORTH JOURNAL, SCREW IT DOWN AND RECHECK ITS S-OFFSET Y'); "
             "ch_channel_assembly_steps.NORTH_BRACKET_SET_REF; "
             "config parts/vn-pedestal-hold-down-screw.yaml (90280A197)"
@@ -1258,15 +1259,17 @@ JOINTS: tuple[Joint, ...] = (
         member="vn_pedestal_hold_down_screw",
         receiver="fr_rocker_arm_support",
         thread="#8-32",
-        quantity=2,
+        quantity=1,
         installed_at=ch_channel_assembly_steps.step_ref("south-bracket-spring-set"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the south pivot_bracket foot to the stationary rocker_arm_support "
-            "rail (neither moves in operation); two screws per foot react any moment "
-            "about one screw's axis in shear through the other, and the rocker bank's "
-            "oscillating drag and end thrust act about/along the pivot-shaft axis (Z), "
-            "perpendicular to the vertical screw axes"
+            "rail (neither moves in operation); one screw per foot, but the bracket "
+            "cannot turn about it: the pivot shaft runs through both brackets' ear "
+            "bores, so either bracket's yaw is reacted by the shaft and the other "
+            "bracket's screw, and the rocker bank's oscillating drag and end thrust "
+            "act about/along the pivot-shaft axis (Z), perpendicular to the vertical "
+            "screw axis"
         ),
         axial_capture="fillister head on the bracket foot top face; thread in a bottoming-tapped #8-32 2B blind seat transferred through the blade-set foot",
         lock=Lock.NONE,
@@ -1275,7 +1278,7 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="",
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
-            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-spring-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS SEATS ... "
+            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-spring-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS SEAT ... "
             "SCREW DOWN, PULL THE BLADE'), left screwed down through 'shaft-cut-to-fit' (STEP 6: 'UNSCREW THE NORTH ... "
             "AND SLIDE IT OFF NORTH; DRAW THE SHAFT NORTH ... REFIT AS STEP 3; "
             "SOUTH EAR LEFT AT ITS STEP 5 SETTING')"

@@ -340,14 +340,13 @@ def test_layout_reads_only_the_channel_stations_and_the_cam_plane() -> None:
 
 def test_pivot_parts_read_only_the_rocker_bank_config() -> None:
     """The shaft reads the stations and the cam plane through the rocker bank
-    layout; the bracket and washer read no machine config at all."""
+    layout, and so does the bracket (its feet end flush with the support from
+    the ear stations); the washer reads no machine config at all."""
     shaft_cfg = config_files_of(SCRIPTS / "build_ch_pivot_shaft.py")
     machine_cfg = {t for t in shaft_cfg if t.startswith("machine/")}
     assert machine_cfg == config_files_of(Path(bank.__file__))
-    assert not any(
-        t.startswith("machine/")
-        for t in config_files_of(SCRIPTS / "build_ch_pivot_bracket.py")
-    )
+    bracket_cfg = config_files_of(SCRIPTS / "build_ch_pivot_bracket.py")
+    assert {t for t in bracket_cfg if t.startswith("machine/")} == machine_cfg
     assert not any(
         t.startswith("machine/")
         for t in config_files_of(SCRIPTS / "build_ch_rocker_thrust_washer.py")

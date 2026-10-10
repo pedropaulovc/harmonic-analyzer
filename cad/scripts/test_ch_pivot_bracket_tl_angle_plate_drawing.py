@@ -7,7 +7,7 @@ import re
 import pytest
 
 import _config
-import ch_pivot_bracket_spec as bracket
+import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_tl_angle_plate_spec as spec
 import draw_ch_pivot_bracket_tl_angle_plate as drawing
 import export_features
@@ -103,7 +103,8 @@ def test_bracket_seat_lies_on_the_upright_face_above_the_ledge() -> None:
     seat = _features()["seat_face"]
     low, high = seat["bounds"]["y"]
     assert spec.BASE_THICK < low < high <= spec.PLATE_HEIGHT
-    assert abs((high - low) - (bracket.FOOT_LEN - spec.PART_PROUD)) < 1e-9
+    config = spec.LEDGE_CONFIG
+    assert abs((high - low) - (sides.FOOT_LEN[config] - spec.PART_PROUD[config])) < 1e-9
     x_low, x_high = seat["bounds"]["x"]
     assert 0.0 < x_low and x_high < spec.PLATE_LENGTH
 
@@ -114,6 +115,18 @@ def test_stud_holes_clear_the_bracket_foot() -> None:
     stud_r = _features()["stud_hole_left"]["dia"][1] / 2.0
     assert spec.STUD_X[0] + stud_r < seat["bounds"]["x"][0]
     assert spec.STUD_X[1] - stud_r > seat["bounds"]["x"][1]
+
+
+def test_stud_holes_keep_the_top_wall_at_the_exported_worst_case() -> None:
+    """Codex P2 on cc1d22b66: the 81.5 row left 1.51 under the upright's top
+    edge with the row and the drill at their exported high limits; CodeRabbit
+    on 3d649fd90: the bought plate may also stand its allowance short."""
+    for side in ("left", "right"):
+        stud = _features()[f"stud_hole_{side}"]
+        plate_min = spec.PLATE_HEIGHT - spec.PLATE_HEIGHT_ALLOWANCE
+        wall = plate_min - stud["height"][1] - stud["dia"][1] / 2.0
+        assert wall == pytest.approx(spec.STUD_TOP_WALL_MIN)
+        assert wall >= 2.0
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
