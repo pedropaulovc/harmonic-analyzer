@@ -17,21 +17,21 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
+from _mcmaster_98296a026 import SPRING_PIN_SIZE, WALL_T  # noqa: E402
 from diagnostics.diag_mcmaster_spring_pin import (  # noqa: E402
-    SPRING_PIN_SIZES,
     build_spring_pin,
     spring_pin_bore,
     spring_pin_volume,
 )
 
 PART_NO = "98296A026"
-PIN_OD, PIN_LEN = SPRING_PIN_SIZES[PART_NO]
-PIN_ID = spring_pin_bore(PART_NO)
-V_PIN = spring_pin_volume(PART_NO)
+PIN_OD, PIN_LEN = SPRING_PIN_SIZE
+PIN_ID = spring_pin_bore(SPRING_PIN_SIZE, WALL_T)
+V_PIN = spring_pin_volume(SPRING_PIN_SIZE, WALL_T)
 
 
 async def build_98296A026(adapter, truth=None):
-    await build_spring_pin(adapter, PART_NO)
+    await build_spring_pin(adapter, SPRING_PIN_SIZE, WALL_T)
 
 
 if __name__ == "__main__":

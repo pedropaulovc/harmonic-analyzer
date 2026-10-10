@@ -16,7 +16,12 @@ import asyncio
 import math
 
 import _telemetry
-from _common import _flag, _read_member, log
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log
+from _com import _flag, _read_member
 
 # part-local bore locals (mm) from build_ch_channel_assembly.py
 ROD_PIN_BORE_LOCAL = [0.0, 127.0, 0.0]      # rod Axis2 (rocker pin)

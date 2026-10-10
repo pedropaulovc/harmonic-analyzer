@@ -15,12 +15,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
 from diagnostics.diag_mcmaster_thumb import build_thumb_screw  # noqa: E402
+from _mcmaster_91882a221 import THUMB_SPEC  # noqa: E402
 
 
+@stock_recipe("91882A221", threaded=True)
 async def build_91882A221(adapter, truth=None):
-    await build_thumb_screw(adapter, "91882A221")
+    await build_thumb_screw(adapter, THUMB_SPEC)
 
 
 if __name__ == "__main__":

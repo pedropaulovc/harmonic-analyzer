@@ -1,8 +1,10 @@
 r"""Pure McMaster 90280A108 stock dimensions and swing-stop seat checks.
 
-This module owns the one authoritative fillister row in mm; the shared
-native ``diagnostics/diag_mcmaster_fillister.py`` recipe consumes it, as do
-the same-SKU foot and latch-hook bracket specs. No native recipe is imported.
+PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
+closure. The fillister row in mm is the per-SKU vendor source
+(``_mcmaster_90280a108.py``, SolidWorks-free at import), which the native
+recipe and the same-SKU foot and latch-hook bracket specs also read; this
+module adds the stock limits and the seat checks.
 
 The stop seats fully home on the base top; the platform edge bears on its
 head only when DISENGAGED. It limits the disengage swing and plays no part
@@ -24,7 +26,8 @@ from math import ceil
 from typing import TYPE_CHECKING
 
 import _config
-from _fit_limits import deviations
+from _fit_deviations import deviations
+from _mcmaster_90280a108 import FILLISTER_SIZE
 
 if TYPE_CHECKING:
     from _hole_spec import HoleSpec
@@ -47,8 +50,6 @@ THREAD_CLASS = "2A"
 # Steelmasters external UNC table, No 4 / 40 TPI / 2A row, inches -> mm.
 THREAD_MAJOR_MAX_MM = 0.1112 * 25.4
 EXTERNAL_PITCH_DIA_MIN_MM = 0.0925 * 25.4
-# (major diameter, under-head length, head height, head diameter, pitch), mm.
-FILLISTER_SIZE = (2.8448, 9.525, 2.7178, 4.6482, 0.635)
 SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, THREAD_PITCH = FILLISTER_SIZE
 # Handbook Table 8, slotted (not drilled) #4 fillister row, inch -> mm.
 # The Optimas ASME fillister table independently agrees on these head limits.
@@ -73,7 +74,7 @@ LENGTH_MAX_MM = SHANK_LEN
 FULL_THREAD_START_MAX_MM = 2.0 * THREAD_PITCH
 
 # Standard stock deviations about the unchanged vendor-model nominals,
-# ordered (upper, lower) as in _fit_limits. No title-block grade is used.
+# ordered (upper, lower) as in _fit_deviations. No title-block grade is used.
 HEAD_DIA_BAND = (HEAD_DIA_MAX_MM - HEAD_DIA, HEAD_DIA_MIN_MM - HEAD_DIA)
 HEAD_H_BAND = (HEAD_TOTAL_MAX_MM - HEAD_H, HEAD_TOTAL_MIN_MM - HEAD_H)
 SHANK_LEN_BAND = (0.0, -LENGTH_SHORT_ALLOWANCE_MM)

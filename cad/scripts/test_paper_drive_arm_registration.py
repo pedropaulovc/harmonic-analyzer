@@ -113,7 +113,8 @@ def test_native_controls_reference_actual_bores_and_project_past_real_chain_plan
 
 
 def test_clamp_axes_have_real_projected_zones_and_independent_actual_cone_faces() -> None:
-    from _gtol_spec import ConeFace, CylinderFace
+    from _gtol_cone import ConeFace
+    from _gtol_cylinder import CylinderFace
     arm_controls = {control.key: control for control in arm_spec.GEOMETRIC_CONTROLS}
     plate_controls = {control.key: control for control in plate_spec.GEOMETRIC_CONTROLS}
     for index, (x, _y) in enumerate(plate.SCREW_HOLES, 1):
@@ -227,7 +228,8 @@ def test_native_registration_reads_real_socket_intersections_not_nominal_proxy(
     monkeypatch: pytest.MonkeyPatch, native_shift: float,
 ) -> None:
     import build_pd_paper_drive_assembly as assembly
-    import _part_pmi
+    import _gtol_face_read
+    import _gtol_face_resolve
 
     models = {
         "arm": SimpleNamespace(name="arm", geometry=arm, seat_z=arm.THICKNESS),
@@ -266,8 +268,8 @@ def test_native_registration_reads_real_socket_intersections_not_nominal_proxy(
         return [local_mm[axis] + origin[axis] for axis in range(3)]
 
     monkeypatch.setattr(assembly, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(_part_pmi, "_resolve_faces", resolve)
-    monkeypatch.setattr(_part_pmi, "_face_geometry", lambda face: face)
+    monkeypatch.setattr(_gtol_face_resolve, "resolve_faces", resolve)
+    monkeypatch.setattr(_gtol_face_read, "face_geometry", lambda face: face)
     monkeypatch.setattr(assembly, "world_point", world_point)
     adapter = SimpleNamespace(currentModel=Assembly())
     if native_shift:

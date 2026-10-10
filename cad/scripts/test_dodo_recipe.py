@@ -5,7 +5,9 @@ compared against the value saved on the last SUCCESSFUL run -- never from doit's
 injected ``changed`` arg, which is corrupted after an intervening failed task.
 """
 
+import ast
 import contextlib
+from functools import cache
 import importlib.util
 import inspect
 import os
@@ -61,10 +63,10 @@ class _FakeTask:
 def test_recipe_tracker_full_vs_refresh(tmp_path):
     dodo = _load_dodo()
     recipe = tmp_path / "build_x_assembly.py"
-    common = tmp_path / "_common.py"
+    helper = tmp_path / "_session.py"
     recipe.write_text("recipe v0\n")
-    common.write_text("common v0\n")
-    files = [str(recipe), str(common)]
+    helper.write_text("helper v0\n")
+    files = [str(recipe), str(helper)]
 
     def run(values):
         """One up-to-date evaluation: returns (up_to_date, recipe_changed, saved)."""
@@ -98,21 +100,21 @@ def test_recipe_tracker_full_vs_refresh(tmp_path):
 
 
 def test_recipe_tracker_detects_any_recipe_member(tmp_path):
-    """Editing _common.py (not just the assembly script) must trigger FULL."""
+    """Editing a shared helper (not just the assembly script) must trigger FULL."""
     dodo = _load_dodo()
     recipe = tmp_path / "build_x_assembly.py"
-    common = tmp_path / "_common.py"
+    helper = tmp_path / "_session.py"
     hook = tmp_path / "hook.py"
-    for f in (recipe, common, hook):
+    for f in (recipe, helper, hook):
         f.write_text("v0\n")
-    files = [str(recipe), str(common), str(hook)]
+    files = [str(recipe), str(helper), str(hook)]
 
     tracker = dodo._RecipeTracker("x", files)
     task = _FakeTask()
     tracker(task, {})
     saved = task.saved()
 
-    for member in (recipe, common, hook):
+    for member in (recipe, helper, hook):
         member.write_text("v1\n")
         t2 = _FakeTask()
         up = dodo._RecipeTracker("x", files)(t2, saved)
@@ -229,17 +231,17 @@ def test_drawing_reading_a_foreign_part_row_carries_that_row(tmp_path):
 # to the own row for a drawing on exactly this premise; a new dynamic reader
 # must be reviewed here, or the narrowing would hide a foreign row edit.
 _DRAWING_OWN_ROW_READERS = {
-    # part_properties(name) / save_part_and_images(adapter, name): the name
-    # arrives from a caller, pinned below to build_<own part>.py's PART_NAME.
-    "_common.py",
+    # part_properties(name): the name arrives from a caller, pinned below to
+    # build_<own part>.py's PART_NAME.
+    "_part_properties.py",
+    # save_part_and_images(adapter, name) forwards its caller's part name to
+    # part_properties(name), which the dynamic-row scan sees here.
+    "_part_save.py",
     # apply_drawing_properties(adapter, name): same callers, same pin.
     "_drawing_marks.py",
     # _config.parts(stock.part_name) after the source identity check
     # (spec.source.stem == stock.part_name).
     "_purchased_fastener_drawing.py",
-    # save_simplified_part(adapter, name, ...) forwards to save_part_and_images:
-    # same callers, same pin.
-    "_drawing_simplified.py",
 }
 # Registry-reading helper -> index of its part-name argument.
 _OWN_ROW_HELPERS = {
@@ -250,10 +252,8 @@ _OWN_ROW_HELPERS = {
 }
 
 
-def _module_part_name(source: Path) -> str | None:
-    import ast
-
-    for node in ast.parse(source.read_text(encoding="utf-8")).body:
+def _module_part_name(tree: ast.Module) -> str | None:
+    for node in tree.body:
         if (
             isinstance(node, ast.Assign)
             and any(
@@ -265,11 +265,9 @@ def _module_part_name(source: Path) -> str | None:
     return None
 
 
-def _helper_name_arguments(source: Path) -> list[tuple[str, str]]:
-    import ast
-
+def _helper_name_arguments(tree: ast.Module) -> tuple[tuple[str, str], ...]:
     found = []
-    for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+    for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
@@ -280,34 +278,45 @@ def _helper_name_arguments(source: Path) -> list[tuple[str, str]]:
         args = [*node.args[index : index + 1]]
         args += [kw.value for kw in node.keywords if kw.arg == "part_name"]
         found.extend((name, ast.unparse(arg)) for arg in args)
-    return found
+    return tuple(found)
 
 
 def test_drawing_closures_read_no_foreign_dynamic_part_row():
     import _buildgraph as bg
 
     dodo = _load_dodo()
+
+    @cache
+    def source_facts(source: Path):
+        # A shared helper can occur in every drawing closure. Source is unchanged
+        # throughout this scan; cache immutable facts, not a production AST oracle.
+        try:
+            tokens = bg._config_tokens_in_source(source)
+        except bg._UnknownConfigUse:
+            return None  # the whole-config fallback narrows nothing
+        if source.name in _DRAWING_OWN_ROW_READERS:
+            return tokens, (), None  # forwards its caller's name
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        return tokens, _helper_name_arguments(tree), _module_part_name(tree)
+
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
         script = spec.script.resolve()
         own_build = f"build_{spec.part}.py"
         for source in (script, *(Path(path) for path in bg.module_deps_of(script))):
-            try:
-                tokens = bg._config_tokens_in_source(source)
-            except bg._UnknownConfigUse:
-                continue  # the whole-config fallback narrows nothing
+            facts = source_facts(source)
+            if facts is None:
+                continue
+            tokens, calls, part_name = facts
             if "parts/*" in tokens:
                 assert source.name in {*_DRAWING_OWN_ROW_READERS, own_build}, (
                     f"drawing:{stem} reaches a new dynamic registry read in "
                     f"{source.name}; review it against _expand_parts_token"
                 )
-            if source.name in _DRAWING_OWN_ROW_READERS:
-                continue  # forwards its caller's name
-            calls = _helper_name_arguments(source)
             if not calls:
                 continue
             assert source.name == own_build, (stem, source.name, calls)
             assert {arg for _name, arg in calls} == {"PART_NAME"}, (stem, calls)
-            assert _module_part_name(source) == spec.part.replace("_", "-"), stem
+            assert part_name == spec.part.replace("_", "-"), stem
 
 
 @pytest.fixture
@@ -1483,7 +1492,7 @@ def test_seat_part_order_diverges_across_seats(monkeypatch):
 
 def test_com_seat_acquires_sets_env_and_releases(tmp_path, monkeypatch):
     """``_com_seat`` acquires the machine-global file lock, marks the seat held via
-    HARMONIC_COM_SEAT (inherited by the COM subprocess -> _common's tripwire), and
+    HARMONIC_COM_SEAT (inherited by the COM subprocess -> _session.run_build's tripwire), and
     releases both on exit. Lock path is overridable so the test never touches the
     real %PROGRAMDATA% lock."""
     monkeypatch.setenv("HARMONIC_COM_LOCK", str(tmp_path / "seat.lock"))
@@ -2188,14 +2197,16 @@ def test_config_deps_are_fine_grained():
 
     # Face width is floor(SEAT_PITCH * 1e4) / 1e4: SEAT_PITCH depends on DP
     # and nominal drum-seat length, hence gear_train + cone_incline. The stamped
-    # contact-ratio screen needs tolerances for oblique edge slack and journal
-    # float: c_deep=(N_cone*M + PD_drum)/2 + edge_slack, then opening/runout.
+    # contact-ratio screen needs the cone_drum_oblique_mesh group for edge slack
+    # and journal float: c_deep=(N_cone*M + PD_drum)/2 + edge_slack, then
+    # opening/runout; the drum tip band comes from the gear_tip group.
     # World station_z0 and active_count cancel; channels.yaml remains unread.
     cone = dodo._config_deps(scripts / "build_dt_cone_gear.py", "dt_cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
         "machine/cone_incline.yaml",
-        "tolerances.yaml",
+        "tolerances/cone_drum_oblique_mesh.yaml",
+        "tolerances/gear_tip.yaml",
         "parts/dt-cone-gear.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
@@ -2238,8 +2249,8 @@ def test_config_deps_are_fine_grained():
     # Assembly title stamping is a separate contract: every released assembly
     # drawing owns TOL_* properties and therefore tracks title_block.yaml, but
     # that must not imply ownership of part-registry rows or the part template.
-    # tolerances.yaml (fit classes) stays out of frame.
-    assert "tolerances.yaml" not in frame_recipe, frame_recipe
+    # Tolerance fit classes stay out of frame.
+    assert not any(path.startswith("tolerances/") for path in frame_recipe), frame_recipe
     assert "title_block.yaml" in frame_recipe, frame_recipe
     assert "release.yaml" in frame_recipe, frame_recipe
     channel_recipe = _rel(dodo._recipe_files("ch_channel"), cfg)
@@ -2672,7 +2683,7 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_fastener_catalog.py",
         "test_drawing_specification_purity.py",
         "test_drawing_surface_finish_validation.py",
-        "test_gtol_spec.py",
+        "test_gtol_contracts.py",
         "test_part_owned_geometric_tolerances.py",
         "test_probe_surface_finish_pmi_telemetry.py",
         "test_surface_finish.py",
@@ -3052,9 +3063,8 @@ def test_check_gates_depend_on_everything_they_execute():
 
 
 def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
-    """A catalogued part, its drawing and an assembly that imports a fastener
-    script's constants depend on a per-task digest of only the rows they read,
-    and the build subprocess is told exactly those rows."""
+    """Catalogue readers carry only their rows; pure-dimension consumers carry
+    no catalogue digest, and the build subprocess is told exactly the rows read."""
     dodo = _load_dodo()
     catalog = str(dodo._FASTENER_CATALOG)
     part = dodo._part_file_deps(
@@ -3065,7 +3075,6 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
     for label, deps in (
         ("part-vn_frame_side_screw", part),
         ("drawing-vn_frame_side_screw", drawing),
-        ("assembly-pn_pen", assembly),
     ):
         assert catalog not in deps, label
         assert any(
@@ -3075,9 +3084,10 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
         ), label
     assert dodo._fastener_rows_env("part:vn_frame_side_screw") == "vn-frame-side-screw"
     assert dodo._fastener_rows_env("drawing:vn_frame_side_screw") == "vn-frame-side-screw"
-    # pen's closure imports build_vn_pen_set_screw for its constants; that module's
-    # fastener("vn-pen-set-screw") runs on import.
-    assert dodo._fastener_rows_env("assembly:pn_pen") == "vn-pen-set-screw"
+    # The pen reads the pure SKU dimensions, not the stock builder's catalogue row.
+    assert catalog not in assembly
+    assert not any(Path(dep).parent.name == ".fastener-catalog" for dep in assembly)
+    assert dodo._fastener_rows_env("assembly:pn_pen") is None
     assert dodo._fastener_rows_env("check:math") is None
 
 
@@ -3090,12 +3100,63 @@ def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
         return type("Done", (), {"returncode": 0})()
 
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
+    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "inherited-must-not-leak")
     monkeypatch.setattr(dodo.subprocess, "run", fake_run)
     assert dodo._run_subprocess(["x"], "part:vn_frame_side_screw") == 0
     assert seen["HARMONIC_FASTENER_ROWS"] == "vn-frame-side-screw"
+    assert seen["HARMONIC_FIT_GROUPS"] == dodo._fit_groups_env("part:vn_frame_side_screw")
     seen.clear()
     assert dodo._run_subprocess(["x"], "check:math") == 0
     assert "HARMONIC_FASTENER_ROWS" not in seen
+    assert "HARMONIC_FIT_GROUPS" not in seen
+
+
+def test_fit_guard_uses_task_recipe_config_dependencies():
+    dodo = _load_dodo()
+    for task, deps in (
+        (
+            "part:dt_cone_gear",
+            dodo._part_file_deps(
+                dodo.SCRIPTS_DIR / "build_dt_cone_gear.py", "dt_cone_gear"
+            ),
+        ),
+        ("assembly:dt_drive_train", dodo._recipe_files("dt_drive_train")),
+        ("drawing:vn_frame_side_screw", dodo._drawing_file_deps("vn_frame_side_screw")),
+    ):
+        groups = {
+            Path(dep).stem for dep in deps
+            if Path(dep).parent == (dodo.CONFIG_DIR / "tolerances").resolve()
+            and Path(dep).stem != "_base"
+        }
+        assert dodo._fit_groups_env(task) == ",".join(sorted(groups))
+    # The drive train and its crank pinion read these groups through literal
+    # fit() calls; an empty guard here would refuse a real build. The inch
+    # cone and drum tips read gear_tip; the crank gears sit on cone_line's
+    # stations, so the pinion also reads the cone mesh's edge slack. The
+    # train's stock-form transgear specs read stock_form_quality.
+    assert dodo._fit_groups_env("assembly:dt_drive_train") == (
+        "cone_drum_oblique_mesh,crank_mesh,gear_tip,shaft_in_bushing,"
+        "stock_form_quality"
+    )
+    assert dodo._fit_groups_env("part:dt_crank_pinion") == (
+        "cone_drum_oblique_mesh,crank_mesh,gear_mesh,shaft_in_bushing"
+    )
+    assert dodo._fit_groups_env("check:config") is None
+    with pytest.raises(ValueError, match="fit groups are unknown"):
+        dodo._fit_groups_env("part:no_such_part")
+
+
+def test_fit_config_dependencies_expand_conservatively(tmp_path):
+    dodo = _load_dodo()
+    script = tmp_path / "fit_probe.py"
+    script.write_text("import _config\nvalue = _config.fit('gear_mesh', 'backlash_mm')\n")
+    assert dodo._config_deps(script) == [
+        str((dodo.CONFIG_DIR / "tolerances" / "gear_mesh.yaml").resolve())
+    ]
+    script = tmp_path / "dynamic_fit_probe.py"
+    script.write_text("import _config\nreader = _config.fit\nvalue = reader(group)\n")
+    assert set(dodo._config_deps(script)) == set(dodo.tolerance_family_files())
+    assert str((dodo.CONFIG_DIR / "tolerances" / "_base.yaml").resolve()) in dodo._config_deps(script)
 
 
 def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
@@ -3124,7 +3185,8 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     # Prime the task's rows from the real recipe, then stub the recipe so the
     # injected hook (no such file) is never read.
     dodo._fastener_rows_env(f"assembly:{stem}")
-    monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: [])
+    deps = dodo._recipe_files(stem)
+    monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: deps)
     monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
     monkeypatch.setattr(dodo, "POST_ASSEMBLY", {stem: ("hook_probe.py",)})
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
@@ -3141,6 +3203,7 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda _stem: None)
     monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
+    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "inherited-must-not-leak")
 
     dodo.build_or_refresh(stem, [], [], [str(target)])
 
@@ -3153,6 +3216,12 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     keying the guard on the label dropped it for every assembly build. The guard
     is keyed on the doit task instead, whatever the display label says."""
     dodo = _load_dodo()
+    # Exercise a narrowed assembly's guard plumbing independently of the pen's
+    # now-pure dimension closure (its actual no-row contract is tested above).
+    monkeypatch.setitem(
+        dodo._FASTENER_ROWS, "assembly:pn_pen", frozenset({"vn-pen-set-screw"})
+    )
+    fit_groups = dodo._fit_groups_env("assembly:pn_pen")
     launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "pn_pen", mode=mode)
 
     scripts = [name for name, _env in launched]
@@ -3162,6 +3231,7 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
         assert scripts == ["refresh_assembly.py"]
     for name, env in launched:
         assert env.get("HARMONIC_FASTENER_ROWS") == "vn-pen-set-screw", name
+        assert env.get("HARMONIC_FIT_GROUPS") == fit_groups, name
 
 
 @pytest.mark.parametrize(
@@ -3212,7 +3282,7 @@ def test_every_title_block_reader_is_classified() -> None:
     # (drawing tasks always keep the token), or a geometry reader in the set.
     import _buildgraph
 
-    stampers = {"_config", "_common", "_assembly"}  # the accessor and TOL_* stamping
+    stampers = {"_config", "_part_properties", "_assembly"}  # accessor and TOL_* stamping
     readers = {
         path.stem
         for path in (REPO_ROOT / "cad" / "scripts").glob("*.py")
@@ -3292,7 +3362,9 @@ def isolated_export_keys(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "source",
     [
-        "export_features.py", "_export_feature_faces.py", "_part_pmi.py",
+        "export_features.py", "_export_feature_faces.py", "_gtol_face_read.py",
+        "_gtol_face.py", "_gtol_cylinder.py", "_gtol_planar.py", "_gtol_cone.py",
+        "_gtol_sphere.py",
         "ch_rocker_arm_spec.py", "rocker_bank_layout.py", "draw_ch_rocker_arm.py",
     ],
 )

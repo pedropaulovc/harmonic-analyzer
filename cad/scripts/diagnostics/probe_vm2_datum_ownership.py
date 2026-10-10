@@ -38,7 +38,7 @@ def main():
         raise RuntimeError("attach-only mode required")
     if not os.environ.get("HARMONIC_DIAGNOSTIC_SW_PID"):
         raise RuntimeError("explicit inventoried SolidWorks PID required")
-    from _common import _early_bound
+    from _com import _early_bound
     from diagnostics._owned_native_session import run_owned_diagnostic
 
     async def inventory(adapter):

@@ -567,8 +567,8 @@ def _helper_blanked_parameters(module: str, function: str) -> dict[str, str | No
 
 
 def _blanked_sketches(build: Path) -> set[str]:
-    """Every sketch a part build hides with _common.blank_sketch, or with
-    _common.blank_reference_sketches (which calls it per sketch) over a
+    """Every sketch a part build hides with _sketch.blank_sketch, or with
+    _sketch.blank_reference_sketches (which calls it per sketch) over a
     literal tuple or the build's REFERENCE_SKETCHES, directly or through a
     repo helper that blanks the sketch it authors (keyword or default name)."""
     tree = _tree(build)
@@ -690,7 +690,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
         "dt_pinion_spring",
     } <= set(found)
     assert found["dt_cylinder_gear_shaft"] == {"DomeReference"}
-    # Blanked with _common.blank_reference_sketches, not blank_sketch.
+    # Blanked with _sketch.blank_reference_sketches, not blank_sketch.
     assert found["dt_cone_pivot_post"] == {
         "BoreSpacingReference",
         "JournalPlanReference",

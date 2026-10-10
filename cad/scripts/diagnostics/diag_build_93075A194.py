@@ -28,12 +28,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     insert_helix,
@@ -42,17 +46,21 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut,
 )
 
-HX_MAJOR_R = 4.1656 / 2.0
-HX_LEN = 12.7
-HX_HW = 6.35            # across flats
-HX_HH = 2.794
-HX_PITCH = 0.79375
-HX_UNDERSIDE = 4.953    # vendor origin sits mid-shank
+from _mcmaster_93075a194 import (  # noqa: E402
+    HX_MAJOR_R,
+    HX_LEN,
+    HX_HW,
+    HX_HH,
+    HX_PITCH,
+    HX_UNDERSIDE,
+)
 
 
+@stock_recipe("93075A194", threaded=True)
 async def build_93075A194(adapter, truth=None):
-    from _common import (add_line_chain, _early_bound, _feature_by_name,
-                         _read_member)
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
+    from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 

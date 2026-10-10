@@ -9,22 +9,20 @@ import pytest
 import _drawing_common
 import _part_pmi
 from _drawing_common import PmiDrawingPlacement
-from _gtol_spec import (
-    ConeFace,
-    CylinderFace,
-    GeometricControl,
-    PartDatum,
-    PlanarFace,
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_controls import GeometricControl, PartDatum, validate_part_pmi
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _gtol_torus import TorusFace
+from _gtol_frame import (
     TRANSLATION_GLYPH,
-    SphereFace,
-    TorusFace,
     gtol_frame_datums,
     gtol_frame_signature,
     gtol_frame_xml,
     translation_print_problem,
-    validate_part_pmi,
 )
-from _part_pmi import _FaceGeometry, _face_matches
+from _gtol_face import FaceGeometry
 
 
 
@@ -109,7 +107,7 @@ def test_part_pmi_validation_rejects_name_collision_and_unknown_datum() -> None:
 
 
 def test_cylinder_face_tolerance_is_diametral_not_radial() -> None:
-    geometry = _FaceGeometry(
+    geometry = FaceGeometry(
         face=SimpleNamespace(),
         identity=4002,
         parameters=(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 5.04e-3),
@@ -117,12 +115,12 @@ def test_cylinder_face_tolerance_is_diametral_not_radial() -> None:
         box=(0.0, 0.0, 0.0, 1.0, 1.0, 1.0),
     )
 
-    assert not _face_matches(geometry, CylinderFace(10.0, tolerance_mm=0.05))
-    assert _face_matches(geometry, CylinderFace(10.0, tolerance_mm=0.1))
+    assert not CylinderFace(10.0, tolerance_mm=0.05).matches(geometry)
+    assert CylinderFace(10.0, tolerance_mm=0.1).matches(geometry)
 
 
 def test_cylinder_face_can_disambiguate_by_x_and_y_stations() -> None:
-    geometry = _FaceGeometry(
+    geometry = FaceGeometry(
         face=SimpleNamespace(),
         identity=4002,
         parameters=(0.011, -0.04, 0.008, 0.0, 1.0, 0.0, 4e-3),
@@ -130,16 +128,12 @@ def test_cylinder_face_can_disambiguate_by_x_and_y_stations() -> None:
         box=(0.007, 0.008, 0.004, 0.015, 0.018, 0.012),
     )
 
-    assert _face_matches(
-        geometry, CylinderFace(8.0, contains_x_mm=11.0, contains_y_mm=13.0)
-    )
-    assert not _face_matches(
-        geometry, CylinderFace(8.0, contains_x_mm=21.0, contains_y_mm=13.0)
-    )
+    assert CylinderFace(8.0, contains_x_mm=11.0, contains_y_mm=13.0).matches(geometry)
+    assert not CylinderFace(8.0, contains_x_mm=21.0, contains_y_mm=13.0).matches(geometry)
 
 
 def test_cone_face_matches_live_coneparams2_contract() -> None:
-    geometry = _FaceGeometry(
+    geometry = FaceGeometry(
         face=SimpleNamespace(),
         identity=4003,
         parameters=(
@@ -159,14 +153,12 @@ def test_cone_face_matches_live_coneparams2_contract() -> None:
         box=(0.0, -0.003, -0.003, 0.045, 0.003, 0.003),
     )
 
-    assert _face_matches(
-        geometry, ConeFace(0.596809, contains_x_mm=22.5, tolerance_degrees=0.001)
-    )
-    assert not _face_matches(geometry, ConeFace(1.0))
+    assert ConeFace(0.596809, contains_x_mm=22.5, tolerance_degrees=0.001).matches(geometry)
+    assert not ConeFace(1.0).matches(geometry)
 
 
 def test_planar_face_can_disambiguate_coplanar_trunnions_by_z_station() -> None:
-    geometry = _FaceGeometry(
+    geometry = FaceGeometry(
         face=SimpleNamespace(),
         identity=4001,
         parameters=(-0.510265461, -0.860016953, 0.0, 0.0043265, 0.002567, 0.097917),
@@ -174,22 +166,16 @@ def test_planar_face_can_disambiguate_coplanar_trunnions_by_z_station() -> None:
         box=(0.0, 0.002567, 0.0762, 0.0043265, 0.005134, 0.097917),
     )
 
-    assert _face_matches(
-        geometry,
-        PlanarFace(
-            (0.510265461, 0.860016953, 0.0),
-            4.415327,
-            contains_z_mm=87.0585,
-        ),
-    )
-    assert not _face_matches(
-        geometry,
-        PlanarFace(
-            (0.510265461, 0.860016953, 0.0),
-            4.415327,
-            contains_z_mm=-87.0585,
-        ),
-    )
+    assert PlanarFace(
+        (0.510265461, 0.860016953, 0.0),
+        4.415327,
+        contains_z_mm=87.0585,
+    ).matches(geometry)
+    assert not PlanarFace(
+        (0.510265461, 0.860016953, 0.0),
+        4.415327,
+        contains_z_mm=-87.0585,
+    ).matches(geometry)
 
 
 def test_planar_face_pins_one_of_four_coplanar_cap_seats_by_x_and_z() -> None:
@@ -198,7 +184,7 @@ def test_planar_face_pins_one_of_four_coplanar_cap_seats_by_x_and_z() -> None:
     Only both plan stations together name one of them, so a control that
     pins just the plane -- or pins the wrong corner -- must not match.
     """
-    geometry = _FaceGeometry(
+    geometry = FaceGeometry(
         face=SimpleNamespace(),
         identity=4001,
         parameters=(0.0, -1.0, 0.0, 0.197, 0.00645, 0.112),
@@ -206,22 +192,13 @@ def test_planar_face_pins_one_of_four_coplanar_cap_seats_by_x_and_z() -> None:
         box=(0.18325, 0.00645, 0.09825, 0.21075, 0.00645, 0.12575),
     )
 
-    assert _face_matches(
-        geometry,
-        PlanarFace((0.0, 1.0, 0.0), 6.45, contains_x_mm=197.0, contains_z_mm=112.0),
-    )
-    assert not _face_matches(
-        geometry,
-        PlanarFace((0.0, 1.0, 0.0), 6.45, contains_x_mm=-197.0, contains_z_mm=112.0),
-    )
-    assert not _face_matches(
-        geometry,
-        PlanarFace((0.0, 1.0, 0.0), 6.45, contains_x_mm=197.0, contains_z_mm=-112.0),
-    )
+    assert PlanarFace((0.0, 1.0, 0.0), 6.45, contains_x_mm=197.0, contains_z_mm=112.0).matches(geometry)
+    assert not PlanarFace((0.0, 1.0, 0.0), 6.45, contains_x_mm=-197.0, contains_z_mm=112.0).matches(geometry)
+    assert not PlanarFace((0.0, 1.0, 0.0), 6.45, contains_x_mm=197.0, contains_z_mm=-112.0).matches(geometry)
 
 
 def test_sphere_identity_is_not_cone_identity() -> None:
-    geometry = _FaceGeometry(
+    geometry = FaceGeometry(
         face=SimpleNamespace(),
         identity=4004,
         parameters=(0.0, 0.0252, 0.0, 0.0065),
@@ -229,11 +206,11 @@ def test_sphere_identity_is_not_cone_identity() -> None:
         box=(),
     )
 
-    assert _face_matches(geometry, SphereFace(13.0, center_mm=(0.0, 25.2, 0.0)))
+    assert SphereFace(13.0, center_mm=(0.0, 25.2, 0.0)).matches(geometry)
 
 
 def test_torus_face_matches_generating_radii_and_center() -> None:
-    geometry = _FaceGeometry(
+    geometry = FaceGeometry(
         face=SimpleNamespace(),
         identity=4005,
         parameters=(0.0, 0.0085, 0.0, 0.0, 1.0, 0.0, 0.0015, 0.005),
@@ -241,10 +218,8 @@ def test_torus_face_matches_generating_radii_and_center() -> None:
         box=(),
     )
 
-    assert _face_matches(
-        geometry, TorusFace(1.5, 5.0, center_mm=(0.0, 8.5, 0.0))
-    )
-    assert not _face_matches(geometry, TorusFace(2.0, 5.0))
+    assert TorusFace(1.5, 5.0, center_mm=(0.0, 8.5, 0.0)).matches(geometry)
+    assert not TorusFace(2.0, 5.0).matches(geometry)
 
 
 def test_imported_pmi_placement_requires_one_attachment() -> None:
@@ -546,7 +521,7 @@ def projected_native(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr(_native_projected_zone, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_part_pmi, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        _part_pmi, "_resolve_faces", lambda *_args: {"projected_axis": object()}
+        _part_pmi, "resolve_faces", lambda *_args: {"projected_axis": object()}
     )
     monkeypatch.setattr(_part_pmi, "_select_face", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(_part_pmi, "_verify_attachment", lambda *_args, **_kwargs: None)

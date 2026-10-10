@@ -10,7 +10,8 @@ silently drift.
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
 from frame_column_stations import COLUMN_SOCKET_DIAMETER, COLUMN_X
@@ -333,7 +334,7 @@ DRAWING_REFERENCE_PRECISION = 1
 # A spotface only has to clean the cast face under a screw head: deeper is
 # harmless, shallower leaves an unfaced ring the head would rock on, so the
 # general .X band is wrong in one direction here. The model carries the band.
-SPOTFACE_DEPTH_BAND_MM = (0.5, 0.0)  # (upper, lower) deviations, like _fit_limits
+SPOTFACE_DEPTH_BAND_MM = (0.5, 0.0)  # (upper, lower) deviations, like _fit_deviations
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names

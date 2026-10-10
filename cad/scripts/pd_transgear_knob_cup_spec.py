@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_transgear_arm_plate_geometry import BORE_DIA_LIMITS as PLATE_BORE_LIMITS

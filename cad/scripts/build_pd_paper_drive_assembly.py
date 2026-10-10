@@ -100,13 +100,10 @@ from _chain import (
     centreline_distance,
     loop_point_tangent,
 )
-from _common import (
-    _early_bound,
-    apply_custom_properties,
-    check,
-    log,
-    run_build,
-)
+from _check import check, log
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
@@ -232,7 +229,7 @@ from build_pd_guide_lock import (  # noqa: E402
 # The printed bands the lock-station sweep judges the platen's lock stack at:
 # the same spec constants the guide and lock builds author on their model
 # dimensions, so the sheets and the sweep read one source.
-from _fit_limits import deviations  # noqa: E402
+from _fit_deviations import deviations  # noqa: E402
 from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
 from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
@@ -2179,8 +2176,8 @@ async def _sprocket_revolute(adapter, name: str, label: str) -> None:
 
 def _assert_knob_collar_capture(adapter, collar: str, shaft: str) -> None:
     """Observe native fitted metal on F and D-clock; lock mates cannot stand in."""
-    from _gtol_spec import PlanarFace
-    from _part_pmi import _resolve_faces
+    from _gtol_planar import PlanarFace
+    from _gtol_face_resolve import resolve_faces
 
     assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
     parts = {}
@@ -2202,11 +2199,11 @@ def _assert_knob_collar_capture(adapter, collar: str, shaft: str) -> None:
         raise RuntimeError(f"knob collar: native fitted length {length} is outside source")
     if abs(length - COLLAR.LENGTH) > 1e-6:
         raise RuntimeError("knob collar: native body differs from this fitted source version")
-    _resolve_faces(parts["collar"], {
+    resolve_faces(parts["collar"], {
         "actual collar rear": PlanarFace((0.0, 0.0, 1.0), length, tolerance_mm=1e-5),
         "actual internal D-flat": PlanarFace((0.0, 1.0, 0.0), -COLLAR.FLAT_TO_AXIS, tolerance_mm=1e-5),
     })
-    _resolve_faces(parts["shaft"], {
+    resolve_faces(parts["shaft"], {
         "actual gear front F": PlanarFace((0.0, 0.0, -1.0), 0.0, tolerance_mm=1e-5),
         "actual shaft D-flat": PlanarFace((0.0, -1.0, 0.0), KNOB_SPEC.CORE_FLAT_FROM_AXIS, tolerance_mm=1e-5),
     })
@@ -2231,8 +2228,10 @@ def _assert_arm_plate_registered(adapter, arm: str, plate: str) -> None:
     The canonical face reader supplies actual surface parameters; these
     post-build numerical bounds are not manufacturing acceptance grades.
     """
-    from _gtol_spec import CylinderFace, PlanarFace
-    from _part_pmi import _face_geometry, _resolve_faces
+    from _gtol_cylinder import CylinderFace
+    from _gtol_planar import PlanarFace
+    from _gtol_face_read import face_geometry
+    from _gtol_face_resolve import resolve_faces
 
     assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
     actual_centres = {}
@@ -2250,7 +2249,7 @@ def _assert_arm_plate_registered(adapter, arm: str, plate: str) -> None:
         model = component.GetModelDoc2()
         if model is None:
             raise RuntimeError(f"registered arm/plate native part unresolved: {name}")
-        resolved = _resolve_faces(_early_bound(model, "IModelDoc2"), {
+        resolved = resolve_faces(_early_bound(model, "IModelDoc2"), {
             "actual mounting seat": seat,
             **{
                 f"actual locator {index} socket": CylinderFace(
@@ -2259,7 +2258,7 @@ def _assert_arm_plate_registered(adapter, arm: str, plate: str) -> None:
                 ) for index, (x, y) in enumerate(geometry.LOCATOR_SITES_MM, 1)
             },
         })
-        seat_geometry = _face_geometry(resolved["actual mounting seat"])
+        seat_geometry = face_geometry(resolved["actual mounting seat"])
         if seat_geometry is None:
             raise RuntimeError(f"{name}: actual mounting plane has no surface")
         plane = tuple(float(value) for value in seat_geometry.parameters)
@@ -2268,7 +2267,7 @@ def _assert_arm_plate_registered(adapter, arm: str, plate: str) -> None:
             raise RuntimeError(f"{name}: native mounting plane is not the authored local Z plane")
         centres, directions = [], []
         for index, (x, y) in enumerate(geometry.LOCATOR_SITES_MM, 1):
-            socket = _face_geometry(resolved[f"actual locator {index} socket"])
+            socket = face_geometry(resolved[f"actual locator {index} socket"])
             if socket is None:
                 raise RuntimeError(f"{name}: actual locating bore {index} has no surface")
             parameters = tuple(float(value) for value in socket.parameters)

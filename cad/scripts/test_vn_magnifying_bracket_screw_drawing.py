@@ -12,9 +12,10 @@ import magnifying_bracket_joint_layout as joint
 import vn_magnifying_bracket_screw_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import RigidTransform, STOCK_RECIPES
+from _stock_fastener import RigidTransform
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91794A077 as recipe
-from vn_fillister_screw_spec import FILLISTER_SIZES
+from _mcmaster_91794a077 import FILLISTER_SIZE
 
 STEM = "vn-magnifying-bracket-screw"
 
@@ -33,7 +34,7 @@ def test_catalogue_and_recipe_are_the_verified_stock_screw() -> None:
     assert row["quantity"] == len(joint.SCREW_POSITIONS) == 2
     assert row["finish"] == "passivated"
     assert row["process"] == "purchased"
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == "build_91794A077"
     assert metadata.threaded is True
@@ -48,7 +49,7 @@ def test_joint_nominals_match_the_stock_family() -> None:
         joint.SCREW_HEAD_DIA,
         joint.SCREW_PITCH,
     )
-    assert FILLISTER_SIZES[spec.SKU] == pytest.approx(
+    assert FILLISTER_SIZE == pytest.approx(
         (spec.MAJOR_DIA, spec.LENGTH, spec.HEAD_H, spec.HEAD_DIA, spec.PITCH)
     )
     assert spec.ENGAGEMENT_NOMINAL == joint.ENGAGEMENT

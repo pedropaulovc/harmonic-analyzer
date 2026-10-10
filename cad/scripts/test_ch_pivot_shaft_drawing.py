@@ -9,12 +9,12 @@ from pathlib import Path
 import pytest
 
 import _config
-import _fit_limits
+import _fit_deviations
+import _fit_shaft_h
 import build_ch_pivot_shaft as part
 import draw_ch_pivot_shaft as drawing
 import ch_pivot_bracket_spec
 import ch_pivot_shaft_spec as spec
-import ch_rocker_arm_spec
 import rocker_bank_layout as bank
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -27,40 +27,39 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["ch_pivot_shaft"].script == Path(drawing.__file__).resolve()
 
 
-def test_every_marked_dimension_lands_on_the_side_view() -> None:
+def test_every_marked_dimension_lands_on_the_side_view_or_its_detail() -> None:
     """Policy rule 7: a turned part's diameters and lengths sit on the side
-    view, and all of them are authored on Right-plane half-profiles. The
-    shoulder reliefs' own feature lands in the 5:1 detail of that view."""
+    view (or DETAIL A, a 5:1 detail of it), and all of them are authored on
+    Right-plane sketches: the half-profile, the flats' cut and the caps."""
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.PROFILE_KEEP) | set(drawing.DETAIL_KEEP) == marked
     assert not set(drawing.PROFILE_KEEP) & set(drawing.DETAIL_KEEP)
-    assert set(drawing.DETAIL_KEEP) == spec.DRAWING_DIMENSIONS["ReliefProfile"]
     assert marked == {
         "ShaftDia",
-        "ShoulderDia",
         "ShaftLength",
-        "ShoulderLength",
-        "JournalLength",
         "DomeHeight",
-        "ReliefWidth",
-        "ReliefDia",
+        "Radius",
+        "FlatLength",
+        "FlatAF",
+        "NorthFlatStation",
+        "SouthFlatStation",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
-    # The profile, the reliefs and the caps.
+    # The profile, the flats and the caps.
     assert source.count('create_sketch("Right")') == 3
     assert "create_revolve(" in source
 
 
 def test_only_the_running_fit_carries_a_size_band() -> None:
-    assert spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+    assert spec.SHAFT_DIA_BAND is _fit_shaft_h.SHAFT_H
     assert model_toleranced_dimensions(part) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
     }
 
 
 def test_shaft_band_runs_in_the_bracket_bores() -> None:
-    lower, upper = _fit_limits.deviations(spec.SHAFT_DIA_BAND)
+    lower, upper = _fit_deviations.deviations(spec.SHAFT_DIA_BAND)
     clearance_min = ch_pivot_bracket_spec.BORE_DIA - (spec.SHAFT_DIA + upper)
     clearance_max = ch_pivot_bracket_spec.BORE_DIA - (spec.SHAFT_DIA + lower)
     assert round(clearance_min, 2) == 0.15
@@ -71,13 +70,13 @@ def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "ShaftDia": 3,
-        "ShoulderDia": 2,
         "ShaftLength": 1,
-        "ShoulderLength": 2,
-        "JournalLength": 1,
         "DomeHeight": 1,
-        "ReliefWidth": 1,
-        "ReliefDia": 3,
+        "Radius": 1,
+        "FlatLength": 1,
+        "FlatAF": 3,
+        "NorthFlatStation": 2,
+        "SouthFlatStation": 2,
     }
     assert "draw_ch_pivot_shaft.py" in PRECISION_MIGRATED_DRAWINGS
     digits = spec.DRAWING_PRECISION_BY_NAME["ShaftDia"]
@@ -112,7 +111,7 @@ def test_the_length_is_a_cut_to_fit_reference() -> None:
 
 
 def test_both_ends_are_domed_and_the_height_is_model_owned() -> None:
-    assert spec.DRAWING_DIMENSIONS["NorthCapProfile"] == {"DomeHeight"}
+    assert spec.DRAWING_DIMENSIONS["NorthCapProfile"] == {"DomeHeight", "Radius"}
     assert spec.DOME_CALLOUT == "BOTH ENDS"
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '_dome(adapter, "North", 0.0, -1.0)' in source
@@ -126,7 +125,7 @@ def test_notes_are_short_specific_facts_with_no_dimension_in_them() -> None:
     for line in lines:
         assert line == line.upper()
         assert not re.search(r"\d+\.\d|±|\+/-", line)
-    assert "NO FLATS" in spec.DRAWING_NOTES
+    assert "BOTH FLATS IN LINE, ONE SIDE." in lines
     assert "STEPS" not in spec.DRAWING_NOTES
 
 
@@ -145,172 +144,88 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_surface_finishes_name_the_running_faces() -> None:
+def test_surface_finishes_name_the_running_face() -> None:
     by_key = {control.key: control for control in spec.SURFACE_FINISHES}
-    assert set(by_key) == {"pivot_bearing", "pivot_journal", "shoulder_thrust"}
-    for control in by_key.values():
-        assert control.roughness_um == 1.6
-    for key in ("pivot_bearing", "pivot_journal"):
-        assert by_key[key].face.diameter_mm == spec.SHAFT_DIA
-        # Each probe station is on the O.D., off both reliefs.
-        z = -by_key[key].face.contains_z_mm
-        north_relief = (spec.JOURNAL_LENGTH - spec.RELIEF_WIDTH, spec.JOURNAL_LENGTH)
-        south_face = spec.JOURNAL_LENGTH + spec.SHOULDER_LENGTH
-        south_relief = (south_face, south_face + spec.RELIEF_WIDTH)
-        for low, high in (north_relief, south_relief):
-            assert not low <= z <= high
-    # Codex #936 PRRT_kwDOPHDy386mTMXt: rocker 19's hub rocks on the
-    # shoulder's south face, which looks -Z at the shoulder's south station.
-    thrust = by_key["shoulder_thrust"].face
-    assert thrust.normal == (0, 0, -1)
-    assert thrust.offset_mm == spec.JOURNAL_LENGTH + spec.SHOULDER_LENGTH
-    # Part frame: the north end at z 0, the body toward -z.
-    body_z = by_key["pivot_bearing"].face.contains_z_mm
-    journal_z = by_key["pivot_journal"].face.contains_z_mm
-    assert -spec.JOURNAL_LENGTH < journal_z < 0.0
-    assert (
-        -bank.PIVOT_SHAFT_LENGTH
-        < body_z
-        < -(spec.JOURNAL_LENGTH + spec.SHOULDER_LENGTH)
-    )
+    assert set(by_key) == {"pivot_bearing"}
+    face = by_key["pivot_bearing"].face
+    assert by_key["pivot_bearing"].roughness_um == 1.6
+    assert face.diameter_mm == spec.SHAFT_DIA
+    # Part frame: the north end at z 0, the body toward -z. The probe station
+    # is on the O.D., off both flats at their longest.
+    z = -face.contains_z_mm
+    assert 0.0 < z < bank.PIVOT_SHAFT_LENGTH
+    half = spec.FLAT_LENGTH_RANGE[1] / 2.0
+    for station in bank.PIVOT_SHAFT_FLAT_STATIONS:
+        assert not station - half <= z <= station + half
     part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    for key in by_key:
-        assert (
-            f'control=surface_finish_by_key(SURFACE_FINISHES,"{key}")' in sheet_source
-        )
+    assert 'control=surface_finish_by_key(SURFACE_FINISHES,"pivot_bearing")' in sheet_source
     assert "roughness_ra=" not in sheet_source
 
 
-def test_shoulder_reliefs_clear_the_tool_and_keep_the_seats_flat() -> None:
-    """Codex #936 PRRT_kwDOPHDy386mTMXq, at the printed worst case."""
-    width_low, width_high = spec.RELIEF_WIDTH_RANGE
-    # The .X band as the title block prints it (0.03 in reads +/-0.8).
-    one_place = _config.title_block("linear_1pl")
-    assert one_place["display"] == f"±{spec.LINEAR_1PL}"
-    assert spec.LINEAR_1PL >= one_place["value_in"] * 25.4
-    assert spec.LINEAR_3PL == _config.title_block("linear_3pl")["value_in"] * 25.4
-    assert spec.CORNER_RADIUS_MAX == _config.title_block("edge_break")["radius_mm"]
-    # The narrowest groove still takes in the facing tool's nose.
-    assert width_low >= spec.FACING_NOSE_RADIUS
-    # The shallowest groove keeps the grooving corner under the O.D.
-    assert (spec.RELIEF_DIA + spec.LINEAR_3PL) / 2.0 + spec.CORNER_RADIUS_MAX <= (
-        spec.SHAFT_DIA_MIN / 2.0
+def test_the_flats_sit_at_the_layout_stations() -> None:
+    """Each flat's centre is its ear's mid-plane, from the north end: the
+    north one by its own global, the south one driven off the length."""
+    assert spec.NORTH_FLAT_STATION == ch_pivot_bracket_spec.EAR_T / 2.0
+    assert part.FLAT_STATIONS == pytest.approx(bank.PIVOT_SHAFT_FLAT_STATIONS, abs=1e-9)
+    assert part.FLAT_STATIONS[0] == pytest.approx(
+        part.SHAFT_LENGTH - spec.NORTH_FLAT_STATION
     )
-    # The reliefs print at the places their sizing assumes.
-    assert spec.DRAWING_PRECISION["ReliefProfile"] == {"ReliefWidth": 1, "ReliefDia": 3}
-    assert round(spec.RELIEF_DIA, 2) == spec.RELIEF_DIA
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '\'"ShaftLength" - "NorthFlatStation"\'' in source
+    assert 'set_global(adapter, "NorthFlatStation"' in source
 
 
-def test_widest_relief_leaves_each_journal_its_bearing_length() -> None:
-    """Codex #936 PRRT_kwDOPHDy386mTMXq: the groove sits under the first
-    RELIEF_WIDTH of the north ear's bore and of hub 19's. What is left must
-    still bear at L/d 0.5 or more on the O6.35."""
-    width_high = spec.RELIEF_WIDTH_RANGE[1]
-    assert spec.BEARING_LENGTH_MIN == 0.5 * spec.SHAFT_DIA
-    # North journal: the ear's thickness, which the journal length matches.
-    assert spec.JOURNAL_LENGTH == ch_pivot_bracket_spec.EAR_T
-    north = ch_pivot_bracket_spec.EAR_T - width_high
-    # Hub 19: bears on the shoulder's south face, so the south groove is
-    # under its bore. The hub may only come out long (HUB_LENGTH_BAND).
-    hub_19 = ch_rocker_arm_spec.HUB_LENGTH - ch_rocker_arm_spec.HUB_LENGTH_BAND[1] - width_high
-    for remaining in (north, hub_19):
-        assert remaining >= spec.BEARING_LENGTH_MIN
-    # A groove 0.1 mm wider than the .X band allows breaks the north journal:
-    # the requirement binds, it is not decoration.
-    assert ch_pivot_bracket_spec.EAR_T - (width_high + 0.1) < spec.BEARING_LENGTH_MIN
+def test_the_cup_seats_on_the_flat_at_its_shallowest() -> None:
+    assert spec.SET_SCREW_CUP_DIA == ch_pivot_bracket_spec.SET_SCREW_POINT_DIA
+    assert spec.FLAT_AF == pytest.approx(spec.SHAFT_DIA - spec.FLAT_DEPTH)
+    assert spec.FLAT_DEPTH_RANGE == pytest.approx(
+        (spec.FLAT_DEPTH - spec.LINEAR_3PL, spec.FLAT_DEPTH + spec.LINEAR_3PL)
+    )
+    # The chord at the shallowest printed depth takes the cup with 0.5 each
+    # side; the deepest flat still leaves most of the round.
+    assert spec.flat_chord(spec.FLAT_DEPTH_RANGE[0]) >= spec.SET_SCREW_CUP_DIA + 1.0
+    assert spec.FLAT_DEPTH_RANGE[1] < spec.SHAFT_DIA / 4.0
 
 
-def test_relief_keeps_the_thrust_faces_whole_annulus() -> None:
-    """Codex #936 PRRT_kwDOPHDy386mTMXq: the groove must not eat the thrust
-    face. Its flat starts where the grooving corner ends; at the groove's
-    high limit that is still inside the hub's and the ear's bores, so each
-    seats on the same annulus a plain shoulder gives -- its own bore edge to
-    the shoulder's O10 -- as MHA-CH-009 seats hub 0 at the other end."""
-    import ch_rocker_thrust_washer_spec as washer
-
-    flat_start = spec.RELIEF_DIA + spec.LINEAR_3PL + 2.0 * spec.CORNER_RADIUS_MAX
-    mating_bores = (ch_rocker_arm_spec.PIVOT_HOLE_DIA, ch_pivot_bracket_spec.BORE_DIA)
-    assert flat_start <= min(mating_bores)
-    # The O10 shoulder sits inside the O10.20 hub face, so hub 19 bears on
-    # the shoulder's whole face; the washer gives hub 0 its own bore out.
-    assert spec.SHOULDER_DIA <= ch_rocker_arm_spec.HUB_DIA == washer.OD
-    assert washer.BORE_DIA >= ch_rocker_arm_spec.PIVOT_HOLE_DIA
+def test_each_flat_stays_inside_its_ear() -> None:
+    """At its longest, each flat stays inside its ear's thickness, so no hub
+    or the spring runs over a flat's edge."""
+    ear = ch_pivot_bracket_spec.EAR_T
+    half = spec.FLAT_LENGTH_RANGE[1] / 2.0
+    south, north = bank.PIVOT_SHAFT_FLAT_STATIONS
+    assert 0.0 < north - half and north + half < ear
+    length = bank.PIVOT_SHAFT_LENGTH
+    assert length - ear < south - half and south + half < length
 
 
-def test_relief_volume_is_two_annular_grooves() -> None:
-    outer = spec.SHAFT_DIA / 2.0
-    inner = spec.RELIEF_DIA / 2.0
-    assert part.V_RELIEFS == 2.0 * math.pi * (outer**2 - inner**2) * spec.RELIEF_WIDTH
+def test_flat_volume_is_two_segments() -> None:
+    radius = spec.SHAFT_DIA / 2.0
+    half_angle = math.acos((radius - spec.FLAT_DEPTH) / radius)
+    segment = radius**2 * (half_angle - math.sin(half_angle) * math.cos(half_angle))
+    assert spec.segment_area(spec.FLAT_DEPTH) == pytest.approx(segment)
+    assert spec.V_FLAT == pytest.approx(segment * spec.FLAT_LENGTH)
+    source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
+    assert "volume-2.0*V_FLAT" in source
 
 
-def test_detail_sits_in_the_open_field() -> None:
-    """Under the profile's length dimension, right of the notes, left of the
-    title block."""
-    radius = drawing.DETAIL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
-    left, right = drawing.DETAIL_CENTER[0] - radius, drawing.DETAIL_CENTER[0] + radius
-    top = drawing.DETAIL_CENTER[1] + radius
-    assert top < drawing.PROFILE_KEEP["ShaftLength"][1]
-    assert right < 0.218
-    assert left > 0.12
-    # The fence takes in both grooves and the shoulder O.D.
-    fence = drawing.DETAIL_RADIUS_MM
-    reach = spec.SHOULDER_LENGTH / 2.0 + spec.RELIEF_WIDTH
-    assert reach < fence
-    assert spec.SHOULDER_DIA / 2.0 < fence
-
-
-# Measured on the r743-2R render (5100x3300 px on 431.8x279.4 mm): an Ra
-# symbol at note text height runs 14.7 mm right of and 7.2 mm above its
-# leader end; the relief callouts' "BOTH SHOULDER FACES" line runs ~52 mm,
-# centred on its dimension text.
-FINISH_SYMBOL_WIDTH = 0.0147
-FINISH_SYMBOL_HEIGHT = 0.0072
-RELIEF_CALLOUT_HALF_WIDTH = 0.026
-TITLE_BLOCK_TOP = 0.065
+def test_the_flats_print_once_as_two_places() -> None:
+    assert drawing.FLATS_CALLOUT == "2X"
+    source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert '{"FlatLength":FLATS_CALLOUT,"FlatAF":FLATS_CALLOUT}' in source
 
 
 def test_finishes_print_at_note_height() -> None:
-    """r743-2R: at the template's default height the three Ra symbols printed
-    ~18 mm tall, the journal's over the profile and DETAIL A's across the
-    length dimension."""
+    """r743-2R: at the template's default height the Ra symbols printed
+    ~18 mm tall."""
     assert drawing.FINISH_CHAR_HEIGHT == 0.0025
     source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
     assert source.count("char_height=FINISH_CHAR_HEIGHT") == len(spec.SURFACE_FINISHES)
 
 
-def test_detail_annotations_keep_off_the_fence_and_each_other() -> None:
-    """r743-2R: the O5.700 callout ran across the fence, and the thrust-face
-    Ra's leader crossed the ReliefWidth callout. The Ra now leads right, over
-    the south groove, to a symbol outside the fence and above the title
-    block; the O5.700 callout ends left of the fence."""
-    radius = drawing.DETAIL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
-    cx, cy = drawing.DETAIL_CENTER
-    symbol = drawing.SHOULDER_FINISH_SYMBOL
-    attach = drawing.SHOULDER_FINISH_ATTACH
-    # The body sits wholly outside the fence, right of it.
-    assert symbol[0] > cx + radius
-    assert symbol[1] > TITLE_BLOCK_TOP
-    assert symbol[1] + FINISH_SYMBOL_HEIGHT < drawing.PROFILE_KEEP["ShaftLength"][1]
-    # The leader runs through air: above the body flank and under the shoulder
-    # O.D. where it leaves the face.
-    scale = drawing.DETAIL_SCALE[0] / 1000.0
-    flank = cy + spec.SHAFT_DIA / 2.0 * scale
-    shoulder_top = cy + spec.SHOULDER_DIA / 2.0 * scale
-    assert flank < attach[1] < shoulder_top
-    assert flank < symbol[1]
-    # The ReliefWidth callout sits above everything the Ra draws.
-    width_text = drawing.DETAIL_KEEP["ReliefWidth"]
-    assert width_text[1] > symbol[1] + FINISH_SYMBOL_HEIGHT
-    # The O5.700 callout ends left of the fence.
-    dia_x, dia_y = drawing.DETAIL_KEEP["ReliefDia"]
-    fence_left = cx - math.sqrt(radius**2 - (dia_y - cy) ** 2)
-    assert dia_x + RELIEF_CALLOUT_HALF_WIDTH < fence_left
-
-
 # Measured on the r743-3 render: "BOTH ENDS" runs 24.5 mm, centred on its
-# dimension text like the relief callouts; the values above them are shorter.
+# dimension text; the value above it is shorter.
 DOME_CALLOUT_HALF_WIDTH = 0.01225
 # Witness lines are hairlines; the text must clear them by a visible gap.
 CALLOUT_WITNESS_CLEARANCE = 0.002
@@ -326,31 +241,62 @@ def _stands_outside(text_x: float, half_width: float, witnesses: tuple) -> bool:
 
 def test_dome_height_callout_stands_outside_its_witness_pair() -> None:
     """r743-3 eye pass: centred on its 1.5 mm span, "1.5 BOTH ENDS" was
-    crossed by both witness lines. It now ends left of the dome tip, clear
-    of the shaft-length witness there too."""
+    crossed by both witness lines. In DETAIL A it ends left of the dome tip."""
     witnesses = (
-        drawing.NORTH_END_X - spec.DOME_HEIGHT * drawing._MM,  # dome tip
-        drawing.NORTH_END_X,  # shaft end
+        drawing._detail_x(spec.DOME_HEIGHT),  # dome tip
+        drawing._detail_x(0.0),  # shaft end
     )
-    text_x, _ = drawing.PROFILE_KEEP["DomeHeight"]
+    text_x, _ = drawing.DETAIL_KEEP["DomeHeight"]
     assert _stands_outside(text_x, DOME_CALLOUT_HALF_WIDTH, witnesses)
     assert text_x < min(witnesses)
-    # Still inside the sheet's left border.
-    assert text_x - DOME_CALLOUT_HALF_WIDTH > 0.02
 
 
-def test_relief_width_callout_stands_outside_its_witness_pair() -> None:
-    """r743-3 eye pass: centred on the 2.0 groove, "2.0 BOTH SHOULDER FACES"
-    was crossed by both witness lines. It now ends left of the groove's
-    outer witness, and stays above the detail fence."""
-    scale = drawing.DETAIL_SCALE[0] / 1000.0
-    witnesses = (
-        drawing._detail_x(-(spec.JOURNAL_LENGTH - spec.RELIEF_WIDTH)),
-        drawing._detail_x(-spec.JOURNAL_LENGTH),
-    )
-    assert witnesses[1] - witnesses[0] == pytest.approx(spec.RELIEF_WIDTH * scale)
-    text_x, text_y = drawing.DETAIL_KEEP["ReliefWidth"]
-    assert _stands_outside(text_x, RELIEF_CALLOUT_HALF_WIDTH, witnesses)
-    assert text_x < min(witnesses)
-    fence_top = drawing.DETAIL_CENTER[1] + drawing.DETAIL_RADIUS_MM * scale
-    assert text_y > fence_top
+def test_the_dome_radius_prints_as_a_spherical_reference() -> None:
+    """PR #1317 machinist review: the 1.5 height alone left the crown's
+    profile open. The model's sphere radius prints as (SR4.1), read-only."""
+    assert spec.DRAWING_PRECISION["NorthCapProfile"]["Radius"] == 1
+    assert f"{spec.DOME_SPHERE_RADIUS:.1f}" == "4.1"
+    assert "Radius" in drawing.DETAIL_KEEP
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_set_spherical_reference(adapter, radius_annotations[0]" in source
+
+
+# The ASME B inner border's right edge and the profile's diameter callout's
+# right end ("0.00 / -0.02" stack, measured on the 20261010T044145843Z render).
+INNER_BORDER_RIGHT = 0.419
+PROFILE_DIA_CALLOUT_RIGHT = 0.264
+
+
+def test_detail_a_takes_the_north_flat_and_dome_clear_of_the_profile() -> None:
+    """PR #1317 eye pass: at 1:1 the flat's dimensions crammed the north end,
+    text on the witnesses and against the dome. A 5:1 detail carries them."""
+    assert drawing.DETAIL_SCALE == (5, 1)
+    tip = drawing._detail_x(spec.DOME_HEIGHT)
+    far = drawing._detail_x(-(spec.NORTH_FLAT_STATION + spec.FLAT_LENGTH / 2.0))
+    left = drawing.DETAIL_CENTER[0] - drawing._DETAIL_FENCE_R
+    right = drawing.DETAIL_CENTER[0] + drawing._DETAIL_FENCE_R
+    assert left < tip < far < right
+    radius_x, _ = drawing.DETAIL_KEEP["Radius"]
+    assert radius_x - 0.010 > PROFILE_DIA_CALLOUT_RIGHT
+    af_x, _ = drawing.DETAIL_KEEP["FlatAF"]
+    assert right < af_x < INNER_BORDER_RIGHT - 0.015
+    # The isometric moved under the profile to make room: right of the notes,
+    # left of the title block.
+    assert 0.105 < drawing.ISO_NOTE_XY[0] < drawing.ISO_CENTER[0] < 0.216
+
+
+def test_detail_a_texts_stand_clear_of_their_witnesses() -> None:
+    """cd4151166 render: centred on its span, the 4.00 station sat on the
+    flat's near witness, and the circle's letter sat on the bar."""
+    end = drawing._detail_x(0.0)
+    station_x, _ = drawing.DETAIL_KEEP["NorthFlatStation"]
+    half = len(f"{spec.NORTH_FLAT_STATION:.2f}") * drawing.CALLOUT_CHAR_WIDTH / 2.0
+    assert station_x + half < end
+    # The (SR4.1) callout is a row lower, so the two cannot meet.
+    assert drawing.DETAIL_KEEP["Radius"][1] < drawing.DETAIL_KEEP["NorthFlatStation"][1] - 0.010
+    letter_x, letter_y = drawing.DETAIL_LETTER_XY
+    circle_left = drawing.NORTH_END_X - (
+        drawing.DETAIL_FENCE_Z_MM + drawing.DETAIL_RADIUS_MM
+    ) * drawing._MM
+    assert letter_x + 0.0065 < circle_left
+    assert letter_y - 0.0065 > drawing.SHAFT_FLANK_Y

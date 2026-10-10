@@ -61,7 +61,14 @@ from _assembly_couplings import (  # noqa: E402
     gear_mate,
 )
 from _assembly_postbuild import discard_open_documents  # noqa: E402
-from _common import OUT_SLDASM, _flag_only, check, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _com import _flag_only  # noqa: E402
+from _paths import OUT_SLDASM  # noqa: E402
+from _session import run_build  # noqa: E402
 from _cwm import (  # noqa: E402
     component_constrained_status,
     component_mate_count,

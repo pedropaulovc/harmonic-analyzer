@@ -56,7 +56,8 @@ from pathlib import Path
 from typing import Any
 
 import _seat_forensics
-from _common import CAD_ROOT, OUT_SLDASM, log
+from _check import log
+from _paths import CAD_ROOT, OUT_SLDASM
 from _drawing_registry import DRAWINGS
 
 import _telemetry

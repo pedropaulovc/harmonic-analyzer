@@ -30,7 +30,12 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import _telemetry  # noqa: E402
-from _common import check, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _session import run_build  # noqa: E402
 from _drawing_common import insert_hole_table  # noqa: E402
 from _holes import HoleSpec, _early, _flag, wizard_holes  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import null_callout  # noqa: E402

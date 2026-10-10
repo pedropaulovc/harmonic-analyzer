@@ -38,8 +38,9 @@ flip_invert:
   - vn pedestal hold down screw datum x
   - vn pedestal hold down screw datum y
   - vn pedestal hold down screw datum z
-  # #743 PR2: the MHA-CH-009 south thrust washer, datum-located IDENTITY
-  # like the pivot brackets (r743-4D flip-seed MISS on its x).
+  # #743 PR2: the MHA-CH-009 thrust washers (north and south, user
+  # 2026-10-10), datum-located IDENTITY like the pivot brackets (r743-4D
+  # flip-seed MISS on its x); both share the one canonical signature.
   - ch rocker thrust washer datum x
   - ch rocker thrust washer datum y
   - ch rocker thrust washer datum z
@@ -48,6 +49,12 @@ flip_invert:
   - vn rocker bank spring datum x
   - vn rocker bank spring datum y
   - vn rocker bank spring datum z
+  # User 2026-10-10: the MHA-VN-034 apex set screws, datum-located IDENTITY
+  # in the bracket loop's wake [INFERENCE: same learned side as every other
+  # IDENTITY datum-located channel part; confirm on the farm build].
+  - vn arbor set screw datum x
+  - vn arbor set screw datum y
+  - vn arbor set screw datum z
 allowed_free_stems:
   - ch-rocker-arm
   - ch-connecting-rod

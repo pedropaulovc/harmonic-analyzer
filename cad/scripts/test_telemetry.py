@@ -210,7 +210,7 @@ def test_log_records_name_the_code_that_logged_them(capture, tmp_path):
     """App Insights maps a dark stretch of a build span to code through the
     ``code.*`` attributes of the record that ends it -- so they must name the
     caller, not the helper that happened to hold the logging call, nor
-    ``_common``'s pass-through ``log`` / ``check`` aliases, nor the span context
+    ``_check``'s pass-through ``log`` / ``check`` aliases, nor the span context
     manager that logs a failure on the caller's behalf."""
     _, logs = capture
     _log_from_a_named_caller("direct")
@@ -218,7 +218,7 @@ def test_log_records_name_the_code_that_logged_them(capture, tmp_path):
     assert rec.attributes["code.function.name"] == "_log_from_a_named_caller"
     assert Path(rec.attributes["code.file.path"]).name == "test_telemetry.py"
 
-    shim = tmp_path / "_common.py"
+    shim = tmp_path / "_check.py"
     shim.write_text(
         "import _telemetry\n"
         "def log(message):\n"
@@ -228,14 +228,14 @@ def test_log_records_name_the_code_that_logged_them(capture, tmp_path):
         "    return result\n",
         encoding="utf-8",
     )
-    spec = importlib.util.spec_from_file_location("_telemetry_test_common_shim", shim)
+    spec = importlib.util.spec_from_file_location("_telemetry_test_check_shim", shim)
     assert spec is not None and spec.loader is not None
-    common = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(common)
+    check_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(check_module)
 
     def build_step():
-        common.log("through log")
-        common.check("through check", None)
+        check_module.log("through log")
+        check_module.check("through check", None)
 
     build_step()
     for body in ("through log", "through check"):

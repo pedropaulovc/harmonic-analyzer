@@ -1,14 +1,46 @@
 # Developing — local workflow notes
 
 Practical, machine-local development notes that don't belong in `AGENTS.md`
-(orientation) or the per-topic policy docs. Right now: supervised farm launches
-and the remote build cache.
+(orientation) or the per-topic policy docs: local pytest timing, supervised farm
+launches and the remote build cache.
 
 Running ONE SolidWorks operation by hand (this checkout has no local seat, so it
 goes to the farm)? Read
 [`cad/docs/one-off-com-operations.md`](cad/docs/one-off-com-operations.md) first
 — it is the decision tree, the seat/cache invariants and the evidence trail for
 an ad-hoc COM operation, and it links back here for cache detail.
+
+## Local pytest timing
+
+Run the CAD and pipeline suite serially for comparable timings:
+
+```text
+uv run --locked python -m pytest -q --durations=50 --junitxml=<outside-worktree>/cad-pytest.xml
+```
+
+The configured suite covers `cad/scripts`, `cad/comparisons/tools` and `tests`,
+including offline diagnostic tests. To include the web Python tests, prepare the
+dependencies and approved model cache using the
+[fresh-checkout instructions](web/README.md#fresh-checkout-tests-and-approved-model-cache),
+then use:
+
+```text
+uv run --locked --group web python -m pytest . -q --durations=50 --junitxml=<outside-worktree>/all-pytest.xml
+```
+
+Use an isolated worktree at a recorded commit and the same environment for
+before/after runs. JUnit case times include fixture setup and teardown; a shared
+fixture's cost is charged to its first consumer. Collection and session overhead
+remain part of the suite wall time. Telemetry appends to that worktree's ignored
+`cad/out/reports/telemetry`, and the root conftest isolates the buildgraph facts
+cache in a temporary directory. Keep `NOSW_GUARD` enabled and leave
+`HARMONIC_BUILDGRAPH_CACHE` unset. The vendored `SolidworksMCP-python` tests are
+excluded because they can take the farm's SolidWorks licence.
+
+Reuse source facts only within an unchanged-source scan, or immutable baseline
+bytes for private mutation fixtures. Keep each case's writable checkout, task
+state and invalidation checks isolated. Error-budget timings must retain the
+configured draws, seeds, reference cases and numerical acceptance checks.
 
 ## Supervised farm launches
 
@@ -106,12 +138,12 @@ for example `-DisplayName:'-DisplayName'`; a separate value matching a known
 PowerShell parameter name would otherwise be parsed as another parameter.
 Launcher stdout JSON and its logs use UTF-8, including detached Windows launches.
 
-Every new leaf execution has Temporal memo `display_name`, separate from the
-optional launcher ownership memo `farm_run`. Neither label enters `LeafRequest`,
-the workflow ID or the cache key. If another session requests an already-running
-leaf, `USE_EXISTING` attaches to it without replacing either creator memo:
-the queued/running display label continues to identify the creator, not the
-latest attaching session.
+Every new leaf execution has coordinator-authored Temporal memo `display_name`,
+separate from optional launcher metadata `farm_run`. Neither label enters the
+workflow ID or cache key. Protocol 5 binds each accepted reservation to an exact
+workflow run; an existing run with foreign ownership is refused, not silently
+attached to another build. The queued/running display label identifies the
+creator, not a later requesting session.
 
 Targets are *selections*, not variables, and they arrive as one string. `pwsh
 -File` binds a single token per parameter, so a repeated `-Targets` or a
@@ -144,6 +176,97 @@ exactly four leaves running 88% of a cold build and one worker idle throughout
 (2026-09-28, build `20260928T150817352Z`).
 `--continue` collects later failures instead of stopping at the first; any failed
 task still leaves the run nonzero.
+
+### FIFO build ownership
+
+After successful preflight, the parent build creates a fresh timestamp-and-GUID
+`build_id`, ignoring any inherited `HARMONIC_FARM_BUILD_ID`, and registers with
+the singleton `BuildFifo` coordinator. Builds wait in strict registration FIFO
+order. A waiting producer executes no doit actions; once active, its leaves
+still run in parallel according to `-n`. Ownership stays open through local
+actions and dependency gaps: an empty leaf queue does not let another build
+overtake it.
+
+The supported runtime is Python 3.12–3.14 (`pyproject.toml` and `uv.lock`);
+`.python-version` selects 3.14 for development rather than narrowing that
+contract. Queued ownership uses finite one-second event waits so Windows
+Python 3.12/3.13 can deliver Ctrl-C. Cancellation joins the parent renewal thread,
+closes the named build even if registration's reply was still uncertain, and
+restores the inherited build-ID environment without entering the scheduler.
+
+Only the parent renews ownership, every 15 seconds on an independent background
+thread, while waiting and while active. Spawned action processes inherit
+`HARMONIC_FARM_BUILD_ID` but do not renew the lease. The coordinator's 120-second
+producer lease expires after a killed or disconnected parent. Transient heartbeat
+and waiting-status RPC failures are retried only while the last acknowledged
+lease remains valid; an uncertain heartbeat reuses its sequence and update ID.
+Queries and duplicate replies do not extend that deadline. Expiry or an explicit
+coordinator refusal fails the producer closed, with no reopening or late renewal.
+Normal completion closes ownership as `finished`, task failure as `failed`,
+and an interrupted parent as `cancelled`. A failed final close RPC is a warning:
+server lease expiry fences ownership, so the command's actual exit code is kept.
+This does not suppress an earlier ownership loss or an artifact/action error.
+Closing ownership alone never cancels remote leaves.
+
+The producer records its build and each leaf request before submitting a
+reservation to the coordinator. The coordinator owns leaf startup and exact-run
+binding. Accepted reservations remain outstanding even when startup or its
+response is uncertain; absence of a workflow is not evidence of no accepted
+work. Closing or expiry blocks new admissions but does not discard accepted
+reservations. The next build waits until those reservations settle and every
+worker attempt has acknowledged actual native execution and cleanup completion.
+Temporal workflow closure, timeout, cancellation and producer lease expiry do
+not prove physical drain. Unknown or unconfirmed attempts block the FIFO
+fail-closed until physical-drain evidence is supplied through the pool operator
+surface.
+`leaf-status` exposes failed startup, grant or history observation as
+`state: "recovery_required"` with typed `error_code` and `error` fields. The
+producer fails the affected action rather than polling forever or attaching to
+a binding whose recovery failed. These reservations remain fail-closed.
+
+Once a leaf reservation is accepted but not yet bound, transient transport
+failures reading `leaf_status` retry the same `LeafKey` for at most 120 consecutive
+seconds, including any RPC in progress. A successful reserved reply starts a new
+read-outage budget; healthy startup polling is not given a total time limit.
+This independent monotonic transport budget is not an acknowledged producer
+lease: only the parent renews ownership and the coordinator fences native
+admissions. Reconciliation never resubmits, starts or cancels the canonical leaf.
+Foreign keys/bindings, recovery-required status, invalid states and definitive
+RPC refusals fail immediately. Exhausting the read budget fails the local action
+without discarding the accepted reservation or manufacturing a result.
+
+For a settled failed reservation, an operator can supply independently checked
+physical-drain evidence with `farm.py confirm-reservation-drained --build-id <id>
+--workflow-id <wf> --evidence <text>`. An unbound reservation must omit `--run-id`.
+A bound reservation requires `--run-id <run>` matching its immutable exact-run
+binding, no pending starter or watcher, and every known attempt already drained.
+The coordinator rejects confirmation without those conditions; it never infers
+physical drain from missing history. Confirm a bound attempt separately with the
+pool's exact-run `confirm-attempt-drained` command before reservation recovery.
+Both are explicit operator confirmations; neither workflow closure nor a missing
+run is their evidence source. Worker drain signals require actual native cleanup.
+The operator-versus-worker source distinction is a trust convention, not a
+separate enforced authorization boundary: both operator updates require explicit
+evidence, and callers must not manufacture it from Temporal state.
+
+A parked pre-grant workflow ignores ordinary cancellation. When recovery
+involves a stale or foreign execution, independently verify that native execution
+and cleanup have physically stopped, then terminate only that exact stale/foreign
+run in the Temporal UI before sending an operator drain confirmation. Check its
+run ID rather than acting on a later execution sharing the canonical workflow ID.
+Termination is cleanup of the Temporal execution, not evidence of physical drain.
+
+An already-running coordinator is reused, but a terminal coordinator cannot be
+recreated as an empty singleton: that would forget accepted work and drain
+obligations. Recovery requires physical-drain evidence and a reviewed,
+snapshot-aware recovery or history reset, not another producer launch.
+
+Protocol 5 is a clean cutover, not a rolling upgrade over protocol 4 histories.
+Migration requires an idle fleet, no outstanding reservations or unconfirmed
+attempts, and compatible producer, coordinator and worker code together.
+Do not deploy from this implementation worktree; future live-history migration
+requires a separately reviewed replay/migration plan.
+
 
 ### The build snapshot
 
@@ -298,6 +421,12 @@ recorded `pid` is alive (a PID reused by a process that started after the run is
 not the launcher), otherwise **`launcher-died`** — the launcher is gone and wrote
 no `.done`.
 
+If the final run-record refresh fails, the launcher still writes `.done` with
+the actual build outcome and reports the refresh error in `cleanup_errors`.
+It keeps the snapshot and records its output path instead of authorizing cleanup
+from stale identity data. Corrupt or conflicting metadata may still make
+`-Status` refuse the record; repair that metadata before using it for cancellation.
+
 - **`-Status`** prints one JSON object: `state`, `exit_code`, `launcher`
   (`pid`, `alive`, and for a dead launcher the `orphaned_processes` it left —
   a build child outlives a killed launcher and keeps dispatching), `commit`,
@@ -311,11 +440,13 @@ no `.done`.
   `.done`'s `outputs` after). Tools that only need a run's `cad/out` —
   `cache.jsonl`, `telemetry/traces.jsonl` — read `outputs` from here.
   Leaves come from the log plus `<run-id>.requests\`: the launcher sets
-  `HARMONIC_FARM_REQUESTS` to that directory, and `_farm._dispatch` writes one
-  `{task, workflow_id}` file there before it creates the workflow (a failed
-  write fails the leaf before dispatch). The log is the launcher's copy of the
-  build's output, so stopping the launcher mid-dispatch can drop a `Farm
-  workflow requested` line; the file cannot be dropped that way.
+  `HARMONIC_FARM_REQUESTS` to that directory. The parent writes `build.json`
+  with `{build_id, farm_run}`; `_farm._dispatch` atomically writes one
+  `{task, workflow_id, build_id, farm_run}` file before submitting a reservation
+  (a failed write fails the leaf before submission). Status also reports
+  `build_id`, recovered from this record or the registration log and persisted
+  in the run record. Stopping the launcher can drop a logged request line but
+  cannot erase the durable request.
 - **`-Watch`** is the required watcher for an agent-launched build. It prints a
   line per leaf state change (`requested`, `attached`, `succeeded`, `failed`,
   each with its workflow id — follow one leaf with `farm.py watch <id>`) and per
@@ -343,34 +474,41 @@ no `.done`.
   10 rounds, else an error). Each process is stopped through a handle whose
   start time matches the scan's, so a PID reused after the scan is never
   killed, and a stopped process still running 60 s later is an error, since it
-  may still be dispatching. It then cancels each of
-  `unsettled_workflows` that `farm.py status` reports `RUNNING`,
-  with the reason and run id on the cancellation. Workflows are shared by ID
-  (`USE_EXISTING`), so two leaves are kept. One is a leaf a sibling run in the
-  same `-LogDirectory` is still waiting on (`kept-shared`; a `launcher-died`
-  sibling counts while its build outlives it). The other is a leaf another
-  submitter created (`kept-foreign`). The launcher sets `HARMONIC_FARM_RUN`
-  to its run id, and `_farm._dispatch` stamps it on the workflow's memo
-  (`farm_run`). Temporal writes a memo only on the start that creates the
-  execution, so an attach leaves the creator's in place, and `farm.py status
-  --json` reports it. A leaf counts as this run's only when `farm_run` equals
-  its run id. A leaf created without one (a direct `build.py --executor farm`)
-  is kept, and so is every leaf when `farm.py` predates `farm_run`
-  (pedropaulovc/solidworks-pool#165). Siblings are scanned right before each
-  `farm.py cancel`, not up front, so a sibling that attaches while `-Cancel`
-  queries the farm keeps its leaf, and one that finishes meanwhile no longer
-  does. A sibling that attaches during
-  the cancel call itself (one `farm.py` round trip) still loses it: its leaf
-  fails as cancelled and a rerun rebuilds it. A submitter outside this
-  `-LogDirectory` that attached *after* this run created a leaf is invisible,
-  and that leaf is cancelled with the rest. Only farm-side reference counting
-  would close both gaps.
-  A leaf the farm reports absent is not settled on that answer: its request
-  record is written before the start RPC, and a build killed mid-RPC can
-  leave a start the farm commits a moment later. `-Cancel` asks again once
-  `-SettleSeconds` (30) have passed since it stopped the run's processes, and
-  handles a leaf that has appeared like any other; one still absent is
-  `not-found`.
+  may still be dispatching. For protocol 5 it then closes producer ownership
+  with `farm.py close-build <build_id> --reason cancelled`, blocking new
+  admissions while retaining accepted reservations. It reconciles each request
+  with `farm.py leaf-status --build-id <id> --workflow-id <wf> --json`.
+  Reserved work is polled for at most `-BindingWaitSeconds` (30 by default;
+  0 performs one query). A still-pending accepted reservation is `unresolved`,
+  not absent; the request and snapshot remain for a later `-Cancel`, and FIFO
+  ownership remains fenced. A typed `recovery_required` or `error_code` response
+  stops reconciliation immediately and calls for operator recovery.
+  Status and cancellation of a bound leaf use `--run-id <run>` so a later
+  execution with the same canonical workflow ID cannot be cancelled by mistake.
+
+  Creator memo and sibling protections remain: a leaf another submitter created
+  is `kept-foreign`; a leaf a live sibling run in the same `-LogDirectory`
+  still waits on is `kept-shared` (a `launcher-died` sibling counts while its
+  build outlives it). `HARMONIC_FARM_RUN` is metadata supplied to the coordinator,
+  which writes creator memo when it starts the reserved leaf. Siblings are
+  checked immediately before each cancellation. A sibling outside that log
+  directory is not visible to this launcher.
+
+  The typed `missing_closed` coordinator reply is `settled-untracked`: producer
+  ownership is fenced closed and no retained reservation remains to reconcile.
+  This includes both never-accepted requests and accepted, physically drained
+  history later pruned; it does not establish whether a leaf was ever submitted
+  or executed. No workflow status or cancellation is inferred from the canonical
+  ID. An operator-confirmed, unbound `drained` reservation is
+  `already-closed`. A fresh unknown reservation, failed query, exhausted binding
+  wait or missing exact bound execution remains `unresolved`: cancellation exits
+  1 without writing `.done` or cleaning the snapshot. Retry the same command; do
+  not erase the request or infer drain from error text.
+  A successful remote cancellation still does not prove native worker cleanup:
+  FIFO handoff waits for the worker's physical-drain acknowledgement.
+  Historical runs without `build_id` retain the legacy settle query after
+  `-SettleSeconds` (30) and may report `not-found`; this is not a protocol 5
+  reservation outcome.
   If any leaf cannot be accounted for (`farm.py` failed on
   authentication, network or CLI), `-Cancel` exits 1 and changes nothing
   else: no `.done`, the snapshot kept, the run still `launcher-died`. Retry the
@@ -378,7 +516,7 @@ no `.done`.
   outputs moved to `<run-id>.out`, snapshot removed — and writes `.done` with
   `state: "cancelled"`, `exit_code: null` and a `cancel` block recording who,
   why, the stopped PIDs and each workflow's outcome (`cancelled`,
-  `already-closed`, `not-found`, `kept-shared`, `kept-foreign`). A cleanup
+  `already-closed`, `settled-untracked`, `not-found`, `kept-shared`, `kept-foreign`). A cleanup
   failure still writes `.done` (with `cleanup_errors`) and exits 1.
   On a run that already finished, `-Cancel` stops nothing and leaves `.done`
   as the launcher wrote it; it only cancels that run's leaves still
@@ -736,9 +874,34 @@ Switching to these per-drawing dependencies changes existing drawing cache keys
 once. It does not reuse legacy keys; subsequent unrelated row changes stay
 isolated. A scoped drawing build need not regenerate the rest of the fleet.
 
+GD&T consumers import focused modules directly: `_gtol_identity` names PMI,
+`_gtol_symbols` defines symbols and zones, `_gtol_frame` handles frame signatures
+and XML, and `_gtol_controls` validates datum/control declarations. Face selectors
+live in `_gtol_cylinder`, `_gtol_cone`, `_gtol_planar`, `_gtol_sphere` and
+`_gtol_torus`; `_gtol_face` holds their shared protocol and geometry contract.
+COM geometry reads and face traversal live separately in `_gtol_face_read` and
+`_gtol_face_resolve`. There is no aggregate facade: the dependency graph counts
+every import, including `TYPE_CHECKING`, at file granularity. This keeps edits to
+one selector or frame representation out of unrelated spec/cache closures while
+still invalidating every consumer of the changed module.
+
+Local Python dependencies are file-granular, including imports inside functions.
+Stock fastener metadata therefore lives beside each diagnostic SKU callable
+(`_stock_recipe.stock_recipe`), and each production builder statically imports
+only its recipe. Threaded builders explicitly supply the `_simplified_part` save
+callback; unthreaded builds do not depend on simplified-configuration derivation.
+Simplified naming, assembly-component fingerprints, shared pure BOM identity and
+part-side configuration saves live in separate helpers. Vendor dimensions are
+pure per-SKU inputs shared by the recipe and its specs, rather than dimensions
+imported through recipe code or a family-wide table.
+The catalogue-only 91251A108/91251A157 socket-head recipes share the pure
+`_socket_head_dimensions` record; each SKU still owns its `DIMS` declaration.
+The knife-hanger and knife-mount-dowel specs import their own per-SKU data,
+not the socket-head or dowel COM recipe.
+
 The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
 submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
-by `_common`/`_assembly` (mate/plane/feature creation), so its source is a genuine
+by `_session`/`_com`/`_assembly` (session access, COM binding, mate/plane/feature creation), so its source is a genuine
 build input, yet it is an installed package, not a repo-local `_*.py` helper, so
 `module_deps_of` never walked it (issue #144). `dodo._submodule_dep()` folds a
 content-hash of the submodule's `src/solidworks_mcp` tree (repo-relative-tagged,
@@ -971,7 +1134,7 @@ subscription.
 
 ## Native projected geometric-control zones
 
-The canonical `_gtol_spec.GeometricControl.projected_zone_height_mm` is optional:
+The canonical `_gtol_controls.GeometricControl.projected_zone_height_mm` is optional:
 `None` preserves the ordinary XML payload and migrated ordinary frames are not
 repopulated; an authored height must be finite and positive. Readback gating is
 stricter for **all** feature-control frames: complete semantic signatures pay
@@ -995,7 +1158,7 @@ different ranged zone.
 `IGtol.SetPTZHeight2` / `GetPTZHeight2` are explicitly pre-2022-only APIs and are
 never a fallback on current frames. The existing old-format seed uses the void
 `SetFrameSymbols2`, BOOL `SetFrameValues2`, and checked `ConvertFormat` status
-before any projected XML is applied. The enrolled `test_gtol_spec.py` and
+before any projected XML is applied. The enrolled `test_gtol_contracts.py` and
 `test_drawing_specification_purity.py` include source-only contract tests; these
 are not native execution evidence. Parent offline checks and the farm gate must
 cover **every drawing with direct or spec-projected FCFs**, including ordinary
@@ -1056,12 +1219,12 @@ remain mandatory parent farm gates; document-unit getters alone cannot waive the
 The source-only `test_native_projected_zone.py` covers these native getter shapes,
 raw evidence, honest unqualified status, reload refusal/fresh-handle semantics,
 multi-sheet annotation enumeration and read-only-open cleanup. Existing
-`test_gtol_spec.py` also covers canonical writer capture and ordinary-path bypass.
+`test_gtol_contracts.py` also covers canonical writer capture and ordinary-path bypass.
 These authored tests are pending parent centralized checks and native farm proof.
 
 ## Native equation-curve stock gaps
 
-`_common.equation_curve` is the canonical stock-gap curve creator. `_gear` uses
+`_gear.equation_curve` is the canonical stock-gap curve creator. `_gear` uses
 it internally and `build_dt_cone_gear` imports it directly. It preserves the
 authored expressions, range `[0, 1]` and locked endpoints while using
 `ISketchManager.AddToDB=True` to avoid creation-time snapping/inference. The

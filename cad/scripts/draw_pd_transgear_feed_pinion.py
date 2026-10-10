@@ -21,7 +21,10 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_annotation_extent import move_annotation
 from _drawing_common import (
     DrawingOutputs,

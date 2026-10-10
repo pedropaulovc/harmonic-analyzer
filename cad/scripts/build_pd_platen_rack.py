@@ -44,28 +44,24 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from _common import (
-    SketchDims,
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     add_line_chain,
-    apply_material,
     anchor_point_to_origin,
     blank_reference_sketches,
-    check,
-    define_polygon_chain,
-    define_rectilinear_chain,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
+    SketchDims,
 )
+from _sketch_chains import define_polygon_chain, define_rectilinear_chain
 from _drawing_marks import (
     _named_dimension,
     apply_drawing_precision,
@@ -73,7 +69,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_simplified import save_simplified_part
+from _simplified_part import save_simplified_part
 from _visibility import blank_reference_geometry
 from pd_platen_rack_spec import (
     BACKER_HEIGHT,

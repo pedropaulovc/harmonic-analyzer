@@ -17,7 +17,7 @@ from __future__ import annotations
 import sys
 
 from _clamp_arc import build_arc
-from _common import run_build
+from _session import run_build
 from _holes import HoleSpec
 
 PART_NAME = "sh-column-clamp-back"

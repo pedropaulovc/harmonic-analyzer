@@ -1,6 +1,6 @@
 """Shared surface-finish grades for released drawing callouts.
 
-PURE DATA, no SolidWorks/COM imports — the sibling of :mod:`_fit_limits`, and
+PURE DATA, no SolidWorks/COM imports — the sibling of :mod:`_fit_deviations`, and
 importable from BOTH the part tier and the drawing tier without tripping
 ``check:partiso``.
 
@@ -34,7 +34,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from _gtol_spec import FaceSpec, pmi_annotation_name
+from _gtol_face import FaceSpec
+from _gtol_identity import pmi_annotation_name
 
 # Roughness average (Ra) in MICROMETRES.
 #

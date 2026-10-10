@@ -31,28 +31,24 @@ import math
 import sys
 
 import _telemetry
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import _feature_by_name, name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    _feature_by_name,
     add_line_chain,
-    apply_material,
-    check,
-    define_circle,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     _named_dimension,
     add_diametric_linear_dimension,
@@ -63,9 +59,9 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
-from _gtol_spec import PlanarFace
-from _part_pmi import _resolve_faces
+from _fit_deviations import deviations
+from _gtol_planar import PlanarFace
+from _gtol_face_resolve import resolve_faces
 from _visibility import blank_reference_geometry
 from pd_transgear_drive_collar_spec import (
     BORE_DIA,
@@ -520,7 +516,7 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _collar_length_reference(adapter)
-    _resolve_faces(
+    resolve_faces(
         adapter.currentModel,
         {
             "collar actual rear reaction face": PlanarFace((0.0, 0.0, 1.0), LENGTH, tolerance_mm=1e-5),

@@ -6,8 +6,7 @@ The official 93585A190.SLDPRT recipe was read-only harvested on 2026-09-29
 ``f168d0847e364090ace8e7401b3563a388a8a01307ef9590decd5ac2218e5555``;
 dump ``cad/out/reports/mcmaster-93585A190-dump.json``).  Sketch1 drives it:
 Thread Size 6.35, Length 19.05, Head Diameter 15.875, Head Height 12.7,
-Pitch 1.27. These scalars and the knurl/runout inputs belong to the pure
-``vn_cone_lock_knob_spec`` consumed here. Vendor tree, in order:
+Pitch 1.27.  Vendor tree, in order:
 
 * Extrude1: dia 6.35 stud, 19.05 down (reversed) -> Chamfer2 on the tip,
   P*.75 = 0.9525.
@@ -57,13 +56,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     assert_profile_closed,
@@ -80,27 +83,24 @@ from diagnostics.sketch_profile import (  # noqa: E402
     Segment,
     minor_arc,
 )
-from vn_cone_lock_knob_spec import (  # noqa: E402
-    HEAD_H,
+
+from _mcmaster_93585a190 import (  # noqa: E402
+    MAJOR_R,
+    PITCH,
+    LENGTH,
     HEAD_R,
+    HEAD_H,
+    RIM_CHAMFER,
+    TIP_CHAMFER,
+    CORE_R,
+    BAND_H,
     KNURL_COUNT,
     KNURL_CREST_W,
     KNURL_FLANK_DEG,
-    LENGTH,
-    MAJOR_R,
-    PITCH,
-    RIM_CHAMFER,
     RUNOUT_DEPTH,
     RUNOUT_DRAFT_DEG,
-    TIP_CHAMFER,
+    ROOT_R,
 )
-
-# --- vendor equations ---------------------------------------------------------
-CORE_R = HEAD_R * 0.98  # D1@Sketch21 = HD * .98
-BAND_H = HEAD_H * 0.05  # D4@Sketch1 = HH * .05 (bands, Chamfer3/4)
-
-H_SHARP = PITCH * math.sqrt(3.0) / 2.0
-ROOT_R = MAJOR_R - 0.75 * H_SHARP  # 2.350111
 
 
 def knurl_ridge_profile() -> tuple[Segment, ...]:
@@ -151,8 +151,10 @@ def rim_cut_profile() -> tuple[Segment, ...]:
     return (Line(a, b), Line(b, c), Line(c, a))
 
 
+@stock_recipe("93585A190", threaded=True)
 async def build_93585A190(adapter, truth=None):
-    from _common import _early_bound, _feature_by_name, _read_member
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
     from diagnostics.diag_mcmaster_lib import no_sketch_inference
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,

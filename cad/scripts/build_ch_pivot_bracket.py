@@ -7,8 +7,11 @@ at one END of the foot, and the foot is only as wide as the support's apex.
 #743 PR2 (Reading 1, user Q4): the bright dome on the ear is the pivot
 shaft's own domed end, not a brazed-on ball, so the ear is a plain plate
 arched EAR_W/2 about the O6.5 cross-bore. The north ear's inner face is the
-rocker bank's axial datum (the shaft's shoulder bears on it); the south one
-is set off the MHA-VN-053 preload spring (#948 ruling R; ``rocker_bank_layout``).
+rocker bank's axial datum (the north thrust washer behind hub 19 bears on
+it); the south one is set off the MHA-VN-053 preload spring
+(``rocker_bank_layout``). One MHA-VN-034 #4-40 set screw
+drops through each ear's arch apex onto the pivot shaft's flat (user,
+2026-10-10).
 
 The channel assembly inserts the NORTH bracket as IDENTITY and the SOUTH one
 turned Ry(180) about its bore axis, so both feet run OUTBOARD, away from the
@@ -26,8 +29,16 @@ FOOT_H tall by FOOT_Z0..FootZ1 along Z; ear EAR_W (= FOOT_W, so its sides run
 flush with the foot's) wide by EAR_T thick (Z), centred on the origin: a block
 from the foot top to the bore height plus a full O EAR_W boss on the bore
 axis, whose upper half is the arch (the arbor-pedestal crown idiom: no arcs,
-only proven primitives); O BORE_DIA cross-bore along Z; one hold-down hole
-through the foot on x = 0 at z = HoleZ, centred in the foot's free run.
+only proven primitives); O BORE_DIA cross-bore along Z; one #4-40 tap down
+through the arch apex (EAR_TOP_Y) on x = 0, z = 0 into the bore
+(``SetScrewTap``); one hold-down hole through the foot on x = 0 in the foot's
+free run (``ch_pivot_bracket_sides`` places it), its station
+(``HoleStation``) dimensioned from the ear's inboard face at FOOT_Z0.
+
+Volume (``V_TOTAL``): foot FOOT_W * FOOT_H * FOOT_LEN, plus the ear block
+EAR_W * (BORE_H - FOOT_H) * EAR_T and the arch half-disc pi R^2 / 2 * EAR_T,
+less the bore, the apex tap's drill from the arch down to the bore
+(``V_TAP``) and the hold-down hole.
 
 Run (SolidWorks already open)::
 
@@ -40,38 +51,40 @@ import math
 import sys
 
 import _config
-from _common import (
-    PANEL_BLACK,
-    SketchDims,
-    _early_bound,
-    _read_member,
+from _appearance import PANEL_BLACK, apply_color, apply_material
+from _check import check
+from _com import _early_bound, _read_member
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import (
     active_configuration_name,
-    add_line_chain,
-    apply_color,
-    apply_material,
     assert_saved_configurations_regenerate,
-    check,
-    define_circle,
-    define_rectilinear_chain,
-    drive_dimension,
-    ensure_fully_defined,
     force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
 )
+from _session import run_build
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from _configuration_material import require_material_in_every_configuration
 from _drawing_marks import set_dimension_symmetric_tolerance
 from _grouped_bom_properties import apply_grouped_bom_properties
+from _hole_spec import blind_cut_dia_mm
+from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from ch_pivot_bracket_sides import (
     CONFIGURATION_NUMBER,
     CONFIGURATIONS,
     FOOT_LEN,
     FOOT_Z1,
+    HOLE_STATION,
     HOLE_Z,
 )
 from ch_pivot_bracket_spec import (
@@ -80,12 +93,14 @@ from ch_pivot_bracket_spec import (
     EAR_ARCH_R,
     EAR_T,
     EAR_T_BAND,
+    EAR_TOP_Y,
     EAR_W,
     FOOT_H,
     FOOT_LEN_BAND,
     FOOT_W,
     FOOT_Z0,
     HOLE_DIA,
+    SET_SCREW_HOLE_SPEC,
     STATION_BAND,
 )
 
@@ -103,13 +118,36 @@ V_BLOCK = EAR_W * (BORE_H - FOOT_H) * EAR_T
 V_ARCH = 0.5 * math.pi * EAR_ARCH_R**2 * EAR_T  # the boss's upper half
 V_BORE = math.pi * (BORE_DIA / 2.0) ** 2 * EAR_T
 V_HOLE = math.pi * (HOLE_DIA / 2.0) ** 2 * FOOT_H
+# The apex tap's drill runs on x = 0 from the arch down to the bore: half of
+# each perpendicular cross-hole volume, arch minus bore (the arbor pedestal's
+# crown-minus-bore idiom; the two cylinders share the bore axis).
+TAP_DRILL_DIA = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
+V_TAP = (
+    cross_hole_volume_mm3(TAP_DRILL_DIA, 2.0 * EAR_ARCH_R)
+    - cross_hole_volume_mm3(TAP_DRILL_DIA, BORE_DIA)
+) / 2.0
 V_TOTAL = {
-    name: V_FOOT[name] + V_BLOCK + V_ARCH - V_BORE - V_HOLE for name in CONFIGURATIONS
+    name: V_FOOT[name] + V_BLOCK + V_ARCH - V_BORE - V_TAP - V_HOLE
+    for name in CONFIGURATIONS
 }
 if EAR_ARCH_R != EAR_W / 2.0 or BORE_H - EAR_ARCH_R <= FOOT_H:
     raise AssertionError("the ear boss must be the block's width and clear the foot")
 if EAR_W > FOOT_W:
     raise AssertionError("the ear must not overhang the foot's sides")
+if abs(BORE_H + EAR_ARCH_R - EAR_TOP_Y) > 1e-9:
+    raise AssertionError("the arch apex must be the ear top the tap starts on")
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry.
+
+    ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
+    derived ISketchLine the entity registry binds -- rebind before the set.
+    """
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
 def _apply_configuration_number(adapter, configuration: str, number: str) -> None:
@@ -285,17 +323,79 @@ async def build(adapter) -> dict[str, str]:
     expected -= V_BORE
     await volume_check(adapter, "shaft bore", expected, 0.02 * V_BORE)
 
-    # Hold-down hole through the foot: a Top-plane circle on x = 0 (sketch y
-    # = -z), cut both ways past the foot height. On-axis in X, so it records
-    # only its z station (HoleZ, per configuration) + diameter.
+    # Apex set-screw tap (user, 2026-10-10): ONE native #4-40 tapped hole
+    # drilled radially down through the arch apex on the ear's mid-plane and
+    # stopped at the next surface -- the shaft bore -- so it never runs on
+    # into the ear below (build_dt_arbor_pedestal's apex-tap idiom). The arch is the
+    # cylinder the wizard drills: its normal at the apex is -Y, through the
+    # shared arch/bore axis. Front Plane holds the point on z = 0, Right Plane
+    # clocks it to the apex.
+    wizard_hole_on_cylinder(
+        adapter,
+        SET_SCREW_HOLE_SPEC,
+        [0.0, EAR_TOP_Y, 0.0],
+        "apex set-screw tap (#4-40)",
+        name="SetScrewTap",
+        point_planes=("Front Plane", "Right Plane"),
+    )
+    expected -= V_TAP
+    await volume_check(adapter, "apex set-screw tap", expected, 0.03 * V_TAP)
+
+    # Hold-down hole through the foot: a Top-plane circle on x = 0 (sketch
+    # (u, v) = model (X, -Z)), cut both ways past the foot height. A
+    # construction line on x = 0 from the ear's inboard face (FOOT_Z0, the
+    # face fit-up sets and the S4 hold's Z0) to the hole centre carries the
+    # station, HoleStation = HoleZ + EarT / 2 per configuration
+    # (build_pd_transgear_disc_hub's oil-hole station idiom); the circle's
+    # centre sits on its end.
     hole_z = HOLE_Z[AUTHORING_CONFIG]
     hole = SketchDims()
     check("create_sketch hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, -hole_z, HOLE_DIA / 2.0, "hold-down hole",
-        dims=hole, names=("HoleX", "HoleStation", "HoleDia"),
-        drives=(None, '"HoleZ"', '"HoleDia"'),
+    set_sketch_direct_db(adapter, True)
+    station = check(
+        "hold-down hole station line",
+        await adapter.add_line(0.0, -FOOT_Z0, 0.0, -hole_z),
     )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, station)
+    check(
+        "hold-down hole station vertical",
+        await adapter.add_sketch_constraint(station, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{station}.start", 0.0, -FOOT_Z0, "hole datum at the inboard face"
+    )
+    hole.record("HoleDatum", '"EarT" / 2')
+    await dimension_between(
+        adapter,
+        f"{station}.start",
+        f"{station}.end",
+        "vertical_distance",
+        HOLE_STATION[AUTHORING_CONFIG],
+        "hold-down hole station from the ear's inboard face",
+    )
+    hole.record("HoleStation", '"HoleZ" + "EarT" / 2')
+    sketch_mgr = adapter.currentSketchManager
+    prev_add_to_db = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    try:
+        circle = check(
+            "hold-down hole circle",
+            await adapter.add_circle(0.0, -hole_z, HOLE_DIA / 2.0),
+        )
+    finally:
+        sketch_mgr.AddToDB = prev_add_to_db
+    check(
+        "hold-down hole centre on the station",
+        await adapter.add_sketch_constraint(
+            f"{circle}.center", f"{station}.end", "coincident"
+        ),
+    )
+    check(
+        "hold-down hole diameter",
+        await adapter.add_sketch_dimension(circle, None, "diameter", HOLE_DIA),
+    )
+    hole.record("HoleDia", '"HoleDia"')
     await ensure_fully_defined(adapter, "hole sketch")
     check("exit_sketch hole", await adapter.exit_sketch())
     name_last_feature(adapter, "HoleProfile")
@@ -355,13 +455,11 @@ async def build(adapter) -> dict[str, str]:
 
     # The three lengths along the foot carry +/-0.10 natively, shared by both
     # configurations (ch_pivot_bracket_spec: the south foot's short run cannot
-    # take title-block .XX). The foot length runs from the ear's inboard face
-    # to the free end. HoleStation is HoleZ, from the ear's mid-plane, while
-    # the spec's stack books the station from the free end, where the S4 hold
-    # gauges it off the ledge; on the mid-plane datum the foot-end ligament
-    # loses EAR_T_BAND / 2 more (S 2.23, still over the 2.0 target) and every
-    # other margin gains. No in-repo sheet prints this part, so a fixture plan
-    # or later drawing inherits the bands from the saved model.
+    # take title-block .XX): the foot length and the hold-down station, both
+    # from the ear's inboard face -- the face fit-up sets and the S4 hold
+    # touches Z0 on -- and the ear thickness. No in-repo sheet prints this
+    # part, so a fixture plan or later drawing inherits the bands from the
+    # saved model.
     set_dimension_symmetric_tolerance(adapter, "FootProfile", "FootLen", FOOT_LEN_BAND)
     set_dimension_symmetric_tolerance(adapter, "Ear", "EarThick", EAR_T_BAND)
     set_dimension_symmetric_tolerance(adapter, "HoleProfile", "HoleStation", STATION_BAND)

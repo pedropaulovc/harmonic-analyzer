@@ -8,7 +8,9 @@ from typing import Any, Literal
 
 import _config
 import _telemetry
-from _common import _early_bound, apply_custom_properties, check
+from _check import check
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
 from _drawing_common import (
     TITLE_BLOCK_TOLERANCE_PROPERTIES,
     DrawingOutputs,
@@ -261,7 +263,7 @@ async def build_purchased_fastener_drawing(
             )
         expected = {
             "Number": str(registry["number"]),
-            # The PART cell prints the slug (_common.part_properties).
+            # The PART cell prints the slug (_part_properties.part_properties).
             "Title": stock.part_name,
             "Material": str(registry["material"]),
             "Stock Name": stock.stock_name,

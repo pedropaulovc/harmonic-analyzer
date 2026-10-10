@@ -1,0 +1,3 @@
+spring_eye_threading:
+  min_margin_mm: 0.10              # plate-threading loop margin bound (~0.11 observed)
+

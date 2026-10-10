@@ -62,7 +62,9 @@ import vn_transgear_pivot_screw_spec as pivot_screw
 import vn_transgear_pivot_spring_spec as spring
 import pd_transgear_removable_spec as sprocket
 from paper_drive_rack_travel import RackOperatingDomain, OPERATING_DIRECTION_TEXT
-from _common import _com_invoke, _early_bound, check, run_build
+from _check import check
+from _com import _com_invoke, _early_bound
+from _session import run_build
 from _pd_paper_drive_explode import exploded_view_name
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,

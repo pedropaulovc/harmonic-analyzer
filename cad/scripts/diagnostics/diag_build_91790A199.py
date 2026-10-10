@@ -24,11 +24,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 from diagnostics.diag_mcmaster_oval import build_oval, catalog_run  # noqa: E402
 
 PART_NO = "91790A199"
 
 
+@stock_recipe("91790A199", threaded=True)
 async def build_91790A199(
     adapter,
     truth=None,
@@ -46,6 +49,10 @@ async def build_catalog(adapter) -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    from _common import run_build
+    if __package__:
+        from . import _script_paths  # noqa: F401
+    else:
+        import _script_paths  # noqa: F401
+    from _session import run_build
 
     sys.exit(run_build(build_catalog))

@@ -16,7 +16,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import OUT_SLDASM, _flag, _read_member, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log  # noqa: E402
+from _com import _flag, _read_member  # noqa: E402
+from _paths import OUT_SLDASM  # noqa: E402
+from _session import run_build  # noqa: E402
 
 _MATE_NAME = {
     0: "COINCIDENT", 1: "CONCENTRIC", 2: "PERPENDICULAR", 3: "PARALLEL",

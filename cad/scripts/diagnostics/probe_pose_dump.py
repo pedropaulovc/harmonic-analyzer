@@ -30,7 +30,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import _telemetry  # noqa: E402
-from _common import OUT_SLDASM, _flag, _read_member, log  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log  # noqa: E402
+from _com import _flag, _read_member  # noqa: E402
+from _paths import OUT_SLDASM  # noqa: E402
 
 ASSEMBLIES = (
     "fr-frame",

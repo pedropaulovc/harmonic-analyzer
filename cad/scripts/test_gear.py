@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import _common
+import _sketch
 
 from _gear import pattern_about_z
 
@@ -189,7 +189,7 @@ def sketch_logs(monkeypatch):
     logs: dict[str, list[str]] = {"error": [], "warn": [], "debug": []}
     for severity in logs:
         monkeypatch.setattr(
-            _common._telemetry, severity,
+            _sketch._telemetry, severity,
             lambda message, severity=severity, **_fields: logs[severity].append(message),
         )
     return logs
@@ -206,7 +206,7 @@ async def test_over_defined_logs_every_relation_before_raising(after_fix, sketch
     phase = "(not_fully_defined)" if after_fix else "(over_defined)"
 
     with pytest.raises(RuntimeError, match=message):
-        await _common.ensure_fully_defined(
+        await _sketch.ensure_fully_defined(
             adapter, "stock gap sketch",
             fix_entities=["EquationCurve_1"], allow_fix_escalation=True,
         )
@@ -242,7 +242,7 @@ async def test_over_defined_keeps_failure_when_diagnostics_refuse(sketch_logs) -
     adapter.relations.refuse_all = True
 
     with pytest.raises(RuntimeError, match="stock gap sketch: sketch OVER-defined"):
-        await _common.ensure_fully_defined(adapter, "stock gap sketch")
+        await _sketch.ensure_fully_defined(adapter, "stock gap sketch")
 
     assert "native GetRelations refused" in sketch_logs["error"][0]
     assert set(adapter.relations.calls) == {0, 1, 2, 6}
@@ -253,16 +253,16 @@ async def test_over_defined_keeps_failure_when_logger_refuses(monkeypatch) -> No
     def refuse(*_args, **_kwargs):
         raise RuntimeError("logging refused")
 
-    monkeypatch.setattr(_common._telemetry, "error", refuse)
+    monkeypatch.setattr(_sketch._telemetry, "error", refuse)
     with pytest.raises(RuntimeError, match="sketch OVER-defined"):
-        await _common.ensure_fully_defined(_SketchAdapter(["over_defined"]), "gap")
+        await _sketch.ensure_fully_defined(_SketchAdapter(["over_defined"]), "gap")
 
 
 @pytest.mark.asyncio
 async def test_nonwhitelisted_sketch_stays_strict(sketch_logs) -> None:
     adapter = _SketchAdapter(["under_defined"])
     with pytest.raises(RuntimeError, match="legacy fix escalation disabled"):
-        await _common.ensure_fully_defined(adapter, "gap", fix_entities=["EquationCurve_1"])
+        await _sketch.ensure_fully_defined(adapter, "gap", fix_entities=["EquationCurve_1"])
     assert adapter.fixed == []
     assert adapter.relations.calls == []
 

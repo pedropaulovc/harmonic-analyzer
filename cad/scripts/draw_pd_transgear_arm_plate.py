@@ -33,7 +33,9 @@ from typing import Any
 import _config
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _check import check
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     PmiDrawingPlacement,

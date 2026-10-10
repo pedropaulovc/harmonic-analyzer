@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import _assembly
-import _drawing_simplified
+import _simplified_part
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -18,12 +18,8 @@ from _drawing_common import (
     set_view_exploded_state,
     view_configuration,
 )
-from _drawing_simplified import (
-    child_bom_identity,
-    is_simplified,
-    simplified_comment,
-    simplified_name,
-)
+from _simplified_bom import child_bom_identity
+from _simplified_names import is_simplified, simplified_comment, simplified_name
 
 WIREFRAME, HLV, HLR, SHADED, SHADED_EDGES = 0, 1, 2, 3, 7
 FACETED_WIREFRAME, FACETED_HLV, FACETED_HLR = 4, 5, 6
@@ -275,7 +271,7 @@ def test_a_linked_configurations_simplified_child_prints_the_root_name() -> None
     root = FakeConfiguration("Default", source=CONFIGURATION)
     linked = FakeConfiguration("T24", root, source=PARENT)
     child = FakeConfiguration("T24 Simplified", linked)
-    _drawing_simplified._copy_bom_identity(FakeModel(root, linked, child), "T24", child.Name)
+    _simplified_part._copy_bom_identity(FakeModel(root, linked, child), "T24", child.Name)
     assert (child.BOMPartNoSource, child.AlternateName, child.UseAlternateNameInBOM) == (
         USER,
         "Default",
@@ -838,7 +834,7 @@ def _cone_gear() -> FakePart:
 
 def test_only_the_named_parents_are_simplified_and_keep_their_teeth() -> None:
     part = _cone_gear()
-    children = _drawing_simplified.add_simplified_configurations(
+    children = _simplified_part.add_simplified_configurations(
         _part_adapter(part), "dt-cone-gear", TEETH, ["T006", "T120"]
     )
     assert children == ["T006 Simplified", "T120 Simplified"]
@@ -851,7 +847,7 @@ def test_only_the_named_parents_are_simplified_and_keep_their_teeth() -> None:
 def test_a_parent_that_already_lacks_the_features_is_refused_before_deriving() -> None:
     part = _cone_gear()
     with pytest.raises(RuntimeError, match=r"already suppressed: \['ToothGapCut in Default'"):
-        _drawing_simplified.add_simplified_configurations(_part_adapter(part), "dt-cone-gear", TEETH)
+        _simplified_part.add_simplified_configurations(_part_adapter(part), "dt-cone-gear", TEETH)
     assert part.GetConfigurationNames() == ["Default", "T006", "T120"]
 
 
@@ -860,16 +856,16 @@ def test_a_child_suppression_that_reaches_its_parent_fails_the_readback() -> Non
     with pytest.raises(
         RuntimeError, match=r"ToothGapCut: suppressed in \(Default, Default Simplified\) reads \(True, True\)"
     ):
-        _drawing_simplified.add_simplified_configurations(_part_adapter(part), "fixture", TEETH)
+        _simplified_part.add_simplified_configurations(_part_adapter(part), "fixture", TEETH)
 
 
 def test_a_simplified_child_of_an_unnamed_configuration_is_an_orphan() -> None:
     part = _cone_gear()
     adapter = _part_adapter(part)
-    _drawing_simplified.add_simplified_configurations(adapter, "dt-cone-gear", TEETH, ["T006", "T120"])
+    _simplified_part.add_simplified_configurations(adapter, "dt-cone-gear", TEETH, ["T006", "T120"])
     part.ConfigurationManager.AddConfiguration2("Default Simplified", "", "", 0, "Default", "", False)
     with pytest.raises(RuntimeError, match=r"orphan simplified configurations \['Default Simplified'\]"):
-        _drawing_simplified.assert_simplified_configurations(
+        _simplified_part.assert_simplified_configurations(
             adapter, "dt-cone-gear", TEETH, ["T006", "T120"]
         )
 
@@ -945,7 +941,7 @@ class FakeLocalToothPart(FakePart):
             self.states("Default", *LOCAL_TEETH),
             {
                 name: (
-                    _drawing_simplified._bom_identity(self.configurations[name]),
+                    _simplified_part._bom_identity(self.configurations[name]),
                     self.properties[name].values.copy(),
                 )
                 for name in ("Default", *LOCAL_TEETH)
@@ -957,7 +953,7 @@ def test_configuration_local_targets_preserve_all_detailed_and_foreign_features(
     part = FakeLocalToothPart()
     before = part.detailed_state()
     adapter = _part_adapter(part)
-    children = _drawing_simplified.add_simplified_configurations(
+    children = _simplified_part.add_simplified_configurations(
         adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
     )
     assert children == [simplified_name(parent) for parent in LOCAL_TEETH]
@@ -971,7 +967,7 @@ def test_configuration_local_targets_preserve_all_detailed_and_foreign_features(
             assert (child in feature.suppressed) == (
                 True if name in names else parent in feature.suppressed
             )
-    _drawing_simplified.assert_simplified_configurations(
+    _simplified_part.assert_simplified_configurations(
         adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
     )
 
@@ -996,15 +992,15 @@ def test_invalid_local_mapping_is_refused_before_any_native_mutation(mapping, op
     with pytest.raises(ValueError):
         if operation == "saved":
             asyncio.run(
-                _drawing_simplified.derive_simplified_on_saved_part(
+                _simplified_part.derive_simplified_on_saved_part(
                     adapter, "local-teeth", mapping, "fixture.SLDPRT", list(LOCAL_TEETH)
                 )
             )
         else:
             function = (
-                _drawing_simplified.add_simplified_configurations
+                _simplified_part.add_simplified_configurations
                 if operation == "add"
-                else _drawing_simplified.assert_simplified_configurations
+                else _simplified_part.assert_simplified_configurations
             )
             function(adapter, "local-teeth", mapping, list(LOCAL_TEETH))
     assert not part.mutations
@@ -1024,7 +1020,7 @@ def test_local_target_integrity_fails_before_deriving(defect):
     else:
         part.features[name].IsSuppressed2 = lambda *_args: ()
     with pytest.raises(RuntimeError):
-        _drawing_simplified.add_simplified_configurations(
+        _simplified_part.add_simplified_configurations(
             _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
         )
     assert not part.mutations
@@ -1036,7 +1032,7 @@ def test_local_target_integrity_fails_before_deriving(defect):
 def test_local_full_readback_refuses_corrupted_configuration(defect):
     part = FakeLocalToothPart()
     adapter = _part_adapter(part)
-    _drawing_simplified.add_simplified_configurations(
+    _simplified_part.add_simplified_configurations(
         adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
     )
     child = part.configurations["T006 Simplified"]
@@ -1055,7 +1051,7 @@ def test_local_full_readback_refuses_corrupted_configuration(defect):
     else:
         part._add("Default Simplified", "", "", 0, "Default", "", False)
     with pytest.raises(RuntimeError, match="readback failed"):
-        _drawing_simplified.assert_simplified_configurations(
+        _simplified_part.assert_simplified_configurations(
             adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
         )
 
@@ -1065,16 +1061,16 @@ def test_local_derivation_retains_activation_and_rebuild_gates(refuse):
     part = FakeLocalToothPart()
     part.refuse = refuse
     with pytest.raises(RuntimeError, match="simplified configurations failed"):
-        _drawing_simplified.add_simplified_configurations(
+        _simplified_part.add_simplified_configurations(
             _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
         )
 
 
 def test_local_derivation_retains_hard_fault_gate(monkeypatch):
     part = FakeLocalToothPart()
-    monkeypatch.setattr(_drawing_simplified, "_hard_faults", lambda *_args: ["native fault"])
+    monkeypatch.setattr(_simplified_part, "_hard_faults", lambda *_args: ["native fault"])
     with pytest.raises(RuntimeError, match="rebuilt with faults"):
-        _drawing_simplified.add_simplified_configurations(
+        _simplified_part.add_simplified_configurations(
             _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
         )
 
@@ -1111,7 +1107,7 @@ def test_local_saved_reopen_derivation_persists_and_reads_every_parent_and_child
     adapter, authoring, events = _saved_local_adapter()
     before = authoring.detailed_state()
     asyncio.run(
-        _drawing_simplified.derive_simplified_on_saved_part(
+        _simplified_part.derive_simplified_on_saved_part(
             adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
         )
     )
@@ -1127,7 +1123,7 @@ def test_local_saved_reopen_derivation_persists_and_reads_every_parent_and_child
     assert all(
         configuration.AddRebuildSaveMark for configuration in reopened.configurations.values()
     )
-    _drawing_simplified.assert_simplified_configurations(
+    _simplified_part.assert_simplified_configurations(
         adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
     )
 
@@ -1136,7 +1132,7 @@ def test_local_saved_derivation_refuses_failed_save():
     adapter, _authoring, events = _saved_local_adapter(save_ok=False)
     with pytest.raises(RuntimeError, match="Save3 failed"):
         asyncio.run(
-            _drawing_simplified.derive_simplified_on_saved_part(
+            _simplified_part.derive_simplified_on_saved_part(
                 adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
             )
         )
@@ -1154,7 +1150,7 @@ def test_local_derivation_refuses_drift_in_an_unselected_detailed_parent(monkeyp
 
     monkeypatch.setattr(part.ConfigurationManager, "AddConfiguration2", add_with_drift)
     with pytest.raises(RuntimeError, match="detailed configuration suppression changed"):
-        _drawing_simplified.add_simplified_configurations(
+        _simplified_part.add_simplified_configurations(
             _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
         )
 
@@ -1168,7 +1164,7 @@ def test_local_child_suppression_must_succeed_and_read_back(monkeypatch, returns
         lambda *_args: returns_success,
     )
     with pytest.raises(RuntimeError, match="SetSuppression2 refused|readback failed"):
-        _drawing_simplified.add_simplified_configurations(
+        _simplified_part.add_simplified_configurations(
             _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
         )
 
@@ -1177,9 +1173,9 @@ def test_local_telemetry_names_the_actual_targets_for_each_parent(monkeypatch):
     part = FakeLocalToothPart()
     annotations = []
     monkeypatch.setattr(
-        _drawing_simplified._telemetry, "annotate", lambda **fields: annotations.append(fields)
+        _simplified_part._telemetry, "annotate", lambda **fields: annotations.append(fields)
     )
-    _drawing_simplified.add_simplified_configurations(
+    _simplified_part.add_simplified_configurations(
         _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
     )
     assert len(annotations) == 2
@@ -1200,7 +1196,7 @@ def test_local_saved_derivation_refuses_failed_reopen():
     adapter.open_model = failed_open
     with pytest.raises(RuntimeError, match="cannot reopen saved part"):
         asyncio.run(
-            _drawing_simplified.derive_simplified_on_saved_part(
+            _simplified_part.derive_simplified_on_saved_part(
                 adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
             )
         )
@@ -1228,10 +1224,10 @@ def test_direct_save_rejects_invalid_mapping_before_save_or_export(monkeypatch, 
         calls.append((args, kwargs))
         raise AssertionError("invalid mappings must never save or export")
 
-    monkeypatch.setattr(_drawing_simplified, "save_part_and_images", save_or_export)
+    monkeypatch.setattr(_simplified_part, "save_part_and_images", save_or_export)
     before = part.detailed_state()
     with pytest.raises(ValueError):
-        asyncio.run(_drawing_simplified.save_simplified_part(adapter, "local-teeth", mapping))
+        asyncio.run(_simplified_part.save_simplified_part(adapter, "local-teeth", mapping))
     assert not calls
     assert not part.mutations
     assert adapter.currentModel is part

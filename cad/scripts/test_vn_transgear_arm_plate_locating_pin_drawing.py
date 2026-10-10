@@ -12,9 +12,9 @@ import draw_vn_transgear_arm_plate_locating_pin as drawing
 import vn_transgear_arm_plate_locating_pin_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_93600A189 as recipe
-from vn_transgear_latch_pin_spec import DOWEL_SIZES
+from _mcmaster_93600a189 import DOWEL_SIZE
 
 
 def test_live_sourced_identity_is_registered_end_to_end() -> None:
@@ -31,7 +31,7 @@ def test_live_sourced_identity_is_registered_end_to_end() -> None:
     lines = row["installation_notes"].splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines)
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_93600A189
     assert metadata.threaded is False
@@ -40,7 +40,7 @@ def test_live_sourced_identity_is_registered_end_to_end() -> None:
 
 
 def test_reference_model_is_nominal_not_an_unsourced_end_replica() -> None:
-    assert DOWEL_SIZES[spec.SKU] == (spec.DIA, spec.LENGTH) == (2.0, 6.0)
+    assert DOWEL_SIZE == (spec.DIA, spec.LENGTH) == (2.0, 6.0)
     source = spec.nominal_material_properties()
     assert source["volume_mm3"] == pytest.approx(math.pi * 6.0)
     assert source["mass_kg"] == pytest.approx(source["volume_mm3"] * 8000.0e-9)

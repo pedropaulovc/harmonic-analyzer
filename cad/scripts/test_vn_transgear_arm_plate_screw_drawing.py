@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-import _common
+import _sketch
+import _sketch_rectangle
 import _config
 import _telemetry
 import build_vn_transgear_arm_plate_screw as part
@@ -21,7 +22,7 @@ import vn_transgear_arm_plate_screw_spec as screw
 import transgear_hanger_joints as joints
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91790A199 as entry
 from diagnostics import diag_mcmaster_lib
 from diagnostics import diag_mcmaster_oval as recipe
@@ -156,7 +157,8 @@ def _record(monkeypatch, *, supplied: bool = False) -> list[tuple]:
     monkeypatch.setattr(recipe, "volume_check", volume_check)
     monkeypatch.setattr(recipe, "insert_helix", logger("insert_helix"))
     monkeypatch.setattr(recipe, "thread_sweep_cut", logger("thread_sweep_cut"))
-    monkeypatch.setattr(_common, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(_sketch, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(_sketch_rectangle, "add_line_chain", add_line_chain)
     monkeypatch.setattr(diag_mcmaster_lib, "no_sketch_inference", no_inference)
     monkeypatch.setattr(diag_mcmaster_lib, "offset_plane", logger("offset_plane"))
     monkeypatch.setattr(
@@ -343,7 +345,7 @@ def test_driver_slot_stops_inside_the_oval_head(monkeypatch) -> None:
 def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     monkeypatch,
 ) -> None:
-    metadata = STOCK_RECIPES[screw.SKU]
+    metadata = discovered_recipes()[screw.SKU]
     assert metadata.module == entry.__name__
     assert metadata.callable_name == entry.build_91790A199.__name__
     assert metadata.threaded

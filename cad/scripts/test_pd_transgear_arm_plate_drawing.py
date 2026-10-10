@@ -22,7 +22,7 @@ import pd_transgear_knob_shaft_spec as knob_shaft
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _printed_tolerance import printed_deviations
 
 

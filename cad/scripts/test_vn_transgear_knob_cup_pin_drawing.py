@@ -13,7 +13,7 @@ import build_vn_transgear_knob_cup_pin as part
 import vn_transgear_knob_cup_pin_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_98296A031 as recipe
 
 STEM = "vn-transgear-knob-cup-pin"
@@ -38,7 +38,7 @@ def test_catalogue_row_is_the_registered_mcmaster_spring_pin() -> None:
     assert row["number"] == "MHA-VN-048"
     assert row["quantity"] == 1
     assert spec.SKU in row["material_specification"]
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_98296A031
     assert metadata.threaded is False
@@ -63,9 +63,9 @@ def test_recipe_is_the_named_size_as_an_installed_tube() -> None:
 
 def test_recipe_section_matches_the_retained_catalogue_authority() -> None:
     """98296A031 retains its own catalogue section and 5/8-in length."""
-    from diagnostics.diag_mcmaster_spring_pin import SPRING_PIN_SIZES, WALL_T
+    from _mcmaster_98296a031 import SPRING_PIN_SIZE, WALL_T
 
-    dia, length = SPRING_PIN_SIZES[spec.SKU]
+    dia, length = SPRING_PIN_SIZE
     assert spec.PIN_DIA == pytest.approx(dia)
     assert spec.PIN_LEN == pytest.approx(length)
     assert spec.WALL_T == pytest.approx(WALL_T)

@@ -759,7 +759,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # through both top-notch cheeks (6.35 bar less the 3.20 notch), and
     # MHA-CH-010: the same pin pressed into its rod's Ø1.968 fork ream through
     # both tines (6.075 fork less the 2.625 slot); channel j's pin with
-    # channel j's bar or rod only.
+    # channel j's bar or rod only. MHA-VN-034: each #4-40 apex set screw's
+    # thread in its MHA-CH-008 ear's tap, over the R8 arch less the Ø6.5
+    # bore's height at the Ø2.845 envelope's edge; screw n in bracket n.
     channel_allowed = _interference_contracts.allowed_interference_pairs("ch-channel")
     assert channel_allowed == pytest.approx(
         {
@@ -774,6 +776,14 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                     (f"ch-rod-pivot-pin-{n}", f"ch-connecting-rod-{n}")
                 ): _annulus_limit(1.984375, 1.968, 3.45)
                 for n in range(1, 21)
+            },
+            **{
+                frozenset(
+                    (f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
+                ): _annulus_limit(
+                    2.845, 2.261, 8.0 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
+                )
+                for n in (1, 2)
             },
         }
     )

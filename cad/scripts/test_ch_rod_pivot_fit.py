@@ -185,7 +185,8 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
     """_interference_contracts restates the modelled press as literals (every
     assembly imports it); they must be the nominal pin, the fork's reamed
     hole and the two tines, and name channel j's pin with channel j's rod
-    only. The channel's only other press pairs are the bar pins'."""
+    only. The channel's only other press pairs are the bar pins', and its
+    only thread pairs the apex set screws' in the bracket ears."""
     import _interference_contracts as ic
 
     pin_dia, hole_dia, engaged = ic.ROD_PIVOT_PIN_PRESS
@@ -201,7 +202,10 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
         frozenset((f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}"))
         for n in range(1, 21)
     }
-    assert set(pairs) == rod_pairs | bar_pairs
+    set_screw_pairs = {
+        frozenset((f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")) for n in (1, 2)
+    }
+    assert set(pairs) == rod_pairs | bar_pairs | set_screw_pairs
     nominal = math.pi / 4.0 * (pin_dia**2 - hole_dia**2) * engaged
     assert all(pairs[pair] == pytest.approx(1.10 * nominal) for pair in rod_pairs)
     # The arm the pin runs in is never a press pair.

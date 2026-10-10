@@ -262,6 +262,7 @@ def test_seed_flip_reads_only_the_active_assembly(fresh_seed_state):
         "vn-pedestal-hold-down-screw",
         "ch-rocker-thrust-washer",
         "vn-rocker-bank-spring",
+        "vn-arbor-set-screw",
     ],
 )
 @pytest.mark.parametrize("axis", ("x", "y", "z"))

@@ -1,8 +1,10 @@
 r"""Pure supplier geometry and stock bands for McMaster 91829A560.
 
-This module owns the harvested nominal dimensions in mm. The native
-``diagnostics/diag_build_91829A560.py`` recipe consumes them; base, platform
-and pose readers never import that recipe or a build wrapper.
+PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
+closure. The harvested nominal dimensions in mm are the per-SKU vendor source
+(``_mcmaster_91829a560.py``, SolidWorks-free at import), which the native
+recipe also reads; base, platform and pose readers never import that recipe
+or a build wrapper.
 
 Only the shoulder diameter and length have supplied tolerance bands here,
 verified on the live product page on 2026-10-08. The harvested head, slot,
@@ -21,6 +23,15 @@ from __future__ import annotations
 from math import ceil
 
 from _hole_spec import TAP_DRILL_MM
+from _mcmaster_91829a560 import (
+    HEAD_DIA,
+    HEAD_T,
+    SHOULDER_DIA,
+    SHOULDER_LEN,
+    THREAD_LEN,
+    THREAD_MAJOR,
+    UNDERHEAD_LEN,
+)
 
 SOURCE = "https://www.mcmaster.com/91829A560/ (live product page, 2026-10-08)"
 MODEL_SOURCE = "cad/out/reports/mcmaster-91829A560-dump2.json"
@@ -30,24 +41,7 @@ THREAD_LIMITS_SOURCE = (
     "External_Thread_Dimensions_for_UNC_Screw_Thread_2016.pdf"
 )
 
-# Vendor-model dimensions (mm), preserving the harvested scalars exactly.
-HEAD_DIA = 9.525  # Head Diameter@Sketch1
-HEAD_T = 4.7625  # Head Height@Sketch1
-SHOULDER_DIA = 6.35  # Shoulder Diameter@Sketch1
-SHOULDER_LEN = 6.35  # Shoulder Length@Sketch1
-THREAD_MAJOR = 4.826  # Screw Size Decimal Equivalent@Sketch1
-THREAD_LEN = 9.525  # Thread Length@Sketch1
-UNDERHEAD_LEN = SHOULDER_LEN + THREAD_LEN
-SLOT_W = 1.524  # D1@Sketch8
-SLOT_D = 1.905  # D1@Cut-Extrude2
-HEAD_CHAMFER = 0.309563  # D1@Chamfer1 (45 deg)
-TIP_CHAMFER = 0.43434  # D1@Chamfer2 (45 deg)
-UC_LAND_DIA = 3.3528  # CADA@Sketch5 (diametric)
-UC_W = 1.6002  # CADB@Sketch5 (fillet + land; split-plane offset)
-PITCH = 1.058333  # Pitch@Helix/Spiral2; preserve the vendor's rounded pitch
-REVS = 9.0  # 9000@Helix/Spiral2
-
-# Supplier deviations in mm, ordered (upper, lower), as in _fit_limits.
+# Supplier deviations in mm, ordered (upper, lower), as in _fit_deviations.
 # SOURCE quotes shoulder diameter +0/-0.001 in and length +0.002/0 in.
 SHOULDER_DIA_BAND = (0.0, -0.0254)
 SHOULDER_LEN_BAND = (0.0508, 0.0)

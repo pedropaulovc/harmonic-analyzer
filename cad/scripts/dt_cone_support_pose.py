@@ -24,7 +24,7 @@ import dt_cone_tip_block_spec as tip
 import dt_crankshaft_spec as crankshaft
 import fr_harmonic_base_spec as base
 import vn_cone_pivot_screw_spec as pivot
-import vn_cone_tip_adjuster_spec as adjuster
+import _mcmaster_94025a164 as adjuster
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 from dt_cone_swing_platform_geometry import (

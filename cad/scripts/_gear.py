@@ -24,16 +24,13 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import _telemetry
 
-from _common import (
-    IN,
-    _early_bound,
-    check,
-    define_circle,
-    dimension_between,
-    ensure_fully_defined,
-    name_last_feature,
-    volume_check,
-)
+from _check import check
+from _com import _early_bound
+from _feature_tree import name_last_feature
+from _part_checks import volume_check
+from _paths import IN
+from _sketch import dimension_between, ensure_fully_defined
+from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 from involute_gear import PA_DEG, gear_facts
 
@@ -60,7 +57,7 @@ R_CLEAR_IN = 60.0 / 25.4
 class ToothedDisc(NamedTuple):
     """``build_fixed_gear``'s volume-checked disc and the features that form
     its teeth (seed gap cut or tooth sweep, then the pattern) -- what a
-    ``_drawing_simplified`` configuration suppresses."""
+    ``_simplified_part`` configuration suppresses."""
 
     volume: float
     tooth_features: tuple[str, ...]

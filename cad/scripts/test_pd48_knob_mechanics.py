@@ -10,7 +10,7 @@ import math
 
 import pytest
 
-import _fit_limits as fits
+import _fit_close_running as fits
 import _gear_quality as quality
 import pd_transgear_arm_plate_geometry as plate
 import pd_transgear_drive_collar_spec as collar
@@ -283,12 +283,12 @@ def test_production_recipe_contains_real_profile_cap_and_grade_sources(builder):
         "paper_drive_stock_envelope",
         "paper_drive_stock_inspection",
         "stock_form_cutter",
-        "_fit_limits",
+        "_fit_deviations",
         "_gear_quality",
         "_config",
     } <= modules
     tokens = graph.config_files_of(script)
-    assert "tolerances.yaml" in tokens or "**" in tokens
+    assert "tolerances/stock_form_quality.yaml" in tokens
     assert "test_pd48_knob_mechanics" not in modules
 
 

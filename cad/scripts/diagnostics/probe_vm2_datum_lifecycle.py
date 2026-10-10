@@ -95,7 +95,7 @@ def assert_annotation_state(state, baseline=None):
 
 def edge_ownership(app, edge, source_part, source_extension, view):
     """Map view topology to the source, require exact roundtrip and body identity."""
-    from _common import _early_bound
+    from _com import _early_bound
 
     bodies = tuple(source_part.GetBodies2(0, False) or ())  # swSolidBody, including hidden bodies
     if len(bodies) != 1 or bodies[0] is None:
@@ -164,7 +164,7 @@ def assert_translated_ink(initial, moved, shift):
 
 def read_rack_finish(app, view, expected_edge):
     """Read one finish symbol through documented annotation/display interfaces."""
-    from _common import _early_bound
+    from _com import _early_bound
 
     annotations = [_early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()]
     finishes = [annotation for annotation in annotations if int(annotation.GetType()) == 7]  # swSFSymbol
@@ -269,7 +269,8 @@ def main():
         witness_path, mode="production" if args.production else "partial",
         ink_refresh=args.ink_refresh, rack_dimension_location=args.rack_dimension_location,
     )
-    from _common import _early_bound, check
+    from _check import check
+    from _com import _early_bound
     from _drawing_common import dimension_name, model_point_in_view, render_pdf_png
     from _drawing_registry import DrawingLayout
     from _gear_drawing_entities import visible_circle_edge

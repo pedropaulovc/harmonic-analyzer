@@ -24,9 +24,8 @@ the vendor Plane1's three roles: split plane, helix seed, runout).
 
 Per-part entry points: ``diag_build_90280A*.py``, ``diag_build_40923906.py``.
 
-The catalogue table is owned by pure ``vn_fillister_screw_spec``; its
-SKU-specific rows retain their existing pure authorities. This native recipe
-consumes the canonical table without duplicating supplier dimensions.
+Each SKU's dimensions live in its pure ``_mcmaster_<sku>``/``_msc_<sku>``
+module; the per-part entry point passes them to ``build_fillister``.
 """
 
 from __future__ import annotations
@@ -38,26 +37,27 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     _spherical_cap_volume,
     insert_helix,
     thread_sweep_cut,
 )
-import vn_fillister_screw_spec
 
 
-async def build_fillister(adapter, part_no: str):
-    from _common import add_line_chain
+async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
+    from _sketch import add_line_chain  # noqa: E402 -- diagnostic path bootstrap
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
 
-    major_d, length, hh, hd, pitch = vn_fillister_screw_spec.FILLISTER_SIZES[part_no]
+    major_d, length, hh, hd, pitch = size
     major_r = major_d / 2.0
     head_r = hd / 2.0
     band = hh * 0.8  # head cylinder height
