@@ -1080,6 +1080,18 @@ def _bind_frame_balloon(
 # the same SetPosition for item 2, (89.32, 250.85), read at fit after the
 # rebuild put the ring at (92.85, 249.98), 1.14 mm off that print, so a fit
 # read is no check of where the ring prints.
+#
+# Zoomed, GetDisplayData snaps the ring's centre to the window's pixel rows,
+# and a ring read while it sits above the window snaps about a pixel lower
+# against its anchor than one inside it. position_bom_balloon takes the
+# anchor-to-ring offset from the read before SetPosition, so a ring that
+# starts above the window carries that pixel to its target. Items 2 and 5
+# start some 50 mm above theirs (item 9 below its own): of 135 zoomed
+# placements of 2 and 5 (2026-09-28 to 2026-10-10) 132 landed 0.59-0.89 px
+# high, the row above the target instead of the one 0.11 px below it, and 5
+# failed 1.59 px high twice (swmaker00000F/A, 2026-10-01) and 1.89 px high
+# once (swmaker00000F, run 20261010T073339590Z, after the raised base deck
+# moved its start 1.7 mm). Placed at fit first, every ring starts inside the zoom.
 _SHORT_BALLOON_ZOOM_HALF = 0.012
 # How far the rebuild may move the balloon's SetPosition anchor: a model
 # value, not a rendered one, so any move is the rebuild's.
@@ -1166,8 +1178,9 @@ def _short_frame_balloon(
 ) -> _ShortBalloonProof:
     """Give frame balloon ``item`` a short leader ``offset`` from its arrowtip.
 
-    The ring is placed zoomed onto its target (:data:`_SHORT_BALLOON_ZOOM_HALF`)
-    and read back there: on target, short, its leader leaving it. The window
+    The ring is placed at fit, then zoomed onto its target
+    (:data:`_SHORT_BALLOON_ZOOM_HALF`), starting from inside that window, and
+    read back there: on target, short, its leader leaving it. The window
     then goes back to fit and the drawing rebuilds, the state the export
     starts from: read there, the balloon must keep its attachment, item and
     SetPosition anchor. It is then read zoomed again, where the ring matches
@@ -1199,6 +1212,14 @@ def _short_frame_balloon(
     # face arrowtip. Sheet XY determines placement and length; Z is view depth.
     target = (leader[-3] + offset[0], leader[-2] + offset[1])
     _telemetry.event("drawing.frame_short_balloon_before", item=item, target=target, **before)
+    # To within a fit pixel, so the zoomed placement starts from a ring inside
+    # its window (see _SHORT_BALLOON_ZOOM_HALF).
+    position_bom_balloon(
+        adapter, [note], item_number=item, position_xy=target,
+        label="frame short-leader balloon at fit",
+    )
+    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     with _zoomed_on(adapter, target, _SHORT_BALLOON_ZOOM_HALF):
         adapter.currentModel.GraphicsRedraw2()
         position_bom_balloon(

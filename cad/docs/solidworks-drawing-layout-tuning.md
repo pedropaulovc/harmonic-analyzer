@@ -148,6 +148,13 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   swmaker000008 and swmaker000005 (runs 20260928T144159300Z,
   20260928T145256004Z), while the same SetPosition printed its leader from the
   ring. Check a leader start only on the read right after `SetPosition`.
+  Zoomed, the ring centre snaps to the window's pixel rows, and a ring read
+  while it sits above the window snaps about a pixel lower against its anchor
+  than inside it: frame items 2 and 5, moved from some 50 mm above a 24 mm
+  zoom by an offset read there, landed 0.6-0.9 px high in 132 of 135
+  placements and item 5 up to 1.89 px (run 20261010T073339590Z). Bring a
+  ring inside the zoomed window (place it at fit first) before reading the
+  anchor-to-ring offset zoomed.
 
 ## Refusal catalogue — do / don't
 
