@@ -3,10 +3,10 @@
   "base_commit": "bfde892a5d609a4ae1f82fd6724d2c7527677306",
   "policy": "vendor evidence first; fabricated direct multi-parent shared; otherwise direct parent; frozen category sequences by old numeric ID then old stem",
   "counts": {
-    "ha": 2,
+    "ms": 3,
     "ch": 9,
     "dt": 36,
-    "vn": 49,
+    "vn": 50,
     "fr": 5,
     "mg": 9,
     "pd": 25,
@@ -17,43 +17,63 @@
   "identities": [
     {
       "kind": "part",
-      "category": "ha",
+      "category": "ms",
       "old_stem": "measuring-stick",
-      "new_stem": "ha-measuring-stick",
+      "new_stem": "ms-stick",
       "old_underscore": "measuring_stick",
-      "new_underscore": "ha_measuring_stick",
+      "new_underscore": "ms_stick",
       "old_number": "MHA-046",
-      "new_number": "MHA-HA-001",
+      "new_number": "MHA-MS-001",
       "direct_parents": [
-        "harmonic_analyzer"
+        "ms_measuring_stick"
       ],
       "evidence": "direct parent",
       "supplier": null,
       "supplier_skus": [],
       "old_registry": "cad/config/parts/measuring-stick.yaml",
-      "new_registry": "cad/config/parts/ha-measuring-stick.yaml",
+      "new_registry": "cad/config/parts/ms-stick.yaml",
       "old_builder": "cad/scripts/build_measuring_stick.py",
-      "new_builder": "cad/scripts/build_ha_measuring_stick.py"
+      "new_builder": "cad/scripts/build_ms_stick.py"
     },
     {
       "kind": "part",
-      "category": "ha",
+      "category": "ms",
       "old_stem": "measuring-stick-stop",
-      "new_stem": "ha-measuring-stick-stop",
+      "new_stem": "ms-stop-block",
       "old_underscore": "measuring_stick_stop",
-      "new_underscore": "ha_measuring_stick_stop",
+      "new_underscore": "ms_stop_block",
       "old_number": "MHA-122",
-      "new_number": "MHA-HA-002",
+      "new_number": "MHA-MS-002",
       "direct_parents": [
-        "harmonic_analyzer"
+        "ms_measuring_stick"
       ],
       "evidence": "direct parent",
       "supplier": null,
       "supplier_skus": [],
       "old_registry": "cad/config/parts/measuring-stick-stop.yaml",
-      "new_registry": "cad/config/parts/ha-measuring-stick-stop.yaml",
+      "new_registry": "cad/config/parts/ms-stop-block.yaml",
       "old_builder": "cad/scripts/build_measuring_stick_stop.py",
-      "new_builder": "cad/scripts/build_ha_measuring_stick_stop.py"
+      "new_builder": "cad/scripts/build_ms_stop_block.py"
+    },
+    {
+      "kind": "part",
+      "category": "ms",
+      "old_stem": null,
+      "new_stem": "ms-stop-plate",
+      "old_underscore": null,
+      "new_underscore": "ms_stop_plate",
+      "old_number": null,
+      "new_number": "MHA-MS-003",
+      "direct_parents": [
+        "ms_measuring_stick"
+      ],
+      "evidence": "direct parent",
+      "supplier": null,
+      "supplier_skus": [],
+      "old_registry": null,
+      "new_registry": "cad/config/parts/ms-stop-plate.yaml",
+      "old_builder": null,
+      "new_builder": "cad/scripts/build_ms_stop_plate.py"
     },
     {
       "kind": "part",
@@ -2987,6 +3007,28 @@
     },
     {
       "kind": "part",
+      "category": "vn",
+      "old_stem": null,
+      "new_stem": "vn-ms-stop-plate-screw",
+      "old_underscore": null,
+      "new_underscore": "vn_ms_stop_plate_screw",
+      "old_number": null,
+      "new_number": "MHA-VN-054",
+      "direct_parents": [
+        "ms_measuring_stick"
+      ],
+      "evidence": "catalog",
+      "supplier": "McMaster-Carr",
+      "supplier_skus": [
+        "90114A124"
+      ],
+      "old_registry": null,
+      "new_registry": "cad/config/parts/vn-ms-stop-plate-screw.yaml",
+      "old_builder": null,
+      "new_builder": "cad/scripts/build_vn_ms_stop_plate_screw.py"
+    },
+    {
+      "kind": "part",
       "category": "sh",
       "old_stem": "column-clamp-front",
       "new_stem": "sh-column-clamp-front",
@@ -3124,6 +3166,20 @@
       "new_registry": "cad/config/assemblies/pd-paper-drive.yaml",
       "old_builder": "cad/scripts/build_paper_drive_assembly.py",
       "new_builder": "cad/scripts/build_pd_paper_drive_assembly.py"
+    },
+    {
+      "kind": "assembly",
+      "category": "ms",
+      "old_stem": null,
+      "new_stem": "ms-measuring-stick",
+      "old_underscore": null,
+      "new_underscore": "ms_measuring_stick",
+      "old_number": null,
+      "new_number": "MHA-MS-000",
+      "old_registry": null,
+      "new_registry": "cad/config/assemblies/ms-measuring-stick.yaml",
+      "old_builder": null,
+      "new_builder": "cad/scripts/build_ms_measuring_stick_assembly.py"
     },
     {
       "kind": "assembly",
@@ -3398,8 +3454,8 @@
     "cad/config/parts/magnifying-lever.yaml": "cad/config/parts/mg-magnifying-lever.yaml",
     "cad/config/parts/magnifying-vertical-rod.yaml": "cad/config/parts/mg-magnifying-vertical-rod.yaml",
     "cad/config/parts/magnifying-wheel.yaml": "cad/config/parts/mg-magnifying-wheel.yaml",
-    "cad/config/parts/measuring-stick-stop.yaml": "cad/config/parts/ha-measuring-stick-stop.yaml",
-    "cad/config/parts/measuring-stick.yaml": "cad/config/parts/ha-measuring-stick.yaml",
+    "cad/config/parts/measuring-stick-stop.yaml": "cad/config/parts/ms-stop-block.yaml",
+    "cad/config/parts/measuring-stick.yaml": "cad/config/parts/ms-stick.yaml",
     "cad/config/parts/nameplate.yaml": "cad/config/parts/fr-nameplate.yaml",
     "cad/config/parts/output-fixture.yaml": "cad/config/parts/mg-output-fixture.yaml",
     "cad/config/parts/pedestal-hold-down-screw.yaml": "cad/config/parts/vn-pedestal-hold-down-screw.yaml",
@@ -3484,7 +3540,7 @@
     "cad/process/cone_pivot_post/plan.toml": "cad/process/dt_cone_pivot_post/plan.toml",
     "cad/process/pivot_shaft/plan.toml": "cad/process/ch_pivot_shaft/plan.toml",
     "cad/process/rocker_arm/plan.toml": "cad/process/ch_rocker_arm/plan.toml",
-    "cad/references/measuring-stick-numerals.dxf": "cad/references/ha-measuring-stick-numerals.dxf",
+    "cad/references/measuring-stick-numerals.dxf": "cad/references/ms-stick-numerals.dxf",
     "cad/references/nameplate-engraving.dxf": "cad/references/fr-nameplate-engraving.dxf",
     "cad/scripts/_drive_train_balloon_anchors.py": "cad/scripts/_dt_drive_train_balloon_anchors.py",
     "cad/scripts/_drive_train_explode.py": "cad/scripts/_dt_drive_train_explode.py",
@@ -3576,8 +3632,8 @@
     "cad/scripts/build_magnifying_lever.py": "cad/scripts/build_mg_magnifying_lever.py",
     "cad/scripts/build_magnifying_vertical_rod.py": "cad/scripts/build_mg_magnifying_vertical_rod.py",
     "cad/scripts/build_magnifying_wheel.py": "cad/scripts/build_mg_magnifying_wheel.py",
-    "cad/scripts/build_measuring_stick.py": "cad/scripts/build_ha_measuring_stick.py",
-    "cad/scripts/build_measuring_stick_stop.py": "cad/scripts/build_ha_measuring_stick_stop.py",
+    "cad/scripts/build_measuring_stick.py": "cad/scripts/build_ms_stick.py",
+    "cad/scripts/build_measuring_stick_stop.py": "cad/scripts/build_ms_stop_block.py",
     "cad/scripts/build_nameplate.py": "cad/scripts/build_fr_nameplate.py",
     "cad/scripts/build_output_fixture.py": "cad/scripts/build_mg_output_fixture.py",
     "cad/scripts/build_paper_drive_assembly.py": "cad/scripts/build_pd_paper_drive_assembly.py",
@@ -3777,7 +3833,7 @@
     "cad/scripts/draw_magnifying_lever.py": "cad/scripts/draw_mg_magnifying_lever.py",
     "cad/scripts/draw_magnifying_vertical_rod.py": "cad/scripts/draw_mg_magnifying_vertical_rod.py",
     "cad/scripts/draw_magnifying_wheel.py": "cad/scripts/draw_mg_magnifying_wheel.py",
-    "cad/scripts/draw_measuring_stick.py": "cad/scripts/draw_ha_measuring_stick.py",
+    "cad/scripts/draw_measuring_stick.py": "cad/scripts/draw_ms_stick.py",
     "cad/scripts/draw_output_fixture.py": "cad/scripts/draw_mg_output_fixture.py",
     "cad/scripts/draw_paper_drive_assembly.py": "cad/scripts/draw_pd_paper_drive_assembly.py",
     "cad/scripts/draw_pedestal_hold_down_screw.py": "cad/scripts/draw_vn_pedestal_hold_down_screw.py",
@@ -3878,8 +3934,8 @@
     "cad/scripts/magnifying_vertical_rod_spec.py": "cad/scripts/mg_magnifying_vertical_rod_spec.py",
     "cad/scripts/magnifying_wheel_geom.py": "cad/scripts/mg_magnifying_wheel_geom.py",
     "cad/scripts/magnifying_wheel_spec.py": "cad/scripts/mg_magnifying_wheel_spec.py",
-    "cad/scripts/measuring_stick_geom.py": "cad/scripts/ha_measuring_stick_geom.py",
-    "cad/scripts/measuring_stick_spec.py": "cad/scripts/ha_measuring_stick_spec.py",
+    "cad/scripts/measuring_stick_geom.py": "cad/scripts/ms_stick_geom.py",
+    "cad/scripts/measuring_stick_spec.py": "cad/scripts/ms_stick_spec.py",
     "cad/scripts/nameplate_spec.py": "cad/scripts/fr_nameplate_spec.py",
     "cad/scripts/output_fixture_spec.py": "cad/scripts/mg_output_fixture_spec.py",
     "cad/scripts/paper_drive_assembly_steps.py": "cad/scripts/pd_paper_drive_assembly_steps.py",
@@ -3996,7 +4052,7 @@
     "cad/scripts/test_magnifying_lever_drawing.py": "cad/scripts/test_mg_magnifying_lever_drawing.py",
     "cad/scripts/test_magnifying_vertical_rod_drawing.py": "cad/scripts/test_mg_magnifying_vertical_rod_drawing.py",
     "cad/scripts/test_magnifying_wheel_drawing.py": "cad/scripts/test_mg_magnifying_wheel_drawing.py",
-    "cad/scripts/test_measuring_stick_drawing.py": "cad/scripts/test_ha_measuring_stick_drawing.py",
+    "cad/scripts/test_measuring_stick_drawing.py": "cad/scripts/test_ms_stick_drawing.py",
     "cad/scripts/test_nameplate_geometry.py": "cad/scripts/test_fr_nameplate_geometry.py",
     "cad/scripts/test_output_fixture_drawing.py": "cad/scripts/test_mg_output_fixture_drawing.py",
     "cad/scripts/test_paper_drive_assembly_drawing.py": "cad/scripts/test_pd_paper_drive_assembly_drawing.py",
@@ -4179,8 +4235,8 @@
     "build_magnifying_lever": "build_mg_magnifying_lever",
     "build_magnifying_vertical_rod": "build_mg_magnifying_vertical_rod",
     "build_magnifying_wheel": "build_mg_magnifying_wheel",
-    "build_measuring_stick": "build_ha_measuring_stick",
-    "build_measuring_stick_stop": "build_ha_measuring_stick_stop",
+    "build_measuring_stick": "build_ms_stick",
+    "build_measuring_stick_stop": "build_ms_stop_block",
     "build_nameplate": "build_fr_nameplate",
     "build_output_fixture": "build_mg_output_fixture",
     "build_paper_drive_assembly": "build_pd_paper_drive_assembly",
@@ -4379,7 +4435,7 @@
     "draw_magnifying_lever": "draw_mg_magnifying_lever",
     "draw_magnifying_vertical_rod": "draw_mg_magnifying_vertical_rod",
     "draw_magnifying_wheel": "draw_mg_magnifying_wheel",
-    "draw_measuring_stick": "draw_ha_measuring_stick",
+    "draw_measuring_stick": "draw_ms_stick",
     "draw_output_fixture": "draw_mg_output_fixture",
     "draw_paper_drive_assembly": "draw_pd_paper_drive_assembly",
     "draw_pedestal_hold_down_screw": "draw_vn_pedestal_hold_down_screw",
@@ -4480,8 +4536,8 @@
     "magnifying_vertical_rod_spec": "mg_magnifying_vertical_rod_spec",
     "magnifying_wheel_geom": "mg_magnifying_wheel_geom",
     "magnifying_wheel_spec": "mg_magnifying_wheel_spec",
-    "measuring_stick_geom": "ha_measuring_stick_geom",
-    "measuring_stick_spec": "ha_measuring_stick_spec",
+    "measuring_stick_geom": "ms_stick_geom",
+    "measuring_stick_spec": "ms_stick_spec",
     "nameplate_spec": "fr_nameplate_spec",
     "output_fixture_spec": "mg_output_fixture_spec",
     "paper_drive_assembly_steps": "pd_paper_drive_assembly_steps",
@@ -4598,7 +4654,7 @@
     "test_magnifying_lever_drawing": "test_mg_magnifying_lever_drawing",
     "test_magnifying_vertical_rod_drawing": "test_mg_magnifying_vertical_rod_drawing",
     "test_magnifying_wheel_drawing": "test_mg_magnifying_wheel_drawing",
-    "test_measuring_stick_drawing": "test_ha_measuring_stick_drawing",
+    "test_measuring_stick_drawing": "test_ms_stick_drawing",
     "test_nameplate_geometry": "test_fr_nameplate_geometry",
     "test_output_fixture_drawing": "test_mg_output_fixture_drawing",
     "test_paper_drive_assembly_drawing": "test_pd_paper_drive_assembly_drawing",
@@ -5355,11 +5411,11 @@
       "part": "measuring_stick",
       "artifact_stem": "measuring-stick",
       "script_name": "draw_measuring_stick.py",
-      "new_part": "ha_measuring_stick",
-      "new_name": "ha_measuring_stick",
-      "new_artifact_stem": "ha-measuring-stick",
-      "new_script_name": "draw_ha_measuring_stick.py",
-      "number": "MHA-HA-001"
+      "new_part": "ms_stick",
+      "new_name": "ms_stick",
+      "new_artifact_stem": "ms-stick",
+      "new_script_name": "draw_ms_stick.py",
+      "number": "MHA-MS-001"
     },
     {
       "name": "cylinder_gear",
@@ -6829,6 +6885,20 @@
       "current_stem": "vn-transgear-pivot-spring",
       "superseded_number": "MHA-VN-046",
       "current_number": "MHA-VN-049"
+    },
+    {
+      "old_stem": "measuring-stick",
+      "superseded_stem": "ha-measuring-stick",
+      "current_stem": "ms-stick",
+      "superseded_number": "MHA-HA-001",
+      "current_number": "MHA-MS-001"
+    },
+    {
+      "old_stem": "measuring-stick-stop",
+      "superseded_stem": "ha-measuring-stick-stop",
+      "current_stem": "ms-stop-block",
+      "superseded_number": "MHA-HA-002",
+      "current_number": "MHA-MS-002"
     }
   ],
   "upstream_commit": "5871f267ec6a896109992104f164302be465e8bc"

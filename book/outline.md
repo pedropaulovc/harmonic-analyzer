@@ -80,7 +80,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 | 23 | The cylinder gear set | `dt-cylinder-gear` ×20 with integral eccentric cam and 0.4 mm index notch; `dt-cylinder-gear-shaft`, `dt-arbor-pedestal` |
 | 24 | The alignment pinion | `dt-alignment-pinion`, `dt-pinion-arbor`, bracket, lever, cam and lift rod — the sine/cosine setup mechanism |
 | 25 | A channel, twenty times | `ch-connecting-rod`, `ch-rocker-arm`, `ch-amplitude-bar`, `ch-channel-lever`, `pivot-bushing`, `lever-bushing`, springs. Batch strategy: how to make twenty identical things by hand without drift. |
-| 26 | The measuring stick | `ha-measuring-stick` — hand-stamped divisions, and why the original's are uneven |
+| 26 | The measuring stick | `ms-stick` — hand-stamped divisions, and why the original's are uneven; `ms-stop-block` + `ms-stop-plate`, the thumbscrew stop clamped at the 2.0 mark |
 | 27 | The summing lever and knife edge | `sm-summing-lever`, `sm-knife-mount`, `vn-knife-hanger-stud`, `vn-knife-mount-dowel`, `vn-boss-hook`, `vn-counter-spring`. The fabrication decision: cast, fabricate, or hog from solid. |
 | 28 | The magnifier | `mg-magnifying-lever`, `mg-magnifying-wheel` (100 mm/20 mm coaxial, ×5), bracket, clamp, vertical rod, `mg-lever-wire` |
 | 29 | The pen mechanism | `pn-pen-frame`, `pn-pen-v-block`, `pn-pen-rod`, `pn-pen-marker`, `pn-pen-wire`, `mg-output-fixture`. Note: the original was lost; this follows the 2013 reconstruction. |

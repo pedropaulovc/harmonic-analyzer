@@ -4,12 +4,10 @@ The scale is OWNED by ``cad/config/machine/amplitude.yaml``
 (``amplitude.stick_division_spacing_mm`` / ``stick_division_count`` /
 ``stick_minor_per_division``): it is the rule the operator reads amplitude-bar
 stations against, so it belongs with the amplitude subsystem, not in a helper.
-This module is the one read point ``build_measuring_stick`` (the engraved
-ticks + the ``DivisionSpacing`` global), ``measuring_stick_spec`` (the print
-notes that quote the pitch) and the offline ``error_budget`` (station ->
-stick-reading conversion) import, so none of them copies a literal -- a copy is
-exactly the drift ``check:budget`` exists to catch. Same drawing-free
-convention as ``channel_frame_geom`` / ``magnifying_lever_geom``.
+This module is the single configuration read point for ``ms_stick_spec``
+and the offline ``error_budget`` station-to-reading conversion. Neither
+copies the graduation pitch. It has no drawing or SolidWorks dependencies.
+The unchanged scale spans 142 mm at 14.2 mm per full division.
 """
 
 from __future__ import annotations

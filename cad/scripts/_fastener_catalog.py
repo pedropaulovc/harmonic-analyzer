@@ -113,6 +113,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91794A077",
         material="AISI 304",
     ),
+    "vn-ms-stop-plate-screw": _stock(
+        "vn-ms-stop-plate-screw",
+        "Brass Fillister Head Slotted Screw",
+        "90114A124",
+        material="Brass",
+    ),
     "vn-frame-side-screw": _stock(
         "vn-frame-side-screw",
         "Steel Narrow Fillister Head Slotted Screw",

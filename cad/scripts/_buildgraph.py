@@ -49,9 +49,10 @@ _DATA_EXTENSIONS = (".dxf", ".dwg")
 _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECASE)
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
-# six subs, so it is last. doit derives ordering from file_dep, but this tuple
+# eight subs, so it is last. doit derives ordering from file_dep, but this tuple
 # still enumerates the assembly tasks. The former monolithic ``output`` is split
-# by function into summing -> magnifier -> pen (the value chain) + paper-drive.
+# by function into summing -> magnifier -> pen (the value chain) + paper-drive;
+# the measuring stick + its clamped stop form their own sub (MS, 2026-10-09).
 ASSEMBLY_ORDER = (
     "fr_frame",
     "dt_drive_train",
@@ -60,6 +61,7 @@ ASSEMBLY_ORDER = (
     "mg_magnifier",
     "pn_pen",
     "pd_paper_drive",
+    "ms_measuring_stick",
     "ha_harmonic_analyzer",
 )
 
@@ -811,9 +813,10 @@ def references_of(asm_stem: str) -> list[str]:
     """Part + sub-assembly stems this assembly's build script references.
 
     These are the prerequisite artefacts (the DAG edges): each output sub
-    (summing/magnifier/pen/paper_drive) references its leaf parts;
-    ``harmonic_analyzer`` references the six sub-assemblies
-    (build_harmonic_analyzer_assembly.SUBASSEMBLIES). doit turns each into a
+    (summing/magnifier/pen/paper_drive/measuring_stick) references its leaf
+    parts; ``harmonic_analyzer`` references eight sub-assemblies: the seven in
+    build_ha_harmonic_analyzer_assembly.SUBASSEMBLIES plus ``ms_measuring_stick``,
+    inserted separately at its derived parked pose. doit turns each into a
     ``file_dep`` on the referenced ``.SLDPRT``/sub-``.SLDASM`` target, so order
     and the refresh/full decision fall out of the graph.
     """

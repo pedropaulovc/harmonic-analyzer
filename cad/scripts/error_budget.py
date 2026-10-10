@@ -56,7 +56,7 @@ import gear_seat_fit
 import mg_lever_wire_geom
 import mg_magnifying_clamp_geom
 import mg_magnifying_lever_geom
-import ha_measuring_stick_geom
+import ms_stick_geom
 import paper_drive_geom
 import pn_pen_wire_geom
 import ch_rocker_arm_spec
@@ -2094,7 +2094,7 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     return bad
 
 
-STICK_DIVISION_MM = ha_measuring_stick_geom.DIVISION_SPACING  # the engraved scale
+STICK_DIVISION_MM = ms_stick_geom.DIVISION_SPACING  # the engraved scale
 
 
 def calibration_table(

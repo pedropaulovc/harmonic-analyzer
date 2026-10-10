@@ -45,6 +45,13 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut,
 )
 from vn_frame_cross_screw_spec import HEAD_DIA, HEAD_H, PITCH, SHANK_DIA, SHANK_LEN
+from vn_ms_stop_plate_screw_spec import (
+    HEAD_DIA as MS_HEAD_DIA,
+    HEAD_H as MS_HEAD_H,
+    LENGTH as MS_LENGTH,
+    MAJOR_DIA as MS_MAJOR_DIA,
+    PITCH as MS_PITCH,
+)
 
 FILLISTER_SIZES = {
     # part:        (major dia, length, head height, head dia, pitch)
@@ -60,6 +67,9 @@ FILLISTER_SIZES = {
     # 18-8 stainless #2-56 x 1/4, live product page and technical drawing
     # read 2026-10-08. Derived family details are not vendor-verified.
     "91794A077": (2.1844, 6.35, 2.1082, 3.556, 25.4 / 56.0),
+    # Brass #2-56 x 1/4, live product page and 2-D drawing read 2026-10-09.
+    # Secondary family details are assumptions, not vendor-solid measurements.
+    "90114A124": (MS_MAJOR_DIA, MS_LENGTH, MS_HEAD_H, MS_HEAD_DIA, MS_PITCH),
     # 18-8 stainless fillister, 0-80 x 1/4, high narrow head 0.096 x 0.055,
     # fully threaded (McMaster 91794A055 product page, read 2026-09-30).
     # Sizes only: its vendor model is a different tree (drafted head, neck,

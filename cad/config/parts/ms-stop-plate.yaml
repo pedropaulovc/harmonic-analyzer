@@ -1,0 +1,8 @@
+ms-stop-plate:
+  number: MHA-MS-003
+  material: Brass
+  material_specification: Brass
+  finish: machined; chemically blackened (brass black)
+  quantity: 1
+  tolerance_class: machined_block
+  process: "sawn and milled 21 x 14.1 x 1.00 brass plate closing the stop-block window; two plate-screw holes match-drilled with its ms-stop-block in one pilot pass, then opened to the 2.4 clearance (parts paired, not interchangeable)"

@@ -1,12 +1,14 @@
 r"""Reproduction script: ha-harmonic-analyzer.SLDASM (top level, M6.5).
 
-The complete machine: the seven subassemblies plus the loose hardware, mated
-to the frame. Every subassembly is authored in MACHINE coordinates (assembly
-origin = base origin, Y up, base top y 50.8, channels along Z, output side -Z),
-so each one is inserted at the identity transform and fixed -- the fix-all
-strategy of M6.2-M6.4 lifted one level. The output is split by function into
-the signal-flow chain summing -> magnifier -> pen (the value) plus paper-drive
-(the orthogonal time-base).
+The complete machine: the seven machine subassemblies plus the parked
+measuring stick, mated to the frame. Every machine subassembly is authored in
+MACHINE coordinates (assembly origin = base origin, Y up, base top y 50.8,
+channels along Z, output side -Z), so each one is inserted at the identity
+transform and fixed -- the fix-all strategy of M6.2-M6.4 lifted one level.
+The measuring stick (ms-measuring-stick.SLDASM) is authored in its stop's own
+frame, so it is inserted at the explicit park transform derived below and
+fixed. The output is split by function into the signal-flow chain summing ->
+magnifier -> pen (the value) plus paper-drive (the orthogonal time-base).
 
 Cross-subassembly fits proven by the top-level interference check:
 
@@ -30,8 +32,9 @@ Cross-subassembly fits proven by the top-level interference check:
   z -155.7 chain plane (pd_transgear_removable_spec.CHAIN_MID_Z);
 * rocker-arm connecting-rod rings (channel) ride the cam lobes integral
   to the drive-train's cylinder gears;
-* the loose measuring-stick stands on its stop block on the base top (y 50.8),
-  the stop's thumbscrew head resting on the deck. The spare T18
+* the measuring stick (ms-measuring-stick.SLDASM, stop clamped at the 2.0
+  mark) is parked on the base top (y 50.8), the stop's thumbscrew head just
+  above the deck. The spare T18
   transgear-removable, a swap part for the platen drive, rides inside
   paper-drive (a flat sibling of its mounted T24) rather than floating here --
   at the top level its leaf name would collide with the T12/T24 instances
@@ -46,6 +49,8 @@ from __future__ import annotations
 
 import sys
 
+import fr_harmonic_base_spec
+import ms_measuring_stick_assembly_spec as ms
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
@@ -61,11 +66,10 @@ from _assembly import (
     assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
-    place_component,
     remap_front_to_machine_front,
     save_assembly_and_images,
 )
-from _transforms import IDENTITY
+from _transforms import IDENTITY, euler_from_rows, rows_from_euler
 from _interference_contracts import allowed_interference_pairs
 
 import _telemetry
@@ -82,87 +86,58 @@ SUBASSEMBLIES = (
     "pd-paper-drive",
 )
 
-# Loose hardware on the base top -- a generic tool, not part of any mechanism.
-# Parked on the base's green land just INBOARD of the west columns, running
-# along Z (machine x -178..-170, z -100..100, propped on its stop block ~8
-# above the land -- see the height derivation below). The user ruling of
-# 2026-10-09 took away the raised rim and set a black deck at x -167..167, 3.0
-# above the land: the stick and its stop (block x -180..-168, head Ø7 at
-# x -174) sit wholly in the land corridor between the deck's east edge and the
-# column east face (x -184.3), which the old rim narrowed to 5.5 -- too narrow
-# for the 8 mm stick. The column pair leaves only 198.6 along Z for its 200,
-# so the stick stays east of the column band, well clear of the crank column
-# (x >= -150.7) and the rocker-arm-support foot (x 41..105). Authored as the
-# EXACT machine transform:
-# flat, long axis along Z, GRADUATIONS UP. build_ha_measuring_stick
-# cuts the ticks into the local z=0 face (outward normal -Z), so graduations-up
-# requires local -Z -> machine +Y, i.e. local +Z -> -Y. The rows therefore map
-# part X(length 200)->machine +Z, part Y(width 8)->machine -X, part Z(3 thick)->
-# machine -Y; the body hangs in -Y from the graduated face, so the placed corner
-# (part origin, on the z=0 face) sits STICK_THICK above the bar's underside.
-# POS.x = -170 so the width runs -X into x -170..-178. euler [90,-90,0] is
-# rows_from_euler of those rows.
+# The measuring stick and its clamped stop -- a generic tool, not part of any
+# mechanism -- parked on the base's green land just INBOARD of the west
+# columns, the stick along Z, GRADUATIONS UP (ms_measuring_stick_assembly_spec:
+# the bar's graduated face bears on the stop's roof, +Y of the stop frame). The
+# user ruling of 2026-10-09 (#1310) took away the raised rim and set a black
+# deck at x -167..167, 3.0 above the land, so the whole stop sits in the land
+# corridor between the deck's east edge and the column east face (x -184.3).
+# The column pair leaves only 198.6 along Z for the 200 bar, so the bar stays
+# east of the column band, clear of the crank column (x >= -150.7) and the front
+# rocker-support band (z <= -118).
 #
-# Height (2026-09-02 stop rework): the parked stick is PROPPED ON THE STOP
-# BLOCK, as the ch30 plates show it standing on the block rather than flat on
-# the base -- the stop's closed window wraps the bar and its knurled thumbscrew
-# head hangs under the block, so the head bottom is what rests on the green
-# land (STOP_LAND_GAP above it) and the bar rides SLOT_FLOOR + half the window
-# clearance above the block bottom. STICK_POS.y (the graduated top face) is
-# therefore derived from the stop's constants, never a literal.
-from build_ha_measuring_stick import (  # noqa: E402
-    BODY_THICKNESS as STICK_THICK,
-    BODY_WIDTH as STICK_WIDTH,
-    DIVISION_SPACING as STICK_DIVISION,
-    SCALE_START_X as STICK_SCALE_START,
-)
-from build_ha_measuring_stick_stop import (  # noqa: E402
-    BLOCK_DEPTH as STOP_BLOCK_DEPTH,
-    HEAD_H as STOP_HEAD_H,
-    SLOT_FLOOR as STOP_SLOT_FLOOR,
-    SLOT_H as STOP_SLOT_H,
-    SLOT_W as STOP_SLOT_W,
-)
-from fr_harmonic_base_spec import DECK_HALF_X, GREEN_TOP  # noqa: E402
+# The stop frame maps X (along the stick) -> machine +Z, Y (thumbscrew axis,
+# up to the roof) -> machine +Y, Z (cover into the block) -> machine -X; the
+# bar's own rows compose to part X -> +Z, part Y -> -X, part Z -> -Y.
+MS_ROWS = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
+MS_EULER = euler_from_rows(MS_ROWS)
+assert all(
+    abs(a - b) < 1e-12
+    for got, want in zip(rows_from_euler(MS_EULER), MS_ROWS, strict=True)
+    for a, b in zip(got, want, strict=True)
+), MS_EULER
 
-LAND_TOP_Y = GREEN_TOP  # the harmonic base's green land the stop rests on
+LAND_TOP_Y = fr_harmonic_base_spec.GREEN_TOP  # the green land the stop rests on
 STOP_LAND_GAP = 0.25  # thumbscrew head bottom above the land (sliver margin)
-# The bar (3 thick x 8 wide) must pass the stop's closed window with clearance
-# on every side (the window is 8.4 x 3.4, floor 4.0 above the block bottom).
-STOP_BAR_CLEAR_Y = (STOP_SLOT_H - STICK_THICK) / 2.0  # 0.2 above and below
-assert STOP_BAR_CLEAR_Y > 0.0, (STOP_SLOT_H, STICK_THICK)
-assert STOP_SLOT_W - STICK_WIDTH >= 0.2, (STOP_SLOT_W, STICK_WIDTH)
+PARK_WEST_LIMIT_X = -184.3  # column east face
+PARK_EAST_LIMIT_X = -fr_harmonic_base_spec.DECK_HALF_X  # the deck's east edge
+PARK_FRONT_LIMIT_Z = -118.0  # front rocker-support band (z <= -118)
 
-# Stack up from the land: gap + head + floor + centring clearance = bar
-# underside; + bar thickness = the graduated face the part origin sits on.
-STICK_BOTTOM_Y = (
-    LAND_TOP_Y + STOP_LAND_GAP + STOP_HEAD_H + STOP_SLOT_FLOOR + STOP_BAR_CLEAR_Y
+# Machine image of a stop-frame point p: (P.x - p.z, P.y + p.y, P.z + p.x).
+# The stop's machine-X envelope (stop Z, cover-screw heads to the block's back
+# wall) is centred in the land corridor; the thumbscrew's head face (the stop's
+# lowest Y) sits STOP_LAND_GAP above the land; the 200 bar is centred on z = 0.
+MS_POS = (
+    (PARK_WEST_LIMIT_X + PARK_EAST_LIMIT_X) / 2.0
+    + (ms.EXTENT_MIN[2] + ms.EXTENT_MAX[2]) / 2.0,
+    LAND_TOP_Y + STOP_LAND_GAP - ms.THUMB_HEAD_FACE_Y,
+    -(ms.STICK_X_MIN + ms.STICK_X_MAX) / 2.0,
 )
-STICK_POS = (-170.0, STICK_BOTTOM_Y + STICK_THICK, -100.0)
-# The stop block (12 wide in x, centred on the bar) must stay off the deck's
-# east edge, and the bar inside the land corridor short of the west columns.
-assert STICK_POS[0] - STICK_WIDTH / 2.0 + STOP_BLOCK_DEPTH / 2.0 < -DECK_HALF_X
-assert STICK_POS[0] - STICK_WIDTH > -184.3
-STICK_EULER = [90.0, -90.0, 0.0]
-STICK_ROWS = [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
-
-STOP_MARK = 2.0  # the ch16 p.36 setting
-STOP_POS = (
-    STICK_POS[0] - STICK_WIDTH / 2.0,  # centred across the bar (part +Y -> machine -X)
-    # Bar centred in the window: the block bottom sits SLOT_FLOOR + 0.2 below
-    # the bar's underside (the bar rides the window floor + half the clearance).
-    STICK_BOTTOM_Y - STOP_SLOT_FLOOR - STOP_BAR_CLEAR_Y,
-    STICK_POS[2] + STICK_SCALE_START + STOP_MARK * STICK_DIVISION,
-)
-STOP_EULER = [0.0, -90.0, 0.0]
-STOP_ROWS = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
-STOP_HEAD_BOTTOM_Y = STOP_POS[1] - STOP_HEAD_H
-STICK_LAND_FLOAT = STICK_BOTTOM_Y - LAND_TOP_Y
-assert abs(STOP_HEAD_BOTTOM_Y - LAND_TOP_Y - STOP_LAND_GAP) < 1e-6, STOP_HEAD_BOTTOM_Y
-assert STICK_LAND_FLOAT > 0.0, STICK_LAND_FLOAT
+MS_WEST_X = MS_POS[0] - ms.EXTENT_MAX[2]
+MS_EAST_X = MS_POS[0] - ms.EXTENT_MIN[2]
+MS_FRONT_Z = MS_POS[2] + ms.EXTENT_MIN[0]
+MS_HEAD_BOTTOM_Y = MS_POS[1] + ms.THUMB_HEAD_FACE_Y
+MS_STICK_BOTTOM_Y = MS_POS[1] + ms.STICK_BOTTOM_Y
+assert MS_WEST_X > PARK_WEST_LIMIT_X, MS_WEST_X
+assert MS_EAST_X < PARK_EAST_LIMIT_X, MS_EAST_X
+assert MS_FRONT_Z > PARK_FRONT_LIMIT_Z, MS_FRONT_Z
+assert abs(MS_HEAD_BOTTOM_Y - LAND_TOP_Y - STOP_LAND_GAP) < 1e-9, MS_HEAD_BOTTOM_Y
+assert MS_POS[1] + ms.EXTENT_MIN[1] > LAND_TOP_Y, MS_POS
 _telemetry.info(
-    f"measuring stick propped on its stop: underside floats {STICK_LAND_FLOAT:.2f} "
-    f"above the green land (head bottom {STOP_HEAD_BOTTOM_Y:.2f}, land {LAND_TOP_Y})"
+    f"measuring stick parked: stop x {MS_WEST_X:.2f}..{MS_EAST_X:.2f}, bar underside "
+    f"y {MS_STICK_BOTTOM_Y:.2f}, front z {MS_FRONT_Z:.2f} (head bottom "
+    f"{MS_HEAD_BOTTOM_Y:.2f}, land {LAND_TOP_Y})"
 )
 
 
@@ -203,18 +178,25 @@ async def build(adapter) -> dict[str, str]:
                 await adapter.fix_component(ComponentRefParameters(name=comp)),
             )
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
-
-    # Loose hardware on the base top (not part of any mechanism). Exact machine
-    # transform: flat, graduated face up, long axis along Z.
-    await place_component(
-        adapter, "ha-measuring-stick", list(STICK_POS), STICK_EULER, STICK_ROWS
+    # The measuring stick and its clamped stop, fixed at the exact park
+    # transform (not the identity: it is authored in the stop frame).
+    data = check(
+        "insert ms-measuring-stick.SLDASM",
+        await adapter.insert_component(
+            InsertComponentParameters(
+                file_path=_subassembly("ms-measuring-stick"),
+                position=list(MS_POS),
+                rotation=MS_EULER,
+            )
+        ),
     )
-    # Its sliding stop (ch16 page001_img01), parked at the 2.0 mark: the
-    # block's seat is on the deck, its open-bottom slot straddling the bar
-    # (part +X along the stick = machine +Z, +Y up, +Z across = machine -X).
-    await place_component(
-        adapter, "ha-measuring-stick-stop", list(STOP_POS), STOP_EULER, STOP_ROWS
-    )
+    comp = data["name"]
+    if not data.get("fixed"):
+        check(
+            "fix ms-measuring-stick",
+            await adapter.fix_component(ComponentRefParameters(name=comp)),
+        )
+    assert_component_placed(adapter, comp, list(MS_POS), MS_ROWS)
 
     assert_components_fully_defined(adapter)
     check_no_interference(

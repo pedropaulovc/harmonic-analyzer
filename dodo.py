@@ -2854,7 +2854,7 @@ def task_verify_soundness():
     worker) already proved restores instead of reopening the model.
 
     A change to one assembly no longer invalidates a monolithic gate that reopens
-    all eight models. The public ``verify:soundness`` task below aggregates these
+    all nine models. The public ``verify:soundness`` task below aggregates these
     child stamps, preserving the existing CLI and release dependency.
     """
     for stem in ASSEMBLY_ORDER:
@@ -3074,6 +3074,11 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # The ms-measuring-stick sub-assembly contract (2026-10-09): parked
+        # pose, retention pairs, BOM numbers and the fully-fixed contract file.
+        # Its YAML reads ride the gate's _CONFIG_YAMLS deps; its module imports
+        # ride module_deps_of.
+        SCRIPTS_DIR / "test_ms_measuring_stick_assembly.py",
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_dt_drive_train_support_layout.py",
@@ -3310,9 +3315,10 @@ def task_check():
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_fr_nameplate_geometry.py")],
         },
         "numerals": {
-            # Guards the GENERATED numerals DXF the measuring-stick build imports:
-            # byte-identical regeneration from gen_stick_numerals_dxf, closed-loop
-            # census, clearance from every tick, and the area/bbox the build pins.
+            # Guards the GENERATED numerals DXF the ms-stick build imports:
+            # byte-identical regeneration from gen_ms_stick_numerals_dxf,
+            # closed-loop census, clearance from every tick, and the area/bbox
+            # the build pins.
             # Deps: the test, the asset, the generator/build/font-render modules it
             # imports (module_deps_of) AND the cad/config files those modules read
             # (_config_deps -> machine/amplitude.yaml, which now owns the engraved
@@ -3327,7 +3333,7 @@ def task_check():
                         REPO_ROOT
                         / "cad"
                         / "references"
-                        / "ha-measuring-stick-numerals.dxf"
+                        / "ms-stick-numerals.dxf"
                     ).resolve()
                 ),
             ],
@@ -3523,7 +3529,7 @@ def task_check():
                     str((SCRIPTS_DIR / "test_error_budget.py").resolve()),
                     str((SCRIPTS_DIR / "build_ch_channel_assembly.py").resolve()),
                     str((SCRIPTS_DIR / "build_dt_cylinder_gear.py").resolve()),
-                    str((SCRIPTS_DIR / "build_ha_measuring_stick.py").resolve()),
+                    str((SCRIPTS_DIR / "build_ms_stick.py").resolve()),
                     # config: derived from the accessor scan of the model's and
                     # the test's import closures (the same _config_deps every
                     # part uses), never hand-listed -- a hand list missed

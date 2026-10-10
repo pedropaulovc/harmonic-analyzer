@@ -135,8 +135,9 @@ _INSERTED_SOURCES = {
     "pd_transgear_front_bushing "
     "pd_transgear_removable vn_transgear_retaining_ring "
     "pd_transgear_thumbnut",
-    "ha_harmonic_analyzer": "ha_measuring_stick ha_measuring_stick_stop fr_frame dt_drive_train "
-    "ch_channel sm_summing mg_magnifier pn_pen pd_paper_drive",
+    "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate vn_ms_stop_plate_screw vn_thumb_screw",
+    "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
+    "pd_paper_drive ms_measuring_stick",
 }
 
 
@@ -1332,7 +1333,7 @@ def test_references_is_inverse_of_dependents():
 
 def test_output_subs_reference_their_parts_only():
     """Each output sub inserts leaf parts, never another sub-assembly."""
-    for stem in ("sm_summing", "mg_magnifier", "pn_pen", "pd_paper_drive"):
+    for stem in ("sm_summing", "mg_magnifier", "pn_pen", "pd_paper_drive", "ms_measuring_stick"):
         refs = references_of(stem)
         assert refs, f"{stem} should reference its parts"
         parts = set(part_stems())
@@ -1342,25 +1343,18 @@ def test_output_subs_reference_their_parts_only():
         )
 
 
-def test_top_references_subassemblies_and_loose_parts():
-    """harmonic-analyzer mates the seven subs plus the two loose top-level parts:
-    the generic measuring-stick and its sliding stop stand directly on the base
-    (the stick propped on the stop block, 2026-09-02). The spare
+def test_top_references_only_subassemblies():
+    """harmonic-analyzer mates the eight subs and no loose part: the measuring
+    stick and its clamped stop moved into their own ms-measuring-stick sub
+    (2026-10-09), so nothing stands directly on the base any more. The spare
     transgear-removable rides inside paper-drive (a flat sibling of its mounted
     T24), not here -- at the top level its leaf name would collide with the
     T12/T24 instances nested in drive-train / paper-drive."""
     refs = set(references_of("ha_harmonic_analyzer"))
-    subs = {
-        "fr_frame",
-        "dt_drive_train",
-        "ch_channel",
-        "sm_summing",
-        "mg_magnifier",
-        "pn_pen",
-        "pd_paper_drive",
-    }
-    loose = {"ha_measuring_stick", "ha_measuring_stick_stop"}
-    assert refs == subs | loose, refs
+    subs = set(ASSEMBLY_ORDER) - {"ha_harmonic_analyzer"}
+    assert len(subs) == 8
+    assert refs == subs, refs
+    assert not (refs & set(part_stems())), refs & set(part_stems())
 
 
 def test_leaf_parts_do_not_depend_on_assembly_helpers():
@@ -1383,7 +1377,10 @@ def test_assemblies_depend_on_assembly_helpers():
 @pytest.mark.parametrize(
     ("helper", "consumers"),
     [
-        ("_assembly_patterns", {"dt_drive_train", "fr_frame", "mg_magnifier", "pd_paper_drive"}),
+        (
+            "_assembly_patterns",
+            {"dt_drive_train", "fr_frame", "mg_magnifier", "pd_paper_drive", "ms_measuring_stick"},
+        ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
         # paper_drive reads its crank axis from cone_line, not the builder.
         ("_dt_drive_train_explode", {"dt_drive_train"}),
@@ -1469,12 +1466,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ),
     ("build_fr_frame_assembly.py", "build_fr_top_frame"): (
         "dtrefactor: reads SIDE_TAP_SPEC"
-    ),
-    ("build_ha_harmonic_analyzer_assembly.py", "build_ha_measuring_stick"): (
-        "dtrefactor: reads BODY_THICKNESS, BODY_WIDTH, DIVISION_SPACING, SCALE_START_X"
-    ),
-    ("build_ha_harmonic_analyzer_assembly.py", "build_ha_measuring_stick_stop"): (
-        "dtrefactor: reads HEAD_H, SLOT_FLOOR, SLOT_H, SLOT_W"
     ),
     ("build_kinematic_probe.py", "build_pd_paper_drive_assembly"): (
         "dtrefactor: reads CHAIN_CRANK_CENTRE, DISC_TEETH, FEED_PD, KNOB_SHAFT_XY, NET_RACK_TRAVEL_PER_CRANK_REV, SPARE_GEAR_POS, THIRD_TEETH"

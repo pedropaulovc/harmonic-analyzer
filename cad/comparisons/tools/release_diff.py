@@ -56,6 +56,10 @@ def load_identity_map(path=IDENTITY_MAP):
     targets = set()
     for row in payload["identities"]:
         old, new = row["old_stem"], row["new_stem"]
+        if old is None:
+            # Families created after the cutover (e.g. the MS stop plate) have
+            # no old-tree member to pair with.
+            continue
         if old != old.lower() or new != new.lower() or "_" in old or "_" in new:
             raise ValueError(f"identity map requires dashed lowercase stems: {old!r}, {new!r}")
         if old in mapping or new in targets:

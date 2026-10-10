@@ -1,17 +1,17 @@
 r"""Generate the measuring stick's engraved numerals DXF (tracked asset).
 
-Writes ``cad/references/ha-measuring-stick-numerals.dxf``: the 0..10 scale
+Writes ``cad/references/ms-stick-numerals.dxf``: the 0..10 scale
 numerals of the ruled measuring stick as closed loops at their FINAL model
-millimetre coordinates, ready for ``build_measuring_stick`` to import onto the
+millimetre coordinates, ready for ``build_ms_stick`` to import onto the
 Front plane and cut ``TICK_DEPTH`` deep (the nameplate precedent: the Makers
 seat ignores the importer's scale/position, so placement is baked into the
 file and the build imports at scale 1, position (0, 0)).
 
 Deterministic: same constants -> same bytes (no timestamps; fixed-precision
 coordinates; matplotlib's bundled DejaVu Sans pinned by file). Re-run after
-changing any layout constant here or in ``build_measuring_stick`` and commit
+changing any layout constant in ``ms_stick_spec`` and commit
 the DXF; ``test_dxf_text`` fails if the tracked file drifts from this script
-or its pinned area/bbox in the build script go stale.
+or its pinned area/bbox in ``ms_stick_spec`` go stale.
 
 Photo derivation (2026-09-02, ch16 page001_img01 at 6x): each full tick carries
 a numeral just past the tick ends, on the +X side of its tick (toward 10), about
@@ -42,7 +42,7 @@ Frames and signs -- the one place they are worked out:
 
 Run::
 
-    uv run python cad\scripts\gen_stick_numerals_dxf.py
+    uv run --frozen python cad\scripts\gen_ms_stick_numerals_dxf.py
 """
 
 from __future__ import annotations
@@ -53,11 +53,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _dxf_text as dxf  # noqa: E402
-from build_ha_measuring_stick import (  # noqa: E402
+from ms_stick_spec import (  # noqa: E402
     BODY_WIDTH,
+    NUMERALS_DXF,
     DIVISION_COUNT,
     DIVISION_SPACING,
-    NUMERALS_DXF,
     NUMERAL_GAP_MM,
     NUMERAL_HEIGHT_MM,
     NUMERAL_ROTATION_DEG,

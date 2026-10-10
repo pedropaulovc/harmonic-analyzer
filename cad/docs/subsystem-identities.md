@@ -6,24 +6,25 @@ Current part and assembly identities are frozen in [`cad/config/parts/`](../conf
 
 Use `<prefix>-<descriptive-name>` for native model and exported asset basenames, and `<prefix>_<descriptive_name>` for Python module and doit task stems. Assembly builders and drawing artefacts retain their `_assembly` or `-assembly` suffix. For example, `dt-drive-train.SLDASM` is built by `build_dt_drive_train_assembly.py`; its drawing artefact stem is `dt-drive-train-assembly`.
 
-Drawing Numbers use `MHA-<CATEGORY>-<NNN>`. `000` is the category's assembly drawing; parts start at `001`. HA, CH, DT, FR, MG, PD, PN and SM have assemblies. VN and SH contain parts only. The cutover assigned part sequences by the old numeric identifier within each evidence-derived category. The numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the new family Number, such as `MHA-DT-003-T006` for a cone-gear configuration; installed channel spring stretch variants retain the unqualified base Number.
+Drawing Numbers use `MHA-<CATEGORY>-<NNN>`. `000` is the category's assembly drawing; parts start at `001`. HA, CH, DT, FR, MG, MS, PD, PN and SM have assemblies. VN and SH contain parts only. The cutover assigned part sequences by the old numeric identifier within each evidence-derived category. The numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the new family Number, such as `MHA-DT-003-T006` for a cone-gear configuration; installed channel spring stretch variants retain the unqualified base Number.
 
 Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<nn>`, sequenced per parent from `01`: `MHA-DT-005-TL-01` is the cone pivot post's bond cradle. The stem is the parent stem plus `-tl-<name>`, such as `dt-cone-pivot-post-tl-bond-cradle`. Fixtures are parts only. They never enter a machine assembly or BOM, and the table's part counts exclude them. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled.
 
 | Prefix | Category | Parts |
 |---|---|---:|
-| `ha` / `HA` | Harmonic analyzer | 2 |
+| `ha` / `HA` | Harmonic analyzer | 0 |
 | `ch` / `CH` | Channel | 11 |
 | `dt` / `DT` | Drive train | 36 |
 | `fr` / `FR` | Frame | 5 |
 | `mg` / `MG` | Magnifier | 9 |
 | `pd` / `PD` | Paper drive | 24 |
 | `pn` / `PN` | Pen | 6 |
+| `ms` / `MS` | Measuring stick | 3 |
 | `sm` / `SM` | Summing | 3 |
-| `vn` / `VN` | Vendor parts | 51 |
+| `vn` / `VN` | Vendor parts | 52 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
-Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence.
+Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
 
 Purchased ANSI #25 inner and outer chain links and finished ISO 2338 m6 crank
 hub dowel stock are VN, including cut-to-length modifications. Pins machined
@@ -98,14 +99,17 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 ## Identity migration table
 
-The table covers 151 part families (the 149 current families plus the two retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
+The table covers 153 part families (the 151 current families plus the two retired identities below) and nine assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
 Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws.
 
+Superseded identities (recorded in the map's `revision_changes`) are likewise lookup keys only: `ha-measuring-stick` MHA-HA-001 became `ms-stick` MHA-MS-001 and `ha-measuring-stick-stop` MHA-HA-002 became `ms-stop-block` MHA-MS-002 on 2026-10-09, so the `measuring-stick` rows below carry their MS Numbers and the HA part Numbers are never reissued. The released v39 web model predates the MS category and keeps its release-pinned identities until the next model release.
+
 | Kind | Old stem | Canonical stem | Old Number | Current Number |
 |---|---|---|---|---|
-| part | `measuring-stick` | `ha-measuring-stick` | MHA-046 | MHA-HA-001 |
-| part | `measuring-stick-stop` | `ha-measuring-stick-stop` | MHA-122 | MHA-HA-002 |
+| part | `measuring-stick` | `ms-stick` | MHA-046 | MHA-MS-001 |
+| part | `measuring-stick-stop` | `ms-stop-block` | MHA-122 | MHA-MS-002 |
+| part | — | `ms-stop-plate` | — | MHA-MS-003 |
 | part | `amplitude-bar` | `ch-amplitude-bar` | MHA-003 | MHA-CH-001 |
 | part | `channel-lever` | `ch-channel-lever` | MHA-009 | MHA-CH-002 |
 | part | `connecting-rod` | `ch-connecting-rod` | MHA-017 | MHA-CH-003 |
@@ -253,6 +257,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | — | `vn-magnifying-bracket-screw` | — | MHA-VN-050 |
 | part | — | `vn-cylinder-bank-spring` | — | MHA-VN-052 |
 | part | — | `vn-rocker-bank-spring` | — | MHA-VN-053 |
+| part | — | `vn-ms-stop-plate-screw` | — | MHA-VN-054 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -262,6 +267,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | assembly | `magnifier` | `mg-magnifier` | MHA-A05 | MHA-MG-000 |
 | assembly | `pen` | `pn-pen` | MHA-A01 | MHA-PN-000 |
 | assembly | `paper-drive` | `pd-paper-drive` | MHA-A06 | MHA-PD-000 |
+| assembly | — | `ms-measuring-stick` | — | MHA-MS-000 |
 | assembly | `harmonic-analyzer` | `ha-harmonic-analyzer` | MHA-A08 | MHA-HA-000 |
 
 ## Changes after the cutover
