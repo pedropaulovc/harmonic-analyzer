@@ -429,37 +429,24 @@ def test_wrong_inspection_pin_cannot_certify_an_unsupported_contact(pin_diameter
         toothspace_gauge_contact_mm(spec.STOCK_PROFILE, pin_diameter)
 
 
-def test_shared_callout_refuses_a_line_circle_or_off_contact_edge(monkeypatch) -> None:
+def test_shared_callout_takes_the_one_formed_edge_through_the_contact() -> None:
     import paper_drive_stock_drawing as ink
 
-    contact = (2.5, 1.5)
-
-    class Curve:
-        line = circle = False
-        shift_m = 0.0
-
-        def IsLine(self):
-            return self.line
-
-        def IsCircle(self):
-            return self.circle
-
-        def GetClosestPointOn(self, x, y, z):
-            # A planar end-face edge at z = 5.9 mm, whatever station is asked.
-            return (x + self.shift_m, y, 0.0059, 0.0, 0.0)
-
-    curve = Curve()
-    edge = SimpleNamespace(GetCurve=lambda: curve)
-    monkeypatch.setattr(ink, "_early_bound", lambda value, interface: value)
-    ink._require_formed_flank(edge, contact, 0.0)
-    for kind in ("line", "circle"):
-        setattr(curve, kind, True)
-        with pytest.raises(RuntimeError, match="not a formed flank"):
-            ink._require_formed_flank(edge, contact, 0.0)
-        setattr(curve, kind, False)
-    curve.shift_m = 0.02e-3  # a neighbouring formed edge 0.02 mm off
-    with pytest.raises(RuntimeError, match=r"passes 0\.0200 mm from the gauge contact"):
-        ink._require_formed_flank(edge, contact, 0.0)
+    contact = (2.5, 1.5, 0.0)
+    flank = ink.EdgeReading("flank", (2.5, 1.505, 0.0), False)
+    neighbour = ink.EdgeReading("next flank", (2.5, 1.52, 0.0), False)
+    root_line = ink.EdgeReading("root line", contact, True)
+    far_face = ink.EdgeReading("far face flank", (2.5, 1.5, 5.9), False)
+    assert ink.flank_at_contact([neighbour, root_line, flank, far_face], contact) is flank
+    # Run 11: the knob's hit test took a line or circle; the feed's took the
+    # far face's partial-depth flank 0.23 mm off; the rack's a neighbour.
+    with pytest.raises(RuntimeError, match=r"matched 0 of 3 drawn edges; nearest: line/circle 0\.0000"):
+        ink.flank_at_contact([root_line, neighbour, far_face], contact)
+    twin = ink.EdgeReading("twin", (2.5, 1.495, 0.0), False)
+    with pytest.raises(RuntimeError, match="matched 2 of 2"):
+        ink.flank_at_contact([flank, twin], contact)
+    with pytest.raises(RuntimeError, match="matched 0 of 0 drawn edges; nearest: none"):
+        ink.flank_at_contact([], contact)
 
 
 @pytest.mark.parametrize(
@@ -485,15 +472,21 @@ def test_flank_ends_lie_far_outside_the_contact_tolerance(spec_module: str, pin_
         assert math.dist(contact.flank_point_mm, end) > 20.0 * ink.CONTACT_TOLERANCE_MM
 
 
-def test_shared_callout_picks_the_contact_and_checks_one_edge_attachment() -> None:
+def test_shared_callout_selects_the_flank_by_entity_and_proves_the_landing() -> None:
     import paper_drive_stock_drawing as ink
 
     source = inspect.getsource(ink.add_toothspace_callout)
     assert _calls(ink.add_toothspace_callout, "toothspace_gauge_contact_mm")
+    assert _calls(ink.add_toothspace_callout, "flank_at_contact")
     assert _calls(ink.add_toothspace_callout, "model_point_in_view")
-    assert _calls(ink.add_toothspace_callout, "add_property_linked_callout")
-    assert "GetAttachedEntities3" in source and "GetAttachedEntityTypes" in source
-    assert _calls(ink.add_toothspace_callout, "_require_formed_flank")
+    (select,) = _calls(ink.add_toothspace_callout, "_select_view_entity")
+    assert _keyword(select, "entity") == "flank.edge"
+    assert "SetSelectionPoint2" in source
+    assert "GetAttachedEntityCount3" in source and "GetAttachedEntityTypes" in source
+    assert _calls(ink.add_toothspace_callout, "_assert_leader_lands")
+    # Never a sheet hit test.
+    assert "SelectByID2" not in inspect.getsource(ink)
+    assert not _calls(ink.add_toothspace_callout, "add_property_linked_callout")
 
 
 def test_single_native_solid_volume_has_no_adapter_fallback(monkeypatch) -> None:

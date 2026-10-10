@@ -1,8 +1,10 @@
 r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-PD-010).
 
-An end view, a longitudinal section B-B and an isometric at 3:1 (the section
-takes B: A names the bore datum). The end view carries the genuine native
-two-tooth span, bore fit note, finish and datum A; the section carries diameters beside their
+An end view, a longitudinal section B-B, a rear-face view and an isometric
+at 3:1 (the section takes B: A names the bore datum). The end view carries
+the genuine native two-tooth span, bore fit note, finish and datum A; the
+rear-face view carries the toothspace inspection callout on a full-depth
+flank; the section carries diameters beside their
 axial extent, the D-flat from the axis, the lengths baselined from the rear
 face (rule 7) and the step face (the disc hub's seat) square to the bore, all
 imported natively from the part with the places and bands the part authored
@@ -72,7 +74,7 @@ from pd_transgear_feed_pinion_spec import (
     TOOTH_SPACE_CALLOUT_PROPERTY,
 )
 from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_feed_pinion"]
@@ -95,6 +97,20 @@ RIGHT_CENTER = (0.230, 0.160)
 # The isometric (94 x 88 mm at 3:1) stands upper right, clear of the title
 # block and right of the oil-hole note.
 ISO_CENTER = (0.367, 0.214)
+# The toothspace pin seats on the straight pass's full-depth flank at the
+# REAR face (TOOTH_SPACE_INSPECTION_END_MM). The end view looks at the step
+# face, where the cutter's run-out leaves only partial-depth gaps: run 11's
+# pick there found a flank 0.23 mm off the contact. So the callout lands on
+# a rear-face view in the free lane below the section, left of the title
+# block (left edge 216 mm, top 66 mm) and under the section caption
+# (bottom ~78 mm); a caption names it.
+REAR_CENTER = (0.165, 0.046)
+REAR_CAPTION = "VIEW FROM REAR FACE"
+REAR_CAPTION_XY = (REAR_CENTER[0] - 0.020, REAR_CENTER[1] - 0.0215)
+# Every gap is the patterned seed. Gap 3 (model 105 deg) mirrors to the rear
+# view's upper side, where the contact flank faces up-left into its own gap,
+# toward the callout lane, so the leader arrives through air.
+TOOTH_SPACE_GAP_INDEX = 3
 SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 
 # Half the printed tooth-tip circle in sheet metres: the section's half-height,
@@ -356,8 +372,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _position_section_caption(adapter, right, SECTION_CAPTION)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (front, right, iso):
+    rear = place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=VIEW_SCALE)
+    for view in (front, right, iso, rear):
         set_hidden_lines_removed(adapter, view)
+    add_note(adapter, REAR_CAPTION, *REAR_CAPTION_XY)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -447,9 +465,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Manufacturing Notes", 0.016, 0.070, char_height=0.0025
     )
     toothspace_callout = add_toothspace_callout(
-        adapter, front, profile=STOCK_PROFILE,
+        adapter, rear, profile=STOCK_PROFILE,
         actual_pin_diameter_mm=TOOTHSPACE_GAUGE_DIA_MM,
-        rotate_rad=TOOTH_SPACE_INSPECTION_PHASE_RAD,
+        rotate_rad=TOOTH_SPACE_INSPECTION_PHASE_RAD
+        + TOOTH_SPACE_GAP_INDEX * 2.0 * math.pi / TEETH,
         axial_station_mm=TOOTH_SPACE_INSPECTION_END_MM,
         property_name=TOOTH_SPACE_CALLOUT_PROPERTY, note_xy=TOOTH_SPACE_CALLOUT_XY,
     )

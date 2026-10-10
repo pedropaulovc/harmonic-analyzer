@@ -19,7 +19,7 @@ from _drawing_contract import (
     drawing_specification_violations,
     model_toleranced_dimensions,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _layout_audit import TEXT_CLEARANCE_HEIGHTS
 from _layout_geometry import ARROW_TEXT_CLEARANCE_M, Box, estimate_text_box
 from _gear_quality import (
@@ -739,6 +739,47 @@ def test_toothspace_control_is_source_owned_and_feature_local() -> None:
     assert drawing.TOOTH_SPACE_INSPECTION_PHASE_RAD == spec.TOOTH_SPACE_INSPECTION_PHASE_RAD
     assert part.TOOTH_SPACE_INSPECTION_PHASE_RAD == spec.TOOTH_SPACE_INSPECTION_PHASE_RAD
     assert drawing.TOOTH_SPACE_INSPECTION_END_MM == spec.TOOTH_SPACE_INSPECTION_END_MM
+
+
+def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
+    """Run 11: the end view looks at the step face, whose run-out gaps are
+    partial depth, and the pick found a flank 0.23 mm off the contact. The
+    straight pass is full depth at the rear face, so the callout lands on a
+    *Back view of it, in free sheet below the section."""
+    import inspect
+
+    source = inspect.getsource(drawing.build)
+    assert 'place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=VIEW_SCALE)' in source
+    assert "add_toothspace_callout(\n        adapter, rear," in source
+    assert spec.TOOTH_SPACE_INSPECTION_END_MM == 0.0
+    assert spec.FULL_DEPTH > spec.TOOTH_SPACE_INSPECTION_END_MM
+    s = drawing.VIEW_SCALE[0] / 1000.0
+    cx, cy = drawing.REAR_CENTER
+    rear = Box(cx - drawing.HALF_OD, cy - drawing.HALF_OD, cx + drawing.HALF_OD, cy + drawing.HALF_OD)
+    left, bottom, right, top = drawing.SHEET_INNER_BORDER
+    assert rear.xmin > left and rear.ymin > bottom
+    title_left = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["pd_transgear_feed_pinion"].layout].title_block_left_m
+    assert rear.xmax + 0.010 < title_left
+    caption_bottom = drawing.SECTION_CAPTION[1] - _CAPTION_HEIGHT
+    assert rear.ymax + 0.010 < caption_bottom
+    # The rear-face extension lines stand right of the view and its leader.
+    assert rear.xmax < drawing._side_x(0.0)
+    caption = _note_box(drawing.REAR_CAPTION, drawing.REAR_CAPTION_XY)
+    assert caption.ymax < rear.ymin and caption.ymin > bottom
+    # *Back mirrors model x. The chosen gap's contact sits on the view's upper
+    # side, its flank facing up-left into its own gap, toward the callout.
+    assert 0 <= drawing.TOOTH_SPACE_GAP_INDEX < spec.TEETH
+    angle = spec.TOOTH_SPACE_INSPECTION_PHASE_RAD + drawing.TOOTH_SPACE_GAP_INDEX * 2.0 * math.pi / spec.TEETH
+    contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, spec.TOOTHSPACE_GAUGE_DIA_MM)
+    x, y = stock_drawing._rotate(contact.flank_point_mm, angle)
+    landing = (cx - x * s, cy + y * s)
+    gap_centre = math.pi - angle
+    contact_angle = math.atan2(landing[1] - cy, landing[0] - cx)
+    assert contact_angle < gap_centre  # the gap opens counter-clockwise of the contact
+    note = _note_box(spec.TOOTH_SPACE_CALLOUT, drawing.TOOTH_SPACE_CALLOUT_XY,
+                     height=drawing.TOOTH_SPACE_CALLOUT_CHAR_HEIGHT)
+    toward_note = math.atan2(note.ymin - landing[1], note.xmax - landing[0])
+    assert contact_angle < toward_note < contact_angle + math.pi / 2.0
 
 
 def test_pitch_index_control_uses_quality_and_actual_reference_circle() -> None:
