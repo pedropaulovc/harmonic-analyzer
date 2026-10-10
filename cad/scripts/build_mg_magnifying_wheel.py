@@ -51,6 +51,7 @@ from _common import (
 
 import _telemetry
 from _drawing_marks import (
+    add_angular_reference_dimension,
     add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
@@ -234,6 +235,17 @@ _TIE2_OUT_R = _GROOVE_CENTRE_R + 0.1  # ends in the groove's air
 _TIE2_ANGLE = math.degrees(math.atan2(abs(_TIE2_U[1]), abs(_TIE2_U[0])))
 if abs(_TIE2_U[1]) < 1e-6 or abs(_TIE2_U[0]) < 1e-6:
     raise AssertionError("TIE 2 must run oblique to the sketch axes")
+# The driven angle's text sits inside the ACUTE sector at P_in, between the
+# axis (outward, along U) and the horizontal ray on the same x side as U --
+# SolidWorks picks which of the four angles to report from the text point.
+_TIE2_ANGLE_TEXT_R = 2.5
+_TIE2_BISECTOR = (_TIE2_U[0] + math.copysign(1.0, _TIE2_U[0]), _TIE2_U[1])
+_TIE2_ANGLE_TEXT = (
+    _TIE2_IN_R * _TIE2_U[0]
+    + _TIE2_ANGLE_TEXT_R * _TIE2_BISECTOR[0] / math.hypot(*_TIE2_BISECTOR),
+    _TIE2_IN_R * _TIE2_U[1]
+    + _TIE2_ANGLE_TEXT_R * _TIE2_BISECTOR[1] / math.hypot(*_TIE2_BISECTOR),
+)
 
 
 def _tie2_profile() -> list[tuple[float, float]]:
@@ -706,8 +718,17 @@ async def build(adapter) -> dict[str, str]:
 
     # TIE 2: the pen-wire tie hole, radial from the groove bottom to the rim
     # bore at TIE2_CLOCK_DEG -- a half rectangle beside its radial axis,
-    # revolve-cut (build_pd_latch_hook's pin hole). The axis line passes the
-    # origin; its angle to the horizontal inner end locates the hole.
+    # revolve-cut. build_pd_latch_hook's pin-hole recipe, relation for
+    # relation: both axis ends anchored by x/y distances, the profile's axis
+    # edge coincident with the axis ENDS, the far side square/parallel to it.
+    # The farm's first native run (1b6b007ff) left this sketch under-defined
+    # with the axis pinned instead by an origin-on-line coincidence, an
+    # outer-reach distance and an adapter "angular" dimension; none of those has
+    # a native precedent in the repo. The angle is therefore a DRIVEN
+    # reference here (the NotchPhase / BoreFlatClock precedent); the anchors
+    # are computed on the radial, so the axis still passes the origin.
+    # DOF: axis 4 + profile 4 lines 8 = 12 = 4 anchor dims + 2x2 end
+    # coincidences + square + parallel + inner end horizontal + diameter.
     tie2_sd = SketchDims()
     profile = _tie2_profile()
     check("create_sketch tie 2", await adapter.create_sketch("Front"))
@@ -732,39 +753,33 @@ async def build(adapter) -> dict[str, str]:
                 f"{on_axis}.end",
                 "coincident",
             ),
-            ("tie 2 axis radial", "origin", on_axis, "coincident"),
             ("tie 2 outer end square to the axis", outer_end, on_axis, "perpendicular"),
             ("tie 2 wall parallel to the axis", wall, on_axis, "parallel"),
             ("tie 2 inner end horizontal", inner_end, None, "horizontal"),
         ),
     )
-    check(
-        "tie 2 angle",
-        await adapter.add_sketch_dimension(inner_end, on_axis, "angular", _TIE2_ANGLE),
-    )
-    tie2_sd.record("Tie2Angle")
-    await dimension_between(
-        adapter,
-        f"{on_axis}.end",
-        "origin",
-        "distance",
-        _TIE2_OUT_R,
-        "tie 2 outer reach",
-    )
-    tie2_sd.record(None)
-    check(
-        "tie 2 axis length",
-        await adapter.add_sketch_dimension(
-            on_axis, None, "linear", _TIE2_OUT_R - _TIE2_IN_R
-        ),
-    )
-    tie2_sd.record(None)
+    for end_ref, point, label in (
+        (f"{tie2_axis}.start", profile[0], "tie 2 axis inner end"),
+        (f"{tie2_axis}.end", profile[1], "tie 2 axis outer end"),
+    ):
+        await anchor_point_to_origin(adapter, end_ref, *point, label)
+        tie2_sd.record(None)
+        tie2_sd.record(None)
     text = (
         profile[2][0] + 3.0 * _TIE2_W[0] + 3.0 * _TIE2_U[0],
         profile[2][1] + 3.0 * _TIE2_W[1] + 3.0 * _TIE2_U[1],
     )
     await add_diametric_linear_dimension(adapter, tie2_axis, wall, text, "Tie2HoleDia")
     tie2_sd.record("Tie2HoleDia", '"TieHoleDia"')
+    await add_angular_reference_dimension(
+        adapter,
+        inner_end,
+        on_axis,
+        _TIE2_ANGLE_TEXT,
+        "tie 2 angle",
+        expected_degrees=_TIE2_ANGLE,
+    )
+    tie2_sd.record("Tie2Angle")
     await ensure_fully_defined(adapter, "tie 2 sketch")
     check("exit_sketch tie 2", await adapter.exit_sketch())
     name_last_feature(adapter, "Tie2Profile")

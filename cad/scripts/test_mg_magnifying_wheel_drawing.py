@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import math
 from pathlib import Path
 
 import pytest
@@ -131,6 +132,15 @@ def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
     assert part._TIE2_ANGLE == pytest.approx(43.0)
     assert (p_out[0] ** 2 + p_out[1] ** 2) ** 0.5 > geom.GROOVE_BOTTOM_DIA / 2.0
     assert (q_out[0] ** 2 + q_out[1] ** 2) ** 0.5 < geom.RIM_OUTER_DIA / 2.0
+    # The driven Tie2Angle reads the ACUTE angle: its text point lies between
+    # the axis ray and the horizontal ray (same x side) from P_in.
+    tx, ty = part._TIE2_ANGLE_TEXT
+    bearing = math.degrees(math.atan2(ty - p_in[1], tx - p_in[0]))
+    axis = math.degrees(math.atan2(p_out[1] - p_in[1], p_out[0] - p_in[0]))
+    horizontal = 0.0 if p_out[0] > p_in[0] else 180.0
+    low, high = sorted((axis % 360.0, horizontal % 360.0))
+    assert high - low == pytest.approx(part._TIE2_ANGLE)
+    assert low < bearing % 360.0 < high
 
 
 def test_linked_notes_specify_the_spokes_and_ties() -> None:
