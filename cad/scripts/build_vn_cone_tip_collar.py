@@ -15,6 +15,7 @@ import _config
 import vn_cone_tip_collar_spec as spec
 from _common import (
     SketchDims, _early_bound, _feature_by_name, active_configuration_name,
+    assert_saved_configurations_regenerate,
     add_line_chain, apply_material, check, define_circle, define_rectilinear_chain, dimension_between,
     drive_dimension, ensure_fully_defined, force_rebuild, name_bore_axis,
     name_dimensions, name_last_feature, report_mass_properties, run_build,
@@ -379,7 +380,16 @@ async def build(adapter) -> dict[str, str]:
         ("TapRootPlane", "PLANE"), ("BodyPlane", "PLANE"),
     ))
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    # The part saves on Default while its Collar/SetScrew manufacturing
+    # configurations keep their own saved caches; reopen and prove every one
+    # regenerates as loaded, like every multi-configuration builder (cg-fx1).
+    part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
+    adapter.swApp.CloseDoc(part_title)
+    adapter.currentModel = None
+    check("reopen saved cone-tip collar", await adapter.open_model(artefacts["part"]))
+    assert_saved_configurations_regenerate(adapter, PART_NAME)
+    return artefacts
 
 
 if __name__ == "__main__":

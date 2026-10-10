@@ -221,7 +221,7 @@ def require_saved_projected_gtols(
     An open part is force-reloaded from its SAME file with DiscardChanges=False;
     open-part dirty state is refused, never discarded or saved. Caller-held part
     handles become stale; reacquire them from the refreshed adapter.currentModel.
-    An already-closed part/drawing opens read-only/silent through OpenDoc7 and
+    An already-closed part/drawing opens read-only/silent through OpenDoc6 and
     closes even when XML audit fails. CloseDoc can also close non-active hidden
     documents, discarding dirty state there: use an isolated farm audit context.
     An open drawing is refused: finalize it first. Saved drawing lookup covers
@@ -274,17 +274,15 @@ def require_saved_projected_gtols(
                 raise RuntimeError(f"{label}: native document units changed across saved reload")
         return after
 
-    specification = app.GetOpenDocSpec(path_string)
-    if specification is None:
-        raise RuntimeError(f"{label}: native saved-file open specification is unavailable")
-    specification = _early_bound(specification, "IDocumentSpecification")
-    specification.DocumentType = document_type
-    specification.ReadOnly = True
-    specification.Silent = True
     try:
-        model = app.OpenDoc7(specification)
-        errors = _native_int(specification.Error, label=f"{label} open error")
-        warnings = _native_int(specification.Warning, label=f"{label} open warning")
+        # swOpenDocOptions_Silent | swOpenDocOptions_ReadOnly. Never OpenDoc7: a
+        # spec may carry ViewOnly, which IsOpenedViewOnly cannot tell from a load
+        # still in progress (test_failure_forensics). Errors and Warnings are
+        # [out] parameters that pywin32 appends to the returned document.
+        opened = app.OpenDoc6(path_string, document_type, 1 | 2, "", 0, 0)
+        model, errors, warnings = opened if isinstance(opened, tuple) else (opened, 0, 0)
+        errors = _native_int(errors, label=f"{label} open error")
+        warnings = _native_int(warnings, label=f"{label} open warning")
         _telemetry.event(
             "native.projected_zone_saved_open", document_path=path_string,
             open_error_raw=errors, open_warning_raw=warnings,
@@ -294,7 +292,7 @@ def require_saved_projected_gtols(
         _require_saved_identity(model, path_string, document_type, label)
         return _read_controls(model, projected, phase="after_saved_reopen", label=label)
     finally:
-        # Also covers a failed OpenDoc7 that nevertheless loaded the target.
+        # Also covers a failed OpenDoc6 that nevertheless loaded the target.
         opened = app.GetOpenDocumentByName(path_string)
         if opened is not None:
             opened = _early_bound(opened, "IModelDoc2")

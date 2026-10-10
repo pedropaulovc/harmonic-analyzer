@@ -152,9 +152,8 @@ class _App:
         self.path = path
         self.saved = saved
         self.opened = current
-        self.specification = SimpleNamespace(
-            DocumentType=0, ReadOnly=False, Silent=False, Error=0, Warning=0,
-        )
+        self.open_error: Any = 0
+        self.open_warning: Any = 0
         self.open_calls = 0
         self.close_calls: list[str] = []
         self.return_none = False
@@ -165,20 +164,19 @@ class _App:
         assert path == self.path
         return self.opened
 
-    def GetOpenDocSpec(self, path: str) -> Any:  # noqa: N802
+    def OpenDoc6(  # noqa: N802
+        self, path: str, document_type: int, options: int, configuration: str,
+        _errors: int, _warnings: int,
+    ) -> Any:
         assert path == self.path
-        return self.specification
-
-    def OpenDoc7(self, specification: Any) -> Any:  # noqa: N802
-        assert specification is self.specification
-        assert specification.DocumentType == self.saved.type
-        assert specification.ReadOnly is True
-        assert specification.Silent is True
+        assert document_type == self.saved.type
+        assert options == 1 | 2  # silent | read-only, never view-only
+        assert configuration == ""
         self.open_calls += 1
         self.opened = self.saved
         if self.open_exception is not None:
             raise self.open_exception
-        return None if self.return_none else self.saved
+        return (None if self.return_none else self.saved, self.open_error, self.open_warning)
 
     def CloseDoc(self, title: str) -> None:  # noqa: N802
         assert self.opened is not None
@@ -453,17 +451,17 @@ def test_closed_native_audit_closes_loaded_target_on_all_read_or_open_failures(
         state.saved.unit.factor = None
         message = "conversion factor is not finite positive"
     elif failure == "error":
-        state.app.specification.Error = 1
+        state.app.open_error = 1
         message = "saved native open failed"
     elif failure == "error_type":
-        state.app.specification.Error = False
+        state.app.open_error = False
         message = "not an integer"
     elif failure == "none":
         state.app.return_none = True
         message = "saved native open failed"
     else:
-        state.app.open_exception = RuntimeError("OpenDoc7 failed after loading")
-        message = "OpenDoc7 failed after loading"
+        state.app.open_exception = RuntimeError("OpenDoc6 failed after loading")
+        message = "OpenDoc6 failed after loading"
     with pytest.raises(RuntimeError, match=message):
         _audit(state)
     assert state.app.close_calls == [state.saved.title]
@@ -555,17 +553,6 @@ def test_closed_audit_never_closes_wrong_identity_lookup(
         _audit(state)
     assert state.app.close_calls == []
     assert state.app.opened is state.saved
-
-
-def test_closed_audit_missing_open_spec_has_no_open_or_close(
-    tmp_path: Path, native_seams: Any, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    state = _saved_state(tmp_path, drawing=True)
-    monkeypatch.setattr(state.app, "GetOpenDocSpec", lambda _path: None)
-    with pytest.raises(RuntimeError, match="open specification is unavailable"):
-        _audit(state)
-    assert state.app.open_calls == 0
-    assert state.app.close_calls == []
 
 
 def test_saved_reader_duplicate_source_identity_refuses_before_native_work(

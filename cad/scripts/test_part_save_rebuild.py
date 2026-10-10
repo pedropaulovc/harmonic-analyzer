@@ -384,7 +384,7 @@ def _configuration_builders() -> set[str]:
     }
 
 
-def test_the_builders_that_create_configurations_are_the_known_five() -> None:
+def test_the_builders_that_create_configurations_are_the_known_six() -> None:
     """A new multi-configuration builder must fail here until it reopens its
     saved part and runs the tripwire (and joins this set).  Every other builder
     that derives drawing configurations goes through save_simplified_part,
@@ -395,6 +395,7 @@ def test_the_builders_that_create_configurations_are_the_known_five() -> None:
         "build_dt_crank_handle_pivot_screw",
         "build_dt_pinion_lever_pin",
         "build_pd_transgear_removable",
+        "build_vn_cone_tip_collar",
     }
 
 
