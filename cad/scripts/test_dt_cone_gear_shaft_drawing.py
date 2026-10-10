@@ -1347,6 +1347,7 @@ def _stubbed_build(monkeypatch):
     ``record`` calls) and how many drives existed when the gate ran."""
     import asyncio
     import inspect
+    from types import SimpleNamespace
     from unittest.mock import AsyncMock, MagicMock
 
     stubs = {}
@@ -1378,6 +1379,19 @@ def _stubbed_build(monkeypatch):
         "_assert_stations_single_owned",
         lambda _a: gated_after.append(len(stubs["drive_dimension"].call_args_list)),
     )
+    # The terminal torque edge's native display/tolerance pair: the build
+    # writes the 2X prefix and MAX type, then reads both back.
+    texts: dict[int, str] = {}
+    torque_display = SimpleNamespace(
+        SetText=lambda where, text: texts.__setitem__(5 if where == 1 else where, text),
+        GetText=lambda where: texts.get(where, ""),
+    )
+    torque_edge = SimpleNamespace(Tolerance=SimpleNamespace(Type=0))
+    monkeypatch.setattr(
+        part, "_named_dimension", lambda _a, _f, _d: (torque_display, torque_edge)
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda raw, _interface: raw)
+    monkeypatch.setattr(part, "_assert_terminal_torque_corners", lambda _a: None)
     adapter = AsyncMock()
     asyncio.run(part.build(adapter))
     return adapter, stubs, sketch_dims, gated_after
