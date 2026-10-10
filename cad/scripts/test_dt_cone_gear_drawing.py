@@ -328,6 +328,21 @@ def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.Mon
         part._native_root_envelope_mm(body, teeth=profile.teeth)
 
 
+def test_root_envelope_reads_the_body_and_failures_name_their_call() -> None:
+    # f68549253: the reopened audit passed the IPartDoc where the reader calls
+    # IBody2.GetFaces, and every configuration failed as an anonymous
+    # DISP_E_MEMBERNOTFOUND.
+    source = inspect.getsource(part._configuration_topology)
+    assert "_native_root_envelope_mm(bodies[0], teeth=teeth)" in source
+    try:
+        part._exit_face(object())
+    except AttributeError as exc:
+        site = part._failure_site(exc)
+    assert '_com_invoke(body, "IBody2", "GetFaces")' in site
+    assert "in _exit_face" in site
+    assert "_failure_site(exc)" in inspect.getsource(part.assert_saved_configuration_topology)
+
+
 def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:
     from dataclasses import replace
 

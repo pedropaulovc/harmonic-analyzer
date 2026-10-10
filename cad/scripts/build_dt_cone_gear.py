@@ -700,7 +700,7 @@ async def _configuration_topology(
     root_observation = ""
     root_issues: list[str] = []
     if measure_roots and len(bodies) == 1:
-        native_min, native_max, root_edges = _native_root_envelope_mm(part, teeth=teeth)
+        native_min, native_max, root_edges = _native_root_envelope_mm(bodies[0], teeth=teeth)
         expected_min, expected_max = floor_radius_min_mm(teeth), floor_radius_max_mm(teeth)
         maximum_bore_radius = (bore_dia_mm(teeth) + BORE_DIA_BAND[0]) / 2.0
         minimum_web = native_min - maximum_bore_radius
@@ -759,6 +759,23 @@ async def _configuration_topology(
             adapter, configuration, phase=phase
         )
     return volume, observation, tuple(issues)
+
+
+def _failure_site(exc: BaseException) -> str:
+    """Name the deepest line of this module the exception passed through.
+
+    A raw COM error (DISP_E_MEMBERNOTFOUND at f68549253) carries no member
+    name; the source line of the call that raised does."""
+    import traceback
+
+    frames = [
+        frame for frame in traceback.extract_tb(exc.__traceback__)
+        if frame.filename == __file__
+    ]
+    if not frames:
+        return type(exc).__name__
+    frame = frames[-1]
+    return f"{type(exc).__name__} at line {frame.lineno} in {frame.name}: {frame.line}"
 
 
 async def assert_saved_configuration_topology(
@@ -825,7 +842,7 @@ async def assert_saved_configuration_topology(
             # Each configuration's own tolerance bands, read with it active.
             _assert_configuration_bands(adapter, configuration, teeth)
         except Exception as exc:
-            failures.append(f"{configuration}: {exc}")
+            failures.append(f"{configuration}: {_failure_site(exc)}: {exc}")
             continue
         volumes[configuration] = volume
         if issues:
