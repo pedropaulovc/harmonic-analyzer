@@ -29,7 +29,7 @@ from _com import _early_bound
 from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
-    DrawingOutputs, add_note, add_property_linked_callout, add_property_linked_note,
+    DrawingOutputs, add_note, add_property_linked_note,
     create_blank_drawing_sheets, finalize_drawing, model_point_in_view, new_project_drawing,
     read_required_properties, set_dimension_callouts, set_hidden_lines_removed,
     rebuild_drawing, stamp_drawing_summary, view_name, property_link,
@@ -61,6 +61,7 @@ NUMERAL_PARENT_CENTER = (0.130, 0.210)
 NUMERAL_CENTER = (0.140, 0.135)
 # The fence includes the real full-tick endpoint and both numeral gap anchors.
 NUMERAL_RADIUS_MM = 7.0
+NUMERAL_NOTE_XY = (0.045, 0.090)
 FRONT_KEEP = {
     "BodyLength": (0.155, 0.205), "BodyWidth": (0.275, 0.175),
     "ScaleStartX": (0.180, 0.150),
@@ -171,7 +172,7 @@ async def build(adapter: Any) -> dict[str, str]:
     source_model = adapter.currentModel
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
                   "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
-                  "Scale End Note")
+                  "Numeral Placement Note")
     read_required_properties(source_model, properties, required=properties)
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout)
@@ -199,12 +200,6 @@ async def build(adapter: Any) -> dict[str, str]:
              0.045, 0.075)
     add_property_linked_note(adapter, "Front View Note", 0.055, 0.135)
     add_property_linked_note(adapter, "Isometric View Note", 0.285, 0.095)
-    scale_end = model_point_in_view(
-        adapter, front, (part.BODY_LENGTH / 1000.0, part.BODY_WIDTH / 2000.0, 0.0),
-        label="scale end edge")
-    add_property_linked_callout(
-        adapter, front, property_name="Scale End Note", edge_xy=scale_end,
-        note_xy=(0.290, 0.225))
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate engraving sheet")
@@ -264,6 +259,7 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations += curate_view_dimensions(
             adapter, numeral, keep=NUMERAL_KEEP, view_label="numeral detail",
             dimensions_by_feature=part.DRAWING_DIMENSIONS)
+    add_property_linked_note(adapter, "Numeral Placement Note", *NUMERAL_NOTE_XY)
     depth_parent = place_view(
         adapter, str(SOURCE), "*Top", *DEPTH_PARENT_CENTER, scale=(1.0, 2.0))
     set_hidden_lines_removed(adapter, depth_parent)

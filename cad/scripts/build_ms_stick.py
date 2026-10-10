@@ -8,8 +8,8 @@ block, cover and stock hardware in the ms-measuring-stick assembly.
 The annotated bar is 200 mm long and 8 mm wide; thickness is photo-derived.
 
 Layout: bar along +X with the bottom-left corner on the origin; graduations
-engraved 0.5 mm deep into the back face (z=0), tick 0 at x=57.5 so the 10 tick
-lands just short of the far end (page001_img02).
+engraved 0.5 mm deep into the back face (z=0), tick 0 at x=56.5 following the
+2026-10-10 user Option B ruling: keep the blank and shift the whole scale left.
 
 Numerals: the 0..10 values are engraved beside their full ticks (page001_img01:
 ~2 mm sans-serif, turned 90 degrees to read with the 10 end up). There is no
@@ -79,7 +79,7 @@ from ms_stick_spec import (
     DRAWING_PRECISION,
     DRAWING_TOLERANCES,
     DRAWING_NOTES,
-    SCALE_END_NOTE,
+    NUMERAL_PLACEMENT_NOTE,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     HALF_TICK_LENGTH,
@@ -566,7 +566,7 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "Scale End Note": SCALE_END_NOTE,
+            "Numeral Placement Note": NUMERAL_PLACEMENT_NOTE,
         },
     )
     _hide_manufacturing_chords(adapter)

@@ -1,4 +1,4 @@
-"""Offline manufacturing contracts for the unchanged measuring-stick geometry."""
+"""Offline manufacturing contracts for the Option B measuring-stick scale."""
 
 from __future__ import annotations
 
@@ -22,6 +22,37 @@ import ms_stick_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
+def test_builder_authors_model_owned_numeral_placement_property(monkeypatch) -> None:
+    """Exercise the builder's actual property call without executing geometry."""
+    tree = ast.parse(Path(builder.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "apply_drawing_properties"
+    ]
+    assert len(calls) == 1
+    authored = {}
+    adapter = object()
+
+    def apply(actual_adapter, part_name, properties):
+        assert actual_adapter is adapter
+        assert part_name == builder.PART_NAME
+        authored.update(properties)
+
+    monkeypatch.setattr(builder, "apply_drawing_properties", apply)
+    expression = ast.Expression(body=calls[0])
+    eval(compile(expression, builder.__file__, "eval"), vars(builder), {"adapter": adapter})
+    assert authored["Numeral Placement Note"] == spec.NUMERAL_PLACEMENT_NOTE
+    assert authored["Manufacturing Notes"] == spec.DRAWING_NOTES
+    assert "Scale End Note" not in authored
+    assert spec.NUMERAL_PLACEMENT_NOTE == (
+        "NUMERALS 0-9 RIGHT OF FULL TICKS;\n"
+        "10 LEFT OF FINAL FULL TICK.\n"
+        "BOTH USE SHOWN GAPS"
+    )
+
+
 def test_current_identity_and_drawing_paths() -> None:
     assert builder.PART_NAME == drawing.PART_STEM == "ms-stick"
     assert DRAWINGS_BY_NAME["ms_stick"].script == Path(drawing.__file__).resolve()
@@ -31,11 +62,15 @@ def test_current_identity_and_drawing_paths() -> None:
     assert spec.NUMERALS_DXF.name == "ms-stick-numerals.dxf"
 
 
-def test_bar_and_engraving_geometry_are_unchanged() -> None:
+def test_option_b_preserves_blank_and_grooves_and_relocates_whole_scale() -> None:
     assert (spec.BODY_LENGTH, spec.BODY_WIDTH, spec.BODY_THICKNESS) == (200.0, 8.0, 3.0)
     assert (spec.TICK_WIDTH, spec.TICK_DEPTH, spec.TICK_LENGTH) == (0.4, 0.5, 3.0)
     assert (spec.MINOR_TICK_LENGTH, spec.HALF_TICK_LENGTH) == (1.8, 4.0)
     assert spec.DIVISION_COUNT == 11 and spec.MINOR_PER_DIVISION == 10
+    assert spec.SCALE_END_MARGIN == pytest.approx(1.5)
+    assert spec.SCALE_START_X == pytest.approx(56.5)
+    assert spec.NUMERALS_BBOX == (57.300, 1.393, 197.700, 4.400)
+    assert spec.NUMERAL_AREA_MM2 == pytest.approx(13.108)
     assert spec.SCALE_SPAN == pytest.approx(
         (spec.DIVISION_COUNT - 1) * spec.DIVISION_SPACING, rel=0.0, abs=1e-12,
     )
@@ -104,8 +139,16 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     last_edge_max = last_center_max + (values["Tick0Width"] + bands["Tick0Width"]) / 2.0
     assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
     assert stock_min == pytest.approx(199.90)
-    assert last_edge_max == pytest.approx(199.825)
+    assert last_edge_max == pytest.approx(198.825)
     assert stock_min >= last_edge_max
+    assert stock_min - last_edge_max == pytest.approx(1.075)
+    last_edge_nominal = (
+        values["ScaleStartX"] + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"]
+        + values["Tick0Width"] / 2.0
+    )
+    assert values["BodyLength"] - last_edge_nominal == pytest.approx(1.30)
+    assert values["Tick0Width"] == pytest.approx(0.40)
+    assert bands["Tick0Width"] == pytest.approx(0.05)
 
 
 def test_loose_cosmetic_depth_keeps_the_structural_floor() -> None:
@@ -391,10 +434,19 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.GetName2())
     for name in (
         "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
-        "set_dimension_callouts", "assert_manufacturing_dimensions", "add_property_linked_note",
-        "rebuild_drawing", "add_note", "add_property_linked_callout",
+        "set_dimension_callouts", "assert_manufacturing_dimensions",
+        "rebuild_drawing", "add_note",
     ):
         monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
+    required_properties, linked_notes = [], []
+    monkeypatch.setattr(
+        drawing, "read_required_properties",
+        lambda model, properties, *, required: required_properties.extend(required),
+    )
+    monkeypatch.setattr(
+        drawing, "add_property_linked_note",
+        lambda adapter, name, x, y: linked_notes.append((active["sheet"], name, (x, y))),
+    )
     monkeypatch.setattr(
         drawing, "set_hidden_lines_removed", lambda adapter, view: clean_views.append(view),
     )
@@ -414,7 +466,10 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
     assert source.read_bytes() == b"offline source sentinel"
-    assert len(utility.points) == 19  # fence transforms plus the native scale-end attachment
+    assert "Numeral Placement Note" in required_properties
+    assert "Scale End Note" not in required_properties
+    assert ("ENGRAVING", "Numeral Placement Note", drawing.NUMERAL_NOTE_XY) in linked_notes
+    assert len(utility.points) == 18  # three transform points for each of six fences
     expected = [
         ("A", "GRADUATIONS", drawing.DETAIL_CENTER, drawing.DETAIL_RADIUS_MM,
          ((spec.SCALE_START_X + spec.DIVISION_SPACING / 2.0) / 1000.0, spec.BODY_WIDTH / 2000.0, 0.0),
@@ -438,12 +493,12 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         assert detail.Position == xy
         assert parent.ScaleRatio == (1.0, 2.0)
         assert tuple(getattr(detail.ScaleRatio, "value", detail.ScaleRatio)) == drawing.DETAIL_SCALE
-        assert utility.points[3 * index + 1] == pytest.approx(model_xyz)
+        assert utility.points[3 * index] == pytest.approx(model_xyz)
         projected = parent.ModelToViewTransform.apply(model_xyz)
         center = (projected[0], projected[1], 0.0)
         rim = (center[0] + radius / 2000.0, center[1], 0.0)
-        assert utility.points[3 * index + 2] == pytest.approx(center)
-        assert utility.points[3 * index + 3] == pytest.approx(rim)
+        assert utility.points[3 * index + 1] == pytest.approx(center)
+        assert utility.points[3 * index + 2] == pytest.approx(rim)
         assert circles[index] == pytest.approx(
             (*sketch_transform.apply(center), *sketch_transform.apply(rim)))
         assert letters[index] == (label, (center[0], center[1] + 0.015))
@@ -472,9 +527,6 @@ def test_graduation_location_chords_terminate_at_groove_centres() -> None:
         assert start == zero[2]
         assert end == (spec.SCALE_START_X + spacing, spec.BODY_WIDTH)
     assert spec.DRAWING_NOTES.endswith("ms-stick.SLDPRT")
-    assert spec.SCALE_END_NOTE == (
-        "SCALE END: DEBURR ONLY;\nDO NOT BREAK EDGE INTO GRADUATIONS"
-    )
 
 
 def test_numeral_fence_contains_real_full_tick_endpoint() -> None:
@@ -538,7 +590,8 @@ def test_detail_letter_refuses_missing_ambiguous_or_ignored_native_placement(
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *args, **kwargs: None)
     with pytest.raises(RuntimeError, match="matching parent circle|placement rejected"):
         drawing._engraving_detail(
-            adapter, parent, model_center=(0.0575, 0.004, 0.0),
+            adapter, parent,
+            model_center=(spec.SCALE_START_X / 1000.0, 0.004, 0.0),
             view_xy=drawing.DETAIL_CENTER, radius_mm=drawing.DETAIL_RADIUS_MM,
             detail_label="A",
         )

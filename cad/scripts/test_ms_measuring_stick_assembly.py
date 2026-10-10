@@ -92,6 +92,11 @@ def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
     assert spec.STICK_MARK_X == pytest.approx(
         stick.SCALE_START_X + stop.STOP_MARK * stick.DIVISION_SPACING
     )
+    assert spec.STICK_MARK_X == pytest.approx(84.9)
+    assert spec.STICK_ORIGIN[0] == pytest.approx(-74.4)
+    assert spec.STICK_X_MIN == pytest.approx(-74.4)
+    assert spec.REFERENCE_STOP_FACE == pytest.approx(74.4)
+    assert spec.STICK_X_MAX == pytest.approx(125.6)
     assert spec.STICK_X_MIN < 0.0 and spec.STICK_X_MAX > stop.BLOCK_LENGTH
 
 
@@ -185,6 +190,9 @@ def test_park_pose_sits_on_the_land_inside_the_corridor() -> None:
     assert top.MS_FRONT_Z > top.PARK_FRONT_LIMIT_Z
     # The 200 bar is centred on machine z = 0.
     assert top.MS_POS[2] + (spec.STICK_X_MIN + spec.STICK_X_MAX) / 2.0 == pytest.approx(0.0)
+    assert top.MS_POS[2] == pytest.approx(-25.6)
+    assert top.MS_POS[2] + spec.STICK_X_MIN == pytest.approx(-100.0)
+    assert top.MS_POS[2] + spec.STICK_X_MAX == pytest.approx(100.0)
     assert _flat(rows_from_euler(top.MS_EULER)) == pytest.approx(_flat(top.MS_ROWS))
 
 
