@@ -20,8 +20,8 @@ the M6.8 mirror layer is gone).
   + fulcrum-shaft x1 (lever bank at (199.9, 1061.4); plain Ø6.35 x 161.35,
   domed 0.5 proud of each keeper lug, set-screw flats up)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
-  black foot-and-ear brackets on the rocker-arm-support's top, 78 either
-  side of the stack centre (the old chrome pivot-ball-mount pair is retired
+  black foot-and-ear brackets on the rocker-arm-support's top, at the
+  fit-up-located S/N stations (the old chrome pivot-ball-mount pair is retired
   -- photo-refuted, and its south pillar stood 19 mm past the support's end
   in mid-air); since the 2026-10-09 sketch both feet run OUTBOARD, flush with
   the support's end faces, as MHA-CH-008's S and N configurations) +
@@ -582,7 +582,7 @@ from stock_anchor_geom import ANCHOR_9489T111  # noqa: E402
 # face is the unambiguous concentric reference -- it is the only geometry at this
 # radius in the inter-channel gap (the shaft is Ø6.35, the OD Ø10/Ø12).
 from _hole_spec import blind_cut_dia_mm  # noqa: E402
-from ch_rocker_arm_spec import HUB_DIA as ROCKER_HUB_DIA, HUB_LENGTH as ROCKER_HUB_LENGTH  # noqa: E402
+from ch_rocker_arm_spec import HUB_LENGTH as ROCKER_HUB_LENGTH  # noqa: E402
 from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB_LENGTH  # noqa: E402
 from ch_pivot_bracket_spec import FOOT_H as PIVOT_BRACKET_FOOT_H  # noqa: E402
 
