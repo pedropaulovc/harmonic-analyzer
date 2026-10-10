@@ -35,6 +35,11 @@ bossed-casting proportions from ch11 `page002_img05.jpeg` and `page002_img06.jpe
 Drive-train tapered pin, output-fixture clamp screw, clevis hardware, nameplate screws, and
 fillister slots are below render resolution and currently omitted.
 
+- Measuring-stick stop (`ms-stop-block`, 2026-10-09): on the original stop's thumbscrew
+  face, beside the thread, sit a small round pin and a small square stub (ch16
+  `page001_img04.png`). Function unknown — possibly a pressure-pad guide or an
+  anti-rotation key. Not modelled; the block carries the bare #4-40 tapped hole.
+
 ## Manufacturing outputs
 
 No 2D drawings, DXF, or CAM outputs yet — the build path is manual milling/turning and the

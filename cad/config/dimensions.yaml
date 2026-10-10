@@ -12,7 +12,7 @@ preamble: |
   > narrative as `prose` properties; `cad/scripts/gen_dimensions.py` renders this
   > view (`--check` gates that the two never drift). The build *inputs* the scripts
   > actually read (tooth counts, pitches, fits, the cone incline) live in the
-  > sibling `machine.yaml` / `channels.yaml` / `tolerances.yaml`; `verify.py`
+  > sibling `machine.yaml` / `channels.yaml` / `tolerances/`; `verify.py`
   > cross-checks those against the dimension rows here. Confidence ladder:
   > annotated → stated → scaled → legacy → derived.
 sections:
@@ -570,7 +570,7 @@ sections:
         - low
       - - Cone mesh grid (X_PITCH)
         - 'every cone gear''s pitch section crosses x = −84.702 at the contact azimuth: X_PITCH is derived from the re-anchored drum x −53.216 and the exact oblique-mesh penetration contract'
-        - 'M6.7 oblique partial engagement (book ch. 12 "partial engagement, distinct wear"): the contact tooth crosses the 3 mm drum face obliquely. The grid shifted ~20 mm inboard from the old +4.49 because the drum radius shrank with the module (tip x 51.65→31.10). FLAG: working depth is now only 1.02 mm (vs 1.69 at DP 30), so the 0.55 edge slack (tolerances.yaml) is large relative to it — the cone/drum mesh penetration needs re-tuning in the Phase 3 rebuild'
+        - 'M6.7 oblique partial engagement (book ch. 12 "partial engagement, distinct wear"): the contact tooth crosses the 3 mm drum face obliquely. The grid shifted ~20 mm inboard from the old +4.49 because the drum radius shrank with the module (tip x 51.65→31.10). FLAG: working depth is now only 1.02 mm (vs 1.69 at DP 30), so the 0.55 edge slack (tolerances/cone_drum_oblique_mesh.yaml) is large relative to it — the cone/drum mesh penetration needs re-tuning in the Phase 3 rebuild'
         - low
       - - Cone big-end (T120) gear centre
         - (x, z) = (−114.564, −25.055) = (X_PITCH − 30.59 cos i, drum plane −31.685 + 30.59 sin i)
@@ -648,7 +648,7 @@ sections:
       - - '`vn-swing-stop-screw` (p1 travel limit)'
         - 'McMaster-Carr 90280A108 steel narrow fillister-head slotted screw, the foot screw''s SKU (user decision 2026-09-29): head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 9.525, screwed fully home (full 9.525 embed, 3.35D) so the head seats on the base top and its whole 2.7178 height sits inside the 6.35 platform edge (below the tolerance-low plate top); the head is the stop. The base receiver has 10.3 full thread depth and 14.5 drill depth before the drill point.'
         - 'base-threaded STATIC at (−140.050, +2.403), derived so the 223.354-long plate''s EAST taper edge just touches the head flank at the 4.686° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 8.569 mm signed clearance to the head (derived and asserted against the base hole).'
-        - 'McMaster-Carr 90280A108 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_vn_swing_stop_screw.py` and `cad/scripts/build_fr_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
+        - 'McMaster-Carr 90280A108 stock dimensions (`cad/scripts/_mcmaster_90280a108.py`) and shared recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and seat fit from `cad/scripts/vn_swing_stop_screw_spec.py`, receiver depths from `cad/scripts/build_fr_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
       - - '`vn-cone-tip-collar` (MHA-VN-016 set-screw collar retaining the gear stack)'
         - 'McMaster-Carr 9414T1 black-oxide steel set-screw shaft collar: Ø6.35 (1/4 in) OD × 4.7625 (3/16 in) wide, Ø1.5875 (1/16 in) bore, one #2-56 cup-point set screw'
@@ -951,9 +951,9 @@ sections:
         - stated
         - high
       - - Scale span (10 divisions)
-        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end); numerals 0-10 engraved 2.0 high, turned 90° with their tops toward the 10 end, 0.6 past each full tick (2026-09-02, `ha-measuring-stick-numerals.dxf`)
+        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end); numerals 0-10 engraved 2.0 high, turned 90° with their tops toward the 10 end, 0.6 past each full tick (2026-09-02, `ms-stick-numerals.dxf`)
         - '5.59'
-        - 'pp.34–37 plates re-read 2026-09 (the earlier 80 mm was a low read): the ruling runs ~0.71 of the 200 bar with tenths between the numbered ticks; close to the 146.05 half-arm (ch.14), so the face is near 1:1 mm — see notes (`build_ha_measuring_stick.py`)'
+        - 'pp.34–37 plates re-read 2026-09 (the earlier 80 mm was a low read): the ruling runs ~0.71 of the 200 bar with tenths between the numbered ticks; close to the 146.05 half-arm (ch.14), so the face is near 1:1 mm — see notes (`build_ms_stick.py`)'
         - scaled
         - med
       - - Body thickness
@@ -962,12 +962,12 @@ sections:
         - pp. 34–35 photo proportion
         - scaled
         - low
-      - - Stop block (2026-09)
-        - 'black 12 mm cube with a closed 8.4 × 3.4 window for the bar (floor 4.0 up) and a Ø7 × 3.5 knurled thumbscrew UNDERNEATH (2026-09-02, p.34: square block, screw below); parked at the 2 mark, so the stick stands propped on the block 7.95 above the deck'
+      - - Stop (re-derived 2026-10-09)
+        - 'two-piece brass stop, blackened: a 21 (along the stick) × 11 (across) × 14.1 (thumbscrew axis) block `ms-stop-block` with an 8.4 × 3.4 window milled open into its plate-side face (window 8.6..12.0 above the head face; roof 2.1 between the window and the roof face, 1×45° chamfers on the roof''s two end edges, opposite wall 2.6), closed by a 21 × 14.1 × 1.00 plate `ms-stop-plate` on two #2-56 brass fillister screws (McMaster 90114A124, at 3.5 and 17.5 along the stick, 4.0 above the head face; holes match-drilled through the paired plate and block in one pilot pass, plate opened to Ø2.4 clearance, block bottoming-tapped blind from the mating face, full thread 6.3 / drill 7.8); a #4-40 thumbscrew (91882A221) tapped up from the head face at 10.5 along / 4.2 across (8.6 wall) clamps the 8 × 3 stick against the roof; parked at the 2.0 mark'
         - —
-        - 'pp.34–35: the sliding/locking stop the text names sits on the bar as a small dark block with a bright screw head (`build_ha_measuring_stick_stop.py`)'
+        - 'ch16 `page001_img01.jpeg` (assembled, 5.65 px/mm), `page001_img02.jpeg` (plate face up), `page001_img04.png` (plate face with 2 slotted screws, window open to the plate side), `page002_img05.png` (in use, head below); approved sketch 2026-10-09 (`stop_rederive_v2.png`); roof 2.1 / height 14.1 is the user''s option B ruling of 2026-10-09 (`stop_roof_options_v1.png`, the 2.0 roof of the sketch thickened for the routine ±0.51 chamfer-to-window margin) (`ms_stop_spec.py`, `ms-measuring-stick` sub-assembly). Replaces the 2026-09 12 mm cube with the screw underneath.'
         - scaled
-        - low
+        - med
   - prose: |2
 
       Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
@@ -1021,7 +1021,7 @@ sections:
       - - Spring end hooks
         - bent-wire loops, both ends, extend axially
         - —
-        - 'p.41 inset; M4: modelled as axial lead (2× wire dia) + 270° loop at coil mean radius, both springs (`_common.add_spring_end_hooks`)'
+        - 'p.41 inset; M4: modelled as axial lead (2× wire dia) + 270° loop at coil mean radius, both springs (`_features.add_spring_end_hooks`)'
         - stated
         - high (feature), loop geometry estimated (low)
       - - Lever count

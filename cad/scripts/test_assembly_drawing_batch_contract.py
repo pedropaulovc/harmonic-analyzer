@@ -13,6 +13,7 @@ import draw_dt_drive_train_assembly
 import draw_fr_frame_assembly
 import draw_ha_harmonic_analyzer_assembly
 import draw_mg_magnifier_assembly
+import draw_ms_measuring_stick_assembly
 import draw_pd_paper_drive_assembly
 import draw_pn_pen_assembly
 import draw_sm_summing_assembly
@@ -22,7 +23,7 @@ from _drawing_common import (
     DrawingOutputs,
 )
 from _drawing_registry import DRAWINGS, DrawingLayout
-from test_drawing_simplified import HLR, FakeDrawing, FakeView
+from test_simplified_helpers import HLR, FakeDrawing, FakeView
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -44,6 +45,7 @@ ASSEMBLY_DRAWINGS = (
     draw_mg_magnifier_assembly,
     draw_pd_paper_drive_assembly,
     draw_sm_summing_assembly,
+    draw_ms_measuring_stick_assembly,
     draw_ha_harmonic_analyzer_assembly,
 )
 
@@ -52,18 +54,20 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     for drawing in ASSEMBLY_DRAWINGS
     # The channel sheet left the shared builder when it gained the rocker
     # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK); the paper-drive
-    # sheet left it when it became three sheets with its own fit-up steps.
+    # sheet left it when it became three sheets with its own fit-up steps; the
+    # measuring-stick sheet is a full fitter package (BOM, explode, steps).
     if drawing
     not in (
         draw_fr_frame_assembly,
         draw_dt_drive_train_assembly,
         draw_ch_channel_assembly,
         draw_pd_paper_drive_assembly,
+        draw_ms_measuring_stick_assembly,
     )
 )
 
 
-def test_registry_contains_exactly_the_eight_assembly_drawings() -> None:
+def test_registry_contains_exactly_the_nine_assembly_drawings() -> None:
     registered = tuple(spec for spec in DRAWINGS if spec.source_kind == "assembly")
     assert {spec.script for spec in registered} == {
         Path(drawing.__file__).resolve() for drawing in ASSEMBLY_DRAWINGS
@@ -117,6 +121,21 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "pd_transgear_knob_shaft_spec.py",
                     "transgear_hanger_joints.py",
                     "pd_latch_hook_geometry.py",
+                )
+            } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_ms_measuring_stick_assembly:
+            scripts_dir = Path(draw_ms_measuring_stick_assembly.__file__).resolve().parent
+            # The spec module (poses, explode plan, steps text) and the pure
+            # part/vendor specs whose constants the sheets print.
+            assert {
+                str(scripts_dir / name)
+                for name in (
+                    "ms_measuring_stick_assembly_spec.py",
+                    "ms_stop_spec.py",
+                    "ms_stick_spec.py",
+                    "_mcmaster_91882a221.py",
+                    "_mcmaster_90114a124.py",
                 )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps

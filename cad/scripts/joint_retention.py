@@ -594,7 +594,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-VN-043), member: 2 into the support_bar's #4-40 through taps
         "vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
         "mg_magnifying_clamp",  # #4-40 UNC-2B tapped ScrewHole (Hole Wizard), receiver of thumb_screw
-        "ha_measuring_stick_stop",  # knurled thumbscrew (size not stated) threading up through the block floor, modelled integral (member AND receiver, one component)
+        "ms_stop_block",  # MHA-MS-002: #4-40 UNC-2B tapped through the floor (receiver of vn_thumb_screw) + 2x #2-56 UNC blind taps (receiver of vn_ms_stop_plate_screw)
+        "vn_ms_stop_plate_screw",  # #2-56 x 1/4 brass fillister (McMaster 90114A124, MHA-VN-054), member: 2 into ms_stop_block through the cover plate
         "mg_output_fixture",  # #4-40 UNC tapped cross hole (entry wall), receiver of the 2nd thumb_screw
         "vn_pedestal_hold_down_screw",  # #8-32 x 3/4 fillister (90280A197, MHA-VN-032), member: 2 arbor-pedestal seats in harmonic_base, 2 pivot-bracket seats in rocker_arm_support
         "pn_pen_frame",  # #4-40 UNC-2B tapped hole up through the bottom rail, receiver of pen_set_screw
@@ -612,7 +613,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "sm_summing_lever",  # receiver: #10-24 counter-anchor, 20x #6-32 channel anchors, two blind #2-56 magnifying-bracket seats
         "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through latch-hook taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
         "vn_swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
-        "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
+        "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty, not placed in the SLDASM); 3rd up through ms_stop_block
         "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #8-32 fulcrum-keeper taps (top-level row)
         "pd_transgear_arm",  # MHA-PD-018: 2x #8-32 plate taps through (pd_transgear_arm_spec), receiver; the pin MHA-PD-023 is pressed in a reamed hole
         "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A196, MHA-VN-040), cut to fit; member: 2 into transgear_arm
@@ -669,7 +670,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "mg_magnifying_lever",  # plain Ø6 domed rod
         "mg_magnifying_vertical_rod",  # plain Ø5 domed rod
         "mg_magnifying_wheel",  # Ø5 reamed running bore; no thread
-        "ha_measuring_stick",  # plain 8 x 3 brass bar; the stop's thumbscrew tip pinches it
+        "ms_stick",  # MHA-MS-001 plain 8 x 3 brass bar; the stop's thumbscrew tip pinches it
+        "ms_stop_plate",  # MHA-MS-003 brass cover plate: 2 plain clearance holes for the #2-56 screws; no thread
         "fr_nameplate",  # brass plate, #4 clearance holes only
         "pn_pen_marker",  # plain barrel; the thumb-screw tip bears on it (no thread)
         "pn_pen_rod",  # square brass bar; #47 drilled wire hole only
@@ -1565,32 +1567,61 @@ JOINTS: tuple[Joint, ...] = (
             "THREADLOCKER.')"
         ),
     ),
+    # --- measuring stick ---
     Joint(
-        id="ha-harmonic-analyzer/stick-stop-thumbscrew",
-        assembly="ha_harmonic_analyzer",
-        member="ha_measuring_stick_stop",
-        receiver="ha_measuring_stick_stop",
-        thread="unstated (knurled thumbscrew, modelled integral)",
+        id="ms-measuring-stick/stop-thumbscrew",
+        assembly="ms_measuring_stick",
+        member="vn_thumb_screw",
+        receiver="ms_stop_block",
+        thread="#4-40 UNC",
         quantity=1,
-        installed_at="",
+        installed_at="MHA-MS-000 STEP 5",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "hand-set operator clamp on a loose gauge: the stop is pinched at a chosen mark on the measuring "
+            "hand-set operator clamp on a gauge: the stop is pinched at a chosen mark on the measuring "
             "stick, which is parked on the deck and is not part of any running chain -- no operating torque "
             "or motion reaches the thumbscrew axis"
         ),
         axial_capture=(
-            "thumbscrew runs up through the block's 4.0 floor; its tip pinches the stick against the window "
-            "roof; head hangs under the block"
+            "thumbscrew runs up the block's 8.6 tapped wall into the window; its tip pinches the stick "
+            "against the roof; knurled head and collar hang under the block"
         ),
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_ha_measuring_stick_stop.py module docstring (thumbscrew screws UP through the floor to pinch "
-            "the bar; head merged), SLOT_FLOOR/HEAD_H; ha-measuring-stick-stop.yaml process; "
-            "build_ha_harmonic_analyzer_assembly.py STOP_POS block"
+            "ms_stop_spec.py THUMB_TAP_SPEC (#4-40 through the floor); ms_measuring_stick_assembly_spec.py "
+            "THUMB_ORIGIN/THUMB_TIP_Y (tip on the stick underside); build_ms_measuring_stick_assembly.py "
+            "'stop thumbscrew clamps the stick'"
+        ),
+    ),
+    Joint(
+        id="ms-measuring-stick/plate-screws",
+        assembly="ms_measuring_stick",
+        member="vn_ms_stop_plate_screw",
+        receiver="ms_stop_block",
+        thread="#2-56 UNC",
+        quantity=2,
+        installed_at="MHA-MS-000 STEP 4",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "cover-plate screws: the plate closes the block's window and never moves against the block; "
+            "the stick slides inside the window and the thumbscrew clamps it to the roof, so no operating "
+            "torque reaches the screw axes"
+        ),
+        axial_capture=(
+            "fillister heads bear on the plate's outer face through its 2.4 clearance holes; threads in the "
+            "block's #2-56 blind taps, tips short of the tapped depth"
+        ),
+        lock=Lock.NONE,
+        lock_part="",
+        lock_binds=(),
+        lock_step="",
+        evidence=(
+            "ms_stop_spec.py PLATE_TAP_SPEC/PLATE_CLEARANCE_SPEC, PLATE_HOLE_XS; "
+            "ms_measuring_stick_assembly_spec.py PLATE_SCREW_ORIGINS/PLATE_SCREW_TAP_RESERVE; "
+            "build_ms_measuring_stick_assembly.py 'cover plate screws into the block'"
         ),
     ),
     # --- magnifier ---
@@ -1666,7 +1697,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_mg_magnifier_assembly.py:build ('thumb-screw (clamp)', lock_mate 'thumb-screw locked to clamp'; "
             "docstring 'Documented simplifications'); build_mg_magnifying_clamp.py ScrewHole HoleSpec('tapped','#4-40'); "
-            "mg_magnifying_clamp_spec.py DRAWING_NOTES; diag_mcmaster_thumb.py THUMB_SPECS['91882A221']"
+            "mg_magnifying_clamp_spec.py DRAWING_NOTES; _mcmaster_91882a221.py THUMB_SPEC"
         ),
     ),
     Joint(
@@ -2053,8 +2084,15 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "ha-harmonic-analyzer/channel-anchor-in-summing-plate": Occurrence(
         "ha_harmonic_analyzer", "build_ch_channel_assembly.py", "direct threaded seat"
     ),
-    "ha-harmonic-analyzer/stick-stop-thumbscrew": Occurrence(
-        "ha_harmonic_analyzer", "build_ha_measuring_stick_stop.py", "thumbscrew"
+    "ms-measuring-stick/stop-thumbscrew": Occurrence(
+        "ms_measuring_stick",
+        "build_ms_measuring_stick_assembly.py",
+        "stop thumbscrew clamps the stick",
+    ),
+    "ms-measuring-stick/plate-screws": Occurrence(
+        "ms_measuring_stick",
+        "build_ms_measuring_stick_assembly.py",
+        "cover plate screws into the block",
     ),
     "sm-summing/knife-hanger-in-mount": Occurrence(
         "sm_summing", "build_sm_summing_assembly.py", "HANGER_STUD_Y"

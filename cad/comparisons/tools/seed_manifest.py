@@ -42,7 +42,7 @@ def catalog_identities() -> dict[str, str]:
     if payload.get("schema_version") != 2:
         raise ValueError("catalog identity map requires schema_version 2")
     return {row["old_underscore"]: row["new_underscore"]
-            for row in payload["identities"]}
+            for row in payload["identities"] if row["old_underscore"] is not None}
 
 
 def part_stems() -> set[str]:
@@ -63,7 +63,7 @@ PHOTO_FOCUS = {
     "connecting rods / cross shafts": ["ch_connecting_rod"],
     "rocker arms (top comb)": ["ch_rocker_arm"],
     "amplitude bars": ["ch_amplitude_bar"],
-    "measuring stick / cord hanger": ["ha_measuring_stick"],
+    "measuring stick / cord hanger": ["ms_stick"],
     "channel springs": ["channel_spring"],
     "channel levers": ["ch_channel_lever"],
     "summing lever": ["sm_summing_lever"],

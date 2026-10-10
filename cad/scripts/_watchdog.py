@@ -1,6 +1,6 @@
 """SolidWorks COM watchdog -- fail loud when the seat process crashes or wedges.
 
-Every COM subprocess (``_common.run_build`` is the single entry) blocks
+Every COM subprocess (``_session.run_build`` is the single entry) blocks
 synchronously inside pywin32 COM calls, so a crashed or hung SolidWorks leaves
 the process -- and the machine-global seat it represents -- stuck forever with
 no Python-level exception. A daemon thread watches four signals, calibrated
@@ -222,8 +222,8 @@ def _info(message: str, **fields: object) -> None:
     _telemetry.info(message, watchdog_signal=True, **fields)
 
 
-# Provenance of the seat this session drives, pushed in by ``_common`` right
-# after connect (pushed rather than imported: ``_common`` imports this module).
+# Provenance of the seat this session drives, pushed in by ``_seat_forensics``
+# after connect via ``_session.run_build`` (pushed rather than imported).
 # A fatal watchdog signal is the one failure that leaves no build-side record at
 # all -- the process is gone before any handler runs -- so the abort must name
 # the seat it killed, or "SolidWorks crashed" stays unattributable to a pid,

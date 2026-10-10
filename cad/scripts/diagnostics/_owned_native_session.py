@@ -12,7 +12,11 @@ import os
 
 import win32com.client
 
-from _common import _early_bound
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound
 import _telemetry
 import _watchdog
 

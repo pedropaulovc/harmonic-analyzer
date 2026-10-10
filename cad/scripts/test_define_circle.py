@@ -13,7 +13,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import _common
+import _sketch
+import _sketch_chains
+import _sketch_circle
 
 
 class _Adapter:
@@ -35,14 +37,16 @@ def adapter(monkeypatch) -> _Adapter:
     async def anchored(*_args) -> None:
         return None
 
-    monkeypatch.setattr(_common, "anchor_point_to_origin", anchored)
+    monkeypatch.setattr(_sketch, "anchor_point_to_origin", anchored)
+    monkeypatch.setattr(_sketch_chains, "anchor_point_to_origin", anchored)
+    monkeypatch.setattr(_sketch_circle, "anchor_point_to_origin", anchored)
     return _Adapter()
 
 
-def _define(adapter: _Adapter, **kwargs) -> _common.SketchDims:
-    dims = _common.SketchDims()
+def _define(adapter: _Adapter, **kwargs) -> _sketch.SketchDims:
+    dims = _sketch.SketchDims()
     asyncio.run(
-        _common.define_circle(
+        _sketch_circle.define_circle(
             adapter,
             0.0,
             39.718,

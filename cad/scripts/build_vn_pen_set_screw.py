@@ -5,29 +5,17 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from diagnostics.diag_build_99607A213 import (
-    TS_HEAD_H,
-    TS_HEAD_R,
-    TS_LEN,
-    TS_MAJOR_R,
-    TS_PITCH,
-    TS_SH_H,
-    build_99607A213,
-)
+from _simplified_part import save_simplified_part
+from _mcmaster_99607a213 import HEAD_STACK_LEN
+from diagnostics.diag_build_99607A213 import build_99607A213
 
 PART_NAME = "vn-pen-set-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-HEAD_DIA = 2.0 * TS_HEAD_R
-HEAD_H = TS_HEAD_H
-HEAD_STACK_LEN = TS_SH_H + TS_HEAD_H
-SHANK_DIA = 2.0 * TS_MAJOR_R
-SHANK_LEN = TS_LEN
-TIP_CHAMFER = TS_PITCH * 0.75
 
 
 async def build(adapter) -> dict[str, str]:
@@ -45,6 +33,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         screw_axis_planes=("Top Plane", "Front Plane"),
     )
 

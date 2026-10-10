@@ -18,12 +18,12 @@ from __future__ import annotations
 import asyncio
 
 import _telemetry
-from _common import (
-    _flag,
-    _read_member,
-    check,
-    log,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _com import _flag, _read_member
 from _assembly import (
     coincident_mate,
     component_named_ref,

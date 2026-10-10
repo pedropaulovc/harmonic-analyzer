@@ -1,0 +1,922 @@
+"""Offline contracts for the ms-measuring-stick sub-assembly (MHA-MS-000).
+
+The clamped pose, the park pose under the top assembly, the thread
+allowances and the fitter package all derive from
+``ms_measuring_stick_assembly_spec``; these tests pin the derivations to the
+part and vendor specs so none of them can drift on its own.
+"""
+
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+import yaml
+
+import _config
+import _drawing_common as drawing_common
+import _hole_spec
+import _interference_contracts as contracts
+import build_ha_harmonic_analyzer_assembly as top
+import draw_ms_measuring_stick_assembly as drawing
+import joint_retention
+import ms_measuring_stick_assembly_spec as spec
+import ms_stick_spec as stick
+import ms_stop_spec as stop
+import _mcmaster_90114a124 as plate_screw
+import _mcmaster_91882a221 as thumb
+from _transforms import rows_from_euler
+
+SCRIPTS = Path(__file__).resolve().parent
+BUILDER = SCRIPTS / "build_ms_measuring_stick_assembly.py"
+
+
+def _matmul(a, b):
+    return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+
+def _flat(rows) -> list[float]:
+    return [float(value) for row in rows for value in row]
+
+
+def _image(rows, origin, point):
+    """Assembly-frame image of a part-local point (``rows[i]`` = image of axis i)."""
+    return tuple(
+        origin[axis] + sum(point[i] * rows[i][axis] for i in range(3)) for axis in range(3)
+    )
+
+
+def test_thumb_screw_spec_is_the_recipe_table_row() -> None:
+    row = thumb.THUMB_SPEC
+    assert thumb.SHANK_DIA == pytest.approx(2.0 * row["major_r"])
+    assert thumb.PITCH == pytest.approx(row["pitch"])
+    assert thumb.SHANK_LEN == pytest.approx(row["length"])
+    assert thumb.COLLAR_DIA == pytest.approx(2.0 * row["collar_r"])
+    assert thumb.COLLAR_H == pytest.approx(row["collar_h"])
+    assert thumb.HEAD_DIA == pytest.approx(2.0 * row["head_r"])
+    assert thumb.HEAD_H == pytest.approx(row["head_h"])
+    assert _config.parts("vn-thumb-screw")["supplier_skus"] == [thumb.SKU]
+
+
+def test_every_rotation_is_proper() -> None:
+    for rows in (spec.STICK_ROWS, spec.THUMB_ROWS, spec.PLATE_SCREW_ROWS, top.MS_ROWS):
+        x, y, z = rows
+        cross = (
+            x[1] * y[2] - x[2] * y[1],
+            x[2] * y[0] - x[0] * y[2],
+            x[0] * y[1] - x[1] * y[0],
+        )
+        assert cross == pytest.approx(tuple(z))
+
+
+def test_stick_rides_the_roof_graduations_up_centred_in_the_window() -> None:
+    # Graduated face (part z=0) on the roof; the far face (part z=thickness) below.
+    top_face = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, 0.0, 0.0))
+    bottom = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, 0.0, stick.BODY_THICKNESS))
+    assert top_face[1] == pytest.approx(stop.WINDOW_Y_MAX)
+    assert bottom[1] == pytest.approx(spec.STICK_BOTTOM_Y)
+    assert spec.STICK_FLOOR_GAP == pytest.approx(
+        stop.WINDOW_HEIGHT - stick.BODY_THICKNESS
+    )
+    near = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, 0.0, 0.0))[2]
+    far = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (0.0, stick.BODY_WIDTH, 0.0))[2]
+    assert near - stop.WINDOW_Z_MIN == pytest.approx(stop.WINDOW_Z_MAX - far)
+    assert near - stop.WINDOW_Z_MIN > 0.0
+
+
+def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
+    mark = _image(spec.STICK_ROWS, spec.STICK_ORIGIN, (spec.STICK_MARK_X, 0.0, 0.0))
+    assert mark[0] == pytest.approx(stop.THUMB_AXIS_X)
+    assert spec.STICK_MARK_X == pytest.approx(
+        stick.SCALE_START_X + stop.STOP_MARK * stick.DIVISION_SPACING
+    )
+    assert spec.STICK_MARK_X == pytest.approx(84.9)
+    assert spec.STICK_ORIGIN[0] == pytest.approx(-74.4)
+    assert spec.STICK_X_MIN == pytest.approx(-74.4)
+    assert spec.REFERENCE_STOP_FACE == pytest.approx(74.4)
+    assert spec.STICK_X_MAX == pytest.approx(125.6)
+    assert spec.STICK_X_MIN < 0.0 and spec.STICK_X_MAX > stop.BLOCK_LENGTH
+
+
+def test_thumbscrew_tip_clamps_the_stick_underside() -> None:
+    tip = _image(spec.THUMB_ROWS, spec.THUMB_ORIGIN, (thumb.OVERALL_LEN, 0.0, 0.0))
+    collar = _image(spec.THUMB_ROWS, spec.THUMB_ORIGIN, (thumb.HEAD_STACK_LEN, 0.0, 0.0))
+    assert tip == pytest.approx((stop.THUMB_AXIS_X, spec.STICK_BOTTOM_Y, stop.THUMB_AXIS_Z))
+    assert collar[1] < 0.0  # the collar hangs under the block, never bearing on it
+    assert spec.THUMB_EXPOSED_THREAD == pytest.approx(
+        thumb.SHANK_LEN - stop.FLOOR_THICKNESS - spec.STICK_FLOOR_GAP
+    )
+    # The stick's 8 width covers the tip within the window.
+    assert spec.STICK_Z_MIN < stop.THUMB_AXIS_Z < spec.STICK_Z_MAX
+
+
+def test_plate_screws_seat_on_the_cover_and_stop_short_of_the_tap_depth() -> None:
+    assert len(spec.PLATE_SCREW_ORIGINS) == spec.QUANTITIES[spec.PLATE_SCREW]
+    for origin in spec.PLATE_SCREW_ORIGINS:
+        bearing = _image(spec.PLATE_SCREW_ROWS, origin, (0.0, 0.0, 0.0))
+        tip = _image(spec.PLATE_SCREW_ROWS, origin, (0.0, -plate_screw.LENGTH, 0.0))
+        head = _image(spec.PLATE_SCREW_ROWS, origin, (0.0, plate_screw.HEAD_H, 0.0))
+        assert bearing[2] == pytest.approx(stop.PLATE_Z_MIN)
+        assert tip[2] == pytest.approx(spec.PLATE_SCREW_TIP_Z)
+        assert head[2] == pytest.approx(spec.PLATE_SCREW_HEAD_Z)
+        assert (bearing[0], bearing[1]) in {
+            (x, stop.PLATE_HOLE_Y) for x in stop.PLATE_HOLE_XS
+        }
+    assert spec.PLATE_SCREW_ENGAGED == pytest.approx(
+        plate_screw.LENGTH - stop.PLATE_THICKNESS
+    )
+    assert 0.0 < spec.PLATE_SCREW_ENGAGED < stop.PLATE_TAP_THREAD_DEPTH
+
+
+def test_thread_allowances_are_the_spec_values() -> None:
+    assert contracts.MS_THUMB_SCREW_THREAD == pytest.approx(
+        (thumb.SHANK_DIA, _hole_spec.TAP_DRILL_MM[thumb.THREAD], stop.FLOOR_THICKNESS)
+    )
+    assert contracts.MS_PLATE_SCREW_THREAD == pytest.approx(
+        (
+            plate_screw.MAJOR_DIA,
+            stop.PLATE_TAP_DRILL_DIA,
+            plate_screw.LENGTH - stop.PLATE_THICKNESS,
+        )
+    )
+    pairs = contracts.allowed_interference_pairs(spec.ASM_NAME)
+    assert set(pairs) == {
+        frozenset(("vn-thumb-screw-1", "ms-stop-block-1")),
+        frozenset(("vn-ms-stop-plate-screw-1", "ms-stop-block-1")),
+        frozenset(("vn-ms-stop-plate-screw-2", "ms-stop-block-1")),
+    }
+
+
+def test_assembly_contract_is_fully_fixed() -> None:
+    path = _config.CONFIG_DIR / "assemblies" / f"{spec.ASM_NAME}.yaml"
+    contract = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert contract["number"] == spec.DRAWING_NUMBER
+    assert contract["free_dof"] == 0
+    assert contract["allowed_free_stems"] == []
+    assert contract["required_free_stems"] == []
+
+
+def _placed_stems() -> list[str]:
+    """Literal part stems the builder hands its placement wrapper."""
+    tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
+    stems = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and getattr(node.func, "id", None) == "_place_fixed"
+            and len(node.args) >= 2
+            and isinstance(node.args[1], ast.Constant)
+        ):
+            stems.append(node.args[1].value)
+    return stems
+
+
+def test_builder_places_exactly_the_inventory() -> None:
+    assert sorted(set(_placed_stems())) == sorted(spec.QUANTITIES)
+    assert sorted(spec.BOM_ORDER) == sorted(spec.QUANTITIES)
+    for _label, families, axis, distance in spec.EXPLODE_STEPS:
+        assert set(families) <= set(spec.QUANTITIES)
+        assert axis in {"x", "y", "z"} and distance != 0.0
+    moved = {family for _label, families, _axis, _distance in spec.EXPLODE_STEPS for family in families}
+    assert moved == set(spec.QUANTITIES) - {spec.BLOCK}
+
+
+def test_park_pose_sits_on_the_land_inside_the_corridor() -> None:
+    assert top.MS_HEAD_BOTTOM_Y == pytest.approx(top.LAND_TOP_Y + top.STOP_LAND_GAP)
+    # Whole stop between the column east face and the deck's east edge.
+    assert top.PARK_WEST_LIMIT_X < top.MS_WEST_X < top.MS_EAST_X < top.PARK_EAST_LIMIT_X
+    assert top.MS_FRONT_Z > top.PARK_FRONT_LIMIT_Z
+    # The 200 bar is centred on machine z = 0.
+    assert top.MS_POS[2] + (spec.STICK_X_MIN + spec.STICK_X_MAX) / 2.0 == pytest.approx(0.0)
+    assert top.MS_POS[2] == pytest.approx(-25.6)
+    assert top.MS_POS[2] + spec.STICK_X_MIN == pytest.approx(-100.0)
+    assert top.MS_POS[2] + spec.STICK_X_MAX == pytest.approx(100.0)
+    assert _flat(rows_from_euler(top.MS_EULER)) == pytest.approx(_flat(top.MS_ROWS))
+
+
+def test_stick_keeps_its_machine_orientation() -> None:
+    """Composed through the sub-assembly, the bar still runs machine +Z with
+    the graduated face up, as it did when the top assembly placed it."""
+    composed = _matmul([list(row) for row in spec.STICK_ROWS], top.MS_ROWS)
+    assert _flat(composed) == pytest.approx(
+        _flat([[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]])
+    )
+
+
+def test_joint_rows_name_printed_steps() -> None:
+    joints = {
+        joint.id: joint
+        for joint in joint_retention.JOINTS
+        if joint.assembly == "ms_measuring_stick"
+    }
+    assert set(joints) == {
+        "ms-measuring-stick/stop-thumbscrew",
+        "ms-measuring-stick/plate-screws",
+    }
+    printed = {line.split(". ", 1)[0]: line for line in spec.ASSEMBLY_STEPS}
+    for joint, word in (
+        (joints["ms-measuring-stick/stop-thumbscrew"], "THUMBSCREW"),
+        (joints["ms-measuring-stick/plate-screws"], "FILLISTER SCREWS"),
+    ):
+        prefix = f"{spec.DRAWING_NUMBER} STEP "
+        assert joint.installed_at.startswith(prefix)
+        assert word in printed[joint.installed_at.removeprefix(prefix)]
+    assert joints["ms-measuring-stick/plate-screws"].quantity == spec.QUANTITIES[spec.PLATE_SCREW]
+
+
+def test_fitter_package_covers_rule_9() -> None:
+    assert drawing.SHEET_NAMES == (
+        "ASSEMBLED + CLAMPED SETUP",
+        "EXPLODED VIEW + BOM",
+        "ASSEMBLY STEPS",
+    )
+    assert drawing.SPEC.layout is drawing.DrawingLayout.LANDSCAPE
+    assert tuple(drawing.SHEET_LAYOUTS[name] for name in drawing.SHEET_NAMES) == (
+        drawing.DrawingLayout.LANDSCAPE,
+        drawing.DrawingLayout.PORTRAIT,
+        drawing.DrawingLayout.LANDSCAPE,
+    )
+    assert all(scale == (1.0, 1.0) for scale in drawing.SHEET_SCALES.values())
+    assert drawing.BOM_COMPONENTS == spec.BOM_ORDER
+    assert set(drawing.BOM_DESCRIPTIONS) == set(spec.QUANTITIES)
+    assert set(drawing.BALLOON_ANCHORS) == set(spec.QUANTITIES)
+    assert drawing.BOM_PART_NUMBERS[spec.PLATE_SCREW] == "MHA-VN-054"
+    for stem in spec.QUANTITIES:
+        assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
+    for text in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS, drawing.SETUP_NOTE):
+        assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in text.splitlines())
+    assert drawing.ASSEMBLY_STEPS.count("\n") >= len(spec.ASSEMBLY_STEPS)
+    for instruction in (spec.ASSEMBLY_STEPS[-1], spec.CLAMPED_SETUP_NOTE):
+        assert "NEAR FACE FROM THE LEFT STICK END" in instruction
+        assert "LOCATION REFERENCE" in instruction
+        assert "THUMBSCREW AXIS" not in instruction
+    assert "SHEET 1" in spec.ASSEMBLY_STEPS[-1]
+    assert "REFERENCE ABOVE; THEN CLAMP" in spec.CLAMPED_SETUP_NOTE
+    assert drawing.EXPLODED_CAPTION == spec.EXPLODED_CAPTION == (
+        "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
+    )
+    # Rule 1/6: the component Finish fields, not fitter notes or steps, own finish.
+    assert not any("BLACKEN" in step or "FINISH" in step for step in spec.ASSEMBLY_STEPS)
+    for obsolete in ("FINISH_NOTE", "FINISH_NOTE_TEXT", "FINISH_NOTE_XY", "_BLOCK_FINISH"):
+        assert not hasattr(drawing, obsolete)
+
+
+def test_bom_prints_registry_identity_and_vendor_sku_only() -> None:
+    assert drawing.BOM_SKUS[spec.PLATE_SCREW] == plate_screw.SKU == "90114A124"
+    assert drawing.BOM_SKUS[spec.THUMB_SCREW] == thumb.SKU == "91882A221"
+    for stem in (spec.STICK, spec.BLOCK, spec.PLATE):
+        assert drawing.BOM_SKUS[stem] == drawing.MADE_PART_SKU
+    for stem in spec.QUANTITIES:
+        row = _config.parts(stem)
+        assert drawing.BOM_PART_NUMBERS[stem] == row["number"]
+    assert set(drawing.BOM_COLUMN_WIDTHS) == {
+        "item",
+        "part",
+        "description",
+        "sku",
+        "quantity",
+    }
+    template = drawing.DRAWING_TEMPLATES[drawing.SHEET_LAYOUTS[drawing.SHEET_NAMES[1]]]
+    left, right = 0.0127, template.width_m - 0.0127
+    assert left <= drawing.BOM_ANCHOR[0]
+    assert drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values()) < right
+    assert not hasattr(drawing, "BOM_MATERIALS")
+    assert not hasattr(drawing, "BOM_MATERIAL_TITLE")
+    assert drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values()) / 2 == (
+        pytest.approx(template.width_m / 2)
+    )
+
+
+def test_portrait_group_translation_balances_visible_ink() -> None:
+    template = drawing.DRAWING_TEMPLATES[drawing.DrawingLayout.PORTRAIT]
+    shift = drawing.EXPLODED_GROUP_SHIFT_Y
+    # Use the recorded full-page visible envelope, not GetOutline's blank air.
+    bottom, top = (value + shift for value in drawing._EXPLODED_MEASURED_GROUP_Y)
+    lower_air = bottom - template.title_block_top_m
+    upper_air = template.height_m - 0.0127 - top
+    assert lower_air == pytest.approx(upper_air)
+    assert lower_air > 0.05
+    assert drawing.EXPLODED_ISO_CENTER == pytest.approx((0.1397, 0.235 + shift))
+    assert drawing.BOM_ANCHOR == pytest.approx((0.0627, 0.405 + shift))
+    assert drawing.EXPLODED_CAPTION_XY == pytest.approx((0.0627, 0.415 + shift))
+
+
+def test_bom_removes_material_without_changing_native_items(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    native_order = (spec.BLOCK, spec.PLATE, spec.STICK, spec.THUMB_SCREW, spec.PLATE_SCREW)
+
+    class Table:
+        def __init__(self):
+            self.cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]]
+            self.cells += [
+                [str(item), stem, drawing.BOM_DESCRIPTIONS[stem], str(spec.QUANTITIES[stem])]
+                for item, stem in enumerate(native_order, 1)
+            ]
+
+        @property
+        def RowCount(self):
+            return len(self.cells)
+
+        @property
+        def ColumnCount(self):
+            return len(self.cells[0])
+
+        def DisplayedText(self, row, column):
+            return self.cells[row][column]
+
+        def IsCellTextEditable(self, row, column):
+            return True
+
+        def SetText2(self, row, column, linked, text):
+            assert linked is False
+            self.cells[row][column] = text
+
+        def InsertColumn2(self, where, after, title, width):
+            assert where == drawing._INSERT_COLUMN_AFTER
+            assert width == drawing._INSERT_COLUMN_DEFAULT_WIDTH
+            assert after == 2 and title == "VENDOR SKU"
+            for row in self.cells:
+                row.insert(after + 1, "")
+            return True
+
+        def SetColumnTitle2(self, column, title, linked):
+            assert linked is False
+            self.cells[0][column] = title
+            return True
+
+        def SetColumnWidth(self, column, width, options):
+            assert options == 0
+            return width
+
+        def SetRowHeight(self, row, height, options):
+            assert height == drawing.BOM_ROW_HEIGHT and options == 0
+
+    table = Table()
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    items = drawing._validate_bom(adapter, table)
+    assert dict(items) == {stem: str(item) for item, stem in enumerate(native_order, 1)}
+    assert table.cells[0] == ["ITEM NO.", "PART NUMBER", "DESCRIPTION", "VENDOR SKU", "QTY."]
+    for row, stem in zip(table.cells[1:], native_order):
+        assert row[1:] == [
+            drawing.BOM_PART_NUMBERS[stem], drawing.BOM_DESCRIPTIONS[stem],
+            drawing.BOM_SKUS[stem], str(spec.QUANTITIES[stem]),
+        ]
+
+
+def test_every_component_instance_carries_a_balloon() -> None:
+    assert set(drawing.BALLOON_ANCHORS) == set(spec.QUANTITIES)
+    pinned = {
+        drawing.BALLOON_ANCHORS[spec.PLATE_SCREW].instance,
+        drawing.SECOND_SCREW_BALLOON_ANCHORS[spec.PLATE_SCREW].instance,
+    }
+    assert pinned == {
+        f"{spec.PLATE_SCREW}-{index}"
+        for index in range(1, spec.QUANTITIES[spec.PLATE_SCREW] + 1)
+    }
+    singles = [stem for stem, count in spec.QUANTITIES.items() if count == 1]
+    assert all(drawing.BALLOON_ANCHORS[stem].instance is None for stem in singles)
+    assert len(singles) + len(pinned) == sum(spec.QUANTITIES.values()) == 6
+    # The second pass rings outside the first, at least a balloon apart.
+    assert drawing.SECOND_SCREW_BALLOON_MARGIN - drawing.BALLOON_MARGIN >= 0.010
+
+
+@pytest.mark.parametrize("layout", tuple(drawing.DrawingLayout))
+def test_view_regions_use_selected_template(monkeypatch, layout) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    template = drawing.DRAWING_TEMPLATES[layout]
+    view = SimpleNamespace(GetOutline=lambda: (0.02, 0.12, 0.08, 0.18))
+    drawing._assert_view_on_sheet(view, layout=layout, label="inside")
+    view.GetOutline = lambda: (0.02, 0.12, template.width_m, 0.18)
+    with pytest.raises(RuntimeError, match="inner border"):
+        drawing._assert_view_on_sheet(view, layout=layout, label="outside")
+    view.GetOutline = lambda: (
+        template.title_block_left_m + 0.001, 0.02,
+        template.width_m - 0.02, template.title_block_top_m - 0.001,
+    )
+    with pytest.raises(RuntimeError, match="title block"):
+        drawing._assert_view_on_sheet(view, layout=layout, label="title")
+
+
+def test_measured_exploded_outline_recenters_and_fits_only_portrait(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    rebuilt = []
+
+    class View:
+        Position = (0.300, 0.145)
+        original = Position
+
+        def GetOutline(self):
+            # Native observation, without the 24 mm balloon ring.
+            x0, y0, x1, y1 = (0.2187158944414347, 0.0691861987846213,
+                              0.4166394446178927, 0.22326010614945984)
+            dx, dy = (self.Position[i] - self.original[i] for i in range(2))
+            return x0 + dx, y0 + dy, x1 + dx, y1 + dy
+
+        def SetViewPosition(self, position, children):
+            assert children is False
+            self.Position = tuple(position)
+            return True
+
+    view = View()
+    before = view.GetOutline()
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: rebuilt.append(True)))
+    drawing._center_view_outline(adapter, view, drawing.EXPLODED_ISO_CENTER, label="exploded")
+    assert view.Position == pytest.approx((
+        0.300 + drawing.EXPLODED_ISO_CENTER[0] - (before[0] + before[2]) / 2,
+        0.145 + drawing.EXPLODED_ISO_CENTER[1] - (before[1] + before[3]) / 2,
+    ))
+    assert rebuilt == [True]
+    drawing._assert_view_on_sheet(
+        view, margin=0.024, layout=drawing.DrawingLayout.PORTRAIT, label="exploded"
+    )
+    with pytest.raises(RuntimeError, match="inner border"):
+        drawing._assert_view_on_sheet(view, margin=0.024, label="exploded")
+
+
+@pytest.mark.parametrize("defect", ("refused", "unapplied", "stale outline"))
+def test_outline_recentering_refuses_failed_or_unapplied_move(monkeypatch, defect) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    view = SimpleNamespace(
+        Position=(0.3, 0.145),
+        GetOutline=lambda: (0.2, 0.07, 0.4, 0.22),
+    )
+    def move(position, _children):
+        if defect == "stale outline":
+            view.Position = tuple(position)
+        return defect != "refused"
+
+    view.SetViewPosition = move
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: None))
+    with pytest.raises(RuntimeError, match="refused|view moved|measured outline"):
+        drawing._center_view_outline(adapter, view, drawing.EXPLODED_ISO_CENTER, label="failed")
+
+
+@pytest.mark.parametrize("defect", (None, "selection", "paste", "activation", "rename"))
+def test_mixed_sheets_copy_real_templates_and_close_donors(monkeypatch, defect) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
+    created, closed, clipboard = [], [], []
+    documents = {}
+
+    class Sheet:
+        def __init__(self, layout):
+            self.name, self.layout = "Sheet1", layout
+
+        def SetName(self, name):
+            if defect != "rename" or name == drawing.SHEET_NAMES[0]:
+                self.name = name
+
+        def GetName(self):
+            return self.name
+
+    class Document:
+        def __init__(self, title, layout):
+            self.title = title
+            self.sheets = [Sheet(layout)]
+            self.active = self.sheets[0]
+            self.Extension = SimpleNamespace(
+                SelectByID2=lambda *args: defect != "selection" and args[0] == self.active.name
+            )
+
+        def GetTitle(self):
+            return self.title
+
+        def ClearSelection2(self, _all):
+            pass
+
+        def EditCopy(self):
+            clipboard[:] = [self.active.layout]
+
+        def GetSheetNames(self):
+            return [sheet.name for sheet in self.sheets]
+
+        def PasteSheet(self, insertion, rename):
+            assert (insertion, rename) == (2, 2)
+            if defect == "paste":
+                return False
+            sheet = Sheet(clipboard[0])
+            sheet.name = f"Sheet{len(self.sheets) + 1}"
+            self.sheets.append(sheet)
+            return True
+
+        def ActivateSheet(self, name):
+            if defect == "activation":
+                return False
+            self.active = next(sheet for sheet in self.sheets if sheet.name == name)
+            return True
+
+        def GetCurrentSheet(self):
+            return self.active
+
+    adapter = SimpleNamespace(currentModel=None)
+
+    def activate(title, silent, rebuild, errors):
+        assert (silent, rebuild, errors) == (False, 2, 0)
+        adapter.currentModel = documents[title]
+        return adapter.currentModel, 0
+
+    adapter.swApp = SimpleNamespace(
+        ActivateDoc3=activate, IsSame=lambda a, b: int(a is b),
+        CloseDoc=lambda title: closed.append(documents.pop(title)),
+    )
+
+    def new_drawing(_adapter, *, layout, scale):
+        assert scale == (1.0, 1.0)
+        document = Document(f"Drawing{len(created)}", layout)
+        documents[document.title] = document
+        created.append(document)
+        adapter.currentModel = document
+        return document, document.active
+
+    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
+    if defect is None:
+        drawing._create_mixed_package_sheets(adapter)
+        target = created[0]
+        assert tuple(target.GetSheetNames()) == drawing.SHEET_NAMES
+        assert tuple(sheet.layout for sheet in target.sheets) == (
+            drawing.DrawingLayout.LANDSCAPE, drawing.DrawingLayout.PORTRAIT,
+            drawing.DrawingLayout.LANDSCAPE,
+        )
+    else:
+        message = {
+            "selection": "select donor sheet", "paste": "sheet paste failed",
+            "activation": "activate pasted sheet", "rename": "rename pasted sheet",
+        }[defect]
+        with pytest.raises(RuntimeError, match=message):
+            drawing._create_mixed_package_sheets(adapter)
+        target = created[0]
+        assert len(created) == 2
+    assert closed == created[1:]
+    assert adapter.currentModel is target
+    assert list(documents.values()) == [target]
+
+
+def test_reference_dimensions_follow_the_spec() -> None:
+    assert spec.REFERENCE_OVERALL_LENGTH == pytest.approx(stick.BODY_LENGTH)
+    # The stop's near face sits half a block short of the STOP_MARK division.
+    assert spec.REFERENCE_STOP_FACE == pytest.approx(
+        stick.SCALE_START_X
+        + stop.STOP_MARK * stick.DIVISION_SPACING
+        - stop.BLOCK_LENGTH / 2.0
+    )
+    assert stop.THUMB_AXIS_X == pytest.approx(stop.BLOCK_LENGTH / 2.0)
+    assert {label for label, _value, _callout in drawing.REFERENCE_DIMENSIONS} == {
+        "overall length",
+        "stop position",
+    }
+    values = {label: value for label, value, _callout in drawing.REFERENCE_DIMENSIONS}
+    assert values["overall length"] == spec.REFERENCE_OVERALL_LENGTH
+    assert values["stop position"] == spec.REFERENCE_STOP_FACE
+    assert f"{stop.STOP_MARK:.1f}" in spec.STOP_POSITION_CALLOUT
+    assert isinstance(spec.DRAWING_REFERENCE_PRECISION, int)
+    assert spec.DRAWING_REFERENCE_PRECISION >= 1
+    # Both texts sit between the front view and the top view above it.
+    assert (
+        drawing.FRONT_CENTER[1]
+        < drawing.STOP_POSITION_TEXT_Y
+        < drawing.OVERALL_LENGTH_TEXT_Y
+        < drawing.TOP_CENTER[1]
+    )
+
+
+@pytest.mark.parametrize(
+    "dimension_types",
+    (
+        (2, 11), (11, 2),
+        (3, 11), (11, 3),
+        (0, 11), (11, 0),
+        (12, 11), (11, 12),
+        ("refused", 11), (11, "refused"),
+    ),
+)
+@pytest.mark.parametrize(
+    "defect",
+    (None, "absent component", "duplicate component", "missing edge", "duplicate edge"),
+)
+def test_reference_dimensions_select_owned_visible_end_edges(
+    monkeypatch, defect, dimension_types
+) -> None:
+    """Exercise the resolver and shared selection, never a sheet hit-test."""
+    selected = []
+    selections = []
+    displays = []
+
+    class Edge:
+        def __init__(self, start, end, assembly_x):
+            self.endpoints = tuple(v / 1000.0 for v in (*start, *end))
+            self.assembly_x = assembly_x
+
+        def GetCurve(self):
+            return SimpleNamespace(IsLine=lambda: True)
+
+        def GetCurveParams2(self):
+            return self.endpoints
+
+        def Select4(self, append, data):
+            assert data.View is front
+            if not append:
+                selected.clear()
+            assert self not in selected
+            selected.append(self)
+            selections.append((self, append, data.View))
+            return True
+
+    class Display:
+        def __init__(self, value):
+            self.value = value
+            self.text = {}
+            self.readbacks = []
+            self.dimension_type = dimension_types[len(displays)]
+            self.value_reads = 0
+
+        @property
+        def Type2(self):
+            if self.dimension_type == "refused":
+                raise RuntimeError("native dimension type getter refused")
+            return self.dimension_type
+
+        @property
+        def SystemValue(self):
+            self.value_reads += 1
+            return self.value
+
+        def GetDimension2(self, index):
+            assert index == 0
+            return self
+
+        def GetAnnotation(self):
+            return SimpleNamespace(GetSpecificAnnotation=lambda: self)
+
+        def SetText(self, index, text):
+            self.text[index] = text
+
+        def GetText(self, index):
+            self.readbacks.append(index)
+            return self.text.get(index, "")
+
+        def SetPrecision3(self, precision, *rest):
+            assert rest == (-1, -1, -1)
+            self.precision = precision
+
+        def GetPrimaryPrecision2(self):
+            return self.precision
+
+    class Draw:
+        Extension = SimpleNamespace(
+            SelectByID2=lambda *args: pytest.fail("coordinate hit-test used")
+        )
+        SelectionManager = SimpleNamespace(
+            CreateSelectData=lambda: SimpleNamespace(View=None),
+            GetSelectedObjectCount2=lambda mark: len(selected),
+        )
+
+        def ActivateView(self, name):
+            assert name == "Front"
+            return True
+
+        def ClearSelection2(self, all_marks):
+            selected.clear()
+
+        def AddHorizontalDimension2(self, x, y, z):
+            assert len(selected) == 2
+            assert z == 0.0
+            expected_y = (
+                drawing.OVERALL_LENGTH_TEXT_Y if not displays
+                else drawing.STOP_POSITION_TEXT_Y
+            )
+            assert y == expected_y
+            assert x == pytest.approx(
+                drawing.FRONT_CENTER[0]
+                + sum(edge.assembly_x for edge in selected) / 2000.0
+            )
+            display = Display(
+                abs(selected[1].assembly_x - selected[0].assembly_x) / 1000.0
+            )
+            displays.append(display)
+            return display
+
+    start = Edge(
+        (0.0, stick.BODY_WIDTH, 0.0),
+        (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS),
+        spec.STICK_X_MIN,
+    )
+    end = Edge(
+        (stick.BODY_LENGTH, stick.BODY_WIDTH, 0.0),
+        (stick.BODY_LENGTH, stick.BODY_WIDTH, stick.BODY_THICKNESS),
+        spec.STICK_X_MAX,
+    )
+    near = Edge(
+        (0.0, 0.0, stop.BLOCK_DEPTH),
+        (0.0, stop.BLOCK_HEIGHT - stop.ROOF_END_CHAMFER, stop.BLOCK_DEPTH),
+        spec.BLOCK_ORIGIN[0],
+    )
+    distractor = Edge(
+        (0.0, stick.BODY_WIDTH, 0.0),
+        (stick.BODY_LENGTH, stick.BODY_WIDTH, 0.0),
+        spec.STICK_X_MIN,
+    )
+    hidden_face = Edge(
+        (0.0, 0.0, 0.0), (0.0, 0.0, stick.BODY_THICKNESS), spec.STICK_X_MIN
+    )
+    stick_component = SimpleNamespace(
+        GetPathName=lambda: f"C:\\models\\{spec.STICK}.SLDPRT",
+        edges=(distractor, hidden_face, end, start),
+    )
+    block_component = SimpleNamespace(
+        GetPathName=lambda: f"C:\\models\\{spec.BLOCK}.SLDPRT", edges=(near,)
+    )
+    front = SimpleNamespace(
+        GetVisibleComponents=lambda: (block_component, stick_component)
+    )
+    adapter = SimpleNamespace(
+        currentModel=Draw(), _attempt=lambda operation, **kwargs: operation()
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(
+        drawing_common._sw_type_info, "early_bound_or_flag",
+        lambda value, *args: value,
+    )
+    monkeypatch.setattr(
+        drawing, "visible_component_entities",
+        lambda view, component, kind: component.edges,
+    )
+    monkeypatch.setattr(drawing_common, "view_name", lambda adapter, view: "Front")
+    monkeypatch.setattr(drawing_common, "rebuild_drawing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        drawing_common, "_projection_frame", lambda adapter, view: (None, None)
+    )
+
+    def project(utility, transform, xyz, **kwargs):
+        assert xyz[2] == 0.0
+        assert xyz[0] in (
+            spec.STICK_X_MIN / 1000.0,
+            spec.STICK_X_MAX / 1000.0,
+            spec.BLOCK_ORIGIN[0] / 1000.0,
+        )
+        return drawing.FRONT_CENTER[0] + xyz[0], drawing.FRONT_CENTER[1] + xyz[1]
+
+    monkeypatch.setattr(drawing_common, "_project_through", project)
+    monkeypatch.setattr(drawing, "_assert_dimension_ink_on_sheet", lambda *a, **kw: None)
+    if defect is not None:
+        if defect == "absent component":
+            front.GetVisibleComponents = lambda: (block_component,)
+            message = "expected one visible.*found 0"
+        elif defect == "duplicate component":
+            duplicate_component = SimpleNamespace(
+                GetPathName=stick_component.GetPathName, edges=stick_component.edges
+            )
+            front.GetVisibleComponents = lambda: (
+                block_component, stick_component, duplicate_component
+            )
+            message = "expected one visible.*found 2"
+        elif defect == "missing edge":
+            stick_component.edges = (distractor, hidden_face, end)
+            message = "expected one exact visible line.*found 0"
+        else:
+            duplicate_edge = Edge(
+                (0.0, stick.BODY_WIDTH, 0.0),
+                (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS),
+                spec.STICK_X_MIN,
+            )
+            stick_component.edges = (*stick_component.edges, duplicate_edge)
+            message = "expected one exact visible line.*found 2"
+        with pytest.raises(RuntimeError, match=message):
+            drawing._add_reference_dimensions(adapter, front)
+        assert selections == []
+        assert displays == []
+        return
+    invalid_index = next(
+        (index for index, kind in enumerate(dimension_types) if kind not in (2, 11)),
+        None,
+    )
+    if invalid_index is not None:
+        # Values deliberately match the requested lengths even for angular
+        # dimensions: a value-only guard cannot detect this defect.
+        label = drawing.REFERENCE_DIMENSIONS[invalid_index][0]
+        kind = dimension_types[invalid_index]
+        message = (
+            "native dimension type getter refused"
+            if kind == "refused"
+            else f"measuring-stick {label}: expected a linear dimension, got type {kind}"
+        )
+        with pytest.raises(RuntimeError, match=message):
+            drawing._add_reference_dimensions(adapter, front)
+        assert len(displays) == invalid_index + 1
+        assert displays[-1].value_reads == 0
+        assert displays[-1].text == {}
+        assert not hasattr(displays[-1], "precision")
+        return
+    drawing._add_reference_dimensions(adapter, front)
+    assert [(edge, append) for edge, append, view in selections] == [
+        (start, False), (end, True), (start, False), (near, True)
+    ]
+    assert [display.value * 1000.0 for display in displays] == pytest.approx(
+        [200.0, spec.REFERENCE_STOP_FACE]
+    )
+    for display, (_, _, callout) in zip(displays, drawing.REFERENCE_DIMENSIONS):
+        assert display.value_reads == 1
+        assert display.text[1] == "("
+        assert display.text[2] == ")"
+        assert {1, 2} <= set(display.readbacks)
+        assert display.precision == spec.DRAWING_REFERENCE_PRECISION
+        if callout:
+            assert display.text[4] == callout
+            assert 4 in display.readbacks
+
+
+def _iso_hull(box) -> list[tuple[float, float]]:
+    """The convex outline of an axis-aligned box in the standard isometric
+    (viewer at +X+Y+Z, Y up)."""
+    s2, s6 = 2.0**-0.5, 6.0**-0.5
+    points = sorted(
+        {
+            (round(s2 * (x - z), 9), round(s6 * (2.0 * y - x - z), 9))
+            for x in box[0]
+            for y in box[1]
+            for z in box[2]
+        }
+    )
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list[tuple[float, float]] = []
+    upper: list[tuple[float, float]] = []
+    for point in points:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= 0:
+            lower.pop()
+        lower.append(point)
+    for point in reversed(points):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= 0:
+            upper.pop()
+        upper.append(point)
+    return lower[:-1] + upper[:-1]
+
+
+def _hulls_overlap(a, b) -> bool:
+    for polygon in (a, b):
+        for index, start in enumerate(polygon):
+            end = polygon[(index + 1) % len(polygon)]
+            normal = (end[1] - start[1], start[0] - end[0])
+            pa = [normal[0] * p[0] + normal[1] * p[1] for p in a]
+            pb = [normal[0] * p[0] + normal[1] * p[1] for p in b]
+            if max(pa) < min(pb) or max(pb) < min(pa):
+                return False
+    return True
+
+
+def test_exploded_isometric_shows_every_component() -> None:
+    """MS_EXPLODED in the drawing's *Isometric: no component's box hides
+    behind another's, except the long stick crossing the block."""
+    head = plate_screw.HEAD_DIA / 2.0
+    knurl = thumb.HEAD_DIA / 2.0
+    boxes = {
+        "block": ((0.0, stop.BLOCK_LENGTH), (0.0, stop.BLOCK_HEIGHT), (0.0, stop.BLOCK_DEPTH)),
+        spec.PLATE: (
+            (0.0, stop.BLOCK_LENGTH),
+            (0.0, stop.BLOCK_HEIGHT),
+            (stop.PLATE_Z_MIN, stop.PLATE_Z_MAX),
+        ),
+        spec.THUMB_SCREW: (
+            (stop.THUMB_AXIS_X - knurl, stop.THUMB_AXIS_X + knurl),
+            (spec.THUMB_HEAD_FACE_Y, spec.THUMB_TIP_Y),
+            (stop.THUMB_AXIS_Z - knurl, stop.THUMB_AXIS_Z + knurl),
+        ),
+        spec.STICK: (
+            (spec.STICK_X_MIN, spec.STICK_X_MAX),
+            (spec.STICK_BOTTOM_Y, spec.STICK_TOP_Y),
+            (spec.STICK_Z_MIN, spec.STICK_Z_MAX),
+        ),
+    }
+    families = {"block": spec.BLOCK, spec.PLATE: spec.PLATE}
+    families.update({spec.THUMB_SCREW: spec.THUMB_SCREW, spec.STICK: spec.STICK})
+    for index, x in enumerate(stop.PLATE_HOLE_XS, start=1):
+        name = f"{spec.PLATE_SCREW}-{index}"
+        families[name] = spec.PLATE_SCREW
+        boxes[name] = (
+            (x - head, x + head),
+            (stop.PLATE_HOLE_Y - head, stop.PLATE_HOLE_Y + head),
+            (spec.PLATE_SCREW_HEAD_Z, spec.PLATE_SCREW_TIP_Z),
+        )
+    hulls = {}
+    for name, box in boxes.items():
+        shift = [0.0, 0.0, 0.0]
+        for _label, moved, axis, distance in spec.EXPLODE_STEPS:
+            if families[name] in moved:
+                shift["xyz".index(axis)] += distance
+        hulls[name] = _iso_hull(
+            [(low + shift[i], high + shift[i]) for i, (low, high) in enumerate(box)]
+        )
+    names = sorted(hulls)
+    overlapping = {
+        frozenset((a, b))
+        for i, a in enumerate(names)
+        for b in names[i + 1 :]
+        if _hulls_overlap(hulls[a], hulls[b])
+    }
+    assert overlapping == {frozenset(("block", spec.STICK))}

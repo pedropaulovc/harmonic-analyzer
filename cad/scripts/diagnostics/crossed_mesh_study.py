@@ -42,9 +42,12 @@ import sys
 import numpy as np
 from matplotlib.path import Path
 
-import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
-# shim that inserts the parent cad/scripts onto sys.path and re-exports the
-# real _common (every diag_*/probe_* script here relies on it)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+# The path-only bootstrap inserts the parent cad/scripts onto sys.path so
+# relocated diagnostic scripts can import their focused helpers.
 import build_dt_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
 from involute_gear import PA_DEG, gear_facts

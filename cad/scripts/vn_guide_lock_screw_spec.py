@@ -38,7 +38,7 @@ import pd_guide_lock_spec as lock
 import pd_platen_guide_spec as guide
 from _hole_spec import blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
-from diagnostics.diag_build_91255A108 import DIMS, IN
+from _mcmaster_91255a108 import DIMS, IN
 
 # [INFERENCE] The 3/8 in length of the 91255A series (91255A106 = 1/4 in, read
 # live 2026-09-30), not yet read live; the vendor check is pending.

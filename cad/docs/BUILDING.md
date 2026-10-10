@@ -160,7 +160,7 @@ uv run python -m doit assembly:pd_paper_drive
 ```
 cad/               everything about the CAD reconstruction
   scripts/         Python reproduction scripts (build_<part>.py, build_<sub>_assembly.py),
-                   shared helpers (_common.py, _gear.py, _chain.py); refresh_assembly.py,
+                   focused helpers (_session.py, _part_save.py, _gear.py, _chain.py); refresh_assembly.py,
                    _buildgraph.py (the doit build graph lives in dodo.py at the repo root)
   scripts/diagnostics/   archived one-off probe/diag scripts (not part of the build)
   config/          YAML source-of-truth for parametrics, tolerances, materials (data layer)

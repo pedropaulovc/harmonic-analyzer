@@ -705,6 +705,27 @@ _CHANNEL_ALLOWED_PAIRS = {
     ),
 }
 
+# The MHA-MS-000 stop: the #4-40 MHA-VN-011 thumbscrew fills the block's whole
+# 8.6 tapped wall (ms_stop_spec.FLOOR_THICKNESS) up to the window, and each
+# #2-56 x 1/4 MHA-VN-054 plate screw passes the 1.0 cover and engages 5.35 of
+# its Ø1.85 (#49) blind tap. Everything else is contact (bar on the roof, tip
+# on the bar's underside, cover on the block) or clear. Literals, like the rows
+# above, so every assembly does not re-key on the stop's layout;
+# test_ms_measuring_stick_assembly pins them to the specs.
+MS_THUMB_SCREW_THREAD = (2.8448, 2.261, 8.6)
+MS_PLATE_SCREW_THREAD = (2.1844, 1.85, 6.35 - 1.0)
+_MS_MEASURING_STICK_ALLOWED_PAIRS = {
+    frozenset(("vn-thumb-screw-1", "ms-stop-block-1")): _smooth_annulus_limit_mm3(
+        *MS_THUMB_SCREW_THREAD
+    ),
+    **_numbered_pairs(
+        "vn-ms-stop-plate-screw",
+        range(1, 3),
+        "ms-stop-block",
+        _smooth_annulus_limit_mm3(*MS_PLATE_SCREW_THREAD),
+    ),
+}
+
 _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {
     "ch-channel": _CHANNEL_ALLOWED_PAIRS,
     "dt-drive-train": _DRIVE_TRAIN_ALLOWED_PAIRS,
@@ -713,6 +734,7 @@ _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {
     "sm-summing": _SUMMING_ALLOWED_PAIRS,
     "pn-pen": _PEN_ALLOWED_PAIRS,
     "pd-paper-drive": _PAPER_DRIVE_ALLOWED_PAIRS,
+    "ms-measuring-stick": _MS_MEASURING_STICK_ALLOWED_PAIRS,
     "ha-harmonic-analyzer": _HARMONIC_ANALYZER_ALLOWED_PAIRS,
 }
 

@@ -1,7 +1,7 @@
 r"""Standalone validation harness -- the verify pass IS the test suite.
 
-The build scripts already gate themselves (``_common`` raises on free DOF,
-interference, rebuild errors). ``verify.py`` promotes those gates into one
+The build scripts already gate themselves (``_assembly`` raises on free DOF and
+interference, ``_rebuild`` on rebuild errors). ``verify.py`` promotes those gates into one
 runnable, re-runnable acceptance check that opens an *already-built* assembly
 and proves it is sound, plus the assertions a build script cannot make about
 itself: that the gear ratios in the live model equal the config, and that the
@@ -73,14 +73,10 @@ import gen_dimensions
 import pen_driver
 import truth_model
 import _telemetry
-from _common import (
-    OUT_SLDASM,
-    active_configuration_name,
-    check,
-    discard_open_documents,
-    log,
-    run_build,
-)
+from _check import check, log
+from _paths import OUT_SLDASM
+from _rebuild import active_configuration_name
+from _session import discard_open_documents, run_build
 from _assembly import (
     _export_assembly_images,
     _invalidate_massprops_proof,
@@ -105,10 +101,8 @@ from _assembly_postbuild import (
 )
 from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
-from _common import (  # component iteration helpers (read-only)
-    _early_bound,
-    _read_member,
-)
+# component iteration helpers (read-only)
+from _com import _early_bound, _read_member
 
 # solidworks_mcp internals reused read-only: the live gear-mate ratios are not
 # exposed by any public tool (list_mates returns name/type/suppressed only), so
@@ -171,9 +165,10 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # band or a gate bug, never a real regression). Kept because the counts document
 # each assembly's structure and size the mock in test_verify_telemetry.
 # component_names counts top-level components only (GetComponents(TopLevelOnly)),
-# so harmonic-analyzer's count is its 7 child subassemblies + 1 loose part (the
-# measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
-# flattened parts. Bands measured live on a green build, with margin.
+# so harmonic-analyzer's count is its 8 child subassemblies (the measuring stick
+# with its clamped stop is ms-measuring-stick; the spare gear rides inside
+# paper-drive) -- NOT the ~340 flattened parts. Bands measured live on a green
+# build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # active_count build-speed knob): channel = 8N + 14 (N×{rocker,rod,rod-pivot-pin,
 # bar,bar-pivot-pin,lever,spring,spring-hook} + pivot shaft + south thrust washer
@@ -221,10 +216,13 @@ _COMPONENT_BAND = {
     # chain; the paper-drive rework replaced the two rails + pinion-bar topology
     # with one bar + two-piece clamps + the hanging-platen furniture and its
     # 22 lock-mated fillister screws; the 2026-07-23 refit resolves 62 links)
+    # ch16 (2026-10-09 re-derivation): stick, block, cover, 2 plate screws and
+    # the thumbscrew.
+    "ms-measuring-stick": (5, 7),  # expected 6
     "ha-harmonic-analyzer": (
         7,
         9,
-    ),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
+    ),  # expected 8: 7 machine subassemblies + ms-measuring-stick
 }
 
 # Tolerance audit (Part D / handoff §14.2 Gate E): every built part must carry
@@ -2075,7 +2073,7 @@ def verify_tolerance_audit(report: Report) -> None:
     Reconciles the parts.yaml registry against the parts the build scripts
     actually save, and asserts every part carries the custom-property fields
     (material / tolerance class / process) with class names that resolve in
-    tolerances.yaml. Writes ``cad/out/reports/tolerance_audit.csv`` whether or
+    tolerances/. Writes ``cad/out/reports/tolerance_audit.csv`` whether or
     not the gates pass, so the artifact always reflects the current state.
     """
     rows, problems = _audit_rows()

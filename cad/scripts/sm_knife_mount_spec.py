@@ -26,7 +26,8 @@ import math
 
 import _config
 import vn_knife_mount_dowel_spec as DOWEL
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import DRILL_POINT_H, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 from sm_summing_lever_spec import HEX_H, HEX_W
