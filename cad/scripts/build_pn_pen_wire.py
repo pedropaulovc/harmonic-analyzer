@@ -3,12 +3,13 @@ ch. 21/24, pp. 50-53 / 60-61).
 
 The steel wire that leaves the magnifying wheel's 100 mm rim groove and
 carries the pen rod (ch. 24: "square brass rod attached to the wire from the
-magnifying wheel"). The pen rod's wire hole sits exactly one rim radius east
-of the wheel axis, so the hanging run is the vertical tangent off the rim's
-3 o'clock point down to the hole. Modeled as the STRAIGHT REST-POSE RUN only
+magnifying wheel"). The pen rod's wire hole sits exactly one wire-centre rim
+radius (RIM_WIRE_R 49.2: the wire seated in the rim groove) east of the wheel
+axis, so the hanging run is the vertical tangent off the groove's 3 o'clock
+point down to the hole. Modeled as the STRAIGHT REST-POSE RUN only
 -- the rim wrap over the wheel top and the tie-off knot are NOT modeled (the
 kinematic coupling stays a Motion-study scotch-yoke -- cad/docs/motion-policy.md);
-the run stands 0.25 off the rim surface so the interference gate reads zero.
+the run's top rides the groove bottom line-to-line (no overlap volume).
 
 Endpoint derivation lives HERE; ``build_pn_pen_assembly`` imports
 ``WIRE_BOTTOM``/``WIRE_LEN`` and asserts them against its own layout anchors
@@ -62,21 +63,11 @@ from pn_pen_wire_spec import (
 PART_NAME = "pn-pen-wire"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-# Geometry nominals (wire dia, endpoint anchors, run length) live in
-# pn_pen_wire_geom -- the prose-free module build_pn_pen_assembly imports -- and are
-# re-imported here so the build and the assembly can never drift.
-from pn_pen_wire_geom import (  # noqa: E402
-    CLEARANCE,
-    RIM_DIA,
-    WHEEL_BAR_Y,
-    WHEEL_MID_Z,
-    WHEEL_X,
-    WIRE_BOTTOM,
-    WIRE_DIA,
-    WIRE_HOLE_Y,
-    WIRE_LEN,
-    WIRE_X,
-)
+# Geometry nominals (wire dia, run length) live in pn_pen_wire_geom -- the
+# prose-free module build_pn_pen_assembly imports (with the endpoint anchors
+# WIRE_X 3.8 / WIRE_BOTTOM) -- and are re-imported here so the build and the
+# assembly can never drift.
+from pn_pen_wire_geom import WIRE_DIA, WIRE_LEN  # noqa: E402
 
 
 async def build(adapter) -> dict[str, str]:

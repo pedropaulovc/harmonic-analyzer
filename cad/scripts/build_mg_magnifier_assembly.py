@@ -12,23 +12,26 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   one DOF is the rock about that Z line; the clamp + thumb screw + vertical rod
   + output-fixture ride the lever as one rigid body at the set magnification
   radius -- the radius from the KNIFE EDGE is what the sliding clamp adjusts
-  (<=4x) -- and the output fixture is where WIRE 1 to the wheel hub hooks.
+  (<=4x) -- and the output fixture is where WIRE 1 to the wheel's drum hooks.
 * wheel-bar (HALF-width, clamped at ONE column with a free end past the pen
   hanger) + its two-piece column clamp (front/back arcs + two clamp screws --
   the platen support bar's clamp, ch30 p005).
-* wheel-axle (structure) carrying the magnifying-wheel, which spins on its stud
-  (revolute); the wheel rim drives the pen rod via WIRE 2 (pn-pen.SLDASM).
+* wheel-axle -- a plain pin pressed in the bar's reamed bore (structure) --
+  carrying the stack back washer, magnifying-wheel (spins on the pin,
+  revolute), front washer, nut and locknut (stations: mg_wheel_group). The
+  brass wheel-drum is pressed on the wheel's front spigot and rides it. The
+  wheel rim drives the pen rod via WIRE 2 (pn-pen.SLDASM).
 * lever-wire -- WIRE 1's straight rest-pose run from the output fixture's cross
-  hole down to the hub-groove tangent. It ARTICULATES like the real wire: a
+  hole down to the drum tangent. It ARTICULATES like the real wire: a
   ball joint at the hook (HookPoint on the wire coincident to the fixture's
-  HookAnchorPoint) plus a 0.25 face-face stand-off tangency to the hub drum,
-  so the hook end follows the lever while the hub end hugs the groove (its two
+  HookAnchorPoint) plus a 0.25 stand-off tangency to the drum,
+  so the hook end follows the lever while the drum end hugs the drum (its two
   residual DOF, swing + spin, are freed operational DOF). Its YokePlane
   carries the WIRE-1 COUPLING mate: the wheel's WireYokePoint held coincident
   to it ties the wheel's spin to the wire's travel along its own axis (the
   linearized inextensible-wire constraint), so with every freed DOF genuinely
   free, dragging the lever swings the clamp/rod/fixture group, the wire
-  pivots at the hook staying on the hub, and the wheel turns: a working
+  pivots at the hook staying on the drum, and the wheel turns: a working
   kinematic chain, pivoted where the book pivots it.
 
 Cross-subassembly fits (checked at the top level): the column-clamp arcs ride
@@ -39,7 +42,7 @@ Documented simplifications (Appendix C): the magnifying clamp's thumb screw is
 modeled backed-out (the tip is tangent to the lever rod -- a seated screw would
 overlap it); the output fixture's clamp screw is omitted (its cross hole doubles
 as the wire hook); the wires are modeled as straight rest-pose rods only
-(lever-wire here, pen-wire in pn-pen.SLDASM) -- hub/rim wraps, hooks and compliance
+(lever-wire here, pen-wire in pn-pen.SLDASM) -- drum/rim wraps, hooks and compliance
 are not, and the kinematic couplings stay Motion-study mates
 (cad/docs/motion-policy.md), so each run stands 0.25 off its wheel surface.
 
@@ -238,28 +241,46 @@ CLAMP_SCREW_X = (COLUMN_X + CLAMP_EAR_DX, COLUMN_X - CLAMP_EAR_DX)
 assert sorted(round(WHEEL_BAR_X0 + lx, 6) for lx in BAR_CLAMP_HOLE_LOCAL_X) == sorted(
     round(x, 6) for x in CLAMP_SCREW_X
 ), "wheel-bar clamp holes drifted off the column clamp-screw lines"
-from mg_wheel_axle_spec import (  # noqa: E402
-    COLLAR_LEN as AXLE_COLLAR_LEN,
-    FLANGE_LEN,
-    NUT_H as AXLE_NUT_H,
-    STUD_LEN,
-    WASHER_START,
-    WHEEL_HUB_RIDE,
+# The axial stack on the pin (bar front face -> back washer -> wheel hub ->
+# endshake -> front washer -> nut -> locknut) lives in mg_wheel_group, asserted
+# there at import; machine z = BAR_FRONT_Z - d.
+import mg_wheel_group as _group  # noqa: E402
+from mg_wheel_group import (  # noqa: E402
+    BACK_WASHER_D,
+    FRONT_WASHER_D,
+    LOCKNUT_D,
+    NUT_D,
+    WHEEL_MID_Z,
 )
 
-WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - WHEEL_HUB_RIDE / 2.0  # -146.9:
-# the 10-wide hub sits flush between the flange face and the washer
-# --- amplification wire 1 (fixture -> hub) -----------------------------------
+assert math.isclose(BAR_FRONT_Z, _group.BAR_FRONT_Z, abs_tol=1e-9), (
+    "wheel-bar front face drifted from mg_wheel_group.BAR_FRONT_Z"
+)
+# --- amplification wire 1 (fixture -> drum) ----------------------------------
 # Endpoints + length live in build_mg_lever_wire.py (the part's length IS the run);
 # re-derive the anchors from THIS script's layout and fail loud on drift, so a
 # layout move can never leave a floating wire.
+import mg_lever_wire_geom as _lever_wire  # noqa: E402
+import pn_pen_wire_geom as _pen_wire  # noqa: E402
 from mg_lever_wire_geom import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
+    DRUM_DIA,
+    RUN_GAPS,
     WIRE_DIA as HUB_WIRE_DIA,
     WIRE_END as HUB_WIRE_END,
     WIRE_START as HUB_WIRE_START,
 )
-from mg_magnifying_wheel_geom import HUB_DIA, SPOKE_AXIAL  # noqa: E402
+from mg_magnifying_wheel_geom import (  # noqa: E402
+    DRUM_MID_Z,
+    HUB_FRONT_Z,
+    HUB_STEP_Z,
+)
+
+for _geom in (_lever_wire, _pen_wire):
+    assert math.isclose(_geom.WHEEL_MID_Z, WHEEL_MID_Z, abs_tol=1e-9), (
+        f"{_geom.__name__}.WHEEL_MID_Z drifted from mg_wheel_group.WHEEL_MID_Z"
+    )
+DRUM_Z = WHEEL_MID_Z + DRUM_MID_Z  # -154.91: drum centre (drum frame mid-plane)
 
 # Hook = tied through the cross hole, hanging under the collar's bottom face
 # (wire r + 0.25) on the front face of the vertical rod (Ø5 rod r 2.5 +
@@ -273,19 +294,21 @@ assert all(
     math.isclose(a, b, abs_tol=1e-9)
     for a, b in zip(HUB_WIRE_START, _HOOK_EXPECTED, strict=True)
 ), f"lever-wire hook {HUB_WIRE_START} drifted from the fixture anchor {_HOOK_EXPECTED}"
-# The run grazes the hub groove at the 0.25 stand-off tangent ...
+# The run grazes the brass drum at the 0.25 stand-off tangent ...
 assert math.isclose(
     math.hypot(HUB_WIRE_END[0] - WHEEL_X, HUB_WIRE_END[1] - WHEEL_BAR_Y),
-    HUB_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE,
+    DRUM_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE,
     abs_tol=1e-9,
-), "lever-wire end is not tangent to the hub groove"
-# ... inside the clear axial lane between the axle flange back face and the
-# spoke front faces (else the slanted run clips the flange or a spoke).
+), "lever-wire end is not tangent to the drum"
+# ... inside the drum's axial span (boss front face .. spigot front end, wire
+# r inside each), and the slanted run clears the rim, spokes and boss pen-side
+# faces it passes (RUN_GAPS, asserted >= CLEARANCE in mg_lever_wire_geom).
 assert (
-    BAR_FRONT_Z - FLANGE_LEN
+    WHEEL_MID_Z + HUB_STEP_Z - HUB_WIRE_DIA / 2.0
     > HUB_WIRE_END[2]
-    > WHEEL_MID_Z + SPOKE_AXIAL / 2.0 + HUB_WIRE_DIA / 2.0
-), "lever-wire end z outside the flange..spoke clear lane"
+    > WHEEL_MID_Z + HUB_FRONT_Z + HUB_WIRE_DIA / 2.0
+), "lever-wire end z outside the drum span"
+assert min(RUN_GAPS.values()) >= WIRE_CLEARANCE, f"lever-wire run gaps {RUN_GAPS}"
 
 
 def _lever_wire_rows() -> list[list[float]]:
@@ -325,7 +348,7 @@ def _lever_wire_rows() -> list[list[float]]:
 # (sensitivity ~0.97, exactly the direction the other rows leave free) and
 # the rest value ~89.8 deg is far from the 0/180 cone apex.
 _HW_ROWS = _lever_wire_rows()
-_STANDOFF_R = HUB_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE  # 10.65
+_STANDOFF_R = DRUM_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE  # 10.1
 _WIRE_SPIN_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[2][0]))))
 
 
@@ -577,8 +600,9 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # --- magnifying wheel ----------------------------------------------------
-    # Rx(-90): the axle's +Y axis points -Z (flange on the bar front face).
-    # The axle is structure (fixed); the wheel spins on its stud (revolute).
+    # Rx(-90): the pin's +Y axis points -Z (back end flush with the bar back
+    # face, origin on the bar front face). The pin is structure (fixed, pressed
+    # in the bar's reamed bore); the wheel spins on its shank (revolute).
     ax = await place_component(
         adapter,
         "mg-wheel-axle",
@@ -586,26 +610,35 @@ async def build(adapter) -> dict[str, str]:
         [-90.0, 0.0, 0.0],
         ROT_X_NEG90,
     )
-    # Hex nut immediately in front of the axle's washer (2026-09-02, ch21 p.51):
-    # nut back face at washer start + washer thickness, i.e. axle y=14; the
-    # stud runs NUT_H + 3 past it.
-    nut_y = WASHER_START + AXLE_COLLAR_LEN
-    if nut_y + AXLE_NUT_H > FLANGE_LEN + STUD_LEN:
-        raise RuntimeError("wheel-axle nut runs past the stud tip")
-    nut = await place_component(
-        adapter,
-        "vn-wheel-axle-nut",
-        [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z - nut_y],
-        [-90.0, 0.0, 0.0],
-        ROT_X_NEG90,
-        ground=False,
-        label="wheel-axle nut",
-    )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{nut}", "PLANE"),
-        named_ref(f"Front Plane@{ax}", "PLANE"),
-        label="wheel-axle nut locked to the axle",
+
+    async def _stack_part(stem: str, d: float, lock_label: str) -> str:
+        """A washer/nut on the pin at stack station d (mg_wheel_group): the
+        part's local +Z axis (z 0..thickness, Front Plane at z 0) turned onto
+        machine -Z by Ry(180), its back face at z BAR_FRONT_Z - d, locked to
+        the pin (the same lock the old single nut used)."""
+        target = [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z - d]
+        comp = await place_component(
+            adapter,
+            stem,
+            target,
+            [0.0, 180.0, 0.0],
+            ROT_Y_180,
+            ground=False,
+            label=f"{stem} d{d:.4g}",
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{comp}", "PLANE"),
+            named_ref(f"Front Plane@{ax}", "PLANE"),
+            label=lock_label,
+        )
+        assert_component_placed(adapter, comp, target, ROT_Y_180)
+        return comp
+
+    await _stack_part(
+        "vn-wheel-axle-back-washer",
+        BACK_WASHER_D,
+        "wheel back washer locked to the axle",
     )
     wh = await place_component(
         adapter,
@@ -634,11 +667,36 @@ async def build(adapter) -> dict[str, str]:
         label="magnifying-wheel axial",
         verify=(wh, wh_o),
     )
-    # --- amplification wire 1 (fixture -> hub) -------------------------------
+    # Brass drum pressed on the wheel's front spigot: rides the wheel.
+    drum_target = [WHEEL_X, WHEEL_BAR_Y, DRUM_Z]
+    drum = await place_component(
+        adapter,
+        "mg-wheel-drum",
+        drum_target,
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{drum}", "PLANE"),
+        named_ref(f"Front Plane@{wh}", "PLANE"),
+        label="wheel drum locked to the wheel",
+    )
+    # Front washer, nut and locknut close the stack at the set endshake.
+    await _stack_part(
+        "vn-wheel-axle-front-washer",
+        FRONT_WASHER_D,
+        "wheel front washer locked to the axle",
+    )
+    await _stack_part("vn-wheel-axle-nut", NUT_D, "wheel-axle nut locked to the axle")
+    await _stack_part(
+        "vn-wheel-axle-nut", LOCKNUT_D, "wheel-axle locknut locked to the axle"
+    )
+    # --- amplification wire 1 (fixture -> drum) ------------------------------
     # The straight rest-pose run: it hangs from the fixture's cross hole and
-    # grazes the hub-groove tangent (the wrap is implied -- module docstring).
-    # Locked to the output fixture so it rides the lever group, like the rest
-    # of the clamped chain. Part origin = the HUB end, +Y toward the hook.
+    # grazes the brass drum's tangent (the wrap is implied -- module docstring).
+    # Part origin = the DRUM end, +Y toward the hook.
     hw = await place_component(
         adapter,
         "mg-lever-wire",
@@ -652,9 +710,9 @@ async def build(adapter) -> dict[str, str]:
     # wire's hub tip would sweep a ~10 mm lateral arc off the hub even over
     # the real ~1.6 deg knife rock -- user-flagged): a BALL JOINT at the hook
     # (the wire's HookPoint coincident to the fixture's HookAnchorPoint) plus
-    # the 0.25 face-face stand-off to the hub drum (the offset tangency the
+    # the 0.25 axis-axis stand-off to the drum (the offset tangency the
     # rest geometry is built at), so the hook end follows the lever while the
-    # hub end hugs the groove; the tip only creeps along its own axis (the
+    # drum end hugs the drum; the tip only creeps along its own axis (the
     # unmodeled wrap's pay-in/pay-out). Ref POINTs select via GetCorresponding
     # -- they do not resolve through name@comp strings.
     await coincident_mate(
@@ -703,7 +761,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # WIRE-1 coupling (replaces the old wheel rock snapshot): the wheel's
-    # WireYokePoint (hub pitch circle @ the wire tangency) held coincident to
+    # WireYokePoint (drum pitch circle @ the wire tangency) held coincident to
     # the lever-wire's YokePlane (perpendicular to the wire axis). The wheel's
     # spin -- its one remaining DOF -- is thereby tied to the lever group's
     # travel along the wire: the linearized inextensible-wire constraint, sign
@@ -722,6 +780,7 @@ async def build(adapter) -> dict[str, str]:
         verify=(wh, wh_o),
     )
     assert_component_placed(adapter, wh, [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], IDENTITY)
+    assert_component_placed(adapter, drum, drum_target, IDENTITY)
 
     # Certify the AS-BUILT model. THREE freed operational DOF: the lever's
     # knife rock + the wire's swing/spin (all recorded into the DOF manifest

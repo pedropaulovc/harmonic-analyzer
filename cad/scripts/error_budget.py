@@ -58,7 +58,7 @@ import mg_magnifying_clamp_geom
 import mg_magnifying_lever_geom
 import ha_measuring_stick_geom
 import paper_drive_geom
-import pn_pen_wire_geom
+import mg_magnifying_wheel_geom
 import ch_rocker_arm_spec
 import sm_summing_lever_spec
 import spring_mount_geom
@@ -112,7 +112,7 @@ class Nominal:
     lever_r_min: float  # knife -> clamp centre, clamp against the bracket collar
     lever_r_built: float  # the as-built (CLAMP_LOCAL_X) radius
     lever_r_max: float  # clamp flush with the rod tip (mechanical bound)
-    wheel_ratio: float  # rim wire radius / hub wire radius
+    wheel_ratio: float  # rim wire radius / drum wire radius
     pen_half: float  # the pen's physical half-stroke
     # -- deviation-only axes (0 as designed) --
     hook_skew: float = 0.0  # rad: hook direction vs fulcrum->bar-pin direction on the
@@ -152,16 +152,7 @@ def nominal() -> Nominal:
         lever_r_min=lever_band[0],
         lever_r_built=lever_band[1],
         lever_r_max=lever_band[2],
-        wheel_ratio=(
-            pn_pen_wire_geom.RIM_DIA / 2.0
-            + pn_pen_wire_geom.WIRE_DIA / 2.0
-            + pn_pen_wire_geom.CLEARANCE
-        )
-        / (
-            mg_lever_wire_geom.HUB_DIA / 2.0
-            + mg_lever_wire_geom.WIRE_DIA / 2.0
-            + mg_lever_wire_geom.CLEARANCE
-        ),
+        wheel_ratio=mg_magnifying_wheel_geom.WIRE_RATIO,
         pen_half=float(_config.machine("output", "pen_trace_half_mm")),
     )
 
@@ -1251,54 +1242,31 @@ def monte_carlo(
 def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     """An OFFLINE estimate -- not a CAD gate -- of wire 1's straight rest run
     with the clamp against the bracket collar: the hook (which rides the clamp
-    at machine x = LEVER_X0 - clamp local x, the same y/z as built) to the hub
-    tangent, versus the magnifying wheel's rim. Reported so the waiver in
+    at machine x = LEVER_X0 - clamp local x, the same y/z as built) to the drum
+    tangent (mg_lever_wire_geom.tangent_end), versus the wheel's pen-side faces
+    (mg_lever_wire_geom.run_gaps). Reported so the waiver in
     error_budget.yaml is an informed one; the proof is a seat build of the
     magnifier at that pose (#748)."""
-    import mg_magnifying_wheel_geom
-
     lever_x0 = mg_lever_wire_geom.CLAMP_X + mg_magnifying_lever_geom.CLAMP_LOCAL_X  # 200
     hook_x = lever_x0 - (mg_magnifying_lever_geom.KNIFE_LOCAL_X - nom.lever_r_min)
-    hook = np.array([hook_x, mg_lever_wire_geom.HOOK_Y, mg_lever_wire_geom.HOOK_Z])
+    hook = (hook_x, mg_lever_wire_geom.HOOK_Y, mg_lever_wire_geom.HOOK_Z)
+    end = mg_lever_wire_geom.tangent_end(hook[0], hook[1])
+    gaps = mg_lever_wire_geom.run_gaps(hook, end)
     cx, cy = mg_lever_wire_geom.WHEEL_X, mg_lever_wire_geom.WHEEL_BAR_Y
-    vx, vy = hook[0] - cx, hook[1] - cy
-    r_eff = mg_lever_wire_geom._R_EFF
-    theta = math.atan2(vy, vx) - math.acos(r_eff / math.hypot(vx, vy))
-    end = np.array(
-        [
-            cx + r_eff * math.cos(theta),
-            cy + r_eff * math.sin(theta),
-            mg_lever_wire_geom.HUB_END_Z,
-        ]
-    )
-    # closest approach of the run to the wheel: the wire runs in FRONT of the
-    # wheel (less negative z), so the clearance is wire z minus the face z of
-    # whatever it passes over -- the rim ring (radial 44..50) or the spokes
     ts = np.linspace(0.0, 1.0, 2001)
-    pts = hook[None, :] + ts[:, None] * (end - hook)[None, :]
+    pts = np.array(hook)[None, :] + ts[:, None] * (np.array(end) - np.array(hook))[None, :]
     radial = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)
-    rim_r = mg_magnifying_wheel_geom.RIM_OUTER_DIA / 2.0
-    rim_in = mg_magnifying_wheel_geom.RIM_INNER_DIA / 2.0
-    margin = mg_lever_wire_geom.WIRE_DIA / 2.0 + mg_lever_wire_geom.CLEARANCE
-    over_ring = (radial >= rim_in - margin) & (radial <= rim_r + margin)
-    over_spokes = (radial > mg_lever_wire_geom.HUB_DIA / 2.0 + margin) & (
-        radial < rim_in - margin
-    )
-    ring_face = mg_lever_wire_geom.WHEEL_MID_Z + mg_magnifying_wheel_geom.RIM_AXIAL / 2.0
-    spoke_face = mg_lever_wire_geom.WHEEL_MID_Z + mg_magnifying_wheel_geom.SPOKE_AXIAL / 2.0
-
-    def gap(mask: np.ndarray, face: float) -> float:
-        if not np.any(mask):
-            return float("inf")
-        return float(np.min(pts[mask, 2] - face)) - mg_lever_wire_geom.WIRE_DIA / 2.0
-
     return {
         "hook_x_mm": float(hook[0]),
-        "wire_length_mm": float(np.linalg.norm(end - hook)),
+        "wire_length_mm": float(math.dist(hook, end)),
         "min_radial_to_wheel_axis_mm": float(np.min(radial)),
-        "rim_outer_radius_mm": rim_r,
-        "z_clearance_to_rim_face_where_over_ring_mm": gap(over_ring, ring_face),
-        "z_clearance_to_spoke_face_where_over_spokes_mm": gap(over_spokes, spoke_face),
+        "rim_outer_radius_mm": mg_magnifying_wheel_geom.RIM_OUTER_DIA / 2.0,
+        # surface gaps to the pen-side faces the run passes (+ = clear)
+        "rim_face_gap_mm": gaps["rim"],
+        "spoke_face_gap_mm": gaps["spokes"],
+        "boss_face_gap_mm": gaps["boss"],
+        "drum_back_lane_gap_mm": gaps["drum_back"],
+        "drum_front_lane_gap_mm": gaps["drum_front"],
         "note": "straight rest run only; no clamp/rod/collar/frame check, no articulation -- NOT a CAD gate",
     }
 
@@ -2285,7 +2253,7 @@ carry. Then set the
 clamp radius so the peak just fills the stroke:
 $R = {mag["lever_radius_min_mm"]:.0f}$ mm $\\times$ {mag["ordinate_capacity_full_scale_bars"]:.2f} $/ P$,
 **capped at the as-built {mag["lever_radius_built_mm"]:.0f} mm** (the clamp's
-far end; the wheel's rim/hub wire ratio is {mag["wheel_ratio"]:.2f}). A sparse
+far end; the wheel's rim/drum wire ratio is {mag["wheel_ratio"]:.2f}). A sparse
 or small input with $P < {p_min_full:.2f}$ therefore cannot fill the stroke:
 its $k=0$ reading is $r_0 = {mag["pen_mm_per_full_scale_bar_at_built"]:.2f}\\,P$ mm
 and every reading error in step 3 is $15/r_0$ times larger; scale such an

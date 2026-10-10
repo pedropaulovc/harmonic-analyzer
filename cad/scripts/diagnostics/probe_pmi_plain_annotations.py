@@ -5,8 +5,8 @@ This probe tests whether ORDINARY model annotations — IModelDoc2::InsertGtol
 and ::InsertDatumTag2, attached to the same spec faces, filled with the same
 frame XML — are fully COM-controllable end to end:
 
-1. PART: exercise the datum tags A (flange face) + B (stud bearing axis) and
-   the two gtols already authored on a COPY of the built wheel axle;
+1. PART: exercise the datum tags A (cone journal bore) + B (foot seat) and
+   the gtol already authored on a COPY of the built cone pivot post;
    SetPosition to distinct spots; save; reopen; positions persisted?
 2. SHEET: front + section drawing; InsertModelAnnotations3(datums|gtols);
    where do they land; SetPosition on sheet; save; reopen; persisted?
@@ -33,25 +33,29 @@ import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _drawing_common import create_section_view, model_point_in_view  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
-from mg_wheel_axle_spec import (  # noqa: E402
+from dt_cone_pivot_post_spec import (  # noqa: E402
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
-    STUD_BEARING_FACE,
 )
 
-SOURCE = CAD_ROOT / "out" / "sldprt" / "mg-wheel-axle.SLDPRT"
-SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "wheel-axle-plain.SLDPRT"
-SCRATCH_DRW = CAD_ROOT / "out" / "slddrw" / "wheel-axle-plain.SLDDRW"
-OUT_PDF = CAD_ROOT / "out" / "pdf" / "wheel-axle-plain.pdf"
-STUD_BEARING_Y = STUD_BEARING_FACE.contains_y_mm / 1000.0
+SOURCE = CAD_ROOT / "out" / "sldprt" / "dt-cone-pivot-post.SLDPRT"
+SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "cone-pivot-post-plain.SLDPRT"
+SCRATCH_DRW = CAD_ROOT / "out" / "slddrw" / "cone-pivot-post-plain.SLDDRW"
+OUT_PDF = CAD_ROOT / "out" / "pdf" / "cone-pivot-post-plain.pdf"
+# The section cuts through datum A's face (the cone journal bore).
+SECTION_Y = PART_DATUMS[0].face.contains_y_mm / 1000.0
 
-# part-space targets (model metres), well separated
-PART_TARGETS = {
-    PART_DATUMS[0].key: (0.024, -0.004, 0.010),
-    PART_DATUMS[1].key: (-0.012, 0.008, 0.010),
-    GEOMETRIC_CONTROLS[0].key: (-0.018, 0.016, 0.008),
-    GEOMETRIC_CONTROLS[1].key: (0.018, 0.016, -0.008),
-}
+# part-space targets (model metres), well separated, one per authored row
+_PART_SPOTS = (
+    (0.060, 0.000, 0.030),
+    (-0.040, 0.050, 0.030),
+    (-0.050, 0.090, 0.020),
+    (0.050, 0.090, -0.020),
+)
+_ROWS = (*PART_DATUMS, *GEOMETRIC_CONTROLS)
+if len(_ROWS) > len(_PART_SPOTS):
+    raise AssertionError("more authored PMI rows than probe target spots")
+PART_TARGETS = {row.key: spot for row, spot in zip(_ROWS, _PART_SPOTS)}
 # sheet-space targets (sheet metres)
 SHEET_TARGETS = [(0.205, 0.115), (0.205, 0.185), (0.275, 0.115), (0.275, 0.185)]
 
@@ -105,7 +109,7 @@ async def main() -> int:
         model = adapter.currentModel
         existing = _plain_gtols_and_datums(model)
         authored = {}
-        for row in (*PART_DATUMS, *GEOMETRIC_CONTROLS):
+        for row in _ROWS:
             item = existing.get(row.annotation_name)
             if item is None:
                 raise RuntimeError(
@@ -154,21 +158,21 @@ async def main() -> int:
         ddoc = _early_bound(draw, "IDrawingDoc")
         front = _early_bound(
             place_view(
-                adapter, str(SCRATCH_PRT), "*Front", 0.09, 0.15, scale=(4.0, 1.0)
+                adapter, str(SCRATCH_PRT), "*Front", 0.09, 0.15, scale=(1.0, 1.0)
             ),
             "IView",
         )
         cut_x, cut_y = model_point_in_view(
-            adapter, front, (0.0, STUD_BEARING_Y, 0.0), label="stud bearing"
+            adapter, front, (0.0, SECTION_Y, 0.0), label="cone journal bore"
         )
         create_section_view(
             adapter,
             front,
-            line_start=(cut_x - 0.04, cut_y),
-            line_end=(cut_x + 0.04, cut_y),
+            line_start=(cut_x - 0.06, cut_y),
+            line_end=(cut_x + 0.06, cut_y),
             view_xy=(0.24, 0.15),
             section_label="C",
-            scale=(4, 1),
+            scale=(1, 1),
             label="plain pmi section",
         )
         inserted = ddoc.InsertModelAnnotations3(

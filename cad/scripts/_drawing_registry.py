@@ -320,6 +320,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="mg_wheel_drum",
+        part="mg_wheel_drum",
+        artifact_stem="mg-wheel-drum",
+        script_name="draw_mg_wheel_drum.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="mg_magnifying_bracket",
         part="mg_magnifying_bracket",
         artifact_stem="mg-magnifying-bracket",

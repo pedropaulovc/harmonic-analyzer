@@ -18,6 +18,8 @@ centre x +109 (machine = local + 109): span -8..+226, covering the wheel
 axle (+53) and the pen-hanger strap top with margin.
 
 Holes (all along local Z, the machine front-back axis):
+* 1x reamed axle bore at local (AXLE_BORE_X, 0) = machine x WHEEL_X, the
+  mg-wheel-axle pressed in flush with the back face (mg_wheel_bar_geom).
 * 2x O4.4 clamp-screw through-holes flanking the column at local
   x 70.5 / 105.5 (the column line crosses the bar at local +88 =
   column +197 - centre +109; ears at +-17.5,
@@ -41,8 +43,11 @@ import sys
 
 from _common import (
     SketchDims,
+    _early_bound,
+    anchor_point_to_origin,
     apply_material,
     check,
+    dimension_between,
     define_centered_rectangle,
     drive_dimension,
     ensure_fully_defined,
@@ -52,6 +57,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _hole_spec import blind_cut_dia_mm
@@ -59,14 +65,21 @@ from _holes import wizard_holes
 import _config
 from vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from mg_wheel_bar_geom import (
+    AXLE_BORE_BAND,
+    AXLE_BORE_DIA,
+    AXLE_BORE_X,
     BAR_DEPTH,
     BAR_LENGTH,
     BAR_SIDE,
+    BAR_SIDE_BAND,
     CLAMP_HOLE_DIA,
     CLAMP_HOLE_SPEC,
     CLAMP_HOLE_X,
@@ -76,8 +89,10 @@ from mg_wheel_bar_geom import (
     require_hanger_end_wall,
 )
 from mg_wheel_bar_spec import (
+    AXLE_BORE_STATION,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
 )
 
@@ -112,6 +127,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
     await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
     await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_X}mm")
+    await set_global(adapter, "AxleBoreDia", f"{AXLE_BORE_DIA}mm")
+    await set_global(adapter, "AxleBoreStation", f"{AXLE_BORE_STATION}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -182,6 +199,70 @@ async def build(adapter) -> dict[str, str]:
     expected -= 2.0 * math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH
     await volume_check(adapter, "bar with clamp holes", expected, 1.0)
 
+    # Reamed axle bore, through along Z. Its centre is located from the bar's
+    # LEFT END (where every hole station reads from) by one construction line
+    # on the mid-height axis, whose length is the printed station; the line's
+    # left end is anchored at the end face (x = -BarLength/2).
+    bore = SketchDims()
+    check("create_sketch axle bore", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    bore_circle = check(
+        "axle bore circle",
+        await adapter.add_circle(AXLE_BORE_X, 0.0, AXLE_BORE_DIA / 2.0),
+    )
+    station_line = check(
+        "axle bore station line",
+        await adapter.add_line(-BAR_LENGTH / 2.0, 0.0, AXLE_BORE_X, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[station_line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("axle bore station line did not take construction flag")
+    check(
+        "axle bore station line on the centre",
+        await adapter.add_sketch_constraint(
+            f"{station_line}.end", f"{bore_circle}.center", "coincident"
+        ),
+    )
+    check(
+        "axle bore station line horizontal",
+        await adapter.add_sketch_constraint(station_line, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{station_line}.start", -BAR_LENGTH / 2.0, 0.0, "bar left end"
+    )
+    bore.record("AxleBoreEndX", '"BarLength" / 2')
+    await dimension_between(
+        adapter,
+        f"{station_line}.start",
+        f"{station_line}.end",
+        "horizontal_distance",
+        AXLE_BORE_STATION,
+        "axle bore station",
+    )
+    bore.record("AxleBoreStation", '"AxleBoreStation"')
+    check(
+        "axle bore diameter",
+        await adapter.add_sketch_dimension(
+            bore_circle, None, "diameter", AXLE_BORE_DIA
+        ),
+    )
+    bore.record("AxleBoreDia", '"AxleBoreDia"')
+    await ensure_fully_defined(adapter, "axle bore sketch")
+    check("exit_sketch axle bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "AxleBoreProfile")
+    drive_jobs += bore.apply(adapter, "AxleBoreProfile")
+    check(
+        "cut axle bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * BAR_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "AxleBore")
+    expected -= math.pi * (AXLE_BORE_DIA / 2.0) ** 2 * BAR_DEPTH
+    await volume_check(adapter, "bar with axle bore", expected, 1.0)
+
     # Deferred drive equations after the model + a rebuild exists, then re-check:
     # each equation evaluates to the as-built value, so geometry must not move.
     await force_rebuild(adapter)
@@ -193,11 +274,18 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # Manufacturing drawing support: the native bands, then mark exactly the
+    # print's dimensions and stamp the make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter, "BarProfile", "Side", *deviations(BAR_SIDE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "AxleBoreProfile", "AxleBoreDia", *deviations(AXLE_BORE_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,
         PART_NAME,

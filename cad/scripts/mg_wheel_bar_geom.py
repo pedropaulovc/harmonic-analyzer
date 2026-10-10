@@ -29,6 +29,25 @@ HANGER_STRAP_TOP_LEFT_X = -16.0
 HANGER_SCREW_MACHINE_X = WHEEL_BAR_X0 + SCREW_HOLE_X
 HANGER_SCREW_LOCAL_X = HANGER_SCREW_MACHINE_X - HANGER_ORIGIN_X
 
+# Wheel-axle bore: reamed .1865 through, on the mid-height line at the wheel
+# station; the 3/16 mg-wheel-axle presses in flush with the back face.
+WHEEL_X = 53.0  # magnifying-wheel centre, machine x
+AXLE_BORE_X = WHEEL_X - WHEEL_BAR_X0  # -56
+AXLE_BORE_DIA = round(0.1865 * 25.4, 6)  # 4.7371
+AXLE_BORE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed
+AXLE_BORE_POSITION_TOL = 0.10  # the hole's offset off the mid-height line
+BAR_SIDE_BAND = (0.10, -0.10)
+AXLE_BORE_MIN_WALL = 2.0  # drawing-simplicity rule 12 target, worst case
+# Worst wall above or below the bore: the bar at its thinnest, the bore at its
+# largest, shifted by its station tolerance toward one face.
+AXLE_BORE_WALL = (
+    (BAR_SIDE + BAR_SIDE_BAND[1]) / 2.0
+    - AXLE_BORE_POSITION_TOL
+    - (AXLE_BORE_DIA + AXLE_BORE_BAND[0]) / 2.0
+)  # 2.476
+if AXLE_BORE_WALL < AXLE_BORE_MIN_WALL:
+    raise AssertionError(f"wheel-bar axle-bore wall {AXLE_BORE_WALL:.3f} < 2.0")
+
 # Native Hole Wizard clearance contracts shared by build, drawing, and assemblies.
 PEN_HANGER_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
 PEN_HANGER_HOLE_DIA = blind_cut_dia_mm(PEN_HANGER_HOLE_SPEC)

@@ -620,8 +620,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pd_transgear_knob_shaft",  # MHA-PD-008: 1/4-20 UNC die-cut front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-VN-048)
         "vn_transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 91829A205, MHA-VN-041), member into the support_bar's blind pivot tap
         "pd_transgear_thumbnut",  # MHA-PD-013 knurled nut, 1/4-20 UNC-2B through; member on the knob shaft's front thread
-        "mg_wheel_axle",  # stud tip carries the hex nut (thread not modelled / not specified on the axle drawing), receiver of wheel_axle_nut
-        "vn_wheel_axle_nut",  # hex nut AF8 x 3 on the O5 stud ("commercial hex nut (thread not modelled)"), member
+        "mg_wheel_axle",  # 3/16 drill-rod pin, #4-40 UNC front end (mg_wheel_axle_spec.THREAD_CALLOUT), receiver of the wheel-axle nuts
+        "vn_wheel_axle_nut",  # McMaster 92671A005 brass #4-40 hex nut x2 (nut + locknut), member
     }
 )
 
@@ -668,7 +668,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "mg_magnifying_bracket",  # two counterbored normal #2 clearance holes in its front mounting flange; no thread
         "mg_magnifying_lever",  # plain Ø6 domed rod
         "mg_magnifying_vertical_rod",  # plain Ø5 domed rod
-        "mg_magnifying_wheel",  # Ø5 reamed running bore; no thread
+        "mg_magnifying_wheel",  # reamed .1890 running bore + two Ø1 wire-tie holes; no thread
+        "mg_wheel_drum",  # MHA-MG-010 brass drum pressed on the wheel's spigot; no thread
         "ha_measuring_stick",  # plain 8 x 3 brass bar; the stop's thumbscrew tip pinches it
         "fr_nameplate",  # brass plate, #4 clearance holes only
         "pn_pen_marker",  # plain barrel; the thumb-screw tip bears on it (no thread)
@@ -714,7 +715,9 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_transgear_knob_drive_pin",  # MHA-VN-038 dowel pressed into plain holes, no thread
         "fr_tube_frame",  # columns: socket slip fit; cross holes enlarged so the MHA-VN-027 shank passes "WITHOUT THREAD CONTACT" (MHA-FR-000 STEP 2/5)
         "vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-FR-000 STEP 7)
-        "mg_wheel_bar",  # #8 clearance holes (clamp screws) + #8 close clearance (pen-hanger screw, which threads into pen_hanger in pen.SLDASM)
+        "vn_wheel_axle_back_washer",  # MHA-VN-054 brass #10 washer (McMaster 92916A480) loose on the axle pin; no thread
+        "vn_wheel_axle_front_washer",  # MHA-VN-055 brass #4 washer (McMaster 92916A250) loose on the axle's #4-40 end; no thread
+        "mg_wheel_bar",  # #8 clearance holes (clamp screws) + #8 close clearance (pen-hanger screw, which threads into pen_hanger in pen.SLDASM) + the reamed .1865 axle-pin press bore
     }
 )
 
@@ -736,6 +739,8 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_cylinder_bank_spring": "wave disc spring loose on the arbor; no thread",
     "vn_rocker_bank_spring": "wave disc spring loose on the pivot shaft; no thread",
     "vn_tube_frame_cap": "push-on round cap over the column end",
+    "vn_wheel_axle_back_washer": "plain washer loose on the wheel-axle pin; no thread",
+    "vn_wheel_axle_front_washer": "plain washer loose on the wheel-axle's threaded end; no thread",
 }
 
 JOINTS: tuple[Joint, ...] = (
@@ -1621,25 +1626,30 @@ JOINTS: tuple[Joint, ...] = (
         assembly="mg_magnifier",
         member="vn_wheel_axle_nut",
         receiver="mg_wheel_axle",
-        thread="not specified (hex nut AF 8 x 3 on the O5 stud; 'thread not modelled'; axle drawing calls no thread) [plausibly M5]",
-        quantity=1,
+        thread="#4-40 UNC",
+        quantity=2,
         installed_at="",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the nut retains the magnifying wheel, which the lever-wire (WIRE 1) turns back and forth every "
-            "harmonic cycle (yoke-coupled to the rocking lever); the hub's outboard face rubs the O9 washer "
-            "the nut seats on, so reversing friction drag reaches the nut thread; the uniform O5 stud has "
-            "no shoulder, so the nut's own position also sets the hub end play (ADJUSTER character too)"
+            "harmonic cycle (yoke-coupled to the rocking lever); the spigot face rubs the MHA-VN-055 washer "
+            "the nut seats on, so reversing friction drag reaches the nut thread; the nut's own position "
+            "also sets the hub endshake (ADJUSTER character too)"
         ),
-        axial_capture="nut seats on the O9 x 1 washer at stud y=14 (washer modelled as the axle's integral 'Collar' feature), stud tip 3 proud",
-        lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
+        axial_capture=(
+            "first nut run down on the MHA-VN-055 washer at the spigot face until the wheel turns free "
+            "without rattle (endshake 0.05-0.15, mg_wheel_group.ENDSHAKE); the back washer MHA-VN-054 "
+            "seats the hub on the bar front face"
+        ),
+        lock=Lock.JAM_NUT,
+        lock_part="vn_wheel_axle_nut:locknut",
+        lock_binds=("vn_wheel_axle_nut", "mg_wheel_axle"),
+        lock_step="second nut jammed against the first (drawing-simplicity rule 9)",
         evidence=(
-            "build_mg_magnifier_assembly.py:build ('wheel-axle nut' place + lock_mate 'wheel-axle nut locked to the axle'); "
-            "build_vn_wheel_axle_nut.py docstring; mg_wheel_axle_spec.py NUT_AF/NUT_H/NUT_BORE_DIA/COLLAR_*; "
-            "build_mg_wheel_axle.py docstring (hub 3..13, washer 13..14, nut 14..17); config parts/vn-wheel-axle-nut.yaml process"
+            "build_mg_magnifier_assembly.py:build (lock_mates 'wheel-axle nut locked to the axle' / 'wheel-axle locknut locked to the axle' at NUT_D / LOCKNUT_D); "
+            "build_vn_wheel_axle_nut.py + diagnostics/diag_build_92671A005.py; "
+            "vn_wheel_axle_nut_spec.py THREAD/COUNT; mg_wheel_axle_spec.py THREAD_CALLOUT; "
+            "mg_wheel_group.py NUT_D/LOCKNUT_D/ENDSHAKE; config parts/vn-wheel-axle-nut.yaml installation_notes"
         ),
     ),
     Joint(

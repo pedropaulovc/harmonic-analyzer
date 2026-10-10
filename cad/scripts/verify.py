@@ -1403,7 +1403,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     pose assert the wire still behaves like a wire:
 
     * wire-rides-hub: the wire's centreline stays at the stand-off tangency
-      radius of the wheel axis (hub r + wire r + clearance);
+      radius of the wheel axis (drum r + wire r + clearance);
     * hook-ball-holds: the wire's hook end stays on the fixture's anchor;
     * coupling-alive: the wheel angle actually spans with the lever (the yoke
       transmits);
@@ -1444,7 +1444,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     # Machine anchors for the invariants (the magnifier is authored
     # machine-handed, #151 -- constants feed straight through).
     axis_xy = (_mag.WHEEL_X, _mag.WHEEL_BAR_Y)  # wheel axis, along Z
-    r_expect = _wire.HUB_DIA / 2.0 + _wire.WIRE_DIA / 2.0 + _wire.CLEARANCE
+    r_expect = _wire.DRUM_DIA / 2.0 + _wire.WIRE_DIA / 2.0 + _wire.CLEARANCE
 
     def _xform(comp: str) -> tuple[list[list[float]], list[float]]:
         a = component_transform(adapter, comp)

@@ -12,6 +12,9 @@ test, which asserts the part marks and the drawing keeps EXACTLY
 from __future__ import annotations
 
 from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
+    AXLE_BORE_BAND,
+    AXLE_BORE_DIA,
+    AXLE_BORE_X,
     BAR_DEPTH,
     BAR_LENGTH,
     BAR_SIDE,
@@ -25,39 +28,38 @@ from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
     SCREW_HOLE_X,
 )
 
+# Bar is modelled centred on the origin, so the left end sits at -L/2; every
+# hole station reads from that end.
+_LEFT_END = -BAR_LENGTH / 2.0
+AXLE_BORE_STATION = AXLE_BORE_X - _LEFT_END  # 61.0
+
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The bar depth (9) is added on the sheet across the right-view
-# section; the three bores are native Hole Wizard clearance holes, annotated by
-# associative callouts + location dims, never fake marked dimensions. ---
+# section.  The reamed axle bore is a sketch-cut whose diameter (with its
+# reamer band) and station from the left end are model dimensions; the three
+# screw bores are native Hole Wizard clearance holes, quoted in the notes,
+# never fake marked dimensions. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {"Length", "Side"},
+    "AxleBoreProfile": {"AxleBoreDia", "AxleBoreStation"},
+}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "AxleBoreProfile": {"AxleBoreDia": 4, "AxleBoreStation": 2},
 }
 
-# Bar is modelled centred on the origin, so the left end sits at -L/2; the hole
-# X-stations are quoted from that end in the notes (computed from the geom
-# constants, never duplicated as literals) -- the small clearance-hole circles
-# are not dependable associative-callout picks at 1:1, so they ride the notes +
-# the front-view centre marks rather than fragile per-hole callouts/location dims.
-_LEFT_END = -BAR_LENGTH / 2.0
+# The small clearance-hole circles are not dependable associative-callout
+# picks at 1:1, so their stations ride the notes (computed from the geom
+# constants, never duplicated as literals) + the front-view centre marks.
 DRAWING_NOTES = "\n".join(
     (
-        "FINISHED BAR SECTION 10 x 9; SPANS ONE COLUMN (CLAMPED END 29 PAST THE",
-        "WEST COLUMN LINE, FREE END JUST PAST THE PEN HANGER).",
-        "ALL THREE BORES ON THE BAR MID-HEIGHT CENTRELINE, AXES NORMAL TO THE",
-        "BACK SEATING FACE (DATUM A); DRILLED THRU FROM THE FRONT FACE.",
-        f"2X CLAMP-SCREW {CLAMP_HOLE_SPEC.size} {CLAMP_HOLE_SPEC.fit.upper()} CLEARANCE "
-        f"Ø{CLAMP_HOLE_DIA:.3f} HOLES NEAR THE CLAMPED END",
-        "(COLUMN-CLAMP SCREWS, MHA-SH-002): HEADS ON THE FRONT FACE.",
-        f"1X PEN-HANGER {PEN_HANGER_HOLE_SPEC.size} {PEN_HANGER_HOLE_SPEC.fit.upper()} "
-        f"CLEARANCE Ø{PEN_HANGER_HOLE_DIA:.3f} HOLE AT THE FREE END.",
-        f"HOLE STATIONS FROM THE LEFT END: PEN-HANGER "
-        f"{PEN_HANGER_HOLE_SPEC.size} {PEN_HANGER_HOLE_SPEC.fit.upper()} AT "
-        f"{SCREW_HOLE_X - _LEFT_END:.1f}; COLUMN-CLAMP "
-        f"{CLAMP_HOLE_SPEC.size} {CLAMP_HOLE_SPEC.fit.upper()} PAIR AT "
-        f"{CLAMP_HOLE_X[0] - _LEFT_END:.1f} AND "
-        f"{CLAMP_HOLE_X[1] - _LEFT_END:.1f}.",
-        f"PEN-HANGER END STATION +/-{PEN_HANGER_STATION_TOL:.2f}; "
-        f"FINISHED END WALL {PEN_HANGER_MIN_END_WALL:.2f} MIN.",
+        "ALL BORES THRU ON THE MID-HEIGHT CENTRELINE, SQUARE TO THE BACK FACE.",
+        f"2X {CLAMP_HOLE_SPEC.size} {CLAMP_HOLE_SPEC.fit.upper()} CLEARANCE "
+        f"Ø{CLAMP_HOLE_DIA:.3f} FOR THE COLUMN-CLAMP SCREWS (MHA-SH-002).",
+        f"1X {PEN_HANGER_HOLE_SPEC.size} {PEN_HANGER_HOLE_SPEC.fit.upper()} "
+        f"CLEARANCE Ø{PEN_HANGER_HOLE_DIA:.3f} FOR THE PEN-HANGER SCREW.",
+        f"HOLE STATIONS FROM THE LEFT END: HANGER {SCREW_HOLE_X - _LEFT_END:.1f} "
+        f"+/-{PEN_HANGER_STATION_TOL:.2f}; CLAMPS "
+        f"{CLAMP_HOLE_X[0] - _LEFT_END:.1f} AND {CLAMP_HOLE_X[1] - _LEFT_END:.1f}.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
