@@ -21,9 +21,15 @@ reaches, so the drill point has cast iron under it to the window bottom. What
 bounds the seat is the web's thickness: 2 * WEB, 9.525 (3/8 in), thickened
 from the source's 6.35 so the thread keeps the 2.0 wall to both web faces.
 
-The stack is checked at the printed worst case: MHA-CH-008's foot at .XX, the
-seat depths at .X, the web at .XX, the screw at its +0/-0.76 commercial length
-band, and the 0.25 edge break at the seat mouth. Every check raises on import.
+Each seat is transferred from its bracket's hole, so it lands wherever the
+bracket's own bands put that hole: the support's end face, the bracket's
+station and its foot length all move the thread toward the end wall.
+
+The stack is checked at the printed worst case: MHA-CH-008's foot height at
+.XX and its foot length and station at +/-0.10, the seat depths and the
+support's 177.8 length at .X, the web at .XX, the screw at its +0/-0.76
+commercial length band, and the 0.25 edge break at the seat mouth. Every check
+raises on import.
 """
 
 from __future__ import annotations
@@ -94,6 +100,17 @@ SCREW_REACH_MIN = SCREW_LENGTH - SCREW_LENGTH_BAND[1] - FOOT_H_RANGE[1]
 ENGAGEMENT_MIN = SCREW_REACH_MIN - SCREW_TIP_CHAMFER - EDGE_BREAK
 # Beside the thread, to either web face, at the web's printed worst case.
 WEB_WALL_MIN = WEB - LINEAR_2PL / 2.0 - SCREW_MAJOR_DIA / 2.0
+# From the thread to the support's end face on its side, at the worst
+# transferred position: the end face moves by half the support length's .X
+# band, the hole by the bracket's station and foot-length bands.
+END_WALL_MIN = tuple(
+    (HALF_Y - abs(x))
+    - SCREW_MAJOR_DIA / 2.0
+    - _bracket.STATION_BAND
+    - _bracket.FOOT_LEN_BAND
+    - LINEAR_1PL / 2.0
+    for x in SEAT_LOCAL_X
+)  # S 2.14, N 2.99
 
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError(
@@ -113,9 +130,15 @@ if WEB_WALL_MIN < RULE12_WEB_TARGET:
     )
 if max(abs(x) for x in SEAT_LOCAL_X) + SEAT_DRILL_DIA / 2.0 > HALF_Y - EDGE_BREAK:
     raise AssertionError("a bracket seat runs off the end of the support")
+if min(END_WALL_MIN) < RULE12_WEB_TARGET:
+    raise AssertionError(
+        f"bracket seat thread leaves {min(END_WALL_MIN):.2f} to the support's end"
+        f" face at worst case, under the {RULE12_WEB_TARGET} wall"
+    )
 
 __all__ = [
     "EDGE_BREAK",
+    "END_WALL_MIN",
     "ENGAGEMENT_MIN",
     "LINEAR_1PL",
     "LINEAR_2PL",

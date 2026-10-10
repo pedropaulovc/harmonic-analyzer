@@ -14,7 +14,8 @@ ears sit 1.7 apart from mid-support, so the two feet differ in length: the
 configurations ``S`` and ``N`` carry their own foot end ``FOOT_Z1`` and hole
 station ``HOLE_Z`` (part frame). Each bracket has one MHA-VN-032 hold-down
 hole, centred in its foot's free run from the ear's outboard face to the foot
-end, its station printed at .XX from the free end.
+end, its station given +/-0.10 from the free end (``ch_pivot_bracket_spec``
+holds the bands).
 """
 
 from __future__ import annotations
@@ -45,18 +46,8 @@ HOLE_MACHINE_Z = {
 }
 CONFIGURATION_NUMBER = {name: f"{PART_NUMBER}-{name}" for name in CONFIGURATIONS}
 
-# Named exception: MHA-CH-008 S end ligament (drawing-simplicity-policy.md, "Named exceptions").
-# The south foot's free run is only 9.64, so its centred
-# hole keeps 2.53 to the foot end nominal and 1.47 at the worst case of the
-# printed bands, under the 1.5 floor: the user accepted a 1.4 floor for this
-# one ligament (2026-10-09 sketch review). Every other ligament keeps 1.5.
-LIGAMENT_FLOOR = {
-    (name, where): (
-        1.4 if (name, where) == ("S", "foot end") else _bracket.LIGAMENT_FLOOR
-    )
-    for name in CONFIGURATIONS
-    for where in ("foot end", "foot side")
-}
+# The south foot's free run is only 9.64: its centred hole keeps 2.53 to the
+# foot end nominal and 2.28 at the worst case of the +/-0.10 bands.
 HOLE_LIGAMENTS_MIN = {
     name: _bracket.hole_ligaments_min(HOLE_Z[name], FOOT_Z1[name])
     for name in CONFIGURATIONS
@@ -76,10 +67,10 @@ for _name in CONFIGURATIONS:
     ):
         raise AssertionError(f"{_name} hold-down hole must lie in the foot's free run")
     for _where, _ligament in HOLE_LIGAMENTS_MIN[_name].items():
-        if _ligament < LIGAMENT_FLOOR[_name, _where]:
+        if _ligament < _bracket.LIGAMENT_FLOOR:
             raise AssertionError(
                 f"{_name} hold-down hole leaves {_ligament:.2f} to the {_where} at worst"
-                f" case, under the {LIGAMENT_FLOOR[_name, _where]} floor"
+                f" case, under the {_bracket.LIGAMENT_FLOOR} floor"
             )
     _end_nominal = FOOT_Z1[_name] - HOLE_Z[_name] - _bracket.HOLE_DIA / 2.0
     if _end_nominal < _bracket.LIGAMENT_TARGET:
@@ -88,7 +79,7 @@ for _name in CONFIGURATIONS:
             f" {_bracket.LIGAMENT_TARGET} target"
         )
     # The fillister head must seat on the foot clear of the ear at the worst
-    # case of the printed bands.
+    # case of the bands.
     if HEAD_TO_EAR_FACE_MIN[_name] <= 0.0:
         raise AssertionError(
             f"{_name} hold-down screw head reaches the ear face at worst case"

@@ -56,6 +56,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -64,6 +65,7 @@ from _common import (
     volume_check,
 )
 from _configuration_material import require_material_in_every_configuration
+from _drawing_marks import set_dimension_symmetric_tolerance
 from _grouped_bom_properties import apply_grouped_bom_properties
 from ch_pivot_bracket_sides import (
     CONFIGURATION_NUMBER,
@@ -77,11 +79,14 @@ from ch_pivot_bracket_spec import (
     BORE_H,
     EAR_ARCH_R,
     EAR_T,
+    EAR_T_BAND,
     EAR_W,
     FOOT_H,
+    FOOT_LEN_BAND,
     FOOT_W,
     FOOT_Z0,
     HOLE_DIA,
+    STATION_BAND,
 )
 
 
@@ -226,6 +231,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Ear")
+    # The ear thickness carries its +/-0.10 band natively: named so the band
+    # selects it by name (the MHA-CH-003 ForkThick idiom).
+    ear_thick_dim = name_dimensions(adapter, "Ear", ["EarThick"])
+    drive_jobs.append((ear_thick_dim[0], '"EarT"'))
     expected += V_BLOCK
     await volume_check(adapter, "ear block", expected, 0.005 * V_BLOCK)
 
@@ -343,6 +352,19 @@ async def build(adapter) -> dict[str, str]:
         await volume_check(
             adapter, f"{name} bracket", V_TOTAL[name], 0.005 * V_TOTAL[name]
         )
+
+    # The three lengths along the foot carry +/-0.10 natively, shared by both
+    # configurations (ch_pivot_bracket_spec: the south foot's short run cannot
+    # take title-block .XX). The foot length runs from the ear's inboard face
+    # to the free end. HoleStation is HoleZ, from the ear's mid-plane, while
+    # the spec's stack books the station from the free end, where the S4 hold
+    # gauges it off the ledge; on the mid-plane datum the foot-end ligament
+    # loses EAR_T_BAND / 2 more (S 2.23, still over the 2.0 target) and every
+    # other margin gains. No in-repo sheet prints this part, so a fixture plan
+    # or later drawing inherits the bands from the saved model.
+    set_dimension_symmetric_tolerance(adapter, "FootProfile", "FootLen", FOOT_LEN_BAND)
+    set_dimension_symmetric_tolerance(adapter, "Ear", "EarThick", EAR_T_BAND)
+    set_dimension_symmetric_tolerance(adapter, "HoleProfile", "HoleStation", STATION_BAND)
 
     # One BOM identity for both sides; each configuration's own Number carries
     # its side (the MHA-DT-003-T006 qualifier convention).

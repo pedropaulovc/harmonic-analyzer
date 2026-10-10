@@ -7,6 +7,7 @@ import pytest
 import _config
 import _interference_contracts
 import build_ch_channel_assembly as channel
+import build_ch_pivot_bracket as bracket_build
 import build_vn_pedestal_hold_down_screw as hold_down_build
 import vn_pedestal_hold_down_screw_spec as hold_down
 import dt_arbor_pedestal_spec as pedestal
@@ -98,6 +99,22 @@ def test_seats_run_in_solid_iron_on_the_support() -> None:
     assert [round(abs(x), 2) for x in seats.SEAT_LOCAL_X] == [84.08, 83.23]
 
 
+def test_seat_thread_keeps_the_end_wall_at_the_worst_transferred_position() -> None:
+    """Codex P2 (2026-10-09 flip): the south seat's thread sat 2.74 from the
+    support's end face nominal and 1.32 at the title-block bands. It is
+    transferred from the bracket's hole, so the bracket's station and foot
+    length bands move it, and the end face moves by half the 177.8's .X band."""
+    for x, wall in zip(seats.SEAT_LOCAL_X, seats.END_WALL_MIN, strict=True):
+        assert wall == pytest.approx(
+            (support.HALF_Y - abs(x))
+            - seats.SCREW_MAJOR_DIA / 2.0
+            - bracket.STATION_BAND
+            - bracket.FOOT_LEN_BAND
+            - seats.LINEAR_1PL / 2.0
+        )
+        assert wall >= seats.RULE12_WEB_TARGET
+
+
 def test_bracket_hole_clears_the_screw_junction_fillet() -> None:
     """r743-3C: MHA-CH-008's #19 hole (0.025 radial over the #8-32 major) cut the
     fillister's under-head junction fillet, P/10 in diag_mcmaster_fillister's
@@ -114,25 +131,33 @@ def test_bracket_hole_is_mha_004s_hole_for_the_same_screw() -> None:
     assert bracket.HOLD_DOWN_HOLE_SPEC == pedestal.SCREW_HOLE_SPEC
 
 
-def test_bracket_hole_ligaments_keep_their_floors_at_worst_case() -> None:
+def test_bracket_hole_ligaments_keep_the_floor_at_worst_case() -> None:
     for name in sides.CONFIGURATIONS:
-        for where, ligament in sides.HOLE_LIGAMENTS_MIN[name].items():
-            assert ligament >= sides.LIGAMENT_FLOOR[name, where]
-    # The one named exception: the south foot's end, 1.4 (user, 2026-10-09).
-    lowered = {
-        key
-        for key, floor in sides.LIGAMENT_FLOOR.items()
-        if floor < bracket.LIGAMENT_FLOOR
-    }
-    assert lowered == {("S", "foot end")}
-    assert sides.LIGAMENT_FLOOR["S", "foot end"] == 1.4
-    # Each term at its own printed band: the foot's edges at the .XX band the
-    # seat stack carries this foot at, the station at .XX, the drilled hole
-    # at the title block's +0.10/0.
-    assert bracket.EDGE_BAND == seats.LINEAR_2PL
-    assert bracket.STATION_BAND == seats.LINEAR_2PL
+        for ligament in sides.HOLE_LIGAMENTS_MIN[name].values():
+            assert ligament >= bracket.LIGAMENT_FLOOR
+    # Each term at its own band: along the foot the three +/-0.10 lengths,
+    # across it the foot's sides at the .XX band the seat stack carries this
+    # foot at, the drilled hole at the title block's +0.10/0.
+    assert bracket.EDGE_BAND == bracket.HOLE_X_BAND == seats.LINEAR_2PL
     drilled = _config.title_block("drilled_hole")
     assert (drilled["minus_mm"], drilled["plus_mm"]) == (0.0, bracket.DRILL_GROWTH)
+
+
+def test_bracket_lengths_along_the_foot_carry_their_bands_on_the_model() -> None:
+    """No in-repo sheet prints MHA-CH-008: the S4 fixture plan and any later
+    drawing take the +/-0.10 lengths from the saved model's dimensions."""
+    from _drawing_contract import model_toleranced_dimensions
+
+    assert (bracket.FOOT_LEN_BAND, bracket.EAR_T_BAND, bracket.STATION_BAND) == (
+        0.10,
+        0.10,
+        0.10,
+    )
+    assert model_toleranced_dimensions(bracket_build) == {
+        ("FootProfile", "FootLen"): "FOOT_LEN_BAND",
+        ("Ear", "EarThick"): "EAR_T_BAND",
+        ("HoleProfile", "HoleStation"): "STATION_BAND",
+    }
 
 
 def test_each_foot_ends_flush_with_the_support_and_centres_its_hole() -> None:
@@ -160,7 +185,8 @@ def test_screw_heads_keep_air_to_the_ear_and_the_foot_end() -> None:
             sides.HOLE_Z[name]
             - head_r
             - bracket.EAR_T / 2.0
-            - bracket.EDGE_BAND
+            - bracket.FOOT_LEN_BAND
+            - bracket.EAR_T_BAND
             - bracket.STATION_BAND
         )
         assert sides.HOLE_Z[name] + head_r < sides.FOOT_Z1[name]

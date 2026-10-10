@@ -41,40 +41,58 @@ HOLD_DOWN_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
 HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 
 # One hold-down hole per bracket, on x = 0 in the foot's free run (from the
-# ear's outboard face to the foot end), its station printed at .XX from the
-# foot's free end. Worst case is each term at its OWN printed band (Codex #936
-# PRRT_kwDOPHDy386mV3AN): the foot's edges at .XX (the band
-# rocker_bracket_seat_layout carries this foot at), the hole station at .XX,
-# and a drilled hole grows by the title block's +0.10/0. An edge ligament
-# loses an edge band, a station band and half the drill growth.
-EDGE_BAND = 0.508  # title-block .XX
-STATION_BAND = 0.508  # title-block .XX
+# ear's outboard face to the foot end), its station given from the foot's
+# free end. Worst case is each term at its OWN band (Codex #936
+# PRRT_kwDOPHDy386mV3AN). Along the foot the south bracket's short run leaves
+# no room for title-block .XX, so three lengths carry +/-0.10 (Codex P2 on
+# 2026-10-09's flip, user option A): the foot length (inboard ear face to free
+# end), the ear thickness and the hole station. Across the foot its sides stay
+# at .XX (the band rocker_bracket_seat_layout carries this foot at) and the
+# hole's centring on x = 0 at .XX; a drilled hole grows by the title block's
+# +0.10/0. build_ch_pivot_bracket carries the three +/-0.10 bands on the
+# model's own dimensions.
+FOOT_LEN_BAND = 0.10
+EAR_T_BAND = 0.10
+STATION_BAND = 0.10
+EDGE_BAND = 0.508  # title-block .XX: the foot's sides
+HOLE_X_BAND = 0.508  # title-block .XX: the hole's centring across the foot
 DRILL_GROWTH = 0.10  # title-block drilled hole, +0.10/0 on the diameter
 LIGAMENT_FLOOR = 1.5
 LIGAMENT_TARGET = 2.0
-EDGE_LOSS = EDGE_BAND + STATION_BAND + DRILL_GROWTH / 2.0
 
 
 def hole_ligaments_min(hole_z: float, foot_z1: float) -> dict[str, float]:
     """Worst-case ligaments round a hold-down hole at station hole_z.
 
-    The ear face is no free edge (the foot runs on under the ear), so the
-    hole's run-side limit is the screw head's clearance to it, not a ligament:
-    see ``head_to_ear_face_min``.
+    The foot end loses the station's band and, booked with it, the foot
+    length's (the free end the station is given from is the end of that
+    length), plus half the drill growth. The ear face is no free edge (the
+    foot runs on under the ear), so the hole's run-side limit is the screw
+    head's clearance to it, not a ligament: see ``head_to_ear_face_min``.
     """
     return {
-        "foot end": foot_z1 - hole_z - HOLE_DIA / 2.0 - EDGE_LOSS,
-        "foot side": (FOOT_W - HOLE_DIA) / 2.0 - EDGE_LOSS,
+        "foot end": foot_z1
+        - hole_z
+        - HOLE_DIA / 2.0
+        - (FOOT_LEN_BAND + STATION_BAND + DRILL_GROWTH / 2.0),
+        "foot side": (FOOT_W - HOLE_DIA) / 2.0
+        - (EDGE_BAND + HOLE_X_BAND + DRILL_GROWTH / 2.0),
     }
 
 
 def head_to_ear_face_min(hole_z: float, head_dia: float) -> float:
     """Worst-case gap from the hold-down screw's head to the ear's outboard face.
 
-    The station is printed from the foot's free end, so the ear face moves
-    against it by the foot's edge band and the station's own band.
+    The station is given from the foot's free end, the foot length from the
+    ear's inboard face and the ear thickness from that face too, so the ear's
+    outboard face closes on the head by all three bands.
     """
-    return hole_z - head_dia / 2.0 - EAR_T / 2.0 - EDGE_BAND - STATION_BAND
+    return (
+        hole_z
+        - head_dia / 2.0
+        - EAR_T / 2.0
+        - (FOOT_LEN_BAND + EAR_T_BAND + STATION_BAND)
+    )
 
 
 if BORE_LIGAMENT < 2.0:
