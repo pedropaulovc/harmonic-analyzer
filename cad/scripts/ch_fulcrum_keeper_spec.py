@@ -18,7 +18,7 @@ dome of the photo). One #1-72 cup-point set screw (MHA-VN-055), tapped down
 through the crown top on the lug mid-plane, bears on the shaft's set-screw
 flat and fixes the shaft axially and in rotation. The short straight foot
 points OUTBOARD, away from the lever bank, and is screwed down into the
-top-frame rail top face with one slotted #4-40 narrow-fillister screw
+top-frame rail top face with one slotted #2-56 fillister screw
 (frame-side-screw, MHA-VN-022) seated flush in a counterbore. 2 required, one
 per shaft end (the second is the same part flipped Ry180 by the assembly).
 
@@ -35,7 +35,7 @@ from math import sqrt
 
 from _fit_limits import REAM_SLIDE
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from dt_cone_pivot_post_installation import CHANNEL_Z0
+from dt_cone_pivot_post_installation import CHANNEL_Z0, FRAME_FRONT_COLUMN_Z
 
 # --- Station (machine Z). The ONE source for build_ch_channel_assembly
 # (shaft, keeper, set-screw and foot-screw placement) and build_fr_top_frame
@@ -67,25 +67,64 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_DIA / 2.0  # 32.2: the set-screw tap's entry
 # shaft. REAM_SLIDE (+0.025/+0.010) over the shaft's 0/-0.020 band gives
 # 0.010-0.045 diametral clearance: the shaft slides through both lugs at
 # assembly and the set screw then pulls it onto the bore wall, so the fit
-# only has to locate it, not run on it. ch_fulcrum_shaft_spec pins the
-# nominal to its SHAFT_DIA.
+# only has to locate it, not run on it. Each keeper prints LugRise at .XX, so
+# two keepers bored apart could sit 2 x 0.51 out of line -- far past that
+# clearance, and a reamer only follows the holes it is given. So the two are
+# drilled and reamed as a pair in one setup (BORE_PAIR_CALLOUT, MHA-CH-000):
+# one axis, one height off one seat flat, and the shaft keeps the bore
+# band's own clearance through both (ch_fulcrum_shaft_spec proves the
+# stack, PAIRED_MIN_CLEARANCE_MM). Each crown is then
+# rounded about its own reamed bore (CROWN_ABOUT_BORE_CALLOUT), keeping it
+# concentric, which the crown thread's worst case below assumes.
+# ch_fulcrum_shaft_spec pins the nominal to its SHAFT_DIA.
 BORE_DIA = 6.35
 BORE_DIA_BAND = REAM_SLIDE
+BORE_PAIR_CALLOUT = (
+    "DRILL AND REAM AS A PAIR WITH THE\n"
+    "MATING MHA-CH-007, INNER LUG FACES\n"
+    "TOGETHER, SEATS ON ONE FLAT: THE\n"
+    "MHA-CH-004 SHAFT SLIDES THROUGH BOTH"
+)
+CROWN_ABOUT_BORE_CALLOUT = "ROUND ABOUT THE REAMED BORE"
 
-# --- Foot screw: one #4 close-clearance drill + counterbore centred on the
-# foot, for the #4-40 narrow fillister (MHA-VN-022). The under-head plane
-# sits at FOOT_H - CBORE_DEPTH. ---
-FOOT_SCREW_THREAD = "#4-40"
+# --- Fit-up on the top frame (MHA-CH-000): the pair goes on with the shaft
+# through both bores and is set by DRO, the lug centres on the fulcrum line
+# and the lug INNER faces off the front column socket, each within
+# KEEPER_FITUP_LOCATION_BAND_MM; the frame's keeper taps are then transferred
+# from the foot holes, so no frame-tap or foot-hole station reaches the
+# keeper's place. The step prints these distances to KEEPER_FITUP_PLACES;
+# build_fr_top_frame reads the same names for the foot-to-boss stack. ---
+KEEPER_FITUP_LOCATION_BAND_MM = 0.02
+KEEPER_FITUP_PLACES = 2
+# Each lug centre stands this far west (+x) of the centre of the top-frame
+# rail web under it, its column's socket axis (Main's ruling: a local X
+# datum on the receiving web). Restated here so the spec stays config-free;
+# draw_ch_channel_assembly pins it to the fulcrum line and the column line.
+KEEPER_FITUP_X_FROM_WEB_MM = 2.9
+KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
+    FULCRUM_KEEPER_CENTRE_Z + side * (KEEPER_Z_OFF - LUG_HALF_T) - FRAME_FRONT_COLUMN_Z
+    for side in (-1.0, 1.0)
+)  # (40.496, 182.496): front, rear
+
+# --- Foot screw: one #2 close-clearance drill + counterbore centred on the
+# foot, for the #2-56 x 7/16 fillister (MHA-VN-022, McMaster 91794A080:
+# 0.14 x 0.083 head, 18-8 stainless; no #2-56 in the 90280A steel family).
+# #2 rather than #4 so the frame's transferred tap, on the keeper's centre
+# line 2.9 off the frame web's centre, keeps the rule-12 ligament
+# (build_fr_top_frame). The under-head plane sits at FOOT_H - CBORE_DEPTH. ---
+FOOT_SCREW_THREAD = "#2-56"
+FOOT_SCREW_LENGTH_MM = 11.1125  # 7/16 under the head (vn_frame_side_screw_spec)
 SCREW_X = LUG_HALF_T + FOOT_L / 2.0  # 8.25: foot centre
-SCREW_FROM_LUG_FACE = SCREW_X - LUG_HALF_T  # 5.25 basic off datum B
+SCREW_FROM_LUG_FACE = SCREW_X - LUG_HALF_T  # 5.25: printed off the outer lug face
+SCREW_FROM_SIDE = KEEPER_WIDTH / 2.0  # 7.0: printed off a side face
 KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF + SCREW_X  # 82.25: screw off the centre
-SCREW_CLEARANCE_SPEC = HoleSpec("clearance", "#4", fit="close")
+SCREW_CLEARANCE_SPEC = HoleSpec("clearance", "#2", fit="close")
 HOLE_DIA_MM = blind_cut_dia_mm(SCREW_CLEARANCE_SPEC)
-# Ø5.1 clears the Ø4.648 stock head; the depth is the exact stock head
-# height (vn_frame_side_screw_spec.HEAD_H, pinned by the part build), so the
-# head is flush.
-CBORE_DIA_MM = 5.1
-CBORE_DEPTH_MM = 2.7178
+# Ø3.8 clears the Ø3.556 stock head (the MHA-VN-050 #2 counterbore); the
+# depth is the exact stock head height (vn_frame_side_screw_spec.HEAD_H,
+# pinned by the part build), so the head is flush.
+CBORE_DIA_MM = 3.8
+CBORE_DEPTH_MM = 2.1082
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
     SCREW_CLEARANCE_SPEC.size,
@@ -95,17 +134,18 @@ SCREW_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": CBORE_DEPTH_MM,
     },
 )
-# The frame's receiver tap (build_fr_top_frame KeeperTaps, at the fulcrum
-# line x and FULCRUM_KEEPER_CENTRE_Z +- KEEPER_SCREW_Z_OFF). The 1/2 in screw enters
-# 12.7 - (FOOT_H - CBORE_DEPTH_MM) = 7.42 (2.6D); 9.0 of thread keeps 0.78 at
-# the .X depth minimum, and the 14.0 drill keeps a plug tap's five-pitch lead
-# below the thread at the .X worst case of both depths.
+# The frame's receiver tap (build_fr_top_frame KeeperTaps, transferred from
+# the foot hole at fit-up; modelled at the fulcrum line x and
+# FULCRUM_KEEPER_CENTRE_Z +- KEEPER_SCREW_Z_OFF). Thread and drill depths
+# print .X; the worst-case stack is below (FOOT_SCREW_ENGAGEMENT_D and the
+# tap-depth asserts).
+KEEPER_TAP_THREAD_DEPTH_MM = 7.6
 KEEPER_TAP_SPEC = HoleSpec(
     "tapped",
     FOOT_SCREW_THREAD,
     end="blind",
-    depth_mm=14.0,
-    overrides_mm={"ThreadDepth": 9.0},
+    depth_mm=11.5,
+    overrides_mm={"ThreadDepth": KEEPER_TAP_THREAD_DEPTH_MM},
 )
 
 # --- Set-screw tap: #1-72 down through the crown top on the lug mid-plane
@@ -150,9 +190,9 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
         f"at the printed worst case (< {SET_SCREW_MIN_ENGAGEMENT_D}D)"
     )
 # Web from the tap's thread major to each lug face. The tap is located off
-# the outer lug face (datum B) and the lug thickness prints separately, both
-# at .XXX (user ruling: a 6.0 lug cannot hold a 1.5 web at .XX for any set
-# screw), so the inner web loses both bands.
+# the outer lug face and the lug thickness prints separately, both at .XXX
+# (user ruling: a 6.0 lug cannot hold a 1.5 web at .XX for any set screw),
+# so the inner web loses both bands.
 _LUG_T_BAND = _BAND_BY_PLACES[3]
 _SET_SCREW_LOCATION_BAND = _BAND_BY_PLACES[3]
 SET_SCREW_WEB_MM = min(
@@ -163,25 +203,65 @@ SET_SCREW_WEB_MM = min(
 )
 if SET_SCREW_WEB_MM < 1.5:
     raise AssertionError(f"crown tap web {SET_SCREW_WEB_MM:.2f} < 1.5 floor")
-# Counterbore to the foot tip: the foot length prints .X off datum B, the
-# hole sits at its basic station inside the position zone (radius = half the
-# position tolerance) and the counterbore is a drilled diameter. The lug side
-# is no wall: the foot runs on under the lug to x = -3.
-_SCREW_POSITION_RADIUS = 0.25 / 2.0  # GEOMETRIC_TOLERANCES_MM screw-hole position
+# Counterbore walls. The hole prints 5.25 off the outer lug face and 7.0 off
+# a side face, both at .XXX (FootScrewReference / FootScrewSideReference:
+# the side station is also the frame tap's transverse place, transferred at
+# fit-up); the foot length and width print .X and the counterbore is a
+# drilled diameter. The lug side is no wall: the foot runs on under the lug
+# to x = -3.
+_CBORE_MAX_RADIUS = (CBORE_DIA_MM + _DRILLED_PLUS) / 2.0
 FOOT_TIP_WALL_MM = (
     (FOOT_L - _BAND_BY_PLACES[1])
-    - (SCREW_FROM_LUG_FACE + _SCREW_POSITION_RADIUS)
-    - (CBORE_DIA_MM + _DRILLED_PLUS) / 2.0
+    - (SCREW_FROM_LUG_FACE + _BAND_BY_PLACES[3])
+    - _CBORE_MAX_RADIUS
 )
 if FOOT_TIP_WALL_MM < 1.5:
     raise AssertionError(f"keeper counterbore tip wall {FOOT_TIP_WALL_MM:.2f} < 1.5")
+FOOT_SIDE_WALL_MM = min(
+    SCREW_FROM_SIDE - _BAND_BY_PLACES[3] - _CBORE_MAX_RADIUS,
+    (KEEPER_WIDTH - _BAND_BY_PLACES[1])
+    - (SCREW_FROM_SIDE + _BAND_BY_PLACES[3])
+    - _CBORE_MAX_RADIUS,
+)
+if FOOT_SIDE_WALL_MM < 1.5:
+    raise AssertionError(f"keeper counterbore side wall {FOOT_SIDE_WALL_MM:.2f} < 1.5")
+# The foot screw's thread in the frame tap (rule 12: >= 1.5D). The screw
+# enters below the under-head plane FOOT_H - CBORE_DEPTH: least with the
+# foot (FootRise, .X) tall and the counterbore (native callout, printed to
+# FOOT_COUNTERBORE_DEPTH_PLACES) shallow, most the other way. The thread's .X
+# least depth must reach past the deepest entry, and the drill's .X least
+# depth must clear the deepest thread by a plug tap's five-pitch lead.
+FOOT_COUNTERBORE_DEPTH_PLACES = 2
+_FOOT_SCREW_PITCH = 25.4 / 56.0
+_PRINTED_CBORE_DEPTH = round(CBORE_DEPTH_MM, FOOT_COUNTERBORE_DEPTH_PLACES)  # 2.11
+_SCREW_ENTRY = FOOT_SCREW_LENGTH_MM - (FOOT_H - _PRINTED_CBORE_DEPTH)  # 5.2225
+_ENTRY_REACH = _BAND_BY_PLACES[1] + _BAND_BY_PLACES[FOOT_COUNTERBORE_DEPTH_PLACES]
+FOOT_SCREW_ENGAGEMENT_D = (_SCREW_ENTRY - _ENTRY_REACH) / THREAD_MAJOR_MM[
+    FOOT_SCREW_THREAD
+]
+if FOOT_SCREW_ENGAGEMENT_D < 1.5:
+    raise AssertionError(
+        f"foot screw engages {FOOT_SCREW_ENGAGEMENT_D:.2f}D of the frame tap (< 1.5D)"
+    )
+if KEEPER_TAP_THREAD_DEPTH_MM - _BAND_BY_PLACES[1] <= _SCREW_ENTRY + _ENTRY_REACH:
+    raise AssertionError("the foot screw bottoms in the frame tap's thread")
+if KEEPER_TAP_SPEC.depth_mm - _BAND_BY_PLACES[1] < (
+    KEEPER_TAP_THREAD_DEPTH_MM + _BAND_BY_PLACES[1] + 5.0 * _FOOT_SCREW_PITCH
+):
+    raise AssertionError("the frame tap drill leaves no plug-tap lead")
 
-# Hidden reference sketch (policy rule 2, the dt_arbor_pedestal pattern): the
-# set-screw tap's station off the outer lug face is a manufacturing dimension
-# no feature measures (the tap is placed on the mid-plane), so a one-line
-# construction sketch on the crown-top outline carries it. The part saves it
-# blanked; the drawing shows it in the front view.
-REFERENCE_SKETCHES = ("SetScrewReference",)
+# Hidden reference sketches (policy rule 2, the dt_arbor_pedestal pattern):
+# the set-screw tap's station off the outer lug face and the foot screw's
+# stations off the outer lug face and a side face are manufacturing
+# dimensions no feature measures (both holes are placed by point), so a
+# one-line construction sketch carries each. The part saves them blanked;
+# the drawing shows the tap's in the front view and the foot screw's in the
+# plan.
+REFERENCE_SKETCHES = (
+    "SetScrewReference",
+    "FootScrewReference",
+    "FootScrewSideReference",
+)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The wizard screw hole and the crown tap ship as native hole
@@ -194,14 +274,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LugCrownProfile": {"CrownDia"},
     "ShaftBoreProfile": {"BoreDia"},
     "SetScrewReference": {"SetScrewLocation"},
+    "FootScrewReference": {"ScrewFromLug"},
+    "FootScrewSideReference": {"ScrewFromSide"},
 }
 # Decimal places ARE the tolerance statement (policy rule 2), so the MODEL
-# owns them. One place is the general grade: the counterbore's tip wall and
-# the crown thread are sized at the .X worst case (FOOT_TIP_WALL_MM,
-# SET_SCREW_ENGAGEMENT_D). The shaft-axis height takes two (both keepers
-# level the shaft the levers rock on); the reamed bore carries its own
-# REAM_SLIDE band; the lug thickness and the tap station take three, the
-# web's worst case (SET_SCREW_WEB_MM).
+# owns them. One place is the general grade: the crown thread is sized at
+# the .X worst case (SET_SCREW_ENGAGEMENT_D). The shaft-axis height takes
+# two (it sets the fulcrum height; the pair reaming lines the two bores
+# up); the reamed bore carries its own REAM_SLIDE band; the lug thickness
+# and the tap station take three, the web's worst case (SET_SCREW_WEB_MM),
+# and so do the foot screw's stations: off the lug for the tip wall
+# (FOOT_TIP_WALL_MM), off the side for the frame tap's ligament
+# (KEEPER_SCREW_TRANSVERSE_BAND_MM, build_fr_top_frame).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugProfile": {"LugRise": 2},
     "LugBody": {"LugThickness": 3},
@@ -210,6 +294,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugCrownProfile": {"CrownDia": 1},
     "ShaftBoreProfile": {"BoreDia": 3},
     "SetScrewReference": {"SetScrewLocation": 3},
+    "FootScrewReference": {"ScrewFromLug": 3},
+    "FootScrewSideReference": {"ScrewFromSide": 3},
 }
 if {f: set(names) for f, names in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
     raise AssertionError("DRAWING_PRECISION and DRAWING_DIMENSIONS disagree")
@@ -217,30 +303,36 @@ if DRAWING_PRECISION["LugBody"]["LugThickness"] != 3 or (
     DRAWING_PRECISION["SetScrewReference"]["SetScrewLocation"] != 3
 ):
     raise AssertionError("the crown-tap web is sized at .XXX lug and tap station")
-if DRAWING_PRECISION["FootProfile"]["FootLength"] != 1:
-    raise AssertionError("the counterbore tip wall is sized at the .X foot length")
+if DRAWING_PRECISION["FootProfile"]["FootLength"] != 1 or (
+    DRAWING_PRECISION["FootScrewReference"]["ScrewFromLug"] != 3
+):
+    raise AssertionError("the counterbore tip wall is sized at .X foot, .XXX station")
+if DRAWING_PRECISION["Foot"]["Depth"] != 1 or (
+    DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"] != 3
+):
+    raise AssertionError(
+        "the counterbore side walls are sized at .X width, .XXX station"
+    )
+if DRAWING_PRECISION["FootProfile"]["FootRise"] != 1:
+    raise AssertionError("the foot screw's engagement is sized at the .X foot height")
 if DRAWING_PRECISION["LugCrownProfile"]["CrownDia"] != 1:
     raise AssertionError("the crown thread is sized at the .X crown diameter")
+# The foot hole's (and so the transferred frame tap's) transverse place off
+# the keeper's centre line, for build_fr_top_frame's tap-ligament stack.
+KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
+    DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"]
+]
 
-# True free-text instructions only (native dims/datums/FCFs carry the rest).
+# True free-text instructions only (native dims and callouts carry the rest;
+# the bore's pair reaming is its callout, BORE_PAIR_CALLOUT). Brackets carry
+# no frames and no datums (policy).
 DRAWING_NOTES = "\n".join(
     (
         "1. MAKE FROM AISI 1018 BAR; BLACK OXIDE AFTER MACHINING.",
-        "2. REAM THE SHAFT BORE: SLIDE FIT ON THE MHA-CH-004 FULCRUM SHAFT.",
-        "3. CROWN TAP FOR THE MHA-VN-055 CUP-POINT SET SCREW; FOOT HOLE",
-        "   FOR THE MHA-VN-022 #4-40 FILLISTER, HEAD FLUSH.",
-        "4. 2 REQUIRED, ONE PER FULCRUM-SHAFT END (SECOND IS",
-        "   THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
+        "2. CROWN TAP FOR THE MHA-VN-055 CUP-POINT SET SCREW; FOOT HOLE",
+        "   FOR THE MHA-VN-022 #2-56 FILLISTER, HEAD FLUSH.",
+        "3. 2 REQUIRED, ONE PER MHA-CH-004 FULCRUM-SHAFT END (SECOND",
+        "   IS THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-
-# Manufacturing GD&T limits consumed by the drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "screw-hole position": "0.25",
-    "foot seating face flatness": "0.05",
-}
-if float(GEOMETRIC_TOLERANCES_MM["screw-hole position"]) / 2.0 != (
-    _SCREW_POSITION_RADIUS
-):
-    raise AssertionError("the tip wall's position zone drifted from the FCF")

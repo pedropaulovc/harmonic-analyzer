@@ -128,6 +128,7 @@ from fr_top_frame_spec import (
     DRAWING_NOTES_B,
     DRAWING_PRECISION,
     DRILL_OVERSIZE,
+    DRAWING_REFERENCE_PRECISION,
     FRONT_COLUMN_Z,
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
@@ -149,6 +150,9 @@ from fr_top_frame_spec import (
     HANGER_SLOT_WIDTH,
     HANGER_SLOT_WIDTH_BAND,
     HANGER_SLOT_X,
+    KEEPER_TAP_CALLOUT_PRECISION,
+    PRINTED_DRILLED_HOLE_PLUS_MM,
+    PRINTED_LINEAR_BAND_MM,
     REAR_COLUMN_Z,
     RING_HEIGHT,
     SURFACE_FINISHES,
@@ -167,7 +171,21 @@ from fr_frame_attachment_spec import (
 )
 from _fit_limits import deviations
 from vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
+from vn_frame_side_screw_spec import SHANK_DIA as KEEPER_SCREW_MAJOR_DIA
 from ch_fulcrum_keeper_spec import (
+    DRAWING_PRECISION as KEEPER_DRAWING_PRECISION,
+    FOOT_L,
+    FOOT_COUNTERBORE_DEPTH_PLACES,
+    FOOT_H,
+    FOOT_SCREW_LENGTH_MM,
+    CBORE_DEPTH_MM,
+    KEEPER_FITUP_X_FROM_WEB_MM,
+    KEEPER_SCREW_TRANSVERSE_BAND_MM,
+    SCREW_FROM_SIDE,
+    KEEPER_FITUP_LOCATION_BAND_MM,
+    KEEPER_FITUP_PLACES,
+    KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
+    LUG_HALF_T,
     FOOT_TIP_X,
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_SCREW_Z_OFF,
@@ -340,9 +358,9 @@ if CAP_RECESS_FLOOR_Y - SIDE_TAP_DRILL_DIA / 2.0 <= 0.0:
 
 # --- Fulcrum keepers (west rail top face; shaft-end brackets, ch17 p.40) ----
 # The keeper's pure spec owns both screw station and receiver geometry:
-# #4-40 with 9 mm full thread and a 14 mm drill leaves a five-pitch plug
+# #2-56 with 7.6 full thread and 11.5 drill retains a five-pitch plug
 # lead at the sheet's general .X depth band. No assembly recipe dependency.
-KEEPER_TAP_X = 199.9  # fulcrum line (build_ch_channel_assembly FULCRUM[0])
+KEEPER_TAP_X = COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM  # nominal fulcrum line
 KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -82.754
 KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +81.746
 
@@ -413,17 +431,49 @@ for _label, _value in (
         raise AssertionError(f"knife-mount dowel slip {_label}: {_value:.3f}")
 if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
-if (
-    abs(KEEPER_TAP_X - COLUMN_X) + THREAD_MAJOR_MM[KEEPER_TAP_SPEC.size] / 2.0
-    > WEB_T / 2.0
-):
+# The unified tap table rounds its nominal major; the actual stock major
+# must also fit. Use the larger diameter for every receiver-wall guard.
+KEEPER_TAP_THREAD_MAJOR_DIA = max(
+    THREAD_MAJOR_MM[KEEPER_TAP_SPEC.size], KEEPER_SCREW_MAJOR_DIA
+)
+if abs(KEEPER_TAP_X - COLUMN_X) + KEEPER_TAP_THREAD_MAJOR_DIA / 2.0 > WEB_T / 2.0:
     raise AssertionError("keeper taps break out of the west-rail web")
 SPOTFACE_FULL_SEAT_LIMIT_Z = abs(FRONT_COLUMN_Z) + math.sqrt(
     (BOSS_DIA / 2.0) ** 2 - (SPOTFACE_DIA / 2.0) ** 2
 )
 SPOTFACE_SEAT_MARGIN = SPOTFACE_FULL_SEAT_LIMIT_Z - SPOTFACE_FLOOR
-if SPOTFACE_SEAT_MARGIN < 0.1 or SPOTFACE_PLANE <= SPOTFACE_FLOOR:
-    raise AssertionError("top cross-screw spotface is not fully on boss material")
+# Prove the complete spotface at the PRINTED bands, not only nominal geometry.
+# Boss diameter, spotface diameter and floor offset all print .X: use the
+# smallest barrel, largest seat and most-outboard floor. The offset is from
+# the same socket axis, so socket pitch does not enter this local stack.
+SPOTFACE_MIN_BOSS_RADIUS = (
+    round(BOSS_DIA, DRAWING_PRECISION["BossUpProfile"]["C0Dia"])
+    - PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["BossUpProfile"]["C0Dia"]]
+) / 2.0
+SPOTFACE_MAX_SEAT_RADIUS = (
+    round(SPOTFACE_DIA, DRAWING_PRECISION["SpotFaceRearProfile"]["S1Dia"])
+    + PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["SpotFaceRearProfile"]["S1Dia"]]
+) / 2.0
+SPOTFACE_MAX_FLOOR_OFFSET = (
+    round(
+        SPOTFACE_FLOOR - abs(FRONT_COLUMN_Z),
+        DRAWING_REFERENCE_PRECISION["spotface floor from socket axis"],
+    )
+    + PRINTED_LINEAR_BAND_MM[
+        DRAWING_REFERENCE_PRECISION["spotface floor from socket axis"]
+    ]
+)
+SPOTFACE_PRINTED_SEAT_MARGIN = (
+    math.sqrt(SPOTFACE_MIN_BOSS_RADIUS**2 - SPOTFACE_MAX_SEAT_RADIUS**2)
+    - SPOTFACE_MAX_FLOOR_OFFSET
+)
+if (
+    min(SPOTFACE_SEAT_MARGIN, SPOTFACE_PRINTED_SEAT_MARGIN) < 0.1
+    or SPOTFACE_PLANE <= SPOTFACE_FLOOR
+):
+    raise AssertionError(
+        "top cross-screw spotface loses its full seat at the printed bands"
+    )
 SIDE_TAP_THREAD_MAJOR_DIA = THREAD_MAJOR_MM[SIDE_TAP_SPEC.size]
 SIDE_TAP_THREAD_END_Z = SPOTFACE_FLOOR - CASTING_FULL_THREAD_DEPTH
 SIDE_TAP_DRILL_POINT_Z = (
@@ -460,6 +510,44 @@ KEEPER_FOOT_BOSS_MARGINS = tuple(
         (REAR_COLUMN_Z, KEEPER_FOOT_TIP_Z_REAR),
     )
 )
+# The bench-pair-reamed keeper INNER faces are DRO-located from the front
+# socket at fit-up, then the frame taps are transferred through their feet.
+# Neither the foot-hole position nor a separate frame-tap station band
+# reaches the foot tip. The real stack is the printed INNER-face station
+# plus its DRO band, full lug thickness, foot length and boss OD; the rear
+# also loses the printed socket-pitch band. Taking zero nearest-X distance
+# is conservative for the complete foot, whatever its X position.
+KEEPER_FOOT_LENGTH_BAND_MM = PRINTED_LINEAR_BAND_MM[
+    KEEPER_DRAWING_PRECISION["FootProfile"]["FootLength"]
+]
+BOSS_DIA_BAND_MM = PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["BossUpProfile"]["C0Dia"]]
+KEEPER_PRINTED_MAX_OUTBOARD_REACH = (
+    round(2.0 * LUG_HALF_T, KEEPER_DRAWING_PRECISION["LugBody"]["LugThickness"])
+    + PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["LugBody"]["LugThickness"]]
+    + round(FOOT_L, KEEPER_DRAWING_PRECISION["FootProfile"]["FootLength"])
+    + KEEPER_FOOT_LENGTH_BAND_MM
+)
+KEEPER_PRINTED_MAX_BOSS_RADIUS = (
+    round(BOSS_DIA, DRAWING_PRECISION["BossUpProfile"]["C0Dia"]) + BOSS_DIA_BAND_MM
+) / 2.0
+KEEPER_PRINTED_MIN_SOCKET_PITCH = (
+    round(
+        REAR_COLUMN_Z - FRONT_COLUMN_Z,
+        DRAWING_REFERENCE_PRECISION["socket vertical pitch"],
+    )
+    - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["socket vertical pitch"]]
+)
+KEEPER_FOOT_PRINTED_BOSS_MARGINS = (
+    round(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0], KEEPER_FITUP_PLACES)
+    - KEEPER_FITUP_LOCATION_BAND_MM
+    - KEEPER_PRINTED_MAX_OUTBOARD_REACH
+    - KEEPER_PRINTED_MAX_BOSS_RADIUS,
+    KEEPER_PRINTED_MIN_SOCKET_PITCH
+    - round(KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1], KEEPER_FITUP_PLACES)
+    - KEEPER_FITUP_LOCATION_BAND_MM
+    - KEEPER_PRINTED_MAX_OUTBOARD_REACH
+    - KEEPER_PRINTED_MAX_BOSS_RADIUS,
+)
 KEEPER_FOOT_RAIL_MARGINS = (
     KEEPER_FOOT_TIP_Z_FRONT + INNER_Z,
     INNER_Z - KEEPER_FOOT_TIP_Z_REAR,
@@ -467,7 +555,7 @@ KEEPER_FOOT_RAIL_MARGINS = (
 KEEPER_TAP_BOSS_MARGINS = tuple(
     math.hypot(KEEPER_TAP_X - COLUMN_X, boss_z - tap_z)
     - BOSS_DIA / 2.0
-    - THREAD_MAJOR_MM[KEEPER_TAP_SPEC.size] / 2.0
+    - KEEPER_TAP_THREAD_MAJOR_DIA / 2.0
     for boss_z, tap_z in (
         (FRONT_COLUMN_Z, KEEPER_TAP_Z_FRONT),
         (REAR_COLUMN_Z, KEEPER_TAP_Z_REAR),
@@ -475,8 +563,115 @@ KEEPER_TAP_BOSS_MARGINS = tuple(
 )
 if min(KEEPER_FOOT_BOSS_MARGINS) < 1.0:
     raise AssertionError("keeper foot-tip-to-boss clearance is below 1 mm")
+if min(KEEPER_FOOT_PRINTED_BOSS_MARGINS) <= 0.0:
+    raise AssertionError("fit-up keeper foot hits a boss at the printed bands")
 if min(*KEEPER_FOOT_RAIL_MARGINS, *KEEPER_TAP_BOSS_MARGINS) <= 0.0:
     raise AssertionError("keeper foot/tap does not clear the rail corner and boss")
+
+# X is set from the ACTUAL receiver web centre, not the opposite socket;
+# horizontal socket-pitch error therefore does not reach this ligament.
+# The hole is located from a SIDE face: its .XXX band plus half the .X
+# foot-width band both reach the transferred tap centre.
+KEEPER_MIN_FOOT_WIDTH = (
+    round(KEEPER_WIDTH, KEEPER_DRAWING_PRECISION["Foot"]["Depth"])
+    - PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["Foot"]["Depth"]]
+)
+KEEPER_MAX_FOOT_WIDTH = (
+    round(KEEPER_WIDTH, KEEPER_DRAWING_PRECISION["Foot"]["Depth"])
+    + PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["Foot"]["Depth"]]
+)
+KEEPER_PRINTED_SIDE_STATION = round(
+    SCREW_FROM_SIDE,
+    KEEPER_DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"],
+)
+KEEPER_MAX_TRANSVERSE_OFFSET = max(
+    abs(
+        KEEPER_PRINTED_SIDE_STATION
+        - KEEPER_SCREW_TRANSVERSE_BAND_MM
+        - KEEPER_MAX_FOOT_WIDTH / 2.0
+    ),
+    abs(
+        KEEPER_PRINTED_SIDE_STATION
+        + KEEPER_SCREW_TRANSVERSE_BAND_MM
+        - KEEPER_MIN_FOOT_WIDTH / 2.0
+    ),
+)
+KEEPER_MAX_WEB_CENTRE_OFFSET = (
+    abs(round(KEEPER_FITUP_X_FROM_WEB_MM, KEEPER_FITUP_PLACES))
+    + KEEPER_FITUP_LOCATION_BAND_MM
+    + KEEPER_MAX_TRANSVERSE_OFFSET
+)
+KEEPER_MIN_WEB_HALF_WIDTH = (
+    round(WEB_T, DRAWING_REFERENCE_PRECISION["side rail web thickness"])
+    - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["side rail web thickness"]]
+) / 2.0
+KEEPER_MIN_FLANGE_THICKNESS = (
+    round(FLANGE, DRAWING_REFERENCE_PRECISION["top flange thickness"])
+    - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["top flange thickness"]]
+)
+KEEPER_MIN_ROOT_RADIUS = (
+    round(ROOT_FILLET_R, DRAWING_REFERENCE_PRECISION["T rail root radius"])
+    - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["T rail root radius"]]
+)
+KEEPER_MAX_FULL_THREAD_DEPTH = (
+    round(
+        KEEPER_TAP_SPEC.overrides_mm["ThreadDepth"],
+        KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"],
+    )
+    + PRINTED_LINEAR_BAND_MM[KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]]
+)
+# The limiting full-thread corner lies next to the quarter-circle T-root.
+# Use its shortest NORMAL distance to that arc, not the larger horizontal
+# section width. Below the arc the same expression becomes the bare web.
+KEEPER_TAP_THREAD_WALL_MARGIN = (
+    math.hypot(
+        KEEPER_MIN_WEB_HALF_WIDTH
+        + KEEPER_MIN_ROOT_RADIUS
+        - KEEPER_MAX_WEB_CENTRE_OFFSET
+        - KEEPER_TAP_THREAD_MAJOR_DIA / 2.0,
+        max(
+            0.0,
+            KEEPER_MIN_FLANGE_THICKNESS
+            + KEEPER_MIN_ROOT_RADIUS
+            - KEEPER_MAX_FULL_THREAD_DEPTH,
+        ),
+    )
+    - KEEPER_MIN_ROOT_RADIUS
+)
+KEEPER_MAX_TAP_DRILL_RADIUS = (
+    round(
+        TAP_DRILL_MM[KEEPER_TAP_SPEC.size],
+        KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldia"],
+    )
+    + PRINTED_DRILLED_HOLE_PLUS_MM
+) / 2.0
+KEEPER_TAP_DRILL_WALL_MARGIN = (
+    KEEPER_MIN_WEB_HALF_WIDTH
+    - KEEPER_MAX_WEB_CENTRE_OFFSET
+    - KEEPER_MAX_TAP_DRILL_RADIUS
+)
+if min(KEEPER_TAP_THREAD_WALL_MARGIN, KEEPER_TAP_DRILL_WALL_MARGIN) < 1.5:
+    raise AssertionError("keeper receiver leaves less than 1.5 mm at printed bands")
+KEEPER_MAX_STOCK_ENTRY = FOOT_SCREW_LENGTH_MM - (
+    (
+        round(FOOT_H, KEEPER_DRAWING_PRECISION["FootProfile"]["FootRise"])
+        - PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["FootProfile"]["FootRise"]]
+    )
+    - (
+        round(CBORE_DEPTH_MM, FOOT_COUNTERBORE_DEPTH_PLACES)
+        + PRINTED_LINEAR_BAND_MM[FOOT_COUNTERBORE_DEPTH_PLACES]
+    )
+)
+KEEPER_MIN_THREAD_TIP_RESERVE = (
+    round(
+        KEEPER_TAP_SPEC.overrides_mm["ThreadDepth"],
+        KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"],
+    )
+    - PRINTED_LINEAR_BAND_MM[KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]]
+    - KEEPER_MAX_STOCK_ENTRY
+)
+if KEEPER_MIN_THREAD_TIP_RESERVE < 0.25:
+    raise AssertionError("keeper foot screw loses its 0.25 mm blind-thread clearance")
 
 
 # --------------------------------------------------------------------------
@@ -1295,8 +1490,8 @@ async def build(adapter) -> dict[str, str]:
     v_pocket = SET_POCKET * SET_POCKET * SET_POCKET_DEPTH
     volume = await volume_check(adapter, "set pocket", volume - v_pocket, 20.0)
 
-    # 9. Side-screw spot-faces: O9 flats at |z|=133.9 on the curved boss
-    #    (0.6 removal on axis; cut plane 134.9 gives a positive 1.0 depth).
+    # 9. Side-screw spot-faces: O9 flats at |z|=132.6 on the curved boss
+    #    (1.9 removal on axis; cut plane 134.9 gives a positive 2.3 depth).
     v_spot = _spotface_removal()
     for side, sign, reverse in SIDE_SCREW_FACES:
         spot_plane = check(

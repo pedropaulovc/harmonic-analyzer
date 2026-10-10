@@ -12,6 +12,8 @@ detail and the removed knife-hanger section F-F.  A group gets its own
 sheet rather than a crowded corner of one:
 qualifiers then park clear of cutting lines, centrelines and each other.
 Projected top/front pairs stay aligned; removed and section views carry scales.
+Keeper taps transfer from MHA-CH-007 at assembly; their retained station
+coordinates are reference-only. Hanger station dimensions remain controlling.
 
 Run with SolidWorks open::
 
@@ -145,6 +147,7 @@ from fr_top_frame_spec import (
     HANGER_SLOT_LENGTH_CALLOUT,
     HANGER_SLOT_WIDTH,
     HANGER_SLOT_WIDTH_CALLOUT,
+    KEEPER_TAP_CALLOUT_PRECISION,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -244,7 +247,7 @@ GEOMETRY_FRONT_CENTER = (0.145, 0.090)
 # Sheet 3: the hole/station plan, centred on the sheet it now fills at
 # 1:2. The Ø25.5 sockets and Ø45 bosses are the setup features; the
 # smaller boss remains 22.5 mm across on paper, the socket 12.75 mm.
-DETAIL_TOP_CENTER = (0.215, 0.160)
+# Its final centre below reserves room for the assembly-transfer callout.
 # The socket Ra symbol reads off the near-side rim of the rear east socket,
 # in the sheet's own empty lower-left corner, so its leader crosses neither
 # the 224.00 pitch lane nor the 4X socket qualifier above the view.
@@ -281,11 +284,72 @@ INK_CLEARANCE = 0.002
 ROUND_OUT = 0.0001
 # The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
 ARROW_HALF_WIDTH = 0.000381
-# Conservative RD4 ink envelope measured on b49e1. The replacement #4-40
-# callout has the same thread/drill text layout and shorter full-depth text;
-# placement retains the measured envelope, and farm layout validation must
-# confirm the regenerated annotation's actual ink and leader landing.
-KEEPER_CALLOUT_EXTENT = (0.0384, 0.0056, 0.0368, 0.0046)
+# Transfer fit-up owns these locations; the nominal model holes and their
+# sheet coordinates are references, not independent inspection requirements.
+# The trailing newline keeps the native thread/drill/depth on separate rows
+# through _drawing_common.compose_hole_callout_prefix.
+TRANSFER_KEEPER_CALLOUT = "TRANSFER FROM MHA-CH-007\nAT ASSEMBLY;\n"
+# Historical RD4 envelope measured on b49e1, NOT a measurement of the new
+# transfer callout. Expand its width for a conservative 3.5 mm per prefix
+# character and its height by two estimated 5.1 mm rows: offline allowances.
+# farm validation must measure the regenerated ink and leader landing.
+_KEEPER_NATIVE_CALLOUT_EXTENT = (0.0384, 0.0056, 0.0368, 0.0046)
+KEEPER_TRANSFER_ROW_PITCH = 0.0051
+KEEPER_TRANSFER_EXTRA_HEIGHT = (
+    TRANSFER_KEEPER_CALLOUT.count("\n") * KEEPER_TRANSFER_ROW_PITCH
+)
+KEEPER_TRANSFER_CHARACTER_WIDTH = 0.0035
+KEEPER_TRANSFER_EXTRA_WIDTH = max(
+    0.0,
+    max(map(len, TRANSFER_KEEPER_CALLOUT.splitlines()))
+    * KEEPER_TRANSFER_CHARACTER_WIDTH
+    - _KEEPER_NATIVE_CALLOUT_EXTENT[0]
+    - _KEEPER_NATIVE_CALLOUT_EXTENT[2],
+)
+KEEPER_CALLOUT_EXTENT = (
+    _KEEPER_NATIVE_CALLOUT_EXTENT[0],
+    _KEEPER_NATIVE_CALLOUT_EXTENT[1],
+    _KEEPER_NATIVE_CALLOUT_EXTENT[2] + KEEPER_TRANSFER_EXTRA_WIDTH,
+    _KEEPER_NATIVE_CALLOUT_EXTENT[3] + KEEPER_TRANSFER_EXTRA_HEIGHT,
+)
+
+
+def _keeper_leader_angle(
+    hole: tuple[float, float], boss: tuple[float, float], boss_r: float
+) -> float:
+    """Steepest lower-right entry clearing the rear boss, in sheet metres."""
+    bx, by = boss[0] - hole[0], boss[1] - hole[1]
+    rho, phi = math.hypot(bx, by), math.atan2(-bx, -by)
+    reach = boss_r + INK_CLEARANCE + ROUND_OUT
+    if reach >= rho:
+        raise ValueError(
+            f"keeper tap stands inside its boss clearance ({rho=}, {reach=})"
+        )
+    return phi + math.acos(reach / rho)
+
+
+# The extra rows lower the shoulder; along the same boss-clear tangent this
+# advances it right by height/tan(angle). Move only this plan left by that
+# advance plus the added width, retaining the previous right-frame clearance.
+KEEPER_TRANSFER_PLAN_SHIFT = (
+    KEEPER_TRANSFER_EXTRA_HEIGHT
+    / math.tan(
+        _keeper_leader_angle(
+            (
+                KEEPER_TAP_X * DETAIL_VIEW_SCALE / 1000.0,
+                -KEEPER_TAP_Z_REAR * DETAIL_VIEW_SCALE / 1000.0,
+            ),
+            (
+                COLUMN_X * DETAIL_VIEW_SCALE / 1000.0,
+                -REAR_COLUMN_Z * DETAIL_VIEW_SCALE / 1000.0,
+            ),
+            BOSS_DIA / 2.0 * DETAIL_VIEW_SCALE / 1000.0,
+        )
+    )
+    + KEEPER_TRANSFER_EXTRA_WIDTH
+)
+DETAIL_TOP_CENTER = (0.215 - KEEPER_TRANSFER_PLAN_SHIFT, 0.160)
+
 # The cap seat symbol's ink right of its leader's bend: "CAP SEAT FLOORS, 4X"
 # and the rule over it end 4.64 mm past the bend (b49e1: bend at x 210.00,
 # text to 214.57, rule to 214.64), rounded outward.
@@ -1329,12 +1393,7 @@ def keeper_callout_placement(
     shoulder_y = hole[1] - (INK_CLEARANCE + ARROW_HALF_WIDTH + ROUND_OUT) - up - down
     # The leader leaves the hole along (cos t, -sin t); its distance to the
     # boss centre is rho cos(t - phi), shrinking as t steepens past phi.
-    bx, by = boss[0] - hole[0], boss[1] - hole[1]
-    rho, phi = math.hypot(bx, by), math.atan2(-bx, -by)
-    reach = boss_r + INK_CLEARANCE + ROUND_OUT
-    if reach >= rho:
-        raise ValueError(f"keeper tap stands inside its boss clearance ({rho=}, {reach=})")
-    steepest = phi + math.acos(reach / rho)
+    steepest = _keeper_leader_angle(hole, boss, boss_r)
     shoulder_x = hole[0] + (hole[1] - shoulder_y) / math.tan(steepest)
     if shoulder_x + left + right + INK_CLEARANCE > SHEET_FRAME[2]:
         raise ValueError(f"keeper callout runs past the frame at x {shoulder_x + left + right:.4f}")
@@ -2072,42 +2131,42 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=keeper_edge,
         callout_xy=keeper_callout_xy,
         label="2X fulcrum-keeper blind taps",
-        process="KEEPER TAP",
+        process=TRANSFER_KEEPER_CALLOUT,
     )
-    # Blind depths under the general .X band, not the .XX the native two
-    # places would ask for (codex round 4); the native tap drill keeps its places.
+    # Part-spec-authored .XX drill diameter and .X blind depths: these are
+    # also the precision inputs to the published-band receiver proof.
     set_hole_callout_precision(
-        keeper_callout, {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
-        label="keeper tap depths",
+        keeper_callout, KEEPER_TAP_CALLOUT_PRECISION,
+        label="keeper tap sizes and depths",
     )
     upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     hanger_x = HANGER_X
     keeper_drill_r = TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0
-    for p0, p1, expected, xy, orientation, label, suffix in (
+    for p0, p1, expected, xy, orientation, label, suffix, reference in (
         (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_CBORE_DIA/2),
          COLUMN_X + hanger_x, (0.162, 0.240), "horizontal",
-         "hanger x from left sockets", "2X HANGER X"),
+         "hanger x from left sockets", "2X HANGER X", False),
         (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_CBORE_DIA/2),
          STUD_Z_FRONT - FRONT_COLUMN_Z, (0.062, 0.209), "vertical",
-         "front hanger z from upper sockets", "FRONT HANGER Z"),
+         "front hanger z from upper sockets", "FRONT HANGER Z", False),
         (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + HANGER_CBORE_DIA/2),
          STUD_Z_REAR - FRONT_COLUMN_Z, (0.040, 0.165), "vertical",
-         "rear hanger z from upper sockets", "REAR HANGER Z"),
+         "rear hanger z from upper sockets", "REAR HANGER Z", False),
         (upper_left_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
          KEEPER_TAP_X + COLUMN_X, (0.150, 0.0745), "horizontal",
-         "keeper x from left sockets", "KEEPER X"),
+         "keeper x from left sockets", "KEEPER X", True),
         (upper_right_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
          KEEPER_TAP_Z_FRONT - FRONT_COLUMN_Z, (0.350, 0.205), "vertical",
-         "front keeper z from upper sockets", "FRONT KEEPER Z"),
+         "front keeper z from upper sockets", "FRONT KEEPER Z", True),
         (upper_right_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR + keeper_drill_r),
          KEEPER_TAP_Z_REAR - FRONT_COLUMN_Z, (0.372, 0.160), "vertical",
-         "rear keeper z from upper sockets", "REAR KEEPER Z"),
+         "rear keeper z from upper sockets", "REAR KEEPER Z", True),
     ):
         _checked_dimension(
             adapter, detail_top, p0=p0, p1=p1, text_xy=xy, label=label,
             expected_mm=expected, orientation=orientation, center=True,
-            suffix=suffix,
+            suffix=suffix, reference=reference,
         )
     detail_top_note = add_note(adapter, HOLE_STATION_NOTE, *HOLE_STATION_NOTE_XY)
     add_property_linked_note(

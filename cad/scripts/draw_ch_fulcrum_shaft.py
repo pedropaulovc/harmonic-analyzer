@@ -23,6 +23,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from ch_fulcrum_shaft_spec import (
     DRAWING_DIMENSIONS,
+    FLAT_FROM_END,
     FLAT_PITCH,
     SHAFT_DIA,
     SHAFT_LENGTH,
@@ -57,18 +58,23 @@ ISO_CENTER = (0.355, 0.205)
 # 1:2, like the near-identical 187 arbor on MHA-DT-013: at 1:1 the shaft's
 # isometric is a long diagonal bar that runs over the right zone border.
 ISO_SCALE = (1, 2)
-
 # Both profile sketches lie on the Right plane, so every print dimension
 # lands in the side view.  The sketch +u axis is model -Z, which the *Right
 # view draws to sheet-RIGHT (the build_ch_pivot_shaft mapping); the flat
-# length and the across-flat witness ride the +u flat.
+# length and the across-flat witness ride the +u flat, and the -u flat's
+# station off the sheet-LEFT dome tip sits at the flat length's height,
+# under the FlatPitch.
 _PLUS_U_FLAT_X = RIGHT_CENTER[0] + FLAT_PITCH / 2000.0
 _TIP_X = RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0
+_MINUS_U_STATION_X = (
+    RIGHT_CENTER[0] - (SHAFT_LENGTH / 2.0 - FLAT_FROM_END / 2.0) / 1000.0
+)
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 RIGHT_KEEP = {
     "OverallLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.020),
     "ShaftDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1]),
     "FlatPitch": (RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.024),
+    "FlatFromEnd": (_MINUS_U_STATION_X, RIGHT_CENTER[1] + 0.013),
     "FlatLength": (_PLUS_U_FLAT_X, RIGHT_CENTER[1] + 0.013),
     "AcrossFlat": (_TIP_X + 0.012, RIGHT_CENTER[1]),
 }

@@ -18,6 +18,7 @@ from __future__ import annotations
 import _config
 import vn_knife_hanger_stud_spec as HANGER_SCREW
 import vn_knife_mount_dowel_spec as KNIFE_DOWEL
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _gtol_spec import CylinderFace, PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
@@ -286,13 +287,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # marks, so ``draw_fr_top_frame`` imports each dimension verbatim and only reads
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
-# One place is this casting's routine band.  The hanger and keeper stations are
-# drilled and tapped clearance features: .X (+/-0.8) is the band they need, and
-# a second place claimed a tolerance nothing on the part requires.  More places
-# appear only where a fit lives there -- the cap recess diameter and depth carry
-# the bilateral bands above, the gooseneck bore prints the clearance a
-# purchased post is set into, and the dowel slip hole and slot width are
-# reamed to their own +/-0.03 band at three places.
+# One place is this casting's routine band. Hanger positions are clearance
+# features drilled under .X (+/-0.8). Keeper positions are model-nominal
+# references only: the frame taps are transferred from the bench-pair-reamed,
+# fit-up-located keeper feet, not independently located to the general band.
+# More places appear only where a fit lives there -- the cap recess diameter
+# and depth carry the bilateral bands above, the gooseneck bore prints the
+# clearance a purchased post is set into, and the dowel slip hole and slot
+# width are reamed to their own +/-0.03 band at three places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
     "WebRing": {"RingHeight": 1},
@@ -362,8 +364,9 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # are the one pair of sheet-derived numbers that earns a second place.
     "socket horizontal pitch": 2,
     "socket vertical pitch": 2,
-    # The hole stations, baseline from the socket bore axes (X from the left
-    # pair, Z from the upper pair): drilled positions under the general band.
+    # Hole stations baseline from socket axes (X from the left pair, Z from
+    # the upper pair). Hangers are drilled under the general band; keeper
+    # coordinates are reference-only guides to assembly-transferred taps.
     "hanger x from left sockets": 1,
     "front hanger z from upper sockets": 1,
     "rear hanger z from upper sockets": 1,
@@ -398,6 +401,15 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
 }
 
+# Use the canonical printed-band reader, not the unrounded inch grades.
+PRINTED_LINEAR_BAND_MM = {places: printed_band_mm(places) for places in (1, 2, 3)}
+PRINTED_DRILLED_HOLE_PLUS_MM = drilled_oversize_mm()
+# Native Hole Wizard variables: diameters retain .XX, blind depths use .X.
+KEEPER_TAP_CALLOUT_PRECISION = {
+    "hw-tapdrldia": 2,
+    "hw-tapdrldepth": 1,
+    "hw-threaddepth": 1,
+}
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit.
 DRAWING_NOTES = (

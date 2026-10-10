@@ -1,12 +1,12 @@
 vn-frame-side-screw:
-  title: Steel Narrow Fillister Head Slotted Screw
+  title: 18-8 Stainless Steel Fillister Head Slotted Screw
   number: MHA-VN-022
-  stock_name: Steel Narrow Fillister Head Slotted Screw
+  stock_name: 18-8 Stainless Steel Fillister Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [90280A110]
-  material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 90280A110
-  finish: zinc plated
+  supplier_skus: [91794A080]
+  material: AISI 304
+  material_specification: 18-8 stainless steel, McMaster-Carr 91794A080
+  finish: passivated
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance

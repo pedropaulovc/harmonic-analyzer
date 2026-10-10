@@ -24,7 +24,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # are BOTH the shared spec's map.
     assert part.DRAWING_DIMENSIONS is ch_fulcrum_keeper_spec.DRAWING_DIMENSIONS
     marked = set().union(*ch_fulcrum_keeper_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
 
 
@@ -58,46 +58,97 @@ def test_crown_set_screw_tap_stops_at_the_bore() -> None:
 
 def test_rule_12_worst_case_walls_and_thread() -> None:
     # Worst case of the printed bands (policy rule 12): >= 1.5D of full
-    # crown thread, >= 1.5 web from the thread major to each lug face and
-    # from the foot counterbore to the foot tip.
+    # crown thread and of foot-screw engagement in the frame, >= 1.5 web from
+    # the crown thread major to each lug face and from the foot counterbore
+    # to the foot tip and sides.
     spec = ch_fulcrum_keeper_spec
     assert spec.SET_SCREW_ENGAGEMENT_D >= 1.5
+    assert spec.FOOT_SCREW_ENGAGEMENT_D >= 1.5
     assert spec.SET_SCREW_WEB_MM >= 1.5
     assert spec.FOOT_TIP_WALL_MM >= 1.5
+    assert spec.FOOT_SIDE_WALL_MM >= 1.5
     assert round(spec.SET_SCREW_WEB_MM, 3) == 1.813
-    assert round(spec.FOOT_TIP_WALL_MM, 3) == 1.725
+    assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.37
+    assert round(spec.FOOT_SCREW_ENGAGEMENT_D, 2) == 1.79
+    # The native counterbore callout prints the template's .XX; the engagement
+    # and bottoming stacks take that printed depth (2.11), not 2.1082.
+    assert spec.FOOT_COUNTERBORE_DEPTH_PLACES == 2
     # The web is only met with the lug and tap station at three places.
     assert spec.DRAWING_PRECISION["LugBody"]["LugThickness"] == 3
     assert spec.DRAWING_PRECISION["SetScrewReference"]["SetScrewLocation"] == 3
+    # GPT review F4 / ruling (d): plain .XXX coordinate dims locate the foot
+    # hole; the frame's transferred tap takes the side-station band.
+    assert spec.DRAWING_PRECISION["FootScrewReference"]["ScrewFromLug"] == 3
+    assert spec.DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"] == 3
+    assert spec.KEEPER_SCREW_TRANSVERSE_BAND_MM == spec._BAND_BY_PLACES[3]
 
 
-def test_tap_station_reference_sketch() -> None:
-    assert part.REFERENCE_SKETCHES == ch_fulcrum_keeper_spec.REFERENCE_SKETCHES
-    assert [row[0] for row in part.REFERENCE_LINES] == ["SetScrewReference"]
-    _, plane, dimension, start, end, _, value, _ = part.REFERENCE_LINES[0]
-    assert plane == "Front"
-    assert dimension == "SetScrewLocation"
-    # From the outer lug face (datum B) to the tap axis, on the crown top.
-    assert start == (
-        ch_fulcrum_keeper_spec.LUG_HALF_T,
-        ch_fulcrum_keeper_spec.CROWN_TOP_Y,
-    )
-    assert end == (0.0, ch_fulcrum_keeper_spec.CROWN_TOP_Y)
-    assert value == ch_fulcrum_keeper_spec.LUG_HALF_T
+def test_tap_and_foot_hole_station_reference_sketches() -> None:
+    spec = ch_fulcrum_keeper_spec
+    assert part.REFERENCE_SKETCHES == spec.REFERENCE_SKETCHES
+    assert [row[0] for row in part.REFERENCE_LINES] == [
+        "SetScrewReference",
+        "FootScrewReference",
+        "FootScrewSideReference",
+    ]
+    rows = {row[0]: row for row in part.REFERENCE_LINES}
+    _, plane, dimension, start, end, _, value, _ = rows["SetScrewReference"]
+    assert (plane, dimension) == ("Front", "SetScrewLocation")
+    # From the outer lug face to the tap axis, on the crown top.
+    assert start == (spec.LUG_HALF_T, spec.CROWN_TOP_Y)
+    assert end == (0.0, spec.CROWN_TOP_Y)
+    assert value == spec.LUG_HALF_T
+    _, plane, dimension, start, end, _, value, _ = rows["FootScrewReference"]
+    assert (plane, dimension) == ("Top", "ScrewFromLug")
+    assert start == (spec.LUG_HALF_T, 0.0) and end == (spec.SCREW_X, 0.0)
+    assert value == spec.SCREW_X - spec.LUG_HALF_T
+    _, plane, dimension, start, end, _, value, _ = rows["FootScrewSideReference"]
+    assert (plane, dimension) == ("Top", "ScrewFromSide")
+    # One keeper part: the foot hole on the width centreline.
+    assert start == (spec.SCREW_X, 0.0)
+    assert end == (spec.SCREW_X, spec.KEEPER_WIDTH / 2.0)
+    assert value == spec.KEEPER_WIDTH / 2.0
 
 
 def test_keeper_tap_spec_for_the_frame() -> None:
-    tap = ch_fulcrum_keeper_spec.KEEPER_TAP_SPEC
-    assert (tap.kind, tap.size, tap.end) == ("tapped", "#4-40", "blind")
-    assert tap.size == ch_fulcrum_keeper_spec.FOOT_SCREW_THREAD
-    assert tap.overrides_mm["ThreadDepth"] < tap.depth_mm
+    spec = ch_fulcrum_keeper_spec
+    tap = spec.KEEPER_TAP_SPEC
+    assert (tap.kind, tap.size, tap.end) == ("tapped", "#2-56", "blind")
+    assert tap.size == spec.FOOT_SCREW_THREAD
+    assert tap.overrides_mm["ThreadDepth"] == spec.KEEPER_TAP_THREAD_DEPTH_MM == 7.6
+    assert tap.depth_mm == 11.5
+
+
+def test_fitup_exports_for_the_top_frame() -> None:
+    # The pair is set by DRO (MHA-CH-000 STEP 9): X off the rail web under
+    # each lug, Z off the front socket line; the frame taps are transferred.
+    spec = ch_fulcrum_keeper_spec
+    assert spec.KEEPER_FITUP_LOCATION_BAND_MM == 0.02
+    assert spec.KEEPER_FITUP_PLACES == 2
+    assert spec.KEEPER_FITUP_X_FROM_WEB_MM == 2.9
+    front, rear = spec.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
+    assert (round(front, 2), round(rear, 2)) == (40.5, 182.5)
+    assert rear - front == 2.0 * (spec.KEEPER_Z_OFF - spec.LUG_HALF_T)
+
+
+def test_print_carries_no_datums_or_frames_and_cites_the_fitup_steps() -> None:
+    # Policy: brackets carry no GD&T; the bore pair's coaxiality is a named
+    # step (F5) and the set-screw lock is a staked mouth (F6).
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "add_datum_feature" not in source
+    assert "add_feature_control_frame" not in source
+    assert not hasattr(ch_fulcrum_keeper_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].endswith("PER MHA-CH-000 STEP 8")
+    assert drawing.DIMENSION_CALLOUTS["CrownDia"].endswith("PER MHA-CH-000 STEP 8")
+    assert "STAKE MOUTH 2 PLACES" in drawing.SET_SCREW_PROCESS
+    assert "MHA-CH-000 STEP 10" in drawing.SET_SCREW_PROCESS
 
 
 def test_screw_hole_seats_the_frame_side_screw() -> None:
     hole = ch_fulcrum_keeper_spec.SCREW_HOLE_SPEC
     assert part.SCREW_HOLE_SPEC is hole
     assert hole.kind == "counterbore_fillister"
-    assert hole.size == "#4"
+    assert hole.size == "#2"
     assert hole.overrides_mm == {
         "HoleDiameter": ch_fulcrum_keeper_spec.HOLE_DIA_MM,
         "CounterBoreDiameter": ch_fulcrum_keeper_spec.CBORE_DIA_MM,
@@ -120,55 +171,14 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert "add_native_hole_callout(" in source
 
 
-def test_outboard_lug_edge_resolver_filters_visible_geometry(monkeypatch) -> None:
-    wrong_x = object()
-    wrong_orientation = object()
-    expected = object()
-    endpoints = {
-        wrong_x: (0.002, 0.008, 0.007, 0.002, 0.0252, 0.007),
-        wrong_orientation: (0.003, 0.008, -0.007, 0.003, 0.008, 0.007),
-        expected: (0.003, 0.008, 0.007, 0.003, 0.0252, 0.007),
-    }
-
-    class FakeSpan:
-        def __init__(self) -> None:
-            self.attributes = {}
-
-        def set_attribute(self, key, value) -> None:
-            self.attributes[key] = value
-
-    span = FakeSpan()
-    monkeypatch.setattr(
-        drawing._telemetry.trace, "get_current_span", lambda context=None: span
-    )
-    resolver = drawing._visible_outboard_lug_edge.__wrapped__
-    monkeypatch.setattr(
-        drawing,
-        "visible_view_entities",
-        lambda view, entity_kind, *, label: [
-            wrong_x,
-            wrong_orientation,
-            expected,
-        ],
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda entity, interface: entity)
-    monkeypatch.setattr(
-        drawing,
-        "_edge_endpoint_key",
-        lambda adapter, edge: endpoints[edge],
-    )
-
-    assert resolver(object(), object()) is expected
-    assert span.attributes["matched"] == 1
-
-
-def test_notes_cover_the_fit_the_tap_and_the_screw() -> None:
+def test_notes_cover_the_finish_the_tap_and_the_screw() -> None:
     notes = ch_fulcrum_keeper_spec.DRAWING_NOTES
     assert "BLACK OXIDE" in notes
-    assert "REAM" in notes
+    # The pair ream is on the bore callout (STEP 8), not a note.
+    assert "REAM" not in notes
     assert "MHA-CH-004" in notes
     assert "MHA-VN-055" in notes
-    assert "MHA-VN-022" in notes
+    assert "MHA-VN-022 #2-56 FILLISTER" in notes
     assert "2 REQUIRED" in notes
     assert len(notes.splitlines()) <= 6
 

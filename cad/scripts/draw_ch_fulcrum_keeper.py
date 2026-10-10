@@ -7,10 +7,12 @@ sheet/template, import, curation, and export behavior lives in
 
 The sheet runs at 2:1 (the bracket is ~16.5 x 32.2 x 14); the isometric
 carries an explicit 1:1 override so it stays clear of the title block.  Four
-views: the side profile (front), the plan (top, which carries the
-counterbored screw-hole and crown set-screw tap callouts), the end view
-(right, which carries the width / shaft-axis-height / crown / bore stack),
-and the isometric.
+views: the side profile (front), the plan (top, which carries the foot
+screw's stations and the counterbored screw-hole and crown set-screw tap
+callouts), the end view (right, which carries the width / shaft-axis-height /
+crown / bore stack), and the isometric.  A bracket carries no frames and no
+datums (drawing-simplicity-policy.md): every location is a plain coordinate
+dimension off a named face.
 
 Run with SolidWorks open::
 
@@ -24,31 +26,30 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+import ch_channel_assembly_steps as steps
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    _edge_endpoint_key,
-    add_datum_feature,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
-    visible_view_entities,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from ch_fulcrum_keeper_spec import (
+    BORE_PAIR_CALLOUT,
     CBORE_DIA_MM,
-    CROWN_TOP_Y,
+    CROWN_ABOUT_BORE_CALLOUT,
     DRAWING_DIMENSIONS,
     FOOT_TIP_X,
-    GEOMETRIC_TOLERANCES_MM,
     LUG_HALF_T,
+    SCREW_FROM_SIDE,
     SCREW_X,
     SET_SCREW_HOLE_SPEC,
 )
@@ -81,9 +82,9 @@ TOP_CENTER = (0.110, 0.228)
 RIGHT_CENTER = (0.225, 0.130)
 ISO_CENTER = (0.330, 0.190)
 
-# Model bbox centres the projected views are laid out around.
+# Model bbox centre the projected views are laid out around (front and plan
+# share model X).
 _X_MID = (-LUG_HALF_T + FOOT_TIP_X) / 2.0  # 5.25
-_Y_MID = CROWN_TOP_Y / 2.0  # 16.1 (crown top 32.2)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -91,57 +92,49 @@ def _front_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + (model_x_mm - _X_MID) * SHEET_SCALE[0] / 1000.0
 
 
-def _front_y(model_y_mm: float) -> float:
-    """Sheet Y of a model-Y point in the front view (2:1, bbox-centred)."""
-    return FRONT_CENTER[1] + (model_y_mm - _Y_MID) * SHEET_SCALE[0] / 1000.0
-
-
-@_telemetry.traced("drawing.pick_lug_edge")
-def _visible_outboard_lug_edge(adapter: Any, view: Any) -> Any:
-    """Return the deterministic front-view edge at the lug's outboard face."""
-    target_x = LUG_HALF_T / 1000.0
-    candidates: list[tuple[tuple[float, ...], Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label="fulcrum front edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        endpoints = _edge_endpoint_key(adapter, edge)
-        if endpoints is None:
-            continue
-        x0, y0, z0, x1, y1, z1 = endpoints
-        if abs(x0 - target_x) > 1e-6 or abs(x1 - target_x) > 1e-6:
-            continue
-        if abs(y1 - y0) < 0.005 or abs(z1 - z0) > 1e-6:
-            continue
-        geometry = tuple(sorted((endpoints[:3], endpoints[3:])))
-        candidates.append((geometry[0] + geometry[1], edge))
-
-    span = _telemetry.trace.get_current_span()
-    span.set_attribute("matched", len(candidates))
-    if not candidates:
-        raise RuntimeError("front view has no vertical edge at the lug outboard face")
-    return min(candidates, key=lambda candidate: candidate[0])[1]
-
-
 # Handy picks derived from the layout above.
-SEAT_EDGE_Y = _front_y(0.0)  # the foot seating face (datum A)
-LUG_FACE_X = _front_x(LUG_HALF_T)  # outboard lug face (datum B)
 HOLE_X_SHEET = _front_x(SCREW_X)  # screw-hole station, shared by the top view
 CBORE_R_SHEET = CBORE_DIA_MM * SHEET_SCALE[0] / 2000.0
 # The crown tap seen end-on in the plan, on the lug mid-plane (x = 0).
 TAP_X_SHEET = _front_x(0.0)
 TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
-SET_SCREW_PROCESS = "TAP TO BORE"
+# The tap is cut at the bench; its mouth is staked over the seated set screw
+# at the channel assembly (policy rule 9's lock, joint_retention), so the
+# callout says so ahead of the native size row.
+SET_SCREW_PROCESS = (
+    f"TAP TO BORE; STAKE MOUTH 2 PLACES\n"
+    f"AT ASSEMBLY PER {steps.step_ref(steps.SET_SCREWS_STAKED_KEY)}\n"
+)
+# The two keepers' bores are drilled and reamed together (one axis whatever
+# LugRise prints) and each crown is then rounded about its own bore: bench
+# instructions of the pair-ream step, so each rides its own dimension.
+_PAIR_REAM_STEP = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
+DIMENSION_CALLOUTS = {
+    "BoreDia": f"{BORE_PAIR_CALLOUT},\nPER {_PAIR_REAM_STEP}",
+    "CrownDia": f"{CROWN_ABOUT_BORE_CALLOUT},\nPER {_PAIR_REAM_STEP}",
+}
 
 # Per-view survivors of the marked-dimension import: parametric name ->
 # sheet position.  The front view carries the lug thickness and the crown
 # tap's station off the outer lug face (both stacked above the crown), the
 # foot length below the seat and the foot height right of the foot tip; the
-# end view carries the width plus the shaft-axis / crown stack and the
-# reamed bore.
+# plan carries the foot screw's station off the outer lug face (above the
+# plan) and off the -Z side face (right of the foot tip); the end view
+# carries the width plus the shaft-axis / crown stack and the reamed bore.
 FRONT_KEEP = {
     "SetScrewLocation": (_front_x(1.5), 0.170),
     "LugThickness": (_front_x(0.0), 0.178),
     "FootLength": (_front_x(SCREW_X), 0.086),
     "FootRise": (0.140, 0.106),
+}
+# The plan projects model -Z to sheet UP, so the -Z side face is the
+# plan's top edge, SCREW_FROM_SIDE above the screw axis.
+TOP_KEEP = {
+    "ScrewFromLug": (_front_x((LUG_HALF_T + SCREW_X) / 2.0), 0.252),
+    "ScrewFromSide": (
+        _front_x(FOOT_TIP_X) + 0.014,
+        TOP_CENTER[1] + SCREW_FROM_SIDE * SHEET_SCALE[0] / 2000.0,
+    ),
 }
 RIGHT_KEEP = {
     "Depth": (0.225, 0.172),
@@ -177,7 +170,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    drawing_model, sheet = new_project_drawing(
+    drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
@@ -200,9 +193,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # The tap station is owned by a reference sketch the part saves blanked
-    # (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES); the hidden-owner curate
-    # shows it in the front view that dimensions it.
+    # The tap and foot-screw stations are owned by reference sketches the
+    # part saves blanked (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES); the
+    # hidden-owner curate shows each in the view that dimensions it.
     curate_view_dimensions(
         adapter,
         front,
@@ -212,66 +205,23 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     curate_view_dimensions(
         adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    right_annotations = curate_view_dimensions(
+        adapter,
         right,
         keep=RIGHT_KEEP,
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
 
-    # Native datum/GD&T annotations.  Datum A is the foot seating face (the
-    # part sits on the rail top face and the screw clamps normal to it),
-    # attached on the END view's edge-on seat line beside the flatness frame:
-    # below the front view the seat line is boxed in by the FootLength extension
-    # lines.  Datum B is the outboard lug face (the foot screw's station).
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] - 0.006, SEAT_EDGE_Y),
-        symbol_xy=(RIGHT_CENTER[0] - 0.006, SEAT_EDGE_Y - 0.010),
-        datum="A",
-        label="keeper seating face",
-    )
-    # Datum B is attached to the actual vertical model edge at x=+3 mm.  It is
-    # not a silhouette edge: the front-view outline scanner returns only the
-    # horizontal crown/foot transitions, while the locating edge is a visible
-    # model edge.  Resolve it by model-space endpoints so view projection drift
-    # cannot move the annotation to another edge.
-    lug_edge = _visible_outboard_lug_edge(adapter, front)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_entity=lug_edge,
-        symbol_xy=(LUG_FACE_X + 0.014, _front_y(12.0)),
-        datum="B",
-        label="outboard lug face",
-    )
-    # Flatness rides the END view's edge-on seat line: in the front view the
-    # seat is boxed in by the FootLength extension lines, so any leader to it
-    # crosses them.  Attach right of the LugRise extension and datum A,
-    # frame below-right of the view.
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] + 0.005, SEAT_EDGE_Y),
-        frame_xy=(0.248, 0.088),
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["foot seating face flatness"],
-        label="seating face flatness",
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=(HOLE_X_SHEET, TOP_CENTER[1] + CBORE_R_SHEET),
-        frame_xy=(0.052, 0.252),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["screw-hole position"],
-        datums=("A", "B"),
-        diameter=True,
-        label="screw-hole position",
-    )
     # Counterbored screw hole ships as the native wizard callout on the plan
     # view, where it projects as its true circles.
     add_native_hole_callout(

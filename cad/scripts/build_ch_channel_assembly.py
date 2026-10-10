@@ -34,7 +34,7 @@ the M6.8 mirror layer is gone).
   bottom-left / ch30 p008; lug mid-planes at (199.9, z 3.088 +- 74.0), the
   shaft through their reamed bores; one #1-72 cup-point set screw down
   through each crown onto the shaft's flat (its only axial and rotational
-  location); feet outboard, screwed down into the rail's tapped #4-40 holes
+  location); feet outboard, screwed down into the rail's tapped #2-56 holes
   at z 3.088 +- 82.25; replaces the photo-refuted chrome baluster lever
   pair, 2026-08-02)
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
@@ -559,7 +559,7 @@ if min(KEEPER_HUB_FLOAT) < KEEPER_HUB_FLOAT_MIN:
 # Foot screws (frame-side-screw MHA-VN-022) at the outboard foot centres,
 # KEEPER_SCREW_Z_OFF off the centre. The under-head plane is derived from the
 # keeper foot and its exact flush counterbore; the screws thread the
-# top-frame's tapped #4-40 holes (build_fr_top_frame.py KeeperTaps).
+# top-frame's tapped #2-56 holes (build_fr_top_frame.py KeeperTaps).
 KEEPER_SCREW_SEAT_H = KEEPER_FOOT_H - KEEPER_CBORE_DEPTH
 # Set screws (MHA-VN-055): cup point down on each shaft flat, on the keeper's
 # crown tap axis (the lug mid-plane, over the shaft axis).

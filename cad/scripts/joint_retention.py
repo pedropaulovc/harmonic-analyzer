@@ -582,8 +582,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_fillister_screw",  # #4-40 brass fillister (90114A511): nameplate into harmonic_base, keeper eye into crank_arm, paper-drive clip and guide screws
         "vn_foot_screw",  # #4-40 fillister (90280A108), member into harmonic_base via pinion_spring foot (top level)
         "vn_frame_cross_screw",  # #10-32 UNF-2A x 1-3/4 (McMaster 90280A837), member: 4 into harmonic_base, 4 into top_frame
-        "vn_frame_side_screw",  # #4-40 narrow fillister (McMaster 90280A110, MHA-VN-022); member, x2 into top_frame KeeperTaps (top-level row)
-        "ch_fulcrum_keeper",  # #1-72 UNF crown tap through to the shaft bore (receiver of MHA-VN-055); its #4 foot hole is clearance only
+        "vn_frame_side_screw",  # #2-56 fillister (McMaster 91794A080, MHA-VN-022); member, x2 into top_frame KeeperTaps (top-level row)
+        "ch_fulcrum_keeper",  # #1-72 UNF crown tap through to the shaft bore (receiver of MHA-VN-055); its #2 foot hole is clearance only
         "vn_fulcrum_set_screw",  # #1-72 UNF x 5/32 cup-point set screw (McMaster 91375A942, MHA-VN-055), member: x2, one into each fulcrum_keeper crown tap
         "sm_gooseneck",  # #6-32 UNC integral slotted spring screw in the brazed end-plug tap (member AND receiver, one component); also the post the frame's 1/4-20 set screw bears on
         "vn_gooseneck_set_screw",  # 1/4-20 UNC square-head cup point (91410A538), member: into top_frame hub tap, grips summing gooseneck
@@ -1323,9 +1323,11 @@ JOINTS: tuple[Joint, ...] = (
         assembly="ha_harmonic_analyzer",
         member="vn_frame_side_screw",
         receiver="fr_top_frame",
-        thread="#4-40",
+        thread="#2-56",
         quantity=2,
-        installed_at="",
+        installed_at=ch_channel_assembly_steps.step_ref(
+            ch_channel_assembly_steps.KEEPERS_SET_KEY
+        ),
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the only fastener of each fulcrum_keeper, which carries the end of the "
@@ -1335,16 +1337,17 @@ JOINTS: tuple[Joint, ...] = (
             "lever/bar loads apply a reversing torque about the single screw's vertical "
             "axis, and no dowel or second screw reacts it"
         ),
-        axial_capture="slotted narrow-fillister head seated flush in the keeper foot counterbore (CBORE_DEPTH 2.7178); thread in top_frame KeeperTaps #4-40 x 9 thread / 14 drill blind",
+        axial_capture="slotted fillister head seated flush in the keeper foot counterbore (CBORE_DEPTH 2.1082); thread in top_frame KeeperTaps #2-56 x 7.6 thread / 11.5 drill blind, transferred from the foot hole at fit-up",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_ch_channel_assembly.py keeper loop (frame-side-screw at FULCRUM_KEEPER_CENTRE_Z +- KEEPER_SCREW_Z_OFF) + header "
-            "('screwed down into the rail's tapped #4-40 holes'); ch_fulcrum_keeper_spec.py docstring/SCREW_X/"
-            "SCREW_HOLE_SPEC/KEEPER_TAP_SPEC (#4-40 blind, 14 drill, ThreadDepth 9) + DRAWING_NOTES 3; build_fr_top_frame.py "
-            "step 'KeeperTaps' consumes KEEPER_TAP_SPEC; config parts/vn-frame-side-screw.yaml (90280A110); no printed install step found"
+            "build_ch_channel_assembly.py keeper loop (frame-side-screw at FULCRUM_KEEPER_CENTRE_Z +- KEEPER_SCREW_Z_OFF) + header; "
+            "ch_fulcrum_keeper_spec.py docstring/SCREW_X/SCREW_HOLE_SPEC/KEEPER_TAP_SPEC (#2-56 blind, 11.5 drill, "
+            "ThreadDepth 7.6; FOOT_SCREW_ENGAGEMENT_D) + DRAWING_NOTES 2; build_fr_top_frame.py step 'KeeperTaps' "
+            "consumes KEEPER_TAP_SPEC; config parts/vn-frame-side-screw.yaml (91794A080); draw_ch_channel_assembly.py "
+            "step fulcrum-keepers-set ('TRANSFER EACH FOOT HOLE INTO THE RAIL, TAP AS MHA-FR-002, SCREW DOWN ONE MHA-VN-022')"
         ),
     ),
     Joint(
@@ -1354,7 +1357,9 @@ JOINTS: tuple[Joint, ...] = (
         receiver="ch_fulcrum_keeper",
         thread="#1-72 UNF",
         quantity=2,
-        installed_at="",
+        installed_at=ch_channel_assembly_steps.step_ref(
+            ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY
+        ),
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the two set screws alone hold the plain fulcrum_shaft axially and in rotation "
@@ -1362,14 +1367,19 @@ JOINTS: tuple[Joint, ...] = (
             "journal drag reaches each screw through its cup point on the shaft flat"
         ),
         axial_capture="cup point tightened onto the 0.3-deep set-screw flat of MHA-CH-004 through the keeper crown tap; screw rides only its own #1-72 thread in the crown (>= 1.5D full thread at the worst case, ch_fulcrum_shaft_spec.SET_SCREW_ENGAGEMENT_D)",
-        lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
+        lock=Lock.STAKED,
+        lock_part="ch_fulcrum_keeper:staked tap mouth",
+        lock_binds=("vn_fulcrum_set_screw", "ch_fulcrum_keeper"),
+        lock_step=ch_channel_assembly_steps.step_ref(
+            ch_channel_assembly_steps.SET_SCREWS_STAKED_KEY
+        ),
         evidence=(
             "build_ch_channel_assembly.py keeper loop (vn-fulcrum-set-screw on each keeper's crown tap axis); "
-            "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next) + DRAWING_NOTES 3; "
-            "ch_fulcrum_shaft_spec FLAT_DEPTH / FLAT_PITCH; config parts/vn-fulcrum-set-screw.yaml (91375A942); no printed install step found"
+            "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next) + DRAWING_NOTES 2; "
+            "draw_ch_fulcrum_keeper.SET_SCREW_PROCESS ('STAKE MOUTH 2 PLACES AT ASSEMBLY PER MHA-CH-000 STEP 10'); "
+            "draw_ch_channel_assembly.py step fulcrum-set-screws-staked ('TIGHTEN ONE MHA-VN-055 SET SCREW ONTO EACH "
+            "FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS'); ch_fulcrum_shaft_spec FLAT_DEPTH / FLAT_PITCH / "
+            "FLAT_STATION_WINDOW_MM; config parts/vn-fulcrum-set-screw.yaml (91375A942)"
         ),
     ),
     # --- summing, pen and the top level (the channel spring anchors) ---

@@ -48,7 +48,36 @@ def test_flats_sit_under_the_keeper_taps() -> None:
     assert spec.FLAT_DEPTH == 0.3
     assert math.isclose(spec.ACROSS_FLAT, 6.05)
     assert spec.FLAT_CHORD_MIN > spec.SET_SCREW_MAJOR_DIA
-    assert spec.FLAT_CUP_CAPTURE > 0.0
+
+
+def test_flat_pair_is_located_from_the_end() -> None:
+    # The print locates the -Z flat's outer edge off its dome tip and the +Z
+    # flat by the like-edge pitch; both at .XXX keep one shaft station that
+    # seats both cups, keeps each flat inside its lug and the cylinder past
+    # both lug faces, at the worst case of every printed and fit-up band.
+    spec = ch_fulcrum_shaft_spec
+    assert math.isclose(spec.FLAT_FROM_END, 4.925)
+    assert "FlatFromEnd" in spec.DRAWING_DIMENSIONS["FlatProfile"]
+    assert "FlatFromEnd" in drawing.RIGHT_KEEP
+    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatFromEnd"] == 3
+    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatPitch"] == 3
+    assert spec.FLAT_STATION_WINDOW_MM > 0.0
+    assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 0.14
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '\'"ShaftLength" / 2 - "FlatPitch" / 2 - "FlatLength" / 2\'' in source
+    assert "FlatStation" not in source
+
+
+def test_paired_keeper_bores_keep_the_slide_fit() -> None:
+    # Bored apart, the two keepers' .XX LugRise bands could put the bores
+    # 1.02 out of line, far past the fit; reamed as a pair they share one
+    # axis and the shaft keeps the fit's least 0.010 clearance through both.
+    spec = ch_fulcrum_shaft_spec
+    assert math.isclose(spec.BORE_OFFSET_UNPAIRED_MM, 1.02)
+    assert spec.BORE_OFFSET_UNPAIRED_MM > (
+        ch_fulcrum_keeper_spec.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1]
+    )
+    assert math.isclose(spec.PAIRED_MIN_CLEARANCE_MM, 0.010)
 
 
 def test_installed_set_screw_meets_rule_12() -> None:

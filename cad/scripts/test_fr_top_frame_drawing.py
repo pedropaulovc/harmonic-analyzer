@@ -74,7 +74,9 @@ def test_four_cross_taps_are_bottoming_10_32_with_tooling_lead() -> None:
     assert part.SIDE_TAP_SPEC.overrides_mm["ThreadDepth"] == CASTING_FULL_THREAD_DEPTH
     pitch = 25.4 / 32.0
     assert TOP_CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH >= 2.0 * pitch
-    depth_tolerance = float(_config.title_block("linear_1pl")["value_in"]) * 25.4
+    depth_tolerance = float(
+        str(_config.title_block("linear_1pl")["display"]).lstrip("±")
+    )
     assert (
         TOP_CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH - 2.0 * depth_tolerance
         >= 2.0 * pitch
@@ -84,8 +86,42 @@ def test_four_cross_taps_are_bottoming_10_32_with_tooling_lead() -> None:
         (part.BOSS_DIA / 2.0) ** 2 - (part.SPOTFACE_DIA / 2.0) ** 2
     )
     assert part.SPOTFACE_FLOOR < full_seat_limit
-    assert part.SPOTFACE_PLANE - part.SPOTFACE_FLOOR == pytest.approx(1.0)
-    assert part.SPOTFACE_SEAT_MARGIN == pytest.approx(0.14540768504858193)
+    assert part.SPOTFACE_PLANE - part.SPOTFACE_FLOOR == pytest.approx(2.3)
+    assert part.SPOTFACE_SEAT_MARGIN == pytest.approx(1.4454076850485819)
+    assert part.SPOTFACE_PRINTED_SEAT_MARGIN == pytest.approx(
+        math.sqrt(22.1**2 - 4.9**2) - 21.4
+    )
+    assert part.SPOTFACE_PRINTED_SEAT_MARGIN >= 0.1
+
+
+@pytest.mark.parametrize("boss_direction", (-1, 1))
+@pytest.mark.parametrize("seat_direction", (-1, 1))
+@pytest.mark.parametrize("floor_direction", (-1, 1))
+def test_full_spotface_stays_on_material_at_every_printed_band_corner(
+    boss_direction: int, seat_direction: int, floor_direction: int
+) -> None:
+    boss_places = spec.DRAWING_PRECISION["BossUpProfile"]["C0Dia"]
+    seat_places = spec.DRAWING_PRECISION["SpotFaceRearProfile"]["S1Dia"]
+    floor_places = spec.DRAWING_REFERENCE_PRECISION["spotface floor from socket axis"]
+    boss_radius = (
+        round(part.BOSS_DIA, boss_places)
+        + boss_direction * spec.PRINTED_LINEAR_BAND_MM[boss_places]
+    ) / 2.0
+    seat_radius = (
+        round(part.SPOTFACE_DIA, seat_places)
+        + seat_direction * spec.PRINTED_LINEAR_BAND_MM[seat_places]
+    ) / 2.0
+    floor_offset = (
+        round(part.SPOTFACE_FLOOR - abs(part.FRONT_COLUMN_Z), floor_places)
+        + floor_direction * spec.PRINTED_LINEAR_BAND_MM[floor_places]
+    )
+    # The widest points of the seat disk are its only limiting XZ points
+    # on a Y-axis cylinder; every other point has a smaller |X| coordinate.
+    assert math.hypot(seat_radius, floor_offset) < boss_radius
+    margin = math.sqrt(boss_radius**2 - seat_radius**2) - floor_offset
+    assert margin >= 0.1
+    if (boss_direction, seat_direction, floor_direction) == (-1, 1, 1):
+        assert margin == pytest.approx(part.SPOTFACE_PRINTED_SEAT_MARGIN)
 
 
 def test_cross_tap_ends_stay_in_the_real_boss_and_side_web_union() -> None:
@@ -138,8 +174,87 @@ def test_smaller_bosses_leave_real_plan_corners_and_the_outward_foot_seat() -> N
     assert part.KEEPER_FOOT_TIP_Z_REAR == pytest.approx(86.996, abs=0.0005)
     assert part.KEEPER_FOOT_BOSS_MARGINS == pytest.approx((1.496, 2.504), abs=0.0005)
     assert min(part.KEEPER_FOOT_BOSS_MARGINS) >= 1.0
+    assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.150, 0.640))
+    assert min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) > 0.0
     assert part.KEEPER_FOOT_RAIL_MARGINS == pytest.approx((4.996, 6.004), abs=0.0005)
-    assert part.KEEPER_TAP_BOSS_MARGINS == pytest.approx((5.467, 6.470), abs=0.0005)
+    stock_major = FILLISTER_SIZES[keeper_screw.SKU][0]
+    assert part.KEEPER_TAP_BOSS_MARGINS == pytest.approx(
+        tuple(
+            math.hypot(part.KEEPER_TAP_X - part.COLUMN_X, boss_z - tap_z)
+            - part.BOSS_DIA / 2.0
+            - stock_major / 2.0
+            for boss_z, tap_z in (
+                (part.FRONT_COLUMN_Z, part.KEEPER_TAP_Z_FRONT),
+                (part.REAR_COLUMN_Z, part.KEEPER_TAP_Z_REAR),
+            )
+        )
+    )
+
+
+@pytest.mark.parametrize("front_station_direction", (-1, 1))
+@pytest.mark.parametrize("rear_station_direction", (-1, 1))
+@pytest.mark.parametrize("pitch_direction", (-1, 1))
+@pytest.mark.parametrize("lug_direction", (-1, 1))
+@pytest.mark.parametrize("foot_direction", (-1, 1))
+@pytest.mark.parametrize("boss_direction", (-1, 1))
+def test_complete_keeper_foot_clears_boss_at_every_printed_fitup_corner(
+    front_station_direction: int,
+    rear_station_direction: int,
+    pitch_direction: int,
+    lug_direction: int,
+    foot_direction: int,
+    boss_direction: int,
+) -> None:
+    # Actual fit-up locates the lug INNER faces before transferring the
+    # frame taps. This is not a stack of model-nominal tap/hole positions.
+    lug_places = keeper.DRAWING_PRECISION["LugBody"]["LugThickness"]
+    foot_places = keeper.DRAWING_PRECISION["FootProfile"]["FootLength"]
+    boss_places = spec.DRAWING_PRECISION["BossUpProfile"]["C0Dia"]
+    pitch_places = spec.DRAWING_REFERENCE_PRECISION["socket vertical pitch"]
+    lug_thickness = (
+        round(2.0 * keeper.LUG_HALF_T, lug_places)
+        + lug_direction * spec.PRINTED_LINEAR_BAND_MM[lug_places]
+    )
+    foot_length = (
+        round(keeper.FOOT_L, foot_places)
+        + foot_direction * spec.PRINTED_LINEAR_BAND_MM[foot_places]
+    )
+    boss_radius = (
+        round(part.BOSS_DIA, boss_places)
+        + boss_direction * spec.PRINTED_LINEAR_BAND_MM[boss_places]
+    ) / 2.0
+    socket_pitch = (
+        round(part.REAR_COLUMN_Z - part.FRONT_COLUMN_Z, pitch_places)
+        + pitch_direction * spec.PRINTED_LINEAR_BAND_MM[pitch_places]
+    )
+    front_inner = (
+        round(
+            keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[0],
+            keeper.KEEPER_FITUP_PLACES,
+        )
+        + front_station_direction * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    )
+    rear_inner = (
+        round(
+            keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM[1],
+            keeper.KEEPER_FITUP_PLACES,
+        )
+        + rear_station_direction * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    )
+    margins = (
+        front_inner - lug_thickness - foot_length - boss_radius,
+        socket_pitch - rear_inner - lug_thickness - foot_length - boss_radius,
+    )
+    assert min(margins) > 0.0
+    if (
+        front_station_direction,
+        rear_station_direction,
+        pitch_direction,
+        lug_direction,
+        foot_direction,
+        boss_direction,
+    ) == (-1, 1, -1, 1, 1, 1):
+        assert margins == pytest.approx(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS)
 
 
 def test_boss_additions_match_an_independent_t_section_area_integral() -> None:
@@ -180,6 +295,43 @@ def test_boss_additions_match_an_independent_t_section_area_integral() -> None:
     assert actual_lower == pytest.approx(28755.37161240547)
 
 
+def test_reseated_spotface_and_cross_tap_volumes_match_smooth_integrals() -> None:
+    # Substitute x=r*sin(theta) so the disk-chord endpoints are smooth.
+    # This is independent of the builder's linear-X integration grids.
+    boss_radius = part.BOSS_DIA / 2.0
+    spot_radius = part.SPOTFACE_DIA / 2.0
+    tap_radius = part.SIDE_TAP_DRILL_DIA / 2.0
+    bore_radius = part.BORE_DIA / 2.0
+    floor_offset = part.SPOTFACE_FLOOR - abs(part.FRONT_COLUMN_Z)
+    assert part.SPOTFACE_PLANE > abs(part.FRONT_COLUMN_Z) + boss_radius
+    steps = 4096
+    theta_step = math.pi / steps
+    spot_volume = tap_volume = 0.0
+    for index in range(steps):
+        theta = -math.pi / 2.0 + (index + 0.5) * theta_step
+        sine, cosine = math.sin(theta), math.cos(theta)
+        spot_volume += (
+            2.0
+            * spot_radius**2
+            * cosine**2
+            * (math.sqrt(boss_radius**2 - (spot_radius * sine) ** 2) - floor_offset)
+            * theta_step
+        )
+        tap_volume += (
+            2.0
+            * tap_radius**2
+            * cosine**2
+            * (
+                TOP_CASTING_TAP_DRILL_DEPTH
+                - 2.0 * math.sqrt(bore_radius**2 - (tap_radius * sine) ** 2)
+            )
+            * theta_step
+        )
+    tap_volume += math.pi / 3.0 * tap_radius**3 * part.DRILL_POINT_H
+    assert part._spotface_removal() == pytest.approx(spot_volume, abs=0.01)
+    assert part._side_tap_removal() == pytest.approx(tap_volume, abs=0.01)
+
+
 def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
     outer, window = part._top_rim_removal()
     assert outer == pytest.approx(2296.176445206839)
@@ -201,19 +353,76 @@ def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
 
 def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
     major, length, _, _, pitch = FILLISTER_SIZES[keeper_screw.SKU]
-    insertion = length - (keeper.FOOT_H - keeper.CBORE_DEPTH_MM)
-    spec = part.KEEPER_TAP_SPEC
-    full_thread = spec.overrides_mm.get("ThreadDepth", spec.depth_mm)
-    depth_tolerance = float(_config.title_block("linear_1pl")["value_in"]) * 25.4
+    tap_spec = part.KEEPER_TAP_SPEC
+    full_thread = tap_spec.overrides_mm["ThreadDepth"]
+    depth_tolerance = spec.PRINTED_LINEAR_BAND_MM[
+        spec.KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]
+    ]
+    foot_places = keeper.DRAWING_PRECISION["FootProfile"]["FootRise"]
+    foot_band = spec.PRINTED_LINEAR_BAND_MM[foot_places]
+    cb_places = keeper.FOOT_COUNTERBORE_DEPTH_PLACES
+    cb_band = spec.PRINTED_LINEAR_BAND_MM[cb_places]
+    minimum_entry = length - (
+        (round(keeper.FOOT_H, foot_places) + foot_band)
+        - (round(keeper.CBORE_DEPTH_MM, cb_places) - cb_band)
+    )
+    maximum_entry = length - (
+        (round(keeper.FOOT_H, foot_places) - foot_band)
+        - (round(keeper.CBORE_DEPTH_MM, cb_places) + cb_band)
+    )
+    assert tap_spec is keeper.KEEPER_TAP_SPEC
+    assert tap_spec.size == keeper_screw.THREAD == "#2-56"
+    assert full_thread == keeper.KEEPER_TAP_THREAD_DEPTH_MM == 7.6
+    assert minimum_entry >= 1.5 * major
+    assert maximum_entry == pytest.approx(6.5325)
+    assert part.KEEPER_MAX_STOCK_ENTRY == pytest.approx(maximum_entry)
+    assert full_thread - depth_tolerance - maximum_entry >= 0.25
+    assert part.KEEPER_MIN_THREAD_TIP_RESERVE == pytest.approx(0.2675)
+    assert tap_spec.depth_mm - full_thread - 2.0 * depth_tolerance >= 5.0 * pitch
+    drill_point = part.TAP_DRILL_MM[tap_spec.size] / 2.0 * part.DRILL_POINT_H
+    assert tap_spec.depth_mm + depth_tolerance + drill_point < part.RING_HEIGHT
 
-    assert spec is keeper.KEEPER_TAP_SPEC
-    assert spec.size == keeper_screw.THREAD == "#4-40"
-    assert insertion >= major
-    assert full_thread - depth_tolerance - insertion >= 0.25
-    assert spec.depth_mm - full_thread - 2.0 * depth_tolerance >= 5.0 * pitch
-    drill_point = part.TAP_DRILL_MM[spec.size] / 2.0 * part.DRILL_POINT_H
-    assert spec.depth_mm + depth_tolerance + drill_point < part.RING_HEIGHT
-    assert abs(part.KEEPER_TAP_X - part.COLUMN_X) + major / 2.0 < part.WEB_T / 2.0
+
+def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -> None:
+    assert part.KEEPER_TAP_X == part.COLUMN_X + keeper.KEEPER_FITUP_X_FROM_WEB_MM
+    assert part.KEEPER_MAX_TRANSVERSE_OFFSET == pytest.approx(0.53)
+    assert part.KEEPER_MAX_WEB_CENTRE_OFFSET == pytest.approx(3.45)
+    assert part.KEEPER_MIN_WEB_HALF_WIDTH == pytest.approx(5.95)
+    assert part.KEEPER_MIN_ROOT_RADIUS == pytest.approx(2.2)
+    assert part.KEEPER_MIN_FLANGE_THICKNESS == pytest.approx(7.2)
+    assert part.KEEPER_MAX_FULL_THREAD_DEPTH == pytest.approx(8.4)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(1.543824360196402)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.560)
+    assert (
+        min(part.KEEPER_TAP_THREAD_WALL_MARGIN, part.KEEPER_TAP_DRILL_WALL_MARGIN)
+        >= 1.5
+    )
+    # Independently sample the actual quarter-circle surface. The threaded
+    # cylinder's deepest/outboard corner, not its horizontal section, is
+    # nearest this concave surface. All other thread points are farther in.
+    corner_x = (
+        part.KEEPER_MAX_WEB_CENTRE_OFFSET
+        + max(
+            part.THREAD_MAJOR_MM[part.KEEPER_TAP_SPEC.size],
+            FILLISTER_SIZES[keeper_screw.SKU][0],
+        )
+        / 2.0
+    )
+    corner_depth = part.KEEPER_MAX_FULL_THREAD_DEPTH
+    radius = part.KEEPER_MIN_ROOT_RADIUS
+    centre_x = part.KEEPER_MIN_WEB_HALF_WIDTH + radius
+    centre_depth = part.KEEPER_MIN_FLANGE_THICKNESS + radius
+    sampled = min(
+        math.hypot(
+            centre_x - radius * math.cos(index * math.pi / 8192.0) - corner_x,
+            centre_depth - radius * math.sin(index * math.pi / 8192.0) - corner_depth,
+        )
+        for index in range(4097)
+    )
+    assert sampled == pytest.approx(part.KEEPER_TAP_THREAD_WALL_MARGIN, abs=1e-6)
+    # The cylindrical pilot extends below the root and therefore reaches
+    # the bare-web wall. Its .XX diameter also carries DRILLED HOLES +0.10.
+    assert part.KEEPER_MAX_TAP_DRILL_RADIUS == pytest.approx(0.94)
 
 
 def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
@@ -335,13 +544,44 @@ def test_keeper_callout_leader_takes_the_short_way_to_its_tap() -> None:
 
 
 def test_b49e1_keeper_callout_is_what_ran_over_the_boss() -> None:
-    """The same measure on b49e1's RD4 (callout (0.366, 0.247), tip on the
-    front tap's far rim) gates, as the audit found."""
-    front_rim = _plan(
-        part.KEEPER_TAP_X,
-        part.KEEPER_TAP_Z_FRONT + part.TAP_DRILL_MM[part.KEEPER_TAP_SPEC.size] / 2.0,
+    """Replay b49e1's RD4, not today's transferred tap and shifted view."""
+    # b49e13940aa0a3e2c22d2909b6d82f4481d13630: build_top_frame.py,
+    # top_frame_spec.py and cone_pivot_post_installation.py own these model
+    # coordinates; _hole_spec.py gives the old #8-32 tap drill diameter.
+    column_x, column_z = 197.0, 112.0
+    outer_x = column_x + 34.2 / 2.0
+    boss_radius = _B49E1_BOSS_DIA / 2.0
+    summing_z = 3.0875877804265315
+    # draw_top_frame.py: HOLES-SOCKETS was 1:2, centred at (0.215, 0.160).
+    scale = 0.5 / 1000.0
+
+    def historical_plan(x, z):
+        return (0.215 + x * scale, 0.160 - z * scale)
+
+    front_rim = historical_plan(199.9, summing_z - 74.0 + 3.454 / 2.0)
+    # Captured b49e1 native RD4 shoulder: left/down = 38.4/5.6 mm.
+    # The later TRANSFER FROM / AT ASSEMBLY prefix is not part of this ink.
+    start = (0.366 - 0.0384, 0.247 - 0.0056)
+    entries = [
+        _segment_circle_entry(
+            start, front_rim, historical_plan(column_x, z), boss_radius * scale
+        )
+        for z in (-column_z, column_z)
+    ]
+    face_x = historical_plan(outer_x, 0.0)[0]
+    if start[0] > face_x > front_rim[0]:
+        t = (start[0] - face_x) / (start[0] - front_rim[0])
+        entries.append((face_x, start[1] + t * (front_rim[1] - start[1])))
+    entry = min((e for e in entries if e), key=lambda e: math.dist(start, e))
+    left, top = historical_plan(-column_x - boss_radius, -column_z - boss_radius)
+    right, bottom = historical_plan(column_x + boss_radius, column_z + boss_radius)
+    approach = min(
+        front_rim[0] - left,
+        right - front_rim[0],
+        front_rim[1] - bottom,
+        top - front_rim[1],
     )
-    _over, _approach, detour = _plan_detour(_shoulder_end((0.366, 0.247), front_rim), front_rim)
+    detour = math.dist(entry, front_rim) - approach
     assert detour > 0.010
 
 
@@ -1191,3 +1431,271 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
     underside = source[source.index('ddoc.ActivateSheet("UNDERSIDE")') :]
     assert "_hanger_section(adapter, hub_bottom_parent)" in underside
     assert "imported_annotations += hanger_dimensions" in underside
+
+
+def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
+    import ast
+    import _drawing_common
+
+    native = "<hw-threaddesc>\n<hw-threaddepth>\n<hw-tapdrldia> <hw-tapdrldepth>"
+    assert (
+        _drawing_common.compose_hole_callout_prefix(
+            drawing.TRANSFER_KEEPER_CALLOUT,
+            native,
+        )
+        == "TRANSFER FROM MHA-CH-007\nAT ASSEMBLY;\n" + native
+    )
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    callouts = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "add_native_hole_callout"
+        and any(
+            keyword.arg == "label"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "2X fulcrum-keeper blind taps"
+            for keyword in node.keywords
+        )
+    ]
+    assert len(callouts) == 1
+    process = next(
+        keyword.value for keyword in callouts[0].keywords if keyword.arg == "process"
+    )
+    assert isinstance(process, ast.Name) and process.id == "TRANSFER_KEEPER_CALLOUT"
+    helper_tree = ast.parse(Path(_drawing_common.__file__).read_text(encoding="utf-8"))
+    helper = next(
+        node
+        for node in helper_tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "add_native_hole_callout"
+    )
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "compose_hole_callout_prefix"
+        for node in ast.walk(helper)
+    )
+    precision_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "set_hole_callout_precision"
+        and node.args
+        and isinstance(node.args[0], ast.Name)
+        and node.args[0].id == "keeper_callout"
+    ]
+    assert len(precision_calls) == 1
+    precision = precision_calls[0].args[1]
+    assert isinstance(precision, ast.Name)
+    assert precision.id == "KEEPER_TAP_CALLOUT_PRECISION"
+    assert spec.KEEPER_TAP_CALLOUT_PRECISION == {
+        "hw-tapdrldia": 2,
+        "hw-tapdrldepth": 1,
+        "hw-threaddepth": 1,
+    }
+
+
+def test_keeper_locations_are_reference_but_hanger_locations_remain_manufacturing() -> (
+    None
+):
+    import ast
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    loops = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.For)
+        and isinstance(node.target, ast.Tuple)
+        and [item.id for item in node.target.elts if isinstance(item, ast.Name)]
+        == ["p0", "p1", "expected", "xy", "orientation", "label", "suffix", "reference"]
+    ]
+    assert len(loops) == 1
+    captured = []
+    environment = dict(vars(drawing))
+    environment.update(
+        adapter=None,
+        detail_top=None,
+        upper_left_rim=(
+            -part.COLUMN_X,
+            part.HALF_H + part.BOSS_ABOVE,
+            part.FRONT_COLUMN_Z + part.BORE_DIA / 2,
+        ),
+        upper_right_rim=(
+            part.COLUMN_X,
+            part.HALF_H + part.BOSS_ABOVE,
+            part.FRONT_COLUMN_Z + part.BORE_DIA / 2,
+        ),
+        hanger_x=(part.BAR_X0 + part.BAR_X1) / 2,
+        keeper_drill_r=part.TAP_DRILL_MM[part.KEEPER_TAP_SPEC.size] / 2,
+        _checked_dimension=lambda *_args, **kwargs: captured.append(kwargs),
+    )
+    exec(
+        compile(ast.Module(body=loops, type_ignores=[]), "<station-contract>", "exec"),
+        environment,
+    )
+    assert len(captured) == 6
+    by_label = {entry["label"]: entry for entry in captured}
+    for label in (
+        "keeper x from left sockets",
+        "front keeper z from upper sockets",
+        "rear keeper z from upper sockets",
+    ):
+        assert by_label[label]["reference"] is True
+        assert by_label[label]["center"] is True
+        assert label in spec.DRAWING_REFERENCE_PRECISION
+    hanger_expectations = (
+        (
+            "hanger x from left sockets",
+            "2X HANGER X",
+            (0.162, 0.240),
+            part.COLUMN_X + environment["hanger_x"],
+        ),
+        (
+            "front hanger z from upper sockets",
+            "FRONT HANGER Z",
+            (0.062, 0.209),
+            part.STUD_Z_FRONT - part.FRONT_COLUMN_Z,
+        ),
+        (
+            "rear hanger z from upper sockets",
+            "REAR HANGER Z",
+            (0.040, 0.165),
+            part.STUD_Z_REAR - part.FRONT_COLUMN_Z,
+        ),
+    )
+    for label, suffix, position, expected in hanger_expectations:
+        entry = by_label[label]
+        assert entry["reference"] is False
+        assert entry["suffix"] == suffix
+        assert entry["text_xy"] == position
+        assert entry["expected_mm"] == pytest.approx(expected)
+    # The existing helper applies parentheses, excluding the nominal from
+    # general location inspection rather than typing a separate nominal note.
+    helper = source[
+        source.index("def _checked_dimension(") : source.index(
+            "def _orient_cut_section("
+        )
+    ]
+    assert (
+        "if reference:\n        set_reference_dimension(adapter, annotation, label=label)"
+        in helper
+    )
+    assert "_set_derived_precision(native, label=label)" in helper
+
+
+def test_transfer_rows_rederive_the_keeper_envelope_and_plan_clearance() -> None:
+    old_left, old_down, old_right, old_up = drawing._KEEPER_NATIVE_CALLOUT_EXTENT
+    left, down, right, up = drawing.KEEPER_CALLOUT_EXTENT
+    extra = (
+        drawing.TRANSFER_KEEPER_CALLOUT.count("\n") * drawing.KEEPER_TRANSFER_ROW_PITCH
+    )
+    assert extra > 0.0
+    assert (left, down) == (old_left, old_down)
+    assert right == pytest.approx(old_right + drawing.KEEPER_TRANSFER_EXTRA_WIDTH)
+    assert up == pytest.approx(old_up + extra)
+    hole, hole_r, boss, boss_r = _keeper_geometry()
+    angle = drawing._keeper_leader_angle(hole, boss, boss_r)
+    assert drawing.KEEPER_TRANSFER_PLAN_SHIFT == pytest.approx(
+        extra / math.tan(angle) + drawing.KEEPER_TRANSFER_EXTRA_WIDTH
+    )
+    callout, tip = drawing.keeper_callout_placement(hole, hole_r, boss, boss_r)
+    box = (callout[0] - left, callout[1] - down, callout[0] + right, callout[1] + up)
+    assert box[2] <= drawing.SHEET_FRAME[2] - drawing.INK_CLEARANCE
+    assert box[1] > TITLE_BLOCK[3]
+    assert hole[1] - box[3] >= drawing.INK_CLEARANCE + drawing.ARROW_HALF_WIDTH
+    assert box[0] > boss[0] + boss_r
+    # Shifting the plan cancels the extra height's horizontal advance along
+    # the tangent, retaining the historical right-frame allowance.
+    old_hole = (hole[0] + drawing.KEEPER_TRANSFER_PLAN_SHIFT, hole[1])
+    old_shoulder_y = old_hole[1] - (
+        drawing.INK_CLEARANCE
+        + drawing.ARROW_HALF_WIDTH
+        + drawing.ROUND_OUT
+        + old_up
+        + old_down
+    )
+    old_shoulder_x = old_hole[0] + (old_hole[1] - old_shoulder_y) / math.tan(angle)
+    assert box[2] == pytest.approx(old_shoulder_x + old_left + old_right)
+    assert math.dist(tip, hole) == pytest.approx(hole_r)
+
+
+def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None:
+    import ast
+
+    left, bottom = _plan(-drawing.PLAN_HALF_X, drawing.PLAN_HALF_Z)
+    right, top = _plan(drawing.PLAN_HALF_X, -drawing.PLAN_HALF_Z)
+    frame = drawing.SHEET_FRAME
+    assert (
+        frame[0] + drawing.INK_CLEARANCE
+        < left
+        < right
+        < frame[2] - drawing.INK_CLEARANCE
+    )
+    assert (
+        TITLE_BLOCK[3] + drawing.INK_CLEARANCE
+        < bottom
+        < top
+        < frame[3] - drawing.INK_CLEARANCE
+    )
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    loop = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.For)
+        and isinstance(node.target, ast.Tuple)
+        and any(
+            isinstance(item, ast.Name) and item.id == "reference"
+            for item in node.target.elts
+        )
+    )
+    environment = dict(vars(drawing))
+    environment.update(
+        upper_left_rim=(
+            -part.COLUMN_X,
+            part.HALF_H + part.BOSS_ABOVE,
+            part.FRONT_COLUMN_Z + part.BORE_DIA / 2,
+        ),
+        upper_right_rim=(
+            part.COLUMN_X,
+            part.HALF_H + part.BOSS_ABOVE,
+            part.FRONT_COLUMN_Z + part.BORE_DIA / 2,
+        ),
+        hanger_x=(part.BAR_X0 + part.BAR_X1) / 2,
+        keeper_drill_r=part.TAP_DRILL_MM[part.KEEPER_TAP_SPEC.size] / 2,
+    )
+    stations = eval(
+        compile(ast.Expression(loop.iter), "<station-fields>", "eval"), environment
+    )
+    assert len(stations) == 6
+    hole, hole_r, boss, boss_r = _keeper_geometry()
+    callout, _tip = drawing.keeper_callout_placement(hole, hole_r, boss, boss_r)
+    left, down, right, up = drawing.KEEPER_CALLOUT_EXTENT
+    callout_box = (
+        callout[0] - left,
+        callout[1] - down,
+        callout[0] + right,
+        callout[1] + up,
+    )
+    # Estimated field allowances, not measured render ink: 2 mm per qualifier
+    # character and the historical 10.2 mm value/qualifier height. Farm ink
+    # validation remains authoritative for actual font metrics and witnesses.
+    for p0, p1, _expected, (x, y), _orientation, label, suffix, _reference in stations:
+        for point in (p0, p1):
+            px, py = _plan(point[0], point[2])
+            assert frame[0] < px < frame[2] and frame[1] < py < frame[3], label
+        half_width = len(suffix) * 0.002 / 2
+        field = (x - half_width, y - 0.0051, x + half_width, y + 0.0051)
+        assert frame[0] < field[0] < field[2] < frame[2], label
+        assert frame[1] < field[1] < field[3] < frame[3], label
+        assert _box_box_gap(field, TITLE_BLOCK) >= drawing.INK_CLEARANCE, label
+        assert _box_box_gap(field, callout_box) >= drawing.INK_CLEARANCE, label
+    # The expanded width covers a conservative full-em prefix allowance.
+    # It is a derived envelope, not a new observed native measurement.
+    assert (
+        max(map(len, drawing.TRANSFER_KEEPER_CALLOUT.splitlines()))
+        * drawing.KEEPER_TRANSFER_CHARACTER_WIDTH
+        <= left + right + 1e-12
+    )

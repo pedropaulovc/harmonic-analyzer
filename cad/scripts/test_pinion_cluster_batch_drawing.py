@@ -684,9 +684,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "ch-channel-1/vn-frame-side-screw",
                 range(1, 3),
                 "fr-frame-1/fr-top-frame",
-                2.8448,
-                2.261,
-                7.4178,
+                2.1844,
+                1.778,
+                5.2207,
             ),
             # #743 PR2: MHA-VN-032 #8-32 x 3/4 through the 6.0 rocker-bracket
             # foot, one per bracket since the 2026-10-09 flip.

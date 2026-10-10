@@ -7,7 +7,7 @@ outermost lever hub and carries the plain Ø6.35 fulcrum shaft in a reamed
 bore, the shaft's domed end proud of its outer face; a #1-72 cup-point set
 screw (MHA-VN-055) in the crown tap bears on the shaft's flat and fixes it.
 The short straight foot points OUTBOARD and is screwed down into the
-top-frame rail top face by one slotted #4-40 narrow-fillister frame-side
+top-frame rail top face by one slotted #2-56 fillister frame-side
 screw (MHA-VN-022) seated flush in a counterbore.
 
 Layout (part frame): +X along the shaft, OUTBOARD (away from the lever
@@ -90,6 +90,8 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_WIDTH,
     LUG_HALF_T,
     REFERENCE_SKETCHES,
+    SCREW_FROM_LUG_FACE,
+    SCREW_FROM_SIDE,
     SCREW_X,
     SCREW_HOLE_SPEC,
     SET_SCREW_HOLE_SPEC,
@@ -104,12 +106,12 @@ LUG_T = 2.0 * LUG_HALF_T  # 6.0 lug thickness along X
 # of the sketch plane): past the lug's +-3 X extent, clear of the foot below.
 BORE_CUT_DEPTH = 2.0 * LUG_T
 
-# The keeper's foot screw is the part-owned #4 close-clearance counterbore;
+# The keeper's foot screw is the part-owned #2 close-clearance counterbore;
 # its depth is the exact stock head height so the bearing face stays flush.
 if FOOT_SCREW_THREAD != FRAME_SIDE_THREAD:
     raise AssertionError("keeper foot screw thread drifted from MHA-VN-022")
 if HOLE_DIA_MM <= FRAME_SIDE_SHANK_DIA:
-    raise AssertionError("standard #4 keeper clearance binds on the stock screw")
+    raise AssertionError("standard #2 keeper clearance binds on the stock screw")
 if CBORE_DIA_MM <= FRAME_SIDE_HEAD_DIA:
     raise AssertionError("keeper counterbore does not clear the stock screw head")
 if CBORE_DEPTH_MM != FRAME_SIDE_HEAD_H:
@@ -121,12 +123,15 @@ if CBORE_DEPTH_MM >= FOOT_H:
 if blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) >= LUG_T:
     raise AssertionError("crown tap drill breaks out of the lug faces")
 
-# The one drawing-reference line (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES):
+# The drawing-reference lines (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES):
 # (sketch, plane, dimension, start, end, orientation, value, drives), the
-# dt_arbor_pedestal pattern. The line runs along the crown-top outline from
-# the outer lug face (datum B, a FEATURE: policy rule 7) to the tap axis.
-# ``drives`` binds the value dimension, then the start point's two origin
-# anchors, to the part's globals.
+# dt_arbor_pedestal pattern. Each line starts on the feature it is measured
+# from (policy rule 7): the set-screw tap's runs along the crown-top outline
+# from the outer lug face to the tap axis; the foot screw's run on the seat
+# (Top plane: sketch u = model X, v = -model Z) from the outer lug face to the
+# screw axis and from the screw axis to the -Z side face. ``drives`` binds
+# the value dimension, then the start point's origin anchors, to the part's
+# globals.
 REFERENCE_LINES = (
     (
         "SetScrewReference",
@@ -137,6 +142,26 @@ REFERENCE_LINES = (
         "horizontal",
         LUG_HALF_T,
         ('"LugT" / 2', '"LugT" / 2', '"ShaftAxisH" + "CrownDia" / 2'),
+    ),
+    (
+        "FootScrewReference",
+        "Top",
+        "ScrewFromLug",
+        (LUG_HALF_T, 0.0),
+        (SCREW_X, 0.0),
+        "horizontal",
+        SCREW_FROM_LUG_FACE,
+        ('"FootL" / 2', '"LugT" / 2'),
+    ),
+    (
+        "FootScrewSideReference",
+        "Top",
+        "ScrewFromSide",
+        (SCREW_X, 0.0),
+        (SCREW_X, SCREW_FROM_SIDE),
+        "vertical",
+        SCREW_FROM_SIDE,
+        ('"KeeperWidth" / 2', '"LugT" / 2 + "FootL" / 2'),
     ),
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
@@ -370,7 +395,7 @@ async def build(adapter) -> dict[str, str]:
         SCREW_HOLE_SPEC,
         [[SCREW_X, FOOT_H, 0.0]],
         (0.0, 1.0, 0.0),
-        "keeper foot screw hole (#4 cbore)",
+        "keeper foot screw hole (#2 cbore)",
         expect_dia_mm=HOLE_DIA_MM,
         name="FootScrewHole",
     )

@@ -25,11 +25,13 @@ from ch_fulcrum_keeper_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
     CROWN_DIA,
+    KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_Z_OFF,
     LUG_HALF_T,
     SET_SCREW_MIN_ENGAGEMENT_D,
     SET_SCREW_PITCH,
 )
+from ch_fulcrum_keeper_spec import DRAWING_PRECISION as KEEPER_PRECISION
 from vn_fulcrum_set_screw_spec import CUP_DIA as SET_SCREW_CUP_DIA
 from vn_fulcrum_set_screw_spec import LENGTH as SET_SCREW_LENGTH
 from vn_fulcrum_set_screw_spec import MAJOR_DIA as SET_SCREW_MAJOR_DIA
@@ -51,10 +53,14 @@ DOME_R = SHAFT_R
 SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 161.35 tip to tip
 
 # --- Set-screw flats: one per end on +Y, centred on the keeper lug mid-plane
-# (z = +-KEEPER_Z_OFF), so the crown tap's cup point lands mid-flat. ---
+# (z = +-KEEPER_Z_OFF), so the crown tap's cup point lands mid-flat. The
+# machinist locates the -Z flat's outer edge FLAT_FROM_END off its dome tip
+# and the +Z flat by the like-edge FlatPitch from it (each flat's -Z edge),
+# so neither flat's length enters the other's station. ---
 FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 148.0 like-edge to like-edge
 FLAT_LENGTH = 3.5
 FLAT_DEPTH = 0.3
+FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 4.925
 ACROSS_FLAT = SHAFT_DIA - FLAT_DEPTH  # 6.05: the printed size
 FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.875: the set screw's cup seat above the axis
 
@@ -72,12 +78,6 @@ if FLAT_CHORD_MIN <= SET_SCREW_MAJOR_DIA:
         f"shallowest flat is {FLAT_CHORD_MIN:.3f} wide, under the set screw's "
         f"{SET_SCREW_MAJOR_DIA} major"
     )
-# Axial play each cup may take from its flat centre and still bear wholly on
-# the flat, at the shortest printed flat; the two keepers' tap spacing and
-# FlatPitch together may use twice this.
-FLAT_CUP_CAPTURE = (_FLAT_LENGTH_MIN - SET_SCREW_CUP_DIA) / 2.0
-if FLAT_CUP_CAPTURE < _BAND_BY_PLACES[2]:
-    raise AssertionError("the shortest flat cannot absorb the FlatPitch band")
 # The longest flat stays inside its keeper lug, so a lever hub never rides it.
 if FLAT_LENGTH + _BAND_BY_PLACES[1] > 2.0 * LUG_HALF_T:
     raise AssertionError("the longest set-screw flat runs out of the keeper lug")
@@ -128,18 +128,21 @@ SURFACE_FINISHES = (
 )
 
 # One revolved half-profile carries the diameter and the tip-to-tip length;
-# the flats' cut sketch carries their length, their like-edge pitch and the
-# across-flat size (a construction line from the flat to the far O.D.).
+# the flats' cut sketch carries their length, the -Z flat's station off its
+# dome tip (a construction line from the origin to the tip), their like-edge
+# pitch and the across-flat size (a construction line from the flat to the
+# far O.D.).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDia", "OverallLength"},
-    "FlatProfile": {"FlatLength", "FlatPitch", "AcrossFlat"},
+    "FlatProfile": {"FlatLength", "FlatFromEnd", "FlatPitch", "AcrossFlat"},
 }
 # Decimal places are the tolerance statement (policy rule 2); the model owns
 # them. ShaftDia carries its SHAFT_H band natively; AcrossFlat at .XXX holds
-# FLAT_CHORD_MIN above the set screw's major.
+# FLAT_CHORD_MIN above the set screw's major; FlatFromEnd and FlatPitch at
+# .XXX hold FLAT_STATION_WINDOW_MM open.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDia": 3, "OverallLength": 2},
-    "FlatProfile": {"FlatLength": 1, "FlatPitch": 2, "AcrossFlat": 3},
+    "FlatProfile": {"FlatLength": 1, "FlatFromEnd": 3, "FlatPitch": 3, "AcrossFlat": 3},
 }
 if {
     feature: set(names) for feature, names in DRAWING_PRECISION.items()
@@ -147,6 +150,118 @@ if {
     raise AssertionError(
         "DRAWING_PRECISION and DRAWING_DIMENSIONS must name the same dims"
     )
+
+
+# --- Flat stations, at the worst case of every printed band and of the
+# MHA-CH-000 fit-up (policy rule 12). The keepers go on the frame with their
+# lug inner faces DRO-set (KEEPER_FITUP_LOCATION_BAND_MM each); each tap
+# stands SetScrewLocation off its lug's outer face, the lug LugThickness
+# thick. The shaft is free to slide until both screws bite, so it needs ONE
+# axial place where at once: each cup lies wholly on its flat; each flat's
+# inner edge stays inside its lug (no lever hub rides a flat); and the
+# cylinder runs out past both lug outer faces (the domes never bear in a
+# bore). With t the -Z dome tip, every requirement is a bound t >= lo or
+# t <= hi linear in the bands, so the window is the least, over every
+# (hi, lo) pair, of its nominal less the pair's summed band reach.
+def _band(precision: dict[str, dict[str, int]], feature: str, name: str) -> float:
+    return _BAND_BY_PLACES[precision[feature][name]]
+
+
+_STATION_BANDS = {
+    "front_face": KEEPER_FITUP_LOCATION_BAND_MM,
+    "rear_face": KEEPER_FITUP_LOCATION_BAND_MM,
+    "front_lug": _band(KEEPER_PRECISION, "LugBody", "LugThickness"),
+    "rear_lug": _band(KEEPER_PRECISION, "LugBody", "LugThickness"),
+    "front_tap": _band(KEEPER_PRECISION, "SetScrewReference", "SetScrewLocation"),
+    "rear_tap": _band(KEEPER_PRECISION, "SetScrewReference", "SetScrewLocation"),
+    "flat_from_end": _band(DRAWING_PRECISION, "FlatProfile", "FlatFromEnd"),
+    "front_flat": _band(DRAWING_PRECISION, "FlatProfile", "FlatLength"),
+    "rear_flat": _band(DRAWING_PRECISION, "FlatProfile", "FlatLength"),
+    "flat_pitch": _band(DRAWING_PRECISION, "FlatProfile", "FlatPitch"),
+    "length": _band(DRAWING_PRECISION, "ShaftProfile", "OverallLength"),
+}
+
+
+def _lin(nominal: float, **terms: float) -> dict[str, float]:
+    """A position: its nominal ("") and its coefficient on each band term."""
+    return {"": nominal, **terms}
+
+
+def _sum(*forms: tuple[float, dict[str, float]]) -> dict[str, float]:
+    """``sum(sign * form)`` over (sign, form) pairs."""
+    total: dict[str, float] = {}
+    for sign, form in forms:
+        for key, value in form.items():
+            total[key] = total.get(key, 0.0) + sign * value
+    return total
+
+
+def _worst(form: dict[str, float]) -> float:
+    return form[""] - sum(
+        abs(coef) * _STATION_BANDS[key] for key, coef in form.items() if key
+    )
+
+
+_INNER = KEEPER_Z_OFF - LUG_HALF_T
+_inner_front = _lin(-_INNER, front_face=1.0)
+_inner_rear = _lin(_INNER, rear_face=1.0)
+_outer_front = _sum((1, _inner_front), (-1, _lin(2.0 * LUG_HALF_T, front_lug=1.0)))
+_outer_rear = _sum((1, _inner_rear), (1, _lin(2.0 * LUG_HALF_T, rear_lug=1.0)))
+_tap_front = _sum((1, _outer_front), (1, _lin(LUG_HALF_T, front_tap=1.0)))
+_tap_rear = _sum((1, _outer_rear), (-1, _lin(LUG_HALF_T, rear_tap=1.0)))
+_from_end = _lin(FLAT_FROM_END, flat_from_end=1.0)
+_front_len = _lin(FLAT_LENGTH, front_flat=1.0)
+_rear_len = _lin(FLAT_LENGTH, rear_flat=1.0)
+_pitch = _lin(FLAT_PITCH, flat_pitch=1.0)
+_length = _lin(SHAFT_LENGTH, length=1.0)
+_cup = _lin(SET_SCREW_CUP_DIA / 2.0)
+_dome = _lin(DOME_R)
+# Bounds on t: front flat [t + S, t + S + FLf]; rear flat [t + S + P, t + S +
+# P + FLr]; rear tip t + L.
+_T_LOW = {
+    "front cup on its flat's inner end": _sum(
+        (1, _tap_front), (1, _cup), (-1, _from_end), (-1, _front_len)
+    ),
+    "rear cup on its flat's outer end": _sum(
+        (1, _tap_rear), (1, _cup), (-1, _from_end), (-1, _pitch), (-1, _rear_len)
+    ),
+    "rear flat inside its lug": _sum((1, _inner_rear), (-1, _from_end), (-1, _pitch)),
+    "rear cylinder past its lug": _sum((1, _outer_rear), (1, _dome), (-1, _length)),
+}
+_T_HIGH = {
+    "front cup on its flat's outer end": _sum(
+        (1, _tap_front), (-1, _cup), (-1, _from_end)
+    ),
+    "rear cup on its flat's inner end": _sum(
+        (1, _tap_rear), (-1, _cup), (-1, _from_end), (-1, _pitch)
+    ),
+    "front flat inside its lug": _sum(
+        (1, _inner_front), (-1, _from_end), (-1, _front_len)
+    ),
+    "front cylinder past its lug": _sum((1, _outer_front), (-1, _dome)),
+}
+FLAT_STATION_WINDOW_MM = min(
+    _worst(_sum((1, high), (-1, low)))
+    for high in _T_HIGH.values()
+    for low in _T_LOW.values()
+)
+if FLAT_STATION_WINDOW_MM <= 0.0:
+    raise AssertionError(
+        f"no shaft station seats both cups at the worst case "
+        f"({FLAT_STATION_WINDOW_MM:.3f})"
+    )
+
+# --- The keepers' bores, drilled and reamed as a pair in one setup
+# (ch_fulcrum_keeper_spec.BORE_PAIR_CALLOUT, MHA-CH-000): bored apart, each
+# keeper's .XX LugRise could put the two bores BORE_OFFSET_UNPAIRED_MM out of
+# line, past the fit's largest diametral clearance; paired they share one
+# axis, so the shaft keeps the fit's least clearance through both.
+BORE_OFFSET_UNPAIRED_MM = 2.0 * _band(KEEPER_PRECISION, "LugProfile", "LugRise")
+PAIRED_MIN_CLEARANCE_MM = BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0]
+if BORE_OFFSET_UNPAIRED_MM <= BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1]:
+    raise AssertionError("the keeper bores line up unpaired: drop the pair reaming")
+if PAIRED_MIN_CLEARANCE_MM <= 0.0:
+    raise AssertionError("the paired keeper bores do not clear the shaft")
 
 DRAWING_NOTES = "\n".join(
     (

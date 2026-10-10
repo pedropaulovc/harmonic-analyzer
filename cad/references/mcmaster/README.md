@@ -23,7 +23,6 @@ recipes:
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90280A110 | `vn-frame-side-screw` (catalogue-only; no vendor model) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | — (diagnostic recipe; a former `vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
@@ -42,6 +41,7 @@ recipes:
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A077 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A080 | `vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A205 | `vn-transgear-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91829A560 | `vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
@@ -93,18 +93,21 @@ Live catalogue verification on October 9, 2026:
   model is harvested: `diagnostics.diag_build_91375A942` scales the
   91375A106 recipe's laws to the #1-72 pitch and the catalogue hex, family
   assumptions, not verified vendor geometry.
-- [90280A110](https://www.mcmaster.com/90280A110/) replaces 90280A194 as the
-  two MHA-VN-022 frame-side screws that hold the fulcrum keepers' feet. The
-  [public #4-40 fillister family table](https://www.mcmaster.com/products/fillister-head-machine-screws/thread-size~4-40/?s=fillister-head-machine-screws)
-  was read live in a browser on October 9, 2026: “Steel Fillister Head
-  Slotted Screws, Zinc-Plated, 4-40 Thread Size, 1/2" Long”, in the
-  “Zinc-Plated Steel” table, length **1/2 in**, head diameter **0.183 in**,
-  head height **0.107 in**, **Fully Threaded**, tensile strength
-  **60,000 psi**, package quantity **100**, package price **$6.83**. Its
-  2-D PDF (“Steel Narrow Fillister Head Slotted Screws”) gives **0.183**,
-  **0.112** major, **0.5** and **0.107**. The head and thread are the
-  90280A108 row's, so the shared fillister recipe builds it from the length
-  alone; no vendor SLDPRT has been harvested for it.
+
+Live catalogue verification on October 10, 2026:
+
+- [91794A080](https://www.mcmaster.com/91794A080/) replaces 90280A110 (and,
+  before it, 90280A194) as the two MHA-VN-022 frame-side screws that hold the
+  fulcrum keepers' feet. The
+  [public #2-56 fillister family table](https://www.mcmaster.com/products/fillister-head-machine-screws/thread-size~2-56/?s=fillister-head-machine-screws)
+  was read live in a browser on October 10, 2026: in the “Stainless Steel
+  Fillister Head Slotted Screws” table, length **7/16 in**, head diameter
+  **0.14 in**, head height **0.083 in**, **Fully Threaded**, tensile strength
+  **70,000 psi**, package quantity **100**. The 90280A steel family has no
+  #2-56 size. The smaller thread follows the transferred top-frame tap: the
+  #4-40 tap left too thin a rule-12 ligament under the keeper foot. The head
+  and thread are the 91794A077 row's, so the shared fillister recipe builds it
+  from the length alone; no vendor SLDPRT has been harvested for it.
   `diagnostics.diag_build_90280A194` stays as a diagnostic recipe.
 
 Live catalog verification on October 8, 2026:

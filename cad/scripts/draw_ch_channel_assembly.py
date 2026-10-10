@@ -5,7 +5,10 @@ south bracket is set off a wave disc spring that preloads the bank north, and
 the plain pivot shaft is cut to fit and held by a set screw in each ear (user,
 2026-10-10), so the setting and its acceptance are shop instructions this sheet
 must print (drawing-simplicity rule 6), generated from ``rocker_bank_layout``
-and numbered by ``channel_assembly_steps``.
+and numbered by ``channel_assembly_steps``. The fulcrum shaft's keepers follow
+in a second block, numbered on from the first: their bench pair-ream, their
+DRO fit-up on the top frame and the set screws' staking
+(``ch_fulcrum_keeper_spec``).
 """
 
 from __future__ import annotations
@@ -30,7 +33,15 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
+from ch_fulcrum_keeper_spec import (
+    KEEPER_FITUP_LOCATION_BAND_MM,
+    KEEPER_FITUP_PLACES,
+    KEEPER_FITUP_X_FROM_WEB_MM,
+    KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
+)
+from channel_frame_geom import LEVER_FULCRUM_XY
 from ch_pivot_shaft_spec import DOME_HEIGHT
+from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
     COUNT,
     PLAIN_END_CUT_BAND,
@@ -57,15 +68,45 @@ FRONT_CENTER = (0.060, 0.150)
 RIGHT_CENTER = (0.130, 0.150)
 ISO_CENTER = (0.225, 0.140)
 
-# The steps fill the empty field right of the isometric (x ~0.248 on the v36
-# render) and above the title block: the note's top-left corner, then the
-# right border and the lowest y the text may reach.
+# The rocker-bank steps fill the empty field right of the isometric (x ~0.248
+# on the v36 render) and above the title block: the note's top-left corner,
+# then the right border and the lowest y the text may reach.
 FITUP_NOTE_XY = (0.268, 0.252)
 FITUP_FIELD_LIMIT = (0.412, 0.085)
 FITUP_LINE_WIDTH = 50  # characters; default-format note text
+# The fulcrum-shaft steps fill the band under the front and right views
+# (lowest at y ~0.079 on the v41 render), left of the title block (x ~0.218)
+# and above the bottom border (y ~0.013).
+FULCRUM_NOTE_XY = (0.016, 0.075)
+FULCRUM_FIELD_LIMIT = (0.214, 0.016)
+FULCRUM_LINE_WIDTH = 70
+FULCRUM_KEYS = (
+    steps.KEEPERS_PAIR_REAMED_KEY,
+    steps.KEEPERS_SET_KEY,
+    steps.SET_SCREWS_STAKED_KEY,
+)
+# The second block numbers on from the first, so its steps close the sequence.
+if steps.SEQUENCE[-len(FULCRUM_KEYS) :] != FULCRUM_KEYS:
+    raise AssertionError("the fulcrum-shaft steps must close the sequence")
 
 
-def _fitup_steps() -> str:
+def _block(
+    heading: str, keys: tuple[str, ...], text: dict[str, str], width: int
+) -> str:
+    lines = [heading]
+    for key in keys:
+        lines += textwrap.wrap(
+            text[key],
+            width=width,
+            initial_indent=f"{steps.step_number(key)}. ",
+            subsequent_indent="   ",
+            # A part number never splits at its hyphens across two lines.
+            break_on_hyphens=False,
+        )
+    return "\n".join(lines)
+
+
+def _fitup_notes() -> tuple[str, str]:
     # Literal stems, so the config-dependency analysis reads exactly these rows.
     arm = _config.parts("ch-rocker-arm")["number"]
     rod = _config.parts("ch-connecting-rod")["number"]
@@ -76,6 +117,11 @@ def _fitup_steps() -> str:
     spring = _config.parts("vn-rocker-bank-spring")["number"]
     set_screw = _config.parts("vn-arbor-set-screw")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
+    keeper = _config.parts("ch-fulcrum-keeper")["number"]
+    fulcrum_shaft = _config.parts("ch-fulcrum-shaft")["number"]
+    set_screw = _config.parts("vn-fulcrum-set-screw")["number"]
+    foot_screw = _config.parts("vn-frame-side-screw")["number"]
+    top_frame = _config.parts("fr-top-frame")["number"]
     last = COUNT - 1
     stack_low, stack_high = STACK_L20_ACCEPT
     set_step = steps.step_number("south-bracket-spring-set")
@@ -87,6 +133,14 @@ def _fitup_steps() -> str:
     # their pinned rods, so the plain rod goes in and comes out only through
     # the set north ear, uncut end first.
     cut_low, cut_high = (DOME_HEIGHT + band for band in reversed(PLAIN_END_CUT_BAND))
+    # Each keeper lug is set off the top-frame rail web under it (its column's
+    # socket axis) in X and off the frame's hole-station origin, the upper-left
+    # socket, in Z (Main's ruling): the lug centre on the fulcrum line, its
+    # inner face off the front socket line.
+    places = KEEPER_FITUP_PLACES
+    if abs(LEVER_FULCRUM_XY[0] - COLUMN_X - KEEPER_FITUP_X_FROM_WEB_MM) > 1e-9:
+        raise AssertionError("KEEPER_FITUP_X_FROM_WEB_MM is off the fulcrum line")
+    front_face, rear_face = KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
     text = {
         # The rings are captured in the closed cam slots as the cylinder stack
         # goes together, and the pressed pin needs its far tine backed on the
@@ -138,33 +192,52 @@ def _fitup_steps() -> str:
             "ACCEPT: PUSHED SOUTH, THE BANK SPRINGS BACK ONTO THE NORTH "
             f"WASHER. ELSE REPEAT STEP {set_step}."
         ),
+        steps.KEEPERS_PAIR_REAMED_KEY: (
+            f"AT THE BENCH: CLAMP THE TWO {keeper} KEEPERS INNER LUG FACES "
+            "TOGETHER, SEATS ON ONE FLAT; DRILL AND REAM BOTH BORES IN ONE "
+            "SETUP, THEN ROUND EACH CROWN ABOUT ITS OWN BORE. ACCEPT IF THE "
+            f"{fulcrum_shaft} SHAFT SLIDES THROUGH BOTH."
+        ),
+        steps.KEEPERS_SET_KEY: (
+            f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "
+            "OUTBOARD ON THE RAIL. SET EACH LUG CENTRE "
+            f"{KEEPER_FITUP_X_FROM_WEB_MM:.{places}f} WEST OF THE RAIL WEB "
+            f"CENTRE BELOW IT, LUG INNER FACES AT Z {front_face:.{places}f} AND "
+            f"{rear_face:.{places}f} FROM THE UPPER-LEFT SOCKET, EACH WITHIN "
+            f"{KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}. CLAMP; TRANSFER EACH "
+            f"FOOT HOLE INTO THE RAIL, TAP AS {top_frame}, SCREW DOWN ONE "
+            f"{foot_screw}."
+        ),
+        steps.SET_SCREWS_STAKED_KEY: (
+            f"WITH THE LEVER BANK ON IT, SLIDE THE {fulcrum_shaft} SHAFT UNTIL "
+            f"EACH FLAT LIES UNDER ITS CROWN TAP; TIGHTEN ONE {set_screw} SET "
+            "SCREW ONTO EACH FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS."
+        ),
     }
-    lines = ["ROCKER BANK FIT-UP"]
-    for key in steps.SEQUENCE:
-        lines += textwrap.wrap(
-            text[key],
-            width=FITUP_LINE_WIDTH,
-            initial_indent=f"{steps.step_number(key)}. ",
-            subsequent_indent="   ",
-        )
-    return "\n".join(lines)
+    rocker_keys = tuple(key for key in steps.SEQUENCE if key not in FULCRUM_KEYS)
+    return (
+        _block("ROCKER BANK FIT-UP", rocker_keys, text, FITUP_LINE_WIDTH),
+        _block("FULCRUM SHAFT FIT-UP", FULCRUM_KEYS, text, FULCRUM_LINE_WIDTH),
+    )
 
 
-FITUP_STEPS = _fitup_steps()
+FITUP_NOTES = _fitup_notes()
+FITUP_STEPS = "\n".join(FITUP_NOTES)
 
 
 def _place_fitup_steps(adapter: Any, sheet: Any) -> None:
-    """A sheet-owned note: activate the sheet so no view owns it."""
+    """Sheet-owned notes: activate the sheet so no view owns them."""
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     name = str(_early_bound(sheet, "ISheet").GetName() or "")
     if not ddoc.ActivateSheet(name):
         raise RuntimeError(f"failed to activate drawing sheet {name!r}")
-    note = add_note(adapter, FITUP_STEPS, *FITUP_NOTE_XY)
-    if note is None:
-        raise RuntimeError("failed to place the rocker-bank fit-up steps")
-    printed = str(_early_bound(note, "INote").GetText() or "")
-    if printed.replace("\r\n", "\n").replace("\r", "\n") != FITUP_STEPS:
-        raise RuntimeError(f"fit-up steps printed as {printed!r}")
+    for text, xy in zip(FITUP_NOTES, (FITUP_NOTE_XY, FULCRUM_NOTE_XY), strict=True):
+        note = add_note(adapter, text, *xy)
+        if note is None:
+            raise RuntimeError(f"failed to place the fit-up steps at {xy}")
+        printed = str(_early_bound(note, "INote").GetText() or "")
+        if printed.replace("\r\n", "\n").replace("\r", "\n") != text:
+            raise RuntimeError(f"fit-up steps printed as {printed!r}")
 
 
 @_telemetry.traced("drawing.channel_assembly")

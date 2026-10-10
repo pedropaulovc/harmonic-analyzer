@@ -67,6 +67,7 @@ from ch_fulcrum_shaft_spec import (
     DRAWING_PRECISION,
     END_VIEW_NOTE,
     FLAT_DEPTH,
+    FLAT_FROM_END,
     FLAT_HEIGHT,
     FLAT_LENGTH,
     FLAT_PITCH,
@@ -188,13 +189,15 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     """The two set-screw flats: one mid-plane cut from two rectangles on the
     Right plane, each from the flat (v = FLAT_HEIGHT) up past the O.D.
 
-    Constraint accounting (16 rectangle + 4 witness unknowns = 20): eight
-    rectangle H/V relations; the +u flat's length, rise and station off the
-    origin; the -u flat's length, rise, like-edge FlatPitch and flat-line
-    alignment; and the construction witness from the +u flat's -u corner
-    straight down to the far O.D. (vertical, under the corner, its foot
-    ShaftDia/2 below the origin, its top on the axis) whose AcrossFlat dim
-    sets both flats' height."""
+    Constraint accounting (16 rectangle + 4 across-flat witness + 4 tip
+    witness unknowns = 24): eight rectangle H/V relations; the +u flat's
+    length and rise; the -u flat's length, rise, FlatFromEnd off the -u dome
+    tip and the like-edge FlatPitch to the +u flat with flat-line alignment;
+    the construction tip witness along the axis from the origin to the -u
+    tip (on the origin, horizontal, ShaftLength/2 long); and the construction
+    witness from the +u flat's -u corner straight down to the far O.D.
+    (vertical, under the corner, its foot ShaftDia/2 below the origin, its
+    top on the axis) whose AcrossFlat dim sets both flats' height."""
     dims = SketchDims()
     half = FLAT_LENGTH / 2.0
     station = FLAT_PITCH / 2.0
@@ -213,8 +216,12 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "flat witness",
         await adapter.add_line(rect_pos[0][0], -SHAFT_R, rect_pos[0][0], 0.0),
     )
+    (tip_witness,) = await add_line_chain(
+        adapter, [(0.0, 0.0), (-TIP, 0.0)], close=False
+    )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, witness)
+    _as_construction(adapter, tip_witness)
     for points, lines in ((rect_pos, lines_pos), (rect_neg, lines_neg)):
         for i, line in enumerate(lines):
             (_, v1), (_, v2) = points[i], points[(i + 1) % len(points)]
@@ -227,6 +234,25 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "flat witness vertical",
         await adapter.add_sketch_constraint(witness, None, "vertical"),
     )
+    check(
+        "tip witness horizontal",
+        await adapter.add_sketch_constraint(tip_witness, None, "horizontal"),
+    )
+    check(
+        "tip witness starts at the origin",
+        await adapter.add_sketch_constraint(
+            f"{tip_witness}.start", "origin", "coincident"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{tip_witness}.start",
+        f"{tip_witness}.end",
+        "horizontal_distance",
+        TIP,
+        "tip witness",
+    )
+    dims.record("TipStation", '"ShaftLength" / 2')
     flat_pos, rise_pos = lines_pos[0], lines_pos[1]
     flat_neg, rise_neg = lines_neg[0], lines_neg[1]
     corner = f"{flat_pos}.start"  # the +u flat's -u edge on the flat line
@@ -248,15 +274,6 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "flat +u rise",
     )
     dims.record("FlatRise")
-    await dimension_between(
-        adapter,
-        corner,
-        "origin",
-        "horizontal_distance",
-        station - half,
-        "flat station",
-    )
-    dims.record("FlatStation", '"FlatPitch" / 2 - "FlatLength" / 2')
     check(
         "flat witness under the corner",
         await adapter.add_sketch_constraint(
@@ -305,6 +322,17 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "flat -u rise",
     )
     dims.record("FlatRiseB")
+    # The -u flat's -u (outer) edge off the -u dome tip: the machinist's
+    # station, from which FlatPitch sets the +u flat.
+    await dimension_between(
+        adapter,
+        f"{tip_witness}.end",
+        f"{flat_neg}.start",
+        "horizontal_distance",
+        FLAT_FROM_END,
+        "FlatFromEnd",
+    )
+    dims.record("FlatFromEnd", '"ShaftLength" / 2 - "FlatPitch" / 2 - "FlatLength" / 2')
     # Like edge to like edge (each flat's -u end): the flat-centre spacing.
     await dimension_between(
         adapter,

@@ -627,14 +627,14 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
             4.1656, 3.454, _PEDESTAL_SCREW_ENGAGEMENT
         ),
     ),
-    # The two #4-40 x 1/2 (12.7) MHA-VN-022 keeper foot screws: the head sits
-    # flush in the 8.0 foot's 2.7178 counterbore, so 12.7 - (8.0 - 2.7178) =
-    # 7.4178 enters the top frame's tap (ch_fulcrum_keeper_spec).
+    # The two #2-56 x 7/16 (11.1125) MHA-VN-022 keeper foot screws: the head
+    # sits flush in the 8.0 foot's 2.1082 counterbore, so 11.1125 - (8.0 -
+    # 2.1082) = 5.2207 enters the top frame's tap (ch_fulcrum_keeper_spec).
     **_numbered_pairs(
         "ch-channel-1/vn-frame-side-screw",
         range(1, 3),
         "fr-frame-1/fr-top-frame",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.4178),
+        _smooth_annulus_limit_mm3(2.1844, 1.778, 5.2207),
     ),
     # #743 PR2: the two #8-32 x 3/4 (19.05) MHA-VN-032 rocker-bracket hold-downs
     # (one per bracket since the 2026-10-09 flip) pass the 6.0 bracket foot
