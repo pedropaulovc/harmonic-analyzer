@@ -44,16 +44,40 @@ SHEET_NAMES = ("Collar", "SetScrew")
 SHEET_SCALES = {"Collar": (4, 1), "SetScrew": (20, 1)}
 END_CENTER = (0.080, 0.170)
 SIDE_CENTER = (0.205, 0.170)
-TAP_CENTER = (SIDE_CENTER[0], 0.240)
+# The radial tap view stands over the end view, left of the turning view.
+# Over the turning view, at (205, 240) mm, its gauge dimensions crossed the
+# top border by 3.2 and 8.8 mm, its note sat on NoseLength's lines, and the
+# root gauge and position leaders ran through the hole callout (run 14 at
+# 7fda4144f). Offsets below are from TAP_CENTER. The view spans +/-11.5 x
+# +/-17.05 mm at 2:1. Run 14 put the tap mouth at (+3.3, +1.8) mm, the callout
+# text at [-39, -1] x [-5.6, -2.1] mm from its callout point, the position
+# frame's leader start at (-6.3, -3.5) mm from its point, and the view note's
+# 62 x 4.3 mm box with its left/top corner at the note point.
+TAP_CENTER = (0.065, 0.238)
 TAP_SCALE = spec.RADIAL_TAP_VIEW_SCALE
 ISO_CENTER = (0.345, 0.210)
 END_KEEP = {"NoseDia": (0.027, 0.165), "FlatDistance": (0.080, 0.112)}
 # CollarDia is a turned-profile sketch dimension, native to the side view.
 SIDE_KEEP = {"CollarWidth": (0.205, 0.110), "CollarDia": (0.250, SIDE_CENTER[1]),
              "NoseLength": (0.182, 0.218), "ShoulderRadius": (0.282, 0.205)}
-TAP_KEEP = {"TapStation": (0.184, 0.266), "TapRootLimit": (0.250, 0.272)}
+# TapStation reads under the view, left of datum B (above the end view's top,
+# y 204 mm). The two-line TAP ROOT gauge reads level with the tap, left of the
+# view; its leader runs straight through the circle.
+TAP_KEEP = {
+    "TapStation": (TAP_CENTER[0] - 0.021, TAP_CENTER[1] - 0.024),
+    "TapRootLimit": (TAP_CENTER[0] - 0.030, TAP_CENTER[1]),
+}
+# Right of the view: the position frame level with the mouth, the hole
+# callout's text 10 mm under it, starting past the view's right edge. The
+# view note goes over the view, 3.7 mm inside the top border.
+TAP_POSITION_FRAME_XY = (TAP_CENTER[0] + 0.0213, TAP_CENTER[1] + 0.0058)
+TAP_CALLOUT_XY = (TAP_CENTER[0] + 0.0553, TAP_CENTER[1] - 0.0062)
+TAP_NOTE_XY = (TAP_CENTER[0] - 0.030, TAP_CENTER[1] + 0.025)
 BORE_CENTER = (0.350, 0.080)
 BORE_KEEP = {"BoreDia": (0.310, 0.110)}
+# Left of the crop circle (x 329.4 mm) and over the title block (top y 66):
+# at (318, 44) mm the note stood 4.8 mm inside the title block (run 14).
+BORE_NOTE_XY = (0.272, 0.082)
 SCREW_CENTER = (0.170, 0.165)
 SCREW_KEEP = {"DogDia": (0.075, 0.200), "DogLength": (0.096, 0.116)}
 # The dog's edge-break limit, printed above DogDia.  One line: SolidWorks
@@ -248,7 +272,7 @@ def _bore_view(adapter):
     )
     assert_imported_precision(adapter, marks, _precision(BORE_KEEP))
     set_dimension_callouts(adapter, marks, {"BoreDia": "REAM THRU"})
-    add_property_linked_note(adapter, "Bore View Note", BORE_CENTER[0] - 0.032, 0.044)
+    add_property_linked_note(adapter, "Bore View Note", *BORE_NOTE_XY)
     return view
 
 
@@ -326,7 +350,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 attachment_xy=point(end, (spec.FLAT_DISTANCE, spec.TAP_STATION, 0.0), "collar clock datum"),
             ),
             "radial_tap_position": PmiDrawingPlacement(
-                view=tap, position=(0.250, 0.221), attachment_xy=tap_rim,
+                view=tap, position=TAP_POSITION_FRAME_XY, attachment_xy=tap_rim,
             ),
         },
         datums=spec.COLLAR_DATUMS, controls=spec.COLLAR_CONTROLS,
@@ -336,7 +360,7 @@ async def build(adapter: Any) -> dict[str, str]:
     callout = add_native_hole_callout(
         adapter, tap,
         edge_xy=tap_rim,
-        callout_xy=(0.250, 0.245), label="custom collar blind set screw tap",
+        callout_xy=TAP_CALLOUT_XY, label="custom collar blind set screw tap",
     )
     set_hole_callout_precision(callout, {
         "hw-tapdrldepth": spec.TAP_DEPTH_PRECISION,
@@ -346,7 +370,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.080)
     add_property_linked_note(adapter, "Installation Notes", 0.016, 0.048)
     add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.160)
-    add_property_linked_note(adapter, "Radial Tap View Note", 0.169, 0.212)
+    add_property_linked_note(adapter, "Radial Tap View Note", *TAP_NOTE_XY)
     _bore_view(adapter)
 
     if not ddoc.ActivateSheet("SetScrew"):
