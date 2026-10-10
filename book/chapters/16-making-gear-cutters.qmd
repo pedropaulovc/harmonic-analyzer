@@ -5,7 +5,7 @@ status: stub
 
 # Making your own gear cutters {#sec-cutters}
 
-Stock involute cutters cover every gear in this machine but one. The six-tooth cone gear sits below the smallest cutter range, so you make its cutter. The replica uses standard 48DP 20° teeth for exactly this reason; the reconstruction's earlier pitch, DP 49.82, matched no cutter anyone sells (`cad/docs/gear-standard.md`).
+Stock involute cutters cover every gear in this machine but one. The six-tooth cone gear sits below the smallest cutter range, so you make its cutter, DT6-FORM1, a tool ground to the form on its own drawing sheet. The replica uses standard 48DP 20° teeth for exactly this reason; the reconstruction's earlier pitch, DP 49.82, matched no cutter anyone sells (`cad/docs/gear-standard.md`).
 
 ::: {.callout-note appearance="simple"}
 **TODO** — stub. Nothing here has been written yet.
@@ -19,7 +19,7 @@ TODO
 
 TODO
 
-## The Eureka method, step by step
+## Form cutters from a button tool (Law, ch. 12)
 
 TODO
 
@@ -27,7 +27,7 @@ TODO
 
 TODO
 
-## Generating the form
+## Grinding the DT6-FORM1 profile
 
 TODO
 
@@ -52,7 +52,7 @@ One form cutter, tested on a brass disc, tooth form checked against the drawing 
 
 **Sources for this chapter**
 
-- `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf` ch. 12
-- `cad/docs/machining-dfm.md` (cutter plan: stock cutters for every gear, one self-made cutter for T006)
+- `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf` ch. 12 (the button tool forms the cutter; the Eureka device only relieves it)
+- `cad/docs/machining-dfm.md` (cutter plan: stock cutters for every gear, the DT6-FORM1 tool for T006)
 - `cad/docs/gear-standard.md` (why the replica uses 48DP 20° teeth)
 

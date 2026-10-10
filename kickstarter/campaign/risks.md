@@ -5,8 +5,8 @@ carefully are the ones who back at the top tiers.
 
 ## Technical
 
-**The six-tooth cone gear may not be machinable in my shop.** It is a gear about 4 mm
-across on a 1/32 in (0.79 mm) bore, leaving about 0.75 mm of metal between
+**The six-tooth cone gear may not be machinable in my shop.** It is a gear 4.31 mm
+across on a 1/32 in (0.79 mm) bore, leaving about 0.64 mm of metal between
 tooth root and bore. `cad/docs/machining-dfm.md` calls it the single hardest part in the machine.
 *Mitigation:* the original used a harder yellow metal for the tip gears; if my
 first articles fail, the book documents the failure and the fallback (outsourced
@@ -15,8 +15,8 @@ wire-EDM), which is itself useful to a reader. **The book ships either way.**
 **Two gears need tooling I don't have yet.** The gear train uses standard 20°
 inch pitches, so stock cutters cover almost every gear
 (`cad/docs/gear-standard.md`). The six-tooth cone gear falls outside every
-stock cutter range, so its cutter is made by the Eureka method (*Gears and Gear
-Cutting*, ch. 12), a documented technique I have not learned yet. The 64-tooth
+stock cutter range, so it needs a form tool I grind myself
+(DT6-FORM1), a skill I have not learned yet. The 64-tooth
 crank gear is helical and needs a dividing head that can cut spirals; the head
 in the shop is sold as semi-universal. *Mitigation:* cutter-making is scheduled
 early in the curriculum, and the spiral head is a budget line (cost TBD) with

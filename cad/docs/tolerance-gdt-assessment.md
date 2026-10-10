@@ -178,9 +178,10 @@ tolerance.**
    a single unified DP would force distinct non-meshing systems to the wrong pitch. (My earlier draft
    had the cone/cylinder train at DP 30 — that was backwards; the rack was the DP-30 system then.)
 
-4. **The Ø6-tooth gear is marginal by construction.** T006's gap floor is printed at Ø2.346 MIN,
-   which leaves a **0.7485 mm minimum web** to the 1/32 in bore. The first 48DP PA20 study left
-   only 0.354 mm on a 1/16 in bore, below the 0.62 mm floor, so the terminal journal was cut to
+4. **The Ø6-tooth gear is marginal by construction.** T006's gap floor, cut by its DT6-FORM1
+   tool, is printed at Ø2.136 MIN, which leaves a **0.64 mm minimum web** over the largest allowed
+   1/32 in bore, against the 0.62 mm floor of its named exception. The first 48DP PA20 study left
+   only 0.354 mm on a 1/16 in bore, so the terminal journal was cut to
    1/32 in. That is a real machining hazard, not a CAD
    artifact — call it out as the hardest part to make, and note the period-correct mitigation: the
    four tip gears were a **harder yellow metal** (Muntz/manganese bronze), which is why they show
@@ -340,7 +341,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 |---|---|---|
 | **Summing lever** `sm-summing-lever`, `sm-knife-mount` | **T1** | knife-edge **straightness + ⟂ to motion plane**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. **Material:** the lever is gray cast iron and the mount brass — neither hardens to a durable edge, so the hardness callout needs a **hardened tool-steel knife-edge insert** (e.g. O1/W1, pinned/screwed into the lever) riding a **hardened-steel seat** set into the mount; spec the insert + seat as separate hardened parts (add to `materials.yaml`), *not* "harden the casting." *Least forgiving interface in the machine.* |
 | **Cylinder gears + cams** `dt-cylinder-gear`, `ch-connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; **rod cam-bore (the `cam_follower_contact` surface) `bearing`; rod *body* `none`** (book: rough — the exemption is the visible body, not the bearing bore). *The 20 cams are the function generators.* |
-| **Cone gears** `dt-cone-gear`, `dt-cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **48DP / 20° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.7485 mm minimum web on its 1/32 in bore** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
+| **Cone gears** `dt-cone-gear`, `dt-cone-gear-shaft` | **T1** | tooth-cutting setup within **0.05 mm TIR** of the finished bore; ordinary bands (OD +0/−0.05, tooth thickness ±0.075; T006 thin-only); **48DP / 20° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.64 mm minimum web on its 1/32 in bore** + harder tip metal (Finding 4); `precision` on bore. The centre distance is **set at assembly** on T120's feeler and locked by the cone-lock knob (MHA-VN-013), so the mesh is gated at nominal plus an RSS corner, not at the arithmetic worst case ([`gear-standard.md`](./gear-standard.md#how-the-meshes-are-accepted)). |
 | **Pivots & bushings** `ch-pivot-shaft`, `ch-fulcrum-shaft`, `pivot-bushing`, `lever-bushing` | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 19 spacers one length, one setup** (channel pitch 7.0565 mm); shaft straightness. |
 | **Rocker arms** `ch-rocker-arm`, `fr-rocker-arm-support` | **T1** | **concave radius R800 nominal** (form, ±0.5 mm; book ch.14 says "= bar length" = 812.8 mm — **reconcile, Finding 5**; stamp the model's R800, never the bar length). Pivot bore **square** to face; slide surface `bearing` finish. |
 | **Amplitude bars** `ch-amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |

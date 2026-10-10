@@ -43,10 +43,10 @@ period brackets/screws).
   tool vs the real solid, so it DOES surface sharp internal corners (as un-cut stock) + reach/gouge/
   collision — the class DFMPro misses. Blind spot: rigid geometry + held stock, so it will NOT catch
   thin-wall breakage / slender-shaft whip / tiny-part workholding (T006 root-to-bore web,
-  Ø0.79×32.7mm shaft tip, thin cam wall) → those need a first-article cut, not a clean sim.
+  Ø0.79×33.6mm shaft tip, thin cam wall) → those need a first-article cut, not a clean sim.
 - **Gear cutters: stock, except one.** The replica uses inch-standard 20° teeth (48DP cone/
   cylinder/alignment train, normal 24DP crank pair, 48DP reducer and 32DP feed in the paper drive, rack bought) so stock eight-cutter
-  sets cover every gear except the 6T cone, which gets one named special cutter (Eureka method,
-  `references/gears-and-gear-cutting/` ch. 12). The earlier DP 49.82 had no commercial cutter
+  sets cover every gear except the 6T cone, which gets one named custom ground cutter (DT6-FORM1;
+  Law's button-tool method, `references/gears-and-gear-cutting/` ch. 12, is background). The earlier DP 49.82 had no commercial cutter
   ([gear-standard.md](../cad/docs/gear-standard.md)). Teeth are cut indexed on a dividing head;
   wire-EDM/hobbing are outsource alternates only (the shop has no 2D cutters).

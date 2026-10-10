@@ -10,7 +10,7 @@ hours_actual: 0
 
 ## Objectives
 
-- Generate a form cutter by the Eureka method
+- Make a form cutter: grind the DT6-FORM1 tool to its sheet
 - Harden and temper it
 - Cut an involute gear and inspect it
 - Work down in size to the fragile end of the cone set
@@ -22,7 +22,7 @@ hours_actual: 0
 
 ## References
 
-- `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf` **ch. 12 (Eureka method)**
+- `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf` **ch. 12 (forming a cutter with a button tool; the Eureka device only relieves it)**
 - `cad/docs/machining-dfm.md` (gear routing; cutter plan with the stock cutter number and indexing for each gear)
 - `cad/docs/gear-standard.md` (why the replica uses 20° inch-standard teeth)
 - `cad/scripts/build_dt_cone_gear.py`, `cad/scripts/build_dt_cylinder_gear.py`
@@ -30,8 +30,8 @@ hours_actual: 0
 ## Practice
 
 - Choosing the stock cutter number for each gear from its tooth count, and why T006 falls outside every range
-- Making the button tool for the T006 cutter
-- Generating the form; relieving; hardening and tempering
+- Making a button tool, as Law does, on a practice cutter
+- Grinding the DT6-FORM1 form; relieving; hardening and tempering
 - Testing a cutter on scrap before trusting it
 - Blank prep: the bore is the datum
 - Mandrels, depth of cut, full tooth depth
@@ -48,7 +48,7 @@ A cut gear that meshes with its mate through a full rotation with no tight spot,
 
 ## Notes
 
-**The long pole of the entire project.** 60 h is a guess and probably low. The T006 gear (about 4 mm OD, 1/32 in (Ø0.794 mm) bore, **0.7485 mm minimum root-to-bore web**) is the single hardest part in the machine — treat reaching it as a separate milestone, and cut a first article long before committing the set.
+**The long pole of the entire project.** 60 h is a guess and probably low. The T006 gear (4.31 mm OD, 1/32 in (Ø0.794 mm) bore, **0.64 mm minimum root-to-bore web**) is the single hardest part in the machine — treat reaching it as a separate milestone, and cut a first article long before committing the set.
 
 ## Sessions
 

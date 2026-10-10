@@ -33,7 +33,7 @@ list with sizes is in the book's shop-setup chapter, and it is published free
 before launch so you can decide before you pledge.
 
 **How hard is this really?**
-Hard. One part, a six-tooth gear about 4 mm across with roughly 0.75 mm of
+Hard. One part, a six-tooth gear 4.31 mm across with about 0.64 mm of
 metal between tooth root and bore, is genuinely at the edge of home-shop
 capability. Stock cutters cover the rest of the gear train, but that gear needs
 a cutter you make yourself. The book

@@ -33,7 +33,7 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-**`ch-pivot-shaft`** (Ø6.35 × 203.2, L/D 32:1) and **`ch-fulcrum-shaft`** (Ø6.35 × 182, 29:1). Then, when M02-M05 are all solid, the **`dt-cone-gear-shaft`** — five steps ending in a Ø0.79 × 32.7 mm (1/32 in) terminal land in steel, 41:1.
+**`ch-pivot-shaft`** (Ø6.35 × 203.2, L/D 32:1) and **`ch-fulcrum-shaft`** (Ø6.35 × 182, 29:1). Then, when M02-M05 are all solid, the **`dt-cone-gear-shaft`** — five steps ending in a Ø0.79 × 33.6 mm (1/32 in) terminal land in steel, 42:1.
 
 ## Competency check
 

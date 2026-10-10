@@ -67,39 +67,85 @@ so the whole train changes together.
 
 ### Stock cutters
 
-At DP 49.82 there was no cutter to buy, so the plan was to
-make every form cutter by the Eureka method. At 48DP PA20 the ordinary eight-cutter
-ranges cover every cone from 12T to 120T, the 120T cylinder gears and the 32T
-alignment drum. The 6T cone is the one gear left needing a special cutter.
+At DP 49.82 no cutter was sold, so every form cutter would have been made in the
+shop. At 48DP PA20 the ordinary eight-cutter ranges cover every cone from 12T to
+120T, the 120T cylinder gears, the 32T alignment drum and the paper reducer. The
+6T cone is the one gear left needing a cutter you make.
 
 ### Cutter-native teeth
 
 A range cutter is ground to the tooth of the lowest count in its range: #8 for
 12–13 teeth, #7 14–16, #6 17–20, #5 21–25, #4 26–34, #3 35–54, #2 55–134. The
-model draws every form-cut gear as exactly the gap its stock cutter makes, not
-as an ideal involute for its own tooth count. The 120T cylinder gears carry the
-#2 form (55T reference), the 32T alignment drum the #4 form (26T), the 16T
-crank pinion the #7 form (14T), and the 64T crank gear the #2 form in its normal
-section. Each cone carries the form of its own range, with its blank diameter
-and plunge solved against the stock-form drum it meshes. The 6T cone uses a
-named special single-point cutter. The two 12T paper pinions carry the #8 form,
-and their hubs are shaped so the cutter runs out clear.
+model draws every form-cut gear as the gap its stock cutter makes, not as an
+ideal involute for its own tooth count. The 120T cylinder gears carry the #2
+form (55T reference), the 32T alignment drum the #4 form (26T), the 16T crank
+pinion the #7 form (14T), and the 64T crank gear the #2 form in its normal
+section. Each cone is cut by the cutter for its own range at standard depth, so
+the cutter's pitch line sits on the cone's pitch circle. Its blank is the AGMA
+standard outside diameter, (N + 2)/DP, floored to 0.01 mm and cut down only
+where the cutter's form would stop supporting the tip. The 6T cone is cut by
+DT6-FORM1, a custom ground tool with its own sheet. The two 12T paper pinions
+carry the #8 form, and their hubs are shaped so the cutter runs out clear.
 
-Gears cut this way do not mesh conjugately, so a classical contact ratio no
-longer describes them. The model reports stock-form coverage instead: the 3D
-union of the angular spans over which a supported contact exists, including
-tip-corner and face-edge contact, divided by the tooth pitch. Coverage is
-neither a contact ratio nor a loaded-contact check. Each drive mesh must also
-keep contact with no gap between teeth, hand over within 0.005 mm, and hold
-positive backlash at every tolerance corner (0.06–0.41 mm for the cones), and
-its transmission error is charged to the existing nominal-residual budget. The
-required coverage is at least 1.1 for every cone and 0.62 for the crank pair.
-The alignment pinion is only meshed while the readout is zeroed, with the
-notches set up by eye, so it is checked for continuity, backlash and root
-clearance instead. The cone and crank meshes are crossed or oblique, so these
-checks run on the 3D solids (`cad/scripts/diagnostics/oblique_cone_mesh_study.py`
-and `stock_form_contact_3d.py`); a planar screen is reported alongside but does
-not count. The final values are in the part specs.
+### How the meshes are accepted
+
+Each mesh gets the ordinary closed-form hand checks (`standard_mesh_checks`):
+contact ratio, involute interference, backlash and root clearance, computed from
+the printed tip and tooth-thickness limits of each gear and the booked range of
+centre distance. The check uses each gear's ideal involute, which is the usual
+shop approximation for range cutters; the SolidWorks assembly interference gate
+checks the real flanks.
+
+The tolerances are ordinary ones for a hobby build of an 1898 machine. Cone
+blanks are OD +0/−0.05 mm and tooth thickness ±0.075 mm, and each cone and drum
+is set up for tooth cutting within 0.05 mm TIR of its finished bore
+(`dt_cone_gear_spec.py`; `tolerances.yaml`, `cone_drum_oblique_mesh`). T006
+keeps its own thin-only bands (thickness +0/−0.04 mm, OD +0/−0.02 mm). Close
+running fits elsewhere use the ordinary H7/g6 class (`_fit_limits.py`).
+
+The cone centre distance is not fixed. It is set at assembly, so the gate is
+written for a set mesh (`cone_set_stack`, `dt_mesh_checks`,
+`test_standard_mesh_checks`):
+
+- Cones T012–T120 must reach a contact ratio of at least 1.0 at the nominal
+  set centre, and show no binding and no interference at the RSS corner of the
+  centre and tooth bands. Nominal ratios run from 1.05 (T012) up to about 1.19.
+- T006 is the named exception. No full-depth six-tooth form reaches a contact
+  ratio of 1 against the 20° 120T drum, so T006 is gated instead on its
+  DT6-FORM1 relief standing at least 0.010 mm clear of every printed drum-tip
+  path over the RSS centre range, with at least 0.02 mm backlash. Its contact
+  ratio, 0.775 at nominal and 0.766 at the RSS corner, is reference only.
+- The crank pair has a fixed centre. It must reach a contact ratio of at least
+  1.0 at the nominal centre (1.088) and must not bind at any tolerance corner.
+  Its open-corner ratio is reference only.
+
+Everything else these checks print is reference (REF): the RSS-corner contact
+ratios and the arithmetic worst-corner interference. Among T012–T120 only T012
+overlaps at the arithmetic worst corner, by 0.322 mm. That is a fit-up note on
+the assembly sheet: if T012 binds after the set, back the swing off or stone
+the T012 tip.
+
+The alignment pinion only meshes while the readout is zeroed, with the notches
+set by eye. It must not bind; its contact ratio is reported, not gated.
+
+### Setting the cone mesh
+
+The cone set swings on a platform. The cone-lock knob, MHA-VN-013, sets and
+locks the engaged mesh at assembly. The swing stop screw, MHA-VN-015, only
+limits how far the set swings out when disengaged; it plays no part in the
+mesh. The order, from note 4 of the drive-train assembly sheet:
+
+1. Ease the arbor-pedestal screws to snug-loose.
+2. Swing in on radial shims, cone tip to drum root, at T012 and T120, so the
+   arbor lines up with the cone line. Tighten the pedestal screws.
+3. Swing in until a feeler is snug between the T120 tip and the drum root, hold
+   it there, and lock MHA-VN-013.
+4. Do not loosen the pedestals after the set. If you do, redo both steps.
+
+The set cannot correct a pivot that moves sideways, so the platform pivot is
+reamed Ø6.350 H7 (6.350–6.365 mm) on the stock 91829A560 shoulder, and the
+base's pivot seat is held ±0.05 mm from the pedestal seats, machined in one
+setup.
 
 ### Undercut
 
@@ -127,16 +173,16 @@ are the deep-edge planar screen, nominal / worst:
 | 42T | 1.577 / 1.056 | 1.542 / 1.104 |
 
 From 48T up the worst-case ratio stays between about 1.12 and 1.21 in both trains.
-These are comparison values only; the built teeth are checked by stock-form
-coverage, as above.
+These are comparison values only; the built teeth are accepted as described in
+[How the meshes are accepted](#how-the-meshes-are-accepted).
 
 ### Paper-drive 12T pinions (study)
 
 As ideal teeth, both 12T paper pinions needed positive profile shift to avoid
 undercut: x = +0.298 with a 0.437-module tip land at 20°, against x = +0.624
-with only 0.272 module of land at 14.5°. The built pinions are cutter-native
-instead: the standard #8 gap moved along its centreline, with blank diameter
-and plunge solved from that geometry.
+with only 0.272 module of land at 14.5°. The built pinions are cut instead with
+the stock #8 form, the feed pinion with the 32DP cutter and the knob pinion with
+the 48DP cutter from the cone set.
 
 ## Why not 14.5° at 48DP
 
@@ -176,21 +222,23 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   cutter's ground profile at every tolerance corner.
 - Cone incline: 12.518° → 13.001°. Cone face width: 6.8887 → 6.8756 mm. The
   7.0565 mm channel pitch is unchanged.
-- Cone outside diameters are solved per cone against the stock-form drum. The
-  study's long-addendum tips (6T 4.16 mm, 120T 64.85 mm) are superseded by the
-  values in `dt_cone_gear_spec.py`.
-- Crank pair: centre distance 39.77 → 43.52 mm (+9.44%); 16T OD 17.38 → 19.05 mm;
-  64T OD 65.21 → 71.63 mm. To make room the crank and the cone journals rise
+- Cone outside diameters follow the AGMA standard blank: 7.26 mm at 12T up to
+  64.35 mm at 120T, where the #2 cutter's form caps it just under the ideal
+  64.56 mm. T006 is 4.31 mm, above its AGMA 4.23 mm, so that its tip keeps a
+  quarter-module land. The values are in `dt_cone_gear_spec.py`.
+- Crank pair: centre distance 39.77 → 43.52 mm (+9.44%); 16T OD 17.38 → 18.87 mm;
+  64T OD 65.21 → 71.04 mm. To make room the crank and the cone journals rise
   4.732 mm together, the cone pivot post grows from 86 to 94.732 mm (head 26.6 mm),
-  the swing platform grows 7.5 mm longer with no relief pocket under the 64T, and
-  the post mounting screw becomes a 4 in 1/4-20 (MSC 40923906) cut to 94.9 mm.
+  the swing platform loses its relief pocket under the 64T, and the post
+  mounting screw becomes a 4 in 1/4-20 (MSC 40923906) cut to 94.9 mm.
 - Paper drive: the reducer keeps its 12:120 counts, which fit the photographed
   1898 disc best, but is cut at 48DP with the cone cutters. The disc shrinks from
-  OD 81.55 mm to just under 64.6 mm, about 21% smaller. The change is deliberate: one
-  48DP cutter set then serves the cones, the cylinder gears and the reducer. The
-  32DP feed pinion and the purchased 32DP rack shorten the paper advance from
-  1.596 to 1.496 mm per crank turn (−6.25%). The chain is 68 links
-  of ANSI #25.
+  OD 81.55 mm to 64.54 mm, about 21% smaller. The change is deliberate: one
+  48DP cutter set then serves the cones, the cylinder gears and the reducer.
+  The 12T 32DP feed pinion runs on a purchased SDP/SI A1B12-Y324 32DP rack,
+  which shortens the paper advance from 1.596 to 1.496 mm per crank turn
+  (−6.25%). The chain stays ANSI #25, 68 links, on the 12T crank and 24T knob
+  sprockets.
 - Tooth form: a 20° tooth has a smaller base circle (0.940 of pitch diameter,
   against 0.968 at 14.5°), so its flanks are more curved and its tip narrower.
   At 48DP the whole tooth is about 1.2 mm deep, so the difference shows under a
@@ -201,8 +249,9 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
 - The 6T cone still needs a cutter you make. No ordinary cutter range reaches
   6 teeth. In the first 48DP study its root-to-bore web fell from 0.621 mm to
   0.354 mm, because the PA20 gap floor sits lower. The terminal journal was
-  then cut to 1/32 in, which restores a 0.7485 mm minimum web. Its cutter is a
-  named single-point fly cutter, DT6-FORM1.
+  then cut to 1/32 in. With DT6-FORM1 the printed gap floor is Ø2.136 mm MIN,
+  which leaves a 0.64 mm web over the largest allowed bore, against a 0.62 mm
+  floor (the one named web exception).
 - The 64T crank gear is a true helix. Cutting it needs a spiral-capable
   universal dividing head geared to the table leadscrew (lead 945.86 mm per
   turn). A plain or semi-universal indexing head cannot do it; the shop's
@@ -214,8 +263,7 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   new, but it is now explicit.
 - The meshes are not conjugate. Drawing each gear as its cutter's form removes
   the earlier mismatch between range cutters and ideal profiles, at the price
-  of a small transmission error in each mesh, which the model bounds and
-  propagates to the drum and channel phase.
+  of some transmission error in each mesh, which the model does not quantify.
 - The paper scale changes by −6.25%, as above.
 
 ## Sources
@@ -229,6 +277,9 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   [archive.org](https://archive.org/details/treatisegear00browrich).
 - Brown & Sharpe Mfg. Co., *Machinery and Tools* catalogue, 1904, involute cutter
   lists, [archive.org](https://archive.org/details/BrownAndSharpeMachineryAndTools1904Catalogue).
+- Ivan Law, *Gears and Gear Cutting*, ch. 12 (`references/gears-and-gear-cutting/`):
+  shop-made form cutters shaped with a button tool; the Eureka device there is
+  a relieving attachment, not a way to generate the form.
 - B. Dengel, "Under Pressure," *Gear Solutions*, September 2017,
   [gearsolutions.com](https://gearsolutions.com/departments/tooth-tips-under-pressure/).
 - KHK, [Gears with a pressure angle of 20 degrees](https://khkgears.net/new/gear_knowledge/gear-nomenclature/gears-with-a-pressure-angle-of-20-degrees.html)

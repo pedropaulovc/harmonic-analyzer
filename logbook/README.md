@@ -54,7 +54,7 @@ All in [`references/`](../references/), which is a git submodule:
 
 - `machining-for-hobbyists-getting-started/`, the beginner spine, a chapter per topic
 - `machinerys-handbook/`, the lookup, with a local search index
-- `gears-and-gear-cutting/`, whose ch. 12 is the Eureka form-cutter method
+- `gears-and-gear-cutting/`, whose ch. 12 forms cutters with a button tool (the Eureka device there only relieves them)
 - `jet-bd-920n-operators-manual.pdf`, the lathe
 - `magxact-mx100m-mill-dro-manual/` and `el400-operation-manual/`, the DROs
 
