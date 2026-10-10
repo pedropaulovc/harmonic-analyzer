@@ -456,39 +456,38 @@ def test_cam_thickness_refuses_a_missing_or_ambiguous_cam_face(count: int) -> No
         drawing._cam_thickness_rims(_CamView(faces))
 
 
-def test_pattern_notch_basic_locator_uses_the_actual_seed_gap() -> None:
+def test_pattern_notch_reference_uses_the_actual_seed_gap() -> None:
     kerf_axis = math.pi / 2.0 + math.radians(spec.NOTCH_PHASE_DEG)
     assert spec.TOOTH_PATTERN_GAP_RAD == pytest.approx(math.pi / spec.TEETH)
     assert math.degrees(kerf_axis - spec.TOOTH_PATTERN_GAP_RAD) == pytest.approx(
-        spec.PATTERN_NOTCH_BASIC_ANGLE_DEG
+        spec.PATTERN_NOTCH_REF_ANGLE_DEG
     )
-    assert spec.PATTERN_NOTCH_BASIC_ANGLE_DEG == 90.0
+    assert spec.PATTERN_NOTCH_REF_ANGLE_DEG == 90.0
     assert spec.CAM_PHASE_TOLERANCE_DEG == 0.25
     assert spec.DRAWING_PRECISION["NotchProfile"]["NotchPhase"] == 1
     assert spec.DRAWING_PRECISION["NotchProfile"]["PatternNotchPhase"] == 0
     assert "PatternNotchPhase" in drawing.FRONT_KEEP
 
 
-def test_pattern_notch_native_locator_is_a_separate_basic_reference() -> None:
+def test_pattern_notch_is_an_untoleranced_reference_with_no_method_text() -> None:
+    """Main's MHA-DT-012 eye pass: the kerf is sawn into a root the indexing
+    already cut, so tooth pattern to notch is not a separate operation. The
+    90 deg prints (90°) REF; the ±0.02 deg grade and the INSPECT text are gone
+    (the callout-above slot never rendered, so its readback was a false pass).
+    Cam lobe to notch stays toleranced on NotchPhase."""
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
-    reference_calls = [
-        node for node in calls
-        if isinstance(node.func, ast.Name)
-        and node.func.id == "add_angular_reference_dimension"
-    ]
     expected_names = {
         keyword.value.id
-        for node in reference_calls
+        for node in calls
+        if isinstance(node.func, ast.Name)
+        and node.func.id == "add_angular_reference_dimension"
         for keyword in node.keywords
         if keyword.arg == "expected_degrees" and isinstance(keyword.value, ast.Name)
     }
-    assert {"NOTCH_PHASE_DEG", "PATTERN_NOTCH_BASIC_ANGLE_DEG"} <= expected_names
-    assert any(
-        isinstance(node.func, ast.Name)
-        and node.func.id == "set_dimension_basic_tolerance"
-        and [arg.value for arg in node.args[1:] if isinstance(arg, ast.Constant)]
-        == ["NotchProfile", "PatternNotchPhase"]
+    assert {"NOTCH_PHASE_DEG", "PATTERN_NOTCH_REF_ANGLE_DEG"} <= expected_names
+    assert not any(
+        isinstance(node.func, ast.Name) and node.func.id == "set_dimension_basic_tolerance"
         for node in calls
     )
     assert any(
@@ -500,58 +499,19 @@ def test_pattern_notch_native_locator_is_a_separate_basic_reference() -> None:
         and node.args[-1].value == "fix"
         for node in calls
     )
-
-
-def test_pattern_notch_grade_has_no_missing_source_fallback(monkeypatch) -> None:
-    import _gear_fit_limits as supplier
-
-    def missing():
-        raise supplier.SourceDomainUnknown("actual published pattern clock is UNKNOWN")
-
-    monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", missing)
-    # Importing the mechanical spec does not demand or invent a released grade.
-    runpy.run_path(spec.__file__)
-    with pytest.raises(supplier.SourceDomainUnknown, match="UNKNOWN"):
-        spec.pattern_notch_clock_grade_deg()
-    with pytest.raises(supplier.SourceDomainUnknown, match="UNKNOWN"):
-        spec.pattern_notch_phase_callouts()
-
-
-@pytest.mark.parametrize("grade", (0.02, 0.031))
-def test_pattern_notch_grade_reads_only_the_published_supplier(monkeypatch, grade) -> None:
-    import _gear_fit_limits as supplier
-
-    monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: grade)
-    assert spec.pattern_notch_clock_grade_deg() == grade
-    assert spec.pattern_notch_phase_callouts() == (
-        f"TOOTH PATTERN TO CAM NOTCH\nANGULAR ERROR +/-{grade:g} DEG FROM BASIC",
-        "INSPECT FROM THE ACTUAL SEED TOOTH GAP,\nNOT FROM THE ECCENTRIC CAM LOBE.",
-    )
-
-
-def test_pattern_notch_grade_reports_a_tighter_admission_without_drawing(monkeypatch) -> None:
-    import _gear_fit_limits as supplier
-
-    monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: 0.019)
-    with pytest.raises(
-        supplier.SourceDomainUnknown,
-        match=r"\+/-0\.019 deg.*do not issue the production drawing",
-    ):
-        spec.pattern_notch_clock_grade_deg()
-    with pytest.raises(
-        supplier.SourceDomainUnknown,
-        match=r"\+/-0\.019 deg.*do not issue the production drawing",
-    ):
-        spec.pattern_notch_phase_callouts()
+    for gone in ("BASIC_DIMENSIONS", "pattern_notch_phase_callouts"):
+        assert not hasattr(spec, gone) and not hasattr(drawing, gone)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "INSPECT" not in source and "GetText(3)" not in source
+    assert "drum_tooth_to_cam_notch_clock_deg" not in (
+        Path(spec.__file__).parents[1] / "config" / "tolerances.yaml"
+    ).read_text(encoding="utf-8")
 
 
 def test_pattern_notch_drawing_consumes_pure_specification() -> None:
     from _drawing_contract import drawing_specification_violations
 
-    assert spec.BASIC_DIMENSIONS == frozenset({"PatternNotchPhase"})
-    assert spec.BASIC_DIMENSIONS <= spec.DRAWING_DIMENSIONS["NotchProfile"]
-    assert drawing.BASIC_DIMENSIONS is spec.BASIC_DIMENSIONS
-    assert drawing.pattern_notch_phase_callouts is spec.pattern_notch_phase_callouts
+    assert drawing.PATTERN_NOTCH_REF_ANGLE_DEG is spec.PATTERN_NOTCH_REF_ANGLE_DEG
     assert drawing_specification_violations(
         Path(drawing.__file__).read_text(encoding="utf-8")
     ) == ()
@@ -562,7 +522,6 @@ class _PatternDimension:
 
     def __init__(self, fault=None):
         self.fault = fault
-        self._tolerance = 0
 
     def __bool__(self):
         raise AssertionError("nullable IDimension must be checked with is None")
@@ -583,25 +542,15 @@ class _PatternDimension:
     def SystemValue(self):
         return math.radians(1.5 if self.fault == "cam_angle" else 90.0)
 
-    def SetToleranceType(self, tolerance):
-        if self.fault == "setter_false":
-            return False
-        if self.fault == "setter_integer":
-            return 1
-        if self.fault != "tolerance_unmoved":
-            self._tolerance = tolerance
-        return True
-
     def GetToleranceType(self):
-        return self._tolerance
+        return 1 if self.fault == "basic" else 0
 
 
 class _PatternDisplay:
     def __init__(self, fault=None):
         self.fault = fault
         self.dimension = None if fault == "null_dimension" else _PatternDimension(fault)
-        self._parentheses = True
-        self._text = {}
+        self._parentheses = False
 
     @property
     def Type2(self):
@@ -620,17 +569,6 @@ class _PatternDisplay:
         assert index == 0
         return self.dimension
 
-    def GetDimension(self):
-        return self.dimension
-
-    def SetText(self, part, text):
-        if self.fault != "text_unmoved":
-            self._text[part] = text
-        return None  # Generated binding is VT_VOID, not a Boolean setter.
-
-    def GetText(self, part):
-        return self._text.get(part, "")
-
 
 class _PatternAnnotation:
     def __init__(self, fault=None):
@@ -641,71 +579,40 @@ class _PatternAnnotation:
 
 
 def _pattern_bindings(monkeypatch):
-    import _drawing_common as drawing_driver
-
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(
-        drawing_driver._sw_type_info,
-        "early_bound_or_flag",
-        lambda value, interface, *methods: value,
+        drawing, "dimension_name", lambda adapter, annotation: "PatternNotchPhase"
     )
-    for module in (drawing, drawing_driver):
-        monkeypatch.setattr(
-            module, "dimension_name", lambda adapter, annotation: "PatternNotchPhase"
-        )
-    return SimpleNamespace(
-        _attempt=lambda operation, **kwargs: operation(),
-        currentModel=SimpleNamespace(EditRebuild3=lambda: None),
-    )
+    return SimpleNamespace()
 
 
-@pytest.mark.parametrize("grade", (0.02, 0.031))
-def test_pattern_notch_basic_and_critical_text_use_native_readback(
-    monkeypatch, grade
-) -> None:
-    import _gear_fit_limits as supplier
-
-    monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: grade)
+def test_pattern_notch_prints_as_a_parenthesized_reference(monkeypatch) -> None:
     adapter = _pattern_bindings(monkeypatch)
     annotation = _PatternAnnotation()
-    callouts = spec.pattern_notch_phase_callouts()
-    display = drawing._pattern_notch_phase_control(adapter, [annotation], callouts)
+    display = drawing._pattern_notch_reference(adapter, [annotation])
     assert display is annotation.display
-    assert display.dimension.GetToleranceType() == 1
-    assert display.dimension.SystemValue == math.radians(90.0)
-    assert display.ShowParenthesis is False
-    assert display.GetText(3) == callouts[0]
-    assert display.GetText(4) == callouts[1]
+    assert display.ShowParenthesis is True
 
 
 @pytest.mark.parametrize(
     "fault",
     (
         "null_display", "null_dimension", "wrong_name", "driving", "cam_angle", "linear",
-        "setter_false", "setter_integer", "tolerance_unmoved",
-        "parentheses_unmoved", "text_unmoved",
+        "basic", "parentheses_unmoved",
     ),
 )
-def test_pattern_notch_control_refuses_non_authoritative_native_state(monkeypatch, fault) -> None:
-    import _gear_fit_limits as supplier
-
-    monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: 0.02)
+def test_pattern_notch_reference_refuses_non_authoritative_native_state(
+    monkeypatch, fault
+) -> None:
     adapter = _pattern_bindings(monkeypatch)
     with pytest.raises(RuntimeError):
-        drawing._pattern_notch_phase_control(
-            adapter, [_PatternAnnotation(fault)], spec.pattern_notch_phase_callouts()
-        )
+        drawing._pattern_notch_reference(adapter, [_PatternAnnotation(fault)])
 
 
 @pytest.mark.parametrize("count", (0, 2))
-def test_pattern_notch_control_requires_one_named_locator(monkeypatch, count) -> None:
-    import _gear_fit_limits as supplier
-
-    monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: 0.02)
+def test_pattern_notch_reference_requires_one_named_locator(monkeypatch, count) -> None:
     adapter = _pattern_bindings(monkeypatch)
     with pytest.raises(RuntimeError, match="expected one actual PatternNotchPhase"):
-        drawing._pattern_notch_phase_control(
-            adapter,
-            [_PatternAnnotation() for _ in range(count)],
-            spec.pattern_notch_phase_callouts(),
+        drawing._pattern_notch_reference(
+            adapter, [_PatternAnnotation() for _ in range(count)]
         )

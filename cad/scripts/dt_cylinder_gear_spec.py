@@ -116,37 +116,12 @@ NOTCH_MEAN_RADIUS = (NOTCH_FLOOR_RADIUS + TIP_RADIUS) / 2.0
 NOTCH_PHASE_DEG = 180.0 / TEETH
 NOTCH_CENTER_X = -NOTCH_MEAN_RADIUS * math.sin(math.radians(NOTCH_PHASE_DEG))
 # The native stock profile is patterned with the canonical seed-gap ray at
-# pi/N. The existing kerf ray is pi/2 + pi/N, so this separate locator is 90
-# BASIC; it is not the cam-lobe-to-kerf NotchPhase/cam_phase control above.
+# pi/N and the kerf ray is pi/2 + pi/N: thirty pitches, 90 deg. Printed as
+# (90°), a reference: the kerf is sawn into a tooth root the indexing already
+# cut, so it has no separate pattern-to-notch error to inspect. The phase the
+# analyzer reads, cam lobe to notch, is NotchPhase's 1.5 ±0.25 above.
 TOOTH_PATTERN_GAP_RAD = math.pi / TEETH
-PATTERN_NOTCH_BASIC_ANGLE_DEG = 90.0
-BASIC_DIMENSIONS = frozenset({"PatternNotchPhase"})
-PATTERN_NOTCH_SHOP_CANDIDATE_DEG = 0.02
-
-
-def pattern_notch_clock_grade_deg() -> float:
-    """Read the post-F4 published drum pattern-to-CAM-NOTCH half-width lazily."""
-    from _gear_fit_limits import SourceDomainUnknown, drum_tooth_to_cam_notch_clock_deg
-
-    grade = drum_tooth_to_cam_notch_clock_deg()
-    if grade < PATTERN_NOTCH_SHOP_CANDIDATE_DEG:
-        raise SourceDomainUnknown(
-            f"actual drum pattern-to-CAM-NOTCH grade +/-{grade:g} deg is tighter "
-            f"than the +/-{PATTERN_NOTCH_SHOP_CANDIDATE_DEG:g} deg shop candidate; "
-            "report the admissible grade, do not issue the production drawing"
-        )
-    return grade
-
-
-def pattern_notch_phase_callouts() -> tuple[str, str]:
-    """Print the actual published pattern-to-notch grade without a fallback."""
-    grade_deg = pattern_notch_clock_grade_deg()
-    return (
-        "TOOTH PATTERN TO CAM NOTCH\n"
-        f"ANGULAR ERROR +/-{grade_deg:g} DEG FROM BASIC",
-        "INSPECT FROM THE ACTUAL SEED TOOTH GAP,\n"
-        "NOT FROM THE ECCENTRIC CAM LOBE.",
-    )
+PATTERN_NOTCH_REF_ANGLE_DEG = 90.0
 
 
 SURFACE_FINISHES = (

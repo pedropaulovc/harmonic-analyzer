@@ -28,7 +28,6 @@ from _drawing_common import (
     new_project_drawing,
     offset_dimension_text,
     read_required_properties,
-    set_basic_dimensions,
     set_dimension_callouts,
     set_hidden_lines_visible,
     set_reference_dimensions,
@@ -42,7 +41,6 @@ from _part_pmi import _face_geometry, _face_matches
 from _surface_finish import surface_finish_by_key
 from dt_cylinder_gear_notes import BORE_FIT_CALLOUT, STACK_FIT_CALLOUT
 from dt_cylinder_gear_spec import (
-    BASIC_DIMENSIONS,
     BORE_DIA,
     CAM_DIA,
     CAM_THICKNESS,
@@ -53,10 +51,9 @@ from dt_cylinder_gear_spec import (
     NOTCH_CENTER_X,
     NOTCH_FLOOR_RADIUS,
     OVERALL_THICKNESS,
-    PATTERN_NOTCH_BASIC_ANGLE_DEG,
+    PATTERN_NOTCH_REF_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_RADIUS,
-    pattern_notch_phase_callouts,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -106,7 +103,8 @@ FRONT_KEEP = {
     "CamDia": (0.175, 0.235),
     "CamCy": (0.175, 0.279),
     "NotchPhase": (0.152, 0.334),
-    "PatternNotchPhase": (0.152, 0.360),
+    # Left of centre so "(90°)" keeps clear of the STACKS note above 7.0565.
+    "PatternNotchPhase": (0.145, 0.360),
 }
 RIGHT_KEEP = {
     "OutsideDia": (0.248, RIGHT_CENTER[1]),
@@ -468,10 +466,14 @@ def _leader_outside_arrow(adapter: Any, annotations: list[Any], name: str) -> No
         raise RuntimeError(f"{name} did not keep its single outside arrow")
 
 
-def _pattern_notch_phase_control(
-    adapter: Any, annotations: list[Any], callouts: tuple[str, str]
-) -> Any:
-    """Keep the true pattern locator BASIC; print its independently paid grade."""
+def _pattern_notch_reference(adapter: Any, annotations: list[Any]) -> Any:
+    """Print the seed-gap-to-kerf 90 degrees as a reference, (90°).
+
+    The kerf is sawn into a root the tooth indexing already cut, so the
+    angle has nothing separate to inspect (dt_cylinder_gear_spec).  The
+    part leaves the driven dimension untoleranced; parentheses mark it
+    reference, as the cam thickness's (4.06) on this sheet.
+    """
     matches = [annotation for annotation in annotations
                if dimension_name(adapter, annotation) == "PatternNotchPhase"]
     if len(matches) != 1:
@@ -488,26 +490,19 @@ def _pattern_notch_phase_control(
     if (type(name) is not str or not name.startswith("PatternNotchPhase@NotchProfile@")
             or int(display.Type2) != 3 or int(dimension.DrivenState) != 1
             or not math.isclose(abs(float(dimension.SystemValue)),
-                                math.radians(PATTERN_NOTCH_BASIC_ANGLE_DEG), abs_tol=1e-8)):
+                                math.radians(PATTERN_NOTCH_REF_ANGLE_DEG), abs_tol=1e-8)):
         raise RuntimeError("pattern-to-CAM-notch locator is not the actual driven 90-degree angle")
-    set_basic_dimensions(adapter, matches, BASIC_DIMENSIONS)
-    display.ShowParenthesis = False
-    if display.ShowParenthesis is not False:
-        raise RuntimeError("BASIC pattern locator incorrectly retained reference parentheses")
-    above, below = callouts
-    # IDisplayDimension.SetText is VT_VOID: success is authoritative GetText,
-    # never the setter's return value. The boxed angle remains BASIC, not +/-.
-    display.SetText(3, above)  # swDimensionTextCalloutAbove
-    display.SetText(4, below)  # swDimensionTextCalloutBelow
-    if display.GetText(3) != above or display.GetText(4) != below:
-        raise RuntimeError("critical gear-pattern angular callout did not persist")
+    if int(dimension.GetToleranceType()) != 0:  # swTolNONE
+        raise RuntimeError("pattern-to-CAM-notch reference carries a tolerance")
+    display.ShowParenthesis = True
+    if display.ShowParenthesis is not True:
+        raise RuntimeError("pattern-to-CAM-notch reference lost its parentheses")
     return display
 
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    pattern_callouts = pattern_notch_phase_callouts()
 
     check("open cylinder-gear source", await adapter.open_model(str(SOURCE)))
     read_required_properties(
@@ -583,7 +578,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # band nobody specified.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"BoreDia"})
-    _pattern_notch_phase_control(adapter, annotations, pattern_callouts)
+    _pattern_notch_reference(adapter, annotations)
     # Keep the controlled face-width value while moving only its text outside
     # the side-view extension lines; the offset leader returns to the dimension.
     offset_dimension_text(

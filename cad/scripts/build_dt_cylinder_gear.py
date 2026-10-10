@@ -101,7 +101,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_basic_tolerance,
     set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
@@ -131,7 +130,7 @@ from dt_cylinder_gear_spec import (
     NOTCH_PHASE_DEG,
     NOTCH_WIDTH,
     NOTCH_WIDTH_BAND,
-    PATTERN_NOTCH_BASIC_ANGLE_DEG,
+    PATTERN_NOTCH_REF_ANGLE_DEG,
     OUTSIDE_DIA,
     OUTSIDE_DIA_BAND,
     OVERALL_THICKNESS,
@@ -578,8 +577,8 @@ async def build(adapter) -> dict[str, str]:
     await add_angular_reference_dimension(
         adapter, pattern_ray, notch_radial,
         (NOTCH_MEAN_RADIUS * .65, NOTCH_MEAN_RADIUS * .70),
-        "actual tooth-pattern to CAM-notch BASIC phase",
-        expected_degrees=PATTERN_NOTCH_BASIC_ANGLE_DEG,
+        "tooth-pattern to CAM-notch reference angle",
+        expected_degrees=PATTERN_NOTCH_REF_ANGLE_DEG,
     )
     notch_dims.record("PatternNotchPhase")
     await ensure_fully_defined(adapter, "notch sketch")
@@ -717,7 +716,6 @@ async def build(adapter) -> dict[str, str]:
         CAM_PHASE_TOLERANCE_DEG,
         require_driven=True,
     )
-    set_dimension_basic_tolerance(adapter, "NotchProfile", "PatternNotchPhase")
     volume = await volume_check(
         adapter, "driven cylinder gear (equations neutral)", volume, 0.01 * v_bore
     )
