@@ -67,7 +67,7 @@ from pd_transgear_feed_pinion_spec import (
     STOCK_PROFILE,
     TOOTHSPACE_GAUGE_DIA_MM,
     TOOTH_SPACE_CALLOUT,
-    TOOTH_SPACE_INSPECTION_ENDS_MM,
+    TOOTH_SPACE_INSPECTION_END_MM,
     TOOTH_SPACE_INSPECTION_PHASE_RAD,
     TOOTH_SPACE_CALLOUT_PROPERTY,
 )
@@ -310,7 +310,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Manufacturing Notes",
             TOOTH_SPACE_CALLOUT_PROPERTY,
-            "Tooth Cut Features",
         ),
         required=(
             "Number",
@@ -320,14 +319,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Manufacturing Notes",
             TOOTH_SPACE_CALLOUT_PROPERTY,
-            "Tooth Cut Features",
         ),
     )
     require_source_control(
         source_properties[TOOTH_SPACE_CALLOUT_PROPERTY], TOOTH_SPACE_CALLOUT,
         label="feed pinion toothspace/index control",
     )
-    tooth_features = tuple(source_properties["Tooth Cut Features"].splitlines())
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -453,8 +450,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, front, profile=STOCK_PROFILE,
         actual_pin_diameter_mm=TOOTHSPACE_GAUGE_DIA_MM,
         rotate_rad=TOOTH_SPACE_INSPECTION_PHASE_RAD,
-        axial_stations_mm=TOOTH_SPACE_INSPECTION_ENDS_MM,
-        tooth_features=tooth_features,
+        axial_station_mm=TOOTH_SPACE_INSPECTION_END_MM,
         property_name=TOOTH_SPACE_CALLOUT_PROPERTY, note_xy=TOOTH_SPACE_CALLOUT_XY,
     )
     _assert_note_inside_border(toothspace_callout, "toothspace inspection callout")

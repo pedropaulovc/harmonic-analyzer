@@ -204,7 +204,7 @@ if not math.isfinite(TOOTH_SPACE_RUNOUT_TIR_MM) or TOOTH_SPACE_RUNOUT_TIR_MM <= 
     raise ValueError("feed toothspace inspection requires a positive configured TIR limit")
 # The actual rear-face flank edge of the indexed straight stock pass.
 TOOTH_SPACE_INSPECTION_PHASE_RAD = math.pi / TEETH
-TOOTH_SPACE_INSPECTION_ENDS_MM = (0.0,)
+TOOTH_SPACE_INSPECTION_END_MM = 0.0
 # Relative angular index is a separate inspection from radial TIR and span
 # thickness. Its linear errors refer to the drawn pitch-reference circle,
 # not the certified measuring pin's centre radius.

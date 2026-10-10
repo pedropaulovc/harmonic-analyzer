@@ -738,7 +738,7 @@ def test_toothspace_control_is_source_owned_and_feature_local() -> None:
     assert drawing.TOOTHSPACE_GAUGE_DIA_MM == spec.TOOTHSPACE_GAUGE_DIA_MM
     assert drawing.TOOTH_SPACE_INSPECTION_PHASE_RAD == spec.TOOTH_SPACE_INSPECTION_PHASE_RAD
     assert part.TOOTH_SPACE_INSPECTION_PHASE_RAD == spec.TOOTH_SPACE_INSPECTION_PHASE_RAD
-    assert drawing.TOOTH_SPACE_INSPECTION_ENDS_MM == spec.TOOTH_SPACE_INSPECTION_ENDS_MM
+    assert drawing.TOOTH_SPACE_INSPECTION_END_MM == spec.TOOTH_SPACE_INSPECTION_END_MM
 
 
 def test_pitch_index_control_uses_quality_and_actual_reference_circle() -> None:
