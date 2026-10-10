@@ -750,16 +750,20 @@ ALL_HOLES = (
 # split the two pedestal seats out of FootScrewHoles into PedestalSeats with
 # the hole count unchanged (warm-c486; both runs import 22 cosmetic threads).
 # One note per feature in each plan view fits both runs, with the side-face
-# BaseCrossTaps adding none. Sheet 3's bottom view is not a plan view here:
-# every deck seat ends blind inside its boss, so from below (hidden lines
-# removed) it shows no tapped hole to annotate. _log_tapped_hole_notes records
-# the per-view split on every build, so a drifted count names the view it
-# drifted in.
+# BaseCrossTaps adding none. Sheet 3's bottom view counts as a plan view too:
+# SolidWorks drops the same per-feature note there although every deck seat
+# ends blind inside its boss (leaf 20261010T072847Z: 8 per view on all three
+# sheets). _log_tapped_hole_notes records the per-view split on every build,
+# so a drifted count names the view it drifted in.
 TAPPED_HOLE_NOTE = "Tapped Hole"
 # finalize_drawing deletes every note containing one of these (case-blind, the
 # adapter's remove_notes_matching), so none of them reaches the final sheet.
 FINAL_SHEET_REMOVED_NOTES = (TAPPED_HOLE_NOTE,)
-PLAN_VIEWS = ((SHEET_NAMES[0], "*Top"), (SHEET_NAMES[1], "*Top"))
+PLAN_VIEWS = (
+    (SHEET_NAMES[0], "*Top"),
+    (SHEET_NAMES[1], "*Top"),
+    (SHEET_NAMES[2], "*Bottom"),
+)
 TAPPED_HOLE_NOTES = len(DECK_TAPPED_SEAT_FEATURES) * len(PLAN_VIEWS)
 TABLE_HOLES = tuple(hole for hole in ALL_HOLES if hole not in TRANSFER_HOLES)
 if len(TABLE_HOLES) != len(ALL_HOLES) - len(TRANSFER_HOLES):

@@ -582,11 +582,14 @@ def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None
         call
         for call in calls
         if getattr(call.func, "id", None) == "place_view"
-        and any(isinstance(arg, ast.Constant) and arg.value == "*Top" for arg in call.args)
+        and any(
+            isinstance(arg, ast.Constant) and arg.value in ("*Top", "*Bottom")
+            for arg in call.args
+        )
     ]
     assert len(plan_views) == len(sheet.PLAN_VIEWS)
     assert sheet.TAPPED_HOLE_NOTES == len(build_features) * len(sheet.PLAN_VIEWS)
-    assert sheet.TAPPED_HOLE_NOTES == 16
+    assert sheet.TAPPED_HOLE_NOTES == 24
 
     finalize = [call for call in calls if getattr(call.func, "id", None) == "finalize_drawing"]
     assert len(finalize) == 1
