@@ -121,10 +121,12 @@ SECTION_CAPTION = (0.295, 0.201)
 SECTION_LABEL_SCALE_TEXT = "SCALE"
 SECTION_SCALE = (1, 1)
 
-# The checked-in landscape template's FINISH value cell, measured between its
-# authored sheet-format rules.  Its linked INote extent is checked natively
-# before export so wrapping can never spill into MATERIAL again.
-_FINISH_CELL = (0.218, 0.0335, 0.310, 0.0450)
+# The landscape template's FINISH rules print at x=215.900/308.328 mm and
+# y=33.584/44.485 mm (sheet origin at lower left).  Round inward rather than
+# granting a PDF-coordinate rounding tolerance outside the cell.  The old
+# x=218 mm limit rejected the correctly contained note starting at 217.8 mm.
+# Keep all four boundaries checked so wrapping cannot spill into MATERIAL.
+_FINISH_CELL = (0.21595, 0.03360, 0.30830, 0.04445)
 
 # ``place_view`` centres a view on its projected bounding box, so the model
 # origin is offset from the view centre by half that box.  The elevation's box

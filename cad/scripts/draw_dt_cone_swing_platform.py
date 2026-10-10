@@ -33,6 +33,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _zoomed_on,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -451,6 +452,15 @@ def _position_section_label(adapter: Any, section: Any) -> None:
         )
 
 
+# INote.GetExtent is read off the drawing as displayed, to the pixel: every
+# maximised 1280x752 seat (2.1 px/mm) read detail B's box at the same point,
+# 0.22/-0.16 mm off its request, and a 1024x640 one (0.95 px/mm) left it
+# 0.70/-0.39 mm off after both corrections -- each residual under one pixel.
+# The label is moved and read zoomed onto its own box, plus this margin, so
+# a pixel is about a tenth of a millimetre whatever the seat's window.
+VIEW_LABEL_ZOOM_MARGIN = 0.005
+
+
 def _position_view_label(
     adapter: Any,
     view: Any,
@@ -461,7 +471,8 @@ def _position_view_label(
     """Move a view's native label so its box's lower-left lands at ``lower_left``.
 
     The label's anchor is not its box corner, so the move is measured: read
-    ``INote.GetExtent``, shift the anchor by the corner's error, read back.
+    ``INote.GetExtent``, shift the anchor by the corner's error, read back,
+    all zoomed onto the requested box (:data:`VIEW_LABEL_ZOOM_MARGIN`).
     The sheet scale is pinned first; finalization re-applying it must not
     move a dynamic label after this readback.  The script adds no notes to
     these views, so the native label is the view's one note.
@@ -475,17 +486,21 @@ def _position_view_label(
         raise RuntimeError(f"expected one native {label}, found {len(notes)} notes")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    for _attempt in range(2):
-        extent = tuple(float(v) for v in note.GetExtent())
-        error = (lower_left[0] - extent[0], lower_left[1] - extent[1])
-        if max(abs(error[0]), abs(error[1])) < 0.0002:
-            break
-        anchor = tuple(float(v) for v in _read_member(annotation, "GetPosition"))
-        moved = (anchor[0] + error[0], anchor[1] + error[1], 0.0)
-        if not annotation.SetPosition2(*moved):
-            raise RuntimeError(f"failed to position native {label}")
-        adapter.currentModel.EditRebuild3()
     extent = tuple(float(v) for v in note.GetExtent())
+    size = (extent[3] - extent[0], extent[4] - extent[1])
+    centre = (lower_left[0] + size[0] / 2.0, lower_left[1] + size[1] / 2.0)
+    with _zoomed_on(adapter, centre, max(size) / 2.0 + VIEW_LABEL_ZOOM_MARGIN):
+        for _attempt in range(2):
+            extent = tuple(float(v) for v in note.GetExtent())
+            error = (lower_left[0] - extent[0], lower_left[1] - extent[1])
+            if max(abs(error[0]), abs(error[1])) < 0.0002:
+                break
+            anchor = tuple(float(v) for v in _read_member(annotation, "GetPosition"))
+            moved = (anchor[0] + error[0], anchor[1] + error[1], 0.0)
+            if not annotation.SetPosition2(*moved):
+                raise RuntimeError(f"failed to position native {label}")
+            adapter.currentModel.EditRebuild3()
+        extent = tuple(float(v) for v in note.GetExtent())
     print(f"{label}: requested lower-left={lower_left} extent={extent}")
     if max(abs(lower_left[0] - extent[0]), abs(lower_left[1] - extent[1])) > 0.0005:
         raise RuntimeError(

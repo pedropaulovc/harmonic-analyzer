@@ -802,6 +802,17 @@ def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
     Position and ModelToViewTransform lag its ink (draw_cone_swing_platform,
     leaf 20260928T075849Z-1-882b4704), so the view is placed by its outline,
     and its projection must catch up before any cut is projected through it.
+
+    The projection is read only behind UpdateViewDisplayGeometry, the view
+    barrier draw_dt_cylinder_gear takes: a rebuild leaves the regenerated view
+    pending until Windows repaints the sheet.  Rebuilds alone caught the
+    transform up within one settle on all 28 earlier leaves that read it (26
+    of them stale at the first read), but on leaf
+    20261009T165136Z-1-acbeda8d (swmaker000004) three never did: the centre
+    projected to (-0.04756, 0.236), the ink centre moved by exactly
+    TIP_DETAIL_CENTER - Position, so the transform still stood where
+    CreateDetailViewAt4 first put the view, while Position (0.24756, 0.236)
+    and the outline (centred on (0.1, 0.236)) had moved on.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -870,6 +881,7 @@ def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
             f"tip detail outline centre stayed at {landed}, requested {TIP_DETAIL_CENTER}"
         )
     for attempt in range(3):
+        _early_bound(detail, "IView").UpdateViewDisplayGeometry()
         (projected,) = model_points_in_view(
             adapter, detail, (centre,), label=f"tip detail centre, read {attempt}"
         )
@@ -882,7 +894,9 @@ def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
     else:
         raise RuntimeError(
             f"tip detail projects its centre to {projected} while its outline is "
-            f"centred on {landed}"
+            f"centred on {landed}; it now reads outline "
+            f"{tuple(float(value) for value in detail.GetOutline())}, Position "
+            f"{tuple(float(value) for value in detail.Position)}"
         )
     _telemetry.info(
         f"tip detail: parent circle centre {sheet[0]}, detail centre {projected}, "

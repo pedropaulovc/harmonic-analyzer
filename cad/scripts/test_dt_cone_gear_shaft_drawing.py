@@ -763,6 +763,140 @@ def test_the_tip_detail_stands_in_the_frame_above_the_side_view() -> None:
     assert drawing.TIP_DETAIL_STATION_MM - circle >= shoulder + 2.0
 
 
+# Tip detail E as swmaker000004 read it on leaf 20261009T165136Z-1-acbeda8d:
+# CreateDetailViewAt4's Position and outline (bit-identical on all seven leaves
+# that logged them), and the tip centre's offset from Position once the
+# transform is current (every passing leaf: centre (0.09999997441408104,
+# 0.236) at Position (0.24755930006504057, 0.23600000000000002)).
+_SEAT_TIP_POSITION = (0.24717657096805057, 0.23644341806020072)
+_SEAT_TIP_OUTLINE = (
+    0.07242928077353916,
+    0.2232354181522899,
+    0.1268052610324808,
+    0.24965141796811155,
+)
+_SEAT_TIP_CENTRE_FROM_POSITION = (
+    0.09999997441408104 - 0.24755930006504057,
+    0.236 - 0.23600000000000002,
+)
+
+
+class _SeatTipDetail:
+    """A fresh detail whose ModelToViewTransform stays where
+    CreateDetailViewAt4 first put the view (TIP_DETAIL_CENTER) through every
+    rebuild, while Position and the outline follow SetViewPosition; only
+    UpdateViewDisplayGeometry brings it up to date, unless ``refreshes`` is
+    False."""
+
+    def __init__(self, events: list[str], *, refreshes: bool) -> None:
+        self.events = events
+        self.refreshes = refreshes
+        self.ScaleRatio = (4.0, 1.0)
+        self.position = _SEAT_TIP_POSITION
+        self.outline = _SEAT_TIP_OUTLINE
+        self.transform_at = drawing.TIP_DETAIL_CENTER
+
+    @property
+    def Position(self) -> tuple[float, float]:  # noqa: N802
+        return self.position
+
+    def GetOutline(self) -> tuple[float, ...]:  # noqa: N802
+        return self.outline
+
+    def SetViewPosition(self, xy, _keep_relative) -> bool:  # noqa: N802
+        dx, dy = xy[0] - self.position[0], xy[1] - self.position[1]
+        x0, y0, x1, y1 = self.outline
+        self.outline = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+        self.position = (float(xy[0]), float(xy[1]))
+        return True
+
+    def UpdateViewDisplayGeometry(self) -> None:  # noqa: N802
+        self.events.append("update display geometry")
+        if self.refreshes:
+            self.transform_at = self.position
+
+    def project_centre(self) -> tuple[float, float]:
+        self.events.append("project tip centre")
+        return (
+            self.transform_at[0] + _SEAT_TIP_CENTRE_FROM_POSITION[0],
+            self.transform_at[1] + _SEAT_TIP_CENTRE_FROM_POSITION[1],
+        )
+
+
+def _tip_detail_on_seat(monkeypatch, *, refreshes: bool):
+    """Run _create_tip_detail against the swmaker000004 seat, COM-free."""
+    from types import SimpleNamespace
+
+    events: list[str] = []
+    detail = _SeatTipDetail(events, refreshes=refreshes)
+    circle = SimpleNamespace(Select4=lambda _append, _data: True)
+    draw = SimpleNamespace(
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: None,
+        SketchManager=SimpleNamespace(AddToDB=False, CreateCircle=lambda *_: circle),
+        SelectionManager=SimpleNamespace(CreateSelectData=SimpleNamespace),
+        CreateDetailViewAt4=lambda *_: detail,
+    )
+    side = object()
+
+    def points_in_view(_adapter, view, points, *, label, names=None):
+        if view is detail:
+            return [detail.project_centre() for _point in points]
+        return [(0.078, 0.15), (0.078, 0.159)][: len(points)]
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        drawing,
+        "_sw_type_info",
+        SimpleNamespace(early_bound_or_flag=lambda obj, *_members: obj),
+    )
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "Drawing View1")
+    monkeypatch.setattr(drawing, "model_points_in_view", points_in_view)
+    monkeypatch.setattr(
+        drawing,
+        "_sheet_segment_in_parent_sketch",
+        lambda _adapter, _parent, sheet: [(x, y, 0.0) for x, y in sheet],
+    )
+    monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(
+        drawing,
+        "rebuild_drawing",
+        lambda _adapter, *, label: events.append(f"rebuild {label}"),
+    )
+    adapter = SimpleNamespace(currentModel=draw)
+    return drawing._create_tip_detail(adapter, side, -1), detail, events
+
+
+def test_the_tip_detail_projects_only_behind_the_display_barrier(monkeypatch) -> None:
+    """Leaf 20261009T165136Z-1-acbeda8d: three settle rebuilds left the tip
+    detail's transform where CreateDetailViewAt4 first put the view, so the
+    centre read (-0.0476, 0.236) under ink centred on (0.1, 0.236).  Every
+    projection read is now taken behind UpdateViewDisplayGeometry, so a seat
+    whose rebuilds never refresh the transform reads it current."""
+    built, detail, events = _tip_detail_on_seat(monkeypatch, refreshes=True)
+    assert built is detail
+    reads = [
+        index for index, event in enumerate(events) if event == "project tip centre"
+    ]
+    assert reads == [events.index("rebuild place tip detail") + 2]
+    assert events[reads[0] - 1] == "update display geometry"
+    assert "rebuild settle tip detail" not in events
+    assert detail.project_centre() == pytest.approx(drawing.TIP_DETAIL_CENTER, abs=1e-7)
+
+
+def test_a_tip_detail_transform_that_never_catches_up_still_fails(monkeypatch) -> None:
+    """The check is not loosened: a transform the barrier cannot refresh
+    reproduces the farm's numbers and fails, naming the ink it disagrees with."""
+    with pytest.raises(RuntimeError) as failure:
+        _tip_detail_on_seat(monkeypatch, refreshes=False)
+    message = str(failure.value)
+    projected = re.search(r"projects its centre to \(([^,]+), ([^)]+)\)", message)
+    assert projected is not None, message
+    assert float(projected[1]) == pytest.approx(-0.04755932565095955, abs=1e-15)
+    assert float(projected[2]) == pytest.approx(0.236, abs=1e-12)
+    assert "outline (0.0728120098" in message and "Position (0.2475593000" in message
+
+
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
     """Three lands 6.9 mm apart carry three texts; each line clears the others.
 

@@ -24,7 +24,7 @@ from _hole_spec import NUMBER_DRILL_MM
 def test_restated_floors_are_their_sources() -> None:
     drilled = _config.title_block("drilled_hole")
     assert (drilled["minus_mm"], drilled["plus_mm"]) == (0.0, pin.DRILLED_PLUS)
-    assert pin.RUNNING_FLOOR == bank.MIN_END_PLAY
+    assert pin.RUNNING_FLOOR == bank.RUNNING_FLOOR
     # The levers' hubs set the pitch the neighbour stack is judged at.
     assert lever.HUB_LENGTH == bank.PITCH
     assert pin.BAR_HOLE_DIA is bar.TOP_PIN_HOLE_DIA
@@ -92,7 +92,13 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
     assert pin_dia == pytest.approx(pin.PIN_DIA, abs=1e-9)
     assert hole_dia == bar.TOP_PIN_HOLE_DIA
     assert engaged == pytest.approx(bar.BAR_WIDTH - bar.TOP_NOTCH_WIDTH, abs=1e-9)
-    pairs = ic.allowed_interference_pairs("ch-channel")
+    # The rod pins' press pairs share the table (test_ch_rod_pivot_fit holds
+    # the union to exactly the two pin joints).
+    pairs = {
+        pair: limit
+        for pair, limit in ic.allowed_interference_pairs("ch-channel").items()
+        if any(name.startswith("ch-bar-pivot-pin-") for name in pair)
+    }
     assert set(pairs) == {
         frozenset((f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}"))
         for n in range(1, 21)

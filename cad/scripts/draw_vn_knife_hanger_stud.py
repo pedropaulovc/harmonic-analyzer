@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the knife hanger stud."""
+"""Create the purchased reference drawing for the knife-hanger screw."""
 
 from __future__ import annotations
 

@@ -3,28 +3,36 @@ pivot shaft (issue #743 PR2) -- one source for the channel assembly, the
 pivot shaft and the bracket stations.
 
 GEOMETRY ONLY, like ``cylinder_bank_layout``: no drawing notes, no drawing
-specs, no title-block reads. It reads the channel stations and nothing from
-the gear train, so the pivot parts never re-key on a cone or gear edit.
+specs, no title-block reads. It reads the channel stations and ONE datum it
+shares with the cylinder bank: the arm plane IS the cam plane
+(``cam_plane.CAM_MID_DZ``), because each connecting rod is flat -- its ring
+rides the cam and its fork straddles the arm in that one plane. That leaf
+reads only the MHA-DT-012 gear spec (and the gear-train config it reads), so
+a cylinder-gear spec change re-keys the pivot parts; the cylinder bank's
+pedestals, arbor, washers, spring and bank pitch do not reach them.
 
 The bank is a SOLID STACK: each MHA-CH-006 arm's integral hub is one station
-pitch long, and neighbouring hubs bear face on face. Reading 1 (user, #743
-Q4) retains it with no keeper:
+pitch long, and neighbouring hubs bear face on face. #948 ruling R (PR #1292)
+preloads it with a keeper spring, reversing #743 Q4 (Reading 1, "no keeper"):
 
 * The pivot shaft's integral O10 x 1.5 SHOULDER bears on the NORTH bracket
   ear's inner face, and hub 19 bears on the shoulder. That ear is the bank's
-  axial datum; the stack is pushed north against it.
-* The SOUTH bracket is feeler-set: one ROCKER_END_FEELER leaf between the
-  MHA-CH-009 thrust washer on hub 0 and the south ear. That gap is the bank's
-  assembled end play E_r, and the shaft floats by the same E_r (the shoulder
-  pulls the stack south until the washer meets the south ear).
+  axial datum: fit-up offsets its DRO target by the measured shoulder's
+  deviation from nominal (MIC_RESIDUAL is what is left of that band).
+* The SOUTH bracket is set off the MHA-CH-009 thrust washer on hub 0 by one
+  ROCKER_SPRING_SET blade, and the MHA-VN-053 wave spring
+  (``vn_rocker_bank_spring_spec``) squeezed in that gap holds the stack and
+  the shaft's shoulder north on the datum ear: the bank has no end play and
+  the shaft no float.
 * Each hub's length is +0.05/0 on its print, and a fit-up acceptance on the
-  measured 20-arm stack caps the cumulative excess (STACK_L20_ACCEPT).
+  measured 20-arm stack caps the cumulative excess (STACK_L20_ACCEPT,
+  +0.10/0, #948 ruling R).
 * The shaft's cylinder spans both ears' outer faces, and each end is domed
   proud of its ear.
 
-The feeler rule is the cylinder bank's (and ``pinion_rig_layout``'s),
-restated here rather than imported so the pivot parts read no gear-train
-config; ``test_rocker_bank_layout`` pins the two in lockstep.
+The set-blade and preload rules are the cylinder bank's, restated here
+because the rocker bank has its own spring; ``test_rocker_bank_layout`` pins
+the two in lockstep.
 """
 
 from __future__ import annotations
@@ -32,10 +40,12 @@ from __future__ import annotations
 import math
 
 import _config
+from cam_plane import CAM_MID_DZ
 import ch_amplitude_bar_spec as _bar
 import ch_pivot_bracket_spec as _bracket
 import ch_pivot_shaft_spec as _shaft
 import ch_rocker_thrust_washer_spec as _washer
+import vn_rocker_bank_spring_spec as _spring
 from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 
 COUNT = 20  # the full bank (the brackets never follow active_count)
@@ -47,7 +57,9 @@ COUNT = 20  # the full bank (the brackets never follow active_count)
 # bank's as-set Z instead is a change to this line alone.
 STATION_Z0 = _config.machine("channels", "station_z0_mm")  # channel 0 gear plane
 PITCH = _config.machine("channels", "station_pitch_mm")
-ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes sit at z_j + 0.8
+# Arm/bar/lever mid-planes, the rod-pin plane and the spring stations sit on
+# the cam plane: z_j + CAM_MID_DZ (-3.528, the integral cam's mid-width).
+ARM_MID_DZ = CAM_MID_DZ
 if abs(HUB_LENGTH - PITCH) > 1e-6:
     raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH must equal the station pitch")
 
@@ -59,22 +71,61 @@ def hub_mid_z(j: int) -> float:
 
 STACK_MID_Z = (hub_mid_z(0) + hub_mid_z(COUNT - 1)) / 2.0
 
-# --- end play (E_r) ------------------------------------------------------------
-MIN_END_PLAY = 0.10  # running floor for 20 oiled steel hub faces
+# --- preload (#948 ruling R) ------------------------------------------------------
+RUNNING_FLOOR = 0.10  # least running air between oiled steel faces
 MARGIN_SPARE = 0.25  # novice spare over every floor (pinion_rig_layout rule)
 FEELER_STEP = 0.05  # blades of the metric gauge set (pinion_rig_fitup)
-ROCKER_END_FEELER_BAND = 0.10  # set error: the bracket re-set on its screws
-ROCKER_END_FEELER = FEELER_STEP * math.ceil(
-    round((MIN_END_PLAY + MARGIN_SPARE + ROCKER_END_FEELER_BAND) / FEELER_STEP, 9)
+ROCKER_SPRING_SET = _spring.INSTALLED_HEIGHT  # the set blade, 0.60
+ROCKER_SPRING_SET_BAND = 0.10  # set error: the bracket re-set on its screws
+ROCKER_SPRING_HEIGHT = (
+    ROCKER_SPRING_SET - ROCKER_SPRING_SET_BAND,
+    ROCKER_SPRING_SET + ROCKER_SPRING_SET_BAND,
 )
-ROCKER_END_PLAY = (
-    ROCKER_END_FEELER - ROCKER_END_FEELER_BAND,
-    ROCKER_END_FEELER + ROCKER_END_FEELER_BAND,
+# (min, max) preload, N, over the set band [INFERENCE: linear rate].
+ROCKER_PRELOAD = (
+    _spring.spring_load(ROCKER_SPRING_HEIGHT[1]),
+    _spring.spring_load(ROCKER_SPRING_HEIGHT[0]),
 )
+PRELOAD_LIMITS = (1.0, 10.0)  # light: single-digit N (cylinder_bank_layout)
+if not math.isclose(
+    ROCKER_SPRING_SET / FEELER_STEP, round(ROCKER_SPRING_SET / FEELER_STEP)
+):
+    raise AssertionError(f"the spring set {ROCKER_SPRING_SET} is not a gauge blade")
+if not (
+    _spring.WORKING_HEIGHT
+    <= ROCKER_SPRING_HEIGHT[0]
+    < ROCKER_SPRING_HEIGHT[1]
+    < _spring.FREE_HEIGHT
+):
+    raise AssertionError(
+        f"the set band {ROCKER_SPRING_HEIGHT} leaves {_spring.SKU}'s working range "
+        f"{_spring.WORKING_HEIGHT:.4f}..{_spring.FREE_HEIGHT:.4f}"
+    )
+if not PRELOAD_LIMITS[0] <= ROCKER_PRELOAD[0] < ROCKER_PRELOAD[1] < PRELOAD_LIMITS[1]:
+    raise AssertionError(
+        f"the rocker preload {ROCKER_PRELOAD} N leaves {PRELOAD_LIMITS}"
+    )
+# The ch0 amplitude bar's foot passes over the spring as over the washer.
+if _spring.OD + _spring.OD_BAND[0] > _washer.OD:
+    raise AssertionError(
+        "the rocker-bank spring's OD stands proud of the hub and washer"
+    )
+
+# Fit-up compensation (#948 ruling R): the fitter mics the shaft's shoulder and
+# offsets the north ear's DRO target by (measured - nominal), so the shoulder's
+# band leaves the chain and only the micrometer reading's residual stays.
+MIC_RESIDUAL = 0.013  # half a thou: one micrometer reading
+NORTH_EAR_LOCATE_BAND = 0.10  # DRO edge-find on the ear's inner face
+NORTH_DATUM_STACK = {
+    "north ear DRO locate": NORTH_EAR_LOCATE_BAND,
+    "shaft shoulder, mic-compensated": MIC_RESIDUAL,
+}
 
 # --- stack length acceptance ---------------------------------------------------
 STACK_L20 = COUNT * HUB_LENGTH  # hub 0 south face to hub 19 north face
-STACK_L20_ACCEPT_BAND = (0.20, 0.0)  # (upper, lower): re-face a long stack
+# (upper, lower): re-face a long stack. #948 ruling R tightens it from +0.20:
+# a fit-up re-face acceptance, not a part band.
+STACK_L20_ACCEPT_BAND = (0.10, 0.0)
 STACK_L20_ACCEPT = (
     STACK_L20 + STACK_L20_ACCEPT_BAND[1],
     STACK_L20 + STACK_L20_ACCEPT_BAND[0],
@@ -88,11 +139,13 @@ SHOULDER_Z = (HUB19_NORTH_FACE_Z, HUB19_NORTH_FACE_Z + _shaft.SHOULDER_LENGTH)
 NORTH_EAR_INNER_Z = SHOULDER_Z[1]
 NORTH_EAR_OUTER_Z = NORTH_EAR_INNER_Z + _bracket.EAR_T
 
-# --- south: washer, leaf, feeler-set ear --------------------------------------
+# --- south: washer, spring, set ear -----------------------------------------------
 HUB0_SOUTH_FACE_Z = hub_mid_z(0) - HUB_LENGTH / 2.0
 SOUTH_WASHER_Z = (HUB0_SOUTH_FACE_Z - _washer.THICKNESS, HUB0_SOUTH_FACE_Z)
-SOUTH_EAR_INNER_Z = SOUTH_WASHER_Z[0] - ROCKER_END_FEELER
+SOUTH_EAR_INNER_Z = SOUTH_WASHER_Z[0] - ROCKER_SPRING_SET
 SOUTH_EAR_OUTER_Z = SOUTH_EAR_INNER_Z - _bracket.EAR_T
+# The spring's installed envelope, south ear to thrust washer.
+ROCKER_SPRING_Z = (SOUTH_EAR_INNER_Z, SOUTH_WASHER_Z[0])
 
 # Bracket origins (ear mid-planes), (south, north).
 PIVOT_BRACKET_Z = (
@@ -110,10 +163,10 @@ PIVOT_SHAFT_NORTH_Z = NORTH_EAR_OUTER_Z
 NORTH_JOURNAL_LENGTH = _shaft.JOURNAL_LENGTH
 PIVOT_SHAFT_OVERALL_LENGTH = PIVOT_SHAFT_LENGTH + 2.0 * _shaft.DOME_HEIGHT
 # The plain (south) end is cut flush with the south ear's outer face to 0.5
-# proud, then domed: with the shaft floated south by E_r max, its apex stands
-# this far south of the ear's outer face at the worst case.
+# proud, then domed: the spring holds the shoulder on the north ear, so the
+# shaft never floats and its apex stands at most this far south of the ear.
 PLAIN_END_CUT_BAND = (0.5, 0.0)  # (upper, lower) past the south ear's outer face
-SOUTH_APEX_REACH_MAX = PLAIN_END_CUT_BAND[0] + _shaft.DOME_HEIGHT + ROCKER_END_PLAY[1]
+SOUTH_APEX_REACH_MAX = PLAIN_END_CUT_BAND[0] + _shaft.DOME_HEIGHT
 if abs(PIVOT_SHAFT_NORTH_Z - NORTH_JOURNAL_LENGTH - SHOULDER_Z[1]) > 1e-9:
     raise AssertionError("the shaft's shoulder is not on the north ear's inner face")
 
@@ -130,7 +183,9 @@ __all__ = [
     "HUB0_SOUTH_FACE_Z",
     "HUB19_NORTH_FACE_Z",
     "MARGIN_SPARE",
-    "MIN_END_PLAY",
+    "MIC_RESIDUAL",
+    "NORTH_DATUM_STACK",
+    "NORTH_EAR_LOCATE_BAND",
     "NORTH_EAR_INNER_Z",
     "NORTH_EAR_OUTER_Z",
     "NORTH_JOURNAL_LENGTH",
@@ -141,9 +196,13 @@ __all__ = [
     "PIVOT_SHAFT_NORTH_Z",
     "PIVOT_SHAFT_OVERALL_LENGTH",
     "PIVOT_SHAFT_SOUTH_Z",
-    "ROCKER_END_FEELER",
-    "ROCKER_END_FEELER_BAND",
-    "ROCKER_END_PLAY",
+    "PRELOAD_LIMITS",
+    "ROCKER_PRELOAD",
+    "ROCKER_SPRING_HEIGHT",
+    "ROCKER_SPRING_SET",
+    "ROCKER_SPRING_SET_BAND",
+    "ROCKER_SPRING_Z",
+    "RUNNING_FLOOR",
     "SHOULDER_Z",
     "SOUTH_EAR_INNER_Z",
     "SOUTH_APEX_REACH_MAX",

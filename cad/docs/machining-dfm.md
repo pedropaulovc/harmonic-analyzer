@@ -38,16 +38,16 @@ geometry is casting-shaped, not milling-shaped.
   | `dt-cone-gear` | 20 | involute teeth cut with a **self-made Eureka-generated form cutter** (cutters for these DP/tooth-counts don't exist — see "How to get this reviewed"), indexed on a dividing head; wire-EDM = outsource alt |
   | `pivot-bushing` / `lever-bushing` | 19 each | turned spacers whose **length** sets channel pitch — length consistency across the set is the point |
   | `ch-rocker-arm` | 20 | flat R800 profile, one setup — ideal CNC profile part |
-  | `ch-connecting-rod` | 20 | flat 2D outline → DXF/2.5D |
+  | `ch-connecting-rod` | 20 | flat 2D outline from 1018 plate, stepped both faces, slotted fork → 2.5D |
   | `sm-knife-mount` | 2 | trivial prismatic block, 2 identical |
 
-- **Casting-vs-bar substitution (3 T1 parts are castings in the registry):** `sm-summing-lever`,
-  `fr-rocker-arm-support`, and `ch-connecting-rod` carry `material: Gray Cast Iron` in
-  `cad/config/parts/*.yaml`. Two are **benign** substitutions — the support cuts fine from bar, and the
-  rod is a flat 2D profile that cuts trivially from plate (book: "rough-finished"). The **lever does
+- **Casting-vs-bar substitution (2 T1 parts are castings in the registry):** `sm-summing-lever` and
+  `fr-rocker-arm-support` carry `material: Gray Cast Iron` in `cad/config/parts/*.yaml`
+  (`ch-connecting-rod` is now 1018 plate, Main ruling 2026-10). The support is a **benign**
+  substitution — it cuts fine from bar. The **lever is
   not** — its ribbed/leaf organic form is casting-native and hogging it from solid means 4–5 setups
   around cantilevered plates. Decide **cast, fabricate (weld/silver-solder up from simple stock), or
-  accept the multi-setup hog** before you start; the support/rod are just a stock choice, the lever is a
+  accept the multi-setup hog** before you start; the support is just a stock choice, the lever is a
   real decision.
   - **`sm-knife-mount` is a material *conflict*, not a settled casting:** its registry
     (`parts/sm-knife-mount.yaml`) and assessment §6 say **Brass**, but `build_sm_knife_mount.py` hardcodes
@@ -62,7 +62,7 @@ geometry is casting-shaped, not milling-shaped.
   engagement (1.956D). The seat is sized at its printed .XX worst case:
   13.20 mm full thread (0.25 mm tip reserve at the low limit) and 20.60 mm
   cylindrical tap-drill depth (five 1.27 mm pitches past the thread).
-  Other receivers are threaded too; the `sm-knife-mount` hanger-stud seat is one
+  Other receivers are threaded too; the `sm-knife-mount` #6-32 bottoming hanger-screw tap is one
   example. The 20 `dt-cone-gear`s and the 64T `dt-crank-drive-gear` transmit torque
   through matching D-bores on the shaft's D-flat lands; the cylinder gears
   ride free on their stationary arbor. The gears seat against each other,
@@ -99,14 +99,14 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`sm-summing-lever`** | modeled **Gray Cast Iron casting**; organic first-class lever ~120×28×196 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× hex knife trunnions (edges = top-vertex ridges) protruding 21.717 each end; 20× #6-32 tapped anchor seats through the 5.08 plate @ 7.0565 pitch (web ~5.06, Ø2.705 tap drill); one #10-24 tap through the Ø19.05×19.05 summation-anchor boss — both purchased spring anchors thread straight in, no nuts | knife-edge ridge **delicate** (the precision line); trunnion slender cantilever → **chatter**; organic 3-pt-arc leaf/rib profiles hard to mill; turning Ø25.4 with cantilevered plates; 20 small through-taps in a 5.08 web → **tap breakage**, use a tapping head | **4–5 from bar** (2 sketch planes + turn) | **CAST or fabricate**, don't hog; knife edge → hardened insert (§6) |
-| **`sm-knife-mount`** | rectangular block 34×43.77×14 (bar/plate); **2 identical** | Ø25.4 through bore (bearing bore for the trunnion), centre ~27.1 below the top face (`BORE_CY` −12.45 from the knife-edge origin, block top +14.62); tapped 1/2-13 blind hole ×12 in the block top (hanger-stud seat); walls 4.0 under bore, ~4.3 flanks | watch **bore breakout on the 4 mm floor**; otherwise trivial | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or trivial manual. Hangs from the top-frame casting's integral crossbar (the former separate top-crossbar part is merged into the top-frame) via a 1/2-13 knife-hanger stud |
+| **`sm-knife-mount`** | rectangular block 24.0×29.6×14.0 at .X (bar/plate); **2 identical** | Ø12.00 +0.03/0 reamed through bore (bearing bore for the trunnion), centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #6-32 UNC-2B bottoming tap in the block top on the bore axis (hanger-screw seat: drill #36 Ø2.705 ×11.20 ±0.47, full thread 9.42 at the general .XX, the drill ≥0.80 past the thread; worst-case 2.02 web over the bore crown, no break-in); 2× Ø3.175 reamed dowel press holes ×9.5 in the block top at ±6.350 from the tap axis (span 12.700 BASIC, the pair ⌖Ø0.13 to the top seat as datum pattern B, the +X hole 5.65 from the +X face and the row 7.0 from the front face; tap ⌖Ø0.10 to the top seat and the pair); walls 3.0 under bore, 6.0 flanks | watch **bore breakout on the 3 mm floor**; hold the #36 drill to 11.20 ±0.47 (the 2.02 worst-case web over the bore crown); otherwise trivial | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or trivial manual. Clamped to the underside of the top-frame casting's integral crossbar (the former separate top-crossbar part is merged into the top-frame) by a #6-32 × 1-1/2 socket head cap screw (MHA-VN-024, McMaster 91251A157) dropped through a Ø7.0 ×6.5 counterbore + Ø4.318 #6 clearance (floor 30.0 above the crossbar underside), 8.10 nominal engagement (6.28..8.90), set with removable medium-strength threadlocker; the two pressed MHA-VN-051 dowels (98381A473, 1/8 × 3/4) slip into a Ø3.24 ±0.03 ×12.0 blind hole and a 3.24 ±0.03 × 4.30 ×12.0 blind slot (reamed width, BASIC 12.700 from and ⌖0.05 to the round hole) in the crossbar underside and key the block against turning |
 
 ### Cylinder gear + cam, connecting rod (T1 — the 20 function generators)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`dt-cylinder-gear`** ×20 | round brass bar ~63; toothed disc OD62.2×3 + integral eccentric cam OD30.6×3.5 (offset +Y 8.64); total H 6.5 | Ø9.525 (3/8") through bore — **rides free on arbor, no keyway**; 120T involute DP49.82 PA14.5° (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.90 mm**; notch kerf **0.4 mm** (slitting-saw, fragile crests); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **CNC-REPEAT** — lathe bore+OD, teeth with a self-made form cutter indexed (wire-EDM = outsource), cam offset, notch by slitting saw; **hold the +Y phasing identical on all 20** |
-| **`ch-connecting-rod`** ×20 | flat plate ~3 mm; 2D outline ~170×40.8; book: "rough-finished" (cosmetically forgiving) | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); Ø2.0 pin hole in head | **~1.4 mm** material over the Ø2 pin (fragile crown); reentrant fillets at shoulder roots (fine — it's an outline); 2.5 mm shank | **1** (profile + 2 drills) | **DXF/2.5D profile** the outline + drill 2 bores; leave body rough |
+| **`ch-connecting-rod`** ×20 | AISI 1018 plate, 1/4" (6.35) faced to 6.075; 2D outline ~188×40.8; ring and shank 2.200 ±0.127 (symmetric to the fork slot within 0.10) and fork 6.075 ±0.05 all on one mid-plane; black finish | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); fork 10 wide, full R5 crown on the pin, 18 long from the crown; slot 2.625 +0.127/0, 14.75 deep from the crown, centred (tines equal within 0.10); Ø1.968 +0.010/0 pin hole reamed through both tines (pin MHA-CH-010 pressed in at assembly, ends dressed flush; user ruling 2026-10-09, PR #1292) | tines **1.725** (1.59 MIN) beside a 2.625 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin 2.200 shank ~150 long faced from 6.35 — chatter/curl); the ream must hold +0.010/0 for the press | **2** (flip to face the second side; slot, drill and ream in the second) | **DXF/2.5D profile** the outline, face both sides to the two levels, slit the fork, drill + ream |
 
 ### Cone gears + shaft (T1 — the DP-49.82 train, tip gears fragile)
 
@@ -143,9 +143,9 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 2. **Decide the `sm-summing-lever` fabrication method** (cast / fabricate / hog) and the **knife-edge
    insert** now — it drives whether this is a 5-setup nightmare or two simple operations, and it is the
    critical interface.
-3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02): the
-   block hangs from the top-frame casting's integral crossbar via a 1/2-13 hanger stud threaded
-   into a tapped hole in the block top; both the stud and the tapped hole are modeled.
+3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02; #6-32 redesign, 2026-10): the
+   block is clamped to the top-frame casting's integral crossbar by a #6-32 socket head cap screw threaded
+   into a bottoming tap in the block top and keyed by two pressed dowels; the screw, dowels and all their holes are modeled.
 4. **Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding) before it becomes a
    drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
 5. **Consider enlarging the tip cone gears** (T006–T012) — the model already flags them marginal and a

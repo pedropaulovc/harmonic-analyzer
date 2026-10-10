@@ -13,14 +13,14 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | Prefix | Category | Parts |
 |---|---|---:|
 | `ha` / `HA` | Harmonic analyzer | 2 |
-| `ch` / `CH` | Channel | 10 |
+| `ch` / `CH` | Channel | 11 |
 | `dt` / `DT` | Drive train | 36 |
 | `fr` / `FR` | Frame | 5 |
 | `mg` / `MG` | Magnifier | 9 |
 | `pd` / `PD` | Paper drive | 24 |
 | `pn` / `PN` | Pen | 6 |
 | `sm` / `SM` | Summing | 3 |
-| `vn` / `VN` | Vendor parts | 48 |
+| `vn` / `VN` | Vendor parts | 51 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence.
@@ -98,7 +98,7 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 ## Identity migration table
 
-The table covers 147 part families and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
+The table covers 151 part families (the 149 current families plus the two retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
 Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws.
 
@@ -115,6 +115,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | `fulcrum-keeper` | `ch-fulcrum-keeper` | MHA-120 | MHA-CH-007 |
 | part | `pivot-bracket` | `ch-pivot-bracket` | MHA-123 | MHA-CH-008 |
 | part | `rocker-thrust-washer` | `ch-rocker-thrust-washer` | MHA-148 | MHA-CH-009 |
+| part | — | `ch-rod-pivot-pin` | — | MHA-CH-010 |
 | part | — | `ch-bar-pivot-pin` | — | MHA-CH-011 |
 | part | `alignment-pinion` | `dt-alignment-pinion` | MHA-002 | MHA-DT-001 |
 | part | `arbor-pedestal` | `dt-arbor-pedestal` | MHA-004 | MHA-DT-002 |
@@ -249,6 +250,9 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | `transgear-retaining-ring` | `vn-transgear-retaining-ring` | MHA-182 | MHA-VN-047 |
 | part | `transgear-knob-cup-pin` | `vn-transgear-knob-cup-pin` | MHA-183 | MHA-VN-048 |
 | part | `transgear-pivot-spring` | `vn-transgear-pivot-spring` | MHA-184 | MHA-VN-049 |
+| part | — | `vn-magnifying-bracket-screw` | — | MHA-VN-050 |
+| part | — | `vn-cylinder-bank-spring` | — | MHA-VN-052 |
+| part | — | `vn-rocker-bank-spring` | — | MHA-VN-053 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -259,3 +263,14 @@ Retired identities keep their rows here for historical lookup but have no regist
 | assembly | `pen` | `pn-pen` | MHA-A01 | MHA-PN-000 |
 | assembly | `paper-drive` | `pd-paper-drive` | MHA-A06 | MHA-PD-000 |
 | assembly | `harmonic-analyzer` | `ha-harmonic-analyzer` | MHA-A08 | MHA-HA-000 |
+
+## Changes after the cutover
+
+A retired Number is never reused. A family added after the cutover takes the
+next free Number in its category and has no old stem or old Number.
+
+| Change | Canonical stem | Number | Note |
+|---|---|---|---|
+| retired | `vn-knife-hanger-washer` | MHA-VN-026 | no replacement: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor |
+| added | `vn-magnifying-bracket-screw` | MHA-VN-050 | screws the MHA-MG-001 magnifying bracket to the MHA-SM-003 summing lever |
+| added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |

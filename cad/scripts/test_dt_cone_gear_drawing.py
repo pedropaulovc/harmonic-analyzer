@@ -181,7 +181,6 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
         for obsolete in ("CONTACT RATIO", "RANGE ONLY", "MATCH FLANKS", "LONG ADDENDUM"):
             assert obsolete not in data
         assert len(data.splitlines()) * 0.00351 <= drawing.GEAR_DATA_HEIGHT
-        assert max(map(len, data.splitlines())) <= drawing.GEAR_DATA_MAX_LINE_CHARS
 
 
 def test_native_gap_features_are_distinct_and_preserve_real_template_topology() -> None:

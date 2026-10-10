@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import math
 import re
+import types
 from pathlib import Path
 
 import _config
@@ -407,3 +409,99 @@ def test_draw_script_passes_the_precision_gate() -> None:
         script.read_text(encoding="utf-8"), filename=script.name
     )
 
+
+class _PixelDrawing:
+    """The failed section D-D seat: a 738x470 px view window fitted to the
+    sheet at 1.649 px/mm; ``ViewZoomTo2`` fits a sheet box into it."""
+
+    WINDOW_PX = (738, 470)
+    FIT_PX_PER_M = 1649.0
+
+    def __init__(self) -> None:
+        self.px_per_m = self.FIT_PX_PER_M
+        self.zooms: list[tuple[float, ...]] = []
+        self.rebuilds = 0
+
+    def GetCurrentSheet(self):  # noqa: N802
+        return types.SimpleNamespace(SetScale=lambda *_args: True)
+
+    def ViewZoomTo2(self, x0, y0, _z0, x1, y1, _z1):  # noqa: N802
+        self.zooms.append((x0, y0, x1, y1))
+        self.px_per_m = min(
+            self.WINDOW_PX[0] / (x1 - x0), self.WINDOW_PX[1] / (y1 - y0)
+        )
+
+    def ViewZoomtofit2(self):  # noqa: N802
+        self.px_per_m = self.FIT_PX_PER_M
+
+    def EditRebuild3(self):  # noqa: N802
+        self.rebuilds += 1
+        return True
+
+
+class _PixelLabel:
+    """A native view label whose ``GetExtent`` floors its true box, a fixed
+    offset from its anchor, to the window's current pixel grid."""
+
+    def __init__(self, window: _PixelDrawing, anchor, corner_offset, size) -> None:
+        self.window = window
+        self.anchor = list(anchor)
+        self.corner_offset = corner_offset
+        self.size = size
+        self.read_px_per_m: list[float] = []
+
+    def true_lower_left(self) -> tuple[float, float]:
+        return tuple(a + o for a, o in zip(self.anchor, self.corner_offset))
+
+    def GetExtent(self):  # noqa: N802
+        px = self.window.px_per_m
+        self.read_px_per_m.append(px)
+        x0, y0 = self.true_lower_left()
+        corners = (x0, y0, x0 + self.size[0], y0 + self.size[1])
+        x0, y0, x1, y1 = (math.floor(value * px) / px for value in corners)
+        return (x0, y0, 0.0, x1, y1, 0.0)
+
+    def GetAnnotation(self):  # noqa: N802
+        return self
+
+    def GetPosition(self):  # noqa: N802
+        return (*self.anchor, 0.0)
+
+    def SetPosition2(self, x, y, _z):  # noqa: N802
+        self.anchor = [x, y]
+        return True
+
+
+def test_section_label_is_placed_and_read_zoomed_onto_its_box(monkeypatch) -> None:
+    """Section D-D's label lands on its request on a small, fitted window.
+
+    At 1.649 px/mm a pixel is 0.61 mm, so the fitted readback could not
+    resolve the 0.5 mm landing check: run 4c569a1fc15f read the box
+    0.56/-0.24 mm off after both corrections.  Zoomed onto the box, every
+    readback that moves or judges the label resolves about a tenth of a
+    millimetre, and the fit is restored afterwards.
+    """
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    window = _PixelDrawing()
+    target = drawing.SECTION_LABEL_LOWER_LEFT
+    # Measured on the green builds: the box's lower-left sits (-23.02, -16.01)
+    # mm from the label's anchor and the box is 45.75 x 16.20 mm.
+    label = _PixelLabel(
+        window,
+        anchor=(target[0] + 0.0236, target[1] + 0.0155),
+        corner_offset=(-0.02302, -0.01601),
+        size=(0.04575, 0.0162),
+    )
+    view = types.SimpleNamespace(GetNotes=lambda: (label,))
+    adapter = types.SimpleNamespace(currentModel=window)
+
+    drawing._position_view_label(adapter, view, target, label="section D-D label")
+
+    assert max(abs(a - b) for a, b in zip(label.true_lower_left(), target)) < 0.0002
+    assert window.rebuilds >= 1
+    assert len(window.zooms) == 1
+    x0, y0, x1, y1 = window.zooms[0]
+    assert x0 < target[0] and y0 < target[1]
+    assert x1 > target[0] + label.size[0] and y1 > target[1] + label.size[1]
+    assert all(px >= 5000.0 for px in label.read_px_per_m[1:])
+    assert window.px_per_m == window.FIT_PX_PER_M

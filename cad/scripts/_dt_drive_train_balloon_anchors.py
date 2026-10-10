@@ -34,6 +34,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "dt-cylinder-gear-shaft": BalloonAnchor(),
         "dt-arbor-pedestal": BalloonAnchor(),
         "dt-cylinder-end-disc": BalloonAnchor(),
+        "vn-cylinder-bank-spring": BalloonAnchor(),
         "vn-arbor-set-screw": BalloonAnchor(),
         "dt-cylinder-gear": BalloonAnchor(),
         "vn-pedestal-hold-down-screw": BalloonAnchor(instance="vn-pedestal-hold-down-screw-1"),

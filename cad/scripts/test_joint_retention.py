@@ -265,6 +265,28 @@ def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> N
     assert f"\u00b1{rock:.1f}\u00b0 per reversal" in jr.RULINGS[row.exception].granted
 
 
+def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_dowel() -> None:
+    """The #6-32 knife hanger clamps each knife mount to the crossbar (gap 0)
+    and the pressed MHA-VN-051 dowel keys it, so no operating torque acts about
+    the screw; the screw's installation notes call for the threadlocker the row
+    cites, and the retired MHA-VN-026 washer is classified nowhere."""
+    (row,) = [j for j in jr.JOINTS if j.id == "sm-summing/knife-hanger-in-mount"]
+    assert row.thread == "#6-32 UNC"
+    assert row.exposure is Exposure.STATIC_CLAMP
+    assert row.lock is Lock.THREADLOCKER_ONLY
+    sentence = "USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER."
+    assert sentence in row.evidence
+    notes = jr._config.parts("vn-knife-hanger-stud")["installation_notes"]
+    assert sentence in " ".join(notes.split())
+    assert "vn_knife_mount_dowel" in jr.UNTHREADED_PARTS
+    assert jr.UNTHREADED_STOCK["vn_knife_mount_dowel"] == (
+        "dowel pin pressed into a reamed hole"
+    )
+    retired = "vn_knife_hanger_washer"
+    assert retired not in jr.THREADED_PARTS | jr.UNTHREADED_PARTS
+    assert retired not in jr.UNTHREADED_STOCK
+
+
 def test_a_static_clamp_must_say_why_no_operating_torque_reaches_it() -> None:
     unreasoned = dataclasses.replace(SCREW, exposure_reason="  ")
     assert _kinds(_audit((STUD, CAP, unreasoned, NUT))) == {

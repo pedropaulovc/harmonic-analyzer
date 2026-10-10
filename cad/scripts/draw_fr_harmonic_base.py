@@ -1859,17 +1859,6 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("section A-A has no native cosmetic-thread instances")
     _telemetry.info(f"section A-A native cosmetic threads: seeds/instances={section_threads!r}")
 
-    for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
-        if not ddoc.ActivateSheet(sheet_name):
-            raise RuntimeError(f"failed to label drawing sheet {sheet_name}")
-        if (
-            add_note(
-                adapter, f"SHEET {sheet_index} OF {len(SHEET_NAMES)}", 0.350, 0.263
-            )
-            is None
-        ):
-            raise RuntimeError(f"failed to stamp sheet count on {sheet_name}")
-
     # Policy rule 2's proof obligation, now that no sheet code writes places:
     # every imported dimension must still print what its PART authored. A
     # silent fallback to the drawing document's two places would ask the shop

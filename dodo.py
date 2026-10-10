@@ -3040,6 +3040,9 @@ def task_check():
         # The transgear hanger's screwed joints, pivot head play and the latch
         # pin's press, judged at the printed bands (transgear_hanger_joints).
         SCRIPTS_DIR / "test_transgear_hanger_joints.py",
+        # The #6-32 knife hanger's tap web, screw reach and dowel stack at the
+        # printed bands, and the retired 1/2-13 tap failing the same web formula.
+        SCRIPTS_DIR / "test_knife_hanger_worst_case.py",
         # The paper-drive interference rows re-derived from their owner specs
         # (_interference_contracts writes them as literals).
         SCRIPTS_DIR / "test_pd_paper_drive_interference_contracts.py",
@@ -3138,6 +3141,8 @@ def task_check():
         # The amplitude bar's pressed MHA-CH-011 pin: its worst-case press,
         # running fit and flush-end gap budget, pinned to their sources.
         SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",
+        # The rod fork / peened MHA-CH-010 pin joint's worst-case budget.
+        SCRIPTS_DIR / "test_ch_rod_pivot_fit.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

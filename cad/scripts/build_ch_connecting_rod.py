@@ -1,30 +1,37 @@
 r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 20 used).
 
-Black rough-finished rod converting each cam's rotation into the rocker
-arm's see-saw: a full ring (strap) riding the Ø30.6 eccentric cam (cast
-integral with each cylinder gear), a thin flat shank, and a rounded
-TOMBSTONE head (the Y-shaped upper end of the ch14 fan photo) pinned (Ø2)
-to the rocker arm's rod-pin hole near the arm's rod-side tip. The centre
-distance follows the actual phased cam centre and the level rocker's pin,
-including the common raised drive-axis height. The ch14 end views show the
-0-crank tip row level (cos-mode home = top of stroke, cam lobe UP); the
-rod length closes that link without moving the rocker bank. The head
-is SHORTER than the 16 mm arm depth (10.5 crown-to-shoulder), 10 wide,
-crown 2.4 above the pin, angled shoulders narrowing into the 8 shank --
-proportions read off the ch14 fan photo against the 16 mm arm-depth
-callout. It matches the arm's 2.5 thickness so the pin joint stacks
-head-beside-arm inside the 7.06 channel pitch; the M2 "thick stepped tip
-blocks" read of p.29 was amplitude-bar feet, not these rods.
+Black rod machined from 1018 low-carbon steel plate, converting each cam's
+rotation into the rocker arm's see-saw: a full ring (strap) riding the Ø30.6
+eccentric cam (cast integral with each cylinder gear), a thin flat shank, and a
+U-shaped FORK (clevis; the Y-shaped upper end of the ch14 fan photo) whose two
+tines straddle the rocker arm's 2.500 strap and carry the pressed pivot pin
+(MHA-CH-010, ch_rod_pivot_pin_spec) through the arm's rod-pin hole near its
+rod-side tip. The centre distance follows the actual phased cam centre and the
+level rocker's pin, including the common raised drive-axis height. The ch14
+end views show the 0-crank tip row level (cos-mode home = top of stroke, cam
+lobe UP); the rod length closes that link without moving the rocker bank.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 13 - Connecting rods" - centre
-distance derived (high), ring bore derived from the cam OD + confirmed on
-the p.25 overlay (med), head proportions photo-scaled vs the 16 mm callout
-(med), everything else photo-scaled (low).
+The rod is FLAT: ring, shank and fork share one mid-plane, which is the cam
+plane and the arm plane (rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ), so the
+arm runs centred in the fork slot. The fork is 10 wide with a full-round
+crown on the pin, 6.075 +/-0.05 over the tines with a 2.625 +0.127/0 slot
+(Main ruling 2026-10, option b): each inter-arm gap holds one tine of each
+neighbouring rod, so both are 3-place model bands. The pin is pressed into a
+hole reamed through both tines and dressed flush (user ruling 2026-10-09, PR
+#1292 review F1, reversing the #746 reconstruction choice of peening it into
+countersinks): the photos show two rod cheeks round each rocker, not the
+original fastener.
 
-Layout: ring centre at the origin, shank rising +Y to the head;
-thicknesses extruded mid-plane in Z. Build order matters: ring disc,
-shank and head are bossed first, then the bore is cut so the strap
-opening also trims the shank sliver that dips into it.
+Dimensions: cad/config/dimensions.yaml "Chapter 13" rod rows - centre distance
+derived (high), ring bore derived from the cam OD + confirmed on the p.25
+overlay (med), fork proportions photo-scaled vs the 16 mm arm-depth callout
+and sized to the joint budget (ch_rod_pivot_pin_spec), everything else
+photo-scaled (low).
+
+Layout: ring centre at the origin, shank rising +Y to the fork; thicknesses
+extruded mid-plane in Z. Build order matters: ring disc, shank and fork are
+bossed first, the slot is cut through the fork, then the bore is cut so the
+strap opening also trims the shank sliver that dips into it.
 
 Run (SolidWorks already open)::
 
@@ -33,9 +40,11 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
+    _early_bound,
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
@@ -43,11 +52,13 @@ from _common import (
     check,
     define_circle,
     define_rectilinear_chain,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
     name_last_feature,
+    name_dimensions,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -55,28 +66,39 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _hole_spec import blind_cut_dia_mm
-from _holes import wizard_holes
 from _drawing_marks import (
+    _named_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
+import _telemetry
 from _saved_part_guard import require_saved_drawing_properties
 from ch_connecting_rod_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
-from ch_connecting_rod_notes import DRAWING_DIMENSIONS
+from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
-    HEAD_CROWN_ABOVE_PIN,
-    HEAD_HEIGHT,
-    HEAD_THICKNESS,
-    HEAD_WIDTH,
-    PIN_HOLE_SPEC,
+    FORK_BASE_BELOW_PIN,
+    FORK_BASE_Y,
+    FORK_CROTCH_BELOW_PIN,
+    FORK_CROTCH_Y,
+    FORK_CROWN_RADIUS,
+    FORK_SLOT_BAND,
+    FORK_SLOT_WIDTH,
+    FORK_THICKNESS,
+    FORK_THICKNESS_BAND,
+    FORK_TOP_Y,
+    FORK_WIDTH,
+    PIN_HOLE_BAND,
+    PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BORE_DIA_BAND,
+    RING_OUTER_RADIUS,
     RING_THICKNESS,
     RING_WALL,
     SHANK_THICKNESS,
@@ -84,10 +106,10 @@ from ch_connecting_rod_spec import (
     SURFACE_FINISHES,
 )
 
-import _telemetry
-
 PART_NAME = "ch-connecting-rod"
-MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
+# AISI 1018 plate (the registry row's material_specification); SOLIDWORKS's
+# library carries it as Plain Carbon Steel -- see _common.apply_material.
+MATERIAL = "Plain Carbon Steel"
 
 # Cam ring centre -> rocker pin, VERTICAL rod: the
 # pin rides the arm's rod-pin hole 133.067 out from the pivot -- directly
@@ -101,22 +123,93 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 # pre-ROM-fit lobe-down phase and -7.82 deg tilt. build_ch_channel_assembly
 # imports this as ROD_C2C (imported, NOT copied). Nominal geometry lives in
 # ch_connecting_rod_spec so the part, channel and drawing move as one recipe.
-# Tombstone head (the "Y" upper end): proportions from the ch14 fan photo
-# scaled by the 16 mm arm-depth callout in the same frame. Rounded crown
-# (radius = half width), short vertical cheeks, angled shoulders narrowing
-# into the shank. The head is SHORTER than the arm depth and the pin sits
-# HIGH in the head / LOW in the arm (crown only 2.4 above the pin).
-HEAD_SHOULDER_RISE = 1.2  # shoulder taper height (width 8 -> 10, photo ~1.2)
-# The rocker-arm rod-end pin hole is a native Hole Wizard number-drill feature;
-# its identity lives in ch_connecting_rod_spec.
-THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
+# The fork (the "Y" upper end of the ch14 fan photo, read as two cheeks round
+# each rocker): a U-shaped clevis whose tines straddle the rocker strap and
+# hold the pressed pivot pin. Its proportions live in ch_connecting_rod_spec;
+# the slot cut runs out SLOT_RUNOUT above the crown so the crown alone shapes
+# the tine tops.
+SLOT_RUNOUT = 1.0  # unprinted
+# The rocker pivot pin hole is a reamed press hole; its size and band live in
+# ch_connecting_rod_spec.
+THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness or width
 
-RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
 SHANK_START_Y = RING_BORE_DIA / 2.0 - 0.5  # overlaps the strap annulus
-HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN
-HEAD_START_Y = HEAD_TOP_Y - HEAD_HEIGHT
-HEAD_CROWN_CY = HEAD_TOP_Y - HEAD_WIDTH / 2.0
-SHOULDER_TOP_Y = HEAD_START_Y + HEAD_SHOULDER_RISE
+FORK_BOSS_LENGTH = FORK_TOP_Y - FORK_BASE_Y  # crown top -> root step (18.0)
+SLOT_DEPTH = FORK_TOP_Y - FORK_CROTCH_Y  # crown top -> slot floor (14.75)
+SLOT_CUT_HEIGHT = SLOT_DEPTH + SLOT_RUNOUT
+
+
+def _circle_cap_area(radius: float, half_width: float) -> float:
+    """Area under y = sqrt(R^2 - x^2) for |x| <= half_width."""
+    return half_width * math.sqrt(radius**2 - half_width**2) + radius**2 * math.asin(
+        half_width / radius
+    )
+
+
+def fork_outline_area(from_y: float) -> float:
+    """Front-plane area of the fork outline (the root rectangle plus the crown
+    semicircle on the pin) at and above ``from_y`` (FORK_BASE_Y..pin)."""
+    return FORK_WIDTH * (CENTER_DISTANCE - from_y) + math.pi * FORK_CROWN_RADIUS**2 / 2.0
+
+
+def boss_volume() -> float:
+    """Ring disc + shank + fork boss before any cut. The shank inside the
+    ring circle is buried in the thicker disc, so only its run from the ring OD
+    to the fork root counts."""
+    shank_area = SHANK_WIDTH * FORK_BASE_Y - _circle_cap_area(
+        RING_OUTER_RADIUS, SHANK_WIDTH / 2.0
+    )
+    return (
+        math.pi * RING_OUTER_RADIUS**2 * RING_THICKNESS
+        + shank_area * SHANK_THICKNESS
+        + fork_outline_area(FORK_BASE_Y) * FORK_THICKNESS
+    )
+
+
+def slot_volume() -> float:
+    """The slot runs through the fork's width above the crotch."""
+    return fork_outline_area(FORK_CROTCH_Y) * FORK_SLOT_WIDTH
+
+
+def strap_bore_volume() -> float:
+    return math.pi * (RING_BORE_DIA / 2.0) ** 2 * RING_THICKNESS
+
+
+def pin_hole_volume() -> float:
+    """The reamed hole crosses the slot, so it only cuts the two tines."""
+    return math.pi * (PIN_HOLE_DIA / 2.0) ** 2 * (FORK_THICKNESS - FORK_SLOT_WIDTH)
+
+
+def finished_volume() -> float:
+    return boss_volume() - slot_volume() - strap_bore_volume() - pin_hole_volume()
+
+
+def tolerance_at_dimension_places(
+    adapter, feature_name: str, dimension_name: str
+) -> int:
+    """Print one dimension's band at the dimension's own decimal places.
+
+    The shared tolerance setters print a band at the fewest places that hold
+    it, so PinHoleDia's +0.010/0 read "Ø1.968 +0.01/0.00" (PR #1292 render at
+    1b1f2f7fd): a three-place reamed size with a two-place band.  The places
+    come from DRAWING_PRECISION, the same entry that sets the value's places,
+    and are set here on the model so the drawing imports them verbatim (the
+    pattern build_dt_pinion_bracket uses for PinSeatCz)."""
+    places = DRAWING_PRECISION[feature_name][dimension_name]
+    display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    do_not_change = -1  # swDimensionPrecisionSettings_e
+    display.SetPrecision3(do_not_change, do_not_change, places, do_not_change)
+    applied = int(display.GetPrimaryTolPrecision2())
+    if applied != places:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: tolerance places did not persist: "
+            f"requested {places}, dimension reports {applied}"
+        )
+    _telemetry.success(
+        f"tolerance places {dimension_name}@{feature_name}: {places} decimals"
+    )
+    return places
 
 
 async def build(adapter) -> dict[str, str]:
@@ -136,23 +229,16 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RingThickness", f"{RING_THICKNESS}mm")
     await set_global(adapter, "ShankWidth", f"{SHANK_WIDTH}mm")
     await set_global(adapter, "ShankThickness", f"{SHANK_THICKNESS}mm")
-    await set_global(adapter, "HeadWidth", f"{HEAD_WIDTH}mm")
-    await set_global(adapter, "HeadHeight", f"{HEAD_HEIGHT}mm")
-    await set_global(adapter, "HeadCrownAbovePin", f"{HEAD_CROWN_ABOVE_PIN}mm")
-    await set_global(adapter, "HeadShoulderRise", f"{HEAD_SHOULDER_RISE}mm")
-    await set_global(adapter, "HeadThickness", f"{HEAD_THICKNESS}mm")
-    # (The old PinHoleDia knob is gone: the rocker pin hole is now a native Hole
-    # Wizard feature whose standard diameter is part-owned.)
+    await set_global(adapter, "ForkWidth", f"{FORK_WIDTH}mm")
+    await set_global(adapter, "ForkThickness", f"{FORK_THICKNESS}mm")
+    await set_global(adapter, "ForkSlotWidth", f"{FORK_SLOT_WIDTH}mm")
+    await set_global(adapter, "ForkCrotchBelowPin", f"{FORK_CROTCH_BELOW_PIN}mm")
+    await set_global(adapter, "ForkBaseBelowPin", f"{FORK_BASE_BELOW_PIN}mm")
+    await set_global(adapter, "SlotRunout", f"{SLOT_RUNOUT}mm")
+    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
     await set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
     await set_global(adapter, "ShankStartY", '"RingBoreDia" / 2 - 0.5mm')
-    await set_global(
-        adapter, "HeadStartY",
-        '"CenterDistance" + "HeadCrownAbovePin" - "HeadHeight"',
-    )
-    await set_global(
-        adapter, "HeadCrownCy",
-        '"CenterDistance" + "HeadCrownAbovePin" - "HeadWidth" / 2',
-    )
+    await set_global(adapter, "ForkBaseY", '"CenterDistance" - "ForkBaseBelowPin"')
 
     # Each sketch records its dim names + drive equations into a per-sketch
     # SketchDims in helper emission order; the drives are collected and applied in
@@ -181,7 +267,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "RingDisc")
 
-    # Shank: flat bar from the strap up to the head's shoulder root. Rectilinear
+    # Shank: flat bar from the strap up to the fork's root step. Rectilinear
     # chain emits width, length, then the corner anchor (x, z) -- the corner sits
     # at (-ShankWidth/2, ShankStartY); the anchor X dim is the unsigned half-width.
     shank_sd = SketchDims()
@@ -190,15 +276,15 @@ async def build(adapter) -> dict[str, str]:
     shank_rect = [
         (-SHANK_WIDTH / 2.0, SHANK_START_Y),
         (SHANK_WIDTH / 2.0, SHANK_START_Y),
-        (SHANK_WIDTH / 2.0, HEAD_START_Y),
-        (-SHANK_WIDTH / 2.0, HEAD_START_Y),
+        (SHANK_WIDTH / 2.0, FORK_BASE_Y),
+        (-SHANK_WIDTH / 2.0, FORK_BASE_Y),
     ]
     shank = await add_line_chain(adapter, shank_rect)
     set_sketch_direct_db(adapter, False)
     await define_rectilinear_chain(
         adapter, shank, shank_rect, label="shank", dims=shank_sd,
         names=["ShankWidthDim", "ShankLength", "ShankCornerX", "ShankCornerZ"],
-        drives=['"ShankWidth"', '"HeadStartY" - "ShankStartY"',
+        drives=['"ShankWidth"', '"ForkBaseY" - "ShankStartY"',
                 '"ShankWidth" / 2', '"ShankStartY"'],
     )
     await ensure_fully_defined(adapter, "shank sketch")
@@ -213,120 +299,183 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Shank")
 
-    # Tombstone head, pinned beside the rocker arm at assembly (the ch14 fan
-    # photo's "Y" upper end): angled shoulders flare the 8 shank to the 10-wide
-    # cheeks, short vertical cheeks, and a semicircular crown (R = HeadWidth/2,
-    # tangent to the cheeks -- add_arc runs CCW start->end, so right-cheek-top ->
-    # left-cheek-top bows over the TOP). Because the crown centre sits on the
-    # sketch axis (x 0) with radius = the cheek half-width, each cheek-top lands
-    # at the crown's equator by construction (x = R forces y = centre y).
-    # Dim EMISSION ORDER (each recorded as its display dim is created): shoulder
-    # width (= ShankWidth), the shoulder-root corner anchor (X half-width, then
-    # Z = HeadStartY), crown radius, crown-centre height (x on-axis, so
-    # anchor_point_to_origin emits ONE dim), the two shoulder rises, the two
-    # cheek half-width offsets. Bottom horizontal + cheek verticals are
-    # RELATIONS, not dims -- exactly 14 coordinate constraints for the 7 free
-    # vertices, no redundancy.
-    head_sd = SketchDims()
-    check("create_sketch head", await adapter.create_sketch("Front"))
+    # Fork boss: a tombstone outline -- the root step at FORK_BASE_Y, two
+    # vertical sides, and a semicircular crown centred on the pin (R =
+    # ForkWidth/2, tangent to the sides -- add_arc runs CCW start->end, so
+    # right-side-top -> left-side-top bows over the TOP). Because the crown
+    # centre sits on the sketch axis with radius = the side half-width, each
+    # side-top lands on the crown's equator by construction. Extruded mid-plane
+    # to the full fork thickness; the slot cut below splits it into two tines.
+    # Dim EMISSION ORDER (each recorded as its display dim is created): root
+    # width, crown radius, crown-centre height (x on-axis, so
+    # anchor_point_to_origin emits ONE dim), right-side length, right-side x.
+    # Root horizontal + side verticals are RELATIONS: 9 DOF (four corners and
+    # the centre, less the arc's equal radius) = 3 relations + the on-axis
+    # alignment + 5 dims, no redundancy.
+    fork_sd = SketchDims()
+    check("create_sketch fork", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    hw, sw = HEAD_WIDTH / 2.0, SHANK_WIDTH / 2.0
-    head_bottom = check(
-        "head bottom",
-        await adapter.add_line(-sw, HEAD_START_Y, sw, HEAD_START_Y),
+    fw = FORK_WIDTH / 2.0
+    fork_root = check(
+        "fork root",
+        await adapter.add_line(-fw, FORK_BASE_Y, fw, FORK_BASE_Y),
     )
-    head_sh_r = check(
-        "head shoulder right",
-        await adapter.add_line(sw, HEAD_START_Y, hw, SHOULDER_TOP_Y),
+    fork_side_r = check(
+        "fork side right",
+        await adapter.add_line(fw, FORK_BASE_Y, fw, CENTER_DISTANCE),
     )
-    head_cheek_r = check(
-        "head cheek right",
-        await adapter.add_line(hw, SHOULDER_TOP_Y, hw, HEAD_CROWN_CY),
+    fork_crown = check(
+        "fork crown",
+        await adapter.add_arc(
+            0.0, CENTER_DISTANCE, fw, CENTER_DISTANCE, -fw, CENTER_DISTANCE
+        ),
     )
-    head_crown = check(
-        "head crown",
-        await adapter.add_arc(0.0, HEAD_CROWN_CY, hw, HEAD_CROWN_CY, -hw, HEAD_CROWN_CY),
-    )
-    head_cheek_l = check(
-        "head cheek left",
-        await adapter.add_line(-hw, HEAD_CROWN_CY, -hw, SHOULDER_TOP_Y),
-    )
-    check(
-        "head shoulder left",
-        await adapter.add_line(-hw, SHOULDER_TOP_Y, -sw, HEAD_START_Y),
+    fork_side_l = check(
+        "fork side left",
+        await adapter.add_line(-fw, CENTER_DISTANCE, -fw, FORK_BASE_Y),
     )
     set_sketch_direct_db(adapter, False)
     for ent, relation in (
-        (head_bottom, "horizontal"),
-        (head_cheek_r, "vertical"),
-        (head_cheek_l, "vertical"),
+        (fork_root, "horizontal"),
+        (fork_side_r, "vertical"),
+        (fork_side_l, "vertical"),
     ):
-        check(f"head {relation}", await adapter.add_sketch_constraint(ent, None, relation))
+        check(f"fork {relation}", await adapter.add_sketch_constraint(ent, None, relation))
     check(
-        "dimension head bottom width",
-        await adapter.add_sketch_dimension(head_bottom, None, "linear", SHANK_WIDTH),
+        "dimension fork width",
+        await adapter.add_sketch_dimension(fork_root, None, "linear", FORK_WIDTH),
     )
-    head_sd.record("HeadBottomWidth", '"ShankWidth"')
+    fork_sd.record("ForkWidthDim", '"ForkWidth"')
+    check(
+        "dimension fork crown radius",
+        await adapter.add_sketch_dimension(fork_crown, None, "radial", fw),
+    )
+    fork_sd.record("ForkCrownR", '"ForkWidth" / 2')
     await anchor_point_to_origin(
-        adapter, f"{head_bottom}.start", -sw, HEAD_START_Y, "head shoulder root"
+        adapter, f"{fork_crown}.center", 0.0, CENTER_DISTANCE, "fork crown centre"
     )
-    head_sd.record("HeadAnchorX", '"ShankWidth" / 2')
-    head_sd.record("HeadAnchorZ", '"HeadStartY"')
+    fork_sd.record("ForkPinY", '"CenterDistance"')
+    await dimension_between(
+        adapter,
+        f"{fork_side_r}.start",
+        f"{fork_side_r}.end",
+        "vertical_distance",
+        FORK_BASE_BELOW_PIN,
+        "fork side length",
+    )
+    fork_sd.record("ForkSideLength", '"ForkBaseBelowPin"')
+    await dimension_between(
+        adapter, f"{fork_side_r}.start", "origin", "horizontal_distance", fw,
+        "fork side x",
+    )
+    fork_sd.record("ForkSideX", '"ForkWidth" / 2')
+    await ensure_fully_defined(adapter, "fork sketch")
+    check("exit_sketch fork", await adapter.exit_sketch())
+    name_last_feature(adapter, "ForkProfile")
+    drive_jobs += fork_sd.apply(adapter, "ForkProfile")
     check(
-        "dimension crown radius",
-        await adapter.add_sketch_dimension(head_crown, None, "radial", hw),
-    )
-    head_sd.record("HeadCrownR", '"HeadWidth" / 2')
-    await anchor_point_to_origin(
-        adapter, f"{head_crown}.center", 0.0, HEAD_CROWN_CY, "crown centre"
-    )
-    head_sd.record("HeadCrownCyDim", '"HeadCrownCy"')
-    check(
-        "dimension shoulder rise right",
-        await adapter.add_sketch_dimension(
-            f"{head_sh_r}.end", f"{head_bottom}.end", "vertical_distance",
-            HEAD_SHOULDER_RISE,
-        ),
-    )
-    head_sd.record("HeadShoulderRiseR", '"HeadShoulderRise"')
-    check(
-        "dimension shoulder rise left",
-        await adapter.add_sketch_dimension(
-            f"{head_cheek_l}.end", f"{head_bottom}.start", "vertical_distance",
-            HEAD_SHOULDER_RISE,
-        ),
-    )
-    head_sd.record("HeadShoulderRiseL", '"HeadShoulderRise"')
-    check(
-        "dimension cheek right x",
-        await adapter.add_sketch_dimension(
-            f"{head_cheek_r}.start", "origin", "horizontal_distance", hw
-        ),
-    )
-    head_sd.record("HeadCheekRX", '"HeadWidth" / 2')
-    check(
-        "dimension cheek left x",
-        await adapter.add_sketch_dimension(
-            f"{head_cheek_l}.start", "origin", "horizontal_distance", hw
-        ),
-    )
-    head_sd.record("HeadCheekLX", '"HeadWidth" / 2')
-    await ensure_fully_defined(adapter, "head sketch")
-    check("exit_sketch head", await adapter.exit_sketch())
-    name_last_feature(adapter, "HeadProfile")
-    drive_jobs += head_sd.apply(adapter, "HeadProfile")
-    check(
-        "extrude head",
+        "extrude fork",
         await adapter.create_extrusion(
-            ExtrusionParameters(depth=HEAD_THICKNESS, both_directions=True)
+            ExtrusionParameters(depth=FORK_THICKNESS, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "Head")
-    res = await adapter.get_mass_properties()
-    _telemetry.info(f"volume after bosses: {res.data.volume:.1f} mm^3")
-    # disc ~3922 + shank ~2467 + head ~233 (shoulder trapezoid 10.8 + cheeks
-    # 43.0 + crown semicircle 39.3 = 93.1 mm^2 x 2.5) - overlap; Phase 3
-    # rebuild confirms
+    name_last_feature(adapter, "ForkBoss")
+    # The fork thickness prints natively at three places (FORK_THICKNESS_BAND):
+    # named so the band, the precision and the drawing select it by name.
+    fork_thickness_dim = name_dimensions(adapter, "ForkBoss", ["ForkThick"])
+    drive_jobs.append((fork_thickness_dim[0], '"ForkThickness"'))
+    v_expected = boss_volume()
+    await volume_check(adapter, "ring, shank and fork bosses", v_expected, 0.002 * v_expected)
+
+    # Fork slot: a Right-plane rectangle (sketch x = model Z) centred on the rod
+    # mid-plane, from the crotch up past the crown, cut through the fork's
+    # width. A construction centreline from the fork's root step to its crown
+    # top carries the two lengths the side view prints from the crown top --
+    # the slot depth (to the crotch) and the boss length (to the root step) --
+    # so the print measures from the visible tine tops, never from the origin.
+    # The boss length is a driving dimension of that reference line, driven by
+    # the same knobs as the fork outline, so it always equals the modelled
+    # step. Dim EMISSION ORDER: reference start height (on-axis anchor, ONE
+    # dim), boss length, slot width, cut height, slot corner x, slot depth.
+    # 12 DOF = reference vertical + on-axis alignment + 2 dims, rectangle's four
+    # relations + 4 dims.
+    slot_sd = SketchDims()
+    check("create_sketch fork slot", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    boss_ref = check(
+        "fork boss reference",
+        await adapter.add_centerline(0.0, FORK_BASE_Y, 0.0, FORK_TOP_Y),
+    )
+    sh = FORK_SLOT_WIDTH / 2.0
+    slot_rect = [
+        (-sh, FORK_CROTCH_Y),
+        (sh, FORK_CROTCH_Y),
+        (sh, FORK_CROTCH_Y + SLOT_CUT_HEIGHT),
+        (-sh, FORK_CROTCH_Y + SLOT_CUT_HEIGHT),
+    ]
+    slot = await add_line_chain(adapter, slot_rect)
+    set_sketch_direct_db(adapter, False)
+    check(
+        "fork boss reference vertical",
+        await adapter.add_sketch_constraint(boss_ref, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{boss_ref}.start", 0.0, FORK_BASE_Y, "fork boss reference"
+    )
+    slot_sd.record("ForkRootY", '"ForkBaseY"')
+    await dimension_between(
+        adapter,
+        f"{boss_ref}.start",
+        f"{boss_ref}.end",
+        "vertical_distance",
+        FORK_BOSS_LENGTH,
+        "fork boss length",
+    )
+    slot_sd.record("ForkBossLength", '"ForkWidth" / 2 + "ForkBaseBelowPin"')
+    for line, (x1, y1), (x2, y2) in zip(
+        slot, slot_rect, slot_rect[1:] + slot_rect[:1], strict=True
+    ):
+        direction = "horizontal" if y1 == y2 else "vertical"
+        check(
+            f"slot {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    await dimension_between(
+        adapter, f"{slot[0]}.start", f"{slot[0]}.end", "horizontal_distance",
+        FORK_SLOT_WIDTH, "slot width",
+    )
+    slot_sd.record("SlotWidth", '"ForkSlotWidth"')
+    await dimension_between(
+        adapter, f"{slot[1]}.start", f"{slot[1]}.end", "vertical_distance",
+        SLOT_CUT_HEIGHT, "slot cut height",
+    )
+    slot_sd.record(
+        "SlotCutHeight", '"ForkWidth" / 2 + "ForkCrotchBelowPin" + "SlotRunout"'
+    )
+    # Centred: the tines come out equal (the notes' tine-match requirement).
+    await dimension_between(
+        adapter, f"{slot[0]}.start", "origin", "horizontal_distance", sh,
+        "slot corner x",
+    )
+    slot_sd.record("SlotHalfWidth", '"ForkSlotWidth" / 2')
+    await dimension_between(
+        adapter, f"{slot[0]}.start", f"{boss_ref}.end", "vertical_distance",
+        SLOT_DEPTH, "slot depth",
+    )
+    slot_sd.record("SlotDepth", '"ForkWidth" / 2 + "ForkCrotchBelowPin"')
+    await ensure_fully_defined(adapter, "fork slot sketch")
+    check("exit_sketch fork slot", await adapter.exit_sketch())
+    name_last_feature(adapter, "ForkSlotProfile")
+    drive_jobs += slot_sd.apply(adapter, "ForkSlotProfile")
+    check(
+        "cut fork slot",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ForkSlot")
+    v_expected -= slot_volume()
+    await volume_check(adapter, "fork slot", v_expected, 0.01 * slot_volume() + 0.05)
 
     # Strap bore - rides the eccentric cam. On-axis circle: diameter only.
     bore_sd = SketchDims()
@@ -347,28 +496,44 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "StrapBore")
+    v_expected -= strap_bore_volume()
+    await volume_check(adapter, "strap bore", v_expected, 0.002 * v_expected)
 
-    # Rocker pin hole through the head (high in the crown, 2.4 below the crown
-    # top), drilled +Z through the 2.5 mm head. Through-all is geometrically
-    # identical to the old mid-plane both-directions cut.
-    pin_cut = wizard_holes(
+    # Pivot pin hole on the rod axis, reamed through both tines (the slot
+    # between them is air). The pin RUNS in the arm's #47 hole and is PRESSED
+    # here, its ends dressed flush (ch_rod_pivot_pin_spec). No countersink: the
+    # hole runs straight through each tine, so the pin bears on the whole tine.
+    pin_hole = SketchDims()
+    check("create_sketch rocker pin hole", await adapter.create_sketch("Front"))
+    await define_circle(
         adapter,
-        PIN_HOLE_SPEC,
-        [[0.0, CENTER_DISTANCE, HEAD_THICKNESS / 2.0]],
-        (0.0, 0.0, 1.0),
+        0.0,
+        CENTER_DISTANCE,
+        PIN_HOLE_DIA / 2.0,
         "rocker pin hole",
-        name="PinHole",
-        placement_dims=[((None, None), ("PinCz", '"CenterDistance"'))],
-        expect_dia_mm=blind_cut_dia_mm(PIN_HOLE_SPEC),
+        dims=pin_hole,
+        names=(None, "PinHoleY", "PinHoleDia"),
+        drives=(None, '"CenterDistance"', '"PinHoleDia"'),
     )
-    drive_jobs += pin_cut.placement_drive_jobs
-    res = await adapter.get_mass_properties()
-    v_built = float(res.data.volume)
-    _telemetry.info(f"volume after cuts: {v_built:.1f} mm^3")
-    # bore now -2234 (r 15.4 x 3) - sliver - pin; Phase 3 rebuild confirms
+    await ensure_fully_defined(adapter, "rocker pin hole sketch")
+    check("exit_sketch rocker pin hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinHoleProfile")
+    drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
+    check(
+        "cut rocker pin hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "PinHole")
+    v_pin = pin_hole_volume()
+    v_expected -= v_pin
+    v_built = await volume_check(
+        adapter, "pin hole through both tines", v_expected, 0.03 * v_pin + 0.05
+    )
 
     # Named bore axes for assembly mates (view-independent name selection):
-    # Axis1 = strap bore on the cam (origin), Axis2 = rocker pin bore (0, 147.67).
+    # Axis1 = strap bore on the cam (origin), Axis2 = pivot pin bore (0, CD).
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "strap bore")
     await name_bore_axis(
         adapter,
@@ -382,10 +547,9 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Apply the deferred drive equations after the whole model + a rebuild exists,
-    # so every target resolves. Each equation evaluates to the as-built value (the
-    # rod's volume has no tidy closed form, so the neutrality gate asserts the
-    # post-drive volume equals the captured as-built volume): geometry must not
-    # move.
+    # so every target resolves. Each equation evaluates to the as-built value, so
+    # the neutrality gate asserts the post-drive volume equals the as-built
+    # volume: geometry must not move.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
@@ -399,6 +563,25 @@ async def build(adapter) -> dict[str, str]:
         "StrapBoreDia",
         *deviations(RING_BORE_DIA_BAND),
     )
+    # The fork straddles the rocker strap inside one station pitch, so its
+    # outer thickness and slot print natively at three places (Main ruling
+    # 2026-10, option b). The fork is centred (mid-plane extrude) and its band
+    # symmetric, so it prints +/-; the slot may only come out wide.
+    fork_lower, fork_upper = deviations(FORK_THICKNESS_BAND)
+    if fork_lower != -fork_upper:
+        raise AssertionError("ch_connecting_rod_spec.FORK_THICKNESS_BAND must be symmetric")
+    set_dimension_symmetric_tolerance(adapter, "ForkBoss", "ForkThick", fork_upper)
+    set_dimension_bilateral_tolerance(
+        adapter, "ForkSlotProfile", "SlotWidth", *deviations(FORK_SLOT_BAND)
+    )
+    # The reamed press hole's band rides natively on its diameter, which the
+    # front view imports at three places (DRAWING_PRECISION); its band prints
+    # at the same three places (+0.010/0.000), not the fewest that hold it.
+    set_dimension_bilateral_tolerance(
+        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    tolerance_at_dimension_places(adapter, "PinHoleProfile", "PinHoleDia")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

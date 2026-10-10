@@ -2,5 +2,10 @@ memory/usage.jsonl merge=union
 cad/comparisons/bench/machinist_review/baseline.txt -text
 cad/comparisons/bench/machinist_review/*.png -text
 web/content/canonical-native/** -text
+# Immutable original observations use raw byte seals, not consumer EOL normalization.
+web/content/*.json -text
+web/content/*.source-track.json text eol=lf
+web/content/model-representation.json text eol=lf
+web/content/analysis-recovery-calibration-evidence/** -text
 cad/config/identity-migration-map.json -text
 cad/references/fr-nameplate-engraving.dxf -text

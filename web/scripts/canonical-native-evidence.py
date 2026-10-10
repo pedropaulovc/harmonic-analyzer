@@ -48,6 +48,7 @@ FRESH_CONSUMER_INPUTS = (
     'web/scripts/native-identity-map.mjs',
     'web/src/native-primitive-snapshot.ts',
     'web/src/source-assembly.ts',
+    'web/src/spring-culling-bounds.ts',
     'web/src/native-landmark-eligibility.ts',
     'web/src/native-target-shader-feedback.ts',
     'web/scripts/current-native-eligibility-report.mjs',

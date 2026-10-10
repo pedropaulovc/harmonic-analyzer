@@ -1353,10 +1353,6 @@ def _create_sheets(adapter: Any) -> None:
         numerator, denominator = SHEET_SCALES[name]
         if not sheet.SetScale(float(numerator), float(denominator), False, False):
             raise RuntimeError(f"failed to set paper-drive sheet scale: {name}")
-        _place_sheet_note(
-            adapter, name, f"SHEET {SHEET_NAMES.index(name) + 1} OF {len(SHEET_NAMES)}",
-            (0.018, 0.020), label="sheet number",
-        )
 
 
 def _validate_bom(

@@ -26,6 +26,54 @@ It also accepts `cad/out/gltf/ha-harmonic-analyzer.glb` when no path is supplied
 The raw cache stays outside public assets under `web/.vite/model-source/`.
 Missing models and failed YouTube playback produce visible errors.
 
+### Fresh-checkout tests and approved model cache
+
+Use Node.js 22.12 or newer, npm and [uv](https://docs.astral.sh/uv/).
+The fixture's exact archived CAD provenance commit,
+`81539e53f5146c06a77541415bd79da673806d96`, must be available locally: use a
+full clone or run `git fetch origin 81539e53f5146c06a77541415bd79da673806d96`.
+From the repository root:
+
+```sh
+npm --prefix web ci
+npm --prefix web run fetch-model:approved
+cd web
+node --test scripts/*.test.mjs
+uv run --isolated --no-project --python 3.13 --with-requirements scripts/source-fit-requirements.txt python -m unittest discover -s scripts -p "test_*.py"
+```
+
+The Node command runs all web Node test files; the Python command runs all web
+Python test files in an isolated environment with the source-fit dependencies.
+These are tooling/geometry tests, not browser source-fidelity acceptance or CAD
+builds. `uv` needs Python 3.13 and the listed packages available locally or
+network access to install them.
+
+`fetch-model:approved` downloads the already-approved optimized release GLB,
+checks its native-source association, SHA-256 and exact byte length, and
+atomically publishes it to
+`web/.vite/deployment-model/<approved-optimized-sha256>.glb`. It requires network
+access to GitHub and the exact approved SHA-named release asset to be published;
+unavailable or mismatched bytes fail the command. It does not require deployment
+commit/branch identity or Cloudflare credentials, build/deploy the site, or
+regenerate raw-model metadata. It does not populate `public/models/` for local
+browser use.
+
+Native spring tests use this immutable-hash cache by default. Alternatively,
+set `SPRING_MODEL_PATH` to a local file containing the exact approved optimized
+GLB bytes before running the Node tests or `npm run test:performance` from
+`web/`. Missing or incompatible geometry is an error, never a mock or skipped
+test. A populated cache or this explicit path lets the spring tests run without
+downloading the model again.
+
+`npm run fetch-model` is different: it imports a **raw CAD export**, projects
+identities and generates optimized output/native metadata as described above.
+Do not pass the optimized release download to that importer or use it just to
+prepare the spring-test cache. `npm run build:deploy` still downloads and
+verifies the approved release before running `test:performance`, regardless of
+an existing cache or `SPRING_MODEL_PATH`.
+
+### Importing a future CAD release
+
 To adopt a future approved CAD release, provide both its full commit and raw
 SHA-256 (not the optimized file's hash):
 
@@ -225,17 +273,33 @@ Fitting and observer availability apply that default at the consumer boundary;
 they do not rewrite the original source measurements or explicit view scopes.
 
 Historical source diagnostics write only to resolved
-`web/.vite/verification-output` or external `/tmp` and `/var/tmp` destinations.
+`web/.vite/verification-output` or external destinations under the platform-native
+temporary directory (`tempfile.gettempdir()`), `/tmp` or `/var/tmp`.
 Public assets, other repository destinations and symlink escapes are refused
 before generation. Their receipts remain non-publishable historical evidence.
-Temporary roots are resolved before comparison, including platform symlinks.
+All historical diagnostic CLIs write through exclusively created staged-file handles,
+flush and sync them, then atomically hard-link the completed files to pinned,
+validated paths. Existing files, symlinks (including dangling links) and reparse-point
+entries are never overwritten. The crank extractor also
+creates its support directory exclusively, refusing existing directories and
+symlink/reparse-point entries.
+Ordinary current observation outputs remain rerunnable: the observer and fitter
+write deterministic gzip through an exclusively created temporary file in the
+validated parent, flush and sync it, then atomically replace the pinned destination.
+A leaf symlink introduced at replacement is replaced, never followed.
+Temporary roots and output paths are resolved before comparison, including platform symlinks.
 The entire checkout remains excluded from external temporary permission even
-when the checkout itself is under `/tmp`; private-root symlink escapes are refused.
+when the checkout itself is under a temporary root; private-root symlink escapes are refused.
 The observer, fitter and remaining historical diagnostic CLIs share
 `check_namespace()` from `fresh-source-observations.py`. The historical CLIs use
 their already-loaded `common.fresh` policy. Declared content aliases are refused
 even when they resolve to external temporary files; historical snapshots are not
 live policy fallbacks.
+
+Immutable original observations and canonical derivatives retain their exact
+Git bytes through `.gitattributes` (`-text`), including on Windows checkouts.
+Raw evidence seals do not permit newline normalization; CRLF-to-LF normalization
+belongs only to current consumer code/data seals.
 
 Compression reduces current storage, not Git ancestry. Oversized historical
 blobs remain unless history is explicitly rewritten.

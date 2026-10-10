@@ -177,6 +177,8 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     )
     # Perpendicular spring taps run along Y: their nearest possible X/Z point
     # remains far outside either longitudinal bracket drill's major envelope.
+    # On the cam plane (#1292) the j=0 station lies alongside the drill's depth,
+    # so that web is the X gap alone.
     spring_radius = THREAD_MAJOR_MM[lever.HOLE_SPEC.size] / 2.0
     spring_stations = tuple(
         lever.CHANNEL_Z0 + lever.HOLE_Z_OFFSET + j * lever.CHANNEL_PITCH
@@ -192,25 +194,30 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
         for x, _y, _z in joint.LEVER_HOLE_POINTS
         for z in spring_stations
     )
-    assert spring_web == pytest.approx(7.8331, abs=1e-4)
-    assert spring_web > 7.8
-    rib_half_height = lever_build.ARC_R * (
-        1.0 - max(point[0] for point in joint.LEVER_HOLE_POINTS) / lever.PLATE_W
-    )
+    assert spring_web == pytest.approx(7.3053, abs=1e-4)
+    assert spring_web >= 2.0
+    # The receiver rib is the build's own -Z edge-rib profile: a slant from the
+    # arc top, clipped by a vertical end face at RIB_PLATE_REACH. Its x-intercept
+    # comes from two profile points, so a rib pulled in to a point at the end
+    # face (slant_reach == reach) is measured as built, not as the plate's width.
+    reach = lever_build.RIB_PLATE_REACH
+    rise = lever_build.edge_rib_half_height(0.0)
+    end_rise = lever_build.edge_rib_half_height(reach)
+    slant_reach = reach * rise / (rise - end_rise)
+    tap_x = max(point[0] for point in joint.LEVER_HOLE_POINTS)
+    # The whole thread envelope sits inboard of the end face, under the slant.
+    assert tap_x + thread_radius + joint.POSITION_BAND < reach - joint.LINEAR_BAND
+    rib_half_height = lever_build.edge_rib_half_height(tap_x)
     rib_normal_margin = (
-        rib_half_height / math.hypot(1.0, lever_build.ARC_R / lever.PLATE_W)
-        - thread_radius
+        rib_half_height / math.hypot(1.0, rise / slant_reach) - thread_radius
     )
     assert rib_normal_margin == pytest.approx(3.69158, abs=1e-5)
-    arc_min = lever_build.ARC_R - joint.LINEAR_BAND
-    width_max = lever.PLATE_W + joint.LINEAR_BAND
-    from_free_edge_min = (
-        lever.PLATE_W - max(point[0] for point in joint.LEVER_HOLE_POINTS)
-        - joint.POSITION_BAND
-    )
+    arc_min = rise - joint.LINEAR_BAND
+    width_max = slant_reach + joint.LINEAR_BAND
+    from_slant_end_min = slant_reach - tap_x - joint.POSITION_BAND
     row_max = joint.POSITION_BAND + joint.LEVER_PLATE_THICKNESS_BAND / 2.0
     rib_wall_min = (
-        (arc_min * from_free_edge_min - width_max * row_max)
+        (arc_min * from_slant_end_min - width_max * row_max)
         / math.hypot(arc_min, width_max) - thread_radius
     )
     assert rib_wall_min == pytest.approx(3.41324, abs=1e-5)
@@ -227,8 +234,11 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
         - spring_position - joint.DRILL_DEPTH - joint.DRILL_DEPTH_BAND
         - joint.DRILL_POINT_DEPTH_MAX
     )
-    spring_web_min = math.hypot(spring_dx_min, spring_dz_min) - thread_radius - spring_radius
-    assert spring_web_min == pytest.approx(6.92736, abs=1e-5)
+    assert spring_dz_min < 0.0  # the j=0 station overlaps the drill's depth
+    spring_web_min = (
+        math.hypot(spring_dx_min, max(spring_dz_min, 0.0)) - thread_radius - spring_radius
+    )
+    assert spring_web_min == pytest.approx(6.59530, abs=1e-5)
     assert spring_web_min >= 2.0
 
 

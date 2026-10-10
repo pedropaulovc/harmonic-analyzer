@@ -33,10 +33,17 @@ SUM_H = 3.0 * MM_PER_IN  # 76.20 summation reach (-X)
 ANCHOR_R = 0.375 * MM_PER_IN  # 9.525 summation-anchor outer radius
 ANCHOR_H = 0.75 * MM_PER_IN  # 19.05 summation-anchor boss height (Y)
 
-# hex knife-edge trunnion (vertex-up).
-HEX_W = 8.653
+# hex knife-edge trunnion (vertex-up).  HEX_W was 8.653 (118.6 deg ridge);
+# narrowed to 8.080 (115.1 deg ridge) so the trunnion still rocks >= 5.0 deg
+# inside the sm-knife-mount Ø12 close bore at the worst case of BOTH parts'
+# bands (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``).  Both section
+# sizes print .XXX, so the title block holds them to HEX_BAND.
+HEX_W = 8.080
 HEX_H = 10.268
+HEX_BAND = 0.13  # title-block .XXX band on HEX_W and HEX_H
 HEX_DEPTH = 21.717
+# Included angle of the knife-edge ridge (the top vertex of the hexagon).
+RIDGE_ANGLE_DEG = 2.0 * math.degrees(math.atan2(HEX_W / 2.0, HEX_H / 4.0))
 
 # Outward normal and plane offset of the upper-right sloping face of the
 # vertex-up hexagon. Its upper endpoint is the +Y knife-edge ridge.
@@ -70,7 +77,12 @@ HOLE_X = 39.85
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
-HOLE_Z_OFFSET = 0.8
+# The spring stations sit on the channel arm plane, the cam plane
+# (rocker_bank_layout.ARM_MID_DZ = cam_plane.CAM_MID_DZ). Restated,
+# like CHANNEL_Z0/CHANNEL_PITCH, not imported: this spec is read by
+# _interference_contracts, so an import would put the gear-train and channel
+# config into every assembly's closure. test_sm_summing_lever_drawing pins it.
+HOLE_Z_OFFSET = -3.52825
 
 # The vn-counter-spring lower anchor (McMaster 9490T1, part ``vn-boss-hook``) threads
 # DIRECTLY through the summation-anchor boss on the same no-nut rule, authored
@@ -80,11 +92,11 @@ COUNTER_HOLE_SPEC = HoleSpec("tapped", ANCHOR_9490T1.thread_size)
 # --- Derived. ---
 CYL_DIA = 2.0 * CYL_R  # 25.4
 TIP_X = -SUM_H  # -76.20 summation tip / anchor X
-HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET  # -66.3
-HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET  # 67.77
+HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET
+HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET
 HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
-HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # 9.90 from -Z end
-HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # 8.43 from +Z end
+HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # from the -Z end
+HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # from the +Z end
 HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
 

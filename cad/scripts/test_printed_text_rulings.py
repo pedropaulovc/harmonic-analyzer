@@ -14,7 +14,6 @@ import ast
 import re
 from pathlib import Path
 
-import pytest
 import yaml
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -134,7 +133,7 @@ def test_the_internal_reference_pattern_catches_what_it_forbids() -> None:
 
 def test_the_scan_reaches_known_printed_text() -> None:
     constants = printed_constants()
-    assert "sm_knife_mount_spec.DRAWING_NOTES" in constants
+    assert "sm_knife_mount_spec.PIN_HOLE_CALLOUT" in constants
     assert "draw_dt_drive_train_assembly.CHECKS" in constants
     assert "sm-knife-mount.material_specification" in printed_registry_fields()
 
@@ -148,20 +147,23 @@ def test_post_mount_screw_prints_no_installation_notes() -> None:
     assert "installation_notes" not in row["vn-post-mount-screw"]
 
 
-@pytest.mark.xfail(strict=True, reason="#932 tbspec wording (checklist, knife-mount)")
 def test_knife_mount_prints_its_heat_treatment_in_finish_only() -> None:
-    import sm_knife_mount_spec
-
     row = yaml.safe_load((PARTS / "sm-knife-mount.yaml").read_text(encoding="utf-8"))
     row = row["sm-knife-mount"]
     # The ruling's contract, not its wording: MATERIAL names the O1 steel,
-    # FINISH carries the hardness and the unpainted state, the notes neither.
+    # FINISH carries the hardness and the unpainted state, no sheet text does.
     assert re.search(r"\bO1\b", row["material_specification"])
     assert "HRC" not in row["material_specification"].upper()
     assert re.search(r"58-60\s*HRC", row["finish"], re.IGNORECASE)
     assert "UNPAINTED" in row["finish"].upper()
-    notes = sm_knife_mount_spec.DRAWING_NOTES.upper()
-    assert "HRC" not in notes and "UNPAINTED" not in notes
+    texts = {
+        name: text.upper()
+        for name, text in printed_constants().items()
+        if name.startswith(("sm_knife_mount_spec.", "draw_sm_knife_mount."))
+    }
+    assert texts
+    for name, text in texts.items():
+        assert "HRC" not in text and "UNPAINTED" not in text, name
 
 
 def test_cone_swing_platform_prints_no_minimum_stock_note() -> None:

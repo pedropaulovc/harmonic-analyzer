@@ -29,7 +29,11 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 def test_thickness_is_held_because_it_sits_in_the_bank_datum_chain() -> None:
     import cylinder_bank_layout as bank
 
-    assert bank.DATUM_CHAIN_STACK["back washer thickness"] == spec.WASHER_THICK_TOLERANCE_MM
+    # #948 ruling R (PR #1292): the fitter mics the back washer and offsets
+    # the strap target by it, so only the reading's residual stays in the
+    # chain; the printed band still bounds what the offset must absorb.
+    chain = bank.DATUM_CHAIN_STACK["back washer, mic-compensated"]
+    assert chain == bank.MIC_RESIDUAL < spec.WASHER_THICK_TOLERANCE_MM
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "BoreDia"): "*deviations(WASHER_BORE_BAND)",
         ("Disc", "DiscThick"): "WASHER_THICK_TOLERANCE_MM",

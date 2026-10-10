@@ -578,8 +578,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_guide_lock_screw",  # #4-40 button head (McMaster 91255A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
         "vn_hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
-        "vn_knife_hanger_stud",  # 1/2-13 UNC (McMaster 91247A720 hex head x 2), member into the knife-mount top tap
-        "sm_knife_mount",  # 1/2-13 UNC-2B x 12.0 blind tap in the top seat, receiver of the knife-hanger stud
+        "vn_knife_hanger_stud",  # #6-32 UNC (McMaster 91251A157 socket head cap screw x 2), member into the knife-mount top tap
+        "sm_knife_mount",  # #6-32 UNC-2B bottoming tap (9.7 full thread, 10.9 drill) in the top seat, receiver of the knife-hanger screw; two plain reamed dowel holes
         "vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
         "vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-VN-043), member: 2 into the support_bar's #4-40 through taps
         "vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
@@ -628,7 +628,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "sh_column_clamp_front",  # #8 CLEARANCE ear holes only; clamped in the screw stack
         "dt_cone_gear",  # slides on the MHA-DT-004 D-flat, no thread
         "dt_cone_pivot_post",  # clamped part: counterbored clearance for MHA-VN-031; journals only
-        "ch_connecting_rod",  # strap bore on cam + #47 pin hole
+        "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-CH-010 pin)
         "vn_counter_spring",  # 1330K524 extension spring: eyes hook the gooseneck screw shank and the boss-hook eye, no thread
         "dt_crank_drive_gear",  # slides on the MHA-DT-004 D-flat against its collar, no thread
         "dt_crank_handle",  # oak handle, runs on the MHA-DT-032 shoulder
@@ -652,7 +652,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_guide_lock",  # 1/8 drill holes (R9-49) only; clamped by guide_lock_screw
         "vn_keeper_chain",  # bead chain
         "vn_keeper_chain_link",  # snap loop link
-        "vn_knife_hanger_washer",  # 90126A211 SAE washer, clearance ID
+        "vn_knife_mount_dowel",  # MHA-VN-051 1/8 dowels, two pressed into each knife mount's reamed top-seat holes, slip in the crossbar hole and slot
         "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "mg_lever_wire",  # wire, tied through the fixture cross hole; no thread
         "mg_magnifying_bracket",  # two counterbored normal #2 clearance holes in its front mounting flange; no thread
@@ -682,6 +682,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_platen_paper",  # paper sheet, no thread
         "pd_platen_rack",  # soft-soldered to the platen back (A06 rack-soldered); no holes, no thread
         "ch_rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
+        "ch_rod_pivot_pin",  # MHA-CH-010 5/64 drill-rod pin, pressed into the fork's reamed tines, ends dressed flush (rod-forks-pinned); no thread
         "ch_rocker_thrust_washer",  # 1/16 sheet washer, plain bore
         "pd_transgear_arm_plate",  # MHA-PD-019: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
         "vn_transgear_collar_cross_pin",  # MHA-VN-037 1/16 slotted spring pin through the drive collar slot and shaft core
@@ -695,6 +696,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_transgear_latch_pin",  # MHA-VN-042 1/8 dowel pressed into the arm's reamed end-face hole
         "pd_transgear_pivot_spacer",  # MHA-PD-020 brass spacer, reamed bore pressed on the pivot shoulder (locating, R9-71); no thread
         "vn_transgear_pivot_spring",  # MHA-VN-049 disc spring on the pivot shoulder; no thread
+        "vn_cylinder_bank_spring",  # MHA-VN-052 wave spring loose on the MHA-DT-013 arbor; no thread
+        "vn_rocker_bank_spring",  # MHA-VN-053 wave spring loose on the MHA-CH-005 shaft; no thread
         "pd_transgear_pin",  # MHA-PD-023 plain steel pin pressed into the arm's reamed hole, ring groove at the front; no thread
         "pd_transgear_rear_bushing",  # MHA-PD-024 brass bushing faced to fit, reamed bore on the pin; no thread
         "pd_transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_pd_transgear_removable)
@@ -713,7 +716,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
     "vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
     "vn_keeper_chain_link": "plain chain link",
-    "vn_knife_hanger_washer": "plain flat washer",
+    "vn_knife_mount_dowel": "dowel pin pressed into a reamed hole",
     "vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
     "vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "vn_transgear_collar_cross_pin": "slotted spring pin in a drilled hole",
@@ -721,6 +724,8 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_transgear_latch_pin": "dowel pin pressed into a reamed hole",
     "vn_transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
     "vn_transgear_pivot_spring": "disc spring on the pivot shoulder; no thread",
+    "vn_cylinder_bank_spring": "wave disc spring loose on the arbor; no thread",
+    "vn_rocker_bank_spring": "wave disc spring loose on the pivot shaft; no thread",
     "vn_tube_frame_cap": "push-on round cap over the column end",
 }
 
@@ -1228,7 +1233,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_rocker_arm_support",
         thread="#8-32",
         quantity=2,
-        installed_at=dt_drive_train_steps.step_ref("north-pivot-bracket-set"),
+        installed_at=ch_channel_assembly_steps.step_ref("north-ear-datum"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the north pivot_bracket foot to the stationary rocker_arm_support "
@@ -1246,7 +1251,9 @@ JOINTS: tuple[Joint, ...] = (
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header (MHA-VN-032, #8-32 x 3/4 fillister, two per foot); "
             "vn_pedestal_hold_down_screw_spec.THREAD; rocker_bracket_seat_layout.SEAT_SPEC (tapped_bottoming #8-32 2B); "
             "draw_dt_drive_train_assembly.py BANK_STEPS step north-pivot-bracket-set (MHA-DT-000 STEP 10: 'DRILL AND TAP THE RAIL "
-            "THROUGH ITS FEET ... SCREW IT DOWN AND RECHECK Y'); ch_channel_assembly_steps.NORTH_BRACKET_SET_REF; "
+            "THROUGH ITS FEET ... UNSCREW IT AND LIFT IT OFF'); draw_ch_channel_assembly.py step north-ear-datum (MHA-CH-000 "
+            "STEP 3: 'SLIDE THE ... EAR SOUTH OVER THE NORTH JOURNAL, SCREW IT DOWN AND RECHECK ITS S-OFFSET Y'); "
+            "ch_channel_assembly_steps.NORTH_BRACKET_SET_REF; "
             "config parts/vn-pedestal-hold-down-screw.yaml (90280A197)"
         ),
     ),
@@ -1257,7 +1264,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_rocker_arm_support",
         thread="#8-32",
         quantity=2,
-        installed_at=ch_channel_assembly_steps.step_ref("south-bracket-feeler-set"),
+        installed_at=ch_channel_assembly_steps.step_ref("south-bracket-spring-set"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the south pivot_bracket foot to the stationary rocker_arm_support "
@@ -1266,16 +1273,17 @@ JOINTS: tuple[Joint, ...] = (
             "oscillating drag and end thrust act about/along the pivot-shaft axis (Z), "
             "perpendicular to the vertical screw axes"
         ),
-        axial_capture="fillister head on the bracket foot top face; thread in a bottoming-tapped #8-32 2B blind seat transferred through the feeler-set foot",
+        axial_capture="fillister head on the bracket foot top face; thread in a bottoming-tapped #8-32 2B blind seat transferred through the blade-set foot",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
-            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-feeler-set' (MHA-CH-000 STEP 4: 'TRANSFER ITS SEATS ... "
-            "SCREW IT DOWN AT THE FEELER'), re-screwed at 'shaft-cut-to-fit' (STEP 5: 'SCREW THE SOUTH ... DOWN AT THE "
-            "FEELER AS STEP 4')"
+            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-spring-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS SEATS ... "
+            "SCREW DOWN, PULL THE BLADE'), left screwed down through 'shaft-cut-to-fit' (STEP 6: 'UNSCREW THE NORTH ... "
+            "AND SLIDE IT OFF NORTH; DRAW THE SHAFT NORTH ... REFIT AS STEP 3; "
+            "SOUTH EAR LEFT AT ITS STEP 5 SETTING')"
         ),
     ),
     Joint(
@@ -1313,29 +1321,33 @@ JOINTS: tuple[Joint, ...] = (
         assembly="sm_summing",
         member="vn_knife_hanger_stud",
         receiver="sm_knife_mount",
-        thread="1/2-13 UNC",
+        thread="#6-32 UNC",
         quantity=2,
         installed_at="",
-        exposure=Exposure.OSCILLATING,
+        exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "the thread is the only support of the knife-edge bearing block on which the summing lever "
-            "rocks back and forth (freed lever_rock DOF); the block hangs MOUNT_GAP 0.25 below the casting "
-            "underside, so nothing clamps it and the thread engagement (11.3735 mm, asserted) also sets the "
-            "knife height -- rocking friction and reversing lever loads reach the unclamped thread"
+            "clamps the knife-edge bearing block's top seat to the stationary crossbar underside (MOUNT_GAP 0); "
+            "block and casting never move relative to each other. The two pressed MHA-VN-051 dowels, slipped into "
+            "the crossbar's round hole and slot, react any torque about the screw axis, and the lever rock (freed lever_rock DOF) "
+            "acts about machine Z, perpendicular to the vertical (Y) screw, so it reaches the thread only as "
+            "cyclic tension and shear, never as torque about its own axis"
         ),
         axial_capture=(
-            "hex head (91247A720) seated on the knife-hanger washer on the crossbar top; bolt passes the "
-            "crossbar's O13.49 clearance hole and engages 11.37 of the 12.0-deep blind tap; the block is "
-            "NOT drawn up against the casting (0.25 gap), so there is no joint preload"
+            "socket head (91251A157) seated on the crossbar's #6 counterbore floor, HANGER_GRIP 30.0 above "
+            "the underside (no washer); the screw passes the O4.318 clearance hole and reaches 8.10 nominal "
+            "(6.284..8.90 worst case, asserted) into the 9.7 full thread of the #6-32 bottoming tap, drawing "
+            "the block up against the casting"
         ),
-        lock=Lock.NONE,
+        lock=Lock.THREADLOCKER_ONLY,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_sm_summing_assembly.py: module docstring, HANGER_STUD_Y/KNIFE_MOUNT_THREAD_ENGAGEMENT, "
-            "_assert_knife_hanger_stack; build_sm_knife_mount.py: MOUNT_GAP, STUD_TAP_SPEC; "
-            "sm_knife_mount_spec.py DRAWING_NOTES (TAP 1/2-13 UNC-2B X 12.0); vn-knife-hanger-stud.yaml (91247A720)"
+            "build_sm_summing_assembly.py: module docstring, HANGER_STUD_Y/HANGER_REACH_MIN/HANGER_REACH_MAX, "
+            "_assert_knife_hanger_stack; build_sm_knife_mount.py: MOUNT_GAP; sm_knife_mount_spec.py "
+            "STUD_TAP_SPEC/STUD_TAP_THREAD_DEPTH_MIN/PIN_HOLE_X; fr_top_frame_spec.py HANGER_HOLE_SPEC/HANGER_GRIP/"
+            "HANGER_PIN_X; vn_knife_mount_dowel_spec.py; cad/config/parts/vn-knife-hanger-stud.yaml "
+            "(91251A157) installation_notes ('USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.')"
         ),
     ),
     Joint(
@@ -1996,10 +2008,10 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "ha_harmonic_analyzer", "build_dt_drive_train_assembly.py", '"vn-slotted-screw"'
     ),
     "ha-harmonic-analyzer/north-pivot-bracket-hold-down": Occurrence(
-        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "north-pivot-bracket-set"
+        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "north-ear-datum"
     ),
     "ha-harmonic-analyzer/south-pivot-bracket-hold-down": Occurrence(
-        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "south-bracket-feeler-set"
+        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "south-bracket-spring-set"
     ),
     "ha-harmonic-analyzer/fulcrum-keeper-screw-in-top-frame": Occurrence(
         "ha_harmonic_analyzer", "build_ch_channel_assembly.py", '"vn-frame-side-screw"'

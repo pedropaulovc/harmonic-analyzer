@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,7 +11,14 @@ import pytest
 
 import _drawing_common
 import _part_pmi
-from _gtol_spec import ConeFace, CylinderFace, PlanarFace, SphereFace, TorusFace
+from _gtol_spec import (
+    ConeFace,
+    CylinderFace,
+    PlanarFace,
+    SphereFace,
+    TorusFace,
+    gtol_frame_xml,
+)
 from _part_pmi import _FaceGeometry
 from _surface_finish import SurfaceFinishControl
 
@@ -299,6 +307,577 @@ def test_feature_control_frame_refuses_a_dimension_attachment() -> None:
             characteristic="runout", tolerance="0.01", label="runout",
             entity_type="DIMENSION",
         )
+
+
+class _FrameXml:
+    def __init__(self, datums: tuple[str, ...]) -> None:
+        self.xml = gtol_frame_xml("position", "0.10", datums=datums, diameter=True)
+
+    def GetSymbolXml(self) -> str:
+        return self.xml
+
+
+class _NamedAnnotation:
+    """A frame's or tag's annotation: its name, selection, attachment and print."""
+
+    def __init__(self, name: str, *, selects: bool = True) -> None:
+        self.name = name
+        self.selects = selects
+        self.position = (0.0, 0.0)
+        self.attached: tuple[Any, ...] = ()
+        self.types: tuple[int, ...] = ()
+        self.prints: list[tuple[str, tuple[float, float]]] = []
+
+    def GetName(self) -> str:
+        return self.name
+
+    def Select2(self, _append: bool, _mark: int) -> bool:
+        return self.selects
+
+    def SetPosition2(self, x: float, y: float, _z: float) -> bool:
+        self.position = (x, y)
+        return True
+
+    def GetPosition(self) -> tuple[float, float, float]:
+        return (*self.position, 0.0)
+
+    def GetAttachedEntities3(self) -> tuple[Any, ...]:
+        return self.attached
+
+    def GetAttachedEntityCount3(self) -> int:
+        return len(self.attached)
+
+    def GetAttachedEntityTypes(self) -> tuple[int, ...]:
+        return self.types
+
+    def GetDisplayData(self) -> Any:
+        prints = self.prints
+
+        class _Data:
+            def GetTextCount(self) -> int:
+                return len(prints)
+
+            def GetTextAtIndex(self, index: int) -> str:
+                return prints[index][0]
+
+            def GetTextPositionAtIndex(self, index: int) -> tuple[float, float, float]:
+                return (*prints[index][1], 0.0)
+
+        return _Data()
+
+
+class _FrameGtol:
+    def __init__(self, name: str, datums: tuple[str, ...] = ("A",)) -> None:
+        self.annotation = _NamedAnnotation(name)
+        self.annotation.position = (0.1466, 0.219)
+        self.frames = [_FrameXml(datums)]
+
+    def GetAnnotation(self) -> _NamedAnnotation:
+        return self.annotation
+
+    def GetFrameCount(self) -> int:
+        return len(self.frames)
+
+    def GetFrame(self, index: int) -> _FrameXml:
+        return self.frames[index - 1]
+
+
+class _DatumTag:
+    def __init__(self, label: str = "", name: str = "DetailItem900") -> None:
+        self.label = label
+        self.annotation = _NamedAnnotation(name)
+
+    def SetLabel(self, label: str) -> bool:
+        self.label = label
+        return True
+
+    def GetLabel(self) -> str:
+        return self.label
+
+    def GetAnnotation(self) -> _NamedAnnotation:
+        return self.annotation
+
+
+class _View:
+    def __init__(self, tags: tuple[str, ...], frames: tuple[_FrameGtol, ...]) -> None:
+        self.tags = [_DatumTag(label) for label in tags]
+        self.frames = frames
+
+    def GetDatumTags(self) -> tuple[_DatumTag, ...]:
+        return tuple(self.tags)
+
+    def GetGTols(self) -> tuple[_FrameGtol, ...]:
+        return self.frames
+
+
+_DATUM_B_XY = (0.1613, 0.200)
+
+
+def _frame_relative_print(anchor_y: float) -> Any:
+    """The tag's print as farm runs 20261009T182549169Z/185542819Z saw it:
+    the letter held at the frame's mid-width (x 0.15997), ``anchor_y`` plus
+    the set y plus its 0.72 mm rise; GetPosition reads back (0.0, set y)."""
+
+    def prints(label: str, position: tuple[float, float]) -> list[tuple[str, tuple[float, float]]]:
+        return [(label, (0.15997, anchor_y + position[1] + 0.00072))]
+
+    return prints
+
+
+def _frame_datum(
+    monkeypatch: pytest.MonkeyPatch,
+    frame: _FrameGtol,
+    *,
+    attaches_to: Any = "frame",
+    selected: tuple[int, Any] | None = None,
+    prints: Any = None,
+) -> tuple[_DatumTag, list[tuple[float, float]]]:
+    """Run add_frame_datum_feature on a fake seat.
+
+    ``attaches_to`` is what the inserted tag is attached to after the rebuild
+    ("frame", another object, or None for nothing).  ``selected`` is what the
+    selection manager reports (type, object; default the frame).  ``prints``
+    maps (letter, set position) to the tag's printed text (default: as the
+    farm printed it, y from the frame's bottom edge 0.212).  Returns the tag
+    and every position set on it.
+    """
+    view = _View(("A",), (frame,))
+    kind, picked = selected if selected is not None else (13, frame)
+    inserted: list[_DatumTag] = []
+    placed: list[tuple[float, float]] = []
+    printer = _frame_relative_print(0.212) if prints is None else prints
+
+    class _SelectionManager:
+        def GetSelectedObjectCount2(self, _mark: int) -> int:
+            return 1
+
+        def GetSelectedObjectType3(self, _index: int, _mark: int) -> int:
+            return kind
+
+        def GetSelectedObject6(self, _index: int, _mark: int) -> Any:
+            return picked
+
+    class _Draw:
+        SelectionManager = _SelectionManager()
+
+        def ActivateView(self, _name: str) -> bool:
+            return True
+
+        def ClearSelection2(self, _all: bool) -> None:
+            pass
+
+        def InsertDatumTag2(self) -> _DatumTag:
+            tag = _DatumTag()
+            view.tags.append(tag)
+            inserted.append(tag)
+            return tag
+
+    def rebuild(_adapter: Any, *, label: str) -> None:
+        annotation = inserted[-1].annotation
+        target = frame if attaches_to == "frame" else attaches_to
+        if target is not None:
+            annotation.attached = (target,)
+            annotation.types = (13,)
+        placed.append(annotation.position)
+        annotation.prints = printer(inserted[-1].label, annotation.position)
+        annotation.position = (0.0, annotation.position[1])
+
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_common, "rebuild_drawing", rebuild)
+    tag = _drawing_common.add_frame_datum_feature(
+        type("_Adapter", (), {"currentModel": _Draw()})(), view, frame, datum="B",
+        symbol_xy=_DATUM_B_XY, label="dowel hole pattern datum B",
+    )
+    return tag, placed
+
+
+def test_frame_datum_symbol_goes_on_the_frame_it_names(monkeypatch) -> None:
+    # Farm run 20261009T182549169Z: Select2 on DetailItem354 attached datum B
+    # to it (one entity, type 13, named DetailItem354).
+    frame = _FrameGtol("DetailItem354")
+    tag, _ = _frame_datum(monkeypatch, frame)
+    assert tag.label == "B"
+    assert tag.annotation.attached == (frame,)
+
+
+def test_frame_datum_is_set_from_the_frame_bottom_edge(monkeypatch) -> None:
+    # Runs 20261009T182549169Z / 185542819Z: SetPosition2(0.1613, 0.2)
+    # printed the letter at (0.15997, 0.41272), 0.2 m above the frame's
+    # bottom edge (0.212).  The first position is that offset, and the
+    # letter then prints at its place with no correction.
+    frame = _FrameGtol("DetailItem354")
+    printer = _frame_relative_print(0.212)
+    assert printer("B", (0.0, 0.2)) == [("B", (0.15997, pytest.approx(0.41272)))]
+    tag, placed = _frame_datum(monkeypatch, frame)
+    assert placed == [pytest.approx((0.0, 0.200 - 0.212))]
+    (letter, (x, y)), = tag.annotation.prints
+    assert (x, y) == pytest.approx((_DATUM_B_XY[0] - 0.00173, _DATUM_B_XY[1] + 0.00072), abs=0.0005)
+
+
+def test_frame_datum_moves_by_its_printed_miss(monkeypatch) -> None:
+    # Were the offset measured from the frame's TOP edge instead, the first
+    # print lands 7 mm high and one correction, in the space GetPosition
+    # reports, brings the letter to its place.
+    tag, placed = _frame_datum(
+        monkeypatch, _FrameGtol("DetailItem354"), prints=_frame_relative_print(0.219)
+    )
+    assert len(placed) == 2
+    assert placed[1][1] == pytest.approx(0.200 - 0.212 - 0.007, abs=1e-6)
+    (_, (_, y)), = tag.annotation.prints
+    assert y == pytest.approx(_DATUM_B_XY[1] + 0.00072, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("case", "match"),
+    (
+        ("not selectable", r"failed to select the frame DetailItem354"),
+        ("other frame", r"selected 1 object\(s\), type 13, name 'DetailItem355'"),
+        ("a dimension", r"selected 1 object\(s\), type 14, name ''"),
+        ("attached to nothing", r"not attached to its frame DetailItem354 .*count=0"),
+        ("attached elsewhere", r"not attached .*attached='DetailItem355'"),
+        # The farm's print, wherever the tag is set: the letter never moves.
+        ("printed elsewhere", r"datum B does not print where it was placed .*\(0\.15997, 0\.41272\)"),
+        ("not printed", r"datum B does not print where it was placed .*printed \[\]"),
+    ),
+)
+def test_frame_datum_symbol_fails_closed_off_its_frame(
+    monkeypatch, case: str, match: str
+) -> None:
+    frame = _FrameGtol("DetailItem354")
+    other = _FrameGtol("DetailItem355")
+    kwargs: dict[str, Any] = {}
+    if case == "not selectable":
+        frame.annotation.selects = False
+    elif case == "other frame":
+        kwargs["selected"] = (13, other)
+    elif case == "a dimension":
+        kwargs["selected"] = (14, object())
+    elif case == "attached to nothing":
+        kwargs["attaches_to"] = None
+    elif case == "attached elsewhere":
+        kwargs["attaches_to"] = other
+    elif case == "printed elsewhere":
+        kwargs["prints"] = lambda label, _position: [(label, (0.15997, 0.41272))]
+    elif case == "not printed":
+        kwargs["prints"] = lambda _label, _position: []
+    with pytest.raises(RuntimeError, match=match):
+        _frame_datum(monkeypatch, frame, **kwargs)
+
+
+class _DisplayData:
+    def __init__(self, texts: list[str]) -> None:
+        self.texts = texts
+
+    def GetTextCount(self) -> int:
+        return len(self.texts)
+
+    def GetTextAtIndex(self, index: int) -> str:
+        return self.texts[index]
+
+
+def _unescaped(xml: str) -> str:
+    # Farm run 20261009T200747541Z: GetSymbolXml reads a letter's symbol code
+    # back unescaped, "<DatumLetter>B<MOD-TRANS2></DatumLetter>".
+    return xml.replace("&lt;", "<").replace("&gt;", ">")
+
+
+def _translated_frame(
+    monkeypatch: pytest.MonkeyPatch,
+    prints: Any,
+    *,
+    accepts: Any = lambda _xml: True,
+    reads_back: Any = _unescaped,
+) -> tuple[Any, list[str]]:
+    """add_feature_control_frame on a fake seat for the slot frame C|B▷.
+
+    ``prints(xml)`` is the frame's printed text for its current XML;
+    ``accepts(xml)`` is SetSymbolXml's answer; ``reads_back(xml)`` is what
+    GetSymbolXml returns for it.  Returns the gtol and every XML SOLIDWORKS
+    was handed.
+    """
+    handed: list[str] = []
+
+    class _XmlFrame:
+        xml = ""
+
+        def SetSymbolXml(self, xml: str) -> bool:
+            handed.append(xml)
+            if accepts(xml):
+                self.xml = xml
+                return True
+            return False
+
+        def GetSymbolXml(self) -> str:
+            return reads_back(self.xml)
+
+    frame = _XmlFrame()
+
+    class _Annotation:
+        def GetAttachedEntityCount3(self) -> int:
+            return 1
+
+        def SetLeader3(self, *_args: Any) -> int:
+            return 0
+
+        def SetPosition2(self, *_args: Any) -> bool:
+            return True
+
+        def GetDisplayData(self) -> _DisplayData:
+            return _DisplayData(prints(frame.xml))
+
+    class _Gtol:
+        def GetFrameCount(self) -> int:
+            return 1
+
+        def GetFrame(self, _index: int) -> _XmlFrame:
+            return frame
+
+        def GetFormat(self) -> int:
+            return 2
+
+        def GetAnnotation(self) -> _Annotation:
+            return _Annotation()
+
+    gtol = _Gtol()
+
+    class _Draw:
+        def InsertGtol(self) -> _Gtol:
+            return gtol
+
+        def ClearSelection2(self, _all: bool) -> None:
+            pass
+
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    monkeypatch.setattr(_drawing_common, "_select_annotation_entity", lambda *_, **__: "rim")
+    monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_common, "_assert_attached_to", lambda *_, **__: None)
+    _drawing_common.add_feature_control_frame(
+        type("_Adapter", (), {"currentModel": _Draw()})(), None,
+        edge_xy=(0.1, 0.2), frame_xy=(0.078, 0.218), characteristic="position",
+        tolerance="0.05", datums=("C", "B"), translated=("B",),
+        label="knife-hanger rear dowel slot position",
+    )
+    return gtol, handed
+
+
+# Farm run 20261009T204136744Z, rear slot frame DetailItem507.
+_PRINTED = ["<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>"]
+
+
+def test_translated_frame_prints_its_glyph_after_the_letter(monkeypatch) -> None:
+    gtol, handed = _translated_frame(monkeypatch, lambda _xml: _PRINTED)
+    assert len(handed) == 1
+    assert "<DatumLetter>B&lt;MOD-TRANS2&gt;</DatumLetter>" in handed[0]
+    assert "Translation" not in handed[0]
+    # SOLIDWORKS reads the symbol code back unescaped (run 20261009T200747541Z).
+    assert "<DatumLetter>B<MOD-TRANS2></DatumLetter>" in gtol.GetFrame(1).GetSymbolXml()
+
+
+@pytest.mark.parametrize(
+    ("accepts", "prints", "reads_back", "match"),
+    (
+        (lambda _xml: False, _PRINTED, _unescaped, r"rejected feature-control frame XML"),
+        (
+            lambda _xml: True,
+            _PRINTED,
+            lambda xml: xml.replace("&lt;MOD-TRANS2&gt;", ""),
+            r"lost its translation modifier",
+        ),
+        (
+            lambda _xml: True,
+            [*_PRINTED, "[0,0,0]"],
+            _unescaped,
+            r"misprints .*prints a translation vector \['\[0,0,0\]'\]",
+        ),
+        (
+            lambda _xml: True,
+            ["<GTOL-POSI>", "0.05", "C", "B"],
+            _unescaped,
+            r"misprints .*prints 0 translation modifier",
+        ),
+    ),
+    ids=("refused", "dropped", "vector", "glyph-less"),
+)
+def test_translated_frame_fails_closed_unless_it_prints_the_glyph_alone(
+    monkeypatch, accepts: Any, prints: list[str], reads_back: Any, match: str
+) -> None:
+    with pytest.raises(RuntimeError, match=match):
+        _translated_frame(
+            monkeypatch, lambda _xml: prints, accepts=accepts, reads_back=reads_back
+        )
+
+
+def _stacked_frame(
+    monkeypatch: pytest.MonkeyPatch,
+    lower_reads_back: Any,
+    upper_reads_back: Any = lambda xml: xml,
+) -> list[str]:
+    """add_feature_control_frame on a fake seat for the knife bore's
+    ⌖Ø0.20|A|B over a stacked ⊥Ø0.05|B; ``upper_reads_back(xml)`` and
+    ``lower_reads_back(xml)`` are what each frame's GetSymbolXml returns.
+    Returns the frames' handed XML.
+    """
+    handed: list[str] = []
+
+    class _XmlFrame:
+        def __init__(self, reads_back: Any) -> None:
+            self.xml = ""
+            self.reads_back = reads_back
+
+        def SetSymbolXml(self, xml: str) -> bool:
+            handed.append(xml)
+            self.xml = xml
+            return True
+
+        def GetSymbolXml(self) -> str:
+            return self.reads_back(self.xml)
+
+    class _Annotation:
+        def GetAttachedEntityCount3(self) -> int:
+            return 1
+
+        def SetLeader3(self, *_args: Any) -> int:
+            return 0
+
+        def SetPosition2(self, *_args: Any) -> bool:
+            return True
+
+    class _Gtol:
+        def __init__(self) -> None:
+            self.frames = [_XmlFrame(upper_reads_back)]
+
+        def GetFrameCount(self) -> int:
+            return len(self.frames)
+
+        def AddFrame(self) -> bool:
+            self.frames.append(_XmlFrame(lower_reads_back))
+            return True
+
+        def GetFrame(self, index: int) -> _XmlFrame:
+            return self.frames[index - 1]
+
+        def GetCompositeFrame2(self, _index: int) -> bool:
+            return False
+
+        def GetFormat(self) -> int:
+            return 2
+
+        def GetAnnotation(self) -> _Annotation:
+            return _Annotation()
+
+    class _Draw:
+        def InsertGtol(self) -> _Gtol:
+            return _Gtol()
+
+        def ClearSelection2(self, _all: bool) -> None:
+            pass
+
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    monkeypatch.setattr(
+        _drawing_common, "_select_annotation_entity", lambda *_, **__: "rim"
+    )
+    monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_common, "_assert_attached_to", lambda *_, **__: None)
+    _drawing_common.add_feature_control_frame(
+        type("_Adapter", (), {"currentModel": _Draw()})(),
+        None,
+        edge_xy=(0.1, 0.2),
+        frame_xy=(0.15, 0.19),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A", "B"),
+        diameter=True,
+        lower_frame=("perpendicularity", "0.05", ("B",)),
+        label="knife-bore position",
+    )
+    return handed
+
+
+def test_stacked_lower_frame_reads_back_its_exact_signature(monkeypatch) -> None:
+    handed = _stacked_frame(monkeypatch, _unescaped)
+    assert handed[1] == gtol_frame_xml(
+        "perpendicularity", "0.05", datums=("B",), diameter=True
+    )
+
+
+_FRAME_CORRUPTIONS = {
+    # The last datum compartment: the lower frame's B, the upper's B of A|B.
+    "lost-last-datum": lambda xml: re.sub(
+        r"<DatumCompartment>(?!.*<DatumCompartment>).*</DatumCompartment>", "", xml
+    ),
+    "tolerance-inside-a-longer-value": lambda xml: re.sub(
+        r">(0\.\d+)</PrimaryToleranceValue>", r">\g<1>5</PrimaryToleranceValue>", xml
+    ),
+    "lost-diameter": lambda xml: xml.replace(
+        "<PrimaryRangeSymbol>phi</PrimaryRangeSymbol>", ""
+    ),
+    "wrong-symbol": lambda xml: re.sub(
+        r"<ToleranceSymbol>[^<]*</ToleranceSymbol>",
+        "<ToleranceSymbol>GTOL-PARA</ToleranceSymbol>",
+        xml,
+    ),
+    "unparsable": lambda xml: re.sub(
+        r"<ToleranceSymbol>[^<]*</ToleranceSymbol>", "", xml
+    ),
+}
+
+
+@pytest.mark.parametrize("frame", ("upper", "lower"))
+@pytest.mark.parametrize("corruption", tuple(_FRAME_CORRUPTIONS))
+def test_frames_fail_unless_their_signature_persists(
+    monkeypatch, frame: str, corruption: str
+) -> None:
+    # CodeRabbit PRRT_kwDOPHDy386rADCQ: a substring readback passed a frame
+    # that lost a datum, or whose 0.05 sat inside another value (0.055).
+    corrupt = _FRAME_CORRUPTIONS[corruption]
+    exact = lambda xml: xml  # noqa: E731
+    match = {
+        "upper": r"feature-control frame did not persist",
+        "lower": r"stacked lower frame did not persist",
+    }[frame]
+    with pytest.raises(RuntimeError, match=match):
+        if frame == "upper":
+            _stacked_frame(monkeypatch, exact, upper_reads_back=corrupt)
+        else:
+            _stacked_frame(monkeypatch, corrupt)
+
+
+def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
+    # Farm run 20261009T171439353Z: the knife mount printed the tap and bore
+    # frames to A|B with no B on the sheet (only the frame's unprinted datum
+    # identifier named it).
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    front = _View(("A",), (_FrameGtol("DetailItem355", ("A", "B")),))
+    top = _View((), (_FrameGtol("DetailItem356", ("A",)), _FrameGtol("DetailItem358", ("A", "B"))))
+    # Farm run 20261009T200747541Z: a composite frame's lower tier read back
+    # with one empty <ToleranceSymbol> (the tiers share the symbol cell); its
+    # datums still count.
+    composite = _FrameGtol("DetailItem357", ("A",))
+    lower = _FrameXml(("A", "C"))
+    lower.xml = re.sub(
+        r"<ToleranceSymbol>[^<]*</ToleranceSymbol>", "<ToleranceSymbol />", lower.xml
+    )
+    composite.frames.append(lower)
+    top.frames = (*top.frames, composite)
+    with pytest.raises(
+        RuntimeError,
+        match=r"reference datum\(s\) no tag prints: B by \['DetailItem355', 'DetailItem358'\], "
+        r"C by \['DetailItem357'\]; tags print \['A'\]",
+    ):
+        _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
+    top.tags = [_DatumTag("B"), _DatumTag("C")]
+    _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
 
 
 @pytest.mark.parametrize(

@@ -109,15 +109,15 @@ _INSERTED_SOURCES = {
     "dt_crank_handle_pivot_screw dt_crank_hub vn_crank_hub_pin dt_crank_pin "
     "dt_crank_pin_eye dt_crank_pin_ring vn_crank_seat_drive_pin dt_crank_seat_washer "
     "dt_crank_pinion dt_crank_pinion_pin dt_crankshaft dt_cylinder_end_disc dt_cylinder_gear "
-    "dt_cylinder_gear_shaft "
+    "vn_cylinder_bank_spring dt_cylinder_gear_shaft "
     "vn_fillister_screw vn_foot_screw vn_keeper_chain vn_keeper_chain_link vn_pedestal_hold_down_screw dt_pinion_arbor dt_pinion_arbor_collar dt_pinion_bracket dt_pinion_cam "
     "dt_pinion_cam_pin dt_pinion_handle dt_pinion_lever dt_pinion_lever_pin dt_pinion_lift_rod "
     "dt_pinion_pivot_block dt_pinion_pivot_shaft dt_pinion_spring vn_pinion_strap_pin vn_post_mount_screw vn_slotted_screw "
     "vn_swing_stop_screw",
     "ch_channel": "ch_amplitude_bar ch_bar_pivot_pin ch_channel_lever vn_channel_spring_installed ch_connecting_rod "
     "vn_frame_side_screw ch_fulcrum_keeper ch_fulcrum_shaft vn_pedestal_hold_down_screw ch_pivot_bracket "
-    "ch_pivot_shaft ch_rocker_arm ch_rocker_thrust_washer vn_spring_hook",
-    "sm_summing": "vn_boss_hook vn_counter_spring sm_gooseneck vn_knife_hanger_stud vn_knife_hanger_washer sm_knife_mount sm_summing_lever",
+    "ch_pivot_shaft ch_rocker_arm vn_rocker_bank_spring ch_rocker_thrust_washer ch_rod_pivot_pin vn_spring_hook",
+    "sm_summing": "vn_boss_hook vn_counter_spring sm_gooseneck vn_knife_hanger_stud vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
     "mg_magnifier": "vn_clamp_screw sh_column_clamp_back sh_column_clamp_front mg_lever_wire "
     "mg_magnifying_bracket vn_magnifying_bracket_screw mg_magnifying_clamp mg_magnifying_lever mg_magnifying_vertical_rod "
     "mg_magnifying_wheel mg_output_fixture vn_thumb_screw mg_wheel_axle vn_wheel_axle_nut mg_wheel_bar",
@@ -1526,17 +1526,8 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_pn_pen_assembly.py", "build_vn_pen_set_screw"): (
         "dtrefactor: reads HEAD_STACK_LEN, SHANK_DIA, SHANK_LEN, TIP_CHAMFER"
     ),
-    ("build_sm_summing_assembly.py", "build_vn_knife_hanger_stud"): (
-        "dtrefactor: reads SHANK_DIA, UNDERHEAD_LEN"
-    ),
-    ("build_sm_summing_assembly.py", "build_vn_knife_hanger_washer"): (
-        "dtrefactor: reads INNER_DIA, OUTER_DIA, THICKNESS"
-    ),
     ("build_sm_summing_assembly.py", "build_sm_knife_mount"): (
-        "dtrefactor: reads CASTING_UNDERSIDE_Y, MOUNT_GAP, STUD_TAP_DEPTH"
-    ),
-    ("build_sm_summing_assembly.py", "build_fr_top_frame"): (
-        "dtrefactor: reads RING_HEIGHT, STUD_HOLE_DIA"
+        "dtrefactor: reads CASTING_UNDERSIDE_Y, MOUNT_GAP"
     ),
 }
 # Entry tools that open built models and therefore import their builders; they

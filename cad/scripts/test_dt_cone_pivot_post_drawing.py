@@ -205,6 +205,59 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("extent", "expected_error"),
+    [
+        # The template anchor is left of the old 218 mm assertion, but still
+        # almost 2 mm inside the actual 215.9 mm rule.
+        ((0.2178, 0.0349, 0.0, 0.2893, 0.0411, 0.0), "native Ra"),
+        ((0.2158, 0.0349, 0.0, 0.2893, 0.0411, 0.0), "authored cell"),
+        ((0.2178, 0.0334, 0.0, 0.2893, 0.0411, 0.0), "authored cell"),
+        # The old 310/45 mm upper limits incorrectly allowed these escapes.
+        ((0.2178, 0.0349, 0.0, 0.3090, 0.0411, 0.0), "authored cell"),
+        ((0.2178, 0.0349, 0.0, 0.2893, 0.0448, 0.0), "authored cell"),
+    ],
+)
+def test_finish_extent_uses_the_template_rules(
+    monkeypatch: pytest.MonkeyPatch,
+    extent: tuple[float, ...],
+    expected_error: str,
+) -> None:
+    import diagnostics.drawing_layout_audit as audit
+
+    region, keep_outs = _landscape_sheet()
+    sheet = SimpleNamespace(
+        name="Sheet1",
+        region=region,
+        keep_outs=keep_outs,
+        annotations=tuple(
+            SimpleNamespace(label=label, kind="dimension")
+            for label in ("CrankBossStartZ", "InclineAngle")
+        ),
+    )
+    note = SimpleNamespace(
+        PropertyLinkedText='$PRPSHEET:"Finish"',
+        GetText=lambda: "finish",
+        GetExtent=lambda: extent,
+    )
+    annotation = SimpleNamespace(
+        GetType=lambda: 6,
+        GetSpecificAnnotation=lambda: note,
+    )
+    model = SimpleNamespace(
+        GetFirstView=lambda: SimpleNamespace(GetAnnotations=lambda: (annotation,))
+    )
+    monkeypatch.setattr(audit, "collect_document", lambda _adapter: [sheet])
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "_view_outline", lambda _view: (0.213, 0.117, 0.257, 0.2034))
+    # A contained Finish reaches the next independent gate (missing Ra);
+    # escaping any rule fails before that gate.  No live COM seat is needed.
+    with pytest.raises(RuntimeError, match=expected_error):
+        drawing._assert_native_layout(
+            SimpleNamespace(currentModel=model), "journal", expected_finish="finish"
+        )
+
+
 def _landscape_sheet() -> tuple[object, tuple]:
     from _drawing_layout_check import DrawableRegion
     from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
