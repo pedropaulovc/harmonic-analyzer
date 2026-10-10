@@ -46,8 +46,6 @@ REFERENCES_DIR = SCRIPTS_DIR.parent / "references"
 # FILE so an edit rebuilds the part and busts its remote-cache key -- see
 # data_deps_of, honored by dodo._part_file_deps.
 _DATA_EXTENSIONS = (".dxf", ".dwg")
-# Whitespace-bearing literals may be filenames or drawing-note prose; resolve
-# them in data_deps_of before accepting them as input edges.
 _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECASE)
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
@@ -1789,14 +1787,14 @@ def data_deps_of(script: Path) -> list[str]:
     ``adapter.import_dxf_dwg``) has no import edge to it, so an edit to the DXF
     would otherwise not rebuild the part. This scans the script's transitive
     module closure source for quoted ``*.dxf``/``*.dwg`` literals and resolves
-    them under ``cad/references``.
+    each basename under ``cad/references``.
 
-    A no-whitespace artefact name is listed **whether or not it exists on disk**:
-    keeping a deleted runtime input in ``file_dep`` makes doit/the build fail
-    loud rather than report the stale ``.SLDPRT`` up to date. Whitespace-bearing
-    literals try their full path under ``cad/references`` (absolute paths remain
-    absolute), then the historical basename fallback. The first existing file
-    wins; if neither is a file the literal is treated as prose.
+    A named artefact is listed **whether or not it currently exists on disk**: a
+    referenced input that is accidentally deleted or renamed after a build is a
+    MISSING runtime dependency, and keeping it in ``file_dep`` makes doit/the
+    build fail loud on it rather than silently report the stale ``.SLDPRT`` up to
+    date. It is CONSERVATIVE (can over- but never under-invalidate): only files
+    named by a literal in the script's own import closure are ever listed.
     """
     sources = [_resolved(script), *(Path(p) for p in module_deps_of(script))]
     found: set[str] = set()
@@ -1806,25 +1804,15 @@ def data_deps_of(script: Path) -> list[str]:
         except OSError:
             continue
         for literal in _data_literals(text):
-            path = Path(literal)
-            candidate = REFERENCES_DIR / path.name
-            if any(char.isspace() for char in literal):
-                literal_candidate = REFERENCES_DIR / path
-                if literal_candidate.is_file():
-                    candidate = literal_candidate
-                elif literal_candidate == candidate or not candidate.is_file():
-                    continue
+            candidate = REFERENCES_DIR / Path(literal).name
             found.add(str(_resolved(candidate)))
     return sorted(found)
 
 
 @functools.lru_cache(maxsize=1024)
 def _data_literals(text: str) -> tuple[str, ...]:
-    """Quoted DXF/DWG candidates cached by source content, not file existence.
-
-    No-whitespace names remain dependencies even if missing; whitespace-bearing
-    candidates need an existing file, checked by ``data_deps_of`` on each call.
-    """
+    """The quoted DXF/DWG names in one source CONTENT (every task re-scans its
+    whole closure, so the ~600 shared helpers are scanned once, not ~1600 times)."""
     return tuple(_DATA_LITERAL_RE.findall(text))
 
 
