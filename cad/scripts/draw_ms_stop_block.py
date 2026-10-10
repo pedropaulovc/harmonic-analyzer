@@ -38,7 +38,8 @@ SHEET_SCALE = (4.0, 1.0)
 FRONT_CENTER = (0.175, 0.185)
 RIGHT_CENTER = (0.315, FRONT_CENTER[1])
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.080)
-ISO_CENTER = (0.350, 0.085)
+# Native 2:1 outline is 56.4 x 60.3 mm; fit above the title and below the end view.
+ISO_CENTER = (0.360, 0.119)
 FRONT_KEEP = {
     "BlockLength": (0.175, 0.235), "BlockHeight": (0.105, 0.185),
     "RoofChamferSize": (0.112, 0.245), "RoofChamferAngle": (0.230, 0.245),
@@ -113,7 +114,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
-    add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.124)
+    add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.024, 0.036)
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
