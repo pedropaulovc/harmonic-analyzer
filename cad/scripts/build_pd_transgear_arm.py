@@ -120,15 +120,11 @@ from pd_transgear_arm_spec import (
     BASIC_REDUCER_DIMENSIONS,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
-    REDUCER_POSITION_INSPECTION_NOTE,
-    ARM_PLATE_NORMAL_INSPECTION_NOTE,
-    CLAMP_AXIS_INSPECTION_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     LATCH_PIN_HEIGHT_TOLERANCE,
     ISOMETRIC_VIEW_NOTE,
     PIVOT_BORE_CALLOUT,
-    PIVOT_FIT_INSPECTION_NOTE,
     SPOT_FACE_DIA_BAND,
     SPOT_FACE_FLOOR_TOLERANCE,
 )
@@ -141,10 +137,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Isometric View Note",
-    "Reducer Position Inspection",
-    "Arm Plate Normal Inspection",
-    "Clamp Axis Inspection",
-    "Pivot Fit Inspection",
 )
 
 THROUGH_CUT_DEPTH = 4.0 * THICKNESS  # mid-plane total; > the arm's thickness
@@ -800,10 +792,6 @@ async def build(adapter: Any) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "Pivot Fit Inspection": PIVOT_FIT_INSPECTION_NOTE,
-            "Reducer Position Inspection": REDUCER_POSITION_INSPECTION_NOTE,
-            "Arm Plate Normal Inspection": ARM_PLATE_NORMAL_INSPECTION_NOTE,
-            "Clamp Axis Inspection": CLAMP_AXIS_INSPECTION_NOTE,
         }
     )
     # The reference sketch owns printed dimensions but no geometry: hidden in

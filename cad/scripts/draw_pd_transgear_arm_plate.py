@@ -30,6 +30,7 @@ import argparse
 import sys
 from typing import Any
 
+import _config
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, check, run_build
@@ -54,6 +55,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _native_projected_zone import require_saved_projected_gtols
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
+from pd_paper_drive_assembly_steps import matched_locator_notes
 from pd_transgear_arm_plate_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
@@ -89,6 +91,7 @@ from pd_transgear_arm_plate_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -118,9 +121,9 @@ BACK_CENTER = (0.206, PLAN_CENTER[1])
 SECTION_CENTER = (0.326, PLAN_CENTER[1])
 ISO_CENTER = (0.390, 0.225)
 ISO_NOTE_XY = (0.353, 0.180)
-REDUCER_POSITION_NOTE_XY = (0.014, 0.048)
-NORMAL_INSPECTION_NOTE_XY = (0.155, 0.112)
-CLAMP_AXIS_INSPECTION_NOTE_XY = (0.155, 0.137)
+# Bottom left, clear of the plan view and of the title block.
+NOTES_XY = (0.014, 0.048)
+NOTES_TEXT = matched_locator_notes(_config.parts("pd-transgear-arm")["number"])
 
 _TOP = TOP_LEFT[1]  # the plate's highest point (the top edge's -X corner)
 _SECTION_TOP = arm_upper_edge_y(0.0)
@@ -140,7 +143,12 @@ SECTION_LINE_MODEL = (
 # (they reach about 5 above the section's top edge); the heights from K
 # stand outboard of each side, the hole height's wide toleranced text wholly
 # between the edge and the top-corner height's dimension line.
-PLAN_ROWS = tuple(_SECTION_TOP + 8.0 + 5.0 * row for row in range(3))
+# Rows 4 apart (8 mm on the sheet: 4.4 mm air between 3.6 mm texts) keep the
+# width's witness lines under the locator diameter's shoulder: at 5 apart
+# they rose to 246.2 mm, through its shoulder at 245.5 mm (farm run
+# 20261009T224545531Z, shoulder-crosses-line), and that four-line callout
+# cannot rise further inside the top border.
+PLAN_ROWS = tuple(_SECTION_TOP + 8.0 + 4.0 * row for row in range(3))
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ScrewHoleX2": (SCREW_HOLES[1][0] / 2.0, PLAN_ROWS[0], _Z_PLAN),
     "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, PLAN_ROWS[1], _Z_PLAN),
@@ -268,9 +276,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Isometric View Note",
-            "Reducer Position Inspection",
-            "Arm Plate Normal Inspection",
-            "Clamp Axis Inspection",
         ),
         required=(
             "Number",
@@ -278,9 +283,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Isometric View Note",
-            "Reducer Position Inspection",
-            "Arm Plate Normal Inspection",
-            "Clamp Axis Inspection",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -415,15 +417,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, placements=placements, datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS, label="plate actual-bore locating frame",
     )
-    add_property_linked_note(
-        adapter, "Reducer Position Inspection", *REDUCER_POSITION_NOTE_XY,
-    )
-    add_property_linked_note(
-        adapter, "Arm Plate Normal Inspection", *NORMAL_INSPECTION_NOTE_XY,
-    )
-    add_property_linked_note(
-        adapter, "Clamp Axis Inspection", *CLAMP_AXIS_INSPECTION_NOTE_XY,
-    )
+    if add_note(adapter, NOTES_TEXT, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the plate's matched-pair notes")
     for view, label in ((plan, "plan"), (back, "back")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME centre marks to the {label} view")

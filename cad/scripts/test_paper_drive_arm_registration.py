@@ -127,9 +127,6 @@ def test_clamp_axes_have_real_projected_zones_and_independent_actual_cone_faces(
         for control in (tap, hole, cone):
             assert control.datums == ("A", "B", "C")
             assert control.tolerance == "0.050" and control.tolerance_zone == "diametral"
-    assert arm_spec.CLAMP_AXIS_INSPECTION_NOTE == plate_spec.CLAMP_AXIS_INSPECTION_NOTE
-    assert "ARM A THROUGH z=+14.7" in arm_spec.CLAMP_AXIS_INSPECTION_NOTE
-    assert "MOUNT A THROUGH z=+7.0" in plate_spec.CLAMP_AXIS_INSPECTION_NOTE
 
 
 def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:

@@ -298,13 +298,23 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert "CRITICAL S-K JIG AT THE GEAR PLANE" in located
     assert "MATCH-DRILL AND REAM" in located
     assert "SEPARATE SPECIFIED FITS" in located
-    assert "DRAWN PROUD SET, NOT TO THE BLIND FLOOR" in located
+    assert (
+        f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
+        f"{plate_locating_pin.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
+    ) in located
+    assert "MATCH-MARK ARM AND PLATE" in located
     fitted = _step_body("arm-plate-fitted")
     assert "PLATE ON THE LOCATING DOWELS" in fitted
     assert "DOWELS LOCATE; SCREWS CLAMP ONLY" in fitted
-    assert "ACTUAL GEAR-PLANE S-K POSE AND FULL K MOTION" in fitted
-    assert "PER THE MATCHED ARM/PLATE INSPECTION" in fitted
+    # The matched acceptance moved here from the part sheets (policy rule 6).
+    assert "ACTUAL GEAR-PLANE S-K POSE WITHIN DIA 0.050 RFS" in fitted
+    assert "X/Y RANGE + 2X GAUGE UNCERTAINTY 0.0707 MAX, FULL TRAVEL 0.100 MAX" in fitted
+    assert "PLUS UNCERTAINTY, 0.005 MAX" in fitted
+    assert "RE-ACCEPT AFTER EVERY REMOVAL OR PIN REPLACEMENT" in fitted
     assert "COUNTERSINK" not in fitted
+    assert "PIVOT BORE WAS REAMED TO ITS MEASURED STRAIGHT SHOULDER" in _step_body(
+        "hanger-pivoted"
+    )
     assert steps.step_number("arm-plate-located") + 1 == steps.step_number("arm-plate-fitted")
 
 

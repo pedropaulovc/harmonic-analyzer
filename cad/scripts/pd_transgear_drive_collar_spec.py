@@ -467,8 +467,11 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-PD-022: {_what}")
 
-BORE_CALLOUT = "DRILL UNDERSIZE; BROACH OR WIRE-EDM TRUE D THRU\nCURVED PORTION H7"
-FLAT_ORIENTATION = "FLAT AT LOCAL -Y; MATCH SHAFT D"
+# Policy rule 6: the callout states the requirement, not a method; the
+# native +0.012/0.000 band already prints the curved portion's H7.
+BORE_CALLOUT = "TRUE D THRU"
+# The view shows the flat's side; the matched fit is the requirement.
+FLAT_ORIENTATION = "MATCH SHAFT D"
 PIN_HOLE_CALLOUT = "2X REAM THROUGH"
 # The overall, pilot front face to rear face, prints as a .X reference.
 OVERALL_LENGTH = LENGTH + PILOT_LENGTH
@@ -612,12 +615,12 @@ FIT_UP_NOTE = "\n".join(
 )
 
 # Existing named external drive-pin rim exception only. The pilot now meets
-# the target and the obsolete slotted-floor exception no longer exists.
+# the target and the obsolete slotted-floor exception no longer exists. The
+# drawing numbers these 1 and 2 and appends the two fitted lengths as notes 3
+# and 4 with their assembly steps (draw_pd_transgear_drive_collar.FIT_NOTES).
 DRAWING_NOTES = "\n".join(
     (
-        f"DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",
-        f"SUPPLY BODY {BODY_BLANK_LENGTH_MIN:.3f} MIN; REAR FACE TO FIT ON F.",
-        f"SUPPLY PILOT {PILOT_BLANK_LENGTH_MIN:.2f} MIN; FRONT FACE TO FIT.",
-        "TRUE D-BORE; CONTROLLED REAR ENTRY BREAK CLEARS SHAFT F CORNERS.",
+        f"1. DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",
+        "2. TRUE D-BORE; CONTROLLED REAR ENTRY BREAK CLEARS SHAFT F CORNERS.",
     )
 )

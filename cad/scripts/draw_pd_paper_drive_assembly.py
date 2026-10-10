@@ -38,6 +38,7 @@ import _chain as chain
 import _config
 import _telemetry
 import paper_drive_geom as paper_geometry
+import paper_drive_arm_registration as registration
 import pd_latch_hook_geometry as hook_geometry
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
@@ -1008,15 +1009,16 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "MATCH-DRILL AND REAM THE LOCATING HOLES TO THEIR SEPARATE SPECIFIED FITS. "
             f"PRESS {TRANSGEAR_QUANTITIES['vn-transgear-arm-plate-locating-pin']} "
             f"{_N['vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
-            "TO ITS DRAWN PROUD SET, NOT TO THE BLIND FLOOR."
+            f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
+            f"{plate_locating_pin.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE "
+            "BLIND FLOOR; MATCH-MARK ARM AND PLATE."
         ),
         "arm-plate-fitted": (
             f"FIT THE {_N['pd-transgear-arm-plate']} PLATE ON THE LOCATING DOWELS. "
             f"FIT {TRANSGEAR_QUANTITIES['vn-transgear-arm-plate-screw']} "
             f"{_N['vn-transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH TAPS; "
             "SNUG BOTH, THEN TIGHTEN THEM IN TURN. DOWELS LOCATE; SCREWS CLAMP ONLY. "
-            "RE-CHECK THE ACTUAL GEAR-PLANE S-K POSE AND FULL K MOTION "
-            "PER THE MATCHED ARM/PLATE INSPECTION."
+            f"{registration.ARM_PLATE_ACCEPTANCE_TEXT}"
         ),
         "arm-plate-screws-cut": (
             "BENCH-FIT THE ACTUAL MATCHED ARM/PLATE AND BOTH SCREWS; "
@@ -1037,7 +1039,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"THE {_N['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE SHOULDER, "
             "FLUSH WITH ITS END ON A FLAT. SEAT IT IN THE "
             f"{_N['pd-support-bar']} BAR'S BLIND TAP WITH LOW-STRENGTH THREADLOCKER; "
-            "THE ARM FALLS FREELY."
+            "THE ARM FALLS FREELY. KEEP THE SCREW PAIRED WITH THE ARM WHOSE PIVOT "
+            "BORE WAS REAMED TO ITS MEASURED STRAIGHT SHOULDER."
         ),
         "disc-cluster-assembled": (
             f"FIT THE {_N['pd-rack-pinion']} DISC ON THE {_N['pd-transgear-disc-hub']} "

@@ -44,7 +44,7 @@ def test_required_drawing_paths() -> None:
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     views = (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.LOCATOR_SECTION_KEEP,
-             drawing.REAR_TEXT_MODEL_MM, drawing.END_KEEP)
+             drawing.END_KEEP)
     assert set().union(*views) == marked
     assert sum(len(view) for view in views) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -60,60 +60,42 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
 
 
-def test_rear_locator_text_projects_model_mm_to_canonical_sheet_pairs(monkeypatch) -> None:
-    """The failed leaf passed model XYZ triples to curate's ``x, y`` unpack."""
-    adapter, rear = object(), object()
-    calls = []
-
-    def project(actual_adapter, actual_view, points, *, names, label):
-        assert actual_adapter is adapter and actual_view is rear
-        calls.append((points, names, label))
-        # Bounded back-view fake: reflected X, actual 1:1 scale and centre.
-        return [
-            (
-                drawing.REAR_CENTER[0] - (xyz[0] - drawing._BBOX_CENTER_X / 1000.0),
-                drawing.REAR_CENTER[1] + xyz[1],
-            )
-            for xyz in points
-        ]
-
-    monkeypatch.setattr(drawing, "model_points_in_view", project)
-    keep = drawing._rear_dimension_positions(adapter, rear)
-    assert set(keep) == set(drawing.REAR_TEXT_MODEL_MM)
-    assert len(calls) == 1
-    points, names, _label = calls[0]
-    assert names == tuple(drawing.REAR_TEXT_MODEL_MM)
-    for name, xyz in zip(names, points, strict=True):
-        assert xyz == pytest.approx(
-            tuple(value / 1000.0 for value in drawing.REAR_TEXT_MODEL_MM[name])
-        )
-        assert xyz[2] == pytest.approx(geometry.THICKNESS / 1000.0)
-        x, y = keep[name]  # The real curate_dimensions contract, not XYZ.
-        assert x == pytest.approx(
-            drawing.REAR_CENTER[0] - xyz[0] + drawing._BBOX_CENTER_X / 1000.0
-        )
-        assert y == pytest.approx(drawing.REAR_CENTER[1] + xyz[1])
-    # The actual caller uses the projection, not the unchanged model triples.
+def test_locating_sockets_print_in_the_front_view() -> None:
+    """The sockets open in the rear face *Front looks at: no second rear view
+    (run 7's 1:1 rear view crowded the sheet), every survivor a sheet pair."""
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    imports = [
+    calls = [
         node for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "curate_view_dimensions"
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, (ast.Attribute, ast.Name))
+        and getattr(node.func, "attr", getattr(node.func, "id", "")) in {
+            "curate_view_dimensions", "place_view",
+        }
     ]
-    assert len(imports) == 5
-    keep_sources = [
+    imports = [
+        call for call in calls if getattr(call.func, "attr", "") == "curate_view_dimensions"
+    ]
+    keep_sources = {
         ast.unparse(next(keyword.value for keyword in call.keywords if keyword.arg == "keep"))
         for call in imports
-    ]
-    assert keep_sources.count("_rear_dimension_positions(adapter, rear)") == 1
-    assert set(keep_sources) == {
-        "FRONT_KEEP", "SECTION_KEEP", "LOCATOR_SECTION_KEEP", "END_KEEP",
-        "_rear_dimension_positions(adapter, rear)",
     }
+    assert len(imports) == 4
+    assert keep_sources == {"FRONT_KEEP", "SECTION_KEEP", "LOCATOR_SECTION_KEEP", "END_KEEP"}
+    orientations = [
+        call.args[2].value for call in calls
+        if getattr(call.func, "id", "") == "place_view"
+    ]
+    assert sorted(orientations) == ["*Front", "*Isometric", "*Right"]
+    for name in ("LocatorX1", "LocatorY1", "LocatorY2", "LocatorDia1"):
+        assert name in drawing.FRONT_KEEP
     for view_keep in (
         drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.LOCATOR_SECTION_KEEP, drawing.END_KEEP,
     ):
         assert all(len(xy) == 2 for xy in view_keep.values())
+    # One frame per socket side, each landing on its own socket's rim.
+    assert {int(math.copysign(1.0, y)) for _x, y in geometry.LOCATOR_SITES_MM} == set(
+        drawing._LOCATOR_FRAMES
+    )
 
 
 def test_plate_tap_stations_follow_the_current_reducer_bore() -> None:
@@ -431,9 +413,9 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     assert spec.PIVOT_BORE_CALLOUT.splitlines()[0] == "REAM TO MEASURED VN041"
     assert "SHOULDER +0.132/+0.152 DIA" in spec.PIVOT_BORE_CALLOUT
     assert "MATCHED SET; NOT INTERCHANGEABLE" in spec.PIVOT_BORE_CALLOUT
-    assert "0.001 mm RESOLUTION" in spec.PIVOT_FIT_INSPECTION_NOTE
-    assert "RECORD PAIRED SHAFT OD, BORE ID AND PART IDS" in spec.PIVOT_FIT_INSPECTION_NOTE
-    assert "Pivot Fit Inspection" in part._SAVED_DRAWING_PROPERTIES
+    # Rule 6: the matched fit rides the callout; no inspection-method note.
+    assert not hasattr(spec, "PIVOT_FIT_INSPECTION_NOTE")
+    assert "Pivot Fit Inspection" not in part._SAVED_DRAWING_PROPERTIES
     assert "BORE AXIS 90° TO FRONT FACE" in spec.PIVOT_BORE_CALLOUT
     assert geometry.PIVOT_AXIS_BINDING_SWEEP_MAX < lower
     assert lower - geometry.PIVOT_AXIS_BINDING_SWEEP_MAX >= 0.004

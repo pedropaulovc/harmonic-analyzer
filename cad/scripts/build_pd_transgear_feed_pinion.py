@@ -72,6 +72,7 @@ from paper_drive_stock_native import (
     author_span,
     measure_one_solid_body_volume,
     check_one_solid_body_volume,
+    pattern_stock_feature,
     placed_ground_curve,
     suppress_dimension_input,
 )
@@ -225,8 +226,7 @@ async def _stock_cutter_endcut(
     await check_one_solid_body_volume(
         adapter, "finite cutter endcut", volume - removed, uncertainty + 0.01 * removed
     )
-    await pattern_about_z(adapter, features.cut, TEETH, OUTSIDE_DIA / 2.0, FULL_DEPTH)
-    name_last_feature(adapter, "ToolEndPattern")
+    await pattern_stock_feature(adapter, features.cut, TEETH, "ToolEndPattern")
     expected = volume - TEETH * removed
     volume = await check_one_solid_body_volume(
         adapter, "finite cutter end pattern", expected, TEETH * (uncertainty + 0.01 * removed)
@@ -594,7 +594,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await check_one_solid_body_volume(adapter, "boss", volume + V_BOSS, 0.01 * V_BOSS)
 
     volume, end_features = await _stock_cutter_endcut(adapter, drive_jobs)
-    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH)
+    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
 
     # Bore through (centre 0,0): define_circle emits only the diameter dim.
     bore = SketchDims()

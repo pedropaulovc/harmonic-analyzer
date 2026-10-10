@@ -157,12 +157,9 @@ GEOMETRIC_CONTROLS += (
         ) for index, (x, y) in enumerate(PLATE.LOCATOR_SITES_MM, 1)
     ),
 )
-REDUCER_POSITION_INSPECTION_NOTE = REGISTRATION.MATCHED_REGISTRATION_NOTE
-ARM_PLATE_NORMAL_INSPECTION_NOTE = REGISTRATION.NORMAL_INSPECTION_NOTE
-CLAMP_AXIS_INSPECTION_NOTE = REGISTRATION.CLAMP_AXIS_INSPECTION_NOTE
 # The dowel engagement pays the arm's mouth break, which is tighter than the
-# title block's edge break; the part notes say the dowels locate and the
-# screws only clamp, so the callout does not repeat it (policy rule 6).
+# title block's edge break; MHA-PD-000 says the dowels locate and the screws
+# only clamp, so the callout does not repeat it (policy rule 6).
 LOCATOR_CALLOUT = (
     f"2X REAM THRU\nBREAK EDGE {PLATE.ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
 )

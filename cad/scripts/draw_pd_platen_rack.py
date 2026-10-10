@@ -105,8 +105,17 @@ def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         # swTolNONE = 0: fabricated .XX controls use the title block. Bought
         # sizes and their composite height keep part-authored parentheses.
-        if int(tolerance.Type) != 0 or int(dimension.DrivenState) != 2:
-            raise RuntimeError(f"rack size {name!r} lost its native tolerance state")
+        # Every size here is equation-owned, and an equation-owned dimension
+        # reads DrivenState 1, never 2 (build_dt_cone_gear_shaft's station
+        # ownership gate); "not a driven reference" is IsReference() False.
+        tolerance_type = int(tolerance.Type)
+        is_reference = bool(dimension.IsReference())
+        if tolerance_type != 0 or is_reference:
+            raise RuntimeError(
+                f"rack size {name!r} lost its native tolerance state "
+                f"(tolerance type {tolerance_type}, IsReference {is_reference}, "
+                f"DrivenState {int(dimension.DrivenState)})"
+            )
         reference = name in DRAWING_REFERENCE_DIMENSIONS
         if bool(display.ShowParenthesis) != reference or bool(annotation.IsDangling()):
             raise RuntimeError(f"rack size {name!r} has wrong reference state or is dangling")

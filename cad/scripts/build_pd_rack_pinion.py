@@ -249,7 +249,7 @@ async def build(adapter) -> dict[str, str]:
     ).name
     # Hidden but still selectable by name for the assembly's mates.
     blank_reference_geometry(adapter, ((gear_axis, "AXIS"),))
-    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH)
+    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
     await author_root_envelope(adapter, STOCK_PROFILE)
     set_dimension_prefix(
         adapter, "RootInspectionProfile", "RootEnvelope", "AXIS ROOT "
