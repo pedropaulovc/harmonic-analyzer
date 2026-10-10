@@ -11,7 +11,8 @@ The locked web dependency group supplies PyAV for native limited-range Y gray8;
 BGR-derived luma is not that approved original raster identity.
 --historical-diagnostic selects only the old materialized-derivative diagnostic.
 It allows private .json output only under web/.vite/verification-output or at
-resolved paths under /tmp or /var/tmp outside the whole checkout. Symlink
+resolved paths under the platform temporary directory, /tmp or /var/tmp outside
+the whole checkout. Symlink
 escapes from the private output directory are rejected; current outputs and
 immutable historical namespaces remain off-limits.
 
@@ -997,7 +998,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--observations", type=Path, required=True, help="Explicit .gz observations; historical diagnostics use their original storage")
-    parser.add_argument("--output", type=Path, required=True, help="Gzip observations; --historical-diagnostic permits private .json only under web/.vite/verification-output or resolved /tmp or /var/tmp outside the checkout")
+    parser.add_argument("--output", type=Path, required=True, help="Gzip observations; --historical-diagnostic permits private .json only under web/.vite/verification-output or resolved platform temporary-directory, /tmp or /var/tmp paths outside the checkout")
     parser.add_argument("--inventory", type=Path, help="Actual current inventory, stored as ordinary JSON; defaults to independently sealed authority")
     parser.add_argument(
         "--historical-diagnostic", action="store_true",

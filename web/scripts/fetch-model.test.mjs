@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { copyFile, cp, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -87,15 +87,30 @@ async function releaseFixture(t, editSource = null) {
   f.nativeBytes = await readFile(join(web, 'src/mechanics-data.ts'), 'utf8')
   f.native = mechanismData(f.nativeBytes)
   await writeFile(f.nativePath, f.nativeBytes)
-  // The candidate release uses the canonical source tree, not the historical
-  // geometry-provenance commit whose module identities predate this cutover.
-  for (const directory of ['scripts', 'config']) await cp(join(repository, 'cad', directory), join(f.directory, 'cad', directory), { recursive: true, filter: path => !path.split(/[\\/]/).includes('__pycache__') })
+  // Pair the released rest frames with their exact source revision before
+  // making a future release. Keep historical filenames/imports immutable.
+  const archive = join(f.directory, 'cad-source.tar')
+  execFileSync('git', ['-c', 'core.autocrlf=false', 'archive', '--format=tar', `--output=${archive}`, f.native.provenance.sourceCommit, 'cad/scripts', 'cad/config'], { cwd: repository })
+  const archivedPaths = new Set(execFileSync('tar', ['-tf', 'cad-source.tar'], { cwd: f.directory, encoding: 'utf8' }).trim().split(/\r?\n/))
+  execFileSync('tar', ['-xf', 'cad-source.tar'], { cwd: f.directory })
+  await rm(archive)
+  for (const { path, sha256 } of f.native.provenance.sourceFiles) {
+    assert.equal(digest(await readFile(join(f.directory, path))), sha256, `${path} must match the native rest-frame source revision`)
+  }
+  // The exporter reads today's pinned map outside the historical archive.
+  const identityMapPath = join(f.directory, 'cad/config/identity-migration-map.json')
+  await copyFile(join(repository, 'cad/config/identity-migration-map.json'), identityMapPath)
+  const originalPaths = new Map(Object.entries(JSON.parse(await readFile(identityMapPath, 'utf8')).file_renames).map(([original, canonical]) => [canonical, original]))
   await mkdir(join(f.webRoot, 'scripts'))
   for (const name of ['export-mechanics.py', 'native_identity_source.py', 'released-models.json', 'native-identity-map.mjs', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
   await copyFile(join(web, 'model-representation.mjs'), join(f.webRoot, 'model-representation.mjs'))
   for (const name of ['kinematics.ts', 'magnifier.ts', 'scene.ts']) await copyFile(join(web, 'src', name), join(f.webRoot, 'src', name))
   if (editSource) {
-    const path = join(f.directory, editSource.path)
+    // Resolve canonical test names exactly as CadIdentityMap.source_file does:
+    // one original/current filename must exist, never a renamed source tree.
+    const paths = [...new Set([originalPaths.get(editSource.path) ?? editSource.path, editSource.path])].filter(path => archivedPaths.has(path))
+    assert.equal(paths.length, 1, `Expected exactly one archived source for ${editSource.path}`)
+    const path = join(f.directory, paths[0])
     const before = await readFile(path, 'utf8')
     const after = before.replace(editSource.from, editSource.to)
     assert.notEqual(after, before, 'release mutation must change the native source parameter')
@@ -105,9 +120,10 @@ async function releaseFixture(t, editSource = null) {
     await writeFile(path, `${await readFile(path, 'utf8')}\n# Geometry-only panel replacement release.\n`)
   }
   execFileSync('git', ['init', '--quiet'], { cwd: f.directory })
-  execFileSync('git', ['add', 'cad'], { cwd: f.directory })
+  execFileSync('git', ['-c', 'core.autocrlf=false', 'add', 'cad'], { cwd: f.directory })
   execFileSync('git', ['-c', 'user.name=Importer fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'Approved CAD release fixture'], { cwd: f.directory })
   f.sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.directory, encoding: 'utf8' }).trim()
+  assert.notEqual(f.sourceCommit, f.native.provenance.sourceCommit)
   f.bytes = rawFixture(f.native)
   f.modelSha256 = digest(f.bytes)
   f.sourceSha256 = f.modelSha256

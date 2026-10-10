@@ -1,6 +1,6 @@
 """Consumer-visible source identity and presentation refusal boundaries."""
 import copy
-from contextlib import contextmanager, redirect_stdout
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 import importlib.util
 import gzip
 import hashlib
@@ -202,8 +202,13 @@ def write_current_record(web, video_id, record):
 
 
 @contextmanager
-def current_source_fixture(filename, video_ids, *, inventory_path=None):
-    """Execute real strict loaders/solver/gates under a temporary sealed authority."""
+def current_source_fixture(filename, video_ids, *, inventory_path=None, with_geometry=False):
+    """Run strict loaders/solver/gates with an isolated sealed authority.
+
+    Only point-motion consumers need the cached, exact approved browser GLB.
+    Each fixture closes its own cached provider before removing its web cwd,
+    including when the provider is unavailable or the test raises.
+    """
     source_root = HERE.parents[1]
     paths = set(CURRENT_BASE_PATHS)
     paths.update((Path(path).resolve().relative_to(source_root) if Path(path).is_absolute()
@@ -214,13 +219,39 @@ def current_source_fixture(filename, video_ids, *, inventory_path=None):
     inventory_sha = hashlib.sha256(inventory_bytes).hexdigest()
     approval = json.loads((HERE.parent / 'content/model-representation.json').read_bytes())
     with tempfile.TemporaryDirectory(prefix='fresh-source-generation-') as directory:
-        root = Path(directory)
+        root = Path(directory).resolve()
         web = root / 'web'
         for relative in paths:
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((source_root / relative).read_bytes())
         (web / 'node_modules').symlink_to(HERE.parent / 'node_modules', target_is_directory=True)
+        if with_geometry:
+            model = web / 'public' / approval['representation']['path']
+            model.parent.mkdir(parents=True)
+            program = r"""
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+const { assertModelRepresentationBytes } = await import(process.argv[1]);
+const { nativeProvenanceFromModule } = await import(process.argv[2]);
+const approval = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+const native = nativeProvenanceFromModule(readFileSync(process.argv[4], 'utf8'));
+const bytes = readFileSync(process.argv[5]);
+assertModelRepresentationBytes(approval, native, {
+  sha256: createHash('sha256').update(bytes).digest('hex'), byteLength: bytes.length,
+});
+writeFileSync(process.argv[6], bytes);
+"""
+            result = subprocess.run(
+                ['node', '--input-type=module', '--eval', program,
+                 (web / 'model-representation.mjs').resolve().as_uri(),
+                 (web / 'scripts/fetch-model.mjs').resolve().as_uri(),
+                 str(web / 'content/model-representation.json'), str(web / 'src/mechanics-data.ts'),
+                 str(HERE.parent / '.vite/deployment-model' / (approval['representation']['sha256'] + '.glb')),
+                 str(model)],
+                capture_output=True, text=True, encoding='utf-8', cwd=root, check=False)
+            if result.returncode:
+                raise ValueError('Approved fixture geometry unavailable: ' + result.stderr.strip())
         (web / 'content/v39-source').mkdir()
         (web / 'content/v39-source/native-inventory.json').write_bytes(inventory_bytes)
         (web / 'content/canonical-native').mkdir()
@@ -240,7 +271,13 @@ def current_source_fixture(filename, video_ids, *, inventory_path=None):
             write_current_record(web, video_id, record)
             (web / f'content/{video_id}.source-track.json').write_text('{"previous":"must survive refusal"}\n')
         module = load_script(str(web / 'scripts' / filename), 'temporary_fresh_producer')
-        yield root, module, data, paths
+        try:
+            yield root, module, data, paths
+        finally:
+            factory = module.common._point_motion_bridge
+            if factory.cache_info().currsize:
+                factory(str(web)).close()
+                factory.cache_clear()
 
 
 class ObservationStorageCommandTests(unittest.TestCase):
@@ -367,6 +404,26 @@ def ordinary_build(module, video_id, entrypoint, data=None):
 
 
 class FreshCurrentGenerationTests(unittest.TestCase):
+    def test_spring_renderer_dependency_is_executed_and_independently_registered(self):
+        relative = 'web/src/spring-culling-bounds.ts'
+        self.assertIn(relative, fresh_tracks.observations.EXECUTED_INPUTS)
+        self.assertIn(relative, fresh_tracks.EXECUTED_INPUTS)
+        evidence = load_script('canonical-native-evidence.py', 'fresh_dependency_registration')
+        self.assertIn(relative, evidence.FRESH_CONSUMER_INPUTS)
+
+    def test_fresh_executed_inputs_match_real_canonical_native_seals(self):
+        source_root = HERE.parents[1]
+        manifest = json.loads((source_root / 'web/content/canonical-native/manifest.json').read_bytes())
+        self.assertEqual(manifest['canonicalConsumerHashNormalization'], 'CRLF-to-LF')
+        seals = {row['path']: row['sha256'] for row in manifest['canonicalConsumerInputs']}
+        for path in fresh_tracks.EXECUTED_INPUTS:
+            relative = (Path(path).resolve().relative_to(source_root) if Path(path).is_absolute()
+                        else Path(path)).as_posix()
+            with self.subTest(path=relative):
+                self.assertIn(relative, seals)
+                actual = (source_root / relative).read_bytes()
+                self.assertEqual(seals[relative], hashlib.sha256(actual.replace(b'\r\n', b'\n')).hexdigest())
+
     def test_all_six_ordinary_apis_assemble_actual_fresh_records_and_publish(self):
         for filename, video_id, entrypoint in CURRENT_PRODUCERS:
             with self.subTest(video=video_id), current_source_fixture(filename, [video_id]) as (root, module, data, _):
@@ -401,7 +458,7 @@ class FreshCurrentGenerationTests(unittest.TestCase):
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const { root, track } = JSON.parse(readFileSync(0, 'utf8'));
-const fresh = await import(root + '/scripts/fresh-source-observations.mjs');
+const fresh = await import(process.argv[1]);
 const observations = await fresh.loadCurrentObservations(root, track.source.videoId);
 await fresh.validateCurrentTrackAssociation(track, observations, root);
 for (const motion of ['fixed', 'moving', null, undefined]) {
@@ -442,7 +499,8 @@ for (const change of [{ motion: 'fixed' }, { untrustedExtension: true }, { partL
 }
 """
             result = subprocess.run(
-                ['node', '--input-type=module', '--eval', program],
+                ['node', '--input-type=module', '--eval', program,
+                 (root / 'web/scripts/fresh-source-observations.mjs').resolve().as_uri()],
                 input=json.dumps({'root': str(root / 'web'), 'track': track}),
                 capture_output=True, text=True, cwd=root, check=False)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -460,7 +518,7 @@ for (const change of [{ motion: 'fixed' }, { untrustedExtension: true }, { partL
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const { root, track, cut, before, after, twoBefore } = JSON.parse(readFileSync(0, 'utf8'));
-const fresh = await import(root + '/scripts/fresh-source-observations.mjs');
+const fresh = await import(process.argv[1]);
 const observations = await fresh.loadCurrentObservations(root, track.source.videoId);
 const index = track.frames.findIndex(frame => frame.timeSeconds === cut);
 await fresh.validateCurrentTrackAssociation(track, observations, root);
@@ -504,7 +562,8 @@ await assert.rejects(fresh.validateCurrentObservations(capture, { webRoot: root 
                     write_current_record(root / 'web', video_id, record)
                     track = module.Generator(video_id, data=record).build()
                     result = subprocess.run(
-                        ['node', '--input-type=module', '--eval', program],
+                        ['node', '--input-type=module', '--eval', program,
+                         (root / 'web/scripts/fresh-source-observations.mjs').resolve().as_uri()],
                         input=json.dumps({'root': str(root / 'web'), 'track': track,
                                           'cut': cut, 'before': before, 'after': after,
                                           'twoBefore': two_before}),
@@ -520,7 +579,7 @@ await assert.rejects(fresh.validateCurrentObservations(capture, { webRoot: root 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const { root, track, time, shotId, incomingId, twoBefore, precut } = JSON.parse(readFileSync(0, 'utf8'));
-const fresh = await import(root + '/scripts/fresh-source-observations.mjs');
+const fresh = await import(process.argv[1]);
 const observations = await fresh.loadCurrentObservations(root, track.source.videoId);
 const frame = track.frames.find(frame => frame.timeSeconds === time);
 assert.equal(frame.shotId, shotId);
@@ -548,7 +607,8 @@ if (incomingId) {
 }
 """
         for filename, video_id, entrypoint, shot_id in cases:
-            with self.subTest(video=video_id), current_source_fixture(filename, [video_id]) as (root, module, _, _):
+            with self.subTest(video=video_id), current_source_fixture(
+                    filename, [video_id], with_geometry=True) as (root, module, _, _):
                 # Keep the original authored gzip bytes and authority tuple exact.
                 relative = f'content/v39-source/{video_id}.observations.json.gz'
                 original = (HERE.parent / relative).read_bytes()
@@ -594,7 +654,8 @@ if (incomingId) {
                                      'precut': precut})
                 for control in controls:
                     result = subprocess.run(
-                        ['node', '--input-type=module', '--eval', program],
+                        ['node', '--input-type=module', '--eval', program,
+                         (root / 'web/scripts/fresh-source-observations.mjs').resolve().as_uri()],
                         input=json.dumps({'root': str(root / 'web'), 'track': track, **control}),
                         capture_output=True, text=True, cwd=root, check=False)
                     self.assertEqual(result.returncode, 0, result.stderr)
@@ -881,7 +942,8 @@ if (incomingId) {
     def test_genuine_runtime_instance_anchor_keeps_template_binding_and_refuses_rest_aliases(self):
         video_id = 'jfH-NbsmvD4'
         template_path = 'ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-3'
-        with current_source_fixture('compact-operation-rocker.py', [video_id]) as (root, module, data, _):
+        with current_source_fixture(
+                'compact-operation-rocker.py', [video_id], with_geometry=True) as (root, module, data, _):
             record = data[video_id]
             anchor = record['anchors'][0]
             anchor.update(partPath=template_path + '@upper',
@@ -919,6 +981,37 @@ if (incomingId) {
                             del candidate['partLocalMetres']
                     with self.assertRaises(ValueError):
                         module.Generator(video_id, data=invalid)
+            self.assertEqual(module.common._point_motion_bridge.cache_info().currsize, 1)
+            bridge = module.common._point_motion_bridge(str(root / 'web'))
+            self.assertFalse(bridge.unavailable)
+        self.assertIsNotNone(bridge.process.poll())
+
+    def test_fixture_closes_point_motion_provider_on_available_and_unavailable_exceptions(self):
+        video_id = 'jfH-NbsmvD4'
+        template_path = 'ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-3'
+        for with_geometry in (False, True):
+            with self.subTest(with_geometry=with_geometry), self.assertRaisesRegex(
+                    RuntimeError, 'fixture exception after classification'):
+                with current_source_fixture(
+                        'compact-operation-rocker.py', [video_id],
+                        with_geometry=with_geometry) as (root, module, data, _):
+                    record = data[video_id]
+                    record['anchors'][0].update(
+                        partPath=template_path + '@upper', runtimeTemplatePartPath=template_path,
+                        correspondenceEvidence='Synthetic association to the actual runtime instance.')
+                    write_current_record(root / 'web', video_id, record)
+                    with redirect_stderr(io.StringIO()) as stderr:
+                        track = module.Generator(video_id).build()
+                    self.assertEqual(module.common._point_motion_bridge.cache_info().currsize, 1)
+                    bridge = module.common._point_motion_bridge(str(root / 'web'))
+                    self.assertEqual(bridge.unavailable, not with_geometry)
+                    self.assertIsNone(track['anchors'][0]['motion'])
+                    if not with_geometry:
+                        self.assertIn('Actual point-motion classification unavailable', stderr.getvalue())
+                    self.assertIsNone(bridge.process.poll())
+                    raise RuntimeError('fixture exception after classification')
+            self.assertIsNotNone(bridge.process.poll())
+
 
     def test_direct_data_requires_current_header_native_tuple_and_exact_camera_binding(self):
         video_id = '6dW6VYXp9HM'
@@ -1096,8 +1189,12 @@ class HistoricalObservationNamespaceTests(unittest.TestCase):
 
     def test_clis_refuse_checkout_outputs_without_consuming_runtime_inputs_or_overwriting(self):
         original = common.load_historical_observations('NAsM30MAHLg')
+        public = HERE.parent / 'public'
+        if not public.exists():
+            public.mkdir()
+            self.addCleanup(public.rmdir)
         with tempfile.TemporaryDirectory() as temporary, \
-                tempfile.TemporaryDirectory(dir=HERE.parent / 'public') as public, \
+                tempfile.TemporaryDirectory(dir=public) as public_directory, \
                 tempfile.TemporaryDirectory(dir=HERE.parent / 'src') as source, \
                 tempfile.TemporaryDirectory(dir=HERE.parent.parent / 'cad') as cad, \
                 tempfile.TemporaryDirectory(dir=HERE.parent.parent) as checkout:
@@ -1106,7 +1203,7 @@ class HistoricalObservationNamespaceTests(unittest.TestCase):
             observations.write_text(json.dumps(original))
             alias = root / 'checkout-alias'
             alias.symlink_to(HERE.parent.parent, target_is_directory=True)
-            destinations = (Path(public) / 'receipt.json', Path(source) / 'receipt.json',
+            destinations = (Path(public_directory) / 'receipt.json', Path(source) / 'receipt.json',
                             Path(checkout) / 'receipt.json', Path(cad) / 'receipt.json',
                             alias / Path(checkout).name / 'receipt.json')
             for filename in self.scripts:
@@ -1128,8 +1225,15 @@ class HistoricalObservationNamespaceTests(unittest.TestCase):
                         self.assertEqual(destination.read_bytes(), b'original receipt must survive')
 
     def test_historical_outputs_use_resolved_temp_roots_excluding_the_whole_checkout(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+        with tempfile.TemporaryDirectory(dir=Path.home()) as temporary:
+            root = Path(temporary).resolve()
+            # Fixed POSIX fallbacks must not mask failure to resolve the
+            # configured platform temp-root alias.
+            for fixed_temp in ('/tmp', '/var/tmp'):
+                self.assertFalse(root.is_relative_to(Path(fixed_temp).resolve()),
+                                 f'Alias-root fixture must be outside {fixed_temp}')
+            temp_alias = root / 'temp-alias'
+            temp_alias.symlink_to(root, target_is_directory=True)
             web = root / 'checkout/web'
             private = web / '.vite/verification-output'
             private.mkdir(parents=True)
@@ -1137,19 +1241,17 @@ class HistoricalObservationNamespaceTests(unittest.TestCase):
             external.mkdir()
             checkout_alias = root / 'checkout-alias'
             checkout_alias.symlink_to(web.parent, target_is_directory=True)
-            temp_alias = root / 'temp-alias'
-            temp_alias.symlink_to(root, target_is_directory=True)
             external_alias = root / 'external-alias'
             external_alias.symlink_to(external, target_is_directory=True)
             private_escape = private / 'escape'
             private_escape.symlink_to(external, target_is_directory=True)
 
-            def temporary_roots(value):
-                return temp_alias if str(value) in ('/tmp', '/var/tmp') else Path(value)
+            self.assertTrue(external.resolve().is_relative_to(temp_alias.resolve()))
+            self.assertFalse(external.resolve().is_relative_to(web.parent))
 
             module = load_script('fresh-source-observations.py', 'observation_namespace')
-            with patch.object(module, 'WEB', web), \
-                    patch.object(module, 'Path', temporary_roots):
+            with patch.object(module, 'WEB', web), patch.object(
+                    module.tempfile, 'gettempdir', return_value=str(temp_alias)):
                 for destination in (private / 'receipt.json', external / 'receipt.json',
                                     external_alias / 'receipt.json'):
                     module.check_namespace(destination, historical_diagnostic=True, output=True)
@@ -1228,7 +1330,7 @@ class HistoricalDiagnosticOutputBoundaryTests(unittest.TestCase):
                         destination.unlink()
 
     def test_declared_content_alias_to_external_temp_is_refused_before_any_write(self):
-        # Resolving into /tmp is not permission to write through a declared
+        # Resolving into native temporary storage is not permission to write through a declared
         # published namespace. Each real CLI must refuse before touching inputs.
         with tempfile.TemporaryDirectory(dir=HERE.parent / 'content') as content, \
                 tempfile.TemporaryDirectory() as temporary:
@@ -1253,8 +1355,10 @@ class HistoricalDiagnosticOutputBoundaryTests(unittest.TestCase):
 
     def test_analysis_cli_writes_original_historical_diagnostic_to_external_temporary_output(self):
         with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary) / 'diagnostic'
+            target = Path(temporary).resolve() / 'diagnostic'
             target.mkdir()
+            self.assertTrue(target.is_relative_to(Path(tempfile.gettempdir()).resolve()))
+            self.assertFalse(target.is_relative_to(HERE.parent.parent))
             alias = Path(temporary) / 'temporary-alias'
             alias.symlink_to(target, target_is_directory=True)
             destination = alias / 'receipt.json'

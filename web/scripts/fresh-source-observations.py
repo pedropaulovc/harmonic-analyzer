@@ -20,6 +20,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 
 WEB = Path(__file__).resolve().parents[1]
 FRESH_ROOT = WEB / "content/v39-source"
@@ -36,6 +37,7 @@ EXECUTED_INPUTS = (
     "web/src/source-witness.ts", "web/src/image-plane-homography.ts", "web/src/video-catalog.ts",
     "web/src/native-primitive-snapshot.ts", "web/src/source-assembly.ts",
     "web/src/native-target-shader-feedback.ts",
+    "web/src/spring-culling-bounds.ts",
 )
 
 _ENCODER_SPEC = importlib.util.spec_from_file_location(
@@ -72,13 +74,14 @@ def check_namespace(path, *, historical_diagnostic=False, output=False, video_id
     if historical_diagnostic and output:
         private = web / ".vite/verification-output"
         external_temp = not path.is_relative_to(web.parent) and any(
-            path.is_relative_to(Path(temp).resolve()) for temp in ("/tmp", "/var/tmp"))
+            path.is_relative_to(Path(temp).resolve())
+            for temp in (tempfile.gettempdir(), "/tmp", "/var/tmp"))
         private_escape = not path.is_relative_to(private) and any(
             parent.name == "verification-output" and parent.parent.name == ".vite"
             and parent.parent.parent.resolve() == web
             for parent in declared.parents)
         if private_escape or not (path.is_relative_to(private) or external_temp):
-            raise ValueError("Historical diagnostics require private .vite/verification-output or resolved output under /tmp or /var/tmp outside the checkout")
+            raise ValueError("Historical diagnostics require private .vite/verification-output or resolved output under the platform temporary directory, /tmp or /var/tmp outside the checkout")
 
 
 def decode_observation_bytes(raw: bytes) -> bytes:

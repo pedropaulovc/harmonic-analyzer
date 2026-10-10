@@ -90,11 +90,13 @@ async function assertDeployable(expected) {
 
 try {
   const command = process.argv[2]
-  if (process.argv.length !== 3 || !['build', 'deploy', 'preview'].includes(command)) {
-    throw new Error('Usage: node scripts/deployment.mjs build|deploy|preview')
+  if (process.argv.length !== 3 || !['fetch-model', 'build', 'deploy', 'preview'].includes(command)) {
+    throw new Error('Usage: node scripts/deployment.mjs fetch-model|build|deploy|preview')
   }
-  const expected = identity()
-  if (command === 'build') {
+  const expected = command === 'fetch-model' ? undefined : identity()
+  if (command === 'fetch-model') {
+    await verifyReleasedModel()
+  } else if (command === 'build') {
     // Original footage is a local, explicitly opt-in verification input, not a
     // deployment asset. Fail rather than accidentally publish copyrighted media.
     try {
