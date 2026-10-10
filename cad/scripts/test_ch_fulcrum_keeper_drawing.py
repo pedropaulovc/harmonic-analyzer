@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import build_ch_fulcrum_keeper as part
@@ -173,6 +174,55 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert ch_fulcrum_keeper_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
     assert "add_native_hole_callout(" in source
+
+
+def test_foot_hole_leader_routes_clear_of_the_crown_tap() -> None:
+    # Farm run r8 (HEAD c126e34b): with its text left of the plan, the
+    # foot-hole callout's leader ran across the plan at y ~229 mm and through
+    # the crown tap's end-on circle, crossing the tap callout's leader at
+    # (99.7, 229.3) mm (leader-crosses-leader).  The leaders are r8's printed
+    # ones; r8 printed the text end 5.6 mm under its position (238 -> 232.4)
+    # and the tip on the counterbore rim toward it.
+    from _layout_audit import _segment_crossing
+    from _layout_geometry import (
+        Segment,
+        point_segment_distance,
+        segment_circle_distance,
+    )
+
+    spec = ch_fulcrum_keeper_spec
+    tap_leader = Segment(0.0997, 0.2295, 0.0993, 0.2265)
+    assert _segment_crossing(Segment(0.1122, 0.2283, 0.0624, 0.2324), tap_leader)
+    x, y = drawing.FOOT_HOLE_CALLOUT_XY
+    end = (x, y - 0.0056)
+    cx, cy = drawing.HOLE_X_SHEET, drawing.TOP_CENTER[1]
+    reach = math.dist(end, (cx, cy))
+    tip = (
+        cx + drawing.CBORE_R_SHEET * (end[0] - cx) / reach,
+        cy + drawing.CBORE_R_SHEET * (end[1] - cy) / reach,
+    )
+    leader = Segment(*tip, *end)
+    assert _segment_crossing(leader, tap_leader) is None
+    tap = (drawing.TAP_X_SHEET, cy, drawing.TAP_R_SHEET)
+    assert segment_circle_distance(leader, tap) >= 0.003
+    # It leaves the plan through the bottom edge >= 3 mm from the foot-tip
+    # corner, its tip >= 3 mm under ScrewFromSide's extension on the screw
+    # axis, and the text stands right of r8's SetScrewLocation text box.
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    corner = (drawing._front_x(spec.FOOT_TIP_X), cy - spec.KEEPER_WIDTH / 2.0 * scale)
+    assert point_segment_distance(corner, leader) >= 0.003
+    assert tip[1] <= cy - 0.003
+    assert x >= 0.1082 + 0.003
+
+
+def test_the_auto_tapped_hole_note_is_removed() -> None:
+    # Farm run r8: SolidWorks' own "#1-72 Tapped Hole" note restated the tap
+    # callout's thread and its leader ran 4.07 mm through the SetScrewLocation
+    # text (leader-through-text); finalize deletes exactly that one note.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'redundant_note_substrings=("Tapped Hole",)' in source
+    assert "expected_redundant_notes=1" in source
+    assert "tapped hole" not in ch_fulcrum_keeper_spec.DRAWING_NOTES.lower()
 
 
 def test_notes_cover_the_finish_the_tap_and_the_screw() -> None:

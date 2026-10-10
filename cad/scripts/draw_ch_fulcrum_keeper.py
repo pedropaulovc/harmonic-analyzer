@@ -98,6 +98,16 @@ CBORE_R_SHEET = CBORE_DIA_MM * SHEET_SCALE[0] / 2000.0
 # The crown tap seen end-on in the plan, on the lug mid-plane (x = 0).
 TAP_X_SHEET = _front_x(0.0)
 TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
+# The foot-hole callout stands below-right of the plan, so its leader drops
+# from the text's left end to the counterbore's lower-right rim and leaves
+# the plan through its bottom edge ~6 mm in from the foot-tip corner, away
+# from the crown tap left of the hole. Text left of the plan (x 40..62 mm at
+# y 238) laid the leader across the plan at y ~229 and through the tap's
+# end-on circle, where it crossed the tap callout's leader at (99.7, 229.3)
+# mm (leader-crosses-leader, farm run r8, HEAD c126e34b). The block's left
+# end, x 126, keeps clear of the ScrewFromSide extension at y 228 above and
+# of the front view's crown stack (x <= 108) and foot below.
+FOOT_HOLE_CALLOUT_XY = (0.126, 0.202)
 # The tap is cut at the bench; its mouth is staked over the seated set screw
 # at the channel assembly (policy rule 9's lock, joint_retention), so the
 # callout says so ahead of the native size row.
@@ -229,7 +239,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=(HOLE_X_SHEET, TOP_CENTER[1] + CBORE_R_SHEET),
-        callout_xy=(0.040, 0.238),
+        callout_xy=FOOT_HOLE_CALLOUT_XY,
         label="keeper foot screw hole",
     )
     # Crown set-screw tap: the plan sees it end-on at the crown top on the
@@ -252,6 +262,12 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Fulcrum Keeper Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks pins its own "#1-72 Tapped Hole" note to the front view
+        # once the crown tap carries a hole callout; the callout already
+        # states the thread, and the note's leader ran through the
+        # SetScrewLocation text (leader-through-text, farm run r8).
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 
