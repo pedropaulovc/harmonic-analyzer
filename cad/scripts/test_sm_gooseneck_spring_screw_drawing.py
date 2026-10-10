@@ -268,14 +268,31 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     thread_half = geom.MAJOR_DIA * drawing.SHEET_SCALE[0] / 2000.0
     assert abs(drawing.THREAD_PICK[1] - drawing.SIDE_CENTER[1]) < thread_half
     assert drawing.THREAD_NOTE_XY[0] - drawing.THREAD_PICK[0] > 0.010
-    # The relief marks sit on the groove; the Ø text's left edge clears the
-    # under-head extension line and its underline stays above row 0.
+    # The relief marks sit on the groove.  The Ø text hangs right of its own
+    # dimension line (its leader meets the text's left end, so the leader
+    # runs beside the text, not through it), clear of the under-head and the
+    # tip-chamfer extension lines, below the thread silhouette and above
+    # row 0 (layout audit, farm run 20261010T190631112Z).
     for name in ("ReliefDia", "ReliefWidth"):
         assert drawing.UNDERHEAD_X < drawing.SIDE_KEEP[name][0] < drawing.RELIEF_END_X
+    assert drawing.SIDE_KEEP["ReliefDia"][0] == drawing.RELIEF_FLOOR_MID_X
     text_x, text_y = drawing.RELIEF_DIA_TEXT_XY
-    assert (text_x - drawing.RELIEF_DIA_TEXT_WIDTH / 2.0) - drawing.UNDERHEAD_X >= 0.003
+    left = text_x - drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
+    right = text_x + drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
+    assert left > drawing.RELIEF_FLOOR_MID_X > drawing.UNDERHEAD_X + 0.002
+    assert right <= drawing.THREAD_START_X - 0.002
+    text_height = 0.0035
+    thread_bottom = drawing.SIDE_CENTER[1] - thread_half
+    assert text_y + 0.001 + text_height <= thread_bottom - 0.002
     underline = text_y - drawing.RELIEF_DIA_TEXT_UNDERLINE_DROP
     assert underline - drawing.SIDE_KEEP["UnderHeadLength"][1] >= 0.010
+    # The crown rise's text stands outside, left of the apex extension line
+    # it shares with the slot depth.
+    crown_x = drawing.SIDE_KEEP["CrownRise"][0]
+    assert crown_x + drawing.CROWN_RISE_TEXT_WIDTH / 2.0 <= drawing.APEX_X - 0.002
+    assert (
+        crown_x - drawing.CROWN_RISE_TEXT_WIDTH / 2.0 > drawing.SIDE_KEEP["HeadDia"][0]
+    )
     # The relief width stands above the head so its text clears the head face.
     assert drawing.SIDE_KEEP["ReliefWidth"][1] > drawing.HEAD_TOP_Y
     # The two apex dimensions stack above the head, 12 mm apart.

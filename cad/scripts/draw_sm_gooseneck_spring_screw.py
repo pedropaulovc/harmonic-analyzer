@@ -135,6 +135,8 @@ RELIEF_FLOOR_MID_X = (_sheet_x(-RELIEF_LEAD) + RELIEF_END_X) / 2.0
 # below it).  Row 0 chains the head height and the under-head length from
 # the under-head face; row 1 carries the reference overall.
 _ROW_Y = (HEAD_TOP_Y - 0.065, HEAD_TOP_Y - 0.080)
+# ' 1.00 ' as rendered (farm run 20261010T190631112Z).
+CROWN_RISE_TEXT_WIDTH = 0.0116
 SIDE_KEEP = {
     "HeadHeight": ((APEX_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[0]),
@@ -143,8 +145,14 @@ SIDE_KEEP = {
     # crown, between the profile and the head-end view.
     "HeadDia": (APEX_X - 0.019, SIDE_CENTER[1]),
     # The crown rise and the slot depth both read from the apex, stacked
-    # above the head.
-    "CrownRise": ((APEX_X + RIM_X) / 2.0, HEAD_TOP_Y + 0.012),
+    # above the head.  The rise is too narrow for its text, so the text
+    # stands outside, left of the apex: centred between the two extension
+    # lines it sat on the slot depth's apex extension (layout audit of farm
+    # run 20261010T190631112Z, 6c56fd769).
+    "CrownRise": (
+        APEX_X - 0.003 - CROWN_RISE_TEXT_WIDTH / 2.0,
+        HEAD_TOP_Y + 0.012,
+    ),
     "SlotDepth": ((APEX_X + SLOT_FLOOR_X) / 2.0, HEAD_TOP_Y + 0.024),
     # The die relief against the under-head face.  Its width reads above it,
     # clear of the head; its Ø below it with the 45-degree lead as its
@@ -154,15 +162,19 @@ SIDE_KEEP = {
     # The tip chamfer's axial leg reads below-right of the tip.
     "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - 0.016),
 }
-# The relief Ø's text goes on an OffsetText leader so the under-head
-# extension line cannot run through the lead callout.  Width as measured on
-# MHA-DT-032's render for the same callout form (farm run 69a2f961).
-RELIEF_DIA_TEXT_WIDTH = 0.045
+# The relief Ø's text goes on an OffsetText leader, hung right of its own
+# dimension line: the leader meets the text's LEFT end, so with that end
+# right of the line the leader descends beside the text, not through it, and
+# the text stays clear of the under-head extension lines (layout audit of farm
+# run 20261010T190631112Z, 6c56fd769: the 0.20-0.40 X 45 DEG LEAD line
+# measured 54.46 wide).  Its right end stops short of the tip chamfer's
+# extension lines and the Ø line stays below the thread silhouette.
+RELIEF_DIA_TEXT_WIDTH = 0.0545
 RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
-RELIEF_DIA_TEXT_CLEARANCE = 0.0035
+RELIEF_DIA_LEADER_GAP = 0.0008
 RELIEF_DIA_TEXT_XY = (
-    UNDERHEAD_X + RELIEF_DIA_TEXT_CLEARANCE + RELIEF_DIA_TEXT_WIDTH / 2.0,
-    SIDE_CENTER[1] - 0.019,
+    RELIEF_FLOOR_MID_X + RELIEF_DIA_LEADER_GAP + RELIEF_DIA_TEXT_WIDTH / 2.0,
+    SIDE_CENTER[1] - 0.0155,
 )
 # The slot width reads right of the head-end view, left of the head Ø.
 END_KEEP = {
