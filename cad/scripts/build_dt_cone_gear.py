@@ -140,36 +140,31 @@ from dt_cone_gear_spec import (
     material_specification,
     gap_floor_deviations_mm,
 )
-from _common import (
-    OUT_PNG,
-    OUT_SLDPRT,
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound, _read_member
+from _custom_properties import apply_custom_properties
+from _dimensions import drive_dimension, name_dimensions
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _paths import OUT_PNG, OUT_SLDPRT
+from _rebuild import assert_saved_configurations_regenerate, force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    _read_member,
-    apply_custom_properties,
-    apply_material,
-    assert_saved_configurations_regenerate,
     blank_sketch,
-    check,
-    define_circle,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 # NOTE: the validating ``set_global`` comes from ``involute_gear`` -- it
 # round-trips every gear-math global through the SW equation parser to assert
-# the trig/sqr/pi dialect, which the plain ``_common.set_global`` does not do,
-# so ``_common.set_global`` is deliberately NOT imported. The self-naming
+# the trig/sqr/pi dialect, which the plain ``_dimensions.set_global`` does not do,
+# so ``_dimensions.set_global`` is deliberately NOT imported. The self-naming
 # helpers above drive only the two
 # ORDINARY circle dims (blank OD, bore); the involute tooth-gap profile is left
 # undimensioned so it stays free to re-solve from the globals and mesh.

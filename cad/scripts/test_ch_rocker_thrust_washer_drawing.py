@@ -91,11 +91,11 @@ def test_title_block_material_prints_the_ruled_sheet() -> None:
     library name "Plain Carbon Steel". The cell reads the part's "Material"
     property, which part_properties takes from the registry row's material;
     that is now the ruled 1008 CR sheet, short enough for the cell."""
-    import _common
+    import _part_properties
 
     row = _config.parts("ch-rocker-thrust-washer")
     assert row["material"] == spec.MATERIAL_TITLE
-    assert dict(_common.part_properties(part.PART_NAME))["Material"] == (
+    assert dict(_part_properties.part_properties(part.PART_NAME))["Material"] == (
         spec.MATERIAL_TITLE
     )
     assert "1008" in spec.MATERIAL_TITLE and "A1008" in spec.MATERIAL_TITLE
@@ -131,7 +131,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     (part_properties) plus, when the build calls it before saving,
     apply_drawing_properties' set; every property the drawing requires must be
     among them and non-blank."""
-    import _common
+    import _part_properties
     import _drawing_marks
 
     required = ast.literal_eval(
@@ -141,7 +141,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
             if k.arg == "required"
         )
     )
-    carried = dict(_common.part_properties(part.PART_NAME))
+    carried = dict(_part_properties.part_properties(part.PART_NAME))
     build_calls = _calls(part.__file__)
     stamp = build_calls.get("apply_drawing_properties")
     if stamp is not None:

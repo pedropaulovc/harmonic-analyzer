@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-import _common
+import _sketch
+import _sketch_rectangle
 import _config
 import _telemetry
 import build_vn_transgear_arm_plate_screw as part
@@ -155,7 +156,8 @@ def _record(monkeypatch, *, supplied: bool = False) -> list[tuple]:
     monkeypatch.setattr(recipe, "volume_check", volume_check)
     monkeypatch.setattr(recipe, "insert_helix", logger("insert_helix"))
     monkeypatch.setattr(recipe, "thread_sweep_cut", logger("thread_sweep_cut"))
-    monkeypatch.setattr(_common, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(_sketch, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(_sketch_rectangle, "add_line_chain", add_line_chain)
     monkeypatch.setattr(diag_mcmaster_lib, "no_sketch_inference", no_inference)
     monkeypatch.setattr(diag_mcmaster_lib, "offset_plane", logger("offset_plane"))
     monkeypatch.setattr(

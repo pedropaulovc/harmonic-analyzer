@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from _common import _com_invoke
+from _com import _com_invoke
 from _gtol_face import (
     SURFACE_CONE,
     SURFACE_CYLINDER,
@@ -33,7 +33,7 @@ def face_geometry(
 ) -> FaceGeometry | None:
     """Read one face's surface identity, parameters, sense and box.
 
-    Every read is one raw round trip (``_common._com_invoke``): through the
+    Every read is one raw round trip (``_com._com_invoke``): through the
     generated wrapper each returned surface cost three more (type info and a
     ``QueryInterface``) on every face a walk only steps over.  ``face`` comes
     back as given.  With ``identities``, a face whose surface is not one of

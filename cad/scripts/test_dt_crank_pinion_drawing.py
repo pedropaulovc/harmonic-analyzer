@@ -724,10 +724,10 @@ class _Seat:
 
 @pytest.fixture
 def _plain_binding(monkeypatch):
-    import _common
+    import _com
     import _gtol_face_resolve
 
-    for module in (_common, _gtol_face_resolve):
+    for module in (_com, _gtol_face_resolve):
         monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
 
 

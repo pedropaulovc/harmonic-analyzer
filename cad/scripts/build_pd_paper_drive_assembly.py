@@ -88,14 +88,11 @@ from _chain import (
     centreline_distance,
     loop_point_tangent,
 )
-from _common import (
-    IN,
-    _early_bound,
-    apply_custom_properties,
-    check,
-    log,
-    run_build,
-)
+from _check import check, log
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _paths import IN
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,

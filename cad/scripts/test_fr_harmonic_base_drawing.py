@@ -2310,15 +2310,15 @@ def test_rig_set_note_clears_the_sheet_2_callouts_table_and_views() -> None:
 
 
 def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
-    # Main (restricted review of #858): one blanking helper in _common, traced
+    # Main (restricted review of #858): one blanking helper in _sketch, traced
     # like every other per-operation helper, and no local copy in the base.
     import inspect
 
-    import _common
+    import _sketch
 
     source = inspect.getsource(part)
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
     assert "def _hide_reference_sketches" not in source
     assert source.count(blank) == 1
     assert part.REFERENCE_SKETCHES == ("HeightReference", "CrossTapReference")
-    assert hasattr(_common.blank_reference_sketches, "__wrapped__")
+    assert hasattr(_sketch.blank_reference_sketches, "__wrapped__")

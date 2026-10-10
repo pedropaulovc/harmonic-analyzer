@@ -48,7 +48,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _stock_recipe import stock_recipe  # noqa: E402
 
 import _telemetry  # noqa: E402
-from _common import check, name_last_feature, volume_check  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from vn_cone_tip_collar_spec import (  # noqa: E402
     BORE_DIA,
     EDGE_BREAK,
@@ -128,7 +134,7 @@ def socket_volume() -> float:
 
 async def _revolve_about_screw_axis(adapter, label: str, points, *, is_cut: bool):
     """Revolve a Front-plane profile about the set-screw axis (y = WIDTH/2)."""
-    from _common import add_line_chain
+    from _sketch import add_line_chain
     from solidworks_mcp.adapters.base import RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference
 
@@ -155,7 +161,9 @@ async def _revolve_about_screw_axis(adapter, label: str, points, *, is_cut: bool
 
 @stock_recipe("9414T1", threaded=False)
 async def build_9414T1(adapter, truth=None, *, cup_radius: float = SET_SCREW_CUP_RADIUS):
-    from _common import _early_bound, _feature_by_name, _read_member, add_line_chain
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
+    from _sketch import add_line_chain
     from solidworks_mcp.adapters.base import RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference
 
@@ -306,6 +314,6 @@ async def build_catalog(adapter) -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    from _common import run_build
+    from _session import run_build
 
     sys.exit(run_build(build_catalog))

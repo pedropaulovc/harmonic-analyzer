@@ -27,7 +27,10 @@ from typing import Any
 
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_common import (
     DrawingOutputs,

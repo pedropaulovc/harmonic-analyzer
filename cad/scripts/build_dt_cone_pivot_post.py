@@ -27,28 +27,23 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import (
-    CASTING_GREEN,
+from _appearance import CASTING_GREEN, apply_color, apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    apply_color,
     blank_reference_sketches,
-    apply_material,
-    check,
-    define_circle,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,

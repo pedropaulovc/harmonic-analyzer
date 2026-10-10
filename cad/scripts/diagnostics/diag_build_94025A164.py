@@ -27,11 +27,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _stock_recipe import stock_recipe  # noqa: E402
 
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     bodies,
@@ -71,7 +73,7 @@ def _strip_area(r: float, w: float) -> float:
 
 @stock_recipe("94025A164", threaded=True)
 async def build_94025A164(adapter, truth=None):
-    from _common import add_line_chain
+    from _sketch import add_line_chain  # noqa: E402 -- diagnostic path bootstrap
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     # --- revolve profile (vendor Sketch2 mapped (r, y) = (y_v, -x_v)) -----

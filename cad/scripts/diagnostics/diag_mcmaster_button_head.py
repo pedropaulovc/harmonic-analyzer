@@ -7,7 +7,13 @@ import math
 from _button_head_dimensions import BAND_DEG, CSK_DEG, ButtonHeadScrew
 
 import _telemetry  # noqa: E402
-from _common import check, name_last_feature, volume_check  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     insert_helix,
@@ -93,7 +99,9 @@ def edge_fillet_volume(d: ButtonHeadScrew) -> float:
 
 async def build_button_head(adapter, d: ButtonHeadScrew) -> None:
     """Build one button head screw of ``d``'s dimensions (the 91255A106 laws)."""
-    from _common import _early_bound, _feature_by_name, _read_member, add_line_chain
+    from _com import _early_bound, _read_member  # noqa: E402 -- diagnostic path bootstrap
+    from _feature_tree import _feature_by_name  # noqa: E402 -- diagnostic path bootstrap
+    from _sketch import add_line_chain  # noqa: E402 -- diagnostic path bootstrap
     from solidworks_mcp.adapters.base import RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
 

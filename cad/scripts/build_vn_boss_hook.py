@@ -26,7 +26,8 @@ from functools import wraps
 import math
 import sys
 
-from _common import _early_bound, _read_member, run_build
+from _com import _early_bound, _read_member
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part

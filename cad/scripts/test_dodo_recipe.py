@@ -61,10 +61,10 @@ class _FakeTask:
 def test_recipe_tracker_full_vs_refresh(tmp_path):
     dodo = _load_dodo()
     recipe = tmp_path / "build_x_assembly.py"
-    common = tmp_path / "_common.py"
+    helper = tmp_path / "_session.py"
     recipe.write_text("recipe v0\n")
-    common.write_text("common v0\n")
-    files = [str(recipe), str(common)]
+    helper.write_text("helper v0\n")
+    files = [str(recipe), str(helper)]
 
     def run(values):
         """One up-to-date evaluation: returns (up_to_date, recipe_changed, saved)."""
@@ -98,21 +98,21 @@ def test_recipe_tracker_full_vs_refresh(tmp_path):
 
 
 def test_recipe_tracker_detects_any_recipe_member(tmp_path):
-    """Editing _common.py (not just the assembly script) must trigger FULL."""
+    """Editing a shared helper (not just the assembly script) must trigger FULL."""
     dodo = _load_dodo()
     recipe = tmp_path / "build_x_assembly.py"
-    common = tmp_path / "_common.py"
+    helper = tmp_path / "_session.py"
     hook = tmp_path / "hook.py"
-    for f in (recipe, common, hook):
+    for f in (recipe, helper, hook):
         f.write_text("v0\n")
-    files = [str(recipe), str(common), str(hook)]
+    files = [str(recipe), str(helper), str(hook)]
 
     tracker = dodo._RecipeTracker("x", files)
     task = _FakeTask()
     tracker(task, {})
     saved = task.saved()
 
-    for member in (recipe, common, hook):
+    for member in (recipe, helper, hook):
         member.write_text("v1\n")
         t2 = _FakeTask()
         up = dodo._RecipeTracker("x", files)(t2, saved)
@@ -229,9 +229,12 @@ def test_drawing_reading_a_foreign_part_row_carries_that_row(tmp_path):
 # to the own row for a drawing on exactly this premise; a new dynamic reader
 # must be reviewed here, or the narrowing would hide a foreign row edit.
 _DRAWING_OWN_ROW_READERS = {
-    # part_properties(name) / save_part_and_images(adapter, name): the name
-    # arrives from a caller, pinned below to build_<own part>.py's PART_NAME.
-    "_common.py",
+    # part_properties(name): the name arrives from a caller, pinned below to
+    # build_<own part>.py's PART_NAME.
+    "_part_properties.py",
+    # save_part_and_images(adapter, name) forwards to part_properties(name):
+    # the same caller-supplied part name, not a foreign registry row.
+    "_part_save.py",
     # apply_drawing_properties(adapter, name): same callers, same pin.
     "_drawing_marks.py",
     # _config.parts(stock.part_name) after the source identity check
@@ -1480,7 +1483,7 @@ def test_seat_part_order_diverges_across_seats(monkeypatch):
 
 def test_com_seat_acquires_sets_env_and_releases(tmp_path, monkeypatch):
     """``_com_seat`` acquires the machine-global file lock, marks the seat held via
-    HARMONIC_COM_SEAT (inherited by the COM subprocess -> _common's tripwire), and
+    HARMONIC_COM_SEAT (inherited by the COM subprocess -> _com's tripwire), and
     releases both on exit. Lock path is overridable so the test never touches the
     real %PROGRAMDATA% lock."""
     monkeypatch.setenv("HARMONIC_COM_LOCK", str(tmp_path / "seat.lock"))
@@ -3233,7 +3236,7 @@ def test_every_title_block_reader_is_classified() -> None:
     # (drawing tasks always keep the token), or a geometry reader in the set.
     import _buildgraph
 
-    stampers = {"_config", "_common", "_assembly"}  # the accessor and TOL_* stamping
+    stampers = {"_config", "_part_properties", "_assembly"}  # accessor and TOL_* stamping
     readers = {
         path.stem
         for path in (REPO_ROOT / "cad" / "scripts").glob("*.py")

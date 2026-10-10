@@ -40,30 +40,22 @@ import math
 import sys
 
 import _config
-from _common import (
-    PANEL_BLACK,
-    SketchDims,
-    _early_bound,
-    _read_member,
+from _appearance import PANEL_BLACK, apply_color, apply_material
+from _check import check
+from _com import _early_bound, _read_member
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import (
     active_configuration_name,
-    add_line_chain,
-    apply_color,
-    apply_material,
     assert_saved_configurations_regenerate,
-    check,
-    define_circle,
-    define_rectilinear_chain,
-    drive_dimension,
-    ensure_fully_defined,
     force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
 )
+from _session import run_build
+from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from _configuration_material import require_material_in_every_configuration
 from _drawing_marks import set_dimension_symmetric_tolerance
 from _grouped_bom_properties import apply_grouped_bom_properties

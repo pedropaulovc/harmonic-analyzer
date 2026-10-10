@@ -34,23 +34,16 @@ import math
 import sys
 
 import _telemetry
-from _common import (
-    SketchDims,
-    _early_bound,
-    _read_member,
-    apply_material,
-    check,
-    define_circle,
-    drive_dimension,
-    ensure_fully_defined,
-    feature_name_by_type,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    set_global,
-)
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound, _read_member
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import feature_name_by_type, name_last_feature
+from _part_checks import report_mass_properties
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, ensure_fully_defined
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,

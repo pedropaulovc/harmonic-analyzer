@@ -37,7 +37,7 @@ from _buildgraph import (  # noqa: E402
     stamps_title_block_properties,
 )
 from _assembly import assembly_title_properties  # noqa: E402
-from _common import part_properties  # noqa: E402
+from _part_properties import part_properties  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -1364,19 +1364,19 @@ def test_top_references_subassemblies_and_loose_parts():
 
 def test_leaf_parts_do_not_depend_on_assembly_helpers():
     """A leaf part must NOT pull in _assembly/_transforms -- the whole point of
-    splitting them out of _common is that assembly-only edits skip every part."""
+    keeping them separate from _session means assembly-only edits skip every part."""
     for stem in part_stems():
         helpers = _helper_names(f"build_{stem}.py")
         assert "_assembly" not in helpers, f"{stem} wrongly depends on _assembly"
         assert "_transforms" not in helpers, f"{stem} wrongly depends on _transforms"
-        assert "_common" in helpers, f"{stem} lost its _common dependency"
+        assert "_session" in helpers, f"{stem} lost its _session dependency"
 
 
 def test_assemblies_depend_on_assembly_helpers():
-    """Every assembly imports _assembly (mates/placement) and _common."""
+    """Every assembly imports _assembly (mates/placement) and _session."""
     for stem in ASSEMBLY_ORDER:
         helpers = _helper_names(script_for(stem).name)
-        assert {"_assembly", "_common"} <= helpers, f"{stem}: {helpers}"
+        assert {"_assembly", "_session"} <= helpers, f"{stem}: {helpers}"
 
 
 @pytest.mark.parametrize(
@@ -1598,10 +1598,10 @@ def test_part_builders_reach_no_other_part_builder():
 
 def test_module_deps_are_transitive():
     """The closure follows imports through helper chains: a chain-link part pulls
-    _chain_link -> _chain -> _common, and _config arrives via _common's lazy
-    import (so parts.yaml-driven custom properties stay correctly tracked)."""
+    _chain_link -> _part_save -> _part_properties, and _config arrives via
+    _part_properties' lazy import (registry-driven properties stay tracked)."""
     links = _helper_names("build_vn_chain_inner_link.py")
-    assert {"_chain_link", "_chain", "_common"} <= links, links
+    assert {"_chain_link", "_chain", "_part_save", "_part_properties"} <= links, links
     assert "_config" in _helper_names("build_vn_cone_tip_collar.py"), (
         "lazy _config edge lost"
     )
@@ -1695,7 +1695,7 @@ def test_config_files_track_real_reads():
     a gear reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY, so a
     machine channels.active_count edit (machine/channels.yaml) skips it -- the
     original problem. The channel/drive-train assemblies read channels.yaml
-    (amplitudes/cone_teeth); every part needs the parts registry via _common."""
+    (amplitudes/cone_teeth); every part needs the registry via _part_properties."""
     cone = config_files_of(SCRIPTS_DIR / "build_dt_cone_gear.py")
     assert "machine/gear_train.yaml" in cone
     assert "machine/channels.yaml" not in cone, (
@@ -1997,17 +1997,18 @@ def test_part_and_title_property_stampers_are_distinct():
 
 
 def test_git_executable_is_resolved_absolute(tmp_path, monkeypatch):
-    import _common
+    import _source_identity
+    import shutil
 
     discovered = tmp_path / "bin" / "git"
-    monkeypatch.setattr(_common.shutil, "which", lambda command: str(discovered))
-    _common._git_executable.cache_clear()
+    monkeypatch.setattr(shutil, "which", lambda command: str(discovered))
+    _source_identity._git_executable.cache_clear()
     try:
-        executable = Path(_common._git_executable())
+        executable = Path(_source_identity._git_executable())
         assert executable == discovered.resolve()
         assert executable.is_absolute()
     finally:
-        _common._git_executable.cache_clear()
+        _source_identity._git_executable.cache_clear()
 
 
 def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
@@ -2023,7 +2024,9 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
     import os
     import subprocess
 
-    import _common
+    import _source_identity
+    import _paths
+    import _session
     import _config
 
     # Never execute a developer's hooks, filters, signer, or filesystem monitor.
@@ -2038,7 +2041,7 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
 
     def git(cwd, *args: str) -> str:
         return subprocess.run(
-            [_common._git_executable(), *args],
+            [_source_identity._git_executable(), *args],
             cwd=str(cwd),
             capture_output=True,
             text=True,
@@ -2068,16 +2071,20 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
 
     monkeypatch.setattr(_config, "release_revision", lambda: "v9")
 
-    monkeypatch.setattr(_common, "CAD_ROOT", origin)
-    full_id = _common._build_id()
-    monkeypatch.setattr(_common, "CAD_ROOT", leaf)
-    leaf_id = _common._build_id()
+    monkeypatch.setattr(_source_identity, "CAD_ROOT", origin)
+    monkeypatch.setattr(_paths, "CAD_ROOT", origin)
+    monkeypatch.setattr(_session, "CAD_ROOT", origin)
+    full_id = _source_identity._build_id()
+    monkeypatch.setattr(_source_identity, "CAD_ROOT", leaf)
+    monkeypatch.setattr(_paths, "CAD_ROOT", leaf)
+    monkeypatch.setattr(_session, "CAD_ROOT", leaf)
+    leaf_id = _source_identity._build_id()
 
     assert full_id == leaf_id == "v9"
 
     git(leaf, "config", "status.showUntrackedFiles", "no")
     (leaf / "uncommitted.txt").write_text("operator edit\n", encoding="utf-8")
-    assert _common._build_id() == "v9-dirty"
+    assert _source_identity._build_id() == "v9-dirty"
 
 
 def test_build_id_translates_a_failed_dirty_probe(monkeypatch):
@@ -2085,7 +2092,7 @@ def test_build_id_translates_a_failed_dirty_probe(monkeypatch):
 
     import pytest
 
-    import _common
+    import _source_identity
 
     def fake_run(command, **_kwargs):
         raise subprocess.CalledProcessError(128, command, stderr="not a git repo")
@@ -2094,7 +2101,7 @@ def test_build_id_translates_a_failed_dirty_probe(monkeypatch):
     with pytest.raises(
         RuntimeError, match="cannot determine Git working-tree state"
     ) as error:
-        _common._build_id()
+        _source_identity._build_id()
     assert isinstance(error.value.__cause__, subprocess.CalledProcessError)
 
 

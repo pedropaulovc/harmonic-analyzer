@@ -17,7 +17,7 @@ because live SW 2026 constrains imported datum positions and interprets
 imported FCF leader endpoints in model space (probed 2026-07-29,
 ``diagnostics/probe_pmi_plain_annotations.py``).
 
-Part tier only: imports ``_common`` + the focused GD&T contracts and face
+Part tier only: imports ``_com`` + the focused GD&T contracts and face
 resolver + the adapter — never a drawing or assembly module (``check:partiso``).
 """
 
@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 import _telemetry
-from _common import _early_bound
+from _com import _early_bound
 from _gtol_controls import GeometricControl, PartDatum, validate_part_pmi
 from _gtol_face import FaceSpec
 from _gtol_face_read import face_geometry
