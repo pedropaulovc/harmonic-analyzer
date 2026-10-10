@@ -212,7 +212,8 @@ WORST_SLIT_MOUTH_WEB_MM = (
 WORST_SCREW_ENVELOPE_GAP_MM = (
     _worst_rise - _pinch_major_radius - _adjuster_major_radius
 )
-# PinchHeight keeps .XX for this ligament: at .X it closes at 1.92.
+# PinchHeight keeps .XX for this ligament: its 46.95 sits on a .X rounding
+# tie, and printed up to 47.0 the ligament closes at 1.92.
 WORST_TOP_LIGAMENT_MM = (
     _height_limits[0]
     - _pinch_limits[1]
@@ -489,8 +490,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places carry the general tolerance and therefore live on the model.
 # U24b: the webs close at the title-block bands.  Still .XX: the pinch-hole
-# height (the top ligament closes at 1.92 at .X) and the slit width (the
-# drill-to-slot point reaches past the far jaw's tap drill at .X).  2026-09-29:
+# height (the top ligament closes at 1.92 at .X if 46.95 prints 47.0) and the
+# slit width (the drill-to-slot point reaches past the far jaw's tap drill at .X).  2026-09-29:
 # with the block fixed by its hold-down, the depth and the passage centre
 # print .XXX (the embed window, the collar-to-block air and the lateral
 # stack; build_dt_drive_train_assembly proves each looser grade fails), and the

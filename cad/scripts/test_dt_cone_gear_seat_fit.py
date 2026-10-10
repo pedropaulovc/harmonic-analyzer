@@ -240,7 +240,7 @@ def test_clock_bound_stays_in_first_connected_width_component() -> None:
         return radius+offset*math.cos(theta)+chord*abs(math.sin(theta))
     assert width(bound-1e-6) < bore
     assert width(bound+1e-6) > bore
-    assert width(math.pi) == pytest.approx(af)
+    assert width(0.0) == pytest.approx(af)  # home: the D's own across-flat
     assert bound < math.acos(offset/radius)
     assert connected_home_clock_angle_bound_rad(
         (4,4),(af,af),(4,4),edge_break_mm=0.0,

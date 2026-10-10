@@ -89,14 +89,18 @@ PNG = OUTPUTS.png
 # bottom view under the front view carries the tap.
 SHEET_SCALE = (2.0, 1.0)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
-FRONT_CENTER = (0.072, 0.129)
-TOP_CENTER = (FRONT_CENTER[0], 0.222)
-BOTTOM_CENTER = (FRONT_CENTER[0], 0.040)
+# The 52.66 block (38.100 common cone-axis height) prints 105 mm tall: the
+# front row rises 3 mm and everything above it 7.8 mm over the 47.93 block's
+# layout, so every gap above the row keeps its measured air, and the bottom
+# view drops 1.8 mm.
+FRONT_CENTER = (0.072, 0.132)
+TOP_CENTER = (FRONT_CENTER[0], 0.2298)
+BOTTOM_CENTER = (FRONT_CENTER[0], 0.0382)
 # The right view and the removed views B and C stand on the front view's
 # projection row; their x follows from the adjuster callout between the front
 # and right views (RIGHT_CENTER, below), and section A-A rides above them.
-# The 2:1 isometric (41 x 102 mm) stands right of VIEW C, past its top.
-ISO_CENTER = (0.365, 0.215)
+# The 2:1 isometric (38 x 108 mm) stands right of VIEW C, past its top.
+ISO_CENTER = (0.365, 0.209)
 # Every view centres on the prism, whose centre is the model origin.
 Z_NORTH = BLOCK_Z / 2.0
 Z_SOUTH = -BLOCK_Z / 2.0
@@ -195,7 +199,7 @@ BACK_CENTER = (RIGHT_CENTER[0] + 2.0 * VIEW_ROW_PITCH, FRONT_CENTER[1])
 # its "SECTION A-A / SCALE 2:1" label under the view (SECTION_LABEL_BOX), so
 # the section rides high enough that the label keeps its air over the pinch
 # clearance callout above the right view.
-SECTION_CENTER = (RIGHT_CENTER[0] + 0.019, 0.240)
+SECTION_CENTER = (RIGHT_CENTER[0] + 0.019, 0.2478)
 # The 1.2 slot prints 2.4 mm wide, narrower than its value, so the arrows
 # stand outside the slot walls and the text sits right of the right arrow's
 # tail on the extended dimension line.  Right, because on the adjuster
@@ -337,12 +341,12 @@ DIMENSION_CALLOUTS = {
 # reaches 3.5 mm past the hole centre: its leader drops from the shoulder's
 # right end to the hole, right of the hole-centre witness and the line's
 # arrow, and SECTION A-A stands high enough for its label to clear the text.
-PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] + 0.0035 - 0.0264, 0.1935)
+PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] + 0.0035 - 0.0264, 0.2013)
 # The pinch thread callout stands above VIEW B, its shoulder's left end far
 # enough right of the hole that the leader drops steeply through the 2:1
 # view's top (16 mm right of centre ran 4.2 mm longer than the hole's
 # shortest approach; so did 19 mm once the prism's depth fell to 9.75).
-PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.015, 0.190)
+PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.015, 0.1978)
 # The hold-down tap's callout stands above the bottom view, right of the
 # FootTapX value and under the front view's Width line, so its leader drops
 # steeply through the view's north edge.  With the tap 1.00 toward -X

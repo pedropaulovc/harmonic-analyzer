@@ -133,7 +133,8 @@ def test_current_manufacturing_plan_tracks_post_geometry_without_changing_toolin
     assert head_face["to_z"] == spec.BLOCK_HEIGHT
     incline = math.radians(_config.machine("cone_incline", "derived_incline_deg"))
     journal = plan["frames"]["J3"]
-    assert journal["origin"] == [0.0, spec.BORE_HEIGHT, 0.0]
+    # 1.5 in: the plan's 38.1 and the spec's 1.5 * 25.4 differ in the last bit.
+    assert journal["origin"] == pytest.approx([0.0, spec.BORE_HEIGHT, 0.0], abs=1e-9)
     assert journal["x"] == pytest.approx([math.cos(incline), 0.0, -math.sin(incline)])
     assert journal["z"] == pytest.approx([-math.sin(incline), 0.0, -math.cos(incline)])
     assert plan["frames"]["C4"]["origin"] == [

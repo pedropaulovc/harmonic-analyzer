@@ -107,7 +107,6 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # Park on the configured level line of centres, with the specified tip
     # gap. Axially the back drum face is leaf D off the configured bank datum;
     # the original drum-to-arbor bond station and head centre stay local.
-    module_mm = 25.4 / _config.machine("gear_train", "diametral_pitch")
     expected_arbor_z = (
         rig.G19_BACK_FACE_Z
         + rig.RIG_SET_LEAF_D
@@ -115,10 +114,15 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
         - arbor_geometry.DRUM_FRONT_Z_AS_BUILT
         - arbor_geometry.DRUM_AFT_SHIFT
     )
+    # The level line of centres parks the stock-cutter tips (each part's
+    # OUTSIDE_DIA, below the ideal (N + 2)/DP) the configured gap apart.
+    import dt_alignment_pinion_spec
+    import dt_cylinder_gear_spec
+
     expected_axis = (
         park.X_DRUM
-        + (int(_config.machine("gear_train", "cylinder_teeth")) + 2) * module_mm / 2.0
-        + (int(_config.machine("alignment_pinion", "teeth")) + 2) * module_mm / 2.0
+        + dt_cylinder_gear_spec.OUTSIDE_DIA / 2.0
+        + dt_alignment_pinion_spec.OUTSIDE_DIA / 2.0
         + _config.machine("alignment_pinion", "disengaged_tip_gap_mm"),
         park.Y_DRIVE,
         expected_arbor_z - (9.0 / 2.0 + 2.0),

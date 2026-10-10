@@ -69,21 +69,23 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)  # 49.718 mm tall; 2:1 keeps the strap and bore legible
+SHEET_SCALE = (2.0, 1.0)  # 55.45 mm tall; 2:1 keeps the strap and bore legible
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
-# The part spans model y 0 (foot seat) to 49.718 (dome top); centre the front
+# The part spans model y 0 (foot seat) to 55.45 (dome top); centre the front
 # elevation on that midpoint. Third-angle projection keeps the plan aligned
 # above the elevation; the isometric balances the aligned group from the
 # right. The elevation sits low so the 28-deep plan (56 on the sheet) clears
 # the crown band and still leaves a callout lane above itself under the
-# sheet border: lateral-location lane 0.055, elevation 0.065..0.165, crown
-# text ~0.173, foot-width lane 0.180, plan 0.186..0.242, hole lateral lane
-# 0.250, hold-down hole callout 0.254.
+# sheet border: lateral-location lane 0.045, elevation 0.055..0.165, crown
+# text ~0.173, foot-width lane 0.183, plan 0.186..0.242, hole lateral lane
+# 0.250, hold-down hole callout 0.254. The 44.45 common cone-axis bore
+# height grew the elevation 9.5 mm on the sheet; it grows downward, so the
+# crown-to-plan band the apex tap callout sits in keeps its height.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
-FRONT_CENTER = (0.115, 0.115)
+FRONT_CENTER = (0.115, 0.110)
 TOP_CENTER = (FRONT_CENTER[0], 0.214)
 ISO_CENTER = (0.325, 0.155)
 
