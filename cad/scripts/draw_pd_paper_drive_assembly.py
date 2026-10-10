@@ -496,8 +496,8 @@ TRANSGEAR_INSTANCES = frozenset(
 # is named by its model geometry, as the disc hub's perpendicularity frames
 # name theirs: the circle on the collar's axis at z LENGTH, r OD/2, from the
 # edges the view lists for the collar. The rear slot (along local X) splits
-# it into a +Y and a -Y arc; the -Y arc holds the landing. That arc's middle,
-# (0, -r), projects onto the line's bottom end, and the leader lands
+# it into a +Y and a -Y arc; the -Y arc holds the landing. That arc's
+# assembly-aligned bottom point projects onto the line's bottom end, and the leader lands
 # COLLAR_RIM_END_INSET up from it: a leader re-solved to the line's nearer
 # end, as run 20261002T160324403Z's was, stays 0.05 mm away at 1:2. The
 # landing is 0.23 mm below the drive-pin hole's edge on the same line and
@@ -509,11 +509,35 @@ COLLAR_RIM_RADIUS = collar.OD / 2.0
 COLLAR_RIM_Z = collar.LENGTH
 COLLAR_RIM_END_INSET = 0.1
 COLLAR_LANDING_Y = COLLAR_RIM_END_INSET - COLLAR_RIM_RADIUS
-# Collar-local mm: (-1.319, -8.650, 4.000).
-COLLAR_LANDING_MM = (
-    -math.sqrt(COLLAR_RIM_RADIUS**2 - COLLAR_LANDING_Y**2),
-    COLLAR_LANDING_Y,
-    COLLAR_RIM_Z,
+# The assembly spins the collar with the knob front stack by
+# FRONT_STACK_PHASE_DEG (-3) about its axis. The inner view looks along the
+# assembly's X, so the rim's line ends and its edge-on witnesses are the
+# assembly-aligned +/-Y and +/-X points, and the landing is placed in that
+# frame. Run 10 projected the collar-LOCAL +X point instead: r sin 3 deg =
+# 0.458 mm off the line's midpoint, 0.153 mm on the 1:3 sheet.
+COLLAR_SPIN_RAD = math.radians(knob_shaft.FRONT_STACK_PHASE_DEG)
+
+
+def _collar_local(x_mm: float, y_mm: float) -> tuple[float, float, float]:
+    """An assembly-aligned point on the rear-rim plane, in collar-local mm."""
+    c, s = math.cos(COLLAR_SPIN_RAD), math.sin(COLLAR_SPIN_RAD)
+    return (x_mm * c + y_mm * s, -x_mm * s + y_mm * c, COLLAR_RIM_Z)
+
+
+# Collar-local mm, in order: the -Y end, the +Y end, the +X point, the -X point.
+COLLAR_RIM_VIEW_POINTS_MM = tuple(
+    _collar_local(x, y)
+    for x, y in (
+        (0.0, -COLLAR_RIM_RADIUS),
+        (0.0, COLLAR_RIM_RADIUS),
+        (COLLAR_RIM_RADIUS, 0.0),
+        (-COLLAR_RIM_RADIUS, 0.0),
+    )
+)
+# View frame (-1.319, -8.650) -> collar-local mm (-0.865, -8.707, 6.200),
+# 0.72 mm outside the lower drive-pin hole.
+COLLAR_LANDING_MM = _collar_local(
+    -math.sqrt(COLLAR_RIM_RADIUS**2 - COLLAR_LANDING_Y**2), COLLAR_LANDING_Y
 )
 # A listed circle is the rim within these of its modelled centre and radius,
 # its axis along the collar's (both senses), and the arc holding the landing
@@ -1820,14 +1844,16 @@ def _balloon_collar_on_its_rear_rim(
         leaves, COLLAR_STEM, BalloonAnchor(instance=COLLAR_INSTANCE), label=label
     )[0]
     offsets = _view_explode_offsets(adapter, view, label=label)
-    r_m, z_m = COLLAR_RIM_RADIUS / 1000.0, COLLAR_RIM_Z / 1000.0
     minus_end, plus_end, plus_x, minus_x = model_points_in_view(
         adapter,
         view,
         _anchor_model_points(
             adapter,
             leaf,
-            ((0.0, -r_m, z_m), (0.0, r_m, z_m), (r_m, 0.0, z_m), (-r_m, 0.0, z_m)),
+            tuple(
+                tuple(value / 1000.0 for value in point)
+                for point in COLLAR_RIM_VIEW_POINTS_MM
+            ),
             offsets,
             stem=COLLAR_STEM,
             label=label,

@@ -395,17 +395,39 @@ def test_the_collar_leader_lands_on_its_rear_rim_beside_the_lower_end() -> None:
     radius = collar.OD / 2.0
     assert math.hypot(x, y) == pytest.approx(radius, abs=1e-9)
     assert z == pytest.approx(collar.LENGTH)
-    assert -y > collar.PIN_CIRCLE_RADIUS + collar.PIN_HOLE_DIA / 2.0
+    pin_gap = math.dist((x, y), (0.0, -collar.PIN_CIRCLE_RADIUS)) - collar.PIN_HOLE_DIA / 2.0
+    assert pin_gap > 0.5
+    # The rear slot along local X splits the rim: the landing stays on the -Y arc.
+    assert abs(math.degrees(math.atan2(x, -y))) < 30.0
     # Green run 20261001T172013211Z's 1:2 rear-rim line, -Y end to +Y end.
     minus_end, plus_end = (0.21852, 0.171822), (0.21852, 0.180572)
     landing = drawing.collar_rim_landing(minus_end, plus_end)
     assert landing[0] == pytest.approx(0.21852)
-    assert landing[1] - minus_end[1] == pytest.approx((radius + y) / 2.0 / 1000.0)
+    view_y = drawing.COLLAR_LANDING_Y
+    assert landing[1] - minus_end[1] == pytest.approx((radius + view_y) / 2.0 / 1000.0)
     largest_scale = max(num / den for num, den in drawing.INNER_SCALE_LADDER)
-    end_gap_m = (radius + y) * largest_scale / 1000.0
+    end_gap_m = (radius + view_y) * largest_scale / 1000.0
     assert end_gap_m < _drawing_common._BALLOON_LANDING_TOLERANCE_M / 2.0
     # Below the axis is away from the feed sleeve: its stud stands above the knob.
     assert assembly.STUD_XY[1] > assembly.KNOB_SHAFT_XY[1]
+
+
+def test_the_collar_rim_points_follow_the_front_stack_spin() -> None:
+    # Run 10: the collar is spun -3 deg with the knob front stack, so its
+    # LOCAL +X point sat r sin 3 deg off the edge-on line's midpoint.
+    assert assembly.THIRD_PHASE_DEG == knob_shaft.FRONT_STACK_PHASE_DEG
+    spin = math.radians(assembly.THIRD_PHASE_DEG)
+    rows = ((math.cos(spin), -math.sin(spin)), (math.sin(spin), math.cos(spin)))
+    radius = collar.OD / 2.0
+    view_frame = [
+        (rows[0][0] * x + rows[0][1] * y, rows[1][0] * x + rows[1][1] * y)
+        for x, y, _z in drawing.COLLAR_RIM_VIEW_POINTS_MM
+    ]
+    expected = [(0.0, -radius), (0.0, radius), (radius, 0.0), (-radius, 0.0)]
+    for got, want in zip(view_frame, expected, strict=True):
+        assert got == pytest.approx(want, abs=1e-12)
+    x, y, _z = drawing.COLLAR_LANDING_MM
+    assert rows[1][0] * x + rows[1][1] * y == pytest.approx(drawing.COLLAR_LANDING_Y)
 
 
 def _circle(

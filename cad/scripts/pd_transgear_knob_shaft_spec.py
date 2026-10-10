@@ -174,6 +174,15 @@ WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
 FACE_WIDTH = 5.9
 FACE_WIDTH_PLACES = 3
 GAP_AZIMUTH_DEG = 180.0 / TEETH
+# The assembly spins the shaft and its whole mounted front stack (collar,
+# drive pins, wheel) about K so a 12T gap faces the reducer disc's tooth on
+# the K -> S line (azimuth 180 + MESH_ANGLE_DEG from K): the nearest
+# representative modulo one tooth pitch. The assembly drawing reads it to
+# find the collar's rim seen edge-on.
+_TOOTH_PITCH_DEG = 360.0 / TEETH
+FRONT_STACK_PHASE_DEG = (180.0 + DISC.MESH_ANGLE_DEG - GAP_AZIMUTH_DEG) % _TOOTH_PITCH_DEG
+if FRONT_STACK_PHASE_DEG > _TOOTH_PITCH_DEG / 2.0:
+    FRONT_STACK_PHASE_DEG -= _TOOTH_PITCH_DEG
 # --- #8-32 stud: passes the true D-bore, including its flat ------------------
 THREAD = "#8-32"
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
