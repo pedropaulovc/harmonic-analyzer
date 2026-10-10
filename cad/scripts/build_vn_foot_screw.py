@@ -7,6 +7,7 @@ import sys
 from _common import PANEL_BLACK, run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_90280A108 import build_90280A108
 
 PART_NAME = "vn-foot-screw"
@@ -26,6 +27,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         color=PANEL_BLACK,
     )
 

@@ -733,6 +733,34 @@ fail a build):
   event is recorded with `drift_expected: true` + a `drift_reason` and logged at
   debug — the `WARN` keeps meaning "a publishing seat drifted".
 
+## File-granular recipe helpers
+
+`_buildgraph.module_deps_of()` follows local imports anywhere in a Python file;
+moving an import into a function does not narrow a recipe's cache key. Keep
+unrelated recipe data and save machinery in separate, statically imported files.
+
+Stock fasteners declare their SKU and modeled-thread contract beside each
+`diagnostics/diag_build_<SKU>.py` callable with `_stock_recipe.stock_recipe`.
+There is no shared SKU-to-recipe registry: a production builder imports its own
+callable, and `_stock_fastener` validates that callable's declaration and identity.
+Only threaded builders import `_simplified_part.save_simplified_part` and pass it
+as `save_threaded_part`; the shared stock save still checks the declared thread
+against the actual `ThreadGroove` feature before either save path runs.
+
+Simplified configuration helpers are separated by their real consumers:
+`_simplified_names` is naming only, `_simplified_identity` fingerprints assembly
+components, `_simplified_bom` is the pure child BOM-number policy needed by part
+derivation, and `_simplified_part` derives and saves part configurations.
+Drawings and assemblies do not import the part-side machinery.
+Vendor dimensions belong in pure per-SKU helpers imported by both the recipe and
+the spec, never in a family table or recipe module imported by unrelated specs.
+Shared parameterized geometry belongs in its own helper (for example
+`_shoulder_screw_geometry`), not in another SKU's decorated recipe module.
+Assemblies and drawings read dimensions from specs or these pure providers, not
+from part builders. `_platen_rack_geometry` owns the shared rack section;
+`_cone_gear_geometry` and `_cone_gear_readback` share cone calculations and saved
+topology checks without importing cone-part derivation.
+
 ## Fine-grained config deps
 
 Each part/assembly depends on ONLY the `cad/config` files it actually reads,

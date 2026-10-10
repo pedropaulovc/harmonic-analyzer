@@ -60,6 +60,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 from _common import (  # noqa: E402
     add_line_chain,
     check,
@@ -75,26 +77,28 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     replica_main,
     thread_sweep_cut,
 )
+from _mcmaster_91794a055 import (  # noqa: E402
+    HEAD_DIA,
+    HEAD_H,
+    PITCH,
+    SHANK_DIA,
+    SHANK_LEN,
+    SKU,
+)
 from vn_transgear_disc_screw_spec import (  # noqa: E402
     CUTTER_CENTRE_PAST_TIP,
     CUTTER_TOP_W,
     DOME_H,
     DOME_R,
     HEAD_BAND,
-    HEAD_DIA,
     HEAD_FILLET_R,
-    HEAD_H,
     HELIX_REVS,
     NECK_DIA,
     NECK_LEN,
-    PITCH,
     ROOT_DIA,
     ROOT_FLAT,
     RUNOUT_DIA,
     RUNOUT_DRAFT_DEG,
-    SHANK_DIA,
-    SHANK_LEN,
-    SKU,
     SLOT_DEPTH,
     SLOT_FILLET_R,
     SLOT_WIDTH,
@@ -152,6 +156,7 @@ def revolved_volume(
     )
 
 
+@stock_recipe("91794A055", threaded=True)
 async def build_91794A055(
     adapter,
     truth=None,

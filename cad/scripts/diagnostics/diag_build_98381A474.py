@@ -19,17 +19,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
+from _mcmaster_98381a474 import DOWEL_SIZE, ENDS  # noqa: E402
 from diagnostics.diag_mcmaster_dowel import build_catalog, build_dowel  # noqa: E402
 
 PART_NO = "98381A474"
 
 
+@stock_recipe("98381A474", threaded=False)
 async def build_98381A474(adapter, truth=None):
-    await build_dowel(adapter, PART_NO)
+    await build_dowel(adapter, PART_NO, DOWEL_SIZE, ENDS)
 
 
 async def _catalog(adapter) -> dict[str, str]:
-    return await build_catalog(adapter, PART_NO)
+    return await build_catalog(adapter, PART_NO, DOWEL_SIZE, ENDS)
 
 
 if __name__ == "__main__":

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import Any
 
 import _telemetry
@@ -21,172 +20,17 @@ from _common import (
     report_mass_properties,
     save_part_and_images,
 )
-from _drawing_simplified import save_simplified_part
+from _stock_recipe import RecipeAuthor, recipe_declaration
 from _visibility import FeatureWalk
 
 
-type RecipeAuthor = Callable[..., Awaitable[None]]
+type ThreadedPartSaver = Callable[[Any, str, Sequence[str]], Awaitable[dict[str, str]]]
 type Vector3 = tuple[float, float, float]
 
 # The helical groove every threaded McMaster replay cuts
 # (diag_mcmaster_lib.thread_sweep_cut*): the only feature the drawing-view
 # configuration suppresses on a fastener.
 THREAD_FEATURE = "ThreadGroove"
-
-
-@dataclass(frozen=True, slots=True)
-class RecipeMetadata:
-    """Static import metadata for one verified diagnostic recipe.
-
-    ``threaded`` declares that the recipe cuts a modeled helical thread named
-    ``THREAD_FEATURE``; the stock build requires the feature to match, so a
-    renamed groove cannot silently save a part without its simplified views.
-    """
-
-    module: str
-    callable_name: str
-    threaded: bool
-
-
-# Metadata only: production builders statically import the one recipe they use and
-# pass its callable in StockComponent. Importing recipes here would make every stock
-# fastener depend on every diagnostic geometry module in the build graph.
-STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
-    {
-        "90280A194": RecipeMetadata(
-            "diagnostics.diag_build_90280A194", "build_90280A194", threaded=True
-        ),
-        "90280A197": RecipeMetadata(
-            "diagnostics.diag_build_90280A197", "build_90280A197", threaded=True
-        ),
-        "90280A837": RecipeMetadata(
-            "diagnostics.diag_build_90280A837", "build_90280A837", threaded=True
-        ),
-        "40923898": RecipeMetadata(
-            "diagnostics.diag_build_40923898", "build_40923898", threaded=True
-        ),
-        "90280A201": RecipeMetadata(
-            "diagnostics.diag_build_90280A201", "build_90280A201", threaded=True
-        ),
-        "91255A148": RecipeMetadata(
-            "diagnostics.diag_build_91255A148", "build_91255A148", threaded=True
-        ),
-        "91255A106": RecipeMetadata(
-            "diagnostics.diag_build_91255A106", "build_91255A106", threaded=True
-        ),
-        "91255A108": RecipeMetadata(
-            "diagnostics.diag_build_91255A108", "build_91255A108", threaded=True
-        ),
-        "91882A425": RecipeMetadata(
-            "diagnostics.diag_build_91882A425", "build_91882A425", threaded=True
-        ),
-        "93585A190": RecipeMetadata(
-            "diagnostics.diag_build_93585A190", "build_93585A190", threaded=True
-        ),
-        "91829A560": RecipeMetadata(
-            "diagnostics.diag_build_91829A560", "build_91829A560", threaded=True
-        ),
-        "91829A205": RecipeMetadata(
-            "diagnostics.diag_build_91829A205", "build_91829A205", threaded=True
-        ),
-        "94025A164": RecipeMetadata(
-            "diagnostics.diag_build_94025A164", "build_94025A164", threaded=True
-        ),
-        "91375A106": RecipeMetadata(
-            "diagnostics.diag_build_91375A106", "build_91375A106", threaded=True
-        ),
-        "90280A108": RecipeMetadata(
-            "diagnostics.diag_build_90280A108", "build_90280A108", threaded=True
-        ),
-        "91794A077": RecipeMetadata(
-            "diagnostics.diag_build_91794A077", "build_91794A077", threaded=True
-        ),
-        "91794A112": RecipeMetadata(
-            "diagnostics.diag_build_91794A112", "build_91794A112", threaded=True
-        ),
-        "90114A511": RecipeMetadata(
-            "diagnostics.diag_build_90114A511", "build_90114A511", threaded=True
-        ),
-        "91410A538": RecipeMetadata(
-            "diagnostics.diag_build_91410A538", "build_91410A538", threaded=True
-        ),
-        "91251A108": RecipeMetadata(
-            "diagnostics.diag_build_91251A108", "build_91251A108", threaded=True
-        ),
-        "93075A194": RecipeMetadata(
-            "diagnostics.diag_build_93075A194", "build_93075A194", threaded=True
-        ),
-        "92865A585": RecipeMetadata(
-            "diagnostics.diag_build_92865A585", "build_92865A585", threaded=True
-        ),
-        "91251A157": RecipeMetadata(
-            "diagnostics.diag_build_91251A157", "build_91251A157", threaded=True
-        ),
-        "92240A540": RecipeMetadata(
-            "diagnostics.diag_build_92240A540", "build_92240A540", threaded=True
-        ),
-        "99607A213": RecipeMetadata(
-            "diagnostics.diag_build_99607A213", "build_99607A213", threaded=True
-        ),
-        "90280A199": RecipeMetadata(
-            "diagnostics.diag_build_90280A199", "build_90280A199", threaded=True
-        ),
-        "91882A221": RecipeMetadata(
-            "diagnostics.diag_build_91882A221", "build_91882A221", threaded=True
-        ),
-        "98296A026": RecipeMetadata(
-            "diagnostics.diag_build_98296A026", "build_98296A026", threaded=False
-        ),
-        "98296A027": RecipeMetadata(
-            "diagnostics.diag_build_98296A027", "build_98296A027", threaded=False
-        ),
-        "98296A031": RecipeMetadata(
-            "diagnostics.diag_build_98296A031", "build_98296A031", threaded=False
-        ),
-        "9489T111": RecipeMetadata(
-            "diagnostics.diag_build_9489T111", "build_9489T111", threaded=True
-        ),
-        "9490T1": RecipeMetadata(
-            "diagnostics.diag_build_9490T1", "build_9490T1", threaded=True
-        ),
-        "9275K141": RecipeMetadata(
-            "diagnostics.diag_build_9275K141", "build_9275K141", threaded=False
-        ),
-        "9414T1": RecipeMetadata(
-            "diagnostics.diag_build_9414T1", "build_9414T1", threaded=False
-        ),
-        "98381A433": RecipeMetadata(
-            "diagnostics.diag_build_98381A433", "build_98381A433", threaded=False
-        ),
-        "98381A434": RecipeMetadata(
-            "diagnostics.diag_build_98381A434", "build_98381A434", threaded=False
-        ),
-        "98381A473": RecipeMetadata(
-            "diagnostics.diag_build_98381A473", "build_98381A473", threaded=False
-        ),
-        "98381A474": RecipeMetadata(
-            "diagnostics.diag_build_98381A474", "build_98381A474", threaded=False
-        ),
-        "91794A055": RecipeMetadata(
-            "diagnostics.diag_build_91794A055", "build_91794A055", threaded=True
-        ),
-        "91790A196": RecipeMetadata(
-            "diagnostics.diag_build_91790A196", "build_91790A196", threaded=True
-        ),
-        "97431A260": RecipeMetadata(
-            "diagnostics.diag_build_97431A260", "build_97431A260", threaded=False
-        ),
-        "9715K43": RecipeMetadata(
-            "diagnostics.diag_build_9715K43", "build_9715K43", threaded=False
-        ),
-        "9714K392": RecipeMetadata(
-            "diagnostics.diag_build_9714K392", "build_9714K392", threaded=False
-        ),
-        "9714K24": RecipeMetadata(
-            "diagnostics.diag_build_9714K24", "build_9714K24", threaded=False
-        ),
-    }
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,13 +56,6 @@ class StockComponent:
 class _NamedBody:
     name: str
     body: Any
-
-
-def _recipe_metadata(sku: str) -> RecipeMetadata:
-    try:
-        return STOCK_RECIPES[sku]
-    except KeyError:
-        raise KeyError(f"unknown stock fastener SKU {sku!r}") from None
 
 
 def _solid_bodies(model: Any) -> tuple[_NamedBody, ...]:
@@ -515,12 +352,16 @@ async def build_stock_fastener(
     material: str,
     color: tuple[float, float, float] | None = None,
     screw_axis_planes: tuple[str, str] | None = None,
+    save_threaded_part: ThreadedPartSaver | None = None,
 ) -> dict[str, str]:
     """Create, normalize, finish, and save one production stock part.
 
     ``screw_axis_planes`` restores the stable ``ScrewAxis`` mate contract for
     assemblies whose normalized stock body axis is not represented by a
     transformed recipe reference.
+
+    Threaded callers supply their statically imported simplified saver through
+    ``save_threaded_part``. Unthreaded leaves never import that part machinery.
     """
 
     check("create_part", await adapter.create_part())
@@ -529,18 +370,8 @@ async def build_stock_fastener(
     threaded = False
     try:
         for component_count, component in enumerate(components, 1):
-            metadata = _recipe_metadata(component.sku)
+            metadata = recipe_declaration(component.sku, component.author)
             threaded = threaded or metadata.threaded
-            if not callable(component.author):
-                raise TypeError(
-                    f"stock fastener SKU {component.sku!r} recipe author is not callable"
-                )
-            if getattr(component.author, "__name__", None) != metadata.callable_name:
-                raise ValueError(
-                    f"stock fastener SKU {component.sku!r} requires recipe "
-                    f"{metadata.callable_name!r}, got "
-                    f"{getattr(component.author, '__name__', type(component.author).__name__)!r}"
-                )
 
             model.ClearSelection2(True)
             before = _solid_bodies(model)
@@ -556,7 +387,7 @@ async def build_stock_fastener(
                 # process).  Every recipe asserts the state it requires instead
                 # of inheriting it, which also repairs a seat an earlier leaf
                 # poisoned.  Imported here, not at module scope, to keep the
-                # build-graph note at the top of this file true.
+                # recipe-import build-graph note in _stock_recipe true.
                 from diagnostics.diag_mcmaster_lib import (
                     assert_seat_sketch_baseline,
                 )
@@ -628,11 +459,17 @@ async def build_stock_fastener(
         },
     )
     await report_mass_properties(adapter)
-    return await _save_stock_part(adapter, part_name, threaded=threaded)
+    return await _save_stock_part(
+        adapter, part_name, threaded=threaded, save_threaded_part=save_threaded_part
+    )
 
 
 async def _save_stock_part(
-    adapter: Any, part_name: str, *, threaded: bool
+    adapter: Any,
+    part_name: str,
+    *,
+    threaded: bool,
+    save_threaded_part: ThreadedPartSaver | None = None,
 ) -> dict[str, str]:
     """Save a finished stock part; a threaded one with its simplified views.
 
@@ -651,6 +488,10 @@ async def _save_stock_part(
             f"{THREAD_FEATURE!r} feature"
         )
     if threaded:
+        if not callable(save_threaded_part):
+            raise TypeError(
+                f"{part_name}: threaded stock part requires a callable simplified saver"
+            )
         # "<cfg> Simplified" suppresses the helical cut for assembly views.
-        return await save_simplified_part(adapter, part_name, (THREAD_FEATURE,))
+        return await save_threaded_part(adapter, part_name, (THREAD_FEATURE,))
     return await save_part_and_images(adapter, part_name)

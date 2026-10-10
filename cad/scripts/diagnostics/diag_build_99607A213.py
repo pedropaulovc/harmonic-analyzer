@@ -32,6 +32,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
@@ -53,14 +55,16 @@ from diagnostics.sketch_profile import (  # noqa: E402
     Segment,
     minor_arc,
 )
+from _mcmaster_99607a213 import (  # noqa: E402
+    TS_HEAD_H,
+    TS_HEAD_R,
+    TS_LEN,
+    TS_MAJOR_R,
+    TS_PITCH,
+    TS_SH_H,
+    TS_SH_R,
+)
 
-TS_MAJOR_R = 2.8448 / 2.0
-TS_PITCH = 0.635
-TS_LEN = 15.875
-TS_SH_R = 5.953125 / 2.0
-TS_SH_H = 3.175
-TS_HEAD_R = 7.540625 / 2.0
-TS_HEAD_H = 3.175
 
 # --- flare lens (Cut-Revolve1) -----------------------------------------------
 # The vendor's equations: D1 = ShoulderLen * 0.2 = 0.635 sets the axial span,
@@ -96,6 +100,7 @@ def flare_profile() -> tuple[Segment, ...]:
     )
 
 
+@stock_recipe("99607A213", threaded=True)
 async def build_99607A213(adapter, truth=None):
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)

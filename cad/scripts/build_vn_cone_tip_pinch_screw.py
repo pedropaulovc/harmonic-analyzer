@@ -7,18 +7,16 @@ import sys
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_91794A112 import build_91794A112
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _mcmaster_91794a112 import SKU
 
 PART_NAME = "vn-cone-tip-pinch-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-THREAD = "#4-40"
-SKU = "91794A112"
 if SPEC.skus != (SKU,):
     raise AssertionError(f"{PART_NAME} catalogues {SPEC.skus}, not {SKU}")
-SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
 
 
 async def build(adapter) -> dict[str, str]:
@@ -33,6 +31,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

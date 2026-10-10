@@ -86,6 +86,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     _early_bound,
@@ -361,6 +363,7 @@ def _face_counts(adapter) -> list[int]:
 # --------------------------------------------------------------------------
 # builder
 # --------------------------------------------------------------------------
+@stock_recipe("9490T1", threaded=True)
 async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = None):
     """Build 9490T1 into the current (empty) part.  Never opens or saves.
 

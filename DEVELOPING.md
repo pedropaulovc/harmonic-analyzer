@@ -612,6 +612,20 @@ every import, including `TYPE_CHECKING`, at file granularity. This keeps edits t
 one selector or frame representation out of unrelated spec/cache closures while
 still invalidating every consumer of the changed module.
 
+Local Python dependencies are file-granular, including imports inside functions.
+Stock fastener metadata therefore lives beside each diagnostic SKU callable
+(`_stock_recipe.stock_recipe`), and each production builder statically imports
+only its recipe. Threaded builders explicitly supply the `_simplified_part` save
+callback; unthreaded builds do not depend on simplified-configuration derivation.
+Simplified naming, assembly-component fingerprints, shared pure BOM identity and
+part-side configuration saves live in separate helpers. Vendor dimensions are
+pure per-SKU inputs shared by the recipe and its specs, rather than dimensions
+imported through recipe code or a family-wide table.
+The catalogue-only 91251A108/91251A157 socket-head recipes share the pure
+`_socket_head_dimensions` record; each SKU still owns its `DIMS` declaration.
+The knife-hanger and knife-mount-dowel specs import their own per-SKU data,
+not the socket-head or dowel COM recipe.
+
 The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
 submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
 by `_common`/`_assembly` (mate/plane/feature creation), so its source is a genuine

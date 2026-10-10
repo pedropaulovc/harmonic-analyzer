@@ -51,15 +51,17 @@ from diagnostics.sketch_profile import (  # noqa: E402
     endpoint_merges,
     minor_arc,
 )
+from _mcmaster_91247a720 import (  # noqa: E402
+    GB_HH,
+    GB_HW,
+    GB_LEN,
+    GB_MAJOR_R,
+    GB_MTL,
+    GB_PITCH,
+    GB_UNDERSIDE,
+    GB_WASHER_T,
+)
 
-GB_MAJOR_R = 12.7 / 2.0
-GB_LEN = 50.8
-GB_HW = 19.05
-GB_HH = 7.9375
-GB_PITCH = 25.4 / 13.0     # stored 1.953846
-GB_MTL = 31.75
-GB_UNDERSIDE = 21.43125    # (L + HH)/2 - HH
-GB_WASHER_T = 0.2
 
 # --- raised triangle logo ring -----------------------------------------------
 # The vendor authored this as a mid-plane Extrude-Thin over a 6-segment

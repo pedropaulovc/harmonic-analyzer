@@ -39,17 +39,9 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut,
 )
 
-THUMB_SPECS = {
-    "91882A221": dict(major_r=2.8448 / 2.0, pitch=0.635, length=11.1125,
-                      collar_r=6.35 / 2.0, collar_h=2.38125,
-                      head_r=9.525 / 2.0, head_h=2.38125),
-    "91882A425": dict(major_r=6.35 / 2.0, pitch=1.27, length=19.05,
-                      collar_r=12.7 / 2.0, collar_h=9.525,
-                      head_r=25.4 / 2.0, head_h=6.35),
-}
 
 
-async def build_thumb_screw(adapter, part_no: str):
+async def build_thumb_screw(adapter, s: dict[str, float]):
     from _common import (add_line_chain, _early_bound, _read_member)
     from diagnostics.diag_mcmaster_lib import (combine_union, mass_properties,
                                    no_sketch_inference, split_at_plane)
@@ -59,7 +51,6 @@ async def build_thumb_screw(adapter, part_no: str):
                                               MirrorFeatureParameters,
                                               RevolveParameters)
 
-    s = THUMB_SPECS[part_no]
     major_r, pitch, length = s["major_r"], s["pitch"], s["length"]
     collar_r, collar_h = s["collar_r"], s["collar_h"]
     head_r, head_h = s["head_r"], s["head_h"]

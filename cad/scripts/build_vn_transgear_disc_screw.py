@@ -26,6 +26,7 @@ import sys
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_91794A055 import build_91794A055
 from vn_transgear_disc_screw_spec import (
     CUT_END_BREAK_MAX,
@@ -62,6 +63,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

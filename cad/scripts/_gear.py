@@ -51,7 +51,7 @@ R_CLEAR_IN = 60.0 / 25.4
 class ToothedDisc(NamedTuple):
     """``build_fixed_gear``'s volume-checked disc and the features that form
     its teeth (seed gap cut or tooth sweep, then the pattern) -- what a
-    ``_drawing_simplified`` configuration suppresses."""
+    ``_simplified_part`` configuration suppresses."""
 
     volume: float
     tooth_features: tuple[str, ...]

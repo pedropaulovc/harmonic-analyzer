@@ -59,8 +59,9 @@ from _drawing_marks import (
 from _fastener_catalog import fastener
 from _fit_deviations import deviations
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_40923898 import build_40923898
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _msc_40923898 import FILLISTER_SIZE
 from diagnostics.diag_mcmaster_lib import no_sketch_inference
 from vn_post_mount_screw_spec import (
     CUT_END_BREAK_BAND,
@@ -78,7 +79,6 @@ from vn_post_mount_screw_spec import (
     DRAWING_PRECISION,
     MAJOR_RADIUS_MM,
     MANUFACTURING_NOTES,
-    SKU,
     STOCK_LENGTH_MM,
     THREAD,
     TRIM_REMOVED_MM3,
@@ -89,7 +89,7 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 # The shared row is the supplied screw; the part's shank is its cut length.
-SHANK_DIA, _STOCK_LEN, HEAD_H, HEAD_DIA, THREAD_PITCH = FILLISTER_SIZES[SKU]
+SHANK_DIA, _STOCK_LEN, HEAD_H, HEAD_DIA, THREAD_PITCH = FILLISTER_SIZE
 if _STOCK_LEN != STOCK_LENGTH_MM:
     raise ValueError("the stock recipe length is not the supplied length")
 SHANK_LEN = CUT_LENGTH_MM
@@ -549,6 +549,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

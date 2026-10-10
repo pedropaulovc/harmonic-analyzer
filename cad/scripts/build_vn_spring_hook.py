@@ -33,6 +33,7 @@ import sys
 from _common import PANEL_BLACK, _early_bound, _read_member, run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from _drawing_marks import (
     _named_dimension,
     apply_drawing_properties,
@@ -152,6 +153,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         color=PANEL_BLACK,  # black-oxide hardware
         # Shank axis = the vendor -Y axis through the eye centre (Front n Right),
         # the stable mate reference the old sketched part named "shank axis".
