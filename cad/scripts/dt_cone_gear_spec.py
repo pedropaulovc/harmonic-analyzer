@@ -182,8 +182,8 @@ def chord_floor_radius_mm(
 # the cutter, so the floor does not move with the tooth band.  Three
 # constructions, all one six-entity gap sketch:
 #
-# * T006, T012: the thicker tooth's chord would sit in the drum tip's path
-#   (+0.030 at T006), so the floor bows below the feet chord to the printed
+# * T006, T012: the historical floor study found too little drum-tip
+#   clearance at the thicker tooth's feet chord, so the floor bows to the printed
 #   MIN.  MIN is the web limit: T006 keeps the 0.621 web the user ruled on as
 #   its named exception (U40); T012 trades its web from 2.12 down to 2.05,
 #   still over the 2.0 target, for a 0.25 window instead of 0.11.
@@ -448,13 +448,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Tip-diameter band, (upper, lower) deviations.  The tip sets how deep the
 # cone teeth reach into the 120T drum on the backed-off oblique mesh, so the
 # title-block .XX +/-0.51 (a whole addendum) is too loose: at -0.51 the
-# nominal 0.459 mm interleave halves (Fable review, 2026-09-23).  Main ruled
+# nominal standard-tip 0.470 mm deep-edge interleave roughly halves.  Main ruled
 # the band by contact ratio (U27: the looser +/-0.25 only if it keeps CR >= 1.1
-# at the worst case).  Worst case of every printed band -- this band, drum OD
-# +0/-0.10, bore-on-land, journal, drum-bore and arbor float -- leaves CR
+# at the worst case).  The historical standard-tip band study -- this band,
+# drum OD +0/-0.10, bore-on-land, journal, drum-bore and arbor float -- left CR
 # 0.09/0.42/0.46 (T006/T060/T120) at +/-0.10 and 0.01/0.28/0.30 at +/-0.25,
-# with the drum floor still clear (+0.83 / +0.75), so +/-0.10 prints: turning
-# the blank OD to a micrometer before cutting teeth is a novice-holdable step.
+# with the drum floor still clear (+0.83 / +0.75).  These are not the U42
+# deepened-tooth results; test_dt_cone_gear_mesh_design budgets the live teeth.
+# The retained +/-0.10 band is novice-holdable by turning the blank OD to a
+# micrometer before cutting teeth.
 BLANK_DIA_BAND = (0.10, -0.10)
 
 
