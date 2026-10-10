@@ -89,7 +89,10 @@ SCREW_SCALE = 20
 SCREW_MID_MM = (
     spec.SET_SCREW_SEAT_RADIUS + spec.SET_SCREW_LENGTH / 2.0, spec.TAP_STATION, 0.0,
 )
-SCREW_CENTER = (0.170, 0.190)
+# 15 mm right of run 17's 170 mm, so DogDia's left-hanging text clears the
+# left border (see SCREW_KEEP); the side view's right end (264 mm) still
+# stands 29 mm off the end view.
+SCREW_CENTER = (0.185, 0.190)
 SCREW_END_CENTER = (0.315, SCREW_CENTER[1])
 # Under the end view, its label under it (59 x 4.3 mm, left/top corner).
 SCREW_ISO_CENTER = (0.330, 0.118)
@@ -98,10 +101,15 @@ DOG_LEFT_X = SCREW_CENTER[0] - spec.SET_SCREW_LENGTH * SCREW_SCALE / 2000.0
 THREAD_LEFT_X = DOG_LEFT_X + spec.DOG_LENGTH * SCREW_SCALE / 1000.0
 # DogDia's text (and the edge callout above it) reads wholly over its upper
 # extension line: placed across both (y +/-2 mm) its own dimension line ran
-# up through the callout and the value (run 16). Its box spans -6.6..+7.3 mm
-# of the text point. DogLength reads left of its extension lines, under.
+# up through the callout and the value (run 16). Placed there, SolidWorks
+# hangs the text LEFT of its dimension line: run 17 read the text 63 mm wide
+# ending at the line (box x 7.4 mm for the line at 70.6 mm, 5.3 mm over the
+# left border). It cannot read right of the screw: its extension lines would
+# cross the thread, and the 29 mm to the end view is narrower than the text.
+# So the line stands 12 mm off the dog's free end, the text ending there.
+# DogLength reads left of its extension lines, under.
 SCREW_KEEP = {
-    "DogDia": (DOG_LEFT_X - 0.020, SCREW_CENTER[1] + 0.013),
+    "DogDia": (DOG_LEFT_X - 0.012, SCREW_CENTER[1] + 0.013),
     "DogLength": (DOG_LEFT_X - 0.020, SCREW_CENTER[1] - 0.040),
 }
 DATUM_D_XY = (THREAD_LEFT_X + 0.003, SCREW_CENTER[1] + 0.003)
