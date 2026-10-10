@@ -1636,7 +1636,8 @@ def test_underside_section_cuts_both_boss_heights_clear_of_every_bore() -> None:
     import draw_fr_harmonic_base as sheet
 
     x = sheet.UNDERSIDE_CUT_X
-    assert x == pytest.approx(-28.67, abs=0.01)
+    # The inch train's parked pinion rig stands 1.2 east of #1310's stations.
+    assert x == pytest.approx(-27.40, abs=0.01)
     assert sheet._CUT_BAND[0] < x < sheet._CUT_BAND[1]
     for shapes in (part.DEEP_BOSS_SHAPES, part.SHALLOW_BOSS_SHAPES):
         assert any(sheet._x_span(s)[0] < x < sheet._x_span(s)[1] for s in shapes)
@@ -1895,9 +1896,9 @@ def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
     printed = {name: round(value, 1) for name, value in _pads_printed().items()}
     assert printed == {
         "Lug1X": 39.6,
-        "LockPadX": 120.5,
+        "LockPadX": 118.2,
         "PedestalPad1X": 160.2,
-        "BlockPad1X": 197.7,
+        "BlockPad1X": 198.9,
         "CrossRibX": 223.6,
         "Lug3X": 417.6,
         "PedestalPad1Y": 38.5,
@@ -1907,8 +1908,8 @@ def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
         "Lug0Y": 218.6,
         "PedestalPad0Y": 221.6,
         "BlockPad0Y": 237.2,
-        "LockPadY": 247.6,
-        "FootBossX": 194.2,
+        "LockPadY": 247.3,
+        "FootBossX": 195.4,
         "FootBossY": 67.2,
         "LockPadWidth": 16.0,
         "PedestalPadLength": 26.0,

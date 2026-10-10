@@ -81,8 +81,11 @@ HANGING_BOSS_MIN_DIA = 16.0  # max(this, 2.5 x tap drill) per seat
 # each seat takes the higher level that still leaves its drill tip 1.5D of
 # metal (build_fr_harmonic_base proves it), so the pattern carries two boss
 # lengths instead of one per seat.
+# The shallow level backs the raised pinion block's seat: its #8-32 x 1-1/2
+# screw runs 13.38 deep at the shortest printed block, so the 16.8 drill's
+# tip stands 32.96 up and needs 1.5D (6.25) under it: 26.71 at most.
 DEEP_BOSS_BOTTOM_Y = 12.0
-SHALLOW_BOSS_BOTTOM_Y = 28.0
+SHALLOW_BOSS_BOTTOM_Y = 26.5
 CASTING_FILLET_R = 6.0
 
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
