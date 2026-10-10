@@ -49,6 +49,7 @@ from _drawing_common import (
     view_name,
     visible_component_entities,
 )
+from _drawing_annotation_extent import place_callout_clear
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
@@ -282,7 +283,11 @@ COLLAR_REAR_FINISH = (
 # depth's band appended by _band_hole_depth)
 # with the press prose under it on two long rows (four rows in all): its
 # leader picks the upper hole's rim and the text sits above the end view and
-# the dome, left of the cross-hole callout, inside the top border.
+# the dome, left of the cross-hole callout, inside the top border.  The text
+# centres on this anchor, and the press row runs ~110 mm wide, so its left end
+# printed 3 mm past the inner border (run 15 and 06a20f94c): the callout is
+# moved from its read-back box to clear the zone frame, and the placement is
+# asserted (place_callout_clear).
 DRIVE_PIN_CALLOUT_XY = (0.066, 0.250)
 # Text centred up-right of the cross-hole: the callout's leader leaves the
 # text's left end and runs down-left at ~53 deg through the hole centre, a
@@ -862,6 +867,13 @@ async def build(adapter: Any) -> dict[str, str]:
         "seat-collar drive-pin holes",
     )
     _set_callout_below(drive_pins, DRIVE_PIN_CALLOUT, "seat-collar drive-pin holes")
+    place_callout_clear(
+        adapter,
+        _early_bound(drive_pins, "IDisplayDimension").GetAnnotation(),
+        label="seat-collar drive-pin holes",
+        below={},
+        beside={},
+    )
     pinion_note = add_attached_note(
         adapter,
         side,

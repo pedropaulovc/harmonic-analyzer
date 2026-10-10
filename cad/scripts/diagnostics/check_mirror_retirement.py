@@ -677,17 +677,18 @@ expect(
     IDENTITY,
     "ch-fulcrum-shaft",
 )
+# The feet run outboard (2026-10-09): the south bracket turns Ry180.
 expect(
     CH,
     "ch-pivot-bracket-1",
-    [c.PIVOT[0], c.SUPPORT_APEX_Y, c.PIVOT_BRACKET_Z[0]],
-    IDENTITY,
+    [c.PIVOT[0], c.SUPPORT_APEX_Y, c._bracket_sides.MOUNT_Z["S"]],
+    ROT_Y_180,
     "pivot-bracket rocker south",
 )
 expect(
     CH,
     "ch-pivot-bracket-2",
-    [c.PIVOT[0], c.SUPPORT_APEX_Y, c.PIVOT_BRACKET_Z[1]],
+    [c.PIVOT[0], c.SUPPORT_APEX_Y, c._bracket_sides.MOUNT_Z["N"]],
     IDENTITY,
     "pivot-bracket rocker north",
 )

@@ -639,14 +639,15 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "fr-frame-1/fr-top-frame",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 8.6624),
     ),
-    # #743 PR2: the four #8-32 x 3/4 (19.05) MHA-VN-032 rocker-bracket hold-downs
-    # pass the 6.0 bracket foot and engage 13.05 of the support rail's
-    # transferred seats. Literals, like the rows above, so every assembly does
-    # not re-key on the rocker bank's layout; test_rocker_bracket_seat_layout
-    # pins them to rocker_bracket_seat_layout.
+    # #743 PR2: the two #8-32 x 3/4 (19.05) MHA-VN-032 rocker-bracket hold-downs
+    # (one per bracket since the 2026-10-09 flip) pass the 6.0 bracket foot
+    # and engage 13.05 of the support's transferred seats. Literals, like the
+    # rows above, so every assembly does not re-key on the rocker bank's
+    # layout; test_rocker_bracket_seat_layout pins them to
+    # rocker_bracket_seat_layout.
     **_numbered_pairs(
         "ch-channel-1/vn-pedestal-hold-down-screw",
-        range(1, 5),
+        range(1, 3),
         "fr-frame-1/fr-rocker-arm-support",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 19.05 - 6.0),
     ),
