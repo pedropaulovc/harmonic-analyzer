@@ -48,7 +48,7 @@ def test_every_printed_size_is_owned_and_precisioned_by_model() -> None:
     assert builder.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     assert builder.DRAWING_PRECISION is spec.DRAWING_PRECISION
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.DETAIL_KEEP) | set(drawing.SECTION_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.DETAIL_KEEP) | set(drawing.DEPTH_KEEP)
     assert kept == marked == set(spec.DRAWING_VALUES_BY_NAME) == set(spec.DRAWING_PRECISION_BY_NAME)
     assert all(places == 2 for places in spec.DRAWING_PRECISION_BY_NAME.values())
     assert set(spec.DRAWING_TOLERANCES) <= marked
@@ -91,13 +91,14 @@ def test_spec_is_pure_and_drawing_never_reauthors_dimensions() -> None:
 
 
 class _StickAffine:
-    def __init__(self, factors, offsets):
+    def __init__(self, factors, offsets, axes=(0, 1, 2)):
         self.factors = factors
         self.offsets = offsets
+        self.axes = axes
 
     def apply(self, xyz):
         return tuple(factor * value + offset for factor, value, offset in zip(
-            self.factors, xyz, self.offsets, strict=True
+            self.factors, (xyz[axis] for axis in self.axes), self.offsets, strict=True
         ))
 
 
@@ -119,62 +120,47 @@ class _StickMathUtility:
         return _StickMathPoint(xyz)
 
 
-@pytest.mark.parametrize(("cut_only", "partial", "error"), [
-    (True, True, None),
-    (False, True, "kept geometry beyond the cut"),
-    (True, False, "not a partial section"),
-])
-def test_build_projects_metre_scale_fence_and_section_points(
-    monkeypatch, tmp_path, cut_only, partial, error,
-) -> None:
-    """Run the real callers and projection math without opening a COM seat."""
+def test_build_projects_metre_scale_graduation_and_open_edge_depth_fences(monkeypatch, tmp_path) -> None:
+    """Run real A/B callers and Back/Top projection without opening a COM seat."""
     source = tmp_path / "ms-stick.SLDPRT"
     source.write_bytes(b"offline source sentinel")
     monkeypatch.setattr(drawing, "SOURCE", source)
     utility = _StickMathUtility()
-    circles, notes, sections, views = [], [], [], []
-    section_modes, rebuilds = [], []
-
-    def set_cut_only(display):
-        section_modes.append(display)
-        # SetDisplayOnlySurfaceCut is void, including when persistence fails.
-
-    def read_section_mode(value):
-        assert rebuilds == ["engraving section cut face"]
-        return value
-
-    cut = SimpleNamespace(
-        SetDisplayOnlySurfaceCut=set_cut_only,
-        GetDisplayOnlySurfaceCut=lambda: read_section_mode(cut_only),
-        GetPartialSection=lambda: read_section_mode(partial),
-    )
+    circles, notes, placements, detail_calls, imports, clean_views = [], [], [], [], [], []
     sketch_transform = _StickAffine((2.0, -3.0, 1.0), (0.03, 0.04, 0.02))
 
-    def make_view(position, scale, center_x):
+    def make_view(position, scale, center_x, orientation="*Back"):
         ratio = scale[0] / scale[1]
-        # Back followed by the recipe's pi rotation: +X and -Y on sheet.
-        view = SimpleNamespace(
-            Position=position, ScaleRatio=scale, Angle=0.0,
+        # Rotated Back projects X/-Y; Top projects X/-Z and looks along Y.
+        axes = (0, 2, 1) if orientation == "*Top" else (0, 1, 2)
+        vertical_center = 0.0015 if orientation == "*Top" else 0.004
+        return SimpleNamespace(
+            Position=position, ScaleRatio=scale, Angle=0.0, Orientation=orientation,
             GetName2=lambda: "offline-view",
             GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=sketch_transform),
             ModelToViewTransform=_StickAffine(
                 (ratio, -ratio, -ratio),
-                (position[0] - ratio * center_x, position[1] + ratio * 0.004, 0.0),
+                (position[0] - ratio * center_x, position[1] + ratio * vertical_center, 0.0),
+                axes=axes,
             ),
         )
-        views.append(view)
-        return view
 
-    detail = make_view(drawing.DETAIL_CENTER, drawing.DETAIL_SCALE, 0.0646)
+    details = {
+        "A": make_view(drawing.DETAIL_CENTER, drawing.DETAIL_SCALE, 0.0646),
+        "B": make_view(drawing.DEPTH_CENTER, drawing.DETAIL_SCALE, 0.0575, "*Top"),
+    }
 
     def circle(*points):
         circles.append(points)
         return object()
 
     def create_detail(*args):
-        assert args == (*drawing.DETAIL_CENTER, 0.0, 0, *drawing.DETAIL_SCALE,
-                        "A", 1, True, False, False, 5)
-        return detail
+        label = args[6]
+        center = drawing.DETAIL_CENTER if label == "A" else drawing.DEPTH_CENTER
+        assert args == (*center, 0.0, 0, *drawing.DETAIL_SCALE,
+                        label, 1, True, False, False, 5)
+        detail_calls.append(label)
+        return details[label]
 
     document = SimpleNamespace(
         ActivateSheet=lambda name: True, ActivateView=lambda name: True,
@@ -199,7 +185,9 @@ def test_build_projects_metre_scale_fence_and_section_points(
     def place_view(adapter, path, orientation, x, y, *, scale):
         assert path == str(source)
         assert orientation in ("*Back", "*Top", "*Isometric")
-        return make_view((x, y), scale, 0.1)
+        view = make_view((x, y), scale, 0.1, orientation)
+        placements.append(view)
+        return view
 
     def invoke(obj, _interface, member, *args):
         value = getattr(obj, member)
@@ -212,43 +200,34 @@ def test_build_projects_metre_scale_fence_and_section_points(
     monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
     monkeypatch.setattr(drawing, "place_view", place_view)
     monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.GetName2())
-    monkeypatch.setattr(
-        drawing, "rebuild_drawing", lambda adapter, *, label: rebuilds.append(label),
-    )
     for name in (
         "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
-        "set_hidden_lines_removed", "set_dimension_callouts", "assert_manufacturing_dimensions",
-        "add_property_linked_note", "_probe_tick_depth_import",
+        "set_dimension_callouts", "assert_manufacturing_dimensions", "add_property_linked_note",
     ):
         monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        drawing, "set_hidden_lines_removed", lambda adapter, view: clean_views.append(view),
+    )
+
+    def curate(adapter, view, **kwargs):
+        imports.append((view, kwargs))
+        return []
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
     monkeypatch.setattr(drawing, "part_sketches_shown", lambda *args, **kwargs: nullcontext())
 
     def note(adapter, text, x, y):
         notes.append((text, x, y))
         return object()
 
-    def section(adapter, view, **kwargs):
-        sections.append((view, kwargs))
-        return SimpleNamespace(GetSection=lambda: cut)
-
     async def finalize(adapter, outputs, **kwargs):
         return {"slddrw": str(outputs.slddrw)}
 
     monkeypatch.setattr(drawing, "add_note", note)
-    monkeypatch.setattr(drawing, "create_section_view", section)
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
-    if error is not None:
-        with pytest.raises(RuntimeError, match=error):
-            asyncio.run(drawing.build(adapter))
-        assert section_modes == [True]
-        assert source.read_bytes() == b"offline source sentinel"
-        return
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
-    assert section_modes == [True]
-    assert rebuilds == ["engraving section cut face"]
     assert source.read_bytes() == b"offline source sentinel"
-    assert len(utility.points) == 16
+    assert len(utility.points) == 17
     assert len(notes) == 11
     for value, (xyz, (text, x, y)) in enumerate(zip(
         utility.points[:11], notes, strict=True
@@ -259,30 +238,33 @@ def test_build_projects_metre_scale_fence_and_section_points(
     assert utility.points[11] == pytest.approx((0.0646, 0.004, 0.0))
     assert utility.points[12] == pytest.approx((0.2123, 0.240, 0.0))
     assert utility.points[13] == pytest.approx((0.2188, 0.240, 0.0))
-    assert len(circles) == 1
+    assert detail_calls == ["A", "B"]
+    assert len(circles) == 2
     assert circles[0] == pytest.approx((0.4546, -0.680, 0.02, 0.4676, -0.680, 0.02))
-    assert utility.points[14] == pytest.approx((0.0563, 0.0065, 0.0))
-    assert utility.points[15] == pytest.approx((0.0587, 0.0065, 0.0))
-    start_x, start_y, _ = utility.points[14]
-    end_x, end_y, _ = utility.points[15]
-    assert start_y == end_y
-    assert (spec.BODY_WIDTH - spec.TICK_LENGTH) / 1000.0 < start_y < spec.BODY_WIDTH / 1000.0
-    assert start_x < (spec.SCALE_START_X - spec.TICK_WIDTH / 2.0) / 1000.0
-    assert end_x > (spec.SCALE_START_X + spec.TICK_WIDTH / 2.0) / 1000.0
-    assert len(sections) == 1
-    section_view, arguments = sections[0]
-    assert section_view is views[-1]
-    assert section_view is not detail
-    assert section_view.Position == drawing.DETAIL_PARENT_CENTER
-    assert section_view.ScaleRatio == (1.0, 2.0)
-    assert arguments["line_start"] == pytest.approx((0.20815, 0.23875))
-    assert arguments["line_end"] == pytest.approx((0.20935, 0.23875))
-    assert arguments["line_end"][0] - arguments["line_start"][0] == pytest.approx(
-        (end_x - start_x) * section_view.ScaleRatio[0] / section_view.ScaleRatio[1],
+    # B looks straight at the groove's open long edge, centred through stock Z.
+    assert utility.points[14] == pytest.approx((0.0575, 0.008, 0.0015))
+    assert utility.points[14][1] == spec.BODY_WIDTH / 1000.0
+    assert utility.points[14][2] == spec.BODY_THICKNESS / 2000.0
+    assert utility.points[15] == pytest.approx((0.20875, 0.080, 0.0))
+    assert utility.points[16] == pytest.approx((0.20975, 0.080, 0.0))
+    assert circles[1] == pytest.approx((0.4475, -0.200, 0.02, 0.4495, -0.200, 0.02))
+    depth_parent = placements[-1]
+    assert depth_parent.Orientation == "*Top"
+    assert depth_parent.Position == drawing.DEPTH_PARENT_CENTER
+    assert depth_parent.ScaleRatio == (1.0, 2.0)
+    assert depth_parent.Angle == 0.0
+    projected_radius = utility.points[16][0] - utility.points[15][0]
+    assert projected_radius == pytest.approx(
+        drawing.DEPTH_RADIUS_MM / 1000.0 * depth_parent.ScaleRatio[0] / depth_parent.ScaleRatio[1],
     )
-    assert arguments["view_xy"] == drawing.SECTION_CENTER
-    assert arguments["section_label"] == "B"
-    assert arguments["scale"] == drawing.DETAIL_SCALE
-    assert arguments["partial"] is True
-    assert views[1].Angle == views[-1].Angle == pytest.approx(math.pi)
-    assert tuple(getattr(detail.ScaleRatio, "value", detail.ScaleRatio)) == drawing.DETAIL_SCALE
+    assert drawing.DEPTH_RADIUS_MM > math.hypot(spec.TICK_WIDTH / 2.0, spec.BODY_THICKNESS / 2.0)
+    assert placements[0].Angle == placements[3].Angle == pytest.approx(math.pi)
+    assert all(tuple(getattr(view.ScaleRatio, "value", view.ScaleRatio)) == drawing.DETAIL_SCALE
+               for view in details.values())
+    assert imports[-2][0] is details["A"]
+    assert imports[-2][1]["keep"] is drawing.DETAIL_KEEP
+    assert imports[-1][0] is details["B"]
+    assert imports[-1][1]["keep"] is drawing.DEPTH_KEEP
+    assert imports[-1][1]["dimensions_by_feature"] is spec.DRAWING_DIMENSIONS
+    assert any(view is depth_parent for view in clean_views)
+    assert any(view is details["B"] for view in clean_views)
