@@ -43,26 +43,16 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    POLISHED_STEEL,
-    SketchDims,
-    apply_color,
-    apply_material,
-    bbox_extent_check,
-    check,
-    define_circle,
-    drive_dimension,
-    ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    set_sketch_direct_db,
-    volume_check,
-)
+from _appearance import POLISHED_STEEL, apply_color, apply_material
+from _check import check
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, ensure_fully_defined, set_sketch_direct_db
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -88,7 +78,7 @@ from fr_tube_frame_spec import (
 )
 
 PART_NAME = "fr-tube-frame"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 # The regular open tube and both matched cross-hole stations share their
 # installed geometry with the base, top frame, and purchased cap through
@@ -246,7 +236,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)  # ch30 plates: see _common palette
+    await apply_color(adapter, POLISHED_STEEL)  # ch30 plates: see _appearance palette
 
     # Verify the regular tube's cut length; the separate cap establishes the
     # preserved finished assembly top.

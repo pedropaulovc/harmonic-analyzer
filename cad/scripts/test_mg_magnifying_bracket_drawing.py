@@ -180,7 +180,17 @@ def test_native_counterbore_dimensions_keep_names_and_route_annotations(monkeypa
     """Offline routing contract, not proof of native SOLIDWORKS geometry."""
     from types import SimpleNamespace
     import pytest
-    import _common
+    import _appearance
+    import _com
+    import _custom_properties
+    import _feature_tree
+    import _part_checks
+    import _part_properties
+    import _part_save
+    import _rebuild
+    import _session
+    import _sketch
+    import _sketch_rectangle
 
     class WizardDimension:
         def __init__(self, full_name, nominal):
@@ -215,7 +225,17 @@ def test_native_counterbore_dimensions_keep_names_and_route_annotations(monkeypa
         "MountingCounterbores": holes,
     }
     adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
-    monkeypatch.setattr(_common, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_com, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_session, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda value, interface: value)
     resolved = part._resolve_native_mounting_dimensions(adapter)
     assert height.Name == "FlangeHeight"
     assert resolved == {

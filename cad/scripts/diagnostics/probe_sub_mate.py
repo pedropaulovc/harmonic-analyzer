@@ -22,11 +22,12 @@ from __future__ import annotations
 import asyncio
 
 import _telemetry
-from _common import (
-    _flag,
-    _read_member,
-    log,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log
+from _com import _flag, _read_member
 from _assembly import component_named_ref
 from build_motion_study import _find_one, _iter_mates
 

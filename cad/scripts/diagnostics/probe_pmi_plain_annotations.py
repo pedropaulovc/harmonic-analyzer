@@ -30,7 +30,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
-from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound, _read_member  # noqa: E402
+from _paths import CAD_ROOT  # noqa: E402
 from _drawing_common import create_section_view, model_point_in_view  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 from dt_cone_pivot_post_spec import (  # noqa: E402

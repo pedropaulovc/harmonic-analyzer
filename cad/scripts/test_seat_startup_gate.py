@@ -50,7 +50,7 @@ from opentelemetry.trace import StatusCode
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import _common  # noqa: E402
+import _session  # noqa: E402
 import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
@@ -601,10 +601,10 @@ def test_exit_89_flushes_its_telemetry_and_names_itself(monkeypatch):
         "solidworks_mcp.adapters.pywin32_adapter",
         SimpleNamespace(PyWin32Adapter=Mock(return_value=adapter)),
     )
-    monkeypatch.setattr(_common._watchdog, "start", Mock())
-    monkeypatch.setattr(_common._watchdog, "stop", Mock())
-    monkeypatch.setattr(_common, "discard_open_documents", Mock())
-    monkeypatch.setattr(_common, "_resident_output_documents", lambda _adapter: [])
+    monkeypatch.setattr(_watchdog, "start", Mock())
+    monkeypatch.setattr(_watchdog, "stop", Mock())
+    monkeypatch.setattr(_session, "discard_open_documents", Mock())
+    monkeypatch.setattr(_session, "_resident_output_documents", lambda _adapter: [])
     monkeypatch.setattr(sys, "argv", ["draw_dt_crank_hub.py"])
     monkeypatch.delenv("TRACEPARENT", raising=False)
     shutdown = Mock()
@@ -614,7 +614,7 @@ def test_exit_89_flushes_its_telemetry_and_names_itself(monkeypatch):
     build = AsyncMock(return_value={})
 
     with pytest.raises(SystemExit) as caught:
-        _common.run_build(build)
+        _session.run_build(build)
 
     assert caught.value.code == 89
     build.assert_not_awaited()

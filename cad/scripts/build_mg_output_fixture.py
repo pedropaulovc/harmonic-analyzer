@@ -23,24 +23,17 @@ import math
 import sys
 
 import _telemetry
-from _common import (
-    SketchDims,
-    _read_member,
-    apply_material,
-    blank_sketch,
-    check,
-    define_circle,
-    drive_dimension,
-    ensure_fully_defined,
-    force_rebuild,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    set_sketch_direct_db,
-    volume_check,
-)
+from _appearance import apply_material
+from _check import check
+from _com import _read_member
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, blank_sketch, ensure_fully_defined, set_sketch_direct_db
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -59,7 +52,7 @@ from mg_output_fixture_spec import (
 )
 
 PART_NAME = "mg-output-fixture"
-MATERIAL = "Brass"  # see _common.apply_material docstring
+MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
 # Collar nominals live in mg_output_fixture_spec (the drawing consumes the same
 # values), so the print and the part cannot silently drift (codex review #361).

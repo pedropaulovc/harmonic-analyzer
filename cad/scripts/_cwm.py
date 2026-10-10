@@ -52,7 +52,7 @@ from __future__ import annotations
 from typing import Any
 
 import _telemetry
-from _common import _early_bound, _flag_only
+from _com import _early_bound, _flag_only
 
 # pywin32 / solidworks_mcp COM imports stay FUNCTION-LOCAL (the _assembly.py
 # convention): this module is imported by build_ch_channel_assembly, which the

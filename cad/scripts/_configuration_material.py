@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import _telemetry
-from _common import _early_bound
+from _com import _early_bound
 
 
 def require_material_in_every_configuration(

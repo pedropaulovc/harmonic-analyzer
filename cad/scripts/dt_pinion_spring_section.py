@@ -20,7 +20,7 @@ MM_PER_IN = 25.4
 THICK = 0.015 * MM_PER_IN  # 0.381
 WIDTH = 0.25 * MM_PER_IN  # 6.35
 # The thickness band is (upper, lower) deviations in mm, read through
-# ``_fit_limits.deviations``: 2325K19 lists -0.00075 to +0.00075 in (vendor
+# ``_fit_deviations.deviations``: 2325K19 lists -0.00075 to +0.00075 in (vendor
 # page read 2026-09-25).  The sheared width prints at .XX, so its readers take
 # the band that print states (``_printed_tolerance.printed_deviations``).
 THICK_BAND = (0.00075 * MM_PER_IN, -0.00075 * MM_PER_IN)

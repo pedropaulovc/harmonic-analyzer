@@ -1,6 +1,6 @@
 """Pure-data manufacturing contract for the platen guide."""
 
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _hole_spec import HoleSpec
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 

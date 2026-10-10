@@ -48,7 +48,12 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from _common import check, run_build
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check
+from _session import run_build
 
 import _telemetry
 
@@ -89,7 +94,7 @@ def _get_point(adapter: Any, entity: Any, iface: str, member: str) -> tuple[Any,
 
 def _origin_feature_names(adapter: Any) -> list[str]:
     """Names of origin-typed features in the tree (locale-proof candidates)."""
-    from _common import _read_member
+    from _com import _read_member
 
     names: list[str] = []
     feat = _read_member(adapter.currentModel, "FirstFeature")

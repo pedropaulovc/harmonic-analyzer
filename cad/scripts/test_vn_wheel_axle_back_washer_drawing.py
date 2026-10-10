@@ -14,7 +14,7 @@ import build_vn_wheel_axle_back_washer as part
 import vn_wheel_axle_back_washer_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_92916A480 as recipe
 
 STEM = "vn-wheel-axle-back-washer"
@@ -36,7 +36,7 @@ def test_catalogue_row_is_the_registered_mcmaster_part() -> None:
     assert row["number"] == NUMBER
     assert row["process"] == "purchased"
     assert int(row["quantity"]) == spec.COUNT == 1
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is getattr(recipe, BUILD)
     assert metadata.threaded is False

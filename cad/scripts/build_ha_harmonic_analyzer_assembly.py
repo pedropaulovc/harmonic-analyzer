@@ -46,13 +46,10 @@ from __future__ import annotations
 
 import sys
 
-from _common import (
-    OUT_PNG,
-    OUT_SLDASM,
-    apply_custom_properties,
-    check,
-    run_build,
-)
+from _check import check
+from _custom_properties import apply_custom_properties
+from _paths import OUT_PNG, OUT_SLDASM
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,

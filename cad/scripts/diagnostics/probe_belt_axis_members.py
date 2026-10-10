@@ -30,7 +30,13 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
-from _common import OUT_SLDASM, check, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _paths import OUT_SLDASM  # noqa: E402
+from _session import run_build  # noqa: E402
 from _telemetry import info, success, warn  # noqa: E402
 from build_kinematic_probe import _removables_by_role  # noqa: E402
 from probe_belt_ratio_fix import _measure_ratio  # noqa: E402

@@ -1,4 +1,4 @@
-"""Shared fit-limit formatting for released drawing callouts.
+"""Fit-limit drawing text, separate so ink edits do not re-key numerical users.
 
 PURE DATA, no SolidWorks/COM imports.  Every released MAX/MIN final-size
 callout must derive from its spec nominal plus a NAMED offset band through
@@ -6,20 +6,15 @@ callout must derive from its spec nominal plus a NAMED offset band through
 spec retune rebuilds the part and the displayed nominal while the released
 shop limits silently keep the old values (codex #359 rounds 2-3, six sheets).
 
-The bands here are the fit CLASSES shared across parts; a band peculiar to
+The fit CLASSES shared across parts live in ``_fit_ream_slide``,
+``_fit_shaft_h`` and ``_fit_ream_h7``; a band peculiar to
 one part (an asymmetric mid-nominal ream, a press band) lives as a named
 constant in that part's ``*_spec.py`` next to the nominal it tolerances.
 """
 
 from __future__ import annotations
 
-# Fit classes: (upper, lower) offsets in mm, added to the nominal.
-# Reamed slide/running fit for a ground rod or arbor over its shared nominal.
-REAM_SLIDE = (0.025, 0.010)
-# Ground-shaft h band: nominal down to -0.020.
-SHAFT_H = (0.000, -0.020)
-# ISO H7 reamed hole, 3-6 mm size range: +0.012 / +0.000.
-REAM_H7 = (0.012, 0.000)
+from _fit_deviations import validate_band
 
 
 def band_text(band: tuple[float, float]) -> str:
@@ -38,29 +33,9 @@ def band_text(band: tuple[float, float]) -> str:
     own, not a side effect of moving a constant.
     """
     upper, lower = band
-    if upper <= lower:
-        raise ValueError(f"fit band is inverted: {band!r}")
+    validate_band(band)
     low = f"{lower:+.2f}" if lower else "-0.00"
     return f"{upper:+.2f}/{low}"
-
-
-def deviations(band: tuple[float, float]) -> tuple[float, float]:
-    """Return ``(lower, upper)`` — the argument order the model setter takes.
-
-    The bands above are written ``(upper, lower)`` because that is how a fit is
-    quoted on a print (upper deviation first, ASME Y14.5 §2.3.2), but
-    ``_drawing_marks.set_dimension_bilateral_tolerance`` takes
-    ``(lower_deviation_mm, upper_deviation_mm)``.  BOTH orderings type-check and
-    a silent swap INVERTS the band, so no call site is allowed to transpose by
-    hand — splat this instead::
-
-        set_dimension_bilateral_tolerance(adapter, "StubProfile", "SeatDia",
-                                          *deviations(SHAFT_H))
-    """
-    upper, lower = band
-    if upper <= lower:
-        raise ValueError(f"fit band is inverted: {band!r}")
-    return lower, upper
 
 
 def fit_limits(
@@ -72,8 +47,7 @@ def fit_limits(
 ) -> str:
     """Render ``X.XXX MAX / X.XXX MIN`` from a nominal + (upper, lower) band."""
     upper, lower = band
-    if upper <= lower:
-        raise ValueError(f"fit band is inverted: {band!r}")
+    validate_band(band)
     prefix = "<MOD-DIAM>" if diameter else ""
     return (
         f"{prefix}{nominal + upper:.{decimals}f} MAX / "

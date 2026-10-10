@@ -25,13 +25,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import (  # noqa: E402
-    add_line_chain,
-    check,
-    define_circle,
-    name_last_feature,
-    volume_check,
-)
+from _stock_recipe import stock_recipe  # noqa: E402
+
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
+from _sketch import add_line_chain  # noqa: E402
+from _sketch_circle import define_circle  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
 from vn_wheel_axle_nut_spec import (  # noqa: E402
     ACROSS_CORNERS,
@@ -53,6 +57,7 @@ def hex_profile_mm() -> list[tuple[float, float]]:
     ]
 
 
+@stock_recipe("92671A005", threaded=False)
 async def build_92671A005(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -102,6 +107,6 @@ async def build_catalog(adapter) -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    from _common import run_build
+    from _session import run_build  # noqa: E402 -- diagnostic path bootstrap
 
     sys.exit(run_build(build_catalog))

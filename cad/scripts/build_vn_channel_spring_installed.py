@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import sys
 
-from _common import run_build
+from _session import run_build
 from _saved_part_guard import require_saved_drawing_properties
 from _spring import build_spring
 from vn_channel_spring_installed_notes import DRAWING_NOTES
