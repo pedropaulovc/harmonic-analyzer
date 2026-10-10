@@ -271,6 +271,8 @@ next free Number in its category and has no old stem or old Number.
 
 | Change | Canonical stem | Number | Note |
 |---|---|---|---|
+| retired | `pd-latch-hook-bracket` | MHA-PD-021 | replaced by the one-piece formed spring-steel MHA-PD-014 latch hook, screwed to the support bar by the two MHA-VN-043 screws |
+| retired | `vn-latch-hook-rivet` | MHA-VN-045 | no replacement: the one-piece MHA-PD-014 latch hook has no riveted joint |
 | retired | `vn-knife-hanger-washer` | MHA-VN-026 | no replacement: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor |
 | added | `vn-magnifying-bracket-screw` | MHA-VN-050 | screws the MHA-MG-001 magnifying bracket to the MHA-SM-003 summing lever |
 | added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
