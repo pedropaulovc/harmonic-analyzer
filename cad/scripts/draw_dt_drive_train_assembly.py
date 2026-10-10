@@ -234,12 +234,15 @@ SHEET_SCALES = package_sheet_scales(CLUSTER_SCALES)
 # --- sheet 1: projected front/top/right group + isometric ---------------------
 # The projected group's lower-left lands here; the views are aligned on the
 # model origin (ASME third angle: top above front, right to the right of it).
-# At 1:3 the group is ~177 mm tall (front y ~42 + gap + top z ~121, the old
-# MHA-DT-000 sheet); the 175 mm the first region allowed failed on the farm (leaf
+# At 1:3 main's group read 209.2 x 190.7 mm with a 14 mm gap (drawing.projected_group);
+# the inch train grew it to 213.0 x 194.9 (0d454fa91), 0.9 mm past the 194 mm
+# region. A 12 mm gap still holds each caption (4 mm under its view, one
+# ~3.5 mm line) ~4.5 mm clear of the view below and fits with 1.1 mm to spare.
+# The 175 mm the first region allowed failed on the farm (leaf
 # 20260923T045245Z-1-b34a8422). The origin sits just above the title block
 # (top y=0.0655) and the region top 4.5 mm under the zone border.
 PROJECTED_GROUP_ORIGIN = (0.024, 0.068)
-PROJECTED_GAP = 0.014
+PROJECTED_GAP = 0.012
 PROJECTED_REGION = (0.018, 0.068, 0.300, 0.262)
 # The right half between the four-line heading (bottom ~0.245) and the title block
 # (top 0.0655): a 1:3 isometric outline is ~130 mm, 1.5x baseline-5's 1:4.
