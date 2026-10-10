@@ -84,20 +84,30 @@ if BACK_END_SUNK_MAX > 0.30 + 1e-9:
 # (a) The pin's shank-to-thread step stays inside the hub's front face, so the
 # wheel runs on the full shank and the front washer sits on the thread.
 STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - _GAUGE[1]  # 0.687
-# (b) The locknut is fully threaded: the thread runs past its outer face.
-LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0]) - (
+# (b) The locknut sits on FULL thread (rule 12 counts full threads only): the
+# thread less the incomplete pitch the dome cuts runs past its outer face,
+# and the first nut's inner face sits past the die's run-out at the step.
+LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0] - _pin.TIP_INCOMPLETE) - (
     _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
-)  # 0.017
-# (c) Only the dome and a little thread stand past the locknut.
-THREAD_PAST_LOCKNUT_LIMIT = 1.8
+)  # 0.002
+NUT_RUNOUT_MARGIN = (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
+    _GAUGE[1] + _pin.DIE_RUNOUT
+)  # 0.241
+# (c) Only the dome and the thread the full-thread margin needs stand past the
+# locknut: the worst geometric thread end, incomplete pitch included.
+THREAD_PAST_LOCKNUT_LIMIT = 2.5
 THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + _THREAD[1]) - (
     _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]
-)  # 1.787
-THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 0.837
+)  # 2.407
+THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 1.457
 if STEP_INSIDE_HUB <= 0.0:
     raise AssertionError(f"pin step clears the hub front face: {STEP_INSIDE_HUB:.4f}")
 if LOCKNUT_THREAD_MARGIN < 0.0:
-    raise AssertionError(f"locknut runs off the thread: {LOCKNUT_THREAD_MARGIN:.4f}")
+    raise AssertionError(
+        f"locknut runs off the full thread: {LOCKNUT_THREAD_MARGIN:.4f}"
+    )
+if NUT_RUNOUT_MARGIN < 0.0:
+    raise AssertionError(f"nut reaches the die run-out: {NUT_RUNOUT_MARGIN:.4f}")
 if THREAD_PAST_LOCKNUT_MAX > THREAD_PAST_LOCKNUT_LIMIT:
     raise AssertionError(
         f"{THREAD_PAST_LOCKNUT_MAX:.4f} of thread past the locknut "

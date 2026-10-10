@@ -48,7 +48,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Every view prints at the sheet scale, so none needs a caption. 4:1 lays the
-# 36.55 pin 146 mm long and its 3/16 shank 19 mm across.
+# 37.17 pin 149 mm long and its 3/16 shank 19 mm across.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -106,7 +106,7 @@ def _view_center_delta(
 
     ``place_view`` anchors on the model origin's projection, not the geometry
     box center, so a part that is not origin-symmetric (this pin spans
-    y -9..27.5) lands its geometry offset from the requested center. Every
+    y -8.9..28.27) lands its geometry offset from the requested center. Every
     layout constant in this recipe is authored about the intended geometry
     center; shifting by this delta makes the edge picks and text positions
     track wherever SolidWorks actually put the geometry.

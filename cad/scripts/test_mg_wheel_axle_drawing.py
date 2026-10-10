@@ -31,16 +31,21 @@ def test_spec_values_are_the_drill_rod_pin() -> None:
     assert spec.SHANK_LEN == 28.4
     assert spec.THREAD == "#4-40"
     assert spec.THREAD_MAJOR == pytest.approx(2.845, abs=1e-3)
-    assert spec.THREAD_LEN == 7.35
-    assert spec.THREAD_END == pytest.approx(35.75)
-    assert spec.PIN_LEN == pytest.approx(36.55)
+    assert spec.THREAD_LEN == 7.97
+    assert spec.THREAD_END == pytest.approx(36.37)
+    assert spec.PIN_LEN == pytest.approx(37.17)
+    # Full thread only: 1.5 pitches of die run-out at the step, one pitch
+    # cut short by the dome.
+    assert spec.THREAD_PITCH == pytest.approx(0.635)
+    assert spec.FULL_THREAD_START_Y == pytest.approx(19.5 + 1.5 * 0.635)
+    assert spec.FULL_THREAD_END_Y == pytest.approx(27.47 - 0.635)
     assert spec.DOME_R == pytest.approx(1.665, abs=1e-3)
     # Pressed to the gauge from the bar's front face (the origin); the back
     # end then sits 0.10 inside the bar's back face.
     assert spec.PRESS_GAUGE == spec.STEP_Y == 19.5
     assert spec.BACK_Y == pytest.approx(-mg_wheel_bar_geom.BAR_DEPTH + 0.10)
     assert (spec.STEP_Y, spec.THREAD_END_Y, spec.TIP_Y) == pytest.approx(
-        (19.5, 26.85, 27.65)
+        (19.5, 27.47, 28.27)
     )
 
 
@@ -142,11 +147,14 @@ def test_part_stamps_make_critical_properties() -> None:
 def test_wheel_group_stack_fits_the_pin() -> None:
     assert group.STEP_INSIDE_HUB > 0.0
     assert group.STEP_INSIDE_HUB == pytest.approx(0.6866, abs=1e-3)
+    # (b) on FULL thread: the dome's incomplete pitch is not counted, and the
+    # first nut stays clear of the die run-out at the step.
     assert group.LOCKNUT_THREAD_MARGIN >= 0.0
-    assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.0166, abs=1e-3)
-    assert group.THREAD_PAST_LOCKNUT_MAX <= group.THREAD_PAST_LOCKNUT_LIMIT == 1.8
-    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(1.7866, abs=1e-3)
-    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(0.8375, abs=1e-3)
+    assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.0016, abs=1e-3)
+    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.2413, abs=1e-3)
+    assert group.THREAD_PAST_LOCKNUT_MAX <= group.THREAD_PAST_LOCKNUT_LIMIT == 2.5
+    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(2.4066, abs=1e-3)
+    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.4575, abs=1e-3)
     # Pressed to the gauge, the back end is within the bar's depth band of
     # the back face.
     assert group.BACK_END_PROUD_MAX == pytest.approx(0.10)

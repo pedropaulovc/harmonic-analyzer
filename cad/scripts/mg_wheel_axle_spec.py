@@ -27,13 +27,21 @@ SHANK_LEN_BAND = (0.05, -0.05)
 THREAD = "#4-40"
 THREAD_CALLOUT = "#4-40 UNC"
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]  # 2.845, modelled at the basic major
+THREAD_PITCH = MM_PER_IN / 40.0  # 0.635
+# Incomplete threads (drawing-simplicity rule 12 counts full thread only): the
+# die cutting up to the step leaves 1.5 pitches of run-out there; the dome
+# cuts the last pitch short (the tip-chamfer allowance the filing stud takes).
+DIE_RUNOUT = 1.5 * THREAD_PITCH  # 0.9525
+TIP_INCOMPLETE = THREAD_PITCH  # 0.635
 # Printed step to thread end: the press gauge is taken at the step, so the
-# thread's reach past the nuts reads off this one length.
-THREAD_LEN = 7.35
+# thread's reach past the nuts reads off this one length. 7.97 is the
+# shortest .XX length whose FULL thread still clears the locknut's outer face
+# at the worst corner (mg_wheel_group).
+THREAD_LEN = 7.97
 THREAD_LEN_BAND = (0.05, -0.05)
-THREAD_END = SHANK_LEN + THREAD_LEN  # 35.75 from the back end
+THREAD_END = SHANK_LEN + THREAD_LEN  # 36.37 from the back end
 DOME_H = 0.8
-PIN_LEN = THREAD_END + DOME_H  # 36.55
+PIN_LEN = THREAD_END + DOME_H  # 37.17
 # The spherical tip through the thread-major edge, DOME_H high.
 DOME_R = ((THREAD_MAJOR / 2.0) ** 2 + DOME_H**2) / (2.0 * DOME_H)  # 1.665
 
@@ -44,8 +52,12 @@ PRESS_GAUGE_TOL = 0.05
 
 STEP_Y = PRESS_GAUGE  # 19.5
 BACK_Y = STEP_Y - SHANK_LEN  # -8.9: 0.10 inside the bar's back face
-THREAD_END_Y = STEP_Y + THREAD_LEN  # 26.85
-TIP_Y = THREAD_END_Y + DOME_H  # 27.65
+THREAD_END_Y = STEP_Y + THREAD_LEN  # 27.47
+TIP_Y = THREAD_END_Y + DOME_H  # 28.27
+# Full thread runs from the die's runout at the step to one pitch short of
+# the dome.
+FULL_THREAD_START_Y = STEP_Y + DIE_RUNOUT  # 20.4525
+FULL_THREAD_END_Y = THREAD_END_Y - TIP_INCOMPLETE  # 26.835
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"},
