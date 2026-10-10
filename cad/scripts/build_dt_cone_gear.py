@@ -538,6 +538,15 @@ async def _configuration_topology(
         else 0
     )
     feature_issues: list[str] = []
+    # Read every row the way the suppression sweep verified it: in the ACTIVE
+    # configuration (IsSuppressed2(1, null)). The specific-configuration form
+    # (3, [name]) disagreed with it on foreign rows after the sweep (probes
+    # 3-9) while the T006 body measured exactly; both are logged once.
+    from solidworks_mcp.adapters.com_variant import null_variant
+
+    if str(_active_configuration(model).Name) != configuration:
+        raise RuntimeError(f"{configuration}: not active for the suppression audit")
+    mode_disagreements: list[str] = []
     for row_teeth in CONFIGURATION_TEETH:
         for feature_name in tooth_features(row_teeth):
             raw_feature = part.FeatureByName(feature_name)
@@ -545,8 +554,12 @@ async def _configuration_topology(
                 feature_issues.append(f"missing native feature {feature_name}")
                 continue
             feature = _early_bound(raw_feature, "IFeature")
-            answer = feature.IsSuppressed2(3, [configuration])
+            answer = feature.IsSuppressed2(1, null_variant())
             answer = answer if isinstance(answer, (list, tuple)) else (answer,)
+            named = feature.IsSuppressed2(3, [configuration])
+            named = named if isinstance(named, (list, tuple)) else (named,)
+            if tuple(map(bool, named)) != tuple(map(bool, answer)):
+                mode_disagreements.append(f"{feature_name}: active={answer!r} named={named!r}")
             if len(answer) != 1 or bool(answer[0]) != (row_teeth != teeth):
                 feature_issues.append(f"{feature_name}: wrong suppression in {configuration}")
             if row_teeth == teeth:
@@ -557,6 +570,11 @@ async def _configuration_topology(
                     feature_issues.append(
                         f"{feature_name}: native error {error[0]}, warning={bool(error[1])}"
                     )
+    if mode_disagreements:
+        _telemetry.info(
+            f"{phase} {configuration}: IsSuppressed2 active vs named readback differs on "
+            f"{len(mode_disagreements)} features: {mode_disagreements[:6]!r}"
+        )
     raw_sketch = part.FeatureByName(tooth_features(teeth)[0])
     if raw_sketch is not None:
         raw_specific = _early_bound(raw_sketch, "IFeature").GetSpecificFeature2()
