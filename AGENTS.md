@@ -188,7 +188,7 @@ uv sync                       # core deps + the dev group (pytest) — everythin
 `pytest`, plus the Windows COM bindings (`pywin32`, `comtypes`) and the
 **`solidworks-mcp-python`** package — wired in as an *editable path source*
 (`[tool.uv.sources]` → `./SolidworksMCP-python`), since `verify.py` /
-`_common.py` / `_assembly.py` all `from solidworks_mcp …`. That package is
+`_session.py` / `_com.py` / `_assembly.py` all `from solidworks_mcp …`. That package is
 vendored as a **git submodule** (tracking branch `personal`), so
 `git submodule update --init` must run before the first `uv sync`. After editing
 `pyproject.toml`, re-run `uv sync`; commit `pyproject.toml` **and** `uv.lock`
@@ -408,7 +408,7 @@ submodule is the comparison gallery:
 The gallery runs on the submitter and takes no COM seat; it is in
 the normal release closure. No farm-dispatchable task's `file_dep` or action
 touches the submodule: the `REFERENCES_DIR` every build script imports is
-`cad/references` (`_common.py`), a tracked in-repo directory of vendored
+`cad/references` (`_paths.py`), a tracked in-repo directory of vendored
 DXF/vendor models, and `cut_release.py` only *string-matches* the `references/`
 prefix when it rewrites doc links (it reads no file there — `release` runs on
 the submitter anyway).
@@ -472,7 +472,7 @@ A cache-keyed COM task must therefore declare its inputs as machine-stable
 `file_dep`s and its outputs under `cad/out/`; a gate whose only output is a
 verdict passes its stamp path as `stamp=` and that stamp IS the cached artefact.
 This is enforced loud at runtime: a doit-launched build that reaches
-`sw.connect` without `HARMONIC_COM_SEAT` set raises in `_common.run_build` (the
+`sw.connect` without `HARMONIC_COM_SEAT` set raises in `_session.run_build` (the
 successor to the removed `_assert_spine_complete` tripwire). The cache RESTORE/STORE
 (Azure transfers) run **outside** the lock, so cache hits stay parallel; only the COM
 subprocess holds the seat.
@@ -482,7 +482,7 @@ carries session-global state, so the lock is a safety belt — not a green light
 genuinely-independent concurrent builds on one machine. Still: never hand-launch two
 SolidWorks build scripts at once. Corollary — **the lock holder owns the session**:
 whoever acquires the seat is right to, and must, discard every open document and
-start from an empty session (`_common.run_build` does exactly that at connect and
+start from an empty session (`_session.run_build` does exactly that at connect and
 fails if any `cad/out` document survives). Work left open across a lock release was
 never protected: save or discard before releasing, and never expect a document to
 be there when you get the seat back. A read-only probe that opens a drawing also
@@ -530,7 +530,7 @@ cold build; the incremental/cache-hit common case keeps restores parallel.
 ## COM watchdog — crash + wedge detection
 
 Every COM subprocess runs a daemon watchdog thread (`_watchdog.py`;
-`_common.run_build` starts it right before `sw.connect` and stops it after
+`_session.run_build` starts it right before `sw.connect` and stops it after
 `sw.disconnect`) so a dead SolidWorks can never hold the seat forever. Four
 signals, three fatal, one log-only:
 
@@ -639,9 +639,19 @@ propagates a part → assembly DAG. When only a part changed, the dependent
 assembly is *refreshed* — reopen + per-config `ForceRebuild3` + health/DOF/
 interference gates + in-place `Save3` (seconds) — instead of a from-scratch
 re-insert/re-mate (~500 s). It escalates to a *full* rebuild (+ any post-assembly
-hooks) when the assembly script / `_common.py` / a hook changed, or the target is
+hooks) when the assembly script / a shared CAD helper in its recipe closure / a hook changed, or the target is
 missing. Force a full rebuild of one assembly by deleting its `.SLDASM` target,
 then `doit assembly:<stem>`.
+
+**Focused helper imports.** Import helpers directly from their owning modules:
+`_session` for build sessions, `_paths` for paths/constants, `_com` for COM access,
+`_part_save` for part exports, `_rebuild` for rebuilds, and the focused sketch,
+property and appearance modules for their respective operations. Recipe closures
+are file-granular and follow local imports transitively, including function-local
+and `TYPE_CHECKING` imports: importing only the helpers a leaf uses narrows cache
+invalidation without hiding any saved-artefact dependency. There is no shared
+re-export facade. Diagnostic scripts use `diagnostics/_script_paths.py` only to
+bootstrap the scripts path; it exports no CAD helpers.
 
 **Fail loud.** A refresh that hits a dangling mate, free DOF, or interference
 exits non-zero and leaves the `.SLDASM` untouched — never a stale artefact.
@@ -733,27 +743,72 @@ fail a build):
   event is recorded with `drift_expected: true` + a `drift_reason` and logged at
   debug — the `WARN` keeps meaning "a publishing seat drifted".
 
+## File-granular recipe helpers
+
+`_buildgraph.module_deps_of()` follows local imports anywhere in a Python file;
+moving an import into a function does not narrow a recipe's cache key. Keep
+unrelated recipe data and save machinery in separate, statically imported files.
+
+Stock fasteners declare their SKU and modeled-thread contract beside each
+`diagnostics/diag_build_<SKU>.py` callable with `_stock_recipe.stock_recipe`.
+There is no shared SKU-to-recipe registry: a production builder imports its own
+callable, and `_stock_fastener` validates that callable's declaration and identity.
+Only threaded builders import `_simplified_part.save_simplified_part` and pass it
+as `save_threaded_part`; the shared stock save still checks the declared thread
+against the actual `ThreadGroove` feature before either save path runs.
+
+Simplified configuration helpers are separated by their real consumers:
+`_simplified_names` is naming only, `_simplified_identity` fingerprints assembly
+components, `_simplified_bom` is the pure child BOM-number policy needed by part
+derivation, and `_simplified_part` derives and saves part configurations.
+Drawings and assemblies do not import the part-side machinery.
+Vendor dimensions belong in pure per-SKU helpers imported by both the recipe and
+the spec, never in a family table or recipe module imported by unrelated specs.
+Shared parameterized geometry belongs in its own helper (for example
+`_shoulder_screw_geometry`), not in another SKU's decorated recipe module.
+Assemblies and drawings read dimensions from specs or these pure providers, not
+from part builders. `_platen_rack_geometry` owns the shared rack section;
+`_cone_gear_geometry` and `_cone_gear_readback` share cone calculations and saved
+topology checks without importing cone-part derivation.
+
 ## Fine-grained config deps
 
 Each part/assembly depends on ONLY the `cad/config` files it actually reads,
 derived by static analysis of its `_config.<accessor>` calls (`config_files_of`
 in `_buildgraph.py`); `dodo.py` honors it as the file_dep + assembly-recipe set.
 The config is split per-subsystem (`cad/config/machine/<subsystem>.yaml` +
-`_base.yaml`) and per-part (`cad/config/parts/<dashed-name>.yaml` +
-`_defaults.yaml`); `_config._doc` re-aggregates them transparently, so
-accessors/verify/provenance are unchanged. Net: editing one part's registry row
-rebuilds only that part; a `machine channels.active_count` edit (in
-`machine/channels.yaml`) skips the gear parts (they read `machine/gear_train.yaml`);
-the narrative `dimensions.yaml` (read by no part) rebuilds nothing. It is
+`_base.yaml`), per-part (`cad/config/parts/<dashed-name>.yaml` +
+`_defaults.yaml`), and per-fit-group (`cad/config/tolerances/<group>.yaml` +
+`_base.yaml` for units/general classes); `_config._doc` re-aggregates them
+transparently, so accessors/verify/provenance are unchanged. Literal
+`_config.fit("<group>", ...)` reads depend only on that group's file, not the
+general classes; dynamic group reads depend on the whole tolerance family.
+Net: editing one part's registry row rebuilds only that part; a
+`machine channels.active_count` edit (in `machine/channels.yaml`) skips the gear
+parts (they read `machine/gear_train.yaml`); the narrative `dimensions.yaml`
+(read by no part) rebuilds nothing. It is
 CONSERVATIVE — any `_config` use the analyzer can't classify falls back to the
 whole config — so it can only over-rebuild, never skip a real change. Don't add a
 new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
 coverage test fails loud otherwise).
 
+Under doit, `HARMONIC_FIT_GROUPS` carries the fit groups covered by the task's
+config dependencies; `_config.fit` refuses a group outside that set. The
+launcher clears inherited restrictions for unnarrowed tasks, mirroring the
+fastener-row guard. This makes a hidden read fail rather than reuse an artefact
+whose cache key omits the group's input.
+
+Fit helpers are file-granular too: `_fit_deviations.py` owns numerical bands
+and validation, `_fit_ream_slide.py`, `_fit_shaft_h.py`, and `_fit_ream_h7.py`
+own the individual fit classes, and `_fit_text.py` owns drawing text renderers.
+Geometry imports numerical helpers without folding text formatting, and a
+fit-class edit reaches only consumers that import that class.
+
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
 that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF
 contract: `free_dof`/`free_dof_per_active_channel`, `required_free_stems`,
-`allowed_free_stems`) lives in its own file, read through
+`allowed_free_stems`; and `carries_chain`, which hands the soundness
+interference gate the chain's wheel mounts) lives in its own file, read through
 `_assembly_contract.py` — never as a stem-keyed table in `_assembly.py` (on every
 assembly's recipe: one drive-train seed there used to re-key all eight
 assemblies and every gate behind them) or `verify.py` (on every soundness
@@ -822,7 +877,7 @@ seat provenance, failure forensics, the authoring-context snapshot, seat
 parking and teardown. It lives in `cad/scripts/_seat_forensics.py`, which
 `_buildgraph.RECIPE_INERT_MODULES` puts in `_local_modules`' skip set, like
 `_telemetry`/`_watchdog`. So an edit to it re-keys nothing. Before the split,
-8 of the 16 `_common.py` commits in two weeks touched only this code, and each
+8 of the 16 commits to the former shared-helper monolith in two weeks touched only this code, and each
 re-keyed all 227 leaves.
 
 For telemetry, "inert" is argued. Here `check:inert` (`test_recipe_inert.py`)
@@ -831,10 +886,10 @@ enforces it, and derives its scope from that one constant:
 1. **No recipe folds it.** No build script's `module_deps_of` closure contains an
    inert module.
 2. **Pinned call sites only.** Tracked code names it only as `<module>.<name>`,
-   inside a pinned `(file, function)`: `_common.run_build` (connect-time
+   inside a pinned `(file, function)`: `_session.run_build` (connect-time
    provenance and the startup gate, post-save `teardown_seat`),
-   `_common.save_part_and_images` (`record_authoring_context`),
-   `_common.force_rebuild` (`capture_rebuild_failure`),
+   `_part_save.save_part_and_images` (`record_authoring_context`),
+   `_rebuild.force_rebuild` (`capture_rebuild_failure`),
    `_drawing_common.read_required_properties` (`capture_missing_properties`),
    `_drawing_common._select_view_entity` (`capture_pick_miss`, a sheet-point
    pick that selected nothing), `_drawing_common.new_project_drawing`
@@ -855,9 +910,10 @@ enforces it, and derives its scope from that one constant:
    (`record_authoring_context`, `record_seat_provenance`,
    `note_seats_before_connect`, `record_drawing_display`) reaches any of them.
 4. **Pinned reads.** The module reads tracked code only as attributes from a
-   pinned list (`_common._read_member`, `_common._early_bound`, …,
-   `_sketch_closure._sketch_state`). There are no from-imports, because
-   `_common` imports it and the modules are cycle-safe only by attribute access.
+   pinned list (`_com._read_member`, `_com._early_bound`, …,
+   `_sketch_closure._sketch_state`). Tracked helpers are accessed through module
+   attributes rather than from-imports, keeping the importing helper modules
+   cycle-safe.
 
 **What must stay tracked.** A verdict a build raises on stays tracked, because
 identical inputs must give an identical verdict. The sketch-closure census and
@@ -1012,13 +1068,13 @@ changes. `cad/out/` is gitignored.
 
 The pipeline is instrumented with **OpenTelemetry**, not `print()`. `cad/scripts/
 _telemetry.py` is the spine; it is **preconfigured on import** (console logging +
-tracing, zero env, no collector) and re-exported through `_common`, so the ~170
-scripts that `from _common import log, check` are instrumented unchanged.
+tracing, zero env, no collector) and wrapped by `_check`, so the ~170
+scripts that `from _check import log, check` are instrumented unchanged.
 
 - **Log, don't print.** Use the severity helpers — `_telemetry.debug` (`..`),
   `.info` (`--`), `.success` (the old `  OK  `), `.warn` (`!!`), `.error` (`xx`).
   Each prints the historical glyph line to **stderr** *and* emits a correlated
-  OTel log record at the matching `SeverityNumber`. `_common.log`/`check` are thin
+  OTel log record at the matching `SeverityNumber`. `_check.log`/`check` are thin
   aliases (`log`→`debug`, a passing `check`→`success`). New code must not add bare
   `print()` for status — reserve `print` for machine-readable stdout a caller pipes.
 - **Log vs event — a moment IN a span is a span event.** A fact that belongs to a
@@ -1035,7 +1091,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
 - **Spans, no gaps.** Wrap work in `with _telemetry.span("name", **attrs):` — it
   sets status OK on clean exit and, on an exception, records it + sets ERROR before
   re-raising, so a failure is never a silent hole. The build is a TREE of operation
-  spans, not a monolith: the per-step `_common` helpers (`define_circle`,
+  spans, not a monolith: the per-step focused helpers (`define_circle`,
   `extrude_at_offset`, `volume_check`, `save_part_and_images`, …) carry an
   `@_telemetry.traced("sketch.circle", label_param="label")` decorator, so each
   becomes a child span automatically. `verify.Report.gate` opens one per gate.
@@ -1168,7 +1224,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
   new subprocess launch.
 - **The process boundary itself is billed, not dark.** Between a task span starting
   and the child's first span (`sw.connect`) sat ~2–5 s of nothing: process creation,
-  interpreter boot, and the import graph (`solidworks_mcp` + `_common` ≈ 0.75 s idle,
+  interpreter boot, and the import graph (`solidworks_mcp` + the shared helpers ≈ 0.75 s idle,
   more under `-n` contention). `inject_env` now also stamps `HARMONIC_SPAWN_NS` with
   the launch instant, and the child's `build_session`/`run_pipeline_span` calls
   `_telemetry.record_process_startup()` once, drawing `proc.startup` with children
@@ -1194,7 +1250,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
 - **A log record names its caller, and a failed span names its cause.** App
   Insights maps a dark gap to code through the `code.function.name` /
   `code.file.path` of the record that ends it; `_telemetry`'s helpers pass a
-  `stacklevel` that skips `_telemetry`, contextlib and `_common`'s pass-through
+  `stacklevel` that skips `_telemetry`, contextlib and `_check`'s pass-through
   `log`/`check`, where every row used to read `success`/`info` in `_telemetry.py`.
   `_exit_span` also stamps `error.type` / `error.message` on the failed span:
   the exported `exception` event reaches the `exceptions` table with an empty
@@ -1301,7 +1357,7 @@ directly (`uv run cad/comparisons/tools/render_offline.py`, then `gallery.py`).
 ## Considered but NOT done (with reasons)
 
 - **`transcode:<stem>` — dropped.** The build writes PNGs via a single COM
-  `export_image()` call (`_common.save_part_and_images`); there is no separable
+  `export_image()` call (`_part_save.save_part_and_images`); there is no separable
   Pillow/BMP step in the build path to move off the seat, so there is nothing to
   parallelize. (BMP→Pillow transcode exists only in `cut_release._export_pngs`,
   inside the already-serial release job — not worth extracting.) The release PNG

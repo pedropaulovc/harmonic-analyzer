@@ -70,7 +70,7 @@ class FeatureWalk:
     components (each part's own save proved its tree), counts what it visits in
     ``visited`` for the span that owns the walk, and refuses a runaway
     traversal.  It yields RAW dispatches: read them with
-    ``_common._com_invoke`` (one round trip a member) rather than paying the
+    ``_com._com_invoke`` (one round trip a member) rather than paying the
     three a generated wrapper spends binding each feature it steps over.
     """
 
@@ -79,7 +79,7 @@ class FeatureWalk:
         self.visited = 0
 
     def __iter__(self) -> Iterator[Any]:
-        from _common import _com_invoke, _early_bound
+        from _com import _com_invoke, _early_bound
 
         def siblings(feature: Any, next_member: str) -> Iterator[Any]:
             while feature is not None:
@@ -107,7 +107,7 @@ def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, s
     One ``IFeatureManager.GetFeatures(False)`` call returns every feature and
     child feature, and none inside an assembly's components (the SolidWorks
     API reference), so nothing is walked.  Every call after the first hop goes
-    straight to a RAW dispatch by dispid (``_common._com_header``), because pywin32
+    straight to a RAW dispatch by dispid (``_com._com_header``), because pywin32
     wraps what a wrapper returns, and each wrap costs round trips: it reads
     the element's type info (GetTypeInfo, GetTypeAttr), and the generated
     class it builds runs a QueryInterface in its constructor, as
@@ -121,7 +121,7 @@ def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, s
     the first feature proving the elements answer ``IFeature``'s dispids (the
     array is untyped, and a foreign table would read every type as unknown,
     so the check would pass blind).  #880's save bar is <= 1 s."""
-    from _common import _com_header, _early_bound
+    from _com import _com_header, _early_bound
 
     started = time.perf_counter()
     model = _early_bound(model, "IModelDoc2")
@@ -259,5 +259,44 @@ def assert_reference_geometry_hidden(
             f"visibility allowance {stale} matches nothing shown; delete it "
             "from reference_visibility_allowances"
         )
+    if problems:
+        raise RuntimeError(f"{label}: " + "; ".join(problems))
+
+
+@_telemetry.traced(
+    "appearance.assert_reference_geometry_hidden_every_configuration",
+    label_param="label",
+)
+def assert_reference_geometry_hidden_in_every_configuration(
+    adapter: Any, label: str, allowed: Mapping[str, str] | None = None
+) -> None:
+    """Run :func:`assert_reference_geometry_hidden` with each configuration active.
+
+    Hide/show is per configuration and ``IFeature.Visible`` reads the active
+    one: the cone gear's pattern axis, blanked with T120 active, passed the
+    single-configuration check and rendered in T006..T114 (7e88be269).  Every
+    configuration is checked, one error names them all, and the originally
+    active configuration is active again at the end.  ``allowed`` applies to
+    each configuration, so an allowance must be shown in all of them.
+    """
+    from _com import _early_bound
+    from _rebuild import active_configuration_name
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    original = active_configuration_name(adapter, model)
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    if original not in names:
+        raise RuntimeError(f"{label}: active configuration {original!r} not in {names}")
+    problems: list[str] = []
+    for name in [name for name in names if name != original] + [original]:
+        if active_configuration_name(adapter, model) != name and not bool(
+            model.ShowConfiguration2(name)
+        ):
+            problems.append(f"{name}: ShowConfiguration2 refused")
+            continue
+        try:
+            assert_reference_geometry_hidden(adapter, f"{label} [{name}]", allowed)
+        except RuntimeError as exc:
+            problems.append(str(exc))
     if problems:
         raise RuntimeError(f"{label}: " + "; ".join(problems))

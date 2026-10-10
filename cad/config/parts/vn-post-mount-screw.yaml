@@ -3,11 +3,16 @@ vn-post-mount-screw:
   number: MHA-VN-031
   stock_name: Zinc-Plated Steel Slotted Fillister Head Machine Screw
   supplier: MSC Industrial Supply
-  supplier_skus: ["40923898"]
+  supplier_skus: ["40923906"]
   material: Plain Carbon Steel
-  material_specification: Steel, SAE J82, MSC 40923898 (mfr 1456MSL)
+  material_specification: Steel, SAE J82 / ASME B18.6.3, MSC 40923906, 1/4-20 x 4 in (101.6 mm) supplied stock
   finish: SUPPLIED ZINC PLATING; OIL BARE CUT END
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  # Modified purchased part: cut to matched-hole fit and deburr.
+  # vn_post_mount_screw_spec owns the raised post's 94.9 mm reference cut length.
+  # Cut each screw to its matched post/platform hole, never proud;
+  # a fixed 94.9 mm batch cut is not the acceptance rule.
+  # Supplier thread length is not established; check actual engagement.

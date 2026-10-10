@@ -5,39 +5,30 @@ rotating with the shaft), with its large-end bearing journal in the green
 pivot post and its thin end located by the external spacer and cup-ended
 adjuster -- the post and adjuster carrier both stand on the swing platform,
 so the whole set pivots out of engagement as one
-unit (ch. 25; p. 18 "pivot"). At the finer module DP 49.82 (ch13 OD 62.2) the
-tip gears are tiny -- T006 OD is 4.28 mm -- so the shaft steps down far
-more at the thin end to match the configured gear bores AND stay inside
-each gear's root circle (`build_dt_cone_gear.py` ``BoreDia``, DIMENSIONS.md
-Appendix C #7). The book never shows how the gears attach; here every gear
-land carries one D-flat on the shaft's +X and the gears' D-bores slide on
-from the tip as a solid touching stack (user ruling 2026-09-28).
+unit (ch. 25; p. 18 "pivot"). The configured cone profiles have small tip
+gears, so the shaft steps down to match their bores and root envelopes
+(`build_dt_cone_gear.py` ``BoreDia``, DIMENSIONS.md Appendix C #7).
+The book never shows how the gears attach; here every gear land carries
+one D-flat on the shaft's +X and the gears' D-bores slide on from the tip
+as a solid touching stack (user ruling 2026-09-28).
 
-Sections, FRONT STUB end at z = 0.  The v2 post puts that end at cone
-station -61.9068609979, 1.0 mm proud of the post front face.  An integral
-Ø12.2308 journal runs to z = 43.011 in the post's Ø12.2808 bore, where an
-integral thrust collar (#914), the 5/8 bar's own Ø15.875 as supplied (#916),
-fills the 3.181 to the 64T's south face and bears on the post's north boss
-face, then steps to the 3/8 in gear-seat shaft.  M6.7 (true-cone mesh, see
-the assembly docstring): gear seats at the exact-tracking stack pitch
-6.8888 mm, each gear 6.8887 thick, grown south from the 6.5 reference north
-face, so the stack touches; each land step sits SEAT_STEP_SETBACK (1.0)
-south of the north face of the last gear on the larger land
-(dt_cone_gear_shaft_spec.seat_step_station; stations below are cone stations):
+The FRONT STUB end is local z = 0, JOURNAL_PROUD south of the post's front
+face. The integral journal spans the post's derived CONE_BOSS_LENGTH and
+that proud length. The 5/8 bar's as-supplied thrust collar bears on the
+post's north boss face and fills the distance to the 64T's south face.
+The spec derives every downstream station from cone_line, the post, the
+configured cone face/seat pitch and the tip-block/adjuster owners:
 
-* 12.2308 mm x 43.011 -- v2 pivot-post bearing journal, 0.05 diametral
-  running clearance
-* 3/8 in to 100.717 -- 64T + seats T120..T030
-* 1/4 in to 107.606 -- T024 seat
-* 1/8 in to 114.495 -- T018 seat
-* 1/16 in to 139.734 -- T012 and T006 seats and the MHA-VN-016 set-screw
-  collar (locked on this land's flat one 0.45 feeler off T006); its end
-  contacts the exact McMaster 94025A164 conical cup apex at the 8.17 mm
-  nominal embed in the tip block (rule-12 E11, with the adjuster's 1.0D
-  engagement exception, user ruling 2026-09-29).  The land runs at L/D 15.9
-  and is turned with tailstock support (a drawing note).  The 1/16 in step
-  leaves T006 the 0.621 mm worst-case web accepted as its named exception
-  (U40) -- see dt_cone_gear_shaft_spec.SECTIONS.
+* The journal fits the post at JOURNAL_CLEARANCE diametral clearance.
+* The 3/8 in land carries the 64T and T120..T030.
+* The 1/4 in land carries T024; the 1/8 in land carries T018.
+* The reader-owned terminal land carries T012, T006 and the custom
+  MHA-VN-016 stack collar, ending at the retained cup apex.
+
+Each land step is SEAT_STEP_SETBACK south of the last larger gear's north
+face. The current T006 special-profile web and manufacturing disposition
+belong to dt_cone_gear_spec; a historical web ruling is not approval of
+changed geometry or a standard form cutter.
 
 Every gear land's flat (SECTION_FLAT_AF, across flat) runs the whole land;
 the terminal land's runs out through the tip, so its end face is a D.
@@ -55,8 +46,8 @@ filleted round and flat alike.
 
 Layout: shaft axis along +Z, large (pivot) end at the origin -- along
 the assembly depth like the gears (`build_dt_cone_gear.py` axis = Z), so
-the drive-train assembly inclines the whole cone set with one Ry(-19.8)
-rotation (DIMENSIONS.md ch. 13 drive-train layout).
+the drive-train assembly inclines the whole cone set by the configured
+cone-line angle (DIMENSIONS.md ch. 13 drive-train layout).
 
 Run (SolidWorks already open)::
 
@@ -70,27 +61,25 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import (
-    IN,
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties
+from _part_save import save_part_and_images
+from _paths import IN
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    name_bore_axis,
-    check,
-    define_circle,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -98,7 +87,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _gear import volume_check
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -122,28 +111,18 @@ from dt_cone_gear_shaft_spec import (
     SECTION_ORIGINS,
     SECTIONS,
     SURFACE_FINISHES,
+    validate_gear_loading_clearances,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 
 PART_NAME = "dt-cone-gear-shaft"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-# FRONT_STUB = 61.9068609979: with the final coupled-layout post centred at
-# cone station -39.90136099793 and spanning 42.011 along that axis, the shaft begins 1.0 mm
-# proud of the front face.  The Ø12.2308 integral journal occupies local
-# 0..43.011 in the post's Ø12.2808 bore; downstream 3/8-in and smaller gear
-# seats retain their world stations because every old local end receives the
-# 49.6068609979 stub delta.
-
-# SECTIONS (diameter in inches, section end station in mm from the FRONT STUB
-# end) lives in dt_cone_gear_shaft_spec.py -- the pure-data contract the drawing
-# shares -- with its derivation: each gear 6.8887 thick at the 6.8888 seat
-# pitch, touching the next, and each step one SEAT_STEP_SETBACK south of the
-# north face of the last gear on the larger land.  Diameters agree with
-# build_dt_cone_gear.bore_dia_in, stepping much finer than the old DP 30 shaft
-# because the tip gears shrank: T006 OD is now 4.28 mm.  The terminal land
-# stops at 1/16": below that the T006 rim gains little and the land becomes
-# unturnable (L/D 31 at 1/32").
+# SECTIONS and SECTION_KNOBS live in the shared pure-data spec.  FRONT_STUB
+# follows the current cone-line post station; the journal spans the post boss
+# and proud length, and each downstream land follows its gear/tip owner.
+# Diameters agree with the configured gear bores; the terminal size comes
+# from cone_shaft_land_bands for tailstock-supported turning.
 
 # Every length knob and the dimensions it is the ONE owner of (the seat-side
 # gate proves it): SecEnd{i} owns land i's end plane and its depth, SecEnd0
@@ -176,6 +155,7 @@ STATION_OWNERS: tuple[tuple[str, float, tuple[str, ...]], ...] = (
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
+    validate_gear_loading_clearances()
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations): one diameter + one end station per
@@ -190,7 +170,7 @@ async def build(adapter) -> dict[str, str]:
     # the knob moves the shoulder and the depth back to its origin together.
     # Option A (#914): the collar's thrust face is the one length origin, so
     # SecEnd1..3 are shoulder stations FROM the collar face; SecEnd0 is the
-    # journal (front stub to collar face) and SecEnd4 the overall length.
+    # journal (front stub to collar face) and SecEnd4 is collar face to tip.
     for i, (dia_in, _end_z) in enumerate(SECTIONS):
         await set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
         await set_global(adapter, f"SecEnd{i}", f"{SECTION_KNOBS[i]}mm")
@@ -348,9 +328,8 @@ async def build(adapter) -> dict[str, str]:
         removed = await _cut_flat(adapter, i, drive_jobs)
         volume -= removed
         # The flat's own volume, not the shaft's, sets the gate: a cut run the
-        # wrong way off the end plane meets only air (the next land lies
-        # inside this flat's plane, the spec proves), so it removes nothing
-        # and fails here even for the Ø1.5875 land's 2 mm^3.
+        # wrong way off the end plane meets only air, since the next land
+        # lies inside the flat plane, even on the slender terminal land.
         await volume_check(adapter, f"Sec{i} flat", volume, 0.1 * removed)
 
     # Step roots.  ONE constant-radius fillet over the three land steps,

@@ -1,7 +1,7 @@
 r"""Standalone validation harness -- the verify pass IS the test suite.
 
-The build scripts already gate themselves (``_common`` raises on free DOF,
-interference, rebuild errors). ``verify.py`` promotes those gates into one
+The build scripts already gate themselves (``_assembly`` raises on free DOF and
+interference, ``_rebuild`` on rebuild errors). ``verify.py`` promotes those gates into one
 runnable, re-runnable acceptance check that opens an *already-built* assembly
 and proves it is sound, plus the assertions a build script cannot make about
 itself: that the gear ratios in the live model equal the config, and that the
@@ -73,14 +73,10 @@ import gen_dimensions
 import pen_driver
 import truth_model
 import _telemetry
-from _common import (
-    OUT_SLDASM,
-    active_configuration_name,
-    check,
-    discard_open_documents,
-    log,
-    run_build,
-)
+from _check import check, log
+from _paths import OUT_SLDASM
+from _rebuild import active_configuration_name
+from _session import discard_open_documents, run_build
 from _assembly import (
     _export_assembly_images,
     _invalidate_massprops_proof,
@@ -103,12 +99,11 @@ from _assembly_postbuild import (
     author_dof_drives,
     load_dof_manifest,
 )
+from _chain_mounts import mounted_wheels
 from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
-from _common import (  # component iteration helpers (read-only)
-    _early_bound,
-    _read_member,
-)
+# component iteration helpers (read-only)
+from _com import _early_bound, _read_member
 
 # solidworks_mcp internals reused read-only: the live gear-mate ratios are not
 # exposed by any public tool (list_mates returns name/type/suppressed only), so
@@ -844,6 +839,16 @@ async def _reopen_assembly_rest_pose(adapter: Any, name: str, sldasm: Path) -> N
         check(f"activate {REST}", await adapter.set_active_configuration(REST))
 
 
+def _soundness_chain_mounts(name: str) -> Any:
+    """The authored wheel mounts for an assembly whose contract says it carries
+    the roller chain, else None: its build passes them to check_no_interference
+    (541011de0), so the soundness gate must too, or every chain-link-on-sprocket
+    mesh contact reads as interference."""
+    if not assembly_contract(name).carries_chain:
+        return None
+    return mounted_wheels()
+
+
 def _run_soundness_battery(
     adapter: Any, name: str, report: Report, rebuilt: Any
 ) -> None:
@@ -891,6 +896,7 @@ def _run_soundness_battery(
         lambda: check_no_interference(
             adapter,
             allowed_pairs=allowed_interference_pairs(name),
+            chain_mounts=_soundness_chain_mounts(name),
         ),
     )
     if name in ("ch-channel", "sm-summing"):
@@ -1028,6 +1034,7 @@ async def _verify_static_one(
         lambda: check_no_interference(
             adapter,
             allowed_pairs=allowed_interference_pairs(name),
+            chain_mounts=_soundness_chain_mounts(name),
         ),
     )
     if name in ("ch-channel", "sm-summing"):
@@ -2075,7 +2082,7 @@ def verify_tolerance_audit(report: Report) -> None:
     Reconciles the parts.yaml registry against the parts the build scripts
     actually save, and asserts every part carries the custom-property fields
     (material / tolerance class / process) with class names that resolve in
-    tolerances.yaml. Writes ``cad/out/reports/tolerance_audit.csv`` whether or
+    tolerances/. Writes ``cad/out/reports/tolerance_audit.csv`` whether or
     not the gates pass, so the artifact always reflects the current state.
     """
     rows, problems = _audit_rows()

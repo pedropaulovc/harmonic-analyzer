@@ -575,7 +575,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_cone_tip_adjuster",  # #10-32 cup-tip set screw (94025A164), member into cone_tip_block
         "dt_cone_tip_block",  # #4-40 blind foot tap + #10-32 through adjuster tap + #4-40 far-jaw pinch tap, receiver
         "vn_cone_tip_block_screw",  # #4-40 SHCS (91251A108), member into cone_tip_block foot
-        "vn_cone_tip_collar",  # #2-56 own set screw (9414T1 set-screw collar), member gripping cone_gear_shaft
+        "vn_cone_tip_collar",  # custom collar + reworked #2-56 94355A213 screw on the shaft D-flat
         "vn_cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_adjuster
         "dt_crank_arm",  # #4-40 through-taps, receiver of crank_handle_pivot_screw and fillister_screw (MHA-VN-006)
         "dt_crank_handle_pivot_screw",  # #4-40 made shoulder screw (MHA-DT-032), member into crank_arm
@@ -604,10 +604,10 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "dt_pinion_cam",  # M2.5 x 0.45 6H tap + supplied ISO 4026 M2.5 x 5 flat-point set screw, member (collar) gripping pinion_lift_rod
         "pd_platen",  # #4-40 tapped through (pd_platen_spec.SOCKET_SPEC), receiver of the 4 clip screws
         "pd_platen_guide",  # #4-40 front bottoming taps (guide screws) + rear through taps (guide-lock screws, R9-48), receiver
-        "vn_post_mount_screw",  # 1/4-20 (MSC 40923898 fillister, cut to fit), member into cone_swing_platform
+        "vn_post_mount_screw",  # 1/4-20 (MSC 40923906 fillister, 4 in stock cut to fit), member into cone_swing_platform
         "pd_rack_pinion",  # 120T disc (MHA-PD-006): 3x #0-80 through taps drilled and tapped at assembly (A06 disc-taps-transferred), receiver of the disc screws
         "fr_rocker_arm_support",  # receiver only of channel screws: 4x #8-32 BracketSeats (top-level rows); its own foot holes are 5/16 clearance
-        "vn_slotted_screw",  # #8-32 x 1-1/4 fillister (90280A201, MHA-VN-019), member into harmonic_base tapped seat
+        "vn_slotted_screw",  # #8-32 x 1-1/2 fillister (90280A203, MHA-VN-019), member into harmonic_base tapped seat
         "vn_spring_hook",  # #6-32 eyebolt (McMaster 9489T111, MHA-VN-012); member, x20 into summing_lever tapped plate (top-level row); no channel-internal joint
         "sm_summing_lever",  # receiver: #10-24 counter-anchor, 20x #6-32 channel anchors, two blind #2-56 magnifying-bracket seats
         "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through latch-hook taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
@@ -951,15 +951,15 @@ JOINTS: tuple[Joint, ...] = (
             "load the screw across its axis"
         ),
         axial_capture=(
-            "collar's own hex-socket cup-point set screw bearing on the shaft's Sec4 D-flat; "
-            "collar set one COLLAR_FEELER off T006"
+            "94355A213 stock set screw's native ground dog seated wholly on the shaft's Sec4 D-flat; "
+            "custom collar set one COLLAR_FEELER off T006; receiver carries >=1.5D full thread"
         ),
         lock=Lock.NONE,
         evidence=(
             "build_dt_drive_train_assembly.py tip_collar placement + 'tip collar set screw on the "
-            "D-flat' parallel mate; cone_tip_collar_spec SET_SCREW_THREAD; cone_stack_end_play "
-            "(collar and block never touch); CONE_CRANK_STEPS 2 (post-and-tip-block 'SLIP MHA-VN-016 "
-            "ON') and 3 (tip-adjuster-set 'LOCK ITS SET SCREW ON THE FLAT')"
+            "D-flat' parallel mate; vn_cone_tip_collar_spec DOG_SIDE_MARGIN_MM, "
+            "WORST_FULL_ENGAGEMENT_MM and WORST_WALLS_MM; cone_stack_end_play "
+            "(collar and block never touch); CONE_CRANK_STEPS 'LOCK ITS SET SCREW ON THE FLAT'"
         ),
     ),
     Joint(
@@ -1218,7 +1218,12 @@ JOINTS: tuple[Joint, ...] = (
             "perpendicular to these vertical screws, and the two-screw spacing carries any yaw as a shear couple, "
             "so no operating torque acts about a screw axis"
         ),
-        axial_capture="fillister head on the block top through a #8 normal-clearance hole; 11.25 (2.7D) in a transfer-tapped bottoming seat",
+        axial_capture=(
+            "fillister head on the block top through a #8 normal-clearance hole; "
+            "38.1 mm stock less the 25.232 mm raised block gives 12.868 mm nominal "
+            "insertion (13.378 mm maximum) into the transfer-tapped bottoming seat, "
+            "with current base full-thread/drill references 14.15/16.8 mm"
+        ),
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
@@ -1666,7 +1671,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_mg_magnifier_assembly.py:build ('thumb-screw (clamp)', lock_mate 'thumb-screw locked to clamp'; "
             "docstring 'Documented simplifications'); build_mg_magnifying_clamp.py ScrewHole HoleSpec('tapped','#4-40'); "
-            "mg_magnifying_clamp_spec.py DRAWING_NOTES; diag_mcmaster_thumb.py THUMB_SPECS['91882A221']"
+            "mg_magnifying_clamp_spec.py DRAWING_NOTES; _mcmaster_91882a221.py THUMB_SPEC"
         ),
     ),
     Joint(

@@ -170,6 +170,23 @@ BLANK_SKUS = {"T12": "6793K4", "T18": "6793K11", "T24": "6793K17"}
 if tuple(BLANK_SKUS) != tuple(name for name, _teeth in CONFIGS):
     raise AssertionError("every configuration needs its purchased blank")
 
+
+def configuration_teeth(configuration: str) -> int:
+    """Return the tooth count of an exactly registered sprocket configuration."""
+    try:
+        return TEETH[configuration]
+    except KeyError:
+        raise ValueError(
+            f"unknown removable sprocket configuration {configuration!r}; "
+            f"choose from {tuple(TEETH)}"
+        ) from None
+
+
+CRANK_CONFIG = "T12"
+KNOB_CONFIG = "T24"
+CRANK_TEETH = configuration_teeth(CRANK_CONFIG)
+KNOB_TEETH = configuration_teeth(KNOB_CONFIG)
+
 # --- manufacturing drawing (one sheet: the T24 views plus one edge view each
 # of T12 and T18; SPROCKET DATA lists all three configurations) --------------
 # The plate thickness carries PLATE_BAND; the bore and the pin holes are

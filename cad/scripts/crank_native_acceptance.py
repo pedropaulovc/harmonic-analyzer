@@ -7,7 +7,8 @@ import math
 from typing import Any
 
 import _telemetry
-from _common import _early_bound, _feature_by_name, _read_member
+from _com import _early_bound, _read_member
+from _feature_tree import _feature_by_name
 
 _POSITION_TOL_MM = 1e-6
 
@@ -119,3 +120,5 @@ def assert_signed_circle_center(
                 )
     if mismatches:
         raise RuntimeError(f"{label}: rebuilt signed position mismatch: " + "; ".join(mismatches))
+
+

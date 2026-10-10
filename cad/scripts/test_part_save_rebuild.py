@@ -1,5 +1,5 @@
-"""SolidWorks-free contract for ``_common.rebuild_stale_configurations`` and
-``_common.assert_saved_configurations_regenerate``.
+"""SolidWorks-free contract for ``_rebuild.rebuild_stale_configurations`` and
+``_rebuild.assert_saved_configurations_regenerate``.
 
 pc-p1r: dt-drive-train.SLDASM opened with NeedsRebuild2=1 because MHA-DT-030's
 INSTALLED configuration, the one the assembly places, was saved stale (amet
@@ -29,9 +29,24 @@ from pathlib import Path
 
 import pytest
 
-import _common
+import _appearance
+import _com
+import _custom_properties
+import _feature_tree
+import _part_checks
+import _part_properties
+import _part_save
+import _rebuild
+import _session
+import _sketch
+import _sketch_rectangle
 
-CONE_FAULTS = (("ToothGapCut", 1, False), ("ToothGapPattern", 1, False))
+def cone_faults(configuration: str) -> tuple[tuple[str, int, bool], ...]:
+    """Current native row names, unlike the historical incident names above."""
+    return (
+        (f"ToothGapCut{configuration}", 1, False),
+        (f"ToothGapPattern{configuration}", 1, False),
+    )
 
 
 class _Config:
@@ -64,7 +79,7 @@ class _Extension:
     def GetWhatsWrong(self):  # noqa: N802
         faults = self.part.faults
         if self.part.active in self.part.bad:
-            faults = (*faults, *CONE_FAULTS)
+            faults = (*faults, *cone_faults(self.part.active))
         names, codes, warnings = zip(*faults) if faults else ((), (), ())
         return True, [_Feature(name) for name in names], list(codes), list(warnings)
 
@@ -143,7 +158,17 @@ class _Adapter:
 
 @pytest.fixture
 def seat(monkeypatch):
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
 
     def make(stale, **kwargs):
         part = _Part(stale, **kwargs)
@@ -165,7 +190,7 @@ def _switches(part: _Part) -> list[str]:
 
 def test_a_clean_part_gets_no_rebuild_call_at_all(seat) -> None:
     adapter, part = seat({name: False for name in CONE_GEAR}, active="T120")
-    _common.rebuild_stale_configurations(adapter, "dt-cone-gear")
+    _rebuild.rebuild_stale_configurations(adapter, "dt-cone-gear")
     assert part.log == []
 
 
@@ -175,10 +200,10 @@ def test_a_stale_active_configuration_gets_one_edit_rebuild_all_and_no_switch(
     """efae8d795's perf intent, kept by the 2026-09-27 ruling: nothing inactive
     is stale, so nothing switches."""
     adapter, part = seat({"Default": True})
-    _common.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
+    _rebuild.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
     assert part.log == ["EditRebuildAll"]
     adapter, part = seat({"Default": True, "INSTALLED": False})
-    _common.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
+    _rebuild.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
     assert part.log == ["EditRebuildAll"]
 
 
@@ -189,7 +214,7 @@ def test_a_stale_inactive_configuration_gets_one_switch_and_a_forced_rebuild(
     one switch per stale inactive configuration, then the active one is shown
     again."""
     adapter, part = seat({"Default": False, "INSTALLED": True})
-    _common.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
+    _rebuild.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
     assert part.log == ["show INSTALLED", "force INSTALLED", "show Default"]
     assert part.active == "Default"
     assert not any(config.NeedsRebuild for config in part.configs.values())
@@ -202,7 +227,7 @@ def test_many_stale_configurations_switch_once_each_and_end_on_the_active_one(
     20 stale inactive ones, one back to T120, and T120 itself keeps the single
     EditRebuildAll (efae8d795's no-switch rebuild for the active one)."""
     adapter, part = seat({name: True for name in CONE_GEAR}, active="T120")
-    _common.rebuild_stale_configurations(adapter, "dt-cone-gear")
+    _rebuild.rebuild_stale_configurations(adapter, "dt-cone-gear")
     inactive = [name for name in CONE_GEAR if name != "T120"]
     assert _switches(part) == [f"show {name}" for name in (*inactive, "T120")]
     assert [entry for entry in part.log if entry.startswith("force")] == [
@@ -221,7 +246,7 @@ def test_configurations_still_stale_after_the_rebuild_raise_naming_part_and_all(
     with pytest.raises(
         RuntimeError, match=r"cone-gear: configurations \['T006', 'T018'\]"
     ):
-        _common.rebuild_stale_configurations(adapter, "dt-cone-gear")
+        _rebuild.rebuild_stale_configurations(adapter, "dt-cone-gear")
 
 
 def test_a_refused_rebuild_raises_even_when_the_flags_read_clean(seat) -> None:
@@ -229,21 +254,21 @@ def test_a_refused_rebuild_raises_even_when_the_flags_read_clean(seat) -> None:
     # false, so the rebuild's own verdict is enforced, not just recorded.
     adapter, _part = seat({"Default": True, "INSTALLED": False}, rebuild_result=False)
     with pytest.raises(RuntimeError, match=r"pinion-lever-pin: EditRebuildAll refused"):
-        _common.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
+        _rebuild.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
     adapter, part = seat({"Default": False, "INSTALLED": True}, force_result=False)
     with pytest.raises(
         RuntimeError, match=r"INSTALLED: ForceRebuild3 returned False"
     ):
-        _common.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
+        _rebuild.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
     assert part.active == "Default"
 
 
 def test_a_hard_fault_after_the_rebuild_raises_but_a_warning_does_not(seat) -> None:
     adapter, _part = seat({"INSTALLED": True}, faults=(("Pin", 2, False),))
     with pytest.raises(RuntimeError, match=r"left faults \['Pin \(rebuild-error\)'\]"):
-        _common.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
+        _rebuild.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
     adapter, part = seat({"INSTALLED": True}, faults=(("Pin", 1, True),))
-    _common.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
+    _rebuild.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
     assert part.log == ["EditRebuildAll"]
 
 
@@ -253,11 +278,11 @@ def test_code_one_is_a_fault_unless_what_s_wrong_flags_it_a_warning(seat) -> Non
     # and _assembly's health gates read it (Main's #928 review).
     adapter, _part = seat({"INSTALLED": True}, faults=(("Pin", 1, False),))
     with pytest.raises(RuntimeError, match=r"left faults \['Pin \(unknown-error\)'\]"):
-        _common.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
+        _rebuild.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
     adapter, part = seat({"INSTALLED": True}, faults=(("Pin", 1, True),))
-    _common.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
+    _rebuild.rebuild_stale_configurations(adapter, "dt-pinion-lever-pin")
     assert part.log == ["EditRebuildAll"]
-    assert _common._FEATURE_ERROR[1] == "unknown-error"
+    assert _rebuild._FEATURE_ERROR[1] == "unknown-error"
 
 
 def test_an_inactive_configuration_still_faulted_while_active_stops_the_save(
@@ -272,10 +297,10 @@ def test_an_inactive_configuration_still_faulted_while_active_stops_the_save(
     with pytest.raises(
         RuntimeError,
         match=r"cone-gear: stale inactive configurations did not rebuild clean while "
-        r"active: T060: \['ToothGapCut \(unknown-error\)', "
-        r"'ToothGapPattern \(unknown-error\)'\]$",
+        r"active: T060: \['ToothGapCutT060 \(unknown-error\)', "
+        r"'ToothGapPatternT060 \(unknown-error\)'\]$",
     ):
-        _common.rebuild_stale_configurations(adapter, "dt-cone-gear")
+        _rebuild.rebuild_stale_configurations(adapter, "dt-cone-gear")
     assert part.active == "T120"
 
 
@@ -285,7 +310,7 @@ def test_the_save_chokepoint_checks_every_configuration_right_before_its_final_s
     # Inside save_part_and_images: after every caller edit and every edit the
     # chokepoint itself makes (block tolerances, properties, summary info), and
     # nothing runs between it and the re-save that persists the part.
-    source = inspect.getsource(_common.save_part_and_images)
+    source = inspect.getsource(_part_save.save_part_and_images)
     call = "rebuild_stale_configurations(adapter, part_name)"
     guard = source.index(call)
     for edit in (
@@ -311,15 +336,19 @@ def test_edit_rebuild_all_alone_leaves_the_cg_fx1_caches_that_fail_the_reopen(
         {name: name != "T120" for name in CONE_GEAR}, active="T120", bad=SWAPPED
     )
     assert part.Extension.EditRebuildAll()
-    assert _common.stale_configurations(part, CONE_GEAR) == []
+    assert _rebuild.stale_configurations(part, CONE_GEAR) == []
     part.log.clear()
     with pytest.raises(RuntimeError) as failure:
-        _common.assert_saved_configurations_regenerate(adapter, "dt-cone-gear")
+        _rebuild.assert_saved_configurations_regenerate(adapter, "dt-cone-gear")
     message = str(failure.value)
     # Every faulted configuration remains diagnosable; prose and formatting
     # are not part of the regeneration contract.
     assert all(name in message for name in SWAPPED)
-    assert all(feature in message for feature in ("ToothGapCut", "ToothGapPattern"))
+    assert all(
+        feature in message
+        for configuration in SWAPPED
+        for feature, _code, _warning in cone_faults(configuration)
+    )
     assert "T120:" not in message and "Default:" not in message
     assert not any(entry.startswith("force") for entry in part.log)
     assert part.bad == set(SWAPPED)
@@ -330,9 +359,9 @@ def test_the_chokepoint_heals_the_cg_fx1_caches_so_the_reopen_passes(seat) -> No
     adapter, part = seat(
         {name: name != "T120" for name in CONE_GEAR}, active="T120", bad=SWAPPED
     )
-    _common.rebuild_stale_configurations(adapter, "dt-cone-gear")
+    _rebuild.rebuild_stale_configurations(adapter, "dt-cone-gear")
     part.log.clear()
-    _common.assert_saved_configurations_regenerate(adapter, "dt-cone-gear")
+    _rebuild.assert_saved_configurations_regenerate(adapter, "dt-cone-gear")
     assert [entry for entry in part.log if entry.startswith("edit")] == [
         f"edit {name}" for name in (*CONE_GEAR[:-1], "T120")
     ]
@@ -344,7 +373,7 @@ def test_clean_saved_caches_pass_with_one_plain_rebuild_each_ending_on_active(
     seat,
 ) -> None:
     adapter, part = seat({name: False for name in CONE_GEAR}, active="T120")
-    _common.assert_saved_configurations_regenerate(adapter, "dt-cone-gear")
+    _rebuild.assert_saved_configurations_regenerate(adapter, "dt-cone-gear")
     assert [entry for entry in part.log if entry.startswith("edit")] == [
         f"edit {name}" for name in (*CONE_GEAR[:-1], "T120")
     ]
@@ -354,7 +383,7 @@ def test_clean_saved_caches_pass_with_one_plain_rebuild_each_ending_on_active(
 
 def test_a_single_configuration_part_regenerates_with_no_switch(seat) -> None:
     adapter, part = seat({"Default": False})
-    _common.assert_saved_configurations_regenerate(adapter, "dt-crank-pin")
+    _rebuild.assert_saved_configurations_regenerate(adapter, "dt-crank-pin")
     assert part.log == ["edit Default"]
 
 
@@ -387,6 +416,7 @@ def test_the_builders_that_create_configurations_are_the_known_six() -> None:
         "build_dt_crank_handle_pivot_screw",
         "build_dt_pinion_lever_pin",
         "build_pd_transgear_removable",
+        "build_vn_cone_tip_collar",
     }
 
 
@@ -398,7 +428,7 @@ def test_only_the_known_helpers_create_configurations_outside_builders() -> None
         for path in SCRIPTS.glob("_*.py")
         if re.search(r"\bAddConfiguration\d*\(", path.read_text(encoding="utf-8"))
     }
-    assert creators == {"_assembly", "_drawing_simplified"}
+    assert creators == {"_assembly", "_simplified_part"}
 
 
 def _assert_reopened_then_tripwire(source: str) -> None:
@@ -423,6 +453,6 @@ def test_every_configuration_builder_proves_its_saved_caches_on_reopen(stem) -> 
 
 
 def test_the_simplified_part_save_proves_its_saved_caches_on_reopen() -> None:
-    import _drawing_simplified
+    import _simplified_part
 
-    _assert_reopened_then_tripwire(inspect.getsource(_drawing_simplified.save_simplified_part))
+    _assert_reopened_then_tripwire(inspect.getsource(_simplified_part.save_simplified_part))

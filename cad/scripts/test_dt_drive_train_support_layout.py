@@ -6,11 +6,13 @@ import math
 
 import pytest
 
-import _fit_limits
+import _fit_shaft_h
 import _config
 import build_dt_drive_train_assembly as drive
+import cone_pitch
 import pinion_rig_fitup as FITUP
 import pinion_rig_layout as RIG
+import pinion_rig_park_geometry
 from _printed_tolerance import printed_band_mm
 from dt_cone_pivot_post_installation import MECHANISM_Z_SHIFT
 from dt_pinion_pivot_block_geometry import BLOCK_EAST
@@ -24,12 +26,24 @@ def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
         drive.TIP_DRUM120 + drive.TIP_APINION + drive.APINION_GAP,
         abs_tol=1e-9,
     )
-    # U28 (user, 2026-09-23; 997f3534): the drum parks 2.0 outside the tip
-    # circles PLUS the base-chord seat offset, so the engage swing ends where
-    # the 120T tips seat on the gap floor (engaged C2C), not at the pitch sum.
-    pitch_sum = (120 + drive.APINION_TEETH) / drive.DP_TRAIN * 25.4 / 2.0
+    # U28's parked tip-circle air remains 2.2425 mm.  The standard-depth
+    # roots no longer define the engaged stop: that independently follows
+    # the pitch-circle sum plus the configured positive running extension.
+    import _config
+
+    pitch_sum = (
+        (120 + pinion_rig_park_geometry.APINION_TEETH)
+        / cone_pitch.DP_TRAIN
+        * 25.4
+        / 2.0
+    )
+    extension = float(
+        _config.machine("alignment_pinion", "engaged_center_extension_mm")
+    )
+    assert math.isclose(drive.APINION_GAP, 2.2425, rel_tol=0.0, abs_tol=1e-9)
+    assert extension > 0.0
     assert math.isclose(
-        drive.APINION_GAP, 2.0 + (drive.ENGAGED_C2C - pitch_sum), abs_tol=1e-4
+        drive.ENGAGED_C2C, pitch_sum + extension, rel_tol=0.0, abs_tol=1e-9
     )
 
 
@@ -102,7 +116,7 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     import dt_pinion_spring_geometry as leaf
     import dt_pinion_spring_spec as spring_spec
     import dt_pinion_spring_section as section
-    from _fit_limits import deviations
+    from _fit_deviations import deviations
     from _printed_tolerance import printed_deviations
 
     parked, engaged = drive.SPRING_DEFLECTION
@@ -123,10 +137,32 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
         *spring_spec.FORMED_DIMENSIONS.values()
     )
     assert len(leaf.FORMED_CORNERS) == 2 ** len(leaf.FORMED_CONTACT_BANDS)
+    # The nominal formed profile IS the free shape (the installed one turned
+    # PRESET_DEG about the bend centre): its crest face, arm and contact
+    # station are the free crest circle's, exactly.  At 8.2 degrees they sit
+    # ~0.5 up the blade and ~1.1 down the strap from the installed contact.
     nominal = leaf.formed_contact()
-    assert nominal[0] == pytest.approx(leaf.PRESET, abs=0.02)
-    assert nominal[1] == pytest.approx(leaf.BLADE_ARM, abs=0.5)
-    assert nominal[2] == pytest.approx(leaf.CONTACT_T, abs=1.0)
+    free_contact = (
+        leaf.FREE_KINK_C[0] - leaf.STRAP_N[0] * (leaf.R_KINK + section.THICK),
+        leaf.FREE_KINK_C[1] - leaf.STRAP_N[1] * (leaf.R_KINK + section.THICK),
+    )
+    blade = (
+        leaf.FREE_KINK_START[0] - leaf.FREE_BEND_EXIT[0],
+        leaf.FREE_KINK_START[1] - leaf.FREE_BEND_EXIT[1],
+    )
+    up = (blade[0] / math.hypot(*blade), blade[1] / math.hypot(*blade))
+    pivot = (leaf.PIVOT_LX, leaf.PIVOT_LY)
+    assert nominal[0] == pytest.approx(leaf.PRESET, abs=1e-9)
+    assert nominal[1] == pytest.approx(
+        (free_contact[0] - leaf.FREE_BEND_EXIT[0]) * up[0]
+        + (free_contact[1] - leaf.FREE_BEND_EXIT[1]) * up[1],
+        abs=1e-9,
+    )
+    assert nominal[2] == pytest.approx(
+        (free_contact[0] - pivot[0]) * leaf.STRAP_U[0]
+        + (free_contact[1] - pivot[1]) * leaf.STRAP_U[1],
+        abs=1e-9,
+    )
     # A shorter free kink height shortens the arm by about as much.
     short = leaf.formed_contact({"FreeKinkV": -band})
     assert short[1] == pytest.approx(nominal[1] - band, abs=0.1)
@@ -140,8 +176,30 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     assert stations0 == pytest.approx(
         (drive._spr_station[0], drive._spr_station[-1]), abs=1e-12
     )
-    assert drive.SPRING_PRELOAD_RATIO == pytest.approx((1.575, 2.118), abs=5e-4)
-    assert drive.SPRING_STRESS_SF == pytest.approx(1.525, abs=5e-4)
+    soft_ratios = []
+    stiff_factors = []
+    for corner in leaf.FORMED_CORNERS:
+        deflections, arm, stations = drive._spring_corner(corner, t_lo)
+        soft_ratios.append(
+            tuple(
+                leaf.contact_force(deflection, t_lo, w_lo, arm) * station / moment
+                for deflection, station, moment in zip(
+                    deflections, stations, gravity, strict=True
+                )
+            )
+        )
+        stiff_deflections, stiff_arm, _ = drive._spring_corner(corner, t_hi)
+        stiff_factors.append(
+            leaf.YIELD_MPA / leaf.root_stress(stiff_deflections[1], t_hi, stiff_arm)
+        )
+    assert drive.SPRING_PRELOAD_RATIO == pytest.approx(
+        tuple(min(ratios[pose] for ratios in soft_ratios) for pose in range(2)),
+        rel=0.0,
+        abs=1e-12,
+    )
+    assert drive.SPRING_STRESS_SF == pytest.approx(
+        min(stiff_factors), rel=0.0, abs=1e-12
+    )
     assert min(drive.SPRING_PRELOAD_RATIO) >= 1.5
     assert drive.SPRING_STRESS_SF >= 1.5
     # Positive control: the one-band gate this replaced read higher on both.
@@ -163,7 +221,14 @@ def test_swing_gravity_basis_is_the_current_parts() -> None:
     # computed at SWING_GRAVITY_BASIS.  A part whose volume, governing
     # dimensions or material moved since fails here, naming the constants to
     # re-measure.
-    import dt_alignment_pinion_spec as drum_spec
+    from pathlib import Path
+
+    from diagnostics.collect_dt_swing_gravity import (
+        COUNTS,
+        SourceSlices,
+        dimension_fingerprint,
+        source_environment,
+    )
     import build_dt_alignment_pinion as drum
     import build_dt_pinion_arbor as arbor
     import build_dt_pinion_arbor_collar as collar
@@ -171,7 +236,6 @@ def test_swing_gravity_basis_is_the_current_parts() -> None:
     import build_dt_pinion_cam_pin as cam_pin
     import build_dt_pinion_handle as handle
     import build_dt_pinion_pivot_shaft as shaft
-    import dt_pinion_bracket_geometry as strap_geometry
 
     density = {"Brass": 8500.0, "Plain Carbon Steel": 7800.0}
     materials = {
@@ -192,48 +256,44 @@ def test_swing_gravity_basis_is_the_current_parts() -> None:
         "dt-pinion-handle": handle.V_ROD,
         "dt-pinion-cam-pin": cam_pin.V_PIN + cam_pin.V_CAP,
     }
-    # The drum's and the strap's c486 mesh volumes stand for these dimensions.
-    dimensions = {
-        "dt-alignment-pinion": (
-            (
-                drum_spec.TEETH,
-                drum_spec.DIAMETRAL_PITCH,
-                drum_spec.FACE_WIDTH,
-                drum_spec.BORE_DIA,
-            ),
-            (32, 49.82, 143.2, 8.0),
-        ),
-        "dt-pinion-bracket": (
-            (
-                strap_geometry.WIDTH,
-                strap_geometry.C2C,
-                strap_geometry.THICKNESS,
-                strap_geometry.PIVOT_BORE,
-                strap_geometry.ARBOR_BORE,
-                strap_geometry.PIN_BORE,
-                strap_geometry.PIN_SEAT,
-            ),
-            (15.0, 28.0, 9.0, 6.35, 8.0, 4.0, 4.0),
-        ),
-    }
-    basis = drive.SWING_GRAVITY_BASIS
-    assert set(basis) == set(materials) == set(volumes) | set(dimensions)
-    stale = [
-        name for name, (_n, _v, rho) in basis.items() if density[materials[name]] != rho
+    # Read the same authoritative spec declarations as the collector, while
+    # comparing them to a frozen report snapshot, never to live config itself.
+    root = Path(drive.__file__).resolve().parents[2]
+    with source_environment(root):
+        dimensions = dimension_fingerprint(SourceSlices(root))
+    fingerprint = drive.SWING_GRAVITY_FINGERPRINT
+    assert set(fingerprint) == set(dimensions)
+    changed_fingerprint_fields = [
+        f"{name}.fingerprint fields"
+        for name in dimensions
+        if set(fingerprint[name]) != set(dimensions[name])
     ]
+    basis = drive.SWING_GRAVITY_BASIS
+    assert set(basis) == set(materials) == set(COUNTS) == set(volumes) | set(dimensions)
+    stale = [
+        name
+        for name, (count, _volume, rho) in basis.items()
+        if count != COUNTS[name] or density[materials[name]] != rho
+    ]
+    stale += changed_fingerprint_fields
     stale += [
         name
         for name, volume in volumes.items()
-        if not math.isclose(basis[name][1], volume, abs_tol=0.01)
+        if not math.isclose(basis[name][1], volume, rel_tol=0.0, abs_tol=0.01)
     ]
     stale += [
-        name
-        for name, (now, then) in dimensions.items()
-        if not all(math.isclose(a, b) for a, b in zip(now, then, strict=True))
+        f"{name}.{dimension}"
+        for name, current in dimensions.items()
+        for dimension, value in current.items()
+        if dimension not in fingerprint[name]
+        or not math.isclose(
+            value, fingerprint[name][dimension], rel_tol=0.0, abs_tol=1e-9
+        )
     ]
     assert not stale, (
         f"{stale} moved since SWING_GRAVITY_BASIS: re-measure SWING_GRAVITY_NMM "
-        "and SWING_GRAVITY_CORNER_NMM, then update the basis"
+        "and SWING_GRAVITY_CORNER_NMM, then install the report's basis, mass "
+        "and SWING_GRAVITY_FINGERPRINT together"
     )
 
 
@@ -242,12 +302,53 @@ def test_base_holes_follow_the_rederived_support() -> None:
         assert math.dist(derived, base) < 1e-9
     for derived, base in zip(drive._FOOT_SCREW_XZ, drive.BASE_FOOT_XZ, strict=True):
         assert math.dist(derived, base) < 1e-9
-    # U34c: the base carries the transferred pedestal seats at the study's
-    # rounded stations; the drive train derives them from the disc stack.
+    # Transferred pedestal seats now use the exact configured bank faces.
     for derived, base in zip(
         drive._PEDESTAL_SCREW_XZ, drive.BASE_PEDESTAL_XZ, strict=True
     ):
-        assert math.dist(derived, base) < 0.005
+        assert math.dist(derived, base) < 1e-9
+
+
+def test_native_base_seats_read_live_park_and_bank_datums(monkeypatch) -> None:
+    import importlib
+    import build_fr_harmonic_base as base
+    import cylinder_bank_layout as bank
+    import pinion_rig_park_geometry as park
+
+    original = base.__dict__.copy()
+    block_seats = base.BLOCK_SCREW_XZ
+    foot_seats = base.FOOT_SCREW_XZ
+    pedestal_seats = base.PEDESTAL_SCREW_XZ
+    shift_x, shift_z = 0.5, 0.25
+    # The actual builder's native Hole Wizard tuples must follow a changed
+    # source datum, not merely agree with the current snapshot by coincidence.
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(park, "PIVOT_X", park.PIVOT_X + shift_x)
+            patch.setattr(
+                RIG, "BLOCK_SEAT_Z", tuple(z + shift_z for z in RIG.BLOCK_SEAT_Z)
+            )
+            patch.setattr(RIG, "SPRING_PAD_Z", RIG.SPRING_PAD_Z + shift_z)
+            patch.setattr(
+                bank, "FRONT_STRAP_INNER_Z", bank.FRONT_STRAP_INNER_Z + shift_z
+            )
+            patch.setattr(bank, "BACK_STRAP_INNER_Z", bank.BACK_STRAP_INNER_Z + shift_z)
+            importlib.reload(base)
+            for before, after in zip(
+                (*block_seats, *foot_seats),
+                (*base.BLOCK_SCREW_XZ, *base.FOOT_SCREW_XZ),
+                strict=True,
+            ):
+                assert (
+                    math.dist(after, (before[0] + shift_x, before[1] + shift_z)) < 1e-9
+                )
+            for before, after in zip(
+                pedestal_seats, base.PEDESTAL_SCREW_XZ, strict=True
+            ):
+                assert math.dist(after, (before[0], before[1] + shift_z)) < 1e-9
+    finally:
+        base.__dict__.clear()
+        base.__dict__.update(original)
 
 
 def _world(origin, rows, local):
@@ -482,8 +583,11 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
         abs_tol=1e-12,
     )
     assert not hasattr(RIG, "RIG_AFT_SHIFT_STEP")
-    # The layout's g19 literal is the gear grid's.
+    # Both consumers use the bank's live configured-grid datum.
+    import cylinder_bank_layout as bank
+
     g19_back = drive.Z_DRUM0 + 19 * drive.Z_PITCH + drive.DRUM_FACE / 2.0
+    assert math.isclose(RIG.G19_BACK_FACE_Z, bank.G19_BACK_FACE_Z, abs_tol=1e-12)
     assert math.isclose(RIG.G19_BACK_FACE_Z, g19_back, abs_tol=1e-9)
     # User ruling (E_b): the bank's own terms come from the #743 retention
     # design, booked by name in their own stack.
@@ -508,6 +612,53 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
         "j = 19 past its full face (bank pushed north)",
         "j = 0 drum overhang slack (rig and bank terms)",
     ]
+
+
+def test_rig_stations_follow_a_changed_bank_datum(monkeypatch) -> None:
+    import importlib
+    import cylinder_bank_layout as bank
+
+    original = RIG.__dict__.copy()
+    shift = 0.5
+    stations = {
+        name: getattr(RIG, name)
+        for name in (
+            "G19_BACK_FACE_Z",
+            "BACK_STOP_Z",
+            "DRUM_FRONT_Z",
+            "DRUM_BACK_Z",
+            "FRONT_BLOCK_Z0",
+            "BACK_BLOCK_Z0",
+            "TORQUE_SHAFT_Z0",
+            "LIFT_ROD_Z0",
+            "SPRING_PAD_Z",
+            "RIG_AFT_SHIFT",
+        )
+    }
+    seats = RIG.BLOCK_SEAT_Z
+    lengths = (RIG.INNER_SPAN, RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN)
+    # Reload only the pure geometry consumer; no assembly or COM operation.
+    # Restore the original bindings too: assembly/spec aliases may retain
+    # tuples imported before this test reloads the shared geometry module.
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(bank, "G19_BACK_FACE_Z", bank.G19_BACK_FACE_Z + shift)
+            importlib.reload(RIG)
+            for name, before in stations.items():
+                assert math.isclose(
+                    getattr(RIG, name), before + shift, rel_tol=0.0, abs_tol=1e-9
+                ), name
+            for before, after in zip(seats, RIG.BLOCK_SEAT_Z, strict=True):
+                assert math.isclose(after, before + shift, rel_tol=0.0, abs_tol=1e-9)
+            for before, after in zip(
+                lengths,
+                (RIG.INNER_SPAN, RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN),
+                strict=True,
+            ):
+                assert math.isclose(after, before, rel_tol=0.0, abs_tol=1e-9)
+    finally:
+        RIG.__dict__.clear()
+        RIG.__dict__.update(original)
 
 
 def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
@@ -542,7 +693,7 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     # the worst case gates it (RIG_MARGINS' grip crossrod row, 11.112 vs 0.25).
     assert drive._GRIP_ROD_Z[0] - drive.REMOVABLE.SEAT_FACE_Z >= 12.0
     assert (
-        drive.RIG_MARGINS["grip crossrod to the T12 chain wheel"][0]
+        drive.RIG_MARGINS["grip crossrod to the crank chain wheel"][0]
         >= 0.25 + RIG.RIG_MARGIN_SPARE
     )
     # 21.06 at the 11.5 head (afe7ea283): its crown sits 0.5 further forward.
@@ -1016,10 +1167,9 @@ def test_cam_set_screw_hole_stays_clear_of_the_follower() -> None:
         for j in range(21)
     ]
     assert min(gaps) - half >= _HOLE_CONTACT_MARGIN_DEG, min(gaps)
-    # At the photographed engage, with the strap fully swung: 83.5 deg.
+    # The exact engage pose must keep the same physical angular air floor.
     engaged = _hole_to_contact_deg(drive.CAM_ENGAGE_ROTATION_DEG, drive._PHI_ENG)
-    assert math.isclose(engaged, 83.52, abs_tol=0.05)
-    assert math.isclose(engaged - half, 75.45, abs_tol=0.05)
+    assert engaged - half >= _HOLE_CONTACT_MARGIN_DEG
 
 
 def test_set_pin_holes_sit_at_the_physical_back_stop_straps() -> None:
@@ -1123,7 +1273,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # does here (the 1/4 shaft is ruled, the 1/16 pin is the smallest B18.8.2
     # size, the hole band is B18.8.2's window), so the loosest band that clears
     # the 1.5 floor governs.
-    shaft_min = pin.PIVOT_BORE + _fit_limits.SHAFT_H[1]
+    shaft_min = pin.PIVOT_BORE + _fit_shaft_h.SHAFT_H[1]
     assert math.isclose(shaft_min, 6.33, abs_tol=1e-9)
     assert math.isclose(pin.SHAFT_LIGAMENT_CENTRED, (6.33 - 1.6475) / 2.0)
     places = pin.CROSS_HOLE_FROM_BORE_WALL_PLACES
@@ -1187,14 +1337,14 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     from _buildgraph import part_stems, references_of
     from _drawing_registry import DRAWINGS_BY_NAME
     from _fastener_catalog import FASTENERS
-    from _stock_fastener import STOCK_RECIPES
+    from _test_stock_recipes import discovered_recipes
     from diagnostics import diag_build_98296A027 as recipe
 
     assert part.SPEC is FASTENERS["vn-pinion-strap-pin"]
     assert part.SPEC.skus == ("98296A027",)
     source = inspect.getsource(part)
     assert 'sku="98296A027"' in source and "author=build_98296A027" in source
-    assert STOCK_RECIPES["98296A027"].module == "diagnostics.diag_build_98296A027"
+    assert discovered_recipes()["98296A027"].module == "diagnostics.diag_build_98296A027"
     assert (recipe.PIN_OD, recipe.PIN_LEN) == (pin.PIN_DIA, pin.PIN_LEN)
     assert math.isclose(pin.WALL_T, 0.012 * 25.4)
     assert math.isclose(recipe.PIN_ID, pin.PIN_DIA - 2.0 * pin.WALL_T)
@@ -1227,7 +1377,7 @@ def test_drive_train_reads_no_shaft_or_pin_drawing_contract() -> None:
 
     deps = {Path(p).stem for p in module_deps_of(Path(drive.__file__))}
     assert not deps & {"dt_pinion_pivot_shaft_spec", "vn_pinion_strap_pin_spec"}, deps
-    assert PIN_HOLE_Z is RIG.TORQUE_SHAFT_PIN_HOLE_Z
+    assert PIN_HOLE_Z == RIG.TORQUE_SHAFT_PIN_HOLE_Z
 
 
 def test_mha145_pins_carry_no_interference_exemption() -> None:

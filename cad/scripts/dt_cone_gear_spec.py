@@ -1,32 +1,42 @@
-r"""Pure-data dimensional contract shared by the cone-gear family and drawing.
+r"""Closed-form stock-cutter authority shared by the cone family and its drawing.
 
-The cone gear is a 20-member configured family (T006..T120 by 6).  The drawing
-package gives every configuration its own complete sheet: configuration-owned
-tip and bore diameters, common face width, and a native driving tooth-thickness
-dimension with the cone-specific deepened-mesh band.
-
-This module stays free of tolerances.yaml because assemblies import it.  The
-bore bands -- the round bore and its across-flat -- derive from the shaft's
-land bands (cone_shaft_land_bands) through the gear seat fit (gear_seat_fit),
-two small import-free modules; every other band is a cone-specific constant.
-The drawing merely imports the resulting native model dimensions, precision,
-and tolerances.
+Every count T006..T120 is cut by its standard 48DP PA20 rotary cutter (the
+approved DT6-FORM1 tool for T006) set at the standard depth: the cutter's
+reference pitch line lies on the gear's own pitch circle, so the nominal pitch
+thickness is the cutter's. The blank is the AGMA standard outside diameter
+(N + 2)/DP, capped where the cutter's finite form stops supporting a tip at
+either thickness limit. Nothing here reads measured or proof data; the mesh
+is checked in closed form by ``standard_mesh_checks`` and natively by the
+assembly interference gate.
 """
 
 from __future__ import annotations
 
+import itertools
 import math
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import Any
 
 import _config
-from _gtol_spec import CylinderFace
+from cone_pitch import SEAT_PITCH
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from cone_shaft_land_bands import (
     FLAT_AF_BAND,
     SECTION_CONE_GEAR_TEETH,
     SECTION_DIA_BANDS,
     SECTION_FLAT_AF,
+    TERMINAL_DIA_MM,
 )
 from gear_seat_fit import flat_bore_af_band, seat_bore_band
+from stock_form_cutter import (
+    CustomSixCutter,
+    StockFormProfile,
+    TrochoidRelief,
+    template_for_teeth,
+    translation_for_pitch_tooth_thickness,
+)
 
 
 MM_PER_IN = 25.4
@@ -38,96 +48,196 @@ _MFG = _config.parts("dt-cone-gear")
 BODY_MATERIAL_SPEC = str(_MFG["material_specification"])
 TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
-TEETH = 120  # default/fundamental configuration
-CONFIGURATION_TEETH = tuple(range(6, 121, 6))
-DIAMETRAL_PITCH = 49.82  # cad/config/machine/gear_train.yaml
-PRESSURE_ANGLE_DEG = 14.5
+TEETH = int(_config.machine("gear_train", "fundamental_cone_teeth"))
+CONFIGURATION_TEETH = tuple(range(6, TEETH + 1, 6))
+CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
+DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
+
+
+def tooth_features(teeth: int) -> tuple[str, str, str]:
+    """Distinct real topology for one configured finite cutter profile."""
+    if teeth not in CONFIGURATION_TEETH:
+        raise ValueError(f"unsupported cone-gear tooth count {teeth}")
+    suffix = f"T{teeth:03d}"
+    return tuple(f"{stem}{suffix}" for stem in (
+        "ToothGapProfile", "ToothGapCut", "ToothGapPattern"
+    ))
+
+
+# All cuts/patterns disappear in the derived assembly drawing configurations.
+SIMPLIFIED_FEATURES = tuple(
+    feature for teeth in CONFIGURATION_TEETH for feature in tooth_features(teeth)[1:]
+)
+SIMPLIFIED_FEATURES_BY_CONFIGURATION = {
+    f"T{teeth:03d}": tooth_features(teeth)[1:] for teeth in CONFIGURATION_TEETH
+}
+
+DIAMETRAL_PITCH = _config.machine("gear_train", "diametral_pitch")
+PRESSURE_ANGLE_DEG = _config.machine("gear_train", "pressure_angle_deg")
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH * MODULE_MM
-TOOTH_FORM = "INVOLUTE FLANKS; FLOOR ANY SHAPE, NOT BELOW FLOOR DIA"
-STANDARD_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
-
-# --- Deepened mesh (U38 option 1b, user ruling U42, 2026-09-23) ---------------
-#
-# The cone axis stays where it is; each gear reaches deeper into its 120T drum
-# (MHA-DT-012, cut standard) through a long addendum -- an oversize blank -- and a
-# tooth thickened so the tightest printed case still keeps
-# ``MESH_BACKLASH_MIN_MM``.  Tightest case: thickest tooth with the cone
-# bore-on-land and drum bore-on-arbor runouts closing the deep-edge centre
-# distance at the as-posed interleave.  The cone runout is sized for the
-# 0/-0.05 shaft seat lands under this +0.05/0 bore: 0.05 radial.
-# Least engagement adds the journal and arbor float opening.  Each OD is the
-# smallest that reaches worst-case CR 1.20 (T060+), else the largest
-# that keeps the tip land >= 0.10 at the thinnest tooth and largest OD and the
-# cone tip >= 0.10 off the drum's chord floor (T006-T054).  ODs print two
-# places and are floored to them; thicknesses print three places, floored
-# toward more backlash.  ``test_dt_cone_gear_mesh_design`` re-derives every
-# constraint from these printed values.
-#
-# Contact ratio stays below 1.1 at the worst case of the printed bands on
-# T006-T042: the tooth comes to a point before it reaches deeper.  The user
-# accepted that as a named book-fidelity exception (U42): it costs wear on the
-# tooth-tip corners, not position error (rigid transmission error at most
-# 0.023 mm at the drum pitch line, on T006; <= 0.004 on the rest).
-MESH_BACKLASH_MIN_MM = 0.06
-# (upper, lower) about the modelled mid thickness.  The 0.15 window is the
-# configured cone<->cylinder backlash window (tolerances.yaml gear_mesh
-# 0.05..0.20) that error_budget.yaml's tooth-thickness mesh-lag term is
-# derived from.
+# (upper, lower), actual pitch arc, about the standard-depth thickness: the
+# ordinary cut-gear band (user ruling 2026-10-10, set-at-assembly cones;
+# dt_mesh_checks.cone_check gates it at the RSS corner of cone_set_stack).
 TOOTH_THICKNESS_BAND = (0.075, -0.075)
-# Backlash with MHA-DT-012, rocked by hand over a full turn at assembly, swing
-# stop set.  The acceptance is that measurement's worst case and nothing more:
-# thickest tooth with both runouts closing, to thinnest tooth with both runouts
-# and both journal floats opening (rocking takes up the cone-shaft journal and
-# drum-arbor clearances).  The upper, 0.374 on T006, is rounded up to two
-# places.
-BACKLASH_ACCEPTANCE_MM = (0.06, 0.38)
-CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36, 42)
-# teeth: (tip diameter, thickest circular tooth thickness at the standard
-# pitch circle), mm.
-DEEPENED_MESH_MM: dict[int, tuple[float, float]] = {
-    6: (4.28, 1.006),
-    12: (7.55, 1.005),
-    18: (10.74, 1.004),
-    24: (13.90, 1.003),
-    30: (17.04, 1.002),
-    36: (20.17, 1.001),
-    42: (23.29, 1.001),
-    48: (26.39, 1.000),
-    54: (29.49, 0.999),
-    60: (32.52, 0.999),
-    66: (35.55, 0.998),
-    72: (38.58, 0.998),
-    78: (41.62, 0.997),
-    84: (44.66, 0.997),
-    90: (47.70, 0.996),
-    96: (50.74, 0.996),
-    102: (53.79, 0.995),
-    108: (56.84, 0.995),
-    114: (59.88, 0.995),
-    120: (62.93, 0.994),
-}
+
+# DT6-FORM1, T006 option (a) (user ruling 2026-10-10). T006 is a named
+# exception: against the shared 20 deg 120T drum no full-depth six-tooth form
+# can reach a contact ratio of 1, so its tooth is sized for no binding and
+# the drum-tip path instead.
+# * Thickness 0.872 at the tool pitch, the band's upper limit
+#   (CUSTOM_SIX_TOOTH_THICKNESS_BAND): every corner pair keeps >= 0.02
+#   backlash at the RSS-closed centre (cone_set_stack, ~std + 0.095).
+# * Root R 1.10 sets the plunge; the involute stops where the relief rejoins it.
+# * Relief: the path of one virtual drum-tip point, held at C0 = standard +
+#   CUSTOM_SIX_RELIEF_CENTRE_ABOVE_STANDARD_MM (0.09, just inside the RSS-closed
+#   centre) with the thick tooth's flank in contact (TrochoidRelief), at radius
+#   C0 - 1.10 so it grazes the root, led 0.0002 rad into the drum tooth. That
+#   keeps every printed drum-tip corner >= 10 um clear of the T006 form at
+#   both T006 thickness limits over the RSS centre range
+#   (dt_mesh_checks.t006_relief_clearance_mm, gated in test_standard_mesh_checks).
+# * Tool tip R 2.25: finite support above the 4.31 blank at the thin corner.
+# * Blank OD 4.31 (+0/-0.02, CUSTOM_SIX_BLANK_DIA_BAND), above the AGMA
+#   (N+2)/DP 4.23: the largest OD, floored to 0.01, whose thin corner keeps the
+#   0.25 m tip land; the extra addendum raises the contact ratio (~0.77, REF).
+CUSTOM_SIX_TOOL_THICKNESS_MM = 0.872
+CUSTOM_SIX_ROOT_RADIUS_MM = 1.10
+CUSTOM_SIX_TOOL_TIP_RADIUS_MM = 2.25
+CUSTOM_SIX_RELIEF_LEAD_RAD = 0.0002
+CUSTOM_SIX_OUTSIDE_DIA_MM = 4.31
+CUSTOM_SIX_RELIEF_CENTRE_ABOVE_STANDARD_MM = 0.09
+
+
+def _custom_six_relief(involute_only: CustomSixCutter) -> TrochoidRelief:
+    """Phase the virtual drum-tip point from the conjugate involute contact.
+
+    At the closing centre C0 the thick T006 flank's line of action leaves its
+    base circle at the operating angle aw; the drum flank in contact starts at
+    polar angle aw + pi - (C0 sin aw - (aw - k6) rb6) / rbD about the drum
+    centre (k6 the tool's half-space base angle), and its involute reaches the
+    virtual radius Rv = C0 - root a further inv(acos(rbD / Rv)) round.
+    """
+    drum_teeth = int(_config.machine("gear_train", "cylinder_teeth"))
+    alpha = math.radians(PRESSURE_ANGLE_DEG)
+    centre = (6 + drum_teeth) * MODULE_MM / 2.0 + CUSTOM_SIX_RELIEF_CENTRE_ABOVE_STANDARD_MM
+    pitch_six, pitch_drum = 6 * MODULE_MM / 2.0, drum_teeth * MODULE_MM / 2.0
+    base_six, base_drum = pitch_six * math.cos(alpha), pitch_drum * math.cos(alpha)
+    aw = math.acos((pitch_six + pitch_drum) * math.cos(alpha) / centre)
+    k6 = involute_only.half_space_base_angle_rad
+    start = aw + math.pi - (centre * math.sin(aw) - (aw - k6) * base_six) / base_drum
+    radius = centre - CUSTOM_SIX_ROOT_RADIUS_MM
+    roll = math.acos(base_drum / radius)
+    phase = start + (math.tan(roll) - roll) - CUSTOM_SIX_RELIEF_LEAD_RAD
+    return TrochoidRelief(drum_teeth, centre, phase)
+
+
+def cutter_template(teeth: int) -> Any:
+    """Canonical stock master or the explicitly approved finite N6 tool."""
+    _require_member(teeth)
+    if teeth == 6:
+        args = (
+            DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG, CUSTOM_SIX_ROOT_RADIUS_MM,
+            CUSTOM_SIX_TOOL_TIP_RADIUS_MM, CUSTOM_SIX_TOOL_THICKNESS_MM, "DT6-FORM1",
+            "User ruling 2026-10-10 option (a): N6 PA20 working involute over a "
+            "drum-tip trochoid relief; root R1.10; finite ground form",
+        )
+        return CustomSixCutter(*args, relief=_custom_six_relief(CustomSixCutter(*args)))
+    return template_for_teeth(teeth, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
 
 
 def _require_member(teeth: int) -> None:
-    if teeth not in CONFIGURATION_TEETH:
+    if type(teeth) is not int or teeth not in CONFIGURATION_TEETH:
         raise ValueError(f"unsupported cone-gear tooth count {teeth}")
 
 
-def outside_dia_mm(teeth: int) -> float:
-    """Return the configuration's nominal tip (blank) diameter."""
+def standard_translation_mm(teeth: int) -> float:
+    """Cutter reference pitch line on the gear's pitch circle (standard depth)."""
+    return teeth * MODULE_MM / 2.0 - cutter_template(teeth).pitch_radius_mm
+
+
+@dataclass(frozen=True)
+class _Member:
+    profile: StockFormProfile
+    corners: tuple[StockFormProfile, ...]
+    floor_limits_mm: tuple[float, float]
+
+
+@lru_cache(maxsize=None)
+def _member(teeth: int) -> _Member:
     _require_member(teeth)
-    return DEEPENED_MESH_MM[teeth][0]
+    cutter = cutter_template(teeth)
+    translation = standard_translation_mm(teeth)
+    pitch_radius = teeth * MODULE_MM / 2.0
+    thickness = StockFormProfile(teeth, cutter, pitch_radius, translation).pitch_tooth_thickness_mm
+    thickness_band, blank_band = tooth_thickness_band(teeth), blank_dia_band(teeth)
+    translations = tuple(
+        translation_for_pitch_tooth_thickness(teeth, cutter, thickness + side)
+        for side in (thickness_band[1], thickness_band[0])
+    )
+    # AGMA standard blank, capped where either thickness limit's finite cutter
+    # form stops supporting the tip at the blank band's upper limit. T006 takes
+    # its ruled land-limited OD instead (CUSTOM_SIX_OUTSIDE_DIA_MM), still
+    # under the same support cap.
+    support = min(
+        StockFormProfile(teeth, cutter, pitch_radius, shift).support_radius_max_mm
+        for shift in translations
+    )
+    cap = 2.0 * support - blank_band[0]
+    if teeth == 6:
+        if CUSTOM_SIX_OUTSIDE_DIA_MM > cap:
+            raise ValueError("T006: DT6-FORM1 finite tip does not support the ruled OD")
+        od = CUSTOM_SIX_OUTSIDE_DIA_MM
+    else:
+        od = math.floor(min((teeth + 2) * MODULE_MM, cap) * 100.0) / 100.0
+    profile = StockFormProfile(teeth, cutter, od / 2.0, translation)
+    corners = tuple(StockFormProfile(teeth, cutter, (od + side) / 2.0, shift)
+                    for side, shift in itertools.product(blank_band, translations))
+    required_land = max(0.10, 0.25 * MODULE_MM)
+    for corner in (profile, *corners):
+        corner.require_tip_land(required_land)
+    root_min = min(corner.root_radius_min_mm for corner in corners)
+    root_max = max(corner.root_radius_max_mm for corner in corners)
+    # The printed root LIMIT pair encloses every corner's actual radial
+    # envelope, rounded outward at the printed places.
+    scale = 10**DRAWING_PRECISION["GapFloorReference"]["FloorDia"]
+    error = max(corner.geometry_error_bound_mm for corner in corners)
+    minimum = math.floor(2.0 * (root_min - error) * scale) / scale
+    maximum = math.ceil(2.0 * (root_max + error) * scale) / scale
+    maximum_bore = math.ceil((bore_dia_mm(teeth) + BORE_DIA_BAND[0]) * 10**BORE_BAND_PLACES - 1e-9) / 10**BORE_BAND_PLACES
+    web_required = WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
+    if (minimum - maximum_bore) / 2.0 < web_required - 1e-9:
+        raise ValueError(f"T{teeth:03d}: printed root misses the retained web")
+    # T006 root (re-derived for option (a), replacing the D2.346 MIN of the
+    # retired R1.491 tool): the standard-depth thick corner sits the tool root
+    # R1.10 on the gear's own axis offset 0, so the root MAX is D2.20; the thin
+    # corner's -0.032 translation gives the MIN. The web above is the strength
+    # floor: D >= the MAX bore + 2 x 0.62.
+    if teeth == 6 and not math.isclose(
+        root_max, CUSTOM_SIX_ROOT_RADIUS_MM + max(translations), abs_tol=error
+    ):
+        raise ValueError("T006: root MAX is not the ruled R1.10 at standard depth")
+    return _Member(profile, corners, (minimum, maximum))
+
+
+def stock_form_profile(teeth: int) -> StockFormProfile:
+    """The nominal native cut: standard depth, standard (or support-capped) blank."""
+    return _member(teeth).profile
+
+
+def manufacturing_corner_profiles(teeth: int) -> tuple[StockFormProfile, ...]:
+    """All four OD/thickness corners: OD band outer, thickness band inner."""
+    return _member(teeth).corners
+
+
+def outside_dia_mm(teeth: int) -> float:
+    """Printed blank diameter."""
+    return 2.0 * stock_form_profile(teeth).blank_radius_mm
 
 
 def tooth_thickness_mm(teeth: int) -> float:
-    """Return the modelled (mid-band) circular tooth thickness at pitch."""
-    _require_member(teeth)
-    return DEEPENED_MESH_MM[teeth][1] - TOOTH_THICKNESS_BAND[0]
+    """Nominal circular pitch thickness cut by the standard-depth cutter."""
+    return stock_form_profile(teeth).pitch_tooth_thickness_mm
 
-
-OUTSIDE_DIA = outside_dia_mm(TEETH)
-TOOTH_THICKNESS = tooth_thickness_mm(TEETH)
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # Face width (user ruling 2026-09-28): the cone set is a solid stack.  Every
@@ -139,8 +249,7 @@ BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # datum the MHA-VN-016 stack collar is feelered off -- does not move.  The band
 # is the cylinder bank's L20 d' rule (+/-0.025 per gear, the 20-gear stack
 # accepted at +/-0.20), so it is faced to a micrometer on both sides.
-SEAT_PITCH = 6.888787817263312  # cone_line.SEAT_PITCH, pinned by test
-FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4  # 6.8887
+FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4
 FACE_WIDTH_BAND = (0.025, -0.025)
 # Flat clock (user ruling 2026-09-28): the bore's D-flat is the gear's
 # angular datum on MHA-DT-004, and its outward normal passes through the centre
@@ -151,137 +260,39 @@ FACE_WIDTH_BAND = (0.025, -0.025)
 FLAT_CLOCK_TOLERANCE_DEG = 0.25
 
 
-def chord_floor_radius_mm(
-    teeth: int, *, thickness_mm: float, tmin: float = 0.0
-) -> float:
-    """Return the radius, on the gap centre line, of the straight feet chord.
-
-    The chord joins the two flank feet at involute parameter ``tmin`` (0: on
-    the base circle) for a tooth ``thickness_mm`` thick at the standard pitch
-    circle.  A thicker tooth pulls the feet together, so the chord rises.
-    This mirrors ``involute_gear.floor_point`` with no dip.
-    """
-    _require_member(teeth)
-    pressure_angle = math.radians(PRESSURE_ANGLE_DEG)
-    pitch_radius = teeth * MODULE_MM / 2.0
-    base_radius = pitch_radius * math.cos(pressure_angle)
-    delta = (
-        thickness_mm / (2.0 * pitch_radius)
-        + math.tan(pressure_angle)
-        - pressure_angle
-    )
-    roll = tmin - math.atan(tmin)
-    half_gap_angle = math.pi / teeth - delta + roll
-    return base_radius * math.hypot(1.0, tmin) * math.cos(half_gap_angle)
+def floor_radius_min_mm(teeth: int) -> float:
+    """Minimum radial envelope of the actual translated finite root arc."""
+    return stock_form_profile(teeth).root_radius_min_mm
 
 
-# --- Gap floor (U38/U40, Main + user rulings 2026-09-23) ----------------------
-#
-# The floor is cut to depth and printed as a MIN diameter; the tooth reaches
-# its thickness by widening the gap with an indexing offset, never by sinking
-# the cutter, so the floor does not move with the tooth band.  Three
-# constructions, all one six-entity gap sketch:
-#
-# * T006, T012: the thicker tooth's chord would sit in the drum tip's path
-#   (+0.030 at T006), so the floor bows below the feet chord to the printed
-#   MIN.  MIN is the web limit: T006 keeps the 0.621 web the user ruled on as
-#   its named exception (U40); T012 trades its web from 2.12 down to 2.05,
-#   still over the 2.0 target, for a 0.25 window instead of 0.11.
-# * T018-T042: the chord between the flank feet on the base circle.
-# * T048-T120: the flanks start at ``GAP_FLOOR_TMIN`` above the base circle,
-#   which raises the floor until the drum tip clears it by 0.30 at the worst
-#   case.  The gap is then shallower and wider at the floor, so one fly
-#   cutter at least 0.43 wide fits every gear.
-#
-# Every gear also prints a MAX (Main, 2026-09-23 for T006/T012; 2026-09-26
-# for the rest, after the #834 machinist review found sheets 3-20 left the
-# gap depth open): the shallowest floor that keeps 0.02 of drum-tip clearance
-# with every runout closing, floored to the printed three places.  A floor
-# above it would rub the drum tip; test_dt_cone_gear_mesh_design re-derives each
-# value from the assembly pose.
-DIPPED_FLOOR_MIN_MM: dict[int, float] = {6: 2.880, 12: 5.738}
-FLOOR_MAX_DIA_MM: dict[int, float] = {
-    6: 2.929,
-    12: 5.988,
-    18: 9.047,
-    24: 12.106,
-    30: 15.165,
-    36: 18.224,
-    42: 21.283,
-    48: 24.342,
-    54: 27.401,
-    60: 30.460,
-    66: 33.519,
-    72: 36.578,
-    78: 39.637,
-    84: 42.696,
-    90: 45.755,
-    96: 48.814,
-    102: 51.873,
-    108: 54.932,
-    114: 57.991,
-    120: 61.050,
-}
-GAP_FLOOR_TMIN: dict[int, float] = {
-    48: 0.0900,
-    54: 0.1200,
-    60: 0.1400,
-    66: 0.1540,
-    72: 0.1650,
-    78: 0.1740,
-    84: 0.1815,
-    90: 0.1875,
-    96: 0.1925,
-    102: 0.1970,
-    108: 0.2010,
-    114: 0.2040,
-    120: 0.2070,
-}
-
-
-def floor_tmin(teeth: int) -> float:
-    """Return the involute parameter where the flanks meet the floor."""
-    _require_member(teeth)
-    return GAP_FLOOR_TMIN.get(teeth, 0.0)
-
-
-def floor_radius_mm(teeth: int) -> float:
-    """Return the modelled gap-floor radius, printed as the MIN diameter."""
-    if teeth in DIPPED_FLOOR_MIN_MM:
-        return DIPPED_FLOOR_MIN_MM[teeth] / 2.0
-    return chord_floor_radius_mm(
-        teeth, thickness_mm=tooth_thickness_mm(teeth), tmin=floor_tmin(teeth)
-    )
+def floor_radius_max_mm(teeth: int) -> float:
+    """Maximum radial envelope, not a filled RootMAX material disk."""
+    return stock_form_profile(teeth).root_radius_max_mm
 
 
 def floor_limits_mm(teeth: int) -> tuple[float, float]:
-    """Return the printed (MIN, MAX) gap-floor diameters.
+    """Printed root-envelope diameters enclosing every tool corner."""
+    return _member(teeth).floor_limits_mm
 
-    The MIN is the modelled floor floored to the printed three places: a band
-    rounds outward, so the sheet never demands a floor above the model's
-    (rounding to nearest raised nine of the twenty MINs by up to 0.0005).
+
+def gap_floor_deviations_mm(teeth: int) -> tuple[float, float]:
+    """FloorDia's (lower, upper) LIMIT deviations from the modelled floor.
+
+    The printed limits are ``floor_limits_mm``; the dimension's nominal is the
+    modelled floor, so each limit is stored as its offset from it.
     """
-    _require_member(teeth)
-    minimum = math.floor(2.0 * floor_radius_mm(teeth) * 1000.0 + 1e-6) / 1000.0
-    return minimum, FLOOR_MAX_DIA_MM[teeth]
-
-
-def floor_dip_mm(teeth: int) -> float:
-    """Return how far the modelled floor bows below its feet chord."""
-    chord = chord_floor_radius_mm(
-        teeth, thickness_mm=tooth_thickness_mm(teeth), tmin=floor_tmin(teeth)
-    )
-    return chord - floor_radius_mm(teeth)
+    minimum, maximum = floor_limits_mm(teeth)
+    nominal = 2.0 * floor_radius_min_mm(teeth)
+    return minimum - nominal, maximum - nominal
 
 
 def bore_dia_mm(teeth: int) -> float:
     """Return the configured bore that fits the matching stepped-shaft land."""
     _require_member(teeth)
-    # T006 and T012 share the 1/16 in terminal land (24.7 long after E1).
-    # U40 S1: T012 1/16, T018 1/8 and T024 1/4 in, one land down each, so
-    # their webs meet the U27 target.
+    # T006/T012 share the actual terminal reader. Their strength acceptance
+    # is rederived below from the current cutter-owned printed floor MINs.
     if teeth <= 12:
-        return 0.0625 * MM_PER_IN
+        return TERMINAL_DIA_MM
     if teeth == 18:
         return 0.125 * MM_PER_IN
     if teeth == 24:
@@ -297,28 +308,24 @@ def material_specification(teeth: int) -> str:
 
 FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 
-# Policy rule 12: machined webs target >= 2.0 mm with a hard floor of 1.5 mm,
-# between the printed MIN floor diameter and the maximum bore.  The D-flat
-# only adds material inside the round bore, so the thinnest web stays on the
-# round side and these values are the round bore's.  U40 (user, 2026-09-23):
-# T012, T018 and T024 each drop one shaft land so their webs meet the target;
-# T006 has no compliant construction (its floor sits at r 1.44) and its web
-# is the one named exception (book fidelity).
+# The sole special web is the user's T006 >=0.62 ruling; T012 and the other
+# gears must achieve the ordinary 2.0 target, not merely the 1.5 hard floor.
+# These are acceptance inputs; the factory checks every actual cutter corner.
 MACHINED_WEB_FLOOR_MM = 1.5
 MACHINED_WEB_TARGET_MM = 2.0
-WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.621}
+WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.62}
+TERMINAL_WEB_REQUIREMENTS_MM = {
+    6: WEB_EXCEPTIONS_MM[6],
+    12: MACHINED_WEB_TARGET_MM,
+}
 
 # Printed places of the bore band (model-owned, DRAWING_PRECISION).
 BORE_BAND_PLACES = 3
 
 
-# The band is UNIFORM, not per land, for two reasons.  BoreCutDia is one model
-# dimension across all 20 configurations, and SOLIDWORKS 2026 rejects the
-# per-configuration IDimensionTolerance.SetValues2 on some dimension types
-# (_drawing_marks).  And T006's named web (U40) caps the largest bore under its
-# printed MIN floor: a per-land +0.085 would cut that web to 0.604.  So the one
-# band is the intersection of the gear seat fit over every land that carries a
-# gear, with its upper limit the lower of two named limits.
+# The band is UNIFORM: BoreCutDia is one model dimension across all twenty
+# configurations. Keep the retained seat class independent of selected cutter
+# settings so numerical qualification does not require its own output first.
 def _seat_fit_band() -> tuple[float, float]:
     """(upper, lower): the round seat fit that holds on every gear land."""
     carried = [
@@ -329,19 +336,20 @@ def _seat_fit_band() -> tuple[float, float]:
     return (min(band[0] for band in carried), max(band[1] for band in carried))
 
 
-def _t006_web_upper() -> float:
-    """Largest bore deviation that leaves T006 its named web, to print places."""
-    web_cap = floor_limits_mm(6)[0] - 2.0 * WEB_EXCEPTIONS_MM[6] - bore_dia_mm(6)
+def terminal_web_bore_upper_mm() -> float:
+    """Largest bore deviation admitted by the qualified terminal root limits."""
     scale = 10**BORE_BAND_PLACES
-    return math.floor(web_cap * scale + 1e-9) / scale
+    cap = min(
+        floor_limits_mm(teeth)[0] - 2.0 * minimum
+        - math.ceil(bore_dia_mm(teeth) * scale - 1e-9) / scale
+        for teeth, minimum in TERMINAL_WEB_REQUIREMENTS_MM.items()
+    )
+    return math.floor(cap * scale + 1e-9) / scale
 
 
-BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = _seat_fit_band()  # +0.055, +0.025
-BORE_BAND_WEB_UPPER = _t006_web_upper()  # +0.050 (0.0505 floored)
-# (upper, lower): +0.050/+0.025.  Round clearance 0.025-0.100 on the seat
-# lands, 0.025-0.070 on the running terminal land: inside 0.025-0.105.
+BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = _seat_fit_band()
 BORE_DIA_BAND = (
-    round(min(BORE_BAND_FIT_UPPER, BORE_BAND_WEB_UPPER), BORE_BAND_PLACES),
+    round(BORE_BAND_FIT_UPPER, BORE_BAND_PLACES),
     round(BORE_BAND_LOWER, BORE_BAND_PLACES),
 )
 if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < 0.02 - 1e-9:
@@ -349,6 +357,17 @@ if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < 0.02 - 1e-9:
         f"cone-gear seat bore band {BORE_DIA_BAND[0]:+.3f}/"
         f"{BORE_DIA_BAND[1]:+.3f} is under 0.02 wide"
     )
+
+
+def terminal_web_mm(teeth: int) -> float:
+    """Print-worst radial ligament, read from the actual cutter and fit."""
+    if teeth not in TERMINAL_WEB_REQUIREMENTS_MM:
+        raise ValueError(f"T{teeth:03d} is not carried by the terminal land")
+    scale = 10**BORE_BAND_PLACES
+    maximum_bore = math.ceil((bore_dia_mm(teeth) + BORE_DIA_BAND[0]) * scale - 1e-9) / scale
+    return (floor_limits_mm(teeth)[0] - maximum_bore) / 2.0
+
+
 
 
 # --- D-bore (user ruling 2026-09-28) -----------------------------------------
@@ -413,10 +432,9 @@ def bore_surface_finish(teeth: int) -> SurfaceFinishControl:
     )
 
 
-# Part PMI is authored while the default T120 configuration is active.  Each
-# drawing sheet resolves "cone_gear_bore" from ITS configuration's finish rows
-# in ``BORE_SURFACE_FINISHES`` so native face validation follows that sheet's
-# bore (the T120 row would reject the T006 1/16 in bore).
+# Part PMI is authored while the default T120 configuration is active. Each
+# sheet resolves its own "cone_gear_bore" finish row: using T120's row would
+# reject the actual terminal bore on T006/T012.
 SURFACE_FINISHES = (bore_surface_finish(TEETH),)
 BORE_SURFACE_FINISHES: dict[int, tuple[SurfaceFinishControl, ...]] = {
     teeth: (bore_surface_finish(teeth),) for teeth in CONFIGURATION_TEETH
@@ -429,14 +447,12 @@ TOOTH_REFERENCE_SKETCH = "ToothThicknessReference"
 GAP_FLOOR_SKETCH = "GapFloorReference"
 REFERENCE_SKETCHES = (TOOTH_REFERENCE_SKETCH, GAP_FLOOR_SKETCH)
 
-# The three blank sizes, the tooth-system acceptance size and the gap-floor
-# limits.  ToothThickness and FloorDia are DRIVING dimensions in
-# construction-only authoring sketches: policy rule 2 permits that pattern
-# when the printed value is not itself a solid feature dimension (the gap
-# floor is an involute-profile chord bowed by FloorDip, with no diameter of
-# its own).  Neither is a reference-status drawing dimension, so their native
-# tolerances remain meaningful: ToothThickness a bilateral band, FloorDia the
-# per-configuration floor_limits_mm pair as LIMIT tolerance.
+# The three blank sizes, actual circular pitch-thickness acceptance and
+# functional root-envelope limits. ToothThickness and FloorDia are driving
+# dimensions in construction-only INSPECTION sketches, not cutter controls.
+# The finite translated root is an off-centre arc, not a bowed ideal chord.
+# Native tolerances remain meaningful: the pitch thickness has its retained
+# bilateral band; the root envelope has the qualified per-count LIMIT pair.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia"},
     "Blank": {"FaceWidth"},
@@ -445,17 +461,27 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     GAP_FLOOR_SKETCH: {"FloorDia"},
 }
 
-# Tip-diameter band, (upper, lower) deviations.  The tip sets how deep the
-# cone teeth reach into the 120T drum on the backed-off oblique mesh, so the
-# title-block .XX +/-0.51 (a whole addendum) is too loose: at -0.51 the
-# nominal 0.459 mm interleave halves (Fable review, 2026-09-23).  Main ruled
-# the band by contact ratio (U27: the looser +/-0.25 only if it keeps CR >= 1.1
-# at the worst case).  Worst case of every printed band -- this band, drum OD
-# +0/-0.10, bore-on-land, journal, drum-bore and arbor float -- leaves CR
-# 0.09/0.42/0.46 (T006/T060/T120) at +/-0.10 and 0.01/0.28/0.30 at +/-0.25,
-# with the drum floor still clear (+0.83 / +0.75), so +/-0.10 prints: turning
-# the blank OD to a micrometer before cutting teeth is a novice-holdable step.
-BLANK_DIA_BAND = (0.10, -0.10)
+# Blank band below the printed outside diameter, undersize only, so the
+# closing corner keeps root clearance (user ruling 2026-10-10: ordinary
+# 0/-0.05). Every corner must still keep finite cutter support, tip land,
+# root air and web before construction.
+BLANK_DIA_BAND = (0.0, -0.05)
+# T006 keeps its own bands (the named exception, user ruling 2026-10-10):
+# DT6-FORM1's relief leaves no flank for a tooth thicker than the tool, and a
+# thinner or smaller T006 loses the tip land. build_dt_cone_gear writes every
+# configuration's band into that configuration (IDimensionTolerance.SetValues2).
+CUSTOM_SIX_TOOTH_THICKNESS_BAND = (0.0, -0.04)
+CUSTOM_SIX_BLANK_DIA_BAND = (0.0, -0.02)
+
+
+def tooth_thickness_band(teeth: int) -> tuple[float, float]:
+    _require_member(teeth)
+    return CUSTOM_SIX_TOOTH_THICKNESS_BAND if teeth == 6 else TOOTH_THICKNESS_BAND
+
+
+def blank_dia_band(teeth: int) -> tuple[float, float]:
+    _require_member(teeth)
+    return CUSTOM_SIX_BLANK_DIA_BAND if teeth == 6 else BLANK_DIA_BAND
 
 
 def configuration_number(part_number: str, teeth: int) -> str:
@@ -470,8 +496,8 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
 # Policy rule 2: places and bands are model properties.  Three places belong
-# on the fit dimensions (the bore, its across-flat and circular tooth
-# thickness) and on the gap-floor limits, whose T006 window is 0.049 wide.
+# on the fitted bore, across-flat, tooth thickness and gap-floor limits, so
+# both ends of each narrow floor window print without rounding inward.
 # Tip diameter prints two places with its own BLANK_DIA_BAND (below); face
 # width prints four, like the cylinder gear's OverallThickness under the same
 # rule: three would round one limit of the +/-0.025 band inward.  The flat

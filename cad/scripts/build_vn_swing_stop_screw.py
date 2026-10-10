@@ -1,12 +1,16 @@
-"""Build the swing-stop screw from shared McMaster 90280A108 stock."""
+"""Build the swing-stop screw from shared McMaster 90280A108 stock.
+
+The stop only limits the disengaged swing; it plays no part in meshing.
+"""
 
 from __future__ import annotations
 
 import sys
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_90280A108 import build_90280A108
 from vn_swing_stop_screw_spec import PROUD_LEN
 
@@ -27,6 +31,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
     )
 
 

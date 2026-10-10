@@ -14,7 +14,10 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -30,6 +33,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_visible,
+    set_reference_dimension,
     set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
@@ -37,7 +41,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _part_pmi import _face_geometry, _face_matches
+from _gtol_face_read import face_geometry
 from _surface_finish import surface_finish_by_key
 from dt_cylinder_gear_notes import BORE_FIT_CALLOUT, STACK_FIT_CALLOUT
 from dt_cylinder_gear_spec import (
@@ -51,6 +55,7 @@ from dt_cylinder_gear_spec import (
     NOTCH_CENTER_X,
     NOTCH_FLOOR_RADIUS,
     OVERALL_THICKNESS,
+    PATTERN_NOTCH_REF_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_RADIUS,
 )
@@ -70,9 +75,9 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Portrait makes the 62.2 mm gear materially larger than the old landscape
-# 1:1 layout.  The cam-side front view exposes every radial feature, so a
-# redundant opposite face view would only consume the exterior dimension lanes.
+# Portrait keeps the configured drum readable without crowding the views.
+# The cam-side front view exposes every radial feature, so a redundant
+# opposite face view would only consume the exterior dimension lanes.
 SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = (3, 2)
 FRONT_CENTER = (0.105, 0.270)
@@ -102,8 +107,11 @@ FRONT_KEEP = {
     "CamDia": (0.175, 0.235),
     "CamCy": (0.175, 0.279),
     "NotchPhase": (0.152, 0.334),
+    # Left of centre so "(90°)" keeps clear of the STACKS note above 7.0565.
+    "PatternNotchPhase": (0.145, 0.360),
 }
 RIGHT_KEEP = {
+    "OutsideDia": (0.248, RIGHT_CENTER[1]),
     "FaceWidth": (0.205, 0.220),
     "OverallThickness": (0.205, 0.360),
 }
@@ -302,8 +310,8 @@ def _cam_thickness_rims(view: Any) -> dict[float, Any]:
     control = surface_finish_by_key(SURFACE_FINISHES, "cam_follower")
     faces = []
     for face in visible_view_entities(view, 3, label="cam thickness face"):
-        geometry = _face_geometry(face)
-        if geometry is not None and _face_matches(geometry, control.face):
+        geometry = face_geometry(face)
+        if geometry is not None and control.face.matches(geometry):
             faces.append(face)
     if len(faces) != 1:
         raise RuntimeError(
@@ -462,6 +470,38 @@ def _leader_outside_arrow(adapter: Any, annotations: list[Any], name: str) -> No
         raise RuntimeError(f"{name} did not keep its single outside arrow")
 
 
+def _pattern_notch_reference(adapter: Any, annotations: list[Any]) -> Any:
+    """Print the seed-gap-to-kerf 90 degrees as a reference, (90°).
+
+    The kerf is sawn into a root the tooth indexing already cut, so the
+    angle has nothing separate to inspect (dt_cylinder_gear_spec).  The
+    part leaves the driven dimension untoleranced; it prints (90°) through
+    main's prefix/suffix reference form, as (Ø9.575) on this sheet: at
+    f68549253 ShowParenthesis read True on this angle but rendered "90°".
+    """
+    matches = [annotation for annotation in annotations
+               if dimension_name(adapter, annotation) == "PatternNotchPhase"]
+    if len(matches) != 1:
+        raise RuntimeError("expected one actual PatternNotchPhase@NotchProfile locator")
+    raw_display = matches[0].GetSpecificAnnotation()
+    if raw_display is None:
+        raise RuntimeError("pattern-to-CAM-notch locator has no display dimension")
+    display = _early_bound(raw_display, "IDisplayDimension")
+    raw_dimension = display.GetDimension2(0)
+    if raw_dimension is None:
+        raise RuntimeError("pattern-to-CAM-notch locator has no model dimension")
+    dimension = _early_bound(raw_dimension, "IDimension")
+    name = dimension.FullName
+    if (type(name) is not str or not name.startswith("PatternNotchPhase@NotchProfile@")
+            or int(display.Type2) != 3 or int(dimension.DrivenState) != 1
+            or not math.isclose(abs(float(dimension.SystemValue)),
+                                math.radians(PATTERN_NOTCH_REF_ANGLE_DEG), abs_tol=1e-8)):
+        raise RuntimeError("pattern-to-CAM-notch locator is not the actual driven 90-degree angle")
+    if int(dimension.GetToleranceType()) != 0:  # swTolNONE
+        raise RuntimeError("pattern-to-CAM-notch reference carries a tolerance")
+    return set_reference_dimension(adapter, matches[0], label="pattern-to-CAM-notch reference")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -540,6 +580,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # band nobody specified.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"BoreDia"})
+    _pattern_notch_reference(adapter, annotations)
     # Keep the controlled face-width value while moving only its text outside
     # the side-view extension lines; the offset leader returns to the dimension.
     offset_dimension_text(

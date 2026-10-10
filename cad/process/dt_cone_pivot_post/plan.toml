@@ -1,7 +1,8 @@
-# Copied from https://github.com/pedropaulovc/prechips/blob/55cae713860a491b8925aed1ad8a24fb30502fe0/examples/cone-pivot-post/plan.toml
-# Inventory verification flags, author-choice process proposals and the
-# plan-authored T1/M2/J3/C4 frames (origins, axes, binding, cites) are unchanged.
-# Hand-authored M2 one-piece candidate; PLANNED, not a verified machining route.
+# Process candidate copied from https://github.com/pedropaulovc/prechips/blob/55cae713860a491b8925aed1ad8a24fb30502fe0/examples/cone-pivot-post/plan.toml
+# Current geometry follows dt_cone_pivot_post_spec and its configured axes;
+# test_dt_cone_pivot_post_drawing.py binds these declarative setup values.
+# Inventory flags, unknown setup bindings and the one-piece operation intent
+# remain the source candidate's, not a verified machining route.
 # All blank allowances, grip, jogs, feeds and depths marked AUTHOR'S CHOICE.
 # No speed, source material grade, available blank, tool reach or setup binding is invented.
 part = "dt-cone-pivot-post"
@@ -24,9 +25,9 @@ form = "round_bar"
 material = "unknown" # source only pins ferrous_noncritical, not a purchased grade
 on_hand = false # inventory stock=[]; this is a procurement candidate, not an inventory item
  dia_mm = 110.0 # AUTHOR'S CHOICE: radius55 covers hypot(50.6591,21.93/2)=51.8322
-length_mm = 120.0 # AUTHOR'S CHOICE: body86 + foot allowance6 + sacrificial top grip28
+length_mm = 128.732 # AUTHOR'S CHOICE: BLOCK_HEIGHT + foot allowance6 + sacrificial grip28
 north_allowance_mm = 6.0 # AUTHOR'S CHOICE: exposed foot-facing allowance
-south_grip_mm = 28.0 # AUTHOR'S CHOICE: past the finished top at body Y86
+south_grip_mm = 28.0 # AUTHOR'S CHOICE: beyond the finished BLOCK_HEIGHT
 note = "AUTHOR'S CHOICE: bar parallel model Y. The complete crank boss reach fits inside radius55; no Ø45 envelope is claimed. Keep both integral journal pads during roughing. Catalogue identity and material grade unknown; M4 swept-envelope/clearance proof not supplied."
 cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:29-33,49-67"]
 
@@ -44,10 +45,9 @@ y = "away" # AUTHOR'S CHOICE: existing EL400 positive mill-Y convention
 z = "toward_exposed_end"
 
 # Plan-owned setup frames (PLAN.md §4.1; docs/plan.md "frames"). The exported
-# manifest declares only `model` and an unknown `setup`; these restore the
-# pre-export T1/M2/J3/C4 transforms and citations verbatim (3a561db
-# examples/cone-pivot-post/features.toml). Origins and axes are model
-# coordinates; every physical binding remains unknown.
+# manifest declares only `model` and an unknown `setup`; the original
+# T1/M2/J3/C4 axes convention is retained, with current post origins and yaw.
+# Origins and axes are model coordinates; physical bindings remain unknown.
 [frames.T1]
 origin = [0.0, 0.0, 0.0]
 x = [1.0, 0.0, 0.0]
@@ -57,29 +57,29 @@ binding = "unknown"
 note = "AUTHOR'S CHOICE: foot-exposed frame (one-piece lathe S1, built-up mill S0); +Z toward the foot, +X radial withdrawal on the lathe."
 cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:29-33,373-376"]
 
-# Head top at Z86 = exported body height_nominal.
+# Head top follows dt_cone_pivot_post_spec.BLOCK_HEIGHT.
 [frames.M2]
 origin = [0.0, 0.0, 0.0]
 x = [1.0, 0.0, 0.0]
 y = [0.0, 0.0, -1.0]
 z = [0.0, 1.0, 0.0]
 binding = "unknown"
-note = "AUTHOR'S CHOICE: foot-down milling; Z0 at finished foot, head top at Z86."
+note = "AUTHOR'S CHOICE: foot-down milling; Z0 at finished foot, head top follows the current post body height."
 cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:29-33,79-81,373-376"]
 
 # Origin = exported journal_bore at; setup -Z = exported journal_bore axis.
 [frames.J3]
-origin = [0.0, 33.368, 0.0]
-x = [0.9762272058393484, 0.0, -0.21674972336567902]
+origin = [0.0, 38.1, 0.0]
+x = [0.9743657169814578, 0.0, -0.22496988592078224]
 y = [0.0, -1.0, 0.0]
-z = [-0.21674972336567902, 0.0, -0.9762272058393484]
+z = [-0.22496988592078224, 0.0, -0.9743657169814578]
 binding = "unknown"
-note = "AUTHOR'S CHOICE: spindle toward the north cone-boss face; trig basis derived from the 12.5182 degree horizontal plan angle, not a tilt."
+note = "AUTHOR'S CHOICE: spindle toward the north cone-boss face; trig basis follows the configured horizontal plan incline, not a bore tilt."
 cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:62-67,268-279"]
 
-# Origin = exported crank_bore at Y72.7 and crank_boss_faces station_nominal 21.3753.
+# Origin = current CRANK_BORE_HEIGHT and CRANK_BOSS_START_Z.
 [frames.C4]
-origin = [0.0, 72.7, -21.3753]
+origin = [0.0, 81.19564350289599, -21.3753]
 x = [1.0, 0.0, 0.0]
 y = [0.0, -1.0, 0.0]
 z = [0.0, 0.0, -1.0]
@@ -87,7 +87,7 @@ binding = "unknown"
 note = "AUTHOR'S CHOICE: crank boss north face Z0; depth goes into boss along negative setup Z."
 cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:49-57"]
 
-# S1 only turns BELOW the inclined pad (lowest pad Y33.368-17.2/2=24.768).
+# S1 only turns BELOW the inclined pad (lowest pad Y38.1-17.2/2=29.5).
 # Do not turn the full body/head and thereby remove either integral boss.
 [[setups]]
 id = "S1"
@@ -100,19 +100,19 @@ deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_
 [setups.stock_state]
 od_mm = 110.0 # AUTHOR'S CHOICE: declared blank OD, not a measurement
 north_end_z = 6.0 # AUTHOR'S CHOICE: foot allowance in T1
-south_end_z = -114.0 # AUTHOR'S CHOICE: 86+28 behind the foot
-note = "AUTHOR'S CHOICE: jaws end at model Y86/T1 Z-86; stock runs to Y114."
+south_end_z = -122.732 # AUTHOR'S CHOICE: BLOCK_HEIGHT + sacrificial grip28 behind foot
+note = "AUTHOR'S CHOICE: jaws end at the finished head top; stock extends another28mm along model +Y."
 [setups.hold]
 fixture = "chuck-4jaw-6-d1-4"
 support = "none" # AUTHOR'S CHOICE: unsupported route; shop ratio remains unknown
  grip_on = "sacrificial upper28mm past the final head top"
 grip_mm = 28.0
-stickout_mm = 92.0 # AUTHOR'S CHOICE: exposed foot allowance6 + body86; L/D=92/110
+stickout_mm = 100.732 # AUTHOR'S CHOICE: exposed foot allowance6 + BLOCK_HEIGHT
 fixed_jaw = "not_applicable"
 jaws_along = "not_applicable"
 parallels = "not_applicable"
 jaw_above_parallels_mm = "not_applicable"
-stop = "AUTHOR'S CHOICE: jaw fronts at T1 Z-86; separately verify tool clearance"
+stop = "AUTHOR'S CHOICE: jaw fronts at T1 Z minus the current body height; separately verify tool clearance"
 clamp = "AUTHOR'S CHOICE: centre in four-jaw; tighten all jaws and remove key before cutting"
 [setups.zero.x]
 feature = "spindle_axis"
@@ -182,12 +182,12 @@ coolant = "CRC cutting oil brushed on"
 deburr_mm = 0.25
 deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
 [setups.stock_state]
-top_z = 114.0 # AUTHOR'S CHOICE: sacrificial upper grip before removal
+top_z = 122.732 # AUTHOR'S CHOICE: BLOCK_HEIGHT + sacrificial grip28 before removal
 bottom_z = 0.0
 note = "AUTHOR'S CHOICE: nominal foot-down placement; toolpaths around both integral pads and real clamping contacts are unproven."
 [setups.stock_state.local_thickness]
-mount_west = 86.0 # spec:30, AUTHOR'S CHOICE: drill after top faced to86
-mount_east = 86.0
+mount_west = 94.732 # current BLOCK_HEIGHT; drill after the head is faced
+mount_east = 94.732
 [setups.hold]
 fixture = "unknown" # no suitable full-envelope integral-blank nest is recorded
 support = "unknown"
@@ -233,7 +233,7 @@ do = "face"
 feature = "head"
 tool = "unknown"
 holder = "unknown"
-to_z = 86.0 # source spec:30; removes AUTHOR'S CHOICE28mm grip
+to_z = 94.732 # current BLOCK_HEIGHT; removes AUTHOR'S CHOICE28mm grip
  direction = "positive_setup_x"
 note = "AUTHOR'S CHOICE: remove sacrificial grip; reach and fixture/tool identities remain unknown."
 [setups.ops.checks]
@@ -372,7 +372,7 @@ clamp = "AUTHOR'S CHOICE: verify asymmetrical post restraint and mill spindle cl
 [setups.hold.index]
 fixture = "BS-0"
 feature = "crank_bore" # exported owner of the BASIC inter-bore angle
-angle_deg = 12.5182 # spec:62,327,387 BASIC plan angle; not bore tilt
+angle_deg = 13.0011073536895 # current INCLINE_DEG, BASIC plan angle; not bore tilt
 positions = 1 # AUTHOR'S CHOICE: one angular setting, NO closure claim
 [setups.zero.transfer]
 from = "S2"

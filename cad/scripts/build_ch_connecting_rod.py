@@ -6,12 +6,10 @@ eccentric cam (cast integral with each cylinder gear), a thin flat shank, and a
 U-shaped FORK (clevis; the Y-shaped upper end of the ch14 fan photo) whose two
 tines straddle the rocker arm's 2.500 strap and carry the pressed pivot pin
 (MHA-CH-010, ch_rod_pivot_pin_spec) through the arm's rod-pin hole near its
-rod-side tip. Centre distance 163.10103: the rod hangs PLUMB with the arm
-LEVEL after the fixed-post photos show every rod dropping vertically from the
-arm tip onto its cam, the ch14 end views show the 0-crank tip row dead level
-(cos-mode home = top of stroke, cam lobe UP), so the pin (127.37 out from the
-mid-seesaw pivot) sits directly above the phased lobe centre at machine
-(-54.474, 99.155) and the rod length closes that vertical link.
+rod-side tip. The centre distance follows the actual phased cam centre and the
+level rocker's pin, including the common raised drive-axis height. The ch14
+end views show the 0-crank tip row level (cos-mode home = top of stroke, cam
+lobe UP); the rod length closes that link without moving the rocker bank.
 
 The rod is FLAT: ring, shank and fork share one mid-plane, which is the cam
 plane and the arm plane (rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ), so the
@@ -45,29 +43,26 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    _early_bound,
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    define_circle,
-    define_rectilinear_chain,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    name_dimensions,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from _drawing_marks import (
     _named_dimension,
     apply_drawing_precision,
@@ -77,7 +72,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 import _telemetry
 from _saved_part_guard import require_saved_drawing_properties
@@ -110,13 +105,13 @@ from ch_connecting_rod_spec import (
 
 PART_NAME = "ch-connecting-rod"
 # AISI 1018 plate (the registry row's material_specification); SOLIDWORKS's
-# library carries it as Plain Carbon Steel -- see _common.apply_material.
+# library carries it as Plain Carbon Steel -- see _appearance.apply_material.
 MATERIAL = "Plain Carbon Steel"
 
 # Cam ring centre -> rocker pin, VERTICAL rod: the
 # pin rides the arm's rod-pin hole 133.067 out from the pivot -- directly
-# above the phased cam LOBE (installed machine centre (-60.167, 99.155) =
-# drum (-60.394, 90.518) + ECC 8.64 rotated by the +1.5 deg tooth phase,
+# above the phased cam LOBE (shared drive height plus the eccentricity
+# rotated by the configured tooth phase),
 # lobe UP at the cos-mode home; the Ry180 axial flip preserves local +Y;
 # ch30 photos + GT rocker-corner triangulation put the arm's rod-side end over
 # the drum). Solved so the rocker rests LEVEL (arm tilt 0 -- the ch14 end views

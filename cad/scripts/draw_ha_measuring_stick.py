@@ -25,7 +25,9 @@ from typing import Any
 
 import _telemetry
 import build_ha_measuring_stick as part
-from _common import CAD_ROOT, check, run_build
+from _check import check
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,

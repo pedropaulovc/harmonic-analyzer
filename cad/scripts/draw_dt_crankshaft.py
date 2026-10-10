@@ -28,7 +28,10 @@ import sys
 from typing import Any, Callable, Sequence
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -199,8 +202,8 @@ SIDE_KEEP = {
     "CollarRearStation": ((COLLAR_REAR_X + FAR_END_X) / 2.0, _ROW_Y[5]),
     "CollarSeatStation": ((COLLAR_SEAT_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[6]),
     "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[7]),
-    # Its "0.0 / 135.4" block sits right of the overall's "(137.4) / OVERALL"
-    # on the next row down, not over it: the two rows are 9.5 mm apart.
+    # The shaft length's native unilateral block sits right of the reference
+    # overall on the next row down, not over it.
     "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0 + 0.035, _ROW_Y[8]),
     "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[9]),
     # Above the dome, between the +Z drive-pin location's text and the

@@ -28,6 +28,7 @@ from __future__ import annotations
 import math
 
 import pd_transgear_arm_geometry as ARM
+from _printed_tolerance import printed_band_mm
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
 # K = the knob shaft axis, 44.766 from the stud on the permanent latch C2C;
@@ -104,6 +105,11 @@ HUB_DIA = 13.2  # .XX
 # chain-plane station (contract §13).
 HUB_LENGTH = 12.6
 HUB_FACE_TO_MOUNTING = NOTCH_DEPTH + HUB_LENGTH  # 20.5375
+# The chain-plane station prints .XXX (contract §13). Keep its existing
+# title-block config reader here, not in the richer drawing/annotation spec:
+# ARM.BAND_XXX is a hard-coded wall band, not this station's printed grade.
+HUB_STATION_PLACES = 3
+HUB_FACE_TO_MOUNTING_BAND = printed_band_mm(HUB_STATION_PLACES)
 BOSS_DIA = 20.0  # .X
 BOSS_HEIGHT = 3.5
 HUB_TO_BOSS = HUB_FACE_TO_MOUNTING + THICKNESS_OVER_ARM + BOSS_HEIGHT  # 29.0375

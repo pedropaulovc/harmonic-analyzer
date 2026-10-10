@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -74,11 +75,12 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # that head centre is MHA-DT-022 local z=-6.5; MHA-DT-015 keeps its own origin.
     # Codex #854/#858 P1 (Main): the assembly shows the fit-up stack, where the
     # back stop puts the drum -- and the arbor it is bonded on -- 0.25 aft of
-    # the released -135.0 arbor station, and RIG_AFT_SHIFT a further 0.97 (user
-    # ruling P1-2: what the rig-set leaf D off g19 leaves, for j = 19's full
-    # face with margin).  Every released station below moves by exactly that,
-    # and nothing else about the cutover changes.
+    # the released arbor station, plus RIG_AFT_SHIFT set from the configured
+    # g19 datum (user ruling P1-2: rig-set leaf D keeps its full face with
+    # margin). Train pitch edits move the datum, not the cutover's local
+    # head or crossrod geometry.
     import pinion_rig_layout as rig
+    import pinion_rig_park_geometry as park
 
     fitup_shift = assembly.ARBOR_Z0 - (-135.0 + MECHANISM_Z_SHIFT)
     assert fitup_shift == pytest.approx(0.25 + rig.RIG_AFT_SHIFT, abs=1e-9)
@@ -100,14 +102,31 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     rod_axis = _world_vector(assembly.HANDLE_ROWS, (0.0, 1.0, 0.0))
     bore_axis = _world_vector(assembly.ARBOR_ROWS, (0.0, 1.0, 0.0))
     shaft_axis = _world_vector(assembly.ARBOR_ROWS, (0.0, 0.0, 1.0))
-    expected_grip_axis = (
-        -0.9063077870366499,
-        0.42261826174069944,
-        0.0,
+    grip_angle = math.radians(65.0)  # released grip clock from vertical
+    expected_grip_axis = (-math.sin(grip_angle), math.cos(grip_angle), 0.0)
+    # Park on the configured level line of centres, with the specified tip
+    # gap. Axially the back drum face is leaf D off the configured bank datum;
+    # the original drum-to-arbor bond station and head centre stay local.
+    expected_arbor_z = (
+        rig.G19_BACK_FACE_Z
+        + rig.RIG_SET_LEAF_D
+        - rig.DRUM_LEN
+        - arbor_geometry.DRUM_FRONT_Z_AS_BUILT
+        - arbor_geometry.DRUM_AFT_SHIFT
     )
-    # x follows the drum's parked station: U28 (2026-09-23) parks it with a
-    # 2.2425 tip gap to the review-first 32T drum's 8.667 tip radius.
-    expected_axis = (-18.383940352466745, 90.518, -137.18811169145133)
+    # The level line of centres parks the stock-cutter tips (each part's
+    # OUTSIDE_DIA, below the ideal (N + 2)/DP) the configured gap apart.
+    import dt_alignment_pinion_spec
+    import dt_cylinder_gear_spec
+
+    expected_axis = (
+        park.X_DRUM
+        + dt_cylinder_gear_spec.OUTSIDE_DIA / 2.0
+        + dt_alignment_pinion_spec.OUTSIDE_DIA / 2.0
+        + _config.machine("alignment_pinion", "disengaged_tip_gap_mm"),
+        park.Y_DRIVE,
+        expected_arbor_z - (9.0 / 2.0 + 2.0),
+    )
     # Rule 12 (audit W6) grew the head 9.0 -> 10.5 and the machinist review of
     # 7f7fc1717 (Main's option 2) to 11.5, each about the released centre, so
     # both faces and the crown move 1.25 out.  The neck shoulder (the released
@@ -130,10 +149,10 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     assert integral_head_stations == pytest.approx(
         (
-            -142.93811169145133,
-            -131.43811169145133,
-            -145.93811169145133,
-            -120.93811169145133,
+            expected_axis[2] - 11.5 / 2.0,
+            expected_axis[2] + 11.5 / 2.0,
+            expected_axis[2] - (11.5 / 2.0 + 3.0),
+            expected_axis[2] + 9.0 / 2.0 + 2.0 + 10.0 - 0.25,
         ),
         abs=1e-12,
     )
@@ -144,16 +163,12 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     assert bore_axis == pytest.approx(rod_axis, abs=1e-12)
     assert shaft_axis == pytest.approx((0.0, 0.0, 1.0), abs=1e-12)
 
-    for local, expected in (
-        (
-            (0.0, -32.0, 0.0),
-            (10.617908832706053, 76.99421562429762, -137.18811169145133),
-        ),
-        (
-            (0.0, 33.0, 0.0),
-            (-48.29209732467619, 104.46440263744309, -137.18811169145133),
-        ),
-    ):
+    for distance in (-spec.ROD_DOWN, spec.ROD_UP):
+        local = (0.0, distance, 0.0)
+        expected = tuple(
+            expected_axis[axis] + distance * expected_grip_axis[axis]
+            for axis in range(3)
+        )
         released_endpoint = _world_point(released_origin, assembly.HANDLE_ROWS, local)
         new_endpoint = _world_point(
             (assembly.APINION_X, assembly.APINION_Y, assembly.HANDLE_Z),

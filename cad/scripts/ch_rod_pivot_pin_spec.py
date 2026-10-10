@@ -69,9 +69,10 @@ NEIGHBOUR_CLEARANCE_MIN = RUNNING_FLOOR + MARGIN_SPARE  # 0.35
 CROTCH_CLEARANCE_MIN = 1.0  # slot floor below the arm's bottom edge, all poses
 BRIDGE_TARGET = 2.0  # fork bridge below the slot floor: the rule-12 target
 # Arm tilt less rod tilt, the swing the crotch must clear: the solved loop
-# (channel_kinematics, cam phase 0..360) spans -8.602..+1.006 deg, restated
-# here rounded outward (test_ch_rod_pivot_fit pins it to the solved loop).
-RELATIVE_SWING_DEG = (-8.61, 1.01)
+# (channel_kinematics, cam phase 0..360) spans -8.662..+1.061 deg with the
+# rod closing the raised drive axis to the level rocker, restated here
+# rounded outward (test_ch_rod_pivot_fit pins it to the solved loop).
+RELATIVE_SWING_DEG = (-8.67, 1.07)
 _SWING_STEPS = 400
 
 

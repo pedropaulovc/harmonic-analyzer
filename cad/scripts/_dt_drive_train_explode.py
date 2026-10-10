@@ -22,8 +22,8 @@ from typing import Any, Mapping, NamedTuple, Sequence
 
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
-from _common import _early_bound
-from _drawing_simplified import simplified_name
+from _com import _early_bound
+from _simplified_names import simplified_name
 from cone_line import COS_I, SIN_I
 from dt_drive_train_assembly_spec import (
     CONE_AXIS_SOURCE,

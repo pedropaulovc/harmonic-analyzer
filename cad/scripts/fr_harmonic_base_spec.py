@@ -10,7 +10,8 @@ silently drift.
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
 from frame_column_stations import COLUMN_SOCKET_DIAMETER, COLUMN_X
@@ -81,8 +82,11 @@ HANGING_BOSS_MIN_DIA = 16.0  # max(this, 2.5 x tap drill) per seat
 # each seat takes the higher level that still leaves its drill tip 1.5D of
 # metal (build_fr_harmonic_base proves it), so the pattern carries two boss
 # lengths instead of one per seat.
+# The shallow level backs the raised pinion block's seat: its #8-32 x 1-1/2
+# screw runs 13.38 deep at the shortest printed block, so the 16.8 drill's
+# tip stands 32.96 up and needs 1.5D (6.25) under it: 26.71 at most.
 DEEP_BOSS_BOTTOM_Y = 12.0
-SHALLOW_BOSS_BOTTOM_Y = 28.0
+SHALLOW_BOSS_BOTTOM_Y = 26.5
 CASTING_FILLET_R = 6.0
 
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
@@ -330,7 +334,7 @@ DRAWING_REFERENCE_PRECISION = 1
 # A spotface only has to clean the cast face under a screw head: deeper is
 # harmless, shallower leaves an unfaced ring the head would rock on, so the
 # general .X band is wrong in one direction here. The model carries the band.
-SPOTFACE_DEPTH_BAND_MM = (0.5, 0.0)  # (upper, lower) deviations, like _fit_limits
+SPOTFACE_DEPTH_BAND_MM = (0.5, 0.0)  # (upper, lower) deviations, like _fit_deviations
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names

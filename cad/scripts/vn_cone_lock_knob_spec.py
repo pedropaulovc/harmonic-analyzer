@@ -1,28 +1,40 @@
-r"""Purchased cone lock knob (McMaster 93585A190) nominals and seat check.
+r"""Pure McMaster 93585A190 nominal geometry and lock-seat checks.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure: the thread, the stud/head dims and the seat-fit check the harmonic
-base, the swing-platform geometry and the drive train read. The dims come from
-the constants of the 93585A190 replica recipe
-(``diagnostics/diag_build_93585A190.py``, SolidWorks-free at import).
-Consumers read them here, not from ``build_vn_cone_lock_knob``, whose stock build
-recipe would otherwise ride their cache keys (#880).
+closure. The supplier-model scalars in mm/degrees are the per-SKU vendor
+source (``_mcmaster_93585a190.py``, SolidWorks-free at import), which the
+native recipe also reads. Base, swing-platform and pose readers import this
+spec, not a native recipe.
 
 The high-profile head has no collar: its chamfered underside bears directly
-on the plate (or, disengaged, on the bare base), so the full knurled head is
-what stands at plate height when the knob fences the notch mouth.
+on the plate (or, disengaged, on the bare base). HEAD_DIA is the source
+model's maximum radial envelope over the knurl crests, not a tolerance-high
+supplied diameter. Head and stud supplier tolerances are unprovided; no
+manufactured title-block grade is assigned to these purchased nominals.
+
+The knob locks the cone-to-drum set at assembly (cone_set_stack): with the
+pedestals already shimmed and tightened, swing the platform in until T120's
+radial feeler is snug, hold it, and tighten the knob. It clamps by friction
+anywhere along the lock notch.
 """
 
 from __future__ import annotations
 
 from _hole_spec import HoleSpec
-from diagnostics.diag_build_93585A190 import (
+from _mcmaster_93585a190 import (
     HEAD_H as _HEAD_H,
     HEAD_R as _HEAD_R,
     LENGTH as _LENGTH,
     MAJOR_R as _MAJOR_R,
     PITCH as _PITCH,
 )
+
+SOURCE = "cad/out/reports/mcmaster-93585A190-dump.json"
+
+HEAD_DIA_BAND = None  # Unknown supplier tolerance, not a zero-width band.
+HEAD_H_BAND = None
+STUD_DIA_BAND = None
+STUD_LEN_BAND = None
 
 THREAD = "1/4-20"
 HEAD_DIA = 2.0 * _HEAD_R

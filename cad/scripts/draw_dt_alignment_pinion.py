@@ -3,6 +3,9 @@ r"""Create the simplicity-policy drawing for the alignment-pinion drum.
 The end view owns the tooth-tip envelope and matched arbor bore.  The aligned
 profile owns the full tooth-face width, and the standard isometric supplies
 pictorial clarity without replacing either manufacturing view.
+The property-linked tooth-system block comes from the rebuilt part: configured
+DP/PA, standard root/depth and the count-specific reference cutter, never the
+retired shallow chord-floor description.
 """
 
 from __future__ import annotations
@@ -13,7 +16,10 @@ from typing import Any
 
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,

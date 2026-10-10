@@ -56,7 +56,6 @@ import math
 import pd_rack_pinion_spec as DISC
 import pd_transgear_arm_geometry as ARM
 import pd_transgear_arm_plate_geometry as ARM_PLATE
-import pd_transgear_arm_plate_spec as ARM_PLATE_SPEC
 import pd_transgear_disc_hub_geometry as HUB_JOINT
 import pd_transgear_feed_pinion_spec as SLEEVE
 import pd_transgear_knob_shaft_spec as KNOB_SHAFT
@@ -96,7 +95,7 @@ F_TERMS: tuple[tuple[str, float, float], ...] = (
     (
         "MHA-PD-019 hub face station",
         ARM_PLATE.HUB_FACE_TO_MOUNTING,
-        printed_band_mm(ARM_PLATE_SPEC.HUB_STATION_PLACES),
+        ARM_PLATE.HUB_FACE_TO_MOUNTING_BAND,
     ),
     ("MHA-VN-046 thrust ring length", KNOB_RING.LENGTH, KNOB_RING.LENGTH_TOL),
     (

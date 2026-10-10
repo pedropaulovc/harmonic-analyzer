@@ -20,7 +20,7 @@ import pd_transgear_knob_shaft_spec as knob_shaft
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _printed_tolerance import printed_deviations
 
 
@@ -225,7 +225,7 @@ def test_the_notch_depth_prints_the_loosest_row_the_lock_sweep_clears(
 def test_the_hub_station_prints_the_loosest_row_the_disc_platen_air_holds() -> None:
     """The disc-to-platen air was judged at HUB_STATION_PLACES' row."""
     printed = spec.DRAWING_PRECISION_BY_NAME["HubFaceToMounting"]
-    judged = _band(spec.HUB_STATION_PLACES)
+    judged = _band(geometry.HUB_STATION_PLACES)
 
     def holds(places: int) -> bool:
         return assembly.DISC_PLATEN_AIR_WORST - (_band(places) - judged) >= 0.0

@@ -1,9 +1,8 @@
 r"""Involute gear math and equation-manager helpers shared by the gear builders.
 
-The cone gear, cylinder gear, alignment pinion, removable transgear and the
-``_gear`` fixed-gear helper all cut the same tooth system: involute flanks at
-the train's diametral pitch and 14.5 deg pressure angle, closed by a chord at
-the base circle.  This module owns that math (``gear_facts`` mirrors the
+The train gear builders use the configured diametral pitch and pressure
+angle; unrelated tooth families pass their own values explicitly. This
+module owns the involute math (``gear_facts`` mirrors the
 equation-manager globals; ``gap_area_in_disc`` is the exact volume
 expectation) and the SolidWorks equation-manager helpers that round-trip it,
 so a gear builder no longer imports another gear's part script.
@@ -31,10 +30,11 @@ from typing import Any
 
 import _config
 import _telemetry
-from _common import _early_bound, _read_member, check
+from _check import check
+from _com import _early_bound, _read_member
 
-DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
-PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
+DP = _config.machine("gear_train", "diametral_pitch")
+PA_DEG = float(_config.machine("gear_train", "pressure_angle_deg"))
 
 PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
 
@@ -193,23 +193,6 @@ async def set_global(adapter: Any, name: str, expression: str, expected: float) 
             f"global {name}: SolidWorks evaluated {value!r}, expected "
             f"{expected:.9g} -- equation-parser dialect mismatch"
         )
-
-
-async def equation_curve(
-    adapter: Any, label: str, x_expr: str, y_expr: str
-) -> str:
-    """Add a parametric equation curve over t in [0, 1]; return its entity ID."""
-    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
-
-    res = await adapter.create_equation_driven_curve(
-        CreateEquationCurveParameters(
-            x_expression=x_expr,
-            y_expression=y_expr,
-            range_start="0",
-            range_end="1",
-        )
-    )
-    return check(f"curve {label}", res)
 
 
 def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) -> str:

@@ -15,62 +15,63 @@ so the values are bit-identical to what the assembly computed.
 
 from __future__ import annotations
 
-import math
-
 import _config
+from cone_stations import (
+    CONE_FACE_STATION_REFERENCE as CONE_FACE_STATION_REFERENCE,
+    PIVOT_STATION,
+    SHAFT_T120_STATION,
+    T006_CENTER_STATION as T006_CENTER_STATION,
+    T006_NORTH_FACE as T006_NORTH_FACE,
+    TIP_END_EXTENSION_MM as TIP_END_EXTENSION_MM,
+)
+from cone_pitch import (
+    COS_I,
+    DP_TRAIN,
+    INCLINE_DEG as INCLINE_DEG,
+    RADIUS_STEP,
+    SEAT_PITCH as SEAT_PITCH,
+    SEC_I,
+    SIN_I,
+    TAN_I,
+    Z_PITCH,
+)
 from dt_cone_pivot_post_installation import DRUM_X, GEAR_AXIS_SHIFT
 from dt_cone_tip_block_spec import BLOCK_Z as TIP_BLOCK_Z
+from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
-Y_DRIVE = Y_BASE_TOP + 6.35 + 33.368  # 90.518: v2 casting's journal axis
+Y_DRIVE = Y_BASE_TOP + PLATFORM_THICKNESS_MM + CONE_AXIS_HEIGHT_MM
 
-DP_TRAIN = _config.machine(
-    "gear_train", "diametral_pitch"
-)  # cad/config/machine.yaml (DIMENSIONS.md ch12)
-ADDENDUM = 25.4 / DP_TRAIN  # 0.510 at DP 49.82
-WORKING_DEPTH = 2.0 * ADDENDUM  # 1.020: full tooth interleave depth
-RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 1.5295: pitch-radius step per 6 teeth
+ADDENDUM = 25.4 / DP_TRAIN  # pitch-based placement reference, not a finite-tool tip
+WORKING_DEPTH = 2.0 * ADDENDUM  # reference interleave depth for the mesh anchor
 CONE_T120_PITCH_R = (
     (120.0 / DP_TRAIN) * 25.4 / 2.0
-)  # 30.59: largest cone gear pitch radius
+)  # largest cone gear's pitch radius
 
-# Shared machine grid: the working train is recentered independently of the
-# fixed post/carrier, along the post's unchanged inclined journal.
-_DRUM_SEAT_NOMINAL = _config.machine(
-    "cone_incline", "drum_seat_nominal_mm"
-)  # 7.2204 (OD 62.2)
-Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(
-    math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL)
-)  # 7.0566: drum z-pitch
+# The shared pitch/incline math is placement-independent (``cone_pitch``).
 X_DRUM = DRUM_X
 # Shared station anchor. Cone seats, cylinder faces, and channels translate as
 # one rigid family without re-indexing the j-to-j pairs.
 Z_DRUM0 = _config.machine("channels", "station_z0_mm")
 
-# True-cone incline (M6.7, exact tracking). Values are at the OD-62.2 /
-# DP 49.82 re-anchor (was 21.10 deg at the retired DP 30).
-SIN_I = RADIUS_STEP / Z_PITCH  # 0.21675
-COS_I = math.sqrt(1.0 - SIN_I * SIN_I)  # 0.97623
-TAN_I = SIN_I / COS_I
-SEC_I = 1.0 / COS_I
-INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 12.5182
-SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 
-# Every station stays on the historical 6.5 cone reference face: the gears
-# grew SOUTH to the full seat pitch with their north faces fixed, so they
-# touch (dt_cone_gear_stack; build_dt_drive_train_assembly).
-CONE_FACE_STATION_REFERENCE = 6.5
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the contact
-# azimuth; the oblique-mesh edge slack is checker-arbitrated (see the drive
-# train's mesh notes).
-DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0  # -85.80 at DP 49.82
+# azimuth; the edge slack is the T120 set point above the standard centre
+# (cone_set_stack, user ruling 2026-10-10).
+# The ideal (N+2)/DP tip below is a retained PLACEMENT REFERENCE, not current
+# material. Actual 120T/32T tooth-tip caps and physical envelopes come from
+# dt_cylinder_gear_spec / dt_alignment_pinion_spec and their stock-form profiles.
+DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0
+# CAD placement of the set: at assembly the pedestals are shimmed to the cone
+# line, T120 is swung in onto its radial feeler (standard clearance + edge
+# slack) and the cone-lock-knob is locked; every other cone follows the swing.
 PEN_EDGE_SLACK = _config.fit(
     "cone_drum_oblique_mesh", "edge_slack_mm"
-)  # cad/config/tolerances.yaml
-PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.565
-X_PITCH = DRUM_TIP_X - ADDENDUM * SEC_I + PEN_MID  # -85.76 at DP 49.82
+)  # cad/config/tolerances/cone_drum_oblique_mesh.yaml
+PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I
+X_PITCH = DRUM_TIP_X - ADDENDUM * SEC_I + PEN_MID
 
 
 def cone_seat(j: int) -> tuple[float, float]:
@@ -79,10 +80,8 @@ def cone_seat(j: int) -> tuple[float, float]:
     return X_PITCH - r * COS_I, Z_DRUM0 + Z_PITCH * j + r * SIN_I
 
 
-# Cone shaft: pivot end at seat station -28.25 from the T120 centre
-# (25 journal + half of the first 6.5 face -- build_dt_cone_gear_shaft.py).
-# CONE_ORIGIN stays the PIVOT END (station 0, the station datum).
-SHAFT_T120_STATION = 25.0 + CONE_FACE_STATION_REFERENCE / 2.0  # 28.25
+# Cone shaft: CONE_ORIGIN stays the PIVOT END (station 0, the station datum);
+# the shaft-local stations live in cone_stations.
 _GEAR_CONE_ORIGIN = [
     cone_seat(0)[0] - SHAFT_T120_STATION * SIN_I,
     Y_DRIVE,
@@ -109,20 +108,11 @@ def cone_station(s: float) -> list[float]:
 # The corrected 2.8360-in v2 crank boss spans local z
 # -21.3753..+50.6591. The 16T follows the shifted 64T row while the T12 chain
 # plane remains photo-anchored, so the resulting axial gaps are intentionally
-# unequal; the post station still fixes crank X and the pair DP.
+# unequal; the post station fixes crank X and the configured bore sets Y.
 POST_STATION = -39.90136099792956
-X_CRANK = cone_station(POST_STATION)[0]  # -129.336: Ry180 v2 installation
-Y_CRANK = Y_BASE_TOP + 6.35 + 72.7  # 129.850: v2 cast-in crank-axis height
+X_CRANK = cone_station(POST_STATION)[0]  # fixed post station in the machine frame
+Y_CRANK = Y_BASE_TOP + PLATFORM_THICKNESS_MM + _config.machine("gear_train", "crank_axis_height_mm")
 
-# T006 is the reference gear for the tip-end stack: its north face is the
-# fixed layout reference the MHA-VN-016 stack collar is feeler-set off.
-T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
-T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
-# The swing platform pivots about a vertical axis here, just north of the
-# shaft's rear end; the base's pivot-screw seat sits directly under it.  The
-# station is the established layout, 23.0 north of T006's face; the base
-# casting's seat fixes it, so the tip block no longer sets it.
-PIVOT_STATION = T006_NORTH_FACE + 23.0
 # User ruling 2026-09-29 (eight-views-4.png): the tip block is a straight
 # prism held by one screw in a fixed platform hole under its centre.  Its
 # north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot,

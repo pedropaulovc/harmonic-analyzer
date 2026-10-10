@@ -6,10 +6,11 @@ import math
 from typing import Literal
 
 import _config
-from _fit_limits import deviations
-from _gtol_spec import PlanarFace
+from _fit_deviations import deviations
+from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
+from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM
 
 
 # Small black-steel clamp block on the swing platform that carries the axial
@@ -38,11 +39,9 @@ BLOCK_X = 17.0  # plan width across the shaft
 # (build_dt_drive_train_assembly's collar-to-block air).  9.75 sits between the
 # two at print-worst.
 BLOCK_Z = 9.75
-# The adjuster axis is the cone journal axis: 33.368 above the platform top,
-# on which the block's foot now stands directly.  The 2026-09-21 DFM
-# correction still stands relative to that axis: free material above the
-# slit floor, and the pinch screw located from the adjuster axis.
-ADJUSTER_AXIS_HEIGHT = 33.368
+# The adjuster and cone journal share one height above the platform top.
+# Free material above the slit floor and the pinch screw's rise stay fixed.
+ADJUSTER_AXIS_HEIGHT = CONE_AXIS_HEIGHT_MM
 # User ruling U24b (2026-09-23, W-target): the pinch screw sits 8.85 above the
 # adjuster axis and the top 14.56 above it, so the slit-mouth web between the
 # pinch clearance hole and the adjuster thread root, and the ligament over the
@@ -51,9 +50,9 @@ ADJUSTER_AXIS_HEIGHT = 33.368
 # straight from the foot (PinchHeight, .XX) rather than chaining it off the
 # adjuster axis.  PINCH_RISE stays the design offset; it no longer prints.
 TOP_ABOVE_AXIS = 14.56
-BLOCK_HEIGHT = ADJUSTER_AXIS_HEIGHT + TOP_ABOVE_AXIS  # 47.928
+BLOCK_HEIGHT = ADJUSTER_AXIS_HEIGHT + TOP_ABOVE_AXIS
 PINCH_RISE = 8.85
-PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE  # 42.218 above the foot
+PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE
 # The printed grade of every dimension a stack reads; DRAWING_PRECISION must
 # carry the same (checked at the end of this module).  Two dimensions carry
 # an explicit band instead of the title block's: the axis height (the tip's
@@ -87,10 +86,13 @@ SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 # engagement, sit that much shallower.  User ruling 2026-09-29: the block is
 # fixed by its hold-down, so the tip's axial scatter lands on that
 # engagement; build_dt_drive_train_assembly sums the stack and asserts it stays
-# inside ADJUSTER_EMBED_WINDOW.  The value centres the engagement there.
+# inside ADJUSTER_EMBED_WINDOW.  The value centres the engagement there: the
+# Ø1/32 in terminal stub seats 0.397 mm (its radius / tan 45 deg) short of the
+# apex, so 7.77 keeps main's 7.376 mm centred engagement (8.17 with the former
+# Ø1/16 stub's 0.794 mm seat depth).
 ADJUSTER_THREAD = "#10-32"
 ADJUSTER_SCREW_LENGTH = 9.525
-ADJUSTER_EMBED = 8.17
+ADJUSTER_EMBED = 7.77
 # 90-degree countersink on each mouth to Ø5.0, just over the 4.826 major, so
 # the first thread starts full rather than on a feather edge (Main,
 # 2026-09-24).  Its depth is the 45-degree break on the tap drill.
@@ -126,7 +128,7 @@ _DRILLED_HOLE_PLUS_MM = float(
 )
 _BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM, 3: _GENERAL_3PL_MM}
 # The title block's general bands as (upper, lower) fit bands, so every stack
-# below reads its limits through _fit_limits.deviations like any other band.
+# below reads its limits through _fit_deviations.deviations like any other band.
 GENERAL_BAND_BY_PLACES = {
     places: (band, -band) for places, band in _BAND_BY_PLACES.items()
 }
@@ -210,7 +212,8 @@ WORST_SLIT_MOUTH_WEB_MM = (
 WORST_SCREW_ENVELOPE_GAP_MM = (
     _worst_rise - _pinch_major_radius - _adjuster_major_radius
 )
-# PinchHeight keeps .XX for this ligament: at .X it closes at 1.92.
+# PinchHeight keeps .XX for this ligament: its 46.95 sits on a .X rounding
+# tie, and printed up to 47.0 the ligament closes at 1.92.
 WORST_TOP_LIGAMENT_MM = (
     _height_limits[0]
     - _pinch_limits[1]
@@ -487,8 +490,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places carry the general tolerance and therefore live on the model.
 # U24b: the webs close at the title-block bands.  Still .XX: the pinch-hole
-# height (the top ligament closes at 1.92 at .X) and the slit width (the
-# drill-to-slot point reaches past the far jaw's tap drill at .X).  2026-09-29:
+# height (the top ligament closes at 1.92 at .X if 46.95 prints 47.0) and the
+# slit width (the drill-to-slot point reaches past the far jaw's tap drill at .X).  2026-09-29:
 # with the block fixed by its hold-down, the depth and the passage centre
 # print .XXX (the embed window, the collar-to-block air and the lateral
 # stack; build_dt_drive_train_assembly proves each looser grade fails), and the

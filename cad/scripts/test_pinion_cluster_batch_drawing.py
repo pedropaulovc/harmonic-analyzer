@@ -19,8 +19,10 @@ import dt_pinion_handle_spec
 import dt_pinion_lever_pin_spec
 import dt_pinion_lever_spec
 import dt_pinion_pivot_shaft_spec
+import dt_pinion_pivot_block_geometry
 import dt_pinion_spring_spec
 import vn_post_mount_screw_spec
+import vn_slotted_screw_spec
 from _buildgraph import module_deps_of
 
 
@@ -661,7 +663,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "fr-frame-1/fr-harmonic-base",
                 4.1656,
                 3.454,
-                11.25,  # rule 12 E10: #8-32 x 1-1/4 through the 20.5 block
+                vn_slotted_screw_spec.SHANK_LEN - dt_pinion_pivot_block_geometry.BLOCK_HEIGHT,
             ),
             **_expected_numbered_pairs(
                 "dt-drive-train-1/vn-foot-screw",

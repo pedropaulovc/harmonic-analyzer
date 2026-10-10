@@ -22,8 +22,10 @@ station (``KINK``, read off the book's notch crop) and the rear boss
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+import pd_transgear_arm_plate_geometry as geometry
 from pd_transgear_arm_plate_geometry import (
     BAND_X,
     BAND_XX,
@@ -67,7 +69,6 @@ THICKNESS_PLACES = 2
 HUB_DIA_PLACES = 2
 NOTCH_PLACES = 1
 SCREW_HOLE_PLACES = 1
-HUB_STATION_PLACES = 3
 HUB_TO_BOSS_PLACES = 3
 BORE_PLACES = 3
 HOLE_POSITION_PLACES = 3
@@ -156,7 +157,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BearingProfile": {
         "HubDia": HUB_DIA_PLACES,
         "BossDia": BOSS_DIA_PLACES,
-        "HubFaceToMounting": HUB_STATION_PLACES,
+        "HubFaceToMounting": geometry.HUB_STATION_PLACES,
         "HubToBoss": HUB_TO_BOSS_PLACES,
     },
     "BoreProfile": {"BoreDia": BORE_PLACES},

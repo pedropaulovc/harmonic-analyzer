@@ -1,59 +1,391 @@
-r"""Purchased MHA-VN-016 cone tip stack collar: McMaster 9414T1, black oxide.
+"""Build the custom MHA-VN-016 collar and reworked 94355A213 set screw.
 
-User ruling 2026-09-29: a stock set-screw shaft collar on the cone shaft's
-D-flat replaces the turned brass tip bushing as MHA-VN-016 (see
-``vn_cone_tip_collar_spec`` for the fit-up and every catalogue number).
-
-Geometry source: the catalogue, not a vendor model.  The McMaster product page
-for 9414T1 (read in a headless browser on 2026-09-29) gives the 1/16 in bore,
-1/4 in OD, 3/16 in width and black-oxide 1215 carbon steel; the vendor STEP,
-read locally and never committed, gives the edge breaks and the #2-56 set
-screw.  ``diagnostics/diag_build_9414T1.py`` builds them; it has no replica
-gate, and no McMaster .SLDPRT is committed or used.
-
-Frame: collar axis +Y, south face at y = 0, north face at y = WIDTH, the set
-screw along +X at mid-width.  The bore axis is published as ``ScrewAxis``
-(Front ∩ Right), the stock-part mate contract the drive train keys it by.
-
-Installed, not as supplied: the set screw is modelled tightened, its cup rim
-on the Sec4 D-flat (``dt_cone_gear_shaft_spec.FLAT_OFFSETS`` of the terminal
-land), which the drive train lays on the collar's +X.  That contact is what
-retains the gear stack; as supplied the rim stands 0.2545 short of it
-(Codex P2 on #1136, 48e27dedf).
+Default contains both bodies in the installed pose; Collar and SetScrew are
+manufacturing configurations. Threads are native cosmetic/Hole Wizard
+features, not a vendor-model claim. Only the ground dog is reworked; retained
+stock socket geometry is pictorial and excluded from manufacturing marks.
 """
 
 from __future__ import annotations
 
+import math
 import sys
 
-from _common import run_build
-from _fastener_catalog import fastener
-from _stock_fastener import StockComponent, build_stock_fastener
-from dt_cone_gear_shaft_spec import FLAT_LANDS, FLAT_OFFSETS
-from diagnostics.diag_build_9414T1 import build_9414T1
+import _config
+import vn_cone_tip_collar_spec as spec
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import _feature_by_name, name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import (
+    active_configuration_name,
+    assert_saved_configurations_regenerate,
+    force_rebuild,
+)
+from _session import run_build
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
+from _drawing_marks import (
+    _named_dimension, add_diametric_linear_dimension, apply_drawing_precision,
+    apply_drawing_properties, clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing, set_dimension_bilateral_tolerance,
+)
+from _fit_deviations import deviations
+from _grouped_bom_properties import apply_grouped_bom_properties
+from _holes import wizard_holes
+from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry, blank_sketch_feature
+from diagnostics.diag_mcmaster_lib import offset_plane
+from solidworks_mcp.adapters.com_variant import null_variant
 
 PART_NAME = "vn-cone-tip-collar"
-SPEC = fastener(PART_NAME)
-MATERIAL = SPEC.material
-# The collar rides the terminal land's flat (build_dt_drive_train_assembly
-# asserts its whole width stays on Sec4).
-SEATED_CUP_RADIUS = FLAT_OFFSETS[FLAT_LANDS[-1]]
+MATERIAL = "Plain Carbon Steel"
+CONFIGURATIONS = ("Default", "Collar", "SetScrew")
+COLLAR_FEATURES = (
+    "Ring", "Body", "ShoulderRoot",
+    "MountFlat", "SetScrewTap",
+    "TapRootPlane", "TapRootGauge",
+)
+SCREW_FEATURES = ("SetScrew", "HexSocket")
+
+
+def _plane(adapter, name, offset, *, base="Top Plane"):
+    offset_plane(adapter, name, offset, base=base)
+    feature = _feature_by_name(adapter, name)
+    if str(feature.Name) != name or str(feature.GetTypeName2()) != "RefPlane":
+        raise RuntimeError(f"collar native reference plane {name} was not created/named")
+
+
+async def _ring(adapter, jobs):
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+
+    dims = SketchDims()
+    check("ring sketch", await adapter.create_sketch("Top"))
+    for name, dia in (("NoseDia", spec.NOSE_DIA), ("BoreDia", spec.BORE_MODEL_DIA_MM)):
+        await define_circle(
+            adapter, 0.0, 0.0, dia / 2.0, name, dims=dims,
+            names=(None, None, name), drives=(None, None, f'"{name}"'),
+        )
+    await ensure_fully_defined(adapter, "collar ring")
+    check("exit ring", await adapter.exit_sketch())
+    name_last_feature(adapter, "RingProfile")
+    jobs.extend(dims.apply(adapter, "RingProfile"))
+    check("extrude ring", await adapter.create_extrusion(ExtrusionParameters(depth=spec.WIDTH)))
+    name_last_feature(adapter, "Ring")
+    jobs.append((name_dimensions(adapter, "Ring", ["CollarWidth"])[0], '"CollarWidth"'))
+    nose_area = math.pi / 4.0 * (spec.NOSE_DIA**2 - spec.BORE_MODEL_DIA_MM**2)
+    await volume_check(adapter, "nose annulus", nose_area * spec.WIDTH, 0.005 * nose_area * spec.WIDTH)
+    # The body step is a turned profile, as main's turned parts are: its
+    # NoseLength is a sketch dimension the drawing imports (a reference
+    # plane's offset is not importable, drawing:vn_cone_tip_collar at
+    # 437cb0842). The axis centreline is fixed as in build_vn_post_mount_screw;
+    # the step's inner edge lies on the ring's OD and is driven by it.
+    nose_r, outer_r = spec.NOSE_DIA / 2.0, spec.OUTER_DIA / 2.0
+    points = [(nose_r, spec.NOSE_LENGTH), (outer_r, spec.NOSE_LENGTH),
+              (outer_r, spec.WIDTH), (nose_r, spec.WIDTH)]
+    check("large body sketch", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    axis = check("collar axis", await adapter.add_centerline(0.0, 0.0, 0.0, spec.WIDTH))
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    check("fix collar axis", await adapter.add_sketch_constraint(axis, None, "fix"))
+    for index, line in enumerate(lines):
+        direction = "horizontal" if index % 2 == 0 else "vertical"
+        check("body profile direction", await adapter.add_sketch_constraint(line, None, direction))
+    dims = SketchDims()
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[1], (outer_r / 2.0, spec.WIDTH + 2.0), "CollarDia",
+    )
+    dims.record("CollarDia", '"CollarDia"')
+    await anchor_point_to_origin(adapter, f"{lines[0]}.start", nose_r, spec.NOSE_LENGTH, "shoulder root corner")
+    dims.record("BodyInnerRadius", '"NoseDia" / 2')
+    dims.record("NoseLength", '"NoseLength"')
+    await dimension_between(adapter, f"{lines[1]}.start", f"{lines[1]}.end",
+                            "vertical_distance", spec.WIDTH - spec.NOSE_LENGTH, "body width")
+    dims.record("BodyWidth", '"CollarWidth" - "NoseLength"')
+    await ensure_fully_defined(adapter, "large collar body")
+    check("exit body", await adapter.exit_sketch())
+    name_last_feature(adapter, "BodyProfile")
+    jobs.extend(dims.apply(adapter, "BodyProfile"))
+    check("merge large body", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Body")
+    expected = nose_area * spec.WIDTH + math.pi / 4.0 * (
+        spec.OUTER_DIA**2 - spec.NOSE_DIA**2
+    ) * (spec.WIDTH - spec.NOSE_LENGTH)
+    await volume_check(adapter, "stepped collar annulus", expected, 0.005 * expected)
+    check("turned shoulder tool root", await adapter.add_fillet(
+        spec.SHOULDER_ROOT_RADIUS, [[spec.NOSE_DIA / 2.0, spec.NOSE_LENGTH, 0.0]],
+    ))
+    name_last_feature(adapter, "ShoulderRoot")
+    name_dimensions(adapter, "ShoulderRoot", ["ShoulderRadius"])
+    jobs.append(("ShoulderRadius@ShoulderRoot", '"ShoulderRadius"'))
+
+    # A real full-length flat is the planar Hole Wizard placement face.
+    # Its axis offset is routine .XX, not a hidden spotface depth assumption.
+    check("mount flat sketch", await adapter.create_sketch("Front"))
+    points = [(spec.FLAT_DISTANCE, -1.0), (spec.OUTER_DIA, -1.0),
+              (spec.OUTER_DIA, spec.WIDTH + 1.0), (spec.FLAT_DISTANCE, spec.WIDTH + 1.0)]
+    set_sketch_direct_db(adapter, True)
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    dims = SketchDims()
+    await define_rectilinear_chain(
+        adapter, lines, points, label="mount flat", dims=dims,
+        names=[None, None, "FlatDistance", None],
+        drives=[None, None, '"FlatDistance"', None],
+    )
+    await ensure_fully_defined(adapter, "mount flat")
+    check("exit flat", await adapter.exit_sketch())
+    name_last_feature(adapter, "MountFlatProfile")
+    jobs.extend(dims.apply(adapter, "MountFlatProfile"))
+    check("cut flat", await adapter.create_cut_extrude(ExtrusionParameters(
+        depth=spec.OUTER_DIA, both_directions=True,
+    )))
+    name_last_feature(adapter, "MountFlat")
+    hole = wizard_holes(
+        adapter, spec.SET_SCREW_HOLE, [(spec.FLAT_DISTANCE, spec.TAP_STATION, 0.0)],
+        (1.0, 0.0, 0.0), "collar set screw", name="SetScrewTap",
+        expect_dia_mm=spec.TAP_DRILL_DIA,
+        placement_dims=[((None, None), ("TapStation", '"TapStation"'))],
+    )
+    jobs.extend(hole.placement_drive_jobs)
+    # A manufacturing limit, not a fictional physical root cut: 2B alone has
+    # no root MAX. This source-native gauge dimension controls the tap tool's
+    # permitted envelope and is projected as MAX TAP ROOT on the drawing.
+    _plane(adapter, "TapRootPlane", spec.FLAT_DISTANCE, base="Right Plane")
+    check("tap root gauge sketch", await adapter.create_sketch("TapRootPlane"))
+    dims = SketchDims()
+    await define_circle(
+        adapter, 0.0, spec.TAP_STATION, spec.THREAD_ENVELOPE_DIA / 2.0,
+        "tap root maximum gauge", dims=dims,
+        names=(None, "GaugeTapStation", "TapRootLimit"),
+        drives=(None, '"TapStation"', '"TapRootLimit"'),
+    )
+    await ensure_fully_defined(adapter, "tap root maximum gauge")
+    check("exit root gauge", await adapter.exit_sketch())
+    name_last_feature(adapter, "TapRootGauge")
+    jobs.extend(dims.apply(adapter, "TapRootGauge"))
+
+
+async def _screw(adapter, jobs):
+    from solidworks_mcp.adapters.base import AddThreadParameters, ExtrusionParameters, RevolveParameters
+
+    y = spec.TAP_STATION
+    x = spec.SET_SCREW_SEAT_RADIUS
+    dog_r = spec.DOG_DIA / 2.0
+    screw_r = spec.SET_SCREW_MAJOR_DIA / 2.0
+    end = spec.SET_SCREW_END_RADIUS
+    points = [(x, y), (x, y + dog_r), (x + spec.DOG_LENGTH, y + dog_r),
+              (x + spec.DOG_LENGTH, y + screw_r), (end, y + screw_r), (end, y)]
+    check("ground screw profile", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    # Main's revolved-pin pattern (build_ch_bar_pivot_pin): the axis runs
+    # exactly the closing edge's endpoints, so they merge and the axis needs
+    # no relation of its own; every profile line is horizontal or vertical,
+    # one corner is anchored to the origin, and the rest are dimensions. The
+    # farm run at f68549253 left the former fixed-line scheme (stock lines and
+    # a longer, unmerged axis fixed) under-defined.
+    axis = check("screw axis", await adapter.add_centerline(x, y, end, y))
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    dims = SketchDims()
+    for index, line in enumerate(lines):
+        direction = "vertical" if index % 2 == 0 else "horizontal"
+        check("screw profile direction", await adapter.add_sketch_constraint(line, None, direction))
+    await dimension_between(adapter, f"{lines[1]}.start", f"{lines[1]}.end",
+                            "horizontal_distance", spec.DOG_LENGTH, "ground dog length")
+    dims.record("DogLength", '"DogLength"')
+    display = await add_diametric_linear_dimension(adapter, axis, lines[1], (x + 0.5, y + 2.0), "ground dog diameter")
+    dim = _early_bound(display.GetDimension2(0), "IDimension")
+    if abs(float(dim.SystemValue) * 1000.0 - spec.DOG_DIA) > 1e-6:
+        raise RuntimeError("ground dog native diameter differs from the contract")
+    dims.record("DogDia", '"DogDia"')
+    # The stock screw's own length and major diameter, then its end corner.
+    await dimension_between(adapter, f"{lines[5]}.start", f"{lines[5]}.end",
+                            "horizontal_distance", spec.SET_SCREW_LENGTH, "stock screw length")
+    dims.record("ScrewLength")
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[3], (end - 1.0, y + screw_r + 2.0), "stock screw major diameter"
+    )
+    dims.record("ScrewMajorDia")
+    await anchor_point_to_origin(adapter, f"{lines[5]}.start", end, y, "stock screw end corner")
+    dims.record("ScrewEndStation")
+    dims.record("ScrewAxisStation")
+    await ensure_fully_defined(adapter, "ground screw profile")
+    check("exit screw profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "SetScrewProfile")
+    jobs.extend(dims.apply(adapter, "SetScrewProfile"))
+    check("revolve separate screw body", await adapter.create_revolve(RevolveParameters(
+        angle=360.0, merge_result=False,
+    )))
+    name_last_feature(adapter, "SetScrew")
+    # Edges stay sharp in the model: the title block's break covers the
+    # collar, and the dog's tighter limit is a printed callout on its Ø.
+    # A native external thread keeps the stock thread identity on the model.
+    check("stock screw thread", await adapter.add_thread(AddThreadParameters(
+        edge_point=[end, y + screw_r, 0.0], standard="ansi_inch",
+        size=spec.SET_SCREW_THREAD, end_type="blind",
+        depth=spec.SET_SCREW_LENGTH - spec.DOG_LENGTH,
+    )))
+    _plane(adapter, "SocketFace", end, base="Right Plane")
+    check("stock socket sketch", await adapter.create_sketch("SocketFace"))
+    a = spec.SET_SCREW_SOCKET_AF / 2.0
+    r = spec.SET_SCREW_SOCKET_AF / math.sqrt(3.0)
+    set_sketch_direct_db(adapter, True)
+    socket = await add_line_chain(adapter, [(0.0, y+r), (-a, y+r/2.0), (-a, y-r/2.0),
+                                           (0.0, y-r), (a, y-r/2.0), (a, y+r/2.0)])
+    set_sketch_direct_db(adapter, False)
+    for line in socket:
+        check("fix retained stock hex", await adapter.add_sketch_constraint(line, None, "fix"))
+    check("exit stock socket", await adapter.exit_sketch())
+    name_last_feature(adapter, "SocketProfile")
+    check("cut retained stock socket", await adapter.create_cut_extrude(ExtrusionParameters(depth=spec.SET_SCREW_SOCKET_DEPTH)))
+    name_last_feature(adapter, "HexSocket")
+
+
+def _activate_configuration(adapter, name):
+    """Read native state before switching: already-active SW2026 can return False."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if active_configuration_name(adapter, model) != name and model.ShowConfiguration2(name) is not True:
+        raise RuntimeError(f"cannot activate collar configuration {name}")
+    if active_configuration_name(adapter, model) != name:
+        raise RuntimeError(f"collar configuration {name} did not remain active")
+
+
+def _manufacturing_configurations(adapter):
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    for name, suppressed in (("Collar", SCREW_FEATURES), ("SetScrew", COLLAR_FEATURES)):
+        _activate_configuration(adapter, "Default")
+        if manager.AddConfiguration2(name, "Manufacturing component", "", 0, "Default", "", False) is None:
+            raise RuntimeError(f"cannot create {name} manufacturing configuration")
+        _activate_configuration(adapter, name)
+        # Suppress dependents before their parents, in this configuration only.
+        for feature in reversed(suppressed):
+            native = _feature_by_name(adapter, feature)
+            if native.SetSuppression2(0, 1, null_variant()) is not True:
+                raise RuntimeError(f"cannot suppress {feature} in {name}")
+            states = native.IsSuppressed2(1, null_variant())
+            if not isinstance(states, (tuple, list)) or len(states) != 1 or states[0] is not True:
+                raise RuntimeError(f"{feature}: actual suppression did not persist in {name}")
+    _activate_configuration(adapter, "Default")
+
+
+def _functional_dimension_types(adapter):
+    """Author part-owned BASIC location and MAX root process limit."""
+    for feature, name, kind in (
+        ("SetScrewTap", "TapStation", 1),  # swTolBASIC
+        ("TapRootGauge", "TapRootLimit", 6),  # swTolMAX
+    ):
+        _display, dimension = _named_dimension(adapter, feature, name)
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = kind
+        if int(tolerance.Type) != kind:
+            raise RuntimeError(f"{name}@{feature}: native tolerance type did not persist")
+
+def _configuration_bom_identity(adapter):
+    apply_grouped_bom_properties(
+        adapter, ("Default",), part_number=str(_config.parts(PART_NAME)["number"]),
+        description=str(_config.parts(PART_NAME)["description"]),
+    )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    for name, description in spec.MANUFACTURING_DESCRIPTIONS.items():
+        raw = model.GetConfigurationByName(name)
+        if raw is None:
+            raise RuntimeError(f"missing manufacturing identity configuration {name}")
+        configuration = _early_bound(raw, "IConfiguration")
+        configuration.Description = description
+        configuration.UseDescriptionInBOM = True
+        if str(configuration.Description) != description or configuration.UseDescriptionInBOM is not True:
+            raise RuntimeError(f"{name}: manufacturing description did not persist")
+
 
 
 async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
-        adapter,
-        part_name=PART_NAME,
-        components=(
-            StockComponent(
-                sku="9414T1",
-                author=build_9414T1,
-                parameters={"cup_radius": SEATED_CUP_RADIUS},
-            ),
-        ),
-        material=MATERIAL,
-        screw_axis_planes=("Front Plane", "Right Plane"),
+    check("create custom collar", await adapter.create_part())
+    for name, value in (("CollarDia", spec.OUTER_DIA), ("BoreDia", spec.BORE_MODEL_DIA_MM),
+                        ("NoseDia", spec.NOSE_DIA), ("NoseLength", spec.NOSE_LENGTH),
+                        ("ShoulderRadius", spec.SHOULDER_ROOT_RADIUS),
+                        ("TapStation", spec.TAP_STATION),
+                        ("CollarWidth", spec.WIDTH), ("FlatDistance", spec.FLAT_DISTANCE),
+                        ("DogDia", spec.DOG_DIA), ("DogLength", spec.DOG_LENGTH),
+                        ("TapRootLimit", spec.THREAD_ENVELOPE_DIA)):
+        await set_global(adapter, name, f"{value}mm")
+    jobs = []
+    await _ring(adapter, jobs)
+    await _screw(adapter, jobs)
+    await force_rebuild(adapter)
+    for name, expression in jobs:
+        await drive_dimension(adapter, name, expression)
+    await force_rebuild(adapter)
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "collar axis")
+    # Free round-bore construction reference; NOT the installed shaft axis.
+    name_last_feature(adapter, "ScrewAxis")
+    # Distinct from the free ROUND bore: this reference is the retained SHAFT
+    # axis in the nonconcentric loaded representative. Assembly mates this
+    # axis, not ScrewAxis, so two finite -X BACK arc contacts remain real.
+    await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Right Plane",
+        -spec.INSTALLED_BORE_AXIS_OFFSET_MM, "loaded shaft axis",
     )
+    name_last_feature(adapter, "InstalledShaftAxis")
+    set_dimension_bilateral_tolerance(adapter, "RingProfile", "BoreDia", *deviations(spec.BORE_MODEL_DIA_BAND))
+    set_dimension_bilateral_tolerance(adapter, "SetScrewProfile", "DogDia", *deviations(spec.DOG_DIA_BAND))
+    set_dimension_bilateral_tolerance(adapter, "ShoulderRoot", "ShoulderRadius", *deviations(spec.SHOULDER_ROOT_BAND))
+    _functional_dimension_types(adapter)
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    clear_dimensions_for_drawing(adapter)
+    for feature, names in spec.DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature, names)
+    apply_drawing_properties(adapter, PART_NAME, {
+        "Description": spec.BOM_DESCRIPTION,
+        "Manufacturing Notes": spec.DRAWING_NOTES,
+        "Installation Notes": spec.INSTALLATION_NOTES,
+        "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
+        "Radial Tap View Note": spec.RADIAL_TAP_VIEW_NOTE,
+        "Bore View Note": spec.BORE_VIEW_NOTE,
+    })
+    _manufacturing_configurations(adapter)
+    _configuration_bom_identity(adapter)
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    for configuration in CONFIGURATIONS:
+        _activate_configuration(adapter, configuration)
+        await apply_material(adapter, "AISI 304" if configuration == "SetScrew" else MATERIAL)
+        await force_rebuild(adapter)
+        bodies = _early_bound(model, "IPartDoc").GetBodies2(0, False) or ()
+        expected = 2 if configuration == "Default" else 1
+        if len(bodies) != expected:
+            raise RuntimeError(f"{configuration} has {len(bodies)} solids, expected {expected}")
+    _activate_configuration(adapter, "Default")
+    author_part_pmi(adapter, datums=spec.PART_DATUMS, controls=spec.GEOMETRIC_CONTROLS)
+    blank_sketch_feature(model, _feature_by_name(adapter, "TapRootGauge"), "tap root limit gauge")
+    blank_reference_geometry(adapter, (
+        ("ScrewAxis", "AXIS"), ("InstalledShaftAxis", "AXIS"), ("SocketFace", "PLANE"),
+        ("TapRootPlane", "PLANE"),
+    ))
+    await report_mass_properties(adapter)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    # The part saves on Default while its Collar/SetScrew manufacturing
+    # configurations keep their own saved caches; reopen and prove every one
+    # regenerates as loaded, like every multi-configuration builder (cg-fx1).
+    part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
+    adapter.swApp.CloseDoc(part_title)
+    adapter.currentModel = None
+    check("reopen saved cone-tip collar", await adapter.open_model(artefacts["part"]))
+    assert_saved_configurations_regenerate(adapter, PART_NAME)
+    return artefacts
 
 
 if __name__ == "__main__":

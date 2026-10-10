@@ -29,29 +29,25 @@ import math
 import sys
 
 import _telemetry
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound, _read_member
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    _read_member,
     anchor_point_to_origin,
     blank_sketch,
     dimension_between,
-    apply_material,
-    check,
-    define_circle,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -59,7 +55,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from cylinder_bank_layout import ARBOR_DOME_HEIGHT, ARBOR_LENGTH
 from dt_cylinder_gear_shaft_spec import (
@@ -74,7 +70,7 @@ from dt_cylinder_gear_shaft_spec import (
 )
 
 PART_NAME = "dt-cylinder-gear-shaft"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 SHAFT_RADIUS = SHAFT_DIA / 2.0
 SHAFT_LENGTH = ARBOR_LENGTH  # the cylinder: the span over both straps (REF)
@@ -218,7 +214,7 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
     drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * SHAFT_RADIUS**2 * SHAFT_LENGTH
-    # expected: pi * 4.7625^2 * 164.58 = ~11,727 mm^3
+    # expected: pi * 4.7625^2 * 165.08 = ~11,763 mm^3
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
     # Both ends domed into the photographed bright caps (#743).
     _dome_end(adapter, 0.0, "SouthDome")

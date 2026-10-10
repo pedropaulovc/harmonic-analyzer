@@ -19,7 +19,12 @@ from __future__ import annotations
 import asyncio
 
 import _telemetry
-from _common import _flag, _read_member, check, log
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _com import _flag, _read_member
 from build_motion_study import _by_z_rank, _comp_xform, _components, _find_one, _rot_angle
 
 TIMES = [0.0, 1.5, 3.0]

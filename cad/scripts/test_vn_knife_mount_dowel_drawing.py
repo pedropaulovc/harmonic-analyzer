@@ -13,9 +13,9 @@ import build_vn_knife_mount_dowel as part
 import vn_knife_mount_dowel_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_98381A473 as recipe
-from diagnostics.diag_mcmaster_dowel import MM_PER_IN
+from _dowel_dimensions import MM_PER_IN
 
 STEM = "vn-knife-mount-dowel"
 
@@ -29,7 +29,7 @@ def test_catalogue_row_is_the_registered_mcmaster_dowel() -> None:
     assert stock.stock_name == row["stock_name"]
     assert row["number"] == "MHA-VN-051"
     assert int(row["quantity"]) == spec.QUANTITY == 4  # two per knife mount
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = recipe_declaration(spec.SKU, recipe.build_98381A473)
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_98381A473
     assert metadata.threaded is False
@@ -65,7 +65,7 @@ def test_pressed_and_proud_lengths_are_the_whole_pin() -> None:
 def test_the_chamfered_end_is_the_pressed_end() -> None:
     from diagnostics.diag_mcmaster_dowel import dowel_section
 
-    section = dowel_section(spec.SKU)
+    section = dowel_section((spec.DIA, spec.LENGTH), spec.ENDS)
     pressed_face = max(rad for rad, y in section if y == 0.0)
     lead_face = max(rad for rad, y in section if y == spec.LENGTH)
     assert pressed_face == pytest.approx(spec.ENDS.point_dia / 2.0)

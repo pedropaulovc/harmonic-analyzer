@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 import _config
-import _fit_limits
+import _fit_shaft_h
 import build_dt_cone_gear_shaft as part
 import build_dt_drive_train_assembly as drive
 import dt_cone_gear_shaft_spec
@@ -15,6 +15,7 @@ import dt_cone_gear_spec
 import dt_cone_gear_stack
 import cone_line
 import dt_cone_pivot_post_installation
+import dt_cone_pivot_post_spec
 import cone_shaft_land_bands
 import cone_stack_end_play
 import dt_cone_tip_block_spec
@@ -29,11 +30,11 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 # Which NAMED band each land rides (U27, 2026-09-23): the two running lands
 # keep the shared h band, the three gear seats open to GEAR_SEAT_BAND.
 _EXPECTED_LAND_BANDS = (
-    ("RUNNING_DIA_BAND", _fit_limits.SHAFT_H),
+    ("RUNNING_DIA_BAND", _fit_shaft_h.SHAFT_H),
     ("GEAR_SEAT_BAND", dt_cone_gear_shaft_spec.GEAR_SEAT_BAND),
     ("GEAR_SEAT_BAND", dt_cone_gear_shaft_spec.GEAR_SEAT_BAND),
     ("GEAR_SEAT_BAND", dt_cone_gear_shaft_spec.GEAR_SEAT_BAND),
-    ("RUNNING_DIA_BAND", _fit_limits.SHAFT_H),
+    ("RUNNING_DIA_BAND", _fit_shaft_h.SHAFT_H),
 )
 
 
@@ -54,7 +55,7 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     stops a local retype from silently forking a named class.
     """
     spec = dt_cone_gear_shaft_spec
-    assert spec.RUNNING_DIA_BAND is _fit_limits.SHAFT_H
+    assert spec.RUNNING_DIA_BAND is _fit_shaft_h.SHAFT_H
     assert spec.GEAR_SEAT_BAND == (0.000, -0.050)
     assert _lands_ride_named_bands(spec.SECTION_DIA_BANDS)
     # Positive control: an equal-valued local retype of either class is caught.
@@ -65,9 +66,10 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     forked = list(spec.SECTION_DIA_BANDS)
     forked[0] = (0.000, -0.020)
     assert not _lands_ride_named_bands(tuple(forked))
-    # The tip land's round never exceeds the MHA-VN-016 collar's stock bore.
+    # The custom collar preserves the terminal land's retained slip class.
     tip_max = spec.SECTION_DIAS[-1] + spec.SECTION_DIA_BANDS[-1][0]
-    assert vn_cone_tip_collar_spec.BORE_DIA - tip_max >= 0.0
+    collar_min = vn_cone_tip_collar_spec.BORE_DIA + vn_cone_tip_collar_spec.BORE_DIA_BAND[1]
+    assert collar_min - tip_max >= 0.025 - 1e-9
     # Every flat rides the one named across-flat band.
     assert spec.FLAT_AF_BAND is cone_shaft_land_bands.FLAT_AF_BAND
     # Applied in ONE loop per family over the named bands, so the AST reports
@@ -76,6 +78,42 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
         ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): "*deviations(band)",
         ("f'Sec{land}FlatProfile'", "f'Sec{land}AF'"): "*deviations(FLAT_AF_BAND)",
     }
+
+
+def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
+    lands = cone_shaft_land_bands
+    assert dt_cone_gear_shaft_spec.TERMINAL_FLAT_EDGE_BREAK_MAX is lands.TERMINAL_FLAT_EDGE_BREAK_MAX
+    radius = (lands.TERMINAL_DIA_MM + lands.RUNNING_DIA_BAND[1]) / 2.0
+    flat = lands.SECTION_FLAT_AF[-1] - radius
+    half_chord = math.sqrt(radius**2 - flat**2)
+    dog = (
+        lands.TIP_SCREW_DOG_PROJECTED_RADIUS_MM
+        + lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM + lands.TIP_SCREW_DOG_AXIS_OFFSET_MM
+    )
+    assert half_chord - lands.TERMINAL_FLAT_EDGE_BREAK_MAX > dog
+    # The title block's R0.25 would eat the dog's flat: the override is real,
+    # and no break above the land radius less the dog budget fits at all.
+    assert half_chord - 0.25 < dog
+    assert lands.TERMINAL_FLAT_EDGE_BREAK_MAX <= radius - dog
+    assert lands.TERMINAL_REQUIRED_HALF_CHORD_MM == pytest.approx(
+        dog + lands.TERMINAL_FLAT_EDGE_BREAK_MAX
+    )
+    # The model keeps the corners sharp; the limit is printed once, above the
+    # terminal across-flat.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "InsertFeatureChamfer" not in source
+    assert "TerminalTorqueEdge" not in source
+    assert "TerminalFlatEdgeBreak" not in dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS
+    callout = drawing.TORQUE_CORNER_CALLOUT
+    assert f"{lands.TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX" in callout
+    # Run 20261010T071427837Z: the two-line above callout was in COM but not
+    # in the PDF.  One line, behind main's printable-above guard.
+    assert drawing._printable_above_callouts({"Sec4AF": callout})
+    with pytest.raises(RuntimeError, match="do not print"):
+        drawing._printable_above_callouts({"Sec4AF": "TORQUE CORNERS:\nSTONE"})
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_printable_above_callouts({name: TORQUE_CORNER_CALLOUT})" in drawing_source
+    assert "TerminalTorqueEdge" not in drawing.D_SECTION_KEEP
 
 
 def test_display_precision_is_owned_by_the_part() -> None:
@@ -151,9 +189,14 @@ def test_the_gears_are_a_touching_stack_on_the_collar() -> None:
     faces = [spec.gear_faces(j) for j in range(20)]
     for (_south, north), (next_south, _north) in zip(faces, faces[1:]):
         assert 0.0 <= next_south - north <= tolerance
-    assert all(north - south == pytest.approx(6.8887) for south, north in faces)
-    # T006's north face, the collar's feeler reference, stays on the 6.5 reference.
-    assert faces[19][1] == pytest.approx(spec.T006_CENTER_STATION + 3.25)
+    assert all(
+        north - south == pytest.approx(dt_cone_gear_spec.FACE_WIDTH)
+        for south, north in faces
+    )
+    # T006's north face remains on the cone line's reference face.
+    assert faces[19][1] == pytest.approx(
+        spec.T006_CENTER_STATION + cone_line.CONE_FACE_STATION_REFERENCE / 2.0
+    )
     assert faces[0][0] - spec.GEAR64_NORTH_FACE_STATION == pytest.approx(0.0, abs=tolerance)
     assert spec.GEAR64_SOUTH_FACE_STATION == pytest.approx(
         spec.COLLAR_END_STATION - spec.FRONT_STUB
@@ -174,11 +217,6 @@ def test_each_step_sits_one_setback_inside_the_larger_gear() -> None:
         margin = _setback_margin(j, _band(spec.DRAWING_PRECISION_BY_NAME[name]))
         assert margin >= 0.0, name
         assert spec.SEAT_STEP_BUDGET[name]["margin"] == pytest.approx(margin), name
-    assert [round(row["margin"], 3) for row in spec.SEAT_STEP_BUDGET.values()] == [
-        0.065,
-        0.090,
-        0.115,
-    ]
 
 
 def test_two_place_steps_would_reach_the_smaller_gear() -> None:
@@ -601,7 +639,7 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
     (on its parent's sheet) from the land's ends, and past the land's
     surface; on the side view it keeps 2 mm off that land's diameter line,
     on the tip detail it stays inside the circle over the whole land.  Each D
-    is enlarged to 15 mm or more so the 1.460 reads, and the four, each with
+    is enlarged to 15 mm or more so its actual AF reads, and the four, each with
     its across-flat over it and its caption under it, stand apart right of
     the side view, inside the frame and off the title block (codex review,
     #1128: in one row the captions ran onto the title block and below the
@@ -637,16 +675,23 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
         x, y = section.centre
         text_x, text_y = drawing.D_SECTION_KEEP[f"Sec{section.land}AF"]
         assert text_x == x and text_y > y + half, section
+        # The terminal land's across-flat carries the torque-corner callout,
+        # centred on its text (20261010T071427837Z: the run reached 6.9 mm
+        # past the right border, and over C-C's outline).
+        terminal = section.land == max(spec.FLAT_LANDS)
+        reach_x, reach_y = drawing.TORQUE_CALLOUT_REACH if terminal else (0.0, 0.005)
         cell = (
-            x - caption_w / 2.0,
+            min(x - caption_w / 2.0, text_x - reach_x),
             y - half - drawing.SECTION_CAPTION_GAP - caption_h,
-            x + caption_w / 2.0,
-            text_y + 0.005,
+            max(x + caption_w / 2.0, text_x + reach_x),
+            text_y + reach_y,
         )
         assert cell[0] > big_end + 0.02, section
-        assert margin <= cell[0] and cell[2] <= template.width_m - margin, section
+        assert margin <= cell[0] and cell[2] <= template.width_m - margin - CLEAR_GAP_M, section
         assert margin <= cell[1] and cell[3] <= template.height_m - margin, section
         assert cell[1] > template.title_block_top_m, section
+        if terminal:
+            assert text_x - reach_x > drawing.SECTION_C_OUTLINE_RIGHT + CLEAR_GAP_M
         cells.append(cell)
     for index, a in enumerate(cells):
         for b in cells[index + 1 :]:
@@ -885,8 +930,21 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert dt_cone_gear_shaft_spec.JOURNAL_CLEARANCE == pytest.approx(0.05)
     assert dt_cone_gear_shaft_spec.JOURNAL_DIA == pytest.approx(12.2308)
     assert dt_cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.011)
-    assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 1.5875))
-    assert dt_cone_gear_shaft_spec.FRONT_STUB == pytest.approx(61.9068609979)
+    assert dias[-1] == cone_shaft_land_bands.TERMINAL_DIA_MM
+    assert dias[:-1] == pytest.approx((12.2308, 9.525, 6.35, 3.175))
+    assert dt_cone_gear_shaft_spec.FRONT_STUB == pytest.approx(
+        -cone_line.POST_STATION
+        + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0
+        + dt_cone_gear_shaft_spec.JOURNAL_PROUD
+    )
+    # Convert the local collar face back to the shared cone station: it must
+    # bear on the post's north boss face, independent of the incline/grid.
+    assert (
+        dt_cone_gear_shaft_spec.COLLAR_START_STATION
+        - dt_cone_gear_shaft_spec.FRONT_STUB
+    ) == pytest.approx(
+        cone_line.POST_STATION + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0
+    )
     # The tip chain (user ruling 2026-09-29): the MHA-VN-016 collar stands one
     # feeler off T006's north face; the block's north face stands the
     # pivot-screw head's air south of the pivot and the block grows south.
@@ -906,38 +964,47 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         dt_cone_gear_shaft_spec.TIP_BLOCK_LENGTH / 2.0
     ) == pytest.approx(cone_line.TIP_BLOCK_STATION)
     assert dt_cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
-        146.69732594770454
+        cone_line.PIVOT_STATION - cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
     )
     # Rule-12 E11: #10-32 94025A164 at the block spec's fit-up embed.
     assert dt_cone_gear_shaft_spec.ADJUSTER_EMBED == dt_cone_tip_block_spec.ADJUSTER_EMBED
     assert dt_cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION == pytest.approx(
-        138.52732594770455
+        cone_line.TIP_BLOCK_NORTH_FACE - dt_cone_tip_block_spec.ADJUSTER_EMBED
     )
-    # Vendor Sketch2 Line7 (harvested 2026-09-24): 45 deg cup, depth = rim radius.
-    assert dt_cone_gear_shaft_spec.MCM_94025A164_CUP_DEPTH == pytest.approx(1.2065)
-    assert dt_cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(139.73382594770456)
+    # Vendor Sketch2 Line7: the pure stock spec owns the actual cup, not this shaft.
+    import _mcmaster_94025a164
+    assert dt_cone_gear_shaft_spec.CUP_DEPTH == _mcmaster_94025a164.CUP_DEPTH
+    assert dt_cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(
+        dt_cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION
+        + _mcmaster_94025a164.CUP_DEPTH
+    )
     assert dt_cone_gear_shaft_spec.SHAFT_LENGTH == (
         dt_cone_gear_shaft_spec.FRONT_STUB + dt_cone_gear_shaft_spec.T006_TIP_STATION
     )
     # Each land step sits one setback behind the larger gear's north face
-    # (T030|T024, T024|T018, T018|T012), so the 1/16-in land carries T012
-    # and T006 and runs on to the stock cup apex.
+    # (T030|T024, T024|T018, T018|T012), so the actual terminal land carries
+    # T012 and T006 and runs on to the retained cup apex.
     assert ends[1:-1] == pytest.approx(
         tuple(
             dt_cone_gear_shaft_spec.FRONT_STUB + dt_cone_gear_shaft_spec.seat_step_station(j)
             for j in (15, 16, 17)
         )
     )
-    # Printed baseline stations from the big (journal) end.
-    assert ends[1:] == pytest.approx((162.624, 169.513, 176.402, 201.641), abs=1e-3)
-    assert ends[-1] == pytest.approx(
-        dt_cone_gear_shaft_spec.FRONT_STUB + 139.73382594770456
+    # Native station knobs and printed baselines share the collar-face origin.
+    assert dt_cone_gear_shaft_spec.SECTION_KNOBS[1:] == pytest.approx(
+        tuple(end - dt_cone_gear_shaft_spec.COLLAR_START_STATION for end in ends[1:])
     )
-    # The terminal stub carries the whole MHA-VN-016 collar.
+    # The terminal stub starts at the T018 interface setback and extends to
+    # the cup apex, rather than a frozen shaft-length snapshot.
     assert dt_cone_gear_shaft_spec.TIP_STUB_START_STATION == pytest.approx(
-        114.495, abs=1e-3
+        cone_line.T006_NORTH_FACE
+        - 2.0 * dt_cone_gear_spec.SEAT_PITCH
+        - dt_cone_gear_shaft_spec.SEAT_STEP_SETBACK
     )
-    assert dt_cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(25.239, abs=1e-3)
+    assert dt_cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(
+        dt_cone_gear_shaft_spec.T006_TIP_STATION
+        - dt_cone_gear_shaft_spec.TIP_STUB_START_STATION
+    )
     assert ends[-1] - ends[-2] == pytest.approx(
         dt_cone_gear_shaft_spec.TIP_STUB_LENGTH
     )
@@ -951,13 +1018,42 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     )
 
 
+def test_custom_tip_collar_stays_wholly_on_the_terminal_land_at_printed_limits() -> None:
+    """Use the accepted stack owner, not a second axial budget or a stock width."""
+    import dt_cone_gear_stack as stack
+
+    shaft = dt_cone_gear_shaft_spec
+    collar = vn_cone_tip_collar_spec
+    face_upper, face_lower = stack.face_band(stack.COUNT - 1, "north")
+    collar_south_min = (
+        shaft.TIP_COLLAR_START_STATION - shaft.printed_band("CollarWidth")
+        + face_lower - cone_stack_end_play.COLLAR_FEELER_BAND
+    )
+    collar_north_max = (
+        shaft.TIP_COLLAR_END_STATION + shaft.printed_band("CollarWidth")
+        + face_upper + cone_stack_end_play.COLLAR_FEELER_BAND + collar.WIDTH_BAND_MM
+    )
+    root_north_max = (
+        shaft.TIP_STUB_START_STATION + shaft.printed_band("Sec3End")
+        + shaft.FILLET_RADIUS + shaft.printed_band("ShoulderR")
+    )
+    shaft_tip_min = shaft.SHAFT_LENGTH - shaft.printed_band("Sec4End")
+    assert shaft.TIP_COLLAR_END_STATION - shaft.TIP_COLLAR_START_STATION == pytest.approx(collar.WIDTH)
+    assert collar_south_min >= root_north_max
+    assert collar_north_max <= shaft_tip_min
+
+
 def test_every_gear_land_carries_one_d_flat() -> None:
     """User ruling 2026-09-28: each gear land is a D whose across-flat is its
     section's; the flat's plane is the AF less the round half-diameter."""
     spec = dt_cone_gear_shaft_spec
     assert spec.FLAT_LANDS == (1, 2, 3, 4)
     assert spec.SECTION_FLAT_AF is cone_shaft_land_bands.SECTION_FLAT_AF
-    assert spec.FLAT_OFFSETS == pytest.approx((None, 4.0005, 2.667, 1.3335, 0.66625))
+    assert spec.FLAT_OFFSETS == pytest.approx(tuple(
+        None if af is None else af - dia / 2.0
+        for af, dia in zip(cone_shaft_land_bands.SECTION_FLAT_AF, spec.SECTION_DIAS)
+    ))
+    assert spec.SECTION_FLAT_AF[-1] == cone_shaft_land_bands.TERMINAL_FLAT_AF_MM
     # Each flat's plane stays OUTSIDE the next land's round, and each bore's
     # flat lets the next land pass (every flat runs off its land into air).
     for land in spec.FLAT_LANDS[:-1]:
@@ -1107,17 +1203,43 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_prose_quotes_the_printed_tip_gear_diameters() -> None:
-    """The shaft prose cites the cone gears' deepened-mesh tip diameters."""
-    import dt_cone_gear_spec
+def test_configured_tip_gears_require_tip_first_shaft_assembly() -> None:
+    """The current cone tips cannot pass over the next inboard gear bore."""
+    spec = dt_cone_gear_shaft_spec
+    assert spec.outside_dia_mm is dt_cone_gear_spec.outside_dia_mm
+    for teeth, next_bore_land in ((6, 4), (12, 3), (18, 2), (24, 1)):
+        tip_dia = dt_cone_gear_spec.outside_dia_mm(teeth)
+        assert tip_dia > spec.SECTION_DIAS[next_bore_land], teeth
 
-    t006 = f"{dt_cone_gear_spec.DEEPENED_MESH_MM[6][0]:.2f}"
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert part_source.count(f"T006 OD is {t006} mm") == 1
-    assert f"T006 OD is now {t006} mm" in part_source
-    spec_source = Path(dt_cone_gear_shaft_spec.__file__).read_text(encoding="utf-8")
-    for teeth in (6, 12, 18, 24):
-        assert f"{dt_cone_gear_spec.DEEPENED_MESH_MM[teeth][0]:.2f}" in spec_source
+
+def test_shaft_loading_preflight_reads_each_accepted_tip(monkeypatch) -> None:
+    spec = dt_cone_gear_shaft_spec
+    rows = ((6, 4), (12, 3), (18, 2), (24, 1))
+    by_teeth = {teeth: spec.SECTION_DIAS[land] + 1.0 for teeth, land in rows}
+    calls = []
+    monkeypatch.setattr(spec, "outside_dia_mm", lambda teeth: calls.append(teeth) or by_teeth[teeth])
+    spec.validate_gear_loading_clearances()
+    assert calls == [teeth for teeth, _land in rows]
+    for teeth, land in rows:
+        previous = by_teeth[teeth]
+        by_teeth[teeth] = spec.SECTION_DIAS[land]
+        with pytest.raises(AssertionError, match=f"T{teeth:03d}"):
+            spec.validate_gear_loading_clearances()
+        by_teeth[teeth] = previous
+
+
+def test_refused_cutter_family_reaches_no_native_shaft_geometry(monkeypatch) -> None:
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    def refused(_teeth):
+        raise ValueError("cutter family refused")
+
+    monkeypatch.setattr(dt_cone_gear_shaft_spec, "outside_dia_mm", refused)
+    adapter = AsyncMock()
+    with pytest.raises(ValueError, match="cutter family refused"):
+        asyncio.run(part.build(adapter))
+    adapter.create_part.assert_not_awaited()
 
 
 def test_every_station_knob_owns_its_plane_and_depth(monkeypatch) -> None:
@@ -1708,10 +1830,170 @@ def test_the_64t_front_plane_is_its_south_face(monkeypatch) -> None:
     south = drive.cone_station(drive._GEAR64_SOUTH_STATION)
     assert placed["dt-crank-drive-gear"] == pytest.approx(south, abs=1e-9)
 
-    blank = inspect.getsource(_gear.build_fixed_gear)
-    assert 'check("create_sketch blank", await adapter.create_sketch("Front"))' in blank
+    blank = inspect.getsource(_gear._build_helical_stock_form_gear)
+    assert 'check("create_sketch stock base", await adapter.create_sketch("Front"))' in blank
     assert "create_extrusion(ExtrusionParameters(depth=face_width))" in blank
     crank = inspect.getsource(build_dt_crank_drive_gear.build)
-    assert "build_fixed_gear(\n        adapter, TEETH, FACE_WIDTH," in crank.replace(
-        "\r\n", "\n"
+    assert "screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM" in crank
+
+
+def test_the_64t_native_stock_tooth_preserves_material_and_phase_gates(monkeypatch) -> None:
+    """Record the released helper's real profile recipe, without native CAD."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    import _gear
+    import dt_crank_drive_gear_spec as gear
+
+    profile = gear.STOCK_PROFILE
+    face = gear.FACE_WIDTH
+    assert profile.teeth == gear.TEETH
+    assert profile.helix_angle_deg == cone_line.INCLINE_DEG
+    assert profile.helix_angle_deg > 0.0
+    base_radius = profile.foot_radius_mm
+    twist = face * math.tan(math.radians(profile.helix_angle_deg)) / profile.pitch_radius_mm
+    material_calls = []
+    emitted = []
+    events = []
+    volumes = {}
+    tooth_body = type(profile).tooth_body_segments
+
+    def record_material_sector(self, **kwargs):
+        segments = tooth_body(self, **kwargs)
+        material_calls.append((kwargs, segments))
+        return segments
+
+    async def record_curve(_adapter, name, x, y):
+        emitted.append((name, x, y))
+        return name
+
+    async def record_volume(_adapter, label, expected, tolerance):
+        volumes[label] = (expected, tolerance)
+        events.append(label)
+        return expected
+
+    async def record_sweep(_adapter, width, *, twist_deg):
+        assert width == face
+        assert twist_deg == pytest.approx(math.degrees(twist))
+        events.append("sweep")
+        return "StockSweep"
+
+    def record_probe(_adapter, actual_profile, width, *, midface_tooth_phase_rad, tolerance_mm):
+        assert tolerance_mm == gear.NATIVE_SWEEP_BOUND_MM
+        assert actual_profile is profile
+        assert width == face
+        assert midface_tooth_phase_rad == 0.0
+        events.append("native phase probe")
+
+    async def record_pattern(_adapter, seed, teeth, radius, station):
+        assert (seed, teeth, radius, station) == (
+            "StockSweep", profile.teeth, profile.blank_radius_mm, face / 2.0
+        )
+        events.append("pattern")
+        return SimpleNamespace(name="StockPattern")
+
+    monkeypatch.setattr(type(profile), "tooth_body_segments", record_material_sector)
+    monkeypatch.setattr(_gear, "check", lambda _label, value: value)
+    for name in ("define_circle", "ensure_fully_defined"):
+        monkeypatch.setattr(_gear, name, AsyncMock())
+    monkeypatch.setattr(_gear, "name_last_feature", lambda *_args: None)
+    monkeypatch.setattr(_gear, "equation_curve", record_curve)
+    monkeypatch.setattr(_gear, "volume_check", record_volume)
+    monkeypatch.setattr(_gear, "_sweep_tooth_sketch", record_sweep)
+    monkeypatch.setattr(_gear, "assert_stock_screw_sweep_phase", record_probe)
+    monkeypatch.setattr(_gear, "pattern_about_z", record_pattern)
+    adapter = AsyncMock()
+    disc = asyncio.run(
+        _gear.build_stock_form_gear(
+            adapter, profile, face, screw_sweep_bound_mm=gear.NATIVE_SWEEP_BOUND_MM
+        )
+    )
+
+    assert adapter.create_sketch.await_args_list[0].args == ("Front",)
+    extrusion = adapter.create_extrusion.await_args.args[0]
+    assert extrusion.depth == face
+    assert not extrusion.reverse_direction
+    assert material_calls[0][0] == {
+        "unit_scale": 1.0 / _gear.IN,
+        "embed_radius_mm": base_radius - _gear._TOOTH_EMBED_MM,
+        "rotate_rad": pytest.approx(-twist / 2.0),
+    }
+    assert len(material_calls) == 1
+    assert emitted == [(s.name, s.x, s.y) for s in material_calls[0][1]]
+    base_area = math.pi * base_radius**2
+    blank_area = math.pi * profile.blank_radius_mm**2
+    sector_area = (blank_area - base_area) / profile.teeth - profile.gap_area_mm2
+    assert sector_area > 0.0
+    seed_volume = (base_area + sector_area) * face
+    final_volume = (blank_area - profile.teeth * profile.gap_area_mm2) * face
+    assert volumes["seeded tooth/gap"] == (pytest.approx(seed_volume), 1.0)
+    assert volumes["toothed disc"] == (
+        pytest.approx(final_volume), pytest.approx(0.01 * final_volume)
+    )
+    assert events.index("seeded tooth/gap") < events.index("native phase probe")
+    assert events.index("native phase probe") < events.index("pattern")
+    assert events.index("pattern") < events.index("toothed disc")
+    assert disc.volume == pytest.approx(final_volume)
+    assert disc.tooth_features == ("StockSweep", "StockPattern")
+
+
+@pytest.mark.parametrize(
+    "twist_sign, phase_offset",
+    [(1.0, 0.0), (0.0, 0.0), (-1.0, 0.0), (1.0, 0.2)],
+)
+def test_the_64t_phase_gate_samples_physical_flanks_and_rejects_wrong_sweeps(
+    monkeypatch, twist_sign, phase_offset
+) -> None:
+    """Synthetic native flank points exercise the gate, not a sweep option bag."""
+    from types import SimpleNamespace
+
+    import _gear
+    import dt_crank_drive_gear_spec as gear
+
+    profile = gear.STOCK_PROFILE
+    face_width = gear.FACE_WIDTH
+    twist_per_mm = math.tan(math.radians(profile.helix_angle_deg)) / profile.pitch_radius_mm
+    native_points = []
+    for fraction in (0.25, 0.5, 0.75):
+        z = face_width * fraction
+        phase = phase_offset + twist_sign * (z - face_width / 2.0) * twist_per_mm
+        for side in (-1, 1):
+            for flank_fraction in (0.25, 0.75):
+                parameter = profile.flank_parameter_min + flank_fraction * (
+                    profile.flank_parameter_max - profile.flank_parameter_min
+                )
+                x, y = profile.flank_point(parameter, side=side)
+                angle = phase - side * math.pi / profile.teeth
+                cosine, sine = math.cos(angle), math.sin(angle)
+                native_points.append((x * cosine - y * sine, x * sine + y * cosine, z))
+    queries = []
+
+    def closest_point(x, y, z):
+        query = (x * 1000.0, y * 1000.0, z * 1000.0)
+        queries.append(query)
+        closest = min(native_points, key=lambda point: math.dist(query, point))
+        return (*(value / 1000.0 for value in closest), 0.0, 0.0)
+
+    native_face = SimpleNamespace(GetClosestPointOn=closest_point)
+    body = SimpleNamespace(GetFaces=lambda: [native_face])
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetBodies2=lambda *_args: [body])
+    )
+    monkeypatch.setattr(_gear, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(_gear._telemetry, "info", lambda *_args: None)
+    if twist_sign == 1.0 and phase_offset == 0.0:
+        _gear.assert_stock_screw_sweep_phase(
+            adapter, profile, face_width, tolerance_mm=gear.NATIVE_SWEEP_BOUND_MM
+        )
+        for query, native in zip(queries, native_points, strict=True):
+            assert query == pytest.approx(native)
+    else:
+        with pytest.raises(RuntimeError, match="stock screw-sweep phase mismatch"):
+            _gear.assert_stock_screw_sweep_phase(
+                adapter, profile, face_width, tolerance_mm=gear.NATIVE_SWEEP_BOUND_MM
+            )
+    assert len(queries) == 12
+    assert sorted({point[2] for point in queries}) == pytest.approx(
+        [face_width / 4.0, face_width / 2.0, 3.0 * face_width / 4.0]
     )

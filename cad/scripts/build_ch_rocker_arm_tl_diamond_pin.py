@@ -22,26 +22,23 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    define_circle,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 from _drawing_marks import (
     apply_drawing_precision,
@@ -50,7 +47,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_diamond_pin_spec import (
     COLLAR_DIA,
@@ -91,6 +88,16 @@ _SAVED_DRAWING_PROPERTIES = (
 NECK_RELIEF_DIA = COLLAR_DIA + 1.5  # annular cut's outer circle, clear of the collar
 FLAT_REACH = 1.2  # flat-cut rectangle width beyond the flat, clear of the land
 FLAT_SPAN = 3.0  # flat-cut rectangle height, clear of the land
+
+# Native bands consumed below; keep the production values visible offline.
+DRAWING_BANDS = {
+    ("LandProfile", "LandDia"): LAND_BAND,
+    ("Flats", "LandHeight"): LAND_HEIGHT_BAND,
+    ("ShankProfile", "ShankDia"): SHANK_BAND,
+    ("NeckProfile", "NeckDia"): NECK_BAND,
+    ("ReamProfile", "ReamDia"): REAM_BAND,
+    ("Collar", "CollarEnd"): COLLAR_END_BAND,
+}
 
 
 def _area(dia: float) -> float:
@@ -395,14 +402,7 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    for feature, dimension, band in (
-        ("LandProfile", "LandDia", LAND_BAND),
-        ("Flats", "LandHeight", LAND_HEIGHT_BAND),
-        ("ShankProfile", "ShankDia", SHANK_BAND),
-        ("NeckProfile", "NeckDia", NECK_BAND),
-        ("ReamProfile", "ReamDia", REAM_BAND),
-        ("Collar", "CollarEnd", COLLAR_END_BAND),
-    ):
+    for (feature, dimension), band in DRAWING_BANDS.items():
         set_dimension_bilateral_tolerance(
             adapter, feature, dimension, *deviations(band)
         )

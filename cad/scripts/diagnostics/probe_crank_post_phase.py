@@ -20,7 +20,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pythoncom  # noqa: E402
 from win32com.client import VARIANT  # noqa: E402
 
-from _common import _early_bound, _read_member, check, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _com import _early_bound, _read_member  # noqa: E402
+from _session import run_build  # noqa: E402
 from _assembly import place_component  # noqa: E402
 from _transforms import compose_rows, rot_z_rows  # noqa: E402
 import build_dt_drive_train_assembly as dta  # noqa: E402

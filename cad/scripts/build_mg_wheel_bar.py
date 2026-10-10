@@ -39,21 +39,16 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    SketchDims,
-    apply_material,
-    check,
-    define_centered_rectangle,
-    drive_dimension,
-    ensure_fully_defined,
-    force_rebuild,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
-)
+from _appearance import apply_material
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, ensure_fully_defined
+from _sketch_rectangle import define_centered_rectangle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 import _config

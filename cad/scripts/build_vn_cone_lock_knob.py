@@ -1,12 +1,17 @@
-r"""Purchased cone lock knob: McMaster 93585A190 in its stock local frame."""
+r"""Purchased cone lock knob: McMaster 93585A190 in its stock local frame.
+
+At assembly the knob locks the swing platform where the tightest cone meets
+a feeler/backlash; it sets the cone-to-drum mesh.
+"""
 
 from __future__ import annotations
 
 import sys
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_93585A190 import build_93585A190
 
 PART_NAME = "vn-cone-lock-knob"
@@ -26,6 +31,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
     )
 
 

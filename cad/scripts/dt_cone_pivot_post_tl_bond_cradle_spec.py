@@ -14,6 +14,14 @@ foot-stop face, at Y0; crank socket axis +Z (up). The base top is at Z -30
 and the base bottom at Z -40. Block heights and the seat axes print from the
 base top, every station along the post from foot B, and every pin top from
 the post axis: a pin top sets a sleeve face against that axis.
+
+Provenance: make-data sections 1.2/1.3 supply the frame and bed height; its
+pin rows predate CN-B5. The relational annulus/spread rule is in
+pedropaulovc/prechips examples/inventory/pedro-shop.toml at
+83807386e38aee0757762c002ee2fbea9a6318d1 (CN-B5).
+examples/cone-pivot-post/built-up.toml S6 at
+d2c5d58557149a8b5ced6ae27b89a6cd094517f6 references the tops to the post axis
+over a seated gauge arbor. Old export X/Z stations are not geometry owners.
 """
 
 from __future__ import annotations
@@ -24,9 +32,10 @@ from dataclasses import dataclass
 import _config
 import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _printed_tolerance import angular_band_deg, printed_band_mm
-from _surface_finish import SEAT_UM, SurfaceFinishControl
+from _surface_finish import SEAT_UM, SurfaceFinishControl, surface_finish_by_key
 
 # Base plate, foot stop and the two saddles (inventory cone-bond-cradle rows).
 BASE_WIDTH = 80.0
@@ -99,6 +108,12 @@ if abs(round(CRANK_PIN_HEIGHT, 2) - 8.62) > 1e-9:
 # journal centre along n. Each pin is a stock dowel reaching its own length
 # from its top down n into the base: the east (+X) top stands lower, so it
 # takes the shorter one (prechips cone-pin-1 4x16, cone-pin-2 4x20).
+# CN-B5's bought dowels have a ground Ø3.2 end flat inside the Ø4 stock
+# envelope modeled here. Contact is partial annulus/edge bearing, not a
+# full-face Ø4 disk: its ±0.5-degree setup-error example bounds axial motion
+# by 1.6 * tan(0.5 degrees) < 0.014. The source accepts a blued dry fit on
+# both pin tops and refusal of a 0.05 feeler under the cap at either pin.
+# Those process checks do not turn the stock envelope into a contact patch.
 CONE_PIN_Y = post.BORE_HEIGHT
 CONE_PIN_SPREAD = 7.4
 if not post.BORE_DIA / 2.0 < CONE_PIN_SPREAD < post.CONE_BOSS_DIA / 2.0:
@@ -106,7 +121,7 @@ if not post.BORE_DIA / 2.0 < CONE_PIN_SPREAD < post.CONE_BOSS_DIA / 2.0:
 _INCLINE = math.radians(post.INCLINE_DEG)
 CONE_PIN_AXIS = (math.sin(_INCLINE), 0.0, math.cos(_INCLINE))
 CONE_PIN_ACROSS = (math.cos(_INCLINE), 0.0, -math.sin(_INCLINE))
-_NORTH_CAP = post.SURFACE_FINISHES[3].face
+_NORTH_CAP = surface_finish_by_key(post.SURFACE_FINISHES, "cone_boss_north_face").face
 if any(abs(a + c) > 1e-12 for a, c in zip(CONE_PIN_AXIS, _NORTH_CAP.normal, strict=True)):
     raise AssertionError("cone pin axis is not square to the post's north cap")
 CONE_PIN_TOP_S = -round(post.CONE_BOSS_LENGTH / 2.0, PIN_TOP_PLACES)
@@ -147,15 +162,33 @@ class ConePin:
 CONE_PIN_EAST = ConePin(side=1, length=16.0)
 CONE_PIN_WEST = ConePin(side=-1, length=20.0)
 CONE_PINS = {"east": CONE_PIN_EAST, "west": CONE_PIN_WEST}
-# prechips CN-B5's stations for the tops, to the half printed unit the
-# rounded top plane may move them along the pin axis.
-if (
-    abs(CONE_PIN_EAST.top_x - 2.671145) > PIN_TOP_ROUNDING
-    or abs(CONE_PIN_EAST.top_z + 22.110089) > PIN_TOP_ROUNDING
-    or abs(CONE_PIN_WEST.top_x + 11.777018) > PIN_TOP_ROUNDING
-    or abs(CONE_PIN_WEST.top_z + 18.902193) > PIN_TOP_ROUNDING
-):
-    raise AssertionError("cone pin tops left prechips CN-B5's stations")
+
+
+def require_cone_pin_top_station(top_mm: tuple[float, float, float], side: int) -> None:
+    """CN-B5's station guard in the current post frame, not its old X/Z pins.
+
+    The cap's outward normal and offset locate its centre from the journal
+    axis; the pin centres straddle it by CONE_PIN_SPREAD along the cap.
+    Keep the original half-printed-unit station allowance.
+    """
+    expected = tuple(
+        centre + _NORTH_CAP.offset_mm * normal + side * CONE_PIN_SPREAD * across
+        for centre, normal, across in zip(
+            (0.0, post.BORE_HEIGHT, 0.0),
+            _NORTH_CAP.normal,
+            CONE_PIN_ACROSS,
+            strict=True,
+        )
+    )
+    if any(
+        abs(actual - nominal) > PIN_TOP_ROUNDING
+        for actual, nominal in zip(top_mm, expected, strict=True)
+    ):
+        raise AssertionError("cone pin top left the current post north-cap station")
+
+
+for _pin in CONE_PINS.values():
+    require_cone_pin_top_station((_pin.top_x, CONE_PIN_Y, _pin.top_z), _pin.side)
 # Each pin's bottom end stays inside the base plate.
 _BOTTOM_HALF_DROP = PIN_RADIUS * math.sin(_INCLINE)
 for _pin in CONE_PINS.values():
@@ -456,7 +489,10 @@ def _crank_pin(x: float) -> ExportFeature:
                 limits(CRANK_PIN_Y, DRAWING_PRECISION_BY_NAME["CrankPinY"]),
                 ("CRANK_PIN_Y", (_POST, "CRANK_BORE_HEIGHT")),
             ),
-            "station_nominal": (CRANK_PIN_Y, ("CRANK_PIN_Y",)),
+            "station_nominal": (
+                round(CRANK_PIN_Y, DRAWING_PRECISION_BY_NAME["CrankPinY"]),
+                ("CRANK_PIN_Y",),
+            ),
             "dia_nominal": (PIN_DIA, ("PIN_DIA",)),
             **_width(
                 x - SIDE_W_X,
@@ -511,7 +547,7 @@ def _cone_pin(name: str) -> ExportFeature:
                 ("CONE_PIN_Y",),
             ),
             "angle_deg": (post.INCLINE_DEG, ((_POST, "INCLINE_DEG"),)),
-            # The printed 12.5 deg tilt, +/- the general angular band.
+            # Tilt at the model-authored places, +/- the general angular band.
             "land_angle_deg": (
                 [CONE_PIN_TILT - CONE_PIN_TILT_TOL, CONE_PIN_TILT + CONE_PIN_TILT_TOL],
                 ("CONE_PIN_TILT", "CONE_PIN_TILT_TOL", (_POST, "INCLINE_DEG")),

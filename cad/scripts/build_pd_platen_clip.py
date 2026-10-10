@@ -27,34 +27,30 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _check import check
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
-    apply_material,
-    check,
-    define_circle,
-    define_polygon_chain,
-    define_rectilinear_chain,
-    drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
-    force_rebuild,
-    name_last_feature,
-    name_dimensions,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain, define_rectilinear_chain
+from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
 from vn_fillister_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN
 from pd_platen_spec import PLATE_THICKNESS, SOCKET_BOSS_H, SOCKET_THREAD_ENGAGEMENT
 
 PART_NAME = "pd-platen-clip"
-MATERIAL = "Brass"  # see _common.apply_material docstring
+MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
 CLIP_LENGTH = (
     83.5  # ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT 134.82

@@ -30,7 +30,6 @@ PENDING_TRIAGE: frozenset[str] = frozenset(
         "test_diag_dump_part.py",
         "test_face_identity_diff.py",
         "test_frame_fastener_fit.py",
-        "test_gear.py",
         "test_hole_spec.py",
         "test_holes_face_selection.py",
         "test_layout_geometry.py",

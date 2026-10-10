@@ -124,9 +124,10 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     # r3: PinchHeight .XX from the foot, BlockHt .X, AxisHeight .XXX +/-0.10
     # (2026-09-29: the prism stands on the platform, so the axis height is
     # the block's own fit); the 17 block adds 1.0 to the adjuster's side wall,
-    # and Width at .XXX (the hold-down containment) adds 0.67 more.
-    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.566, abs=1e-3)
-    assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.19, abs=1e-6)
+    # and Width at .XXX (the hold-down containment) adds 0.67 more. On the
+    # 38.100 common cone-axis height the 52.66 block prints 52.7.
+    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.564, abs=1e-3)
+    assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.26, abs=1e-6)
     assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(5.720, abs=1e-3)
     for web in (
         spec.WORST_SLIT_MOUTH_WEB_MM,
@@ -161,7 +162,9 @@ def test_block_stands_on_the_platform_and_keeps_every_axis_relation() -> None:
     """2026-09-29: the foot sits straight on the platform, so the adjuster
     axis is the cone axis's height above the platform top."""
     spec = dt_cone_tip_block_spec
-    assert spec.ADJUSTER_AXIS_HEIGHT == 33.368
+    from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM
+
+    assert spec.ADJUSTER_AXIS_HEIGHT == CONE_AXIS_HEIGHT_MM
     assert abs(spec.SLIT_FLOOR - (spec.ADJUSTER_AXIS_HEIGHT - 0.65)) < 1e-12
     assert abs(spec.PINCH_HEIGHT - spec.ADJUSTER_AXIS_HEIGHT - spec.PINCH_RISE) < 1e-12
     assert spec.DRAWING_DIMENSIONS["AxisHeightReference"] == {"AxisHeight"}
@@ -335,7 +338,14 @@ def test_pinch_depth_dimension_line_stands_between_the_block_and_section_a() -> 
     """At +0.003 the 6.0's dimension line printed on the block's top edge."""
     top = drawing._elevation_y(part.BLOCK_HEIGHT, drawing.RIGHT_CENTER)
     line_y = drawing.RIGHT_KEEP["PinchDepthCenter"][1]
-    section_foot = drawing._elevation_y(0.0, drawing.SECTION_CENTER)
+    # Section A-A is turned 90 degrees: its lowest ink is its native label and
+    # the ROTATED note under the view, not an elevation foot.
+    texts = drawing.sheet_text_boxes()
+    section_foot = min(
+        drawing.sheet_view_silhouettes()["section A-A"][1],
+        texts["SECTION A-A label"][1],
+        texts["ROTATED 90°"][1],
+    )
     assert line_y - top >= 0.005
     assert line_y + drawing.VALUE_TEXT_HALF_HEIGHT <= section_foot - 0.005
 
@@ -646,18 +656,21 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
 
 
 def test_top_ligament_needs_the_pinch_height_at_two_places() -> None:
-    """The one r3 .XX kept for a web: at .X the ligament over the pinch hole
-    closes at 1.92, under the 2.0 target."""
+    """The one r3 .XX kept for a web. The 46.95 pinch height sits on a .X
+    rounding tie; printed up to 47.0 the ligament over the pinch hole closes
+    at 1.92, under the 2.0 target, so only .XX prints it safely."""
     spec = dt_cone_tip_block_spec
     clearance_r = (round(spec.PINCH_CLEARANCE_DIA, 2) + _DRILLED_PLUS) / 2.0
     height_min = _printed("BlockHt", spec.BLOCK_HEIGHT)[0]
 
-    def ligament(places: int) -> float:
-        pinch_max = round(spec.PINCH_HEIGHT, places) + _GENERAL[places]
+    def ligament(printed: float, places: int) -> float:
+        pinch_max = printed + _GENERAL[places]
         return height_min - pinch_max - clearance_r - 2.0 * spec.EDGE_BREAK_MAX_MM
 
-    assert ligament(2) == pytest.approx(spec.WORST_TOP_LIGAMENT_MM)
-    assert round(ligament(2), 6) >= 2.0 > ligament(1)
+    two_places = ligament(round(spec.PINCH_HEIGHT, 2), 2)
+    one_place_up = ligament(math.ceil(round(spec.PINCH_HEIGHT * 10.0, 6)) / 10.0, 1)
+    assert two_places == pytest.approx(spec.WORST_TOP_LIGAMENT_MM)
+    assert round(two_places, 6) >= 2.0 > one_place_up
 
 
 def _reference_call(body: str, feature: str) -> str:
@@ -825,7 +838,7 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     of MHA-VN-018 and Main's ruling (a)."""
     import _config
     from _fastener_catalog import fastener
-    from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+    from _mcmaster_91794a112 import FILLISTER_SIZE
 
     config = _config.parts("vn-cone-tip-pinch-screw")
     assert config["supplier_skus"] == ["91794A112"]
@@ -836,9 +849,8 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     assert " STEEL" not in notes
     assert fastener("vn-cone-tip-pinch-screw").skus == ("91794A112",)
     assert fastener("vn-cone-tip-pinch-screw").material == "AISI 304"
-    assert FILLISTER_SIZES["91794A112"][1] == dt_cone_tip_block_spec.PINCH_SCREW_LENGTH
+    assert FILLISTER_SIZE[1] == dt_cone_tip_block_spec.PINCH_SCREW_LENGTH
     assert dt_cone_tip_block_spec.PINCH_SCREW_SKU == "91794A112"
-    assert "90280A110" not in FILLISTER_SIZES
 
 
 # Run 1 (d09c2b9eb leaf dump, c2-dumps/cone-tip-block-d09c2b9eb.json.gz):

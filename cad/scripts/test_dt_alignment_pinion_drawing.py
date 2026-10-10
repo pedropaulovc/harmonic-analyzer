@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import ast
 import math
 import re
+import runpy
+from pathlib import Path
 
 import pytest
 
@@ -11,25 +14,50 @@ import _config
 import dt_alignment_pinion_spec as spec
 import dt_pinion_arbor_geometry as arbor_geometry
 import dt_pinion_arbor_spec as arbor
+from _gear_fit_limits import gear_tip_band_mm
 
 
-def test_gear_data_block_preserves_the_actual_base_chord_profile() -> None:
+def test_gear_data_block_preserves_the_actual_finite_stock_profile() -> None:
     data = spec.GEAR_DATA
-    assert spec.TEETH == 32
     assert spec.TEETH == int(_config.machine("alignment_pinion", "teeth"))
-    assert "NUMBER OF TEETH:  32" in data
+    assert spec.DIAMETRAL_PITCH == _config.machine("gear_train", "diametral_pitch")
+    assert spec.PRESSURE_ANGLE_DEG == _config.machine(
+        "gear_train", "pressure_angle_deg"
+    )
+    assert spec.MODULE_MM == pytest.approx(spec.MM_PER_IN / spec.DIAMETRAL_PITCH)
+    assert spec.CUTTER_REFERENCE_TEETH == spec.CUTTER_TEETH_RANGE[0]
+    assert spec.STOCK_FORM.template == spec.CUTTER_TEMPLATE
+    assert spec.STOCK_FORM.teeth == spec.TEETH
+    assert spec.CUTTER_RADIAL_TRANSLATION_MM == pytest.approx(
+        spec.PITCH_DIA / 2.0 - spec.CUTTER_TEMPLATE.pitch_radius_mm
+    )
+    assert spec.ROOT_ENVELOPE_DIA_MM == pytest.approx(
+        (2.0 * spec.STOCK_FORM.root_radius_min_mm, 2.0 * spec.STOCK_FORM.root_radius_max_mm)
+    )
+    assert spec.ROOT_ENVELOPE_DIA_MM[0] < spec.ROOT_ENVELOPE_DIA_MM[1]
+    assert spec.WHOLE_DEPTH == pytest.approx(spec.STOCK_FORM.plunge_mm)
+    assert spec.MAX_CUT_DEPTH_MM > spec.WHOLE_DEPTH
+    assert spec.OUTSIDE_DIA <= spec.MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM
+    assert spec.OUTSIDE_DIA + 0.01 > spec.MIN_SPAN_SUPPORT_OUTSIDE_DIA_MM
+    assert spec.CUTTER_NUMBER == 4
+    assert spec.CUTTER_TEETH_RANGE == (26, 34)
+    assert spec.CUTTER_TEETH_RANGE[0] <= spec.TEETH <= spec.CUTTER_TEETH_RANGE[1]
     for field in (
-        "DIAMETRAL PITCH",
-        "MODULE",
-        "PRESSURE ANGLE",
-        "PITCH DIAMETER",
-        "MIN CHORD-FLOOR DIAMETER (mm, REF):  15.780",
-        "AS-CUT RADIAL TOOTH DEPTH (mm, REF):  0.777",
-        f"TOOTH FORM:  {spec.BASE_CHORD_ROOT_FORM}",
+        f"NUMBER OF TEETH:  {spec.TEETH}",
+        f"DIAMETRAL PITCH:  {spec.DIAMETRAL_PITCH:.2f}",
+        f"MODULE (mm, REF):  {spec.MODULE_MM:.3f}",
+        f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
+        f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
+        f"ROOT ENVELOPE DIAMETER (mm, REF):  "
+        f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
+        f"CUTTER PLUNGE (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
+        f"FORM CUTTER (REF):  #{spec.CUTTER_NUMBER}, "
+        f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
+        f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
+        f"TOOTH FORM:  {spec.TOOTH_FORM}",
     ):
         assert field in data, field
-    assert "FULL DEPTH" not in data
-    assert "WHOLE DEPTH" not in data
+    assert "CHORD" not in data
     assert "X.XX" not in data
 
 
@@ -154,22 +182,84 @@ def test_material_readback_names_the_unresolved_text() -> None:
 
 def test_tooth_thickness_is_controlled_by_the_model_base_tangent_span() -> None:
     k = spec.BASE_TANGENT_SPAN_TEETH
-    # Unroll the model's own base-circle tooth: k tooth arcs plus k-1 pitches.
-    unrolled = spec._BASE_RADIUS * (
-        2.0 * spec._BASE_TOOTH_HALF_ANGLE + (k - 1) * 2.0 * math.pi / spec.TEETH
+    # Parallel tangent contacts on the actual translated reference flanks,
+    # not the unrolled N32 involute the old inspection formula assumed.
+    beta = math.pi * k / spec.TEETH
+    parameter = beta - spec.CUTTER_TEMPLATE.half_space_base_angle_rad
+    assert spec.CUTTER_TEMPLATE.flank_parameter_min < parameter
+    assert parameter < spec.CUTTER_TEMPLATE.flank_parameter_max
+    span = (
+        2.0 * spec.CUTTER_TEMPLATE.base_radius_mm * parameter
+        + 2.0 * spec.CUTTER_RADIAL_TRANSLATION_MM * math.sin(beta)
     )
-    assert spec.BASE_TANGENT_SPAN == pytest.approx(unrolled, abs=1e-9)
-    contact_r = math.hypot(spec._BASE_RADIUS, spec.BASE_TANGENT_SPAN / 2.0)
-    assert spec._BASE_RADIUS < contact_r < spec.OUTSIDE_DIA / 2.0
-    assert abs(contact_r - spec.PITCH_DIA / 2.0) < 0.05
+    assert spec.BASE_TANGENT_SPAN == pytest.approx(span, abs=1e-9)
+    assert spec.BASE_TANGENT_SPAN == pytest.approx(spec.STOCK_FORM.tangent_span_mm(k))
     assert spec.BASE_TANGENT_SPAN_BAND == (0.0, -0.100)
-    assert "BASE-TANGENT SPAN, OVER 3 TEETH (mm):  3.964 +0.000/-0.100" in spec.GEAR_DATA
+    assert (
+        f"BASE-TANGENT SPAN, OVER {k} TEETH (mm):  "
+        f"{spec.BASE_TANGENT_SPAN:.{spec.BASE_TANGENT_SPAN_PLACES}f} "
+        f"+{spec.BASE_TANGENT_SPAN_BAND[0]:.3f}"
+        f"/{spec.BASE_TANGENT_SPAN_BAND[1]:.3f}"
+    ) in spec.GEAR_DATA
+
+
+def test_printed_thickness_corners_keep_finite_actual_cutter_support() -> None:
+    span_limits = spec.base_tangent_span_limits_mm()
+    nominal = round(spec.BASE_TANGENT_SPAN, spec.BASE_TANGENT_SPAN_PLACES)
+    assert span_limits[0] <= spec.BASE_TANGENT_SPAN <= span_limits[1]
+    upper, lower = spec.BASE_TANGENT_SPAN_BAND
+    assert span_limits == pytest.approx((nominal + lower, nominal + upper))
+    profiles = spec.manufacturing_corner_profiles()
+    assert len(profiles) == 4
+    for profile, (tip, span) in zip(
+        profiles,
+        (
+            (tip, span)
+            for tip in spec.outside_dia_limits_mm()
+            for span in span_limits
+        ),
+        strict=True,
+    ):
+        assert profile.template == spec.CUTTER_TEMPLATE
+        assert profile.teeth == spec.TEETH
+        assert profile.blank_radius_mm == pytest.approx(tip / 2.0)
+        assert profile.blank_radius_mm <= profile.support_radius_max_mm
+        assert profile.tangent_span_mm(spec.BASE_TANGENT_SPAN_TEETH) == pytest.approx(span)
+        assert 0.0 < profile.teeth * profile.gap_area_mm2 < math.pi * (tip / 2.0) ** 2
+    assert min(profile.radial_translation_mm for profile in profiles) == pytest.approx(
+        spec.MIN_SPAN_CUTTER_RADIAL_TRANSLATION_MM
+    )
 
 
 def test_fit_bore_callout_names_its_process() -> None:
     import draw_dt_alignment_pinion as draw
 
     assert draw.DIMENSION_CALLOUTS["ArborBoreDia"].splitlines()[0] == "REAM THRU"
+
+
+def test_diagnostic_home_clocking_uses_engaged_pose_and_native_row_handedness() -> None:
+    import dt_cylinder_gear_spec as gear
+
+    swing, heading = 0.08, math.pi - 0.02
+    driver_clock, driven_clock = spec.engaged_home_clocking_rad(swing, heading)
+    lock = math.radians(float(_config.machine("gear_train", "cylinder_lock_phase_deg")))
+    assert (driver_clock, driven_clock) == pytest.approx(
+        (swing + math.pi / spec.TEETH - heading, -lock - heading)
+    )
+    native_gap = math.pi / gear.TEETH
+    # Independently apply the native ROW-vector Ry180 then Rz(-lock).
+    x, y = -math.cos(native_gap), math.sin(native_gap)
+    machine_x = x * math.cos(lock) + y * math.sin(lock)
+    machine_y = -x * math.sin(lock) + y * math.cos(lock)
+    canonical_x = machine_x * math.cos(heading) + machine_y * math.sin(heading)
+    canonical_y = -machine_x * math.sin(heading) + machine_y * math.cos(heading)
+    engine_angle = math.pi - math.pi / gear.TEETH + driven_clock
+    assert (math.cos(engine_angle), math.sin(engine_angle)) == pytest.approx(
+        (canonical_x, canonical_y), abs=1e-12
+    )
+    assert spec.ENGAGED_HOME_LOADED_EDGE == "lower"
+    with pytest.raises(ValueError, match="must be finite"):
+        spec.engaged_home_clocking_rad(float("nan"), heading)
 
 
 def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
@@ -190,40 +280,90 @@ def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
         assert "SLIDE" not in line and "BY HAND" not in line, line
 
 
-def test_od_at_the_general_band_keeps_tip_clearance_and_contact() -> None:
-    """The .XX (+/-0.51) OD band is functionally enough for the 120T mesh."""
+def test_critical_tip_bands_keep_nominal_stock_root_air() -> None:
+    """Retain the >0.20 air guard with both ACTUAL printed tip/root envelopes."""
     import dt_cylinder_gear_spec as gear
 
-    general = 0.51
-    alpha = math.radians(spec.PRESSURE_ANGLE_DEG)
-    inv = math.tan(alpha) - alpha
-    engaged_c2c = float(_config.machine("alignment_pinion", "engaged_center_distance_mm"))
-    gear_base_r = gear.TEETH * spec.MODULE_MM * math.cos(alpha) / 2.0
-    gear_floor_r = gear_base_r * math.cos(
-        math.pi / gear.TEETH - (math.pi / (2.0 * gear.TEETH) + inv)
+    assert spec.OUTSIDE_DIA_BAND == gear.OUTSIDE_DIA_BAND
+    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("contact_critical")
+    pinion_lower, pinion_upper = spec.outside_dia_limits_mm()
+    gear_lower, gear_upper = gear.outside_dia_limits_mm()
+    engaged_c2c = spec.ENGAGED_CENTER_DISTANCE_MM
+    expected_c2c = (spec.PITCH_DIA + gear.PITCH_DIA) / 2.0 + float(
+        _config.machine("alignment_pinion", "engaged_center_extension_mm")
     )
-    gear_tip_r = gear.OUTSIDE_DIA / 2.0
-    # The base-chord gap floor stops the 120T tips 0.24 short of standard depth;
-    # U28 (user, 2026-09-23) parks the drum 0.2425 further out so the swing
-    # lands exactly there -- the configured engaged centre distance IS the
-    # seated one.
-    seated_c2c = gear_tip_r + spec.MIN_CHORD_FLOOR_DIA / 2.0
-    assert seated_c2c - engaged_c2c == pytest.approx(0.0, abs=1e-5)
+    assert engaged_c2c == pytest.approx(expected_c2c, abs=1e-9)
+    assert engaged_c2c == pytest.approx(
+        _config.machine("alignment_pinion", "engaged_center_distance_mm"), abs=1e-6
+    )
+    assert engaged_c2c - pinion_upper / 2.0 - gear.ROOT_ENVELOPE_DIA_MM[1] / 2.0 > 0.20
+    assert engaged_c2c - gear_upper / 2.0 - spec.ROOT_ENVELOPE_DIA_MM[1] / 2.0 > 0.20
+    assert pinion_lower < pinion_upper <= spec.SUPPORT_OUTSIDE_DIA_MM
+    assert gear_lower < gear_upper <= gear.SUPPORT_OUTSIDE_DIA_MM
+    for pinion in spec.manufacturing_corner_profiles():
+        for drum in gear.manufacturing_corner_profiles():
+            assert engaged_c2c - pinion.blank_radius_mm - drum.root_radius_max_mm > 0.20
+            assert engaged_c2c - drum.blank_radius_mm - pinion.root_radius_max_mm > 0.20
 
-    def contact_ratio(c2c: float, tip_r: float) -> float:
-        working = math.acos((spec._BASE_RADIUS + gear_base_r) / c2c)
-        path = (
-            math.sqrt(tip_r**2 - spec._BASE_RADIUS**2)
-            + math.sqrt(gear_tip_r**2 - gear_base_r**2)
-            - c2c * math.sin(working)
-        )
-        return path / (math.pi * spec.MODULE_MM * math.cos(alpha))
 
-    for c2c in (engaged_c2c, seated_c2c):
-        largest_tip_r = (spec.OUTSIDE_DIA + general) / 2.0
-        smallest_tip_r = (spec.OUTSIDE_DIA - general) / 2.0
-        assert c2c - largest_tip_r - gear_floor_r > 0.20
-        assert contact_ratio(c2c, smallest_tip_r) > 1.1
+def test_tip_limits_follow_printed_nominal_not_unrounded_od() -> None:
+    places = spec.DRAWING_PRECISION_BY_NAME["OutsideDia"]
+    nominal = round(spec.OUTSIDE_DIA, places)
+    upper, lower = spec.OUTSIDE_DIA_BAND
+    assert spec.outside_dia_limits_mm() == pytest.approx(
+        (nominal + lower, nominal + upper), abs=1e-12
+    )
+    # The finite supported blank is explicitly quantized before modelling;
+    # the standard mathematical actual-N tip is NOT the accepted upper tip.
+    assert spec.outside_dia_limits_mm()[1] <= spec.SUPPORT_OUTSIDE_DIA_MM
+    assert spec.OUTSIDE_DIA < (spec.TEETH + 2) * spec.MODULE_MM
+
+
+def test_tip_grade_is_spec_owned_native_pmi_not_a_toleranced_note() -> None:
+    import draw_dt_alignment_pinion as drawing
+
+    assert spec.DRAWING_DIMENSIONS["GearBlankProfile"] == {"OutsideDia"}
+    assert drawing.FRONT_KEEP.keys() | drawing.RIGHT_KEEP.keys() == set(
+        spec.DRAWING_PRECISION_BY_NAME
+    )
+    source = Path(spec.__file__).with_name("build_dt_alignment_pinion.py")
+    calls = [
+        node
+        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "set_dimension_bilateral_tolerance"
+    ]
+    assert any(
+        len(call.args) == 4
+        and ast.literal_eval(call.args[1]) == "GearBlankProfile"
+        and ast.literal_eval(call.args[2]) == "OutsideDia"
+        and ast.unparse(call.args[3]) == "*deviations(OUTSIDE_DIA_BAND)"
+        for call in calls
+    )
+    assert "OUTSIDE DIAMETER" not in spec.GEAR_DATA
+
+
+def test_tip_grade_configuration_reaches_the_part_spec(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_fit = _config.fit
+    changed_band = [0.0, -0.01]
+
+    def fit_value(*keys: str):
+        if keys == ("gear_tip", "contact_critical_band_mm"):
+            return changed_band
+        return original_fit(*keys)
+
+    monkeypatch.setattr(_config, "fit", fit_value)
+    dimensions = runpy.run_path(spec.__file__)
+    assert dimensions["OUTSIDE_DIA_BAND"] == tuple(changed_band)
+    nominal = round(
+        dimensions["OUTSIDE_DIA"], dimensions["DRAWING_PRECISION_BY_NAME"]["OutsideDia"]
+    )
+    assert dimensions["outside_dia_limits_mm"]() == pytest.approx(
+        (nominal - 0.01, nominal), abs=1e-12
+    )
 
 
 def test_no_note_line_carries_a_dimension() -> None:

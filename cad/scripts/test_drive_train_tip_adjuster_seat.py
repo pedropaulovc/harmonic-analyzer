@@ -1,4 +1,4 @@
-"""The cone-shaft tip seats on the 94025A150 cup WALL, derived, never tuned.
+"""The cone-shaft tip seats on the 94025A164 cup WALL, derived, never tuned.
 
 A flat shaft end in a conical cup touches along the ring where its end edge
 meets the cone, end-radius / tan(half-angle) short of the apex. Placing it AT
@@ -13,7 +13,7 @@ import math
 import pytest
 
 import build_dt_drive_train_assembly as bdt
-from build_vn_cone_tip_adjuster import CUP_DEPTH, CUP_DIA
+from _mcmaster_94025a164 import CUP_DEPTH, CUP_DIA
 from dt_cone_gear_shaft_spec import ADJUSTER_EMBED, SECTIONS
 
 
@@ -26,10 +26,11 @@ def test_seat_depth_is_the_end_radius_over_the_cup_half_angle() -> None:
 
 
 def test_the_vendor_cup_is_the_90_degree_cone_the_derivation_reads() -> None:
-    # 94025A150 Sketch2: rim radius equals cup depth, a 45 deg half-angle, so a
-    # 1/16 in end seats exactly one end radius (0.79375) short of the apex.
+    # Current 94025A164 Sketch2: rim radius equals nominal cup depth,
+    # so the current shaft end seats one end radius short of the apex.
     assert math.degrees(bdt.ADJ_CUP_HALF_ANGLE) == pytest.approx(45.0, abs=1e-6)
-    assert bdt.ADJ_SEAT_DEPTH == pytest.approx(25.4 / 32.0, abs=1e-9)
+    end_radius = SECTIONS[-1][0] * 25.4 / 2.0
+    assert bdt.ADJ_SEAT_DEPTH == pytest.approx(end_radius, abs=1e-9)
 
 
 def test_shaft_end_meets_the_cup_wall_and_the_adjuster_backs_out_by_that_depth() -> None:

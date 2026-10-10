@@ -2,19 +2,19 @@ r"""Create the curated machinist drawing for the cone swing platform.
 
 The SLDPRT remains authoritative.  The plan imports the plate outline,
 post-mount pattern, lock notch and corner radii; the native Hole Wizard callout
-defines the pivot clearance hole; section A-A exposes the shallow pivot-head
+defines the reamed pivot bore; section A-A exposes the shallow pivot-head
 relief and plate thickness in solid lines.  Display precision comes from the
 model.
 
-The platform is an asymmetric steel wedge with a 1/4-in close-clearance pivot
-hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
+The platform is an asymmetric steel wedge with a 1/4-in reamed H7 pivot
+bore on the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, four rounded plan corners and the counterbored #4
 clearance hole for the tip block's single hold-down screw, rising from the
 underside (user ruling 2026-09-29).  The three plan views run 1:2 and pivot
 section A-A 2:1.  Detail B enlarges a 12 mm radius around the pivot-to-hole
 region at 2:1 for the hole's station; section C-C (1:1), cut on the
 plate-profile plan through the hole's axis, shows the underside counterbore
-in solid lines and carries its native Hole Wizard callout.  The isometric
+in solid lines and carries its native Hole Wizard callout. The isometric
 runs 1:3.
 
 Run with SolidWorks open::
@@ -30,7 +30,10 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
+from _check import check
+from _com import _early_bound, _read_member
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     _zoomed_on,
@@ -39,6 +42,7 @@ from _drawing_common import (
     add_surface_finish,
     assert_imported_precision,
     create_section_view,
+    create_blank_drawing_sheets,
     check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
@@ -74,12 +78,12 @@ from dt_cone_swing_platform_spec import (
     HOLDDOWN_CLEARANCE_DIA,
     HOLDDOWN_LOCAL_X,
     HOLDDOWN_LOCAL_Z,
-    PIVOT_HOLE_DIA,
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
 )
+from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
 from diagnostics.drawing_layout_audit import collect_document, describe_sheet
 
 
@@ -96,6 +100,9 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # title block states the principal (plan) scale; iso and section carry their own
+SHEET_NAMES = ("PLATFORM",)
+SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE}
+
 
 # Sheet layout (meters).  Three 1:2 plan views separate the profile, hole
 # pattern and lock-notch definitions instead of routing unrelated leaders
@@ -121,6 +128,63 @@ SECTION_CENTER = _shifted(0.335, 0.105)
 # taking SECTION_SHIFT's extra 10 mm past the border (0.4189).
 BASE_SLIDE_FINISH_XY = (0.375, _shifted(0.355, 0.120)[1])
 
+# The pivot on the profile plan, where the farm run at 039e557da landed it
+# (the plate's current outline re-centres the 1:2 view).
+PROFILE_PIVOT_XY = (0.0718, 0.1357)
+
+
+def corner_fillet_centre_mm(label: str) -> tuple[float, float]:
+    """Model plan (x, z) of a corner fillet's centre, from the part's own corners.
+
+    The build fillets the sharp ``PLATE_CORNERS`` vertex, so the arc centre
+    lies on the interior bisector, r / sin(theta / 2) from the vertex.
+    """
+    corners = _part.PLATE_CORNERS
+    idx = [corner[0] for corner in corners].index(label)
+    _label, x, z, radius = corners[idx]
+    rays = []
+    for _n, nx, nz, _r in (corners[idx - 1], corners[(idx + 1) % len(corners)]):
+        length = math.hypot(nx - x, nz - z)
+        rays.append(((nx - x) / length, (nz - z) / length))
+    bx, bz = rays[0][0] + rays[1][0], rays[0][1] + rays[1][1]
+    norm = math.hypot(bx, bz)
+    reach = radius / math.sin(_part._corner_theta(label) / 2.0)
+    return (x + bx / norm * reach, z + bz / norm * reach)
+
+
+# A left-standing radius's leader knee (where its shelf meets the radial
+# leader) relative to the text position SetPosition sets: measured on the R12
+# corner, (+8.6, -2.8) mm on the run-20261009T172850508Z render, and the
+# ray from the arc centre through it read 183.5 deg against the 183.3 deg
+# arrow of run 20261010T072401692Z. The leader runs this far past the arc.
+RADIUS_KNEE_FROM_TEXT = (0.0086, -0.0028)
+CORNER_LEADER_REACH = 0.004
+
+
+def corner_radius_text_xy(label: str) -> tuple[float, float]:
+    """Text position that lands a corner radius's arrow at its arc's middle.
+
+    The arc's middle lies on the ray from the fillet centre to the sharp
+    ``PLATE_CORNERS`` vertex it rounds, in model space; the 1:2 plan maps
+    model (x, z) to sheet (x, -z) about PROFILE_PIVOT_XY. A fixed sheet
+    station went stale when the plate outline moved: CornerSER's
+    near-horizontal shelf landed its arrow 5 deg past the R12 arc's end, on
+    the east edge (run 20261010T072401692Z).
+    """
+    per_mm = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
+    corners = {corner[0]: corner for corner in _part.PLATE_CORNERS}
+    _label, vx, vz, radius = corners[label]
+    cx, cz = corner_fillet_centre_mm(label)
+    length = math.hypot(vx - cx, vz - cz)
+    ux, uy = (vx - cx) / length, -(vz - cz) / length
+    reach = radius * per_mm + CORNER_LEADER_REACH
+    knee = (
+        PROFILE_PIVOT_XY[0] + cx * per_mm + ux * reach,
+        PROFILE_PIVOT_XY[1] - cz * per_mm + uy * reach,
+    )
+    return (knee[0] - RADIUS_KNEE_FROM_TEXT[0], knee[1] - RADIUS_KNEE_FROM_TEXT[1])
+
+
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
     "NorthEastX": (0.045, 0.105),
@@ -128,13 +192,15 @@ PROFILE_KEEP = {
     "SouthWestX": (0.104, 0.258),
     "SouthEastX": (0.045, 0.259),
     # Radial rays must meet actual trimmed corners, not circle extensions.
-    # CornerNE/R10 is left and CornerNW/R8 is right in this view.  R10 and
-    # R12 shelves sit just above horizontal enough to land inside their arcs
-    # while clearing the 223.4 witness lines.
+    # CornerNE/R10 is left and CornerNW/R8 is right in this view.  The R10
+    # shelf sits just above horizontal enough to land inside its arc while
+    # clearing the 223.4 witness lines.
     "CornerNER": (0.045, 0.139),
     "CornerNWR": (0.135, 0.118),
     "CornerSWR": (0.110, 0.249),
-    "CornerSER": (0.040, 0.2435),
+    # R12's arrow lands at its arc's middle (corner_radius_text_xy); its
+    # text stands between the 223.4 south witness and the 24.0 line.
+    "CornerSER": corner_radius_text_xy("SE"),
 }
 FEATURE_KEEP = {
     # Short lines (12 characters, ~34 mm at most) between the 195.09 line
@@ -294,9 +360,6 @@ HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.072)
 # caption).  Its 59.7 x 4.8 mm box, anchored upper-left and centred under
 # the notch plan, clears the 7.0 arrow tip (y 0.1276) above.
 NOTCH_CAPTION_UPPER_LEFT = (NOTCH_CENTER[0] - 0.02985, 0.1255)
-# The pivot on the profile plan, from the NE/NW corner-radius stations below
-# (their fillet centres sit at model (-6.35, -3) and (0.97, -1) mm).
-PROFILE_PIVOT_XY = (0.0718, 0.1377)
 
 
 def plate_edge_mm(z_mm: float, side: int) -> float:
@@ -313,6 +376,8 @@ def holddown_section_line_model_points() -> tuple[tuple[float, float, float], ..
         (x / 1000.0, PLATE_THICKNESS / 1000.0, HOLDDOWN_LOCAL_Z / 1000.0)
         for x in HOLDDOWN_SECTION_LINE_X_MM
     )
+
+
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
@@ -797,7 +862,7 @@ def expected_corner_arcs(feature_name: str) -> int:
     on where the open relief splits a fillet's top edge.
     """
     label = feature_name.removeprefix("Corner")
-    radius = {corner[0]: corner[3] for corner in _part._CORNERS}[label]
+    radius = {corner[0]: corner[3] for corner in _part.PLATE_CORNERS}[label]
     return 2 if _part._north_fillet_relief_overlap(label, radius) > 0.0 else 1
 
 
@@ -816,7 +881,7 @@ def check_corner_arc_plan(
 
 def _assert_corner_radius_attachment(
     adapter: Any, view: Any, annotations: list[Any], *,
-    name: str, feature_name: str, radius_m: float, station_xy: tuple[float, float],
+    name: str, feature_name: str, radius_m: float,
 ) -> None:
     """Prove a native radius dimension's arrow lies on its owned visible arc."""
     matches = [item for item in annotations if dimension_name(adapter, item) == name]
@@ -847,6 +912,7 @@ def _assert_corner_radius_attachment(
         raise RuntimeError(f"expected one {name} arrow tip, found {arrows}")
     arrow = arrows[0]
     visible = visible_view_entities(view, 1, label=f"{name} visible corner edges")
+    centre_mm = corner_fillet_centre_mm(feature_name.removeprefix("Corner"))
     candidates = []
     for raw_face in owner.GetFaces() or ():
         face = _early_bound(raw_face, "IFace2")
@@ -864,9 +930,12 @@ def _assert_corner_radius_attachment(
             circle = tuple(float(value) for value in curve.CircleParams)
             if abs(circle[6] - radius_m) > 1e-8:
                 continue
+            # The owned arc's centre must be this corner's, in model space;
+            # sheet stations went stale whenever the plate moved on the sheet.
+            if math.dist((circle[0] * 1000.0, circle[2] * 1000.0), centre_mm) > 0.01:
+                continue
             center = model_point_in_view(adapter, view, circle[:3], label=f"{name} owned circle")
-            if all(abs(center[i] - station_xy[i]) <= 0.001 for i in (0, 1)):
-                candidates.append((edge, circle, center))
+            candidates.append((edge, circle, center))
     # W18 (5db29554, run d9711228): the open pivot relief crosses the NW
     # fillet, so its plan arc is two physical edges on one circle -- one on
     # the 6.35 top, one on the 6.10 relief floor.  Every owned visible arc
@@ -948,6 +1017,12 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="cone swing platform package"
+    )
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate the platform sheet")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -1150,9 +1225,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         feature,
         callout_xy=(0.215, 0.107),
-        label="pivot close-clearance hole",
+        label="pivot reamed bore",
         edge=pivot_edge,
-        process="DRILL",
+        process="REAM",
     )
     add_native_hole_callout(
         adapter,
@@ -1226,15 +1301,15 @@ async def build(adapter: Any) -> dict[str, str]:
         str(thickness_reference.GetText(2)),
     ) != ("(", ")"):
         raise RuntimeError("stock plate thickness reference state did not persist")
-    for name, feature_name, radius_m, station_xy in (
-        ("CornerSWR", "CornerSW", 0.005, (0.0875, 0.2433)),
-        ("CornerNWR", "CornerNW", 0.008, (0.0723, 0.1382)),
-        ("CornerNER", "CornerNE", 0.010, (0.0686, 0.1392)),
-        ("CornerSER", "CornerSE", 0.012, (0.0660, 0.2398)),
+    for name, feature_name, radius_m in (
+        ("CornerSWR", "CornerSW", 0.005),
+        ("CornerNWR", "CornerNW", 0.008),
+        ("CornerNER", "CornerNE", 0.010),
+        ("CornerSER", "CornerSE", 0.012),
     ):
         _assert_corner_radius_attachment(
             adapter, profile, profile_annotations,
-            name=name, feature_name=feature_name, radius_m=radius_m, station_xy=station_xy,
+            name=name, feature_name=feature_name, radius_m=radius_m,
         )
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")
@@ -1251,6 +1326,8 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     for sheet_geometry in collect_document(adapter):
         print(describe_sheet(sheet_geometry))
+        if sheet_geometry.name != SHEET_NAMES[0]:
+            continue
         thickness_geometry = [
             item for item in sheet_geometry.annotations if item.label == "PlateThk"
         ]
@@ -1278,6 +1355,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Cone Swing Platform Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+        sheet_scales=SHEET_SCALES,
     )
 
 

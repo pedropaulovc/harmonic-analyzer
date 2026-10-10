@@ -17,7 +17,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import _common
+import _bore_axis
+import _part_save
+import _rebuild
 import _visibility
 import build
 import visibility_debt
@@ -277,6 +279,51 @@ def test_an_assembly_level_shown_sketch_fails() -> None:
         _visibility.assert_reference_geometry_hidden(_adapter(model), "asm")
 
 
+class _ConfiguredModel:
+    """Hide/show is per configuration: each one reports its own shown set."""
+
+    def __init__(self, shown: dict[str, list[tuple[str, str]]], active: str) -> None:
+        self.shown, self.active, self.shows = shown, active, []
+
+    def GetConfigurationNames(self) -> tuple[str, ...]:
+        return tuple(self.shown)
+
+    def ShowConfiguration2(self, name: str) -> bool:
+        self.shows.append(name)
+        self.active = name
+        return True
+
+
+def test_every_configuration_is_checked_with_itself_active(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """7e88be269: the cone gear's axis, blanked with T120 active, passed the
+    active-configuration check and rendered in T006."""
+    model = _ConfiguredModel(
+        {"T006": [("Axis1", "axis")], "T012": [], "T120": []}, active="T120"
+    )
+    monkeypatch.setattr(
+        _rebuild, "active_configuration_name", lambda _adapter, _model=None: model.active
+    )
+    monkeypatch.setattr(
+        _visibility,
+        "visible_reference_geometry",
+        lambda m, _label="": list(m.shown[m.active]),
+    )
+    adapter = SimpleNamespace(currentModel=model)
+    with pytest.raises(RuntimeError, match=r"\[T006\].*axis 'Axis1'") as caught:
+        _visibility.assert_reference_geometry_hidden_in_every_configuration(adapter, "cone")
+    assert "[T012]" not in str(caught.value)
+    assert model.shows == ["T006", "T012", "T120"]
+    assert model.active == "T120"
+
+    model.shown["T006"] = []
+    model.shows.clear()
+    _visibility.assert_reference_geometry_hidden_in_every_configuration(adapter, "cone")
+    assert model.active == "T120"
+
+
+
 def test_an_allowance_admits_its_sketch_and_nothing_else() -> None:
     model = _part_tree(
         _Feature("StationReference", "ProfileFeature", SHOWN),
@@ -303,7 +350,7 @@ def test_part_save_checks_before_the_first_save() -> None:
         _part_tree(_Feature("StationReference", "ProfileFeature", SHOWN)), saves
     )
     with pytest.raises(RuntimeError, match="StationReference"):
-        asyncio.run(_common.save_part_and_images(adapter, "dt-crank-arm"))
+        asyncio.run(_part_save.save_part_and_images(adapter, "dt-crank-arm"))
     assert saves == []
 
 
@@ -313,7 +360,7 @@ def test_a_shown_plane_reaching_the_save_fails_it() -> None:
     saves: list[str] = []
     model = _part_tree(_Feature("Axis1", "RefAxis", SHOWN))
     with pytest.raises(RuntimeError, match="axis 'Axis1'"):
-        asyncio.run(_common.save_part_and_images(_adapter(model, saves), "dt-crank-arm"))
+        asyncio.run(_part_save.save_part_and_images(_adapter(model, saves), "dt-crank-arm"))
     assert model.by_name["Axis1"].Visible == SHOWN
     assert saves == []
 
@@ -483,7 +530,7 @@ def test_name_bore_axis_hides_the_planes_and_axis_it_creates() -> None:
         currentModel=model, create_plane=create_plane, create_axis=create_axis
     )
     axis = asyncio.run(
-        _common.name_bore_axis(adapter, "Front Plane", 4.0, "Top Plane", 0.0, "bore")
+        _bore_axis.name_bore_axis(adapter, "Front Plane", 4.0, "Top Plane", 0.0, "bore")
     )
     assert axis == "Axis1"
     assert [f.Name for f in model.features if f.Visible == SHOWN] == []
@@ -772,11 +819,101 @@ _REFERENCE_KINDS = frozenset({"PLANE", "AXIS", "POINT", "DATUMPOINT", "SKETCH"})
 _AUTO_NAME = re.compile(r"^(?:Plane|Axis|Point)\d+$")
 
 
+def _loop_authored_reference_names(tree: ast.Module) -> set[str]:
+    """Expand literal loop tags only where they reach a real reference creator.
+
+    A local helper qualifies by creating reference geometry and passing its
+    name parameter to name_last_feature. An unrelated formatted label, a
+    removed helper call, or a bare prefix elsewhere in the file is not proof.
+    """
+
+    def called(node: ast.Call) -> str:
+        return getattr(node.func, "id", "") or getattr(node.func, "attr", "")
+
+    name_arguments = {"name_last_feature": 1}
+    for helper in ast.walk(tree):
+        if not isinstance(helper, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        calls = [node for node in ast.walk(helper) if isinstance(node, ast.Call)]
+        if not any(_REFERENCE_CREATE.fullmatch(f"{called(node)}(") for node in calls):
+            continue
+        parameters = [arg.arg for arg in helper.args.posonlyargs + helper.args.args]
+        for node in calls:
+            if called(node) != "name_last_feature" or len(node.args) < 2:
+                continue
+            name = node.args[1]
+            if isinstance(name, ast.Name) and name.id in parameters:
+                name_arguments[helper.name] = parameters.index(name.id)
+
+    authored: set[str] = set()
+    for loop in ast.walk(tree):
+        if not isinstance(loop, ast.For) or not isinstance(
+            loop.iter, (ast.Tuple, ast.List)
+        ):
+            continue
+        targets = (
+            loop.target.elts
+            if isinstance(loop.target, (ast.Tuple, ast.List))
+            else [loop.target]
+        )
+        templates = {
+            target.id: node.value
+            for node in ast.walk(loop)
+            if isinstance(node, ast.Assign)
+            for target in node.targets
+            if isinstance(target, ast.Name) and isinstance(node.value, ast.JoinedStr)
+        }
+        for row in loop.iter.elts:
+            values = (
+                row.elts
+                if isinstance(loop.target, (ast.Tuple, ast.List))
+                and isinstance(row, (ast.Tuple, ast.List))
+                else [row]
+            )
+            if len(targets) != len(values):
+                continue  # non-literal/star-unpacked rows are not authorship proof
+            bindings = {
+                target.id: value.value
+                for target, value in zip(targets, values, strict=True)
+                if isinstance(target, ast.Name)
+                and isinstance(value, ast.Constant)
+                and isinstance(value.value, str)
+            }
+            for node in ast.walk(loop):
+                if not isinstance(node, ast.Call):
+                    continue
+                index = name_arguments.get(called(node))
+                if index is None or len(node.args) <= index:
+                    continue
+                expression = node.args[index]
+                if isinstance(expression, ast.Name):
+                    expression = templates.get(expression.id)
+                if not isinstance(expression, ast.JoinedStr):
+                    continue
+                parts = []
+                for part in expression.values:
+                    if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                        parts.append(part.value)
+                    elif (
+                        isinstance(part, ast.FormattedValue)
+                        and isinstance(part.value, ast.Name)
+                        and part.value.id in bindings
+                        and part.conversion == -1
+                        and part.format_spec is None
+                    ):
+                        parts.append(bindings[part.value.id])
+                    else:
+                        break
+                else:
+                    authored.add("".join(parts))
+    return authored
+
+
 def _blanked_names_never_authored(text: str) -> list[str]:
     """Names passed to blank_reference_geometry that nothing else in the source
-    authors.  A name is authored if it is a string literal outside the blank
-    call, or, for ``<X>StartPlane``, if ``<X>`` is (the crankshaft's
-    ``f"{name}StartPlane"`` helper)."""
+    authors. Literal loop tags count when their formatted name is passed to a
+    proven reference-creating helper. The crankshaft's ``<X>StartPlane`` naming
+    convention also accepts a literal ``<X>`` outside the blank call."""
     tree = ast.parse(text)
     in_blank: set[int] = set()
     blanked: list[str] = []
@@ -795,6 +932,7 @@ def _blanked_names_never_authored(text: str) -> list[str]:
         and isinstance(node.value, str)
         and id(node) not in in_blank
     }
+    authored.update(_loop_authored_reference_names(tree))
     return [
         name
         for name in blanked
@@ -816,6 +954,29 @@ def test_the_blank_sweep_flags_a_name_nothing_authors() -> None:
     assert _blanked_names_never_authored(
         'blank_reference_geometry(adapter, (("Plane7", "PLANE"),))\n'
     ) == []
+
+
+def test_the_blank_sweep_tracks_loop_names_through_reference_creators() -> None:
+    source = (
+        "async def _offset_plane(adapter, name, base, offset):\n"
+        "    await adapter.create_plane(params)\n"
+        "    name_last_feature(adapter, name)\n"
+        "for which, y in (('Body', BODY_Y), ('Tail', TAIL_Y)):\n"
+        "    plane = f'{which}SeatPlane'\n"
+        "    await _offset_plane(adapter, plane, 'Top Plane', y)\n"
+        "blank_reference_geometry(adapter, (('BodySeatPlane', 'PLANE'), "
+        "('TailSeatPlane', 'PLANE')))\n"
+    )
+    assert _blanked_names_never_authored(source) == []
+    assert _blanked_names_never_authored(
+        source.replace("await _offset_plane(adapter, plane, 'Top Plane', y)", "pass")
+    ) == ["BodySeatPlane", "TailSeatPlane"]
+    assert _blanked_names_never_authored(
+        source.replace("await adapter.create_plane(params)", "pass")
+    ) == ["BodySeatPlane", "TailSeatPlane"]
+    assert _blanked_names_never_authored(
+        source.replace("f'{which}SeatPlane'", "f'{which}SeatProfile'")
+    ) == ["BodySeatPlane", "TailSeatPlane"]
 
 
 def test_every_blanked_name_is_one_its_builder_authors() -> None:

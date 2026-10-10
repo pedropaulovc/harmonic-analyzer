@@ -5,7 +5,7 @@ views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The sheet runs at 3:1 (the block is 40 x 20.5 x 11.0); the isometric carries an
+The sheet runs at 3:1 with the raised envelope from the spec; the isometric carries an
 explicit 2:1 override so it stays clear of the title block.
 
 Run with SolidWorks open::
@@ -20,7 +20,9 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _check import check
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -39,9 +41,11 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from dt_pinion_pivot_block_spec import (
     BLOCK_DEPTH,
+    BLOCK_HEIGHT,
     BLOCK_WEST,
     BLOCK_WIDTH as BLOCK_WIDTH,
     BORE_DIA,
+    BORE_UP,
     FRONT_BBOX_CX,
     FRONT_BBOX_CY,
     LIFT_BORE_RISE,
@@ -70,11 +74,10 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 
-# Sheet layout (meters).  U28: the part origin is the PIVOT bore, so
-# the front view's model bbox runs -26..14 in X and -12..8.5 in Y; at 3:1 the
-# view is 120 x 61.5 mm.  Third angle: the top view (block seen from above,
-# carrying the two hold-down holes) sits ABOVE the front view; the right view
-# (20.5 x 11.0 stock section) sits to its right.
+# Sheet layout (meters). The part origin is the pivot bore; the front
+# bounding box follows the raised stock's spec spans at 3:1. Third angle:
+# the top view carrying the two hold-down holes sits above the front;
+# the right view carries the block-height by depth section.
 FRONT_CENTER = (0.140, 0.128)
 TOP_CENTER = (0.140, 0.222)
 RIGHT_CENTER = (0.285, 0.128)
@@ -93,6 +96,8 @@ def _front_y(model_y_mm: float) -> float:
 
 BORE_R_SHEET = BORE_DIA * SHEET_SCALE[0] / 2000.0
 SCREW_R_SHEET = SCREW_HOLE_DIA * SHEET_SCALE[0] / 2000.0
+FRONT_TOP_Y = _front_y(BLOCK_HEIGHT - BORE_UP)
+PIVOT_FINISH_XY = (0.208, FRONT_TOP_Y + 0.01125)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Everything is measured from the pivot bore (the part
@@ -103,13 +108,13 @@ SCREW_R_SHEET = SCREW_HOLE_DIA * SHEET_SCALE[0] / 2000.0
 FRONT_KEEP = {
     "BlockWidth": (_front_x(FRONT_BBOX_CX), 0.074),
     "AnchorX": (_front_x(-BLOCK_WEST / 2.0), 0.084),
-    "LiftBoreX": (_front_x(-LIFT_BORE_SPACING / 2.0), 0.165),
+    "LiftBoreX": (_front_x(-LIFT_BORE_SPACING / 2.0), FRONT_TOP_Y + 0.00625),
     "BlockHeight": (0.226, 0.123),
     "AnchorZ": (0.212, 0.113),
     # BETWEEN the bores: the witnesses leave each centre toward the other and
     # stop at the dimension line, so neither crosses the other bore (render r1:
     # placed left, the pivot-centre witness ran through the lift bore).
-    "LiftBoreCz": (_front_x(-LIFT_BORE_SPACING / 2.0), 0.1365),
+    "LiftBoreCz": (_front_x(-LIFT_BORE_SPACING / 2.0), _front_y(0.0) + 0.00325),
     # Every horizontal/vertical witness from the pivot centre crosses its rim
     # at 0/90/180/270 deg.  The leader runs to the NEAR end of the text's
     # shoulder, so the text sits right of the bore (render r1: centred at
@@ -118,9 +123,9 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.212, 0.195),
     # Shallow, to the left: the parallelism frame's leader climbs from the
     # lift bore's top above this one, so the two never cross.
-    "LiftBoreDia": (0.045, 0.168),
+    "LiftBoreDia": (0.045, FRONT_TOP_Y + 0.00925),
 }
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.168)}
+RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], FRONT_TOP_Y + 0.00925)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "THRU - REAM",
@@ -182,7 +187,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    # Right view: the 20.5 x 11.0 stock section carries only the block depth.
+    # Right view: the stock section carries only the block depth.
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
@@ -259,7 +264,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=pivot_right_edge,
-        symbol_xy=(0.208, 0.170),
+        symbol_xy=PIVOT_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
         char_height=0.0025,

@@ -1,0 +1,17 @@
+# Fits & clearances — applied UNIFORMLY across channels (see cad/docs/tolerance-policy.md).
+#
+# Because the output is a force balance, channel-to-channel consistency matters
+# more than absolute precision: these are shared named classes, never per-part
+# magic numbers. Build scripts assert their analytic clearance margins against
+# these values and raise on violation.
+units: mm
+
+# Drawing title-block general tolerances live in ../title_block.yaml (own file,
+# so a display edit never FULL-rebuilds geometry readers). Each fit group lives
+# in its own sibling file to limit the cache blast radius of clearance edits.
+
+general:
+  machined_block:    { tolerance: "+/-0.10", applies_to: "milled blocks, brackets, plates" }
+  plate_profile:     { tolerance: "+/-0.20", applies_to: "noncritical exterior profiles" }
+  visual_noncritical: { tolerance: "+/-0.50", applies_to: "cosmetic/decorative geometry" }
+

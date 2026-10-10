@@ -3,19 +3,19 @@ r"""Create the complete cone-gear batch drawing package (MHA-DT-003).
 Every configured family member T006..T120 by six receives a standalone sheet.
 Each sheet selects its own part configuration, imports the native model-owned
 blank diameter, D-bore (diameter, across-flat and flat clock), face width,
-driving circular-tooth-thickness requirement and gap-floor limits, and carries
-its own gear data and title-block alloy.  The bands are authored by
-``build_cone_gear`` from the named shaft and gear-mesh fits (the gap floor as
-one LIMIT band per configuration); this drawing only arranges and verifies
-them.
+driving circular-tooth-thickness requirement and functional root-envelope
+limits, plus the actual finite cutter recipe and bounded carrying-contact data.
+The native imported bands remain model-owned. A separate DT6-FORM1 sheet
+gives the custom tool's grind data beside its installed T006 gap outline; the
+exact grinding equations stay in the model's "Cutter Profile" property.
 
 There are no datums or feature-control frames.  Hidden lines communicate no
 additional manufacturing fact on these through-bored spur gears, so every view
 remains hidden-lines-removed.  The one finish symbol belongs to the fitted
 bore.  The side view stays in projection with the front view's bore axis; its
-face width hangs below it, clear of the Gear Data block.  The circular tooth
-thickness is dimensioned on the +X tooth's pitch chord (a tooth on every
-configuration), and the gap floor on a phantom circle at the modelled floor.
+face width hangs below it, clear of the Gear Data block. The circular pitch
+thickness uses a construction inspection witness of the actual arc size, not
+an ideal chord oracle; root MIN/MAX use the actual radial-envelope witness.
 The D-bore prints in an enlarged bore view, a cropped *Front model view at a
 scale that renders every bore at least ``BORE_VIEW_BORE_MIN`` across (its flat
 is 0.13 deep on T006 and T012); both views centre-mark the bore.  The part
@@ -32,7 +32,10 @@ from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
-from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
+from _check import check
+from _com import _early_bound, _read_member
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_leaders import ARROW_TEXT_CLEARANCE
 from _drawing_common import (
     _INSERT_DIMS_MARKED,
@@ -58,12 +61,11 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_deviations import deviations
 from _layout_audit import arc_segments
 from _surface_finish import surface_finish_by_key
-from build_dt_cone_gear import (
-    assert_saved_configuration_topology,
-    gap_floor_deviations_mm,
-)
+from _cone_gear_readback import assert_saved_configuration_topology
+from dt_cone_gear_notes import CUTTER_DETAIL_SHEET
 from dt_cone_gear_spec import (
     BORE_SURFACE_FINISHES,
     CONFIGURATION_TEETH,
@@ -71,10 +73,14 @@ from dt_cone_gear_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     bore_dia_mm,
+    blank_dia_band,
+    tooth_thickness_band,
     bore_flat_offset_mm,
     floor_limits_mm,
+    gap_floor_deviations_mm,
     outside_dia_mm,
     tooth_thickness_mm,
+    stock_form_profile,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -93,9 +99,10 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_NAMES = tuple(f"T{teeth:03d}" for teeth in CONFIGURATION_TEETH)
-# Discrete standard ratios keep the face view legible while the 6.8887 mm
-# face width still fits in the side view on the smallest gears.
+GEAR_SHEET_NAMES = tuple(f"T{teeth:03d}" for teeth in CONFIGURATION_TEETH)
+SHEET_NAMES = (*GEAR_SHEET_NAMES, CUTTER_DETAIL_SHEET)
+# Discrete standard ratios keep both the tip and common face width legible.
+# The enlarged T120 blank takes 1:1 so its view stays in the existing lanes.
 _SCALE_BY_TEETH = {
     6: (8.0, 1.0),
     12: (6.0, 1.0),
@@ -116,11 +123,11 @@ _SCALE_BY_TEETH = {
     102: (3.0, 2.0),
     108: (3.0, 2.0),
     114: (3.0, 2.0),
-    120: (3.0, 2.0),
+    120: (1.0, 1.0),
 }
 SHEET_SCALES = {
     f"T{teeth:03d}": _SCALE_BY_TEETH[teeth] for teeth in CONFIGURATION_TEETH
-}
+} | {CUTTER_DETAIL_SHEET: (20.0, 1.0)}
 SHEET_SCALE = SHEET_SCALES[SHEET_NAMES[0]]
 
 FRONT_CENTER = (0.105, 0.150)
@@ -143,10 +150,12 @@ ISO_CENTER = (0.355, 0.150)
 # largest tip circle on the set, by ~4 mm and the title stays above the
 # 12.7 mm zone band.
 BORE_VIEW_CENTER = (0.052, 0.060)
-# Each sheet takes the smallest ladder ratio above its own that renders the
-# bore at least this wide: 20:1 on T006/T012, 10:1 T018, 5:1 T024, 4:1 T030+.
+# Each sheet takes the smallest useful ladder ratio above its own, reading the
+# current web-qualified terminal land rather than assuming the old 1/16 seat.
 BORE_VIEW_BORE_MIN = 0.028
-BORE_VIEW_SCALE_LADDER = ((4.0, 1.0), (5.0, 1.0), (10.0, 1.0), (20.0, 1.0))
+BORE_VIEW_SCALE_LADDER = (
+    (4.0, 1.0), (5.0, 1.0), (10.0, 1.0), (20.0, 1.0), (40.0, 1.0),
+)
 # Gear body kept round the bore inside the crop circle, sheet metres.
 BORE_VIEW_CROP_MARGIN = 0.003
 # The view's title stands this far under the crop circle, below the
@@ -163,6 +172,34 @@ BORE_VIEW_LABEL_DROP = 0.016
 # up; the text's left edge clears the flat's witness by BORE_VIEW_AF_GAP.
 BORE_VIEW_AF_GAP = 0.004
 BORE_VIEW_AF_HALF_WIDTH = 0.022
+# The flat clock's two-line text ("90° ±0.25°" over TO TOOTH CENTERLINE),
+# measured in the run-20261010T051729717Z T006 PDF: x 69.8-119.9 mm, y
+# 60.0-72.0 mm round its SetPosition point (94.9, 66.0) mm, so the point is
+# the block's centre. Its arc ends on the bore's +X axis line with an
+# arrowhead at radius |text - vertex|, i.e. under the text: there the axis
+# line and arrow ran through the C of CENTERLINE (eye pass of that run). The
+# arrowhead (3.6 mm long on that PDF; the document's 6.35 mm arrow-length
+# preference is not what this arc end draws) now ends ARROW_TEXT_CLEARANCE
+# under the block, and the block's left edge stands CLEAR_GAP_M right of the
+# crop circle the audit flagged it against (detail-circle crossing at x
+# 70.6 mm).
+BORE_CLOCK_TEXT_HALF_WIDTH = 0.025
+BORE_CLOCK_TEXT_HALF_HEIGHT = 0.006
+BORE_CLOCK_TEXT_GAP = 0.002
+BORE_CLOCK_ARROW_LENGTH = 0.0036
+# swDimensionArrowsSide_e.swDimArrowsInside, set rather than left to the
+# document's smart arrows (main's draw_dt_cone_tip_block form). Left smart,
+# the clock read whole at the sweep (0-14.6 and 24.2-90 deg about the
+# vertex at 35.0 mm) but the settling rebuild drew it with its arrows
+# outside on every sheet whose arc is that short (T018-T120, run
+# 20261010T073917031Z): two 10 deg stubs beyond the legs, no arc between
+# them. At 46.4 mm (T006/T012) smart arrows stayed inside.
+ARROWS_INSIDE = 0
+# A settled clock's arcs reach both legs within this, and sweep at least
+# CLOCK_MIN_SWEEP_DEG between them (the text gap is the rest; T006 swept
+# 0-11 and 18-90 deg in that run, 83 deg).
+CLOCK_LEG_TOL_DEG = 1.0
+CLOCK_MIN_SWEEP_DEG = 45.0
 # The bore axis must land within 0.1 mm of BORE_VIEW_CENTER after the move
 # (draw_amplitude_bar's detail tolerance), and the title within 1 mm.
 BORE_VIEW_POSITION_TOL_M = 1e-4
@@ -184,10 +221,80 @@ CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAn
 # rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
 # line; the 15-line block ends ~52.6 mm down, still above the largest side
 # view (top 0.197) with FaceWidth below it.
+# The dedicated custom-tool sheet keeps the grind data out of these
+# dimension/view lanes.
 GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
+CUTTER_DETAIL_POS = (0.015, 0.263)
+CUTTER_DETAIL_VIEW_CENTER = (0.325, 0.155)
+
+
+def cutter_detail_window_mm() -> tuple[float, float, float]:
+    """Bound the installed T006 material-facing gap for its native cropped view."""
+    profile = stock_form_profile(6)
+    radial_midpoint = (profile.root_radius_min_mm + profile.blank_radius_mm) / 2.0
+    phase = math.pi / profile.teeth
+    cosine, sine = math.cos(phase), math.sin(phase)
+    center = radial_midpoint, 0.0
+    samples = 32
+    radius = 0.0
+    for segment in profile.gap_segments():
+        if segment.kind == "tip_arc":
+            continue
+        # Core's second-derivative bound pays the unsampled chord sagitta.
+        deviation = segment.second_derivative_bound_mm / (8.0 * samples**2)
+        radius = max(radius, max(
+            math.dist(center, segment.point(index / samples))
+            for index in range(samples + 1)
+        ) + deviation + profile.geometry_error_bound_mm)
+    return cosine * radial_midpoint, sine * radial_midpoint, radius + 0.15
+
+
+def cutter_grind_data() -> str:
+    """What the toolmaker grinds DT6-FORM1 to and checks it against.
+
+    The sheet once printed the part's "Cutter Profile" property: parametric
+    equations with 17-digit floats, which no shop grinds to (eye pass of
+    run 20261010T051729717Z). The equations stay in the model; the sheet
+    gives the form's outline sizes at 3 places, read from the same profile
+    the native cut uses. T006 cuts at T=0 on a spur (helix 0) gear, so its
+    installed gap IS the ground form, and the widths are chords across that
+    gap. The comparator magnification is this sheet's own scale, so the
+    sheet's gap view serves as the overlay chart.
+    """
+    profile = stock_form_profile(6)
+    template = profile.template
+    if template.cutter_number is not None or template.name != CUTTER_DETAIL_SHEET:
+        raise ValueError("T006 must use the specified DT6-FORM1 custom cutter")
+    if profile.radial_translation_mm != 0.0 or profile.helix_angle_deg != 0.0:
+        raise ValueError("DT6-FORM1's installed gap is its ground form only at T=0, helix 0")
+    pitch_radius = profile.pitch_radius_mm
+    pitch_half_gap = (
+        profile.angular_pitch_rad - profile.pitch_tooth_thickness_mm / pitch_radius
+    ) / 2.0
+    blank_radius = profile.blank_radius_mm
+    numerator, denominator = SHEET_SCALES[CUTTER_DETAIL_SHEET]
+    rows = (
+        ("FORM DEPTH (PLUNGE FROM BLANK OD)", f"{profile.plunge_mm:.3f}"),
+        ("TIP ARC (FORMS GEAR ROOT)", f"R{template.root_radius_mm:.3f}"),
+        (
+            f"WIDTH AT PITCH DIA {2.0 * pitch_radius:.3f} (CHORD)",
+            f"{2.0 * pitch_radius * math.sin(pitch_half_gap):.3f}",
+        ),
+        (
+            f"WIDTH AT BLANK OD {2.0 * blank_radius:.3f} (CHORD)",
+            f"{2.0 * blank_radius * math.sin(profile.tip_half_angle_rad):.3f}",
+        ),
+        ("TIF (RELIEF TO INVOLUTE)", f"R{template.relief_junction_radius_mm:.3f} REF"),
+    )
+    return "\n".join((
+        f"{template.name} GROUND FORM TOOL, mm",
+        *(f"{label}:  {value}" for label, value in rows),
+        f"GRIND TO TEMPLATE; CHECK ON OPTICAL COMPARATOR AT {numerator:g}:{denominator:g}",
+    ))
+
 
 DIMENSION_CALLOUTS = {
     # No process word: a reamer would cut away the flat, and the dimensions
@@ -204,8 +311,8 @@ DIMENSION_CALLOUTS = {
     # Pitch diameter, backlash and mate already live in the Gear Data block.
     # Repeating them here made the long suffix collide with the bore callout.
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
-    # The limit pair points at a phantom circle; name what it bounds.
-    "FloorDia": "GAP FLOOR",
+    # The origin circle is an inspection witness, not the off-centre root arc.
+    "FloorDia": "ROOT ENVELOPE",
 }
 
 
@@ -224,11 +331,11 @@ def rendered_half_face_width(teeth: int) -> float:
 # above the bore axis on that sheet (layout audit, 0.82 mm overlap); 0.0145
 # clears it, and no other text on any sheet is within 36 mm above the value.
 BLANK_DIA_LIFT = 0.0145
-# The gap-floor limit stack (value pair plus "GAP FLOOR") stands right of the
-# tip circle, above the thickness witness: in the same lane as the thickness
+# The functional root-envelope stack stands right of the tip circle,
+# above the thickness witness: in the same lane as the thickness
 # dimension line, which runs DOWN from the +X tooth, and clear of the side
 # view (left edge >= 0.219 on every sheet).
-FLOOR_DIA_GAP_X = 0.012
+FLOOR_DIA_GAP_X = 0.016
 FLOOR_DIA_RISE = 0.006
 # The thickness dimension's arrows stand outside its witnesses, so the upper
 # arrow's tail runs UP the stack's lane: on the 834-fix-6927 T006 sheet (8:1)
@@ -294,7 +401,7 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
         # just right of the tip circle, and runs down to the text below the
         # gear's lowest point (the ~65 mm callout stays left of the side view).
         "ToothThickness": (
-            FRONT_CENTER[0] + half_od + 0.012,
+            FRONT_CENTER[0] + half_od + 0.014,
             FRONT_CENTER[1] - half_od - 0.025,
         ),
     }
@@ -337,21 +444,25 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     arc's -X point and the flat) and runs on right to its text, which stands
     outside the flat's witness; the clock's arc sweeps the quadrant between
     the flat's upper half and the +X centre-mark line
-    (``_sweep_clock_right_of_flat``), its text right of the circle and just
-    above the axis, where the front view's thickness callout (above right,
-    x 134-164 y 78-108 mm) never reaches.
+    (``_sweep_clock_right_of_flat``), its text right of the circle and
+    raised clear of the axis line and the arc's arrowhead on it
+    (BORE_CLOCK_TEXT_*), where the front view's thickness callout (above
+    right, x 134-164 y 78-108 mm) never reaches.
     """
     ratio = _bore_view_ratio(teeth)
     flat = bore_flat_offset_mm(teeth) * ratio / 1000.0
     crop = bore_view_crop_radius(teeth)
     x, y = BORE_VIEW_CENTER
     return {
-        "BoreCutDia": (x - 0.020, y + crop + 0.006),
+        "BoreCutDia": (x - 0.022, y + crop + 0.006),
         "BoreAF": (
             x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
             y - crop - BORE_VIEW_AF_DROP,
         ),
-        "BoreFlatClock": (x + crop + 0.024, y + 0.006),
+        "BoreFlatClock": (
+            x + crop + BORE_CLOCK_TEXT_GAP + BORE_CLOCK_TEXT_HALF_WIDTH,
+            y + BORE_CLOCK_ARROW_LENGTH + ARROW_TEXT_CLEARANCE + BORE_CLOCK_TEXT_HALF_HEIGHT,
+        ),
     }
 
 
@@ -420,10 +531,11 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
-def _assert_sheet_floor_limits(
+def _assert_sheet_bands(
     adapter: Any, annotations: list[Any], configuration: str, teeth: int
 ) -> None:
-    """Prove the sheet's gap-floor dimension carries THIS configuration's limits.
+    """Prove the sheet's gap-floor, blank and tooth-thickness dimensions carry
+    THIS configuration's bands.
 
     One model dimension holds twenty LIMIT bands; the imported display
     dimension reads the band of its view's referenced configuration from the
@@ -455,6 +567,38 @@ def _assert_sheet_floor_limits(
         )
     _telemetry.success(
         f"{configuration}: sheet gap-floor limits {floor_limits_mm(teeth)} mm"
+    )
+    # T006 carries its own blank and tooth-thickness bands in its
+    # configuration only; every sheet reads its own back the same way.
+    for name, band in (
+        ("BlankDia", blank_dia_band(teeth)),
+        ("ToothThickness", tooth_thickness_band(teeth)),
+    ):
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{configuration}: expected one {name} on the sheet, found {len(matches)}"
+            )
+        display = _early_bound(
+            _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        tolerance = _early_bound(
+            _early_bound(display.GetDimension2(0), "IDimension").Tolerance,
+            "IDimensionTolerance",
+        )
+        observed = (
+            float(tolerance.GetMinValue()) * 1000.0,
+            float(tolerance.GetMaxValue()) * 1000.0,
+        )
+        expected = deviations(band)
+        if any(abs(o - e) > 1e-6 for o, e in zip(observed, expected)):
+            raise RuntimeError(
+                f"{configuration}: sheet {name} reads {observed} mm, expected {expected} mm"
+            )
+    _telemetry.success(
+        f"{configuration}: sheet blank {blank_dia_band(teeth)} and tooth-thickness "
+        f"{tooth_thickness_band(teeth)} bands"
     )
 
 
@@ -524,12 +668,10 @@ def _center_bore_view(adapter: Any, view: Any, configuration: str) -> None:
 
 
 def _crop_bore_view(
-    adapter: Any, view: Any, configuration: str, teeth: int, kept: set[str]
+    adapter: Any, view: Any, configuration: str, teeth: int, kept: set[str],
+    *, center: tuple[float, float] = BORE_VIEW_CENTER, radius: float | None = None,
 ) -> None:
-    """Crop the bore view to its circle round the bore axis: a circle in the
-    view's own sketch (sheet points through its ModelToSketchTransform), left
-    selected for Crop2.  Status, IsCropped, the outline, its plain boundary
-    and the kept dimensions are read back and raise."""
+    """Crop to a native circle, read back its boundary, outline and dimensions."""
     draw = adapter.currentModel
     view = _early_bound(view, "IView")
     label = f"{configuration} bore view"
@@ -538,9 +680,9 @@ def _crop_bore_view(
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    radius = bore_view_crop_radius(teeth)
+    radius = bore_view_crop_radius(teeth) if radius is None else radius
     points = []
-    for x, y in (BORE_VIEW_CENTER, (BORE_VIEW_CENTER[0] + radius, BORE_VIEW_CENTER[1])):
+    for x, y in (center, (center[0] + radius, center[1])):
         point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
@@ -594,6 +736,60 @@ def _crop_bore_view(
         raise RuntimeError(f"{label} lost {lost} to its crop; it holds {sorted(after)}")
 
 
+def clock_arc_faults(
+    arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
+    vertex: tuple[float, float],
+) -> list[str]:
+    """Why a flat clock's drawn arcs do not read as one 90 deg arc between
+    its legs: centred on the flat/axis crossing, inside the quadrant right of
+    the flat and above the axis, reaching both legs and sweeping most of the
+    way between them. Empty when they do."""
+    if not arcs:
+        return ["no arc"]
+    faults = []
+    angles = []
+    for centre, points in arcs:
+        if math.dist(centre, vertex) > CLOCK_ARC_CENTRE_TOL:
+            faults.append(f"arc centred {math.dist(centre, vertex) * 1000:.2f} mm off the vertex")
+        ends = [
+            math.degrees(math.atan2(py - vertex[1], px - vertex[0]))
+            for px, py in (points[0], points[-1])
+        ]
+        angles.append((min(ends), max(ends)))
+    stray = [
+        point
+        for _centre, points in arcs
+        for point in points
+        if point[0] < vertex[0] - CLOCK_ARC_OVERRUN or point[1] < vertex[1] - CLOCK_ARC_OVERRUN
+    ]
+    if stray:
+        faults.append(f"{len(stray)} point(s) outside the quadrant")
+    low = min(a for a, _b in angles)
+    high = max(b for _a, b in angles)
+    if abs(low) > CLOCK_LEG_TOL_DEG or abs(high - 90.0) > CLOCK_LEG_TOL_DEG:
+        faults.append(f"arcs end at {low:.1f}..{high:.1f} deg, not on the legs")
+    swept = sum(b - a for a, b in angles)
+    if swept < CLOCK_MIN_SWEEP_DEG:
+        faults.append(f"arcs sweep {swept:.1f} deg")
+    return faults
+
+
+def _assert_settled_clocks(adapter: Any, clocks: list[tuple[str, Any, int]]) -> None:
+    """After finalize's settling rebuild, every sheet's flat clock still draws
+    one arc between its legs (run 20261010T073917031Z: read whole at the
+    sweep, drawn as two outside stubs in the PDF on T018-T120)."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    faults = []
+    for configuration, display, teeth in clocks:
+        if not ddoc.ActivateSheet(configuration):
+            raise RuntimeError(f"failed to activate {configuration} for its settled clock")
+        found = clock_arc_faults(_clock_arcs(display), bore_flat_vertex(teeth))
+        if found:
+            faults.append(f"{configuration}: {'; '.join(found)}")
+    if faults:
+        raise RuntimeError("flat clock arcs after the settling rebuild:\n" + "\n".join(faults))
+
+
 def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[float, float]]]]:
     """The clock dimension's drawn arcs as (centre, tessellated points), in
     sheet metres, read the way the layout audit reads them."""
@@ -611,7 +807,7 @@ def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[floa
 
 def _sweep_clock_right_of_flat(
     adapter: Any, view: Any, annotations: list[Any], teeth: int, *, label: str
-) -> None:
+) -> Any:
     """Flip the imported flat clock until its arc sweeps only the quadrant
     right of the flat and above the axis, then re-seat its text there.
 
@@ -630,6 +826,9 @@ def _sweep_clock_right_of_flat(
     annotation = clocks[0]
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    display.ArrowSide = ARROWS_INSIDE
+    if int(display.ArrowSide) != ARROWS_INSIDE:
+        raise RuntimeError(f"{label}: the flat clock did not keep its arrows inside")
     selection_name = str(display.GetNameForSelection() or "")
     if not selection_name:
         raise RuntimeError(f"{label}: the flat clock has no selection name")
@@ -697,7 +896,9 @@ def _sweep_clock_right_of_flat(
                 f"{math.degrees(imported):.4f} to {math.degrees(measured):.4f} deg"
             )
         if not stray:
-            return
+            if int(display.ArrowSide) != ARROWS_INSIDE:
+                raise RuntimeError(f"{label}: {flips} put the clock's arrows outside")
+            return display
     raise RuntimeError(
         f"{label}: flat clock arc still leaves the quadrant right of the flat and "
         f"above the axis after {flips}; first stray points "
@@ -885,6 +1086,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
+    clocks: list[tuple[str, Any, int]] = []
     for teeth in CONFIGURATION_TEETH:
         configuration = f"T{teeth:03d}"
         view_scale = SHEET_SCALES[configuration]
@@ -926,9 +1128,10 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} bore",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-        _sweep_clock_right_of_flat(
+        clock = _sweep_clock_right_of_flat(
             adapter, bore_view, bore_annotations, teeth, label=f"{configuration} bore view"
         )
+        clocks.append((configuration, clock, teeth))
         _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
         # The part saves both authoring sketches hidden; the front view shows
         # them again for their dimensions (the side and iso views show the
@@ -941,7 +1144,7 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} front",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-        _assert_sheet_floor_limits(adapter, front_annotations, configuration, teeth)
+        _assert_sheet_bands(adapter, front_annotations, configuration, teeth)
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,
@@ -983,6 +1186,53 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, layout=SPEC.layout, stem=f"cone-gear {configuration}"
         )
 
+    if not ddoc.ActivateSheet(CUTTER_DETAIL_SHEET):
+        raise RuntimeError("failed to activate the DT6-FORM1 tool detail sheet")
+    detail = place_view(
+        adapter, str(SOURCE), "*Front", *CUTTER_DETAIL_VIEW_CENTER,
+        scale=SHEET_SCALES[CUTTER_DETAIL_SHEET],
+    )
+    _configure_views(adapter, "T006", (detail,))
+    center_x, center_y, radius_mm = cutter_detail_window_mm()
+    projected = model_point_in_view(
+        adapter, detail, (center_x / 1000.0, center_y / 1000.0, 0.0),
+        label="DT6-FORM1 installed gap centre",
+    )
+    detail = _early_bound(detail, "IView")
+    position = tuple(float(value) for value in detail.Position)
+    if not detail.SetViewPosition(double_array([
+        position[i] + CUTTER_DETAIL_VIEW_CENTER[i] - projected[i] for i in range(2)
+    ]), False):
+        raise RuntimeError("failed to position the DT6-FORM1 installed gap crop")
+    rebuild_drawing(adapter, label="DT6-FORM1 crop centre")
+    projected = model_point_in_view(
+        adapter, detail, (center_x / 1000.0, center_y / 1000.0, 0.0),
+        label="DT6-FORM1 installed gap centre readback",
+    )
+    if math.dist(projected, CUTTER_DETAIL_VIEW_CENTER) > BORE_VIEW_POSITION_TOL_M:
+        raise RuntimeError("DT6-FORM1 installed gap crop centre did not persist")
+    numerator, denominator = SHEET_SCALES[CUTTER_DETAIL_SHEET]
+    _crop_bore_view(
+        adapter, detail, "DT6-FORM1", 6, set(),
+        center=CUTTER_DETAIL_VIEW_CENTER,
+        radius=radius_mm * numerator / denominator / 1000.0,
+    )
+    set_hidden_lines_removed(adapter, detail)
+    # The grind data, not the model's "Cutter Profile" equations (see
+    # cutter_grind_data).
+    if add_note(adapter, cutter_grind_data(), *CUTTER_DETAIL_POS) is None:
+        raise RuntimeError("failed to add the DT6-FORM1 grind data")
+    if add_note(
+        adapter, "T006 INSTALLED GAP - SEE T006 FOR FINISHED GEAR",
+        0.230, 0.092,
+    ) is None:
+        raise RuntimeError("failed to label the installed gap on the cutter detail")
+    sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    if not sheet.SetScale(*SHEET_SCALES[CUTTER_DETAIL_SHEET], False, False):
+        raise RuntimeError("failed to pin the DT6-FORM1 detail sheet scale")
+    rebuild_drawing(adapter, label="DT6-FORM1 detail layout audit")
+    check_drawing_layout(adapter, layout=SPEC.layout, stem="cone-gear DT6-FORM1")
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -992,6 +1242,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales=SHEET_SCALES,
+        settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),),
     )
 
 

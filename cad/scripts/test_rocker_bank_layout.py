@@ -377,6 +377,11 @@ def test_pivot_parts_read_only_the_rocker_bank_config() -> None:
     the ear stations)."""
     shaft_cfg = config_files_of(SCRIPTS / "build_ch_pivot_shaft.py")
     machine_cfg = {t for t in shaft_cfg if t.startswith("machine/")}
-    assert machine_cfg == config_files_of(Path(bank.__file__))
+    # The cam plane's cylinder gear spec also reads the shared title-block
+    # and tolerance tables (its printed gear bands); only machine files are
+    # the rocker bank's stations.
+    assert machine_cfg == {
+        t for t in config_files_of(Path(bank.__file__)) if t.startswith("machine/")
+    }
     bracket_cfg = config_files_of(SCRIPTS / "build_ch_pivot_bracket.py")
     assert {t for t in bracket_cfg if t.startswith("machine/")} == machine_cfg

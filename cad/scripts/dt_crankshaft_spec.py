@@ -12,8 +12,10 @@ from __future__ import annotations
 import math
 
 import _config
+import cone_line
 from _hole_spec import HoleSpec, drill_process
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_cone_pivot_post_spec import CRANK_BORE_DIA as JOURNAL_BORE_DIA
 from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as JOURNAL_BORE_BAND
@@ -36,7 +38,7 @@ from dt_crank_hub_geometry import (
 
 # The restored v36 post's north boss face, measured from the shifted dome root.
 # Keep this independent of the post's rebuild closure; assembly checks the mate.
-POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT
+POST_BORE_END = cone_line.cone_station(cone_line.POST_STATION)[2] + 183.0 + 21.3753
 SEAT_PINION = POST_BORE_END + dt_crank_pinion_spec.SEAT_FEELER_MM
 if SEAT_PINION <= POST_BORE_END:
     raise AssertionError("the 16T seat must clear the restored post boss north face")
@@ -80,6 +82,7 @@ JOURNAL_CLEARANCE = JOURNAL_BORE_DIA - JOURNAL_DIA
 JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
 _JOURNAL_CLEARANCE_LOW = JOURNAL_BORE_BAND[1] - JOURNAL_DIA_BAND[0] + JOURNAL_CLEARANCE
 _JOURNAL_CLEARANCE_HIGH = JOURNAL_BORE_BAND[0] - JOURNAL_DIA_BAND[1] + JOURNAL_CLEARANCE
+JOURNAL_DIAMETRAL_CLEARANCE_MM = (_JOURNAL_CLEARANCE_LOW, _JOURNAL_CLEARANCE_HIGH)
 if not (
     _RUNNING_CLEARANCE[0] - 1e-9
     <= _JOURNAL_CLEARANCE_LOW
@@ -133,7 +136,10 @@ JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
 STEP_WEB_WORST = JOURNAL_INBOARD_STATION - PINION_SEAT_STATION - 2.0 * STATION_ROW
 RELIEF_DIA = 10.4
 RELIEF_DIA_PLACES = 1
-RELIEF_OUTBOARD_STATION = 82.8
+# The post bore's south rim and the general edge breaks leave the outboard
+# land's real contact short at 82.8; inset only this relief end by 0.7 mm on
+# the one-place station grid. Outer journal ends, seats and fits are unchanged.
+RELIEF_OUTBOARD_STATION = 82.1
 RELIEF_INBOARD_STATION = 44.5
 RELIEF_START = local_station(RELIEF_OUTBOARD_STATION)
 RELIEF_END = local_station(RELIEF_INBOARD_STATION)
@@ -147,6 +153,13 @@ JOURNAL_LANDS_WORST = (
     SHAFT_LENGTH - JOURNAL_START + _OUTBOARD_START_LOWER
     - RELIEF_OUTBOARD_STATION - STATION_ROW,
     RELIEF_INBOARD_STATION - JOURNAL_INBOARD_STATION - 2.0 * STATION_ROW,
+)
+# Extreme retained contact stations, not the full post bore or the relieved
+# middle. Both stations share the shaft's far-end datum, so its overall-length
+# variation cancels from their separation. Used by local mesh and global pose.
+JOURNAL_SUPPORT_SPAN_MIN_MM = (
+    round(SHAFT_LENGTH - JOURNAL_START, STATION_PLACES)
+    - JOURNAL_INBOARD_STATION - 2.0 * STATION_ROW
 )
 if STEP_WEB_WORST < WEB_TARGET_MM:
     raise AssertionError("journal-to-pinion-seat web falls below its printed worst-case floor")

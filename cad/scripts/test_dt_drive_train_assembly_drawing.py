@@ -7,8 +7,11 @@ import math
 import re
 from pathlib import Path
 
+import _config
+import cone_line
+import cylinder_bank_layout as bank_layout
+import dt_cone_gear_spec as cone_spec
 import pytest
-import yaml
 
 import dt_crank_handle_pivot_screw_spec as screw_spec
 import dt_crank_handle_spec as handle_spec
@@ -50,19 +53,44 @@ def _builder_stems() -> set[str]:
 
 
 def _instances(**overrides) -> list[spec.Instance]:
-    """A stand-in census of the built model: builder families at plausible origins."""
-    drum_x = -60.39
+    """Synthetic presentation census; live bank/cone grids supply their counts."""
+    drum_x, drum_y = cone_line.X_DRUM, cone_line.Y_DRIVE
     layout = {
-        "dt-cylinder-gear-shaft": [(drum_x, 90.5, -86.9)],
-        "dt-arbor-pedestal": [(drum_x, 50.8, -87.4), (drum_x, 50.8, 100.6)],
-        "dt-cylinder-end-disc": [(drum_x, 90.5, -72.5), (drum_x, 90.5, 72.1)],
-        "vn-cylinder-bank-spring": [(drum_x, 90.5, -72.019)],
-        "vn-arbor-set-screw": [(drum_x, 95.3, -77.019), (drum_x, 95.3, 78.062)],
-        "dt-cylinder-gear": [(drum_x, 90.5, -64.0 + 7.0 * j) for j in range(20)],
+        "dt-cylinder-gear-shaft": [(drum_x, drum_y, bank_layout.ARBOR_SOUTH_Z)],
+        "dt-arbor-pedestal": [
+            (drum_x, cone_line.Y_BASE_TOP, z)
+            for z in (
+                bank_layout.FRONT_PEDESTAL_ORIGIN_Z,
+                bank_layout.BACK_PEDESTAL_ORIGIN_Z,
+            )
+        ],
+        "dt-cylinder-end-disc": [
+            (drum_x, drum_y, interval[0])
+            for interval in (bank_layout.FRONT_WASHER_Z, bank_layout.BACK_WASHER_Z)
+        ],
+        "vn-cylinder-bank-spring": [(drum_x, drum_y, bank_layout.FRONT_STRAP_INNER_Z)],
+        "vn-arbor-set-screw": [
+            (drum_x, drum_y, z)
+            for z in (bank_layout.FRONT_SET_SCREW_Z, bank_layout.BACK_SET_SCREW_Z)
+        ],
+        "dt-cylinder-gear": [
+            (drum_x, drum_y, bank_layout.station_z(j)) for j in range(bank_layout.COUNT)
+        ],
         "vn-foot-screw": [(7.49, 52.0, 74.0)],
-        "vn-pedestal-hold-down-screw": [(drum_x, 55.8, -91.652), (drum_x, 55.8, 94.202)],
-        "vn-slotted-screw": [(-19.4, 60.0, -94.9), (7.6, 60.0, -94.9), (-19.4, 60.0, 85.1), (7.6, 60.0, 85.1)],
-        "dt-cone-gear": [(-115.0 + j, 90.5, -25.0 + 6.0 * j) for j in range(20)],
+        "vn-pedestal-hold-down-screw": [
+            (drum_x, 55.8, -91.652),
+            (drum_x, 55.8, 94.202),
+        ],
+        "vn-slotted-screw": [
+            (-19.4, 60.0, -94.9),
+            (7.6, 60.0, -94.9),
+            (-19.4, 60.0, 85.1),
+            (7.6, 60.0, 85.1),
+        ],
+        "dt-cone-gear": [
+            (cone_line.cone_seat(j)[0], drum_y, cone_line.cone_seat(j)[1])
+            for j in range(len(cone_spec.CONFIGURATION_TEETH))
+        ],
         "dt-pinion-bracket": [(-12.1, 62.8, -72.0), (-12.1, 62.8, 71.0)],
         "dt-pinion-pivot-block": [(-5.9, 62.8, -95.0), (-5.9, 62.8, 85.0)],
         "dt-pinion-cam-pin": [(-8.0, 70.0, -72.0), (-8.0, 70.0, 71.0)],
@@ -82,8 +110,13 @@ def _instances(**overrides) -> list[spec.Instance]:
 
 def _drawing_facts() -> drawing.SourceFacts:
     instances = _instances()
-    cones = sorted(i.name for i in instances if i.stem == "dt-cone-gear")
-    configurations = {name: f"T{6 * n:03d}" for n, name in enumerate(cones, start=1)}
+    cones = [i.name for i in instances if i.stem == "dt-cone-gear"]
+    configurations = {
+        name: f"T{teeth:03d}"
+        for name, teeth in zip(
+            cones, reversed(cone_spec.CONFIGURATION_TEETH), strict=True
+        )
+    }
     return drawing.SourceFacts(instances, configurations)
 
 
@@ -108,7 +141,7 @@ def test_bom_part_numbers_match_the_parts_registry() -> None:
         if not path.exists():
             assert stem in spec.PENDING_STEMS, f"{stem} has no registry row"
             continue
-        row = yaml.safe_load(path.read_text(encoding="utf-8"))[stem]
+        row = _config.parts(stem)
         assert row["number"] == number, stem
 
 
@@ -119,7 +152,7 @@ def test_bom_catalog_numbers_match_the_parts_registry() -> None:
         path = PARTS / f"{stem}.yaml"
         if not path.exists():
             continue
-        skus = yaml.safe_load(path.read_text(encoding="utf-8"))[stem].get("supplier_skus")
+        skus = _config.parts(stem).get("supplier_skus")
         printed = re.findall(r"\b(?:MCMASTER|MSC) (\S+)$", text)
         if not skus:
             assert not printed, stem
@@ -255,7 +288,7 @@ def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
         ), build.name
         if stem not in drawing.BOM_DESCRIPTIONS:
             continue
-        row = yaml.safe_load((PARTS / f"{stem}.yaml").read_text(encoding="utf-8"))[stem]
+        row = _config.parts(stem)
         assert row.get("description") == drawing.BOM_DESCRIPTIONS[stem], stem
         printed.append(stem)
     assert {"dt-cone-gear", "dt-pinion-lever-pin"} <= set(printed)
@@ -264,6 +297,57 @@ def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
 def test_bom_descriptions_keep_one_line() -> None:
     for stem, text in drawing.BOM_DESCRIPTIONS.items():
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
+
+
+def test_changed_gear_bom_counts_come_from_their_specs() -> None:
+    import dt_crank_drive_gear_spec as gear64
+    import dt_crank_pinion_spec as pinion
+    import dt_cylinder_gear_spec as drum
+
+    for stem, teeth in (
+        ("dt-cylinder-gear", drum.TEETH),
+        ("dt-crank-drive-gear", gear64.TEETH),
+        ("dt-crank-pinion", pinion.TEETH),
+    ):
+        assert f"{teeth}T" in drawing.BOM_DESCRIPTIONS[stem]
+
+
+def test_t120_printed_facts_match_the_actual_print_worst_envelope() -> None:
+    import build_dt_drive_train_assembly as assembly
+    import dt_crank_pinion_spec as pinion
+
+    actual_shoulder = assembly.T120_SHOULDER_AIR
+    check = _flat(pinion.T120_FITUP_ASSEMBLY_CHECK)
+    assert not math.isnan(actual_shoulder)
+    if math.isinf(actual_shoulder):
+        assert actual_shoulder == math.inf
+        assert pinion.T120_SHOULDER_AIR_WORST == actual_shoulder
+        # The section helper, not a typed large air allowance, establishes absence.
+        shift, dy = assembly._cone_corners(
+            assembly._CONE_FLOATS, assembly._CRANK_HEIGHT_BAND
+        )
+        section = assembly._t120_lowest(
+            assembly._T120_SOUTH_FACE_STATION + shift,
+            dy,
+            assembly.R16
+            + assembly.ADD16
+            + max(assembly._PINION_TIP_RADIUS_BAND)
+            + assembly.T120_POSE_RADIAL,
+        )
+        assert all(float(value) == math.inf for value in section.flat)
+        assert "NO AXIAL OVERLAP" in check
+    else:
+        assert (
+            pinion.T120_SHOULDER_AIR_WORST
+            == math.floor(actual_shoulder * 100.0) / 100.0
+        )
+    actual_band = assembly.T120_TURNED_BAND_RADIAL
+    assert math.isfinite(actual_band)
+    assert (
+        pinion.T120_TURNED_BAND_RADIAL_WORST == math.floor(actual_band * 100.0) / 100.0
+    )
+    assert not re.search(r"\b(?:INF|NAN)\b|∞", check, re.IGNORECASE)
+    assert check in _flat(drawing.CONE_CRANK_STEPS)
 
 
 def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
@@ -281,16 +365,47 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
-    """MHA-VN-015 bounds the DISENGAGE swing; engaged, the plate stands off it."""
+    """MHA-VN-015 bounds the DISENGAGE swing; the engaged mesh is set at
+    assembly (cone_set_stack): pedestals snug-loose, shims at T012 and T120,
+    pedestals tightened, then the T120 feeler and MHA-VN-013 -- never the stop."""
+    import cone_set_stack as set_stack
+
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    t012 = f"{set_stack.feeler_gap_mm(12):.2f} AT T012"
+    t120 = f"{set_stack.feeler_gap_mm(120):.2f} AT T120"
     order = [
         check.index("TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012"),
-        check.index("SWING IT BACK"),
-        check.index("RE-ENGAGE"),
+        check.index("(MHA-VN-032) TO SNUG-LOOSE"),
+        check.index(t012),
+        check.index(t120),
+        check.index("TIGHTEN MHA-VN-032"),
+        check.index(f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-VN-013"),
+        check.index("DO NOT LOOSEN MHA-DT-002 AFTER THIS SET; IF YOU DO, REDO BOTH STEPS"),
     ]
     assert order == sorted(order), check
     assert "RETURN IT TO THE MHA-VN-015" not in check
+
+
+def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> None:
+    """The supplied thread class does not prove the assembled stop's engagement."""
+    import vn_swing_stop_screw_spec as stop_screw
+
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    minimum = f"{stop_screw.MIN_USEFUL_ENGAGEMENT_MM:.2f}"
+    assert f"VERIFY MHA-VN-015 FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
+    assert "HEAD FULLY SEATED" in check
+    assert "MHA-DT-020 REMAINS SEATED THROUGH P1" in check
+
+
+def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
+    """The seated shoulder does not establish actual full-form thread engagement."""
+    import vn_cone_pivot_screw_spec as pivot_screw
+
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    minimum = f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_MM:.2f}"
+    assert f"VERIFY MHA-VN-014 FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
+    assert "SHOULDER FULLY SEATED" in check
 
 
 def _flat(text: str) -> str:
@@ -1066,7 +1181,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     steps = _flat(drawing.BANK_STEPS)
     thickness = bank.OVERALL_THICKNESS
     upper, lower = bank.OVERALL_THICKNESS_BAND
-    # 7.0565 +/-0.025 is exact at four places (user ruling L20 d').
+    # The gear's authoritative overall-thickness band is exact at four places.
     assert limits(thickness + lower, thickness + upper, 4) in steps
     assert limits(*bank.STACK_L20_ACCEPT, 2) in steps
     short = f"SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR"
@@ -1076,8 +1191,16 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     # #948 ruling R (PR #1292): the target moves north -- LESS Y, a rear-face
     # distance -- by the miced back washer's excess over nominal.
     washer = f"{bank.WASHER_THICK:.3f}"
+    bank_x = cone_line.X_DRUM + base.BOTTOM_LENGTH / 2.0
     assert (
-        f"Y {limits(back_y - band, back_y + band, 2)} LESS (W - {washer})" in steps
+        f"TO X {limits(bank_x - band, bank_x + band, spec.FIT_LIMIT_PLACES)}" in steps
+    )
+    assert (
+        f"X {limits(bank_x - band, bank_x + band, spec.FIT_LIMIT_PLACES)} AND SPOT" in steps
+    )
+    assert (
+        f"Y {limits(back_y - band, back_y + band, spec.FIT_LIMIT_PLACES)} "
+        f"LESS (W - {washer})" in steps
     )
     assert steps.index("MIC ONE MHA-DT-026, W") < steps.index("FACE TO Y")
     # Step 10: the north MHA-CH-008 ear inner face on the same DRO zero, its

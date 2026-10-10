@@ -44,7 +44,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import check, name_last_feature, volume_check  # noqa: E402
+from _stock_recipe import stock_recipe  # noqa: E402
+
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     assert_profile_closed,
     draw_closed_profile,
@@ -187,6 +195,7 @@ if abs(math.hypot(*_GAP_OD) - OUTER_R) > 1e-5:
     raise ValueError("97431A260 gap corner is off the O.D.")
 
 
+@stock_recipe("97431A260", threaded=False)
 async def build_97431A260(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
 from pathlib import Path
@@ -11,6 +12,8 @@ import yaml
 
 import _config
 import _drawing_leaders
+import _cone_gear_geometry as geometry
+import _cone_gear_readback as readback
 import build_dt_cone_gear as part
 import dt_cone_gear_notes as notes
 import dt_cone_gear_shaft_spec
@@ -18,6 +21,7 @@ import dt_cone_gear_spec as spec
 import draw_dt_cone_gear as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
+import _drawing_annotation_extent
 
 
 def test_required_drawing_paths_and_registry_entry() -> None:
@@ -28,19 +32,22 @@ def test_required_drawing_paths_and_registry_entry() -> None:
 
 
 def test_every_configuration_has_one_complete_sheet_and_native_scale() -> None:
-    expected_teeth = tuple(range(6, 121, 6))
+    expected_teeth = tuple(
+        range(6, int(_config.machine("gear_train", "fundamental_cone_teeth")) + 1, 6)
+    )
     expected_names = tuple(f"T{teeth:03d}" for teeth in expected_teeth)
     assert spec.CONFIGURATION_TEETH == expected_teeth
-    assert part.CONFIGS == tuple(zip(expected_names, expected_teeth, strict=True))
-    assert drawing.SHEET_NAMES == expected_names
-    assert set(drawing.SHEET_SCALES) == set(expected_names)
+    assert spec.CONFIGS == tuple(zip(expected_names, expected_teeth, strict=True))
+    assert drawing.GEAR_SHEET_NAMES == expected_names
+    assert drawing.SHEET_NAMES == (*expected_names, notes.CUTTER_DETAIL_SHEET)
+    assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
 
     for teeth in expected_teeth:
         name = f"T{teeth:03d}"
         numerator, denominator = drawing.SHEET_SCALES[name]
         drawn_od = drawing.outside_dia_mm(teeth) * numerator / denominator
-        # The smallest six-tooth member is necessarily limited by the common
-        # 6.8887 mm face width; every other face lands in the useful 40-95 mm band.
+        # The smallest member is limited by the common configured face width;
+        # every view must stay inside the existing useful-size envelope.
         assert 30.0 < drawn_od < 95.0
         assert drawing.rendered_half_od(teeth) == pytest.approx(drawn_od / 2000.0)
 
@@ -73,38 +80,39 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
 def test_model_owns_precision_for_every_printed_dimension() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "BlankDia": 2,
-        # 6.8887 is floor4(SEAT_PITCH): fewer places would print a face that
-        # rounds up past the 6.8888 seat pitch.
+        # Fewer places would round the faced gear above its derived seat pitch.
         "FaceWidth": 4,
         "BoreCutDia": 3,
         # The AF band is 0.010 wide; three places print both limits exactly.
         "BoreAF": 3,
         "BoreFlatClock": 1,
         "ToothThickness": 3,
-        # The T006 floor window is 0.049 wide: two places would print the
-        # upper limit rounded up (probe 834-gapfloor-c301 showed .049 as .05).
+        # Narrow floor windows need three places to preserve both limits.
         "FloorDia": 3,
     }
     assert "draw_dt_cone_gear.py" in PRECISION_MIGRATED_DRAWINGS
 
 
 def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
-    # Main ruling (2026-09-23): the title-block .XX +/-0.51 is a whole
-    # addendum; the contact-ratio stack kept +/-0.25 below CR 1.1, so the
-    # tip prints +/-0.10, applied on the model like the other two bands.
-    assert spec.BLANK_DIA_BAND == (0.10, -0.10)
+    # Ordinary undersize-only blank band (user ruling 2026-10-10, cones at
+    # ordinary tolerances); T006 keeps its own -0.02 band for the DT6-FORM1
+    # relief, written into T006 alone.
+    assert spec.BLANK_DIA_BAND == (0.0, -0.05)
+    assert spec.blank_dia_band(6) == spec.CUSTOM_SIX_BLANK_DIA_BAND == (0.0, -0.02)
+    assert all(spec.blank_dia_band(t) is spec.BLANK_DIA_BAND for t in spec.CONFIGURATION_TEETH if t != 6)
     assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert (
         '"BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)' in source
     )
+    assert "_set_configuration_bands(adapter)" in source
 
 
 def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
     # Solid touching stack: twenty gears end to end on SEAT_PITCH centres.
     # The nominal is the seat pitch floored to 4 places, so it never prints
     # longer than the pitch; cone_gear_stack owns the stack's band.
-    assert spec.FACE_WIDTH == pytest.approx(6.8887, abs=1e-12)
+    assert spec.FACE_WIDTH == math.floor(spec.SEAT_PITCH * 1e4) / 1e4
     assert spec.FACE_WIDTH <= spec.SEAT_PITCH < spec.FACE_WIDTH + 1e-4
     assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -123,126 +131,301 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
     assert '"Number": configuration_number(part_number, teeth)' in source
 
 
-def test_bore_bands_are_the_derived_seat_fit_bands() -> None:
-    # Every gear slides onto its D-flat land (gear_seat_fit): the family's one
-    # BoreCutDia band is +0.050/+0.025 and its one BoreAF band +0.020/+0.010
-    # (test_cone_gear_seat_fit proves every seat at the print extremes).
-    assert part.BORE_DIA_BAND is spec.BORE_DIA_BAND
-    assert spec.BORE_DIA_BAND == (0.05, 0.025)
+def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
+    assert spec.BORE_DIA_BAND is spec.BORE_DIA_BAND
+    assert spec.BORE_DIA_BAND[0] <= spec.BORE_BAND_FIT_UPPER
+    assert spec.BORE_DIA_BAND[0] <= spec.terminal_web_bore_upper_mm()
+    assert spec.BORE_DIA_BAND[0] - spec.BORE_DIA_BAND[1] >= 0.02 - 1e-9
     assert spec.BORE_AF_BAND == pytest.approx((0.02, 0.01))
+    for teeth in spec.CONFIGURATION_TEETH:
+        assert spec.bore_dia_mm(teeth) == pytest.approx(
+            dt_cone_gear_shaft_spec.SECTION_DIAS[spec.land_section(teeth)]
+        )
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)' in source
     assert '"BoreProfile", "BoreAF", *deviations(BORE_AF_BAND)' in source
 
-    # Every configured bore seats on a published cone-shaft land; T006 and
-    # T012 slide straight onto the flatted 1/16-inch tip land.
-    assert spec.bore_dia_mm(6) == pytest.approx(1.5875)
-    assert spec.FAMILY_BORES_MM[6] == pytest.approx(
-        dt_cone_gear_shaft_spec.SECTION_DIAS[-1]
-    )
-    for bore in spec.FAMILY_BORES_MM.values():
-        assert any(
-            bore == pytest.approx(section)
-            for section in dt_cone_gear_shaft_spec.SECTION_DIAS
-        )
 
-
-def test_native_tooth_thickness_is_the_modelled_deepened_mesh_tooth() -> None:
-    # The band is the configured backlash WINDOW, centred on the modelled
-    # tooth: error_budget.yaml's tooth-thickness mesh-lag term is derived
-    # from that window.
-    minimum, maximum = _config.fit("gear_mesh", "backlash_mm")
-    upper, lower = spec.TOOTH_THICKNESS_BAND
-    assert upper == pytest.approx(-lower)
-    assert upper - lower == pytest.approx(maximum - minimum)
+def test_native_tooth_inspection_reads_the_actual_installed_cutter() -> None:
+    # Ordinary +/-0.075 thickness band about the cutter's standard-depth
+    # thickness; T006 alone is thin-only (DT6-FORM1 relief clearance).
+    assert spec.TOOTH_THICKNESS_BAND == (0.075, -0.075)
+    assert spec.tooth_thickness_band(6) == spec.CUSTOM_SIX_TOOTH_THICKNESS_BAND == (0.0, -0.04)
     for teeth in spec.CONFIGURATION_TEETH:
-        thickest = spec.DEEPENED_MESH_MM[teeth][1]
-        assert spec.tooth_thickness_mm(teeth) + upper == pytest.approx(thickest)
-        # Thicker than standard at both limits: the deepened mesh.
-        assert spec.tooth_thickness_mm(teeth) + lower > spec.STANDARD_TOOTH_THICKNESS
-        facts = part.cone_facts(teeth)
-        assert facts["ToothThickness"] * spec.MM_PER_IN == pytest.approx(
-            spec.tooth_thickness_mm(teeth)
-        )
-        assert 2.0 * facts["Ra"] * spec.MM_PER_IN == pytest.approx(
-            spec.outside_dia_mm(teeth)
-        )
-    assert spec.TOOTH_THICKNESS == pytest.approx(spec.tooth_thickness_mm(120))
+        _upper, lower = spec.tooth_thickness_band(teeth)
+        profile = spec.stock_form_profile(teeth)
+        assert profile.pitch_tooth_thickness_mm == pytest.approx(spec.tooth_thickness_mm(teeth))
+        assert 2.0 * profile.blank_radius_mm == pytest.approx(spec.outside_dia_mm(teeth))
+        assert profile.pitch_tooth_thickness_mm + lower > 0.0
+        assert readback._expected_configuration_volume(teeth) == pytest.approx((
+            math.pi * profile.blank_radius_mm**2
+            - teeth * profile.gap_area_mm2 - geometry.bore_area_mm2(teeth)
+        ) * spec.FACE_WIDTH)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "*deviations(TOOTH_THICKNESS_BAND)" in source
-    # Delta solves from the printed thickness, so the flanks follow it.
-    assert '"ToothThickness" * "DP" / "ToothCount" + tan("PA") - "PArad"' in source
+    assert "FloorDip" not in source
+    assert "gear_facts(" not in source
+    assert "gap_area_in_disc(" not in source
 
-
-def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates() -> None:
+def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
     for teeth in spec.CONFIGURATION_TEETH:
         data = notes.gear_data(teeth)
         assert data.startswith("GEAR DATA\n")
-        assert f"CONFIGURATION:  T{teeth:03d}" in data
-        assert f"NUMBER OF TEETH:  {teeth}" in data
-        assert f"PITCH DIAMETER (mm, REF):  {teeth * spec.MODULE_MM:.2f}" in data
-        assert "DIAMETRAL PITCH" in data
-        assert "PRESSURE ANGLE" in data
-        assert "INVOLUTE FLANKS" in data
-        assert f"CYLINDER GEAR {notes.CYLINDER_MATE_NUMBER}" in data
-        # The tooth form and the floor's native limit dimension state the
-        # result, so no row says how to cut it (rule 6).
-        for method in ("CUTTING", "CUTTER", "PLUNGE", "INDEXING", "SINKING"):
-            assert method not in data
-        assert spec.TOOTH_FORM in data
-        assert "FULL DEPTH" not in data
-        assert "WHOLE DEPTH" not in data
-        assert notes.CYLINDER_MATE_NUMBER in data
-        assert (
-            f"BACKLASH WITH MHA-DT-012, ACCEPT AT ASSEMBLY (mm):  "
-            f"{spec.BACKLASH_ACCEPTANCE_MM[0]:.2f} TO "
-            f"{spec.BACKLASH_ACCEPTANCE_MM[1]:.2f}"
-        ) in data
-        # The operating mesh is not a reference-centre-distance mesh; say so
-        # beside the mate, and say where the view's thickness is measured.
-        assert "TOOTH THICKNESS IN VIEW:  ARC LENGTH AT PITCH DIAMETER" in data
-        # 49.1 mm measured for 14 lines natively (e91d2581 layout audit).
-        assert len(data.splitlines()) * 0.00351 <= drawing.GEAR_DATA_HEIGHT
-        assert "OPERATING MESH:  LONG ADDENDUM, PARTIAL DEPTH ON INCLINED AXES" in data
-        assert "48 DP" not in data
-        # These values are native imported dimensions, never parallel typed rows.
-        for duplicate in (
-            "OUTSIDE DIAMETER",
-            "FACE WIDTH",
-            "BORE",
-            "CIRCULAR TOOTH THICKNESS",
-            "GAP FLOOR DIAMETER",
-            "FAMILY T",
+        assert f"T{teeth:03d}" in data
+        assert f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG" in data
+        for physical_recipe in (
+            "CUTTER", "TEMPLATE", "TOOL T", "PLUNGE", "WHOLE DEPTH",
+            "TOOTH FORM", "BACKLASH WITH MATE", "ROOT RADIAL MIN/MAX", "WEB",
         ):
-            assert duplicate not in data
+            assert physical_recipe in data, (teeth, physical_recipe)
+        assert ("TROCHOID RELIEF" in data) == (teeth == 6)
+        assert notes.CYLINDER_MATE_NUMBER in data
+        for obsolete in ("CONTACT RATIO", "RANGE ONLY", "MATCH FLANKS", "LONG ADDENDUM"):
+            assert obsolete not in data
+        assert len(data.splitlines()) * 0.00351 <= drawing.GEAR_DATA_HEIGHT
 
 
-def test_gap_floor_constructions() -> None:
-    # T006/T012 keep the standard tooth's base chord (the drum tip would rub a
-    # risen chord); T018-T042 take the thicker tooth's chord; T048+ raise it.
+def test_native_gap_features_are_distinct_and_preserve_real_template_topology() -> None:
+    features = [name for teeth in spec.CONFIGURATION_TEETH for name in spec.tooth_features(teeth)]
+    assert len(set(features)) == 3 * len(spec.CONFIGURATION_TEETH)
+    assert len(spec.SIMPLIFIED_FEATURES) == 2 * len(spec.CONFIGURATION_TEETH)
+    assert spec.SIMPLIFIED_FEATURES_BY_CONFIGURATION == {
+        f"T{teeth:03d}": spec.tooth_features(teeth)[1:] for teeth in spec.CONFIGURATION_TEETH
+    }
     for teeth in spec.CONFIGURATION_TEETH:
-        chord = spec.chord_floor_radius_mm(
-            teeth,
-            thickness_mm=spec.tooth_thickness_mm(teeth),
-            tmin=spec.floor_tmin(teeth),
+        profile = spec.stock_form_profile(teeth)
+        core = profile.cut_order_native_segments(
+            unit_scale=1.0 / spec.MM_PER_IN, clearance_radius_mm=geometry.R_CLEAR_MM
         )
+        expected_entities = 8 if profile.template.root_radius_mm < profile.template.base_radius_mm else 6
+        assert len(core) == expected_entities
+        native = part.native_gap_segments(teeth)
+        assert [row[0] for row in native] == [segment.name for segment in core]
+        for (_name, x, y), segment in zip(native, core, strict=True):
+            assert segment.x in x and segment.y in x
+            assert segment.x in y and segment.y in y
+        if teeth != 6:
+            assert profile.template.reference_teeth <= teeth
+            assert profile.template.reference_teeth in (12, 17, 21, 26, 35, 55)
+        assert all(name.endswith(f"T{teeth:03d}") for name in spec.tooth_features(teeth))
+        assert profile.contains_material(
+            profile.pitch_radius_mm, 0.0, rotate_rad=math.pi / teeth
+        ), f"T{teeth:03d} must seed a physical tooth on +X"
+        phase = math.pi / teeth
+        for (_name, x_expression, y_expression), segment in zip(native, core, strict=True):
+            for t in (0.0, 0.25, 0.5, 0.75, 1.0):
+                variables = {"t": t, "cos": math.cos, "sin": math.sin}
+                observed = (
+                    eval(x_expression, {"__builtins__": {}}, variables),
+                    eval(y_expression, {"__builtins__": {}}, variables),
+                )
+                x, y = segment.point(t)
+                expected = (
+                    (math.cos(phase) * x - math.sin(phase) * y) / spec.MM_PER_IN,
+                    (math.sin(phase) * x + math.cos(phase) * y) / spec.MM_PER_IN,
+                )
+                assert observed == pytest.approx(expected, abs=1e-12)
+
+
+def test_root_envelope_is_the_actual_translated_arc_not_a_bisector_circle() -> None:
+    for teeth in spec.CONFIGURATION_TEETH:
+        profile = spec.stock_form_profile(teeth)
+        assert spec.floor_radius_min_mm(teeth) == pytest.approx(profile.root_radius_min_mm)
+        assert spec.floor_radius_max_mm(teeth) == pytest.approx(profile.root_radius_max_mm)
         minimum, maximum = spec.floor_limits_mm(teeth)
-        assert maximum > minimum
-        # Bands round outward: the printed MIN is the modelled floor floored
-        # to three places, never above it.
-        modelled = 2.0 * spec.floor_radius_mm(teeth)
-        assert modelled - 0.001 < minimum <= modelled
+        assert minimum <= 2.0 * profile.root_radius_min_mm + 1e-9
+        assert maximum >= 2.0 * profile.root_radius_max_mm - 1e-9
         assert minimum == pytest.approx(round(minimum, 3), abs=1e-12)
-        if teeth in spec.DIPPED_FLOOR_MIN_MM:
-            assert spec.floor_radius_mm(teeth) == pytest.approx(minimum / 2.0)
-            assert spec.floor_dip_mm(teeth) > 0.0
-            assert spec.floor_tmin(teeth) == 0.0
+        if abs(profile.radial_translation_mm) > 1e-9:
+            assert profile.root_radius_min_mm < profile.root_radius_max_mm
+    assert drawing.DIMENSION_CALLOUTS["FloorDia"] == "ROOT ENVELOPE"
+
+
+def test_refused_rows_block_the_complete_native_family(monkeypatch: pytest.MonkeyPatch) -> None:
+    visited = []
+
+    def profile(teeth: int) -> object:
+        visited.append(teeth)
+        if teeth in (6, 18, 120):
+            raise ValueError("finite support refused")
+        return object()
+
+    monkeypatch.setattr(part, "stock_form_profile", profile)
+    with pytest.raises(RuntimeError, match="cutter-native cone family is unqualified") as caught:
+        part.require_complete_stock_family()
+    assert visited == list(spec.CONFIGURATION_TEETH)
+    for teeth in (6, 18, 120):
+        assert f"T{teeth:03d}: finite support refused" in str(caught.value)
+
+
+def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.MonkeyPatch) -> None:
+    from stock_form_cutter import CutterTemplate, StockFormProfile
+
+    template = CutterTemplate(12, spec.DIAMETRAL_PITCH, spec.PRESSURE_ANGLE_DEG)
+    profile = StockFormProfile(12, template, template.tip_radius_mm + 0.05, 0.1)
+    root = next(segment for segment in profile.native_segments(
+        unit_scale=1.0, clearance_radius_mm=geometry.R_CLEAR_MM
+    ) if segment.kind == "root_arc")
+
+    z = part.FACE_WIDTH / 1000.0
+
+    class Edge:
+        def __init__(self, index: int) -> None:
+            angle = (2 * index + 1) * math.pi / profile.teeth
+            cosine, sine = math.cos(angle), math.sin(angle)
+            self.points = []
+            for t in (0.0, 0.5, 1.0):
+                x, y = root.point(t)
+                self.points.append((cosine * x - sine * y, sine * x + cosine * y))
+            self.queries = []
+
+        def GetCurve(self) -> object:
+            return object()
+
+        def GetCurveParams2(self) -> tuple[float, ...]:
+            (x0, y0), (x1, y1) = self.points[0], self.points[-1]
+            return x0 / 1000.0, y0 / 1000.0, z, x1 / 1000.0, y1 / 1000.0, z, 0.0, 1.0
+
+        def GetClosestPointOn(self, x: float, y: float, z: float) -> tuple[float, ...]:
+            self.queries.append((x, y, z))
+            if x == y == 0.0:
+                point = min(self.points, key=lambda point: math.hypot(*point))
+            else:
+                point = self.points[1]
+            return point[0] / 1000.0, point[1] / 1000.0, z, 0.0, 0.0
+
+    class Line:
+        """A tooth-flank edge: it runs along the gear axis, never a root."""
+
+        def GetCurve(self) -> object:
+            return object()
+
+        def GetCurveParams2(self) -> tuple[float, ...]:
+            return 0.004, 0.0, 0.0, 0.004, 0.0, z, 0.0, 1.0
+
+    class Face:
+        def __init__(self, z_mm: float, edges: list) -> None:
+            self.z, self.edges = z_mm / 1000.0, edges
+
+        def GetBox(self) -> tuple[float, ...]:
+            return -0.01, -0.01, self.z, 0.01, 0.01, self.z
+
+        def GetEdges(self) -> list:
+            return self.edges
+
+    edges = [Edge(index) for index in range(profile.teeth)]
+    flank = type("Flank", (), {"GetBox": lambda self: (-0.01, -0.01, 0.0, 0.01, 0.01, z)})()
+    faces = [Face(0.0, []), flank, Face(part.FACE_WIDTH, [Line(), *edges])]
+    body = type("Body", (), {"GetFaces": lambda self: faces})()
+    monkeypatch.setattr(readback, "stock_form_profile", lambda _teeth: profile)
+    minimum, maximum, count = readback._native_root_envelope_mm(body, teeth=profile.teeth)
+    assert count == profile.teeth
+    assert minimum == pytest.approx(profile.root_radius_min_mm)
+    assert maximum == pytest.approx(profile.root_radius_max_mm)
+    assert minimum < maximum
+    assert all(len(edge.queries) == 2 for edge in edges)
+    # A gap that did not cut through leaves its root off the far face.
+    faces[-1].edges.pop()
+    with pytest.raises(RuntimeError, match="native root arcs on the exit face"):
+        readback._native_root_envelope_mm(body, teeth=profile.teeth)
+
+
+def test_root_envelope_reads_the_body_and_failures_name_their_call() -> None:
+    # f68549253: the reopened audit passed the IPartDoc where the reader calls
+    # IBody2.GetFaces, and every configuration failed as an anonymous
+    # DISP_E_MEMBERNOTFOUND.
+    source = inspect.getsource(readback._configuration_topology)
+    assert "_native_root_envelope_mm(bodies[0], teeth=teeth)" in source
+    try:
+        readback._exit_face(object())
+    except AttributeError as exc:
+        site = readback._failure_site(exc)
+    assert '_com_invoke(body, "IBody2", "GetFaces")' in site
+    assert "in _exit_face" in site
+    assert "_failure_site(exc)" in inspect.getsource(readback.assert_saved_configuration_topology)
+
+
+def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:
+    from dataclasses import replace
+
+    installed = spec.stock_form_profile(6)
+    template = installed.template
+    tool = replace(
+        installed, blank_radius_mm=template.tip_radius_mm, radial_translation_mm=0.0
+    )
+    detail = notes.custom_cutter_detail()
+    assert template.cutter_number is None
+    assert template.name == notes.CUTTER_DETAIL_SHEET == "DT6-FORM1"
+    assert drawing.SHEET_NAMES[-1] == notes.CUTTER_DETAIL_SHEET
+    assert "CUSTOM GROUND FORM" in detail
+    assert "NO UPPER CONTINUATION" in detail
+    assert "ROOT ARC; DRUM-TIP TROCHOID RELIEF TO TIF; N6 WORKING INVOLUTE" in detail
+    normalized = re.sub(r"\s+", "", detail)
+    required = []
+    for segment in tool.native_segments(
+        unit_scale=1.0, clearance_radius_mm=template.tip_radius_mm + 1.0
+    ):
+        if segment.kind in {"root_arc", "relief", "flank"}:
+            required.append(segment.kind)
+            assert re.sub(r"\s+", "", segment.x) in normalized
+            assert re.sub(r"\s+", "", segment.y) in normalized
+    assert sorted(required) == ["flank", "flank", "relief", "relief", "root_arc"]
+    assert "closing_ray" not in detail
+    assert "clearance_arc" not in detail
+    assert "STOCK #8" not in detail
+    assert max(map(len, detail.splitlines())) <= notes.CUTTER_DETAIL_LINE_CHARS
+
+
+def test_custom_six_sheet_gives_grind_data_not_equations() -> None:
+    """Sheet DT6-FORM1 prints what the toolmaker grinds to (3 places, the
+    comparator check at the sheet's own scale), not the model's equations."""
+    profile = spec.stock_form_profile(6)
+    data = drawing.cutter_grind_data()
+    lines = data.splitlines()
+    assert lines[0] == "DT6-FORM1 GROUND FORM TOOL, mm"
+    assert lines[-1] == "GRIND TO TEMPLATE; CHECK ON OPTICAL COMPARATOR AT 20:1"
+    assert "FORM DEPTH (PLUNGE FROM BLANK OD):  1.055" in lines
+    assert "TIP ARC (FORMS GEAR ROOT):  R1.100" in lines
+    assert "TIF (RELIEF TO INVOLUTE):  R1.531 REF" in lines
+    # Chords across the installed gap, which at T=0 IS the ground form:
+    # the pitch chord closes on the tool's pitch tooth thickness.
+    pitch = next(line for line in lines if line.startswith("WIDTH AT PITCH DIA 3.175 (CHORD)"))
+    chord = float(pitch.rsplit(" ", 1)[1])
+    half_gap = math.asin(chord / (2.0 * profile.pitch_radius_mm))
+    thickness = profile.pitch_radius_mm * (profile.angular_pitch_rad - 2.0 * half_gap)
+    assert thickness == pytest.approx(profile.pitch_tooth_thickness_mm, abs=0.002)
+    assert "WIDTH AT BLANK OD 4.310 (CHORD):  1.953" in lines
+    assert "(t)" not in data and "sin" not in data and "SOURCE" not in data
+    # Every decimal prints at 3 places.
+    for number in re.findall(r"\d+\.\d+", data):
+        assert len(number.split(".")[1]) == 3, number
+
+
+def test_custom_gap_detail_crop_contains_every_real_boundary() -> None:
+    profile = spec.stock_form_profile(6)
+    center_x, center_y, radius = drawing.cutter_detail_window_mm()
+    phase = math.pi / profile.teeth
+    for segment in profile.gap_segments():
+        if segment.kind == "tip_arc":
             continue
-        assert spec.floor_radius_mm(teeth) == pytest.approx(chord)
-        assert spec.floor_dip_mm(teeth) == pytest.approx(0.0)
-        assert (spec.floor_tmin(teeth) > 0.0) == (teeth >= 48)
-    assert set(spec.DIPPED_FLOOR_MIN_MM) == {6, 12}
-    assert set(spec.FLOOR_MAX_DIA_MM) == set(spec.CONFIGURATION_TEETH)
+        for index in range(129):
+            x, y = segment.point(index / 128)
+            rotated = (
+                math.cos(phase) * x - math.sin(phase) * y,
+                math.sin(phase) * x + math.cos(phase) * y,
+            )
+            assert math.dist((center_x, center_y), rotated) < radius
+    numerator, denominator = drawing.SHEET_SCALES[notes.CUTTER_DETAIL_SHEET]
+    rendered_radius = radius * numerator / denominator / 1000.0
+    # The grind data at the default note height: 2.4 mm a character, measured
+    # on the run-20261010T051729717Z render of this sheet's 47-character
+    # installed-gap label (113 mm).
+    widest = max(map(len, drawing.cutter_grind_data().splitlines()))
+    assert drawing.CUTTER_DETAIL_VIEW_CENTER[0] - rendered_radius > (
+        drawing.CUTTER_DETAIL_POS[0] + widest * 0.0024 + 0.005
+    )
+    assert drawing.CUTTER_DETAIL_VIEW_CENTER[0] + rendered_radius < 0.420
+    assert drawing.CUTTER_DETAIL_VIEW_CENTER[1] - rendered_radius > 0.100
 
 
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:
@@ -265,14 +448,12 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
 
 
 def test_notes_state_no_bore_joint_method_or_review_record() -> None:
-    # Rule 6: the D-bore and its fit print as native dimensions in the bore
-    # view; no joint, keyway or retaining method is named.  The U42/U40
-    # shortfalls print once each, as GEAR DATA rows (test_named_shortfalls_
-    # print_as_facts_on_their_sheets), so the notes never repeat them.  Every
-    # sheet prints the same two lines.
+    # Rule 6: native D-bore dimensions carry its fit, and the Gear Data block
+    # reports actual cutter/mesh facts separately. Every sheet keeps the same
+    # two short manufacturing notes, without review history or waived floors.
     expected = [
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
-        "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
+        "MAKE ONE GEAR FROM EACH T-CONFIGURATION SHEET.",
     ]
     assert notes.DRAWING_NOTES.splitlines() == expected
     assert not hasattr(notes, "ATTACHMENT")
@@ -301,41 +482,13 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
     assert '"Manufacturing Notes": drawing_notes(teeth)' in source
 
 
-def test_book_fidelity_exceptions_are_recorded_in_the_spec_not_on_a_sheet() -> None:
-    # U42 (contact ratio below 1.1) and U40 (T006's thin web) are exact sets:
-    # test_cone_gear_mesh_design and the root-to-bore web test re-derive which
-    # gears need them, so a new exception needs a new ruling, not a quiet edit.
-    assert spec.CONTACT_RATIO_EXCEPTION_TEETH == (6, 12, 18, 24, 30, 36, 42)
-    assert spec.WEB_EXCEPTIONS_MM == {6: 0.621}
-    for retired in ("CONTACT_RATIO_EXCEPTION", "web_exception", "both_exceptions"):
-        assert not hasattr(notes, retired)
-
-
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_named_shortfalls_print_as_facts_on_their_sheets(teeth: int) -> None:
-    # The blind reviewer sees only the sheets, so every sheet a named
-    # exception row affects states the shortfall itself, as a plain fact with
-    # its value (drawing-simplicity policy, named exceptions); the ruling
-    # never prints (test_no_sheet_prints_a_review_record).
+def test_actual_web_prints_as_a_fact(teeth: int) -> None:
     data = notes.gear_data(teeth)
-    web_label = "WEB, GAP FLOOR TO HOLE (mm, REF):  "
-    if teeth in spec.WEB_EXCEPTIONS_MM:
-        web = notes.root_to_bore_web_min_mm(teeth)
-        # the printed limits give exactly the web the user accepted
-        assert web == pytest.approx(spec.WEB_EXCEPTIONS_MM[teeth], abs=0.0005)
-        # stated rounded DOWN: never more web than the limits give
-        stated = float(data.split(web_label)[1].split()[0])
-        assert 0.0 <= web - stated < 0.01
-        assert f"{web_label}{stated:.2f} MIN" in data
-    else:
-        assert web_label not in data
-        assert notes.root_to_bore_web_min_mm(teeth) >= spec.MACHINED_WEB_FLOOR_MM
-    ratio_row = f"CONTACT RATIO WITH {notes.CYLINDER_MATE_NUMBER}, WORST CASE (REF):  "
-    assert set(notes.WORST_CONTACT_RATIO) == set(spec.CONTACT_RATIO_EXCEPTION_TEETH)
-    if teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH:
-        assert f"{ratio_row}{notes.WORST_CONTACT_RATIO[teeth]:.2f}" in data
-    else:
-        assert ratio_row not in data
+    web = notes.root_to_bore_web_min_mm(teeth)
+    required = spec.WEB_EXCEPTIONS_MM.get(teeth, spec.MACHINED_WEB_TARGET_MM)
+    assert web >= required - 1e-9
+    assert f"WEB MIN (mm, REF):  {math.floor(web * 100.0) / 100.0:.2f}" in data
 
 
 _REVIEW_RECORD_TEXT = re.compile(
@@ -450,13 +603,11 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
 
 # Text half-widths in the bore view, sheet metres: the stacked diameter
 # (~33 mm, measured when its callout still read "REAM THRU"; "THRU" is
-# narrower) and the clock value over "TO TOOTH CENTERLINE" (~42 mm,
-# estimated at the fleet's 2.5 mm text), and the two-line title.
+# narrower), and the two-line title. The clock text's measured block is
+# drawing.BORE_CLOCK_TEXT_HALF_WIDTH/HEIGHT.
 _BORE_DIA_TEXT_HALF_WIDTH = 0.0165
-_BORE_CALLOUT_TEXT_HALF_WIDTH = 0.021
 _BORE_TEXT_HALF_HEIGHT = 0.005
 _BORE_TITLE_HEIGHT = 0.008
-_THICKNESS_TEXT_HALF_WIDTH = 0.0325
 # The layout audit compares IView.GetOutline boxes, which pad the geometry:
 # ~5.5 mm round an uncropped view (T084 front [54.8, 99.8, 155.2, 200.2]
 # about a 44.66 mm half tip circle) and 10.1-10.75 mm past a bore view's crop
@@ -521,13 +672,26 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         # The clock text stands wholly right of the circle and clear of the
         # thickness callout under the front view.
         clock_x, clock_y = keep["BoreFlatClock"]
-        assert clock_x - _BORE_CALLOUT_TEXT_HALF_WIDTH > cx + crop
-        ctt_x, ctt_y = drawing.front_keep(teeth)["ToothThickness"]
-        assert (
-            ctt_x - _THICKNESS_TEXT_HALF_WIDTH
-            > clock_x + _BORE_CALLOUT_TEXT_HALF_WIDTH + 0.005
-            or ctt_y - clock_y > 4.0 * _BORE_TEXT_HALF_HEIGHT
+        # Its two-line block (measured half-extents) stands an arrow length
+        # plus clearance above the axis line, where the arc's arrowhead ends
+        # under the text, and clear of the crop circle.
+        assert clock_y - drawing.BORE_CLOCK_TEXT_HALF_HEIGHT >= (
+            cy + drawing.BORE_CLOCK_ARROW_LENGTH + _drawing_leaders.ARROW_TEXT_CLEARANCE - 1e-12
         ), teeth
+        assert clock_x - drawing.BORE_CLOCK_TEXT_HALF_WIDTH >= cx + crop + 0.002 - 1e-12, teeth
+        # The thickness callout, measured on the T006 PDF of run
+        # 20261010T051729717Z: its text spans x 136.2-200.4, y 100.0-116.5 mm
+        # round its keep (136.24, 107.76) mm, starting at its dimension line
+        # (the keep x) and running right, with its leader above.
+        ctt_x, ctt_y = drawing.front_keep(teeth)["ToothThickness"]
+        clock_box = (
+            clock_x - drawing.BORE_CLOCK_TEXT_HALF_WIDTH,
+            clock_y - drawing.BORE_CLOCK_TEXT_HALF_HEIGHT,
+            clock_x + drawing.BORE_CLOCK_TEXT_HALF_WIDTH,
+            clock_y + drawing.BORE_CLOCK_TEXT_HALF_HEIGHT,
+        )
+        ctt_box = (ctt_x - 0.001, ctt_y - 0.0078, ctt_x + 0.0642, ctt_y + 0.0088)
+        assert _drawing_annotation_extent.boxes_clear(clock_box, ctt_box), teeth
         # The clock's arc centres where the flat crosses the axis and swings
         # through its text, in the quadrant right of the flat and above the
         # axis: clear of the diameter's upper-left lane and under the front
@@ -543,6 +707,43 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
             "BORE PROFILE",
             f"SCALE {view_numerator:g} : {view_denominator:g}",
         ]
+
+
+def test_settled_clock_check_refuses_outside_arrow_stubs() -> None:
+    """Run 20261010T073917031Z's arc readbacks (sheet mm): T006's clock drew
+    one arc between its legs, broken by its text; T120's, its arrows left
+    smart, drew two 10 deg stubs outside them and no arc. The clock is forced
+    arrows-inside, and finalize re-reads every sheet's arcs after settling."""
+
+    def arc(vertex, radius, start, end):
+        steps = 12
+        return (
+            vertex,
+            [
+                (
+                    vertex[0] + radius * math.cos(math.radians(start + (end - start) * i / steps)),
+                    vertex[1] + radius * math.sin(math.radians(start + (end - start) * i / steps)),
+                )
+                for i in range(steps + 1)
+            ],
+        )
+
+    good_vertex = (0.05292, 0.060)
+    good = [arc(good_vertex, 0.04642, 0.0, 11.0), arc(good_vertex, 0.04642, 18.0, 90.0)]
+    assert drawing.clock_arc_faults(good, good_vertex) == []
+    bad_vertex = (0.068, 0.060)
+    bad = [arc(bad_vertex, 0.03503, -10.2, 0.0), arc(bad_vertex, 0.03503, 90.0, 100.2)]
+    faults = drawing.clock_arc_faults(bad, bad_vertex)
+    assert any("outside the quadrant" in fault for fault in faults)
+    assert any("sweep" in fault for fault in faults)
+    assert drawing.clock_arc_faults([], bad_vertex) == ["no arc"]
+    assert drawing.ARROWS_INSIDE == 0  # swDimensionArrowsSide_e.swDimArrowsInside
+    assert "display.ArrowSide = ARROWS_INSIDE" in inspect.getsource(
+        drawing._sweep_clock_right_of_flat
+    )
+    assert "settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),)" in (
+        inspect.getsource(drawing.build)
+    )
 
 
 def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
@@ -569,9 +770,8 @@ def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
         drawing._assert_dimension_arrow_length(_Drawing(0.003175))
 
 
-# The gap-floor stack: "Ø61.050" over "Ø60.485" over "GAP FLOOR" at 3.5 mm
-# text, the widest row 9 characters at ~1.85 mm.
-_FLOOR_TEXT_HALF_WIDTH = 9 * 0.00185 / 2.0
+# The functional root callout is thirteen characters, wider than either value.
+_FLOOR_TEXT_HALF_WIDTH = len(drawing.DIMENSION_CALLOUTS["FloorDia"]) * 0.00185 / 2.0
 
 
 class _FakeFeature:
@@ -619,9 +819,19 @@ def test_the_part_saves_both_authoring_sketches_hidden() -> None:
     assert model.blanked == sketches
     source = Path(part.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
-    assert body.index("_blank_reference_sketches(adapter)") < body.index(
+    assert body.index("_suppress_rows_and_hide_references(adapter, pattern_axis)") < body.index(
         "await adapter.save_file("
     )
+    # Hide/show is per configuration (7e88be269 T006 image): the axis and both
+    # sketches are blanked inside the loop that activates each configuration,
+    # and the reopened part is gated in every configuration.
+    helper = inspect.getsource(part._suppress_rows_and_hide_references)
+    loop = helper[helper.index("for configuration in"):]
+    assert "_activate_configuration(model, configuration)" in loop
+    assert 'blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))' in loop
+    assert "_blank_reference_sketches(adapter)" in loop
+    assert "blank_reference_geometry(" not in body
+    assert "assert_reference_geometry_hidden_in_every_configuration(adapter, PART_NAME)" in body
 
 
 def test_a_blank_that_does_not_take_fails_the_part_build() -> None:
@@ -647,7 +857,7 @@ def _patch_floor_dimension(monkeypatch: pytest.MonkeyPatch, tolerance: object) -
         assert (feature, name) == (spec.GAP_FLOOR_SKETCH, "FloorDia")
         return object(), dimension
 
-    monkeypatch.setattr(part, "_named_dimension", named)
+    monkeypatch.setattr(readback, "_named_dimension", named)
 
 
 def test_each_configuration_stores_its_own_gap_floor_limits(
@@ -659,12 +869,12 @@ def test_each_configuration_stores_its_own_gap_floor_limits(
     _patch_floor_dimension(monkeypatch, tolerance)
     part._set_gap_floor_limits(object())
     assert tolerance.Type == 3  # swTolLIMIT
-    assert [call[3] for call in tolerance.calls] == [[name] for name, _ in part.CONFIGS]
+    assert [call[3] for call in tolerance.calls] == [[name] for name, _ in spec.CONFIGS]
     for (lower, upper, which, _names), (_name, teeth) in zip(
-        tolerance.calls, part.CONFIGS, strict=True
+        tolerance.calls, spec.CONFIGS, strict=True
     ):
         assert which == 3  # swSetValue_InSpecificConfigurations
-        nominal = 2.0 * spec.floor_radius_mm(teeth)
+        nominal = 2.0 * spec.floor_radius_min_mm(teeth)
         minimum, maximum = spec.floor_limits_mm(teeth)
         assert nominal + lower * 1000.0 == pytest.approx(minimum, abs=1e-9)
         assert nominal + upper * 1000.0 == pytest.approx(maximum, abs=1e-9)
@@ -677,6 +887,34 @@ def test_a_rejected_configuration_limit_fails_the_part_build(
     _patch_floor_dimension(monkeypatch, _FakeTolerance(accept=False))
     with pytest.raises(RuntimeError, match="FloorDia@T006: SetValues2 rejected"):
         part._set_gap_floor_limits(object())
+
+
+def test_every_configuration_stores_its_own_blank_and_thickness_band(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """part:dt_cone_gear at 039e557da: the T006-only write's immediate readback
+    returned T006's band. The FloorDia form instead: all twenty written, T006
+    its own, then each read back in the reopened audit with itself active."""
+    tolerances = {"BlankDia": _FakeTolerance(), "ToothThickness": _FakeTolerance()}
+
+    def named(_adapter: object, _feature: str, name: str) -> tuple[object, object]:
+        return object(), type("Dimension", (), {"Tolerance": tolerances[name]})()
+
+    monkeypatch.setattr(part, "_named_dimension", named)
+    part._set_configuration_bands(object())
+    for name, band_for in (
+        ("BlankDia", spec.blank_dia_band),
+        ("ToothThickness", spec.tooth_thickness_band),
+    ):
+        calls = tolerances[name].calls
+        assert [call[3] for call in calls] == [[c] for c, _ in spec.CONFIGS]
+        for (lower, upper, which, _names), (_c, teeth) in zip(calls, spec.CONFIGS, strict=True):
+            assert which == 3
+            upper_mm, lower_mm = band_for(teeth)
+            assert (lower * 1000.0, upper * 1000.0) == pytest.approx((lower_mm, upper_mm))
+    source = inspect.getsource(readback.assert_saved_configuration_topology)
+    assert "_assert_configuration_bands(adapter, configuration, teeth)" in source
+    assert "GetMinValue" not in inspect.getsource(part._set_configuration_bands)
 
 
 def test_only_the_front_view_shows_the_authoring_sketches() -> None:
@@ -707,9 +945,9 @@ def test_invalid_family_member_is_rejected() -> None:
     with pytest.raises(ValueError):
         spec.bore_dia_mm(7)
     with pytest.raises(ValueError):
-        spec.chord_floor_radius_mm(7, thickness_mm=spec.STANDARD_TOOTH_THICKNESS)
+        spec.floor_radius_max_mm(7)
     with pytest.raises(ValueError):
-        spec.floor_radius_mm(7)
+        spec.floor_radius_min_mm(7)
     with pytest.raises(ValueError):
         spec.outside_dia_mm(7)
     with pytest.raises(ValueError):
@@ -722,36 +960,30 @@ def test_invalid_family_member_is_rejected() -> None:
         notes.gear_data(7)
 
 
-def test_root_to_bore_webs_meet_rule_12_except_the_named_t006() -> None:
-    # Policy rule 12 at the worst case: the printed MIN floor diameter against
-    # the maximum bore.  The D-flat only adds material on +X, so the round
-    # side is the thinnest web.  U40 (user): T012/T018/T024 moved one shaft
-    # land down to meet the target; T006 is the one named exception.
-    upper = part.BORE_DIA_BAND[0]
+def test_root_to_bore_webs_keep_the_floor_and_target_guards() -> None:
+    # Printed root MIN against the outward-rounded maximum bore, not a nominal
+    # floor. T006's approved 0.62 web is separate from the ordinary 2.0 target.
     for teeth in spec.CONFIGURATION_TEETH:
-        web = spec.floor_radius_mm(teeth) - (spec.bore_dia_mm(teeth) + upper) / 2.0
+        web = notes.root_to_bore_web_min_mm(teeth)
         if teeth in spec.WEB_EXCEPTIONS_MM:
-            assert 0.0 < web < spec.MACHINED_WEB_FLOOR_MM, teeth
-            assert web == pytest.approx(spec.WEB_EXCEPTIONS_MM[teeth], abs=0.0005)
+            assert web >= spec.WEB_EXCEPTIONS_MM[teeth] - 1e-9
             continue
-        assert web >= spec.MACHINED_WEB_TARGET_MM, teeth
+        assert web >= spec.MACHINED_WEB_TARGET_MM, (teeth, web)
     # The flat is a chord of the round bore on the axis's +X side: it only
     # ever leaves material, so no web is thinner than the round side's.
     for teeth in spec.CONFIGURATION_TEETH:
         assert 0.0 < spec.bore_flat_offset_mm(teeth) < spec.bore_dia_mm(teeth) / 2.0
-    # T012's MIN floor is its web limit: 2.05, one printed step deeper breaks it.
-    t012_bore = (spec.bore_dia_mm(12) + upper) / 2.0
-    assert spec.floor_radius_mm(12) - t012_bore >= 2.05
-    assert (spec.DIPPED_FLOOR_MIN_MM[12] - 0.001) / 2.0 - t012_bore < 2.05
-    assert set(spec.WEB_EXCEPTIONS_MM) == {6}
-    # U40: the user ruled T006's exception at a 0.621 worst-case web; any
-    # drift below it needs a new ruling, not a quiet edit.
-    t006_web = spec.floor_radius_mm(6) - (spec.bore_dia_mm(6) + upper) / 2.0
-    assert t006_web >= 0.621 - 1e-9
-    assert spec.WEB_EXCEPTIONS_MM[6] == 0.621
-    assert [spec.bore_dia_mm(t) for t in (6, 12, 18, 24, 30)] == pytest.approx(
-        [1.5875, 1.5875, 3.175, 6.35, 9.525]
+    # The terminal gear remains bounded by its current spec-owned special
+    # web floor; neither a stale historical pin nor a new approval is used.
+    terminal = spec.CONFIGURATION_TEETH[0]
+    assert notes.root_to_bore_web_min_mm(terminal) >= (
+        spec.WEB_EXCEPTIONS_MM[terminal] - 1e-9
     )
+    for teeth in spec.CONFIGURATION_TEETH:
+        section = spec.land_section(teeth)
+        assert spec.bore_dia_mm(teeth) == pytest.approx(
+            dt_cone_gear_shaft_spec.SECTION_DIAS[section]
+        )
 
 
 def test_dimensions_record_gear_bores_row_follows_the_spec() -> None:

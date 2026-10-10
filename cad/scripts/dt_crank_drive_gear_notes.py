@@ -1,58 +1,18 @@
-"""Drawing-only text for the crank-drive gear, excluded from the assemblies'
-shared geometry imports.
+"""Drawing-only crank-drive gear text, above the shared geometry specs.
 
-``crank_drive_gear_spec`` is imported by ``cone_swing_platform_spec`` (it needs
-the tip circle to lay the platform out), so anything the spec reads becomes a
-rebuild dependency of every assembly above it. The tooth-thickness requirement
-below is sourced from a FIT CLASS (``fits.gear_mesh.backlash_mm``), and fit
-classes must not reach the frame's recipe (test_dodo_recipe's fine-grained
-config contract) -- so the text that needs them lives here, exactly as
-``cylinder_gear_notes`` does for the cylinder gear.
+The cone-swing platform consumes the tip circle without importing these notes.
+Exact stock tangent-span limits come from the part spec; the crossed mesh's
+standard check lives in crank_mesh_stack.
 """
 
 from __future__ import annotations
-
-import math
 
 import _config
 import dt_crank_drive_gear_spec as spec
 
 
-# The mesh's permitted backlash, from the named fit class ("zero-backlash-in-CAD
-# gears bind in brass"). cad/docs/tolerance-policy.md puts gear teeth in the
-# critical group and says the backlash comes from ``_config.fit`` -- so this is
-# the one place the tooth-thickness requirement can come from.
-BACKLASH_MM = _config.fit("gear_mesh", "backlash_mm")
-
-# Standard full-depth thickness at the pitch circle, before any thinning.
-STANDARD_TOOTH_THICKNESS = math.pi * spec.MODULE_MM / 2.0
-# The gear is cut and measured square to its helix (#906): every transverse
-# thickness reads cos(helix) thinner there.
-_COS_HELIX = math.cos(math.radians(spec.HELIX_ANGLE_DEG))
-
-# Tooth thickness is this part's ONE tooth-system acceptance size, so it is a
-# toleranced requirement, not a REF consequence of the cutter: the pinion it
-# runs against is cut to full thickness, so every thousandth of backlash in the
-# pair comes off THIS gear's flanks. The band is the fit class read backwards --
-# a tooth this much thicker still leaves the minimum backlash, one this much
-# thinner still stays inside the maximum -- which is why it is asymmetric about
-# the nominal the model is cut to.
-TOOTH_THICKNESS_DEVIATIONS = (
-    round(spec.BACKLASH_MM - BACKLASH_MM[0], 3),
-    round(-(BACKLASH_MM[1] - spec.BACKLASH_MM), 3),
-)
-# ... and the same band where the caliper reads it, square to the helix.
-NORMAL_TOOTH_THICKNESS_DEVIATIONS = tuple(
-    round(deviation * _COS_HELIX, 3) for deviation in TOOTH_THICKNESS_DEVIATIONS
-)
-
-
-# The pair's worst-case contact ratio, rounded down so a sheet never claims
-# more (user ruling 2026-09-30). crank_mesh_stack derives it at the open
-# corner with both tips at their printed lower limits; this module is below
-# that stack, so the printed value is a literal the assembly's import and
-# test_crank_mesh_stack hold to the derivation. Both gear sheets print it.
-WORST_CONTACT_RATIO = 0.60
+# Keep the part's stock-form geometry independent of assembly diagnostics.
+GEAR_MESH_BACKLASH_MM = tuple(_config.fit("gear_mesh", "backlash_mm"))
 
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
@@ -60,54 +20,65 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
-# Named exception: MHA-DT-007 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
-CONTACT_RATIO_ROW = ("CONTACT RATIO WITH MHA-DT-010, WORST CASE (REF)", f"{WORST_CONTACT_RATIO:.2f}")
-
-
-# Rule 6's gear-data block: the tooth system a cut-gear drawing cannot express
-# as dimensions. The cutter is named first, in the NORMAL plane it cuts in
-# (#906: one cutter for the pair, set over at the helix angle); every number
-# that follows from it is REF -- the cutter, its depth of cut and the helix
-# setting produce them, and the acceptance sizes are the three native
-# dimensions on the views. The two rows that are NOT REF are the pair's
-# requirement, and each names WHERE it is accepted: the tooth thickness is
-# checked on this part, the backlash it exists to produce is checked when the
-# pair is assembled (the operating centre distance and shaft angle live on the
-# assembly, not here -- codex's iter1 blocker was that the sheet claimed a
-# backlash range a part inspector cannot establish alone).
+# Rule 6's compact data identifies the standard normal full-depth CUTTER.
+# The supported blank's actual cut depth and root envelope are separately REF.
+# The primary exact normal span controls the part, not an ideal tooth caliper.
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{spec.TEETH}"),
         (
             "DIAMETRAL PITCH, NORMAL (CUTTER)",
-            f"{spec.CUTTER_DIAMETRAL_PITCH:.2f} (NONSTANDARD; SAME CUTTER AS MHA-DT-010)",
+            f"{spec.CUTTER_DIAMETRAL_PITCH:.2f}",
         ),
-        ("PRESSURE ANGLE, NORMAL (CUTTER)", f"{spec.CUTTER_PRESSURE_ANGLE_DEG:.1f} DEG"),
+        (
+            "PRESSURE ANGLE, NORMAL (CUTTER)",
+            f"{spec.CUTTER_PRESSURE_ANGLE_DEG:.1f} DEG",
+        ),
+        (
+            "FORM CUTTER / REFERENCE TEETH / VIRTUAL TEETH (REF)",
+            f"#{spec.CUTTER_NUMBER}, {spec.CUTTER_TEETH_RANGE[0]}-"
+            f"{spec.CUTTER_TEETH_RANGE[1]}T / "
+            f"{spec.CUTTER_TEMPLATE.reference_teeth} / "
+            f"{spec.VIRTUAL_TEETH:.{spec.GEAR_DATA_REFERENCE_PLACES}f}",
+        ),
         ("DIAMETRAL PITCH, TRANSVERSE (REF)", f"{spec.DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE, TRANSVERSE (REF)", f"{spec.PRESSURE_ANGLE_DEG:.2f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.2f}"),
-        ("ROOT DIAMETER (mm, REF)", f"{spec.ROOT_DIA:.2f}"),
-        ("WHOLE DEPTH (mm, REF)", f"{spec.WHOLE_DEPTH:.2f}"),
         (
-            "HELIX ANGLE AT PITCH DIAMETER",
-            f"{spec.HELIX_ANGLE_DEG:.1f} DEG {spec.HELIX_HAND}",
+            "ACTUAL ROOT DIA MIN-MAX / MAX CUT DEPTH (mm, REF)",
+            f"{spec.ROOT_DIA_MIN:.3f}-{spec.ROOT_DIA_MAX:.3f} / {spec.WHOLE_DEPTH:.3f}",
         ),
         (
-            "CIRCULAR TOOTH THICKNESS AT PITCH DIA, NORMAL (mm), ACCEPT ON THIS PART",
-            f"{spec.NORMAL_CIRCULAR_TOOTH_THICKNESS:.3f} "
-            f"+{NORMAL_TOOTH_THICKNESS_DEVIATIONS[0]:.3f} / "
-            f"{NORMAL_TOOTH_THICKNESS_DEVIATIONS[1]:.3f}",
+            "HELIX AT PITCH DIA / LEAD (mm/rev, REF)",
+            f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} DEG "
+            f"{spec.HELIX_HAND} / "
+            f"{spec.HELIX_LEAD_MM:.{spec.GEAR_DATA_REFERENCE_PLACES}f}",
         ),
+        (
+            f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL (mm), ACCEPT ON THIS PART",
+            f"{spec.BASE_TANGENT_SPAN_LIMITS_MM[0]:.{spec.BASE_TANGENT_SPAN_PLACES}f} TO "
+            f"{spec.BASE_TANGENT_SPAN_LIMITS_MM[1]:.{spec.BASE_TANGENT_SPAN_PLACES}f}",
+        ),
+        (
+            "ACTUAL TRANSVERSE CIRCULAR PITCH THICKNESS (mm, REF)",
+            f"{spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f}",
+        ),
+        ("NORMAL TOOL PLUNGE (mm, REF)", f"{spec.TOOL_PLUNGE_MM:.3f}"),
         (
             "TRANSVERSE BACKLASH WITH MHA-DT-010, ACCEPT AT ASSEMBLY (mm)",
-            f"{BACKLASH_MM[0]:.2f} TO {BACKLASH_MM[1]:.2f}",
+            f"{GEAR_MESH_BACKLASH_MM[0]:.2f} TO {GEAR_MESH_BACKLASH_MM[1]:.2f}",
+        ),
+        (
+            "TOOTH CUTTING SETUP, ACCEPT AT SETUP",
+            f"{spec.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
         ),
         (
             "TOOTH FORM",
-            f"HELICAL INVOLUTE, LONG ADDENDUM (+{spec.LONG_ADDENDUM_MM:.2f} mm), ARC ROOT FLOOR",
+            f"FULL-DEPTH NORMAL-{spec.CUTTER_DIAMETRAL_PITCH:g}DP "
+            f"PA{spec.CUTTER_PRESSURE_ANGLE_DEG:g} STOCK #{spec.CUTTER_NUMBER}/"
+            f"{spec.CUTTER_TEMPLATE.reference_teeth}T; NOMINAL NORMAL-SECTION SCREW SWEEP",
         ),
-        ("MATES WITH", "CRANK PINION MHA-DT-010, 16T STRAIGHT SPUR, FULL THICKNESS"),
-        CONTACT_RATIO_ROW,
+        ("MATES WITH", "CRANK PINION MHA-DT-010, 16T STOCK #7/14T STRAIGHT SPUR"),
     ]
 )
 

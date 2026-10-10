@@ -46,13 +46,10 @@ from __future__ import annotations
 
 import sys
 
-from _common import (
-    OUT_PNG,
-    OUT_SLDASM,
-    apply_custom_properties,
-    check,
-    run_build,
-)
+from _check import check
+from _custom_properties import apply_custom_properties
+from _paths import OUT_PNG, OUT_SLDASM
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
@@ -67,6 +64,7 @@ from _assembly import (
 )
 from _transforms import IDENTITY
 from _interference_contracts import allowed_interference_pairs
+from _chain_mounts import mounted_wheels
 
 import _telemetry
 
@@ -220,6 +218,7 @@ async def build(adapter) -> dict[str, str]:
     check_no_interference(
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        chain_mounts=mounted_wheels(),
     )
 
     # Title-block identity for the top assembly drawing

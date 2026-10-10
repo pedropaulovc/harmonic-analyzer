@@ -26,7 +26,8 @@ recipes:
 | 90280A194 | `vn-frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
-| 90280A201 | `vn-clamp-screw`, `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A201 | `vn-clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A203 | `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | — (diagnostic recipe; a former `vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
@@ -46,7 +47,8 @@ recipes:
 | 91882A221 | `vn-thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `vn-tube-frame-cap` | Metal Round Cap |
-| 9414T1 | `vn-cone-tip-collar` (catalogue-only; no vendor model) | Set Screw Shaft Collar for 1/16" Diameter |
+| 9414T1 | — (historical MHA-VN-016 until the 2026-10-08 terminal redesign) | Set Screw Shaft Collar for 1/16" Diameter |
+| 94355A213 | `vn-cone-tip-collar` screw stock, ground to the custom dog-tip drawing | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
 | 92865A585 | `vn-hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 93075A194 | `vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
@@ -205,18 +207,40 @@ Catalog specifications checked on September 10, 2026:
   `5bcc08b043bb1e7a8060c75d32db9f30f1528139478ee2a3f35676ab754c05c8`;
   native SLDPRT
   `0e52851776ee9ac5cd03c4d6ad2b1c07715417e4b97b85f032206cd8c2e3fad2`.
-- [9414T1](https://www.mcmaster.com/9414T1/) (`vn-cone-tip-collar`, MHA-VN-016,
-  replacing the turned brass tip bushing by user ruling 2026-09-29): the
-  product page, read in a headless browser on September 29, 2026, gives a
-  one-piece set screw shaft collar for 1/16 in shaft, 1/4 in OD, 3/16 in
-  wide, black-oxide 1215 carbon steel, with one black-oxide steel hex-socket
-  set screw. The vendor STEP was read locally (not committed) for what the
-  page omits: 45 deg breaks 0.009375 in on all four edges and the #2-56
-  radial cup-point set screw at mid-width, 0.050 in hex socket, its outer
-  end 5/32 in from the axis. The numbers live in `vn_cone_tip_collar_spec.py`;
-  `diag_build_9414T1.py` builds them (flat-ended set screw at the cup rim,
-  threads not modelled). No vendor model is kept here, so it has no replica
-  gate; its standalone diagnostic is a catalog-only run.
+- [9414T1](https://www.mcmaster.com/9414T1/) is historical provenance only:
+  MHA-VN-016 used this actual 1/16-inch collar from 2026-09-29 until the
+  2026-10-08 1/32-inch terminal redesign. The September 29 page gave 1/4-inch
+  OD, 3/16-inch width and black-oxide 1215 steel; the uncommitted vendor STEP
+  supplied the 0.009375-inch edge breaks and #2-56 cup screw. It is not
+  relabelled as a 1/32-inch product; its obsolete recipe is removed.
+- [1/32-inch shaft collars](https://www.mcmaster.com/shaft-collars/shaft-diameter~1-32/)
+  were read live on October 8, 2026. 6435K234 (one-piece stainless),
+  6436K236 (two-piece stainless) and 6157K64 (aluminum) are 3/8-inch OD,
+  7/32-inch wide clamp-on collars. They are legitimate smaller-envelope
+  alternatives; preserving the existing set-screw mechanism motivated the
+  custom design, not an explicit user requirement that COTS collars cannot
+  meet. Final selection also depends on actual native assembly air.
+- [94355A213](https://www.mcmaster.com/94355A213/) was verified live on
+  October 8, 2026: 18-8 stainless flat-tip headless set screw, #2-56 UNC-3A,
+  5/16-inch long, 0.035-inch hex, basic major 0.086 inch, Rockwell B80,
+  ASME B18.3. The custom MHA-VN-016 collar is turned steel, not purchased;
+  this genuine screw's tip is ground to its native dog diameter, length and
+  edge-break dimensions. The page gives no socket depth or end break.
+  [ASME B18.3-2012 Table 14](https://www.finesz.com/pic/ASME%20B18.3.pdf)
+  supplies the #2 minimum key engagement (0.060 inch), flat-point minimum
+  diameter (0.039 inch), 45-degree minimum point angle, 30–45-degree socket
+  face chamfer and ±0.01-inch length tolerance for this length. The retained
+  factory depiction is not vendor-exact geometry or a rework instruction.
+  [BBI's ASME thread limits](https://www.brightonbest.com/download/pds/PDS_Thread_Details_Inch_Series.pdf)
+  give the #2-56 3A pitch-diameter minimum, 0.0728 inch; the
+  [2B UNC chart](https://amesweb.info/Screws/unc-thread-chart.aspx) gives the
+  receiver maximum, 0.0772 inch. The terminal flat reader books their radial
+  play and tilt with the collar's native position control. Because 2B gives
+  no internal major/root maximum, the custom print separately controls the
+  native MAX root gauge diameter; its wall proof does not invent a standard
+  maximum. The same package prints the BASIC tap location and datum frame.
+  94355A212 (#2-56 x 1/4 inch, also verified) loses because the shorter
+  screw buries its drive at the collar's worst-case radial flat.
 - [90280A197](https://www.mcmaster.com/90280A197/) was read live on
   September 23, 2026: #8-32 UNC class 2A, 3/4 in (19.05 mm) long under the
   head, fully threaded zinc-plated steel, flat tip, ASME B18.6.3; head
@@ -224,6 +248,18 @@ Catalog specifications checked on September 10, 2026:
   harvested 90280A194 and 90280A199, so the shared fillister family recipe
   builds it from the length alone. No vendor SLDPRT has been harvested for
   this length yet.
+- [90280A203](https://www.mcmaster.com/90280A203/) was read live on
+  October 8, 2026: #8-32 UNC class 2A, 1-1/2 in (38.1 mm) long under the
+  head, fully threaded zinc-plated steel, flat tip, ASME B18.6.3; head
+  diameter 0.27 in and height 0.156 in. It replaces 90280A201 only for
+  MHA-VN-019: the raised pinion block needs the longer grip. The old
+  31.75-mm screw loses the 1.5D engagement floor at the block's printed
+  high limit even before entrance/tip deductions. Candidate 90280A202
+  returned “No results”; it is not a purchasable length. No length band or
+  slot dimensions are stated on the live page; the native family recipe's
+  existing slot depiction is not new vendor-qualified metrology. No vendor
+  SLDPRT was harvested. Base tap/drill depths follow the new stock length
+  and shortest printed block, preserving the ordinary blind-seat reserves.
 - [91255A148](https://www.mcmaster.com/91255A148/) is the #6-32 x 1/2 in
   black-oxide alloy steel button head hex drive screw that held the cone tip
   block under U30 (rule-12 W22). `vn-cone-tip-block-screw` is now
@@ -355,10 +391,12 @@ Catalog specifications checked on September 10, 2026:
   head hex drive screw, #4-40 UNC class 3A, right hand, 1/4 in under the
   head, fully threaded, flat tip, standard-profile head Ø0.213 in x 0.059 in,
   1/16 in hex drive, 140 ksi, Rockwell C39, ASME B18.3 / ASTM F835. The page
-  gives nothing else, so `diag_build_91255A106.py` carries the 91255A148
-  vendor-measured laws over in proportion: flat top 7/5 of the hex, band
-  0.15 of the head height at 10 deg, fillets 0.05, socket floor 0.55, the
-  60 deg countersink. It is catalogue-only: no vendor model is downloaded or
+  gives nothing else, so `diagnostics/diag_mcmaster_button_head.py` and
+  `_button_head_dimensions.py` carry the 91255A148 vendor-measured laws over
+  in proportion: flat top 7/5 of the hex, band 0.15 of the head height at
+  10 deg, fillets 0.05, socket floor 0.55, the 60 deg countersink.
+  `_mcmaster_91255a106.py` and `_mcmaster_91255a108.py` hold their separate
+  SKU dimensions. It is catalogue-only: no vendor model is downloaded or
   kept here, so it has no replica gate, and its standalone diagnostic is a
   catalog-only run. Lost: 91255A105 (3/16 in; shortens the lock stack) and
   18-8 stainless 92949A106 (same head and length, 70 ksi, Rockwell B55;
@@ -368,8 +406,9 @@ Catalog specifications checked on September 10, 2026:
   of the guide's blind tap at the worst case, so the guide's lock receivers
   became through taps and the screw 3/8 in under the head (2.02D at the
   worst case). [INFERENCE] 91255A108 is the 3/8 in length of the same
-  91255A series; its page has not been read live. `diag_build_91255A108.py`
-  builds it with the 91255A106 recipe at that length; it is catalogue-only.
+  91255A series; its page has not been read live. `_mcmaster_91255a108.py`
+  carries that size, and `diag_mcmaster_button_head.py` builds it with the
+  shared laws at that length; it is catalogue-only.
 - [98296A027](https://www.mcmaster.com/98296A027/) was read live on
   September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
   diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,
@@ -387,11 +426,12 @@ Catalog specifications checked on September 10, 2026:
   0.062-0.065 in hole. It is pressed through the knob cup and the knob
   shaft's journal in a hole match-drilled at assembly. No vendor SLDPRT has
   been harvested for it yet.
-- All three spring pins are rows of `diagnostics/diag_mcmaster_spring_pin.py`,
-  which models each as installed, a 1/16 in tube with the catalog wall,
-  without slot or chamfer; `diag_build_98296A026.py`,
-  `diag_build_98296A027.py` and `diag_build_98296A031.py` are its per-size
-  runs.
+- The three spring pins have separate data in `_mcmaster_98296a026.py`,
+  `_mcmaster_98296a027.py` and `_mcmaster_98296a031.py`, passed to
+  `diagnostics/diag_mcmaster_spring_pin.py`. The shared recipe models each
+  as installed, a 1/16 in tube with the catalog wall, without slot or
+  chamfer; `diag_build_98296A026.py`, `diag_build_98296A027.py` and
+  `diag_build_98296A031.py` are its per-size runs.
 - [98381A434](https://www.mcmaster.com/98381A434/) (`vn-crank-seat-drive-pin`,
   MHA-VN-044, crank only) was read live on September 30, 2026: alloy steel dowel pin,
   unplated, 3/32 in diameter (+0.0001 to +0.0003 in), 1/4 in long, end shape

@@ -7,6 +7,10 @@ hold-down hole and the surface-finish controls.  The print-only data
 the plan outline in ``dt_cone_swing_platform_geometry``, so the harmonic base and
 the drive train, which read this module and the geometry, do not re-key when
 the print changes.
+
+The engaged swing angle is set at assembly (tightest cone against a
+feeler/backlash, then lock the cone-lock-knob); the swing stop screw only
+limits the disengaged swing.
 """
 
 from __future__ import annotations
@@ -14,19 +18,24 @@ from __future__ import annotations
 import math
 
 import _config
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
+import cone_line
+import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec
-from dt_crank_drive_gear_spec import OUTSIDE_DIA as CRANK_GEAR_OUTSIDE_DIA
+import dt_crank_drive_gear_spec as gear64
+import dt_post_mount_stack as post_mount
+from cone_stack_end_play import CONE_FLOAT_NORTH
+from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
 POST_ATTACHMENT_SPACING = dt_cone_pivot_post_spec.ATTACHMENT_SPACING
 POST_BLOCK_DIA = dt_cone_pivot_post_spec.BLOCK_DIA
 POST_CONE_BORE_HEIGHT = dt_cone_pivot_post_spec.BORE_HEIGHT
 
 
-PLATE_THICKNESS = 6.35
+PLATE_THICKNESS = post_mount.PLATFORM_THICKNESS_MM
 # User ruling U41 (2026-09-23): the thickness is the stock's, printed as a
 # reference "(6.35)" with "1/4 PLATE AS SUPPLIED" -- no machined thickness
 # band.  Rule-12 stacks through the plate use the stock's mill tolerance.
@@ -52,19 +61,72 @@ PIVOT_RELIEF_FIT_REQUIREMENT = (
     "WITH SHOULDER SEATED ON BASE, LOCK KNOB RELEASED:\n"
     "PLATFORM SWINGS FREELY WITH MINIMAL AXIAL PLAY."
 )
-# The platform swings on the stock 1/4-in shoulder, but this occasional setup
-# pivot has no measured need for a close running bearing fit.  Preserve the
-# established native Hole Wizard close-clearance feature and its table size.
-PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
-PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
 
 
-# The recentered DP25.731 gear is smaller than the intermediate DP24.74 gear;
-# its complete swept OD now clears the platform top, so the obsolete scallop is
-# removed and the plate remains full thickness beneath the mesh.
-CRANK_GEAR_PLATFORM_CLEARANCE = POST_CONE_BORE_HEIGHT - CRANK_GEAR_OUTSIDE_DIA / 2.0
-if CRANK_GEAR_PLATFORM_CLEARANCE < 0.5:
-    raise AssertionError("recentered crank gear has under 0.5 mm platform air")
+_XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+
+def crank_gear_platform_budget() -> dict[str, float]:
+    """Full rotating 64T envelope above the unrelieved platform, in mm.
+
+    Heights are measured from the seated post foot, so base elevation and
+    common plate thickness cancel. Opposite local stock limits still spend
+    twice the mill band. Mount-hole float and yaw translate/rotate in the
+    plate plane and cannot reduce distance to this infinite-plane bound.
+    The retained title-row-sized and relative-crank-FCF deductions are EXTRA
+    conservative air reserves, not tolerances on the BASIC cone incline or
+    independent whole-post pose. Actual global pose is constrained by both
+    supports (dt_cone_support_pose). Boss length and collar width spend their
+    actual general grades; north float and the far 64T face maximize overhang.
+    """
+    post = dt_cone_pivot_post_spec
+
+    def upper(nominal: float, places: int) -> float:
+        band = float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+        return round(nominal, places) + band
+
+    boss_half_max = upper(
+        post.CONE_BOSS_LENGTH, post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]
+    ) / 2.0
+    overhang = (
+        upper(cone_shaft.COLLAR_THICKNESS, cone_shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
+        + round(gear64.FACE_WIDTH, gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"])
+        + gear64.FACE_WIDTH_BAND[0] + CONE_FLOAT_NORTH
+    )
+    running = cone_shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM[1]
+    angular_air_reserve = math.radians(float(_config.title_block("angular")["value_deg"]))
+    height = round(post.BORE_HEIGHT, post.DRAWING_PRECISION_BY_NAME["JournalAxisY"])
+    tip_radius = (
+        round(gear64.OUTSIDE_DIA, gear64.DRAWING_PRECISION_BY_NAME["OutsideDia"])
+        + gear64.OUTSIDE_DIA_TOLERANCE_MM
+    ) / 2.0
+    return {
+        "printed journal height": height,
+        "journal height lower band": -post.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
+        "printed maximum tip radius": -tip_radius,
+        "gear seat eccentricity": -GEAR_SEAT_CLEARANCE[1] / 2.0,
+        "shaft running float and tilt": -(
+            running / 2.0
+            + running / cone_shaft.JOURNAL_SUPPORT_SPAN_MIN_MM * overhang
+        ),
+        "relative-crank FCF air reserve (not a cone-axis grade)": -(boss_half_max + overhang) * math.tan(
+            math.radians(post.CRANK_BORE_ANGLE_LIMIT_DEG)
+        ),
+        "conservative angular air reserve (not a BASIC-angle grade)": -(
+            (boss_half_max + overhang) * math.tan(angular_air_reserve)
+            + height * (1.0 - math.cos(angular_air_reserve))
+        ),
+        "tooth cutting runout": -gear64.TOOTH_RUNOUT_TIR_MM / 2.0,
+        "local platform stock variation": -2.0 * PLATE_STOCK_BAND,
+    }
+
+
+def crank_gear_platform_clearance() -> float:
+    """Worst full-turn plate air; the tip cylinder overbounds every tooth."""
+    return sum(crank_gear_platform_budget().values())
+
+
+if crank_gear_platform_clearance() < 0.5:
+    raise AssertionError("64T unrelieved platform air is below 0.5 mm at print/service worst")
 
 
 # The post's 1/4-in fillister clearance bores mate to these platform threads.
@@ -72,9 +134,9 @@ if CRANK_GEAR_PLATFORM_CLEARANCE < 0.5:
 # counterpart required by that purchased screw family.
 POST_MOUNT_SPEC = HoleSpec("tapped", "1/4-20")
 POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
-# The MHA-VN-031 post screws (MSC 40923898, 1/4-20 fillister, cut to fit, U37c)
+# The MHA-VN-031 post screws (MSC 40923906, 1/4-20 fillister, cut to fit, U37c)
 # thread through the plate, flush to this much short of its underside.
-POST_SCREW_CUT_TO_FIT_SHORT = 0.3
+POST_SCREW_CUT_TO_FIT_SHORT = post_mount.CUT_TO_FIT_SHORT_MM
 POST_MOUNT_THREAD_DIA = 0.25 * 25.4
 # The title block's R0.25/0.25 edge break would take up to 0.25 of thread off
 # each end of the through tap (0.85D worst case, under the audit floor), so the
@@ -129,7 +191,7 @@ POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
 # Pivot bore centre to tip-block centre, cone_line.TIP_BLOCK_PIVOT_OFFSET
 # (asserted equal by build_dt_drive_train_assembly).  Same frame and sign as the
 # pivot-origin plate: -z runs south from the pivot along the cone axis.
-HOLDDOWN_LOCAL_Z = -10.45
+HOLDDOWN_LOCAL_Z = -cone_line.TIP_BLOCK_PIVOT_OFFSET
 # 1.00 to -x of the cone-axis line, with the block's foot tap the same 1.00
 # to -x of its adjuster axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), so the
 # block body still stands centred on the cone line.  The offset exists only
@@ -155,7 +217,6 @@ POST_MOUNT_STATION_TOL_MM = 0.10
 # build_dt_drive_train_assembly asserts them equal to the MHA-VN-030 part.
 HOLDDOWN_SCREW_HEAD_DIA = 0.183 * 25.4
 HOLDDOWN_SCREW_HEAD_H = 0.112 * 25.4
-_XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
 _DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 # #4 CLOSE clearance, drilled: the title block's DRILLED HOLES +0.10/0 row.
 HOLDDOWN_CLEARANCE_DIA = CLEARANCE_MM[("#4", "close")]

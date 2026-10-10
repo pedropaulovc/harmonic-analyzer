@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import sys
 import types
 from pathlib import Path
 
 import _config
+import cone_line
+import dt_crank_drive_gear_spec as gear64
+import dt_cone_swing_platform_crank_axis as crank_axis
 import vn_cone_pivot_screw_spec
 import build_dt_cone_swing_platform as part
 import dt_cone_pivot_post_spec
@@ -16,7 +20,7 @@ import dt_cone_swing_platform_geometry as geometry
 import dt_cone_swing_platform_spec as spec
 import draw_dt_cone_swing_platform as drawing
 import pytest
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
 
@@ -41,14 +45,23 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
 
 
-def test_pivot_preserves_native_close_clearance_hole() -> None:
-    assert spec.PIVOT_HOLE_SPEC.kind == "clearance"
-    assert spec.PIVOT_HOLE_SPEC.size == "1/4"
-    assert spec.PIVOT_HOLE_SPEC.fit == "close"
-    assert spec.PIVOT_HOLE_SPEC.end == "through_all"
-    assert spec.PIVOT_HOLE_DIA == blind_cut_dia_mm(spec.PIVOT_HOLE_SPEC)
-    assert spec.PIVOT_HOLE_DIA == pytest.approx(6.756)
-    assert spec.PIVOT_HOLE_DIA > vn_cone_pivot_screw_spec.SHOULDER_DIA
+def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
+    """Main ruling 2026-10-10: the plate is reamed Ø6.350 H7 on the 6.3246-6.350
+    shoulder, band from config, carried natively on the Hole Wizard feature."""
+    import _config
+
+    import dt_cone_swing_platform_pivot_spec as pivot_spec
+
+    assert pivot_spec.PIVOT_HOLE_SPEC.kind == "drilled_fractional"
+    assert pivot_spec.PIVOT_HOLE_SPEC.size == "1/4"
+    assert pivot_spec.PIVOT_HOLE_SPEC.end == "through_all"
+    assert pivot_spec.PIVOT_HOLE_DIA == blind_cut_dia_mm(pivot_spec.PIVOT_HOLE_SPEC)
+    assert pivot_spec.PIVOT_HOLE_DIA == pytest.approx(6.350)
+    assert pivot_spec.PIVOT_HOLE_BAND == tuple(
+        _config.fit("cone_drum_oblique_mesh", "pivot_bore_band_mm")
+    ) == (0.015, 0.0)
+    shoulder_max = vn_cone_pivot_screw_spec.SHOULDER_DIA + vn_cone_pivot_screw_spec.SHOULDER_DIA_BAND[0]
+    assert pivot_spec.PIVOT_HOLE_DIA + pivot_spec.PIVOT_HOLE_BAND[1] >= shoulder_max
 
 
 def test_post_mount_pattern_is_derived_from_its_mating_post() -> None:
@@ -112,16 +125,45 @@ def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
 
 
 def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
-    assert part.PLATE_LEN == pytest.approx(223.3541869456341)
-    assert geometry.POST_SOUTH_MARGIN == pytest.approx(3.175)
-    assert geometry.PLATE_SOUTH_Z == pytest.approx(-216.3541869456341)
+    assert geometry.POST_LOCAL_Z == cone_line.POST_STATION - cone_line.PIVOT_STATION
+    assert geometry.PLATE_SOUTH_Z == pytest.approx(
+        geometry.POST_LOCAL_Z - spec.POST_BLOCK_DIA / 2.0 - geometry.POST_SOUTH_MARGIN
+    )
+    assert part.PLATE_LEN == pytest.approx(
+        geometry.NORTH_OVERHANG - geometry.PLATE_SOUTH_Z
+    )
     assert geometry.POST_MAIN_DIA == spec.POST_BLOCK_DIA
     assert geometry.POST_FOOT_CONTAINMENT >= 0.25
     assert spec.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.50)
     assert part.PLATE_T - spec.PIVOT_BEARING_THICKNESS == pytest.approx(
         spec.PIVOT_BEARING_RELIEF_DEPTH
     )
-    assert spec.CRANK_GEAR_PLATFORM_CLEARANCE > 0.5
+    assert spec.crank_gear_platform_clearance() >= 0.5
+
+
+def test_stepped_collar_extension_keeps_post_and_tip_attachment_laws() -> None:
+    from dt_cone_swing_platform_crank_axis import CRANK_AXIS_OFF
+
+    # The retained 7.5 extension plus the custom collar body's northward shift.
+    from cone_shaft_land_bands import TIP_COLLAR_BODY_NORTH_SHIFT_MM
+
+    assert cone_line.TIP_END_EXTENSION_MM == 7.5 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
+    assert cone_line.PIVOT_STATION - cone_line.T006_NORTH_FACE == pytest.approx(
+        23.0 + cone_line.TIP_END_EXTENSION_MM
+    )
+    assert cone_line.PIVOT_STATION - cone_line.TIP_BLOCK_NORTH_FACE == pytest.approx(
+        cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
+    )
+    assert cone_line.TIP_BLOCK_PIVOT_OFFSET == pytest.approx(
+        cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET + cone_line.TIP_BLOCK_Z / 2.0
+    )
+    assert CRANK_AXIS_OFF == pytest.approx(cone_line.PIVOT_XZ[0] - cone_line.X_CRANK)
+    assert geometry.POST_MOUNT_WEST_XZ[1] == pytest.approx(
+        geometry.POST_LOCAL_Z + geometry.POST_MOUNT_DZ
+    )
+    assert geometry.POST_MOUNT_EAST_XZ[1] == pytest.approx(
+        geometry.POST_LOCAL_Z - geometry.POST_MOUNT_DZ
+    )
 
 
 def test_pivot_relief_runs_out_through_the_north_edge() -> None:
@@ -146,7 +188,7 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     # Only the NW fillet reaches over the 10.50 strip, and only by a sliver.
     overlaps = {
         label: part._north_fillet_relief_overlap(label, r)
-        for label, _x, _z, r in part._CORNERS
+        for label, _x, _z, r in part.PLATE_CORNERS
     }
     assert overlaps["NE"] == 0.0 and overlaps["SW"] == 0.0 and overlaps["SE"] == 0.0
     assert 0.0 < overlaps["NW"] < part._corner_fillet_area("NW", 8.0)
@@ -173,6 +215,68 @@ def test_corner_arc_count_follows_the_relief_overlap() -> None:
         drawing.check_corner_arc_plan(
             "CornerNWR", [split[0], (0.0070, 0.007, 0.008)], 2
         )
+
+
+def test_corner_arc_station_is_the_fillet_centre_in_model_space() -> None:
+    """The farm run at 039e557da found 0 CornerSW arcs at a stale sheet station.
+
+    The station is now the model fillet centre: radius r from both edges
+    that meet at the corner, so moving the plate on the sheet cannot stale it.
+    """
+    corners = part.PLATE_CORNERS
+    for index, (label, x, z, radius) in enumerate(corners):
+        cx, cz = drawing.corner_fillet_centre_mm(label)
+        for _n, nx, nz, _r in (corners[index - 1], corners[(index + 1) % len(corners)]):
+            cross = (nx - x) * (cz - z) - (nz - z) * (cx - x)
+            assert abs(cross) / math.hypot(nx - x, nz - z) == pytest.approx(radius)
+    source = inspect.getsource(drawing._assert_corner_radius_attachment)
+    assert "station_xy" not in source and "corner_fillet_centre_mm" in source
+
+
+def test_r12_corner_arrow_lands_at_its_arc_middle() -> None:
+    """Run 20261010T072401692Z: CornerSER's fixed shelf put its arrow at
+    183.3 deg about the R12 centre, past the arc's 178 deg end, on the east
+    edge.  The text now derives from the arc's middle; the old station is
+    the positive control."""
+    px, py = drawing.PROFILE_PIVOT_XY
+    corners = {c[0]: c for c in part.PLATE_CORNERS}
+    index = [c[0] for c in part.PLATE_CORNERS].index("SE")
+    _label, vx, vz, radius = corners["SE"]
+    cx, cz = drawing.corner_fillet_centre_mm("SE")
+    centre = (px + cx * 0.0005, py - cz * 0.0005)
+
+    def sheet_angle(x, z):
+        return math.degrees(math.atan2(-(z - cz), x - cx)) % 360.0
+
+    # The arc's ends are the tangent points on the two edges into the vertex.
+    ends = []
+    for _n, nx, nz, _r in (
+        part.PLATE_CORNERS[index - 1], part.PLATE_CORNERS[(index + 1) % 4]
+    ):
+        length = math.hypot(nx - vx, nz - vz)
+        ux, uz = (nx - vx) / length, (nz - vz) / length
+        t = (cx - vx) * ux + (cz - vz) * uz
+        ends.append(sheet_angle(vx + t * ux, vz + t * uz))
+    low, high = sorted(ends)
+    assert high - low < 180.0
+
+    def arrow_angle(text_xy):
+        knee = (
+            text_xy[0] + drawing.RADIUS_KNEE_FROM_TEXT[0],
+            text_xy[1] + drawing.RADIUS_KNEE_FROM_TEXT[1],
+        )
+        return math.degrees(math.atan2(knee[1] - centre[1], knee[0] - centre[0])) % 360.0
+
+    text = drawing.PROFILE_KEEP["CornerSER"]
+    assert arrow_angle(text) == pytest.approx((low + high) / 2.0, abs=1e-6)
+    assert not low <= arrow_angle((0.040, 0.2435)) <= high
+    # R12.0 is 11.7 x 3.9 mm round its position (run 20261009T172850508Z):
+    # above the 223.4 south witness, below the 24.0 dimension line (2.6 mm
+    # under its text), and left of the 24.0 east extension line.
+    south_witness_y = py - min(c[2] for c in part.PLATE_CORNERS) * 0.0005
+    assert text[1] - 0.00195 > south_witness_y + 0.0015
+    assert text[1] + 0.00195 < drawing.PROFILE_KEEP["SouthEastX"][1] - 0.0026 - 0.0015
+    assert text[0] + 0.00585 < px + vx * 0.0005 - 0.002
 
 
 def test_disengaged_collar_margin_survives_general_bands() -> None:
@@ -483,7 +587,19 @@ def test_holddown_section_cuts_through_the_hole_axis_across_the_plate() -> None:
     assert ends[0][0] * 1000.0 < east and ends[1][0] * 1000.0 > west
     # The plate's chord at the hold-down station, 10.45 south of the pivot on
     # #1128's stack (the prism block's centre station).
-    assert west - east == pytest.approx(26.89, abs=0.01)
+    fraction = (geometry.NORTH_OVERHANG - spec.HOLDDOWN_LOCAL_Z) / geometry.PLATE_LEN
+    assert west - east == pytest.approx(
+        geometry.HALF_WIDTH_N
+        + geometry.WEST_HALF_N
+        + (
+            geometry.EAST_HALF_S
+            - geometry.HALF_WIDTH_N
+            + geometry.WEST_HALF_S
+            - geometry.WEST_HALF_N
+        )
+        * fraction,
+        abs=1e-9,
+    )
     assert east < spec.HOLDDOWN_LOCAL_X - spec.HOLDDOWN_CBORE_DIA / 2.0
     assert west > spec.HOLDDOWN_LOCAL_X + spec.HOLDDOWN_CBORE_DIA / 2.0
 
@@ -525,8 +641,14 @@ def test_holddown_section_arrows_clear_the_profile_plan() -> None:
     arrows, letters = _cc_arrows_and_letters(drawing.HOLDDOWN_SECTION_LINE_X_MM)
     for side, arrow, letter in zip((-1, 1), arrows, letters):
         assert _clears_plate(arrow, side) and _clears_plate(letter, side)
-    r10_leader = ((0.051, 0.139), (0.0686 - 0.00354, 0.1392 - 0.00354))
-    r8_leader = ((0.135, 0.118), (0.0723 + 0.00283, 0.1382 - 0.00283))
+    def arc_tip(label, dx, dy):
+        # Sheet-up is model -z; the leader meets the arc at 45 degrees.
+        cx, cz = drawing.corner_fillet_centre_mm(label)
+        radius = {c[0]: c[3] for c in part.PLATE_CORNERS}[label] * 0.0005 / math.sqrt(2.0)
+        return (px + cx * 0.0005 + dx * radius, py - cz * 0.0005 + dy * radius)
+
+    r10_leader = ((0.051, 0.139), arc_tip("NE", -1.0, -1.0))
+    r8_leader = ((0.135, 0.118), arc_tip("NW", 1.0, -1.0))
     north_edge_y = py - part.NORTH_OVERHANG * 0.0005
     nw_x = px + part.WEST_HALF_N * 0.0005
     nw_extension = ((nw_x, 0.113), (nw_x, north_edge_y))
@@ -561,7 +683,9 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
         "CounterBoreDepth": spec.HOLDDOWN_CBORE_DEPTH,
     }
     assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
-    assert (spec.HOLDDOWN_LOCAL_X, spec.HOLDDOWN_LOCAL_Z) == (-1.0, -10.45)
+    assert spec.HOLDDOWN_LOCAL_X == -1.0
+    assert spec.HOLDDOWN_LOCAL_Z == -cone_line.TIP_BLOCK_PIVOT_OFFSET
+    assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-10.45)
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 
@@ -649,7 +773,10 @@ def test_holddown_guards_refuse_a_spec_that_fails_at_print_worst(
 @pytest.mark.parametrize(
     "replacement",
     [
-        ("HOLDDOWN_LOCAL_Z = -10.45", "HOLDDOWN_LOCAL_Z = -6.00"),  # onto the pivot
+        (
+            "HOLDDOWN_LOCAL_Z = -cone_line.TIP_BLOCK_PIVOT_OFFSET",
+            "HOLDDOWN_LOCAL_Z = -6.00",
+        ),  # onto the pivot
         ("HOLDDOWN_LOCAL_X = -1.0", "HOLDDOWN_LOCAL_X = 6.0"),  # to the west edge
     ],
 )
@@ -694,6 +821,68 @@ def test_relief_width_text_sits_between_its_neighbours() -> None:
     # No compass word: sheet-down is model north (codex B2 on 68565ace).
     assert not any(word in drawing.RELIEF_WIDTH_CALLOUT for word in ("NORTH", "SOUTH"))
     assert "PIVOT" in drawing.RELIEF_WIDTH_CALLOUT.split("\n")[-1]
+
+
+def test_crank_axis_follows_the_actual_train() -> None:
+    assert crank_axis.CRANK_AXIS_OFF == cone_line.PIVOT_XZ[0] - cone_line.X_CRANK
+    assert crank_axis.CRANK_AXIS_Y == cone_line.Y_CRANK - cone_line.Y_BASE_TOP
+    assert crank_axis.CRANK_PLANE_ANGLE == cone_line.INCLINE_DEG
+    assert spec.POST_CONE_BORE_HEIGHT > gear64.OUTSIDE_DIA / 2.0
+    assert spec.crank_gear_platform_clearance() >= 0.5
+    assert len(drawing.SHEET_NAMES) == 1
+    assert drawing.SHEET_SCALES == {drawing.SHEET_NAMES[0]: drawing.SHEET_SCALE}
+
+
+def test_unrelieved_plate_budget_spends_all_booked_sources() -> None:
+    import dt_cone_pivot_post_spec as post
+
+    budget = spec.crank_gear_platform_budget()
+    assert set(budget) == {
+        "printed journal height", "journal height lower band",
+        "printed maximum tip radius", "gear seat eccentricity",
+        "shaft running float and tilt", "relative-crank FCF air reserve (not a cone-axis grade)",
+        "conservative angular air reserve (not a BASIC-angle grade)", "tooth cutting runout",
+        "local platform stock variation",
+    }
+    assert budget["journal height lower band"] == -post.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
+    assert budget["local platform stock variation"] == -2 * spec.PLATE_STOCK_BAND
+    assert budget["tooth cutting runout"] == -gear64.TOOTH_RUNOUT_TIR_MM / 2
+    assert all(value < 0 for name, value in budget.items() if name != "printed journal height")
+    assert spec.crank_gear_platform_clearance() == pytest.approx(sum(budget.values()))
+    assert spec.cone_shaft.JOURNAL_SUPPORT_SPAN_MIN_MM < post.CONE_BOSS_LENGTH
+
+
+def test_platform_air_uses_actual_contact_span(monkeypatch) -> None:
+    initial = spec.crank_gear_platform_budget()["shaft running float and tilt"]
+    monkeypatch.setattr(
+        spec.cone_shaft, "JOURNAL_SUPPORT_SPAN_MIN_MM",
+        spec.cone_shaft.JOURNAL_SUPPORT_SPAN_MIN_MM / 2.0,
+    )
+    assert spec.crank_gear_platform_budget()["shaft running float and tilt"] < initial
+
+
+@pytest.mark.parametrize("air", (0.0, 0.49))
+def test_unrelieved_plate_preflight_refuses_below_floor(monkeypatch, air) -> None:
+    monkeypatch.setattr(part, "crank_gear_platform_clearance", lambda: 0.5)
+    part.require_crank_gear_platform_clearance()
+    monkeypatch.setattr(part, "crank_gear_platform_clearance", lambda: air)
+    with pytest.raises(AssertionError, match="unrelieved platform air"):
+        part.require_crank_gear_platform_clearance()
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    build = source.split("async def build(adapter)", 1)[1]
+    assert build.index("require_crank_gear_platform_clearance()") < build.index(
+        'check("create_part"'
+    )
+
+
+def test_lower_journal_and_larger_tip_close_air_without_changing_bands(monkeypatch) -> None:
+    import dt_cone_pivot_post_spec as post
+
+    before = spec.crank_gear_platform_clearance()
+    monkeypatch.setattr(gear64, "OUTSIDE_DIA", gear64.OUTSIDE_DIA + 2.0)
+    assert spec.crank_gear_platform_clearance() == pytest.approx(before - 1.0)
+    monkeypatch.setattr(post, "BORE_HEIGHT", post.BORE_HEIGHT - 3.0)
+    assert spec.crank_gear_platform_clearance() < 0.5
 
 
 class _PixelDrawing:

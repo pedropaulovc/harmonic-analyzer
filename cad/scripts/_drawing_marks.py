@@ -1,7 +1,7 @@
 """Part-side drawing support: dimension marks + manufacturing properties.
 
 Imported ONLY by parts that ship a manufacturing drawing (see
-``_drawing_registry``).  Deliberately a separate module from ``_common`` so
+``_drawing_registry``).  Deliberately separate from ``_part_properties`` so
 adding a drawing to one part never shifts the recipe digest of the ~100 parts
 that carry no drawing.
 
@@ -18,23 +18,15 @@ from typing import Any, Mapping
 
 import _config
 import _telemetry
-from _common import (
-    apply_custom_properties,
-    _bind,
-    _com_invoke,
-    _com_put,
-    _dim_owner_feature,
-    _early_bound,
-    _feature_by_name,
-    _feature_display_dimensions,
-    _iter_features,
-    _read_member,
-)
+from _com import _bind, _com_invoke, _com_put, _early_bound, _read_member
+from _custom_properties import apply_custom_properties
+from _dimensions import _dim_owner_feature, _feature_display_dimensions
+from _feature_tree import _feature_by_name, _iter_features
 
 
 def _feature_tree(feature: Any) -> Any:
     """Yield ``feature`` and every subfeature, depth-first, as RAW dispatches
-    (``_common._com_invoke``: one round trip a step, no wrapper per feature).
+    (``_com._com_invoke``: one round trip a step, no wrapper per feature).
 
     Hole Wizard placement dimensions live on ``ProfileFeature`` subfeatures,
     so both the mark AND the clear path must walk the same tree — a clear
@@ -256,6 +248,28 @@ def apply_drawing_precision(
                 decimals,
                 display=resolved[dimension_name][0],
             )
+
+
+def set_dimension_basic_tolerance(
+    adapter: Any,
+    feature_name: str,
+    dimension_name: str,
+) -> None:
+    """Make a frame-controlled locator BASIC on its source-model dimension.
+
+    BASIC defines the nominal locator; it must not inherit a title-block
+    size or angle tolerance. The owning spec supplies its surviving frame.
+    """
+    _display, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    if dimension.SetToleranceType(1) is not True:  # swTolType_e.swTolBASIC
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: SetToleranceType rejected BASIC"
+        )
+    if int(dimension.GetToleranceType()) != 1:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: BASIC tolerance type did not persist"
+        )
+    _telemetry.success(f"toleranced {dimension_name}@{feature_name}: BASIC")
 
 
 def set_dimension_symmetric_tolerance(

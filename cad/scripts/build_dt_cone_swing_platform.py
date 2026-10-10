@@ -10,6 +10,10 @@ the cylinder set (video 4/4, engage/disengage stills). Swing separation
 grows with distance from the pivot, so pivoting at the TIP gives the
 big-end gears the largest throw.
 
+The platform is ADJUSTABLE: at assembly swing it in until the tightest cone
+meets a feeler/backlash, then lock the cone-lock-knob. The swing stop screw
+only limits the disengaged swing and plays no part in meshing.
+
 Plan shape is the p.18 wedge, ASYMMETRIC about the shaft line: the east
 side tapers 16 -> 24 half-width, the west side flares 8 -> 37 so the
 run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
@@ -22,11 +26,11 @@ round-ended about the pivot and open through the north edge (rule-12 W18),
 reduces only the local bearing thickness to 6.10, preserving 0.25 running
 axial clearance without lowering the plate or its mounted hardware.
 
-The shortened envelope and paired 1/4-20 post mounts are the direct platform
-cascade from ``cone-pivot-post-v2.SLDPRT``.  Its 42.011 mm casting foot is
-centred at cone station -39.9014; the post's world-X hole pair is transformed
-into this plate's engaged local frame so the two native tapped holes remain
-coaxial after Ry(+12.5182 deg) placement.
+The platform envelope and paired 1/4-20 post mounts follow the post spec.
+The post's world-X hole pair is transformed into this plate's engaged local
+frame so the native tapped holes remain coaxial after the configured incline
+rotation. The crank geometry is raised above the unrelieved top face; no
+crank-gear pocket is cut into the platform.
 
 The asymmetric flare keeps the part CHIRAL; the assembly places it at
 Ry(+INCLINE), under which part-local +x tips machine WEST at the engaged
@@ -49,32 +53,26 @@ import math
 import sys
 from typing import Any
 
-from _common import (
-    PANEL_BLACK,
+from _appearance import PANEL_BLACK, apply_color, apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound, _read_member
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    _read_member,
     add_line_chain,
     anchor_point_to_origin,
-    apply_color,
-    apply_material,
-    check,
-    define_circle,
-    define_polygon_chain,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    name_dimensions,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -99,6 +97,7 @@ from dt_cone_swing_platform_crank_axis import (
     CRANK_SEAT_ANCHOR,
 )
 from dt_cone_swing_platform_geometry import (
+    PLATE_CORNERS,
     EAST_HALF_S,
     HALF_WIDTH_N,
     NORTH_OVERHANG,
@@ -122,6 +121,7 @@ from dt_cone_swing_platform_geometry import (
     WEST_HALF_S,
 )
 from dt_cone_swing_platform_spec import (
+    crank_gear_platform_clearance,
     HOLDDOWN_CBORE_DEPTH,
     HOLDDOWN_CBORE_DIA,
     HOLDDOWN_CLEARANCE_DIA,
@@ -131,14 +131,17 @@ from dt_cone_swing_platform_spec import (
     HOLDDOWN_STATION_TOL_MM,
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
-    PIVOT_HOLE_DIA,
-    PIVOT_HOLE_SPEC,
     PIVOT_RELIEF_FIT_REQUIREMENT,
     POST_MOUNT_ENGAGEMENT_NOTE,
     POST_MOUNT_SPEC,
     POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_DIA,
     SURFACE_FINISHES,
+)
+from dt_cone_swing_platform_pivot_spec import (
+    PIVOT_HOLE_BAND,
+    PIVOT_HOLE_DIA,
+    PIVOT_HOLE_SPEC,
 )
 
 PART_NAME = "dt-cone-swing-platform"
@@ -310,8 +313,8 @@ def _north_fillet_relief_overlap(label: str, r: float) -> float:
     is the north edge (horizontal), so the fillet circle is tangent to it at
     ``x_t`` and the removed wedge above the arc spans ``x_t`` to the corner.
     """
-    idx = [c[0] for c in _CORNERS].index(label)
-    x, z = _CORNERS[idx][1], _CORNERS[idx][2]
+    idx = [c[0] for c in PLATE_CORNERS].index(label)
+    x, z = PLATE_CORNERS[idx][1], PLATE_CORNERS[idx][2]
     if abs(z - NORTH_OVERHANG) > 1e-9:
         return 0.0
     tangent = r / math.tan(_corner_theta(label) / 2.0)
@@ -325,24 +328,12 @@ def _north_fillet_relief_overlap(label: str, r: float) -> float:
     )
 
 
-# --- rounded plan corners (item: they echo the neighbouring hardware) --------
-# (authored x, local z, radius): north pair ~ the pivot screw head, south-east
-# ~ the green column foot.  The south-west fillet is reduced around the
-# relocated lock notch so the corner round and the closed seat do not overlap.
-_CORNERS = (
-    ("NE", -HALF_WIDTH_N, NORTH_OVERHANG, 10.0),
-    ("NW", WEST_HALF_N, NORTH_OVERHANG, 8.0),
-    ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 5.0),
-    ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 12.0),
-)
-
-
 def _corner_theta(label: str) -> float:
     """Interior angle of the named sharp plan corner, radians."""
-    idx = [c[0] for c in _CORNERS].index(label)
-    x, z = _CORNERS[idx][1], _CORNERS[idx][2]
-    xp, zp = _CORNERS[idx - 1][1], _CORNERS[idx - 1][2]
-    xn, zn = _CORNERS[(idx + 1) % 4][1], _CORNERS[(idx + 1) % 4][2]
+    idx = [c[0] for c in PLATE_CORNERS].index(label)
+    x, z = PLATE_CORNERS[idx][1], PLATE_CORNERS[idx][2]
+    xp, zp = PLATE_CORNERS[idx - 1][1], PLATE_CORNERS[idx - 1][2]
+    xn, zn = PLATE_CORNERS[(idx + 1) % 4][1], PLATE_CORNERS[(idx + 1) % 4][2]
     v1 = (xp - x, zp - z)
     v2 = (xn - x, zn - z)
     dot = v1[0] * v2[0] + v1[1] * v2[1]
@@ -367,7 +358,17 @@ if not _CRANK_AXIS_FEATURES.isdisjoint(DRAWING_DIMENSIONS):
     )
 
 
+def require_crank_gear_platform_clearance() -> None:
+    """Bound the complete rotating tip cylinder above the unrelieved plate."""
+    air = crank_gear_platform_clearance()
+    if air < 0.5:
+        raise AssertionError(
+            f"64T unrelieved platform air {air:.6f} mm is below 0.5 mm"
+        )
+
+
 async def build(adapter) -> dict[str, str]:
+    require_crank_gear_platform_clearance()
     from solidworks_mcp.adapters.base import (
         CreateAxisParameters,
         CreatePlaneParameters,
@@ -491,19 +492,18 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
-    # Pivot screw clearance hole at the origin: preserve the native Hole
-    # Wizard 1/4 close-clearance feature used by this occasional setup pivot.
-    # There is no measured evidence that its stock shoulder needs a tighter
-    # running-bearing fit, so the title block's DRILLED HOLES +0.10/0 row
-    # governs it; a per-feature band would only restate that row.
+    # Pivot bore at the origin: native Hole Wizard 1/4 drill-size hole,
+    # reamed H7 on the stock shoulder (dt_cone_swing_platform_spec). The band
+    # lives on the feature, so the sheet's REAM callout displays it.
     pivot_dia = PIVOT_HOLE_DIA
     wizard_holes(
         adapter,
         PIVOT_HOLE_SPEC,
         [[0.0, 0.0, 0.0]],
         (0.0, -1.0, 0.0),
-        "pivot screw hole (1/4 clearance)",
+        "pivot bore (1/4 reamed H7)",
         name="PivotHole",
+        dia_tolerance_mm=(-PIVOT_HOLE_BAND[1], PIVOT_HOLE_BAND[0]),
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = await volume_check(
@@ -789,7 +789,7 @@ async def build(adapter) -> dict[str, str]:
     # Rounded plan corners LAST (they consume the sharp corner edges; the
     # notch-mouth edges and the axis construction are already in place).
     v_fillets = 0.0
-    for lbl, cx_a, cz_l, r in _CORNERS:
+    for lbl, cx_a, cz_l, r in PLATE_CORNERS:
         check(
             f"fillet corner {lbl}",
             await adapter.add_fillet(r, [[cx_a, PLATE_T / 2.0, cz_l]]),
