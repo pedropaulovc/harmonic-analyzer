@@ -81,6 +81,15 @@ def test_thickness_is_the_one_thirty_second_stock() -> None:
     assert "_set_stock_text" in build_calls
 
 
+def test_bore_callout_states_its_process() -> None:
+    """PR #1317 machinist review: the banded bore printed no DRILL/REAM.
+    Rule 7: a hole callout states the process; the bore is a drilled-class
+    running clearance on the shaft."""
+    assert drawing.BORE_CALLOUT == "DRILL THRU"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_dimension_callouts(adapter, annotations, {"BoreDia": BORE_CALLOUT})' in source
+
+
 def test_registry_row_is_two_of_the_one_thirty_second_stock() -> None:
     row = _config.parts("ch-rocker-thrust-washer")
     assert row["number"] == "MHA-CH-009"

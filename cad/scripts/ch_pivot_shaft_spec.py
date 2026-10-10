@@ -102,11 +102,14 @@ SURFACE_FINISHES = (
 )
 
 # The diameter and length live on the revolved half-profile, the dome height
-# on the north crown's own profile (the south crown is driven by the same
-# global and prints as "BOTH ENDS"), the flats on their one cut's profile.
+# and its sphere radius on the north crown's own profile (the south crown is
+# driven by the same globals and prints as "BOTH ENDS"), the flats on their
+# one cut's profile. The radius prints as a spherical REFERENCE: the height
+# on the toleranced diameter fixes it, and it tells the shop the crown is a
+# sphere (PR #1317 machinist review: the height alone left the profile open).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDia", "ShaftLength"},
-    "NorthCapProfile": {"DomeHeight"},
+    "NorthCapProfile": {"DomeHeight", "Radius"},
     "FlatProfile": {"FlatLength", "FlatAF", "NorthFlatStation", "SouthFlatStation"},
 }
 
@@ -115,10 +118,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # depth band its sizing above assumes. The dome only has to read as a dome
 # and the flat's length is checked at .X. The stations hold each flat under
 # its screw at .XX. The cylinder length is a REFERENCE the cut-to-fit callout
-# governs: one place.
+# governs: one place, like the dome's reference sphere radius.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDia": 3, "ShaftLength": 1},
-    "NorthCapProfile": {"DomeHeight": 1},
+    "NorthCapProfile": {"DomeHeight": 1, "Radius": 1},
     "FlatProfile": {
         "FlatLength": 1,
         "FlatAF": 3,

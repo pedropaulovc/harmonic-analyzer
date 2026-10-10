@@ -26,17 +26,19 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["ch_pivot_shaft"].script == Path(drawing.__file__).resolve()
 
 
-def test_every_marked_dimension_lands_on_the_side_view() -> None:
+def test_every_marked_dimension_lands_on_the_side_view_or_its_detail() -> None:
     """Policy rule 7: a turned part's diameters and lengths sit on the side
-    view, and all of them are authored on Right-plane sketches: the
-    half-profile, the flats' cut and the caps."""
+    view (or DETAIL A, a 5:1 detail of it), and all of them are authored on
+    Right-plane sketches: the half-profile, the flats' cut and the caps."""
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.PROFILE_KEEP) == marked
+    assert set(drawing.PROFILE_KEEP) | set(drawing.DETAIL_KEEP) == marked
+    assert not set(drawing.PROFILE_KEEP) & set(drawing.DETAIL_KEEP)
     assert marked == {
         "ShaftDia",
         "ShaftLength",
         "DomeHeight",
+        "Radius",
         "FlatLength",
         "FlatAF",
         "NorthFlatStation",
@@ -69,6 +71,7 @@ def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None
         "ShaftDia": 3,
         "ShaftLength": 1,
         "DomeHeight": 1,
+        "Radius": 1,
         "FlatLength": 1,
         "FlatAF": 3,
         "NorthFlatStation": 2,
@@ -107,7 +110,7 @@ def test_the_length_is_a_cut_to_fit_reference() -> None:
 
 
 def test_both_ends_are_domed_and_the_height_is_model_owned() -> None:
-    assert spec.DRAWING_DIMENSIONS["NorthCapProfile"] == {"DomeHeight"}
+    assert spec.DRAWING_DIMENSIONS["NorthCapProfile"] == {"DomeHeight", "Radius"}
     assert spec.DOME_CALLOUT == "BOTH ENDS"
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '_dome(adapter, "North", 0.0, -1.0)' in source
@@ -237,14 +240,45 @@ def _stands_outside(text_x: float, half_width: float, witnesses: tuple) -> bool:
 
 def test_dome_height_callout_stands_outside_its_witness_pair() -> None:
     """r743-3 eye pass: centred on its 1.5 mm span, "1.5 BOTH ENDS" was
-    crossed by both witness lines. It now ends left of the dome tip, clear
-    of the shaft-length witness there too."""
+    crossed by both witness lines. In DETAIL A it ends left of the dome tip."""
     witnesses = (
-        drawing.NORTH_END_X - spec.DOME_HEIGHT * drawing._MM,  # dome tip
-        drawing.NORTH_END_X,  # shaft end
+        drawing._detail_x(spec.DOME_HEIGHT),  # dome tip
+        drawing._detail_x(0.0),  # shaft end
     )
-    text_x, _ = drawing.PROFILE_KEEP["DomeHeight"]
+    text_x, _ = drawing.DETAIL_KEEP["DomeHeight"]
     assert _stands_outside(text_x, DOME_CALLOUT_HALF_WIDTH, witnesses)
     assert text_x < min(witnesses)
-    # Still inside the sheet's left border.
-    assert text_x - DOME_CALLOUT_HALF_WIDTH > 0.02
+
+
+def test_the_dome_radius_prints_as_a_spherical_reference() -> None:
+    """PR #1317 machinist review: the 1.5 height alone left the crown's
+    profile open. The model's sphere radius prints as (SR4.1), read-only."""
+    assert spec.DRAWING_PRECISION["NorthCapProfile"]["Radius"] == 1
+    assert f"{spec.DOME_SPHERE_RADIUS:.1f}" == "4.1"
+    assert "Radius" in drawing.DETAIL_KEEP
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_set_spherical_reference(adapter, radius_annotations[0]" in source
+
+
+# The ASME B inner border's right edge and the profile's diameter callout's
+# right end ("0.00 / -0.02" stack, measured on the 20261010T044145843Z render).
+INNER_BORDER_RIGHT = 0.419
+PROFILE_DIA_CALLOUT_RIGHT = 0.264
+
+
+def test_detail_a_takes_the_north_flat_and_dome_clear_of_the_profile() -> None:
+    """PR #1317 eye pass: at 1:1 the flat's dimensions crammed the north end,
+    text on the witnesses and against the dome. A 5:1 detail carries them."""
+    assert drawing.DETAIL_SCALE == (5, 1)
+    tip = drawing._detail_x(spec.DOME_HEIGHT)
+    far = drawing._detail_x(-(spec.NORTH_FLAT_STATION + spec.FLAT_LENGTH / 2.0))
+    left = drawing.DETAIL_CENTER[0] - drawing._DETAIL_FENCE_R
+    right = drawing.DETAIL_CENTER[0] + drawing._DETAIL_FENCE_R
+    assert left < tip < far < right
+    radius_x, _ = drawing.DETAIL_KEEP["Radius"]
+    assert radius_x - 0.010 > PROFILE_DIA_CALLOUT_RIGHT
+    af_x, _ = drawing.DETAIL_KEEP["FlatAF"]
+    assert right < af_x < INNER_BORDER_RIGHT - 0.015
+    # The isometric moved under the profile to make room: right of the notes,
+    # left of the title block.
+    assert 0.105 < drawing.ISO_NOTE_XY[0] < drawing.ISO_CENTER[0] < 0.216

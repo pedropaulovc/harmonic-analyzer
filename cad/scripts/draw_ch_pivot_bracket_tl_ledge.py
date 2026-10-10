@@ -93,7 +93,10 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"Thick": (RIGHT_CENTER[0], 0.226)}
 # Both holes stand on the one Y station the part prints (Hole1Y).
 DIMENSION_PREFIXES = {"Hole1Y": "2X "}
-HOLE_CALLOUT_XY = (0.200, 0.200)
+# Centred text (~63 mm at 4:1) in the gap between the face's right edge
+# (0.180) and the edge view (0.278): at x 0.200 it began inside the face and
+# the outline ran through DRILL (PR #1317 machinist review).
+HOLE_CALLOUT_XY = (0.230, 0.200)
 HOLE_CALLOUT_PROCESS = drill_process(CLEARANCE_SPEC)
 
 

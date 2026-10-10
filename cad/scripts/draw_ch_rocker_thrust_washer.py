@@ -17,6 +17,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -47,12 +48,14 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # A O10.2 x 1/32 washer: 4:1 keeps both diameters and the thickness legible
-# without crowding the landscape sheet.
+# without crowding the landscape sheet. The group sits 35 mm lower than it
+# first did: at y 0.180 it left a dead field under it (PR #1317 machinist
+# review).
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
-FRONT_CENTER = (0.110, 0.180)
-RIGHT_CENTER = (0.200, 0.180)
-ISO_CENTER = (0.320, 0.180)
+FRONT_CENTER = (0.110, 0.145)
+RIGHT_CENTER = (0.200, 0.145)
+ISO_CENTER = (0.320, 0.145)
 
 DRAWING_PRECISION_BY_NAME = {
     name: digits
@@ -61,12 +64,15 @@ DRAWING_PRECISION_BY_NAME = {
 }
 
 FRONT_KEEP = {
-    "DiscDia": (0.060, 0.240),
-    "BoreDia": (0.150, 0.240),
+    "DiscDia": (0.060, 0.205),
+    "BoreDia": (0.150, 0.205),
 }
 RIGHT_KEEP = {
-    "DiscThick": (0.235, 0.225),
+    "DiscThick": (0.235, 0.190),
 }
+# Rule 7: a hole callout states its process; the banded bore is a drilled-class
+# running clearance on the shaft (PR #1317 machinist review).
+BORE_CALLOUT = "DRILL THRU"
 
 # The faces carry no finish symbol (Main 2026-09-26): they are the stock
 # sheet's as supplied, and the title block's surface row is a process
@@ -162,6 +168,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_stock_text(adapter, annotations)
+    set_dimension_callouts(adapter, annotations, {"BoreDia": BORE_CALLOUT})
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the washer face view")
 
