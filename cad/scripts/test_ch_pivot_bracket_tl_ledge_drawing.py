@@ -24,7 +24,7 @@ PRECHIPS_PART_PROUD = 4.04
 PRECHIPS_TABLE_Z = -92.94  # base box bottom
 PRECHIPS_LEDGE_Z = (-42.14, -15.64)  # bolted foot-end ledge box, 26.5 high
 PRECHIPS_SCREW_Z = -24.64  # ledge screws, clearance and tapped holes
-PRECHIPS_STUD_Z = -11.44  # bridge stud holes (the bridge's Setup Z)
+PRECHIPS_STUD_Z = -11.94  # bridge stud holes (the bridge's Setup Z)
 
 
 def _features() -> dict:
@@ -45,7 +45,7 @@ def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
     hole_y = round(PRECHIPS_SCREW_Z - PRECHIPS_LEDGE_Z[0], 1)
     tap_y = round(PRECHIPS_SCREW_Z - PRECHIPS_TABLE_Z, 1)
     stud_y = round(PRECHIPS_STUD_Z - PRECHIPS_TABLE_Z, 1)
-    assert (height, hole_y, tap_y, stud_y) == (26.5, 17.5, 68.3, 81.5)
+    assert (height, hole_y, tap_y, stud_y) == (26.5, 17.5, 68.3, 81.0)
     rest = ledge["foot_rest"]
     assert (rest["height_nominal"], rest["height"]) == (height, limits(height, 1))
     for side in ("left", "right"):

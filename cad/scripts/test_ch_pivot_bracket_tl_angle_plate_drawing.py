@@ -117,6 +117,16 @@ def test_stud_holes_clear_the_bracket_foot() -> None:
     assert spec.STUD_X[1] - stud_r > seat["bounds"]["x"][1]
 
 
+def test_stud_holes_keep_the_top_wall_at_the_exported_worst_case() -> None:
+    """Codex P2 on cc1d22b66: the 81.5 row left 1.51 under the upright's top
+    edge with the row and the drill at their exported high limits."""
+    for side in ("left", "right"):
+        stud = _features()[f"stud_hole_{side}"]
+        wall = spec.PLATE_HEIGHT - stud["height"][1] - stud["dia"][1] / 2.0
+        assert wall == pytest.approx(spec.STUD_TOP_WALL_MIN)
+        assert wall >= 2.0
+
+
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-pivot-bracket")["number"]
     number = _config.parts("ch-pivot-bracket-tl-angle-plate")["number"]

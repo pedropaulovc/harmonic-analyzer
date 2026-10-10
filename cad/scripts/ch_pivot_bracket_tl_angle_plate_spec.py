@@ -103,15 +103,17 @@ TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 # configurations share: from the S ear's face (EAR_T under its faced outer
 # face) to the common foot end on the ledge, where the ledge's front face
 # carries on flush with the foot top. That run's centre is out of reach (its
-# stud hole would break the upright's top wall), so the studs stand 7.4 under
-# the plate top, leaving that wall 2.3 (81.8 would leave 2.01):
+# stud hole would break the upright's top wall), so the studs stand at the
+# highest one-place row whose hole keeps the 2.0 wall at the exported worst
+# case (the row at its .X high limit, the drill at its printed 10.08 +0.10):
+# 81.0, 7.9 under the plate top, leaving 2.01 (81.1 would leave 1.91).
 # STUD_BELOW_PART_TOP under each configuration's outer face (the prechips S4
-# hold's Setup Z, S -11.44, N -13.14). A bar up to 2 * (11.44 - EAR_T) = 10.9
+# hold's Setup Z, S -11.94, N -13.64). A bar up to 2 * (11.94 - EAR_T) = 11.8
 # wide clears the S ear.
 STUD_DIA = 9.525
 STUD_SPEC = HoleSpec("drilled_letter", "X")
 STUD_HALF_PITCH = 20.0
-STUD_Y = 81.5
+STUD_Y = 81.0
 STUD_BELOW_PART_TOP = {
     name: PLATE_HEIGHT + proud - STUD_Y for name, proud in PART_PROUD.items()
 }
@@ -190,6 +192,19 @@ _DRILLED = (drilled_oversize_mm(), 0.0)
 # printed size, under the DRILLED HOLES row, is the drill's inspected band.
 TAP_DRILL_PLACES = 2
 TAP_DRILL_PRINTED = round(_TAP_DRILL, TAP_DRILL_PLACES)
+# The stud row's wall to the upright's top edge at the bands it exports: the
+# row at its one-place high limit, the hole at its printed drill's high limit
+# (Codex P2 on cc1d22b66: the 81.5 row left 1.51).
+STUD_TOP_WALL_MIN = (
+    PLATE_HEIGHT
+    - _station(STUD_Y)[1]
+    - limits(STUD_DIA_PRINTED, STUD_DIA_PLACES, _DRILLED)[1] / 2.0
+)
+if STUD_TOP_WALL_MIN < 2.0:
+    raise AssertionError(
+        f"the stud holes leave {STUD_TOP_WALL_MIN:.2f} under the upright's top"
+        " edge at the exported worst case, under the 2.0 wall"
+    )
 EXPORT_FEATURES: dict[str, ExportFeature] = {
     "seat_face": ExportFeature(
         kind="face",
