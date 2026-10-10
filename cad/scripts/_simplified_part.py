@@ -70,7 +70,7 @@ from _common import (
     stale_configurations,
     whats_wrong,
 )
-from _simplified_bom import BomIdentity, _USER_SPECIFIED, child_bom_identity
+from _simplified_bom import USER_SPECIFIED, BomIdentity, child_bom_identity
 from _simplified_names import is_simplified, simplified_comment, simplified_name
 
 _SUPPRESS = 0  # swFeatureSuppressionAction_e.swSuppressFeature
@@ -146,7 +146,7 @@ def _copy_bom_identity(model: Any, parent: str, child: str) -> None:
     # The source must be set first: any non-user-specified source clears the
     # alternate name (IConfiguration.BOMPartNoSource remarks).
     target.BOMPartNoSource = expected[0]
-    if expected[0] == _USER_SPECIFIED:
+    if expected[0] == USER_SPECIFIED:
         target.AlternateName = expected[1]
     target.UseAlternateNameInBOM = expected[2]
     target.Description = expected[3]

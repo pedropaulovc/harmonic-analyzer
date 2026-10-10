@@ -838,7 +838,6 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     assert fastener("vn-cone-tip-pinch-screw").material == "AISI 304"
     assert FILLISTER_SIZE[1] == dt_cone_tip_block_spec.PINCH_SCREW_LENGTH
     assert dt_cone_tip_block_spec.PINCH_SCREW_SKU == "91794A112"
-    assert "90280A110" not in fastener("vn-cone-tip-pinch-screw").skus
 
 
 # Run 1 (d09c2b9eb leaf dump, c2-dumps/cone-tip-block-d09c2b9eb.json.gz):

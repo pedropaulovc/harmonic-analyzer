@@ -3050,7 +3050,7 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_layout_check.py",
         # The split simplified helpers' shared policy (1:2 boundary, roles,
         # BOM identity, part derivation and simplified re-save fingerprint).
-        SCRIPTS_DIR / "test_drawing_simplified.py",
+        SCRIPTS_DIR / "test_simplified_helpers.py",
         # Recipe-local stock declarations; a missing groove fails loud.
         SCRIPTS_DIR / "test_stock_fastener.py",
         # The shared layout audit's own contract (_layout_audit.py finders + ink model).

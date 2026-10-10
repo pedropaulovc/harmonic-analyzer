@@ -9,7 +9,7 @@ from __future__ import annotations
 _DOCUMENT_NAME = 1  # swBOMPartNumberSource_e.swBOMPartNumber_DocumentName
 _CONFIGURATION_NAME = 2  # swBOMPartNumberSource_e.swBOMPartNumber_ConfigurationName
 _PARENT_NAME = 4  # swBOMPartNumberSource_e.swBOMPartNumber_ParentName
-_USER_SPECIFIED = 8  # swBOMPartNumberSource_e.swBOMPartNumber_UserSpecified
+USER_SPECIFIED = 8  # swBOMPartNumberSource_e.swBOMPartNumber_UserSpecified
 
 # (BOMPartNoSource, AlternateName, UseAlternateNameInBOM, Description,
 #  UseDescriptionInBOM) of one configuration.
@@ -39,7 +39,7 @@ def child_bom_identity(
                 f"{parent_name!r} links its part number to a parent configuration "
                 "it does not have"
             )
-        return (_USER_SPECIFIED, grandparent_name, True, description, use_description)
-    if source == _USER_SPECIFIED:
+        return (USER_SPECIFIED, grandparent_name, True, description, use_description)
+    if source == USER_SPECIFIED:
         return (source, alternate, use_alternate, description, use_description)
     raise ValueError(f"{parent_name!r}: unknown BOM part-number source {source}")
