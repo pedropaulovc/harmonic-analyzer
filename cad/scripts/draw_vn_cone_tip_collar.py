@@ -24,6 +24,7 @@ from _drawing_common import (
     set_dimension_callouts, set_hidden_lines_removed,
     set_hole_callout_precision, stamp_drawing_summary, view_name,
 )
+import _drawing_hidden_sketches as hidden_sketches
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import format_findings
 from diagnostics.drawing_layout_audit import audit_document
@@ -206,7 +207,9 @@ async def build(adapter: Any) -> dict[str, str]:
                                        view_label="collar turning view", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     marks = end_marks + side_marks
     assert_imported_precision(adapter, marks, _precision(END_KEEP | SIDE_KEEP))
-    tap_marks = curate_view_dimensions(
+    # TapRootGauge is a blanked sketch: main's hidden-owner importer shows it
+    # in this view for the import (draw_ch_rocker_arm_tl_pivot_screw).
+    tap_marks = hidden_sketches.curate_view_dimensions(
         adapter, tap, keep=TAP_KEEP, view_label="collar radial process controls",
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )

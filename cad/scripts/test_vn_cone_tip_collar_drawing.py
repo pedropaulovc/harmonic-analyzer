@@ -806,3 +806,11 @@ def test_each_view_asserts_only_the_precision_it_keeps() -> None:
     source = inspect.getsource(drawing)
     assert "assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)" not in source
     assert source.count(", _precision(") == 4
+
+
+def test_tap_view_imports_the_blanked_root_gauge_through_the_hidden_owner_path() -> None:
+    # 8f1cd4a9f: the blanked TapRootGauge sketch's TapRootLimit never imported.
+    source = inspect.getsource(drawing.build)
+    assert "hidden_sketches.curate_view_dimensions(\n        adapter, tap, keep=TAP_KEEP" in source
+    assert "TapRootLimit" in drawing.TAP_KEEP
+    assert "TapRootLimit" in spec.DRAWING_DIMENSIONS["TapRootGauge"]
