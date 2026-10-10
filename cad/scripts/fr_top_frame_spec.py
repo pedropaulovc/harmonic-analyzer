@@ -118,36 +118,46 @@ if HANGER_PIN_SLIP_CLEARANCE_MIN < 0.02 or HANGER_PIN_SLIP_CLEARANCE_MAX > 0.10:
         f"knife-mount dowel slip clearance {HANGER_PIN_SLIP_CLEARANCE_MIN}-"
         f"{HANGER_PIN_SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
     )
+# Manufacturing GD&T limits consumed by the part's drawing projection: each
+# slot to the round hole beside it (datum B front, C rear) at the BASIC
+# 12.700 between them, oriented by the other round hole with its location
+# released (translation modifier), so the two mounts' dowel lines stay square
+# to the B-C line.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {"knife-hanger slot position": "0.05"}
+HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
+# The slot's station from its round hole, BASIC (the frame's zone holds it),
+# so the crossbar's .XXX round-hole station never opens the slot-to-hole
+# spacing; from the screw axis it sits at the round hole's .XXX band plus
+# the zone radius: 0.155.
+HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 12.700, BASIC
+HANGER_SLOT_FROM_ROUND_PLACES = 3
+HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_POSITION_TOL / 2.0
 # The -X dowel's blind slot: the round hole's reamed slip width (so the pin
-# keeps the same 0.0274..0.0925 slip across it), its centre plane held to the
-# round hole beside it by the position frame below, and its length (along X,
-# the dowel line) printed .XXX.  The slot takes up the spacing mismatch:
-# both crossbar stations at opposite .XXX limits (2 x 0.13), the knife
-# mount's .XXX span (0.13) and the round-hole pin across its loosest slip
-# (0.046), either way: 3.183 + 2 x 0.436 = 4.055 under the 4.470 shortest.
+# keeps the same 0.0274..0.0925 slip across it), held to the round hole
+# beside it by the position frame above, and its length (along X, the dowel
+# line) printed .XX.  The slot takes up the spacing mismatch: its zone
+# radius (0.025), the knife mount's .XXX span (0.13) and the round-hole pin
+# across its loosest slip (0.046), either way: 3.183 + 2 x 0.201 = 3.585
+# under the 3.790 shortest.
 HANGER_SLOT_WIDTH = HANGER_PIN_HOLE_DIA
 HANGER_SLOT_WIDTH_BAND = HANGER_PIN_HOLE_DIA_BAND
 HANGER_SLOT_WIDTH_PLACES = HANGER_PIN_HOLE_DIA_PLACES
-HANGER_SLOT_LENGTH = 4.60
-HANGER_SLOT_LENGTH_PLACES = 3
-HANGER_SLOT_LENGTH_TOL = _XXX  # 0.13
+HANGER_SLOT_LENGTH = 4.30
+HANGER_SLOT_LENGTH_PLACES = 2
+HANGER_SLOT_LENGTH_TOL = _XX  # 0.51
 HANGER_SLOT_DEPTH = HANGER_PIN_HOLE_DEPTH
 HANGER_SLOT_TRAVEL = (
-    2.0 * HANGER_PIN_X_TOL + KNIFE_DOWEL.SPAN_TOL + HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
-)  # 0.436
-HANGER_SLOT_LENGTH_REQUIRED = KNIFE_DOWEL.DIA_MAX + 2.0 * HANGER_SLOT_TRAVEL  # 4.055
+    HANGER_SLOT_POSITION_TOL / 2.0
+    + KNIFE_DOWEL.SPAN_TOL
+    + HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
+)  # 0.201
+HANGER_SLOT_LENGTH_REQUIRED = KNIFE_DOWEL.DIA_MAX + 2.0 * HANGER_SLOT_TRAVEL  # 3.585
 if HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL < HANGER_SLOT_LENGTH_REQUIRED:
     raise AssertionError(
         f"knife-hanger slot {HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL:.3f} long"
         f" at its shortest does not take the dowel's"
         f" {HANGER_SLOT_LENGTH_REQUIRED:.3f} travel"
     )
-# Manufacturing GD&T limits consumed by the part's drawing projection: each
-# slot's centre plane to the round hole beside it (datum B front, C rear),
-# oriented by the other round hole with its location released (translation
-# modifier), so the two mounts' dowel lines stay square to the B-C line.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {"knife-hanger slot position": "0.05"}
-HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
 # The drilled #6 hole's float about the screw shank: (4.318 - 3.505) / 2.  The
 # knife-hanger stack in ``build_sm_summing_assembly`` (which owns the knife
 # mount's tap position term) proves the dowel stations' mismatch stays inside.
@@ -375,13 +385,13 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "set-pocket depth from outer rail face": 1,
     # Sheet 6, UNDERSIDE: the junction lands and the knife-hanger section F-F
     # -- the counterbore floor (the screw's grip) above the crossbar underside,
-    # the dowel slip hole's and slot's stations from the screw axis, and the
-    # slot's length.
+    # the dowel slip hole's station from the screw axis, the slot's BASIC
+    # station from the round hole, and the slot's length.
     "crossbar junction land": 1,
     "underside gusset thickness": 1,
     "hanger counterbore floor from underside": HANGER_GRIP_PLACES,
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
-    "dowel slot from hanger axis": HANGER_PIN_X_PLACES,
+    "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
 }
 

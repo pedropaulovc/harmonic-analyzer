@@ -45,10 +45,22 @@ SURFACE_FINISHES = (
 
 # --- Knife-hanger screw tap and anti-rotation dowel holes (top seat) ---------
 # General tolerances the printed places claim (title block, policy rule 12).
+_X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
 _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
-# The Ø12 bore prints .XX: its diameter band.
-BORE_DIA_TOL = _XX
+# The Ø12 bore is REAMED through (Ra 1.6 on its knife seat is a reamed
+# finish, not a drilled one) to an explicit +0.03/0 band (the MHA-DT-016
+# arbor-pedestal running-bore precedent, ``dt_arbor_pedestal_spec``): the
+# rock budget takes the smallest bore, the webs the largest.
+BORE_DIA_BAND = (0.03, 0.0)
+BORE_DIA_PLACES = 2
+BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 6.000
+BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.015
+# The block's overall sizes print one place (.X, rule 12: every web below
+# holds at that band); the stacks judge the block at those limits.
+BLOCK_SIZE_PLACES = 1
+BLOCK_SIZE_TOL = _X  # 0.8
+BLOCK_HEIGHT_PRINTED = round(BLK_TOP - BLK_BOT, BLOCK_SIZE_PLACES)  # 29.6
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-bore position": "0.20",
@@ -112,8 +124,9 @@ def free_rock_deg(
 # offset t across the 14 deep bore: t 0 -> 8.92 deg, 0.05 -> 8.44, 0.10 ->
 # 7.96, 0.18 -> 7.17.  The rule-12 budget -- the trunnion's .XXX section and
 # the bore's .XX size at their band limits, t the Ø0.05 tier plus the dowel
-# yaw -- is ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0,
-# 5.038), which owns the crossbar's slip terms.  Ø0.05 is also the bedding
+# yaw across the deepest .X block -- is
+# ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.16 in
+# the reamed bore), which owns the crossbar's slip terms.  Ø0.05 is also the bedding
 # gap a 0.05 feeler finds under a top seat that rocks on the casting.
 KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 # The bore crown (its upper inner wall) below the top seat: 14.62.
@@ -121,10 +134,16 @@ BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # MHA-VN-024, a stock #6-32 socket head cap screw down through the crossbar,
 # threads into a bottoming tap on the bore's vertical centreline at
 # mid-depth.  The drill runs 1.2 past the full thread (>= 1.5 P for the
-# bottoming tap's chamfer).
+# bottoming tap's chamfer).  Both depths carry explicit bands on the
+# sheet's hole callout (the MHA-SM-003 bracket-tap precedent,
+# ``magnifying_bracket_joint_layout``): .XX's +/-0.51 on both left only
+# 10.39 - 10.21 = 0.18 of drill past the deepest full thread, under one
+# pitch for the tap's lead (blind machinist review, 2026-10-09).
 STUD_THREAD = "#6-32"
 STUD_TAP_DRILL_DEPTH = 10.9
 STUD_TAP_THREAD_DEPTH = 9.7
+STUD_TAP_THREAD_DEPTH_BAND = 0.05
+STUD_TAP_DRILL_DEPTH_BAND = 0.10
 STUD_TAP_SPEC = HoleSpec(
     "tapped_bottoming",
     STUD_THREAD,
@@ -141,23 +160,49 @@ if STUD_TAP_RUNOUT < 1.5 * STUD_PITCH:
         f"knife-mount tap drill runs {STUD_TAP_RUNOUT:.3f} past the thread,"
         f" under 1.5 P ({1.5 * STUD_PITCH:.3f})"
     )
+# At the bands' adverse limits the drill still runs past the deepest full
+# thread by at least one pitch, the bottoming tap's lead: 10.80 - 9.75 = 1.05.
+STUD_TAP_RUNOUT_MIN = (STUD_TAP_DRILL_DEPTH - STUD_TAP_DRILL_DEPTH_BAND) - (
+    STUD_TAP_THREAD_DEPTH + STUD_TAP_THREAD_DEPTH_BAND
+)
+if STUD_TAP_RUNOUT_MIN < STUD_PITCH:
+    raise AssertionError(
+        f"knife-mount tap drill runs {STUD_TAP_RUNOUT_MIN:.3f} past the thread at"
+        f" worst case, under one pitch ({STUD_PITCH:.3f})"
+    )
 # The metal the tap's drill point leaves over the bore crown, every band at
-# its worst (the tap and the bore print .XX, the bore's position zone is
-# KNIFE_BORE_POSITION_TOL): 14.62 - 0.10 - 0.255 - 11.41 - 0.813 = 2.04.
+# its worst (the drill depth's band, the largest reamed bore, the bore's
+# position zone KNIFE_BORE_POSITION_TOL): 14.62 - 0.10 - 0.015 - 11.00 -
+# 0.813 = 2.69.
 STUD_TAP_WEB_MIN = 2.0
 STUD_TAP_POINT_H = STUD_TAP_DIA / 2.0 * DRILL_POINT_H  # 0.813
-STUD_TAP_DRILL_DEPTH_MAX = STUD_TAP_DRILL_DEPTH + _XX  # 11.41
-BORE_CROWN_DEPTH_MIN = BORE_CROWN_DEPTH - KNIFE_BORE_POSITION_TOL / 2.0 - _XX / 2.0
+STUD_TAP_DRILL_DEPTH_MAX = STUD_TAP_DRILL_DEPTH + STUD_TAP_DRILL_DEPTH_BAND  # 11.00
+BORE_CROWN_DEPTH_MIN = (
+    BORE_CROWN_DEPTH - KNIFE_BORE_POSITION_TOL / 2.0 - max(BORE_DIA_BAND) / 2.0
+)
 
 
-def tap_web_worst(blk_top: float, drill_depth: float, tap_drill_dia: float) -> float:
+def tap_web_worst(
+    blk_top: float,
+    drill_depth: float,
+    tap_drill_dia: float,
+    *,
+    drill_band: float = STUD_TAP_DRILL_DEPTH_BAND,
+    bore_oversize: float = max(BORE_DIA_BAND),
+) -> float:
     """Worst-case metal between a top-seat tap's 118 deg drill point and the
-    bore crown, the seat at local ``blk_top``: the deepest .XX drill, the
-    largest .XX bore, the bore at the top of its position zone.  The build
-    calls it with its derived (unrounded) top, the regression test with the
-    retired 1/2-13 tap."""
-    crown_min = blk_top - (BORE_CY + R_BORE) - KNIFE_BORE_POSITION_TOL / 2.0 - _XX / 2.0
-    return crown_min - (drill_depth + _XX) - tap_drill_dia / 2.0 * DRILL_POINT_H
+    bore crown, the seat at local ``blk_top``: the deepest drill (its depth
+    ``drill_band`` over), the largest bore (``bore_oversize`` over its
+    nominal Ø), the bore at the top of its position zone.  The build calls
+    it with its derived (unrounded) top, the regression test with the
+    retired 1/2-13 tap at its .XX bands."""
+    crown_min = (
+        blk_top
+        - (BORE_CY + R_BORE)
+        - KNIFE_BORE_POSITION_TOL / 2.0
+        - bore_oversize / 2.0
+    )
+    return crown_min - (drill_depth + drill_band) - tap_drill_dia / 2.0 * DRILL_POINT_H
 
 
 STUD_TAP_WEB_WORST = tap_web_worst(BLK_TOP, STUD_TAP_DRILL_DEPTH, STUD_TAP_DIA)
@@ -167,11 +212,7 @@ if STUD_TAP_WEB_WORST < STUD_TAP_WEB_MIN:
         f" crown at worst case, under {STUD_TAP_WEB_MIN}"
     )
 # The full thread the screw can use, at the shallowest printed thread depth.
-STUD_TAP_THREAD_DEPTH_MIN = STUD_TAP_THREAD_DEPTH - _XX  # 9.19
-# The tap's thread to the block's front/back faces: 7 - 1.75 = 5.25.
-STUD_TAP_Z_WALL = SUPPORT_Z_THICK / 2.0 - STUD_THREAD_MAJOR / 2.0
-if STUD_TAP_Z_WALL < STUD_TAP_WEB_MIN:
-    raise AssertionError(f"knife-mount tap leaves a {STUD_TAP_Z_WALL:.3f} z wall")
+STUD_TAP_THREAD_DEPTH_MIN = STUD_TAP_THREAD_DEPTH - STUD_TAP_THREAD_DEPTH_BAND  # 9.65
 
 # MHA-VN-051 dowels: two blind flat-bottom reamed holes in the top seat at
 # DOWEL.HANGER_OFFSET either side of the tap axis along local X, at mid-depth.
@@ -224,11 +265,69 @@ PIN_PRESS_PRINTED = (
 if PIN_PRESS_PRINTED != (0.0025, 0.0177):
     raise AssertionError(f"knife-mount dowel press prints {PIN_PRESS_PRINTED}")
 # Worst-case webs round each dowel hole (largest ream, station off by its
-# band).  The pair mirrors about the tap axis, so one judgement covers both.
+# band).
 _PIN_R_MAX = (PIN_HOLE_DIA + max(PIN_HOLE_DIA_BAND)) / 2.0
-# To the block's nearer side face, the pattern's implied centring on the
-# block judged at the .XXX band: 12 - 6.48 - 1.5875 = 3.93.
-PIN_HOLE_SIDE_WEB = BLK_HALF_X - (PIN_HOLE_X + _XXX) - _PIN_R_MAX
+# The pattern is located on the block's outside faces at general tolerance
+# (blind machinist review, 2026-10-09: nothing tied the dowel/tap/bore family
+# to the faces), both in the top view: the +X dowel hole's axis from the +X
+# side face (.XX, the BASIC span chains on to the -X hole) and the -X hole's
+# axis from the front face (.X).  The row's square to the front face is the
+# title block's angular tolerance.
+PIN_HOLE_SIDE_DISTANCE = BLK_HALF_X - PIN_HOLE_X  # 5.65
+PIN_HOLE_SIDE_PLACES = 2
+PIN_HOLE_SIDE_TOL = _XX  # 0.51
+HOLE_ROW_FACE_DISTANCE = SUPPORT_Z_THICK / 2.0  # 7.0
+HOLE_ROW_FACE_PLACES = 1
+HOLE_ROW_FACE_TOL = _X  # 0.8
+_ANGULAR_TOL_DEG = float(_config.title_block("angular")["value_deg"])  # 1.0
+# To the +X side face: 5.65 - 0.51 - 1.5875 = 3.55.
+PIN_HOLE_SIDE_WEB = PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL - _PIN_R_MAX
+# The -X hole to the -X face, the narrowest .X block and the hole a full span
+# variation out: 23.2 - (6.16 + 12.83) - 1.5875 = 2.62.
+PIN_HOLE_FAR_SIDE_WEB = (
+    (2.0 * BLK_HALF_X - BLOCK_SIZE_TOL)
+    - (PIN_HOLE_SIDE_DISTANCE + PIN_HOLE_SIDE_TOL + PIN_HOLE_SPAN + PIN_HOLE_SPAN_TOL)
+    - _PIN_R_MAX
+)
+# Front and back faces: the -X hole off its .X band, the block at its
+# thinnest .X depth, the row skewed by the angular tolerance.  The +X hole
+# stands a full pattern variation and the longest span's skew off it, 0.13 +
+# 12.83 tan 1 deg = 0.354; the tap the half-span band, its zone radius and
+# half that skew, 0.227.  Back (the binding side) 13.2 - 7.8 = 5.4 from the
+# -X axis: dowel 5.4 - 0.354 - 1.5875 = 3.46, tap thread 5.4 - 0.227 -
+# 1.7525 = 3.42.
+_ROW_Z_MIN = min(
+    HOLE_ROW_FACE_DISTANCE - HOLE_ROW_FACE_TOL,
+    (2.0 * HOLE_ROW_FACE_DISTANCE - BLOCK_SIZE_TOL)
+    - (HOLE_ROW_FACE_DISTANCE + HOLE_ROW_FACE_TOL),
+)
+_ROW_SKEW = (PIN_HOLE_SPAN + PIN_HOLE_SPAN_TOL) * math.tan(
+    math.radians(_ANGULAR_TOL_DEG)
+)
+PIN_HOLE_Z_WEB = _ROW_Z_MIN - (PIN_HOLE_SPAN_TOL + _ROW_SKEW) - _PIN_R_MAX
+STUD_TAP_Z_WALL = (
+    _ROW_Z_MIN - (PIN_HOLE_X_TOL + _ROW_SKEW / 2.0) - STUD_THREAD_MAJOR / 2.0
+)
+# The bore's flanks, its axis off the pattern centre by its zone radius and
+# the pattern centre off the side face by the +X hole's band and the span's
+# half variation: near 12 - 0.575 - 0.10 - 6.015 = 5.31, far 23.2 - 12.575 -
+# 0.10 - 6.015 = 4.51.
+_PATTERN_X_MAX = BLK_HALF_X + PIN_HOLE_SIDE_TOL + PIN_HOLE_HALF_SPAN_TOL
+BORE_SIDE_WEB = (
+    (2.0 * BLK_HALF_X - BLOCK_SIZE_TOL)
+    - _PATTERN_X_MAX
+    - KNIFE_BORE_POSITION_TOL / 2.0
+    - BORE_R_MAX
+)
+# Under the bore: the shortest .X block below the BASIC bore centre, the bore
+# at the bottom of its zone and at its largest: 28.8 - 20.62 - 0.10 - 6.015
+# = 2.07 (the build's exact 20.616 leaves 0.004 more).
+BORE_BOTTOM_WALL = (
+    (BLOCK_HEIGHT_PRINTED - BLOCK_SIZE_TOL)
+    - (BLK_TOP - BORE_CY)
+    - KNIFE_BORE_POSITION_TOL / 2.0
+    - BORE_R_MAX
+)
 # To the tap's thread major: 6.235 - 1.5875 - 1.7525 = 2.90.
 PIN_HOLE_TAP_WEB = (PIN_HOLE_X - PIN_HOLE_X_TOL) - _PIN_R_MAX - STUD_THREAD_MAJOR / 2.0
 # The hole floor's inner corner to the bore, the floor at its deepest and the
@@ -239,17 +338,21 @@ PIN_HOLE_BORE_WEB = (
     (PIN_HOLE_X - PIN_HOLE_HALF_SPAN_TOL - KNIFE_BORE_POSITION_TOL / 2.0 - _PIN_R_MAX)
     ** 2
     + (_PIN_FLOOR_Y_MIN - (BORE_CY + KNIFE_BORE_POSITION_TOL / 2.0)) ** 2
-) ** 0.5 - (R_BORE + _XX / 2.0)
+) ** 0.5 - BORE_R_MAX
 for _label, _web in (
-    ("block side", PIN_HOLE_SIDE_WEB),
-    ("tap thread", PIN_HOLE_TAP_WEB),
-    ("bore", PIN_HOLE_BORE_WEB),
-    ("z face", SUPPORT_Z_THICK / 2.0 - _PIN_R_MAX),
+    ("dowel to the +X side face", PIN_HOLE_SIDE_WEB),
+    ("dowel to the -X side face", PIN_HOLE_FAR_SIDE_WEB),
+    ("dowel to the tap thread", PIN_HOLE_TAP_WEB),
+    ("dowel to the bore", PIN_HOLE_BORE_WEB),
+    ("dowel to the front/back face", PIN_HOLE_Z_WEB),
+    ("tap thread to the front/back face", STUD_TAP_Z_WALL),
+    ("bore to the side face", BORE_SIDE_WEB),
+    ("bore to the bottom face", BORE_BOTTOM_WALL),
 ):
     if _web < STUD_TAP_WEB_MIN:
         raise AssertionError(
-            f"knife-mount dowel hole leaves {_web:.3f} to the {_label}"
-            f" at worst case, under {STUD_TAP_WEB_MIN}"
+            f"knife-mount {_label} leaves {_web:.3f} at worst case,"
+            f" under {STUD_TAP_WEB_MIN}"
         )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -268,9 +371,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinHoleProfile": {"PinHoleDia"},
     "PinHole": {"PinHoleDepth"},
 }
-# Places the part authors on the dowel-hole dimensions (drawing-simplicity
-# policy rule 2); the block and bore print at the document default.
+# Places the part authors on the marked dimensions (drawing-simplicity
+# policy rule 2): the block's sizes at .X, the reamed bore at its band's two.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BlockProfile": {"BlockWidth": BLOCK_SIZE_PLACES, "BlockHeight": BLOCK_SIZE_PLACES},
+    "BoreProfile": {"BoreDia": BORE_DIA_PLACES},
     "PinHoleProfile": {"PinHoleDia": PIN_HOLE_DIA_PLACES},
     "PinHole": {"PinHoleDepth": PIN_HOLE_DEPTH_PLACES},
 }
@@ -282,13 +387,17 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 # Places of the dimensions the sheet adds between two model features (no
 # model dimension carries them; the fr_top_frame_spec precedent): the dowel
 # pair's BASIC span and the bore centre's BASIC height under the datum-A top
-# seat.  A BASIC states the model's exact value, so its places must print it
-# unrounded: the height is the build's 14.866 + 5.75 = 20.616
+# seat, the block's depth, and the pattern's two face locations.  A BASIC
+# states the model's exact value, so its places must print it unrounded: the
+# height is the build's 14.866 + 5.75 = 20.616
 # (``build_sm_knife_mount.BORE_CENTRE_DEPTH``), not this module's 14.87
 # mirror.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole span": PIN_HOLE_SPAN_PLACES,
     "knife-bore centre from top seat": 3,
+    "block-depth overall": BLOCK_SIZE_PLACES,
+    "dowel hole from side face": PIN_HOLE_SIDE_PLACES,
+    "hole row from front face": HOLE_ROW_FACE_PLACES,
 }
 # The pair's count above the dowel holes' Ø and three short lines under it
 # (the MHA-PD-018 PIN_HOLE_CALLOUT precedent): the operation, the mating

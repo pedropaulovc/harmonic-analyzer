@@ -142,6 +142,7 @@ from fr_top_frame_spec import (
     HANGER_SLOT_DEPTH,
     HANGER_SLOT_LENGTH,
     HANGER_SLOT_LENGTH_TOL,
+    HANGER_SLOT_STATION_TOL,
     HANGER_SLOT_WIDTH,
     HANGER_SLOT_WIDTH_BAND,
     HANGER_SLOT_X,
@@ -203,7 +204,7 @@ STUD_Z_REAR = SUMMING_Z + HEX_Z_MID  # +90.148
 HANGER_X = BAR_X0 + 11.0  # -15.0: the crossbar centreline, KNIFE x
 PIN_HOLE_X = HANGER_X + HANGER_ROUND_X  # -8.65: round dowel slip holes, +X
 SLOT_X = HANGER_X + HANGER_SLOT_X  # -21.35: dowel slots, -X of the screw
-SLOT_FLAT = HANGER_SLOT_LENGTH - HANGER_SLOT_WIDTH  # 1.36: straight run
+SLOT_FLAT = HANGER_SLOT_LENGTH - HANGER_SLOT_WIDTH  # 1.06: straight run
 HANGER_SLOT_AREA = (
     SLOT_FLAT * HANGER_SLOT_WIDTH + math.pi * (HANGER_SLOT_WIDTH / 2.0) ** 2
 )
@@ -380,9 +381,11 @@ if STUD_Z_REAR + HANGER_CBORE_DIA / 2.0 >= INNER_Z + GUSSET:
     raise AssertionError("rear hanger counterbore escapes the junction material")
 # Dowel slip holes and slots (rule 12, print-worst): the largest reamed hole
 # and the longest slot keep a wall to the crossbar's +X / -X face and to the
-# largest drilled screw clearance hole with their stations at the .XXX limit;
-# their blind floors stay below the counterbore floor, so neither meets the
-# screw's bearing face.
+# largest drilled screw clearance hole with the round hole's station at its
+# .XXX limit and the slot's at that plus its zone radius off the BASIC 12.700
+# (0.155); their blind floors stay below the counterbore floor, so neither
+# meets the screw's bearing face.  The slot's screw-side wall (1.581) sits
+# under the 2.0 target, over the 1.5 floor.
 _PIN_HOLE_MAX_R = (HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)) / 2.0
 _CLEARANCE_MAX_R = (HANGER_CLEARANCE_DIA + DRILL_OVERSIZE) / 2.0
 _SLOT_MAX_HALF_L = (HANGER_SLOT_LENGTH + HANGER_SLOT_LENGTH_TOL) / 2.0
@@ -390,10 +393,10 @@ PIN_HOLE_BAR_WALL = BAR_X1 - (PIN_HOLE_X + HANGER_PIN_X_TOL) - _PIN_HOLE_MAX_R  
 PIN_HOLE_SCREW_WALL = (
     HANGER_ROUND_X - HANGER_PIN_X_TOL - _PIN_HOLE_MAX_R - _CLEARANCE_MAX_R
 )  # 2.376
-SLOT_BAR_WALL = (SLOT_X - HANGER_PIN_X_TOL - _SLOT_MAX_HALF_L) - BAR_X0  # 2.155
+SLOT_BAR_WALL = (SLOT_X - HANGER_SLOT_STATION_TOL - _SLOT_MAX_HALF_L) - BAR_X0  # 2.09
 SLOT_SCREW_WALL = (
-    -HANGER_SLOT_X - HANGER_PIN_X_TOL - _SLOT_MAX_HALF_L - _CLEARANCE_MAX_R
-)  # 1.646
+    -HANGER_SLOT_X - HANGER_SLOT_STATION_TOL - _SLOT_MAX_HALF_L - _CLEARANCE_MAX_R
+)  # 1.581
 PIN_HOLE_FLOOR_MARGIN = HANGER_GRIP - HANGER_PIN_HOLE_DEPTH  # 18.0
 SLOT_FLOOR_MARGIN = HANGER_GRIP - HANGER_SLOT_DEPTH  # 18.0
 for _label, _value in (

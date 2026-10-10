@@ -44,6 +44,7 @@ from _drawing_common import (
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
     set_reference_dimension,
+    set_basic_dimension,
     add_property_linked_note,
     create_section_view,
     create_blank_drawing_sheets,
@@ -139,6 +140,7 @@ from fr_top_frame_spec import (
     HANGER_PIN_HOLE_DEPTH,
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_X,
+    HANGER_SLOT_FROM_ROUND,
     HANGER_SLOT_LENGTH,
     HANGER_SLOT_LENGTH_CALLOUT,
     HANGER_SLOT_WIDTH,
@@ -366,20 +368,22 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 # hole walls, its four-line callout parked on a leader in the open band
 # below-right of the section (the dda9a33a8 render printed it across its own
 # extension lines and the underside edge).  Right: the depth the hole and
-# slot share.  Above: the 6.350 stations between the owned axes, the hole's
-# text on a jog to the right, clear of the locator's land text, the slot's
-# on a jog to the left, between the counterbore floor's text and the
-# locator's label.  Under the slot, a row below the hole's size so their
-# arrows cannot meet: its length, the text on a jog between the caption
-# and the hole's callout.  The caption takes the empty lower-left corner
-# of the band.
+# slot share.  Above, between the owned axes: the hole's 6.350 station from
+# the screw axis, its text on a jog to the right, clear of the locator's land
+# text; a row higher, so the two dimension lines never share the hole's
+# extension line at one height, the slot's BASIC 12.700 from the round hole
+# (the slot position frames' true location), its text on a jog to the left,
+# between the counterbore floor's text and the locator's label.  Under the
+# slot, a row below the hole's size so their arrows cannot meet: its length,
+# the text on a jog between the caption and the hole's callout.  The caption
+# takes the empty lower-left corner of the band.
 HANGER_FLOOR_TEXT_XY = _hanger_section_xy(
     BAR_X0 - HANGER_SECTION_GUSSET_REACH - 8.0, -HALF_H + HANGER_GRIP / 2.0
 )
 HANGER_FLOOR_OFFSET_XY = (0.058, 0.076)
 PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
 PIN_STATION_OFFSET_XY = (0.160, 0.106)
-SLOT_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + SLOT_X) / 2.0, HALF_H + 8.0)
+SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 14.0)
 SLOT_STATION_OFFSET_XY = (0.066, 0.104)
 SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
 SLOT_LENGTH_OFFSET_XY = (0.118, 0.026)
@@ -1095,7 +1099,8 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     never off hidden lines.  The counterbore itself is fully defined by its
     callout on sheet 3; this view adds what no callout states -- the floor's
     height above the crossbar underside (the screw's grip), the slip hole's
-    and slot's stations from the screw axis and the slot's length -- and
+    station from the screw axis, the slot's BASIC station from the slip hole
+    and the slot's length -- and
     carries the model's own slip hole size, band and the depth hole and slot
     share.  The slot's width is across this cut; the underside locator
     carries it.  Returns the view and its imported dimensions.
@@ -1175,16 +1180,20 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         suffix="2X DOWEL HOLE\nFROM SCREW AXIS",
         offset_text=PIN_STATION_OFFSET_XY,
     )
-    _checked_dimension(
+    # The slot's true location for its position frame: BASIC from the round
+    # hole beside it, the bare box like every BASIC on the sheets (a BASIC
+    # keeps no below-text, and its above-text did not print on the
+    # 20261010T001553082Z render: layout audit text-unmatched).
+    slot_station = _checked_dimension(
         adapter, view,
-        p0=(SLOT_X, -HALF_H-2.0, z), p1=(HANGER_X, -HALF_H-2.0, z),
-        text_xy=SLOT_STATION_TEXT_XY, label="dowel slot from hanger axis",
-        expected_mm=HANGER_PIN_X, orientation="horizontal",
+        p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
+        text_xy=SLOT_STATION_TEXT_XY, label="dowel slot from dowel hole",
+        expected_mm=HANGER_SLOT_FROM_ROUND, orientation="horizontal",
         entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
-        entities=(axes[2], axes[0]),
-        suffix="2X DOWEL SLOT\nFROM SCREW AXIS",
+        entities=(axes[2], axes[1]),
         offset_text=SLOT_STATION_OFFSET_XY,
     )
+    set_basic_dimension(adapter, slot_station, label="dowel slot from dowel hole")
     # The slot's end walls, where the cut runs through both end radii: the
     # straight run plus one width.
     slot_ends = [

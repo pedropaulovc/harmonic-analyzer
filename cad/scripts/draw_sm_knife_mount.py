@@ -12,9 +12,11 @@ frame under it, Ø0.13 to A, carrying the datum feature symbol B for the pair,
 at their BASIC span in the top view, and their flat-floor depth in section
 A-A, cut from the top view through the tap and dowel axes (policy rule 7: the
 floor is hidden in the front view, so it is dimensioned where the cut shows
-it).  The bore carries a composite position frame to the top seat (datum A)
-and the dowel pattern, its centre a BASIC height under A; the #6-32 tap a
-position frame to the same A|B.
+it).  The pattern is located on the block's +X side and front faces at
+general tolerance in the top view.  The reamed bore carries a composite
+position frame to the top seat (datum A) and the dowel pattern, its centre a
+BASIC height under A; the #6-32 tap a position frame to the same A|B, its
+thread and drill depths banded on its hole callout.
 
 Run with SolidWorks open::
 
@@ -68,14 +70,20 @@ from sm_knife_mount_spec import (
     BORE_CY,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HOLE_ROW_FACE_DISTANCE,
     PIN_HOLE_CALLOUT,
     PIN_HOLE_PAIR_CALLOUT,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
+    PIN_HOLE_SIDE_DISTANCE,
     PIN_HOLE_SPAN,
     PIN_HOLE_X,
     R_BORE,
     STUD_TAP_DIA,
+    STUD_TAP_DRILL_DEPTH,
+    STUD_TAP_DRILL_DEPTH_BAND,
+    STUD_TAP_THREAD_DEPTH,
+    STUD_TAP_THREAD_DEPTH_BAND,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
@@ -135,16 +143,17 @@ def _sheet_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
 
 
-# The 29.62 height's dimension line stands at sheet x 0.055, 36 mm off the
-# block's -X face, and the bore's Ø and THRU sit in the band between them,
-# 10.6 mm right of that line and 8.6 mm off the face: the 5ff8fba5d render
-# ran the height line (then x 0.063) 3.62 mm through the Ø (text 58.5..75.3
-# mm).  BORE_DIA_TEXT_HALF_WIDTH is half that render's block.
-BORE_DIA_TEXT_HALF_WIDTH = 0.0084
+# The 29.6 height's dimension line stands at sheet x 0.050, 41 mm off the
+# block's -X face, and the bore's Ø, its ream band and REAM THRU sit in the
+# band between them: the 5ff8fba5d render ran the height line (then x 0.063)
+# 3.62 mm through the Ø (text 58.5..75.3 mm).  BORE_DIA_TEXT_HALF_WIDTH is
+# half the banded line: the 20261009T204136744Z render's Ø12.00 (16.2 mm)
+# plus a stacked +0.03/0.00 at the dowel band's 2.05 mm a character.
+BORE_DIA_TEXT_HALF_WIDTH = 0.0135
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
-    "BlockHeight": (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1]),
-    "BoreDia": (FRONT_CENTER[0] - 0.041, _front_y(BORE_CY) + 0.026),
+    "BlockHeight": (FRONT_CENTER[0] - 0.065, FRONT_CENTER[1]),
+    "BoreDia": (FRONT_CENTER[0] - 0.044, _front_y(BORE_CY) + 0.026),
 }
 # The dowel hole's floor depth stands right of the section, level with the
 # middle of the hole, its witness lines off the cut top seat and hole floor.
@@ -169,8 +178,28 @@ PIN_CALLOUT_HALF_WIDTH = 0.04225
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
 PIN_CALLOUT_SHOULDER_DROP = 0.01286
 PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.006, TOP_CENTER[1] - 0.010)
-# The pair's BASIC 12.700 span runs above the top view, between the hole axes.
-PIN_SPAN_TEXT_XY = (TOP_CENTER[0], TOP_CENTER[1] + TOP_HALF_Z + 0.010)
+# The pair's BASIC 12.700 span runs above the top view, between the hole axes,
+# its box 3 mm left of centre so the side-face 5.65's left arrow (a row up)
+# stands clear of it.
+PIN_SPAN_TEXT_XY = (TOP_CENTER[0] - 0.003, TOP_CENTER[1] + TOP_HALF_Z + 0.0075)
+# The pattern's face locations (blind machinist review, 2026-10-09), both in
+# the top view: the +X hole's axis from the +X side face, a row above the
+# BASIC span (under the view, the 20261010T001553082Z render ran the dowel
+# frame's leader across its side-face extension line; on the span's own row,
+# 20261010T002544960Z, the two dimensions' outside arrows met under the 5.65
+# and its right arrow ran into the cutting line's "A", top 256.9 mm).  Its
+# arrows clear that letter by ~2.8 mm and its text the border by ~2.8 mm;
+# the span's arrows stand under the letters' tops, between them.
+# The -X hole's axis from the front face (the view's lower edge), its line
+# left of the block under the A-A cutting line's end.
+PIN_SIDE_TEXT_XY = (
+    _sheet_x(BLK_HALF_X - PIN_HOLE_SIDE_DISTANCE / 2.0),
+    TOP_CENTER[1] + TOP_HALF_Z + 0.0135,
+)
+ROW_FACE_TEXT_XY = (
+    _sheet_x(-BLK_HALF_X) - 0.012,
+    TOP_CENTER[1] - TOP_HALF_Z + HOLE_ROW_FACE_DISTANCE * SHEET_SCALE[0] / 1000.0 / 2.0,
+)
 TOP_KEEP = {
     "PinHoleDia": (
         PIN_CALLOUT_SHOULDER_START[0]
@@ -179,8 +208,10 @@ TOP_KEEP = {
         PIN_CALLOUT_SHOULDER_START[1] + PIN_CALLOUT_SHOULDER_DROP,
     ),
 }
+# The knife bore is reamed (Ra 1.6, +0.03/0 band): the process is stated
+# (blind machinist review, 2026-10-09: a bare THRU left drill or ream open).
 DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU",
+    "BoreDia": "REAM THRU",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 # The pair's count rides ABOVE its Ø (the pd-latch-hook-bracket PAIR_CALLOUT
@@ -207,25 +238,36 @@ PIN_DATUM_B_XY = (
 )
 # The #6-32 bottoming tap is stated once, on its Hole Wizard callout in the
 # top view (fr-top-frame's KEEPER TAP precedent), not in a note.  The
-# process rides its own row over the native drill and thread rows: three
-# 4.3 mm rows, the widest ("#6-32 UNC-2B" and its depth) ~52 mm at the dowel
-# callout's 2.73 mm a character.  The block parks in the band between the
-# top view and the front view's datum-A tag (its top at y 0.1951), left of
-# that tag (x >= 0.1115), so the leader climbs steeply to the tap's lower
-# rim: ~14 mm over the part against a 12 mm approach from the view's lower
-# edge, a ~2 mm detour (_layout_audit.LEADER_DETOUR_PROVISIONAL_M is 10).
-TAP_CALLOUT_PROCESS = "BOTTOMING TAP\n"
-TAP_CALLOUT_HALF_WIDTH = 0.026
+# process rides the thread row's prefix and names its depth the full thread
+# (blind machinist review, 2026-10-09); both depths carry their bands
+# (sm_knife_mount_spec.STUD_TAP_*_DEPTH_BAND).  Three 4.3 mm rows, the widest
+# the process (27 characters, ~76 mm at the 20261009T204136744Z render's
+# 2.82 mm a character).  The block parks in the band between the top view
+# and the front view's datum-A tag (its top at y 0.1951), its right end where
+# the three-row block's stood (x ~0.095), so the leader climbs steeply to the
+# tap's lower rim as before: ~14 mm over the part against a 12 mm approach
+# from the view's lower edge, a ~2 mm detour
+# (_layout_audit.LEADER_DETOUR_PROVISIONAL_M is 10).
+TAP_CALLOUT_PROCESS = "BOTTOMING TAP - FULL THREAD\n"
+TAP_CALLOUT_HALF_WIDTH = 0.039
 TAP_CALLOUT_HALF_HEIGHT = 0.0065
-TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.022, TOP_CENTER[1] - TOP_HALF_Z - 0.014)
+TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.035, TOP_CENTER[1] - TOP_HALF_Z - 0.014)
+TAP_CALLOUT_DEPTH_BANDS = {
+    "hw-threaddepth": (STUD_TAP_THREAD_DEPTH, STUD_TAP_THREAD_DEPTH_BAND),
+    "hw-tapdrldepth": (STUD_TAP_DRILL_DEPTH, STUD_TAP_DRILL_DEPTH_BAND),
+}
 # The tap's position frame hangs under its callout block, on its own leader
 # to the tap.  The two leaders land on the tap's two lower rims (model x
 # side): the callout's on the lower-left, nearer its block, the frame's on
 # the lower-right, so the frame's leader, climbing from the frame's right
 # end, stays right of the callout's.  Both on the lower-left rim, it crossed
 # the callout's 2 mm short of the tip (leader-crosses-leader, farm run
-# 20261009T164113078Z).
-TAP_FRAME_XY = (TAP_CALLOUT_XY[0], TAP_CALLOUT_XY[1] - TAP_CALLOUT_HALF_HEIGHT - 0.007)
+# 20261009T164113078Z).  The frame keeps its station when the wider callout
+# moves left, so its leader stays right of the callout's.
+TAP_FRAME_XY = (
+    _sheet_x(-BLK_HALF_X) - 0.022,
+    TAP_CALLOUT_XY[1] - TAP_CALLOUT_HALF_HEIGHT - 0.007,
+)
 TAP_CALLOUT_RIM_SIDE = -1.0
 TAP_FRAME_RIM_SIDE = 1.0
 # The bore's two-tier frame stands above the block's upper-right corner,
@@ -293,6 +335,106 @@ def _look_section_along_minus_z(adapter: Any, section: Any) -> None:
         raise RuntimeError(
             f"section A-A still looks along +Z (sign product {direction})"
         )
+
+
+def _band_tap_callout_depths(callout: Any) -> None:
+    """Author the tap's thread- and drill-depth bands on its hole callout.
+
+    A hole callout variable carries its OWN tolerance (SW 2016+:
+    ``ICalloutVariable.ToleranceType``), so the bands are set and read back
+    on the callout, the draw_sm_summing_lever bracket-tap precedent: the
+    title block's .XX on both left 0.18 of drill past the deepest full
+    thread, under the tap's one-pitch lead (blind machinist review,
+    2026-10-09).
+    """
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch
+
+    required = dict(TAP_CALLOUT_DEPTH_BANDS)
+    for raw in callout.GetHoleCalloutVariables() or ():
+        # Concrete callout interfaces alias the generic metadata DISPIDs.
+        variable = dynamic_dispatch(raw._oleobj_)
+        variable_name = str(variable.VariableName)
+        if variable_name not in required:
+            continue
+        depth, band = required.pop(variable_name)
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        if abs(float(length.Length) * 1000.0 - depth) > 1e-5:
+            raise RuntimeError(
+                f"knife-hanger tap callout {variable_name} reads "
+                f"{float(length.Length) * 1000.0:g}, expected {depth:g} mm"
+            )
+        variable.ToleranceType = 4  # swTolType_e.swTolSYMMETRIC
+        variable.ToleranceMin = -band / 1000.0
+        variable.ToleranceMax = band / 1000.0
+        length.TolerancePrecision = 2
+        if (
+            int(variable.ToleranceType) != 4
+            or abs(float(variable.ToleranceMin) * 1000.0 + band) > 1e-5
+            or abs(float(variable.ToleranceMax) * 1000.0 - band) > 1e-5
+            or int(length.TolerancePrecision) != 2
+        ):
+            raise RuntimeError(
+                f"knife-hanger tap callout band for {variable_name} did not "
+                f"persist: wanted symmetric {band} mm at 2 places"
+            )
+    if required:
+        raise RuntimeError(f"knife-hanger tap callout omits native depths: {required}")
+
+
+# Section A-A cuts the tap on its axis: SolidWorks' cosmetic-thread
+# annotation printed its major Ø there dashed, as a hidden thread (blind
+# machinist review, 2026-10-09).  It moves onto a visible thin continuous
+# layer, the section's own thread line.  The right view is drawn
+# hidden-lines-removed, which does not touch the annotation (the
+# draw_fr_top_frame._hide_cosmetic_threads measurement), so its thread moves
+# onto an invisible layer.
+SECTION_THREAD_LAYER = "TAP-THREAD-SECTION"
+HIDDEN_THREAD_LAYER = "TAP-THREAD-HIDDEN"
+_COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+
+
+def _layer_cosmetic_threads(
+    adapter: Any, view: Any, *, layer_name: str, visible: bool, label: str
+) -> int:
+    """Move one view's cosmetic-thread annotations onto ``layer_name``.
+
+    The layer is created thin and continuous (``ILayerMgr::AddLayer``),
+    shown or hidden by ``visible``, the draw_fr_top_frame precedent: both the
+    layer state and every annotation's layer are read back.  Returns the
+    count moved; the caller decides whether none is a failure.
+    """
+    draw = adapter.currentModel
+    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(layer_name)
+    if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
+        if int(manager.AddLayer(layer_name, label, 0, 0, 0)) != 1:
+            raise RuntimeError(f"{label}: failed to add layer {layer_name}")
+        layer = manager.GetLayer(layer_name)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = visible
+    if bool(layer.Visible) != visible or (not visible and bool(layer.Printable)):
+        raise RuntimeError(
+            f"{label}: layer {layer_name} reads visible={layer.Visible!r}, "
+            f"printable={layer.Printable!r}; wanted visible={visible}"
+        )
+    if visible and (int(layer.Style) != 0 or int(layer.Width) != 0):
+        raise RuntimeError(
+            f"{label}: layer {layer_name} reads style {layer.Style!r}, width "
+            f"{layer.Width!r}; wanted thin continuous"
+        )
+    moved = 0
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        annotation.Layer = layer_name
+        if str(annotation.Layer or "") != layer_name:
+            raise RuntimeError(f"{label}: a cosmetic thread refused layer {layer_name}")
+        moved += 1
+    rebuild_drawing(adapter, label=f"cosmetic threads to {layer_name}")
+    _telemetry.info(f"{label}: moved {moved} cosmetic thread(s) to {layer_name}")
+    return moved
 
 
 def _tap_lower_rim(adapter: Any, top: Any, x_side: float) -> tuple[float, float]:
@@ -381,11 +523,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _look_section_along_minus_z(adapter, section)
     set_hidden_lines_removed(adapter, section)
-    # The bore only reads in the front view; show it dashed in the projected
-    # right/top views so the orthographic set carries the thru-hole the
-    # isometric implies (blind-review finding: HLR left them empty rectangles).
-    set_hidden_lines_removed(adapter, iso)
-    for view in (front, right, top):
+    # The bore only reads in the front view; show it dashed in the top view so
+    # the plan carries the thru-hole the isometric implies (blind-review
+    # finding: HLR left it an empty rectangle).  The right view carries only
+    # the block's depth: its dashed tap, dowel and bore restated the front
+    # view, section A-A and their callouts (blind machinist review,
+    # 2026-10-09), so it is drawn hidden-lines-removed.
+    for view in (iso, right):
+        set_hidden_lines_removed(adapter, view)
+    for view in (front, top):
         set_hidden_lines_visible(adapter, view)
 
     # The dowel hole's floor depth (section A-A) is imported before its
@@ -425,6 +571,21 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    if not _layer_cosmetic_threads(
+        adapter,
+        section,
+        layer_name=SECTION_THREAD_LAYER,
+        visible=True,
+        label="section A-A tap thread",
+    ):
+        raise RuntimeError("section A-A carries no cosmetic thread; the tap moved?")
+    _layer_cosmetic_threads(
+        adapter,
+        right,
+        layer_name=HIDDEN_THREAD_LAYER,
+        visible=False,
+        label="right view hidden tap thread",
+    )
     # SolidWorks pins its own raw "#6-32 Tapped Hole" note to a view that
     # imports from the tapped part (the dda9a33a8 render put it on the top
     # view, through the dowel callout).  The tap is stated once, on its hole
@@ -435,7 +596,7 @@ async def build(adapter: Any) -> dict[str, str]:
     removed_tap_notes = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
     _telemetry.info(f"removed {removed_tap_notes} automatic tapped-hole note(s)")
     tap_rim = _tap_lower_rim(adapter, top, TAP_CALLOUT_RIM_SIDE)
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=tap_rim,
@@ -443,6 +604,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="knife-hanger screw bottoming tap",
         process=TAP_CALLOUT_PROCESS,
     )
+    _band_tap_callout_depths(tap_callout)
     # One arrow on the bore's near (upper-left) rim, its leader short from
     # the text on the left; native, the Ø line ran rim to rim through the
     # centre and across the view to a shoulder left of it.
@@ -460,8 +622,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if len(marks) != 1:
         raise RuntimeError(f"expected one knife-bore centre mark, found {len(marks)}")
 
-    # Block depth (14): dimension the right view's flat front/back faces.
-    add_edge_dimension(
+    # Block depth (14.0, .X like the width and height): dimension the right
+    # view's flat front/back faces.
+    depth = add_edge_dimension(
         adapter,
         right,
         p0=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
@@ -469,6 +632,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - RIGHT_HALF_Y - 0.014),
         label="block-depth overall",
     )
+    _set_sheet_precision(depth, label="block-depth overall")
 
     # The dowel pair's span: hole axis to hole axis, picked on each hole's
     # outer rim at 45 deg, clear of the bore's hidden lines at x +/-6.
@@ -509,6 +673,72 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     _set_sheet_precision(span, label="dowel hole span")
     set_basic_dimension(adapter, span, label="dowel hole span")
+
+    # The pattern on the block's outside faces at general tolerance (blind
+    # machinist review, 2026-10-09: the span located the dowels only to each
+    # other).  Across X, the +X hole's axis from the +X side face; across Z,
+    # the -X hole's axis from the front face.  Each face is picked off the
+    # cutting line and the bore's hidden lines, each hole on the rim the span
+    # took.
+    side_face = model_point_in_view(
+        adapter,
+        top,
+        (BLK_HALF_X / 1000.0, BLK_TOP / 1000.0, SUPPORT_Z_THICK / 4.0 / 1000.0),
+        label="+X side face",
+    )
+    side = add_edge_dimension(
+        adapter,
+        top,
+        p0=side_face,
+        p1=span_picks[1],
+        text_xy=PIN_SIDE_TEXT_XY,
+        label="dowel hole from side face",
+        orientation="horizontal",
+    )
+    set_arc_endpoints_to_center(adapter, side, label="dowel hole from side face")
+    if abs(_sheet_dimension_mm(side) - PIN_HOLE_SIDE_DISTANCE) > 1e-5:
+        raise RuntimeError(
+            f"+X dowel hole measures {_sheet_dimension_mm(side):g} from the side "
+            f"face, expected {PIN_HOLE_SIDE_DISTANCE:g} mm"
+        )
+    _set_sheet_precision(side, label="dowel hole from side face")
+    front_face = model_point_in_view(
+        adapter,
+        top,
+        (
+            -(BLK_HALF_X + PIN_HOLE_X) / 2.0 / 1000.0,
+            BLK_TOP / 1000.0,
+            SUPPORT_Z_THICK / 2.0 / 1000.0,
+        ),
+        label="front face",
+    )
+    row_y = model_point_in_view(
+        adapter,
+        top,
+        (-PIN_HOLE_X / 1000.0, BLK_TOP / 1000.0, 0.0),
+        label="-X dowel axis",
+    )[1]
+    if not front_face[1] < row_y:
+        raise RuntimeError(
+            f"the front face projects at sheet y {front_face[1]:g}, not below the "
+            f"hole row ({row_y:g}): ROW_FACE_TEXT_XY assumes the top view's lower edge"
+        )
+    row = add_edge_dimension(
+        adapter,
+        top,
+        p0=front_face,
+        p1=span_picks[0],
+        text_xy=ROW_FACE_TEXT_XY,
+        label="hole row from front face",
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_center(adapter, row, label="hole row from front face")
+    if abs(_sheet_dimension_mm(row) - HOLE_ROW_FACE_DISTANCE) > 1e-5:
+        raise RuntimeError(
+            f"-X dowel hole measures {_sheet_dimension_mm(row):g} from the front "
+            f"face, expected {HOLE_ROW_FACE_DISTANCE:g} mm"
+        )
+    _set_sheet_precision(row, label="hole row from front face")
 
     # Datum A = the block top seat (clamped to the top-frame casting underside;
     # carries the #6-32 knife-hanger-screw tap and the MHA-VN-051 dowel

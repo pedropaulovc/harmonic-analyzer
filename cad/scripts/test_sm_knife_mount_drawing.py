@@ -59,15 +59,23 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     )
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    # Every marked dowel-hole dimension carries part-authored places; the
-    # pair's span is sheet-added between the two axes, its places the spec's.
+    # Every marked dimension carries part-authored places (the block's .X
+    # overall size, the reamed bore's .XX band, the dowel hole's); the
+    # pair's span, the block depth and the pattern's face locations are
+    # sheet-added, their places the spec's.
     assert set(sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME) == {
+        "BlockWidth",
+        "BlockHeight",
+        "BoreDia",
         "PinHoleDia",
         "PinHoleDepth",
     }
     assert sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION == {
         "dowel hole span": 3,
         "knife-bore centre from top seat": 3,
+        "block-depth overall": 1,
+        "dowel hole from side face": 2,
+        "hole row from front face": 1,
     }
     for feature, names in sm_knife_mount_spec.DRAWING_PRECISION.items():
         assert set(names) <= sm_knife_mount_spec.DRAWING_DIMENSIONS[feature]
@@ -132,7 +140,7 @@ def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_native_hole_callout(") == 1
     assert "process=TAP_CALLOUT_PROCESS" in source
-    assert drawing.TAP_CALLOUT_PROCESS == "BOTTOMING TAP\n"
+    assert drawing.TAP_CALLOUT_PROCESS == "BOTTOMING TAP - FULL THREAD\n"
     assert drawing.TAPPED_HOLE_NOTE == "Tapped Hole"
     assert "remove_notes_matching(adapter, TAPPED_HOLE_NOTE)" in source
     assert "redundant_note_substrings=(TAPPED_HOLE_NOTE,)" in source
@@ -152,7 +160,7 @@ def test_tap_callout_parks_between_the_top_view_and_the_datum_tag() -> None:
     assert y + drawing.TAP_CALLOUT_HALF_HEIGHT < top_view_bottom
     assert y - drawing.TAP_CALLOUT_HALF_HEIGHT > datum_tag_top
     assert x + drawing.TAP_CALLOUT_HALF_WIDTH < drawing.FRONT_CENTER[0] - 0.0035
-    # Over the 29.62 height line's upper witness line (y at the block top),
+    # Over the 29.6 height line's upper witness line (y at the block top),
     # not beside it.
     assert y - drawing.TAP_CALLOUT_HALF_HEIGHT > drawing._front_y(
         sm_knife_mount_spec.BLK_TOP
@@ -189,7 +197,7 @@ def test_tap_frame_leader_lands_clear_of_the_tap_callout_leader() -> None:
 
 
 def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
-    # 5ff8fba5d render: the 29.62 dimension line ran 3.62 mm through the
+    # 5ff8fba5d render: the 29.6 dimension line ran 3.62 mm through the
     # Ø12.00 THRU text, and the Ø line crossed the bore and the view to a
     # shoulder left of it.  The text now sits in the band between the height
     # line and the block's -X face, at least 5 mm clear of each, and the Ø
@@ -237,6 +245,9 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert sm_knife_mount_spec.PIN_HOLE_XS == (-6.350, 6.350)
     assert sm_knife_mount_spec.PIN_HOLE_SPAN == 12.700
     assert sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME == {
+        "BlockWidth": 1,
+        "BlockHeight": 1,
+        "BoreDia": 2,
         "PinHoleDia": 3,
         "PinHoleDepth": 1,
     }
@@ -336,9 +347,10 @@ def test_native_gdt_and_bore_geometry() -> None:
         "dowel hole pattern position": "0.13",
     }
     # Sheet-added: the block depth, the dowel span and the bore centre's
-    # height under A, both BASIC; the dowel holes' Ø and depth are marked
-    # model dimensions (DRAWING_DIMENSIONS).
-    assert source.count("add_edge_dimension(") == 3
+    # height under A (both BASIC), and the pattern's two face locations; the
+    # dowel holes' Ø and depth are marked model dimensions
+    # (DRAWING_DIMENSIONS).
+    assert source.count("add_edge_dimension(") == 5
     assert source.count("set_basic_dimension(") == 2
     assert 'set_basic_dimension(adapter, span, label="dowel hole span")' in source
 
@@ -409,3 +421,92 @@ def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
     for sy in (hex_centre_y + HEX_H / 4.0, hex_centre_y - HEX_H / 4.0):
         d = math.hypot(HEX_W / 2.0, sy - part.BORE_CY)
         assert d < part.R_BORE - 0.5
+
+
+def test_tap_callout_bands_its_depths_with_a_pitch_of_runout() -> None:
+    # Machinist review B2: the bottoming tap needs drill past the full
+    # thread.  Both depths carry explicit bands on the native callout (the
+    # summing-lever bracket-tap precedent); at their adverse limits the drill
+    # still runs 1.05 past the thread, over one 0.794 pitch.
+    assert drawing.TAP_CALLOUT_DEPTH_BANDS == {
+        "hw-threaddepth": (9.7, 0.05),
+        "hw-tapdrldepth": (10.9, 0.10),
+    }
+    assert sm_knife_mount_spec.STUD_TAP_RUNOUT_MIN >= sm_knife_mount_spec.STUD_PITCH
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "tap_callout = add_native_hole_callout(" in source
+    assert "_band_tap_callout_depths(tap_callout)" in source
+    body = source[source.index("def _band_tap_callout_depths(") :]
+    body = body[: body.index("\ndef ")]
+    assert "variable.ToleranceType = 4" in body
+    assert "if required:" in body
+
+
+def test_hidden_threads_and_restated_hidden_lines_are_gone() -> None:
+    # Machinist review: the right view's dashed tap, dowel and bore restated
+    # the front view and A-A, and A-A printed the tap's thread dashed.  The
+    # right view is hidden-lines-removed, its thread annotation on a hidden
+    # layer; A-A's thread on a visible thin continuous layer, and none moved
+    # there fails the build.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (iso, right):\n        set_hidden_lines_removed(adapter, view)" in source
+    assert "for view in (front, top):\n        set_hidden_lines_visible(adapter, view)" in source
+    assert drawing.SECTION_THREAD_LAYER != drawing.HIDDEN_THREAD_LAYER
+    section_call = source[source.index("    if not _layer_cosmetic_threads(\n        adapter,\n        section,") :]
+    section_call = section_call[: section_call.index("    _layer_cosmetic_threads(\n        adapter,\n        right,")]
+    assert "layer_name=SECTION_THREAD_LAYER" in section_call
+    assert "visible=True" in section_call
+    assert "raise RuntimeError" in section_call
+    right_call = source[source.index("    _layer_cosmetic_threads(\n        adapter,\n        right,") :]
+    right_call = right_call[: right_call.index(")\n") + 2]
+    assert "layer_name=HIDDEN_THREAD_LAYER" in right_call
+    assert "visible=False" in right_call
+
+
+def test_the_pattern_is_located_from_the_side_and_front_faces() -> None:
+    # Machinist review B1: the span located the dowels only to each other.
+    # The +X hole's axis stands 5.65 .XX from the +X face, a row above the
+    # BASIC span over the top view (clear of the dowel frame's leader under
+    # it, and of the span's arrows); the row 7.0 .X from the front face, left
+    # of the view.
+    assert sm_knife_mount_spec.PIN_HOLE_SIDE_DISTANCE == pytest.approx(
+        sm_knife_mount_spec.BLK_HALF_X - sm_knife_mount_spec.PIN_HOLE_X
+    )
+    assert sm_knife_mount_spec.HOLE_ROW_FACE_DISTANCE == pytest.approx(
+        sm_knife_mount_spec.SUPPORT_Z_THICK / 2.0
+    )
+    top_view_top = drawing.TOP_CENTER[1] + drawing.TOP_HALF_Z
+    side_x, side_y = drawing.PIN_SIDE_TEXT_XY
+    assert side_y > top_view_top
+    assert side_y >= drawing.PIN_SPAN_TEXT_XY[1] + 0.006
+    assert drawing._sheet_x(sm_knife_mount_spec.PIN_HOLE_X) < side_x
+    assert side_x < drawing._sheet_x(sm_knife_mount_spec.BLK_HALF_X)
+    row_x, _ = drawing.ROW_FACE_TEXT_XY
+    assert row_x < drawing._sheet_x(-sm_knife_mount_spec.BLK_HALF_X)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for label in ("dowel hole from side face", "hole row from front face"):
+        assert f'_set_sheet_precision(side, label="{label}")' in source or (
+            f'_set_sheet_precision(row, label="{label}")' in source
+        )
+        assert source.count(f'label="{label}"') == 3
+
+
+def test_the_bore_states_its_ream_and_band() -> None:
+    # Machinist review B3: a bare THRU left drill or ream open; the bore is
+    # reamed to +0.03/0 at two places (Ra 1.6 stays).
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "REAM THRU"
+    assert sm_knife_mount_spec.BORE_DIA_BAND == (0.03, 0.0)
+    assert sm_knife_mount_spec.BORE_DIA_PLACES == 2
+    assert sm_knife_mount_spec.DRAWING_PRECISION["BoreProfile"] == {"BoreDia": 2}
+    assert sm_knife_mount_spec.BORE_R_MIN == sm_knife_mount_spec.R_BORE
+    assert sm_knife_mount_spec.BORE_R_MAX == pytest.approx(6.015)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert (
+        "        \"BoreProfile\",\n"
+        "        \"BoreDia\",\n"
+        "        *deviations(BORE_DIA_BAND),\n"
+        "        places=BORE_DIA_PLACES,\n"
+    ) in source
+    assert source.index("*deviations(BORE_DIA_BAND)") < source.index(
+        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
+    )

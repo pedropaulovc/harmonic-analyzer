@@ -130,7 +130,7 @@ HANGER_REACH_MAX = hanger_screw.LENGTH_MAX - (
 # a full thread), 6.284 - 0.794 = 5.49, against the 1.5 D floor, 5.258.
 HANGER_ENGAGEMENT_MIN = HANGER_REACH_MIN - hanger_screw.PITCH
 HANGER_ENGAGEMENT_FLOOR = hanger_screw.ENGAGEMENT_MIN_D * hanger_screw.SHANK_DIA
-# The longest reach under the shallowest printed full thread: 9.19 - 8.90 = 0.29.
+# The longest reach under the shallowest banded full thread: 9.65 - 8.90 = 0.75.
 HANGER_TIP_CLEARANCE = knife_mount.STUD_TAP_THREAD_DEPTH_MIN - HANGER_REACH_MAX
 # The plain shank stays in the crossbar: 19.05 of thread covers the 8.90 reach.
 HANGER_THREAD_SPARE = hanger_screw.THREAD_LENGTH - HANGER_REACH_MAX
@@ -173,23 +173,22 @@ HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATC
 # The free rock the knife-edge keeps at the rule-12 worst case (the
 # 2026-10-09 ruling: >= 5.0 deg).  The pair yaws the block about the screw by
 # the slot pin's worst offset over the shortest span, atan(0.117 / 12.57) =
-# 0.535 deg; across the 14 deep bore that walks its far end 0.131 off the
-# ridge line, and the bore's Ø0.05 orientation tier adds 0.05: t = 0.181.
-# The trunnion is judged at its widest, lowest .XXX section (8.21 x 10.138)
-# in the smallest .XX bore (Ø11.49): 5.038 deg.
+# 0.535 deg; across the deepest .X block (14.8) that walks the bore's far end
+# 0.138 off the ridge line, and the bore's Ø0.05 orientation tier adds 0.05:
+# t = 0.188.  The trunnion is judged at its widest, lowest .XXX section
+# (8.21 x 10.138) in the smallest reamed bore (Ø12.00): 6.16 deg.
 KNIFE_DOWEL_SPAN_MIN = knife_mount.PIN_HOLE_SPAN - knife_mount.PIN_HOLE_SPAN_TOL
 KNIFE_MOUNT_YAW_DEG = math.degrees(
     math.atan(_KNIFE_DOWEL_PAIR_SHIFT / KNIFE_DOWEL_SPAN_MIN)
 )
 KNIFE_BORE_FAR_END_OFFSET = (
-    knife_mount.SUPPORT_Z_THICK * math.tan(math.radians(KNIFE_MOUNT_YAW_DEG))
-    + knife_mount.KNIFE_BORE_ORIENTATION_TOL
-)
+    knife_mount.SUPPORT_Z_THICK + knife_mount.BLOCK_SIZE_TOL
+) * math.tan(math.radians(KNIFE_MOUNT_YAW_DEG)) + knife_mount.KNIFE_BORE_ORIENTATION_TOL
 KNIFE_FREE_ROCK_WORST_DEG = knife_mount.free_rock_deg(
     KNIFE_BORE_FAR_END_OFFSET,
     hex_w=HEX_W + HEX_BAND,
     hex_h=HEX_H - HEX_BAND,
-    r_bore=knife_mount.R_BORE - knife_mount.BORE_DIA_TOL / 2.0,
+    r_bore=knife_mount.BORE_R_MIN,
 )
 KNIFE_FREE_ROCK_FLOOR_DEG = 5.0
 

@@ -86,6 +86,8 @@ from _drawing_marks import (
 )
 from _part_pmi import author_part_pmi
 from sm_knife_mount_spec import (
+    BORE_DIA_BAND,
+    BORE_DIA_PLACES,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
@@ -146,7 +148,7 @@ if abs(BLK_TOP - sm_knife_mount_spec.BLK_TOP) > 0.005:
 # BASIC 0.004 off the part (farm run 20261009T155421516Z measured 20.616).
 BORE_CENTRE_DEPTH = BLK_TOP - BORE_CY
 # The spec judges the tap's web at its rounded mirror; the derived top is
-# 0.004 lower, so re-judge it here (2.038).
+# 0.004 lower, so re-judge it here (2.688).
 _TAP_WEB_WORST = sm_knife_mount_spec.tap_web_worst(
     BLK_TOP,
     sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH,
@@ -362,7 +364,7 @@ async def build(adapter) -> dict[str, str]:
     # ThreadDepth override), on the trunnion-axis centreline (both placement
     # coords are zero -> origin-axis relations, no placement dims). The
     # analytic expectation subtracts the drill cylinder to its depth plus the
-    # drill point; the point stops STUD_TAP_WEB_WORST (2.04) above the bore
+    # drill point; the point stops STUD_TAP_WEB_WORST (2.69) above the bore
     # crown, so none of it overlaps the bore void.
     wizard_holes(
         adapter,
@@ -486,6 +488,15 @@ async def build(adapter) -> dict[str, str]:
             *deviations(PIN_HOLE_DIA_BAND),
             places=PIN_HOLE_DIA_PLACES,
         )
+    # The reamed knife bore's +0.03/0 band (sm_knife_mount_spec.BORE_DIA_BAND),
+    # printed at its two places: Ø12.00 +0.03/0.00 REAM THRU.
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "BoreProfile",
+        "BoreDia",
+        *deviations(BORE_DIA_BAND),
+        places=BORE_DIA_PLACES,
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.

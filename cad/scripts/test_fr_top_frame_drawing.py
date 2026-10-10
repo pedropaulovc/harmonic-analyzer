@@ -718,21 +718,28 @@ def test_dowel_slot_contract() -> None:
     assert part.SLOT_X - part.HANGER_X == pytest.approx(spec.HANGER_SLOT_X)
     assert spec.HANGER_SLOT_X == -6.35
     assert spec.HANGER_PIN_XS == (spec.HANGER_SLOT_X, spec.HANGER_ROUND_X)
-    # Slip width = the round hole's ream; length .XXX; floor = the hole's.
+    # Slip width = the round hole's ream; length .XX; floor = the hole's.
     assert (spec.HANGER_SLOT_WIDTH, spec.HANGER_SLOT_WIDTH_BAND) == (3.24, (0.03, -0.03))
-    assert (spec.HANGER_SLOT_LENGTH, spec.HANGER_SLOT_LENGTH_TOL) == (4.60, 0.13)
+    assert (spec.HANGER_SLOT_LENGTH, spec.HANGER_SLOT_LENGTH_TOL) == (4.30, 0.51)
     assert spec.HANGER_SLOT_DEPTH == spec.HANGER_PIN_HOLE_DEPTH
-    assert part.SLOT_FLAT == pytest.approx(1.36)
-    # Rule 12 walls and floor, print-worst.
-    assert part.SLOT_BAR_WALL == pytest.approx(2.155)
-    assert part.SLOT_SCREW_WALL == pytest.approx(1.646)
+    assert part.SLOT_FLAT == pytest.approx(1.06)
+    # The slot stands BASIC 12.700 from its round hole; from the screw axis
+    # it carries the round hole's .XXX band plus its zone radius.
+    assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(12.7)
+    assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(0.155)
+    # Rule 12 walls and floor, print-worst: the screw-side wall under the
+    # 2.0 target, over the 1.5 floor.
+    assert part.SLOT_BAR_WALL == pytest.approx(2.09)
+    assert part.SLOT_SCREW_WALL == pytest.approx(1.581)
+    assert part.SLOT_SCREW_WALL >= 1.5
     assert part.SLOT_FLOOR_MARGIN == pytest.approx(18.0)
     # The model owns the width and its band (front slot, on the underside
-    # locator); F-F derives the stations and the length.
+    # locator); F-F derives the station and the length.
     assert spec.DRAWING_DIMENSIONS["HangerSlotProfile"] == {"HangerSlotWidth"}
     assert spec.DRAWING_PRECISION_BY_NAME["HangerSlotWidth"] == 3
-    assert spec.DRAWING_REFERENCE_PRECISION["dowel slot from hanger axis"] == 3
-    assert spec.DRAWING_REFERENCE_PRECISION["dowel slot length"] == 3
+    assert "dowel slot from hanger axis" not in spec.DRAWING_REFERENCE_PRECISION
+    assert spec.DRAWING_REFERENCE_PRECISION["dowel slot from dowel hole"] == 3
+    assert spec.DRAWING_REFERENCE_PRECISION["dowel slot length"] == 2
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'for slot_width_name in ("HangerSlotWidth", "HangerSlot1Width"):' in source
     assert 'prefix = "HangerSlot" if station == "Front" else "HangerSlot1"' in source
@@ -1013,6 +1020,26 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
     bottom = drawing._hanger_section_xy(part.HANGER_X, -part.HALF_H)[1]
     assert drawing.PIN_STATION_TEXT_XY[1] > top
     assert drawing.HANGER_SECTION_KEEP["HangerPinHoleDia"][1] < bottom
+    # The slot's BASIC row stands above the hole's station row, so the two
+    # dimension lines never meet on the round hole's extension line.
+    assert drawing.SLOT_STATION_TEXT_XY[1] > drawing.PIN_STATION_TEXT_XY[1] + 0.004
+
+
+def test_slot_station_is_basic_from_its_round_hole() -> None:
+    # Machinist review (sheet 6): the slot position frames lacked a basic
+    # location.  The slot now stands BASIC 12.700 from the round hole beside
+    # it (datum B front, C rear), a bare box: its above-text did not print
+    # (20261010T001553082Z layout audit, text-unmatched).
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    section = source[source.index("def _hanger_section(") : source.index("def _hub_underside_detail(")]
+    assert "2X DOWEL SLOT\\nFROM SCREW AXIS" not in section
+    assert "p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z)" in section
+    assert "entities=(axes[2], axes[1])" in section
+    assert "expected_mm=HANGER_SLOT_FROM_ROUND" in section
+    assert 'set_basic_dimension(adapter, slot_station, label="dowel slot from dowel hole")' in section
+    assert "FROM DOWEL HOLE" not in section
+    assert 'location="above"' not in section
+    assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(spec.HANGER_ROUND_X - spec.HANGER_SLOT_X)
 
 
 def test_slip_hole_callout_is_parked_clear_of_the_section() -> None:

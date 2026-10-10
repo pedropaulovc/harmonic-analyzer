@@ -85,8 +85,9 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      A|B, so the crossbar's Ø4.318 clearance hole still floats round the screw
      — `build_sm_summing_assembly._assert_knife_hanger_stack`); the top
      frame's two knife-hanger dowel slots (⌖0.05 to the round dowel hole at
-     their own station, datum B front / C rear, with the other station's
-     round hole translated, B|C▷ and C|B▷, so the two knife mounts' dowel
+     their own station, BASIC 12.700 from it, datum B front / C rear, with
+     the other station's round hole translated, B|C▷ and C|B▷, so the two
+     knife mounts' dowel
      lines stay square to the knife-edge line); summing-lever knife seat and
      its 20-hole spring pattern (one pattern position frame);
    - **cams** — pinion-cam eccentric-axis position (and any future cam);
