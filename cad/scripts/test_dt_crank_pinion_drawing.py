@@ -656,7 +656,6 @@ def test_boss_gate_face_is_the_outboard_stub_not_a_gap_floor() -> None:
     """The runtime boss gate's decision: the relieved gap floors share the
     boss radius over the teeth only, so a pinion whose boss dropped (diag v3,
     d6ca08eb7) has no face the gate accepts; an intact one has exactly one."""
-
     radius = spec.BOSS_DIA / 2.0
     gap_floors = [_cylinder(radius, 0.0, spec.FACE_WIDTH) for _ in range(spec.TEETH)]
     boss = _cylinder(radius, spec.FACE_WIDTH, spec.OVERALL_LENGTH)

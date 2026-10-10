@@ -3313,6 +3313,8 @@ def isolated_export_keys(tmp_path, monkeypatch):
     "source",
     [
         "export_features.py", "_export_feature_faces.py", "_gtol_face_read.py",
+        "_gtol_face.py", "_gtol_cylinder.py", "_gtol_planar.py", "_gtol_cone.py",
+        "_gtol_sphere.py",
         "ch_rocker_arm_spec.py", "rocker_bank_layout.py", "draw_ch_rocker_arm.py",
     ],
 )
