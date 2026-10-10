@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import importlib
 import inspect
 import math
 from pathlib import Path
@@ -229,8 +230,15 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert f"CUT TO {spec.CUT_LENGTH_MM:.2f} MM" in installation
     assert "SOFT-SOLDER TO BACKER" in installation
     assert "SET MESH AT ASSEMBLY" in installation
-    for operation in spec.rack_flank_inspection_callout_text().splitlines():
-        assert operation in installation
+    # Policy option (c): the sheet carries the flank requirement only; the
+    # wire/secant/uncertainty procedure is MHA-PD-000's rack-soldered step.
+    callout = spec.rack_flank_inspection_callout_text()
+    assert callout == f"FLANKS {spec.PA_DEG:g} DEG +/-{quality.rack_working_side_angle_deviation_deg():g}"
+    procedure = spec.rack_flank_inspection_procedure_text()
+    for method in ("WIRE", "SECANT", "INDICATOR"):
+        assert method not in callout and method in procedure
+    assembly_source = inspect.getsource(importlib.import_module("draw_pd_paper_drive_assembly"))
+    assert "platen_rack.rack_flank_inspection_procedure_text()" in assembly_source
 
 
 def test_incoming_rack_limits_are_source_requirements_not_supplier_accuracy() -> None:
@@ -243,6 +251,16 @@ def test_incoming_rack_limits_are_source_requirements_not_supplier_accuracy() ->
     source = inspect.getsource(drawing)
     assert '"Incoming Rack Inspection"' in source
     assert '"Purchased Rack", PURCHASED_RACK_XY' not in source
+
+
+def test_rack_index_and_face_lead_fit_the_feed_opposite_flank_budget() -> None:
+    """tolerances.yaml derivation: with two pairs in contact the second
+    pair's clearance is the set datum backlash less every lateral term."""
+    import paper_drive_geom
+
+    closing = quality.rack_pitch_index_deviation_mm() + paper_drive_geom.feed_lateral_deviation_mm()
+    assert closing <= min(feed.RACK_BACKLASH_RANGE)
+    assert quality.rack_pitch_index_deviation_mm() >= 0.002 * 25.4  # SDP/SI accumulated
 
 
 def test_one_millimetre_gauge_pin_seats_on_both_source_flanks_clear_of_root() -> None:
@@ -704,11 +722,12 @@ def test_raw_pins_cloud_or_roll_scalar_is_not_a_material_envelope_certificate(un
 
 def test_feature_local_flank_ink_uses_one_canonical_shop_resolution_source():
     text = spec.rack_flank_inspection_callout_text()
-    assert f"CHECK FLANKS {spec.PA_DEG:g} DEG +/-{quality.rack_working_side_angle_deviation_deg():g}" in text
-    assert f"MEASURED SECANT DY >={quality.rack_flank_secant_minimum_height_mm():g} MM" in text
-    assert f"MIC/WIRE U +/-{quality.wire_measurement_uncertainty_mm():g} MM" in text
-    assert f"INDICATOR U +/-{quality.pitch_index_measurement_uncertainty_mm():g} MM" in text
-    assert "SAME WIRE/DIA" in text and "PAY BOTH XY READINGS" in text
+    assert text == f"FLANKS {spec.PA_DEG:g} DEG +/-{quality.rack_working_side_angle_deviation_deg():g}"
+    procedure = spec.rack_flank_inspection_procedure_text()
+    assert f"SECANT DY {quality.rack_flank_secant_minimum_height_mm():g} MM MIN" in procedure
+    assert f"MIC/WIRE U +/-{quality.wire_measurement_uncertainty_mm():g} MM" in procedure
+    assert f"INDICATOR U +/-{quality.pitch_index_measurement_uncertainty_mm():g} MM" in procedure
+    assert "ONE WIRE DIA" in procedure and "PAYING BOTH XY READINGS" in procedure
     for qualifier in (
         quality.stock_form_receiving_status_text(),
         "WHOLE MATERIAL", "X-INTERCEPT", "BOUNDARY", "ROOT INTRUSION",
@@ -716,8 +735,8 @@ def test_feature_local_flank_ink_uses_one_canonical_shop_resolution_source():
     ):
         assert qualifier not in text
         assert qualifier not in _config.parts(builder.PART_NAME)["installation_notes"]
-    assert len(text.splitlines()) == 3
-    assert all(len(line) <= 70 for line in text.splitlines())
+    assert len(text.splitlines()) == 1
+    assert len(text) <= 70
     assert builder.RACK_FLANK_INSPECTION_PROPERTY == drawing.RACK_FLANK_INSPECTION_PROPERTY
     assert builder.rack_flank_inspection_callout_text is spec.rack_flank_inspection_callout_text
     source = inspect.getsource(drawing)

@@ -398,7 +398,7 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     low, high = spec.LATCH_PIN_PRESS_PRINTED
     assert 0.0 < low <= loosest < tightest <= high < tightest + 1e-4
     lines = spec.PIN_HOLE_CALLOUT.splitlines()
-    assert lines[1] == f"PRESS PIN {spec.LATCH_PIN_NUMBER} TO FLOOR"
+    assert lines[1] == f"PRESS FIT PIN {spec.LATCH_PIN_NUMBER}"
     assert lines[2] == f"{low:.4f}/{high:.4f} INTERFERENCE"
     assert lines[2] == "0.0025/0.0177 INTERFERENCE"
 

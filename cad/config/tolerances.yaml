@@ -39,7 +39,16 @@ fits:
     recording_paper_width_deviation_mm: 0.100
     recording_paper_left_inset_deviation_mm: 0.100
     recording_pen_x_deviation_mm: 0.100
-    rack_pitch_index_deviation_mm: 0.010
+    # Purchased-rack index and assembled face lead share the feed mesh's
+    # opposite-flank budget: while two pairs touch (CR 1.245-1.318) the
+    # second pair's clearance is the set datum backlash (0.12 MIN) less the
+    # other lateral terms (form 0.025 + pinion index 0.010 + cocking 0.0046
+    # + tilt 0.0001 = 0.0397), leaving 0.080 for rack index + face lead.
+    # Index 0.055 holds SDP/SI's published rack accuracy (Gears.pdf p. 1-190:
+    # tooth-to-tooth .0005 in, total accumulated .002 in = 0.051 mm); the
+    # 0.025 lead takes the rest. Contact continuity is not binding: the
+    # 0.245 overlap of the 2.343 base pitch tolerates 0.61 mm of index.
+    rack_pitch_index_deviation_mm: 0.055
     rack_flank_constraint_deviation_mm: 0.025
     # Source closing/projection outer gives0.2724567 mm native root air.
     # Keep the0.25 mm floor: this inclusive MAX pays indicator U0.002;
@@ -49,7 +58,7 @@ fits:
     rack_flank_secant_minimum_height_mm: 0.800
     purchased_rack_working_side_form_model_premise: PURCHASED_RACK_32DP_PA20_STRAIGHT_SMOOTH_WORKING_SIDE_FORM
     pinion_pitch_index_deviation_mm: 0.010
-    rack_face_lead_deviation_mm: 0.010
+    rack_face_lead_deviation_mm: 0.025
     pitch_index_measurement_uncertainty_mm: 0.002
     wire_measurement_uncertainty_mm: 0.005
     feed_loaded_travel_height_deviation_mm: 0.010

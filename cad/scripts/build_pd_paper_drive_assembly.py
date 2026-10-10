@@ -119,7 +119,6 @@ from _assembly import (
     component_names,
     component_origin,
     coincident_mate,
-    concentric_mate,
     component_transform,
     distance_driver,
     lock_mate,
@@ -2703,12 +2702,15 @@ async def build(adapter) -> dict[str, str]:
     )
     # Physical seat 3DOF + ONE primary dowel 2DOF + clock 1DOF.
     # The second pin is inspected, not a redundant second concentric mate.
+    # Two reference axes take a coincident mate (the repo's axis-to-axis
+    # coaxial idiom); CreateMate refuses concentric between two axes (run
+    # 20261010T001620278Z: "CreateMate failed for concentric mate").
     await coincident_mate(
         adapter, named_ref(f"Front Plane@{arm_plate}", "PLANE"),
         named_ref(f"RearFace@{arm}", "PLANE"),
         label="arm-plate actual mounting seat", verify=(arm_plate, plate_origin),
     )
-    await concentric_mate(
+    await coincident_mate(
         adapter, named_ref(f"Axis4@{arm_plate}", "AXIS"),
         named_ref(f"Axis6@{arm}", "AXIS"),
         label="arm-plate primary locating dowel", verify=(arm_plate, plate_origin),
@@ -2727,10 +2729,19 @@ async def build(adapter) -> dict[str, str]:
             adapter, "vn-transgear-arm-plate-locating-pin", pin_origin,
             [-90.0, 0.0, 0.0], ROT_X_NEG90, ground=False,
         )
-        await concentric_mate(
+        await coincident_mate(
             adapter, named_ref(f"ScrewAxis@{locating_pin}", "AXIS"),
-            named_ref(f"Axis{index + 5}@{arm}", "AXIS"), lock_rotation=True,
+            named_ref(f"Axis{index + 5}@{arm}", "AXIS"),
             label=f"locating dowel {index} arm press axis", verify=(locating_pin, pin_origin),
+        )
+        # The dowel's spin is immaterial; clock it to the grounded frame it
+        # was placed in. Its origin sits on the axis, so an off-axis witness
+        # separates the two parallel solutions.
+        await parallel_mate(
+            adapter, named_ref(f"Right Plane@{locating_pin}", "PLANE"),
+            named_ref("Right Plane", "PLANE"),
+            label=f"locating dowel {index} spin clock", verify=(locating_pin, pin_origin),
+            witness_local=[1.0, 0.0, 0.0],
         )
         await distance_driver(
             adapter, named_ref(f"Top Plane@{locating_pin}", "PLANE"),

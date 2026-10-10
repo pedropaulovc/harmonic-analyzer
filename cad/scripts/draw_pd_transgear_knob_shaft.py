@@ -45,7 +45,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from paper_drive_stock_drawing import add_toothspace_callout
+from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_transgear_knob_shaft_spec import (
     CHAMFER_CALLOUT,
     CORE_DIA,
@@ -236,8 +236,10 @@ async def build(adapter: Any) -> dict[str, str]:
             "Tooth Cut Features",
         ),
     )
-    if source_properties[TOOTH_SPACE_CALLOUT_PROPERTY] != TOOTH_SPACE_CALLOUT:
-        raise RuntimeError("knob source toothspace grade is stale relative to the actual source policy")
+    require_source_control(
+        source_properties[TOOTH_SPACE_CALLOUT_PROPERTY], TOOTH_SPACE_CALLOUT,
+        label="knob shaft toothspace grade",
+    )
     tooth_features = tuple(source_properties["Tooth Cut Features"].splitlines())
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout

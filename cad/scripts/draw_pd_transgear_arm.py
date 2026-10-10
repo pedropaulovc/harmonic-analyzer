@@ -60,7 +60,6 @@ from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     PIN_HOLE_DEPTH,
-    PIN_HOLE_Z,
     PIN_STATION,
     PIVOT_END_R,
     PLATE_TAP_SPEC,
@@ -123,12 +122,16 @@ FRONT_CENTER = (0.189, 0.205)
 # overall-length reference under the station stack.
 SECTION_CENTER = (FRONT_CENTER[0], 0.094)
 END_CENTER = (0.357, FRONT_CENTER[1])
-ISO_CENTER = (0.370, 0.115)
-ISO_NOTE_XY = (0.335, 0.080)
+# Bottom left between the notes and the title block, under section A-A's
+# label: the right column holds the end view, its pin callout and section
+# B-B (run 20261010T001620278Z: B-B's label printed on the isometric).
+ISO_CENTER = (0.184, 0.037)
+ISO_NOTE_XY = (0.080, 0.022)
 # Bottom left, clear of the section's floor-depth text and of the title block.
 NOTES_XY = (0.014, 0.048)
 NOTES_TEXT = matched_locator_notes(_config.parts("pd-transgear-arm-plate")["number"])
-LOCATOR_SECTION_CENTER = (0.370, 0.155)
+# Under the end view's pin callout; its label clears the title block.
+LOCATOR_SECTION_CENTER = (0.370, 0.120)
 # The front view centres on the outline's bounding box (x -R .. tip).
 _BBOX_CENTER_X = (TIP_STATION - PIVOT_END_R) / 2.0
 
@@ -217,14 +220,18 @@ SECTION_KEEP = {
         SECTION_CENTER[1] - 0.020,
     ),
 }
+# Each narrow depth's text stands right of its witness lines and outside
+# its view (run 20261010T001620278Z: inside them, the witness lines and the
+# view edges struck the text).
 LOCATOR_SECTION_KEEP = {
-    "LocatorDepth": (0.375, 0.128),
+    "LocatorDepth": (0.396, 0.094),
 }
 END_KEEP = {
-    "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.010),
-    "PinHoleZ": (_end_x(PIN_HOLE_Z / 2.0), _end_y(-PIVOT_END_R) - 0.010),
-    # Absolute x: the callout's right edge sits 2 mm inside the right border.
-    "PinHoleDia": (0.385, _end_y(0.0) + 0.018),
+    "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.017),
+    # Between the end view and the stock text, right of the front face.
+    "PinHoleZ": (_end_x(0.0) + 0.017, _end_y(PIVOT_END_R) + 0.006),
+    # Below the end view, above section B-B, right edge inside the border.
+    "PinHoleDia": (0.384, 0.162),
 }
 
 

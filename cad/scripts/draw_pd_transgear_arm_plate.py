@@ -116,7 +116,10 @@ PNG = OUTPUTS.png
 # right of the section's over-arm wall and ends inside the border (x 0.419).
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
-PLAN_CENTER = (0.080, 0.165)
+# 12 mm lower than run 20261010T001620278Z, whose top frame row and locator
+# callout printed above the border; section A-A's caption still clears the
+# title block (it reached y 0.085).
+PLAN_CENTER = (0.080, 0.153)
 BACK_CENTER = (0.206, PLAN_CENTER[1])
 SECTION_CENTER = (0.326, PLAN_CENTER[1])
 ISO_CENTER = (0.390, 0.225)
@@ -162,9 +165,10 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ScrewHoleDia": (EDGE_MINUS_X - 8.0, _TOP + 8.0, _Z_PLAN),
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 8.0, _Z_PLAN),
     "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2] + 5.0, _Z_PLAN),
-    # High enough that its two callout lines clear the screw-hole callout,
-    # and its right end clears countersink 1's frame leader.
-    "LocatorDia1": (EDGE_MINUS_X - 7.0, _TOP + 21.0, _Z_PLAN),
+    # High enough that its callout lines clear the screw-hole callout, and
+    # its right end clears countersink 1's frame leader; three short lines
+    # keep its left edge inside the border.
+    "LocatorDia1": (EDGE_MINUS_X - 7.0, _TOP + 23.75, _Z_PLAN),
 }
 # Back view (the mounting face): the notch face's corner heights, outboard.
 BACK_KEEP: dict[str, tuple[float, float, float]] = {
@@ -211,7 +215,7 @@ FINISH_CHAR_HEIGHT = 0.0025
 # countersink 2's right of it. The back view mirrors X, so its hole frames
 # sit outboard of their own holes (no crossing) and the two through-bore
 # locator leaders drop between the hole leaders.
-FRAME_ROWS = (0.274, 0.262, 0.250)
+FRAME_ROWS = (0.262, 0.250, 0.238)
 FRAME_XY = {
     "plate_countersink_1_position": (0.071, FRAME_ROWS[0]),
     "plate_countersink_2_position": (0.1143, FRAME_ROWS[1]),
@@ -358,22 +362,22 @@ async def build(adapter: Any) -> dict[str, str]:
     plan_edges = scan_view_edges(plan, label="plate rear-face locating PMI")
     back_edges = scan_view_edges(back, label="plate mounting-face drill PMI")
     placements = {
-        # Above section A-A's station stack (its top text reaches y 0.2485),
+        # Above section A-A's station stack (its top text reaches y 0.2365),
         # so the tag's horizontal leader to the mounting face's extension
         # runs clear of the HubFaceToMounting text.
         "datum:A": PmiDrawingPlacement(
-            section, (0.300, 0.256),
+            section, (0.300, 0.244),
             attachment_xy=_sheet_xy(
                 adapter, section, (0.0, SCREW_HOLES[0][1], 0.0),
                 "plate mounting datum",
             ),
         ),
         "datum:B": PmiDrawingPlacement(
-            plan, (0.037, 0.120),
+            plan, (0.037, 0.108),
             edge_entity=visible_circle_edge(adapter, plan, BORE_DIA),
         ),
         "datum:C": PmiDrawingPlacement(
-            plan, (0.128, 0.213),
+            plan, (0.128, 0.201),
             edge_entity=plan_edges.exact_line_through(
                 (EDGE_PLUS_X, (TOP_RIGHT[1] + NOTCH_RIGHT[1]) / 2.0, REAR_FACE_Z),
                 label="plate +X clock edge",
@@ -400,7 +404,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         # Below the end radius's text and right of the bore finish symbol.
         "knob_projected_axis": PmiDrawingPlacement(
-            plan, (0.092, 0.100),
+            plan, (0.092, 0.088),
             edge_entity=visible_circle_edge(adapter, plan, BORE_DIA),
         ),
         **{

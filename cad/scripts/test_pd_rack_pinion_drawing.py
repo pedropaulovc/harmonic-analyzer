@@ -540,15 +540,27 @@ def test_stale_native_tooth_space_control_is_refused_before_drawing_creation() -
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
                  and node.name == "build")
-    guard = next(node for node in build.body if isinstance(node, ast.If)
-                 and ast.unparse(node.test) ==
-                 "properties[TOOTH_SPACE_CALLOUT_PROPERTY] != TOOTH_SPACE_CALLOUT")
-    assert len(guard.body) == 1 and isinstance(guard.body[0], ast.Raise)
+    guard = next(node for node in build.body if isinstance(node, ast.Expr)
+                 and ast.unparse(node.value).startswith(
+                     "require_source_control(properties[TOOTH_SPACE_CALLOUT_PROPERTY], "
+                     "TOOTH_SPACE_CALLOUT,"))
     creation = next(node for node in build.body if isinstance(node, ast.Assign)
                     and isinstance(node.value, ast.Call)
                     and isinstance(node.value.func, ast.Name)
                     and node.value.func.id == "new_project_drawing")
     assert build.body.index(guard) < build.body.index(creation)
+
+
+def test_saved_crlf_control_passes_and_a_changed_line_is_refused() -> None:
+    """A reopened part reads its property's line breaks back as CRLF (the run
+    20261010T001620278Z SLDPRT stores them so); the lines are the control."""
+    from paper_drive_stock_drawing import require_source_control
+
+    saved = spec.TOOTH_SPACE_CALLOUT.replace("\n", "\r\n")
+    require_source_control(saved, spec.TOOTH_SPACE_CALLOUT, label="rack pinion")
+    stale = saved.replace("0.005", "0.010")
+    with pytest.raises(RuntimeError, match="differs from the current specification"):
+        require_source_control(stale, spec.TOOTH_SPACE_CALLOUT, label="rack pinion")
 
 
 def test_tooth_space_control_is_a_model_linked_physical_flank_callout() -> None:

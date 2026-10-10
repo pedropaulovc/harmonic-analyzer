@@ -19,6 +19,21 @@ from paper_drive_stock_inspection import GaugeContact, toothspace_gauge_contact_
 from stock_form_cutter import StockFormProfile
 
 
+def require_source_control(source: str, expected: str, *, label: str) -> None:
+    """Raise unless the part's saved control text is the spec's, line for line.
+
+    SolidWorks stores a custom property's line breaks as CRLF on save (the
+    run 20261010T001620278Z rack-pinion SLDPRT's properties stream holds
+    ``\\r\\n``), so a reopened source reads back CRLF where the build wrote
+    LF. The line break is not the control; every line must still match.
+    """
+    if source.splitlines() != expected.splitlines():
+        raise RuntimeError(
+            f"{label}: source control {source!r} differs from the current "
+            f"specification {expected!r}"
+        )
+
+
 def _vector(raw: Any, count: int, label: str) -> tuple[float, ...]:
     if raw is None:
         raise RuntimeError(f"{label}: no native numerical array")
