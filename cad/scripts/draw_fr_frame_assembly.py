@@ -1081,17 +1081,18 @@ def _bind_frame_balloon(
 # rebuild put the ring at (92.85, 249.98), 1.14 mm off that print, so a fit
 # read is no check of where the ring prints.
 #
-# Zoomed, GetDisplayData snaps the ring's centre to the window's pixel rows,
-# and a ring read while it sits above the window snaps about a pixel lower
-# against its anchor than one inside it. position_bom_balloon takes the
-# anchor-to-ring offset from the read before SetPosition, so a ring that
-# starts above the window carries that pixel to its target. Items 2 and 5
-# start some 50 mm above theirs (item 9 below its own): of 135 zoomed
-# placements of 2 and 5 (2026-09-28 to 2026-10-10) 132 landed 0.59-0.89 px
-# high, the row above the target instead of the one 0.11 px below it, and 5
-# failed 1.59 px high twice (swmaker00000F/A, 2026-10-01) and 1.89 px high
-# once (swmaker00000F, run 20261010T073339590Z, after the raised base deck
-# moved its start 1.7 mm). Placed at fit first, every ring starts inside the zoom.
+# Zoomed, GetDisplayData snaps the ring's centre to the window's pixel rows.
+# position_bom_balloon takes the anchor-to-ring offset from the read before
+# SetPosition; read inside the window, that offset differs from the placed
+# ring's only by which of the two rows bracketing the target it snaps to,
+# under a pixel. Items 2 and 5 start some 50 mm above the window, where the
+# offset read up to two rows off: item 5 landed 1.59 px high twice
+# (swmaker00000F/A, 2026-10-01) and 1.89 px high once (swmaker00000F, run
+# 20261010T073339590Z, its start moved 1.7 mm by the raised base deck).
+# Placed at fit first, every ring starts inside the zoom: items 2, 5 and 9
+# then landed 0.89, -0.11 and -0.11 px from target on swmaker00000a and
+# swmaker000004; all 168 placements made at fit, both reads inside the
+# window, stayed under a pixel.
 _SHORT_BALLOON_ZOOM_HALF = 0.012
 # How far the rebuild may move the balloon's SetPosition anchor: a model
 # value, not a rendered one, so any move is the rebuild's.
