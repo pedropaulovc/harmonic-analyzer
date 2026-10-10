@@ -18,7 +18,9 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 import _telemetry
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -52,7 +54,7 @@ from _drawing_common import (
     sheet_drawable_region,
     visible_component_entities,
 )
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
 from fr_frame_attachment_spec import (

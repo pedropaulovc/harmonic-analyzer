@@ -1,8 +1,10 @@
 r"""Pure McMaster 93585A190 nominal geometry and lock-seat checks.
 
-This module owns the supplier-model scalars in mm/degrees. The native
-``diagnostics/diag_build_93585A190.py`` recipe reads them, never the reverse.
-Base, swing-platform and pose readers import this spec, not a native recipe.
+PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
+closure. The supplier-model scalars in mm/degrees are the per-SKU vendor
+source (``_mcmaster_93585a190.py``, SolidWorks-free at import), which the
+native recipe also reads. Base, swing-platform and pose readers import this
+spec, not a native recipe.
 
 The high-profile head has no collar: its chamfered underside bears directly
 on the plate (or, disengaged, on the bare base). HEAD_DIA is the source
@@ -19,21 +21,15 @@ anywhere along the lock notch.
 from __future__ import annotations
 
 from _hole_spec import HoleSpec
+from _mcmaster_93585a190 import (
+    HEAD_H as _HEAD_H,
+    HEAD_R as _HEAD_R,
+    LENGTH as _LENGTH,
+    MAJOR_R as _MAJOR_R,
+    PITCH as _PITCH,
+)
 
 SOURCE = "cad/out/reports/mcmaster-93585A190-dump.json"
-
-# Sketch1 driving dimensions (mm), and the harvested knurl/runout scalars.
-MAJOR_R = 3.175  # Thread Size 6.35 / 2
-PITCH = 1.27
-LENGTH = 19.05  # Stud under the head
-HEAD_R = 7.9375  # Head Diameter 15.875 / 2, over knurl crests
-HEAD_H = 12.7
-RIM_CHAMFER = 0.79375  # Sketch37 45-deg rim triangle leg
-KNURL_COUNT = 131  # D1@CirPattern1
-KNURL_CREST_W = 0.127  # D3@Sketch26
-KNURL_FLANK_DEG = 20.0  # D1@Sketch26 = D2@Sketch26
-RUNOUT_DEPTH = 2.54  # Boss-Extrude7 dir1
-RUNOUT_DRAFT_DEG = 45.0
 
 HEAD_DIA_BAND = None  # Unknown supplier tolerance, not a zero-width band.
 HEAD_H_BAND = None
@@ -41,10 +37,11 @@ STUD_DIA_BAND = None
 STUD_LEN_BAND = None
 
 THREAD = "1/4-20"
-HEAD_DIA = 2.0 * HEAD_R
-STUD_DIA = 2.0 * MAJOR_R
-STUD_LEN = LENGTH
-THREAD_PITCH = PITCH
+HEAD_DIA = 2.0 * _HEAD_R
+HEAD_H = _HEAD_H
+STUD_DIA = 2.0 * _MAJOR_R
+STUD_LEN = _LENGTH
+THREAD_PITCH = _PITCH
 TIP_CHAMFER = THREAD_PITCH * 0.75
 MIN_USEFUL_ENGAGEMENT = 1.5 * STUD_DIA
 STUD_BOTTOM_CLEARANCE = 0.25

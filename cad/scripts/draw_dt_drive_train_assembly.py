@@ -47,7 +47,9 @@ import vn_post_mount_screw_spec as post_screw
 import vn_swing_stop_screw_spec as stop_screw
 from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY, RODS_PINNED_REF
 from ch_channel_assembly_steps import step_ref as channel_step_ref
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     BalloonLanding,
@@ -75,7 +77,7 @@ from _drawing_common import (
     set_view_exploded_state,
     view_configuration,
 )
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _dt_drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS

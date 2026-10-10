@@ -25,7 +25,7 @@ import _config
 import cone_line
 import cone_shaft_land_bands
 import gear_seat_fit
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from stock_form_cutter import (
     StockFormProfile,
@@ -33,6 +33,7 @@ from stock_form_cutter import (
     translation_for_pitch_tooth_thickness,
     translation_for_tangent_span,
 )
+from gear_seat_fit import GEAR_SEAT_CLEARANCE, seat_bore_band
 
 
 MM_PER_IN = 25.4
@@ -238,11 +239,24 @@ STOCK_PROFILE_CORNERS = tuple(
     )
 )
 
-# The Ø9.525 round portion of MHA-DT-004's Sec1 gear seat. The round-bore
-# clearance is paired with the published shaft diameter band in the part
-# builder. This shared spec owns the nominal and D-flat AF band without
-# pulling a fit-class config read into assembly rebuild dependencies.
+# The Ø9.525 round portion of MHA-DT-004's Sec1 gear seat. This shared spec
+# owns its nominal, round slide-fit clearance and D-flat AF band without
+# pulling the part builder into drawing recipes.
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525
+
+# A printable slide fit on the Sec1 gear-seat land. The round and flat
+# clearances are independent: BoreDia sets radial runout; BoreAF limits
+# angular play on the local +X flat. No joining compound is involved.
+_LAND_UPPER, _LAND_LOWER = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
+if (_LAND_UPPER, _LAND_LOWER) != cone_shaft_land_bands.GEAR_SEAT_BAND:
+    raise AssertionError("the 64T no longer rides a gear-seat land")
+BORE_DIA_BAND = seat_bore_band(cone_shaft_land_bands.GEAR_SEAT_BAND)
+BORE_DIAMETRAL_CLEARANCE = (
+    round(BORE_DIA_BAND[1] - _LAND_UPPER, 6),
+    round(BORE_DIA_BAND[0] - _LAND_LOWER, 6),
+)
+if BORE_DIAMETRAL_CLEARANCE != GEAR_SEAT_CLEARANCE:
+    raise AssertionError("64T bore lost its round slide-fit clearance")
 
 # One D-flat on local +X, paired with MHA-DT-004 Sec1. Across-flat is measured
 # from this plane to the opposite circular wall, not from the gear centre.

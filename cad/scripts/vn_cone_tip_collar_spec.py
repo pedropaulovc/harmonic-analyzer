@@ -26,7 +26,9 @@ from dataclasses import dataclass
 
 import _config
 
-from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _gtol_controls import GeometricControl, PartDatum
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM
 from _printed_tolerance import printed_band_mm
 from cone_shaft_land_bands import (

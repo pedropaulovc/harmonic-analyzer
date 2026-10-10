@@ -95,15 +95,13 @@ from typing import Any
 
 import _telemetry
 
-from _common import (
-    OUT_SLDPRT,
-    _early_bound,
-    apply_custom_properties,
-    check,
-    run_build,
-)
+from _check import check
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _paths import OUT_SLDPRT
+from _session import run_build
 from _drawing_marks import DRAWN_BY
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from _assembly import (
     activate_assembly_contract,
     assembly_title_properties,
@@ -160,7 +158,7 @@ from fr_rocker_arm_support_spec import (
     SUPPORT_WORLD_X,
     SUPPORT_WORLD_Z,
 )
-from build_vn_gooseneck_set_screw import SHANK_LEN as GOOSENECK_SHANK_LEN
+from _mcmaster_91410a538 import SHANK_LEN as GOOSENECK_SHANK_LEN
 from vn_frame_cross_screw_spec import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,

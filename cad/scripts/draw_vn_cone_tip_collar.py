@@ -14,7 +14,10 @@ from typing import Any
 
 import _telemetry
 import vn_cone_tip_collar_spec as spec
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs, PmiDrawingPlacement, _select_view_entity, add_native_hole_callout,
     add_property_linked_note, assert_imported_precision, create_blank_drawing_sheets,
@@ -26,7 +29,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 import _drawing_hidden_sketches as hidden_sketches
-from _part_pmi import _face_geometry, _face_matches
+from _gtol_face_read import face_geometry
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import format_findings
 from diagnostics.drawing_layout_audit import audit_document
@@ -143,7 +146,7 @@ def _face_reading(face: Any) -> dict[str, Any]:
     """Owning body, surface identity, area (mm^2) and box (mm) of one face."""
     native = _early_bound(face, "IFace2")
     body = native.GetBody()
-    geometry = _face_geometry(face)
+    geometry = face_geometry(face)
     return {
         "body": None if body is None else str(_early_bound(body, "IBody2").Name),
         "surface": None if geometry is None else geometry.identity,
@@ -163,11 +166,11 @@ def _view_faces(view: Any, specs: dict[str, Any], *, label: str) -> dict[str, An
     candidates = [
         geometry
         for face in visible_view_entities(view, _VIEW_FACES, label=label)
-        if (geometry := _face_geometry(face)) is not None
+        if (geometry := face_geometry(face)) is not None
     ]
     picked = {}
     for key, face_spec in specs.items():
-        matches = [geometry for geometry in candidates if _face_matches(geometry, face_spec)]
+        matches = [geometry for geometry in candidates if face_spec.matches(geometry)]
         if len(matches) != 1:
             listing = [
                 (

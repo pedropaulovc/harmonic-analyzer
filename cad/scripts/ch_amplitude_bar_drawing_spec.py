@@ -2,7 +2,7 @@
 
 Split from ``ch_amplitude_bar_spec`` on purpose: the channel kinematics, the
 rocker-bank layout and the spring specs import the bar's geometry, so the
-finish controls (and the ``_gtol_spec``/``_surface_finish`` closure they pull
+finish controls (and the ``_gtol_planar``/``_surface_finish`` closure they pull
 in) living there would re-key the channel, magnifier and summing assemblies on
 every finish edit (the codex #354 lesson). This module is imported only by the
 part build (which authors the PMI) and its drawing.
@@ -10,7 +10,7 @@ part build (which authors the PMI) and its drawing.
 
 from __future__ import annotations
 
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _surface_finish import GROUND_UM, SurfaceFinishControl
 from ch_amplitude_bar_spec import BOTTOM_NOTCH_HEIGHT
 

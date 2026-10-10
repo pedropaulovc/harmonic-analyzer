@@ -17,7 +17,7 @@ from __future__ import annotations
 import sys
 
 from _chain_link import INNER_LINK, build_link
-from _common import run_build
+from _session import run_build
 
 PART_NAME = "vn-chain-inner-link"
 MATERIAL = "Plain Carbon Steel"

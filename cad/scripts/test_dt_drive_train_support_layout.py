@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-import _fit_limits
+import _fit_shaft_h
 import _config
 import build_dt_drive_train_assembly as drive
 import cone_pitch
@@ -116,7 +116,7 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     import dt_pinion_spring_geometry as leaf
     import dt_pinion_spring_spec as spring_spec
     import dt_pinion_spring_section as section
-    from _fit_limits import deviations
+    from _fit_deviations import deviations
     from _printed_tolerance import printed_deviations
 
     parked, engaged = drive.SPRING_DEFLECTION
@@ -1273,7 +1273,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # does here (the 1/4 shaft is ruled, the 1/16 pin is the smallest B18.8.2
     # size, the hole band is B18.8.2's window), so the loosest band that clears
     # the 1.5 floor governs.
-    shaft_min = pin.PIVOT_BORE + _fit_limits.SHAFT_H[1]
+    shaft_min = pin.PIVOT_BORE + _fit_shaft_h.SHAFT_H[1]
     assert math.isclose(shaft_min, 6.33, abs_tol=1e-9)
     assert math.isclose(pin.SHAFT_LIGAMENT_CENTRED, (6.33 - 1.6475) / 2.0)
     places = pin.CROSS_HOLE_FROM_BORE_WALL_PLACES
@@ -1337,14 +1337,14 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     from _buildgraph import part_stems, references_of
     from _drawing_registry import DRAWINGS_BY_NAME
     from _fastener_catalog import FASTENERS
-    from _stock_fastener import STOCK_RECIPES
+    from _test_stock_recipes import discovered_recipes
     from diagnostics import diag_build_98296A027 as recipe
 
     assert part.SPEC is FASTENERS["vn-pinion-strap-pin"]
     assert part.SPEC.skus == ("98296A027",)
     source = inspect.getsource(part)
     assert 'sku="98296A027"' in source and "author=build_98296A027" in source
-    assert STOCK_RECIPES["98296A027"].module == "diagnostics.diag_build_98296A027"
+    assert discovered_recipes()["98296A027"].module == "diagnostics.diag_build_98296A027"
     assert (recipe.PIN_OD, recipe.PIN_LEN) == (pin.PIN_DIA, pin.PIN_LEN)
     assert math.isclose(pin.WALL_T, 0.012 * 25.4)
     assert math.isclose(recipe.PIN_ID, pin.PIN_DIA - 2.0 * pin.WALL_T)

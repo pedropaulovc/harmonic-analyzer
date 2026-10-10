@@ -8,7 +8,7 @@ import cone_line
 import dt_cone_pivot_post_spec
 import dt_cone_tip_block_spec
 
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -30,7 +30,7 @@ from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft bui
 )
 from cone_stack_end_play import COLLAR_FEELER, MARGIN_SPARE, SHAFT_END_PLAY
 from vn_cone_tip_collar_spec import WIDTH as TIP_COLLAR_WIDTH
-from vn_cone_tip_adjuster_spec import CUP_DEPTH
+from _mcmaster_94025a164 import CUP_DEPTH
 from dt_crank_drive_gear_spec import CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_NORTH
 from dt_crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 from dt_crank_drive_gear_spec import LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE_WIDTH

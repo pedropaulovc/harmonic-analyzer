@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 
 import _config
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 

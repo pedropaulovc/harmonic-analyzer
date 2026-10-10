@@ -20,7 +20,7 @@ from typing import Any
 
 import _config
 from cone_pitch import SEAT_PITCH
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from cone_shaft_land_bands import (
     FLAT_AF_BAND,
@@ -50,6 +50,28 @@ TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
 TEETH = int(_config.machine("gear_train", "fundamental_cone_teeth"))
 CONFIGURATION_TEETH = tuple(range(6, TEETH + 1, 6))
+CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
+DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
+
+
+def tooth_features(teeth: int) -> tuple[str, str, str]:
+    """Distinct real topology for one configured finite cutter profile."""
+    if teeth not in CONFIGURATION_TEETH:
+        raise ValueError(f"unsupported cone-gear tooth count {teeth}")
+    suffix = f"T{teeth:03d}"
+    return tuple(f"{stem}{suffix}" for stem in (
+        "ToothGapProfile", "ToothGapCut", "ToothGapPattern"
+    ))
+
+
+# All cuts/patterns disappear in the derived assembly drawing configurations.
+SIMPLIFIED_FEATURES = tuple(
+    feature for teeth in CONFIGURATION_TEETH for feature in tooth_features(teeth)[1:]
+)
+SIMPLIFIED_FEATURES_BY_CONFIGURATION = {
+    f"T{teeth:03d}": tooth_features(teeth)[1:] for teeth in CONFIGURATION_TEETH
+}
+
 DIAMETRAL_PITCH = _config.machine("gear_train", "diametral_pitch")
 PRESSURE_ANGLE_DEG = _config.machine("gear_train", "pressure_angle_deg")
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
@@ -251,6 +273,17 @@ def floor_radius_max_mm(teeth: int) -> float:
 def floor_limits_mm(teeth: int) -> tuple[float, float]:
     """Printed root-envelope diameters enclosing every tool corner."""
     return _member(teeth).floor_limits_mm
+
+
+def gap_floor_deviations_mm(teeth: int) -> tuple[float, float]:
+    """FloorDia's (lower, upper) LIMIT deviations from the modelled floor.
+
+    The printed limits are ``floor_limits_mm``; the dimension's nominal is the
+    modelled floor, so each limit is stored as its offset from it.
+    """
+    minimum, maximum = floor_limits_mm(teeth)
+    nominal = 2.0 * floor_radius_min_mm(teeth)
+    return minimum - nominal, maximum - nominal
 
 
 def bore_dia_mm(teeth: int) -> float:

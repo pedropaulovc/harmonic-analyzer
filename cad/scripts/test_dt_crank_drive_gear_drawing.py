@@ -115,7 +115,7 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
 
 def test_bore_bands_fit_both_sec1_land_dimensions_at_every_limit() -> None:
     land_upper, land_lower = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
-    bore_upper, bore_lower = part.BORE_DIA_BAND
+    bore_upper, bore_lower = spec.BORE_DIA_BAND
     assert (
         bore_lower - land_upper,
         bore_upper - land_lower,
@@ -180,7 +180,7 @@ def test_chamfer_leaves_a_collar_bearing_annulus_and_flat_engagement() -> None:
         dt_cone_gear_shaft_spec.COLLAR_DIA
         + dt_cone_gear_shaft_spec.STOCK_DIA_BAND[1]
     ) / 2
-    bore_max_r = (spec.BORE_DIA + part.BORE_DIA_BAND[0]) / 2
+    bore_max_r = (spec.BORE_DIA + spec.BORE_DIA_BAND[0]) / 2
     chamfer_max = spec.BORE_SOUTH_CHAMFER + spec.BORE_SOUTH_CHAMFER_BAND[0]
     annulus = collar_min_r - bore_max_r - chamfer_max
     assert spec.COLLAR_BEARING_ANNULUS == pytest.approx(annulus)

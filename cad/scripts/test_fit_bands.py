@@ -1,6 +1,6 @@
 """Every fit band a build script hands to SolidWorks is valid at import time.
 
-A band only reaches ``_fit_limits.deviations`` (or the bilateral setter) inside
+A band only reaches ``_fit_deviations.deviations`` (or the bilateral setter) inside
 ``build()``, which needs a SolidWorks seat. So an inverted or zero-width band
 used to pass the whole offline suite and fail its farm leaf instead: warm-c486
 lost ``part:dt_crank_drive_gear`` to "fit band is inverted: (0.025, 0.025)" at
@@ -36,7 +36,9 @@ from typing import Any
 
 import pytest
 
-import _fit_limits
+import _fit_close_running
+import _fit_deviations
+import _fit_text
 import _gear_fit_limits
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -311,7 +313,7 @@ def _call_name(node: ast.Call) -> str | None:
 def _band_uses() -> list[BandUse]:
     uses: list[BandUse] = []
     for path in sorted(SCRIPTS.glob("*.py")):
-        if path.name.startswith("test_") or path.name == "_fit_limits.py":
+        if path.name.startswith("test_"):
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
@@ -399,7 +401,7 @@ def _check_band(label: str, band: Any, order: str) -> None:
     assert all(isinstance(v, (int, float)) for v in band), f"{label}: {band!r}"
     if order == "upper_lower":
         # Exactly what build() does; raises on an inverted or zero-width band.
-        lower, upper = _fit_limits.deviations(band)
+        lower, upper = _fit_deviations.deviations(band)
     else:
         lower, upper = band
     assert lower < upper, f"{label}: lower {lower} >= upper {upper} ({order})"
@@ -517,7 +519,7 @@ def test_every_band_tuple_is_checked_or_classified() -> None:
         unclassified.append(f"{module_name}.{name} = {value!r}")
     assert not unclassified, (
         "band tuples that no checked consumer reads; feed them through "
-        "_fit_limits.deviations or list them in NOT_FIT_BANDS with a reason: "
+        "_fit_deviations.deviations or list them in NOT_FIT_BANDS with a reason: "
         + "; ".join(unclassified)
     )
 
@@ -721,19 +723,19 @@ def test_measured_close_running_clearance_tracks_shared_bands(
     source: str,
     replacement: tuple[float, float],
 ) -> None:
-    hole_lower, hole_upper = _fit_limits.deviations(_fit_limits.REAM_H7)
-    shaft_lower, shaft_upper = _fit_limits.deviations(_fit_limits.SHAFT_G6_3_TO_6_MM)
+    hole_lower, hole_upper = _fit_deviations.deviations(_fit_close_running.REAM_H7)
+    shaft_lower, shaft_upper = _fit_deviations.deviations(_fit_close_running.SHAFT_G6_3_TO_6_MM)
     expected = hole_lower - shaft_upper, hole_upper - shaft_lower
-    assert _fit_limits.measured_close_running_clearance_mm() == pytest.approx(expected)
+    assert _fit_close_running.measured_close_running_clearance_mm() == pytest.approx(expected)
     assert 0.0 < expected[0] < expected[1]
 
     # Change each input independently: a copied clearance literal cannot pass.
-    monkeypatch.setattr(_fit_limits, source, replacement)
-    hole_lower, hole_upper = _fit_limits.deviations(_fit_limits.REAM_H7)
-    shaft_lower, shaft_upper = _fit_limits.deviations(_fit_limits.SHAFT_G6_3_TO_6_MM)
+    monkeypatch.setattr(_fit_close_running, source, replacement)
+    hole_lower, hole_upper = _fit_deviations.deviations(_fit_close_running.REAM_H7)
+    shaft_lower, shaft_upper = _fit_deviations.deviations(_fit_close_running.SHAFT_G6_3_TO_6_MM)
     changed = hole_lower - shaft_upper, hole_upper - shaft_lower
     assert changed != expected
-    assert _fit_limits.measured_close_running_clearance_mm() == pytest.approx(changed)
+    assert _fit_close_running.measured_close_running_clearance_mm() == pytest.approx(changed)
 
 
 @pytest.mark.parametrize("grade", ("standard", "contact_critical"))
@@ -770,3 +772,39 @@ def test_gear_tip_grade_reader_refuses_unknown_or_inverted_grades(
     monkeypatch.setattr(_config, "fit", lambda *keys: (-0.02, 0.0))
     with pytest.raises(ValueError, match="inverted"):
         _gear_fit_limits.gear_tip_band_mm("contact_critical")
+
+
+@pytest.mark.parametrize("band", [(0.025, 0.025), (0.010, 0.050)])
+def test_fit_helpers_share_band_validation(band: tuple[float, float]) -> None:
+    for helper in (
+        _fit_deviations.validate_band,
+        _fit_deviations.deviations,
+        _fit_text.band_text,
+        lambda value: _fit_text.fit_limits(6.0, value),
+    ):
+        with pytest.raises(ValueError) as error:
+            helper(band)
+        assert str(error.value) == f"fit band is inverted: {band!r}"
+
+
+@pytest.mark.parametrize(
+    ("band", "text"),
+    [
+        ((0.025, 0.010), "+0.03/+0.01"),
+        ((0.000, -0.020), "+0.00/-0.02"),
+        ((0.012, 0.000), "+0.01/-0.00"),
+        ((-0.010, -0.030), "-0.01/-0.03"),
+    ],
+)
+def test_fit_text_preserves_released_band_signs(
+    band: tuple[float, float], text: str
+) -> None:
+    assert _fit_text.band_text(band) == text
+    assert _fit_deviations.deviations(band) == (band[1], band[0])
+
+
+def test_fit_limits_preserves_precision_and_diameter_prefix() -> None:
+    assert _fit_text.fit_limits(6.0, (0.012, 0.0)) == "6.012 MAX / 6.000 MIN"
+    assert _fit_text.fit_limits(
+        6.0, (0.012, 0.0), decimals=2, diameter=True
+    ) == "<MOD-DIAM>6.01 MAX / <MOD-DIAM>6.00 MIN"

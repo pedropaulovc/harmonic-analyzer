@@ -138,14 +138,11 @@ import sys
 
 import _config
 import _telemetry
-from _common import (
-    _early_bound,
-    apply_custom_properties,
-    check,
-    force_rebuild,
-    log,
-    run_build,
-)
+from _check import check, log
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _rebuild import force_rebuild
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _printed_tolerance import printed_deviations
 from _transforms import ROT_X_NEG90, ROT_Y_180, compose_rows, euler_from_rows
@@ -495,7 +492,7 @@ from dt_crank_arm_spec import (  # noqa: E402
     ARM_C2C,
     ARM_THICKNESS,
 )
-from _fit_limits import deviations  # noqa: E402
+from _fit_deviations import deviations  # noqa: E402
 import _chain  # noqa: E402
 import vn_crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
 import dt_crank_seat_washer_spec as SEAT_WASHER  # noqa: E402
@@ -1113,7 +1110,7 @@ from build_dt_arbor_pedestal import (  # noqa: E402
 from dt_arbor_pedestal_spec import SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC  # noqa: E402
 
 # --- ch25 pinion swing rig part constants (PR7: imported, not hardcoded) ----
-from build_dt_alignment_pinion import (  # noqa: E402
+from dt_alignment_pinion_spec import (  # noqa: E402
     BORE_DIA as DRUM_BORE_DIA,
 )
 from dt_pinion_arbor_geometry import (  # noqa: E402
@@ -1306,13 +1303,13 @@ from vn_cone_tip_collar_spec import (  # noqa: E402
     WIDTH as COLLAR_WIDTH,
     WIDTH_BAND_MM as COLLAR_WIDTH_BAND_MM,
 )
-from vn_cone_tip_adjuster_spec import (  # noqa: E402
+from _mcmaster_94025a164 import (  # noqa: E402
     BODY_LEN as ADJ_LEN,
     CUP_DEPTH as ADJ_CUP_DEPTH,
     CUP_DIA as ADJ_CUP_DIA,
     THREAD as ADJ_THREAD,
 )
-from build_vn_cone_tip_pinch_screw import (  # noqa: E402
+from _mcmaster_91794a112 import (  # noqa: E402
     SHANK_LEN as PINCH_SHANK_LEN,
     SKU as PINCH_SKU,
     THREAD as PINCH_THREAD,

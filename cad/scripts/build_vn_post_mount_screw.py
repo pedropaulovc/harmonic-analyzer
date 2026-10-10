@@ -33,20 +33,18 @@ import math
 import sys
 
 import _telemetry
-from _common import (
-    _early_bound,
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     anchor_point_to_origin,
     SketchDims,
     add_line_chain,
-    check,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    run_build,
-    set_global,
     set_sketch_direct_db,
 )
 from _drawing_marks import (
@@ -57,10 +55,11 @@ from _drawing_marks import (
     _named_dimension,
 )
 from _fastener_catalog import fastener
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_40923906 import build_40923906
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _msc_40923906 import FILLISTER_SIZE
 from diagnostics.diag_mcmaster_lib import no_sketch_inference
 from vn_post_mount_screw_spec import (
     CUT_END_BREAK_BAND,
@@ -88,7 +87,7 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 # The shared row is the supplied screw; the part's shank is its cut length.
-SHANK_DIA, _STOCK_LEN, HEAD_H, HEAD_DIA, THREAD_PITCH = FILLISTER_SIZES[SKU]
+SHANK_DIA, _STOCK_LEN, HEAD_H, HEAD_DIA, THREAD_PITCH = FILLISTER_SIZE
 if _STOCK_LEN != STOCK_LENGTH_MM:
     raise ValueError("the stock recipe length is not the supplied length")
 SHANK_LEN = CUT_LENGTH_MM
@@ -130,7 +129,7 @@ def _as_construction(adapter, entity_id: str) -> None:
 
 def _cut_end_y_mm(adapter) -> float:
     """The solid's lowest point along the screw axis (IBody2.GetExtremePoint,
-    exact -- see _common.bbox_extent_check), in mm."""
+    exact -- see _part_checks.bbox_extent_check), in mm."""
     part = _early_bound(adapter.currentModel, "IPartDoc")
     bodies = part.GetBodies2(0, False) or ()  # swSolidBody
     if not bodies:
@@ -548,6 +547,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

@@ -1,17 +1,10 @@
-"""Geometric-control (GD&T) spec vocabulary — pure data, importable from BOTH tiers.
+"""Feature-control-frame XML and signatures, shared by parts and drawings.
 
-A ``<part>_spec.py`` describes its geometric controls as rows of
-:class:`GeometricControl` / :class:`PartDatum`; the PART build authors them as
-plain model annotations (``_part_pmi.author_part_pmi``) and the DRAWING
-projects the same typed rows onto native sheet annotations
-(``_drawing_common.project_part_pmi``) instead of typing frozen
-``tolerance="..."`` strings per sheet.  Like ``_fit_limits`` /
-``_surface_finish`` this module carries NO COM and imports nothing from
-either tier, so ``check:partiso`` stays clean.
+Keeping this payload contract separate avoids importing face selectors for frames.
 
-``gtol_frame_xml`` moved here from ``_drawing_common`` (which now re-exports
-it): the same current-format frame XML fills a sheet-authored ``IGtol`` and a
-model-authored one, and the part tier may not import a drawing module.
+``gtol_frame_xml`` originated in ``_drawing_common``: the same current-format
+frame XML fills a sheet-authored ``IGtol`` and a model-authored one, and the
+part tier may not import a drawing module.
 """
 
 from __future__ import annotations
@@ -20,24 +13,11 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from math import isfinite
-from typing import Literal, Sequence, Union
+from typing import Sequence
 from xml.etree import ElementTree
 
-# SOLIDWORKS 2022+ frame-XML symbol names per geometric characteristic.
-GTOL_SYMBOLS = {
-    "angularity": "GTOL-ANGULAR",
-    "circular_runout": "GTOL-SRUN",
-    "cylindricity": "GTOL-CYL",
-    "flatness": "GTOL-FLAT",
-    "parallelism": "GTOL-PARA",
-    "position": "GTOL-POSI",
-    "profile_surface": "GTOL-SPROF",
-    "perpendicularity": "GTOL-PERP",
-    "straightness": "GTOL-STRAIGHT",
-    "total_runout": "GTOL-TRUN",
-}
+from _gtol_symbols import GTOL_SYMBOLS, ToleranceZone
 
-ToleranceZone = Literal["linear", "diametral"]
 # The translation modifier is its symbol code after the letter in the
 # DatumLetter text (the schema's "string value for datum letter displayed in
 # the edit box"), spelt as SOLIDWORKS prints it: farm run 20261009T204136744Z
@@ -49,17 +29,6 @@ ToleranceZone = Literal["linear", "diametral"]
 # (farm runs 20261009T174542021Z, 20261009T182549169Z).
 TRANSLATION_GLYPH = "<MOD-TRANS2>"
 _TRANSLATION_MODIFIER = "MOD-TRANS"
-_PMI_NAME_PREFIX = "HARMONIC_PMI_"
-
-
-def datum_key(letter: str) -> str:
-    """Return the stable spec key for a datum feature symbol."""
-    return f"datum:{letter}"
-
-
-def pmi_annotation_name(key: str) -> str:
-    """Return the unique model-annotation name persisted for ``key``."""
-    return f"{_PMI_NAME_PREFIX}{key.replace(':', '_')}"
 
 
 def gtol_frame_xml(
@@ -299,205 +268,3 @@ def translation_print_problem(texts: Sequence[str], translated: Sequence[str]) -
         if own != datum and not (own == "" and before == datum):
             return f"prints its translation modifier off datum {datum} in {items!r}"
     return ""
-
-
-@dataclass(frozen=True)
-class CylinderFace:
-    """The unique cylindrical face of ``diameter_mm`` (optionally disambiguated
-    by a point its axis span must contain, in part coordinates, mm).
-
-    The three station coordinates are independent and AND together, which is
-    what it takes to name ONE bore of a symmetric family: the harmonic base's
-    four column sockets share their diameter, depth and height and differ only
-    in X and Z, so a diameter (or a diameter and an X) matches two or four
-    faces and resolves none of them.
-    """
-
-    diameter_mm: float
-    contains_x_mm: float | None = None
-    contains_y_mm: float | None = None
-    contains_z_mm: float | None = None
-    tolerance_mm: float = 0.05
-
-    def __post_init__(self) -> None:
-        if self.diameter_mm <= 0.0:
-            raise ValueError("cylinder diameter must be positive")
-        if self.tolerance_mm <= 0.0:
-            raise ValueError("cylinder match tolerance must be positive")
-
-
-@dataclass(frozen=True)
-class ConeFace:
-    """The unique conical face with the specified half-angle.
-
-    ``contains_x_mm`` optionally requires the face bounding box to cross a
-    part-coordinate X station. This distinguishes coaxial conical patches
-    without depending on volatile face enumeration order.
-    """
-
-    half_angle_degrees: float
-    contains_x_mm: float | None = None
-    tolerance_degrees: float = 0.01
-    tolerance_mm: float = 0.05
-
-    def __post_init__(self) -> None:
-        if not 0.0 < self.half_angle_degrees < 90.0:
-            raise ValueError("cone half-angle must be between 0 and 90 degrees")
-        if self.tolerance_degrees <= 0.0:
-            raise ValueError("cone angle tolerance must be positive")
-        if self.tolerance_mm <= 0.0:
-            raise ValueError("cone match tolerance must be positive")
-
-
-@dataclass(frozen=True)
-class PlanarFace:
-    """The unique planar face whose outward normal ≈ ``normal`` and whose plane
-    sits at ``offset_mm`` along that normal (part coordinates, mm).
-
-    ``contains_x_mm`` and ``contains_z_mm`` AND together like the cylinder
-    stations above: the top frame's four cap-recess floors are COPLANAR (one Y
-    offset, one annulus area each), so naming one takes both plan stations.
-    """
-
-    normal: tuple[float, float, float]
-    offset_mm: float
-    contains_z_mm: float | None = None
-    contains_x_mm: float | None = None
-    tolerance_mm: float = 0.05
-
-    def __post_init__(self) -> None:
-        if len(self.normal) != 3 or not any(float(value) for value in self.normal):
-            raise ValueError("plane normal must be a non-zero 3-vector")
-        if self.tolerance_mm <= 0.0:
-            raise ValueError("plane match tolerance must be positive")
-
-
-@dataclass(frozen=True)
-class SphereFace:
-    """The unique spherical face of ``diameter_mm`` and optional centre."""
-
-    diameter_mm: float
-    center_mm: tuple[float, float, float] | None = None
-    tolerance_mm: float = 0.05
-
-    def __post_init__(self) -> None:
-        if self.diameter_mm <= 0.0:
-            raise ValueError("sphere diameter must be positive")
-        if self.center_mm is not None and len(self.center_mm) != 3:
-            raise ValueError("sphere center must be a 3-vector")
-        if self.tolerance_mm <= 0.0:
-            raise ValueError("sphere match tolerance must be positive")
-
-
-@dataclass(frozen=True)
-class TorusFace:
-    """The unique toroidal face with the specified generating radii."""
-
-    major_radius_mm: float
-    minor_radius_mm: float
-    center_mm: tuple[float, float, float] | None = None
-    tolerance_mm: float = 0.05
-
-    def __post_init__(self) -> None:
-        # SolidWorks permits negative major radii for lemon tori, so only the
-        # physically positive minor radius is constrained here.
-        if self.minor_radius_mm <= 0.0:
-            raise ValueError("torus minor radius must be positive")
-        if self.center_mm is not None and len(self.center_mm) != 3:
-            raise ValueError("torus center must be a 3-vector")
-        if self.tolerance_mm <= 0.0:
-            raise ValueError("torus match tolerance must be positive")
-
-
-FaceSpec = Union[CylinderFace, ConeFace, PlanarFace, SphereFace, TorusFace]
-
-
-@dataclass(frozen=True)
-class PartDatum:
-    """A datum feature symbol authored on the model (``InsertDatumTag2``)."""
-
-    letter: str
-    face: FaceSpec
-
-    def __post_init__(self) -> None:
-        if not self.letter or len(self.letter) > 2:
-            raise ValueError(f"invalid datum letter: {self.letter!r}")
-
-    @property
-    def key(self) -> str:
-        return datum_key(self.letter)
-
-    @property
-    def annotation_name(self) -> str:
-        return pmi_annotation_name(self.key)
-
-
-@dataclass(frozen=True)
-class GeometricControl:
-    """One feature-control frame authored on the model (``InsertGtol``)."""
-
-    key: str
-    characteristic: str
-    tolerance: str
-    face: FaceSpec
-    datums: tuple[str, ...] = ()
-    tolerance_zone: ToleranceZone = "linear"
-    projected_zone_height_mm: float | None = None
-
-    def __post_init__(self) -> None:
-        if self.characteristic not in GTOL_SYMBOLS:
-            raise ValueError(
-                f"{self.key}: unsupported characteristic {self.characteristic!r}"
-            )
-        if not self.key:
-            raise ValueError("geometric-control key cannot be blank")
-        if self.tolerance_zone not in ("linear", "diametral"):
-            raise ValueError(
-                f"{self.key}: unsupported tolerance zone {self.tolerance_zone!r}"
-            )
-        # Validate the complete frame contract at spec construction time.  This
-        # catches blank tolerances, overlong datum sequences, and invalid datum
-        # letters before a build reaches SolidWorks.
-        self.frame_xml
-
-    @property
-    def annotation_name(self) -> str:
-        return pmi_annotation_name(self.key)
-
-    @property
-    def frame_xml(self) -> str:
-        return gtol_frame_xml(
-            self.characteristic,
-            self.tolerance,
-            datums=self.datums,
-            diameter=self.tolerance_zone == "diametral",
-            projected_zone_height_mm=self.projected_zone_height_mm,
-        )
-
-
-def validate_part_pmi(
-    datums: Sequence[PartDatum], controls: Sequence[GeometricControl]
-) -> None:
-    """Validate cross-row identity and datum-reference contracts."""
-    datum_letters = [datum.letter for datum in datums]
-    if len(set(datum_letters)) != len(datum_letters):
-        raise ValueError(f"duplicate datum letters: {datum_letters!r}")
-
-    control_keys = [control.key for control in controls]
-    if len(set(control_keys)) != len(control_keys):
-        raise ValueError(f"duplicate geometric-control keys: {control_keys!r}")
-
-    row_keys = [datum.key for datum in datums] + control_keys
-    if len(set(row_keys)) != len(row_keys):
-        raise ValueError(f"datum/control key collision: {row_keys!r}")
-    annotation_names = [pmi_annotation_name(key) for key in row_keys]
-    if len(set(annotation_names)) != len(annotation_names):
-        raise ValueError(f"annotation-name collision: {annotation_names!r}")
-
-    known_datums = set(datum_letters)
-    for control in controls:
-        missing = set(control.datums) - known_datums
-        if missing:
-            raise ValueError(
-                f"{control.key}: unknown datum references {sorted(missing)!r}"
-            )

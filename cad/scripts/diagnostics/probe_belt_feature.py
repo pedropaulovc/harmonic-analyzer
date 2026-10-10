@@ -31,7 +31,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
-from _common import OUT_SLDASM, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _paths import OUT_SLDASM  # noqa: E402
+from _session import run_build  # noqa: E402
 from _telemetry import info, warn, error, success  # noqa: E402
 from solidworks_mcp.adapters import sw_type_info  # noqa: E402
 from solidworks_mcp.adapters.com_variant import (  # noqa: E402
@@ -62,7 +67,7 @@ async def build(adapter) -> dict[str, str]:
     if not asm.exists():
         error(f"not built: {asm}")
         return {}
-    from _common import check  # noqa: E402
+    from _check import check  # noqa: E402
 
     check("open paper-drive", await adapter.open_model(str(asm)))
     try:

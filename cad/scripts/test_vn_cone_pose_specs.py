@@ -17,7 +17,7 @@ PURE_SPECS = (
     "vn_cone_pivot_screw_spec",
     "vn_cone_lock_knob_spec",
     "vn_swing_stop_screw_spec",
-    "vn_cone_tip_adjuster_spec",
+    "_mcmaster_94025a164",
     "vn_foot_screw_spec",
 )
 
@@ -43,7 +43,8 @@ def _pure_local_closure(module_name: str) -> set[str]:
     visited = set()
     forbidden_roots = {
         "diagnostics",
-        "_common",
+        "_com",
+        "_session",
         "_holes",
         "_assembly",
         "_drawing_common",
@@ -108,7 +109,7 @@ def test_pure_closure_guard_has_a_real_native_positive_control() -> None:
     ("spec_name", "recipe_name", "scalars"),
     [
         (
-            "vn_cone_pivot_screw_spec",
+            "_mcmaster_91829a560",
             "diagnostics.diag_build_91829A560",
             {
                 "HEAD_DIA": 9.525,
@@ -129,7 +130,7 @@ def test_pure_closure_guard_has_a_real_native_positive_control() -> None:
             },
         ),
         (
-            "vn_cone_lock_knob_spec",
+            "_mcmaster_93585a190",
             "diagnostics.diag_build_93585A190",
             {
                 "MAJOR_R": 3.175,
@@ -147,7 +148,7 @@ def test_pure_closure_guard_has_a_real_native_positive_control() -> None:
             },
         ),
         (
-            "vn_cone_tip_adjuster_spec",
+            "_mcmaster_94025a164",
             "diagnostics.diag_build_94025A164",
             {
                 "SS_MAJOR_R": 2.413,
@@ -182,9 +183,10 @@ def test_native_recipes_consume_one_preserved_scalar_authority(
     ]
     assert len(imports) == 1
     imported = {alias.name for alias in imports[0].names}
-    assert set(scalars) <= imported
+    declared = _top_level_assignments(_source_tree(spec_name)).keys()
+    assert imported <= declared
     assert not set(scalars) & _top_level_assignments(recipe).keys()
-    assert set(scalars) <= _top_level_assignments(_source_tree(spec_name)).keys()
+    assert set(scalars) <= declared
     for name, expected in scalars.items():
         assert getattr(spec, name) == pytest.approx(expected, rel=0.0, abs=1e-12)
 
@@ -202,49 +204,20 @@ def test_same_sku_fillister_row_has_one_pure_authority() -> None:
         "CONTACT_DIA": 4.6482,
     }.items():
         assert getattr(stop, name) == pytest.approx(expected, rel=0.0, abs=1e-12)
-    assert len(stop.FILLISTER_SIZE) == 5
-    recipe = _source_tree("diagnostics.diag_mcmaster_fillister")
-    row_imports = [
-        alias
-        for node in recipe.body
-        if isinstance(node, ast.ImportFrom)
-        and node.module == "vn_swing_stop_screw_spec"
-        for alias in node.names
-        if alias.name == "FILLISTER_SIZE"
-    ]
-    assert len(row_imports) == 1
-    row_name = row_imports[0].asname or row_imports[0].name
-    table = _top_level_assignments(recipe)["FILLISTER_SIZES"]
-    assert isinstance(table, ast.Dict)
-    matching_rows = [
-        value
-        for key, value in zip(table.keys, table.values, strict=True)
-        if isinstance(key, ast.Constant) and key.value == "90280A108"
-    ]
-    assert len(matching_rows) == 1
-    assert isinstance(matching_rows[0], ast.Name)
-    assert matching_rows[0].id == row_name
-    # Both same-SKU consumers read the row, not the native table or a copy.
-    for consumer in ("vn_foot_screw_spec", "vn_latch_hook_bracket_screw_spec"):
-        tree = _source_tree(consumer)
-        assert "vn_swing_stop_screw_spec" in _imports(tree)
-        assert not any(name.startswith("diagnostics") for name in _imports(tree))
-        unpacked = [
-            node.value
-            for node in tree.body
-            if isinstance(node, ast.Assign)
-            and any(isinstance(target, ast.Tuple) for target in node.targets)
-        ]
-        assert len(unpacked) == 1
-        assert isinstance(unpacked[0], ast.Name)
-        assert unpacked[0].id == "FILLISTER_SIZE"
-    foot = _pure_spec("vn_foot_screw_spec")
-    assert foot.FILLISTER_SIZE is stop.FILLISTER_SIZE
+    vendor = _pure_spec("_mcmaster_90280a108")
+    assert len(vendor.FILLISTER_SIZE) == 5
+    # Every same-SKU reader holds the vendor row itself, not a copy.
+    for consumer in (
+        "vn_swing_stop_screw_spec",
+        "vn_foot_screw_spec",
+        "vn_latch_hook_bracket_screw_spec",
+    ):
+        assert _pure_spec(consumer).FILLISTER_SIZE is vendor.FILLISTER_SIZE
 
 
 def test_pivot_bands_are_actual_supplier_limits_with_explicit_order() -> None:
     pivot = _pure_spec("vn_cone_pivot_screw_spec")
-    fit = _pure_spec("_fit_limits")
+    fit = _pure_spec("_fit_deviations")
     assert "https://www.mcmaster.com/91829A560/" in pivot.SOURCE
     assert "2026-10-08" in pivot.SOURCE
     assert pivot.SHOULDER_DIA_BAND == (0.0, -0.0254)
@@ -263,16 +236,17 @@ def test_pivot_bands_are_actual_supplier_limits_with_explicit_order() -> None:
 def test_public_nominals_and_unknown_supplier_grades_are_not_conflated() -> None:
     pivot = _pure_spec("vn_cone_pivot_screw_spec")
     lock = _pure_spec("vn_cone_lock_knob_spec")
+    lock_vendor = _pure_spec("_mcmaster_93585a190")
     stop = _pure_spec("vn_swing_stop_screw_spec")
-    cup = _pure_spec("vn_cone_tip_adjuster_spec")
+    cup = _pure_spec("_mcmaster_94025a164")
     assert pivot.HEAD_H == pivot.HEAD_T
     assert pivot.THREAD_TAIL_LEN == pivot.THREAD_LEN
     assert pivot.THREAD_SOLID_DIA == pivot.THREAD_MAJOR
     assert pivot.THREAD == "#10-24"
-    assert lock.HEAD_DIA == 2.0 * lock.HEAD_R == 15.875
-    assert lock.STUD_DIA == 2.0 * lock.MAJOR_R == 6.35
-    assert lock.STUD_LEN == lock.LENGTH == 19.05
-    assert lock.THREAD_PITCH == lock.PITCH == 1.27
+    assert lock.HEAD_DIA == 2.0 * lock_vendor.HEAD_R == 15.875
+    assert lock.STUD_DIA == 2.0 * lock_vendor.MAJOR_R == 6.35
+    assert lock.STUD_LEN == lock_vendor.LENGTH == 19.05
+    assert lock.THREAD_PITCH == lock_vendor.PITCH == 1.27
     assert lock.THREAD == "1/4-20"
     assert stop.THREAD == "#4-40"
     assert cup.THREAD == "#10-32"
@@ -305,7 +279,7 @@ def test_adjuster_data_consumers_do_not_read_the_native_wrapper() -> None:
             alias.name
             for node in tree.body
             if isinstance(node, ast.ImportFrom)
-            and node.module == "vn_cone_tip_adjuster_spec"
+            and node.module == "_mcmaster_94025a164"
             for alias in node.names
         }
         assert expected_names <= actual
@@ -318,14 +292,14 @@ def test_adjuster_data_consumers_do_not_read_the_native_wrapper() -> None:
     ]
     assert len(native_imports) == 1
     assert {alias.name for alias in native_imports[0].names} == {"build_94025A164"}
-    assert "vn_cone_tip_adjuster_spec" in _imports(wrapper)
+    assert "_mcmaster_94025a164" in _imports(wrapper)
     assert not {"BODY_LEN", "BODY_DIA", "CUP_DEPTH", "CUP_DIA", "THREAD"} & (
         _top_level_assignments(wrapper).keys()
     )
 
 
 def test_adjuster_thread_limits_are_qualified_separately_from_its_cup() -> None:
-    cup = _pure_spec("vn_cone_tip_adjuster_spec")
+    cup = _pure_spec("_mcmaster_94025a164")
     assert cup.THREAD == "#10-32"
     assert cup.THREAD_CLASS == "2A"
     assert "https://www.mcmaster.com/94025A164/" in cup.THREAD_FIT_SOURCE
@@ -354,7 +328,7 @@ def test_stop_thread_limits_are_separate_from_its_nominal_profile() -> None:
 
 def test_stop_standard_envelopes_are_sourced_without_changing_native_nominals() -> None:
     stop = _pure_spec("vn_swing_stop_screw_spec")
-    fit = _pure_spec("_fit_limits")
+    fit = _pure_spec("_fit_deviations")
     assert stop.STOCK_STANDARD == "ASME B18.6.3"
     assert "Machinery's%20Handbook" in stop.HEAD_LIMITS_SOURCE
     assert "optimas.com" in stop.LENGTH_LIMITS_SOURCE

@@ -69,7 +69,7 @@ DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0
 # slack) and the cone-lock-knob is locked; every other cone follows the swing.
 PEN_EDGE_SLACK = _config.fit(
     "cone_drum_oblique_mesh", "edge_slack_mm"
-)  # cad/config/tolerances.yaml
+)  # cad/config/tolerances/cone_drum_oblique_mesh.yaml
 PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I
 X_PITCH = DRUM_TIP_X - ADDENDUM * SEC_I + PEN_MID
 

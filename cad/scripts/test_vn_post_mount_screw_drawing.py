@@ -13,14 +13,14 @@ import build_vn_post_mount_screw as part
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
 import draw_vn_post_mount_screw as drawing
-from _fit_limits import deviations
+from _fit_deviations import deviations
 import vn_post_mount_screw_spec as spec
 from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_40923906 as recipe
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _msc_40923906 import FILLISTER_SIZE
 
 IN = 25.4
 # Screw head seated on the counterbore floor: its under-head face is this far
@@ -285,14 +285,14 @@ def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:
     row = _config.parts(part.PART_NAME)
     assert row["supplier_skus"] == [spec.SKU]
     assert spec.SKU == recipe.PART_NO
-    assert FILLISTER_SIZES[spec.SKU][1] == pytest.approx(4.0 * IN)
-    assert spec.STOCK_LENGTH_MM == FILLISTER_SIZES[spec.SKU][1]
+    assert FILLISTER_SIZE[1] == pytest.approx(4.0 * IN)
+    assert spec.STOCK_LENGTH_MM == FILLISTER_SIZE[1]
     assert part.SHANK_LEN == spec.CUT_LENGTH_MM < spec.STOCK_LENGTH_MM
     # A half-inch-shorter predecessor cannot reach the longest fitted seat.
     assert spec.STOCK_LENGTH_MM - 0.5 * IN < spec.FIXED_LENGTH_ENGAGEMENT_MIN_MM
     assert not hasattr(part, "_supplied_stock_length")
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "FILLISTER_SIZES[SKU] =" not in source
+    assert "FILLISTER_SIZE =" not in source
 
 
 def _independent_removal() -> tuple[float, float]:
@@ -473,7 +473,7 @@ def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == recipe.build_40923906.__name__
     assert part.SPEC.skus == (spec.SKU,)

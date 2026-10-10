@@ -20,7 +20,7 @@ import _native_tip_collar_air as native_air
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _printed_tolerance import printed_band_mm
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from gear_seat_fit import GEAR_SEAT_CLEARANCE, seat_bore_band
 
 
@@ -177,7 +177,7 @@ def test_procurement_is_custom_not_a_relabelled_vendor_collar():
     assert "18-8" in row["material_specification"]
     assert "supplier_skus" not in row
     assert part.PART_NAME not in FASTENERS
-    assert "9414T1" not in STOCK_RECIPES
+    assert "9414T1" not in discovered_recipes()
     assert spec.SET_SCREW_SKU == "94355A213"
     assert spec.SET_SCREW_LENGTH == 5.0 * spec.IN / 16.0
     assert spec.SET_SCREW_SOCKET_AF == 0.035 * spec.IN
@@ -275,11 +275,11 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
 def test_screw_faces_come_from_the_view_one_per_spec(monkeypatch):
     """4323e8d1e and 7924d573e: a part-document face selected into the view
     read back as another face. The pick is from the view's own faces."""
-    from _part_pmi import _FaceGeometry
+    from _gtol_face import FaceGeometry
 
     def cylinder(diameter_mm, x0_mm, x1_mm):
         radius = diameter_mm / 2000.0
-        return _FaceGeometry(
+        return FaceGeometry(
             face=object(), identity=4002,
             parameters=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, radius),
             outward_normal=None,
@@ -291,7 +291,7 @@ def test_screw_faces_come_from_the_view_one_per_spec(monkeypatch):
     dog = cylinder(spec.DOG_DIA, seat, seat + spec.DOG_LENGTH)
     faces = {id(g.face): g for g in (major, dog)}
     monkeypatch.setattr(drawing, "visible_view_entities", lambda _v, kind, label: [g.face for g in faces.values()] if kind == 3 else [])
-    monkeypatch.setattr(drawing, "_face_geometry", lambda face: faces[id(face)])
+    monkeypatch.setattr(drawing, "face_geometry", lambda face: faces[id(face)])
     specs = {
         **{datum.key: datum.face for datum in spec.SCREW_DATUMS},
         **{control.key: control.face for control in spec.SCREW_CONTROLS},

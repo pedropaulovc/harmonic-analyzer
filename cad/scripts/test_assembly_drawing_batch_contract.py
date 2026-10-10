@@ -23,7 +23,7 @@ from _drawing_common import (
     DrawingOutputs,
 )
 from _drawing_registry import DRAWINGS, DrawingLayout
-from test_drawing_simplified import HLR, FakeDrawing, FakeView
+from test_simplified_helpers import HLR, FakeDrawing, FakeView
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

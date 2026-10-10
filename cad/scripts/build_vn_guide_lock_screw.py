@@ -27,9 +27,10 @@ from __future__ import annotations
 import sys
 from math import pi
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_91255A108 import build_91255A108
 from vn_guide_lock_screw_spec import SKU
 
@@ -50,6 +51,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
     )
 
 

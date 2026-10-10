@@ -26,7 +26,8 @@ import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_profile_fixture_spec as profile
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import GROUND_UM, MACHINED_UM, SurfaceFinishControl

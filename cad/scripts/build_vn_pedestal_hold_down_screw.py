@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import sys
 
-from _common import PANEL_BLACK, run_build
+from _appearance import PANEL_BLACK
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_90280A197 import build_90280A197
 
 PART_NAME = "vn-pedestal-hold-down-screw"
@@ -32,6 +34,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         color=PANEL_BLACK,
     )
 

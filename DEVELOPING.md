@@ -736,9 +736,34 @@ Switching to these per-drawing dependencies changes existing drawing cache keys
 once. It does not reuse legacy keys; subsequent unrelated row changes stay
 isolated. A scoped drawing build need not regenerate the rest of the fleet.
 
+GD&T consumers import focused modules directly: `_gtol_identity` names PMI,
+`_gtol_symbols` defines symbols and zones, `_gtol_frame` handles frame signatures
+and XML, and `_gtol_controls` validates datum/control declarations. Face selectors
+live in `_gtol_cylinder`, `_gtol_cone`, `_gtol_planar`, `_gtol_sphere` and
+`_gtol_torus`; `_gtol_face` holds their shared protocol and geometry contract.
+COM geometry reads and face traversal live separately in `_gtol_face_read` and
+`_gtol_face_resolve`. There is no aggregate facade: the dependency graph counts
+every import, including `TYPE_CHECKING`, at file granularity. This keeps edits to
+one selector or frame representation out of unrelated spec/cache closures while
+still invalidating every consumer of the changed module.
+
+Local Python dependencies are file-granular, including imports inside functions.
+Stock fastener metadata therefore lives beside each diagnostic SKU callable
+(`_stock_recipe.stock_recipe`), and each production builder statically imports
+only its recipe. Threaded builders explicitly supply the `_simplified_part` save
+callback; unthreaded builds do not depend on simplified-configuration derivation.
+Simplified naming, assembly-component fingerprints, shared pure BOM identity and
+part-side configuration saves live in separate helpers. Vendor dimensions are
+pure per-SKU inputs shared by the recipe and its specs, rather than dimensions
+imported through recipe code or a family-wide table.
+The catalogue-only 91251A108/91251A157 socket-head recipes share the pure
+`_socket_head_dimensions` record; each SKU still owns its `DIMS` declaration.
+The knife-hanger and knife-mount-dowel specs import their own per-SKU data,
+not the socket-head or dowel COM recipe.
+
 The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
 submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
-by `_common`/`_assembly` (mate/plane/feature creation), so its source is a genuine
+by `_session`/`_com`/`_assembly` (session access, COM binding, mate/plane/feature creation), so its source is a genuine
 build input, yet it is an installed package, not a repo-local `_*.py` helper, so
 `module_deps_of` never walked it (issue #144). `dodo._submodule_dep()` folds a
 content-hash of the submodule's `src/solidworks_mcp` tree (repo-relative-tagged,
@@ -971,7 +996,7 @@ subscription.
 
 ## Native projected geometric-control zones
 
-The canonical `_gtol_spec.GeometricControl.projected_zone_height_mm` is optional:
+The canonical `_gtol_controls.GeometricControl.projected_zone_height_mm` is optional:
 `None` preserves the ordinary XML payload and migrated ordinary frames are not
 repopulated; an authored height must be finite and positive. Readback gating is
 stricter for **all** feature-control frames: complete semantic signatures pay
@@ -995,7 +1020,7 @@ different ranged zone.
 `IGtol.SetPTZHeight2` / `GetPTZHeight2` are explicitly pre-2022-only APIs and are
 never a fallback on current frames. The existing old-format seed uses the void
 `SetFrameSymbols2`, BOOL `SetFrameValues2`, and checked `ConvertFormat` status
-before any projected XML is applied. The enrolled `test_gtol_spec.py` and
+before any projected XML is applied. The enrolled `test_gtol_contracts.py` and
 `test_drawing_specification_purity.py` include source-only contract tests; these
 are not native execution evidence. Parent offline checks and the farm gate must
 cover **every drawing with direct or spec-projected FCFs**, including ordinary
@@ -1061,7 +1086,7 @@ These authored tests are pending parent centralized checks and native farm proof
 
 ## Native equation-curve stock gaps
 
-`_common.equation_curve` is the canonical stock-gap curve creator. `_gear` uses
+`_gear.equation_curve` is the canonical stock-gap curve creator. `_gear` uses
 it internally and `build_dt_cone_gear` imports it directly. It preserves the
 authored expressions, range `[0, 1]` and locked endpoints while using
 `ISketchManager.AddToDB=True` to avoid creation-time snapping/inference. The

@@ -27,12 +27,12 @@ import _config
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
 import dt_post_mount_stack as mount_stack
-from _fit_limits import deviations
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _fit_deviations import deviations
+from _msc_40923906 import FILLISTER_SIZE
 
-SKU = str(_config.parts("vn-post-mount-screw")["supplier_skus"][0])
+SKU = "40923906"
 THREAD = platform.POST_MOUNT_SPEC.size
-THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
+THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZE
 
 # Head seated on the MHA-DT-005 counterbore floor: the under-head face to the
 # plate's top face, at the model's nominal post.
@@ -99,7 +99,7 @@ PLATE_STOCK_BAND_MM = platform.PLATE_STOCK_BAND
 #   permitting no break at all (Main's MHA-VN-031 eye pass on #857).
 POST_MOUNT_TAP_EDGE_BREAK = platform.POST_MOUNT_TAP_EDGE_BREAK
 CUT_END_BREAK_MM = 0.1
-CUT_END_BREAK_BAND = (0.0, -0.1)  # (upper, lower), the _fit_limits convention
+CUT_END_BREAK_BAND = (0.0, -0.1)  # (upper, lower), the _fit_deviations convention
 _break_lower, _break_upper = deviations(CUT_END_BREAK_BAND)
 CUT_END_BREAK_MAX_MM = CUT_END_BREAK_MM + _break_upper
 CUT_END_BREAK_MIN_MM = CUT_END_BREAK_MM + _break_lower
@@ -165,7 +165,7 @@ if FIXED_CUT_LENGTH_EXISTS:
 # The fit-to-hole acceptance (MHA-DT-000): each screw's cut end sits between
 # flush with its own MHA-DT-020 underside and this much short of it, never proud.
 # A band on the cut end's position relative to that underside, in the
-# (upper, lower) _fit_limits convention: upper 0 IS "never proud", lower is
+# (upper, lower) _fit_deviations convention: upper 0 IS "never proud", lower is
 # the most it may be cut short. The import-free mount stack owns the allowance;
 # both part owners' printed-band engagement stacks spend all of it.
 POST_SCREW_CUT_TO_FIT_BAND = (0.0, -platform.POST_SCREW_CUT_TO_FIT_SHORT)

@@ -4,8 +4,8 @@ Same vendor recipe as 94025A150 (see ``diag_build_94025A150.py``):
 through-axis revolve profile (tip cone + 45 deg cup cone + 55 deg slot-end
 chamfer) -> slot Cut-Extrude (ThroughAllBoth) -> helix (seeded at the slot
 face, height L+P = 13 revs, start angle 90 deg) -> thread Cut-Sweep (UN
-cutter capped at 15P/16, centred 7P/16 past the face). Raw nominal source
-scalars live in ``vn_cone_tip_adjuster_spec``; this native recipe reads them.
+cutter capped at 15P/16, centred 7P/16 past the face).  Every constant
+below is read off ``cad/out/reports/mcmaster-94025A164-dump.json``.
 
 Cup depth (c10 for the cone-tip adjuster): Sketch2 Line7 runs from the cup
 rim (r 1.2065 at the end face) to the apex on the axis 1.2065 inside it.
@@ -25,11 +25,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+from _stock_recipe import stock_recipe  # noqa: E402
+
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     bodies,
@@ -39,7 +43,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     replica_main,
     thread_sweep_cut_modern,
 )
-from vn_cone_tip_adjuster_spec import (  # noqa: E402
+from _mcmaster_94025a164 import (  # noqa: E402
     SS_CHAM_H,
     SS_CHAM_R,
     SS_CONE_Y,
@@ -65,8 +69,11 @@ def _strip_area(r: float, w: float) -> float:
     return 2.0 * (h * math.sqrt(r * r - h * h) + r * r * math.asin(h / r))
 
 
+
+
+@stock_recipe("94025A164", threaded=True)
 async def build_94025A164(adapter, truth=None):
-    from _common import add_line_chain
+    from _sketch import add_line_chain  # noqa: E402 -- diagnostic path bootstrap
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     # --- revolve profile (vendor Sketch2 mapped (r, y) = (y_v, -x_v)) -----
