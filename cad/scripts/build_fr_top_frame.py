@@ -16,7 +16,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   top, hanging 6.3 below the underside). All four upper/lower bosses use
   the smaller user-ruled diameter so the outward keeper feet sit flat.
   The O25.5 column bores and O27.5 cap recesses stay unchanged. Four
-  stock 1-3/4 in cross screws enter the front/rear spot seats and clear
+  stock 1-3/4 in cross screws seat flush in front/rear O9 counterbores and clear
   both tube walls into the far casting wall/web through #10-32 taps.
 * Two bounded keeper-seat regions on the side-rail TOP FLANGE are faced
   together in one setup, within the keeper-owned common 0.04 flatness zone.
@@ -25,11 +25,15 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   local flange below both seats is controlled at 8.0 (.X, minimum 7.2),
   with Ra 3.2 locating-seat finish; the nominal rail-top plane stays fixed.
 * Integral crossbar 22 wide at x -26..-4 spanning the window along Z,
-  flush with BOTH faces (its underside 999.7 is the knife-mount seat
-  plane), with 18 x 18 plan gussets at all four rail junctions and, at
-  z 3.088 -/+ 87.06, a #6 SHCS counterbore + dowel slip hole per knife
-  mount: the MHA-VN-024 screw drops through the counterbore into the
-  mount's tap, the MHA-VN-051 dowel slips into the blind underside hole.
+  flush with BOTH faces at its junctions (the underside 999.7 is the
+  knife-mount seat plane), with 18 x 18 plan gussets at all four rail
+  junctions and, at z 3.088 -/+ 87.06, a #6 SHCS counterbore + dowel slip
+  hole per knife mount: the MHA-VN-024 screw drops through the counterbore
+  into the mount's tap, the MHA-VN-051 dowel slips into the blind underside
+  hole. Over its middle (|z| <= 69, short of the gussets and the
+  knife-mount seats) the bar is a T like the rails: the 22-wide, 8-tall
+  top flange over a 13.0 web centred on the knife line through the
+  underside, with R3 roots.
 * Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 27 wide,
   O17 clearance bore for the O16 counter-spring post, underside boss
   O30 x 8 with twin V-gussets (ch30 p004), a 16 x 16 x 2 cast pocket and
@@ -41,13 +45,16 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   receivers' printed-band plus drill-wander stack; full-thickness lands remain
   at the bosses, hub rib and crossbar junctions.
 * Finishing (chamfer external, fillet internal): R3 cast fillets along
-  the internal web/flange T-roots (both shelves of every rail, ch19
-  img04's panel blends), C2 x 45 breaks on the top-face rims -- outer
-  rail rim and both window rims -- and C1 x 45 lead-ins on the bore
-  TOP ends only. The R22.5 bosses bulge 5.4 beyond the side rails and
-  3.5 beyond the front/rear rails, but no longer reach the plan corners
-  (25.56 from their centres): window corners and short outer-corner
-  rim runs remain. The web bottom rim and boss undersides stay sharp.
+  the internal web/flange T-roots (both shelves of every rail and the
+  crossbar web, ch19 img04's panel blends), C2 x 45 breaks on the
+  top-face rims -- outer rail rim and both window rims -- then C2 x 45 on
+  every other external convex edge (flange undersides, web bottoms, lands,
+  crossbar, hub rib, boss rims), and C1 x 45 lead-ins on the bore TOP ends
+  only. The R22.5 bosses bulge 5.4 beyond the side rails and 3.5 beyond
+  the front/rear rails, but no longer reach the plan corners (25.56 from
+  their centres): window corners and short outer-corner rim runs remain.
+  Edges too short or too close to a feature for C2 stay sharp (listed in
+  _external_edge_breaks); hole and bore low ends stay sharp.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -56,16 +63,18 @@ Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 planes mirror sketch x -- see the gusset/pocket sites). Build order
 (ADDITIVE T-section -- the web/flange rings are extruded, not pocketed):
 web ring -> crossbar junction lands -> top-flange ring -> hub rib
-restore -> crossbar+gussets -> corner bosses (up/down pair) -> hub boss
-+ V-gussets -> set-screw pocket -> spot-faces -> column bores ->
-gooseneck bore -> wizard holes (#6 SHCS hanger counterbores) -> dowel
-slip holes -> wizard holes (side-screw taps, set-screw tap, keeper taps)
--> internal T-root fillets (R3) -> external
-top-rim breaks (C2) -> C1 bore top lead-ins -> keeper-seat split lines.
+restore -> crossbar+gussets -> crossbar T pockets -> corner bosses
+(up/down pair) -> hub boss + V-gussets -> set-screw pocket ->
+counterbores -> column bores -> gooseneck bore -> wizard holes (#6 SHCS
+hanger counterbores) -> dowel slip holes -> wizard holes (side-screw
+taps, set-screw tap, keeper taps) -> internal T-root fillets (R3) ->
+external top-rim breaks (C2) -> C1 bore top lead-ins -> remaining
+external edge breaks (C2) -> keeper-seat split lines.
 Wizard holes come after the face cuts so every seat face is final; the
 edge breaks and zero-volume split lines follow the solid features.
 Analytic volume checks after every feature; boss additions and top-rim
-breaks use circle-segment formulas, while hub/spot-face/tap expectations
+breaks use circle-segment formulas, the remaining edge breaks sum
+per-edge chamfer sections, while hub/counterbore/tap expectations
 use small grid integrals against the webbed solid.
 
 Run (SolidWorks already open)::
@@ -165,6 +174,7 @@ from fr_top_frame_spec import (
     KEEPER_SEAT_WIDTH_MM,
     PRINTED_DRILLED_HOLE_PLUS_MM,
     PRINTED_LINEAR_BAND_MM,
+    HANGER_PIN_SLIP_CLEARANCE_MAX,
     REAR_COLUMN_Z,
     RING_HEIGHT,
     SURFACE_FINISHES,
@@ -178,12 +188,18 @@ from fr_frame_attachment_spec import (
     CAP_RECESS_DIAMETER,
     CASTING_FULL_THREAD_DEPTH,
     TOP_CASTING_TAP_DRILL_DEPTH,
-    SCREW_SPOTFACE_DIAMETER,
+    TOP_SCREW_COUNTERBORE_DIAMETER,
     TOP_SCREW_SEAT_Z,
 )
 from _fit_deviations import deviations
 from vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
+import sm_knife_mount_spec as KNIFE_MOUNT
+from _printed_tolerance import angular_band_deg
 from vn_frame_side_screw_spec import SHANK_DIA as KEEPER_SCREW_MAJOR_DIA
+from _mcmaster_90280a837 import (
+    HEAD_DIA as CROSS_SCREW_HEAD_DIA,
+    HEAD_H as CROSS_SCREW_HEAD_H,
+)
 from ch_fulcrum_keeper_spec import (
     DRAWING_PRECISION as KEEPER_DRAWING_PRECISION,
     FOOT_L,
@@ -348,9 +364,12 @@ SET_POCKET_DEPTH = 2.0
 SET_TAP_SPEC = HoleSpec("tapped", "1/4-20", end="through_next")
 
 # --- Cross screws (frame -> tube-frame columns -> far casting wall) ----------
-SPOTFACE_DIA = SCREW_SPOTFACE_DIAMETER
-SPOTFACE_PLANE = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0 + 0.4
-SPOTFACE_FLOOR = TOP_SCREW_SEAT_Z
+# Flush counterbores: the Ø9 cut starts 0.4 outside the boss crown and stops
+# at the screw seat, deep enough that the stock fillister head sits below
+# the mouth's lowest barrel point (guards below).
+COUNTERBORE_DIA = TOP_SCREW_COUNTERBORE_DIAMETER
+COUNTERBORE_PLANE = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0 + 0.4
+COUNTERBORE_FLOOR = TOP_SCREW_SEAT_Z
 SIDE_TAP_SPEC = HoleSpec(
     "tapped_bottoming",
     "#10-32",
@@ -396,15 +415,24 @@ WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.5
 WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.5
 LAND_X0 = BAR_X0 - GUSSET - 6.0  # -50; crossbar-junction land pads on the
 LAND_X1 = BAR_X1 + GUSSET + 6.0  # +20; front/rear inner faces (6 margin)
+# Crossbar T-section: over the middle of the bar (|z| <= BAR_POCKET_Z) the
+# crossbar keeps its 22-wide, FLANGE-tall top flange and below it thins to a
+# WEB_T web centred on the knife line, through the underside. Two flanking
+# pockets cut it out of the full-height bar; they stop 6 short of the gusset
+# legs (z +/-75) so the full-depth ends, which carry every hanger hole, keep
+# the whole knife-mount top seat clear of the pocket-end C2 breaks.
+BAR_WEB_X0 = HANGER_X - WEB_T / 2.0  # -21.5
+BAR_WEB_X1 = HANGER_X + WEB_T / 2.0  # -8.5
+BAR_POCKET_Z = 69.0  # pocket length 138.0, centred on the crossbar
 
 THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
 
 # --- Edge finishing ----------------------------------------------------------
 # Convention (2026-08-03): CHAMFER external edges, FILLET internal wall
-# junctions. The web ring's bottom rim and the boss undersides keep sharp
-# edges (no low-side breaks -- explicit instruction).
+# junctions. User ruling: C2 x 45 on EVERY external convex edge, top and
+# bottom, except where an edge cannot take it (_external_edge_breaks).
 ROOT_FILLET_R = 3.0  # internal web/flange T-root blends (cast root, ch19 img04)
-EDGE_CHAMFER = 2.0  # external top-face rim breaks, 45 deg (one grinding pass)
+EDGE_CHAMFER = 2.0  # external edge breaks, 45 deg (one grinding pass)
 BORE_CHAMFER = 1.0  # note 9: C1 x 45 TOP-end bore breaks; low ends stay sharp
 
 if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
@@ -441,6 +469,66 @@ for _label, _value in (
 ):
     if _value <= 0.0:
         raise AssertionError(f"knife-mount dowel slip {_label}: {_value:.3f}")
+# Crossbar pockets (rule 12, print-worst): every hanger hole stays in the
+# full-depth junction beyond the pocket end. The nearer (front) station
+# keeps its wall in z with the station at its .X band from the socket axis,
+# each pocket end a full band of its printed .X length out (the length's
+# band, then as much again for the pocket's centring), the largest printed
+# hole and the 0.3 deg drill drift over that hole's depth. The counterbore wall is taken in plan although its floor
+# (y +11.75) stands above the pocket roof (y +10.25).
+_POCKET_STATION = min(abs(STUD_Z_FRONT), abs(STUD_Z_REAR)) - PRINTED_LINEAR_BAND_MM[1]
+_POCKET_LENGTH_PLACES = DRAWING_REFERENCE_PRECISION["crossbar pocket length"]
+_POCKET_END = (
+    round(2.0 * BAR_POCKET_Z, _POCKET_LENGTH_PLACES) / 2.0
+    + 2.0 * PRINTED_LINEAR_BAND_MM[_POCKET_LENGTH_PLACES]
+)  # 70.6
+_DRIFT_PER_MM = math.tan(math.radians(KEEPER_TAP_DRILL_WANDER_DEG))
+BAR_POCKET_HOLE_WALLS = {
+    "hanger counterbore": _POCKET_STATION
+    - (HANGER_CBORE_DIA + PRINTED_LINEAR_BAND_MM[2]) / 2.0
+    - _POCKET_END,  # 8.617
+    "hanger clearance hole": _POCKET_STATION
+    - _CLEARANCE_MAX_R
+    - _DRIFT_PER_MM * RING_HEIGHT
+    - _POCKET_END,  # 9.972
+    "dowel slip hole": _POCKET_STATION
+    - _PIN_HOLE_MAX_R
+    - _DRIFT_PER_MM * HANGER_PIN_HOLE_DEPTH
+    - _POCKET_END,  # 10.675
+    "dowel slot": _POCKET_STATION
+    - (HANGER_SLOT_WIDTH + max(HANGER_SLOT_WIDTH_BAND)) / 2.0
+    - _DRIFT_PER_MM * HANGER_SLOT_DEPTH
+    - _POCKET_END,  # 10.675
+}
+for _label, _value in BAR_POCKET_HOLE_WALLS.items():
+    if _value < 2.0:
+        raise AssertionError(
+            f"crossbar pocket leaves {_value:.3f} mm to the {_label} at the printed bands"
+        )
+# The knife-mount top seat stays whole (print-worst): its face nearest the
+# pocket stands from the mount's dowel row by the worse of the row-to-face
+# .X distance and the .X depth less the far row-to-face distance, plus the
+# whole .X block width skewed by the title-block angle; the row sits on the
+# frame's hanger station at its .X band plus half the dowel slip. That edge
+# must stand >= 0.5 beyond the pocket end's C2 band.
+_SEAT_REACH = max(
+    KNIFE_MOUNT.HOLE_ROW_FACE_DISTANCE + KNIFE_MOUNT.HOLE_ROW_FACE_TOL,
+    (KNIFE_MOUNT.SUPPORT_Z_THICK + KNIFE_MOUNT.BLOCK_SIZE_TOL)
+    - (KNIFE_MOUNT.HOLE_ROW_FACE_DISTANCE - KNIFE_MOUNT.HOLE_ROW_FACE_TOL),
+) + (2.0 * KNIFE_MOUNT.BLK_HALF_X + KNIFE_MOUNT.BLOCK_SIZE_TOL) * math.tan(
+    math.radians(angular_band_deg())
+)  # 9.033
+KNIFE_SEAT_PRINTED_MIN_Z = (
+    _POCKET_STATION - HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0 - _SEAT_REACH
+)  # 74.093
+BAR_POCKET_SEAT_CLEARANCE = KNIFE_SEAT_PRINTED_MIN_Z - (
+    _POCKET_END + EDGE_CHAMFER
+)  # 1.293
+if BAR_POCKET_SEAT_CLEARANCE < 0.5:
+    raise AssertionError(
+        f"crossbar pocket-end C2 band comes within {BAR_POCKET_SEAT_CLEARANCE:.3f} mm"
+        " of the knife-mount top seat at the printed bands (needs 0.5)"
+    )
 if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
 # The unified tap table rounds its nominal major; the actual stock major
@@ -450,46 +538,87 @@ KEEPER_TAP_THREAD_MAJOR_DIA = max(
 )
 if abs(KEEPER_TAP_X - COLUMN_X) + KEEPER_TAP_THREAD_MAJOR_DIA / 2.0 > WEB_T / 2.0:
     raise AssertionError("keeper taps break out of the west-rail web")
-SPOTFACE_FULL_SEAT_LIMIT_Z = abs(FRONT_COLUMN_Z) + math.sqrt(
-    (BOSS_DIA / 2.0) ** 2 - (SPOTFACE_DIA / 2.0) ** 2
+# Flush counterbore (rule 12, print-worst). The mouth's lowest point on the
+# Y-axis barrel is at its widest |x| = Dcb/2, so the head top must stay below
+# |Zcol| + sqrt(R^2 - (Dcb/2)^2). Boss diameter, counterbore diameter and the
+# floor offset from the socket axis all print .X: the shallowest recess takes
+# the smallest barrel, the largest counterbore and the most-outboard floor;
+# the head clearance takes the smallest counterbore. The offset is from the
+# same socket axis, so socket pitch does not enter this local stack.
+COUNTERBORE_MOUTH_LOW_Z = abs(FRONT_COLUMN_Z) + math.sqrt(
+    (BOSS_DIA / 2.0) ** 2 - (COUNTERBORE_DIA / 2.0) ** 2
 )
-SPOTFACE_SEAT_MARGIN = SPOTFACE_FULL_SEAT_LIMIT_Z - SPOTFACE_FLOOR
-# Prove the complete spotface at the PRINTED bands, not only nominal geometry.
-# Boss diameter, spotface diameter and floor offset all print .X: use the
-# smallest barrel, largest seat and most-outboard floor. The offset is from
-# the same socket axis, so socket pitch does not enter this local stack.
-SPOTFACE_MIN_BOSS_RADIUS = (
-    round(BOSS_DIA, DRAWING_PRECISION["BossUpProfile"]["C0Dia"])
-    - PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["BossUpProfile"]["C0Dia"]]
+COUNTERBORE_HEAD_RECESS = COUNTERBORE_MOUTH_LOW_Z - (
+    COUNTERBORE_FLOOR + CROSS_SCREW_HEAD_H
+)  # 1.373 nominal
+_BOSS_DIA_PLACES = DRAWING_PRECISION["BossUpProfile"]["C0Dia"]
+_COUNTERBORE_DIA_PLACES = DRAWING_PRECISION["CounterboreRearProfile"]["CB1Dia"]
+_COUNTERBORE_FLOOR_PLACES = DRAWING_REFERENCE_PRECISION[
+    "counterbore floor from socket axis"
+]
+COUNTERBORE_MIN_BOSS_RADIUS = (
+    round(BOSS_DIA, _BOSS_DIA_PLACES) - PRINTED_LINEAR_BAND_MM[_BOSS_DIA_PLACES]
 ) / 2.0
-SPOTFACE_MAX_SEAT_RADIUS = (
-    round(SPOTFACE_DIA, DRAWING_PRECISION["SpotFaceRearProfile"]["S1Dia"])
-    + PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["SpotFaceRearProfile"]["S1Dia"]]
+COUNTERBORE_MAX_RADIUS = (
+    round(COUNTERBORE_DIA, _COUNTERBORE_DIA_PLACES)
+    + PRINTED_LINEAR_BAND_MM[_COUNTERBORE_DIA_PLACES]
 ) / 2.0
-SPOTFACE_MAX_FLOOR_OFFSET = (
-    round(
-        SPOTFACE_FLOOR - abs(FRONT_COLUMN_Z),
-        DRAWING_REFERENCE_PRECISION["spotface floor from socket axis"],
-    )
-    + PRINTED_LINEAR_BAND_MM[
-        DRAWING_REFERENCE_PRECISION["spotface floor from socket axis"]
-    ]
+COUNTERBORE_MIN_RADIUS = (
+    round(COUNTERBORE_DIA, _COUNTERBORE_DIA_PLACES)
+    - PRINTED_LINEAR_BAND_MM[_COUNTERBORE_DIA_PLACES]
+) / 2.0
+COUNTERBORE_MAX_FLOOR_OFFSET = (
+    round(COUNTERBORE_FLOOR - abs(FRONT_COLUMN_Z), _COUNTERBORE_FLOOR_PLACES)
+    + PRINTED_LINEAR_BAND_MM[_COUNTERBORE_FLOOR_PLACES]
 )
-SPOTFACE_PRINTED_SEAT_MARGIN = (
-    math.sqrt(SPOTFACE_MIN_BOSS_RADIUS**2 - SPOTFACE_MAX_SEAT_RADIUS**2)
-    - SPOTFACE_MAX_FLOOR_OFFSET
+COUNTERBORE_MIN_FLOOR_OFFSET = (
+    round(COUNTERBORE_FLOOR - abs(FRONT_COLUMN_Z), _COUNTERBORE_FLOOR_PLACES)
+    - PRINTED_LINEAR_BAND_MM[_COUNTERBORE_FLOOR_PLACES]
 )
+COUNTERBORE_PRINTED_HEAD_RECESS = math.sqrt(
+    COUNTERBORE_MIN_BOSS_RADIUS**2 - COUNTERBORE_MAX_RADIUS**2
+) - (COUNTERBORE_MAX_FLOOR_OFFSET + CROSS_SCREW_HEAD_H)  # 0.078
+COUNTERBORE_PRINTED_HEAD_CLEARANCE = (
+    COUNTERBORE_MIN_RADIUS - CROSS_SCREW_HEAD_DIA / 2.0
+)  # 0.125 radial
 if (
-    min(SPOTFACE_SEAT_MARGIN, SPOTFACE_PRINTED_SEAT_MARGIN) < 0.1
-    or SPOTFACE_PLANE <= SPOTFACE_FLOOR
+    min(COUNTERBORE_HEAD_RECESS, COUNTERBORE_PRINTED_HEAD_RECESS) <= 0.0
+    or COUNTERBORE_PRINTED_HEAD_CLEARANCE <= 0.0
+    or COUNTERBORE_PLANE <= COUNTERBORE_FLOOR
 ):
     raise AssertionError(
-        "top cross-screw spotface loses its full seat at the printed bands"
+        "top cross-screw head stands proud of its counterbore at the printed bands"
+    )
+# The near casting wall between the counterbore floor and the socket bore
+# carries the screw's near thread: the most-inboard printed floor against
+# the largest printed bore.
+COUNTERBORE_PRINTED_NEAR_WALL = (
+    COUNTERBORE_MIN_FLOOR_OFFSET
+    - (
+        round(BORE_DIA, DRAWING_PRECISION["BoreProfile"]["B0Dia"])
+        + PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["BoreProfile"]["B0Dia"]]
+    )
+    / 2.0
+)  # 2.15
+# Cap recess to counterbore ligament: the recess's deepest, widest printed
+# corner against the counterbore's outboard-most floor rim, with the tap
+# axis at the high end of its .X station below the boss top. 1.518 sits
+# under the 2.0 target, over the 1.5 floor (nominal 3.05).
+_AXIS_PLACES = DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
+COUNTERBORE_PRINTED_CAP_LIGAMENT = math.hypot(
+    COUNTERBORE_MIN_FLOOR_OFFSET
+    - (CAP_RECESS_DIAMETER + CAP_RECESS_DIAMETER_BAND[0]) / 2.0,
+    (CAP_RECESS_FLOOR_Y - CAP_RECESS_DEPTH_BAND[0])
+    - (PRINTED_LINEAR_BAND_MM[_AXIS_PLACES] + COUNTERBORE_MAX_RADIUS),
+)
+if min(COUNTERBORE_PRINTED_NEAR_WALL, COUNTERBORE_PRINTED_CAP_LIGAMENT) < 1.5:
+    raise AssertionError(
+        "top cross-screw counterbore leaves under 1.5 mm to the bore or cap recess"
     )
 SIDE_TAP_THREAD_MAJOR_DIA = THREAD_MAJOR_MM[SIDE_TAP_SPEC.size]
-SIDE_TAP_THREAD_END_Z = SPOTFACE_FLOOR - CASTING_FULL_THREAD_DEPTH
+SIDE_TAP_THREAD_END_Z = COUNTERBORE_FLOOR - CASTING_FULL_THREAD_DEPTH
 SIDE_TAP_DRILL_POINT_Z = (
-    SPOTFACE_FLOOR
+    COUNTERBORE_FLOOR
     - TOP_CASTING_TAP_DRILL_DEPTH
     - SIDE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
 )
@@ -739,6 +868,65 @@ KEEPER_MIN_THREAD_TIP_RESERVE = (
 if KEEPER_MIN_THREAD_TIP_RESERVE < 0.25:
     raise AssertionError("keeper foot screw loses its 0.25 mm blind-thread clearance")
 
+# The deeper counterbore carries the west cross taps past both keeper
+# stations, so the #10-32 thread now runs under the #2-56 tap drills. The
+# wall is the keeper drill's cylinder-plus-cone profile (deepest printed
+# drill, largest drilled radius, nearest printed transverse offset) against
+# the thread major with its axis at the top of the stacked .X bands (axis
+# below boss top, boss top above rail top), less both axes' wander. The
+# cross-tap axis lies on the receiver web centre (the socket axis), and its
+# wander uses the same angular drift over the run from the counterbore floor.
+KEEPER_MIN_WEB_CENTRE_OFFSET = (
+    abs(round(KEEPER_FITUP_X_FROM_WEB_MM, KEEPER_FITUP_PLACES))
+    - KEEPER_FITUP_LOCATION_BAND_MM
+    - KEEPER_MAX_TRANSVERSE_OFFSET
+)  # 2.35
+_KEEPER_DRILL_BOTTOM_Y = HALF_H - KEEPER_MAX_TAP_DRILL_DEPTH
+_KEEPER_DRILL_TIP_Y = (
+    _KEEPER_DRILL_BOTTOM_Y - KEEPER_MAX_TAP_DRILL_RADIUS * DRILL_POINT_H
+)
+_CROSS_AXIS_MAX_Y = (
+    PRINTED_LINEAR_BAND_MM[
+        DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
+    ]
+    + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["boss top above rail top"]]
+)
+_CROSS_TAP_WANDER_MM = (
+    COUNTERBORE_FLOOR - min(abs(KEEPER_TAP_Z_FRONT), abs(KEEPER_TAP_Z_REAR))
+) * math.tan(math.radians(KEEPER_TAP_DRILL_WANDER_DEG))
+
+
+def _point_segment_distance(
+    p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy)
+    t = min(1.0, max(0.0, t))
+    return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
+
+
+_KEEPER_DRILL_NEAR_SIDE_X = KEEPER_MIN_WEB_CENTRE_OFFSET - KEEPER_MAX_TAP_DRILL_RADIUS
+KEEPER_CROSS_TAP_WALL = (
+    min(
+        # the drill's inboard wall above its bottom corner, then its cone
+        _point_segment_distance(
+            (0.0, _CROSS_AXIS_MAX_Y),
+            (_KEEPER_DRILL_NEAR_SIDE_X, HALF_H),
+            (_KEEPER_DRILL_NEAR_SIDE_X, _KEEPER_DRILL_BOTTOM_Y),
+        ),
+        _point_segment_distance(
+            (0.0, _CROSS_AXIS_MAX_Y),
+            (_KEEPER_DRILL_NEAR_SIDE_X, _KEEPER_DRILL_BOTTOM_Y),
+            (KEEPER_MIN_WEB_CENTRE_OFFSET, _KEEPER_DRILL_TIP_Y),
+        ),
+    )
+    - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
+    - _CROSS_TAP_WANDER_MM
+    - KEEPER_TAP_AXIS_WANDER_MM
+)  # 1.73: under the 2.0 target, over the 1.5 floor
+if KEEPER_CROSS_TAP_WALL < 1.5:
+    raise AssertionError("top cross-tap thread leaves under 1.5 mm to a keeper drill")
+
 
 # --------------------------------------------------------------------------
 # Analytic expectations. The webbed casting has no tidy closed form at the
@@ -864,9 +1052,9 @@ def _hub_underhang_volume() -> float:
     return vol
 
 
-def _spotface_removal() -> float:
-    """Material one O9 spot-face removes from the Ø45 curved boss."""
-    r_d = SPOTFACE_DIA / 2.0
+def _counterbore_removal() -> float:
+    """Material one O9 counterbore removes from the Ø45 curved boss."""
+    r_d = COUNTERBORE_DIA / 2.0
     r_b = BOSS_DIA / 2.0
     step = 0.01
     vol = 0.0
@@ -875,7 +1063,7 @@ def _spotface_removal() -> float:
         dd = d + 0.5 * step
         chord = 2.0 * math.sqrt(max(0.0, r_d * r_d - dd * dd))
         surf = abs(FRONT_COLUMN_Z) + math.sqrt(max(0.0, r_b * r_b - dd * dd))
-        length = max(0.0, min(surf, SPOTFACE_PLANE) - SPOTFACE_FLOOR)
+        length = max(0.0, min(surf, COUNTERBORE_PLANE) - COUNTERBORE_FLOOR)
         vol += chord * length * step
         d += step
     return vol
@@ -1000,9 +1188,11 @@ def _t_root_add() -> float:
     rail. Every web face sits WEB_T/2 = 6.5 off its rail centreline, so
     one boss chord covers all four families; the hub rib interrupts both
     east-rail runs, the junction lands interrupt both front/rear WINDOW
-    runs. The fillet ends dying into boss barrels / rib / land walls and
-    the small vertical junction coves at those walls are not modeled --
-    the check tolerance absorbs the ends; the vertical coves stay sharp.
+    runs. The crossbar web adds its two roots between the pocket ends
+    (|z| <= 69). The fillet ends dying into boss barrels / rib / land /
+    pocket-end walls and the small vertical junction coves at those walls
+    are not modeled -- the check tolerance absorbs the ends; the vertical
+    coves stay sharp.
     """
     area = _fillet_section_area(ROOT_FILLET_R)
     cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (WEB_T / 2.0) ** 2)
@@ -1010,7 +1200,8 @@ def _t_root_add() -> float:
     fr = 2.0 * (COLUMN_X - cut)  # one front/rear run, uninterrupted
     outer = side + (side - HUB_RIB_W) + 2.0 * fr
     window = side + (side - HUB_RIB_W) + 2.0 * (fr - (LAND_X1 - LAND_X0))
-    return area * (outer + window)
+    crossbar = 2.0 * 2.0 * BAR_POCKET_Z
+    return area * (outer + window + crossbar)
 
 
 def _bore_chamfer_removal() -> float:
@@ -1020,6 +1211,142 @@ def _bore_chamfer_removal() -> float:
         return math.pi * BORE_CHAMFER**2 * (bore_dia / 2.0 + BORE_CHAMFER / 3.0)
 
     return 4.0 * ring(CAP_RECESS_DIAMETER) + ring(GOOSENECK_BORE_DIA)
+
+
+def _external_edge_breaks() -> tuple[list[list[float]], float]:
+    """Selection points and analytic removal for the C2 ExternalEdgeBreaks.
+
+    Every external convex edge the top-rim and bore-top breaks left, once
+    the T-section crossbar exists: the flange undersides (outer, window and
+    the eight short outer-corner runs), the four outer vertical corners, the
+    web bottoms, the junction lands' free edges, the crossbar web bottoms,
+    pocket-end bottoms and outer corners, the bar's full-depth side bottoms
+    beyond the pockets, the gusset hypotenuse bottoms and their 135-degree
+    vertical corners, the hub rib's free corners, and the corner/hub boss
+    rims.
+    Straight edges remove ``c^2 sin(angle) / 2`` per mm over their run to the
+    face that ends them; outer rims remove ``pi c^2 (R - c/3)``. Corner
+    patches and the ends dying into boss barrels are left to the tolerance.
+
+    Not broken C2: the crossbar flange's underside edges (only a 1.5 flat
+    beside the R3 web root), the hub rib's outer and inner bottom edges
+    (2.1 to the Ø30 hub boss, so C2 leaves a 0.1 land), the tapered hub
+    V-gusset edges (they feather into the underside), the 2-deep set-screw
+    pocket rim (C2 would consume the whole pocket wall), and every hole,
+    bore, counterbore, tap, slot and keeper split-line edge.
+    """
+    c = EDGE_CHAMFER
+    z_col = abs(FRONT_COLUMN_Z)
+    r_boss = BOSS_DIA / 2.0
+    r_hub = HUB_BOSS_DIA / 2.0
+    side_cut = math.sqrt(r_boss**2 - (RAIL_W_SIDE / 2.0) ** 2)  # 14.624
+    fr_cut = math.sqrt(r_boss**2 - (RAIL_W_FR / 2.0) ** 2)  # 12.052
+    web_cut = math.sqrt(r_boss**2 - (WEB_T / 2.0) ** 2)  # 21.540
+    hub_web_cut = math.sqrt(r_hub**2 - (WEB_T / 2.0) ** 2)  # 13.518
+    hub_rib_cut = math.sqrt(r_hub**2 - (HUB_RIB_W / 2.0) ** 2)  # 6.538
+    rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0
+    rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0
+    y_under = FLANGE_BOT_Y
+    y_bottom = -HALF_H
+    points: list[list[float]] = []
+    removal = 0.0
+
+    def edge(point: tuple[float, float, float], length: float, angle: float) -> None:
+        nonlocal removal
+        if length <= 2.0 * c:
+            raise AssertionError(
+                f"edge at {point} is too short for C{c:g}: {length:.3f}"
+            )
+        points.append(list(point))
+        removal += 0.5 * c * c * math.sin(math.radians(angle)) * length
+
+    def along_x(z: float, y: float, x0: float, x1: float, angle: float = 90.0) -> None:
+        lo, hi = sorted((x0, x1))
+        edge(((lo + hi) / 2.0, y, z), hi - lo, angle)
+
+    def along_y(x: float, z: float, y0: float, y1: float, angle: float = 90.0) -> None:
+        lo, hi = sorted((y0, y1))
+        edge((x, (lo + hi) / 2.0, z), hi - lo, angle)
+
+    def along_z(x: float, y: float, z0: float, z1: float, angle: float = 90.0) -> None:
+        lo, hi = sorted((z0, z1))
+        edge((x, y, (lo + hi) / 2.0), hi - lo, angle)
+
+    # Flange underside, outer: west/east (rib-split) and front/rear runs
+    # between the bosses, the eight short runs outside the boss barrels, and
+    # the four vertical outer corners below the top-rim break.
+    along_z(OUTER_X, y_under, -(z_col - side_cut), z_col - side_cut)
+    along_z(-OUTER_X, y_under, -(z_col - side_cut), rib_lo)
+    along_z(-OUTER_X, y_under, rib_hi, z_col - side_cut)
+    for sz in (-1.0, 1.0):
+        along_x(sz * OUTER_Z, y_under, -(COLUMN_X - fr_cut), COLUMN_X - fr_cut)
+    for sx in (-1.0, 1.0):
+        for sz in (-1.0, 1.0):
+            along_z(sx * OUTER_X, y_under, sz * (z_col + side_cut), sz * OUTER_Z)
+            along_x(sz * OUTER_Z, y_under, sx * (COLUMN_X + fr_cut), sx * OUTER_X)
+            along_y(sx * OUTER_X, sz * OUTER_Z, y_under, HALF_H - c)
+    # Flange underside, window: west, east (rib-split), front/rear (land-split).
+    along_z(INNER_X, y_under, -INNER_Z, INNER_Z)
+    along_z(-INNER_X, y_under, -INNER_Z, rib_lo)
+    along_z(-INNER_X, y_under, rib_hi, INNER_Z)
+    for sz in (-1.0, 1.0):
+        along_x(sz * INNER_Z, y_under, -INNER_X, LAND_X0)
+        along_x(sz * INNER_Z, y_under, LAND_X1, INNER_X)
+    # Web bottoms: side rails between the corner bosses (the east pair split
+    # by the hub boss), front/rear outer faces, front/rear window faces
+    # (land-split).
+    for x_web in (WEB_OUT_X, WEB_IN_X):
+        along_z(x_web, y_bottom, -(z_col - web_cut), z_col - web_cut)
+        along_z(-x_web, y_bottom, -(z_col - web_cut), GOOSENECK_Z - hub_web_cut)
+        along_z(-x_web, y_bottom, GOOSENECK_Z + hub_web_cut, z_col - web_cut)
+    for sz in (-1.0, 1.0):
+        along_x(sz * WEB_OUT_Z, y_bottom, -(COLUMN_X - web_cut), COLUMN_X - web_cut)
+        along_x(sz * WEB_IN_Z, y_bottom, -(COLUMN_X - web_cut), LAND_X0)
+        along_x(sz * WEB_IN_Z, y_bottom, LAND_X1, COLUMN_X - web_cut)
+    # Junction lands: the free vertical corners, end bottoms and the short
+    # window-face bottoms beside the gussets.
+    for sz in (-1.0, 1.0):
+        for x_land in (LAND_X0, LAND_X1):
+            along_y(x_land, sz * INNER_Z, y_bottom, y_under)
+            along_z(x_land, y_bottom, sz * INNER_Z, sz * WEB_IN_Z)
+        along_x(sz * INNER_Z, y_bottom, LAND_X0, BAR_X0 - GUSSET)
+        along_x(sz * INNER_Z, y_bottom, BAR_X1 + GUSSET, LAND_X1)
+    # Crossbar: web bottoms; per pocket end its bottom and its outer vertical
+    # corner; the bar's full-depth side bottoms from the pocket end to the
+    # gusset leg; the gusset hypotenuse bottoms and the full-height
+    # 135-degree vertical corners where the bar sides meet the hypotenuses.
+    for x_web in (BAR_WEB_X0, BAR_WEB_X1):
+        along_z(x_web, y_bottom, -BAR_POCKET_Z, BAR_POCKET_Z)
+    hypotenuse = GUSSET * math.sqrt(2.0)
+    gusset_z = INNER_Z - GUSSET
+    for sz in (-1.0, 1.0):
+        along_x(sz * BAR_POCKET_Z, y_bottom, BAR_X0, BAR_WEB_X0)
+        along_x(sz * BAR_POCKET_Z, y_bottom, BAR_WEB_X1, BAR_X1)
+        for x_bar, sx in ((BAR_X0, -1.0), (BAR_X1, 1.0)):
+            along_y(x_bar, sz * BAR_POCKET_Z, y_bottom, y_under)
+            along_z(x_bar, y_bottom, sz * BAR_POCKET_Z, sz * gusset_z)
+            edge(
+                (x_bar + sx * GUSSET / 2.0, y_bottom, sz * (INNER_Z - GUSSET / 2.0)),
+                hypotenuse,
+                90.0,
+            )
+            along_y(x_bar, sz * gusset_z, y_bottom, HALF_H - c, angle=135.0)
+    # Hub rib: the four free vertical corners and its side bottoms out to the
+    # hub boss barrel.
+    for z_rib in (rib_lo, rib_hi):
+        for x_face in (-OUTER_X, -INNER_X):
+            along_y(x_face, z_rib, y_bottom, y_under)
+        along_x(z_rib, y_bottom, -OUTER_X, GOOSENECK_X - hub_rib_cut)
+        along_x(z_rib, y_bottom, GOOSENECK_X + hub_rib_cut, -INNER_X)
+    # Boss rims: the four corner bosses top and bottom, and the hub boss.
+    for sx in (-1.0, 1.0):
+        for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z):
+            for y_rim in (HALF_H + BOSS_ABOVE, -(HALF_H + BOSS_BELOW)):
+                points.append([sx * (COLUMN_X + r_boss), y_rim, z_world])
+                removal += math.pi * c * c * (r_boss - c / 3.0)
+    points.append([GOOSENECK_X - r_hub, -(HALF_H + HUB_BOSS_DROP), GOOSENECK_Z])
+    removal += math.pi * c * c * (r_hub - c / 3.0)
+    return points, removal
 
 
 def _open_underside_sketch(
@@ -1461,6 +1788,59 @@ async def build(adapter) -> dict[str, str]:
     v_bar = bar_area * RING_HEIGHT
     volume = await volume_check(adapter, "crossbar", volume + v_bar, 500.0)
 
+    # 5b. Crossbar T-section: two pockets either side of the WEB_T web, from
+    #     the flange underside through the bottom, over |z| <= 69 (6 short of
+    #     the gusset legs, clear of the knife-mount seats). Sketched on a
+    #     positive-offset Top plane at the flange underside, (x, y) -> (X, -Z);
+    #     its default cut runs toward -Y.
+    pocket_roof = check(
+        "create_plane crossbar pockets",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=FLANGE_BOT_Y
+            )
+        ),
+    )
+    pocket_roof_name = str(getattr(pocket_roof, "name", pocket_roof))
+    ref_planes.append(pocket_roof_name)
+    bar_pockets = SketchDims()
+    check(
+        "create_sketch crossbar pockets", await adapter.create_sketch(pocket_roof_name)
+    )
+    for k, (x_lo, x_hi) in enumerate(((BAR_X0, BAR_WEB_X0), (BAR_WEB_X1, BAR_X1))):
+        pts = [
+            (x_lo, -BAR_POCKET_Z),
+            (x_hi, -BAR_POCKET_Z),
+            (x_hi, BAR_POCKET_Z),
+            (x_lo, BAR_POCKET_Z),
+        ]
+        pocket_lines = await add_line_chain(adapter, pts)
+        await define_rectilinear_chain(
+            adapter,
+            pocket_lines,
+            pts,
+            label=f"crossbar pocket {k}",
+            dims=bar_pockets,
+            names=[f"BP{k}Run", f"BP{k}Rise", f"BP{k}OffX", f"BP{k}OffZ"],
+        )
+    await ensure_fully_defined(adapter, "crossbar pockets sketch")
+    check("exit_sketch crossbar pockets", await adapter.exit_sketch())
+    name_last_feature(adapter, "BarPocketProfile")
+    drive_jobs += bar_pockets.apply(adapter, "BarPocketProfile")
+    check(
+        "cut crossbar pockets",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=RING_HEIGHT - FLANGE, reverse_direction=False)
+        ),
+    )
+    name_last_feature(adapter, "BarPockets")
+    v_bar_pockets = (
+        (BAR_X1 - BAR_X0 - WEB_T) * 2.0 * BAR_POCKET_Z * (RING_HEIGHT - FLANGE)
+    )  # 35397
+    volume = await volume_check(
+        adapter, "crossbar pockets", volume - v_bar_pockets, 50.0
+    )
+
     # 6. Corner bosses: one circle set extruded UP to the boss top, a second
     #    identical set extruded DOWN to the boss bottom (one-direction pair;
     #    a mid-plane extrude cannot land the asymmetric 22.75/24.55 split).
@@ -1649,54 +2029,56 @@ async def build(adapter) -> dict[str, str]:
     v_pocket = SET_POCKET * SET_POCKET * SET_POCKET_DEPTH
     volume = await volume_check(adapter, "set pocket", volume - v_pocket, 20.0)
 
-    # 9. Side-screw spot-faces: O9 flats at |z|=132.6 on the curved boss
-    #    (1.9 removal on axis; cut plane 134.9 gives a positive 2.3 depth).
-    v_spot = _spotface_removal()
+    # 9. Side-screw counterbores: O9 x 6.8 from the 134.9 cut plane to the
+    #    |z|=128.1 floor (6.4 below the boss crown), deep enough that the
+    #    stock fillister head sits below the mouth on the curved boss.
+    v_cbore = _counterbore_removal()
     for side, sign, reverse in SIDE_SCREW_FACES:
-        spot_plane = check(
-            f"create_plane spotface {side}",
+        cb_plane = check(
+            f"create_plane counterbore {side}",
             await adapter.create_plane(
                 CreatePlaneParameters(
                     mode="offset",
                     base_plane="Front Plane",
-                    offset=sign * SPOTFACE_PLANE,
+                    offset=sign * COUNTERBORE_PLANE,
                 )
             ),
         )
-        spot = SketchDims()
+        cbore = SketchDims()
         check(
-            f"create_sketch spotface {side}",
-            await adapter.create_sketch(getattr(spot_plane, "name", spot_plane)),
+            f"create_sketch counterbore {side}",
+            await adapter.create_sketch(getattr(cb_plane, "name", cb_plane)),
         )
-        ref_planes.append(str(getattr(spot_plane, "name", spot_plane)))
+        ref_planes.append(str(getattr(cb_plane, "name", cb_plane)))
         for k, x in enumerate(SIDE_SCREW_XS):
             await define_circle(
                 adapter,
                 x,
                 0.0,
-                SPOTFACE_DIA / 2.0,
-                f"spotface {side} (x={x:+.0f})",
-                dims=spot,
-                names=(f"S{k}X", None, f"S{k}Dia"),
+                COUNTERBORE_DIA / 2.0,
+                f"counterbore {side} (x={x:+.0f})",
+                dims=cbore,
+                names=(f"CB{k}X", None, f"CB{k}Dia"),
             )
-        await ensure_fully_defined(adapter, f"spotface {side} sketch")
-        check(f"exit_sketch spotface {side}", await adapter.exit_sketch())
-        name_last_feature(adapter, f"SpotFace{side.capitalize()}Profile")
-        spot.apply(adapter, f"SpotFace{side.capitalize()}Profile")
+        await ensure_fully_defined(adapter, f"counterbore {side} sketch")
+        check(f"exit_sketch counterbore {side}", await adapter.exit_sketch())
+        name_last_feature(adapter, f"Counterbore{side.capitalize()}Profile")
+        cbore.apply(adapter, f"Counterbore{side.capitalize()}Profile")
         check(
-            f"cut spotface {side}",
+            f"cut counterbore {side}",
             await adapter.create_cut_extrude(
                 ExtrusionParameters(
-                    depth=SPOTFACE_PLANE - SPOTFACE_FLOOR, reverse_direction=reverse
+                    depth=COUNTERBORE_PLANE - COUNTERBORE_FLOOR,
+                    reverse_direction=reverse,
                 )
             ),
         )
-        name_last_feature(adapter, f"SpotFace{side.capitalize()}")
+        name_last_feature(adapter, f"Counterbore{side.capitalize()}")
         volume = await volume_check(
             adapter,
-            f"spotface {side}",
-            volume - len(SIDE_SCREW_XS) * v_spot,
-            0.2 * v_spot + 15.0,
+            f"counterbore {side}",
+            volume - len(SIDE_SCREW_XS) * v_cbore,
+            0.2 * v_cbore + 15.0,
         )
 
     # 10. Column bores (through the boss stacks).
@@ -2011,13 +2393,13 @@ async def build(adapter) -> dict[str, str]:
 
     # 13. Cross-screw taps (#10-32 UNF-2B bottoming): one per boss,
     #     46.0 mm full thread in a 49.2 mm cylindrical drill. Each path
-    #     starts on its spot seat, crosses the near casting wall and column
+    #     starts on its counterbore floor, crosses the near casting wall and column
     #     bore, then continues into the far boss/centred side-rail web.
     #     Opposed holes remain one two-position Hole Wizard feature per side.
     v_side_tap = _side_tap_removal()
     for side, sign, _reverse in SIDE_SCREW_FACES:
         feat = f"SideTaps{side.capitalize()}"
-        z_face = sign * SPOTFACE_FLOOR
+        z_face = sign * COUNTERBORE_FLOOR
         normal = (0.0, 0.0, sign)
         tap_points = [[x, 0.0, z_face] for x in SIDE_SCREW_XS]
         wizard_holes(
@@ -2075,8 +2457,8 @@ async def build(adapter) -> dict[str, str]:
     #     each recessed web face meets the flange underside (y +10.25) --
     #     the cast root blend ch19 img04 shows on every panel. One edge
     #     per uninterrupted run: the hub rib splits both east-rail runs,
-    #     the junction lands split both front/rear window runs. The web
-    #     ring's BOTTOM rim stays sharp (no low-side breaks).
+    #     the junction lands split both front/rear window runs; the crossbar
+    #     web's two roots run between its pocket ends.
     x_shelf_out = COLUMN_X + WEB_T / 2.0  # 203.5
     x_shelf_in = COLUMN_X - WEB_T / 2.0  # 190.5
     z_shelf_out = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.5
@@ -2108,6 +2490,9 @@ async def build(adapter) -> dict[str, str]:
                 [land_mid_w, FLANGE_BOT_Y, z_shelf_in],
                 [land_mid_e, FLANGE_BOT_Y, -z_shelf_in],
                 [land_mid_e, FLANGE_BOT_Y, z_shelf_in],
+                # crossbar web, both sides
+                [BAR_WEB_X0, FLANGE_BOT_Y, 0.0],
+                [BAR_WEB_X1, FLANGE_BOT_Y, 0.0],
             ],
         ),
     )
@@ -2158,7 +2543,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # 18. C1 x 45 lead-ins on the four cap-recess mouths and gooseneck bore
-    # top. Boss undersides remain sharp.
+    # top; bore and counterbore low ends stay sharp.
     boss_top_y = HALF_H + BOSS_ABOVE
     r_gn = GOOSENECK_BORE_DIA / 2.0
     check(
@@ -2177,6 +2562,21 @@ async def build(adapter) -> dict[str, str]:
     v_breaks = _bore_chamfer_removal()
     volume = await volume_check(
         adapter, "bore top breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
+    )
+
+    # 18b. C2 x 45 on every remaining external convex edge (87 edges, see
+    #      _external_edge_breaks for the list and the edges left unbroken).
+    break_points, v_external = _external_edge_breaks()
+    check(
+        "chamfer external edges",
+        await adapter.add_chamfer(EDGE_CHAMFER, break_points),
+    )
+    name_last_feature(adapter, "ExternalEdgeBreaks")
+    volume = await volume_check(
+        adapter,
+        "external edge breaks",
+        volume - v_external,
+        0.03 * v_external + 150.0,
     )
 
     # 19. Machined keeper-seat regions on the unchanged rail-top plane.

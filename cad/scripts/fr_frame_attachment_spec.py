@@ -23,7 +23,12 @@ COLUMN_BOTTOM_Y = SOCKET_MOUTH_Y - COLUMN_SOCKET_DEPTH
 BASE_SCREW_Y = COLUMN_BOTTOM_Y + 12.7
 BASE_SCREW_SEAT_Z = 133.0
 TOP_SCREW_Y = 1017.95
-TOP_SCREW_SEAT_Z = 132.6  # Ø45/Ø9/.X bands retain >=0.1 full-seat margin
+# Top-frame bosses take a flush counterbore, not a spotface: the stock
+# fillister head (HEAD_H 4.572) sits below the Ø9 mouth's lowest barrel point
+# at every printed .X corner (build_fr_top_frame proves it).
+TOP_SCREW_SEAT_Z = 128.1
+TOP_SCREW_COUNTERBORE_DIAMETER = 9.0
+# The base keeps its spotface seat at the same diameter.
 SCREW_SPOTFACE_DIAMETER = 9.0
 # The casting is tapped continuously across the interrupted column socket.
 # Tube walls are clearance-drilled separately after matching their positions.

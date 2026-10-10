@@ -286,7 +286,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BossesUpper": {"BossTopExtent"},
     "BossesLower": {"BossBottomExtent"},
     "BoreProfile": {"B0X", "B0Z", "B0Dia"},
-    "SpotFaceRearProfile": {"S1Dia"},
+    "CounterboreRearProfile": {"CB1Dia"},
     "BarProfile": {
         "BarAnchorX",
         "BarAnchorZ",
@@ -338,7 +338,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "WebRing": {"RingHeight": 1},
     "BossUpProfile": {"C0Dia": 1},
     "BoreProfile": {"B0Dia": 1},
-    "SpotFaceRearProfile": {"S1Dia": 1},
+    "CounterboreRearProfile": {"CB1Dia": 1},
     "BarProfile": {"GussetRunE": 1},
     "HubBossProfile": {"HubDia": 1},
     "RibProfile": {"RibWidth": 1},
@@ -376,7 +376,7 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # Rule 2's one exception.  Some numbers on this print are distances between two
 # model faces that no single model dimension expresses: a web thickness that is
 # the difference of two profile offsets, a flange thickness between two extrude
-# extents, a boss stack that sums three, a chamfer leg, a spotface-floor
+# extents, a boss stack that sums three, a chamfer leg, a counterbore-floor
 # separation, a ramp angle.  Their VALUE is still the model's -- every one is
 # measured in the view and the build fails if the geometry moved -- but there is
 # no model dimension to carry the places, so the places live here, in the part's
@@ -384,19 +384,22 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # recipe's own dimension label.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # Sheet 1, GEOMETRY: envelope, windows, T-rail section B-B and side
-    # section E-E -- cast stock under the title block's general band.
+    # section E-E with the crossbar T -- cast stock under the title block's
+    # general band.
     "overall casting width": 1,
     "overall casting depth": 1,
     "side flange width": 1,
     "left window clear width": 1,
     "right window clear width": 1,
-    "central web width": 1,
+    "crossbar flange width": 1,
     "rail web thickness": 1,
     "front rear flange width": 1,
     "top flange thickness": FLANGE_THICKNESS_PLACES,
     "top rim chamfer": 1,
     "T rail root radius": 1,
     "side rail web thickness": 1,
+    "crossbar web thickness": 1,
+    "crossbar flange thickness": FLANGE_THICKNESS_PLACES,
     # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
     # column plan is drilled from, and MHA-FR-001 states them to 0.01, so they
     # are the one pair of sheet-derived numbers that earns a second place.
@@ -411,14 +414,14 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "keeper x from left sockets": 1,
     "front keeper z from upper sockets": 1,
     "rear keeper z from upper sockets": 1,
-    # Sheet 3, CROSS-TAPS: boss stack, cap-mouth chamfer, opposed spotface
+    # Sheet 3, CROSS-TAPS: boss stack, cap-mouth chamfer, opposed counterbore
     # floors and the tap axis below the boss top.
     "socket boss overall height": 1,
     "boss top above rail top": 1,
     "top bore mouth chamfer": 1,
-    "opposed spotface floor separation": 1,
+    "opposed counterbore floor separation": 1,
     "cross screw axis from boss top": 1,
-    "spotface floor from socket axis": 1,
+    "counterbore floor from socket axis": 1,
     # Sheet 4, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
     # cropped set-pocket section D-D.
     "hub from left front socket": 1,
@@ -432,6 +435,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # the dowel slip hole's station from the screw axis, the slot's BASIC
     # station from the round hole, and the slot's length.
     "crossbar junction land": 1,
+    "crossbar pocket length": 1,
     "underside gusset thickness": 1,
     "hanger counterbore floor from underside": HANGER_GRIP_PLACES,
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
@@ -460,10 +464,17 @@ KEEPER_TAP_CALLOUT_PRECISION = {
 KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit.
+# The C2 general break overrides the title block's 0.25 max break on the edges
+# the model chamfers.  The edges too short or too close to a feature for C2
+# (build_fr_top_frame._external_edge_breaks) are the "UNLESS NOTED": section
+# E-E's note names the crossbar flange underside, the hub side view's note the
+# hub rib bottoms, V-gussets and set-screw pocket rim; they keep the title
+# block break.  Rule 6 caps this block at four lines.
 DRAWING_NOTES = (
     "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-FR-003 TUBE.\n"
     "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
-    "RETAIN CORNER AND ORIENTATION MATCH MARKS."
+    "RETAIN CORNER AND ORIENTATION MATCH MARKS.\n"
+    "BREAK ALL EXTERNAL EDGES C2 X 45 DEG UNLESS NOTED."
 )
 DRAWING_NOTES_B = (
     "FACE BOTH KEEPER SEATS IN ONE SETUP.\n"
