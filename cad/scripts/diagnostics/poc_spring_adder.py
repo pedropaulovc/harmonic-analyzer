@@ -34,10 +34,11 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import (
-    check,
-    log,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
 from _assembly import (
     bore_axis_ref,
     component_named_ref,
@@ -90,7 +91,7 @@ async def _insert(adapter, part, pos, *, fixed):
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters, InsertComponentParameters,
     )
-    from _common import OUT_SLDPRT
+    from _paths import OUT_SLDPRT
     path = str((OUT_SLDPRT / f"{part}.SLDPRT").resolve())
     data = check(f"insert {part} @ {pos}", await adapter.insert_component(
         InsertComponentParameters(file_path=path, position=pos, rotation=VERT_ROT,

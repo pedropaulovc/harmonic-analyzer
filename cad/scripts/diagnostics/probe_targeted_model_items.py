@@ -48,7 +48,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 sys.path[:0] = [str(ROOT), str(ROOT / "cad/scripts")]
 
-from _common import _early_bound  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import null_callout  # noqa: E402
 
 DRAWING = Path(

@@ -13,7 +13,13 @@ from __future__ import annotations
 
 import sys
 
-from _common import OUT_SLDASM, check, log, run_build
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _paths import OUT_SLDASM
+from _session import run_build
 from _assembly import _flag, _read_member  # raw-COM helpers
 
 
@@ -113,7 +119,7 @@ async def build(adapter) -> dict[str, str]:
     adapter._attempt(lambda: model.GraphicsRedraw2(), default=None)
     log(f"leaves={len(leaves)} hid {hidden}; rendering isolated clash")
 
-    from _common import OUT_PNG
+    from _paths import OUT_PNG
     png_dir = (OUT_PNG / "diag_sl_clash")
     png_dir.mkdir(parents=True, exist_ok=True)
     for view in ("right", "top", "isometric", "front"):

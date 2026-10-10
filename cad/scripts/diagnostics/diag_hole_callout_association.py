@@ -22,7 +22,12 @@ sys.path.insert(0, str(ROOT))
 
 import dodo
 from win32com.client.dynamic import Dispatch as dynamic_dispatch
-from _common import _early_bound, check
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402 -- diagnostic path bootstrap
+from _com import _early_bound  # noqa: E402 -- diagnostic path bootstrap
 from _drawing_common import add_native_hole_callout, new_project_drawing, render_pdf_png
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from draw_fr_harmonic_base import _cross_tap_edge

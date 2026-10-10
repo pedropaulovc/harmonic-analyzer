@@ -49,6 +49,10 @@ async def build_catalog(adapter) -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    from _common import run_build
+    if __package__:
+        from . import _script_paths  # noqa: F401
+    else:
+        import _script_paths  # noqa: F401
+    from _session import run_build
 
     sys.exit(run_build(build_catalog))

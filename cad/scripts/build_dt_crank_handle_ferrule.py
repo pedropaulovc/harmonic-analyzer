@@ -20,27 +20,27 @@ import math
 import sys
 
 import _config
-from _common import (
-    SketchDims,
-    _early_bound,
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import (
     active_configuration_name,
+    assert_saved_configurations_regenerate,
+    force_rebuild,
+)
+from _session import run_build
+from _sketch import (
+    SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    assert_saved_configurations_regenerate,
-    check,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
 from _drawing_marks import (
     add_diametric_linear_dimension,
@@ -67,7 +67,7 @@ from dt_crank_handle_ferrule_spec import (
 )
 
 PART_NAME = "dt-crank-handle-ferrule"
-MATERIAL = "Brass"  # the gears' gold; see _common.apply_material docstring
+MATERIAL = "Brass"  # the gears' gold; see _appearance.apply_material docstring
 
 OUTER_R = OUTER_DIA / 2.0
 BORE_R = BORE_DIA / 2.0

@@ -43,37 +43,29 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from _common import (
-    CASTING_GREEN,
-    PANEL_BLACK,
+from _appearance import CASTING_GREEN, PANEL_BLACK, apply_color, apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import name_last_feature
+from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _paths import OUT_PNG, REFERENCES_DIR
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
     anchor_point_to_point,
-    apply_color,
-    apply_material,
-    bbox_extent_check,
     blank_reference_sketches,
-    check,
-    define_circle,
-    define_rectilinear_chain,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
-    force_rebuild,
-    name_last_feature,
-    name_dimensions,
-    OUT_PNG,
-    REFERENCES_DIR,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -239,7 +231,7 @@ def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None
 
 
 PART_NAME = "fr-harmonic-base"
-MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
+MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 
 # Plate nominal geometry (BOTTOM_*/TOP_*) lives in fr_harmonic_base_spec -- the
 # COM-free contract the drawing shares. DIMENSIONS.md ch6: 46 cm / 28 cm callouts

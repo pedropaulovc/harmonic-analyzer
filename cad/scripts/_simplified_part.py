@@ -59,14 +59,13 @@ from collections.abc import Iterable, Sequence
 from typing import Any
 
 import _telemetry
-from _common import (
-    DEFAULT_VIEWS,
-    _early_bound,
-    _read_member,
+from _check import check
+from _com import _early_bound, _read_member
+from _part_save import save_part_and_images
+from _paths import DEFAULT_VIEWS
+from _rebuild import (
     active_configuration_name,
     assert_saved_configurations_regenerate,
-    check,
-    save_part_and_images,
     stale_configurations,
     whats_wrong,
 )
@@ -115,7 +114,7 @@ def _expected_child_identity(model: Any, parent: str) -> BomIdentity:
 
 
 def _property_manager(model: Any, configuration: str) -> Any:
-    # A raw Extension dispatch, as _common.apply_custom_properties: the
+    # A raw Extension dispatch, as _custom_properties.apply_custom_properties: the
     # parameterised CustomPropertyManager property is not a method on the
     # early-bound IModelDocExtension wrapper.
     extension = _read_member(model, "Extension")

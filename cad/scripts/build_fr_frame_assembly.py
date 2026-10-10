@@ -95,13 +95,11 @@ from typing import Any
 
 import _telemetry
 
-from _common import (
-    OUT_SLDPRT,
-    _early_bound,
-    apply_custom_properties,
-    check,
-    run_build,
-)
+from _check import check
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _paths import OUT_SLDPRT
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _simplified_names import simplified_name
 from _assembly import (

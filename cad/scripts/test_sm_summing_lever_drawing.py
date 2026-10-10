@@ -229,7 +229,18 @@ def test_receiver_view_is_on_a_back_view_sheet_with_real_binding() -> None:
 
 
 def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesses(monkeypatch) -> None:
-    import _common
+    import _appearance
+    import _com
+    import _custom_properties
+    import _dimensions
+    import _feature_tree
+    import _part_checks
+    import _part_properties
+    import _part_save
+    import _rebuild
+    import _session
+    import _sketch
+    import _sketch_rectangle
     import _drawing_marks
     import build_sm_summing_lever as part
     import pytest
@@ -325,8 +336,20 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         assert not args
         return attribute
 
-    monkeypatch.setattr(_common, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_common, "_com_invoke", invoke)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_com, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_session, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(_com, "_com_invoke", invoke)
+    monkeypatch.setattr(_dimensions, "_com_invoke", invoke)
+    monkeypatch.setattr(_feature_tree, "_com_invoke", invoke)
     monkeypatch.setattr(_drawing_marks, "_com_invoke", invoke)
     bands = []
     monkeypatch.setattr(

@@ -19,28 +19,25 @@ import math
 
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     anchor_point_to_origin,
-    apply_material,
     blank_sketch,
-    name_bore_axis,
-    check,
-    define_circle,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _features import lens_area
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
@@ -81,7 +78,7 @@ from dt_crank_arm_spec import (
 from crank_native_acceptance import assert_signed_circle_center
 
 PART_NAME = "dt-crank-arm"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses

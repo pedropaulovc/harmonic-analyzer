@@ -29,7 +29,10 @@ from typing import Any
 from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_leader_note,

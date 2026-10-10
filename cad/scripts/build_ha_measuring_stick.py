@@ -46,24 +46,20 @@ from __future__ import annotations
 import sys
 
 import _telemetry
-from _common import (
-    REFERENCES_DIR,
+from _appearance import apply_material
+from _check import check
+from _dimensions import drive_dimension, dump_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import measure_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _paths import REFERENCES_DIR
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    drive_dimension,
-    dump_dimensions,
     ensure_fully_defined,
-    force_rebuild,
-    measure_check,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
 )
 from _drawing_marks import (
     apply_drawing_properties,
@@ -84,7 +80,7 @@ from ha_measuring_stick_spec import (
 )
 
 PART_NAME = "ha-measuring-stick"
-MATERIAL = "Brass"  # see _common.apply_material docstring
+MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
 BODY_LENGTH = 200.0  # DIMENSIONS.md ch16: annotated (high)
 BODY_WIDTH = 8.0  # DIMENSIONS.md ch16: stick width, annotated (high) — the 8 mm
