@@ -1,0 +1,10 @@
+sm-gooseneck-spring-screw:
+  title: Gooseneck Spring Screw
+  number: MHA-SM-004
+  description: "GOOSENECK SPRING SCREW"
+  material: AISI 12L14 CF round, 1/2 in
+  material_specification: AISI 12L14 cold-finished steel round, 1/2 in
+  finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turned slotted fillister screw; die-cut #6-32 thread"

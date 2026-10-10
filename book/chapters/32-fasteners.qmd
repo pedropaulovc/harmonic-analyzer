@@ -35,6 +35,7 @@ The screws, and the small parts that do not belong anywhere else.
 | `vn-transgear-knob-drive-pin` | TODO | TODO | TODO |
 | `vn-transgear-knob-cup-pin` | TODO | TODO | TODO |
 | `vn-gooseneck-set-screw` | TODO | TODO | TODO |
+| `sm-gooseneck-spring-screw` (MHA-SM-004) | 1 | AISI 12L14 cold-finished steel | Ø12.7 mm (1/2") round; shop-turned slotted fillister with die-cut #6-32 thread; dimensions: `sm_gooseneck_spring_screw_geom.py` |
 | `pd-guide-lock` | TODO | TODO | TODO |
 | `sh-column-clamp-front` | TODO | TODO | TODO |
 | `sh-column-clamp-back` | TODO | TODO | TODO |

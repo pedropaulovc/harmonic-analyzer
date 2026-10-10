@@ -40,13 +40,13 @@ from build_ch_channel_assembly import (
 )
 from dt_cone_pivot_post_installation import CHANNEL_Z0, DRUM_X
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
-from _common import (
-    _flag,
-    _read_member,
-    check,
-    log,
-    run_build,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _com import _flag, _read_member
+from _session import run_build
 from _assembly import (
     bore_axis_ref,
     coincident_mate,
@@ -211,7 +211,7 @@ async def build(adapter):
 
     # cam: pin its bore to an assembly axis at the (mirrored) cam centre +
     # a Z plane, so only its spin is free for the motor.
-    from _common import name_bore_axis
+    from _bore_axis import name_bore_axis
 
     cam_world_x = -X_DRUM  # mirrored
     axis_name = await name_bore_axis(

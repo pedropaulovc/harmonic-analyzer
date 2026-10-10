@@ -1,0 +1,4 @@
+cam_follower_contact:
+  min_clearance_to_adjacent_channel_mm: 0.50
+  contact_gap_mm: 0.02             # BAR_CONTACT_GAP — design margin, not a tangent
+

@@ -25,11 +25,12 @@ from __future__ import annotations
 import asyncio
 
 import _telemetry
-from _common import (
-    OUT_SLDASM,
-    check,
-    log,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _paths import OUT_SLDASM
 from _assembly import (
     coincident_mate,
     named_ref,

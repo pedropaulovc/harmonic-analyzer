@@ -19,7 +19,7 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from _common import run_build
+from _session import run_build
 
 
 async def build(adapter: Any) -> dict[str, str]:

@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import _early_bound, _flag_only  # noqa: E402
+from _com import _early_bound, _flag_only  # noqa: E402
 
 
 class _Flaggable:

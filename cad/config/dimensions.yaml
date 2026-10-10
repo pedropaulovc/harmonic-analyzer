@@ -12,7 +12,7 @@ preamble: |
   > narrative as `prose` properties; `cad/scripts/gen_dimensions.py` renders this
   > view (`--check` gates that the two never drift). The build *inputs* the scripts
   > actually read (tooth counts, pitches, fits, the cone incline) live in the
-  > sibling `machine.yaml` / `channels.yaml` / `tolerances.yaml`; `verify.py`
+  > sibling `machine.yaml` / `channels.yaml` / `tolerances/`; `verify.py`
   > cross-checks those against the dimension rows here. Confidence ladder:
   > annotated → stated → scaled → legacy → derived.
 sections:
@@ -570,7 +570,7 @@ sections:
         - low
       - - Cone mesh grid (X_PITCH)
         - 'every cone gear''s pitch section crosses x = −84.702 at the contact azimuth: X_PITCH is derived from the re-anchored drum x −53.216 and the exact oblique-mesh penetration contract'
-        - 'M6.7 oblique partial engagement (book ch. 12 "partial engagement, distinct wear"): the contact tooth crosses the 3 mm drum face obliquely. The grid shifted ~20 mm inboard from the old +4.49 because the drum radius shrank with the module (tip x 51.65→31.10). FLAG: working depth is now only 1.02 mm (vs 1.69 at DP 30), so the 0.55 edge slack (tolerances.yaml) is large relative to it — the cone/drum mesh penetration needs re-tuning in the Phase 3 rebuild'
+        - 'M6.7 oblique partial engagement (book ch. 12 "partial engagement, distinct wear"): the contact tooth crosses the 3 mm drum face obliquely. The grid shifted ~20 mm inboard from the old +4.49 because the drum radius shrank with the module (tip x 51.65→31.10). FLAG: working depth is now only 1.02 mm (vs 1.69 at DP 30), so the 0.55 edge slack (tolerances/cone_drum_oblique_mesh.yaml) is large relative to it — the cone/drum mesh penetration needs re-tuning in the Phase 3 rebuild'
         - low
       - - Cone big-end (T120) gear centre
         - (x, z) = (−114.564, −25.055) = (X_PITCH − 30.59 cos i, drum plane −31.685 + 30.59 sin i)
@@ -648,7 +648,7 @@ sections:
       - - '`vn-swing-stop-screw` (p1 travel limit)'
         - 'McMaster-Carr 90280A108 steel narrow fillister-head slotted screw, the foot screw''s SKU (user decision 2026-09-29): head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 9.525, screwed fully home (full 9.525 embed, 3.35D) so the head seats on the base top and its whole 2.7178 height sits inside the 6.35 platform edge (below the tolerance-low plate top); the head is the stop. The base receiver has 10.3 full thread depth and 14.5 drill depth before the drill point.'
         - 'base-threaded STATIC at (−140.050, +2.403), derived so the 223.354-long plate''s EAST taper edge just touches the head flank at the 4.686° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 8.569 mm signed clearance to the head (derived and asserted against the base hole).'
-        - 'McMaster-Carr 90280A108 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_vn_swing_stop_screw.py` and `cad/scripts/build_fr_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
+        - 'McMaster-Carr 90280A108 stock dimensions (`cad/scripts/_mcmaster_90280a108.py`) and shared recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and seat fit from `cad/scripts/vn_swing_stop_screw_spec.py`, receiver depths from `cad/scripts/build_fr_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
       - - '`vn-cone-tip-collar` (MHA-VN-016 set-screw collar retaining the gear stack)'
         - 'McMaster-Carr 9414T1 black-oxide steel set-screw shaft collar: Ø6.35 (1/4 in) OD × 4.7625 (3/16 in) wide, Ø1.5875 (1/16 in) bore, one #2-56 cup-point set screw'
@@ -1021,7 +1021,7 @@ sections:
       - - Spring end hooks
         - bent-wire loops, both ends, extend axially
         - —
-        - 'p.41 inset; M4: modelled as axial lead (2× wire dia) + 270° loop at coil mean radius, both springs (`_common.add_spring_end_hooks`)'
+        - 'p.41 inset; M4: modelled as axial lead (2× wire dia) + 270° loop at coil mean radius, both springs (`_features.add_spring_end_hooks`)'
         - stated
         - high (feature), loop geometry estimated (low)
       - - Lever count
@@ -1260,9 +1260,9 @@ sections:
         - stated
         - high (feature)
       - - Gooseneck
-        - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — geometry UNCHANGED by the 2026-08-02 rederive; the post drops ≈120 below the rail underside (999.7, unchanged) and ends in a free tip, passing through the Ø17 clearance bore in the top-frame''s east-rail hub and gripped by the hub''s square-head set screw (clamp deleted); 90° bend R 51 (the 180° candy-cane is refuted, M6.8); horizontal arm running 50.8 past the bend exit to an end face at machine |x| 95.2 (the part dimension is `sm_gooseneck_geom.ARM_END_X` -101.8: the tube is inserted mirrored at the column line x 197, so machine |x| = 197 - 101.8), carrying the axial #6-32 slotted spring screw whose exposed shank hangs the counter spring''s top eye plumb above the boss hook at |x| 91.2; the arm HEIGHT is the tension adjustment (set by the counter-spring balance, `spring_mount_geom.GOOSENECK_ORIGIN_Y`), not a photo read'
+        - 'Ø16 × 2 wall chrome tube, 90° bend R51. Part arm end X −103.359695 and straight arm run 52.359695 (`sm_gooseneck_geom.py`), so the counter spring upper-eye centre stays at part X −105.8 / machine X −91.2, plumb over the lower anchor. A Ø12 × 8.00 brazed end plug is tapped #6-32 UNC-2B THRU. Shop-turned MHA-SM-004 is a 12L14 slotted fillister screw with #6-32 UNC-2A × 16.00 under-head length and a Ø12.50 × 7.00 head. It clamps the 1330K524 double-loop eye against the end face; the 4.88061 installed gap derives from `vn_counter_spring_stock_geom.END_OCCUPIED_WIDTH_MM`, not a free-swivel stand-off. The screw tip projects 3.11939 into the hollow tube beyond the plug. The post passes through the east-rail hub and its height is adjusted for balance, then held by the square-head set screw'
         - —
-        - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin -- SUPERSEDED 2026-09-02 (ch19 p.45 page001_img02): a #6-32 slotted screw driven AXIALLY into the arm''s plugged end face (Ø3.6 shank, Ø10 head — head since grown to Ø12 for the 1330K524 double-loop eye), the counter spring''s top eye hanging on the shank against the head. Arm END re-derived 2026-09-14 for the vertical counter axis: the eye rides the exposed shank''s midpoint, so the arm end face moved to machine |x| 95.2 from 101.75 (part ARM_END_X −95.25 → −101.8, a 44.25 → 50.8 straight run past the R51 bend) to hang the eye plumb at |x| 91.2 — the summing lever''s counter anchor (`sm_gooseneck_geom.py`, `spring_mount_geom.COUNTER_ANCHOR_XY`); the arm HEIGHT stays the sliding tension adjustment'
+        - 'ch19 p.45 page001_img02: tall domed slotted fillister at the tube end, spring eye between head and end face. User ruling 2026-09-21: tighten until the upper eye is clamped and cannot swivel; no threadlocker. User option-B disposition 2026-10-10 selects a shop-turned #6-32 fillister to preserve supplier coil/tube clearance. `sm_gooseneck_geom.py`, `sm_gooseneck_spring_screw_geom.py` and the joint contract own dimensions. Full receiver thread is 7.50 nominal / 6.99 worst, above 1.5D = 5.2578; the die relief still leaves 2.68061 of the eye band over full thread. Native spring-seat calibration owns installed height and must be repeated for this separate screw'
         - scaled + derived
         - leg-top med, drop med
       - - Gooseneck clamp
@@ -1273,16 +1273,13 @@ sections:
         - med
   - prose: |2
 
-      Notes: single large spring balancing the combined pull of the 20 channel
-      springs. Hang chain (machine y): boss hook rod 1004.7 → bottom ring 1001.7 →
-      coil ~1041.7..1367 → top loop 1370.6 → gooseneck pin 1373 (summing end −10.3
-      with the 2026-08-02 rederive, gooseneck end unchanged ⇒ installed length
-      +10.3, parametric spring re-derived). Tension is set by sliding the tube
-      through the top-frame hub bore against its set screw; the post passes
-      through the east rail's Ø17 clearance bore and drops ~120 below the rail
-      underside, ending in a free tip at machine y 880 (below the rail bottom
-      999.7) — the support extends well below the top plate (ch. 7 page001_img17
-      back-left ¾ view).
+      Notes: the stock 1330K524 counter spring balances the combined moment of
+      the 20 channel springs. Native spring-seat calibration owns the loaded
+      eye positions and gooseneck height; historical photo-chain heights are
+      not installed dimensions. Clamp the upper eye between MHA-SM-004 and
+      the brazed plug end face, without threadlocker (user ruling 2026-09-21).
+      Slide the post through the top-frame hub until the summing lever balances,
+      then tighten the hub set screw. The eye centre remains machine X −91.2.
 - heading: Chapter 20 — Magnifying Lever (pp. 46–49)
   elements:
   - prose: |2

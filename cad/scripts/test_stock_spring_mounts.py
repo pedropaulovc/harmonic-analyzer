@@ -21,6 +21,30 @@ def test_counter_leading_half_turn_clears_tube_and_head() -> None:
     assert head_gap >= spring_mount_geom.MIN_CLEARANCE_MM
 
 
+def test_counter_upper_eye_bears_on_full_thread_and_clears_the_tube() -> None:
+    """The MHA-SM-004 shank supports the plumb eye on its full-thread major."""
+    import build_sm_summing_assembly as summing
+    import sm_gooseneck_spring_screw_geom as spring_screw
+
+    pose = spring_mount_geom.COUNTER_REFERENCE_POSE
+    assert pose.axis_xy[1] == pytest.approx(1.0, abs=1e-6)
+    assert spring_mount_geom.counter_upper_support_offset(
+        pose.axis_xy
+    ) == pytest.approx(2.9972, abs=1e-4)
+    assert sm_gooseneck_geom.SPRING_EYE_GAP == pytest.approx(4.88061)
+    assert spring_mount_geom.COUNTER_UPPER_EYE_X == pytest.approx(
+        spring_mount_geom.COLUMN_X - sm_gooseneck_geom.SPRING_EYE_X
+    )
+    assert (
+        spring_screw.LENGTH
+        > sm_gooseneck_geom.SPRING_EYE_GAP + sm_gooseneck_geom.PLUG_LENGTH
+    )
+    summing._assert_counter_spring_top_hang(pose, spring_mount_geom.GOOSENECK_ORIGIN_Y)
+    # The screw frame's head (+Z) points outboard (machine +X), so its shank
+    # runs into the plug.
+    assert summing.ROT_Y_POS90[2] == [1.0, 0.0, 0.0]
+
+
 def test_bank_balance_uses_each_configured_station_force_and_moment() -> None:
     """A heterogeneous nonzero bank cannot collapse to neutral force times 20."""
     neutral = spring_mount_geom.solve_bank_balance([0.0] * 20)

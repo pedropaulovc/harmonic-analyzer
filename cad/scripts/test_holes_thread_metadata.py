@@ -16,7 +16,15 @@ from typing import Any
 
 import pytest
 
-import _common
+import _appearance
+import _bore_axis
+import _check
+import _part_save
+import _rebuild
+import _sketch
+import _sketch_chains
+import _sketch_circle
+import _sketch_rectangle
 import _holes
 from _hole_spec import HoleSpec
 
@@ -163,7 +171,15 @@ def fake_seat(monkeypatch):
     does: the termination on the hole, but the THREAD blind with no class."""
     monkeypatch.setattr(_holes, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(_holes, "blank_sketch_feature", lambda *args: None)
-    monkeypatch.setattr(_common, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(_appearance, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(_bore_axis, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(_check, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(_part_save, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(_rebuild, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(_sketch, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(_sketch_chains, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(_sketch_circle, "check", lambda _label, result: result.data)
+    monkeypatch.setattr(_sketch_rectangle, "check", lambda _label, result: result.data)
     from solidworks_mcp.adapters.solidworks import sketch
 
     monkeypatch.setattr(sketch, "_add_sketch_constraint_impl", lambda *args: _Result())

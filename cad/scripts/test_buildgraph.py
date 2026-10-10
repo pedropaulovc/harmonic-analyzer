@@ -37,7 +37,7 @@ from _buildgraph import (  # noqa: E402
     stamps_title_block_properties,
 )
 from _assembly import assembly_title_properties  # noqa: E402
-from _common import part_properties  # noqa: E402
+from _part_properties import part_properties  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -118,7 +118,7 @@ _INSERTED_SOURCES = {
     "vn_frame_side_screw ch_fulcrum_keeper ch_fulcrum_shaft vn_pedestal_hold_down_screw ch_pivot_bracket "
     "ch_pivot_shaft ch_rocker_arm vn_rocker_bank_spring ch_rocker_thrust_washer ch_rod_pivot_pin vn_spring_hook "
     "vn_arbor_set_screw",
-    "sm_summing": "vn_boss_hook vn_counter_spring sm_gooseneck vn_knife_hanger_stud vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
+    "sm_summing": "vn_boss_hook vn_counter_spring sm_gooseneck sm_gooseneck_spring_screw vn_knife_hanger_stud vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
     "mg_magnifier": "vn_clamp_screw sh_column_clamp_back sh_column_clamp_front mg_lever_wire "
     "mg_magnifying_bracket vn_magnifying_bracket_screw mg_magnifying_clamp mg_magnifying_lever mg_magnifying_vertical_rod "
     "mg_magnifying_wheel mg_output_fixture vn_thumb_screw mg_wheel_axle vn_wheel_axle_nut mg_wheel_bar",
@@ -1365,19 +1365,19 @@ def test_top_references_subassemblies_and_loose_parts():
 
 def test_leaf_parts_do_not_depend_on_assembly_helpers():
     """A leaf part must NOT pull in _assembly/_transforms -- the whole point of
-    splitting them out of _common is that assembly-only edits skip every part."""
+    keeping them separate from _session means assembly-only edits skip every part."""
     for stem in part_stems():
         helpers = _helper_names(f"build_{stem}.py")
         assert "_assembly" not in helpers, f"{stem} wrongly depends on _assembly"
         assert "_transforms" not in helpers, f"{stem} wrongly depends on _transforms"
-        assert "_common" in helpers, f"{stem} lost its _common dependency"
+        assert "_session" in helpers, f"{stem} lost its _session dependency"
 
 
 def test_assemblies_depend_on_assembly_helpers():
-    """Every assembly imports _assembly (mates/placement) and _common."""
+    """Every assembly imports _assembly (mates/placement) and _session."""
     for stem in ASSEMBLY_ORDER:
         helpers = _helper_names(script_for(stem).name)
-        assert {"_assembly", "_common"} <= helpers, f"{stem}: {helpers}"
+        assert {"_assembly", "_session"} <= helpers, f"{stem}: {helpers}"
 
 
 @pytest.mark.parametrize(
@@ -1440,20 +1440,11 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_ch_channel_assembly.py", "build_ch_fulcrum_keeper"): (
         "dtrefactor: reads CBORE_DEPTH_MM, FOOT_H"
     ),
-    ("build_dt_drive_train_assembly.py", "build_dt_alignment_pinion"): (
-        "dtrefactor: reads BORE_DIA"
-    ),
     ("build_dt_drive_train_assembly.py", "build_dt_arbor_pedestal"): (
         "dtrefactor: reads FOOT_HEIGHT, FOOT_WIDTH, SCREW_Z"
     ),
     ("build_dt_drive_train_assembly.py", "build_dt_cone_pivot_post"): (
         "dtrefactor: reads BLOCK_DIA, BORE_HEIGHT, CONE_BOSS_LENGTH, CRANK_BORE_HEIGHT, CRANK_BOSS_LENGTH, CRANK_BOSS_START_Z"
-    ),
-    ("build_dt_drive_train_assembly.py", "build_vn_cone_tip_adjuster"): (
-        "dtrefactor: reads BODY_LEN, CUP_DEPTH, CUP_DIA, THREAD"
-    ),
-    ("build_dt_drive_train_assembly.py", "build_vn_cone_tip_pinch_screw"): (
-        "dtrefactor: reads SHANK_LEN, THREAD"
     ),
     ("build_dt_drive_train_assembly.py", "build_dt_crankshaft"): (
         "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_PINION, SHAFT_LENGTH"
@@ -1463,9 +1454,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ),
     ("build_dt_drive_train_assembly.py", "build_fr_harmonic_base"): (
         "dtrefactor: reads BLOCK_SCREW_HOLE_DEPTH, BLOCK_SCREW_XZ, BLOCK_SEAT_SPEC, FOOT_SCREW_HOLE_DEPTH, FOOT_SCREW_XZ, FOOT_SEAT_SPEC, LOCK_KNOB_XZ, LOCK_SEAT_SPEC, LOCK_STUD_ENGAGEMENT, PEDESTAL_SCREW_HOLE_DEPTH, PEDESTAL_SCREW_XZ, PEDESTAL_SEAT_SPEC, PIVOT_SCREW_XZ, PIVOT_SEAT_SPEC, STOP_SCREW_XZ, STOP_SEAT_SPEC, SWING_HARDWARE_GEOMETRY, require_blind_seat_fit"
-    ),
-    ("build_fr_frame_assembly.py", "build_vn_gooseneck_set_screw"): (
-        "dtrefactor: reads SHANK_LEN"
     ),
     ("build_fr_frame_assembly.py", "build_fr_top_frame"): (
         "dtrefactor: reads SIDE_TAP_SPEC"
@@ -1478,9 +1466,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ),
     ("build_kinematic_probe.py", "build_pd_paper_drive_assembly"): (
         "dtrefactor: reads CHAIN_CRANK_CENTRE, DISC_TEETH, FEED_PD, KNOB_SHAFT_XY, NET_RACK_TRAVEL_PER_CRANK_REV, SPARE_GEAR_POS, THIRD_TEETH"
-    ),
-    ("build_mg_magnifier_assembly.py", "build_vn_thumb_screw"): (
-        "dtrefactor: reads HEAD_STACK_LEN, SHANK_LEN"
     ),
     ("build_mobility_probe.py", "build_motion_study"): (
         "dtrefactor: reads ANGLE, DISTANCE, _family, _iter_mates, _real_parts"
@@ -1509,26 +1494,14 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_pd_paper_drive_assembly.py", "build_pd_platen_paper"): (
         "dtrefactor: reads PAPER_HEIGHT, PAPER_WIDTH"
     ),
-    ("build_pd_paper_drive_assembly.py", "build_pd_platen_rack"): (
-        "dtrefactor: reads ADDENDUM, BAR_HEIGHT, BAR_LENGTH, FIRST_GAP_X, PITCH"
-    ),
-    ("build_pd_paper_drive_assembly.py", "build_pd_rack_pinion"): (
-        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
-    ),
     ("build_pd_paper_drive_assembly.py", "build_pd_support_bar"): (
         "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X"
-    ),
-    ("build_pd_paper_drive_assembly.py", "build_pd_transgear_feed_pinion"): (
-        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
     ),
     ("build_pn_pen_assembly.py", "build_pn_pen_frame"): (
         "dtrefactor: reads FRAME_DEPTH, OUTER_HEIGHT, OUTER_WIDTH, RAIL_END, RAIL_SIDE"
     ),
     ("build_pn_pen_assembly.py", "build_pn_pen_hanger"): (
         "dtrefactor: reads SCREW_HOLE_XY, STRAP_Z"
-    ),
-    ("build_pn_pen_assembly.py", "build_vn_pen_set_screw"): (
-        "dtrefactor: reads HEAD_STACK_LEN, SHANK_DIA, SHANK_LEN, TIP_CHAMFER"
     ),
     ("build_sm_summing_assembly.py", "build_sm_knife_mount"): (
         "dtrefactor: reads CASTING_UNDERSIDE_Y, MOUNT_GAP"
@@ -1626,10 +1599,10 @@ def test_part_builders_reach_no_other_part_builder():
 
 def test_module_deps_are_transitive():
     """The closure follows imports through helper chains: a chain-link part pulls
-    _chain_link -> _chain -> _common, and _config arrives via _common's lazy
-    import (so parts.yaml-driven custom properties stay correctly tracked)."""
+    _chain_link -> _part_save -> _part_properties, and _config arrives via
+    _part_properties' lazy import (registry-driven properties stay tracked)."""
     links = _helper_names("build_vn_chain_inner_link.py")
-    assert {"_chain_link", "_chain", "_common"} <= links, links
+    assert {"_chain_link", "_chain", "_part_save", "_part_properties"} <= links, links
     assert "_config" in _helper_names("build_vn_cone_tip_collar.py"), (
         "lazy _config edge lost"
     )
@@ -1723,7 +1696,7 @@ def test_config_files_track_real_reads():
     a gear reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY, so a
     machine channels.active_count edit (machine/channels.yaml) skips it -- the
     original problem. The channel/drive-train assemblies read channels.yaml
-    (amplitudes/cone_teeth); every part needs the parts registry via _common."""
+    (amplitudes/cone_teeth); every part needs the registry via _part_properties."""
     cone = config_files_of(SCRIPTS_DIR / "build_dt_cone_gear.py")
     assert "machine/gear_train.yaml" in cone
     assert "machine/channels.yaml" not in cone, (
@@ -1736,9 +1709,9 @@ def test_config_files_track_real_reads():
 
 def test_config_files_subset_of_known_tokens():
     """Every real script resolves to known tokens (concrete files that exist, or
-    the machine/* | parts/* | title_block | ** dynamic tokens). The set can only
+    the machine/* | tolerances/* | parts/* | title_block | ** dynamic tokens). The set can only
     NARROW the old whole-config dep, never invent a missing-file dependency."""
-    globs = {"machine/*", "parts/*", "title_block", "**"}
+    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**"}
     for stem in part_stems():
         for tok in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"):
             assert tok in globs or (bg.CONFIG_DIR / tok).is_file(), f"{stem}: {tok}"
@@ -1775,8 +1748,8 @@ def test_config_files_resolve_known_forms():
     assert _tokens("import _config\nx = _config.active_count()\n") == frozenset(
         {"machine/channels.yaml"}
     )
-    assert _tokens("import _config\nx = _config.fit('g', 'k')\n") == frozenset(
-        {"tolerances.yaml"}
+    assert _tokens("import _config\nx = _config.fit('gear_mesh', 'k')\n") == frozenset(
+        {"tolerances/gear_mesh.yaml"}
     )
     assert _tokens("import _config\nx = _config.release_revision()\n") == frozenset(
         {"release.yaml"}
@@ -1785,8 +1758,19 @@ def test_config_files_resolve_known_forms():
         {"channels.yaml"}
     )
     assert _tokens("import _config\nx = _config._doc('tolerances')\n") == frozenset(
-        {"tolerances.yaml"}
+        {"tolerances/*"}
     )
+    for expression in (
+        "fit(group, 'k')",
+        "fit('unknown', 'k')",
+        "fit",
+        "fit(group='gear_mesh')",
+    ):
+        assert _tokens(f"import _config\nx = _config.{expression}\n") == frozenset(
+            {"tolerances/*"}
+        )
+    with pytest.raises(bg._UnknownConfigUse):
+        _tokens("import _config\nx = _config.tolerances()\n")
     # a dynamic machine/parts arg widens to the whole family (conservative, not an error).
     assert _tokens("import _config\nx = _config.machine(sub, 'k')\n") == frozenset(
         {"machine/*"}
@@ -2014,17 +1998,18 @@ def test_part_and_title_property_stampers_are_distinct():
 
 
 def test_git_executable_is_resolved_absolute(tmp_path, monkeypatch):
-    import _common
+    import _source_identity
+    import shutil
 
     discovered = tmp_path / "bin" / "git"
-    monkeypatch.setattr(_common.shutil, "which", lambda command: str(discovered))
-    _common._git_executable.cache_clear()
+    monkeypatch.setattr(shutil, "which", lambda command: str(discovered))
+    _source_identity._git_executable.cache_clear()
     try:
-        executable = Path(_common._git_executable())
+        executable = Path(_source_identity._git_executable())
         assert executable == discovered.resolve()
         assert executable.is_absolute()
     finally:
-        _common._git_executable.cache_clear()
+        _source_identity._git_executable.cache_clear()
 
 
 def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
@@ -2040,7 +2025,7 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
     import os
     import subprocess
 
-    import _common
+    import _source_identity
     import _config
 
     # Never execute a developer's hooks, filters, signer, or filesystem monitor.
@@ -2055,7 +2040,7 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
 
     def git(cwd, *args: str) -> str:
         return subprocess.run(
-            [_common._git_executable(), *args],
+            [_source_identity._git_executable(), *args],
             cwd=str(cwd),
             capture_output=True,
             text=True,
@@ -2085,16 +2070,16 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
 
     monkeypatch.setattr(_config, "release_revision", lambda: "v9")
 
-    monkeypatch.setattr(_common, "CAD_ROOT", origin)
-    full_id = _common._build_id()
-    monkeypatch.setattr(_common, "CAD_ROOT", leaf)
-    leaf_id = _common._build_id()
+    monkeypatch.setattr(_source_identity, "CAD_ROOT", origin)
+    full_id = _source_identity._build_id()
+    monkeypatch.setattr(_source_identity, "CAD_ROOT", leaf)
+    leaf_id = _source_identity._build_id()
 
     assert full_id == leaf_id == "v9"
 
     git(leaf, "config", "status.showUntrackedFiles", "no")
     (leaf / "uncommitted.txt").write_text("operator edit\n", encoding="utf-8")
-    assert _common._build_id() == "v9-dirty"
+    assert _source_identity._build_id() == "v9-dirty"
 
 
 def test_build_id_translates_a_failed_dirty_probe(monkeypatch):
@@ -2102,7 +2087,7 @@ def test_build_id_translates_a_failed_dirty_probe(monkeypatch):
 
     import pytest
 
-    import _common
+    import _source_identity
 
     def fake_run(command, **_kwargs):
         raise subprocess.CalledProcessError(128, command, stderr="not a git repo")
@@ -2111,7 +2096,7 @@ def test_build_id_translates_a_failed_dirty_probe(monkeypatch):
     with pytest.raises(
         RuntimeError, match="cannot determine Git working-tree state"
     ) as error:
-        _common._build_id()
+        _source_identity._build_id()
     assert isinstance(error.value.__cause__, subprocess.CalledProcessError)
 
 

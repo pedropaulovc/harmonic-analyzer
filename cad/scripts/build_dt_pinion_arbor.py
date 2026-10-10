@@ -12,32 +12,25 @@ import math
 import sys
 
 import _telemetry
-from _common import (
-    POLISHED_STEEL,
+from _appearance import POLISHED_STEEL, apply_color, apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    _feature_by_name,
     anchor_point_to_origin,
-    apply_color,
-    apply_material,
     blank_reference_sketches,
-    check,
-    define_circle,
-    drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
-    feature_name_by_type,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     add_diametric_linear_dimension,
     apply_drawing_precision,
@@ -48,9 +41,11 @@ from _drawing_marks import (
     set_dimension_prefix,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
-from _gtol_spec import CylinderFace
-from _part_pmi import _face_geometry, _face_matches, _resolve_faces, author_part_pmi
+from _fit_deviations import deviations
+from _gtol_cylinder import CylinderFace
+from _gtol_face_read import face_geometry
+from _gtol_face_resolve import resolve_faces
+from _part_pmi import author_part_pmi
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _saved_part_guard import require_saved_drawing_properties
 from dt_pinion_arbor_pin_spec import PIN_HOLE_DIA, PIN_HOLE_DIA_BAND
@@ -263,8 +258,8 @@ def _shaft_faces(adapter) -> list[object]:
     for body in part.GetBodies2(0, False) or ():
         face = _early_bound(body, "IBody2").GetFirstFace()
         while face is not None:
-            geometry = _face_geometry(face)
-            if geometry is not None and _face_matches(geometry, spec):
+            geometry = face_geometry(face)
+            if geometry is not None and spec.matches(geometry):
                 faces.append(geometry.face)
             face = _early_bound(face, "IFace2").GetNextFace()
     return faces
@@ -273,7 +268,7 @@ def _shaft_faces(adapter) -> list[object]:
 def _journal_face(adapter, prefix: str, journal_z: float) -> object:
     label = f"{prefix} land"
     spec = CylinderFace(SHAFT_DIA, contains_z_mm=journal_z + JOURNAL_LEN / 2.0)
-    return _resolve_faces(adapter.currentModel, {label: spec})[label]
+    return resolve_faces(adapter.currentModel, {label: spec})[label]
 
 
 async def _add_journal_land(

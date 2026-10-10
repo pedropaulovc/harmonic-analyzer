@@ -4,7 +4,7 @@ apply_material("Oak") attaches the polished-oak TEXTURE appearance at
 part scope; doc MPV only retints its primary colour, so the wood image
 kept rendering over the overrides (paper showed oak grain, the handle
 washed out pale). Body appearances outrank part appearances, so
-re-applying through the upgraded _common.apply_color (doc + body MPV)
+re-applying through the upgraded _appearance.apply_color (doc + body MPV)
 fixes the saved SLDPRTs without a rebuild.
 
 Run: C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\fix_body_colors.py
@@ -17,13 +17,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from _common import (  # noqa: E402
-    PAPER_WHITE,
-    STAINED_OAK,
-    apply_color,
-    check,
-    run_build,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _appearance import PAPER_WHITE, STAINED_OAK, apply_color  # noqa: E402
+from _check import check  # noqa: E402
+from _session import run_build  # noqa: E402
 
 import _telemetry  # noqa: E402
 

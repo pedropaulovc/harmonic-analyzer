@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import _telemetry
-from _common import _early_bound, _read_member
+from _com import _early_bound, _read_member
 from solidworks_mcp.adapters.com_variant import dispatch_array
 
 
@@ -330,7 +330,11 @@ _CHANNEL_CONTACT_FAMILIES = (
     "vn-spring-hook",
     "ch-channel-lever",
 )
-_SUMMING_CONTACT_FAMILIES = ("vn-counter-spring", "vn-boss-hook", "sm-gooseneck")
+_SUMMING_CONTACT_FAMILIES = (
+    "vn-counter-spring",
+    "vn-boss-hook",
+    "sm-gooseneck-spring-screw",
+)
 _STATION_LOOKUP_TOLERANCE_MM = 1e-3
 
 
@@ -549,14 +553,16 @@ def assert_assembly_spring_contacts(
             "vn-boss-hook",
             _ordered_family("vn-boss-hook", found["vn-boss-hook"], 1),
         )
-        gooseneck = _match_station_family(
+        screw = _match_station_family(
             counter,
-            "sm-gooseneck",
-            _ordered_family("sm-gooseneck", found["sm-gooseneck"], 1),
+            "sm-gooseneck-spring-screw",
+            _ordered_family(
+                "sm-gooseneck-spring-screw", found["sm-gooseneck-spring-screw"], 1
+            ),
         )
         counter_instance = counter[0]
         boss_instance = boss[0]
-        gooseneck_instance = gooseneck[0]
+        screw_instance = screw[0]
         lower = assert_native_contact(
             adapter,
             counter_instance.name,
@@ -566,7 +572,7 @@ def assert_assembly_spring_contacts(
         )
         upper = assert_native_contact(
             adapter,
-            gooseneck_instance.name,
+            screw_instance.name,
             counter_instance.name,
             maximum_distance_mm=seat.upper_maximum_distance_mm,
             label="counter upper native seat",

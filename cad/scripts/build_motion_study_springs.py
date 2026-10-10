@@ -38,10 +38,7 @@ import sys
 
 import _telemetry
 
-from _common import (
-    check,
-    log,
-)
+from _check import check, log
 from _assembly import (
     coincident_mate,
     component_named_ref,
@@ -84,10 +81,10 @@ SUM_LEVER_EYE = (
     + ANCHOR_9489T111.eye_centre_mm[1],
     _SL.HOLE_Z_FIRST + ANCHOR_9489T111.eye_centre_mm[2],
 )
-# The stock double-loop spring is centred along the exposed screw shank,
-# as in spring_mount_geom.COUNTER_UPPER_EYE_X (in the assembly frame).
+# The stock double-loop spring is clamped along the exposed full-thread band
+# of made MHA-SM-004, as in spring_mount_geom.COUNTER_UPPER_EYE_X (assembly frame).
 GOOSENECK_EYE = (
-    _GN.ARM_END_X - _GN.SCREW_SHANK_LEN / 2.0,
+    _GN.SPRING_EYE_X,
     _GN.ARM_Y,
     0.0,
 )

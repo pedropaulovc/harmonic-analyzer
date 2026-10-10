@@ -8,26 +8,37 @@ dimension NAME map + notes from here; ``draw_sm_gooseneck`` keeps exactly
 from __future__ import annotations
 
 import sm_gooseneck_geom
+from sm_gooseneck_spring_joint import (
+    BRAZE_CLEARANCE_MAX,
+    BRAZE_CLEARANCE_MIN,
+    DRILL_WANDER_MAX,
+    EDGE_BREAK,
+    ENGAGEMENT_MIN,
+    ENGAGEMENT_NOMINAL,
+    PLUG_DIA,
+    PLUG_DIAMETER_BAND,
+    PLUG_LENGTH_BAND,
+    TAP_SPEC,
+    THREAD_AXIS_OFFSET_MAX,
+)
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The bend RADIUS (R51) and the horizontal ARM RUN are marked --
 # both live on the Front-plane sweep-path sketch (BendPath), so they project
-# cleanly to the elevation view.  The Ø16 tube, the vertical-leg length, the
-# end plug and the axial spring screw are carried in the notes: a diameter dim
-# on a tube seen edge-on imports unreliably, the leg length is an extrude
-# offset (not a sketch dim), and the plug/screw are a brazed-then-tapped
-# sub-operation the notes schedule in full. ---
+# cleanly to the elevation view. This legacy sheet retains its note-based
+# tube-stock, leg-length and brazed-plug/tap schedule; it is not a simplicity-
+# policy migration. EndPlugProfile owns the native plug length, while ThreadBore
+# owns the native through-tap identity. The Ø14 union envelope is modelling
+# overlap only: the notes specify the physical Ø12 plug. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BendPath": {"BendRadius", "ArmRun"},
 }
 
-# Lines kept short (<~60 chars) so the left-anchored block clears both the tall
-# tube elevation and the title block (x >= 0.264 m); it grows DOWNWARD. The
-# screw is the book's p.45 "slotted screw" in the arm end: the spring's top
-# eye rides its exposed shank, so the screw is set once and never removed --
-# the part model carries it integral (build_sm_gooseneck), the notes carry it as
-# the fastener it is.
+# Lines kept short so the left-anchored block clears the elevation and title
+# block; it grows DOWNWARD. The plug belongs to this brazed weldment, while the
+# made MHA-SM-004 spring screw and spring-eye clamping instructions belong to
+# the assembly package.
 DRAWING_NOTES = "\n".join(
     (
         "1. TUBE <MOD-DIAM>16.00 +/-0.10 X 2.0 WALL; CUT ENDS",
@@ -38,18 +49,20 @@ DRAWING_NOTES = "\n".join(
         f"   BEND, {sm_gooseneck_geom.ARM_RUN:.2f} STRAIGHT ARM TO END FACE. LINEAR",
         "   +/-0.5; RADIUS +/-0.5; ANGLE +/-1 DEG. LEG + ARM",
         "   CENTERLINES COPLANAR (ELEVATION PLANE) WITHIN 1.0.",
-        "3. END PLUG: AISI 1018 <MOD-DIAM>12.00 (LIGHT PRESS IN",
-        "   BORE) X 6.00, FLUSH WITH ARM END FACE +/-0.10.",
+        f"3. END PLUG: AISI 1018 <MOD-DIAM>{PLUG_DIA:.2f} +/-{PLUG_DIAMETER_BAND:.2f}",
+        f"   X {sm_gooseneck_geom.PLUG_LENGTH:.2f} +/-{PLUG_LENGTH_BAND:.2f};"
+        " FIT TO THE TUBE BORE AT",
+        f"   {BRAZE_CLEARANCE_MIN:.2f}-{BRAZE_CLEARANCE_MAX:.2f} DIAMETRAL CLEARANCE;"
+        " FLUSH WITH ARM END +/-0.10.",
         "   SILVER-BRAZE BAg-7 PER AWS A5.8, FULL",
-        "   FAYING-SURFACE PENETRATION; EXPOSED GAP 0.10 MAX.",
-        "4. AFTER BRAZE: DRILL + TAP #6-32 UNC X 6.0 DEEP ON",
-        "   THE TUBE AXIS +/-0.15, SQUARE TO THE END FACE.",
-        "5. SPRING SCREW: AISI 1018 SLOTTED ROUND HEAD #6-32",
-        f"   X 14 UNDER HEAD; HEAD <MOD-DIAM>{sm_gooseneck_geom.SCREW_HEAD_DIA:.2f}"
-        f" X {sm_gooseneck_geom.SCREW_HEAD_T:.2f}; SLOT",
-        "   0.80 WIDE X 0.80 DEEP. SEAT ON END FACE: 8.00",
-        "   +/-0.25 SHANK EXPOSED (SPRING EYE RIDES HERE).",
-        "   NOT REMOVED IN SERVICE; MODELED INTEGRAL.",
+        "   FAYING-SURFACE PENETRATION; NO OPEN GAP AT END FACE.",
+        f"4. AFTER BRAZE: {TAP_SPEC.size} UNC-{TAP_SPEC.thread_class} THRU PLUG.",
+        f"   THREAD AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f};",
+        f"   DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX; SQUARE TO END FACE.",
+        f"   BREAK BOTH TAP ENDS {EDGE_BREAK:.2f} X 45 DEG.",
+        f"   FULL THREAD {ENGAGEMENT_NOMINAL:.2f} NOMINAL; {ENGAGEMENT_MIN:.2f} MIN.",
+        "5. MHA-SM-004 SPRING SCREW: MADE SEPARATELY;",
+        "   NOT INCLUDED IN THIS WELDMENT. SEE ASSEMBLY.",
         "6. BEND OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
         "7. PLATE ALL SURFACES; NO MASKING. DIMS PRE-PLATE.",
     )

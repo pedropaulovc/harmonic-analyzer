@@ -19,7 +19,7 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `mg` / `MG` | Magnifier | 9 |
 | `pd` / `PD` | Paper drive | 24 |
 | `pn` / `PN` | Pen | 6 |
-| `sm` / `SM` | Summing | 3 |
+| `sm` / `SM` | Summing | 4 |
 | `vn` / `VN` | Vendor parts | 51 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
@@ -204,6 +204,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | `gooseneck` | `sm-gooseneck` | MHA-032 | MHA-SM-001 |
 | part | `knife-mount` | `sm-knife-mount` | MHA-037 | MHA-SM-002 |
 | part | `summing-lever` | `sm-summing-lever` | MHA-073 | MHA-SM-003 |
+| part | — | `sm-gooseneck-spring-screw` | — | MHA-SM-004 |
 | part | `boss-hook` | `vn-boss-hook` | MHA-005 | MHA-VN-001 |
 | part | `channel-spring-installed` | `vn-channel-spring-installed` | MHA-011 | MHA-VN-004 |
 | part | `counter-spring` | `vn-counter-spring` | MHA-019 | MHA-VN-005 |
@@ -274,3 +275,4 @@ next free Number in its category and has no old stem or old Number.
 | retired | `vn-knife-hanger-washer` | MHA-VN-026 | no replacement: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor |
 | added | `vn-magnifying-bracket-screw` | MHA-VN-050 | screws the MHA-MG-001 magnifying bracket to the MHA-SM-003 summing lever |
 | added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
+| added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |

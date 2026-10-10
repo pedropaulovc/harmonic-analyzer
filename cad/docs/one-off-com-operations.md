@@ -158,7 +158,7 @@ throw away afterwards. Non-negotiable shape:
   `_run`/`_run_stamped` have no `com` parameter and no seat access. Enforced at
   runtime, not by review: a COM process launched under doit (`TRACEPARENT`
   set) that reaches `sw.connect` without `HARMONIC_COM_SEAT` raises in
-  `_common.run_build`.
+  `_session.run_build`.
 - **The lock holder owns the session: start empty, leave empty.**
   `run_build` discards every open document at connect and *fails* if a
   `cad/out` document survives; at teardown it closes them again. Leaving one

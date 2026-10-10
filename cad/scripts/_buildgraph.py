@@ -847,7 +847,7 @@ def references_of(asm_stem: str) -> list[str]:
 
 
 # Observation-only modules no recipe folds in: an edit to one re-keys nothing.
-# Each is imported by tracked code (``_common`` imports ``_seat_forensics``) but
+# Each is imported by tracked code (``_session`` imports ``_seat_forensics``) but
 # can never change a saved artefact, which ``check:inert`` (test_recipe_inert.py)
 # enforces -- pinned call sites, no COM mutator before a save -- and derives its
 # scope from this constant. See AGENTS.md, "Recipe-inert modules".
@@ -880,13 +880,13 @@ def _local_modules() -> dict[str, Path]:
     tools (verify/cut_release/...) stay in the map but are harmless: they are never
     imported by a build script, so ``_direct_local_imports`` never selects them.
 
-    ``_telemetry`` is excluded too: ``_common`` imports it, so leaving it in would
-    pull it into every part/assembly's ``file_dep`` + artefact-cache key, and a
-    logging-only edit would then invalidate the whole remote cache and force every
-    SolidWorks part to rebuild. Telemetry output can never change saved CAD bytes,
+    ``_telemetry`` is excluded too: ``_check`` and other focused helpers import it,
+    so leaving it in would pull it into their ``file_dep`` + artefact-cache key, and a
+    logging-only edit would then invalidate affected remote-cache entries and force
+    those SolidWorks leaves to rebuild. Telemetry output can never change saved CAD bytes,
     so dropping it cannot under-invalidate (the one cardinal sin here) -- it only
     stops a spurious over-rebuild. ``_watchdog`` is excluded for the same reason:
-    also imported by ``_common``, it only ever aborts-or-logs (crash/idle/hung
+    imported by ``_session``, it only ever aborts-or-logs (crash/idle/hung
     detection) -- a build it kills produces NO artefact at all, so its content can
     never change saved CAD bytes either (codex #344).
 
@@ -1278,8 +1278,8 @@ def module_deps_of(script: Path) -> list[str]:
 
     Local modules include top-level helpers/build recipes and recursively
     discovered package modules.  This replaces the old blanket "every ``_*.py``
-    is a dep of every build" rule: a leaf importing only ``_common`` no longer
-    rebuilds for unrelated helpers, while dotted imports such as
+    is a dep of every build" rule: a leaf importing only the focused helpers it
+    uses no longer rebuilds for unrelated helpers, while dotted imports such as
     ``diagnostics.diag_build_90280A194`` retain their exact recipe chain.
     Following real imports transitively prevents under-invalidation so long as a
     script imports what it uses, which Python enforces at run time.  The BFS is
@@ -1820,14 +1820,15 @@ def _data_literals(text: str) -> tuple[str, ...]:
 # row, or even the 98 KB narrative dimensions.yaml that NO part reads) marked all
 # ~76 parts stale -> a ~25 min full rebuild on the single SolidWorks seat.
 #
-# The two largest data files are SPLIT into per-concern files (see _config.py,
-# which re-aggregates them transparently), so the dependency can be per-subsystem
-# / per-part rather than per-file:
+# Machine, part-registry and tolerance data are SPLIT into per-concern files
+# (see _config.py, which re-aggregates them transparently), so dependencies can
+# be per-subsystem, per-part or per-fit-group rather than per-document:
 # ``config_files_of`` returns config-relative TOKENS: a concrete path
 # (``"channels.yaml"``, ``"machine/gear_train.yaml"``, ``"parts/dt-cone-gear.yaml"``)
-# or one of four dynamic tokens -- ``"machine/*"`` (whole machine family, for a
-# dynamic subsystem), ``"parts/*"`` (whole parts registry, for the dynamic part
-# name in ``_common.part_properties``), ``"title_block"`` (title_block.yaml,
+# or dynamic tokens -- ``"machine/*"`` (whole machine family, for a dynamic
+# subsystem), ``"tolerances/*"`` (whole tolerance family for dynamic/unknown fit
+# groups or escaped fit references), ``"parts/*"`` (whole registry, for the part
+# name in ``_part_properties.part_properties``), ``"title_block"`` (title_block.yaml,
 # but only for tasks that stamp part properties), ``"assemblies/*"`` (the
 # per-assembly contracts, for any closure reaching ``_assembly_contract``),
 # ``"**"`` (whole config, the fallback). dodo.py expands these, narrowing
@@ -1846,9 +1847,8 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
     "poses": frozenset({"poses.yaml"}),
     "active_count": frozenset({"machine/channels.yaml"}),
     "active_channels": frozenset({"channels.yaml", "machine/channels.yaml"}),
-    "fit": frozenset({"tolerances.yaml"}),
     "release_revision": frozenset({"release.yaml"}),
-    # title_block is read by the TOL_* stamping (_common.part_properties,
+    # title_block is read by the TOL_* stamping (_part_properties.part_properties,
     # _assembly.assembly_title_properties) and, for geometry, by the modules in
     # TITLE_BLOCK_GEOMETRY_MODULES (worst-case stacks sized from the printed
     # rows).  It emits a DYNAMIC token dodo narrows per task exactly like
@@ -1863,9 +1863,10 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
 # Accessors whose file(s) are named by their FIRST positional argument:
 #   machine(<subsystem>, ...) -> machine/<subsystem>.yaml   (dynamic -> machine/*)
 #   parts(<dashed-name>)      -> parts/<name>.yaml+_defaults (dynamic -> parts/*)
+#   fit(<group>, ...)        -> tolerances/<group>.yaml (dynamic -> tolerances/*)
 #   provenance/_doc(<doc>)    -> that doc's file family      (dynamic -> "**")
 _FAMILY_ACCESSORS: frozenset[str] = frozenset(
-    {"machine", "parts", "provenance", "_doc"}
+    {"machine", "parts", "fit", "provenance", "_doc"}
 )
 
 
@@ -1876,7 +1877,7 @@ class _UnknownConfigUse(Exception):
 
 @functools.lru_cache(maxsize=1)
 def _top_level_docs() -> frozenset[str]:
-    """Single-file config doc stems (channels, tolerances, materials, dimensions)."""
+    """Single-file config doc stems (channels, materials, dimensions)."""
     return frozenset(p.stem for p in CONFIG_DIR.glob("*.yaml"))
 
 
@@ -1902,6 +1903,17 @@ def _part_registry_names() -> frozenset[str]:
     )
 
 
+@functools.lru_cache(maxsize=1)
+def _tolerance_groups() -> frozenset[str]:
+    """Fit-group stems (``tolerances/<group>.yaml`` minus the units _base)."""
+    d = CONFIG_DIR / "tolerances"
+    return (
+        frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_base")
+        if d.is_dir()
+        else frozenset()
+    )
+
+
 def _doc_family_tokens(doc: str) -> frozenset[str] | None:
     """The token(s) covering a whole doc by name (for provenance/_doc): the split
     docs map to their family glob, single-file docs to their file. None = unknown
@@ -1910,6 +1922,8 @@ def _doc_family_tokens(doc: str) -> frozenset[str] | None:
         return frozenset({"machine/*"})
     if doc == "parts":
         return frozenset({"parts/*"})
+    if doc == "tolerances":
+        return frozenset({"tolerances/*"})
     if doc in _top_level_docs():
         return frozenset({f"{doc}.yaml"})
     return None
@@ -1918,6 +1932,10 @@ def _doc_family_tokens(doc: str) -> frozenset[str] | None:
 def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
     """Resolve a family accessor at one call site. ``arg`` is the literal first-arg
     string, or None when there is no positional arg OR it is non-literal."""
+    if accessor == "fit":
+        if arg in _tolerance_groups():
+            return frozenset({f"tolerances/{arg}.yaml"})
+        return frozenset({"tolerances/*"})
     if accessor == "machine":
         if arg is None:
             return frozenset({"machine/*"})  # dynamic subsystem -> whole family
@@ -1926,7 +1944,7 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
         raise _UnknownConfigUse  # unknown subsystem
     if accessor == "parts":
         if arg is None:
-            return frozenset({"parts/*"})  # dynamic part name (the _common path)
+            return frozenset({"parts/*"})  # dynamic part name (_part_properties)
         if arg in _part_registry_names():
             return frozenset({f"parts/{arg}.yaml", "parts/_defaults.yaml"})
         raise _UnknownConfigUse  # unknown registry row
@@ -2033,6 +2051,9 @@ def _config_tokens_in_source(path: Path) -> frozenset[str]:
         raise _UnknownConfigUse
     tokens: set[str] = set()
     for attr, use, argument in references:
+        if attr == "fit" and use is _ConfigUse.REFERENCE:
+            tokens.add("tolerances/*")
+            continue
         if attr in _FIXED_ACCESSOR_TOKENS:
             tokens |= _FIXED_ACCESSOR_TOKENS[attr]
             continue
@@ -2081,6 +2102,13 @@ def machine_family_files() -> list[str]:
     return sorted(str(_resolved(p)) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
+def tolerance_family_files() -> list[str]:
+    """Every tolerance group plus units/general base; whole-family expansion."""
+    return sorted(
+        str(_resolved(p)) for p in (CONFIG_DIR / "tolerances").glob("*.yaml")
+    )
+
+
 def parts_registry_files() -> list[str]:
     """Every parts/*.yaml (incl _defaults) -- the conservative ``"parts/*"``
     expansion (dodo.py narrows this per task)."""
@@ -2106,7 +2134,7 @@ def assembly_contract_files() -> list[str]:
 def part_row_files(dashed_name: str) -> list[str]:
     """The registry files a single part reads when it stamps its own properties:
     its row + the shared defaults. Empty if the part is unregistered (then
-    ``part_properties`` reads neither -- see _common)."""
+    ``part_properties`` reads neither -- see _part_properties)."""
     row = CONFIG_DIR / "parts" / f"{dashed_name}.yaml"
     if not row.exists():
         return []
@@ -2300,6 +2328,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "export_features",
         "fr_harmonic_base_fasteners",
         "fr_top_frame_spec",
+        "sm_gooseneck_spring_joint",
+        "sm_gooseneck_spring_screw_spec",
         "sm_knife_mount_spec",
         "vn_guide_lock_screw_spec",
         "vn_post_mount_screw_spec",
