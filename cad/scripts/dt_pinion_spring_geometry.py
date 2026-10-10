@@ -183,10 +183,14 @@ FREE_KINK_START = _free(KINK_START)
 FREE_KINK_C = _free(KINK_C)
 FREE_KINK_EXIT = _free(KINK_EXIT)
 FREE_FLAT_TIP = _free(FLAT_TIP)
-# How far the free crest stands into the parked flank, along the flank normal.
+# How far the free crest's outer face stands into the parked flank, along the
+# flank normal: the free crest circle's centre shift less the parked air. The
+# parked contact point turned PRESET_DEG is no longer the face's nearest point
+# to the flank; it would understate this by (R_KINK + THICK)(1 - cos PRESET_DEG),
+# 0.038 mm at 8.2 degrees. formed_contact measures the same face.
 PRESET = (
-    (CREST[0] - _free(CREST)[0]) * STRAP_N[0]
-    + (CREST[1] - _free(CREST)[1]) * STRAP_N[1]
+    (KINK_C[0] - FREE_KINK_C[0]) * STRAP_N[0]
+    + (KINK_C[1] - FREE_KINK_C[1]) * STRAP_N[1]
     - PARKED_AIR
 )
 

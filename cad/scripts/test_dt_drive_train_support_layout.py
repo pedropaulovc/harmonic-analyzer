@@ -137,10 +137,32 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
         *spring_spec.FORMED_DIMENSIONS.values()
     )
     assert len(leaf.FORMED_CORNERS) == 2 ** len(leaf.FORMED_CONTACT_BANDS)
+    # The nominal formed profile IS the free shape (the installed one turned
+    # PRESET_DEG about the bend centre): its crest face, arm and contact
+    # station are the free crest circle's, exactly.  At 8.2 degrees they sit
+    # ~0.5 up the blade and ~1.1 down the strap from the installed contact.
     nominal = leaf.formed_contact()
-    assert nominal[0] == pytest.approx(leaf.PRESET, abs=0.02)
-    assert nominal[1] == pytest.approx(leaf.BLADE_ARM, abs=0.5)
-    assert nominal[2] == pytest.approx(leaf.CONTACT_T, abs=1.0)
+    free_contact = (
+        leaf.FREE_KINK_C[0] - leaf.STRAP_N[0] * (leaf.R_KINK + section.THICK),
+        leaf.FREE_KINK_C[1] - leaf.STRAP_N[1] * (leaf.R_KINK + section.THICK),
+    )
+    blade = (
+        leaf.FREE_KINK_START[0] - leaf.FREE_BEND_EXIT[0],
+        leaf.FREE_KINK_START[1] - leaf.FREE_BEND_EXIT[1],
+    )
+    up = (blade[0] / math.hypot(*blade), blade[1] / math.hypot(*blade))
+    pivot = (leaf.PIVOT_LX, leaf.PIVOT_LY)
+    assert nominal[0] == pytest.approx(leaf.PRESET, abs=1e-9)
+    assert nominal[1] == pytest.approx(
+        (free_contact[0] - leaf.FREE_BEND_EXIT[0]) * up[0]
+        + (free_contact[1] - leaf.FREE_BEND_EXIT[1]) * up[1],
+        abs=1e-9,
+    )
+    assert nominal[2] == pytest.approx(
+        (free_contact[0] - pivot[0]) * leaf.STRAP_U[0]
+        + (free_contact[1] - pivot[1]) * leaf.STRAP_U[1],
+        abs=1e-9,
+    )
     # A shorter free kink height shortens the arm by about as much.
     short = leaf.formed_contact({"FreeKinkV": -band})
     assert short[1] == pytest.approx(nominal[1] - band, abs=0.1)
