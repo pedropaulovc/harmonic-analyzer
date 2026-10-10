@@ -19,7 +19,7 @@ def probe(monkeypatch):
     original_import = builtins.__import__
 
     def prohibit_native_import(name, *args, **kwargs):
-        if name in {"_common", "_gear_drawing_entities", "dodo", "diagnostics._owned_native_session",
+        if name in {"_com", "_gear_drawing_entities", "dodo", "diagnostics._owned_native_session",
                     "diagnostics.probe_vm2_datum_lifecycle"}:
             imports.append(name)
             raise AssertionError(f"CLI reached native execution import: {name}")

@@ -27,7 +27,11 @@ import _telemetry  # noqa: E402
 
 import win32com.client  # noqa: E402
 
-from _common import _early_bound  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound  # noqa: E402
 from solidworks_mcp.adapters import sw_type_info  # noqa: E402
 
 _FEATURE_ERROR = {

@@ -11,7 +11,7 @@ import _config
 import ch_fulcrum_keeper_spec as keeper
 import rocker_bank_layout as rocker_bank
 import vn_frame_side_screw_spec as keeper_screw
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _mcmaster_91794a080 import FILLISTER_SIZE
 import build_fr_top_frame as part
 import draw_fr_top_frame as drawing
 from fr_frame_attachment_spec import (
@@ -178,7 +178,7 @@ def test_smaller_bosses_leave_real_plan_corners_and_the_outward_foot_seat() -> N
     assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.150, 0.640))
     assert min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) > 0.0
     assert part.KEEPER_FOOT_RAIL_MARGINS == pytest.approx((4.996, 6.004), abs=0.0005)
-    stock_major = FILLISTER_SIZES[keeper_screw.SKU][0]
+    stock_major = FILLISTER_SIZE[0]
     assert part.KEEPER_TAP_BOSS_MARGINS == pytest.approx(
         tuple(
             math.hypot(part.KEEPER_TAP_X - part.COLUMN_X, boss_z - tap_z)
@@ -366,7 +366,7 @@ def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
 
 
 def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
-    major, length, _, _, pitch = FILLISTER_SIZES[keeper_screw.SKU]
+    major, length, _, _, pitch = FILLISTER_SIZE
     tap_spec = part.KEEPER_TAP_SPEC
     full_thread = tap_spec.overrides_mm["ThreadDepth"]
     depth_tolerance = spec.PRINTED_LINEAR_BAND_MM[
@@ -422,7 +422,7 @@ def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -
         part.KEEPER_MAX_WEB_CENTRE_OFFSET
         + max(
             part.THREAD_MAJOR_MM[part.KEEPER_TAP_SPEC.size],
-            FILLISTER_SIZES[keeper_screw.SKU][0],
+            FILLISTER_SIZE[0],
         )
         / 2.0
     )
@@ -500,7 +500,7 @@ def _printed_receiver_stack():
     major_radius = (
         max(
             part.THREAD_MAJOR_MM[keeper.KEEPER_TAP_SPEC.size],
-            FILLISTER_SIZES[keeper_screw.SKU][0],
+            FILLISTER_SIZE[0],
         )
         / 2.0
     )

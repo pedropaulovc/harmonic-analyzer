@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from math import hypot, sqrt
 
-from _fit_limits import SHAFT_H
+from _fit_shaft_h import SHAFT_H
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from dt_cone_pivot_post_installation import CHANNEL_Z0, FRAME_FRONT_COLUMN_Z
 

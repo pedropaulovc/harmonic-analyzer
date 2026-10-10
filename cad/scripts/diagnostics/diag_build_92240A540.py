@@ -5,7 +5,7 @@ its 19.05-mm under-head length engages the base 1.956D where 92240A539's 5/8
 engages 1.456D. McMaster's page (checked 2026-09-25) lists every field of
 92240A539 but the length: 1/4"-20 UNC-2A, fully threaded, 7/16" x 5/32" head,
 flat tip, ASME B18.2.1. So this replay is the 92240A539 family law
-(``diag_build_92240A539.build_hex_screw``) at 19.05 mm.
+(``diag_mcmaster_hex_screw.build_hex_screw``) at 19.05 mm.
 
 Its supplied SolidWorks model (``cad/references/mcmaster/92240A540.SLDPRT``,
 SHA-256 0257bc44e4273a32536e58829d52ec552e04b631a472ae080a067f29b38eac39,
@@ -26,31 +26,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from diagnostics.diag_build_92240A539 import (  # noqa: E402
-    HEX_HEIGHT_MM,
-    HEX_WIDTH_MM,
-    MAJOR_DIAMETER_MM,
-    PITCH_MM,
-    WASHER_DEPTH_MM,
-    build_hex_screw,
-)
+from _stock_recipe import stock_recipe  # noqa: E402
+
+from _mcmaster_92240a540 import HEX_SCREW_SIZE  # noqa: E402
+from diagnostics.diag_mcmaster_hex_screw import build_hex_screw  # noqa: E402
 from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
 
-LENGTH_MM = 19.05
-__all__ = (
-    "HEX_HEIGHT_MM",
-    "HEX_WIDTH_MM",
-    "LENGTH_MM",
-    "MAJOR_DIAMETER_MM",
-    "PITCH_MM",
-    "WASHER_DEPTH_MM",
-    "build_92240A540",
-)
 
 
+@stock_recipe("92240A540", threaded=True)
 async def build_92240A540(adapter, truth=None):
     """Build 92240A540 by the 92240A539 family law at its 3/4-in length."""
-    await build_hex_screw(adapter, sku="92240A540", length_mm=LENGTH_MM)
+    await build_hex_screw(adapter, sku="92240A540", size=HEX_SCREW_SIZE)
 
 
 if __name__ == "__main__":

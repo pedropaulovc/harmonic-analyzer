@@ -15,14 +15,14 @@ from __future__ import annotations
 
 import sys
 
-from _common import (
-    OUT_SLDASM,
-    check,
-    log,
-    run_build,
-    _flag,
-    _read_member,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _com import _flag, _read_member
+from _paths import OUT_SLDASM
+from _session import run_build
 
 IDENTITY = [0.0, 0.0, 0.0]
 RIGID, FLEXIBLE = 0, 1

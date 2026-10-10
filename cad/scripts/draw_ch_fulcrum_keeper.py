@@ -27,7 +27,9 @@ from typing import Any
 
 import _telemetry
 import ch_channel_assembly_steps as steps
-from _common import CAD_ROOT, check, run_build
+from _check import check
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,

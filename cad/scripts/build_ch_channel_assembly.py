@@ -151,14 +151,10 @@ import _config
 import _telemetry
 import channel_kinematics
 import settled_spring_seats
-from _common import (
-    UNDER_CONSTRAINED,
-    _early_bound,
-    apply_custom_properties,
-    check,
-    log,
-    run_build,
-)
+from _check import check, log
+from _com import UNDER_CONSTRAINED, _early_bound
+from _custom_properties import apply_custom_properties
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
@@ -701,7 +697,7 @@ async def _debug_png(adapter: Any, tag: str) -> None:
     ``cad/out/png/cwm-debug/`` (``HARMONIC_CWM_DEBUG=1`` only)."""
     if not _CWM_DEBUG:
         return
-    from _common import OUT_PNG
+    from _paths import OUT_PNG
 
     out = OUT_PNG / "cwm-debug"
     out.mkdir(parents=True, exist_ok=True)

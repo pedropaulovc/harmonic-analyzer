@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from math import sqrt
 
-from _fit_limits import SHAFT_H
-from _gtol_spec import CylinderFace
+from _fit_shaft_h import SHAFT_H
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from ch_fulcrum_keeper_spec import (
     BORE_DIA,

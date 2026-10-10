@@ -32,27 +32,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+from _mcmaster_91251a108 import DIMS  # noqa: E402
 from diagnostics.diag_mcmaster_socket_head import (  # noqa: E402
-    SocketHeadScrew,
     build_socket_head,
     build_socket_head_catalog,
 )
 
-PART_NO = "91251A108"
-IN = 25.4
 
-DIMS = SocketHeadScrew(
-    part_no=PART_NO,
-    major_dia=0.112 * IN,
-    pitch=IN / 40.0,
-    length=0.375 * IN,
-    head_dia=0.183 * IN,
-    head_h=0.112 * IN,
-    socket_af=3.0 / 32.0 * IN,
-    socket_depth=0.055 * IN,
-)
-
-
+@stock_recipe("91251A108", threaded=True)
 async def build_91251A108(adapter, truth=None):
     await build_socket_head(adapter, DIMS)
 
@@ -63,6 +51,6 @@ async def build_catalog(adapter) -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    from _common import run_build
+    from _session import run_build
 
     sys.exit(run_build(build_catalog))

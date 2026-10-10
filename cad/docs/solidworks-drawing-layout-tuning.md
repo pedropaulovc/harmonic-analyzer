@@ -426,7 +426,7 @@ translation vector (`<TranslationValueI/J/K>`) at its zero default, 13.6 mm
 of text that ASME Y14.5-2018 does not write.
 Do: write the modifier as its symbol code after the letter,
 `<DatumLetter>C&lt;MOD-TRANS2&gt;</DatumLetter>`, with no flag
-(`_gtol_spec.TRANSLATION_GLYPH`). On farm run 20261009T204136744Z both slot
+(`_gtol_frame.TRANSLATION_GLYPH`). On farm run 20261009T204136744Z both slot
 frames printed "<GTOL-POSI> | 0.05 | C | B | <MOD-TRANS2>", the triangle in
 the datum's compartment and no vector. Every flag form tried printed a
 vector (run 20261009T182549169Z): empty i, j, k printed "[0,0,0]", "false"
@@ -434,7 +434,7 @@ values printed "[false,false,false]", and SOLIDWORKS rewrote the flag after
 the letter to the empty-vector XML. `add_feature_control_frame` still reads
 the printed text items (`IAnnotation::GetDisplayData`) and fails on any
 bracket or a missing or misplaced glyph
-(`_gtol_spec.translation_print_problem`), logging `gtol.translation_print`.
+(`_gtol_frame.translation_print_problem`), logging `gtol.translation_print`.
 `GetSymbolXml` reads the symbol code back unescaped,
 `<DatumLetter>C<MOD-TRANS2></DatumLetter>`, which is not well-formed XML
 (run 20261009T200747541Z); the frame-XML parser escapes `<MOD-…>`/`<GTOL-…>`

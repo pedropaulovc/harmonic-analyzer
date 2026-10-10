@@ -38,12 +38,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    run_build,
-    volume_check,
-)
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _session import run_build  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
+from _stock_recipe import stock_recipe  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     OUT_DIR,
     _rev_frustum,
@@ -153,8 +152,11 @@ if ROOT_R <= hex_corner_r():
     raise ValueError("91375A942 thread root reaches the hex socket")
 
 
+@stock_recipe("91375A942", threaded=True)
 async def build_91375A942(adapter, truth=None):
-    from _common import _early_bound, _feature_by_name, _read_member, add_line_chain
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
+    from _sketch import add_line_chain
     from solidworks_mcp.adapters.base import RevolveParameters
 
     major_r = MAJOR_DIA / 2.0

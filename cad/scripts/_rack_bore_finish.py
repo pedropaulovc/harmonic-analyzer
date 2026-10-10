@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from _common import _early_bound
+from _com import _early_bound
 from _drawing_common import _validate_surface_finish_control_face, model_point_in_view
 from _surface_finish import surface_finish_by_key
 from pd_rack_pinion_spec import BORE_DIA, FACE_WIDTH, SURFACE_FINISHES

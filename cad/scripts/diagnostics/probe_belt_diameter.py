@@ -36,7 +36,12 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
-from _common import check, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _session import run_build  # noqa: E402
 from _telemetry import info, success, warn  # noqa: E402
 from _assembly import (  # noqa: E402
     activate_assembly_contract,

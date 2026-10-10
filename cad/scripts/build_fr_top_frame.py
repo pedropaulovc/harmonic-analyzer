@@ -78,35 +78,28 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    _early_bound,
-    CASTING_GREEN,
+from _appearance import CASTING_GREEN, apply_color, apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import feature_name_by_type, name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     _feature_by_name,
     add_line_chain,
     anchor_point_to_origin,
-    apply_color,
-    apply_material,
-    check,
-    define_centered_rectangle,
-    define_circle,
-    define_polygon_chain,
-    define_rectilinear_chain,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
-    force_rebuild,
-    feature_name_by_type,
-    name_last_feature,
-    name_dimensions,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain, define_rectilinear_chain
+from _sketch_circle import define_circle
+from _sketch_rectangle import define_centered_rectangle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -124,9 +117,10 @@ from _holes import (
     find_planar_face,
     wizard_holes,
 )
-from _part_pmi import _resolve_faces, author_part_pmi
+from _gtol_face_resolve import resolve_faces
+from _part_pmi import author_part_pmi
 from _named_views import name_octant_views
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from fr_top_frame_spec import (
     BORE_DIA,
@@ -187,7 +181,7 @@ from fr_frame_attachment_spec import (
     SCREW_SPOTFACE_DIAMETER,
     TOP_SCREW_SEAT_Z,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
 from vn_frame_side_screw_spec import SHANK_DIA as KEEPER_SCREW_MAJOR_DIA
 from ch_fulcrum_keeper_spec import (
@@ -1096,14 +1090,14 @@ def _open_underside_sketch(
 def _qualify_machined_faces(adapter) -> None:
     """Area-check every face the surface-finish spec owns.
 
-    ``_resolve_faces`` already proves each spec names exactly ONE face; the
+    ``resolve_faces`` already proves each spec names exactly ONE face; the
     area proves it named the RIGHT one, so a station typo ships a build failure
     instead of a roughness symbol on the wrong surface (build_fr_harmonic_base's
     _paint_machined_faces_black precedent). Expectations are the full analytic
     wall/annulus areas; the 5% band absorbs the cross-screw and set-screw tap
     windows that break into the bores (~1% each) and the C1 bore-top breaks.
     """
-    faces = _resolve_faces(
+    faces = resolve_faces(
         adapter.currentModel,
         {control.key: control.face for control in SURFACE_FINISHES},
     )
@@ -1136,7 +1130,7 @@ async def _split_keeper_seats(adapter) -> None:
     it does not model a cast machining allowance or cut that plane lower.
     """
     x, z = KEEPER_SEAT_CENTRES_XZ[0]
-    target = _resolve_faces(
+    target = resolve_faces(
         adapter.currentModel,
         {
             "keeper_top": PlanarFace(

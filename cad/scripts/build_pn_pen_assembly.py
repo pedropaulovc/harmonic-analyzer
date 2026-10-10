@@ -62,11 +62,9 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    apply_custom_properties,
-    check,
-    run_build,
-)
+from _check import check
+from _custom_properties import apply_custom_properties
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
@@ -94,10 +92,10 @@ from mg_wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
 from mg_wheel_bar_geom import HANGER_SCREW_MACHINE_X
 from build_pn_pen_hanger import SCREW_HOLE_XY as HANGER_TAP_XY
 from build_pn_pen_hanger import STRAP_Z as HANGER_STRAP_Z
-from build_vn_pen_set_screw import HEAD_STACK_LEN as PEN_SET_HEAD_STACK_LEN
-from build_vn_pen_set_screw import SHANK_LEN as PEN_SET_SHANK_LEN
-from build_vn_pen_set_screw import SHANK_DIA as PEN_SET_SHANK_DIA
-from build_vn_pen_set_screw import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
+from _mcmaster_99607a213 import HEAD_STACK_LEN as PEN_SET_HEAD_STACK_LEN
+from _mcmaster_99607a213 import SHANK_LEN as PEN_SET_SHANK_LEN
+from _mcmaster_99607a213 import SHANK_DIA as PEN_SET_SHANK_DIA
+from _mcmaster_99607a213 import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
 from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
 
 ASM_NAME = "pn-pen"

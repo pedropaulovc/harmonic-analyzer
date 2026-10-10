@@ -32,28 +32,24 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    PANEL_BLACK,
+from _appearance import PANEL_BLACK, apply_color, apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
-    apply_color,
-    apply_material,
-    check,
-    define_centered_rectangle,
-    define_polygon_chain,
-    drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain
+from _sketch_rectangle import define_centered_rectangle
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,

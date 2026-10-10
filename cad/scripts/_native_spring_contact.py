@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import _telemetry
-from _common import _early_bound, _read_member
+from _com import _early_bound, _read_member
 from solidworks_mcp.adapters.com_variant import dispatch_array
 
 

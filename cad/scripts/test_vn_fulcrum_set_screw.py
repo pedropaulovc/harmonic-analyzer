@@ -15,7 +15,8 @@ import vn_fulcrum_set_screw_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _hole_spec import THREAD_MAJOR_MM
-from _stock_fastener import STOCK_RECIPES, RigidTransform
+from _stock_fastener import RigidTransform
+from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_91375A942 as recipe
 
 IN = 25.4
@@ -23,7 +24,7 @@ STEM = "vn-fulcrum-set-screw"
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = recipe_declaration(spec.SKU, recipe.build_91375A942)
     assert spec.SKU == "91375A942"
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == recipe.build_91375A942.__name__

@@ -29,7 +29,9 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_notes as rocker_notes
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import ConeFace, CylinderFace, PlanarFace
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 
 _XXX = printed_band_mm(3)

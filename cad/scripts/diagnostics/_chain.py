@@ -1,4 +1,4 @@
-"""Import shim for archived diagnostics — see ``_common.py`` in this directory.
+"""Import shim for archived diagnostics; ``_script_paths.py`` bootstraps paths.
 
 Re-exports the real ``cad/scripts/_chain.py`` one directory up so moved
 diagnostics that do ``from _chain import ...`` keep resolving.

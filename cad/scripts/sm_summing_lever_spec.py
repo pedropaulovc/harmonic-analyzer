@@ -19,7 +19,7 @@ from _hole_spec import HoleSpec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4

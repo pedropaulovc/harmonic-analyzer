@@ -25,7 +25,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
 from _assembly import _under_constrained_components  # noqa: E402
-from _common import OUT_SLDASM, check, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _paths import OUT_SLDASM  # noqa: E402
+from _session import run_build  # noqa: E402
 
 DEFAULT_NAMES = ("dt-drive-train", "mg-magnifier", "pd-paper-drive", "ch-channel",
                  "sm-summing", "pn-pen")

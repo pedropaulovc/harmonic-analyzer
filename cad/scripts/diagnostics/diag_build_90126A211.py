@@ -19,12 +19,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import (  # noqa: E402
-    check,
-    define_circle,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
+from _sketch_circle import define_circle  # noqa: E402
 from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
 
 
@@ -39,7 +41,8 @@ async def _asymmetric_fillet(adapter, edge_points_mm, r1_mm: float,
     build -- runs with identical arguments produced different leg
     orientations (the positional call partially inherits SolidWorks
     session defaults), so the replica goes create-then-modify instead."""
-    from _common import _early_bound, _feature_by_name
+    from _com import _early_bound  # noqa: E402 -- diagnostic path bootstrap
+    from _feature_tree import _feature_by_name  # noqa: E402 -- diagnostic path bootstrap
 
     check(f"fillet base {feature_name}", await adapter.add_fillet(
         r1_mm, [list(p) for p in edge_points_mm]))

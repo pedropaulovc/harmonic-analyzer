@@ -46,7 +46,9 @@ import pd_transgear_knob_shaft_spec as knob_shaft
 import vn_transgear_pivot_screw_spec as pivot_screw
 import vn_transgear_pivot_spring_spec as spring
 import pd_transgear_removable_spec as sprocket
-from _common import _com_invoke, _early_bound, check, run_build
+from _check import check
+from _com import _com_invoke, _early_bound
+from _session import run_build
 from _pd_paper_drive_explode import exploded_view_name
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -1596,18 +1598,18 @@ def _place_assembled_sheet(adapter: Any) -> Any:
     """Front, right and isometric of the whole drive; returns the isometric,
     centred so its balloon ring keeps inside ISO_RING_LIMITS."""
     _activate_sheet(adapter, SHEET_NAMES[0])
-    for view_name, center in (
+    for orientation, center in (
         ("*Front", FRONT_CENTER),
         ("*Right", RIGHT_CENTER),
         ("*Isometric", ISO_CENTER),
     ):
         view = place_view(
-            adapter, str(SOURCE), view_name, *center, scale=ASSEMBLED_SCALE
+            adapter, str(SOURCE), orientation, *center, scale=ASSEMBLED_SCALE
         )
         # The isometric is the drawing's full-detail view.
-        role = ViewRole.FULL_DETAIL if view_name == "*Isometric" else ViewRole.PLAIN
+        role = ViewRole.FULL_DETAIL if orientation == "*Isometric" else ViewRole.PLAIN
         apply_view_configuration(
-            adapter, view, role=role, label=f"paper drive {view_name}"
+            adapter, view, role=role, label=f"paper drive {orientation}"
         )
     label = "sheet 1 isometric"
     scale, outline = step_down_to_fit(

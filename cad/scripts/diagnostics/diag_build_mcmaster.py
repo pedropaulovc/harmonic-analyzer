@@ -32,7 +32,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _session import run_build  # noqa: E402
 import _telemetry  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     MCMASTER_DIR,

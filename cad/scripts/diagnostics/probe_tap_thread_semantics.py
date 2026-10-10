@@ -25,7 +25,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import dodo
 from _assembly_postbuild import discard_open_documents
-from _common import _early_bound, check, run_build
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     add_native_hole_callout,
     new_project_drawing,

@@ -30,24 +30,22 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
-    apply_material,
-    check,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
 from _drawing_marks import (
     add_diametric_linear_dimension,
@@ -58,7 +56,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_prefix,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from ch_fulcrum_shaft_spec import (
     ACROSS_FLAT,
@@ -82,7 +80,7 @@ from ch_fulcrum_shaft_spec import (
 )
 
 PART_NAME = "ch-fulcrum-shaft"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 TIP = SHAFT_LENGTH / 2.0  # 80.675: dome apex off the centre
 # Capsule: the straight O.D. between the dome centres plus one full sphere.

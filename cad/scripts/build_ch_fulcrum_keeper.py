@@ -31,32 +31,26 @@ import math
 import sys
 
 import _telemetry
-from _common import (
-    PANEL_BLACK,
+from _appearance import PANEL_BLACK, apply_color, apply_material
+from _check import check
+from _com import _early_bound, _read_member
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    _read_member,
     add_line_chain,
     anchor_point_to_origin,
-    apply_color,
-    apply_material,
     blank_sketch,
-    check,
-    define_circle,
-    define_rectilinear_chain,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -64,7 +58,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder, wizard_holes
 from vn_frame_side_screw_spec import HEAD_DIA as FRAME_SIDE_HEAD_DIA
@@ -99,7 +93,7 @@ from ch_fulcrum_keeper_spec import (
 )
 
 PART_NAME = "ch-fulcrum-keeper"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 LUG_T = 2.0 * LUG_HALF_T  # 6.0 lug thickness along X
 # Mid-plane through-cut total (both_directions splits the depth half per side

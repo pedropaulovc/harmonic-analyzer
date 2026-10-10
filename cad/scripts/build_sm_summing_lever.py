@@ -45,7 +45,7 @@ positions (so the 20 channel springs need no change) and the summation
 anchor lands where the counter-spring boss-hook attaches (local x -76 ->
 machine -91 ~ the M6.4 hook at -90.5).
 
-Sketches follow the repo fully-defined convention (cad/scripts/_common.py): the
+Sketches follow the repo fully-defined convention (cad/scripts/_sketch.py): the
 prismatic/polygon profiles via point-ref anchors + driving dims; each arc via
 its neighbours' fixed endpoints plus a radial dim. Organic-arc volumes are not
 analytically gated -- rely on the mass-properties report + ch30 renders.
@@ -64,32 +64,27 @@ import math
 import sys
 
 import _telemetry
-from _common import (
-    CASTING_GREEN,
-    IN,
+from _appearance import CASTING_GREEN, apply_color, apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _paths import IN
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    apply_color,
-    apply_material,
-    check,
-    define_circle,
-    define_polygon_chain,
-    define_rectilinear_chain,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain, define_rectilinear_chain
+from _sketch_circle import define_circle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from magnifying_bracket_joint_layout import (
@@ -130,7 +125,7 @@ from sm_summing_lever_spec import (
 )
 
 PART_NAME = "sm-summing-lever"
-MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
+MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 
 # The .cs is authored with the coefficients plate on -X; the machine wants it on
 # the +X arm (to match the M6.4 frame the rest of the assembly registers to), so
@@ -797,7 +792,8 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
 def _receiver_model_bands(adapter) -> None:
     """Author receiver limits on owned source dimensions, including subfeatures."""
-    from _common import _com_invoke, _early_bound, _feature_display_dimensions
+    from _com import _com_invoke, _early_bound
+    from _dimensions import _feature_display_dimensions
     from _drawing_marks import _feature_tree
     from magnifying_bracket_joint_layout import THREAD_DEPTH
 
@@ -877,7 +873,7 @@ def _receiver_model_bands(adapter) -> None:
 def _band_held_dimension(display, dimension, band: float, label: str) -> None:
     """Symmetric tolerance + 2-place display on an already-resolved dimension
     (the by-name ``set_dimension_symmetric_tolerance`` contract, minus lookup)."""
-    from _common import _bind, _early_bound
+    from _com import _bind, _early_bound
     from _drawing_marks import _set_tolerance_precision
 
     display = _bind(display, "IDisplayDimension")
@@ -909,7 +905,7 @@ def _band_held_dimension(display, dimension, band: float, label: str) -> None:
 
 async def _receiver_coordinate_dimensions(adapter) -> None:
     """Native coordinate dimensions from the real free edge and lower face."""
-    from _common import anchor_point_to_point
+    from _sketch import anchor_point_to_point
     from magnifying_bracket_joint_layout import POSITION_BAND
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
