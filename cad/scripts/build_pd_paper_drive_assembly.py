@@ -130,6 +130,7 @@ from _assembly_patterns import (
     grid_component_pattern,
     PatternDirection,
 )
+from _chain_mounts import mounted_wheels
 from _interference_contracts import allowed_interference_pairs
 from _visibility import blank_reference_geometry, visible_reference_geometry
 from _transforms import (  # noqa: E402
@@ -2987,6 +2988,7 @@ async def build(adapter) -> dict[str, str]:
     check_no_interference(
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        chain_mounts=mounted_wheels(),
     )
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the

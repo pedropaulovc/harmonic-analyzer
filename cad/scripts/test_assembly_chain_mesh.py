@@ -16,6 +16,12 @@ import pytest
 import _assembly
 import _chain
 import pd_transgear_removable_spec as removable
+from _chain_mounts import mounted_wheels
+
+
+def _check(adapter, **kwargs):
+    """The gate as the chain-carrying assemblies call it: with the mounts read now."""
+    return _assembly.check_no_interference(adapter, chain_mounts=mounted_wheels(), **kwargs)
 
 
 class _MathTransform:
@@ -222,7 +228,7 @@ def test_selected_mounts_allow_mesh_without_a_configuration_whitelist(
     # Keep the existing unbounded chain-mesh volume protocol unchanged.
     components = [wheel, link] if reverse_pair else [link, wheel]
     adapter = _Adapter(_Interference(components, volume_mm3=1000.0))
-    _assembly.check_no_interference(adapter)
+    _check(adapter)
 
     assert wheel.total_requests == [False]
     assert wheel.relative_reads == 0
@@ -265,7 +271,7 @@ def test_stored_spare_with_the_active_configuration_remains_a_clash(
         _Interference([_link(), spare]),
     )
     with pytest.raises(RuntimeError, match="pd-transgear-removable-3"):
-        _assembly.check_no_interference(adapter)
+        _check(adapter)
     assert observations.spans["gate.interference"].attributes["chain_mesh_contacts"] == 1
     assert observations.spans["gate.interference"].attributes["hits"] == 1
     assert observations.events[0][1]["configurations"] == ["", equal_config]
@@ -279,7 +285,7 @@ def test_role_selection_mismatch_is_not_intended_mesh(observations, role) -> Non
         removable.KNOB_CONFIG if role == "crank" else removable.CRANK_CONFIG
     )
     with pytest.raises(RuntimeError, match="pd-transgear-removable-17"):
-        _assembly.check_no_interference(_mesh_adapter(wheel))
+        _check(_mesh_adapter(wheel))
     assert observations.spans["gate.interference"].attributes["chain_mesh_contacts"] == 0
 
 
@@ -290,7 +296,7 @@ def test_unregistered_selection_cannot_qualify_even_at_the_mount(
     monkeypatch.setattr(removable, "CRANK_CONFIG", configuration)
     wheel = _wheel("crank")
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_mesh_adapter(wheel))
+        _check(_mesh_adapter(wheel))
     assert wheel.total_requests == []
 
 
@@ -310,7 +316,7 @@ def test_unregistered_selection_cannot_qualify_even_at_the_mount(
 def test_prefix_false_friends_are_not_chain_mesh(observations, wheel_name, link_name):
     wheel = _wheel("crank", name=wheel_name)
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_mesh_adapter(wheel, link=_link(link_name)))
+        _check(_mesh_adapter(wheel, link=_link(link_name)))
     assert wheel.total_requests == []
 
 
@@ -337,7 +343,7 @@ def test_nonfinite_or_nonrigid_transform_is_never_allowed(observations, index, v
     values[index] = value
     wheel = _wheel("crank", values=values)
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_mesh_adapter(wheel))
+        _check(_mesh_adapter(wheel))
     assert wheel.relative_reads == 0
 
 
@@ -346,7 +352,7 @@ def test_malformed_array_data_is_never_allowed(observations, array_data) -> None
     wheel = _wheel("crank")
     wheel.total = _MathTransform(array_data)
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_mesh_adapter(wheel))
+        _check(_mesh_adapter(wheel))
 
 
 @pytest.mark.parametrize("failure", ["null", "exception", "no-method", "no-array"])
@@ -369,7 +375,7 @@ def test_unavailable_pose_has_no_relative_or_identity_fallback(observations, fai
             Transform2=mounted,
         )
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_mesh_adapter(wheel))
+        _check(_mesh_adapter(wheel))
     assert mounted.reads == 0
     if isinstance(wheel, _Component):
         assert wheel.relative_reads == 0
@@ -389,7 +395,7 @@ def test_right_family_and_configuration_still_require_the_physical_mount(
         values[:9] = [1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0]
         values[11] = removable.SEAT_FACE_Z / 1000.0
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_mesh_adapter(_wheel("knob", values=values)))
+        _check(_mesh_adapter(_wheel("knob", values=values)))
 
 
 def test_readback_tolerance_is_small_and_not_a_manufacturing_grade(observations):
@@ -398,11 +404,11 @@ def test_readback_tolerance_is_small_and_not_a_manufacturing_grade(observations)
     nominal = _mount_values("crank")
     near = nominal.copy()
     near[9] += _assembly._CHAIN_MOUNT_READBACK_MM * 0.5 / 1000.0
-    _assembly.check_no_interference(_mesh_adapter(_wheel("crank", values=near)))
+    _check(_mesh_adapter(_wheel("crank", values=near)))
     outside = nominal.copy()
     outside[9] += _assembly._CHAIN_MOUNT_READBACK_MM * 2.0 / 1000.0
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_mesh_adapter(_wheel("crank", values=outside)))
+        _check(_mesh_adapter(_wheel("crank", values=outside)))
 
 
 @pytest.mark.parametrize("world_is_mounted", [True, False])
@@ -423,10 +429,10 @@ def test_nested_pose_uses_active_root_without_fallback_or_double_composition(
     wheel.relative = _MathTransform(displaced if world_is_mounted else mounted)
     adapter = _mesh_adapter(wheel, link=_link("pd-paper-drive-1/vn-chain-inner-link-1"))
     if world_is_mounted:
-        _assembly.check_no_interference(adapter)
+        _check(adapter)
     else:
         with pytest.raises(RuntimeError, match="pd-paper-drive-1/pd-transgear-removable-2"):
-            _assembly.check_no_interference(adapter)
+            _check(adapter)
     assert wheel.total_requests == [False]
     assert wheel.relative_reads == wheel.relative.reads == 0
 
@@ -446,9 +452,9 @@ def test_mounts_follow_shared_centre_band_and_selection_cells_lazily(
     monkeypatch.setattr(removable, "BAND_FRONT_Z", removable.BAND_FRONT_Z - 1.0)
     monkeypatch.setattr(removable, "SEAT_FACE_Z", removable.SEAT_FACE_Z - 1.0)
 
-    _assembly.check_no_interference(_mesh_adapter(_wheel(role)))
+    _check(_mesh_adapter(_wheel(role)))
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_mesh_adapter(old_wheel))
+        _check(_mesh_adapter(old_wheel))
 
 
 @pytest.mark.parametrize("equal_configs", [False, True])
@@ -466,7 +472,7 @@ def test_simultaneous_role_readback_windows_are_ambiguous(
     if equal_configs:
         monkeypatch.setattr(removable, "KNOB_CONFIG", removable.CRANK_CONFIG)
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_mesh_adapter(_wheel("crank")))
+        _check(_mesh_adapter(_wheel("crank")))
 
 
 @pytest.mark.parametrize("shape", ["three-components", "two-wheels", "one-wheel"])
@@ -478,7 +484,7 @@ def test_only_a_two_component_link_wheel_pair_can_be_mesh(observations, shape):
         "one-wheel": [wheel],
     }[shape]
     with pytest.raises(RuntimeError, match="interference"):
-        _assembly.check_no_interference(_Adapter(_Interference(components)))
+        _check(_Adapter(_Interference(components)))
     assert wheel.total_requests == []
 
 
@@ -497,9 +503,9 @@ def test_link_contacts_and_allowed_pairs_keep_their_aggregate_behavior(
     )
     if pair_total > 1.0:
         with pytest.raises(RuntimeError, match=r"1.2 mm\^3 over 2 bodies"):
-            _assembly.check_no_interference(adapter, allowed_pairs=limit)
+            _check(adapter, allowed_pairs=limit)
     else:
-        _assembly.check_no_interference(adapter, allowed_pairs=limit)
+        _check(adapter, allowed_pairs=limit)
         [(name, attrs)] = observations.events
         assert name == "interference.bounded_pair"
         assert attrs["pair"] == names

@@ -133,7 +133,9 @@ def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bo
 # Chain mesh is an assembly-only policy: a configuration identifies a tooth
 # count, not a mounted wheel. A loose spare can have the SAME configuration as
 # either active wheel, so only the authored mount's root-world pose and selected
-# configuration qualify. Keep the lazy centre authority below off leaf recipes.
+# configuration qualify. The chain-carrying assemblies pass that authority in
+# (``_chain_mounts.mounted_wheels()``); importing it here would put the cone
+# line and channel table on every assembly's recipe.
 _CHAIN_SPROCKET_PREFIXES = ("pd-transgear-removable",)
 # COM readback tolerances, NOT manufacturing allowances: 0.00001 mm for the
 # authored centre/band, 0.00000001 for a rigid unit-scale rotation.
@@ -151,19 +153,20 @@ def _chain_component_family(name: str, families: tuple[str, ...]) -> bool:
     )
 
 
-def _mounted_chain_sprocket(component: Any, configuration: str) -> bool:
+def _mounted_chain_sprocket(component: Any, configuration: str, mounts: Any) -> bool:
     """Prove one selected crank/knob mount, never infer a role from its suffix.
 
     ``component`` comes directly from the active root assembly's interference
     manager, not from a separately opened subassembly document. Its collapsed
     total transform therefore includes any nesting in HA; do not compose a
     parent again or fall back to a relative/identity transform on missing data.
+    ``mounts`` is the caller's ``_chain_mounts.WheelMounts``; without one no
+    contact is mesh.
     """
-    import _chain
-    import pd_transgear_removable_spec as removable
-
+    if mounts is None:
+        return False
     try:
-        removable.configuration_teeth(configuration)
+        mounts.configuration_teeth(configuration)
         transform = _early_bound(component, "IComponent2").GetTotalTransform(False)
         if transform is None:
             return False
@@ -202,14 +205,11 @@ def _mounted_chain_sprocket(component: Any, configuration: str) -> bool:
     # or reversal is not the same axial band (the stored spare is Rx(-90)).
     mm_tol = _CHAIN_MOUNT_READBACK_MM
     if (
-        abs(z - removable.BAND_FRONT_Z) > mm_tol
-        or abs(z + values[8] * removable.PLATE - removable.SEAT_FACE_Z) > mm_tol
+        abs(z - mounts.band_front_z) > mm_tol
+        or abs(z + values[8] * mounts.plate - mounts.seat_face_z) > mm_tol
     ):
         return False
-    roles = (
-        (_chain.CRANK_CENTRE, removable.CRANK_CONFIG),
-        (_chain.KNOB_CENTRE, removable.KNOB_CONFIG),
-    )
+    roles = mounts.roles
     mounted = [
         selected
         for centre, selected in roles
@@ -1999,6 +1999,7 @@ def check_no_interference(
     adapter: Any,
     *,
     allowed_pairs: Mapping[frozenset[str], float] | None = None,
+    chain_mounts: Any = None,
 ) -> None:
     """Run interference detection on the active assembly; raise on any hit.
 
@@ -2023,6 +2024,8 @@ def check_no_interference(
     way the gate already tolerates face-flush and tangent contacts). Link contact
     with a selected, physically mounted removable is intended chain mesh; any
     other link/non-link overlap, including a same-configuration spare, is a fault.
+    Only an assembly that passes ``chain_mounts`` (``_chain_mounts.mounted_wheels()``)
+    can have chain mesh at all.
     """
     asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
     with _telemetry.span("gate.interference") as isp:
@@ -2078,7 +2081,7 @@ def check_no_interference(
                 and len(links) == 1
                 and len(sprockets) == 1
                 and _mounted_chain_sprocket(
-                    components[sprockets[0]], configs[sprockets[0]]
+                    components[sprockets[0]], configs[sprockets[0]], chain_mounts
                 )
             ):
                 chain_mesh_contacts.append(volume_mm3)
