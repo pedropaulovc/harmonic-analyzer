@@ -42,7 +42,7 @@
       "start": 2.3023,
       "end": 53.987267,
       "classification": "machine",
-      "reason": "Stationary whole corresponding machine alongside presenter and changing title/plot overlays.",
+      "reason": "Stationary whole physical machine alongside presenter and changing title/plot overlays; intentionally blurred navigation thumbnails excluded.",
       "views": [
         {
           "viewId": "whole-machine",
@@ -51,56 +51,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -134,56 +84,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1618,
@@ -205,66 +105,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "cone-bank",
-          "rectSourcePixels": [
-            78,
-            223,
-            1271,
-            715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1638,
@@ -284,56 +124,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -367,56 +157,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1692,
@@ -436,56 +176,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -519,56 +209,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1795,
@@ -588,56 +228,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -671,56 +261,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1872,
@@ -740,56 +280,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -813,56 +303,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1902,
@@ -872,62 +312,12 @@
       "id": "navigation-gap-one",
       "start": 63.897167,
       "end": 64.297567,
-      "classification": "machine",
-      "reason": "The main viewport is black, but three right-side source-photo containers contain five independently visible physical hardware views. All five remain required; navigation labels do not exempt physical photographs.",
-      "views": [
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        }
-      ],
+      "classification": "non-machine",
+      "reason": "Black main viewport plus intentionally blurred navigation thumbnail links; no independently alignable physical machine view.",
+      "views": [],
       "startFrame": 1915,
-      "endFrame": 1927
+      "endFrame": 1927,
+      "reclassifiedFrom": "machine"
     },
     {
       "id": "analysis-hand-bars",
@@ -943,56 +333,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -1026,56 +366,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1951,
@@ -1095,56 +385,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -1178,56 +418,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1981,
@@ -1247,56 +437,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -1340,56 +480,6 @@
             340
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 2018,
@@ -1419,56 +509,6 @@
             233,
             760,
             340
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -1512,56 +552,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 2075,
@@ -1581,56 +571,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -1654,56 +594,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 2176,
@@ -1713,62 +603,12 @@
       "id": "navigation-gap-two",
       "start": 73.039633,
       "end": 73.406667,
-      "classification": "machine",
-      "reason": "The main viewport is black, but three right-side source-photo containers contain five independently visible physical hardware views. All five remain required; navigation labels do not exempt physical photographs.",
-      "views": [
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        }
-      ],
+      "classification": "non-machine",
+      "reason": "Black main viewport plus intentionally blurred navigation thumbnail links; no independently alignable physical machine view.",
+      "views": [],
       "startFrame": 2189,
-      "endFrame": 2200
+      "endFrame": 2200,
+      "reclassifiedFrom": "machine"
     },
     {
       "id": "operation-entry-fade",
@@ -1784,56 +624,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -1855,56 +645,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -1958,56 +698,6 @@
             234
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 2260,
@@ -2047,56 +737,6 @@
             704,
             735,
             234
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -2150,56 +790,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 2320,
@@ -2219,56 +809,6 @@
             223,
             1271,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -2312,56 +852,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 2380,
@@ -2393,56 +883,6 @@
             715
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 2390,
@@ -2472,56 +912,6 @@
             223,
             643,
             715
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-synthesis",
-          "rectSourcePixels": [
-            1380,
-            93,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-analysis",
-          "rectSourcePixels": [
-            1380,
-            405,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-top",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-middle",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "right-operation-bottom",
-          "rectSourcePixels": [
-            1380,
-            717,
-            480,
-            270
           ],
           "presentation": "native"
         }
@@ -2680,7 +1070,7 @@
       "start": 184.21736666666666,
       "end": 185.185,
       "classification": "transition",
-      "reason": "Live corresponding whole machine crossfades beneath six actual source-photo containers comprising eight physical hardware views. Live whole-machine state remains required until185.185s; all preview states are independently required while their source pixels remain present.",
+      "reason": "Live whole machine crossfades beneath intentionally blurred navigation/endcard links. Retain the outgoing live machine until it disappears; blurred thumbnail backgrounds are excluded.",
       "views": [
         {
           "viewId": "whole-machine",
@@ -2689,86 +1079,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-synthesis",
-          "rectSourcePixels": [
-            0,
-            0,
-            639,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-analysis",
-          "rectSourcePixels": [
-            642,
-            0,
-            637,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-operation-top",
-          "rectSourcePixels": [
-            1282,
-            0,
-            638,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-operation-middle",
-          "rectSourcePixels": [
-            1282,
-            0,
-            638,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-operation-bottom",
-          "rectSourcePixels": [
-            1282,
-            0,
-            638,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-book-posters",
-          "rectSourcePixels": [
-            0,
-            542,
-            639,
-            538
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-page-by-page",
-          "rectSourcePixels": [
-            642,
-            542,
-            637,
-            538
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-rocker-arms",
-          "rectSourcePixels": [
-            1282,
-            542,
-            638,
-            538
           ],
           "presentation": "native"
         }
@@ -2780,202 +1090,32 @@
       "id": "navigation-endcards",
       "start": 185.185,
       "end": 213.646767,
-      "classification": "machine",
-      "reason": "Six source-photo containers contain eight required physical hardware views, including the three independent Operation paper images. Book/page-linked hardware photos are required; excluded linked guide/private destinations remain excluded.",
-      "views": [
-        {
-          "viewId": "end-synthesis",
-          "rectSourcePixels": [
-            0,
-            0,
-            639,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-analysis",
-          "rectSourcePixels": [
-            642,
-            0,
-            637,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-operation-top",
-          "rectSourcePixels": [
-            1282,
-            0,
-            638,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-operation-middle",
-          "rectSourcePixels": [
-            1282,
-            0,
-            638,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-operation-bottom",
-          "rectSourcePixels": [
-            1282,
-            0,
-            638,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-book-posters",
-          "rectSourcePixels": [
-            0,
-            542,
-            639,
-            538
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-page-by-page",
-          "rectSourcePixels": [
-            642,
-            542,
-            637,
-            538
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-rocker-arms",
-          "rectSourcePixels": [
-            1282,
-            542,
-            638,
-            538
-          ],
-          "presentation": "native"
-        }
-      ],
+      "classification": "non-machine",
+      "reason": "Intentionally blurred endcard thumbnails and credits/link labels; no independently alignable physical machine view (same rationale as Synthesis endcards).",
+      "views": [],
       "startFrame": 5550,
-      "endFrame": 6403
+      "endFrame": 6403,
+      "reclassifiedFrom": "machine"
     },
     {
       "id": "credits-crossfade",
       "start": 213.646767,
       "end": 214.34746666666666,
-      "classification": "transition",
-      "reason": "Credits crossfade still contains eight physical hardware source-photo views through native exposure6423/214.3141s. All remain required until actual disappearance6424/214.347466667s.",
-      "views": [
-        {
-          "viewId": "end-synthesis",
-          "rectSourcePixels": [
-            0,
-            0,
-            639,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-analysis",
-          "rectSourcePixels": [
-            642,
-            0,
-            637,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-operation-top",
-          "rectSourcePixels": [
-            1282,
-            0,
-            638,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-operation-middle",
-          "rectSourcePixels": [
-            1282,
-            0,
-            638,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-operation-bottom",
-          "rectSourcePixels": [
-            1282,
-            0,
-            638,
-            539
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-book-posters",
-          "rectSourcePixels": [
-            0,
-            542,
-            639,
-            538
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-page-by-page",
-          "rectSourcePixels": [
-            642,
-            542,
-            637,
-            538
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "end-rocker-arms",
-          "rectSourcePixels": [
-            1282,
-            542,
-            638,
-            538
-          ],
-          "presentation": "native"
-        }
-      ],
+      "classification": "non-machine",
+      "reason": "Intentionally blurred endcard thumbnails and credits/link labels; no independently alignable physical machine view (same rationale as Synthesis endcards).",
+      "views": [],
       "startFrame": 6403,
-      "endFrame": 6424
+      "endFrame": 6424,
+      "reclassifiedFrom": "transition"
     },
     {
       "id": "credits-crossfade-no-machine",
       "start": 214.34746666666666,
       "end": 214.7145,
-      "classification": "transition",
-      "reason": "Decoded source hardware-photo patterns have disappeared by native exposure6424; remaining credits/background crossfade has no corresponding machine.",
-      "views": [
-        {
-          "viewId": "main",
-          "rectSourcePixels": [
-            0,
-            0,
-            1920,
-            1080
-          ],
-          "presentation": "native"
-        }
-      ],
+      "classification": "non-machine",
+      "reason": "Credits/background crossfade only; decoded hardware imagery has already disappeared at frame 6424.",
+      "reclassifiedFrom": "transition",
+      "views": [],
       "startFrame": 6424,
       "endFrame": 6435
     },

@@ -157,16 +157,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            134,
-            878,
-            170,
-            98
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 705,
@@ -217,16 +207,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            185,
-            676,
-            284,
-            164
           ],
           "presentation": "native"
         }
@@ -281,16 +261,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            181,
-            45,
-            285,
-            163
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1011,
@@ -341,16 +311,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            189,
-            652,
-            258,
-            148
           ],
           "presentation": "native"
         }
@@ -426,16 +386,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            7,
-            30,
-            1855,
-            1046
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1461,
@@ -457,16 +407,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            617,
-            359,
-            831,
-            532
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 1473,
@@ -486,16 +426,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            98,
-            49,
-            1747,
-            1004
           ],
           "presentation": "native"
         }
@@ -540,16 +470,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            16,
-            110,
-            1702,
-            959
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 2315,
@@ -590,16 +510,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            2,
-            31,
-            1859,
-            1047
           ],
           "presentation": "native"
         }
@@ -717,16 +627,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            199,
-            716,
-            271,
-            114
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 2997,
@@ -820,26 +720,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "upper-inset",
-          "rectSourcePixels": [
-            261,
-            100,
-            127,
-            39
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "lower-inset",
-          "rectSourcePixels": [
-            200,
-            716,
-            269,
-            114
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 4180,
@@ -861,16 +741,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "upper-inset",
-          "rectSourcePixels": [
-            262,
-            100,
-            115,
-            38
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 4196,
@@ -890,16 +760,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            5,
-            2,
-            1864,
-            1051
           ],
           "presentation": "native"
         }
@@ -944,16 +804,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            20,
-            11,
-            1714,
-            969
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 4560,
@@ -994,16 +844,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            0,
-            0,
-            1798,
-            999
           ],
           "presentation": "native"
         }
@@ -1152,16 +992,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            134,
-            44,
-            825,
-            474
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 5124,
@@ -1181,16 +1011,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            196,
-            66,
-            286,
-            168
           ],
           "presentation": "native"
         }
@@ -1214,16 +1034,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            5,
-            2,
-            1864,
-            1051
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 5223,
@@ -1243,16 +1053,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            53,
-            40,
-            1803,
-            1016
           ],
           "presentation": "native"
         }
@@ -1297,16 +1097,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            52,
-            33,
-            1524,
-            858
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 5463,
@@ -1347,16 +1137,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            8,
-            6,
-            1761,
-            993
           ],
           "presentation": "native"
         }
@@ -1401,16 +1181,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            26,
-            79,
-            1712,
-            965
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 5653,
@@ -1451,16 +1221,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            134,
-            59,
-            1491,
-            840
           ],
           "presentation": "native"
         }
@@ -1505,16 +1265,6 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            93,
-            135,
-            1660,
-            935
-          ],
-          "presentation": "native"
         }
       ],
       "startFrame": 6026,
@@ -1555,16 +1305,6 @@
             0,
             1920,
             1080
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "detail-inset",
-          "rectSourcePixels": [
-            177,
-            28,
-            1435,
-            809
           ],
           "presentation": "native"
         }
