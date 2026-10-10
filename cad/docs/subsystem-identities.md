@@ -98,7 +98,7 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 ## Identity migration table
 
-The table covers 151 part families (the 149 current families plus the two retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
+The table covers 152 part families (the 150 current families plus the two retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
 Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws.
 

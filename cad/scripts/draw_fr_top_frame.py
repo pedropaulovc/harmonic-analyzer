@@ -1587,7 +1587,6 @@ def keeper_section_cut_ends() -> tuple[Point, Point]:
     )
 
 
-
 def _pin_section_profile(
     adapter: Any,
     view: Any,
@@ -2582,7 +2581,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Part-spec-authored .XX drill diameter and .X blind depths: these are
     # also the precision inputs to the published-band receiver proof.
     set_hole_callout_precision(
-        keeper_callout, KEEPER_TAP_CALLOUT_PRECISION,
+        keeper_callout,
+        KEEPER_TAP_CALLOUT_PRECISION,
         label="keeper tap sizes and depths",
     )
     upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)

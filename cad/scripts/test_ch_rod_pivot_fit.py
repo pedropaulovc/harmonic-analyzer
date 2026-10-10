@@ -204,9 +204,11 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
         for n in range(1, 21)
     }
     set_screw_pairs = {
-        frozenset((f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")) for n in (1, 2)
+        frozenset((f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
+        for n in (1, 2)
     } | {
-        frozenset((f"vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}")) for n in (1, 2)
+        frozenset((f"vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}"))
+        for n in (1, 2)
     }
     assert set(pairs) == rod_pairs | bar_pairs | set_screw_pairs
     nominal = math.pi / 4.0 * (pin_dia**2 - hole_dia**2) * engaged
