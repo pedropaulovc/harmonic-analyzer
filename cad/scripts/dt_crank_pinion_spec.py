@@ -562,22 +562,19 @@ TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.
 # T120 feeler check, MHA-DT-000's crank step), and only when the band itself
 # fails that check (a shoulder failure is the shoulder's to correct); the
 # sheet permits it only as that check directs and states the floor, so the
-# part stays conforming after the fit-up cut, and states the worst-case
-# clearances to T120 that the check is there for.  Codex P1 on #1154
-# (review 3).  The note names the check, not its step number: a part never
-# reads the step registry (Main's TbPB ruling 2; test_part_isolation).
+# part stays conforming after the fit-up cut.  Codex P1 on #1154 (review 3).
+# The worst-case clearances to T120 are a design-check result, so only the
+# assembly's crank step prints them (T120_FITUP_ASSEMBLY_CHECK).  The note
+# names the check, not its step number: a part never reads the step registry
+# (Main's TbPB ruling 2; test_part_isolation).
 T120_SHOULDER_CLEARANCE_TEXT = (
     "NO AXIAL OVERLAP"
     if T120_SHOULDER_AIR_WORST == math.inf
     else f"{T120_SHOULDER_AIR_WORST:.2f}"
 )
-TURNED_BAND_FITUP_NOTE = "\n".join(
-    (
-        "TURNED BAND MAY BE TURNED DOWN PER MHA-DT-000 T120 CHECK, "
-        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN.",
-        f"WORST-CASE CLEARANCE TO MHA-DT-003 T120: BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "
-        f"SHOULDER {T120_SHOULDER_CLEARANCE_TEXT}.",
-    )
+TURNED_BAND_FITUP_NOTE = (
+    "TURNED BAND MAY BE TURNED DOWN PER MHA-DT-000 T120 CHECK, "
+    f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN."
 )
 DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, TURNED_BAND_FITUP_NOTE))
 # The MHA-DT-000 crank step's T120 check (user, 2026-09-30, #1154), printed by

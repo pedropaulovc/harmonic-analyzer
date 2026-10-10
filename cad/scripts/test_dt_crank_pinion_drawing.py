@@ -975,7 +975,7 @@ def test_t120_clearance_facts_match_the_ordinary_floors_without_a_waiver() -> No
         assert longer["shoulder air"] < spec.T120_SHOULDER_AIR_WORST
     else:
         assert air == math.inf
-        assert "NO AXIAL OVERLAP" in spec.DRAWING_NOTES
+        assert "NO AXIAL OVERLAP" in spec.T120_FITUP_ASSEMBLY_CHECK
     _assert_no_t120_shortfall_waiver()
 
 
@@ -1163,9 +1163,11 @@ def _crank_step() -> str:
     return step.split(f"\n{number + 1}. ")[0]
 
 
-def test_both_sheets_state_current_t120_clearance_and_absent_sections() -> None:
+def test_assembly_step_states_current_t120_clearance_and_absent_sections() -> None:
     # Each finite fact belongs to its own feature. A missing shoulder section
     # is stated as absence, never as an infinite size or an obsolete shortfall.
+    # The clearances are a design-check result: the part sheet does not print
+    # them (Main's MHA-DT-010 eye pass), only the assembly's crank step does.
     import build_dt_drive_train_assembly as bdt
 
     band = round(math.floor(bdt.T120_TURNED_BAND_RADIAL * 100.0) / 100.0, 2)
@@ -1174,11 +1176,13 @@ def test_both_sheets_state_current_t120_clearance_and_absent_sections() -> None:
         if math.isfinite(bdt.T120_SHOULDER_AIR)
         else set()
     )
-    for text in (spec.DRAWING_NOTES, _crank_step()):
-        assert _t120_clearance_facts(text) == {"BAND": {band}, "SHOULDER": shoulder}
-        if not shoulder:
-            assert "SHOULDER NO AXIAL OVERLAP" in text
-        assert not re.search(r"\b(?:INF|NAN)\b|∞", text)
+    text = _crank_step()
+    assert _t120_clearance_facts(text) == {"BAND": {band}, "SHOULDER": shoulder}
+    if not shoulder:
+        assert "SHOULDER NO AXIAL OVERLAP" in text
+    assert not re.search(r"\b(?:INF|NAN)\b|∞", text)
+    assert "CLEARANCE" not in spec.DRAWING_NOTES
+    assert _t120_clearance_facts(spec.DRAWING_NOTES) == {"BAND": set(), "SHOULDER": set()}
 
 
 def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
