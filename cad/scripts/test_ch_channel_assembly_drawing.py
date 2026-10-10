@@ -84,6 +84,10 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
         f"{fitup_number} STEP "
         f"{dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY)}"
     )
+    stack_ref = (
+        f"{fitup_number} STEP "
+        f"{dt_drive_train_steps.step_number(steps.CYLINDER_STACK_KEY)}"
+    )
     sheets = {
         channel_number: _sequence_steps(drawing.FITUP_STEPS),
         fitup_number: _sequence_steps(
@@ -100,7 +104,17 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     # What each pointer's target must name, keyed by (citing sheet, pointer).
     expected = {
         (channel_number, north_ref): f"THE NORTH {bracket}",
+        # The rod rings go onto their cams in the cylinder stack, so the
+        # bench-pinned rod + arm pairs must exist by then.
+        (channel_number, stack_ref): "ON ITS CAM AS ITS GEAR GOES ON",
+        # ... and that drive-train step names the pinning step it relies on.
+        (fitup_number, steps.RODS_PINNED_REF): "ROD FORK TO ITS",
         (fitup_number, f"{frame_number} STEP 8"): f"{support} ON DECK",
+        # The north bracket comes off again at the drive-train step that sets
+        # it: the channel sheet threads the shaft and refits it, and the DRO
+        # zero must last through the cut-to-fit refit.
+        (fitup_number, steps.step_ref("north-ear-datum")): "THREAD THE",
+        (fitup_number, steps.step_ref("shaft-cut-to-fit")): "CUT THE PLAIN END",
     }
     found = set()
     for sheet, bodies in sheets.items():
@@ -113,6 +127,12 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     north_label = str(dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY))
     north = sheets[fitup_number][north_label]
     assert "EAR INNER FACE TO Y" in north and "DRO STILL ZEROED AS 9A" in north
+    # The shoulder cannot pass the set ear: the bracket comes off again, and
+    # the channel sheet threads the shaft from the north and rechecks its Y.
+    assert "UNSCREW IT AND LIFT IT OFF" in north
+    north_ear = _step_body("north-ear-datum")
+    assert "BODY FIRST FROM THE NORTH" in north_ear
+    assert f"RECHECK ITS S-OFFSET Y AS {steps.NORTH_BRACKET_SET_REF}" in north_ear
     # Positive control: the step before it is the bank's end play, not the ear.
     assert f"NORTH {bracket}" not in sheets[fitup_number]["9F"]
     # It follows 9F, the bank's last sub-step, on the bank sheet: the rig's
@@ -136,21 +156,29 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     assert printed == list(range(1, len(steps.SEQUENCE) + 1))
 
 
-def test_the_feeler_set_and_its_acceptance_are_printed_from_the_layout() -> None:
-    """Codex #936 (PRRT_kwDOPHDy386mRSOK): the south bracket's feeler and the
-    end play it leaves lived only in rocker_bank_layout. Rule 6: the channel
-    assembly's steps carry both, generated from the layout, never typed."""
-    feeler = _step_body("south-bracket-feeler-set")
-    assert f"{bank.ROCKER_END_FEELER:.2f} FEELER" in feeler
-    accept = _step_body("end-play-accepted")
-    low, high = bank.ROCKER_END_PLAY
-    assert f"{low:.2f} TO {high:.2f}" in accept
-    assert f"STEP {steps.step_number('south-bracket-feeler-set')}" in accept
+def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> None:
+    """#948 ruling R (PR #1292): the south bracket is set off the MHA-CH-009
+    washer by the spring's set blade, beside the MHA-VN-053 spring, which is
+    first run along the shaft (its catalogue ID can bind). Rule 6: the blade
+    comes from rocker_bank_layout, never typed; the acceptance is the preload."""
+    spring = _config.parts("vn-rocker-bank-spring")["number"]
+    shaft = _config.parts("ch-pivot-shaft")["number"]
+    setting = _step_body("south-bracket-spring-set")
+    assert f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS." in setting
+    assert f"{bank.ROCKER_SPRING_SET:.2f} BLADE BESIDE THE SPRING" in setting
+    assert "PULL THE BLADE" in setting
+    accept = _step_body("preload-accepted")
+    assert "PUSHED SOUTH," in accept
+    assert "SPRING BACK ONTO THE NORTH EAR" in accept
+    assert f"STEP {steps.step_number('south-bracket-spring-set')}" in accept
     stack = _step_body("rocker-stack-accepted")
     assert f"{bank.STACK_L20_ACCEPT[0]:.2f} TO {bank.STACK_L20_ACCEPT[1]:.2f}" in stack
     assert steps.NORTH_BRACKET_SET_REF in _step_body("north-ear-datum")
-    # Positive control: the feeler is not what step 3 sets.
-    assert "FEELER" not in _step_body("south-washer-fitted")
+    # No feeler end play survives the ruling.
+    assert "FEELER" not in drawing.FITUP_STEPS
+    assert "END PLAY" not in drawing.FITUP_STEPS
+    # Positive control: the spring is not what step 4 fits.
+    assert spring not in _step_body("south-washer-fitted")
 
 
 
@@ -165,10 +193,44 @@ def test_the_step_block_fits_the_field_right_of_the_isometric() -> None:
     assert left > 0.248 + 0.015
 
 
-def test_the_shaft_supplied_long_is_cut_to_fit_before_the_end_play_is_accepted() -> None:
+def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
+    """The rod ring is captured in its closed cam slot during the cylinder
+    stack, and a pressed pin needs its far tine backed on the press, so the
+    MHA-CH-010 pin goes in at the bench, before that drive-train step -- after
+    the hub stack is proved on the shaft and the rockers come off in order.
+    User ruling 2026-10-09 (PR #1292 review F1): pressed, ends dressed flush,
+    removable with a punch, as the MHA-CH-011 bar pin."""
+    from ch_rod_pivot_pin_spec import PIN_END_PROUD_MAX
+
+    assert steps.SEQUENCE[:2] == ("rocker-stack-accepted", steps.RODS_PINNED_KEY)
+    stack = _step_body("rocker-stack-accepted")
+    assert stack.endswith("SLIDE THE ROCKERS OFF IN ORDER AND KEEP THAT ORDER.")
+    body = _step_body(steps.RODS_PINNED_KEY)
+    rod = _config.parts("ch-connecting-rod")["number"]
+    arm = _config.parts("ch-rocker-arm")["number"]
+    pin = _config.parts("ch-rod-pivot-pin")["number"]
+    assert f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH:" in body
+    assert f"EACH {rod} ROD FORK TO ITS {arm} ARM WITH ONE {pin}." in body
+    assert "PRESS IT IN, FAR TINE BACKED; DRESS BOTH ENDS FLUSH." in body
+    assert PIN_END_PROUD_MAX == 0.0  # what "FLUSH" states
+    # Removal is a property of the pin, not a step: the later steps need the
+    # pin in place (CodeRabbit, PR #1292).
+    assert "PIN REMOVABLE WITH PUNCH." in body
+    assert "DRIVE OUT" not in body
+    assert "SWINGS FREE UNDER ITS OWN WEIGHT" in body
+    assert "PEEN" not in drawing.FITUP_STEPS
+    assert "COUNTERSINK" not in drawing.FITUP_STEPS
+    # Positive control: no other step pins or presses.
+    for key in steps.SEQUENCE:
+        if key != steps.RODS_PINNED_KEY:
+            assert pin not in _step_body(key) and "PRESS" not in _step_body(key)
+
+
+
+def test_the_shaft_supplied_long_is_cut_to_fit_before_the_preload_is_accepted() -> None:
     """Codex #936 (PRRT_kwDOPHDy386mSteE): MHA-CH-005 is supplied long with its
     plain end uncut, and its print defers the length to the assembly, but no
-    step cut it. A step between the south bracket's setting and the end-play
+    step cut it. A step between the south bracket's setting and the preload
     acceptance must scribe the shaft at the ear, take it out, and cut and dome
     it to the layout's band."""
     import ch_pivot_shaft_spec as shaft
@@ -180,16 +242,28 @@ def test_the_shaft_supplied_long_is_cut_to_fit_before_the_end_play_is_accepted()
     assert len(cut_steps) == 1
     (key,) = cut_steps
     number = steps.step_number(key)
-    assert steps.step_number("south-bracket-feeler-set") < number
-    assert number < steps.step_number("end-play-accepted")
+    assert steps.step_number("south-bracket-spring-set") < number
+    assert number < steps.step_number("preload-accepted")
     body = _step_body(key)
     upper, lower = bank.PLAIN_END_CUT_BAND
     cut = f"{shaft.DOME_HEIGHT + lower:.1f} TO {shaft.DOME_HEIGHT + upper:.1f}"
     assert f"CUT THE PLAIN END {cut} PAST THE SCRIBE" in body
     assert f"DOME IT {shaft.DOME_HEIGHT:.1f}" in body
     assert "SCRIBE" in body.split("CUT")[0] and "SOUTH EAR'S OUTER FACE" in body
-    # It comes out only with the south bracket off, and goes back at the feeler.
-    assert "UNSCREW THE SOUTH" in body
-    assert f"AT THE FEELER AS STEP {steps.step_number('south-bracket-feeler-set')}" in body
+    # The integral shoulder passes neither ear nor a hub, and the pinned rods
+    # hold the arms at their stations: the shaft comes out only northward with
+    # the north bracket off, and goes back by the threading of the north-ear
+    # step, the south bracket staying down at its spring setting.
+    assert "UNSCREW THE NORTH" in body and "DRAW THE SHAFT NORTH" in body
+    assert "EACH ARM LEFT HANGING ON ITS ROD" in body
+    # The refit re-threads the washer and spring the draw-out caught: the
+    # first pass fits them after the shaft (CodeRabbit, PR #1292).
+    assert (
+        f"REFIT AS STEP {steps.step_number('north-ear-datum')}, WASHER AND SPRING"
+        " THREADED ON PAST HUB 0;"
+    ) in body
+    assert f"SOUTH EAR AT ITS STEP {steps.step_number('south-bracket-spring-set')} SETTING" in body
+    assert "CATCH WASHER AND SPRING" in body
+    assert "UNSCREW THE SOUTH" not in body
     # Positive control: no other step mentions the cut.
-    assert "SCRIBE" not in _step_body("south-bracket-feeler-set")
+    assert "SCRIBE" not in _step_body("south-bracket-spring-set")

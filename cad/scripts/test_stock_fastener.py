@@ -30,7 +30,9 @@ def test_every_recipe_declares_the_thread_it_cuts() -> None:
         for sku, metadata in STOCK_RECIPES.items()
     }
     # Anchors: a scan that found nothing (or everything) must not pass.
-    assert scanned["91375A106"] and scanned["90280A194"] and not scanned["90126A211"]
+    assert scanned["91375A106"] and scanned["90280A194"] and not scanned["98381A473"]
+    # The partial-thread SHCS cuts its groove in the shared socket-head helper.
+    assert scanned["91251A157"] and scanned["91251A108"]
     assert declared == scanned
 
 

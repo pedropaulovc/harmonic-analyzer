@@ -1100,16 +1100,18 @@ def test_spare_sprocket_transformed_underside_contacts_base_deck(monkeypatch):
     top = _spare_world_point(monkeypatch, [0.0, 0.0, sprocket.PLATE])
     assert underside[1] == pytest.approx(base.STACK_HEIGHT, rel=0, abs=1e-9)
     assert top[1] == pytest.approx(base.STACK_HEIGHT + sprocket.PLATE, rel=0, abs=1e-9)
-    assert (underside[0], underside[2]) == (160.0, -75.0)
-    assert (top[0], top[2]) == (160.0, -75.0)
+    assert (underside[0], underside[2]) == (140.0, -75.0)
+    assert (top[0], top[2]) == (140.0, -75.0)
 
 
-def test_spare_t18_footprint_is_on_flat_deck_not_raised_rim(monkeypatch):
+def test_spare_t18_footprint_is_on_the_flat_deck(monkeypatch):
+    # The deck's flat ends at its edge break (user ruling 2026-10-09: the
+    # black deck x +-167.0, z +-130.25 stands DECK_RISE above the green land).
     radius = sprocket.outside_dia(sprocket.TEETH["T18"]) / 2.0
     for x, y, z in product((-radius, radius), (-radius, radius), (0.0, sprocket.PLATE)):
         world = _spare_world_point(monkeypatch, [x, y, z])
-        assert abs(world[0]) < base.TOP_LENGTH / 2.0 - base.LIP_W
-        assert abs(world[2]) < base.TOP_WIDTH / 2.0 - base.LIP_W
+        assert abs(world[0]) < base.DECK_HALF_X - base.DECK_EDGE_BREAK
+        assert abs(world[2]) < base.DECK_HALF_Z - base.DECK_EDGE_BREAK
 
 
 def test_spare_storage_clears_nameplate_envelope_by_five_mm(monkeypatch):

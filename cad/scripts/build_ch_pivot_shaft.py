@@ -1,11 +1,11 @@
 r"""Reproduction script: rocker pivot shaft (MHA-CH-005; book ch. 14 / ch. 17; 1 used).
 
 The Ø6.35 steel shaft that carries the 20 rocker arms at machine
-(x, y) = (72.9, 253.8), held by the two pivot brackets with no keeper (#743
-PR2, Reading 1, user Q4). It is turned from O10 bar and keeps an integral
+(x, y) = (72.9, 253.8), held by the two pivot brackets and preloaded north by
+the MHA-VN-053 spring (#948 ruling R, PR #1292). It is turned from O10 bar and keeps an integral
 O10 x 1.5 shoulder one ear thickness from its north end. The shoulder bears
 on the north ear's inner face, and rocker 19's hub bears on the shoulder;
-the stack closes south on the MHA-CH-009 washer at the feeler-set south ear
+the spring holds the stack north off the MHA-CH-009 washer at the south ear
 (``rocker_bank_layout``). The cylinder spans both ears' outer faces and each
 end is domed 1.5 proud, like the cylinder arbor's ends (ch14 page002_img07
 shows the near-flush domed end on the ear).

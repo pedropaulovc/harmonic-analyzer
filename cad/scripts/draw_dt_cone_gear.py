@@ -216,15 +216,16 @@ CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
 CLOCK_ARC_OVERRUN = 0.0003
 CLOCK_ARC_CENTRE_TOL = 0.0005
 CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")
-# Fifteen compact data lines retain the measured 3.51 mm line-height budget.
+# Top-aligned with the manufacturing notes: the 14-line block (header + 13
+# rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
+# line; the 15-line block ends ~52.6 mm down, still above the largest side
+# view (top 0.197) with FaceWidth below it.
 # The dedicated custom-tool sheet keeps the grind data out of these
 # dimension/view lanes.
 GEAR_DATA_POS = (0.215, 0.263)
-# Rendered height/width budget of the Gear Data block, for the layout test.
+# Rendered height budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
-GEAR_DATA_MAX_LINE_CHARS = 66
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
-SHEET_COUNT_POS = (0.350, 0.263)
 CUTTER_DETAIL_POS = (0.015, 0.263)
 CUTTER_DETAIL_VIEW_CENTER = (0.325, 0.155)
 
@@ -1085,7 +1086,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
     clocks: list[tuple[str, Any, int]] = []
-    for sheet_index, teeth in enumerate(CONFIGURATION_TEETH, start=1):
+    for teeth in CONFIGURATION_TEETH:
         configuration = f"T{teeth:03d}"
         view_scale = SHEET_SCALES[configuration]
         if not ddoc.ActivateSheet(configuration):
@@ -1179,15 +1180,6 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS,
             char_height=0.0025,
         )
-        if (
-            add_note(
-                adapter,
-                f"SHEET {sheet_index} OF {len(SHEET_NAMES)}",
-                *SHEET_COUNT_POS,
-            )
-            is None
-        ):
-            raise RuntimeError(f"failed to stamp sheet count on {configuration}")
         rebuild_drawing(adapter, label=f"{configuration} layout audit")
         check_drawing_layout(
             adapter, layout=SPEC.layout, stem=f"cone-gear {configuration}"

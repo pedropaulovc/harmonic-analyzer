@@ -306,7 +306,6 @@ def test_assembly_recipes_exclude_cylinder_drawing_prose(
 
 
 def test_stacking_thickness_is_the_held_marked_dimension() -> None:
-    import cylinder_bank_layout as bank
     import dt_cylinder_gear_notes as notes
 
     # The overall thickness sets every station of the solid bank (#743), so it
@@ -315,7 +314,10 @@ def test_stacking_thickness_is_the_held_marked_dimension() -> None:
     assert spec.DRAWING_DIMENSIONS["CamBoss"] == {"OverallThickness"}
     assert spec.DRAWING_PRECISION_BY_NAME["OverallThickness"] == 4
     assert "OverallThickness" in drawing.RIGHT_KEEP
-    assert f"{bank.RING_OVERHANG_MAX:.2f}" in notes.STACK_FIT_CALLOUT
+    # The bank is preloaded (#948 ruling R, PR #1292): no ring overhangs its
+    # cam, so the stacking callout states no overhang bound.
+    assert "OVERHANG" not in notes.STACK_FIT_CALLOUT
+    assert "MHA-DT-013" in notes.STACK_FIT_CALLOUT
 
 
 class _RimEdge:

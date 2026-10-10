@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "fetch-model": "node scripts/fetch-model.mjs",
+    "fetch-model:approved": "node scripts/deployment.mjs fetch-model",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test:deployments": "node --test scripts/cloudflare-deployments.test.mjs",

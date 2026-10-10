@@ -695,12 +695,14 @@ from build_dt_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E40
 # The cylinder bank is a SOLID STACK (#743, cylinder_bank_layout): each
 # MHA-DT-012 is one station pitch thick, cam face to back face, and a turned
 # MHA-DT-026 thrust washer closes each end. The back (north) strap is the bank's
-# axial datum and the bank is modelled pushed back against it; the front
-# strap stands one BANK_END_FEELER leaf off the front washer. Every station
-# below is the layout module's, so the ladder, the washers, the straps, the
-# arbor and the apex set screws cannot drift apart. (Supersedes U34's
-# END_DISC_AIR split and its -72.652 / +75.202 strap stations.)
+# axial datum and the bank is modelled held back against it; the front strap
+# stands one BANK_SPRING_SET blade off the front washer, and the MHA-VN-052
+# wave spring in that gap preloads the stack north (#948 ruling R, PR #1292).
+# Every station below is the layout module's, so the ladder, the washers, the
+# spring, the straps, the arbor and the apex set screws cannot drift apart.
+# (Supersedes U34's END_DISC_AIR split and its -72.652 / +75.202 strap stations.)
 import cylinder_bank_layout as _bank  # noqa: E402
+import vn_cylinder_bank_spring_spec as BANK_SPRING  # noqa: E402
 
 if abs(Z_DRUM0 - _bank.STATION_Z0) > 1e-9 or abs(Z_PITCH - _bank.BANK_PITCH) > 1e-9:
     raise AssertionError("drive-train drum ladder left the cylinder-bank stations")
@@ -708,6 +710,13 @@ if abs(END_DISC_THICK - (_bank.BACK_WASHER_Z[1] - _bank.BACK_WASHER_Z[0])) > 1e-
     raise AssertionError("placed thrust washer is not the bank layout's washer")
 END_DISC_SOUTH_Z0 = _bank.FRONT_WASHER_Z[0]
 END_DISC_NORTH_Z0 = _bank.BACK_WASHER_Z[0]
+# The spring's model is its installed envelope: z = 0 on the front strap's
+# inner face, z = MODEL_HEIGHT on the front washer.
+BANK_SPRING_Z0 = _bank.BANK_SPRING_Z[0]
+if abs(_bank.BANK_SPRING_Z[1] - _bank.BANK_SPRING_Z[0] - BANK_SPRING.MODEL_HEIGHT) > 1e-9:
+    raise AssertionError("placed bank spring is not the layout's front-strap gap")
+if abs(_bank.BANK_SPRING_Z[1] - END_DISC_SOUTH_Z0) > 1e-9:
+    raise AssertionError("bank spring does not bear on the front thrust washer")
 
 # Arbor pedestals (U34c, dt-bank-pedestal-layout-20260923 rev 3): the SAME
 # casting twice -- south as built, north rotated 180 about Y so its strap looks
@@ -720,17 +729,17 @@ from dt_arbor_pedestal_spec import (  # noqa: E402
     STRAP_ROOT_Z as ARBOR_PED_STRAP_ROOT_Z,
 )
 
-ARBOR_STRAP_SOUTH_Z = _bank.FRONT_STRAP_INNER_Z  # -71.519
+ARBOR_STRAP_SOUTH_Z = _bank.FRONT_STRAP_INNER_Z  # -72.019
 ARBOR_STRAP_NORTH_Z = _bank.BACK_STRAP_INNER_Z  # +73.062
 # Pedestal ORIGINS: south at -ARBOR_PEDESTAL_Z (as built, local +Z = machine
 # +Z), north at +ARBOR_PEDESTAL_NORTH_Z (Ry180, local +Z = machine -Z).
-ARBOR_PEDESTAL_Z = -_bank.FRONT_PEDESTAL_ORIGIN_Z  # 79.519
+ARBOR_PEDESTAL_Z = -_bank.FRONT_PEDESTAL_ORIGIN_Z  # 80.019
 ARBOR_PEDESTAL_NORTH_Z = _bank.BACK_PEDESTAL_ORIGIN_Z  # 81.062
 # Plan z band of each whole foot (strap inner face .. ledge end).
 ARBOR_PED_SOUTH_Z_BAND = (
     -ARBOR_PEDESTAL_Z + ARBOR_PED_FOOT_NEAR_Z,
     -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_INNER_Z,
-)  # -99.519..-71.519
+)  # -100.019..-72.019
 ARBOR_PED_NORTH_Z_BAND = (
     ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_INNER_Z,
     ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_FOOT_NEAR_Z,
@@ -1093,7 +1102,6 @@ from fr_nameplate_spec import (  # noqa: E402
 )
 from fr_harmonic_base_spec import (  # noqa: E402
     COLUMN_SOCKET_XZ as BASE_COLUMN_SOCKET_XZ,
-    LIP_W as BASE_LIP_W,
     TOP_LENGTH as BASE_TOP_LENGTH,
     TOP_WIDTH as BASE_TOP_WIDTH,
 )
@@ -2857,7 +2865,9 @@ def _plan_gap_to_plate(point: Plan, swing_deg: float) -> float:
 # seated manufacturing enclosure, not just the nominal DISENGAGE_DEG:
 # - the straight west edge against both arbor-pedestal blocks (their floors
 #   above: 2.0 south, 0.25 north);
-# - every sharp plate vertex inside the base deck, within the green lip;
+# - every sharp plate vertex over the base pad (user ruling 2026-10-09 took
+#   away the green lip it used to stay inside; the plate swings above the
+#   black deck, so the deck's 3.0 step is no obstacle);
 # - every other base-fixed occupant clear of the plate outline: see
 #   SWING_OCCUPANT_CLEARANCE, after the rig and spring layout it reads.
 SWING_SAMPLES = 400
@@ -2876,15 +2886,13 @@ for _k, _swing in enumerate(SWING_ANGLES):
     for _label, (_vx, _vz) in zip(
         ("NE", "NW", "SW", "SE"), plate_vertices_machine(_swing), strict=True
     ):
-        _margin = min(
-            _BASE_X_LIMIT - BASE_LIP_W - abs(_vx), _BASE_Z_LIMIT - BASE_LIP_W - abs(_vz)
-        )
-        _key = f"{_label} corner inside the lip"
+        _margin = min(_BASE_X_LIMIT - abs(_vx), _BASE_Z_LIMIT - abs(_vz))
+        _key = f"{_label} corner over the base"
         SWING_SWEEP[_key] = min(SWING_SWEEP.get(_key, math.inf), _margin)
         if _margin < 0.0:
             raise AssertionError(
-                f"swing-plate {_label} corner crosses the base lip by {-_margin:.3f} "
-                f"at swing {_swing:.3f} deg"
+                f"swing-plate {_label} corner overhangs the base by "
+                f"{-_margin:.3f} at swing {_swing:.3f} deg"
             )
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
 # The 32T drum shares the train's configured pitch and pressure angle.
@@ -3006,9 +3014,9 @@ if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > APINION_Z_BACK + 0.5:
 # and must stay 1.0 south of g0's front face.  Both spares join RIG_MARGINS
 # (below), and one leaf step thinner would leave j = 19 short of
 # RIG_MARGIN_SPARE (D is the thinnest setting that holds).  D is set with the
-# bank pushed north, so the bank adds nothing to j = 19; at the front g0
-# itself walks south by the bank's end play and a long g0 -> g19 pitch stack
-# (RIG.G0_FRONT_SOUTH_STACK, #743), so the j = 0 row carries those beside the
+# bank held north (preloaded, #948 ruling R, PR #1292), so the bank adds
+# nothing to j = 19; at the front g0 sits south by a long g0 -> g19 pitch
+# stack (RIG.G0_FRONT_SOUTH_STACK), so the j = 0 row carries it beside the
 # drum's own retreat (Codex #858, PRRT_kwDOPHDy386mUjhU).
 _G19_FACE_Z = (
     Z_DRUM0 + 19 * Z_PITCH - DRUM_FACE / 2.0,
@@ -4624,7 +4632,7 @@ async def build(adapter) -> dict[str, str]:
     await _lock_static(adapter, north_pedestal, arbor)
     # Thrust washers (MHA-DT-026, #743): the front one on gear 0's cam face, the
     # back one on gear 19's back face against the datum strap -- the bank
-    # modelled pushed back. They turn with nothing, so each is held like the
+    # modelled held back. They turn with nothing, so each is held like the
     # pedestals: one lock to the fixed seed arbor.
     for _disc_z0, _end in ((END_DISC_SOUTH_Z0, "south"), (END_DISC_NORTH_Z0, "north")):
         end_disc = await place_component(
@@ -4637,6 +4645,19 @@ async def build(adapter) -> dict[str, str]:
             label=f"cylinder thrust washer {_end} z0={_disc_z0:.3f}",
         )
         await _lock_static(adapter, end_disc, arbor)
+    # Bank spring (MHA-VN-052, #948 ruling R, PR #1292): its installed envelope
+    # fills the front-strap gap, south face on the strap, north face on the
+    # front washer, coaxial with the arbor; static like the washers.
+    bank_spring = await place_component(
+        adapter,
+        "vn-cylinder-bank-spring",
+        [X_DRUM, Y_DRIVE, BANK_SPRING_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label=f"cylinder bank spring z0={BANK_SPRING_Z0:.3f}",
+    )
+    await _lock_static(adapter, bank_spring, arbor)
     # Apex set screws (MHA-VN-034, #743 Q3): point down through each crown onto
     # the arbor's top at the strap's mid-depth; static like their pedestals.
     for _screw_z, _end in ((SET_SCREW_SOUTH_Z, "south"), (SET_SCREW_NORTH_Z, "north")):

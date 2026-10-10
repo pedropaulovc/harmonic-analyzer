@@ -23,7 +23,7 @@ LEVER_THICKNESS = 3.0  # ch_channel_lever_spec.LEVER_THICKNESS (the top notch's)
 LEVER_THICKNESS_TOLERANCE = 0.10  # channel-lever note 2: "3.00 +/-0.10 OVERALL"
 STRAP_THICKNESS = 2.5  # ch_rocker_arm_spec.ARM_THICKNESS (the foot notch's)
 STRAP_THICKNESS_TOLERANCE = 0.508  # ch_rocker_arm_spec.LINEAR_2PL: "STRAP 2.50" at .XX
-STRADDLE_RUNNING_FLOOR = 0.10  # rocker_bank_layout.MIN_END_PLAY, oiled steel faces
+STRADDLE_RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR, oiled steel faces
 
 
 def _straddle_minimum(plate: float, tolerance: float) -> float:

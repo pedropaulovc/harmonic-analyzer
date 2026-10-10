@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import cylinder_bank_layout as bank
 import dt_cylinder_gear_spec as spec
 
 BORE_FIT_CALLOUT = (
@@ -14,15 +13,10 @@ BORE_FIT_CALLOUT = (
 )
 # TODO(#744): validate the forked rod and centered channel bank in the native
 # assembly. The drawing requirement below does not certify that integration.
-# The bank is a solid, unpreloaded stack (#743): a ring can overhang its cam
-# only by an interface the end play lets open, so the acceptance names that
-# bound (cylinder_bank_layout.RING_OVERHANG_MAX, user ruling Q1).
-STACK_FIT_CALLOUT = (
-    "STACKS CAM FACE TO BACK FACE\n"
-    "ON CYLINDER-GEAR-SHAFT MHA-DT-013;\n"
-    "CONNECTING ROD MHA-CH-003 RING\n"
-    f"OVERHANGS CAM {bank.RING_OVERHANG_MAX:.2f} MAX"
-)
+# The bank is a solid stack preloaded onto its datum (#948 ruling R, PR #1292):
+# no gear interface opens, so a connecting-rod ring never overhangs its cam
+# and the callout no longer states an overhang bound.
+STACK_FIT_CALLOUT = "STACKS CAM FACE TO BACK FACE\nON CYLINDER-GEAR-SHAFT MHA-DT-013"
 GEAR_DATA = "\n".join(
     (
         "GEAR DATA",

@@ -369,6 +369,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rod_pivot_pin",
+        part="ch_rod_pivot_pin",
+        artifact_stem="ch-rod-pivot-pin",
+        script_name="draw_ch_rod_pivot_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_counter_spring",
         part="vn_counter_spring",
         artifact_stem="vn-counter-spring",
@@ -1034,6 +1041,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_cylinder_bank_spring",
+        part="vn_cylinder_bank_spring",
+        artifact_stem="vn-cylinder-bank-spring",
+        script_name="draw_vn_cylinder_bank_spring.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_rocker_bank_spring",
+        part="vn_rocker_bank_spring",
+        artifact_stem="vn-rocker-bank-spring",
+        script_name="draw_vn_rocker_bank_spring.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_transgear_arm",
         part="pd_transgear_arm",
         artifact_stem="pd-transgear-arm",
@@ -1097,10 +1118,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="vn_knife_hanger_washer",
-        part="vn_knife_hanger_washer",
-        artifact_stem="vn-knife-hanger-washer",
-        script_name="draw_vn_knife_hanger_washer.py",
+        name="vn_knife_mount_dowel",
+        part="vn_knife_mount_dowel",
+        artifact_stem="vn-knife-mount-dowel",
+        script_name="draw_vn_knife_mount_dowel.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

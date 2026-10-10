@@ -889,7 +889,10 @@ assert math.isclose(
 # Keep the loose T18 on the deck, ahead of the nameplate. At the previous
 # Z=-15 storage station, lowering onto the deck intersected the nameplate;
 # Z=-75 leaves 5 mm between the T18 tip envelope and the plate's Z=-50 edge.
-SPARE_GEAR_POS = (160.0, BASE_DECK_Y, -75.0)
+# X=140 (was 160): the black deck now ends at X=167 (user ruling 2026-10-09),
+# and at X=160 the tip envelope (to X=180) straddled its 3.0 step; from 140 it
+# spans X 120..160, flat on the deck and west of the rocker-support foot.
+SPARE_GEAR_POS = (140.0, BASE_DECK_Y, -75.0)
 
 # --- fasteners ----------------------------------------------------------------
 # Platen-clip screws: through the clips' integral outer seats and #4 clearance

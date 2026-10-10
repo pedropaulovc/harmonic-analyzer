@@ -49,7 +49,7 @@ jq -r '[.name, ((.end_time[0:19]+"Z"|fromdateiso8601)
               - (.start_time[0:19]+"Z"|fromdateiso8601))] | @tsv' \
   cad/out/reports/telemetry/traces.jsonl | sort -k2 -gr | head -20
 
-# Current registered inventory: 147 part families and 8 assembly identities.
+# Current registered inventory: 149 part families and 8 assembly identities.
 # See ../../cad/docs/subsystem-identities.md; registry counts are not task counts.
 # how many parts, assemblies, drawings.
 # NOTE: do NOT count `build_*.py` — that file set also contains the 8 assembly

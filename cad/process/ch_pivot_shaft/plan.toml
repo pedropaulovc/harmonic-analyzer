@@ -93,10 +93,10 @@ cite = [
 
 # S3: origin at the scribe the fitter makes at the south ear's outer face,
 # +Z toward the plain end. Nominal model position = -ShaftLength REF
-# (-156.67; exported south_dome base_z); the real position is the
+# (-156.82; exported south_dome base_z); the real position is the
 # installed-ear span, which no input supplies.
 [frames.T3]
-origin = [0.0, 0.0, -156.67]
+origin = [0.0, 0.0, -156.82]
 x = [1.0, 0.0, 0.0]
 y = [0.0, -1.0, 0.0]
 z = [0.0, 0.0, -1.0]
@@ -441,7 +441,7 @@ jaw_above_parallels_mm = "not_applicable"
 stop = "jaw fronts 10 mm north of actual fit-up scribe, T3 Z -10"  # author's choice; actual scribe position remains unmeasured
 clamp = "tighten chuck key by hand at all three pinions; remove key; indicate after clamping"  # author's choice
 jaw_protection = "prepare clean paper sleeve under smooth, deburred jaw contacts; reject marks or slip"  # author's choice; no listed accessory invented
-stickout_mm = "unknown"     # depends on actual scribe-to-supply-end length, not the 156.67 REF
+stickout_mm = "unknown"     # depends on actual scribe-to-supply-end length, not the 156.82 REF
 
 [setups.zero.transfer]
 from = "S2"

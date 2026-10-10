@@ -129,7 +129,7 @@ feature = "strap_datum_b"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 to_z = -2.27825 # upper strap face: HUB_PROUD = (7.0565 - 2.5)/2 below the hub face
-to_z_cite = "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:122"
+to_z_cite = "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:124"
 direction = "conventional" # author's choice
 
 [[setups.ops]]
@@ -200,7 +200,7 @@ note = "Lower side, flipped about model X: qualify the lower hub face to the hub
 top_feature = "hub_faces" # the Z-touch face is the lower hub face; strap face ops do not move it
 top_z = 4.47175 # author's choice, flipped raw model Z-8 relative to frame B Z-3.52825
 bottom_z = -7.0565 # S1 hub face, HUB_LENGTH below frame B Z0 (nominal; band +0.05/0)
-bottom_z_cite = "harmonic-analyzer/cad/scripts/ch_rocker_arm_spec.py:117-121"
+bottom_z_cite = "harmonic-analyzer/cad/scripts/ch_rocker_arm_spec.py:122-126"
 retained_rail_bottom_z = -11.52825 # author's choice, raw model Z8 after flip; rails, not faced hub, seat on supports
 
 [setups.hold]
@@ -265,7 +265,7 @@ feature = "strap_faces"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 to_z = -2.27825
-to_z_cite = "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:122"
+to_z_cite = "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:124"
 direction = "conventional" # author's choice
 
 [setups.ops.checks]
@@ -323,15 +323,15 @@ note = "Finish on a supported profile fixture: upper hub OD and ream without rel
 top_feature = "hub_faces" # Z touches the upper hub face
 top_z = 0.0 # upper hub face (S1 op 10)
 bottom_z = -7.0565 # lower hub face (S2 op 10), nominal hub length
-bottom_z_cite = "harmonic-analyzer/cad/scripts/ch_rocker_arm_spec.py:117-121"
+bottom_z_cite = "harmonic-analyzer/cad/scripts/ch_rocker_arm_spec.py:122-126"
 
 [setups.stock_state.local_thickness]
 pivot_bore = 7.0565 # bore runs the full hub length
 rod_hole = 2.5 # rod bore runs the strap only
 
 [setups.stock_state.local_thickness_cite]
-pivot_bore = "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:542-544"
-rod_hole = "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:542-545"
+pivot_bore = "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:549-551"
+rod_hole = "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:549-552"
 
 [setups.stock_state.entry_z]
 pivot_bore = 0.0

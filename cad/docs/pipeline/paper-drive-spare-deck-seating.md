@@ -2,6 +2,25 @@
 
 > Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../subsystem-identities.md) for the canonical migration map.
 
+## October 9 base-deck redesign: X=160 -> X=140
+
+The user ruling of 2026-10-09 (ch30 p002/p003/p006, ch26 p.71 photos)
+removed the base's green raised rim. The base now carries a black deck
+X=-167.0..167.0, Z=-130.25..130.25 mm, standing 3.0 above a green land at
+Y=47.8, with a 0.79 edge break. The nameplate moved to X=117.67..163.0,
+Z=-50..50. At X=160 the T18 tip envelope (X=140..180) straddled the deck's
+3.0 west step, so the spare would rock.
+
+The storage station is now **(140, STACK_HEIGHT, -75) mm**. The tip envelope
+is X=120.1..159.9 and Z=-94.9..-55.1. It lies on the deck flat, 6.3 mm inside
+the break, and keeps its 5 mm from the plate's Z=-50 edge. The rocker-support
+foot ends at X=104.65, so it does not reach the spare.
+`test_spare_t18_footprint_is_on_the_flat_deck` now checks the deck bounds,
+inset by the break, instead of the rim. All of this is offline evidence. The
+native interference gate, contact readback and a fresh oblique render are
+still required at the next full build. The sections below are historical; their
+X=160 station and their rim bounds are superseded.
+
 ## September 7 native counterexample and revised placement
 
 The first candidate at `e864524b2cc559a04ef90c4d8884771fb2ad2b34`

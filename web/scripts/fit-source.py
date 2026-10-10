@@ -13,9 +13,11 @@ Posed/unknown assembly descriptors and runtime-instance anchors are explicitly r
 genuine supplied posed-view cameras use the shared validator instead.
 --historical-diagnostic explicitly selects old materialized derivative diagnostics.
 It allows private .json output only under web/.vite/verification-output or at
-resolved paths under /tmp or /var/tmp outside the whole checkout. Symlink
-escapes from the private output directory are rejected; current outputs and
-immutable historical namespaces remain off-limits.
+resolved paths under the platform-native temporary directory (tempfile.gettempdir()),
+/tmp or /var/tmp outside the whole checkout. Temporary roots and output paths
+are resolved before comparison, including platform symlinks. Symlink escapes
+from the private output directory are rejected; current outputs and immutable
+historical namespaces remain off-limits.
 Current CPU residuals are diagnostics, never camera-candidate or GPU/source acceptance gates.
 Native line CHECK scores add the unchanged final-source localization/raster bound
 once, plus explicitly certified independent geometry; no extra source raster allowance.
@@ -1824,7 +1826,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("observations", type=Path, help="Explicit .gz observations; historical diagnostics use their original storage")
     parser.add_argument("--inventory", type=Path, required=True, help="Actual native inventory, stored as ordinary JSON")
-    parser.add_argument("--output", type=Path, help="Gzip observations; --historical-diagnostic permits private .json only under web/.vite/verification-output or resolved /tmp or /var/tmp outside the checkout")
+    parser.add_argument("--output", type=Path, help="Gzip observations; --historical-diagnostic permits private .json only under web/.vite/verification-output or the platform-native temporary directory (tempfile.gettempdir()), /tmp or /var/tmp outside the whole checkout; temporary roots and output paths are resolved, including platform symlinks, and private-root symlink escapes are refused")
     parser.add_argument("--require-complete", action="store_true")
     parser.add_argument(
         "--historical-diagnostic", action="store_true",
@@ -1842,7 +1844,7 @@ def main():
         video_id=observations["source"]["videoId"],
     )
     if args.output:
-        contract.check_namespace(
+        output_path = contract.check_namespace(
             args.output, historical_diagnostic=args.historical_diagnostic,
             output=True, video_id=observations["source"]["videoId"],
         )
@@ -1852,11 +1854,13 @@ def main():
         historical_diagnostic=args.historical_diagnostic,
     )
     if args.output:
-        if args.historical_diagnostic:
-            common.write_observations(args.output, fitted)
-        else:
-            decoded = (json.dumps(fitted, indent=2) + "\n").encode("utf-8")
-            args.output.write_bytes(contract.encode_observation_bytes(decoded))
+        contents = json.dumps(fitted, indent=2) + "\n"
+        if args.output.suffix == ".gz":
+            contents = contract.encode_observation_bytes(contents.encode("utf-8"))
+        contract.write_output(
+            output_path, contents, declared_path=args.output,
+            historical_diagnostic=args.historical_diagnostic,
+        )
     summary = {
         key: value
         for key, value in report.items()

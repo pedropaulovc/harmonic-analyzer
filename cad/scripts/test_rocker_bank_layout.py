@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import _config
+import cam_plane
 import ch_amplitude_bar_spec as bar
 import channel_frame_geom as frame
 import channel_kinematics as ck
@@ -34,29 +35,60 @@ def test_hub_length_is_the_station_pitch_and_only_comes_out_long() -> None:
     upper, lower = arm.HUB_LENGTH_BAND
     assert lower == 0.0 < upper == pytest.approx(0.05)
     assert bank.STACK_L20 == pytest.approx(bank.COUNT * arm.HUB_LENGTH)
+    # #948 ruling R tightened the acceptance to +0.10/0 (a fit-up re-face).
     assert bank.STACK_L20_ACCEPT == pytest.approx(
-        (bank.STACK_L20, bank.STACK_L20 + 0.20)
+        (bank.STACK_L20, bank.STACK_L20 + 0.10)
     )
 
 
-def test_end_play_rule_is_the_cylinder_bank_rule() -> None:
-    """The rocker layout redefines the feeler rule rather than importing
-    cylinder_bank_layout (which would pull gear_train/cone_incline into the
-    pivot shaft's config deps); this pins the two in lockstep."""
-    assert bank.MIN_END_PLAY == drum_bank.MIN_END_PLAY
+def test_preload_rule_is_the_cylinder_bank_rule() -> None:
+    """The rocker layout shares ONE datum with cylinder_bank_layout (the cam
+    plane, its arm plane, from the cam_plane leaf) but restates the set-blade,
+    preload and fit-up compensation rules, because it has its own spring and datum ear; this
+    pins the two in lockstep."""
     assert bank.MARGIN_SPARE == drum_bank.MARGIN_SPARE
     assert bank.FEELER_STEP == drum_bank.FEELER_STEP
-    assert bank.ROCKER_END_FEELER_BAND == drum_bank.BANK_END_FEELER_BAND
-    assert bank.ROCKER_END_FEELER == pytest.approx(0.45)
-    assert bank.ROCKER_END_PLAY == pytest.approx((0.35, 0.55))
+    assert bank.ROCKER_SPRING_SET_BAND == drum_bank.BANK_SPRING_SET_BAND
+    assert bank.PRELOAD_LIMITS == drum_bank.PRELOAD_LIMITS
+    assert bank.MIC_RESIDUAL == drum_bank.MIC_RESIDUAL
+    assert bank.NORTH_EAR_LOCATE_BAND == drum_bank.BACK_STRAP_LOCATE_BAND
+
+
+def test_the_bank_is_preloaded_by_its_spring() -> None:
+    # #948 ruling R: the 0.45 leaf became a 9714K24 wave spring set on a 0.60
+    # blade; its whole set band stays in the spring's working range at a
+    # light, single-digit-newton preload; no end play, no shaft float.
+    assert bank.ROCKER_SPRING_SET == pytest.approx(0.60)
+    assert bank.ROCKER_SPRING_HEIGHT == pytest.approx((0.50, 0.70))
+    assert bank.ROCKER_PRELOAD == pytest.approx((2.17, 9.18), abs=0.01)
+    assert bank.ROCKER_SPRING_Z == (bank.SOUTH_EAR_INNER_Z, bank.SOUTH_WASHER_Z[0])
+    assert not hasattr(bank, "ROCKER_END_PLAY")
+    assert bank.NORTH_DATUM_STACK == pytest.approx(
+        {"north ear DRO locate": 0.10, "shaft shoulder, mic-compensated": 0.013}
+    )
+
+
+def test_the_rocker_spring_fits_the_shaft_and_under_the_bar_foot() -> None:
+    import vn_rocker_bank_spring_spec as spring
+
+    # The ch0 bar's foot passes over it as over the washer and the hubs.
+    assert spring.OD + spring.OD_BAND[0] <= washer.OD == arm.HUB_DIA
+    # It bears on the washer's face clear of the washer's bore.
+    assert spring.OD + spring.OD_BAND[1] > washer.BORE_DIA
+    # Nominal ID clears the shaft; the catalogue's -0.02 in reaches under it,
+    # which the channel assembly's slide-free check catches.
+    assert spring.SHAFT_CLEARANCE_NOMINAL == pytest.approx(0.1905)
+    assert spring.ID + spring.ID_BAND[1] < shaft.SHAFT_DIA
 
 
 def test_hub_mid_planes_are_the_channel_arm_planes() -> None:
     z0 = _config.machine("channels", "station_z0_mm")
     pitch = _config.machine("channels", "station_pitch_mm")
-    assert bank.ARM_MID_DZ == 0.8
+    # Option A (rod fork joint): the arm plane IS the cam plane.
+    assert bank.ARM_MID_DZ == cam_plane.CAM_MID_DZ
+    assert bank.ARM_MID_DZ == pytest.approx(-3.52825)
     for j in (0, 7, 19):
-        assert bank.hub_mid_z(j) == pytest.approx(z0 + pitch * j + 0.8)
+        assert bank.hub_mid_z(j) == pytest.approx(z0 + pitch * j + cam_plane.CAM_MID_DZ)
     assert bank.STACK_MID_Z == pytest.approx(
         (bank.hub_mid_z(0) + bank.hub_mid_z(19)) / 2
     )
@@ -75,10 +107,10 @@ def test_stack_closes_north_on_the_shoulder_against_the_north_ear() -> None:
     assert bank.NORTH_EAR_OUTER_Z == pytest.approx(
         bank.NORTH_EAR_INNER_Z + bracket.EAR_T
     )
-    assert bank.NORTH_EAR_INNER_Z == pytest.approx(75.889, abs=5e-4)
+    assert bank.NORTH_EAR_INNER_Z == pytest.approx(71.561, abs=5e-4)
 
 
-def test_south_bracket_is_feeler_set_off_the_thrust_washer() -> None:
+def test_south_bracket_is_set_off_the_thrust_washer_by_the_spring() -> None:
     assert bank.HUB0_SOUTH_FACE_Z == pytest.approx(
         bank.hub_mid_z(0) - arm.HUB_LENGTH / 2
     )
@@ -86,14 +118,13 @@ def test_south_bracket_is_feeler_set_off_the_thrust_washer() -> None:
         (bank.HUB0_SOUTH_FACE_Z - washer.THICKNESS, bank.HUB0_SOUTH_FACE_Z)
     )
     assert bank.SOUTH_WASHER_Z[0] - bank.SOUTH_EAR_INNER_Z == pytest.approx(
-        bank.ROCKER_END_FEELER
+        bank.ROCKER_SPRING_SET
     )
     assert bank.SOUTH_EAR_OUTER_Z == pytest.approx(
         bank.SOUTH_EAR_INNER_Z - bracket.EAR_T
     )
-    # 1/16 stock (1.59, was 1.50) moves the south ear 0.09 out; the end play
-    # is the feeler leaf, set at assembly, so it does not move with it.
-    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-68.781, abs=5e-4)
+    # The 0.60 spring set (was the 0.45 leaf) moves the south ear 0.15 out.
+    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-73.259, abs=5e-4)
 
 
 def test_brackets_sit_on_their_ears_and_move_in_from_78() -> None:
@@ -147,25 +178,26 @@ def test_shoulder_stays_on_its_bar_and_under_each_mating_od() -> None:
     assert shaft.SHOULDER_DIA <= washer.OD
 
 
-def test_no_keeper_is_needed_at_the_south_extreme() -> None:
-    """Shaft and stack pushed south by the full end play: the shoulder leaves
-    the north ear by E_r max, the north journal still bears on most of the
-    ear, the south end still fills its ear, and both domes stay proud."""
-    float_max = bank.ROCKER_END_PLAY[1]
-    assert bank.NORTH_JOURNAL_LENGTH - float_max >= 0.9 * bracket.EAR_T
-    assert bank.PIVOT_SHAFT_SOUTH_Z - float_max <= bank.SOUTH_EAR_OUTER_Z
-    assert shaft.DOME_HEIGHT - float_max > 0.5
+def test_the_spring_holds_the_shaft_on_the_north_ear() -> None:
+    """#948 ruling R reverses #743 Q4's "no keeper": the spring holds the
+    stack and the shoulder north, so the shaft never floats and the south
+    end fills its ear with its dome proud."""
+    assert bank.PIVOT_SHAFT_NORTH_Z - bank.NORTH_JOURNAL_LENGTH == pytest.approx(
+        bank.NORTH_EAR_INNER_Z
+    )
+    assert bank.PIVOT_SHAFT_SOUTH_Z <= bank.SOUTH_EAR_OUTER_Z
 
 
 def test_south_apex_stays_on_the_support_at_the_worst_case() -> None:
     """Main (a): both ends domed. The plain end is cut flush to +0.5 past the
-    south ear, then domed; floated south by E_r max, the apex must stay over
-    the rocker-arm-support's -88.9 end and no further out than the retired
-    170 shaft's end (-81.2), which nothing outboard ever touched."""
+    south ear, then domed; the apex must stay over the rocker-arm-support's
+    -88.9 end. Outboard of the south ear at the shaft's height there is only
+    the support's own top, so its end is the bound. The preloaded shaft no
+    longer floats south (#948 ruling R)."""
     assert bank.PLAIN_END_CUT_BAND == (0.5, 0.0)
-    assert bank.SOUTH_APEX_REACH_MAX == pytest.approx(0.5 + 1.5 + 0.55)
+    assert bank.SOUTH_APEX_REACH_MAX == pytest.approx(0.5 + 1.5)
     apex_z = bank.SOUTH_EAR_OUTER_Z - bank.SOUTH_APEX_REACH_MAX
-    assert apex_z > -81.2
+    assert apex_z == pytest.approx(-81.259, abs=5e-4)
     assert apex_z - (-88.9) >= 2.0
 
 
@@ -182,7 +214,7 @@ def test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case() -> None:
         washer.STOCK_THICKNESS_RANGE[0],
     ):
         clearance = standoff_min + face_offset_min - bar.BAR_WIDTH / 2
-        assert clearance >= bank.MIN_END_PLAY + bank.MARGIN_SPARE
+        assert clearance >= bank.RUNNING_FLOOR + bank.MARGIN_SPARE
     # Without a stand-off the bar would reach the ear.
     assert face_offset_min - bar.BAR_WIDTH / 2 < 0.0
     assert bank.BAR_TO_THRUST_EAR == pytest.approx(
@@ -285,9 +317,17 @@ def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(
     assert max(deltas) / fundamental(nom, nom.d_max) < 0.0005
 
 
-def test_layout_reads_only_the_channel_stations() -> None:
-    assert config_files_of(Path(bank.__file__)) == {"machine/channels.yaml"}
+def test_layout_reads_only_the_channel_stations_and_the_cam_plane() -> None:
+    """The rocker bank reads the channel stations and, for CAM_MID_DZ alone,
+    the cam_plane leaf over the cylinder gear spec: the arm plane is the cam
+    plane. Not the whole cylinder_bank_layout closure (whose bank pitch reads
+    gear_train/cone_incline; PR #1292 review F3), and no builder or notes
+    module joins it."""
+    assert config_files_of(Path(bank.__file__)) == config_files_of(
+        SCRIPTS / "cam_plane.py"
+    ) | {"machine/channels.yaml"}
     deps = {Path(p).name for p in module_deps_of(Path(bank.__file__))}
+    assert "cam_plane.py" in deps
     assert deps.isdisjoint(
         {
             "cylinder_bank_layout.py",
@@ -298,12 +338,17 @@ def test_layout_reads_only_the_channel_stations() -> None:
     )
 
 
-def test_pivot_parts_read_no_gear_train_config() -> None:
+def test_pivot_parts_read_only_the_rocker_bank_config() -> None:
+    """The shaft reads the stations and the cam plane through the rocker bank
+    layout; the bracket and washer read no machine config at all."""
     shaft_cfg = config_files_of(SCRIPTS / "build_ch_pivot_shaft.py")
-    assert "machine/channels.yaml" in shaft_cfg
-    assert {"machine/gear_train.yaml", "machine/cone_incline.yaml"}.isdisjoint(
-        shaft_cfg
-    )
+    machine_cfg = {t for t in shaft_cfg if t.startswith("machine/")}
+    # The cam plane's cylinder gear spec also reads the shared title-block
+    # and tolerance tables (its printed gear bands); only machine files are
+    # the rocker bank's stations.
+    assert machine_cfg == {
+        t for t in config_files_of(Path(bank.__file__)) if t.startswith("machine/")
+    }
     assert not any(
         t.startswith("machine/")
         for t in config_files_of(SCRIPTS / "build_ch_pivot_bracket.py")

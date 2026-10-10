@@ -262,11 +262,11 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
     # breaks, and the dog's tighter limit is printed once on its diameter.
     assert "add_chamfer" not in source
     # One line: an above callout's line break prints nothing (main's guard).
-    assert drawing.DOG_EDGE_CALLOUT == f"STONE DOG EDGE {spec.DOG_EDGE_BREAK:.2f} MAX"
-    assert drawing._printable_above_callouts({"DogDia": drawing.DOG_EDGE_CALLOUT})
+    assert spec.DOG_EDGE_CALLOUT == f"STONE DOG EDGE {spec.DOG_EDGE_BREAK:.2f} MAX"
+    assert drawing._printable_above_callouts({"DogDia": spec.DOG_EDGE_CALLOUT})
     with pytest.raises(RuntimeError, match="do not print"):
         drawing._printable_above_callouts({"DogDia": "DOG EDGE:\nSTONE"})
-    assert '_printable_above_callouts({"DogDia": DOG_EDGE_CALLOUT})' in drawing_source
+    assert '_printable_above_callouts({"DogDia": spec.DOG_EDGE_CALLOUT})' in drawing_source
     # The screw faces come from the faces the screw view draws.
     assert "_view_faces(\n        screw," in drawing_source
     assert "_resolve_faces" not in drawing_source

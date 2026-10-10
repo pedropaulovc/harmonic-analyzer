@@ -6,9 +6,9 @@ sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 The strap is a long thin curved seesaw (~292 mm tip to tip, 16 mm deep, 2.5 mm
-thick).  A projected side view of the curved strap is a messy band, so the
-16 x 2.5 section is carried in the notes and the print shows the profile (front)
-plus a 1:2 isometric.  The sheet runs at 1:2.
+thick).  The print shows the profile (front), a 1:1 end view that carries the
+strap's 2.500 +/-0.025 thickness and the hub length natively, plus a 1:4
+isometric.  The sheet runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -277,8 +277,15 @@ FRONT_KEEP = {
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
 # The hub length (+0.05/0, #743 PR2) under the end view, where the hub shows
 # its full length (the end view is 1:1, centred on the pivot mid-depth).
+# The strap thickness (+/-0.025, ARM_THICKNESS_BAND, Main ruling 2026-10
+# option b) right of the end view, its line across the strap ABOVE the hub
+# and 3 mm above datum B's attachment (broad_face, RIGHT_CENTER y + 0.007),
+# so its outside arrows clear datum B's down-left leader; the text sits under
+# the iso caption (top y 0.183) and right of the end view.
+STRAP_THICKNESS_TEXT_XY = (RIGHT_CENTER[0] + 0.017, RIGHT_CENTER[1] + 0.010)
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "HubLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - (_PIVOT_MID_Y + 12.0) / 1000.0),
+    "StrapThickness": STRAP_THICKNESS_TEXT_XY,
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 
@@ -388,8 +395,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Explicit per-view scale (an auto-scaled view shifts every coordinate pick).
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
-    # 1:1 right end view: the 2.50 x ~29 strap section -- shows the section the
-    # profile notes describe, gives the through direction, and carries datum B
+    # 1:1 right end view: the 2.50 x ~29 strap section -- prints the strap
+    # thickness and hub length, gives the through direction, and carries datum B
     # (the broad face) so the rod-pin position frame has an orientation datum.
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
@@ -407,11 +414,11 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The hub length only shows its length in the end view; the front looks
-    # down the hub's axis. Codex #936 (PRRT_kwDOPHDy386mRk__): RIGHT_KEEP was
-    # declared but never curated, so the +0.05/0 band that sets all 20
-    # channel stations never printed. Targeted by feature, so only Hub's
-    # dimensions arrive.
+    # The hub length and the strap thickness only show in the end view; the
+    # front looks down their direction. Codex #936 (PRRT_kwDOPHDy386mRk__):
+    # RIGHT_KEEP was declared but never curated, so the +0.05/0 band that sets
+    # all 20 channel stations never printed. Targeted by feature, so only
+    # Hub's and Strap's dimensions arrive, each selected by its feature name.
     curate_view_dimensions(
         adapter,
         right,

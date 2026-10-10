@@ -41,7 +41,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # threadlocker are the print's business, not an assembly aside.
 DRAWING_NOTES = "\n".join(
     (
-        f"1. HEX TRUNNIONS {HEX_W:.2f} W x {HEX_H:.2f} HIGH,",
+        f"1. HEX TRUNNIONS {HEX_W:.3f} W x {HEX_H:.3f} HIGH,",
         f"   {HEX_DEPTH:.2f} LONG EACH END; VERTEX UP",
         "   IS THE KNIFE EDGE.",
         f"2. COEFFICIENT PLATE {PLATE_T:.2f} THICK.",

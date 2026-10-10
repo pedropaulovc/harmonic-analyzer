@@ -114,11 +114,6 @@ SCREW_KEEP = {
 }
 DATUM_D_XY = (THREAD_LEFT_X + 0.003, SCREW_CENTER[1] + 0.003)
 DOG_RUNOUT_XY = (DOG_LEFT_X - 0.040, SCREW_CENTER[1] - 0.027)
-# The dog's edge-break limit, printed above DogDia.  One line: SolidWorks
-# stores an above callout's line break but prints none of it (main's
-# pd_transgear drawings; the cone shaft's torque corners at
-# 20261010T071427837Z).  Stoning is named because it matches the number.
-DOG_EDGE_CALLOUT = f"STONE DOG EDGE {spec.DOG_EDGE_BREAK:.2f} MAX"
 
 
 def _configuration(adapter, views, name):
@@ -434,7 +429,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, marks, _precision(SCREW_KEEP))
     # Above the value: the freed lane where the old break dimension stood.
     set_dimension_callouts(
-        adapter, marks, _printable_above_callouts({"DogDia": DOG_EDGE_CALLOUT}),
+        adapter, marks, _printable_above_callouts({"DogDia": spec.DOG_EDGE_CALLOUT}),
         location="above",
     )
     # The major and dog diameters draw as a revolve's flank SILHOUETTES, not

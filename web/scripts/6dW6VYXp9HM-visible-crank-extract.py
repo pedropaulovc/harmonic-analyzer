@@ -6,6 +6,8 @@ The default output and preview crops stay in private .vite verification storage.
 never published/canonical content. No native metadata or native code is consumed.
 The filename-derived source-pixel-support directory follows --output; the default
 uses a distinct source-pixels folder, never the original private capture folder.
+The receipt and support directory must be new entries; existing files,
+directories and filesystem aliases are refused rather than reused.
 
 Linearly interpolate frames[].relativeCrankTurns only inside the measured shot
 interval. Positive means clockwise in ORIGINAL pixels; native shaft sign/home,
@@ -42,9 +44,36 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def save(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, separators=(',', ':'), allow_nan=False) + '\n')
+def create_support_directory(path, *, declared_path):
+    """Create only the initially validated, still absent support directory."""
+    if (
+        common.fresh.check_namespace(declared_path, historical_diagnostic=True, output=True) != path
+        or common.fresh.check_namespace(path, historical_diagnostic=True, output=True) != path
+    ):
+        raise ValueError('Support directory changed after validation')
+    for destination in (Path(declared_path), path):
+        try:
+            destination.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            raise FileExistsError(f'Source-pixel support requires a new directory: {destination}')
+    path.mkdir(parents=True, exist_ok=False)
+
+
+def save(path, value, *, declared_path):
+    common.fresh.write_output(
+        path, json.dumps(value, separators=(',', ':'), allow_nan=False) + '\n',
+        declared_path=declared_path, historical_diagnostic=True)
+
+
+def save_preview(path, image, *, declared_path):
+    encoded, contents = cv2.imencode('.png', image)
+    if not encoded:
+        raise ValueError('Cannot encode source-pixel support preview')
+    common.fresh.write_output(
+        path, contents.tobytes(), declared_path=declared_path,
+        historical_diagnostic=True)
 
 
 def collar(image):
@@ -156,10 +185,13 @@ def main():
     parser.add_argument('--output', type=Path, default=OUTPUT)
     args = parser.parse_args()
     try:
-        common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
-        output = args.output.resolve()
-        support = output.parent / f'{output.stem}-source-pixel-support'
-        common.fresh.check_namespace(support, historical_diagnostic=True, output=True)
+        output = common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
+        declared_support = args.output.parent / f'{args.output.stem}-source-pixel-support'
+        support = common.fresh.check_namespace(declared_support, historical_diagnostic=True, output=True)
+        declared_preview = declared_support / 'track-contact.png'
+        preview = common.fresh.check_namespace(declared_preview, historical_diagnostic=True, output=True)
+        declared_measurements = declared_support / 'measurements.json'
+        measurements = common.fresh.check_namespace(declared_measurements, historical_diagnostic=True, output=True)
     except ValueError as error:
         parser.error(str(error))
     if args.video.resolve().is_relative_to((WEB / 'content/v39-source').resolve()):
@@ -167,7 +199,7 @@ def main():
     producer_hash = sha(Path(__file__))
     if sha(args.video) != EXPECTED_SHA:
         raise ValueError('Unexpected original source identity')
-    support.mkdir(parents=True, exist_ok=True)
+    create_support_directory(support, declared_path=declared_support)
     probe = json.loads(subprocess.check_output([
         'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_frames',
         '-show_entries', 'frame=pts,best_effort_timestamp_time', '-of', 'json', str(args.video)]))['frames']
@@ -199,12 +231,13 @@ def main():
     cap.release()
     while len(previews)%12:
         previews.append(np.zeros_like(previews[0]))
-    cv2.imwrite(str(support/'track-contact.png'), np.vstack([np.hstack(previews[i:i+12]) for i in range(0,len(previews),12)]))
-    save(support/'measurements.json', {
+    save_preview(preview, np.vstack([np.hstack(previews[i:i+12]) for i in range(0,len(previews),12)]),
+                 declared_path=declared_preview)
+    save(measurements, {
         'kind': 'historical-source-pixel-measurements', 'historicalDiagnostic': True,
         'publishable': False, 'productionIntegrated': False,
         'geometryAuthority': None, 'authorityScope': 'original-source-pixels-only',
-        'frames': rows})
+        'frames': rows}, declared_path=declared_measurements)
     assert all(row['fitFeature'] is not None for row in rows), 'Do not interpolate unavailable FIT observations'
     motion = relative_motion(rows)
     packet = {
@@ -242,7 +275,7 @@ def main():
         'measurement': motion, 'frames': rows}
     if sha(Path(__file__)) != producer_hash or sha(args.video) != EXPECTED_SHA:
         raise ValueError('Producer or original source changed during extraction')
-    save(output, packet)
+    save(output, packet, declared_path=args.output)
     print(json.dumps(motion))
     print(json.dumps({'output':str(output),'supportDirectory':str(support),
                       'frames':len(rows),'missing':[r['frameIndex'] for r in rows if r['fitFeature'] is None]}))

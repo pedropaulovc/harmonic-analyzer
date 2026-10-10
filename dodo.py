@@ -3045,6 +3045,9 @@ def task_check():
         SCRIPTS_DIR / "test_transgear_hanger_joints.py",
         # Matched stock-dowel registration and paid loaded plate motion.
         SCRIPTS_DIR / "test_paper_drive_arm_registration.py",
+        # The #6-32 knife hanger's tap web, screw reach and dowel stack at the
+        # printed bands, and the retired 1/2-13 tap failing the same web formula.
+        SCRIPTS_DIR / "test_knife_hanger_worst_case.py",
         # The paper-drive interference rows re-derived from their owner specs
         # (_interference_contracts writes them as literals).
         SCRIPTS_DIR / "test_pd_paper_drive_interference_contracts.py",
@@ -3153,6 +3156,8 @@ def task_check():
         # The amplitude bar's pressed MHA-CH-011 pin: its worst-case press,
         # running fit and flush-end gap budget, pinned to their sources.
         SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",
+        # The rod fork / peened MHA-CH-010 pin joint's worst-case budget.
+        SCRIPTS_DIR / "test_ch_rod_pivot_fit.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
@@ -3303,15 +3308,26 @@ def task_check():
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
         },
         "nameplate": {
-            # Guards the vendored engraving DXF the nameplate build imports; the
-            # DXF is now the source of truth (the re-traced coordinate loops are
-            # retired), so the gate depends on the file + its integrity test.
+            # The plate outline, notched field and engraving are all vendored
+            # geometry; any contour or its pinned area/bbox must invalidate this
+            # SolidWorks-free integrity gate.
             "file_dep": [
                 str((SCRIPTS_DIR / "test_fr_nameplate_geometry.py").resolve()),
                 str((SCRIPTS_DIR / "fr_nameplate_spec.py").resolve()),
+                str((SCRIPTS_DIR / "build_fr_nameplate.py").resolve()),
                 str(
                     (
                         REPO_ROOT / "cad" / "references" / "fr-nameplate-engraving.dxf"
+                    ).resolve()
+                ),
+                str(
+                    (
+                        REPO_ROOT / "cad" / "references" / "fr-nameplate-outline.dxf"
+                    ).resolve()
+                ),
+                str(
+                    (
+                        REPO_ROOT / "cad" / "references" / "fr-nameplate-field.dxf"
                     ).resolve()
                 ),
             ],

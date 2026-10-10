@@ -1,7 +1,7 @@
 r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 
 Static structure of the machine: the stepped cast base, four polished tube
-columns seated one inch into blind base sockets, the rocker-arm support, and
+columns seated 22.4 into blind base sockets, the rocker-arm support, and
 the top-frame casting. Eight stock 90280A837 cross screws enter from the
 front/rear, clear both tube walls, and engage the far casting wall as well as
 the near wall. The visible frame pose and evidence-locked top station remain
@@ -12,8 +12,8 @@ axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28.7 cm
 flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 "28 cm" callout; see ``fr_harmonic_base_spec.TOP_WIDTH``):
 
-* harmonic-base fixed at the origin, deck at Y=50.8, with four 25.4-deep
-  sockets.
+* harmonic-base fixed at the origin, deck at Y=50.8, with four 22.4-deep
+  sockets opening on the green land at Y=47.8.
 * tube-frame x4 inserted at Y=25.4 near the top-plate corners at
   x +/-197, z +/-112, preserving the prior visible span.
 * rocker-arm-support x1 (the windowed trapezoidal NORTH support,
@@ -52,11 +52,10 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 * frame-cross-screw x8 + gooseneck-set-screw x1: four lower and four upper
   casting-to-column retainers plus the top-frame hub fastener, each placed at
   its shared physical station and locked to the fixed base.
-* nameplate x1: the maker's plate (book ch. 26), laid FLAT on the base top
-  face on the EAST (+X) side, decorated side up, centred front-back between the
-  two east columns and read by an operator at that face. Cosmetic; constrained
-  at its measured transform and locked to the fixed base (see
-  fr_nameplate_spec.MOUNT_POS).
+* nameplate x1: the maker's plate (book ch. 26; user ruling 2026-10-09), laid
+  FLAT on the WEST (+X) end of the black deck, decorated side up and read by
+  an operator west of the machine. Cosmetic; constrained at its shared
+  transform and locked to the fixed base (see fr_nameplate_spec.MOUNT_POS).
 * fillister-screw x4 (2026-09-02 ch26 p.71 re-derive): the brass slotted
   round-head screws at the plate's four corners, heads seated on the
   decorated face, shanks down through the plate's #4 clearance holes into the
@@ -150,6 +149,7 @@ from fr_nameplate_spec import (
     MOUNT_HOLE_XZ as NAMEPLATE_SCREW_STATIONS,
     MOUNT_POS as NAMEPLATE_POS,
     MOUNT_ROWS as NAMEPLATE_ROWS,
+    PLATE_HEIGHT as NAMEPLATE_HEIGHT,
     PLATE_THICKNESS as NAMEPLATE_THICKNESS,
 )
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as LAG_FOOT_THICKNESS
@@ -303,9 +303,9 @@ GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
 SET_SCREW_TIP_X = -205.15  # 0.15 clear (outboard) of the Ø16 post surface -205
 SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - GOOSENECK_SHANK_LEN
 
-# Maker's nameplate (book ch. 26, pp. 70-71): the 100 x 55 brass plate lies FLAT
-# on the base top, decorated side up, on the EAST (+X) face. The mount
-# transform (NAMEPLATE_POS / _EULER / _ROWS, formerly authored here) now lives
+# Maker's nameplate (ch.26 p.71; user ruling 2026-10-09): its traced outer edge
+# defines the brass plate, flat on the black deck's WEST (+X) end, decorated up.
+# The transform (NAMEPLATE_POS / _EULER / _ROWS, formerly authored here) now lives
 # in fr_nameplate_spec -- the pure-data contract build_fr_harmonic_base reads to
 # derive the tapped seats under the plate's corner screws -- so the plate, the
 # base taps and the screws below derive from ONE source; the provenance and
@@ -324,13 +324,13 @@ if any(
 # nameplate screws (2026-09-02 ch26 p.71 re-derive): 4x #4-40 brass
 # fillister-screw, one per plate corner, screwed DOWN into the base's blind
 # #4-40 taps (fr_harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the plate's own
-# corner holes carried through the mount transform: x 209.75/163.75,
-# z +/-45.5). The part is authored axis along local +Z with the origin at the
-# UNDER-HEAD bearing plane, head at -Z. The stock wrapper preserves that frame,
-# so the placement point is the under-head seat on the plate's decorated face
-# (y NAMEPLATE_FRONT_Y 52.3) and ROT_X_POS90 (euler [90,0,0]) turns local +Z
-# -> -Y. The stock 6.35 shank passes through the 1.5 plate with 4.85 engaged
-# in the existing 6.0 thread; the 2.7178 head sits above the deck rim.
+# DXF-mark holes carried through the shared mount transform). The part is
+# authored axis along local +Z with the origin at the UNDER-HEAD bearing plane,
+# head at -Z. The stock wrapper preserves that frame, so the placement point is
+# the under-head seat on the plate's decorated face (y NAMEPLATE_FRONT_Y) and
+# ROT_X_POS90 (euler [90,0,0]) turns local +Z -> -Y. The stock shank passes
+# through NAMEPLATE_THICKNESS into the existing base threads; the head sits
+# above the decorated face.
 # The under-head plane seats FLUSH on the plate face, exactly as the
 # paper-drive seats the same screw on its clips. The stock external thread
 # engages the matching #4-40 base seat rather than using a tap-drill-sized
@@ -634,9 +634,10 @@ async def build(adapter) -> dict[str, str]:
     if not res.data.get("fixed"):
         raise RuntimeError("base component was not auto-fixed")
 
-    # Columns seat 25.4 into the four base sockets. Lowering the authored
-    # origin from the deck to COLUMN_BOTTOM_Y preserves the previous exposed
-    # span and every upper attachment station.
+    # Columns seat 22.4 into the four base sockets, whose mouths open on the
+    # green land. Lowering the authored origin to COLUMN_BOTTOM_Y (y 25.4, the
+    # socket floor) preserves the exposed span and every upper attachment
+    # station.
     column_target = [COLUMN_X, COLUMN_BOTTOM_Y, REAR_COLUMN_Z]
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=column_path, position=column_target)
@@ -795,9 +796,9 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, cap_name, cap_target, IDENTITY)
 
-    # Maker's nameplate: laid flat on the base top, decorated face up, on the
-    # EAST face, centred front-back between the two east columns (see
-    # NAMEPLATE_POS / NAMEPLATE_ROWS). Cosmetic + rigid -> locked to the base.
+    # Maker's nameplate: flat on the WEST end of the black base deck, decorated
+    # face up, centred front-back (see NAMEPLATE_POS / NAMEPLATE_ROWS).
+    # Cosmetic + rigid -> locked to the base.
     nameplate_name = await place_component(
         adapter,
         "fr-nameplate",
@@ -820,7 +821,10 @@ async def build(adapter) -> dict[str, str]:
     # NAMEPLATE_SCREW_* constants). Rigid fasteners -> the same single-mate
     # fix-all treatment as the frame-side screws below.
     for nx, nz in NAMEPLATE_SCREW_STATIONS:
-        tag = f"{'rear' if nz > 0 else 'front'} {'east' if nx > 200.0 else 'west'}"
+        tag = (
+            f"{'rear' if nz > 0 else 'front'} "
+            f"{'west' if nx > NAMEPLATE_POS[0] - NAMEPLATE_HEIGHT / 2.0 else 'east'}"
+        )
         np_target = [nx, NAMEPLATE_FRONT_Y, nz]
         np_screw = await place_component(
             adapter,

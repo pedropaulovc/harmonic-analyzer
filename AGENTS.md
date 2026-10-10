@@ -761,7 +761,8 @@ coverage test fails loud otherwise).
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
 that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF
 contract: `free_dof`/`free_dof_per_active_channel`, `required_free_stems`,
-`allowed_free_stems`) lives in its own file, read through
+`allowed_free_stems`; and `carries_chain`, which hands the soundness
+interference gate the chain's wheel mounts) lives in its own file, read through
 `_assembly_contract.py` — never as a stem-keyed table in `_assembly.py` (on every
 assembly's recipe: one drive-train seed there used to re-key all eight
 assemblies and every gate behind them) or `verify.py` (on every soundness

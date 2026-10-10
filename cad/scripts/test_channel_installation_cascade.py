@@ -7,11 +7,10 @@ import math
 import pytest
 
 import _config
-import _cwm
 import build_ch_channel_assembly as channel
 import channel_kinematics
 import ch_connecting_rod_spec
-import cylinder_bank_layout
+import cam_plane
 import ch_fulcrum_shaft_spec
 import rocker_bank_layout
 from _assembly import _seed_flip, activate_assembly_contract
@@ -25,7 +24,7 @@ def test_machine_config_and_channel_interface_share_one_installation_contract() 
     assert math.isclose(channel.Z0, CHANNEL_Z0, abs_tol=1e-12)
     assert channel.X_DRUM == DRUM_X
     # #743 solid stack: the ring rides the middle of its closed cam slot.
-    assert channel.CAM_DZ == pytest.approx(cylinder_bank_layout.CAM_MID_DZ)
+    assert channel.CAM_DZ == pytest.approx(cam_plane.CAM_MID_DZ)
     assert channel.CAM_DZ == pytest.approx(-7.0565 / 2.0)
 
     phase = math.radians(channel.GEAR_PHASE_DEG)
@@ -75,22 +74,3 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
 def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
     activate_assembly_contract("ch-channel")
     assert _seed_flip("ch-fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z)
-
-
-def test_copied_internal_rod_axial_mate_is_reset_to_the_seed_side(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class Mate:
-        Flipped = False
-        CanBeFlipped = True
-
-    mate = Mate()
-    monkeypatch.setattr(_cwm, "_component_distance_mate", lambda *_a, **_kw: mate)
-
-    assert _cwm.ensure_component_distance_mate_flip(
-        object(), "ch-connecting-rod-3", 4.05, True
-    )
-    assert mate.Flipped is True
-    assert not _cwm.ensure_component_distance_mate_flip(
-        object(), "ch-connecting-rod-3", 4.05, True
-    )

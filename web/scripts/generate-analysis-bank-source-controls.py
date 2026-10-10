@@ -3,6 +3,7 @@
 
 Run with --historical-diagnostic. Source pixels/uncertainties are copied, never
 projected or interpolated. This packet cannot amend current production tracks.
+Outputs are write-once diagnostic files; existing entries are never replaced.
 """
 import copy
 import argparse
@@ -126,13 +127,14 @@ def main():
     parser.add_argument("--output", type=Path, default=WEB / ".vite/verification-output/compact-source-refinement/analysis-bank-source-controls.json")
     args = parser.parse_args()
     try:
-        common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
-        output = args.output.resolve()
+        output = common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
     except ValueError as error:
         parser.error(str(error))
     packet = build_packet(historical_diagnostic=args.historical_diagnostic)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(packet,separators=(",",":"),allow_nan=False)+"\n")
+    common.fresh.write_output(
+        output, json.dumps(packet,separators=(",",":"),allow_nan=False)+"\n",
+        declared_path=args.output, historical_diagnostic=args.historical_diagnostic)
     print(output)
     print(json.dumps(packet["sourceMeasurementCounts"]))
 
