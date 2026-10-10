@@ -1,203 +1,197 @@
-"""Integrity guard for the nameplate's vendored engraving DXF.
+"""SolidWorks-free integrity guards for the photo-traced nameplate contours.
 
-``build_nameplate`` no longer draws the engraving from hard-coded coordinate
-loops -- it **imports** the vendored DXF (``cad/references/fr-nameplate-engraving.dxf``)
-onto the decorated face and cuts the whole artwork (lettering + scroll cartouche
-+ pinstripe frame) as one feature (``adapter.import_dxf_dwg`` ->
-``IFeatureManager::InsertDwgOrDxfFile2``). The DXF is now the source of truth.
+The 2026-10-09 ruling makes the original outer ribbon's OUTER edge the plate
+outline, uniformly scaled to 100 mm wide. That edge is imported for the slab;
+the ribbon itself is omitted from the engraving so it cannot nick the plate.
+The recessed field follows the notched pinstripe INNER edge, copied into its
+own single-loop DXF. Screw holes must coincide with the traced head marks and
+the whole head must bear on the raised border, not the sunken field.
 
-That vendored DXF is a CLOSED-REGION rendering of the traced artwork: the raw
-photo trace is outline line-art (open strokes, hollow letters) that a cut-extrude
-cannot turn into a feature, so each stroke was buffered into a thin closed ribbon
-and the ribbons unioned into closed modelspace polylines that cut as grooves (see
-``build_nameplate`` docstring). So the file is a flat set of **closed LWPOLYLINEs**
-in the ENTITIES section -- no blocks, no open contours.
-
-This test is the kernel-free, dependency-free guard on that file: it confirms the
-DXF is present, is a millimetre-unit DXF (``$INSUNITS = 4`` -- the build imports it
-as mm), carries the expected population of CLOSED polyline regions (not an empty,
-open, or wrong export), and that its artwork extent matches what the build's import
-scale (``ENGRAVING_RAW_WIDTH``) assumes. A DXF that is swapped, re-exported at a
-different unit, truncated, or left with open contours fails here rather than
-silently producing a mis-scaled or uncuttable engraving on the live SolidWorks seat
-(where ``build_nameplate`` itself bounds-checks the removed volume).
-
-Parsed with a tiny regex reader over the ASCII DXF group-code pairs -- no ezdxf,
-no CAD kernel -- so it runs in the SolidWorks-free ``check:nameplate`` gate.
-
-Run directly for a full report::
-
-    python cad/scripts/test_fr_nameplate_geometry.py
+Reuse the repo's ASCII DXF/polygon helpers: no ezdxf or CAD kernel is needed.
+These tests run in check:nameplate and guard units, closed contours, exact
+extents/areas, mount geometry and all three vendored recipe inputs.
 """
 
 from __future__ import annotations
 
+import math
 import re
 from collections import Counter
 from pathlib import Path
 
-import _telemetry
+import numpy as np
+import pytest
 
-ENGRAVING_DXF = Path(__file__).resolve().parents[1] / "references" / "fr-nameplate-engraving.dxf"
-
-# Golden facts about the closed-region artwork, captured from the vendored DXF. The
-# build imports it as millimetres and uniform-scales its outer frame
-# (ENGRAVING_RAW_WIDTH in build_nameplate) to the plate footprint, so both the unit
-# and the extent are load-bearing for a correctly-placed engraving.
-GOLDEN_INSUNITS = 4  # 4 = millimetres (build imports as mm)
-# Artwork bounding box in the modelspace ENTITIES. The file is authored at FINAL
-# plate-mm (the Makers seat ignores the import scale), so the outer frame spans the
-# 88 mm plate footprint exactly. Guards against truncation / a wrong-unit re-export.
-GOLDEN_COORD_WIDTH = 88.000  # artwork bbox width (mm, +/- 1%)
-GOLDEN_COORD_HEIGHT = 39.892  # artwork bbox height (mm, +/- 1%)
-# The buffered-ribbon union yields many closed polyline regions (letter strokes,
-# frame, scroll, screws). An empty or under-populated export is not the engraving.
-MIN_CLOSED_REGIONS = 90  # closed LWPOLYLINE rings (112 as vendored)
+import _dxf_text as dxf
+import build_fr_nameplate as part
+import fr_nameplate_spec as spec
+from vn_fillister_screw_spec import HEAD_DIA
 
 
-def _read() -> str:
-    return ENGRAVING_DXF.read_text(encoding="utf-8", errors="replace")
+def _read(path: Path) -> str:
+    return path.read_text(encoding="ascii")
 
 
-def _header_int(txt: str, var: str) -> int | None:
-    """Read an integer ``$VAR`` from the DXF HEADER section (group code 70)."""
-    m = re.search(rf"\${var}\n\s*70\n\s*(-?\d+)", txt)
-    return int(m.group(1)) if m else None
+def _entities_section(text: str) -> str:
+    start = text.find("\nENTITIES\n")
+    end = text.find("\nENDSEC\n", start)
+    assert start >= 0 and end > start, "missing ENTITIES section"
+    return text[start:end]
 
 
-def _entities_section(txt: str) -> str:
-    start = txt.find("\nENTITIES\n")
-    end = txt.find("\nENDSEC\n", start)
-    return txt[start:end] if start >= 0 and end > start else ""
+def _rings(path: Path) -> list[dxf.Ring]:
+    return [ring for ring, _ in dxf.read_lwpolylines(_entities_section(_read(path)))]
 
 
-def _entity_counts(seg: str) -> Counter:
-    return Counter(re.findall(r"\n  0\n(\w+)\n", seg))
+@pytest.mark.parametrize(
+    ("path", "count"),
+    [(part.ENGRAVING_DXF, 110), (part.OUTLINE_DXF, 1), (part.FIELD_DXF, 1)],
+    ids=["engraving", "outline", "field"],
+)
+def test_vendored_dxf_has_only_closed_millimetre_contours(path: Path, count: int):
+    assert path.is_file(), path
+    text = _read(path)
+    assert dxf.header_int(text, "INSUNITS") == 4
+    assert "AC1024" in text  # retain the source R2010 header/units
+    assert text.endswith("  0\nEOF\n")
+    section = _entities_section(text)
+    counts = Counter(re.findall(r"\n  0\n(\w+)\n", section))
+    assert counts == {"LWPOLYLINE": count}, counts
+    entities = dxf.read_lwpolylines(section)
+    assert len(entities) == count
+    assert all(closed and len(ring) >= 3 for ring, closed in entities)
+    # Every contour is a planar line loop, not an unparsed arc/width/extrusion.
+    assert not re.search(r"\n (?:38|39|40|41|42)\n(?!0(?:\.0)?\n)", section)
 
 
-def _closed_flags(seg: str) -> list[int]:
-    """Per-LWPOLYLINE closed flag (group 70 after the AcDbPolyline vertex count 90)."""
-    return [int(f) for f in re.findall(r"AcDbPolyline\n\s*90\n\s*\d+\n\s*70\n\s*(\d+)", seg)]
+def test_engraving_extent_matches_the_baked_import_constants():
+    bounds = dxf.bbox(_rings(part.ENGRAVING_DXF))
+    assert bounds == pytest.approx(part.ENGRAVING_RAW_BBOX, abs=1e-9)
+    width = bounds[2] - bounds[0]
+    centre = ((bounds[0] + bounds[2]) / 2.0, (bounds[1] + bounds[3]) / 2.0)
+    assert width == pytest.approx(part.ENGRAVING_TARGET_WIDTH, abs=1e-9)
+    assert centre == pytest.approx(part.ENGRAVING_CENTER, abs=1e-9)
+    assert part.ENGRAVING_SCALE == pytest.approx(1.0, abs=1e-12)
+    assert part.ENGRAVING_POSITION == (0.0, 0.0)
+    # The dropped edge ribbon is not imported as a cut: all remaining vertices
+    # are strictly inside the plate's outer contour.
+    outline = _rings(part.OUTLINE_DXF)[0]
+    assert all(
+        dxf.point_in_ring(outline, point)
+        for ring in _rings(part.ENGRAVING_DXF)
+        for point in ring
+    )
 
 
-def _artwork_bbox(seg: str) -> tuple[float, float]:
-    """Width/height of the modelspace geometry from its (10, 20) vertex coordinates."""
-    xs = [float(v) for v in re.findall(r"\n 10\n([-0-9.eE+]+)\n", seg)]
-    ys = [float(v) for v in re.findall(r"\n 20\n([-0-9.eE+]+)\n", seg)]
-    return (max(xs) - min(xs), max(ys) - min(ys))
+def test_plate_outline_is_the_scaled_dxf_outer_edge():
+    outline = _rings(part.OUTLINE_DXF)[0]
+    bounds = dxf.bbox([outline])
+    assert bounds == pytest.approx(
+        (0.0, 0.0, spec.PLATE_WIDTH, spec.PLATE_HEIGHT), abs=1e-9
+    )
+    assert spec.PLATE_WIDTH == spec.DXF_OUTER_WIDTH * spec.DXF_SCALE
+    assert spec.PLATE_HEIGHT == spec.DXF_OUTER_HEIGHT * spec.DXF_SCALE
+    assert abs(dxf.signed_area(outline)) == pytest.approx(
+        part.OUTLINE_AREA_MM2, abs=1e-8
+    )
+    # The trace is retained, not replaced by a four-sided rectangle or fitted
+    # rounded rectangle; the outer contour has its original 117 vertices.
+    assert len(outline) == 117
+    assert abs(dxf.signed_area(outline)) < spec.PLATE_WIDTH * spec.PLATE_HEIGHT
 
 
-def _pct(got: float, ref: float) -> float:
-    return 100.0 * (1.0 - abs(got - ref) / abs(ref))
+def test_corner_radius_matches_the_traced_outer_corner():
+    outline = np.asarray(_rings(part.OUTLINE_DXF)[0])
+    corner = outline[(outline[:, 0] < 4.1) & (outline[:, 1] < 4.1)]
+    assert len(corner) >= 20
+    matrix = np.column_stack(
+        (2.0 * corner[:, 0], 2.0 * corner[:, 1], np.ones(len(corner)))
+    )
+    cx, cy, constant = np.linalg.lstsq(matrix, np.sum(corner**2, axis=1), rcond=None)[0]
+    radius = math.sqrt(constant + cx**2 + cy**2)
+    assert radius == pytest.approx(part.CORNER_R, abs=1e-9)
+    assert np.max(abs(np.hypot(corner[:, 0] - cx, corner[:, 1] - cy) - radius)) < 0.001
 
 
-def test_engraving_dxf_present():
-    """The vendored engraving DXF the build imports exists and is non-trivial."""
-    assert ENGRAVING_DXF.is_file(), ENGRAVING_DXF
-    assert ENGRAVING_DXF.stat().st_size > 10_000, ENGRAVING_DXF.stat().st_size
+def test_field_is_exactly_the_pinstripe_inner_edge_and_has_pinned_area():
+    field = _rings(part.FIELD_DXF)[0]
+    assert field in _rings(part.ENGRAVING_DXF), (
+        "field must be the actual frame inner loop"
+    )
+    assert len(field) == 173  # preserve the traced notches, not a BorderW rectangle
+    assert abs(dxf.signed_area(field)) == pytest.approx(part.FIELD_AREA_MM2, abs=1e-8)
+    x0, y0, x1, y1 = dxf.bbox([field])
+    assert abs(dxf.signed_area(field)) < (x1 - x0) * (y1 - y0)
+    outline = _rings(part.OUTLINE_DXF)[0]
+    assert all(dxf.point_in_ring(outline, point) for point in field)
 
 
-def test_engraving_dxf_is_millimetre_unit():
-    """$INSUNITS = 4 -- the build imports the DXF as millimetres."""
-    assert _header_int(_read(), "INSUNITS") == GOLDEN_INSUNITS
-
-
-def test_engraving_dxf_has_closed_regions():
-    """The artwork is a population of CLOSED polyline regions (cuttable profiles)."""
-    seg = _entities_section(_read())
-    counts = _entity_counts(seg)
-    assert counts.get("LWPOLYLINE", 0) >= MIN_CLOSED_REGIONS, counts
-    flags = _closed_flags(seg)
-    assert len(flags) >= MIN_CLOSED_REGIONS, len(flags)
-    # Every ribbon must be closed -- an open contour would not cut as a region.
-    assert all(f & 1 for f in flags), flags
-
-
-def test_engraving_dxf_coordinate_extent():
-    """The artwork's coordinate extent is intact (not truncated/rescaled)."""
-    w, h = _artwork_bbox(_entities_section(_read()))
-    assert _pct(w, GOLDEN_COORD_WIDTH) >= 99.0, w
-    assert _pct(h, GOLDEN_COORD_HEIGHT) >= 99.0, h
-
-
-def test_mount_contract_puts_the_plate_flat_on_the_deck():
-    """nameplate_spec (pure data): the four corner screw stations, the mount
-    transform, and their machine-frame image -- the base's tapped seats and the
-    frame's screw drops derive from these, so pin them (2026-09-02 ch26 p.71
-    re-derive: four corner screws)."""
-    import fr_nameplate_spec as spec
-
-    assert (spec.PLATE_WIDTH, spec.PLATE_HEIGHT, spec.PLATE_THICKNESS) == (100.0, 55.0, 1.5)
+def test_screw_stations_coincide_with_the_dxf_head_marks():
+    rings = _rings(part.ENGRAVING_DXF)
     assert len(spec.SCREW_XY) == 4
-    inset = spec.SCREW_INSET
-    assert set(spec.SCREW_XY) == {
-        (inset, inset),
-        (100.0 - inset, inset),
-        (inset, 55.0 - inset),
-        (100.0 - inset, 55.0 - inset),
-    }
-    # Rows: local +X -> -Z (text runs front-back), +Y -> -X, +Z (decorated
-    # front) -> +Y (face up).
-    assert spec.MOUNT_ROWS == [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-    assert spec.MOUNT_NORMAL == (0.0, 1.0, 0.0)
-    assert spec.MOUNT_FRONT_Y == 52.3
-    assert abs(spec.MOUNT_BACK_Y - 50.8) < 1e-12  # the base deck (STACK_HEIGHT)
-    # Plate-local (x, y) -> machine (214.25 - y, 50 - x).
-    assert spec.mount_point((0.0, 0.0, 0.0)) == (214.25, 52.3, 50.0)
-    assert spec.mount_point((100.0, 55.0, -1.5)) == (159.25, 50.8, -50.0)
-    assert set(spec.MOUNT_HOLE_XZ) == {
-        (209.75, 45.5), (209.75, -45.5), (163.75, 45.5), (163.75, -45.5),
-    }
-    assert len(spec.MOUNT_HOLE_XZ) == 4
+    for station in spec.SCREW_XY:
+        # Each slotted head is two ribbon halves, each with an inner counter.
+        # Identify by geometry, not DXF ordering/handles, to tolerate a re-export.
+        mark = []
+        for ring in rings:
+            x0, y0, x1, y1 = dxf.bbox([ring])
+            centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+            if x1 - x0 < 5.0 and y1 - y0 < 5.0 and math.dist(centre, station) < 1.0:
+                mark.append(ring)
+        assert len(mark) == 4, (station, len(mark))
+        x0, y0, x1, y1 = dxf.bbox(mark)
+        centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+        assert math.dist(centre, station) < 0.01, (station, centre)
 
 
-if __name__ == "__main__":
-    txt = _read()
-    seg = _entities_section(txt)
-    counts = _entity_counts(seg)
-    flags = _closed_flags(seg)
-    w, h = _artwork_bbox(seg)
-    _telemetry.info("nameplate engraving DXF integrity")
-    _telemetry.info(f"file           : {ENGRAVING_DXF}")
-    _telemetry.info(f"$INSUNITS      : {_header_int(txt, 'INSUNITS')}  golden {GOLDEN_INSUNITS}")
-    _telemetry.info(f"entities       : {dict(counts)}")
-    _telemetry.info(f"closed regions : {sum(f & 1 for f in flags)} / {len(flags)}  (min {MIN_CLOSED_REGIONS})")
-    _telemetry.info(f"coord width    : {w:9.3f}  golden {GOLDEN_COORD_WIDTH:9.3f}  -> {_pct(w, GOLDEN_COORD_WIDTH):7.3f}%")
-    _telemetry.info(f"coord height   : {h:9.3f}  golden {GOLDEN_COORD_HEIGHT:9.3f}  -> {_pct(h, GOLDEN_COORD_HEIGHT):7.3f}%")
-
-
-def test_corner_screw_holes_stay_inside_the_rounded_plate_outline():
-    """Each #4 clearance hole must be fully enclosed by the plate outline,
-    rounded corners included (CodeRabbit #652: a hole that breaks out of a
-    corner arc would leave an open slot the screw head cannot clamp)."""
-    import math
-
-    import build_fr_nameplate as bn
-    import fr_nameplate_spec as spec
-
-    w, h, rc = spec.PLATE_WIDTH, spec.PLATE_HEIGHT, bn.CORNER_R
-    r = bn.SCREW_HOLE_DIA / 2.0
-
-    def inside(x: float, y: float) -> bool:
-        if not (0.0 <= x <= w and 0.0 <= y <= h):
-            return False
-        # corner squares beyond each arc centre: the point must lie within the arc
-        corners = (
-            (x < rc and y < rc, rc, rc),
-            (x > w - rc and y < rc, w - rc, rc),
-            (x < rc and y > h - rc, rc, h - rc),
-            (x > w - rc and y > h - rc, w - rc, h - rc),
-        )
-        for in_square, cx, cy in corners:
-            if in_square and (x - cx) ** 2 + (y - cy) ** 2 > rc**2 + 1e-9:
-                return False
-        return True
-
+def test_screw_holes_and_heads_stay_on_the_raised_plate_border():
+    outline = _rings(part.OUTLINE_DXF)[0]
+    field = _rings(part.FIELD_DXF)[0]
     for hx, hy in spec.SCREW_XY:
-        for i in range(360):
-            a = math.radians(i)
-            px, py = hx + r * math.cos(a), hy + r * math.sin(a)
-            assert inside(px, py), f"hole at ({hx}, {hy}) breaks the outline at ({px:.3f}, {py:.3f})"
-        # and a real ligament to the nearest straight edge
-        lig = min(hx, w - hx, hy, h - hy) - r
-        assert lig >= 1.0, f"ligament {lig:.2f} at ({hx}, {hy})"
+        for diameter in (part.SCREW_HOLE_DIA, HEAD_DIA):
+            for degrees in range(360):
+                angle = math.radians(degrees)
+                point = (
+                    hx + diameter / 2.0 * math.cos(angle),
+                    hy + diameter / 2.0 * math.sin(angle),
+                )
+                assert dxf.point_in_ring(outline, point), (hx, hy, diameter, point)
+                assert not dxf.point_in_ring(field, point), (hx, hy, diameter, point)
+        # The through-hole has a real ligament, including toward the nearest edge.
+        ligament = (
+            min(hx, spec.PLATE_WIDTH - hx, hy, spec.PLATE_HEIGHT - hy)
+            - part.SCREW_HOLE_DIA / 2.0
+        )
+        assert ligament >= 1.5, (hx, hy, ligament)
+
+
+def test_mount_contract_puts_the_plate_flat_on_the_west_deck():
+    from _transforms import rows_from_euler
+
+    assert np.asarray(spec.MOUNT_ROWS) == pytest.approx(
+        np.asarray(rows_from_euler(spec.MOUNT_EULER)), abs=1e-12
+    )
+    assert spec.MOUNT_NORMAL == (0.0, 1.0, 0.0)
+    assert spec.MOUNT_FRONT_Y - spec.MOUNT_BACK_Y == pytest.approx(spec.PLATE_THICKNESS)
+    assert spec.MOUNT_BACK_Y == pytest.approx(50.8)  # shared base STACK_HEIGHT
+    corners = [
+        spec.mount_point((x, y, 0.0))
+        for x in (0.0, spec.PLATE_WIDTH)
+        for y in (0.0, spec.PLATE_HEIGHT)
+    ]
+    assert max(point[0] for point in corners) == pytest.approx(167.0 - 4.0)
+    assert min(point[0] for point in corners) > 104.65  # rocker-arm support's west edge
+    assert min(point[2] for point in corners) == pytest.approx(
+        -max(point[2] for point in corners)
+    )
+    mapped = [spec.mount_point((x, y, 0.0)) for x, y in spec.SCREW_XY]
+    assert all(point[1] == pytest.approx(spec.MOUNT_FRONT_Y) for point in mapped)
+    assert spec.MOUNT_HOLE_XZ == tuple((point[0], point[2]) for point in mapped)
+
+
+def test_all_nameplate_dxf_assets_are_part_recipe_dependencies():
+    from _buildgraph import data_deps_of
+
+    dependencies = data_deps_of(Path(part.__file__))
+    for asset in (part.ENGRAVING_DXF, part.OUTLINE_DXF, part.FIELD_DXF):
+        assert str(asset.resolve()) in dependencies, dependencies
