@@ -24,7 +24,6 @@ _EXPECTED = {
     "vn-frame-side-screw": (("90280A194",), "MHA-VN-022", 2),
     "vn-frame-cross-screw": (("90280A837",), "MHA-VN-027", 8),
     "vn-gooseneck-set-screw": (("91410A538",), "MHA-VN-023", 1),
-    "vn-gooseneck-spring-screw": (("90280A583",), "MHA-VN-054", 1),
     "vn-hanger-screw": (("93075A194",), "MHA-VN-007", 1),
     "vn-hex-bolt": (("92865A585",), "MHA-VN-008", None),
     "vn-knife-hanger-stud": (("91251A157",), "MHA-VN-024", 2),
@@ -104,12 +103,10 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
     # the clamp screws' #8-32 x 1-1/4; the swing stop then left the x 1 for
     # the foot screw's #4-40 x 3/8 (2026-09-29), retiring 90280A199; the
     # paper drive's latch hook takes two more (MHA-VN-043, ruling 2),
-    # the magnifying bracket takes two #2-56 x 1/4 (MHA-VN-050), and
-    # the gooseneck spring takes one 5/16-18 x 1 (MHA-VN-054).
+    # while the magnifying bracket takes two #2-56 x 1/4 (MHA-VN-050).
     assert fleet_quantity("90280A199") == 0
     assert fleet_quantity("90280A108") == 4
     assert fleet_quantity("91794A077") == 2
-    assert fleet_quantity("90280A583") == 1
     assert fleet_quantity("90280A201") == 10
 
 

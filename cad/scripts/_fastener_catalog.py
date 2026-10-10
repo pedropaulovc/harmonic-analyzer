@@ -128,11 +128,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Square-Head Cup-Point Set Screw",
         "91410A538",
     ),
-    "vn-gooseneck-spring-screw": _stock(
-        "vn-gooseneck-spring-screw",
-        "Zinc-Plated Steel Fillister Head Slotted Screw",
-        "90280A583",
-    ),
     "vn-hanger-screw": _stock(
         "vn-hanger-screw",
         "Low-Strength Zinc-Plated Steel Hex Head Screw",
