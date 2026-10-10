@@ -56,7 +56,7 @@ def test_gooseneck_arm_end_hangs_the_counter_eye_over_its_anchor() -> None:
         anchor_x, abs=PLUMB_TOL_MM
     )
     # The plug face is half the supplier's clamped band inboard of its eye
-    # datum; the purchased screw's head is the other half outboard.
+    # datum; the made MHA-SM-004 screw's head is the other half outboard.
     assert sm_gooseneck_geom.ARM_END_X == pytest.approx(
         spring_mount_geom.COLUMN_X - anchor_x + sm_gooseneck_geom.SPRING_EYE_GAP / 2.0,
         abs=PLUMB_TOL_MM,

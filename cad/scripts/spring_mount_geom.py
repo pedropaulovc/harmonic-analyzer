@@ -21,7 +21,7 @@ import ch_channel_lever_spec
 import vn_channel_spring_stock_geom as channel_stock
 import vn_counter_spring_stock_geom as counter_stock
 import sm_gooseneck_geom
-import vn_gooseneck_spring_screw_spec as spring_screw
+import sm_gooseneck_spring_screw_geom as spring_screw
 import sm_summing_lever_spec
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
@@ -217,7 +217,7 @@ _COUNTER_LOWER_OFFSET = _counter_lower_offset()
 
 
 def counter_upper_support_offset(axis: tuple[float, float]) -> float:
-    """Ideal circular-wire support seed for the counter's half-turn clocking."""
+    """Seat the eye on full-thread major diameter, not the partial die relief."""
     ux, uy = axis
     radius = counter_stock.COIL_MEAN_RADIUS_MM
     tube = counter_stock.WIRE_RADIUS_MM + spring_screw.MAJOR_DIA / 2.0

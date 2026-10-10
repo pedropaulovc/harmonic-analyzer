@@ -19,8 +19,8 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `mg` / `MG` | Magnifier | 9 |
 | `pd` / `PD` | Paper drive | 24 |
 | `pn` / `PN` | Pen | 6 |
-| `sm` / `SM` | Summing | 3 |
-| `vn` / `VN` | Vendor parts | 52 |
+| `sm` / `SM` | Summing | 4 |
+| `vn` / `VN` | Vendor parts | 51 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence.
@@ -204,6 +204,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | `gooseneck` | `sm-gooseneck` | MHA-032 | MHA-SM-001 |
 | part | `knife-mount` | `sm-knife-mount` | MHA-037 | MHA-SM-002 |
 | part | `summing-lever` | `sm-summing-lever` | MHA-073 | MHA-SM-003 |
+| part | — | `sm-gooseneck-spring-screw` | — | MHA-SM-004 |
 | part | `boss-hook` | `vn-boss-hook` | MHA-005 | MHA-VN-001 |
 | part | `channel-spring-installed` | `vn-channel-spring-installed` | MHA-011 | MHA-VN-004 |
 | part | `counter-spring` | `vn-counter-spring` | MHA-019 | MHA-VN-005 |
@@ -253,7 +254,6 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | — | `vn-magnifying-bracket-screw` | — | MHA-VN-050 |
 | part | — | `vn-cylinder-bank-spring` | — | MHA-VN-052 |
 | part | — | `vn-rocker-bank-spring` | — | MHA-VN-053 |
-| part | — | `vn-gooseneck-spring-screw` | — | MHA-VN-054 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -275,4 +275,4 @@ next free Number in its category and has no old stem or old Number.
 | retired | `vn-knife-hanger-washer` | MHA-VN-026 | no replacement: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor |
 | added | `vn-magnifying-bracket-screw` | MHA-VN-050 | screws the MHA-MG-001 magnifying bracket to the MHA-SM-003 summing lever |
 | added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
-| added | `vn-gooseneck-spring-screw` | MHA-VN-054 | McMaster 90280A583 fillister clamps the counter spring's upper eye to MHA-SM-001's brazed, through-tapped end plug |
+| added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |

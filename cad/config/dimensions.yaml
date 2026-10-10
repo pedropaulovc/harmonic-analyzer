@@ -1260,9 +1260,9 @@ sections:
         - stated
         - high (feature)
       - - Gooseneck
-        - 'Ø16 × 2 wall chrome tube, 90° bend R51. Part arm end X −103.359695 and straight arm run 52.359695 (`sm_gooseneck_geom.py`), so the counter spring upper-eye centre stays at part X −105.8 / machine X −91.2, plumb over the lower anchor. A Ø12 × 16.0 brazed end plug is tapped 5/16-18 UNC-2B THRU. Purchased MHA-VN-054 (McMaster 90280A583, zinc-steel slotted fillister 5/16-18 × 25.4 under head, Ø13.1572 × 7.493 head) clamps the 1330K524 double-loop eye against the end face; the 4.88061 installed gap derives from `vn_counter_spring_stock_geom.END_OCCUPIED_WIDTH_MM`, not a free-swivel stand-off. The screw tip projects into the hollow tube beyond the plug. The post passes through the east-rail hub and its height is adjusted for balance, then held by the square-head set screw'
+        - 'Ø16 × 2 wall chrome tube, 90° bend R51. Part arm end X −103.359695 and straight arm run 52.359695 (`sm_gooseneck_geom.py`), so the counter spring upper-eye centre stays at part X −105.8 / machine X −91.2, plumb over the lower anchor. A Ø12 × 8.00 brazed end plug is tapped #6-32 UNC-2B THRU. Shop-turned MHA-SM-004 is a 12L14 slotted fillister screw with #6-32 UNC-2A × 16.00 under-head length and a Ø12.50 × 7.00 head. It clamps the 1330K524 double-loop eye against the end face; the 4.88061 installed gap derives from `vn_counter_spring_stock_geom.END_OCCUPIED_WIDTH_MM`, not a free-swivel stand-off. The screw tip projects 3.11939 into the hollow tube beyond the plug. The post passes through the east-rail hub and its height is adjusted for balance, then held by the square-head set screw'
         - —
-        - 'ch19 p.45 page001_img02: tall domed slotted fillister at the tube end, spring eye between head and end face. McMaster live product table read 2026-10-10 and supplied native SLDPRT recorded in cad/references/mcmaster/README.md; parametric family replay still requires native comparison before release. User ruling 2026-09-21: tighten to clamp the upper eye, no threadlocker or swivel requirement. 2026-10-10 length disposition selects the 1-inch screw so its incomplete tip thread lies beyond the through-tapped plug; the rejected 3/4-inch screw cannot conservatively guarantee 1.5D full engagement. `sm_gooseneck_geom.py`, `vn_gooseneck_spring_screw_spec.py` and the joint contract own dimensions; native spring-seat calibration owns installed height'
+        - 'ch19 p.45 page001_img02: tall domed slotted fillister at the tube end, spring eye between head and end face. User ruling 2026-09-21: tighten until the upper eye is clamped and cannot swivel; no threadlocker. User option-B disposition 2026-10-10 selects a shop-turned #6-32 fillister to preserve supplier coil/tube clearance. `sm_gooseneck_geom.py`, `sm_gooseneck_spring_screw_geom.py` and the joint contract own dimensions. Full receiver thread is 7.50 nominal / 6.99 worst, above 1.5D = 5.2578; the die relief still leaves 2.68061 of the eye band over full thread. Native spring-seat calibration owns installed height and must be repeated for this separate screw'
         - scaled + derived
         - leg-top med, drop med
       - - Gooseneck clamp
@@ -1276,7 +1276,7 @@ sections:
       Notes: the stock 1330K524 counter spring balances the combined moment of
       the 20 channel springs. Native spring-seat calibration owns the loaded
       eye positions and gooseneck height; historical photo-chain heights are
-      not installed dimensions. Clamp the upper eye between MHA-VN-054 and
+      not installed dimensions. Clamp the upper eye between MHA-SM-004 and
       the brazed plug end face, without threadlocker (user ruling 2026-09-21).
       Slide the post through the top-frame hub until the summing lever balances,
       then tighten the hub set screw. The eye centre remains machine X −91.2.

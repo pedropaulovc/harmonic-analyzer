@@ -28,7 +28,7 @@ boss-hook / counter-spring / gooseneck chain.
 * boss-hook (keyed to the lever's anchor eye) + counter-spring + gooseneck
   -- the counter-balance hung from the east column; the post is gripped by
   the top-frame rail hub's set screw (no separate clamp part).
-* vn-gooseneck-spring-screw -- purchased fillister, head outboard, clamps the
+* sm-gooseneck-spring-screw -- made MHA-SM-004 fillister, head outboard, clamps the
   supplier upper-eye band to the gooseneck plug face; locked to the fixed
   gooseneck with no additional operational DOF.
 
@@ -85,7 +85,7 @@ from _assembly import (
 )
 from _native_spring_contact import assert_assembly_spring_contacts
 from _interference_contracts import allowed_interference_pairs
-from _transforms import IDENTITY, ROT_Y_180, euler_from_rows, rot_z_rows
+from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90, euler_from_rows
 from dt_cone_pivot_post_installation import SUMMING_Z
 import fr_top_frame_spec as top_frame
 import sm_knife_mount_spec as knife_mount
@@ -303,7 +303,8 @@ def _assert_knife_hanger_stack() -> None:
 # --- purchased counter spring and directly threaded lower anchor -----------
 import vn_counter_spring_stock_geom as counter_stock  # noqa: E402
 import sm_gooseneck_geom  # noqa: E402
-import vn_gooseneck_spring_screw_spec as spring_screw  # noqa: E402
+import sm_gooseneck_spring_screw_geom as spring_screw  # noqa: E402
+import sm_gooseneck_spring_joint as spring_joint  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
@@ -313,9 +314,9 @@ BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
 # ``counter_seat`` before assembly creation.
 
 UPPER_EYE_CLAMP_NOTES = (
-    "UPPER-EYE CLAMP: FIT MHA-VN-054 THROUGH COUNTER-SPRING UPPER EYE.\n"
-    "TIGHTEN HEAD TO CLAMP EYE BAND AGAINST GOOSENECK PLUG FACE.\n"
-    "EYE MUST NOT SWIVEL; NO THREADLOCKER REQUIRED."
+    "MHA-SM-004: CLAMP COUNTER-SPRING UPPER EYE TO PLUG.\n"
+    "TIGHTEN UNTIL UPPER EYE IS CLAMPED AND CANNOT SWIVEL.\n"
+    "NO THREADLOCKER."
 )
 
 
@@ -331,9 +332,12 @@ def _assert_counter_spring_top_hang(
     """
     ux, uy = pose.axis_xy
     screw_y = gooseneck_y + sm_gooseneck_geom.ARM_Y
-    retention = (spring_screw.HEAD_DIA - counter_stock.EYE_ID_MM) / 2.0
-    if retention < 1.0:
-        raise RuntimeError(f"counter eye head retention only {retention:.3f} mm radial")
+    retention = spring_joint.HEAD_RETENTION
+    if spring_joint.HEAD_RETENTION_MIN < 1.0:
+        raise RuntimeError(
+            f"counter eye worst head retention only "
+            f"{spring_joint.HEAD_RETENTION_MIN:.3f} mm radial"
+        )
     band = (
         abs(ux) * counter_stock.COIL_MEAN_RADIUS_MM
         + uy * counter_stock.LOOP_HALF_RISE_MM
@@ -355,6 +359,15 @@ def _assert_counter_spring_top_hang(
         raise RuntimeError(
             f"double-loop band does not fit clamped gap: {axial_gap:.9f} mm"
         )
+    # ROT_Y_POS90 sends the shank toward -X. The die relief occupies only the
+    # outboard part of the supplier eye band; the rest MUST bear on the full
+    # thread major used by counter_upper_support_offset.
+    head_x = spring_mounts.GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP
+    full_thread_overlap = min(
+        pose.upper_eye_xy[0] + band, head_x - spring_screw.RELIEF_WIDTH
+    ) - max(pose.upper_eye_xy[0] - band, head_x - spring_screw.LENGTH)
+    if min(full_thread_overlap, spring_joint.EYE_FULL_THREAD_OVERLAP_MIN) <= 0.0:
+        raise RuntimeError("counter upper eye bears only on the screw die relief")
     coil_top = (
         pose.centre_xy[1]
         + uy * counter_stock.coil_end_x_mm(pose.length_mm)
@@ -370,7 +383,8 @@ def _assert_counter_spring_top_hang(
         )
     log(
         f"counter upper support: head retention {retention:.3f}, "
-        f"eye clamp side clearance {axial_gap:.9f}, main coil {main_coil_gap:.3f}, "
+        f"eye clamp side clearance {axial_gap:.9f}, full-thread eye overlap "
+        f"{full_thread_overlap:.5f}, main coil {main_coil_gap:.3f}, "
         f"half-turn tube/head {tube_gap:.3f}/{head_gap:.3f} mm"
     )
 
@@ -618,11 +632,11 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )
-    # The stock under-head plane is local Y=0; Rz(-90) maps head +Y to
-    # machine +X, outboard of the plug, and sends the threaded shank into it.
-    # Lock to the fixed gooseneck exactly as the magnifier's stock screws are
-    # locked to their receiver. It is not a new operational DOF.
-    screw_rows = rot_z_rows(-90.0)
+    # The made screw's under-head plane is local Z=0; ROT_Y_POS90 maps head +Z
+    # to machine +X, outboard of the plug, and sends the threaded shank into it.
+    # This mate records the static clamped pose, not a mechanical screw lock.
+    # Tightening the physical eye clamp adds no operational DOF.
+    screw_rows = ROT_Y_POS90
     screw_position = [
         spring_mounts.GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP,
         gooseneck_origin_y + sm_gooseneck_geom.ARM_Y,
@@ -630,7 +644,7 @@ async def build(adapter) -> dict[str, str]:
     ]
     screw = await place_component(
         adapter,
-        "vn-gooseneck-spring-screw",
+        "sm-gooseneck-spring-screw",
         screw_position,
         euler_from_rows(screw_rows),
         screw_rows,
@@ -662,8 +676,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # Title-block identity for the assembly drawing (draw_sm_summing_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
-    # finalize_drawing requires without consulting the part registry;
-    # released component drawing (the BOM has no material/finish columns).
+    # finalize_drawing requires without consulting the part registry.
+    # Component drawings own their material and finish specifications.
     apply_custom_properties(
         adapter,
         {

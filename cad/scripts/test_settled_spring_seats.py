@@ -3,7 +3,11 @@
 import pytest
 
 import _config
-from settled_spring_seats import channel_seat, counter_seat
+from settled_spring_seats import (
+    channel_seat,
+    counter_seat,
+    counter_upper_support_geometry,
+)
 
 
 @pytest.fixture
@@ -31,6 +35,7 @@ def isolated_calibration(monkeypatch):
         },
         "final_distance_mm": {"lower": 0.0, "upper": 0.0},
         "gooseneck_origin_y_mm": 15.0,
+        "upper_support": counter_upper_support_geometry(),
     }
     amplitudes = [0.0]
     config = {
@@ -200,4 +205,75 @@ def test_counter_rejects_nonfinite_gooseneck_origin(isolated_calibration, goosen
     with pytest.raises(
         ValueError, match="gooseneck_origin_y_mm must be a finite number"
     ):
+        counter_seat()
+
+
+def test_production_old_counter_record_cannot_certify_the_made_support(monkeypatch):
+    presets = _config.machine("springs", "presets")
+    machine = _config.machine
+    for name, preset in presets.items():
+        # Read the historical measured record itself, not a fabricated bad pose.
+        assert (
+            preset["counter"].get("upper_support") != counter_upper_support_geometry()
+        )
+
+        def selected_machine(*keys):
+            if keys == ("amplitude", "preset"):
+                return name
+            return machine(*keys)
+
+        monkeypatch.setattr(_config, "machine", selected_machine)
+        monkeypatch.setattr(_config, "amplitudes", lambda: preset["amplitudes_mm"])
+        with pytest.raises(ValueError, match="Stale counter native calibration"):
+            counter_seat()
+
+
+def test_isolated_counter_provenance_identifies_the_whole_made_support(
+    isolated_calibration,
+):
+    _, record = isolated_calibration
+    support = record["upper_support"]
+    assert support["component"] == "sm-gooseneck-spring-screw"
+    assert support["number"] == "MHA-SM-004"
+    assert "sku" not in support
+    assert support["major_dia_mm"] == pytest.approx(3.5052)
+    assert support["underhead_length_mm"] == 16.0
+    assert support["head_dia_mm"] == 12.5
+    assert support["head_height_mm"] == 7.0
+    assert support["crown_rise_mm"] == 1.0
+    assert support["slot_width_mm"] == 1.6
+    assert support["slot_depth_mm"] == 3.0
+    assert support["relief_dia_mm"] == 2.2
+    assert support["relief_width_mm"] == 2.2
+    assert support["relief_lead_mm"] == 0.3
+    assert support["tip_chamfer_mm"] == 0.3
+    assert support["plug_length_mm"] == 8.0
+    counter_seat()
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "major_dia_mm",
+        "underhead_length_mm",
+        "head_dia_mm",
+        "head_height_mm",
+        "crown_rise_mm",
+        "slot_width_mm",
+        "slot_depth_mm",
+        "relief_dia_mm",
+        "relief_width_mm",
+        "relief_lead_mm",
+        "tip_chamfer_mm",
+        "clamp_gap_mm",
+        "plug_length_mm",
+    ],
+)
+def test_changed_support_geometry_cannot_reuse_a_native_certificate(
+    isolated_calibration,
+    field,
+):
+    _, record = isolated_calibration
+    record["upper_support"][field] += 0.01
+    with pytest.raises(ValueError, match="Stale counter native calibration"):
         counter_seat()

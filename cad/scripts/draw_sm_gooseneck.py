@@ -6,10 +6,10 @@ manufacturing notes; every shared sheet/template, import, curation, and export
 behavior lives in ``_drawing_common``.
 
 The post is a polished chrome Ø16 x 2-wall tube with a tall vertical leg,
-an R51 quarter bend and a horizontal arm. Its flush brazed end plug has an
-axial native through tap; the purchased MHA-VN-054 spring screw is NOT part
-of this weldment. The approximately 501 mm tall post keeps the elevation
-at 1:3 and the isometric at 1:4.
+an R51 quarter bend and a horizontal arm. Its flush brazed Ø12 x 8 end plug
+has an axial native #6-32 UNC-2B through tap; the made MHA-SM-004 spring screw
+is NOT part of this weldment. The approximately 501 mm tall post keeps the
+elevation at 1:3 and the isometric at 1:4.
 
 Run with SolidWorks open::
 
@@ -60,7 +60,7 @@ SHEET_SCALE = (1.0, 3.0)  # 1:3 whole sheet (~501 mm tall post)
 FRONT_CENTER = (0.180, 0.150)
 ISO_CENTER = (0.350, 0.150)
 # No arm-end detail: this legacy sheet retains the model-stamped plug/tap
-# schedule in its notes. The purchased screw appears only in the assembly
+# schedule in its notes. The separate made screw appears only in the assembly
 # package, so neither view needs an integral-head reference or detail fence.
 
 # Per-view survivors of the marked-dimension import: the bend radius (R51) and
@@ -73,7 +73,7 @@ FRONT_KEEP = {
 
 
 def _require_saved_tap(model: Any) -> None:
-    """Reject a saved source whose native receiver lost its thread identity."""
+    """Require the saved native receiver's size, class, ends and drill diameter."""
     feature = _early_bound(model, "IPartDoc").FeatureByName("ThreadBore")
     if feature is None:
         raise RuntimeError("saved gooseneck has no native ThreadBore")

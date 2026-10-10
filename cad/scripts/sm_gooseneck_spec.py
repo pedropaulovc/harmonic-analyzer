@@ -35,8 +35,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Lines kept short so the left-anchored block clears the elevation and title
 # block; it grows DOWNWARD. The plug belongs to this brazed weldment, while the
-# purchased spring screw and spring-eye clamping instructions belong to the
-# assembly package.
+# made MHA-SM-004 spring screw and spring-eye clamping instructions belong to
+# the assembly package.
 DRAWING_NOTES = "\n".join(
     (
         "1. TUBE <MOD-DIAM>16.00 +/-0.10 X 2.0 WALL; CUT ENDS",
@@ -47,8 +47,7 @@ DRAWING_NOTES = "\n".join(
         f"   BEND, {sm_gooseneck_geom.ARM_RUN:.2f} STRAIGHT ARM TO END FACE. LINEAR",
         "   +/-0.5; RADIUS +/-0.5; ANGLE +/-1 DEG. LEG + ARM",
         "   CENTERLINES COPLANAR (ELEVATION PLANE) WITHIN 1.0.",
-        f"3. END PLUG: AISI 1018 <MOD-DIAM>{PLUG_DIA:.2f}"
-        f" +/-{PLUG_DIAMETER_BAND:.2f}",
+        f"3. END PLUG: AISI 1018 <MOD-DIAM>{PLUG_DIA:.2f} +/-{PLUG_DIAMETER_BAND:.2f}",
         f"   X {sm_gooseneck_geom.PLUG_LENGTH:.2f} +/-{PLUG_LENGTH_BAND:.2f};"
         " FLUSH WITH ARM END +/-0.10.",
         "   SILVER-BRAZE BAg-7 PER AWS A5.8, FULL",
@@ -57,9 +56,8 @@ DRAWING_NOTES = "\n".join(
         f"   THREAD AXIS TO TUBE AXIS +/-{THREAD_AXIS_OFFSET_MAX:.2f};",
         f"   DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX; SQUARE TO END FACE.",
         f"   BREAK BOTH TAP ENDS {EDGE_BREAK:.2f} X 45 DEG.",
-        f"   FULL THREAD {ENGAGEMENT_NOMINAL:.2f} NOMINAL;"
-        f" {ENGAGEMENT_MIN:.2f} MIN.",
-        "5. MHA-VN-054 SPRING SCREW: PURCHASED SEPARATELY;",
+        f"   FULL THREAD {ENGAGEMENT_NOMINAL:.2f} NOMINAL; {ENGAGEMENT_MIN:.2f} MIN.",
+        "5. MHA-SM-004 SPRING SCREW: MADE SEPARATELY;",
         "   NOT INCLUDED IN THIS WELDMENT. SEE ASSEMBLY.",
         "6. BEND OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
         "7. PLATE ALL SURFACES; NO MASKING. DIMS PRE-PLATE.",

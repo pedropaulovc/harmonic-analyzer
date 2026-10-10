@@ -10,8 +10,8 @@ uses, on the same native fixtures as the production seats:
 * channel: ``ch-channel-lever`` (at the station's solved tilt) + ``vn-spring-hook``
   + one ``9432K31`` length variant, per distinct calibrated amplitude;
 * counter: ``vn-boss-hook`` + one ``1330K524`` at the preset's balance length +
-  ``sm-gooseneck`` + ``vn-gooseneck-spring-screw``, per preset (the gooseneck
-  and separate screw move together; the screw is the upper contact surface).
+  ``sm-gooseneck`` + made ``sm-gooseneck-spring-screw`` (MHA-SM-004), per preset
+  (the gooseneck and screw move together; the screw is the upper contact surface).
 
 Each contact's native collision/clear boundary is located to 1e-6 mm, and the
 component is then seated ``springs.boolean_stability_mm`` past it, on the clear
@@ -28,9 +28,12 @@ re-measured until both boundaries sit at the allowance within half of it.
 Every seed comes from ``spring_mount_geom`` (the catalogue-nominal poses),
 never from the table being replaced, so a stale table cannot bias the new one.
 
-Run with SolidWorks open (the parts must already be built)::
+Run on a licensed farm/native seat (the parts must already be built):
+``ch-channel-lever``, ``vn-spring-hook``, ``vn-boss-hook``, ``sm-gooseneck``
+and ``sm-gooseneck-spring-screw``. The driver builds the supplier spring
+length variants itself; no summing assembly is needed to replace a stale seat::
 
-    uv run cad/scripts/diagnostics/calibrate_spring_seats.py --write
+    uv run cad/scripts/diagnostics/calibrate_spring_seats.py --presets neutral square --write
 
 Without ``--write`` the measurements only go to the JSON report.
 """
@@ -79,7 +82,13 @@ from _common import (  # noqa: E402
 from _cwm import put_component_pose  # noqa: E402
 from _spring import build_spring  # noqa: E402
 from _stock_fastener import _blank_recipe_references  # noqa: E402
-from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rot_z_rows  # noqa: E402
+from _transforms import (
+    ROT_Y_180,
+    ROT_Y_POS90,
+    compose_rows,
+    euler_from_rows,
+    rot_z_rows,
+)  # noqa: E402
 from build_ch_channel_assembly import ARM_MID_DZ, FULCRUM, IDENTITY, z_station  # noqa: E402
 from dt_cone_pivot_post_installation import SUMMING_Z  # noqa: E402
 from diagnostics._seat_search import ContactSolution, solve_component_contact  # noqa: E402
@@ -335,7 +344,7 @@ async def _calibrate_counter(
     try:
         check("create counter seat fixture", await adapter.create_assembly())
         fixture = _early_bound(adapter.currentModel, "IModelDoc2")
-        screw_rows = rot_z_rows(-90.0)
+        screw_rows = ROT_Y_POS90
         boss, counter, gooseneck, screw = await place_components_batch(
             adapter,
             [
@@ -361,9 +370,10 @@ async def _calibrate_counter(
                     "ground": True,
                 },
                 {
-                    "part": "vn-gooseneck-spring-screw",
+                    "part": "sm-gooseneck-spring-screw",
                     "position": [
-                        spring_mounts.GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP,
+                        spring_mounts.GOOSENECK_END_X
+                        + sm_gooseneck_geom.SPRING_EYE_GAP,
                         gooseneck_y + sm_gooseneck_geom.ARM_Y,
                         SUMMING_Z,
                     ],
@@ -421,12 +431,10 @@ async def _calibrate_counter(
                 raise RuntimeError(
                     f"{preset} counter {label}: landed pose is not seated ({contact!r})"
                 )
-        # The fixture variant has the same stock receiver joint as production;
+        # The fixture variant has the same made-screw receiver joint as production;
         # allow only that exact thread/plug overlap, never spring/support masks.
         screw_pair = frozenset((screw, gooseneck))
-        production_pair = frozenset(
-            ("vn-gooseneck-spring-screw-1", "sm-gooseneck-1")
-        )
+        production_pair = frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1"))
         check_no_interference(
             adapter,
             allowed_pairs={

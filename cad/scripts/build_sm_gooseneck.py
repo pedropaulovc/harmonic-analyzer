@@ -2,11 +2,11 @@ r"""Build the gooseneck post with its brazed, through-tapped end plug.
 
 The polished Ø16 x 2-wall tube anchors the stock counter spring above the
 summing lever. Its vertical leg, R51 quarter bend and horizontal arm form
-one hollow tube. A physical Ø12 x 16 AISI 1018 plug is silver-brazed flush
-with the arm end, then drilled and tapped 5/16-18 UNC-2B through. Both tap
-ends have a 0.25 x 45-degree break, leaving 15.50 mm nominal full thread.
-The purchased MHA-VN-054 slotted fillister screw is a separate assembly
-component, not part of this weldment.
+one hollow tube. A physical Ø12 x 8 AISI 1018 plug is silver-brazed flush
+with the arm end, then drilled and tapped #6-32 UNC-2B through. Both tap
+ends have a 0.25 x 45-degree break, leaving 7.50 mm nominal full thread
+(6.99 mm minimum at the printed plug-length band). The made MHA-SM-004
+slotted fillister screw is a separate component, not part of this weldment.
 
 The post slides through the east top-frame hub, whose square-head set screw
 sets its installed height. The stock counter spring's geometry owns that
@@ -16,7 +16,7 @@ puts the spring eye on its counter-anchor axis.
 Layout: origin at the vertical leg's reference mid-height; leg y -330..112.3,
 bend centre (-51, 112.3), arm centreline y 163.3. The straight arm runs
 52.359695 mm west from x -51 to -103.359695; the plug extends east from that
-end face to x -87.359695. The plug's modelling envelope is Ø14, overlapping
+end face to x -95.359695. The plug's modelling envelope is Ø14, overlapping
 the tube's mid-wall by 1 mm so the union adds only the Ø12 bore fill.
 That overlap is not the physical plug diameter on the print.
 ``ThreadBore`` is the axial native Hole Wizard tap; ``SpringScrewAxis`` is
@@ -197,7 +197,9 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch end plug", await adapter.exit_sketch())
     name_last_feature(adapter, "EndPlugProfile")
     drive_jobs += plug_dims.apply(adapter, "EndPlugProfile")
-    check("revolve end plug", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check(
+        "revolve end plug", await adapter.create_revolve(RevolveParameters(angle=360.0))
+    )
     name_last_feature(adapter, "EndPlug")
     v_plug_envelope = math.pi * PLUG_OVERLAP_R**2 * PLUG_LENGTH
     vol = await volume_check(
@@ -248,17 +250,39 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, False)
     break_reach_drive = f'"TapDrillDia" / 2 + "TapEdgeBreak" + {_BREAK_OVERRUN}mm'
     for prefix, lines, points, apex_drive in (
-        ("Mouth", mouth_lines, mouth_profile,
-         '-"ArmEndX" - "TapDrillDia" / 2 - "TapEdgeBreak"'),
-        ("Inner", inner_lines, inner_profile,
-         '-"ArmEndX" - "PlugLength" + "TapDrillDia" / 2 + "TapEdgeBreak"'),
+        (
+            "Mouth",
+            mouth_lines,
+            mouth_profile,
+            '-"ArmEndX" - "TapDrillDia" / 2 - "TapEdgeBreak"',
+        ),
+        (
+            "Inner",
+            inner_lines,
+            inner_profile,
+            '-"ArmEndX" - "PlugLength" + "TapDrillDia" / 2 + "TapEdgeBreak"',
+        ),
     ):
         await define_polygon_chain(
-            adapter, lines, points, label=f"{prefix.lower()} tap break", dims=breaks,
-            names=[f"{prefix}ApexX", f"{prefix}AxisY",
-                   f"{prefix}ConeRun", f"{prefix}ConeRise", f"{prefix}Closure"],
-            drives=[apex_drive, '"ArmY"', break_reach_drive,
-                    break_reach_drive, break_reach_drive],
+            adapter,
+            lines,
+            points,
+            label=f"{prefix.lower()} tap break",
+            dims=breaks,
+            names=[
+                f"{prefix}ApexX",
+                f"{prefix}AxisY",
+                f"{prefix}ConeRun",
+                f"{prefix}ConeRise",
+                f"{prefix}Closure",
+            ],
+            drives=[
+                apex_drive,
+                '"ArmY"',
+                break_reach_drive,
+                break_reach_drive,
+                break_reach_drive,
+            ],
         )
     await ensure_fully_defined(adapter, "tap edge breaks")
     check("exit_sketch tap edge breaks", await adapter.exit_sketch())
@@ -275,8 +299,14 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await name_bore_axis(
-        adapter, "Front Plane", 0.0, "Top Plane", ARM_Y,
-        "spring screw", drive_b='"ArmY"', drive_jobs=drive_jobs,
+        adapter,
+        "Front Plane",
+        0.0,
+        "Top Plane",
+        ARM_Y,
+        "spring screw",
+        drive_b='"ArmY"',
+        drive_jobs=drive_jobs,
     )
     name_last_feature(adapter, "SpringScrewAxis")
 
@@ -487,7 +517,7 @@ async def build(adapter) -> dict[str, str]:
     v_arm = _RING_AREA * ARM_RUN
     # The sweep merges the plug and leg. Subtract the Ø12..Ø14 overlap band:
     # the finished plug adds bore fill only, less its native tap and breaks.
-    v_overlap = math.pi * (PLUG_OVERLAP_R**2 - (PLUG_DIA / 2.0)**2) * PLUG_LENGTH
+    v_overlap = math.pi * (PLUG_OVERLAP_R**2 - (PLUG_DIA / 2.0) ** 2) * PLUG_LENGTH
     expected = expected + v_bend + v_arm - v_overlap
     vol = await _volume(adapter)
     _telemetry.info(
