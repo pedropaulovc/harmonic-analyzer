@@ -74,7 +74,6 @@ from _drawing_leaders import (
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _layout_geometry import estimate_text_box
 from _surface_finish import surface_finish_by_key
-from cone_shaft_land_bands import TERMINAL_FLAT_EDGE_BREAK_MAX
 from dt_cone_gear_shaft_spec import (
     COLLAR_DIA,
     COLLAR_END_STATION,
@@ -88,6 +87,7 @@ from dt_cone_gear_shaft_spec import (
     SECTION_ENDS,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
+    TORQUE_CORNER_CALLOUT,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
@@ -341,14 +341,6 @@ D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
-# The terminal flat's two long torque corners stay sharp in the model; their
-# break limit is a drawing requirement, printed above the terminal
-# across-flat.  One line: SolidWorks stores an above callout's line break but
-# prints none of it (run 20261010T071427837Z: the two-line
-# "TORQUE CORNERS:\nSTONE BURR ONLY" was in COM, not in the PDF; the layout
-# audit found it text-unmatched, as main's pd_transgear drawings found).
-# Stoning is named because it matches the number.
-TORQUE_CORNER_CALLOUT = f"STONE CORNERS {TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX"
 # An above callout is centred on its dimension's text, set as one run: that
 # 40-character run read 110.6 mm wide in COM (Sec4AF's 0.3377..0.4483 at
 # 20261010T071427837Z) and 8.7 mm above the text position (f68549253).
