@@ -25,6 +25,7 @@ from _drawing_common import (
     set_hole_callout_precision, stamp_drawing_summary, view_name,
 )
 import _drawing_hidden_sketches as hidden_sketches
+from _part_pmi import _resolve_faces
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import format_findings
 from diagnostics.drawing_layout_audit import audit_document
@@ -280,21 +281,30 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, marks, _precision(SCREW_KEEP))
     # Above the value: the freed lane where the old break dimension stood.
     set_dimension_callouts(adapter, marks, {"DogDia": spec.DOG_EDGE_CALLOUT}, location="above")
+    # The major and dog diameters draw as a revolve's flank SILHOUETTES, not
+    # model edges, so an EDGE pick at their projected points misses (farm run
+    # at a0defd137: "failed to select ... datum:D edge at sheet (0.219831,
+    # 0.221844)"). Main's form (draw_dt_pinion_cam_pin._crown_face): attach to
+    # the part-owned FACE resolved on the referenced part; the projected point
+    # stays as the frame's leader landing.
+    screw_faces = _resolve_faces(
+        _early_bound(_early_bound(screw, "IView").ReferencedDocument, "IModelDoc2"),
+        {
+            **{datum.key: datum.face for datum in spec.SCREW_DATUMS},
+            **{control.key: control.face for control in spec.SCREW_CONTROLS},
+        },
+    )
     project_part_pmi(
         adapter,
         placements={
             "datum:D": PmiDrawingPlacement(
                 view=screw, position=(0.203, 0.203),
-                attachment_xy=point(
-                    screw,
-                    (spec.SET_SCREW_SEAT_RADIUS + spec.DOG_LENGTH + 1.0,
-                     spec.TAP_STATION + spec.SET_SCREW_MAJOR_DIA / 2.0, 0.0),
-                    "retained stock thread datum",
-                ),
+                entity=screw_faces["datum:D"], attachment_type="FACE",
             ),
             "ground_dog_runout": PmiDrawingPlacement(
                 view=screw, position=(0.046, 0.161),
-                attachment_xy=point(
+                entity=screw_faces["ground_dog_runout"], attachment_type="FACE",
+                leader_attachment_xy=point(
                     screw,
                     (spec.SET_SCREW_SEAT_RADIUS + spec.DOG_LENGTH / 2.0,
                      spec.TAP_STATION + spec.DOG_DIA / 2.0, 0.0),

@@ -6,7 +6,8 @@ blank diameter, D-bore (diameter, across-flat and flat clock), face width,
 driving circular-tooth-thickness requirement and functional root-envelope
 limits, plus the actual finite cutter recipe and bounded carrying-contact data.
 The native imported bands remain model-owned. A separate DT6-FORM1 sheet
-defines the complete custom tool grind from model-stamped core equations.
+gives the custom tool's grind data beside its installed T006 gap outline; the
+exact grinding equations stay in the model's "Cutter Profile" property.
 
 There are no datums or feature-control frames.  Hidden lines communicate no
 additional manufacturing fact on these through-bored spur gears, so every view
@@ -170,6 +171,21 @@ BORE_VIEW_LABEL_DROP = 0.016
 # up; the text's left edge clears the flat's witness by BORE_VIEW_AF_GAP.
 BORE_VIEW_AF_GAP = 0.004
 BORE_VIEW_AF_HALF_WIDTH = 0.022
+# The flat clock's two-line text ("90° ±0.25°" over TO TOOTH CENTERLINE),
+# measured in the run-20261010T051729717Z T006 PDF: x 69.8-119.9 mm, y
+# 60.0-72.0 mm round its SetPosition point (94.9, 66.0) mm, so the point is
+# the block's centre. Its arc ends on the bore's +X axis line with an
+# arrowhead at radius |text - vertex|, i.e. under the text: there the axis
+# line and arrow ran through the C of CENTERLINE (eye pass of that run). The
+# arrowhead (3.6 mm long on that PDF; the document's 6.35 mm arrow-length
+# preference is not what this arc end draws) now ends ARROW_TEXT_CLEARANCE
+# under the block, and the block's left edge stands CLEAR_GAP_M right of the
+# crop circle the audit flagged it against (detail-circle crossing at x
+# 70.6 mm).
+BORE_CLOCK_TEXT_HALF_WIDTH = 0.025
+BORE_CLOCK_TEXT_HALF_HEIGHT = 0.006
+BORE_CLOCK_TEXT_GAP = 0.002
+BORE_CLOCK_ARROW_LENGTH = 0.0036
 # The bore axis must land within 0.1 mm of BORE_VIEW_CENTER after the move
 # (draw_amplitude_bar's detail tolerance), and the title within 1 mm.
 BORE_VIEW_POSITION_TOL_M = 1e-4
@@ -188,7 +204,7 @@ CLOCK_ARC_OVERRUN = 0.0003
 CLOCK_ARC_CENTRE_TOL = 0.0005
 CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")
 # Fifteen compact data lines retain the measured 3.51 mm line-height budget.
-# The dedicated custom-tool sheet keeps exact grinding equations out of these
+# The dedicated custom-tool sheet keeps the grind data out of these
 # dimension/view lanes.
 GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height/width budget of the Gear Data block, for the layout test.
@@ -219,6 +235,50 @@ def cutter_detail_window_mm() -> tuple[float, float, float]:
             for index in range(samples + 1)
         ) + deviation + profile.geometry_error_bound_mm)
     return cosine * radial_midpoint, sine * radial_midpoint, radius + 0.15
+
+
+def cutter_grind_data() -> str:
+    """What the toolmaker grinds DT6-FORM1 to and checks it against.
+
+    The sheet once printed the part's "Cutter Profile" property: parametric
+    equations with 17-digit floats, which no shop grinds to (eye pass of
+    run 20261010T051729717Z). The equations stay in the model; the sheet
+    gives the form's outline sizes at 3 places, read from the same profile
+    the native cut uses. T006 cuts at T=0 on a spur (helix 0) gear, so its
+    installed gap IS the ground form, and the widths are chords across that
+    gap. The comparator magnification is this sheet's own scale, so the
+    sheet's gap view serves as the overlay chart.
+    """
+    profile = stock_form_profile(6)
+    template = profile.template
+    if template.cutter_number is not None or template.name != CUTTER_DETAIL_SHEET:
+        raise ValueError("T006 must use the specified DT6-FORM1 custom cutter")
+    if profile.radial_translation_mm != 0.0 or profile.helix_angle_deg != 0.0:
+        raise ValueError("DT6-FORM1's installed gap is its ground form only at T=0, helix 0")
+    pitch_radius = profile.pitch_radius_mm
+    pitch_half_gap = (
+        profile.angular_pitch_rad - profile.pitch_tooth_thickness_mm / pitch_radius
+    ) / 2.0
+    blank_radius = profile.blank_radius_mm
+    numerator, denominator = SHEET_SCALES[CUTTER_DETAIL_SHEET]
+    rows = (
+        ("FORM DEPTH (PLUNGE FROM BLANK OD)", f"{profile.plunge_mm:.3f}"),
+        ("TIP ARC (FORMS GEAR ROOT)", f"R{template.root_radius_mm:.3f}"),
+        (
+            f"WIDTH AT PITCH DIA {2.0 * pitch_radius:.3f} (CHORD)",
+            f"{2.0 * pitch_radius * math.sin(pitch_half_gap):.3f}",
+        ),
+        (
+            f"WIDTH AT BLANK OD {2.0 * blank_radius:.3f} (CHORD)",
+            f"{2.0 * blank_radius * math.sin(profile.tip_half_angle_rad):.3f}",
+        ),
+        ("TIF (RELIEF TO INVOLUTE)", f"R{template.relief_junction_radius_mm:.3f} REF"),
+    )
+    return "\n".join((
+        f"{template.name} GROUND FORM TOOL, mm",
+        *(f"{label}:  {value}" for label, value in rows),
+        f"GRIND TO TEMPLATE; CHECK ON OPTICAL COMPARATOR AT {numerator:g}:{denominator:g}",
+    ))
 
 
 DIMENSION_CALLOUTS = {
@@ -369,9 +429,10 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     arc's -X point and the flat) and runs on right to its text, which stands
     outside the flat's witness; the clock's arc sweeps the quadrant between
     the flat's upper half and the +X centre-mark line
-    (``_sweep_clock_right_of_flat``), its text right of the circle and just
-    above the axis, where the front view's thickness callout (above right,
-    x 134-164 y 78-108 mm) never reaches.
+    (``_sweep_clock_right_of_flat``), its text right of the circle and
+    raised clear of the axis line and the arc's arrowhead on it
+    (BORE_CLOCK_TEXT_*), where the front view's thickness callout (above
+    right, x 134-164 y 78-108 mm) never reaches.
     """
     ratio = _bore_view_ratio(teeth)
     flat = bore_flat_offset_mm(teeth) * ratio / 1000.0
@@ -383,7 +444,10 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
             x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
             y - crop - BORE_VIEW_AF_DROP,
         ),
-        "BoreFlatClock": (x + crop + 0.024, y + 0.006),
+        "BoreFlatClock": (
+            x + crop + BORE_CLOCK_TEXT_GAP + BORE_CLOCK_TEXT_HALF_WIDTH,
+            y + BORE_CLOCK_ARROW_LENGTH + ARROW_TEXT_CLEARANCE + BORE_CLOCK_TEXT_HALF_HEIGHT,
+        ),
     }
 
 
@@ -920,7 +984,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
-            "Cutter Profile",
         ),
         required=(
             "Number",
@@ -929,7 +992,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
-            "Cutter Profile",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -1089,9 +1151,10 @@ async def build(adapter: Any) -> dict[str, str]:
         radius=radius_mm * numerator / denominator / 1000.0,
     )
     set_hidden_lines_removed(adapter, detail)
-    add_property_linked_note(
-        adapter, "Cutter Profile", *CUTTER_DETAIL_POS, char_height=0.0025
-    )
+    # The grind data, not the model's "Cutter Profile" equations (see
+    # cutter_grind_data).
+    if add_note(adapter, cutter_grind_data(), *CUTTER_DETAIL_POS) is None:
+        raise RuntimeError("failed to add the DT6-FORM1 grind data")
     if add_note(
         adapter, "T006 INSTALLED GAP - SEE T006 FOR FINISHED GEAR",
         0.230, 0.092,
