@@ -1249,17 +1249,14 @@ async def build(adapter) -> dict[str, str]:
             teeth * (0.01 * removed - area_error),
         )
         _restrict_to_configuration(adapter, teeth)
-    # Probe 4 (5710714ee): blanked once in the configuration the suppression
-    # sweep ended on, the pattern axis still saved shown with T120 active, so
-    # it is hidden with each configuration active. Probe 7 (6235960db): done
-    # AFTER the sweep, that pass left T012..T120 unsuppressed in T006 again,
-    # so it runs first and the sweep (which reads each state back) runs last.
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    for configuration in [str(name) for name in model.GetConfigurationNames()]:
-        _activate_configuration(model, configuration)
-        blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
     _suppress_other_rows_in_each_configuration(adapter)
     check("activate T120 for native PMI", await adapter.set_active_configuration("T120"))
+    # The pattern axis is hidden with T120 active, as on main, where T120 was
+    # the last authored row: hidden in the sweep's last configuration (probe
+    # 4, 5710714ee) it still saved shown in T120, and hidden with every
+    # configuration active, before or after the sweep (probes 7 and 8), it
+    # left T012..T120 reading unsuppressed in T006.
+    blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))
 
     # Author before the existing 20-configuration regeneration sweep.  This is
     # the live regression gate for the model-owned symbol: a face-attached
