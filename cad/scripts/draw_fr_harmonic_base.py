@@ -386,18 +386,27 @@ HOLE_TAG_POSITIONS = {
 }
 # The nameplate taps sit on the plate's DXF screw marks, about 2 mm (at 1:4)
 # inside the deck's east edge with section line A 7.5 mm east of that, so a
-# tag east of its tap crosses both (F3/F4 at ec323b4eb: crossed section line
-# A and each other). Every nameplate tag therefore stays INSIDE the four-tap
-# quad: the west taps' tags inline east of the tap, the east taps' tags under
-# them, stepped toward the quad's middle row so no box or leader meets
-# another. Placed from each tag's own table row, not its letter, so a
-# re-lettered or re-sorted table still lands each tag beside its own tap.
-# Offsets run from each tap centre to its tag box's left edge and mid-height
-# (sheet m); the east tags' vertical step points toward the quad's middle.
-# A tag's insertion point is its box's top-left: F3 at (342.5, 181.0) mm
-# started its leader at (342.5, 179.2), mid-height of a 3.5 mm tag.
-NAMEPLATE_TAG_WEST_OFFSET = (0.0025, 0.0)
-NAMEPLATE_TAG_EAST_OFFSET = (-0.0059, 0.00625)
+# tag east of section A's line crosses it (F3/F4 at ec323b4eb: crossed
+# section line A and each other). Nor do four tags fit inside the 9 x 23 mm
+# four-tap quad: two tags whose columns overlap read as one block unless a
+# full row pitch (5.4 mm) separates them (enforced merged-blocks, ab1f78504),
+# and E4 already stands over the quad. So the west taps' tags read just east
+# of their taps, inside the quad -- the front one stepped down a row pitch
+# under E4, the rear one stepped down away from E1, whose box ends beside
+# that tap -- and the east taps' tags read in the open pad strip between the
+# deck's east edge and section line A, a row pitch clear of A3 and A4. Placed
+# from each tag's own table row, not its letter, so a re-lettered or
+# re-sorted table still lands each tag beside its own tap.
+# (east tap, rear tap) -> (tap centre to tag box's left edge, tap centre to
+# tag mid-height), sheet m. A tag's insertion point is its box's top-left: F3
+# at (342.5, 181.0) mm started its leader at (342.5, 179.2), mid-height of a
+# 3.5 mm tag.
+NAMEPLATE_TAG_OFFSETS = {
+    (False, False): (0.0025, -0.0040),
+    (False, True): (0.0025, -0.0020),
+    (True, False): (0.0033, -0.0036),
+    (True, True): (0.0033, 0.0010),
+}
 _HOLE_TAG_HALF_HEIGHT_M = 0.00175
 _NAMEPLATE_QUAD_CENTRE_XZ = (
     sum(x for x, _ in NAMEPLATE_SCREW_XZ) / len(NAMEPLATE_SCREW_XZ),
@@ -442,12 +451,8 @@ def _nameplate_tag_position(
         return None
     hole_x, hole_y = _plan_xy(x_mm, z_mm, center=HOLE_TOP_CENTER)
     centre_x, centre_z = _NAMEPLATE_QUAD_CENTRE_XZ
-    dx, dy = (
-        NAMEPLATE_TAG_EAST_OFFSET if x_mm > centre_x else NAMEPLATE_TAG_WEST_OFFSET
-    )
-    # Plan z runs DOWN the sheet: a rear (+z) tap steps up toward the middle.
-    step = dy if z_mm > centre_z else -dy
-    return (hole_x + dx, hole_y + step + _HOLE_TAG_HALF_HEIGHT_M)
+    dx, dy = NAMEPLATE_TAG_OFFSETS[(x_mm > centre_x, z_mm > centre_z)]
+    return (hole_x + dx, hole_y + dy + _HOLE_TAG_HALF_HEIGHT_M)
 
 
 @_telemetry.traced("drawing.base_cross_tap_edge")

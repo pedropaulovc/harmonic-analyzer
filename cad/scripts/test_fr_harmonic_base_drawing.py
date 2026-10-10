@@ -1971,17 +1971,22 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
                 )
 
 
-def test_nameplate_tags_stay_inside_their_quad_clear_of_section_a() -> None:
+def test_nameplate_tags_read_clear_of_section_a_and_of_every_other_tag() -> None:
     # ec323b4eb leaf: F3's and F4's leaders crossed section line A and each
-    # other (enforced layout audit). Every nameplate tag now reads inside the
-    # four-tap quad, west of the deck's east edge.
+    # other; ab1f78504 leaf: the tags stacked in one column within a row pitch
+    # of each other and of E4 (enforced merged-blocks). The west tags read in
+    # the four-tap quad, the east tags between the deck's east edge and
+    # section line A; any two tags whose columns overlap stand a row pitch
+    # (1.543 text heights, 5.4 mm at 3.5 mm) apart.
     import draw_fr_harmonic_base as sheet
 
     spec = fr_harmonic_base_spec
     half_h = sheet._HOLE_TAG_HALF_HEIGHT_M
     tag_w = 2 * _DIM_CHAR_M
+    row_pitch = 5.556 / 3.5 * 2 * half_h
     section_x = sheet._plan_xy(spec.COLUMN_X, 0.0, center=sheet.HOLE_TOP_CENTER)[0]
     deck_east = sheet._plan_xy(part.DECK_HALF_X, 0.0, center=sheet.HOLE_TOP_CENTER)[0]
+    centre_x = sum(x for x, _ in part.NAMEPLATE_SCREW_XZ) / len(part.NAMEPLATE_SCREW_XZ)
     taps = [
         sheet._plan_xy(x, z, center=sheet.HOLE_TOP_CENTER) for x, z in part.NAMEPLATE_SCREW_XZ
     ]
@@ -1989,26 +1994,34 @@ def test_nameplate_tags_stay_inside_their_quad_clear_of_section_a() -> None:
     for (x, z), tap in zip(part.NAMEPLATE_SCREW_XZ, taps, strict=True):
         table = (x + spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z - z)
         left, top = sheet._nameplate_tag_position(table)
-        tags.append(((left, top - 2 * half_h, left + tag_w, top), tap))
+        box = (left, top - 2 * half_h, left + tag_w, top)
+        if x > centre_x:
+            assert deck_east + 0.001 < box[0] and box[2] < section_x - 0.001
+        else:
+            assert tap[0] < box[0] and box[2] < deck_east - 0.001
+        # The leader leaves the box's west side and ends on its tap; judged
+        # to 1 mm short of the centre, where the arrowhead lands on the tap.
+        start = (box[0], top - half_h)
+        length = math.dist(start, tap)
+        end = tuple(s + (t - s) * (length - 0.001) / length for s, t in zip(start, tap))
+        tags.append((box, (start, end)))
     assert sheet._nameplate_tag_position((0.0, 0.0)) is None
-    others = {
-        tag: (x, y - 2 * half_h, x + tag_w, y)
-        for tag, (x, y) in sheet.HOLE_TAG_POSITIONS.items()
-    }
+    others = [
+        (x, y - 2 * half_h, x + tag_w, y) for x, y in sheet.HOLE_TAG_POSITIONS.values()
+    ]
     radius = part.NAMEPLATE_SCREW_HOLE_DIA * sheet.VIEW_SCALE / 2000.0
-    for i, (box, tap) in enumerate(tags):
-        assert box[2] < deck_east - 0.001 < section_x
-        for tag, other in others.items():
-            assert _box_gap(box, other) > 0.0015, tag
+    boxes = [box for box, _ in tags] + others
+    for i, (box, leader) in enumerate(tags):
         for hole in taps:
             assert _box_gap(box, (hole[0], hole[1], hole[0], hole[1])) > radius + 0.0008
-        for other_box, other_tap in tags[i + 1 :]:
-            assert _box_gap(box, other_box) > 0.0015
-            # Leaders, box middle to tap: no crossing, no leader through a box.
-            leader = (((box[0] + box[2]) / 2, (box[1] + box[3]) / 2), tap)
-            other_leader = (((other_box[0] + other_box[2]) / 2, (other_box[1] + other_box[3]) / 2), other_tap)
-            assert _segment_box_gap(leader, other_box) > 0.0005
-            assert _segment_box_gap(other_leader, box) > 0.0005
+        for j, other in enumerate(boxes):
+            if j == i:
+                continue
+            assert _segment_box_gap(leader, other) > 0.0003, (i, other)
+            if min(box[2], other[2]) > max(box[0], other[0]):  # one column
+                gap = max(box[1] - other[3], other[1] - box[3])
+                assert gap > row_pitch + 0.0003, (i, other, gap)
+        for _other_box, other_leader in tags[i + 1 :]:
             (ax, ay), (bx, by) = leader
             (cx, cy), (dx, dy) = other_leader
             cross = lambda px, py, qx, qy, rx, ry: (qx - px) * (ry - py) - (qy - py) * (rx - px)  # noqa: E731
