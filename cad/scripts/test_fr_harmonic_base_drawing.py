@@ -402,12 +402,12 @@ def _socket_bore_geometry(x_mm: float, z_mm: float):
     the bore's own radius in X and Z and the socket depth in Y, so the specs
     can be resolved offline without a SolidWorks session.
     """
-    from _part_pmi import _SURFACE_CYLINDER, _FaceGeometry
+    from _gtol_face import SURFACE_CYLINDER, FaceGeometry
 
     radius = part.COLUMN_SOCKET_DIAMETER / 2000.0
-    return _FaceGeometry(
+    return FaceGeometry(
         face=None,
-        identity=_SURFACE_CYLINDER,
+        identity=SURFACE_CYLINDER,
         parameters=(x_mm / 1000.0, 0.0, z_mm / 1000.0, 0.0, 1.0, 0.0, radius),
         outward_normal=None,
         box=(
@@ -427,8 +427,7 @@ def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
     build after ten minutes of cutting -- or, worse, print the seat grade
     against the wrong bore. Require a 1:1 station/control match, and hold the
     ambiguity the Z station exists to resolve."""
-    from _gtol_spec import CylinderFace
-    from _part_pmi import _face_matches
+    from _gtol_cylinder import CylinderFace
 
     spec = fr_harmonic_base_spec
     geometries = {
@@ -439,7 +438,7 @@ def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
         matched = [
             station
             for station, geometry in geometries.items()
-            if _face_matches(geometry, control.face)
+            if control.face.matches(geometry)
         ]
         assert matched == [
             station
@@ -450,8 +449,8 @@ def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
         assert control.production_method == spec.SOCKET_BORE_TARGET
     x_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER, contains_x_mm=part.COLUMN_X)
     size_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER)
-    assert sum(_face_matches(g, x_only) for g in geometries.values()) == 2
-    assert sum(_face_matches(g, size_only) for g in geometries.values()) == 4
+    assert sum(x_only.matches(g) for g in geometries.values()) == 2
+    assert sum(size_only.matches(g) for g in geometries.values()) == 4
 
 
 def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:

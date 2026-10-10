@@ -29,7 +29,7 @@ from _drawing_common import (
 )
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
-from _part_pmi import _face_geometry, _face_matches
+from _gtol_face_read import face_geometry
 from _surface_finish import surface_finish_by_key
 from dt_cone_pivot_post_tl_bond_cradle_spec import (
     BODY_SADDLE_THICK,
@@ -304,8 +304,8 @@ def _seat_finish(adapter: Any, view: Any, key: str, face_y: float, *, label: str
         if abs(float(p0[0]) - float(p1[0])) * 1000.0 < 1.0:
             continue
         for face in edge.GetTwoAdjacentFaces2() or ():
-            geometry = None if face is None else _face_geometry(face)
-            if geometry is not None and _face_matches(geometry, control.face):
+            geometry = None if face is None else face_geometry(face)
+            if geometry is not None and control.face.matches(geometry):
                 arcs.append(raw)
                 break
     if len(arcs) != 1:

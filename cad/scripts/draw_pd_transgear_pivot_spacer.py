@@ -50,10 +50,10 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _native_axis_datum import add_native_axis_datum
 from _layout_geometry import audit_sheet, format_findings
-from _part_pmi import _face_geometry, _face_matches
+from _gtol_face_read import face_geometry
 from _surface_finish import surface_finish_by_key
 from diagnostics.drawing_layout_audit import collect_document
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -278,11 +278,11 @@ def controlled_face(rim: ViewEdge, mark: EndFaceMark) -> Any:
     faces = tuple(
         face for face in (rim.edge.GetTwoAdjacentFaces2() or ()) if face is not None
     )
-    geometries = [_face_geometry(face) for face in faces]
+    geometries = [face_geometry(face) for face in faces]
     matches = [
         face
         for face, geometry in zip(faces, geometries)
-        if geometry is not None and _face_matches(geometry, mark.face)
+        if geometry is not None and mark.face.matches(geometry)
     ]
     if len(faces) != 2 or len(matches) != 1:
         described = "; ".join(

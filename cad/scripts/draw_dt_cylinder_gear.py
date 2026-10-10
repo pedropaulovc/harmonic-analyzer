@@ -37,7 +37,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _part_pmi import _face_geometry, _face_matches
+from _gtol_face_read import face_geometry
 from _surface_finish import surface_finish_by_key
 from dt_cylinder_gear_notes import BORE_FIT_CALLOUT, STACK_FIT_CALLOUT
 from dt_cylinder_gear_spec import (
@@ -302,8 +302,8 @@ def _cam_thickness_rims(view: Any) -> dict[float, Any]:
     control = surface_finish_by_key(SURFACE_FINISHES, "cam_follower")
     faces = []
     for face in visible_view_entities(view, 3, label="cam thickness face"):
-        geometry = _face_geometry(face)
-        if geometry is not None and _face_matches(geometry, control.face):
+        geometry = face_geometry(face)
+        if geometry is not None and control.face.matches(geometry):
             faces.append(face)
     if len(faces) != 1:
         raise RuntimeError(

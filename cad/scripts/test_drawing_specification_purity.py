@@ -124,7 +124,7 @@ add_surface_finish(
 def test_detector_requires_surface_finish_controls_from_a_part_spec() -> None:
     local_control = """
 from _drawing_common import add_surface_finish
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 add_surface_finish(

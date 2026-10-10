@@ -65,7 +65,7 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_layout_check import DrawableRegion
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
-from _part_pmi import _resolve_faces
+from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
 from build_fr_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
@@ -1943,7 +1943,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SERIAL_NOTE_XY,
     )
     deck_control = surface_finish_by_key(PART_SURFACE_FINISHES, "deck")
-    deck_face = _resolve_faces(
+    deck_face = resolve_faces(
         _early_bound(top.ReferencedDocument, "IModelDoc2"),
         {"deck": deck_control.face},
     )["deck"]
@@ -2205,7 +2205,7 @@ async def build(adapter: Any) -> dict[str, str]:
     socket_control = surface_finish_by_key(
         PART_SURFACE_FINISHES, socket_bore_finish_key(*SECTION_SOCKET_XZ)
     )
-    socket_face = _resolve_faces(
+    socket_face = resolve_faces(
         _early_bound(hole_top.ReferencedDocument, "IModelDoc2"),
         {"socket": socket_control.face},
     )["socket"]

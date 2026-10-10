@@ -24,7 +24,7 @@ import math
 import _config
 import cone_shaft_land_bands
 import gear_seat_fit
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 

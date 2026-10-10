@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import ConeFace
+from _gtol_cone import ConeFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 PIN_LENGTH = 45.0

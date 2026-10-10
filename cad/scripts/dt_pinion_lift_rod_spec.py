@@ -3,7 +3,7 @@ r"""Pure-data dimensional contract shared by the pinion lift rod and drawing."""
 from __future__ import annotations
 
 from _fit_shaft_h import SHAFT_H
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_rig_layout import LIFT_ROD_LEN
 
