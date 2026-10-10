@@ -108,6 +108,12 @@ param(
     [ValidateRange(0, 600)]
     [int]$SettleSeconds = 30,
 
+    # Protocol 5: bound reconciliation may need operator recovery. A timeout
+    # leaves the reservation unresolved; it never releases FIFO ownership.
+    [Parameter(ParameterSetName = 'Cancel')]
+    [ValidateRange(0, 600)]
+    [int]$BindingWaitSeconds = 30,
+
     [Parameter(ParameterSetName = 'List')]
     [ValidateSet('running', 'succeeded', 'failed', 'cancelled', 'launcher-died')]
     [string]$State,
@@ -1479,7 +1485,8 @@ function Invoke-RunCancel {
         [Parameter(Mandatory)][string]$Directory,
         [Parameter(Mandatory)][string]$RecordPath,
         [Parameter(Mandatory)][string]$Why,
-        [Parameter(Mandatory)][int]$SettleSeconds
+        [Parameter(Mandatory)][int]$SettleSeconds,
+        [Parameter(Mandatory)][int]$BindingWaitSeconds
     )
 
     $snapshot = Get-RunStatus -RecordPath $RecordPath
@@ -1538,6 +1545,7 @@ function Invoke-RunCancel {
         if ($buildId) {
             # Accepted reservations can bind long after the local producer dies.
             # Never substitute workflow absence for the coordinator's answer.
+            $bindingWait = [System.Diagnostics.Stopwatch]::StartNew()
             while ($true) {
                 $reservation = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @(
                     'leaf-status', '--build-id', $buildId, '--workflow-id', $WorkflowId, '--json'
@@ -1551,6 +1559,33 @@ function Invoke-RunCancel {
                 }
                 $reservationLine = $reservation.output | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1
                 $leafStatus = $reservationLine | ConvertFrom-Json -AsHashtable
+                $key = $leafStatus['key']
+                if ($null -eq $key -or $key['build_id'] -ne $buildId -or $key['workflow_id'] -ne $WorkflowId) {
+                    throw "invalid coordinator reservation for $WorkflowId"
+                }
+                $reservationState = $leafStatus['state']
+                if ($leafStatus['error_code'] -or $reservationState -eq 'recovery_required') {
+                    $outcome['outcome'] = 'unresolved'
+                    $outcome['detail'] = "$($leafStatus['error_code']): $($leafStatus['error'])"
+                    $outcome['event'] = "unresolved reservation $WorkflowId`: operator recovery required"
+                    $errors.Add("reservation $WorkflowId requires operator recovery: $($outcome['detail'])")
+                    return $outcome
+                }
+                if ($reservationState -eq 'missing_closed') {
+                    if ($null -ne $leafStatus['binding'] -or @($leafStatus['unconfirmed_attempts']).Count -gt 0) {
+                        throw "invalid missing_closed reservation for $WorkflowId"
+                    }
+                    # No retained reservation remains to reconcile. This also
+                    # covers accepted, physically drained history later pruned;
+                    # never infer submission history or a run from the ID.
+                    $outcome['outcome'] = 'settled-untracked'
+                    $outcome['detail'] = 'producer fenced closed; reservation is no longer tracked'
+                    $outcome['event'] = "settled untracked reservation $WorkflowId`: producer fenced closed"
+                    return $outcome
+                }
+                if ($reservationState -notin @('reserved', 'bound', 'admitted', 'terminal', 'drained')) {
+                    throw "invalid coordinator reservation state for $WorkflowId"
+                }
                 $binding = $leafStatus['binding']
                 if ($null -ne $binding) {
                     if ($binding['build_id'] -ne $buildId -or $binding['workflow_id'] -ne $WorkflowId -or -not $binding['run_id']) {
@@ -1561,8 +1596,30 @@ function Invoke-RunCancel {
                     $statusArguments += @('--run-id', $bindingRun)
                     break
                 }
-                Write-RunEvent -RunId $runId -Text "pending reservation $WorkflowId`: $($leafStatus['state']); waiting for exact binding"
-                Start-Sleep -Seconds 1
+                if ($reservationState -eq 'drained' -and @($leafStatus['unconfirmed_attempts']).Count -eq 0) {
+                    $outcome['outcome'] = 'already-closed'
+                    $outcome['detail'] = 'coordinator confirmed reservation physically drained'
+                    $outcome['event'] = "already closed $WorkflowId`: reservation drained"
+                    return $outcome
+                }
+                if ($reservationState -ne 'reserved') {
+                    $outcome['outcome'] = 'unresolved'
+                    $outcome['detail'] = "unbound reservation state: $reservationState"
+                    $outcome['event'] = "unresolved reservation $WorkflowId"
+                    $errors.Add("reservation $WorkflowId is $reservationState without an exact binding")
+                    return $outcome
+                }
+                $remaining = $BindingWaitSeconds - $bindingWait.Elapsed.TotalSeconds
+                if ($remaining -le 0) {
+                    $outcome['outcome'] = 'unresolved'
+                    $outcome['detail'] = "accepted reservation still pending after $BindingWaitSeconds s; FIFO ownership remains fenced"
+                    $outcome['event'] = "unresolved reservation $WorkflowId`: binding wait exhausted"
+                    $errors.Add("reservation $WorkflowId has no exact binding after $BindingWaitSeconds s; retry -Cancel or use operator recovery")
+                    return $outcome
+                }
+                # Stream progress without adding strings to the outcome.
+                Write-RunEvent -RunId $runId -Text "pending reservation $WorkflowId`: $reservationState; waiting for exact binding" | Out-Host
+                Start-Sleep -Milliseconds ([int][Math]::Ceiling([Math]::Min(1, $remaining) * 1000))
             }
         }
         $query = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments ($statusArguments + @($WorkflowId))
@@ -1746,7 +1803,7 @@ if ($PSCmdlet.ParameterSetName -ne 'Launch') {
                 switch ($PSCmdlet.ParameterSetName) {
                     'Status' { Invoke-RunStatus -RecordPath $selected }
                     'Watch' { Invoke-RunWatch -RecordPath $selected -PollSeconds $PollSeconds }
-                    'Cancel' { Invoke-RunCancel -Directory $trackedDirectory -RecordPath $selected -Why $Why -SettleSeconds $SettleSeconds }
+                    'Cancel' { Invoke-RunCancel -Directory $trackedDirectory -RecordPath $selected -Why $Why -SettleSeconds $SettleSeconds -BindingWaitSeconds $BindingWaitSeconds }
                 }
             }
         }

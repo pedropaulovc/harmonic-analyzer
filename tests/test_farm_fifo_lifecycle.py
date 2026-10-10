@@ -89,11 +89,13 @@ class _Control:
         self.starts = []
         self.handles = []
         self.cancellations = []
+        self.warnings = []
         self.registration_records = []
         self.start_error = None
         self.register_response = None
         self.heartbeat_response = None
         self.query_response = None
+        self.close_response = None
         self.heartbeat_gate = None
         self.heartbeat_gate_sequence = None
         self.build_id = None
@@ -151,6 +153,8 @@ class _Control:
         assert name == "close_build"
         assert isinstance(arg, _farm.CloseBuild)
         self.closed.set()
+        if isinstance(self.close_response, BaseException):
+            raise self.close_response
         return replace(self.status(), producer_state="closed")
 
     async def query(self, name, arg, **options):
@@ -279,6 +283,10 @@ def control(_guarded_process, monkeypatch):
     requests, _interrupted, _interrupt_calls = _guarded_process
     fake = _Control(requests)
     monkeypatch.setattr(_farm, "_connect_client", fake.connect)
+    monkeypatch.setattr(
+        _farm._telemetry, "warn",
+        lambda message, **fields: fake.warnings.append((message, fields)),
+    )
     yield fake
     if fake.heartbeat_gate is not None:
         fake.heartbeat_gate.release()
@@ -426,20 +434,172 @@ def test_finally_closes_group_without_cancelling_shared_remote_work(
     assert not _guarded_process[1].is_set()
 
 
+@pytest.mark.parametrize("fault", ["lost-reply", "frontend-unavailable", "update-timeout"])
+def test_transient_heartbeat_retries_same_lease_sequence_and_update_id(
+    control, start_parent, _guarded_process, fault
+):
+    first_deadline = control.lease_deadline
+    attempts = []
+    from temporalio.client import WorkflowUpdateRPCTimeoutOrCancelledError
+    from temporalio.service import RPCError, RPCStatusCode
+
+    outage = {
+        "lost-reply": TimeoutError("accepted heartbeat reply lost"),
+        "frontend-unavailable": RPCError("frontend restarting", RPCStatusCode.UNAVAILABLE, b""),
+        "update-timeout": WorkflowUpdateRPCTimeoutOrCancelledError(),
+    }[fault]
+
+    def heartbeat_response(status):
+        attempts.append(status)
+        if len(attempts) == 1:
+            # The server accepted the renewal; only its reply was lost.
+            control.lease_deadline = _deadline(120)
+            raise outage
+        return control.status()
+
+    control.heartbeat_response = heartbeat_response
+    control.heartbeat_gate = _AsyncGate()
+    control.heartbeat_gate_sequence = 2
+    parent = start_parent()
+    _wait(parent.entered, "producer did not enter action")
+    _wait(control.heartbeat_gate.entered, "recovered producer did not send next heartbeat")
+
+    heartbeats = control.calls("heartbeat_build")
+    assert [heartbeat.sequence for heartbeat, _options in heartbeats] == [1, 1, 2]
+    assert heartbeats[0] == heartbeats[1], "retry changed uncertain heartbeat identity"
+    assert control.lease_deadline != first_deadline
+    assert parent.ownership._lease_wall == datetime.fromisoformat(control.lease_deadline)
+    assert parent.ownership._failure is None
+    assert not _guarded_process[1].is_set()
+    assert len(control.calls("register_build")) == 1
+    assert control.calls("close_build") == []
+
+    control.heartbeat_gate.release()
+    parent.finish()
+    assert parent.errors == []
+    _assert_close(control, parent.ownership.build_id, "finished")
+
+
+@pytest.mark.parametrize("fault", ["connection", "frontend-unavailable"])
+def test_transient_waiting_status_query_retries_without_new_registration_or_lease(
+    control, start_parent, _guarded_process, fault
+):
+    control.active.clear()
+    original_deadline = control.lease_deadline
+    attempts = []
+    from temporalio.service import RPCError, RPCStatusCode
+
+    outage = (
+        ConnectionError("temporary frontend outage") if fault == "connection"
+        else RPCError("frontend restarting", RPCStatusCode.UNAVAILABLE, b"")
+    )
+
+    def query_response(status):
+        attempts.append(status)
+        if len(attempts) == 1:
+            raise outage
+        control.active.set()
+        return control.status()
+
+    control.query_response = query_response
+    control.heartbeat_gate = _AsyncGate()
+    parent = start_parent()
+    _wait(parent.entered, "recovered waiting query did not activate producer")
+    _wait(control.heartbeat_gate.entered, "active producer did not begin renewal")
+
+    assert len(control.queries) == 2
+    assert control.queries[0] == control.queries[1]
+    assert control.lease_deadline == original_deadline
+    assert parent.ownership._lease_wall == datetime.fromisoformat(original_deadline)
+    assert len(control.calls("register_build")) == 1
+    assert parent.ownership._failure is None
+    assert not _guarded_process[1].is_set()
+
+    control.heartbeat_gate.release()
+    parent.finish()
+    assert parent.errors == []
+    _assert_close(control, parent.ownership.build_id, "finished")
+
+
+@pytest.mark.parametrize(
+    ("success", "action_error", "reason"),
+    [
+        (True, None, "finished"),
+        (False, None, "failed"),
+        (True, RuntimeError("artifact restore failed"), "failed"),
+        (True, KeyboardInterrupt("parent cancelled"), "cancelled"),
+    ],
+)
+def test_close_transport_failure_warns_without_replacing_local_outcome(
+    control, start_parent, _guarded_process, success, action_error, reason
+):
+    control.close_response = ConnectionError("final close unavailable")
+    parent = start_parent()
+    _wait(parent.entered, "producer did not enter action")
+    parent.success = success
+    parent.action_error = action_error
+    parent.finish()
+
+    assert parent.errors == ([] if action_error is None else [action_error])
+    assert parent.ownership._failure is None
+    assert not _guarded_process[1].is_set()
+    _assert_close(control, parent.ownership.build_id, reason)
+    [(warning, fields)] = control.warnings
+    assert "final close unavailable" in warning
+    assert "producer lease will expire" in warning
+    assert fields == {"build_id": parent.ownership.build_id}
+
+
+def test_close_transport_warning_cannot_mask_prior_ownership_loss(
+    control, start_parent, _guarded_process
+):
+    control.close_response = ConnectionError("final close unavailable")
+    control.heartbeat_gate = _AsyncGate()
+    control.heartbeat_response = lambda status: replace(status, producer_state="closed")
+    parent = start_parent()
+    _wait(parent.entered, "producer did not enter action")
+    _wait(control.heartbeat_gate.entered, "heartbeat did not reach fake boundary")
+    control.heartbeat_gate.release()
+    _wait(_guarded_process[1], "refused ownership did not interrupt parent")
+    prior_failure = parent.ownership._failure
+    parent.finish()
+
+    assert len(parent.errors) == 1
+    assert isinstance(parent.errors[0], _farm.BuildOwnershipError)
+    assert parent.errors[0].__cause__ is prior_failure
+    assert "coordinator refused" in str(prior_failure)
+    _assert_close(control, parent.ownership.build_id, "failed")
+    assert len(control.warnings) == 1
+
+
 @pytest.mark.parametrize(
     "fault",
-    ["rpc-outage", "closed", "expired", "past-deadline", "foreign-build", "waiting", "drained"],
+    ["lease-expiring-outage", "update-refusal", "rpc-refusal", "closed", "expired",
+     "past-deadline", "foreign-build", "waiting", "drained"],
 )
 def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
     control, start_parent, _guarded_process, fault
 ):
     # Gate the first renewal until local execution has actually started.
     control.heartbeat_gate = _AsyncGate()
+    if fault == "lease-expiring-outage":
+        control.lease_deadline = _deadline(0.5)
     parent = start_parent()
     _wait(parent.entered, "producer did not enter action")
     _wait(control.heartbeat_gate.entered, "heartbeat did not reach fake boundary")
-    if fault == "rpc-outage":
+    if fault == "lease-expiring-outage":
         control.heartbeat_response = ConnectionError("control unavailable")
+    elif fault == "update-refusal":
+        from temporalio.client import WorkflowUpdateFailedError
+        from temporalio.exceptions import ApplicationError
+
+        control.heartbeat_response = WorkflowUpdateFailedError(
+            cause=ApplicationError("ownership explicitly refused", non_retryable=True)
+        )
+    elif fault == "rpc-refusal":
+        from temporalio.service import RPCError, RPCStatusCode
+
+        control.heartbeat_response = RPCError("unauthorized", RPCStatusCode.UNAUTHENTICATED, b"")
     else:
         changes = {
             "closed": {"producer_state": "closed"},
@@ -461,6 +621,14 @@ def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
     assert isinstance(parent.errors[0], _farm.BuildOwnershipError)
     _assert_close(control, parent.ownership.build_id, "failed")
     assert len(_guarded_process[2]) == 1
+    heartbeats = control.calls("heartbeat_build")
+    if fault == "lease-expiring-outage":
+        assert len(heartbeats) > 1, "an outage must retry while its lease remains valid"
+        assert {heartbeat.sequence for heartbeat, _options in heartbeats} == {1}
+        assert len({options["id"] for _heartbeat, options in heartbeats}) == 1
+        assert "acknowledged lease expired" in str(parent.errors[0].__cause__)
+    else:
+        assert len(heartbeats) == 1, "an explicit refusal is not a transient outage"
     assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
 
@@ -654,6 +822,45 @@ def test_real_build_wrapper_mints_fresh_ids_only_after_successful_preflight(
         _farm.CloseBuild(build_id, "finished") for build_id in minted
     ]
     assert control.cancellations == []
+
+
+@pytest.mark.parametrize("action_succeeds", [True, False])
+def test_real_build_wrapper_preserves_command_exit_on_unacknowledged_close(
+    control, monkeypatch, action_succeeds
+):
+    monkeypatch.setattr(build, "_farm_preflight", lambda: None)
+    executed = []
+
+    def action():
+        executed.append(os.environ["HARMONIC_FARM_BUILD_ID"])
+        return action_succeeds
+
+    _install_serial_build(monkeypatch, action)
+    arguments = ["--executor", "farm", "--display-name", DISPLAY_NAME, "local_gap"]
+    baseline = build.main(arguments)
+    assert (baseline == 0) is action_succeeds
+    [(baseline_registration, _options)] = control.calls("register_build")
+    reason = "finished" if action_succeeds else "failed"
+    _assert_close(control, baseline_registration.build_id, reason)
+    assert control.warnings == []
+    assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
+
+    control.close_response = TimeoutError("close reply lost")
+    result = build.main(arguments)
+
+    assert result == baseline, "an unacknowledged close replaced the runner's actual exit"
+    registrations = [registration for registration, _options in control.calls("register_build")]
+    assert len(registrations) == 2
+    assert registrations[0].build_id != registrations[1].build_id
+    assert executed == [registration.build_id for registration in registrations]
+    assert [close for close, _options in control.calls("close_build")] == [
+        _farm.CloseBuild(registration.build_id, reason) for registration in registrations
+    ]
+    assert control.cancellations == []
+    [(warning, fields)] = control.warnings
+    assert "close reply lost" in warning
+    assert fields == {"build_id": registrations[1].build_id}
+    assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
 
 @pytest.mark.parametrize(

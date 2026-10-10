@@ -2073,3 +2073,49 @@ def test_mismatched_child_build_id_is_refused_before_connection(
     with pytest.raises(_farm.BuildOwnershipError, match="does not match"):
         asyncio.run(_farm._dispatch(request, "leaf:part:pen_rod:" + "k" * 64 + ":900s"))
     assert calls["connect"] == []
+
+
+@pytest.mark.parametrize(
+    ("state", "error_code", "bound"),
+    [
+        ("recovery_required", "fifo_start_failed", False),
+        ("recovery_required", "fifo_grant_failed", True),
+        ("recovery_required", "fifo_observation_failed", True),
+        ("bound", "fifo_observation_failed", True),
+    ],
+)
+def test_reservation_recovery_failure_stops_dispatch_before_attaching(
+    temporal_boundary, monkeypatch, state, error_code, bound
+):
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+
+    async def query(handle, name, key, result_type):
+        binding = _farm.LeafBinding(key.build_id, key.workflow_id, "exact-run") if bound else None
+        return _farm.LeafStatus(
+            key, state, binding, [], error_code, "exact history needs operator evidence"
+        )
+
+    monkeypatch.setattr(_farm, "_rpc_query", query)
+    with pytest.raises(_farm.BuildOwnershipError, match=f"operator recovery \\[{error_code}\\]"):
+        _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    assert len(calls["submit"]) == 1
+    assert calls["handles"] == [("solidworks-build-fifo", {})]
+
+
+@pytest.mark.parametrize("state", ["missing_closed", "drained"])
+def test_settled_unbound_reply_cannot_be_used_as_a_leaf_result(
+    temporal_boundary, monkeypatch, state
+):
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+
+    async def query(handle, name, key, result_type):
+        return _farm.LeafStatus(key, state, None, [])
+
+    monkeypatch.setattr(_farm, "_rpc_query", query)
+    with pytest.raises(_farm.BuildOwnershipError, match="closed without a proven run binding"):
+        _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    assert calls["handles"] == [("solidworks-build-fifo", {})]

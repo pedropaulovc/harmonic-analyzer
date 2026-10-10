@@ -190,11 +190,16 @@ overtake it.
 Only the parent renews ownership, every 15 seconds on an independent background
 thread, while waiting and while active. Spawned action processes inherit
 `HARMONIC_FARM_BUILD_ID` but do not renew the lease. The coordinator's 120-second
-producer lease expires after a killed or disconnected parent; renewal errors
-and ownership loss fail the producer closed rather than permitting more work.
+producer lease expires after a killed or disconnected parent. Transient heartbeat
+and waiting-status RPC failures are retried only while the last acknowledged
+lease remains valid; an uncertain heartbeat reuses its sequence and update ID.
+Queries and duplicate replies do not extend that deadline. Expiry or an explicit
+coordinator refusal fails the producer closed, with no reopening or late renewal.
 Normal completion closes ownership as `finished`, task failure as `failed`,
-and an interrupted parent as `cancelled`. Closing ownership alone never cancels
-remote leaves.
+and an interrupted parent as `cancelled`. A failed final close RPC is a warning:
+server lease expiry fences ownership, so the command's actual exit code is kept.
+This does not suppress an earlier ownership loss or an artifact/action error.
+Closing ownership alone never cancels remote leaves.
 
 The producer records its build and each leaf request before submitting a
 reservation to the coordinator. The coordinator owns leaf startup and exact-run
@@ -207,6 +212,31 @@ Temporal workflow closure, timeout, cancellation and producer lease expiry do
 not prove physical drain. Unknown or unconfirmed attempts block the FIFO
 fail-closed until physical-drain evidence is supplied through the pool operator
 surface.
+`leaf-status` exposes failed startup, grant or history observation as
+`state: "recovery_required"` with typed `error_code` and `error` fields. The
+producer fails the affected action rather than polling forever or attaching to
+a binding whose recovery failed. These reservations remain fail-closed.
+For a settled failed reservation, an operator can supply independently checked
+physical-drain evidence with `farm.py confirm-reservation-drained --build-id <id>
+--workflow-id <wf> --evidence <text>`. An unbound reservation must omit `--run-id`.
+A bound reservation requires `--run-id <run>` matching its immutable exact-run
+binding, no pending starter or watcher, and every known attempt already drained.
+The coordinator rejects confirmation without those conditions; it never infers
+physical drain from missing history. Confirm a bound attempt separately with the
+pool's exact-run `confirm-attempt-drained` command before reservation recovery.
+Both are explicit operator confirmations; neither workflow closure nor a missing
+run is their evidence source. Worker drain signals require actual native cleanup.
+The operator-versus-worker source distinction is a trust convention, not a
+separate enforced authorization boundary: both operator updates require explicit
+evidence, and callers must not manufacture it from Temporal state.
+
+A parked pre-grant workflow ignores ordinary cancellation. When recovery
+involves a stale or foreign execution, independently verify that native execution
+and cleanup have physically stopped, then terminate only that exact stale/foreign
+run in the Temporal UI before sending an operator drain confirmation. Check its
+run ID rather than acting on a later execution sharing the canonical workflow ID.
+Termination is cleanup of the Temporal execution, not evidence of physical drain.
+
 An already-running coordinator is reused, but a terminal coordinator cannot be
 recreated as an empty singleton: that would forget accepted work and drain
 obligations. Recovery requires physical-drain evidence and a reviewed,
@@ -423,8 +453,11 @@ no `.done`.
   with `farm.py close-build <build_id> --reason cancelled`, blocking new
   admissions while retaining accepted reservations. It reconciles each request
   with `farm.py leaf-status --build-id <id> --workflow-id <wf> --json`.
-  Reserved work is polled until the coordinator supplies an exact run binding;
-  it is never declared absent merely because the workflow has not started.
+  Reserved work is polled for at most `-BindingWaitSeconds` (30 by default;
+  0 performs one query). A still-pending accepted reservation is `unresolved`,
+  not absent; the request and snapshot remain for a later `-Cancel`, and FIFO
+  ownership remains fenced. A typed `recovery_required` or `error_code` response
+  stops reconciliation immediately and calls for operator recovery.
   Status and cancellation of a bound leaf use `--run-id <run>` so a later
   execution with the same canonical workflow ID cannot be cancelled by mistake.
 
@@ -436,9 +469,16 @@ no `.done`.
   checked immediately before each cancellation. A sibling outside that log
   directory is not visible to this launcher.
 
-  An unknown reservation, failed query or missing exact bound execution is
-  `unresolved`: cancellation exits 1 without writing `.done` or cleaning the
-  snapshot. Retry the same command; do not erase the request or infer drain.
+  The typed `missing_closed` coordinator reply is `settled-untracked`: producer
+  ownership is fenced closed and no retained reservation remains to reconcile.
+  This includes both never-accepted requests and accepted, physically drained
+  history later pruned; it does not establish whether a leaf was ever submitted
+  or executed. No workflow status or cancellation is inferred from the canonical
+  ID. An operator-confirmed, unbound `drained` reservation is
+  `already-closed`. A fresh unknown reservation, failed query, exhausted binding
+  wait or missing exact bound execution remains `unresolved`: cancellation exits
+  1 without writing `.done` or cleaning the snapshot. Retry the same command; do
+  not erase the request or infer drain from error text.
   A successful remote cancellation still does not prove native worker cleanup:
   FIFO handoff waits for the worker's physical-drain acknowledgement.
   Historical runs without `build_id` retain the legacy settle query after
@@ -451,7 +491,7 @@ no `.done`.
   outputs moved to `<run-id>.out`, snapshot removed — and writes `.done` with
   `state: "cancelled"`, `exit_code: null` and a `cancel` block recording who,
   why, the stopped PIDs and each workflow's outcome (`cancelled`,
-  `already-closed`, `not-found`, `kept-shared`, `kept-foreign`). A cleanup
+  `already-closed`, `settled-untracked`, `not-found`, `kept-shared`, `kept-foreign`). A cleanup
   failure still writes `.done` (with `cleanup_errors`) and exits 1.
   On a run that already finished, `-Cancel` stops nothing and leaves `.done`
   as the launcher wrote it; it only cancels that run's leaves still

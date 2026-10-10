@@ -120,7 +120,18 @@ if farm is not None:
     workflows = json.loads(state_path.read_text(encoding="utf-8"))
     command, *rest = sys.argv[farm + 1 :]
     if command == "close-build":
-        workflows.setdefault("_builds", {})[rest[0]] = {"reason": rest[-1]}
+        if workflows.get("_close_error"):
+            print("Error: close-build unavailable", file=sys.stderr)
+            raise SystemExit(1)
+        workflows.setdefault("_builds", {})[rest[0]] = {
+            "reason": rest[-1], "producer_state": "closed",
+        }
+        for workflow_id, reservation in list(workflows.get("_reservations", {}).items()):
+            if (reservation["build_id"] == rest[0]
+                and reservation.get("state") == "drained"
+                and reservation.get("_prune_after_close")):
+                # Model an authoritative status whose drained history was pruned.
+                del workflows["_reservations"][workflow_id]
         state_path.write_text(json.dumps(workflows), encoding="utf-8")
         print(json.dumps({"build_id": rest[0], "producer_state": "closed"}))
         raise SystemExit(0)
@@ -128,21 +139,35 @@ if farm is not None:
         build_id = rest[rest.index("--build-id") + 1]
         workflow_id = rest[rest.index("--workflow-id") + 1]
         reservation = workflows.get("_reservations", {}).get(workflow_id)
-        if reservation is None or reservation["build_id"] != build_id:
+        if workflows.get("_reservation_query_error"):
             print("Error: unknown reservation", file=sys.stderr)
-            raise SystemExit(2)
-        pending = reservation.get("_pending_for", 0)
-        if pending:
+            raise SystemExit(1)
+        if reservation is None or reservation["build_id"] != build_id:
+            if workflows.get("_builds", {}).get(build_id, {}).get("producer_state") != "closed":
+                print("Error: unknown reservation", file=sys.stderr)
+                raise SystemExit(2)
+            print(json.dumps({
+                "key": {"build_id": build_id, "workflow_id": workflow_id},
+                "state": "missing_closed", "binding": None,
+                "unconfirmed_attempts": [], "error_code": None, "error": None,
+            }))
+            raise SystemExit(0)
+        pending = reservation.get("_pending_for", 0) or reservation.get("_pending_forever")
+        if reservation.get("_pending_for", 0):
             reservation["_pending_for"] -= 1
+        reservation["_queries"] = reservation.get("_queries", 0) + 1
         state_path.write_text(json.dumps(workflows), encoding="utf-8")
+        state = reservation.get("state") or ("reserved" if pending else "bound")
         print(json.dumps({
             "key": {"build_id": build_id, "workflow_id": workflow_id},
-            "state": "reserved" if pending else "bound",
-            "binding": None if pending else {
+            "state": state,
+            "binding": None if pending or "run_id" not in reservation else {
                 "build_id": build_id, "workflow_id": workflow_id,
                 "run_id": reservation["run_id"],
             },
-            "unconfirmed_attempts": [],
+            "unconfirmed_attempts": reservation.get("unconfirmed_attempts", []),
+            "error_code": reservation.get("error_code"),
+            "error": reservation.get("error"),
         }))
         raise SystemExit(0)
     workflow = rest[-1]
@@ -2568,11 +2593,22 @@ def test_fifo_cancel_closes_group_and_reconciles_exact_reservation(
     state = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
     assert state["_builds"][build_id]["reason"] == "cancelled"
     assert "not-found" not in cancel.stdout
-    if reservation in ("unknown", "bound-missing"):
+    if reservation == "bound-missing":
         assert cancel.returncode == 1, (cancel.stdout, cancel.stderr)
         assert "unresolved" in cancel.stdout
         assert not Path(running["done"]).exists()
         assert not Path(fixture["farm_cancels"]).exists()
+    elif reservation == "unknown":
+        assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+        done = _record(Path(running["done"]))
+        assert done["state"] == "cancelled"
+        assert done["snapshot_removed"] is True
+        assert not Path(running["snapshot"]).exists()
+        assert done["cancel"]["errors"] == []
+        assert not Path(fixture["farm_cancels"]).exists()
+        assert state[LEAF_NUT]["status"] == "RUNNING"
+        assert done["cancel"]["workflows"][0]["workflow_id"] == LEAF_NUT
+        assert "run_id" not in done["cancel"]["workflows"][0]
     elif reservation == "foreign":
         assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
         assert state[LEAF_NUT]["status"] == "RUNNING"
@@ -2616,3 +2652,211 @@ def test_fifo_cancel_closes_durable_group_without_any_leaf_or_registration_log(
     assert done["build_id"] == "waiting-build"
     assert done["cancel"]["workflows"] == []
     assert not Path(fixture["farm_cancels"]).exists()
+
+
+@pytest.mark.parametrize(
+    "reservation",
+    ["pending", "start-failed", "grant-failed", "observation-failed", "query-error"],
+)
+def test_fifo_cancel_pending_or_failed_reconciliation_is_bounded_and_retryable(
+    tmp_path: Path, reservation: str,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(
+        tmp_path, fixture, f"Farm workflow requested: {LEAF_NUT}\n", "recovery"
+    )
+    build_id = "recovery-build"
+    requests = Path(running["requests"])
+    build_record = json.dumps({"build_id": build_id, "farm_run": running["run_id"]})
+    request_record = json.dumps({
+        "build_id": build_id, "farm_run": running["run_id"],
+        "task": "part:wheel_axle_nut", "workflow_id": LEAF_NUT,
+    })
+    try:
+        (requests / "build.json").write_text(build_record, encoding="utf-8")
+        (requests / "leaf.json").write_text(request_record, encoding="utf-8")
+        accepted = {"build_id": build_id}
+        if reservation == "pending":
+            accepted["_pending_forever"] = True
+        elif reservation != "query-error":
+            accepted.update({
+                "state": "recovery_required",
+                "error_code": {
+                    "start-failed": "fifo_start_failed",
+                    "grant-failed": "fifo_grant_failed",
+                    "observation-failed": "fifo_observation_failed",
+                }[reservation],
+                "error": "operator evidence required",
+            })
+            if reservation != "start-failed":
+                accepted["run_id"] = "exact-leaf-run"
+        state = {
+            "_reservations": {LEAF_NUT: accepted},
+            LEAF_NUT: {
+                "status": "RUNNING", "run_id": "exact-leaf-run",
+                "farm_run": running["run_id"],
+            },
+        }
+        if reservation == "query-error":
+            state["_reservation_query_error"] = True
+        state_path = Path(fixture["farm_state"])
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        arguments = _tracking(
+            fixture, "-Cancel", "-RunId", running["run_id"],
+            "-Why", "bounded recovery", "-SettleSeconds", "0",
+            "-BindingWaitSeconds", "0",
+        )
+        cancel = _run_launcher(fixture, arguments, fixture["environment"])
+        process.communicate(timeout=HANG_GUARD_S)
+
+        assert cancel.returncode == 1, (cancel.stdout, cancel.stderr)
+        outcomes = [
+            json.loads(line) for line in cancel.stdout.splitlines() if line.startswith("{")
+        ]
+        assert [(outcome["workflow_id"], outcome["outcome"]) for outcome in outcomes] == [
+            (LEAF_NUT, "unresolved")
+        ]
+        assert not Path(running["done"]).exists()
+        assert Path(running["snapshot"]).exists()
+        assert (requests / "build.json").read_text("utf-8") == build_record
+        assert (requests / "leaf.json").read_text("utf-8") == request_record
+        assert not Path(fixture["farm_cancels"]).exists()
+        state = json.loads(state_path.read_text("utf-8"))
+        assert state["_builds"][build_id]["producer_state"] == "closed"
+        assert state[LEAF_NUT]["status"] == "RUNNING"
+        if reservation == "pending":
+            assert state["_reservations"][LEAF_NUT]["_queries"] == 1
+            assert "binding wait exhausted" in cancel.stdout
+        elif reservation != "query-error":
+            assert "operator recovery required" in cancel.stdout
+            assert state["_reservations"][LEAF_NUT]["_queries"] == 1
+
+        # Only an authoritative recovered binding allows the retry to cancel.
+        state.pop("_reservation_query_error", None)
+        state["_reservations"][LEAF_NUT] = {
+            "build_id": build_id, "run_id": "exact-leaf-run",
+        }
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        retried = _run_launcher(fixture, arguments, fixture["environment"])
+        assert retried.returncode == 0, (retried.stdout, retried.stderr)
+        done = _record(Path(running["done"]))
+        assert done["cancel"]["workflows"][0]["outcome"] == "cancelled"
+        assert done["cancel"]["workflows"][0]["run_id"] == "exact-leaf-run"
+    finally:
+        release.touch()
+        process.communicate(timeout=HANG_GUARD_S)
+
+
+@pytest.mark.parametrize(
+    ("close_fails", "pruned_drained"),
+    [(False, False), (True, False), (False, True)],
+)
+def test_fifo_cancel_unknown_or_pruned_reservation_settles_only_with_closed_fence(
+    tmp_path: Path, close_fails: bool, pruned_drained: bool,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(
+        tmp_path, fixture, "recorded request without retained binding\n", "untracked"
+    )
+    build_id = "untracked-build"
+    requests = Path(running["requests"])
+    try:
+        (requests / "build.json").write_text(
+            json.dumps({"build_id": build_id, "farm_run": running["run_id"]}),
+            encoding="utf-8",
+        )
+        request_path = requests / "leaf.json"
+        request_path.write_text(json.dumps({
+            "build_id": build_id, "farm_run": running["run_id"],
+            "task": "part:wheel_axle_nut", "workflow_id": LEAF_NUT,
+        }), encoding="utf-8")
+        state_path = Path(fixture["farm_state"])
+        state = {
+            # The canonical workflow belongs to another run, not this request.
+            LEAF_NUT: {
+                "status": "RUNNING", "run_id": "foreign-leaf-run",
+                "farm_run": "another-producer",
+            },
+        }
+        if pruned_drained:
+            state["_reservations"] = {
+                LEAF_NUT: {
+                    "build_id": build_id, "run_id": "old-physically-drained-run",
+                    "state": "drained", "_prune_after_close": True,
+                },
+            }
+        if close_fails:
+            state["_close_error"] = True
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        arguments = _tracking(
+            fixture, "-Cancel", "-RunId", running["run_id"],
+            "-Why", "untracked closed reservation", "-SettleSeconds", "0",
+            "-BindingWaitSeconds", "0",
+        )
+        cancel = _run_launcher(fixture, arguments, fixture["environment"])
+        process.communicate(timeout=HANG_GUARD_S)
+        if close_fails:
+            assert cancel.returncode == 1, (cancel.stdout, cancel.stderr)
+            outcomes = [
+                json.loads(line) for line in cancel.stdout.splitlines() if line.startswith("{")
+            ]
+            assert outcomes[0]["outcome"] == "unresolved"
+            assert not Path(running["done"]).exists()
+            assert request_path.exists()
+            assert Path(running["snapshot"]).exists()
+            state = json.loads(state_path.read_text("utf-8"))
+            state.pop("_close_error")
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            cancel = _run_launcher(fixture, arguments, fixture["environment"])
+
+        assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+        done = _record(Path(running["done"]))
+        assert done["state"] == "cancelled"
+        assert done["snapshot_removed"] is True
+        assert not Path(running["snapshot"]).exists()
+        assert done["cancel"]["errors"] == []
+        assert done["cancel"]["workflows"][0]["workflow_id"] == LEAF_NUT
+        assert "run_id" not in done["cancel"]["workflows"][0]
+        state = json.loads(state_path.read_text("utf-8"))
+        assert state["_builds"][build_id]["producer_state"] == "closed"
+        assert LEAF_NUT not in state.get("_reservations", {})
+        assert state[LEAF_NUT]["status"] == "RUNNING"
+        assert not Path(fixture["farm_cancels"]).exists()
+    finally:
+        release.touch()
+        process.communicate(timeout=HANG_GUARD_S)
+
+
+def test_fifo_cancel_operator_confirmed_unbound_drain_is_settled(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(
+        tmp_path, fixture, f"Farm workflow requested: {LEAF_NUT}\n", "drained"
+    )
+    build_id = "drained-build"
+    try:
+        (Path(running["requests"]) / "build.json").write_text(
+            json.dumps({"build_id": build_id, "farm_run": running["run_id"]}),
+            encoding="utf-8",
+        )
+        state_path = Path(fixture["farm_state"])
+        state_path.write_text(json.dumps({
+            "_reservations": {LEAF_NUT: {"build_id": build_id, "state": "drained"}},
+        }), encoding="utf-8")
+        cancel = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Cancel", "-RunId", running["run_id"],
+                      "-Why", "operator evidence supplied", "-BindingWaitSeconds", "0"),
+            fixture["environment"],
+        )
+        process.communicate(timeout=HANG_GUARD_S)
+        assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+        done = _record(Path(running["done"]))
+        outcome = done["cancel"]["workflows"][0]
+        assert outcome["outcome"] == "already-closed"
+        assert outcome["detail"] == "coordinator confirmed reservation physically drained"
+        assert not Path(fixture["farm_cancels"]).exists()
+    finally:
+        release.touch()
+        process.communicate(timeout=HANG_GUARD_S)

@@ -29,6 +29,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 from uuid import uuid4
 
 import _telemetry
@@ -149,7 +150,7 @@ class LeafAttempt:
 
 @dataclass(frozen=True)
 class AttemptAdmission:
-    admitted: bool
+    state: Literal["admitted", "drained", "denied"]
     reason: str | None
 
 
@@ -159,6 +160,8 @@ class LeafStatus:
     state: str
     binding: LeafBinding | None
     unconfirmed_attempts: list[LeafAttempt]
+    error_code: str | None = None
+    error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -168,10 +171,18 @@ class ConfirmAttemptDrained:
 
 
 @dataclass(frozen=True)
+class ConfirmReservationDrained:
+    key: LeafKey
+    evidence: str
+    run_id: str | None = None
+
+
+@dataclass(frozen=True)
 class FifoStatus:
     active: BuildStatus | None
     waiting: list[BuildStatus]
     draining: list[BuildStatus]
+    capacity_error: str | None = None
 
 
 def clamp_leaf_timeout_s(requested: int | None) -> int:
@@ -476,7 +487,8 @@ class _ProducerBuild:
     """One parent thread owns the client, renewal loop and normal close.
 
     Spawned doit workers inherit only the build ID, never the renewal thread.
-    A control fault stops local scheduling; accepted reservations still drain
+    Lease-bounded transient retries keep the same registration and update ID.
+    Ownership loss stops local scheduling; accepted reservations still drain
     under the coordinator rather than being cancelled by this context.
     """
 
@@ -599,6 +611,40 @@ class _ProducerBuild:
         self._lease_remaining()
         return status.ownership_state == "active"
 
+    async def _leased_rpc(self, call, *args) -> BuildStatus | None:
+        """Retry uncertain transport results, never a coordinator refusal.
+
+        Every retry is bounded by the last acknowledged lease. The caller keeps
+        the same heartbeat sequence and operation ID until it gets an answer.
+        """
+        from temporalio.client import WorkflowUpdateRPCTimeoutOrCancelledError
+        from temporalio.service import RPCError, RPCStatusCode
+
+        while not self._stop.is_set():
+            remaining = self._lease_remaining()
+            try:
+                return await asyncio.wait_for(call(*args), timeout=remaining)
+            except (
+                TimeoutError,
+                ConnectionError,
+                WorkflowUpdateRPCTimeoutOrCancelledError,
+                RPCError,
+            ) as exc:
+                if isinstance(exc, RPCError) and exc.status not in {
+                    RPCStatusCode.CANCELLED,
+                    RPCStatusCode.UNKNOWN,
+                    RPCStatusCode.DEADLINE_EXCEEDED,
+                    RPCStatusCode.RESOURCE_EXHAUSTED,
+                    RPCStatusCode.ABORTED,
+                    RPCStatusCode.INTERNAL,
+                    RPCStatusCode.UNAVAILABLE,
+                }:
+                    raise
+                remaining = self._lease_remaining()
+                if not self._stop.is_set():
+                    await asyncio.sleep(min(STATUS_POLL_INTERVAL_S, remaining))
+        return None
+
     async def _serve(self) -> None:
         handle = None
         try:
@@ -623,30 +669,33 @@ class _ProducerBuild:
             heartbeat_due = time.monotonic() + FIFO_HEARTBEAT_INTERVAL_S
             sequence = 0
             while not self._stop.is_set():
-                remaining = self._lease_remaining()
+                self._lease_remaining()
                 if active:
                     self._ready.set()
                 if time.monotonic() >= heartbeat_due:
                     sequence += 1
-                    status = await asyncio.wait_for(
-                        _rpc_update(
-                            handle,
-                            "heartbeat_build",
-                            HeartbeatBuild(self.build_id, sequence),
-                            BuildStatus,
-                            f"heartbeat:{self.build_id}:{sequence}",
-                        ),
-                        timeout=remaining,
+                    status = await self._leased_rpc(
+                        _rpc_update,
+                        handle,
+                        "heartbeat_build",
+                        HeartbeatBuild(self.build_id, sequence),
+                        BuildStatus,
+                        f"heartbeat:{self.build_id}:{sequence}",
                     )
+                    if status is None:
+                        break
                     active = self._accept_status(status, active=active, renewed=True)
                     heartbeat_due = time.monotonic() + FIFO_HEARTBEAT_INTERVAL_S
                 elif not active:
-                    status = await asyncio.wait_for(
-                        _rpc_query(
-                            handle, "build_status", BuildKey(self.build_id), BuildStatus
-                        ),
-                        timeout=remaining,
+                    status = await self._leased_rpc(
+                        _rpc_query,
+                        handle,
+                        "build_status",
+                        BuildKey(self.build_id),
+                        BuildStatus,
                     )
+                    if status is None:
+                        break
                     active = self._accept_status(status, active=False)
                 await asyncio.sleep(
                     min(STATUS_POLL_INTERVAL_S, self._lease_remaining())
@@ -664,8 +713,15 @@ class _ProducerBuild:
                         BuildStatus,
                         f"close:{self.build_id}:{self._reason}",
                     )
-                except BaseException as exc:
-                    self._fail(exc)
+                except Exception as exc:
+                    # No new local work remains. Server lease expiry fences an
+                    # unacknowledged close; it cannot change the command result
+                    # or erase any ownership failure already recorded above.
+                    _telemetry.warn(
+                        f"Farm build close unacknowledged: {self.build_id}: {exc}; "
+                        "the producer lease will expire",
+                        build_id=self.build_id,
+                    )
 
 
 def leaf_timeout_s() -> int | None:
@@ -827,10 +883,18 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         f"submit:{request.build_id}:{wf_id}",
     )
     while True:
-        if status.key != key or status.state not in {
-            "reserved", "bound", "admitted", "terminal", "drained"
-        }:
+        if status.key != key:
             raise BuildOwnershipError("coordinator returned a foreign leaf reservation")
+        if status.error_code or status.state == "recovery_required":
+            raise BuildOwnershipError(
+                f"leaf reservation requires operator recovery "
+                f"[{status.error_code or 'recovery_required'}]: "
+                f"{status.error or wf_id}"
+            )
+        if status.state not in {
+            "reserved", "bound", "admitted", "terminal", "drained", "missing_closed"
+        }:
+            raise BuildOwnershipError("coordinator returned an invalid leaf reservation state")
         binding = status.binding
         if binding is not None:
             if (
