@@ -38,6 +38,9 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_FITUP_PLACES,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
+    KEEPER_INNER_FACE_SPAN_MM,
+    PAIR_REAMER_DIA_IN,
+    PAIR_REAMER_OAL_IN,
 )
 from channel_frame_geom import LEVER_FULCRUM_XY
 from ch_pivot_shaft_spec import DOME_HEIGHT
@@ -141,6 +144,10 @@ def _fitup_notes() -> tuple[str, str]:
     if abs(LEVER_FULCRUM_XY[0] - COLUMN_X - KEEPER_FITUP_X_FROM_WEB_MM) > 1e-9:
         raise AssertionError("KEEPER_FITUP_X_FROM_WEB_MM is off the fulcrum line")
     front_face, rear_face = KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
+    # The pair is reamed at the spacing STEP 9 sets it to (Main's ruling).
+    ream_span = rear_face - front_face
+    if abs(ream_span - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
+        raise AssertionError("the pair-ream span is not the fit-up span")
     text = {
         # The rings are captured in the closed cam slots as the cylinder stack
         # goes together, and the pressed pin needs its far tine backed on the
@@ -193,10 +200,12 @@ def _fitup_notes() -> tuple[str, str]:
             f"WASHER. ELSE REPEAT STEP {set_step}."
         ),
         steps.KEEPERS_PAIR_REAMED_KEY: (
-            f"AT THE BENCH: CLAMP THE TWO {keeper} KEEPERS INNER LUG FACES "
-            "TOGETHER, SEATS ON ONE FLAT; DRILL AND REAM BOTH BORES IN ONE "
-            "SETUP, THEN ROUND EACH CROWN ABOUT ITS OWN BORE. ACCEPT IF THE "
-            f"{fulcrum_shaft} SHAFT SLIDES THROUGH BOTH."
+            f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
+            f"{ream_span:.{places}f} APART, BORE AXIS PARALLEL TO THE FLAT; "
+            "DRILL AND REAM BOTH IN ONE PASS, "
+            f"{PAIR_REAMER_OAL_IN:.0f} IN {PAIR_REAMER_DIA_IN:.4f} REAMER; ROUND "
+            f"EACH CROWN ON ITS BORE. ACCEPT IF THE {fulcrum_shaft} SHAFT SLIDES "
+            "FREELY THROUGH BOTH, CLAMPED."
         ),
         steps.KEEPERS_SET_KEY: (
             f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "

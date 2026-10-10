@@ -31,7 +31,7 @@ underside x -3..+13.5 is the flat seat.
 
 from __future__ import annotations
 
-from math import radians, sqrt, tan
+from math import hypot, sqrt
 
 from _fit_limits import SHAFT_H
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -68,38 +68,85 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_DIA / 2.0  # 32.2: the set-screw tap's entry
 # then pulls it onto the bore wall, so the fit only has to locate it, not run
 # on it. Each keeper prints LugRise at .XX, so two keepers bored apart could
 # sit 2 x 0.51 out of line -- far past any slide clearance, and a reamer only
-# follows the holes it is given. So the two are drilled and reamed as a pair
-# in one setup (BORE_PAIR_CALLOUT, MHA-CH-000): one axis, one height off one
-# seat flat. Pairing does not square that axis to the seat, though: a common
-# inclination passes the bench slide test (the bores 6 apart) and then, with
-# the keepers 2 x KEEPER_Z_OFF apart on the flat rail, each bore crosses the
-# straight shaft at that angle. The shaft's best line runs through both lug
-# centres (tilting it costs the 148 span, not the 6 lug), so each lug costs
-# its thickness x tan(inclination) of diametral clearance. With a budget of
-# BORE_INCLINATION_BUDGET_DEG that allowance rides on top of the running
-# minimum, and BORE_DIA_BAND (+0.035/+0.050, a 0.2515 in over-size reamer)
-# keeps both over the shaft's 0/-0.020 band (ch_fulcrum_shaft_spec proves the
-# stack, PAIRED_MIN_CLEARANCE_MM). Each crown is then rounded about its own
-# reamed bore (CROWN_ABOUT_BORE_CALLOUT), keeping it concentric, which the
-# crown thread's worst case below assumes. ch_fulcrum_shaft_spec pins the
-# nominal to its SHAFT_DIA.
+# follows the holes it is given. So the two are drilled and reamed through in
+# one pass AT THEIR INSTALLED SPACING (BORE_PAIR_CALLOUT, MHA-CH-000 STEP 8):
+# feet outboard and down on one flat, inner lug faces KEEPER_INNER_FACE_SPAN_MM
+# apart as STEP 9 sets them, the bore axis set parallel to the flat. Both
+# bores are then one straight line across the whole span, and the acceptance
+# (the actual MHA-CH-004 shaft slides freely through both, still clamped)
+# gauges that line itself. A setup tilt of the line to the flat costs no
+# clearance -- on any one plane both bores keep it, so the shaft just lies at
+# that tilt -- and a span error delta moves a bore only delta x tilt off it.
+# Each crown is then rounded about its own reamed bore
+# (CROWN_ABOUT_BORE_CALLOUT), keeping it concentric, which the crown thread's
+# worst case below assumes. ch_fulcrum_shaft_spec pins the nominal to its
+# SHAFT_DIA.
 BORE_DIA = 6.35
 BORE_RUNNING_MIN_CLEARANCE_MM = 0.010
-BORE_INCLINATION_BUDGET_DEG = 0.2
-BORE_INCLINATION_ALLOWANCE_MM = (
-    2.0 * LUG_HALF_T * tan(radians(BORE_INCLINATION_BUDGET_DEG))
-)  # 0.0209
 BORE_DIA_BAND = (0.050, 0.035)  # (upper, lower)
-if KEEPER_Z_OFF <= LUG_HALF_T:
-    raise AssertionError("the keeper span no longer exceeds a lug thickness")
-if BORE_DIA_BAND[1] - SHAFT_H[0] < (
-    BORE_RUNNING_MIN_CLEARANCE_MM + BORE_INCLINATION_ALLOWANCE_MM
+KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 142.0
+KEEPER_OUTER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF + LUG_HALF_T)  # 154.0
+# The one-pass reamer: a 0.2513 in long-series chucking reamer, 12 in overall,
+# made to order (Super Tool 9458EL finishes any size in .2211-.2530 to
+# +.0001/+.0005 in, 1-1/2 flute, .2193 shank, 6-1/32 to 12 OAL; L&I's LV533XL
+# shelf range stops at .2500). The toleranced reamer, not its nominal, must
+# lie inside BORE_DIA_BAND. Gripped one inch, its reach must carry the whole
+# flute past the far lug's outer face, and its shank must pass the reamed
+# near bore.
+PAIR_REAMER_DIA_IN = 0.2513
+_PAIR_REAMER_TOLERANCE_IN = (0.0001, 0.0005)  # (lower, upper), over nominal
+PAIR_REAMER_OAL_IN = 12.0
+_PAIR_REAMER_FLUTE_IN = 1.5
+_PAIR_REAMER_SHANK_MAX_IN = 0.2193
+_PAIR_REAMER_GRIP_IN = 1.0
+PAIR_REAMER_RANGE_MM = tuple(
+    (PAIR_REAMER_DIA_IN + plus) * 25.4 - BORE_DIA for plus in _PAIR_REAMER_TOLERANCE_IN
+)  # (+0.0356, +0.0457) over BORE_DIA
+PAIR_REAMER_REACH_MARGIN_MM = (
+    PAIR_REAMER_OAL_IN - _PAIR_REAMER_GRIP_IN - _PAIR_REAMER_FLUTE_IN
+) * 25.4 - KEEPER_OUTER_FACE_SPAN_MM  # +87.3
+if PAIR_REAMER_REACH_MARGIN_MM < 0.0:
+    raise AssertionError("the pair reamer does not reach through both keepers")
+if _PAIR_REAMER_SHANK_MAX_IN * 25.4 >= BORE_DIA:
+    raise AssertionError("the pair reamer's shank does not pass the near bore")
+if not (
+    BORE_DIA_BAND[1] <= PAIR_REAMER_RANGE_MM[0]
+    and PAIR_REAMER_RANGE_MM[1] <= BORE_DIA_BAND[0]
 ):
-    raise AssertionError("the keeper bore band does not cover the inclination")
+    raise AssertionError("the pair reamer's toleranced size is off the bore band")
+# What the bench cannot see is the rail. Both foot seats on MHA-FR-002 are
+# faced in one setup (the frame's machined keeper-seat callout, which pins
+# this constant), so they lie within one zone KEEPER_SEAT_FLATNESS_BUDGET_MM
+# thick. Inside it the seats can stand the zone apart in height, roll
+# opposite ways across KEEPER_WIDTH (each lug centre SHAFT_AXIS_H x roll
+# sideways) and each pitch zone/KEEPER_SEAT_LENGTH_MM along the shaft. The
+# shaft takes the straight line through both lug centres, so each lug spends
+# its thickness x (its pitch + that line's slope over the 2 x KEEPER_Z_OFF
+# span) of diametral clearance: BORE_SEAT_ALLOWANCE_MM, on top of the running
+# minimum, inside BORE_DIA_BAND's least clearance (ch_fulcrum_shaft_spec
+# proves the stack, PAIRED_MIN_CLEARANCE_MM).
+KEEPER_SEAT_FLATNESS_BUDGET_MM = 0.04
+KEEPER_SEAT_LENGTH_MM = LUG_HALF_T + FOOT_TIP_X  # 16.5: seat along the shaft
+_SEAT_ROLL = KEEPER_SEAT_FLATNESS_BUDGET_MM / KEEPER_WIDTH
+_LUG_CENTRE_OFFSET = hypot(
+    KEEPER_SEAT_FLATNESS_BUDGET_MM, 2.0 * SHAFT_AXIS_H * _SEAT_ROLL
+)  # 0.1495
+BORE_SEAT_ALLOWANCE_MM = (
+    2.0
+    * LUG_HALF_T
+    * (
+        KEEPER_SEAT_FLATNESS_BUDGET_MM / KEEPER_SEAT_LENGTH_MM
+        + _LUG_CENTRE_OFFSET / (2.0 * KEEPER_Z_OFF)
+    )
+)  # 0.0206
+if BORE_DIA_BAND[1] - SHAFT_H[0] < (
+    BORE_RUNNING_MIN_CLEARANCE_MM + BORE_SEAT_ALLOWANCE_MM
+):
+    raise AssertionError("the keeper bore band does not cover the rail-seat budget")
 BORE_PAIR_CALLOUT = (
-    "DRILL AND REAM AS A PAIR WITH THE\n"
-    "MATING MHA-CH-007, INNER LUG FACES\n"
-    "TOGETHER, SEATS ON ONE FLAT: THE\n"
+    "DRILL AND REAM IN ONE PASS WITH THE\n"
+    "MATING MHA-CH-007 AT ITS INSTALLED\n"
+    "SPACING, FEET ON ONE FLAT: THE\n"
     "MHA-CH-004 SHAFT SLIDES THROUGH BOTH"
 )
 CROWN_ABOUT_BORE_CALLOUT = "ROUND ABOUT THE REAMED BORE"

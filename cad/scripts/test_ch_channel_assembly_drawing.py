@@ -208,10 +208,12 @@ def test_the_step_block_fits_the_field_right_of_the_isometric() -> None:
 
 
 def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
-    """GPT review F5/F6 (PR #1311): the two keeper bores share one axis only
-    if they are reamed as a pair; the pair is then set on the top frame by DRO
-    with the shaft through both, and each crown tap's mouth is staked over its
-    set screw (rule 9's lock). The keeper print points at these steps."""
+    """GPT review F5/F6 and round 3 (PR #1311): the two keeper bores share one
+    axis only if they are reamed through in one pass at their installed
+    spacing, feet on one flat; the actual shaft gauges that line in the
+    clamped setup. The pair is then set on the top frame by DRO with the
+    shaft through both, and each crown tap's mouth is staked over its set
+    screw (rule 9's lock). The keeper print points at these steps."""
     import ch_fulcrum_keeper_spec as keeper
     import draw_ch_fulcrum_keeper as keeper_drawing
     from channel_frame_geom import LEVER_FULCRUM_XY
@@ -226,13 +228,22 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         steps.KEEPERS_SET_KEY,
         steps.SET_SCREWS_STAKED_KEY,
     )
-    reamed = _step_body(steps.KEEPERS_PAIR_REAMED_KEY)
-    assert f"CLAMP THE TWO {number} KEEPERS INNER LUG FACES TOGETHER" in reamed
-    assert "DRILL AND REAM BOTH BORES IN ONE SETUP" in reamed
-    assert "ROUND EACH CROWN ABOUT ITS OWN BORE" in reamed
-    assert f"ACCEPT IF THE {fulcrum_shaft} SHAFT SLIDES THROUGH BOTH." in reamed
     places = keeper.KEEPER_FITUP_PLACES
     front, rear = keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
+    reamed = _step_body(steps.KEEPERS_PAIR_REAMED_KEY)
+    # The controlling operation: installed spacing (STEP 9's own two faces),
+    # one common flat, axis set to it, one pass with a reamer that reaches.
+    assert keeper.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(rear - front) == 142.0
+    assert f"CLAMP BOTH {number}, FEET OUTBOARD ON ONE FLAT" in reamed
+    assert f"INNER LUG FACES {rear - front:.{places}f} APART" in reamed
+    assert "BORE AXIS PARALLEL TO THE FLAT" in reamed
+    assert "DRILL AND REAM BOTH IN ONE PASS, 12 IN 0.2513 REAMER" in reamed
+    assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
+    assert "ROUND EACH CROWN ON ITS BORE" in reamed
+    assert (
+        f"ACCEPT IF THE {fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED."
+        in reamed
+    )
     fitted = _step_body(steps.KEEPERS_SET_KEY)
     assert f"{top_frame} ON THE MILL:" in fitted
     # Main's ruling: X off the receiving web, Z off the upper-left socket.

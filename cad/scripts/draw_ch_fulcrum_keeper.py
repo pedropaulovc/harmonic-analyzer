@@ -105,9 +105,10 @@ SET_SCREW_PROCESS = (
     f"TAP TO BORE; STAKE MOUTH 2 PLACES\n"
     f"AT ASSEMBLY PER {steps.step_ref(steps.SET_SCREWS_STAKED_KEY)}\n"
 )
-# The two keepers' bores are drilled and reamed together (one axis whatever
-# LugRise prints) and each crown is then rounded about its own bore: bench
-# instructions of the pair-ream step, so each rides its own dimension.
+# The two keepers' bores are drilled and reamed through in one pass at their
+# installed spacing (one straight line whatever LugRise prints) and each crown
+# is then rounded about its own bore: bench instructions of the pair-ream
+# step, so each rides its own dimension.
 _PAIR_REAM_STEP = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
 DIMENSION_CALLOUTS = {
     "BoreDia": f"{BORE_PAIR_CALLOUT},\nPER {_PAIR_REAM_STEP}",

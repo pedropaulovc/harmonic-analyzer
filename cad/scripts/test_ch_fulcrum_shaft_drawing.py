@@ -68,30 +68,64 @@ def test_flat_pair_is_located_from_the_end() -> None:
     assert "FlatStation" not in source
 
 
-def test_paired_keeper_bores_keep_a_running_fit_at_the_inclination_budget() -> None:
+def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
     # Bored apart, the two keepers' .XX LugRise bands could put the bores
-    # 1.02 out of line, far past the fit; reamed as a pair they share one
-    # axis. GPT re-review (PR #1311): that common axis may lean 0.2 deg to the
-    # seat unseen by the bench slide test (bores 6 apart); installed 148 apart
-    # on the flat rail, the straight shaft's best line runs through both lug
-    # centres and each 6.0 lug spends 6 tan(0.2 deg) of diametral clearance.
+    # 1.02 out of line, far past the fit; reamed through in one pass at their
+    # installed spacing they are one straight line, so a setup tilt of that
+    # line costs nothing. GPT round 3 (PR #1311): the residual is the rail
+    # under the two feet, faced in one setup on MHA-FR-002 to one 0.04 zone: a
+    # step, opposite rolls across the 14 width (each lug centre 25.2 high) and
+    # a pitch over the 16.5 seat; the shaft runs through both lug centres
+    # 148 apart and each 6.0 lug spends its thickness x (pitch + slope).
     keeper = ch_fulcrum_keeper_spec
     spec = ch_fulcrum_shaft_spec
     assert math.isclose(spec.BORE_OFFSET_UNPAIRED_MM, 1.02)
     assert spec.BORE_OFFSET_UNPAIRED_MM > (
         keeper.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1]
     )
-    assert keeper.BORE_INCLINATION_BUDGET_DEG == 0.2
+    flatness = keeper.KEEPER_SEAT_FLATNESS_BUDGET_MM
+    assert flatness == 0.04
+    assert keeper.KEEPER_SEAT_LENGTH_MM == 16.5
     lug_t = 2.0 * keeper.LUG_HALF_T
-    angular = lug_t * math.tan(math.radians(keeper.BORE_INCLINATION_BUDGET_DEG))
-    assert math.isclose(keeper.BORE_INCLINATION_ALLOWANCE_MM, angular)
-    assert round(angular, 4) == 0.0209
-    # Tilting the shaft to follow the lean costs the span, not the lug.
-    assert 2.0 * keeper.KEEPER_Z_OFF == 148.0 > lug_t
+    span = 2.0 * keeper.KEEPER_Z_OFF
+    assert span == 148.0
+    sideways = 2.0 * keeper.SHAFT_AXIS_H * flatness / keeper.KEEPER_WIDTH
+    slope = math.hypot(flatness, sideways) / span
+    pitch = flatness / keeper.KEEPER_SEAT_LENGTH_MM
+    allowance = lug_t * (pitch + slope)
+    assert math.isclose(keeper.BORE_SEAT_ALLOWANCE_MM, allowance)
+    assert round(allowance, 4) == 0.0206
     least = keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0]
-    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + angular  # 0.035 >= 0.0309
-    assert math.isclose(spec.PAIRED_MIN_CLEARANCE_MM, least - angular)
+    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance  # 0.035 >= 0.0306
+    assert math.isclose(spec.PAIRED_MIN_CLEARANCE_MM, least - allowance)
+    assert round(spec.PAIRED_MIN_CLEARANCE_MM, 4) == 0.0144
     assert spec.PAIRED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
+
+
+def test_the_pair_reamer_reaches_and_sizes_the_bores() -> None:
+    # One pass through both lugs: a 12 in long-series 0.2513 chucking reamer,
+    # made to order (Super Tool 9458EL finishes .2211-.2530 to +.0001/+.0005
+    # in, 12 OAL, 1-1/2 flute, .2193 shank), gripped 1 in, carries its whole
+    # flute past the far lug's outer face, 154.0 from the near one. Its
+    # nominal sits under the band floor; the toleranced reamer lies inside.
+    keeper = ch_fulcrum_keeper_spec
+    assert keeper.KEEPER_OUTER_FACE_SPAN_MM == 154.0
+    assert keeper.PAIR_REAMER_OAL_IN == 12.0
+    reach = (12.0 - 1.0 - 1.5) * 25.4
+    assert math.isclose(keeper.PAIR_REAMER_REACH_MARGIN_MM, reach - 154.0)
+    assert round(keeper.PAIR_REAMER_REACH_MARGIN_MM, 1) == 87.3
+    # An 8 in OAL reamer would not carry the flute through.
+    assert (8.0 - 1.0 - 1.5) * 25.4 < 154.0
+    assert keeper.PAIR_REAMER_DIA_IN == 0.2513
+    low, high = (
+        (keeper.PAIR_REAMER_DIA_IN + plus) * 25.4 - keeper.BORE_DIA
+        for plus in (0.0001, 0.0005)
+    )
+    assert math.isclose(keeper.PAIR_REAMER_RANGE_MM[0], low)
+    assert math.isclose(keeper.PAIR_REAMER_RANGE_MM[1], high)
+    assert (round(low, 4), round(high, 4)) == (0.0356, 0.0457)
+    assert keeper.BORE_DIA_BAND[1] <= low < high <= keeper.BORE_DIA_BAND[0]
+    assert keeper.PAIR_REAMER_DIA_IN * 25.4 - keeper.BORE_DIA < keeper.BORE_DIA_BAND[1]
 
 
 def test_installed_set_screw_meets_rule_12() -> None:

@@ -39,10 +39,13 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     assert spec.FOOT_TIP_X == spec.LUG_HALF_T + spec.FOOT_L == 13.5
     assert spec.SCREW_X == 8.25
     assert spec.KEEPER_SCREW_Z_OFF == spec.KEEPER_Z_OFF + spec.SCREW_X == 82.25
-    # Plain reamed bore on the plain Ø6.35 shaft: a running band that covers
-    # the paired bores' 0.2 deg inclination budget (ch_fulcrum_shaft_spec).
+    # Plain reamed bore on the plain Ø6.35 shaft: a running band, cut by one
+    # made-to-order 0.2513 in reamer through both keepers at their installed
+    # spacing, that covers the faced rail seats' flatness (ch_fulcrum_shaft_spec).
     assert spec.BORE_DIA == 6.35
     assert spec.BORE_DIA_BAND == (0.050, 0.035)  # (upper, lower)
+    assert spec.BORE_PAIR_CALLOUT.startswith("DRILL AND REAM IN ONE PASS WITH THE")
+    assert "AT ITS INSTALLED\nSPACING, FEET ON ONE FLAT" in spec.BORE_PAIR_CALLOUT
 
 
 def test_crown_set_screw_tap_stops_at_the_bore() -> None:

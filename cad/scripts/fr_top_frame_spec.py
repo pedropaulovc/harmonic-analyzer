@@ -24,6 +24,16 @@ from _hole_spec import CLEARANCE_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
 from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
+from ch_fulcrum_keeper_spec import (
+    FOOT_TIP_X,
+    FULCRUM_KEEPER_CENTRE_Z,
+    KEEPER_FITUP_X_FROM_WEB_MM,
+    KEEPER_SEAT_FLATNESS_BUDGET_MM,
+    KEEPER_SEAT_LENGTH_MM as KEEPER_CONTACT_LENGTH_MM,
+    KEEPER_WIDTH,
+    KEEPER_Z_OFF,
+    LUG_HALF_T,
+)
 
 # --- Machined-surface geometry ------------------------------------------------
 #
@@ -45,6 +55,32 @@ BORE_DIA = COLUMN_SOCKET_DIAMETER
 CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
 GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
+
+# Two faced regions on the existing top flange, not raised pads or pockets.
+# Native split lines bound the NOMINAL contact plus its edge allowance;
+# machining matches the actual keeper contacts in the single setup below.
+# The 16.5 contact length includes the lug underside as well as the foot.
+KEEPER_SEAT_EDGE_MARGIN_MM = 0.10
+KEEPER_SEAT_WIDTH_MM = KEEPER_WIDTH + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
+KEEPER_SEAT_LENGTH_MM = KEEPER_CONTACT_LENGTH_MM + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
+KEEPER_SEAT_HEIGHT_MM = HALF_H - CAP_RECESS_FLOOR_Y
+KEEPER_SEAT_CENTRES_XZ = tuple(
+    (
+        COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM,
+        FULCRUM_KEEPER_CENTRE_Z
+        + side * (KEEPER_Z_OFF + (FOOT_TIP_X - LUG_HALF_T) / 2.0),
+    )
+    for side in (-1.0, 1.0)
+)
+KEEPER_SEAT_BOUNDS_XZ = tuple(
+    (
+        x - KEEPER_SEAT_WIDTH_MM / 2.0,
+        x + KEEPER_SEAT_WIDTH_MM / 2.0,
+        z - KEEPER_SEAT_LENGTH_MM / 2.0,
+        z + KEEPER_SEAT_LENGTH_MM / 2.0,
+    )
+    for x, z in KEEPER_SEAT_CENTRES_XZ
+)
 
 
 # --- Knife-hanger screw counterbores and dowel slip holes (crossbar) ---------
@@ -179,10 +215,10 @@ HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# Why these nine faces and nothing else. The title block names no grade
-# ("CAST/MACHINED"), so a surface that MUST be cut on an otherwise as-cast
-# casting has to say so on the face (simplicity policy rule 5: what LOCATES the
-# part gets the control).
+# These nine faces own native finish controls. The two keeper-seat regions
+# instead carry the bounded facing/common-zone instruction below: existing
+# PlanarFace bounding-box selectors cannot distinguish those coplanar patches
+# from the residual rail top. No finish is silently assigned to that whole face.
 #
 # * The four tube-socket bores take the MHA-FR-003 columns on a match-fitted close
 #   hand-slip; a cast bore wall cannot hold that fit and would score the tube.
@@ -399,6 +435,15 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
     "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
+    # Keeper facing: actual contacts set the region size; nominal split-line
+    # footprints are reference only. Height uses the cap-seat precision.
+    "keeper seat width": 1,
+    "keeper seat length": 1,
+    "keeper seat inner edge from socket": 1,
+    "keeper seat end from socket": 1,
+    "keeper seat height above cap floors": DRAWING_PRECISION["CapRecesses"][
+        "CapRecessDepth"
+    ],
 }
 
 # Use the canonical printed-band reader, not the unrounded inch grades.
@@ -420,4 +465,9 @@ DRAWING_NOTES = (
     "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
     "RETAIN CORNER AND ORIENTATION MATCH MARKS."
 )
-DRAWING_NOTES_B = ""
+DRAWING_NOTES_B = (
+    "FACE BOTH KEEPER SEATS IN ONE SETUP.\n"
+    f"BOTH SEATS WITHIN ONE COMMON {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f} FLATNESS ZONE.\n"
+    f"SIZE TO ACTUAL KEEPER CONTACTS PLUS {KEEPER_SEAT_EDGE_MARGIN_MM:.2f} EACH EDGE.\n"
+    "SPLIT-LINE FOOTPRINT DIMENSIONS ARE NOMINAL REFERENCES."
+)
