@@ -72,6 +72,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     }
     assert sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION == {
         "dowel hole span": 3,
+        "dowel hole from tap axis": 3,
         "knife-bore centre from top seat": 3,
         "block-depth overall": 1,
         "dowel hole from side face": 2,
@@ -346,13 +347,18 @@ def test_native_gdt_and_bore_geometry() -> None:
         "knife-hanger tap position": "0.10",
         "dowel hole pattern position": "0.13",
     }
-    # Sheet-added: the block depth, the dowel span and the bore centre's
-    # height under A (both BASIC), and the pattern's two face locations; the
+    # Sheet-added: the block depth, the dowel span, the tap axis's station
+    # from a dowel axis and the bore centre's height under A (all BASIC), and
+    # the pattern's two face locations; the
     # dowel holes' Ø and depth are marked model dimensions
     # (DRAWING_DIMENSIONS).
-    assert source.count("add_edge_dimension(") == 5
-    assert source.count("set_basic_dimension(") == 2
+    assert source.count("add_edge_dimension(") == 6
+    assert source.count("set_basic_dimension(") == 3
     assert 'set_basic_dimension(adapter, span, label="dowel hole span")' in source
+    assert (
+        'set_basic_dimension(adapter, station, label="dowel hole from tap axis")'
+        in source
+    )
 
 
 @pytest.mark.parametrize(
@@ -360,6 +366,7 @@ def test_native_gdt_and_bore_geometry() -> None:
     (
         ("knife-bore centre from top seat", part.BORE_CENTRE_DEPTH),
         ("dowel hole span", sm_knife_mount_spec.PIN_HOLE_SPAN),
+        ("dowel hole from tap axis", sm_knife_mount_spec.PIN_HOLE_X),
     ),
 )
 def test_each_basic_prints_the_modelled_value_unrounded(label: str, basic: float) -> None:
@@ -489,6 +496,38 @@ def test_the_pattern_is_located_from_the_side_and_front_faces() -> None:
             f'_set_sheet_precision(row, label="{label}")' in source
         )
         assert source.count(f'label="{label}"') == 3
+
+
+def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
+    # Machinist review (2026-10-10): the tap frame and the bore's composite
+    # reference B, but their offset from B was only the implied centre.  The
+    # tap axis, run on through the bore's centre in section A-A, stands BASIC
+    # 6.350 from the -X dowel axis; its boxed value parks left of that axis,
+    # over the section's top seat.
+    assert sm_knife_mount_spec.PIN_HOLE_X == pytest.approx(
+        sm_knife_mount_spec.PIN_HOLE_SPAN / 2.0
+    )
+    section_top = drawing._section_y(sm_knife_mount_spec.BLK_TOP)
+    pin_x = drawing._section_x(-sm_knife_mount_spec.PIN_HOLE_X)
+    text_x, text_y = drawing.TAP_STATION_TEXT_XY
+    assert pin_x < text_x < drawing._section_x(0.0)
+    assert text_y > section_top
+    offset_x, offset_y = drawing.TAP_STATION_OFFSET_XY
+    assert offset_y == text_y
+    assert offset_x < pin_x
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # The tap's axis reaches past the bore's bottom, the dowel's past its
+    # floor, both inside the block.
+    assert "(0.0, BORE_CY - R_BORE - SECTION_AXIS_TAIL_MM, 0.0)" in source
+    assert "BLK_TOP - PIN_HOLE_DEPTH - SECTION_AXIS_TAIL_MM" in source
+    assert (
+        sm_knife_mount_spec.BORE_CY
+        - sm_knife_mount_spec.R_BORE
+        - drawing.SECTION_AXIS_TAIL_MM
+        > sm_knife_mount_spec.BLK_BOT
+    )
+    assert 'entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT")' in source
+    assert source.count('label="dowel hole from tap axis"') == 3
 
 
 def test_the_bore_states_its_ream_and_band() -> None:

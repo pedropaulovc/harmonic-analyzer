@@ -386,14 +386,17 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 # Places of the dimensions the sheet adds between two model features (no
 # model dimension carries them; the fr_top_frame_spec precedent): the dowel
-# pair's BASIC span and the bore centre's BASIC height under the datum-A top
-# seat, the block's depth, and the pattern's two face locations.  A BASIC
+# pair's BASIC span, the tap axis's BASIC station from a dowel axis (the tap
+# and bore frames reference B), the bore centre's BASIC height under the
+# datum-A top seat, the block's depth, and the pattern's two face
+# locations.  A BASIC
 # states the model's exact value, so its places must print it unrounded: the
 # height is the build's 14.866 + 5.75 = 20.616
 # (``build_sm_knife_mount.BORE_CENTRE_DEPTH``), not this module's 14.87
 # mirror.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole span": PIN_HOLE_SPAN_PLACES,
+    "dowel hole from tap axis": PIN_HOLE_SPAN_PLACES,
     "knife-bore centre from top seat": 3,
     "block-depth overall": BLOCK_SIZE_PLACES,
     "dowel hole from side face": PIN_HOLE_SIDE_PLACES,

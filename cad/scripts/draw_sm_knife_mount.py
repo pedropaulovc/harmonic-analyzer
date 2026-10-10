@@ -13,7 +13,8 @@ at their BASIC span in the top view, and their flat-floor depth in section
 A-A, cut from the top view through the tap and dowel axes (policy rule 7: the
 floor is hidden in the front view, so it is dimensioned where the cut shows
 it).  The pattern is located on the block's +X side and front faces at
-general tolerance in the top view.  The reamed bore carries a composite
+general tolerance in the top view; the tap axis, run on through the bore's
+centre, stands BASIC 6.350 from the -X dowel axis in section A-A.  The reamed bore carries a composite
 position frame to the top seat (datum A) and the dowel pattern, its centre a
 BASIC height under A; the #6-32 tap a position frame to the same A|B, its
 thread and drill depths banded on its hole callout.
@@ -50,6 +51,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
     rebuild_drawing,
     set_arc_endpoints_to_center,
@@ -58,6 +60,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -87,6 +90,7 @@ from sm_knife_mount_spec import (
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
@@ -138,6 +142,11 @@ def _section_y(model_y_mm: float) -> float:
     return SECTION_CENTER[1] + (model_y_mm - _BLOCK_CY) * SHEET_SCALE[0] / 1000.0
 
 
+def _section_x(model_x_mm: float) -> float:
+    """Sheet x of a model x in section A-A (+X right, as the front)."""
+    return SECTION_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
+
+
 def _sheet_x(model_x_mm: float) -> float:
     """Sheet x of a model x in the front and top views (shared column)."""
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
@@ -163,6 +172,24 @@ SECTION_KEEP = {
         _section_y(BLK_TOP - PIN_HOLE_DEPTH / 2.0),
     ),
 }
+# The tap and bore frames both reference B, the dowel pair, so the tap axis
+# stands BASIC 6.350 from the -X dowel axis (blind machinist review,
+# 2026-10-10: the implied centre left the tap and bore with no explicit
+# horizontal location).  It is dimensioned in section A-A, the one view that
+# cuts the tap, the bore and the dowel hole together, between two owned
+# axes: the tap's, run on down through the bore's centre so one axis carries
+# both, and the -X dowel's.  Each starts SECTION_AXIS_OVERRUN_MM above the
+# top seat and ends SECTION_AXIS_TAIL_MM past its feature (the bore's bottom,
+# the dowel hole's floor), inside the block.
+SECTION_AXIS_OVERRUN_MM = 2.0
+SECTION_AXIS_TAIL_MM = 1.0
+# The dimension line stands 8 mm over the cut top seat, in the open band
+# under the isometric's caption.  Its boxed value (~14 mm) is wider than the
+# 12.7 mm between the axes, so it parks on a leader left of the -X axis
+# (draw_fr_top_frame's F-F station precedent: text past the arrows
+# otherwise rides the dimension line).
+TAP_STATION_TEXT_XY = (_section_x(-PIN_HOLE_X / 2.0), _section_y(BLK_TOP) + 0.008)
+TAP_STATION_OFFSET_XY = (_section_x(-PIN_HOLE_X) - 0.012, TAP_STATION_TEXT_XY[1])
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 # The dowel hole's Ø and its three callout lines park in the open band right
@@ -303,6 +330,76 @@ def _sheet_dimension_mm(display: Any) -> float:
         abs(float(_early_bound(native.GetDimension2(0), "IDimension").SystemValue))
         * 1000.0
     )
+
+
+def _add_section_axes(
+    adapter: Any,
+    view: Any,
+    axes: tuple[tuple[tuple[float, float, float], tuple[float, float, float]], ...],
+) -> list[Any]:
+    """Draw owned centerlines (model mm end to end) in ``view``'s own sketch.
+
+    The draw_fr_top_frame ``_add_view_centerlines`` idiom: each end is the
+    model point projected to the sheet and taken into the view's sketch
+    frame, placed direct to the database (an inferred end snaps onto nearby
+    ink) and read back.  Returns each ``ISketchSegment``, in order, for a
+    dimension to pick (``"SKETCHSEGMENT"``).
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the view for its owned axes")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    segments = []
+    for start, end in axes:
+        points = []
+        for xyz in (start, end):
+            x, y = model_point_in_view(
+                adapter,
+                view,
+                tuple(value / 1000.0 for value in xyz),
+                label="owned axis end",
+            )
+            point = _early_bound(
+                utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+            )
+            projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+            points.append(tuple(float(value) for value in projected.ArrayData))
+        previous_add_to_db = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            segment = manager.CreateCenterLine(*points[0], *points[1])
+        finally:
+            manager.AddToDB = previous_add_to_db
+        if segment is None:
+            raise RuntimeError("failed to create an owned axis")
+        line = _early_bound(segment, "ISketchLine")
+        for expected, accessor in zip(points, ("GetStartPoint2", "GetEndPoint2")):
+            placed = _early_bound(
+                adapter._get_attr_or_call(line, accessor), "ISketchPoint"
+            )
+            actual = [
+                float(adapter._get_attr_or_call(placed, axis))
+                for axis in ("X", "Y", "Z")
+            ]
+            drift = max(abs(a - b) for a, b in zip(actual, expected))
+            if drift > 1e-9:
+                raise RuntimeError(
+                    f"owned axis {accessor[3:-6].lower()} point sits "
+                    f"{drift * 1000.0:.4g} mm from where it was authored"
+                )
+        segment = _early_bound(segment, "ISketchSegment")
+        segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+        if int(segment.Color) != 0:
+            raise RuntimeError("owned axis color did not persist")
+        segments.append(segment)
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="section A-A owned axes")
+    return segments
 
 
 def _look_section_along_minus_z(adapter: Any, section: Any) -> None:
@@ -739,6 +836,71 @@ async def build(adapter: Any) -> dict[str, str]:
             f"face, expected {HOLE_ROW_FACE_DISTANCE:g} mm"
         )
     _set_sheet_precision(row, label="hole row from front face")
+
+    # The tap axis BASIC from the -X dowel axis, in section A-A between owned
+    # axes (TAP_STATION_TEXT_XY); the tap's axis runs on through the bore's
+    # centre, so the one BASIC locates both from B.
+    tap_axis_x = model_point_in_view(
+        adapter, section, (0.0, BLK_TOP / 1000.0, 0.0), label="A-A tap axis"
+    )[0]
+    pin_axis_x = model_point_in_view(
+        adapter,
+        section,
+        (-PIN_HOLE_X / 1000.0, BLK_TOP / 1000.0, 0.0),
+        label="A-A -X dowel axis",
+    )[0]
+    if not pin_axis_x < tap_axis_x:
+        raise RuntimeError(
+            f"section A-A draws the -X dowel axis at sheet x {pin_axis_x:g}, not left "
+            f"of the tap axis ({tap_axis_x:g}): TAP_STATION_OFFSET_XY assumes +X right"
+        )
+    axis_top = BLK_TOP + SECTION_AXIS_OVERRUN_MM
+    tap_axis, pin_axis = _add_section_axes(
+        adapter,
+        section,
+        (
+            ((0.0, axis_top, 0.0), (0.0, BORE_CY - R_BORE - SECTION_AXIS_TAIL_MM, 0.0)),
+            (
+                (-PIN_HOLE_X, axis_top, 0.0),
+                (-PIN_HOLE_X, BLK_TOP - PIN_HOLE_DEPTH - SECTION_AXIS_TAIL_MM, 0.0),
+            ),
+        ),
+    )
+    station_picks = [
+        model_point_in_view(
+            adapter,
+            section,
+            (x / 1000.0, (BLK_TOP + SECTION_AXIS_OVERRUN_MM / 2.0) / 1000.0, 0.0),
+            label=f"A-A axis pick x{x:+g}",
+        )
+        for x in (0.0, -PIN_HOLE_X)
+    ]
+    station = add_edge_dimension(
+        adapter,
+        section,
+        p0=station_picks[0],
+        p1=station_picks[1],
+        text_xy=TAP_STATION_TEXT_XY,
+        label="dowel hole from tap axis",
+        orientation="horizontal",
+        entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
+        entities=(tap_axis, pin_axis),
+    )
+    if abs(_sheet_dimension_mm(station) - PIN_HOLE_X) > 1e-5:
+        raise RuntimeError(
+            f"the -X dowel axis measures {_sheet_dimension_mm(station):g} from the "
+            f"tap axis, expected {PIN_HOLE_X:g} mm"
+        )
+    _set_sheet_precision(station, label="dowel hole from tap axis")
+    station_annotation = _early_bound(
+        _early_bound(station, "IDisplayDimension").GetAnnotation(), "IAnnotation"
+    )
+    offset_dimension_text(
+        adapter,
+        [station_annotation],
+        {dimension_name(adapter, station_annotation): TAP_STATION_OFFSET_XY},
+    )
+    set_basic_dimension(adapter, station, label="dowel hole from tap axis")
 
     # Datum A = the block top seat (clamped to the top-frame casting underside;
     # carries the #6-32 knife-hanger-screw tap and the MHA-VN-051 dowel
