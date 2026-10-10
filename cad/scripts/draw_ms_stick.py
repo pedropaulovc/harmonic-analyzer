@@ -165,21 +165,25 @@ def _probe_tick_depth_import(adapter: Any, source_model: Any, views: tuple[Any, 
             ))
         return rows
 
-    for view in views:
-        name = view_name(adapter, view)
+    def probe_view(view: Any, *, root_only: bool) -> None:
+        selected_view_name = view_name(adapter, view)
+        phase = "root-only" if root_only else "all-paths"
+        name = f"{selected_view_name} phase={phase}"
         before = census(view)
         _telemetry.info(f"TickDepth probe {name}: before={[full for full, _ in before]}")
         # Neither target has been curated. Refuse to delete any pre-existing ink.
         if before:
             raise RuntimeError(f"TickDepth diagnostic target {name} already has dimensions")
-        if not ddoc.ActivateView(name):
+        if not ddoc.ActivateView(selected_view_name):
             raise RuntimeError(f"TickDepth probe cannot activate {name}")
         draw.ClearSelection2(True)
         if not draw.Extension.SelectByID2(
-            name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, _dc.null_callout(), 0,
+            selected_view_name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, _dc.null_callout(), 0,
         ):
             raise RuntimeError(f"TickDepth probe cannot select {name}")
         paths = _dc._model_item_paths(adapter, view)
+        if root_only:
+            paths = paths[-1:]
         winner = _dc._select_model_feature(adapter, "Tick0Cut", paths=paths)
         _telemetry.info(f"TickDepth probe {name}: paths={paths}, winner={winner}")
         selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
@@ -211,6 +215,10 @@ def _probe_tick_depth_import(adapter: Any, source_model: Any, views: tuple[Any, 
             f"TickDepth probe {name}: selected_count={selected_count}, "
             f"selected_objects={selected_objects}"
         )
+        if root_only and selected_count != 2:
+            raise RuntimeError(
+                f"TickDepth probe {name}: expected view plus one owner, selected {selected_count}"
+            )
         try:
             try:
                 # Direct call: adapter._attempt would erase the native COM error.
@@ -253,6 +261,32 @@ def _probe_tick_depth_import(adapter: Any, source_model: Any, views: tuple[Any, 
             _telemetry.info(f"TickDepth probe {name}: cleanup_dimensions={[full for full, _ in remaining]}")
             if remaining:
                 raise RuntimeError(f"TickDepth diagnostic left imported dimensions in {name}")
+
+    # Temporary projected depth-axis control; never retained in the package.
+    top = place_view(adapter, str(SOURCE), "*Top", 0.350, 0.075, scale=(1.0, 1.0))
+    top_name = view_name(adapter, top)
+    try:
+        for view in (*views, top):
+            probe_view(view, root_only=False)
+            probe_view(view, root_only=True)
+    finally:
+        draw.ClearSelection2(True)
+        if not draw.Extension.SelectByID2(
+            top_name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, _dc.null_callout(), 0,
+        ):
+            raise RuntimeError("TickDepth probe cannot select temporary Top view for deletion")
+        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        if int(selection.GetSelectedObjectCount2(-1)) != 1:
+            raise RuntimeError("TickDepth probe temporary view deletion selection is not one view")
+        if not draw.Extension.DeleteSelection2(0):
+            raise RuntimeError("TickDepth probe cannot delete temporary Top view")
+        draw.ClearSelection2(True)
+        rebuild_drawing(adapter, label="TickDepth probe temporary Top view removed")
+        if ddoc.ActivateView(top_name):
+            raise RuntimeError("TickDepth probe temporary Top view survived deletion")
+        if not ddoc.ActivateView(view_name(adapter, views[-1])):
+            raise RuntimeError("TickDepth probe cannot restore package section view")
+        _telemetry.info(f"TickDepth probe temporary Top view {top_name}: deleted")
 
 
 async def build(adapter: Any) -> dict[str, str]:
