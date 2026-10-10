@@ -1902,53 +1902,25 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     log_directory.mkdir()
     extra = [] if names is None else [str(log_directory / names)]
     started = time.time()
-    parent = subprocess.Popen(
+    parent = subprocess.run(
         [
-            sys._base_executable,
+            sys.executable,
             "-c",
-            "import json, os, subprocess, sys; "
-            f"child = subprocess.Popen([sys._base_executable, '-c', {SLEEPER!r}, *{extra!r}], "
+            "import subprocess, sys; "
+            f"print(subprocess.Popen([sys.executable, '-c', {SLEEPER!r}, *{extra!r}], "
             "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
-            "stderr=subprocess.DEVNULL); "
-            "print(json.dumps([os.getpid(), child.pid]), flush=True)",
+            "stderr=subprocess.DEVNULL).pid)",
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        check=True,
+        capture_output=True,
         text=True,
+        timeout=HANG_GUARD_S,
     )
+    child = int(parent.stdout)
     try:
-        output, errors = parent.communicate(timeout=HANG_GUARD_S)
-    except BaseException:
-        parent.kill()
-        parent.communicate(timeout=HANG_GUARD_S)
-        raise
-    parent_pid, child = json.loads(output)
-
-    # Keep this exact sleeper's handle: cleanup must not kill a different
-    # process if the sleeper exits and its numeric PID is later reused.
-    import ctypes
-    from ctypes import wintypes
-
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
-    kernel32.OpenProcess.restype = wintypes.HANDLE
-    kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
-    kernel32.TerminateProcess.restype = wintypes.BOOL
-    kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
-    kernel32.WaitForSingleObject.restype = wintypes.DWORD
-    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
-    kernel32.CloseHandle.restype = wintypes.BOOL
-    handle = kernel32.OpenProcess(0x100001, False, child)  # SYNCHRONIZE | TERMINATE
-    assert handle, ctypes.get_last_error()
-    try:
-        assert parent.returncode == 0, (output, errors)
-        # These stdlib-only collaborators use the base executable, not a venv
-        # redirector: the retained handles identify the actual Python processes.
-        assert parent_pid == parent.pid
-        assert not _process_alive(parent_pid)
         _write_run_record(
             fixture,
-            pid=parent_pid,
+            pid=_dead_parent_pid(child),
             tag="reused",
             workflow=LEAF_NUT,
             argv=["uv", "-c", recorded_code],
@@ -1961,18 +1933,31 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
             fixture["environment"],
         )
     finally:
-        try:
-            # TerminateProcess may report it already exited; waiting on the
-            # retained handle checks completion without reopening its PID.
-            kernel32.TerminateProcess(handle, 1)
-            assert kernel32.WaitForSingleObject(handle, HANG_GUARD_S * 1000) == 0
-        finally:
-            kernel32.CloseHandle(handle)
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(child)], capture_output=True
+        )
 
     assert status.returncode == 0, status.stderr
     report = json.loads(status.stdout)
     assert report["state"] == "launcher-died"
     assert (child in report["launcher"]["orphaned_processes"]) is orphaned
+
+
+def _dead_parent_pid(child: int) -> int:
+    listed = subprocess.run(
+        [
+            "pwsh.exe",
+            "-NoProfile",
+            "-Command",
+            f"(Get-CimInstance Win32_Process -Filter 'ProcessId={child}').ParentProcessId",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    parent = int(listed.stdout)
+    assert not _process_alive(parent)
+    return parent
 
 
 def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
