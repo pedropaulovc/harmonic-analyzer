@@ -4,6 +4,7 @@
 This prepares nonpublishable historical diagnostic observations; it never changes
 production tracks, loads a native model, fits a camera, or runs a GPU/browser.
 Require --historical-diagnostic. Original FIT/CHECK roles and uncertainties remain.
+Outputs are write-once diagnostic files; existing entries are never replaced.
 """
 import argparse
 import hashlib
@@ -111,13 +112,14 @@ def main():
     parser.add_argument("--output", type=Path, default=WEB / ".vite" / "verification-output" / "compact-track-refinement" / "spin-montage-source-controls.json")
     args = parser.parse_args()
     try:
-        observe.common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
-        output = args.output.resolve()
+        output = observe.common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
     except ValueError as error:
         parser.error(str(error))
     packet = build_packet(args.reference_root, historical_diagnostic=args.historical_diagnostic)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(packet, separators=(",", ":"), allow_nan=False) + "\n")
+    observe.common.fresh.write_output(
+        output, json.dumps(packet, separators=(",", ":"), allow_nan=False) + "\n",
+        declared_path=args.output, historical_diagnostic=args.historical_diagnostic)
     print(json.dumps({"output": str(output), **packet["summary"]}))
 
 

@@ -59,21 +59,6 @@ def read_observations(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def write_observations(path, data):
-    """Keep canonical observations compressed; plain temporary JSON is supported."""
-    path = Path(path)
-    canonical = (WEB / "content" / "canonical-native").resolve()
-    if path.resolve().is_relative_to(canonical) and path.name.endswith(".observations.json"):
-        raise ValueError("Canonical observation output must end in .observations.json.gz")
-    contents = json.dumps(data, indent=2) + "\n"
-    if path.suffix == ".gz":
-        with path.open("wb") as stored:
-            with gzip.GzipFile(filename="", mode="wb", fileobj=stored, compresslevel=9, mtime=0) as compressed:
-                compressed.write(contents.encode("utf-8"))
-    else:
-        path.write_text(contents, encoding="utf-8")
-
-
 def load_observations(video_id):
     """Ordinary generation reads only independently measured current observations."""
     return fresh.load_observations(video_id, web_root=WEB)
