@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 import _config
+import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_spec as bracket
 import ch_pivot_bracket_tl_angle_plate_spec as plate
 import ch_pivot_bracket_tl_ledge_spec as spec
@@ -13,15 +14,19 @@ import export_features
 from _feature_requirements import limits
 from _hole_spec import THREAD_MAJOR_MM
 
-# The prechips S4 hold the ledge and plate were built for (review/compose-r5
+# The prechips S4 hold the ledge and plate are built for (review/compose-r5
 # follow-on 67237b9, examples/inventory/pedro-shop.toml [fixtures.angle-plate]
-# and examples/pivot-bracket/plan.toml [setups.hold]), in Setup frame TC: Z0 is
-# the bracket's faced outer face, 4 mm proud of the plate top.
-PRECHIPS_PART_PROUD = 4.0
-PRECHIPS_TABLE_Z = -92.9  # base box bottom
-PRECHIPS_LEDGE_Z = (-42.1, -24.2)  # bolted foot-end ledge box, 17.9 high
-PRECHIPS_SCREW_Z = -33.2  # ledge screws, clearance and tapped holes
-PRECHIPS_STUD_Z = -17.5  # bridge stud holes (the bridge's Setup Z)
+# and examples/pivot-bracket/plan.toml [setups.hold]), in Setup frame TC for
+# the S configuration (the shorter foot the ledge is sized for): Z0 is the
+# bracket's faced outer face, 5.24 proud of the plate top. The 2026-10-09
+# flip moved every row, and the worst-case 4 mm floor (CodeRabbit on
+# 3d649fd90) raised the ledge and lowered the studs; the prechips plan
+# follows these.
+PRECHIPS_PART_PROUD = 5.24
+PRECHIPS_TABLE_Z = -94.14  # base box bottom
+PRECHIPS_LEDGE_Z = (-43.34, -15.64)  # bolted foot-end ledge box, 27.7 high
+PRECHIPS_SCREW_Z = -26.14  # ledge screws, clearance and tapped holes
+PRECHIPS_STUD_Z = -13.44  # bridge stud holes (the bridge's Setup Z)
 
 
 def _features() -> dict:
@@ -29,11 +34,11 @@ def _features() -> dict:
 
 
 def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
-    """BR-B1 (#1262): the part stands 4 mm proud, so the ledge is 17.9 high
-    with its holes 8.9 off its bottom, and the plate's taps and studs sit at
+    """BR-B1 (#1262): the part stands at least 4 mm proud at the stack's worst
+    case, so the ledge is 27.7 high with its holes 17.2 off its bottom, and the plate's taps and studs sit at
     the prechips hold's Z rows. Each printed value is held here, independently
     of the specs, and checked with its one-place band."""
-    assert plate.PART_PROUD == PRECHIPS_PART_PROUD
+    assert round(plate.PART_PROUD[plate.LEDGE_CONFIG], 2) == PRECHIPS_PART_PROUD
     ledge = _features()
     taps_and_studs = export_features.requirement_manifest("ch_pivot_bracket_tl_angle_plate")["features"]
     ledge_bottom = PRECHIPS_LEDGE_Z[0] - PRECHIPS_TABLE_Z  # on its 2 in block
@@ -42,7 +47,7 @@ def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
     hole_y = round(PRECHIPS_SCREW_Z - PRECHIPS_LEDGE_Z[0], 1)
     tap_y = round(PRECHIPS_SCREW_Z - PRECHIPS_TABLE_Z, 1)
     stud_y = round(PRECHIPS_STUD_Z - PRECHIPS_TABLE_Z, 1)
-    assert (height, hole_y, tap_y, stud_y) == (17.9, 8.9, 59.7, 75.4)
+    assert (height, hole_y, tap_y, stud_y) == (27.7, 17.2, 68.0, 80.7)
     rest = ledge["foot_rest"]
     assert (rest["height_nominal"], rest["height"]) == (height, limits(height, 1))
     for side in ("left", "right"):
@@ -85,8 +90,10 @@ def test_ledge_top_meets_the_bracket_foot_free_end() -> None:
     """On its 1-2-3 block the ledge top stands where the foot's free end
     lands with the bracket's outer face proud of the plate top."""
     top = _features()["foot_rest"]["height_nominal"]
-    foot_end = plate.PLATE_HEIGHT + plate.PART_PROUD - bracket.FOOT_LEN
-    assert abs(plate.BLOCK_HEIGHT + top - foot_end) < 1e-9
+    for name, foot_len in sides.FOOT_LEN.items():
+        foot_end = plate.PLATE_HEIGHT + plate.PART_PROUD[name] - foot_len
+        assert abs(plate.BLOCK_HEIGHT + top - foot_end) < 1e-9
+        assert plate.PART_PROUD[name] >= plate.PART_PROUD_MIN
 
 
 def test_ledge_carries_the_whole_foot_and_clears_the_stud_nuts() -> None:
