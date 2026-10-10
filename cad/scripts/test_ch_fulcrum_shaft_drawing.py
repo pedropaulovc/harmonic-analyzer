@@ -92,8 +92,9 @@ def _station_window(spec) -> float:
 
 def test_no_station_dimension_can_drop_a_place(monkeypatch) -> None:
     # Machinist review r8 asked for .X on 161.35 and .XX on 4.925 / 148.000.
-    # Each one-place loosening, alone, closes the flat-station window (policy
-    # rule 12), so all three keep their places.
+    # Band sensitivity at unchanged nominals: each one-place loosening, alone,
+    # closes the flat-station window (policy rule 12). Rounding the printed
+    # nominal to fewer places does not reopen it, so all three keep their places.
     spec = ch_fulcrum_shaft_spec
     assert math.isclose(_station_window(spec), spec.FLAT_STATION_WINDOW_MM)
     assert spec.DRAWING_PRECISION["ShaftProfile"]["OverallLength"] == 2
