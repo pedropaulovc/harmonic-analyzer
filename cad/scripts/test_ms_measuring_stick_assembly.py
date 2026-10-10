@@ -179,9 +179,10 @@ def test_builder_places_exactly_the_inventory() -> None:
     assert moved == set(spec.QUANTITIES) - {spec.BLOCK}
 
 
-def test_park_pose_sits_on_the_deck_inside_the_park_band() -> None:
-    assert top.MS_HEAD_BOTTOM_Y == pytest.approx(top.DECK_TOP_Y + top.STOP_DECK_GAP)
-    assert top.MS_WEST_X == pytest.approx(top.PARK_WEST_LIMIT_X + top.PARK_WEST_CLEARANCE)
+def test_park_pose_sits_on_the_land_inside_the_corridor() -> None:
+    assert top.MS_HEAD_BOTTOM_Y == pytest.approx(top.LAND_TOP_Y + top.STOP_LAND_GAP)
+    # Whole stop between the column east face and the deck's east edge.
+    assert top.PARK_WEST_LIMIT_X < top.MS_WEST_X < top.MS_EAST_X < top.PARK_EAST_LIMIT_X
     assert top.MS_FRONT_Z > top.PARK_FRONT_LIMIT_Z
     # The 200 bar is centred on machine z = 0.
     assert top.MS_POS[2] + (spec.STICK_X_MIN + spec.STICK_X_MAX) / 2.0 == pytest.approx(0.0)
