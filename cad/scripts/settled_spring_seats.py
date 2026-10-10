@@ -12,6 +12,8 @@ from numbers import Real
 
 import _config
 from spring_mount_geom import SpringPose
+import sm_gooseneck_geom
+import vn_gooseneck_spring_screw_spec as spring_screw
 
 _UNIT_AXIS_ABS_TOL = 1e-12
 _CENTRE_ABS_TOL_MM = 1e-9
@@ -169,9 +171,36 @@ def channel_seat(amplitude_mm: float) -> SettledSpring:
     raise ValueError(f"No native spring calibration for amplitude {amplitude_mm!r} mm")
 
 
+def counter_upper_support_geometry() -> dict[str, str | float]:
+    """Identify the actual upper support measured by the native fixture.
+
+    Counter-only provenance: the old integral 3.6-mm shank certificate is
+    invalid for this purchased screw. Channel measurements are unchanged.
+    """
+    return {
+        "component": "vn-gooseneck-spring-screw",
+        "sku": spring_screw.SKU,
+        "major_dia_mm": spring_screw.MAJOR_DIA,
+        "head_dia_mm": spring_screw.HEAD_DIA,
+        "head_height_mm": spring_screw.HEAD_H,
+        "clamp_gap_mm": sm_gooseneck_geom.SPRING_EYE_GAP,
+        "arm_end_x_mm": sm_gooseneck_geom.ARM_END_X,
+        "spring_eye_x_mm": sm_gooseneck_geom.SPRING_EYE_X,
+    }
+
+
+
 def counter_seat() -> tuple[SettledSpring, float]:
     """Return the fixed counter placement and gooseneck height for this bank."""
     record = _active_preset()["counter"]
+    if record.get("upper_support") != counter_upper_support_geometry():
+        raise ValueError(
+            "Stale counter native calibration: upper support must be the "
+            "purchased 90280A583 screw in its clamped gap. Rebuild the stock screw "
+            "and gooseneck, then run diagnostics/calibrate_spring_seats.py "
+            "--presets neutral square --write on a licensed farm/native seat; "
+            "old integral-shank measurements cannot certify this joint."
+        )
     return (
         _spring(record, expected_clocking="half_turn"),
         _pose_number(record["gooseneck_origin_y_mm"], "gooseneck_origin_y_mm"),

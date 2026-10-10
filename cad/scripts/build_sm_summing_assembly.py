@@ -28,6 +28,9 @@ boss-hook / counter-spring / gooseneck chain.
 * boss-hook (keyed to the lever's anchor eye) + counter-spring + gooseneck
   -- the counter-balance hung from the east column; the post is gripped by
   the top-frame rail hub's set screw (no separate clamp part).
+* vn-gooseneck-spring-screw -- purchased fillister, head outboard, clamps the
+  supplier upper-eye band to the gooseneck plug face; locked to the fixed
+  gooseneck with no additional operational DOF.
 
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
@@ -66,6 +69,7 @@ from _assembly import (
     angle_driver,
     assembly_title_properties,
     assert_free_dof_necessity,
+    assert_component_placed,
     check_no_interference,
     coincident_mate,
     component_names,
@@ -81,7 +85,7 @@ from _assembly import (
 )
 from _native_spring_contact import assert_assembly_spring_contacts
 from _interference_contracts import allowed_interference_pairs
-from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
+from _transforms import IDENTITY, ROT_Y_180, euler_from_rows, rot_z_rows
 from dt_cone_pivot_post_installation import SUMMING_Z
 import fr_top_frame_spec as top_frame
 import sm_knife_mount_spec as knife_mount
@@ -299,6 +303,7 @@ def _assert_knife_hanger_stack() -> None:
 # --- purchased counter spring and directly threaded lower anchor -----------
 import vn_counter_spring_stock_geom as counter_stock  # noqa: E402
 import sm_gooseneck_geom  # noqa: E402
+import vn_gooseneck_spring_screw_spec as spring_screw  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
@@ -306,6 +311,12 @@ from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
 # The counter spring and gooseneck use complete calibrated placements loaded by
 # ``counter_seat`` before assembly creation.
+
+UPPER_EYE_CLAMP_NOTES = (
+    "UPPER-EYE CLAMP: FIT MHA-VN-054 THROUGH COUNTER-SPRING UPPER EYE.\n"
+    "TIGHTEN HEAD TO CLAMP EYE BAND AGAINST GOOSENECK PLUG FACE.\n"
+    "EYE MUST NOT SWIVEL; NO THREADLOCKER REQUIRED."
+)
 
 
 def _assert_counter_spring_top_hang(
@@ -320,7 +331,7 @@ def _assert_counter_spring_top_hang(
     """
     ux, uy = pose.axis_xy
     screw_y = gooseneck_y + sm_gooseneck_geom.ARM_Y
-    retention = (sm_gooseneck_geom.SCREW_HEAD_DIA - counter_stock.EYE_ID_MM) / 2.0
+    retention = (spring_screw.HEAD_DIA - counter_stock.EYE_ID_MM) / 2.0
     if retention < 1.0:
         raise RuntimeError(f"counter eye head retention only {retention:.3f} mm radial")
     band = (
@@ -332,14 +343,17 @@ def _assert_counter_spring_top_hang(
         min(
             pose.upper_eye_xy[0] - spring_mounts.GOOSENECK_END_X,
             spring_mounts.GOOSENECK_END_X
-            + sm_gooseneck_geom.SCREW_SHANK_LEN
+            + sm_gooseneck_geom.SPRING_EYE_GAP
             - pose.upper_eye_xy[0],
         )
         - band
     )
-    if axial_gap < spring_mounts.MIN_CLEARANCE_MM:
+    # The supplier band is CLAMPED between the plug face and the under-head
+    # plane (user, 2026-09-21), not hung on a free stand-off. Zero nominal
+    # side clearance is intentional; only floating-point round-off is tolerated.
+    if axial_gap < -1e-9:
         raise RuntimeError(
-            f"double-loop band does not fit exposed shank: {axial_gap:.3f} mm"
+            f"double-loop band does not fit clamped gap: {axial_gap:.9f} mm"
         )
     coil_top = (
         pose.centre_xy[1]
@@ -356,7 +370,7 @@ def _assert_counter_spring_top_hang(
         )
     log(
         f"counter upper support: head retention {retention:.3f}, "
-        f"eye axial gap {axial_gap:.3f}, main coil {main_coil_gap:.3f}, "
+        f"eye clamp side clearance {axial_gap:.9f}, main coil {main_coil_gap:.3f}, "
         f"half-turn tube/head {tube_gap:.3f}/{head_gap:.3f} mm"
     )
 
@@ -597,13 +611,38 @@ async def build(adapter) -> dict[str, str]:
     # Ry(180): the gooseneck's overhang arm reaches from the east column toward
     # the machine centre. Its measured origin Y is inserted directly; the post
     # is held in the top-frame rail-hub bore by its 1/4-20 set screw.
-    await place_component(
+    gooseneck = await place_component(
         adapter,
         "sm-gooseneck",
         [COLUMN_X, gooseneck_origin_y, SUMMING_Z],
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )
+    # The stock under-head plane is local Y=0; Rz(-90) maps head +Y to
+    # machine +X, outboard of the plug, and sends the threaded shank into it.
+    # Lock to the fixed gooseneck exactly as the magnifier's stock screws are
+    # locked to their receiver. It is not a new operational DOF.
+    screw_rows = rot_z_rows(-90.0)
+    screw_position = [
+        spring_mounts.GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP,
+        gooseneck_origin_y + sm_gooseneck_geom.ARM_Y,
+        SUMMING_Z,
+    ]
+    screw = await place_component(
+        adapter,
+        "vn-gooseneck-spring-screw",
+        screw_position,
+        euler_from_rows(screw_rows),
+        screw_rows,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{screw}", "PLANE"),
+        named_ref(f"Front Plane@{gooseneck}", "PLANE"),
+        label="gooseneck spring screw clamped to plug",
+    )
+    assert_component_placed(adapter, screw, screw_position, screw_rows)
 
     # Certify the AS-BUILT model.  The lever rock remains the sole intended
     # freed DOF; the exact allowed-stem set rejects any free screw, dowel, or
@@ -634,6 +673,7 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification": "SEE COMPONENT DRAWINGS",
             "Finish": "SEE COMPONENT DRAWINGS",
             "Quantity": "1",
+            "Manufacturing Notes": UPPER_EYE_CLAMP_NOTES,
             "Drawn By": DRAWN_BY,
         },
     )

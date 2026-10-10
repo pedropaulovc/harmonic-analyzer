@@ -5,12 +5,13 @@ placement and only certify it (zero native overlap, bounded separation). That
 table goes stale whenever an anchor part moves -- the channel lever's spring
 hole, the gooseneck's arm end, the summing lever's tap stations, or a supplier
 end loop. This driver re-measures it with the same native predicates the gate
-uses, on the same three-part fixtures the retired in-build search used:
+uses, on the same native fixtures as the production seats:
 
 * channel: ``ch-channel-lever`` (at the station's solved tilt) + ``vn-spring-hook``
   + one ``9432K31`` length variant, per distinct calibrated amplitude;
 * counter: ``vn-boss-hook`` + one ``1330K524`` at the preset's balance length +
-  ``sm-gooseneck``, per preset (the gooseneck height is the measured output).
+  ``sm-gooseneck`` + ``vn-gooseneck-spring-screw``, per preset (the gooseneck
+  and separate screw move together; the screw is the upper contact surface).
 
 Each contact's native collision/clear boundary is located to 1e-6 mm, and the
 component is then seated ``springs.boolean_stability_mm`` past it, on the clear
@@ -54,6 +55,9 @@ import channel_kinematics  # noqa: E402
 import vn_channel_spring_stock_geom as channel_stock  # noqa: E402
 import sm_gooseneck_geom  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
+import settled_spring_seats  # noqa: E402
+from _interference_contracts import allowed_interference_pairs  # noqa: E402
+from build_sm_summing_assembly import _assert_counter_spring_top_hang  # noqa: E402
 from _assembly import (  # noqa: E402
     assert_pose_ledger,
     check_no_interference,
@@ -331,7 +335,8 @@ async def _calibrate_counter(
     try:
         check("create counter seat fixture", await adapter.create_assembly())
         fixture = _early_bound(adapter.currentModel, "IModelDoc2")
-        boss, counter, gooseneck = await place_components_batch(
+        screw_rows = rot_z_rows(-90.0)
+        boss, counter, gooseneck, screw = await place_components_batch(
             adapter,
             [
                 {
@@ -355,10 +360,21 @@ async def _calibrate_counter(
                     "rows": ROT_Y_180,
                     "ground": True,
                 },
+                {
+                    "part": "vn-gooseneck-spring-screw",
+                    "position": [
+                        spring_mounts.GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP,
+                        gooseneck_y + sm_gooseneck_geom.ARM_Y,
+                        SUMMING_Z,
+                    ],
+                    "rotation": euler_from_rows(screw_rows),
+                    "rows": screw_rows,
+                    "ground": True,
+                },
             ],
             label="counter seat fixture",
         )
-        titles = _owned_titles(adapter, fixture, [boss, counter, gooseneck])
+        titles = _owned_titles(adapter, fixture, [boss, counter, gooseneck, screw])
         allowance = _allowance_mm()
         lower = solve_component_contact(
             adapter,
@@ -372,14 +388,16 @@ async def _calibrate_counter(
         _land(adapter, counter, lower_direction, _correction_mm(lower, allowance))
         upper = solve_component_contact(
             adapter,
-            gooseneck,
+            screw,
             counter,
             upper_direction,
             bracket,
             label=f"{preset} counter upper",
             locate_only=True,
         )
-        _land(adapter, gooseneck, upper_direction, _correction_mm(upper, allowance))
+        upper_correction = _correction_mm(upper, allowance)
+        _land(adapter, screw, upper_direction, upper_correction)
+        _land(adapter, gooseneck, upper_direction, upper_correction)
         lower_check = solve_component_contact(
             adapter,
             counter,
@@ -391,7 +409,7 @@ async def _calibrate_counter(
         )
         upper_check = solve_component_contact(
             adapter,
-            gooseneck,
+            screw,
             counter,
             upper_direction,
             bracket,
@@ -403,7 +421,18 @@ async def _calibrate_counter(
                 raise RuntimeError(
                     f"{preset} counter {label}: landed pose is not seated ({contact!r})"
                 )
-        check_no_interference(adapter)
+        # The fixture variant has the same stock receiver joint as production;
+        # allow only that exact thread/plug overlap, never spring/support masks.
+        screw_pair = frozenset((screw, gooseneck))
+        production_pair = frozenset(
+            ("vn-gooseneck-spring-screw-1", "sm-gooseneck-1")
+        )
+        check_no_interference(
+            adapter,
+            allowed_pairs={
+                screw_pair: allowed_interference_pairs("sm-summing")[production_pair]
+            },
+        )
         actual_centre = component_origin(adapter, counter)
         actual_gooseneck_y = component_origin(adapter, gooseneck)[1]
     finally:
@@ -415,6 +444,7 @@ async def _calibrate_counter(
         lower_eye_xy=(seed.lower_eye_xy[0] + dx, seed.lower_eye_xy[1] + dy),
         upper_eye_xy=(seed.upper_eye_xy[0] + dx, seed.upper_eye_xy[1] + dy),
     )
+    _assert_counter_spring_top_hang(pose, actual_gooseneck_y)
     report["counter"].append(
         {
             "preset": preset,
@@ -434,6 +464,7 @@ async def _calibrate_counter(
     return {
         "pose": _pose_record(pose),
         "gooseneck_origin_y_mm": actual_gooseneck_y,
+        "upper_support": settled_spring_seats.counter_upper_support_geometry(),
         "final_distance_mm": {
             "lower": lower_check.seed_distance_mm,
             "upper": upper_check.seed_distance_mm,

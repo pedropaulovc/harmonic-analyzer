@@ -1260,9 +1260,9 @@ sections:
         - stated
         - high (feature)
       - - Gooseneck
-        - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — geometry UNCHANGED by the 2026-08-02 rederive; the post drops ≈120 below the rail underside (999.7, unchanged) and ends in a free tip, passing through the Ø17 clearance bore in the top-frame''s east-rail hub and gripped by the hub''s square-head set screw (clamp deleted); 90° bend R 51 (the 180° candy-cane is refuted, M6.8); horizontal arm running 50.8 past the bend exit to an end face at machine |x| 95.2 (the part dimension is `sm_gooseneck_geom.ARM_END_X` -101.8: the tube is inserted mirrored at the column line x 197, so machine |x| = 197 - 101.8), carrying the axial #6-32 slotted spring screw whose exposed shank hangs the counter spring''s top eye plumb above the boss hook at |x| 91.2; the arm HEIGHT is the tension adjustment (set by the counter-spring balance, `spring_mount_geom.GOOSENECK_ORIGIN_Y`), not a photo read'
+        - 'Ø16 × 2 wall chrome tube, 90° bend R51. Part arm end X −103.359695 and straight arm run 52.359695 (`sm_gooseneck_geom.py`), so the counter spring upper-eye centre stays at part X −105.8 / machine X −91.2, plumb over the lower anchor. A Ø12 × 16.0 brazed end plug is tapped 5/16-18 UNC-2B THRU. Purchased MHA-VN-054 (McMaster 90280A583, zinc-steel slotted fillister 5/16-18 × 25.4 under head, Ø13.1572 × 7.493 head) clamps the 1330K524 double-loop eye against the end face; the 4.88061 installed gap derives from `vn_counter_spring_stock_geom.END_OCCUPIED_WIDTH_MM`, not a free-swivel stand-off. The screw tip projects into the hollow tube beyond the plug. The post passes through the east-rail hub and its height is adjusted for balance, then held by the square-head set screw'
         - —
-        - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin -- SUPERSEDED 2026-09-02 (ch19 p.45 page001_img02): a #6-32 slotted screw driven AXIALLY into the arm''s plugged end face (Ø3.6 shank, Ø10 head — head since grown to Ø12 for the 1330K524 double-loop eye), the counter spring''s top eye hanging on the shank against the head. Arm END re-derived 2026-09-14 for the vertical counter axis: the eye rides the exposed shank''s midpoint, so the arm end face moved to machine |x| 95.2 from 101.75 (part ARM_END_X −95.25 → −101.8, a 44.25 → 50.8 straight run past the R51 bend) to hang the eye plumb at |x| 91.2 — the summing lever''s counter anchor (`sm_gooseneck_geom.py`, `spring_mount_geom.COUNTER_ANCHOR_XY`); the arm HEIGHT stays the sliding tension adjustment'
+        - 'ch19 p.45 page001_img02: tall domed slotted fillister at the tube end, spring eye between head and end face. McMaster live product table read 2026-10-10 and supplied native SLDPRT recorded in cad/references/mcmaster/README.md; parametric family replay still requires native comparison before release. User ruling 2026-09-21: tighten to clamp the upper eye, no threadlocker or swivel requirement. 2026-10-10 length disposition selects the 1-inch screw so its incomplete tip thread lies beyond the through-tapped plug; the rejected 3/4-inch screw cannot conservatively guarantee 1.5D full engagement. `sm_gooseneck_geom.py`, `vn_gooseneck_spring_screw_spec.py` and the joint contract own dimensions; native spring-seat calibration owns installed height'
         - scaled + derived
         - leg-top med, drop med
       - - Gooseneck clamp
@@ -1273,16 +1273,13 @@ sections:
         - med
   - prose: |2
 
-      Notes: single large spring balancing the combined pull of the 20 channel
-      springs. Hang chain (machine y): boss hook rod 1004.7 → bottom ring 1001.7 →
-      coil ~1041.7..1367 → top loop 1370.6 → gooseneck pin 1373 (summing end −10.3
-      with the 2026-08-02 rederive, gooseneck end unchanged ⇒ installed length
-      +10.3, parametric spring re-derived). Tension is set by sliding the tube
-      through the top-frame hub bore against its set screw; the post passes
-      through the east rail's Ø17 clearance bore and drops ~120 below the rail
-      underside, ending in a free tip at machine y 880 (below the rail bottom
-      999.7) — the support extends well below the top plate (ch. 7 page001_img17
-      back-left ¾ view).
+      Notes: the stock 1330K524 counter spring balances the combined moment of
+      the 20 channel springs. Native spring-seat calibration owns the loaded
+      eye positions and gooseneck height; historical photo-chain heights are
+      not installed dimensions. Clamp the upper eye between MHA-VN-054 and
+      the brazed plug end face, without threadlocker (user ruling 2026-09-21).
+      Slide the post through the top-frame hub until the summing lever balances,
+      then tighten the hub set screw. The eye centre remains machine X −91.2.
 - heading: Chapter 20 — Magnifying Lever (pp. 46–49)
   elements:
   - prose: |2
