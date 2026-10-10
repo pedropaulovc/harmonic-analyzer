@@ -31,12 +31,12 @@ the M6.8 mirror layer is gone).
   apex onto the shaft's flat)
 * fulcrum-keeper x2 + frame-side-screw x2 + fulcrum-set-screw x2 (the black
   shaft-END brackets on the top-frame west rail top face -- ch17 p.40
-  bottom-left / ch30 p008; lug mid-planes at (199.9, z 3.088 +- 74.0), the
+  bottom-left / ch30 p008; lug mid-planes at (199.9, STACK_MID_Z +- 74.0), the
   shaft through their reamed bores; one #1-72 cup-point set screw down
   through each crown onto the shaft's flat (its only axial and rotational
   location); feet outboard, screwed down into the rail's tapped #2-56 holes
-  at z 3.088 +- 82.25; replaces the photo-refuted chrome baluster lever
-  pair, 2026-08-02)
+  at STACK_MID_Z +- 82.25 (the lever-bank mid-plane, z -0.504); replaces
+  the photo-refuted chrome baluster lever pair, 2026-08-02)
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),

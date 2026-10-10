@@ -615,7 +615,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through latch-hook taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
         "vn_swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
         "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
-        "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #4-40 fulcrum-keeper taps (top-level row)
+        "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #2-56 fulcrum-keeper taps (top-level row)
         "pd_transgear_arm",  # MHA-PD-018: 2x #8-32 plate taps through (pd_transgear_arm_spec), receiver; the pin MHA-PD-023 is pressed in a reamed hole
         "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A196, MHA-VN-040), cut to fit; member: 2 into transgear_arm
         "vn_transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-VN-039), cut to fit; member: 3 through the hub flange into rack_pinion

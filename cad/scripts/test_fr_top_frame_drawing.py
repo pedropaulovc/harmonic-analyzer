@@ -1967,7 +1967,7 @@ def test_keeper_seat_note_is_the_part_property_carrying_the_keeper_budget() -> N
     assert spec.KEEPER_SEAT_FLATNESS_BUDGET_MM is budget
     assert "fr_top_frame_spec" not in Path(keeper.__file__).read_text(encoding="utf-8")
     lines = spec.DRAWING_NOTES_B.splitlines()
-    assert len(lines) == 5
+    assert len(lines) == 4
     assert lines[0] == "FACE BOTH KEEPER SEATS IN ONE SETUP."
     assert f"WITHIN ONE COMMON {budget:.2f} FLATNESS ZONE" in lines[1]
     assert "SIZE TO ACTUAL KEEPER CONTACT" in lines[2]
