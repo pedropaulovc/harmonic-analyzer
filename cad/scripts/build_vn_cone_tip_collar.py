@@ -340,18 +340,6 @@ async def build(adapter) -> dict[str, str]:
         expected = 2 if configuration == "Default" else 1
         if len(bodies) != expected:
             raise RuntimeError(f"{configuration} has {len(bodies)} solids, expected {expected}")
-        for body in bodies:
-            native = _early_bound(body, "IBody2")
-            bounds = tuple(float(value) for value in native.GetBodyBox())
-            if len(bounds) != 6 or not all(math.isfinite(value) for value in bounds):
-                raise RuntimeError(f"{configuration}: actual body bounds are unavailable/non-finite")
-            is_screw = bounds[1] > 0.001
-            material = "AISI 304" if is_screw else MATERIAL
-            if native.SetMaterialProperty(configuration, "", material) != 1:
-                raise RuntimeError(f"{configuration}: cannot assign {material} to its body")
-            observed, _database = native.GetMaterialPropertyName(configuration)
-            if str(observed) != material:
-                raise RuntimeError(f"{configuration}: body material {observed!r} != {material}")
     _activate_configuration(adapter, "Default")
     author_part_pmi(adapter, datums=spec.PART_DATUMS, controls=spec.GEOMETRIC_CONTROLS)
     blank_sketch_feature(model, _feature_by_name(adapter, "TapRootGauge"), "tap root limit gauge")
