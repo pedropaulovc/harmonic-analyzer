@@ -1,10 +1,11 @@
 r"""Create the one-sheet Front/Right/Isometric channel assembly drawing (MHA-CH-000).
 
 The sheet carries the rocker bank's fit-up steps (#948 ruling R, PR #1292): the
-south bracket is set off a wave disc spring that preloads the bank north, so the
-setting and its acceptance are shop instructions this sheet must print
-(drawing-simplicity rule 6), generated from ``rocker_bank_layout`` and numbered
-by ``channel_assembly_steps``.
+south bracket is set off a wave disc spring that preloads the bank north, and
+the plain pivot shaft is cut to fit and held by a set screw in each ear (user,
+2026-10-10), so the setting and its acceptance are shop instructions this sheet
+must print (drawing-simplicity rule 6), generated from ``rocker_bank_layout``
+and numbered by ``channel_assembly_steps``.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ from _drawing_common import (
     read_required_properties,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
 from ch_pivot_shaft_spec import DOME_HEIGHT
 from rocker_bank_layout import (
     COUNT,
@@ -74,6 +76,7 @@ def _fitup_steps() -> str:
     bracket = _config.parts("ch-pivot-bracket")["number"]
     washer = _config.parts("ch-rocker-thrust-washer")["number"]
     spring = _config.parts("vn-rocker-bank-spring")["number"]
+    set_screw = _config.parts("vn-arbor-set-screw")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
     last = COUNT - 1
     stack_low, stack_high = STACK_L20_ACCEPT
@@ -82,10 +85,9 @@ def _fitup_steps() -> str:
     # The pivot shaft is supplied long, its plain end uncut (pivot_shaft_spec):
     # the cylinder ends PLAIN_END_CUT_BAND past the south ear's outer face and
     # the dome stands DOME_HEIGHT beyond that, so the saw cut sits that far
-    # past a scribe on the ear face. The shoulder cannot pass either ear or a
-    # hub bore, and the arms are held at their stations by their pinned rods,
-    # so the shaft goes in and comes out only northward, body first, with the
-    # north bracket lifted off its seats (Main's ruling, option i).
+    # past a scribe on the ear face. The arms are held at their stations by
+    # their pinned rods, so the plain rod goes in and comes out only through
+    # the set north ear, uncut end first.
     cut_low, cut_high = (DOME_HEIGHT + band for band in reversed(PLAIN_END_CUT_BAND))
     text = {
         # The rings are captured in the closed cam slots as the cylinder stack
@@ -93,8 +95,8 @@ def _fitup_steps() -> str:
         # press, so each rod + arm pair is pinned at the bench before that step -- and
         # after the hub stack is proved on the shaft, while the arms are loose.
         "rocker-stack-accepted": (
-            f"STACK THE {COUNT} {arm} ROCKERS ON THE {shaft} SHAFT, HUB {last} "
-            f"AGAINST ITS SHOULDER. HUB 0 SOUTH FACE TO HUB {last} NORTH FACE: "
+            f"STACK THE {COUNT} {arm} ROCKERS ON THE {shaft} SHAFT, CLOSED UP. "
+            f"HUB 0 SOUTH FACE TO HUB {last} NORTH FACE: "
             f"{stack_low:.2f} TO {stack_high:.2f}; RE-FACE A LONG STACK. SLIDE "
             "THE ROCKERS OFF IN ORDER AND KEEP THAT ORDER."
         ),
@@ -105,14 +107,12 @@ def _fitup_steps() -> str:
             "ACCEPT IF THE ARM SWINGS FREE UNDER ITS OWN WEIGHT."
         ),
         "north-ear-datum": (
-            f"BASE ON THE MILL, DRO ZEROED, NORTH {bracket} LIFTED "
-            f"OFF AT {steps.NORTH_BRACKET_SET_REF}: SWING EACH ARM UP "
-            f"ON ITS ROD AND THREAD THE {shaft} SHAFT, BODY FIRST FROM THE "
-            f"NORTH, THROUGH HUBS {last} TO 0 IN ORDER. SLIDE THE {bracket} "
-            "EAR SOUTH OVER THE NORTH JOURNAL, SCREW IT DOWN AND RECHECK ITS "
-            f"S-OFFSET Y AS {steps.NORTH_BRACKET_SET_REF}."
+            f"NORTH {bracket} SET AT {steps.NORTH_BRACKET_SET_REF}: SWING "
+            f"EACH ARM UP ON ITS ROD; PUSH THE {shaft} SHAFT, UNCUT END "
+            f"FIRST, FLATS UP, SOUTH THROUGH THE EAR, ITS MICED {washer} AND "
+            f"HUBS {last} TO 0."
         ),
-        "south-washer-fitted": f"SLIP THE {washer} WASHER ON AGAINST HUB 0.",
+        "south-washer-fitted": f"SLIP THE OTHER {washer} ON AGAINST HUB 0.",
         "south-bracket-spring-set": (
             f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS. "
             f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
@@ -121,17 +121,24 @@ def _fitup_steps() -> str:
             "PULL THE BLADE."
         ),
         "shaft-cut-to-fit": (
-            f"SHOULDER PUSHED NORTH, SCRIBE THE {shaft} SHAFT AT THE SOUTH "
-            f"EAR'S OUTER FACE. UNSCREW THE NORTH {bracket} AND SLIDE IT OFF "
-            "NORTH; DRAW THE SHAFT NORTH OUT OF THE HUBS, EACH ARM LEFT "
-            "HANGING ON ITS ROD; CATCH WASHER AND SPRING. CUT THE PLAIN END "
+            f"NORTH END FLUSH WITH ITS EAR, SCRIBE THE {shaft} AT THE SOUTH "
+            "EAR'S OUTER FACE. DRAW IT OUT NORTH, EACH ARM LEFT HANGING ON "
+            "ITS ROD; CATCH WASHERS AND SPRING. CUT THE PLAIN END "
             f"{cut_low:.1f} TO {cut_high:.1f} PAST THE SCRIBE AND DOME IT "
-            f"{DOME_HEIGHT:.1f}. REFIT AS STEP {north_step}, WASHER AND SPRING "
-            f"THREADED ON PAST HUB 0; SOUTH EAR AT ITS STEP {set_step} SETTING."
+            f"{DOME_HEIGHT:.1f}. REFIT AS STEP {north_step}, WASHERS AND SPRING "
+            f"IN PLACE; SOUTH EAR AT ITS STEP {set_step} SETTING."
+        ),
+        # Rule 9 waived for this joint only (joint_retention RULINGS
+        # "U-MHA-VN-034-channel-threadlocker", user 2026-10-10).
+        "set-screws-driven": (
+            f"NORTH END FLUSH, FLATS UP: RUN ONE {set_screw} DOWN EACH APEX "
+            "TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. "
+            # Named exception: MHA-CH-008 set-screw engagement (drawing-simplicity-policy.md, "Named exceptions").
+            f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
         ),
         "preload-accepted": (
-            "ACCEPT: PUSHED SOUTH, BANK AND SHAFT SPRING BACK ONTO THE NORTH "
-            f"EAR. ELSE REPEAT STEP {set_step}."
+            "ACCEPT: PUSHED SOUTH, THE BANK SPRINGS BACK ONTO THE NORTH "
+            f"WASHER. ELSE REPEAT STEP {set_step}."
         ),
     }
     lines = ["ROCKER BANK FIT-UP"]

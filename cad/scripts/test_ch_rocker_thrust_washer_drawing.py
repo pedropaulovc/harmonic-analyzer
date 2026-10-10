@@ -41,31 +41,36 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     }
 
 
-def test_only_the_bore_is_banded() -> None:
-    """The south ear is blade-set off this washer (#948 ruling R), so its thickness sits in
+def test_nothing_is_banded_on_the_model() -> None:
+    """The south ear is blade-set off its washer (#948 ruling R) and the north
+    washer is miced into the datum ear's DRO target, so its thickness sits in
     no datum chain: it is the stock's, judged at the mill's band by the bar
-    clearance (test_rocker_bank_layout)."""
-    assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "BoreDia"): "*deviations(BORE_BAND)",
-    }
-    assert spec.BORE_BAND[1] == 0.0
+    clearance (test_rocker_bank_layout). The bore prints DRILL THRU, so the
+    title block's DRILLED HOLES row is its band (PR #1317 machinist review:
+    a model +0.1/0 restated it, against rule 1)."""
+    from _printed_tolerance import drilled_oversize_mm
+
+    assert model_toleranced_dimensions(part) == {}
+    assert spec.BORE_BAND == (drilled_oversize_mm(), 0.0)
     assert spec.BORE_DIA - 6.35 > 0.0
 
 
-def test_thickness_is_the_one_sixteenth_stock() -> None:
-    """User ruling 2026-09-26: cut from 1/16 in stock, modelled at 1.59 and
-    printed "1/16 (1.59) STOCK" so the stock's tolerance governs."""
-    assert spec.STOCK_THICKNESS_IN == Fraction(1, 16)
-    assert spec.STOCK_THICKNESS == pytest.approx(1.5875)
-    assert spec.THICKNESS == 1.59
+def test_thickness_is_the_one_thirty_second_stock() -> None:
+    """User, 2026-10-10 (was 1/16, ruling 2026-09-26): cut from 1/32 in
+    stock, modelled at 0.79 and printed "1/32 (0.79) STOCK" so the stock's
+    tolerance governs."""
+    assert spec.STOCK_THICKNESS_IN == Fraction(1, 32)
+    assert spec.STOCK_THICKNESS == pytest.approx(0.79375)
+    assert spec.THICKNESS == 0.79
     assert part.DISC_THICK == spec.THICKNESS
     places = spec.DRAWING_PRECISION["Disc"]["DiscThick"]
     printed = (
         f"{spec.STOCK_TEXT_PREFIX}{spec.THICKNESS:.{places}f}{spec.STOCK_TEXT_SUFFIX}"
     )
-    assert printed == "1/16 (1.59) STOCK"
+    assert printed == "1/32 (0.79) STOCK"
     lo, hi = spec.STOCK_THICKNESS_RANGE
-    assert hi - lo == pytest.approx(2 * 0.005 * 25.4)
+    assert hi - lo == pytest.approx(2 * spec.STOCK_THICKNESS_TOL_IN * 25.4)
+    assert spec.STOCK_THICKNESS_TOL_IN == 0.003
     assert drawing.STOCK_TEXT_PREFIX is spec.STOCK_TEXT_PREFIX
     assert drawing.STOCK_TEXT_SUFFIX is spec.STOCK_TEXT_SUFFIX
     build_calls = [
@@ -78,12 +83,22 @@ def test_thickness_is_the_one_sixteenth_stock() -> None:
     assert "_set_stock_text" in build_calls
 
 
-def test_registry_row_is_the_one_sixteenth_stock_mha_148() -> None:
+def test_bore_callout_states_its_process() -> None:
+    """PR #1317 machinist review: the banded bore printed no DRILL/REAM.
+    Rule 7: a hole callout states the process; the bore is a drilled-class
+    running clearance on the shaft."""
+    assert drawing.BORE_CALLOUT == "DRILL THRU"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_dimension_callouts(adapter, annotations, {"BoreDia": BORE_CALLOUT})' in source
+
+
+def test_registry_row_is_two_of_the_one_thirty_second_stock() -> None:
     row = _config.parts("ch-rocker-thrust-washer")
     assert row["number"] == "MHA-CH-009"
-    assert int(row["quantity"]) == 1
+    # One at each end of the rocker stack (user, 2026-10-10).
+    assert int(row["quantity"]) == 2
     assert row["material_specification"] == spec.MATERIAL_SPECIFICATION
-    assert "1/16 in" in str(row["process"])
+    assert "1/32 in" in str(row["process"])
 
 
 def test_title_block_material_prints_the_ruled_sheet() -> None:
@@ -170,7 +185,7 @@ def _called_names(path: str) -> set[str]:
 
 
 def test_faces_carry_no_roughness_callout() -> None:
-    """Main 2026-09-26 (r743-3 eye pass): the faces are the 1/16 sheet's as
+    """Main 2026-09-26 (r743-3 eye pass): the faces are the sheet's as
     supplied. A face Ra could only force the facing the stock ruling avoids,
     and a hand-cranked thrust washer does not need one. This supersedes the
     two MACHINED face finishes Codex #936 (PRRT_kwDOPHDy386mRSOM) asked for.

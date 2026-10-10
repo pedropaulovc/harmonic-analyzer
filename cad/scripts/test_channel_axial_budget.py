@@ -60,7 +60,7 @@ def _clear_window() -> tuple[float, float]:
 
 def _station_delta(j: int) -> tuple[float, float]:
     """(min, max) Delta at station j: both datums DRO-set with the mic
-    compensation (back washer, shaft shoulder), both banks held north on them
+    compensation (back washer, north thrust washer), both banks held north on them
     by their springs (no end play)."""
     cam_datum = sum(bank.DATUM_CHAIN_STACK.values())
     arm_datum = sum(rocker.NORTH_DATUM_STACK.values())
