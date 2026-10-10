@@ -249,7 +249,7 @@ def test_straight_stock_pass_keeps_blind_boss_cut_direction_and_native_guards(re
     )
     assert len(volumes) == 3
     assert boss.lineno < volumes[0] < native[0].lineno
-    pattern = [node for node in calls if isinstance(node.func, ast.Name) and node.func.id in {"_pattern_stock_feature", "pattern_about_z"}]
+    pattern = [node for node in calls if isinstance(node.func, ast.Name) and node.func.id in {"pattern_stock_feature", "pattern_about_z"}]
     assert len(pattern) == 1
     assert cut.lineno < volumes[1] < pattern[0].lineno < volumes[2]
 

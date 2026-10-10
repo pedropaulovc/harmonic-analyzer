@@ -137,6 +137,22 @@ def step_ref(key: str) -> str:
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"
 
 
+def matched_locator_notes(mate_number: str) -> str:
+    """The arm's and the plate's two sheet notes: requirement and step only.
+
+    The matched-pair procedure and its acceptance print at these steps
+    (drawing-simplicity rule 6: no method text on a part sheet).
+    """
+    return "\n".join(
+        (
+            f"1. LOCATING HOLES MATCH-DRILLED WITH {mate_number};",
+            f"   {step_ref('arm-plate-located')}.",
+            "2. ASSEMBLED S-K POSE AND SEAT ACCEPTANCE:",
+            f"   {step_ref('arm-plate-fitted')}.",
+        )
+    )
+
+
 # --- Values the procedure owns (CONTRACT-paper-drive.md §13.2) --------------
 # A reference operating quantity, not a second gear-data block. The current
 # travel law uses the reference pitch circle. A finite cutter's setting

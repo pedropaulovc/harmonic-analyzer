@@ -24,6 +24,7 @@ from _drawing_contract import (
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+import paper_drive_stock_native
 from paper_drive_stock_inspection import span_contact_points_mm, toothspace_gauge_contact_mm
 from stock_form_cutter import CutterTemplate, StockFormProfile, translation_for_tangent_span
 
@@ -174,9 +175,11 @@ def test_builder_has_no_ideal_or_flat_slot_cutover_path() -> None:
     assert body.index("_journal_profile(") < body.index("_stock_cutter_endcut(")
     assert body.index("_stud_profile(") < body.index("_stock_cutter_endcut(")
     assert _calls(part._native_volume_check, "measure_one_solid_body_volume")
-    assert _calls(part._straight_stock_gaps, "_pattern_stock_feature")
-    patterns = _calls(part._pattern_stock_feature, "CircularPatternParameters")
-    assert len(patterns) == 1 and _keyword(patterns[0], "count") == "TEETH"
+    for builder in (part._straight_stock_gaps, part._stock_cutter_endcut):
+        stock_patterns = _calls(builder, "pattern_stock_feature")
+        assert len(stock_patterns) == 1 and ast.unparse(stock_patterns[0].args[2]) == "TEETH"
+    patterns = _calls(paper_drive_stock_native.pattern_stock_feature, "CircularPatternParameters")
+    assert len(patterns) == 1 and _keyword(patterns[0], "count") == "count"
     assert _keyword(patterns[0], "geometry_pattern") == "False"
 
 

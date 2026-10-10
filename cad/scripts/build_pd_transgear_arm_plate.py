@@ -120,9 +120,6 @@ from pd_transgear_arm_plate_spec import (
     BASIC_REDUCER_DIMENSIONS,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
-    REDUCER_POSITION_INSPECTION_NOTE,
-    ARM_PLATE_NORMAL_INSPECTION_NOTE,
-    CLAMP_AXIS_INSPECTION_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     HUB_TO_BOSS_TOLERANCE,
@@ -138,9 +135,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Isometric View Note",
-    "Reducer Position Inspection",
-    "Arm Plate Normal Inspection",
-    "Clamp Axis Inspection",
 )
 
 THROUGH_CUT_DEPTH = 4.0 * HUB_TO_BOSS  # mid-plane total; > the plate's depth
@@ -943,9 +937,6 @@ async def build(adapter: Any) -> dict[str, str]:
         PART_NAME,
         {
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "Reducer Position Inspection": REDUCER_POSITION_INSPECTION_NOTE,
-            "Arm Plate Normal Inspection": ARM_PLATE_NORMAL_INSPECTION_NOTE,
-            "Clamp Axis Inspection": CLAMP_AXIS_INSPECTION_NOTE,
         },
     )
     blank_reference_sketches(adapter, ("CountersinkReference",))

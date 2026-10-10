@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+import textwrap
 from typing import Any
 
 import _telemetry
@@ -19,6 +20,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
+    add_note,
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
@@ -26,6 +28,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
+    property_link,
     read_required_properties,
     rebuild_drawing,
     set_dimension_callouts,
@@ -36,6 +39,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_drive_collar_spec import (
+    BODY_BLANK_LENGTH_MIN,
     BORE_CALLOUT,
     BORE_ENTRY_BREAK_CALLOUT,
     BODY_LENGTH_CALLOUT,
@@ -46,6 +50,7 @@ from pd_transgear_drive_collar_spec import (
     LENGTH,
     OD,
     OVERALL_LENGTH,
+    PILOT_BLANK_LENGTH_MIN,
     PILOT_DIA,
     PILOT_LENGTH,
     PILOT_LENGTH_CALLOUT,
@@ -86,53 +91,94 @@ PIN_R = PIN_CIRCLE_RADIUS * _S / 1000.0
 _SEAT_X = SIDE_CENTER[0] + (LENGTH - PILOT_LENGTH) * _S / 2000.0
 _REAR_X = _SEAT_X - LENGTH * _S / 1000.0
 _PILOT_X = _SEAT_X + PILOT_LENGTH * _S / 1000.0
-# The end view: the bore off the upper right and the pin holes off the lower
-# right, each leader running straight in, the two pin offsets stacked left.
-# The bore's broach callout is wide (its shoulder measured 121.6 mm on the
-# farm sheet), so its text sits wholly right of section line A with the
-# shoulder above the line's top end and above the section's entry-break
-# dimension, never along either.
-_BORE_SHOULDER_HALF = 0.061
+# SolidWorks draws a diameter's leader from its text THROUGH the circle's
+# centre to the far rim (farm run 20261009T224545531Z: the bore's leader from
+# above crossed the upper pin hole, and the pin's from below crossed the
+# bore). So each text stands where that whole line is clear: the bore's up
+# and right of the bore, between the pins and right of section line A; the
+# dimensioned (+Y) pin hole's up and left of that hole, outside the part. The
+# flat's size stands right of the view, its stacked limits between its
+# witness lines and its matched-fit line under them, clear of the section.
+_BORE_TEXT_HALF = 0.017
+_PIN_TEXT_HALF = 0.022
 END_KEEP = {
-    "BoreDia": (
-        END_CENTER[0] + 0.008 + _BORE_SHOULDER_HALF,
-        END_CENTER[1] + HALF_OD + 0.030,
-    ),
-    "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.020, END_CENTER[1] - 0.004),
-    "PinPosDia": (END_CENTER[0] + 0.030, END_CENTER[1] - HALF_OD - 0.012),
+    "BoreDia": (END_CENTER[0] + 0.040 + _BORE_TEXT_HALF, END_CENTER[1] + 0.030),
+    "FlatToAxis": (END_CENTER[0] + HALF_OD + 0.025, END_CENTER[1] - 0.0044),
+    "PinPosDia": (END_CENTER[0] - 0.018 - _PIN_TEXT_HALF, END_CENTER[1] + 0.055),
     "PinPosY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] + PIN_R / 2.0),
     "PinNegY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] - PIN_R / 2.0),
 }
-# The fitted lengths stack below the section; the entry break stays above
-# its actual rear edge, away from the end-view D diameter/flat callouts.
+# SolidWorks prints "SECTION A-A / SCALE 4:1" under the section, its top
+# 16.6 mm under the view's lower edge and centred on it (measured on run
+# 20261009T224545531Z's sheet), so nothing tall may stand there. The two
+# fitted lengths share one row just under the section, each with only a
+# pointer to its sheet note; the pilot's text stands right of its short
+# span. The overall reference reads above the section, and the rear entry
+# break above its rear edge wholly left of the overall's rear witness line.
+# The outside diameter reads right of the pilot's.
+_LENGTH_ROW_Y = SIDE_CENTER[1] - HALF_OD - 0.006
 SIDE_KEEP = {
-    "PilotLength": ((_SEAT_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.012),
-    "CollarLength": ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.036),
-    # Keep the outside diameter's native band clear of the rear entry.
-    "CollarDia": (_REAR_X - 0.040, SIDE_CENTER[1]),
+    "PilotLength": (_PILOT_X + 0.019, _LENGTH_ROW_Y),
+    "CollarLength": ((_REAR_X + _SEAT_X) / 2.0 - 0.003, _LENGTH_ROW_Y),
+    "CollarDia": (_PILOT_X + 0.047, SIDE_CENTER[1]),
     "PilotDia": (_PILOT_X + 0.014, SIDE_CENTER[1]),
-    "BoreEntryBreak": (_REAR_X - 0.014, SIDE_CENTER[1] + HALF_OD + 0.012),
+    "BoreEntryBreak": (_REAR_X - 0.035, SIDE_CENTER[1] + HALF_OD + 0.012),
 }
-OVERALL_TEXT_XY = ((_REAR_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.050)
+OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
 # Physical annular end-face picks, outside the actual rear entry relief and
 # inside the pilot. The rear-face bore/chamfer is air, not a length witness.
 _OVERALL_PICK_Y = SIDE_CENTER[1] + PILOT_DIA * 3.0 * _S / 8000.0
 OVERALL_PICKS = ((_PILOT_X, _OVERALL_PICK_Y), (_REAR_X, _OVERALL_PICK_Y))
-# The pilot is supplied long and faced at assembly; the sheet prints the
-# fitted band and points at the assembly step that faces it.
+# The pilot is supplied long and faced at assembly, and the body's rear face
+# is faced on F; each fitted band and its assembly step is a numbered sheet
+# note, continuing the part's notes 1-2, and its length points at it.
 FIT_STEP_KEY = "pilot-faced-to-fit"
 BODY_FIT_STEP_KEY = "collar-rear-faced-to-fit"
+_NOTE_WIDTH = 70
+
+
+def _numbered(number: int, text: str) -> str:
+    return "\n".join(
+        textwrap.wrap(
+            f"{number}. {text}",
+            width=_NOTE_WIDTH,
+            subsequent_indent="   ",
+            break_on_hyphens=False,
+        )
+    )
+
+
+PILOT_NOTE = 3
+BODY_NOTE = 4
+FIT_NOTES = "\n".join(
+    (
+        _numbered(
+            PILOT_NOTE,
+            f"PILOT: SUPPLY {PILOT_BLANK_LENGTH_MIN:.2f} MIN; "
+            f"{PILOT_LENGTH_CALLOUT.replace(chr(10), ', ')}, "
+            f"PER {step_ref(FIT_STEP_KEY)}.",
+        ),
+        _numbered(
+            BODY_NOTE,
+            f"BODY: SUPPLY {BODY_BLANK_LENGTH_MIN:.3f} MIN; "
+            f"{BODY_LENGTH_CALLOUT.replace(chr(10), ', ')}, "
+            f"PER {step_ref(BODY_FIT_STEP_KEY)}.",
+        ),
+    )
+)
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
     "PinPosDia": PIN_HOLE_CALLOUT,
-    "PilotLength": f"{PILOT_LENGTH_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}",
-    "CollarLength": f"{BODY_LENGTH_CALLOUT},\nPER {step_ref(BODY_FIT_STEP_KEY)}",
+    "PilotLength": f"SEE NOTE {PILOT_NOTE}",
+    "CollarLength": f"SEE NOTE {BODY_NOTE}",
     "FlatToAxis": FLAT_ORIENTATION,
     "BoreEntryBreak": BORE_ENTRY_BREAK_CALLOUT,
 }
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
-# Four source-owned notes; the actual fit procedure is linked to its feature.
+# The part's two notes, then the drawing's two fitted-length notes, in one
+# block; the actual fit procedure is linked to its assembly step.
 NOTES_XY = (0.016, 0.085)
+NOTES_TEXT = f"{property_link('Manufacturing Notes')}\n{FIT_NOTES}"
 
 
 def _section_frame(adapter: Any, view: Any) -> tuple[tuple[float, float], ...]:
@@ -288,7 +334,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _overall_reference(adapter, side)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the collar end view")
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    if add_note(adapter, NOTES_TEXT, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the collar's numbered sheet notes")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

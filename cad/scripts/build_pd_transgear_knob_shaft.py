@@ -71,6 +71,7 @@ from paper_drive_stock_native import (
     author_root_envelope,
     author_span,
     measure_one_solid_body_volume,
+    pattern_stock_feature,
     placed_ground_curve,
     suppress_dimension_input,
 )
@@ -192,31 +193,6 @@ async def _native_volume_check(
     return actual
 
 
-async def _pattern_stock_feature(adapter: Any, seed: str, name: str) -> str:
-    from solidworks_mcp.adapters.base import CircularPatternParameters, CreateAxisParameters
-
-    axis = check(
-        "stock pattern origin-Z axis",
-        await adapter.create_axis(
-            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
-        ),
-    )
-    check(
-        f"native stock pattern {seed}",
-        await adapter.circular_pattern_feature(
-            CircularPatternParameters(
-                axis_name=axis.name,
-                features=[seed],
-                count=TEETH,
-                geometry_pattern=False,
-            )
-        ),
-    )
-    name_last_feature(adapter, name)
-    blank_reference_geometry(adapter, ((axis.name, "AXIS"),))
-    return name
-
-
 async def _straight_stock_gaps(
     adapter: Any, drive_jobs: list[tuple[str, str]]
 ) -> ToothedDisc:
@@ -280,7 +256,7 @@ async def _straight_stock_gaps(
         blank_volume - one_gap + area_error,
         1.0,
     )
-    pattern = await _pattern_stock_feature(adapter, "StraightToothGap", "StraightToothPattern")
+    pattern = await pattern_stock_feature(adapter, "StraightToothGap", TEETH, "StraightToothPattern")
     expected = blank_volume - TEETH * one_gap
     volume = await _native_volume_check(
         adapter, "finite twelve-gap straight pattern",
@@ -305,7 +281,7 @@ async def _stock_cutter_endcut(
         adapter, "rear finite stock-disk terminal seed",
         volume - upper, volume - lower, 0.01 * removed,
     )
-    pattern = await _pattern_stock_feature(adapter, features.cut, "ToolEndPattern")
+    pattern = await pattern_stock_feature(adapter, features.cut, TEETH, "ToolEndPattern")
     actual = await _native_volume_check(
         adapter, "twelve rear finite stock-disk terminals",
         volume - TEETH * upper, volume - TEETH * lower, 0.01 * TEETH * removed,
@@ -816,7 +792,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The rear terminal must cut both partial-depth teeth and real journal.
     volume, end_features = await _stock_cutter_endcut(adapter, volume, drive_jobs)
     await author_root_envelope(adapter, STOCK_PROFILE)
-    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH)
+    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
 
     stations = (
         ("PinionRear", PINION_REAR_Z, '"FaceWidth"'),

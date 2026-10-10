@@ -56,15 +56,21 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
     assert body == {"CollarDia", "CollarLength", "PilotDia", "PilotLength"}
     assert body <= set(drawing.SIDE_KEEP)
     assert spec.OVERALL_LENGTH == pytest.approx(spec.LENGTH + spec.PILOT_LENGTH)
-    # The overall reads outside both lengths, below them.
-    lowest_length = min(
-        drawing.SIDE_KEEP[n][1] for n in ("CollarLength", "PilotLength")
-    )
-    assert drawing.OVERALL_TEXT_XY[1] < lowest_length - 0.008
-    assert drawing.OVERALL_TEXT_XY[1] > BORDER + 0.010
-    # The O.D. is outboard of the rear face; there is no rear slot.
-    assert drawing.SIDE_KEEP["CollarDia"][0] < drawing._REAR_X
+    # Both lengths share one row under the section, above the native
+    # "SECTION A-A" label (16.6 mm under the view); the overall reads above.
+    rows = {drawing.SIDE_KEEP[n][1] for n in ("CollarLength", "PilotLength")}
+    assert len(rows) == 1
+    (row,) = rows
+    view_bottom = drawing.SIDE_CENTER[1] - drawing.HALF_OD
+    assert view_bottom - 0.016 < row < view_bottom
+    assert drawing.OVERALL_TEXT_XY[1] > drawing.SIDE_CENTER[1] + drawing.HALF_OD
+    # The pilot's length text stands right of its own short span.
+    assert drawing.SIDE_KEEP["PilotLength"][0] > drawing._PILOT_X + 0.0145
+    # Both diameters read right of the pilot face, the O.D. outboard.
+    assert drawing.SIDE_KEEP["CollarDia"][0] > drawing.SIDE_KEEP["PilotDia"][0] + 0.026
     assert drawing.SIDE_KEEP["PilotDia"][0] > drawing._PILOT_X
+    # The rear entry break's text ends left of the overall's rear witness.
+    assert drawing.SIDE_KEEP["BoreEntryBreak"][0] + 0.030 < drawing._REAR_X
 
 
 class _SideViewSeat:
@@ -202,25 +208,47 @@ def _segments_cross(a, b, c, d) -> bool:
     return side(a, b, c) * side(a, b, d) < 0 and side(c, d, a) * side(c, d, b) < 0
 
 
-def test_end_view_leaders_run_straight_in_without_crossing() -> None:
-    cx, cy = drawing.END_CENTER
-    bore_r = spec.BORE_DIA * drawing._S / 2000.0
-    bore_text = drawing.END_KEEP["BoreDia"]
-    angle = math.atan2(bore_text[1] - cy, bore_text[0] - cx)
-    bore_tip = (cx + bore_r * math.cos(angle), cy + bore_r * math.sin(angle))
-    pin_text = drawing.END_KEEP["PinPosDia"]
-    pin_tip = (cx, cy - drawing.PIN_R)  # the lower hole's centre
-    assert not _segments_cross(bore_text, bore_tip, pin_text, pin_tip)
-    # Neither diameter leader passes through the other pin hole.
-    hole_r = spec.PIN_HOLE_DIA * drawing._S / 2000.0
-    upper = (cx, cy + drawing.PIN_R)
-    (x0, y0), (x1, y1) = bore_text, bore_tip
-    t = ((upper[0] - x0) * (x1 - x0) + (upper[1] - y0) * (y1 - y0)) / (
+def _through_centre(text, centre, radius):
+    """A SolidWorks diameter leader: text to the far rim through the centre."""
+    angle = math.atan2(text[1] - centre[1], text[0] - centre[0])
+    return text, (centre[0] - radius * math.cos(angle), centre[1] - radius * math.sin(angle))
+
+
+def _clearance(segment, point) -> float:
+    (x0, y0), (x1, y1) = segment
+    t = ((point[0] - x0) * (x1 - x0) + (point[1] - y0) * (y1 - y0)) / (
         (x1 - x0) ** 2 + (y1 - y0) ** 2
     )
     t = min(1.0, max(0.0, t))
-    nearest = (x0 + t * (x1 - x0), y0 + t * (y1 - y0))
-    assert math.dist(nearest, upper) > hole_r
+    return math.dist((x0 + t * (x1 - x0), y0 + t * (y1 - y0)), point)
+
+
+def test_end_view_leaders_run_straight_in_without_crossing() -> None:
+    """Farm run 20261009T224545531Z: each diameter leader runs from the near
+    end of its text through the centre to the far rim, so the bore's crossed
+    the upper pin hole and the (+Y) pin's crossed the bore."""
+    cx, cy = drawing.END_CENTER
+    bore_r = spec.BORE_DIA * drawing._S / 2000.0
+    hole_r = spec.PIN_HOLE_DIA * drawing._S / 2000.0
+    upper = (cx, cy + drawing.PIN_R)  # PinPosDia dimensions the +Y hole
+    lower = (cx, cy - drawing.PIN_R)
+    bore_x, bore_y = drawing.END_KEEP["BoreDia"]
+    pin_x, pin_y = drawing.END_KEEP["PinPosDia"]
+    for start in (bore_x - drawing._BORE_TEXT_HALF, bore_x):
+        bore = _through_centre((start, bore_y), (cx, cy), bore_r)
+        for hole in (upper, lower):
+            assert _clearance(bore, hole) > hole_r
+        for pin_start in (pin_x + drawing._PIN_TEXT_HALF, pin_x):
+            pin = _through_centre((pin_start, pin_y), upper, hole_r)
+            assert not _segments_cross(*bore, *pin)
+            assert _clearance(pin, (cx, cy)) > bore_r
+    # Neither text stands across section line A (x = centre) from its leader.
+    assert bore_x - drawing._BORE_TEXT_HALF > cx + drawing.HALF_OD
+    assert pin_x + drawing._PIN_TEXT_HALF < cx
+    # Negative control: the run's pin leader left its text's near end at
+    # about (108, 122) mm on the sheet and crossed the bore.
+    run7_pin = _through_centre((0.108, 0.122), upper, hole_r)
+    assert _clearance(run7_pin, (cx, cy)) < bore_r
 
 
 def test_true_d_sizes_are_not_a_full_round_hole_or_an_unlocated_flat() -> None:
@@ -350,11 +378,21 @@ def test_the_pilot_is_faced_to_stand_proud_of_the_knob_wheel_from_the_blank() ->
         spec.PILOT_BLANK_LENGTH_MIN
         >= spec.PILOT_LENGTH_FITTED_MAX + spec.FACING_ALLOWANCE - 1e-9
     )
-    assert f"{spec.PILOT_BLANK_LENGTH_MIN:.2f} MIN" in spec.DRAWING_NOTES
-    callout = drawing.DIMENSION_CALLOUTS_BELOW["PilotLength"]
+    assert f"{spec.PILOT_BLANK_LENGTH_MIN:.2f} MIN" in drawing.FIT_NOTES
     fitted = f"{spec.PILOT_LENGTH_FITTED_MIN:.2f}-{spec.PILOT_LENGTH_FITTED_MAX:.2f}"
-    assert fitted in callout
-    assert "FACED TO FIT" in callout
+    assert fitted in drawing.FIT_NOTES
+    assert "FACED TO FIT" in drawing.FIT_NOTES
+    assert drawing.DIMENSION_CALLOUTS_BELOW["PilotLength"] == (
+        f"SEE NOTE {drawing.PILOT_NOTE}"
+    )
+
+
+def _note(number: int) -> str:
+    """Sheet note ``number`` as one line, its wrapped lines rejoined."""
+    text = " ".join(drawing.FIT_NOTES.split())
+    start = text.index(f"{number}. ")
+    end = text.find(f" {number + 1}. ", start)
+    return text[start : None if end < 0 else end]
 
 
 def test_the_pilot_length_callout_points_at_its_facing_step() -> None:
@@ -363,11 +401,13 @@ def test_the_pilot_length_callout_points_at_its_facing_step() -> None:
     assert steps.step_number(drawing.FIT_STEP_KEY) < steps.step_number(
         drawing.BODY_FIT_STEP_KEY
     )
-    callout = drawing.DIMENSION_CALLOUTS_BELOW["PilotLength"]
-    assert callout.endswith(
+    assert _note(drawing.PILOT_NOTE).endswith(
         f"PER {assembly_contract('pd-paper-drive').number} "
-        f"STEP {steps.step_number(drawing.FIT_STEP_KEY)}"
+        f"STEP {steps.step_number(drawing.FIT_STEP_KEY)}."
     )
+    # The part's own notes are 1 and 2; the fit notes continue the list.
+    assert spec.DRAWING_NOTES.splitlines()[-1].startswith("2. ")
+    assert (drawing.PILOT_NOTE, drawing.BODY_NOTE) == (3, 4)
 
 
 def test_the_thumbnut_bears_on_the_pilot_and_the_knob_wheel_floats() -> None:
@@ -385,19 +425,29 @@ def test_body_rear_face_reacts_at_f_over_the_whole_fitted_domain() -> None:
     assert spec.BODY_REAR_FACE_FROM_F == 0.0
     assert spec.BODY_BLANK_LENGTH_MIN >= spec.LENGTH_FITTED_MAX + spec.FACING_ALLOWANCE
     assert drawing.BODY_FIT_STEP_KEY == "collar-rear-faced-to-fit"
-    callout = drawing.DIMENSION_CALLOUTS_BELOW["CollarLength"]
-    assert spec.BODY_LENGTH_CALLOUT in callout
-    assert callout.endswith(f"PER {steps.step_ref(drawing.BODY_FIT_STEP_KEY)}")
-    assert "SEATED ON GEAR FRONT F" in callout
+    assert drawing.DIMENSION_CALLOUTS_BELOW["CollarLength"] == (
+        f"SEE NOTE {drawing.BODY_NOTE}"
+    )
+    note = _note(drawing.BODY_NOTE)
+    assert spec.BODY_LENGTH_CALLOUT.replace("\n", ", ") in note
+    assert note.endswith(f"PER {steps.step_ref(drawing.BODY_FIT_STEP_KEY)}.")
+    assert "SEATED ON GEAR FRONT F" in note
+    assert f"{spec.BODY_BLANK_LENGTH_MIN:.3f} MIN" in note
     assert spec.THUMBNUT_ENGAGEMENT_WORST >= shaft.ENGAGEMENT_FLOOR_D * shaft.THREAD_MAJOR
     assert spec.FRONT_BEARING_AREA_MIN > 0.0
     assert spec.NUT_CORE_STEP_AIR > 0.0
 
 
 def test_notes_and_recipe_have_no_obsolete_front_pin_or_slot() -> None:
-    notes = spec.DRAWING_NOTES
+    notes = f"{spec.DRAWING_NOTES}\n{drawing.FIT_NOTES}"
     assert f"{spec.DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN" in notes
     assert f"{spec.BODY_BLANK_LENGTH_MIN:.3f} MIN" in notes
+    # Rule 6: four numbered notes, no method words in the bore callout.
+    assert [line[:3] for line in notes.splitlines() if not line.startswith(" ")] == [
+        "1. ", "2. ", "3. ", "4. "
+    ]
+    assert "BROACH" not in spec.BORE_CALLOUT and "EDM" not in spec.BORE_CALLOUT
+    assert drawing.NOTES_TEXT.startswith('$PRPSHEET:"Manufacturing Notes"\n3. ')
     for path in (part.__file__, drawing.__file__, spec.__file__):
         tree = ast.parse(Path(path).read_text(encoding="utf-8"))
         imports = [node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
@@ -419,7 +469,9 @@ def _notes_box(text: str, left: float, top: float) -> tuple[float, float, float]
 def test_the_notes_fit_left_of_the_title_block_and_under_the_views() -> None:
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
     left, top = drawing.NOTES_XY
-    right, bottom, top = _notes_box(spec.DRAWING_NOTES, left, top)
+    right, bottom, top = _notes_box(
+        f"{spec.DRAWING_NOTES}\n{drawing.FIT_NOTES}", left, top
+    )
     assert left > BORDER and right < template.title_block_left_m
     assert bottom > BORDER
     # The notes stay below both orthographic views' silhouettes.
