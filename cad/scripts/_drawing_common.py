@@ -758,6 +758,19 @@ def _validate_surface_finish_control_face(
     )
 
 
+def _gtol_frame_persisted(applied: str, authored: str) -> bool:
+    """Whether a frame's read-back XML states every semantic ``authored`` does.
+
+    The parsed signature, not substrings: a dropped datum or a 0.05 inside
+    another value passed a substring test (CodeRabbit PRRT_kwDOPHDy386rADCQ).
+    The _part_pmi readback precedent; an unparsable readback did not persist.
+    """
+    try:
+        return _gtol_frame_signature(applied) == _gtol_frame_signature(authored)
+    except ValueError:
+        return False
+
+
 @_telemetry.traced("drawing.datum_feature", label_param="label")
 def add_datum_feature(
     adapter: Any,
@@ -1045,11 +1058,13 @@ def add_feature_control_frame(
     if (not migrated or translated) and not frame.SetSymbolXml(xml):
         raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
     applied = str(frame.GetSymbolXml() or "")
-    if _GTOL_SYMBOLS[characteristic] not in applied or tolerance not in applied:
-        raise RuntimeError(f"feature-control frame did not persist ({label})")
     if translated and _gtol_frame_signature(applied).translated != tuple(translated):
         raise RuntimeError(
             f"feature-control frame lost its translation modifier ({label}): {applied!r}"
+        )
+    if not _gtol_frame_persisted(applied, xml):
+        raise RuntimeError(
+            f"feature-control frame did not persist ({label}): {applied!r}"
         )
     if int(gtol.GetFormat()) != 2:  # swGtolFormatType_e.GTOL_SW2022 (current)
         raise RuntimeError(f"feature-control frame remained in old format ({label})")
@@ -1070,11 +1085,10 @@ def add_feature_control_frame(
         if gtol.GetCompositeFrame2(1):
             raise RuntimeError(f"stacked frames read back composite ({label})")
         lower_applied = str(lower.GetSymbolXml() or "")
-        if (
-            _GTOL_SYMBOLS[lower_characteristic] not in lower_applied
-            or lower_tolerance not in lower_applied
-        ):
-            raise RuntimeError(f"stacked lower frame did not persist ({label})")
+        if not _gtol_frame_persisted(lower_applied, lower_xml):
+            raise RuntimeError(
+                f"stacked lower frame did not persist ({label}): {lower_applied!r}"
+            )
     if quantity:
         if not gtol.InsertBelowFrameTextAt(1, quantity):
             raise RuntimeError(f"failed to add feature quantity {quantity!r} ({label})")

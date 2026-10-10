@@ -19,7 +19,8 @@ bore carries a position frame to the top seat (datum A) and the dowel pattern
 (B) with a perpendicularity frame to B stacked under it, its centre a BASIC
 height under A; the #6-32 tap a position frame to the same A|B, its full
 thread at the general .XX and its drill depth banded on its hole callout.
-The bore and the top seat carry Ra 1.6.  Every view is hidden-lines-removed.
+The bore carries Ra 1.6, the top seat Ra 3.2.  Every view is
+hidden-lines-removed.
 
 Run with SolidWorks open::
 
@@ -313,7 +314,7 @@ BORE_BASIC_TEXT_XY = (
 
 RIGHT_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 RIGHT_HALF_Y = (BLK_TOP - BLK_BOT) / 2.0 * SHEET_SCALE[0] / 1000.0
-# The top seat's Ra 1.6 lands left of the right view's top edge middle, its
+# The top seat's Ra 3.2 lands left of the right view's top edge middle, its
 # symbol a short leader up and right of it.
 TOP_SEAT_FINISH_EDGE_XY = (RIGHT_CENTER[0] - 0.006, RIGHT_CENTER[1] + RIGHT_HALF_Y)
 TOP_SEAT_FINISH_XY = (RIGHT_CENTER[0] + 0.004, RIGHT_CENTER[1] + RIGHT_HALF_Y + 0.010)

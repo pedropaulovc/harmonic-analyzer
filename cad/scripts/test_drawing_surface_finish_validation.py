@@ -713,6 +713,143 @@ def test_translated_frame_fails_closed_unless_it_prints_the_glyph_alone(
         )
 
 
+def _stacked_frame(
+    monkeypatch: pytest.MonkeyPatch,
+    lower_reads_back: Any,
+    upper_reads_back: Any = lambda xml: xml,
+) -> list[str]:
+    """add_feature_control_frame on a fake seat for the knife bore's
+    ⌖Ø0.20|A|B over a stacked ⊥Ø0.05|B; ``upper_reads_back(xml)`` and
+    ``lower_reads_back(xml)`` are what each frame's GetSymbolXml returns.
+    Returns the frames' handed XML.
+    """
+    handed: list[str] = []
+
+    class _XmlFrame:
+        def __init__(self, reads_back: Any) -> None:
+            self.xml = ""
+            self.reads_back = reads_back
+
+        def SetSymbolXml(self, xml: str) -> bool:
+            handed.append(xml)
+            self.xml = xml
+            return True
+
+        def GetSymbolXml(self) -> str:
+            return self.reads_back(self.xml)
+
+    class _Annotation:
+        def GetAttachedEntityCount3(self) -> int:
+            return 1
+
+        def SetLeader3(self, *_args: Any) -> int:
+            return 0
+
+        def SetPosition2(self, *_args: Any) -> bool:
+            return True
+
+    class _Gtol:
+        def __init__(self) -> None:
+            self.frames = [_XmlFrame(upper_reads_back)]
+
+        def GetFrameCount(self) -> int:
+            return len(self.frames)
+
+        def AddFrame(self) -> bool:
+            self.frames.append(_XmlFrame(lower_reads_back))
+            return True
+
+        def GetFrame(self, index: int) -> _XmlFrame:
+            return self.frames[index - 1]
+
+        def GetCompositeFrame2(self, _index: int) -> bool:
+            return False
+
+        def GetFormat(self) -> int:
+            return 2
+
+        def GetAnnotation(self) -> _Annotation:
+            return _Annotation()
+
+    class _Draw:
+        def InsertGtol(self) -> _Gtol:
+            return _Gtol()
+
+        def ClearSelection2(self, _all: bool) -> None:
+            pass
+
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    monkeypatch.setattr(
+        _drawing_common, "_select_annotation_entity", lambda *_, **__: "rim"
+    )
+    monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_common, "_assert_attached_to", lambda *_, **__: None)
+    _drawing_common.add_feature_control_frame(
+        type("_Adapter", (), {"currentModel": _Draw()})(),
+        None,
+        edge_xy=(0.1, 0.2),
+        frame_xy=(0.15, 0.19),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A", "B"),
+        diameter=True,
+        lower_frame=("perpendicularity", "0.05", ("B",)),
+        label="knife-bore position",
+    )
+    return handed
+
+
+def test_stacked_lower_frame_reads_back_its_exact_signature(monkeypatch) -> None:
+    handed = _stacked_frame(monkeypatch, _unescaped)
+    assert handed[1] == gtol_frame_xml(
+        "perpendicularity", "0.05", datums=("B",), diameter=True
+    )
+
+
+_FRAME_CORRUPTIONS = {
+    # The last datum compartment: the lower frame's B, the upper's B of A|B.
+    "lost-last-datum": lambda xml: re.sub(
+        r"<DatumCompartment>(?!.*<DatumCompartment>).*</DatumCompartment>", "", xml
+    ),
+    "tolerance-inside-a-longer-value": lambda xml: re.sub(
+        r">(0\.\d+)</PrimaryToleranceValue>", r">\g<1>5</PrimaryToleranceValue>", xml
+    ),
+    "lost-diameter": lambda xml: xml.replace(
+        "<PrimaryRangeSymbol>phi</PrimaryRangeSymbol>", ""
+    ),
+    "wrong-symbol": lambda xml: re.sub(
+        r"<ToleranceSymbol>[^<]*</ToleranceSymbol>",
+        "<ToleranceSymbol>GTOL-PARA</ToleranceSymbol>",
+        xml,
+    ),
+    "unparsable": lambda xml: re.sub(
+        r"<ToleranceSymbol>[^<]*</ToleranceSymbol>", "", xml
+    ),
+}
+
+
+@pytest.mark.parametrize("frame", ("upper", "lower"))
+@pytest.mark.parametrize("corruption", tuple(_FRAME_CORRUPTIONS))
+def test_frames_fail_unless_their_signature_persists(
+    monkeypatch, frame: str, corruption: str
+) -> None:
+    # CodeRabbit PRRT_kwDOPHDy386rADCQ: a substring readback passed a frame
+    # that lost a datum, or whose 0.05 sat inside another value (0.055).
+    corrupt = _FRAME_CORRUPTIONS[corruption]
+    exact = lambda xml: xml  # noqa: E731
+    match = {
+        "upper": r"feature-control frame did not persist",
+        "lower": r"stacked lower frame did not persist",
+    }[frame]
+    with pytest.raises(RuntimeError, match=match):
+        if frame == "upper":
+            _stacked_frame(monkeypatch, exact, upper_reads_back=corrupt)
+        else:
+            _stacked_frame(monkeypatch, corrupt)
+
+
 def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
     # Farm run 20261009T171439353Z: the knife mount printed the tap and bore
     # frames to A|B with no B on the sheet (only the frame's unprinted datum

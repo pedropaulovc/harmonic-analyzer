@@ -16,13 +16,14 @@ from _drawing_registry import DRAWINGS_BY_NAME
 def test_knife_seat_bore_finish_is_part_owned_and_consumed_by_key() -> None:
     # Policy rule 5: the knife SEAT carries MACHINED_UM (1.6); GROUND_UM (0.8)
     # is for the knife edge itself, which is the lever trunnion's ridge.  The
-    # top seat, datum A, carries the same 1.6 (2026-10-10 ruling).
+    # top seat, datum A, a static mating face, carries SEAT_UM (3.2;
+    # 2026-10-10 ruling).
     control, top_seat = sm_knife_mount_spec.SURFACE_FINISHES
     assert control.key == "knife_bore"
     assert control.roughness_um == sm_knife_mount_spec.MACHINED_UM == 1.6
     assert control.face.diameter_mm == 2.0 * sm_knife_mount_spec.R_BORE
     assert top_seat.key == "top_seat"
-    assert top_seat.roughness_um == sm_knife_mount_spec.MACHINED_UM
+    assert top_seat.roughness_um == sm_knife_mount_spec.SEAT_UM == 3.2
     assert top_seat.face.normal == (0.0, 1.0, 0.0)
     assert top_seat.face.offset_mm == sm_knife_mount_spec.BLK_TOP
     # The built top (14.866) is inside the face match.

@@ -28,7 +28,7 @@ import _config
 import vn_knife_mount_dowel_spec as DOWEL
 from _gtol_spec import CylinderFace, PlanarFace
 from _hole_spec import DRILL_POINT_H, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 from sm_summing_lever_spec import HEX_H, HEX_W
 
 # --- fixed geometry for the drawing's view math (mirrors build_sm_knife_mount) ----
@@ -39,11 +39,12 @@ BLK_TOP = 14.87  # local block top (clamped to the top-frame casting underside)
 BLK_BOT = -14.75  # local block bottom (BORE_CY - R_BORE - 3.0 wall)
 BORE_CY = -5.75  # bore centre below the ridge origin (TopClear 0.25 - R_BORE)
 
-# The knife bore's reamed seat and the top seat (datum A), which the screw
-# clamps to the casting underside and the dowels key: both Ra 1.6.
+# The knife bore's reamed seat, Ra 1.6; the top seat (datum A), which the
+# screw clamps to the casting underside and the dowels key, Ra 3.2: a static
+# mating face, nothing runs on it (SEAT_UM, policy rule 5; 2026-10-10 ruling).
 SURFACE_FINISHES = (
     SurfaceFinishControl("knife_bore", MACHINED_UM, CylinderFace(2.0 * R_BORE)),
-    SurfaceFinishControl("top_seat", MACHINED_UM, PlanarFace((0.0, 1.0, 0.0), BLK_TOP)),
+    SurfaceFinishControl("top_seat", SEAT_UM, PlanarFace((0.0, 1.0, 0.0), BLK_TOP)),
 )
 
 # --- Knife-hanger screw tap and anti-rotation dowel holes (top seat) ---------
