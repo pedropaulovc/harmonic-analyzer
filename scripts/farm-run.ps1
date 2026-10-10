@@ -1300,6 +1300,11 @@ function Stop-RunProcesses {
             return
         }
         $stopping = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+        # Pin and check the whole round before stopping any of it. Killing a
+        # process can take its children down with it (the venv's python.exe
+        # launcher holds the build in a kill-on-close job), and a child that
+        # died unpinned would free its PID unchecked and unreported.
+        $alive = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
         foreach ($process in $fresh) {
             $processId = [int]$process.ProcessId
             $created = $process.CreationDate.ToUniversalTime()
@@ -1334,12 +1339,10 @@ function Stop-RunProcesses {
                     continue
                 }
                 $verified = $true
-                if ($holder.HasExited) {
-                    $stopping.Add($holder)
-                    continue
-                }
-                $holder.Kill()
-                $Killed.Add($processId)
+                # Verified is enough: one that exits from here on is still
+                # this round's, and the stop loop skips Kill() on an exited
+                # holder but records it.
+                $alive.Add($holder)
                 $stopping.Add($holder)
             }
             catch {
@@ -1362,6 +1365,32 @@ function Stop-RunProcesses {
                 # Gone before its start time was read: identity unproven.
                 $stopped.Remove($processId)
                 [void]$rejected.Add($processId)
+            }
+        }
+        # In scan order, so the launcher goes first. Verified when pinned and
+        # gone now is stopped by this round, by its own kill or with a parent's.
+        foreach ($holder in $alive) {
+            try {
+                if (-not $holder.HasExited) {
+                    $holder.Kill()
+                }
+                $Killed.Add($holder.Id)
+            }
+            catch {
+                $problem = $_.Exception.Message
+                $gone = $false
+                try {
+                    $gone = $holder.HasExited
+                }
+                catch {
+                    # No access to ask: report the original failure.
+                }
+                if ($gone) {
+                    $Killed.Add($holder.Id)
+                    continue
+                }
+                $Errors.Add("could not stop process $($holder.Id)`: $problem")
+                [void]$stopping.Remove($holder)
             }
         }
         $deadline = [System.Diagnostics.Stopwatch]::StartNew()
