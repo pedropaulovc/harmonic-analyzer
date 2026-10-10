@@ -218,7 +218,7 @@ def test_build_projects_metre_scale_fence_and_section_points(
     for name in (
         "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
         "set_hidden_lines_removed", "set_dimension_callouts", "assert_manufacturing_dimensions",
-        "add_property_linked_note",
+        "add_property_linked_note", "_probe_tick_depth_import",
     ):
         monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
     monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *args, **kwargs: [])

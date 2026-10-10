@@ -13,10 +13,15 @@ import argparse
 import math
 import sys
 from typing import Any
+from types import SimpleNamespace
 
 import _telemetry
 import ms_stick_spec as part
-from _common import CAD_ROOT, _early_bound, check, run_build
+import _drawing_common as _dc
+from _common import (
+    CAD_ROOT, _com_invoke, _early_bound, _feature_by_name, _feature_display_dimensions,
+    check, run_build,
+)
 from _drawing_common import (
     DrawingOutputs, add_property_linked_note, create_blank_drawing_sheets,
     create_section_view, finalize_drawing, model_point_in_view, new_project_drawing,
@@ -131,6 +136,125 @@ def _engraving_detail(adapter: Any, parent: Any) -> Any:
     return detail
 
 
+def _probe_tick_depth_import(adapter: Any, source_model: Any, views: tuple[Any, ...]) -> None:
+    """Temporary native diagnostic; erase probe ink before normal curation."""
+    feature = _feature_by_name(SimpleNamespace(currentModel=source_model), "Tick0Cut")
+    source_dimensions = []
+    for display in _feature_display_dimensions(feature):
+        dimension = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+        source_dimensions.append({
+            "name": _com_invoke(dimension, "IDimension", "Name"),
+            "full_name": _com_invoke(dimension, "IDimension", "FullName"),
+            "marked": bool(_com_invoke(display, "IDisplayDimension", "MarkedForDrawing")),
+        })
+    _telemetry.info(
+        f"TickDepth probe source: GetTypeName={_com_invoke(feature, 'IFeature', 'GetTypeName')!r}, "
+        f"GetTypeName2={_com_invoke(feature, 'IFeature', 'GetTypeName2')!r}, "
+        f"display_dimensions={source_dimensions}"
+    )
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+
+    def census(view: Any) -> list[tuple[str, Any]]:
+        rows = []
+        for display in _com_invoke(view, "IView", "GetDisplayDimensions") or ():
+            dimension = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+            rows.append((
+                str(_com_invoke(dimension, "IDimension", "FullName")),
+                _com_invoke(display, "IDisplayDimension", "GetAnnotation"),
+            ))
+        return rows
+
+    for view in views:
+        name = view_name(adapter, view)
+        before = census(view)
+        _telemetry.info(f"TickDepth probe {name}: before={[full for full, _ in before]}")
+        # Neither target has been curated. Refuse to delete any pre-existing ink.
+        if before:
+            raise RuntimeError(f"TickDepth diagnostic target {name} already has dimensions")
+        if not ddoc.ActivateView(name):
+            raise RuntimeError(f"TickDepth probe cannot activate {name}")
+        draw.ClearSelection2(True)
+        if not draw.Extension.SelectByID2(
+            name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, _dc.null_callout(), 0,
+        ):
+            raise RuntimeError(f"TickDepth probe cannot select {name}")
+        paths = _dc._model_item_paths(adapter, view)
+        winner = _dc._select_model_feature(adapter, "Tick0Cut", paths=paths)
+        _telemetry.info(f"TickDepth probe {name}: paths={paths}, winner={winner}")
+        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selected_count = int(selection.GetSelectedObjectCount2(-1))
+        selected_objects = []
+        for index in range(1, selected_count + 1):
+            row = {
+                "index": index,
+                "selection_type": int(selection.GetSelectedObjectType3(index, -1)),
+            }
+            picked = selection.GetSelectedObject6(index, -1)
+            try:
+                if picked is None:
+                    raise RuntimeError("GetSelectedObject6 returned no dispatch")
+                picked_feature = _early_bound(picked, "IFeature")
+            except Exception as error:
+                row["feature_bind_error"] = f"{type(error).__name__}: {error!r}"
+            else:
+                try:
+                    row["feature"] = {
+                        "name": _com_invoke(picked_feature, "IFeature", "Name"),
+                        "type_name": _com_invoke(picked_feature, "IFeature", "GetTypeName"),
+                        "type_name2": _com_invoke(picked_feature, "IFeature", "GetTypeName2"),
+                    }
+                except Exception as error:
+                    row["feature_read_error"] = f"{type(error).__name__}: {error!r}"
+            selected_objects.append(row)
+        _telemetry.info(
+            f"TickDepth probe {name}: selected_count={selected_count}, "
+            f"selected_objects={selected_objects}"
+        )
+        try:
+            try:
+                # Direct call: adapter._attempt would erase the native COM error.
+                result = ddoc.InsertModelAnnotations3(
+                    1, _dc._INSERT_DIMS_MARKED | _dc._INSERT_HOLE_WIZARD_LOCATION_DIMS,
+                    False, True, True, False,
+                )
+            except Exception as error:
+                _telemetry.warn(
+                    f"TickDepth probe {name}: direct native exception "
+                    f"{type(error).__name__}: {error!r}"
+                )
+            else:
+                _telemetry.info(f"TickDepth probe {name}: raw_result={result!r}")
+                returned = []
+                for annotation in result or ():
+                    display = _com_invoke(annotation, "IAnnotation", "GetSpecificAnnotation")
+                    dimension = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+                    returned.append(str(_com_invoke(dimension, "IDimension", "FullName")))
+                _telemetry.info(f"TickDepth probe {name}: returned_dimensions={returned}")
+        finally:
+            draw.ClearSelection2(True)
+            after = census(view)
+            _telemetry.info(f"TickDepth probe {name}: actual_dimensions={[full for full, _ in after]}")
+            # Clean even a partial native import that raised. Only target-view
+            # display annotations are selected, never the owning model feature.
+            for full_name, annotation in after:
+                draw.ClearSelection2(True)
+                if not _com_invoke(annotation, "IAnnotation", "Select2", False, 0):
+                    raise RuntimeError(f"TickDepth probe cannot select imported {full_name}")
+                selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+                if int(selection.GetSelectedObjectCount2(-1)) != 1:
+                    raise RuntimeError("TickDepth probe deletion selection is not one annotation")
+                if not draw.Extension.DeleteSelection2(0):
+                    raise RuntimeError(f"TickDepth probe cannot delete imported {full_name}")
+            draw.ClearSelection2(True)
+            if after:
+                rebuild_drawing(adapter, label=f"TickDepth probe cleanup {name}")
+            remaining = census(view)
+            _telemetry.info(f"TickDepth probe {name}: cleanup_dimensions={[full for full, _ in remaining]}")
+            if remaining:
+                raise RuntimeError(f"TickDepth diagnostic left imported dimensions in {name}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source measuring stick missing: {SOURCE}")
@@ -207,6 +331,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not bool(cut.GetPartialSection()):
         raise RuntimeError("engraving section is not a partial section")
     set_hidden_lines_removed(adapter, section)
+    _probe_tick_depth_import(adapter, source_model, (parent, section))
     annotations += curate_view_dimensions(adapter, section, keep=SECTION_KEEP,
                                            view_label="engraving depth section",
                                            dimensions_by_feature=part.DRAWING_DIMENSIONS)
