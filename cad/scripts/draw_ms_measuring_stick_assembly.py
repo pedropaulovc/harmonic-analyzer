@@ -82,6 +82,10 @@ SHEET_LAYOUTS = dict(zip(SHEET_NAMES, (
 SHEET_SCALE = (1.0, 1.0)
 SHEET_SCALES = {name: SHEET_SCALE for name in SHEET_NAMES}
 
+# swDimensionType_e: accept native lengths before converting metres to mm.
+_LINEAR_DIMENSION = 2  # swLinearDimension
+_HORIZONTAL_LINEAR_DIMENSION = 11  # swHorLinearDimension
+
 # Sheet geometry, metres: the template's inner border and the title block in
 # its lower-right corner. Every view outline and balloon ring stays inside the
 # border and out of the title block (drawing-simplicity rule 8).
@@ -591,8 +595,9 @@ def _reference_end_edge(
 def _add_reference_dimensions(adapter: Any, front: Any) -> None:
     """Overall length and the stop position as parenthesized REFERENCE
     dimensions across the front view's edges: both stick ends, and the
-    stop's near (X=0) face. Each measured value is proved against the spec
-    before it is bracketed; the places come from the spec too."""
+    stop's near (X=0) face. Each native type is proved linear before its
+    measured value is checked against the spec and bracketed; places come
+    from the spec too."""
     # Mid-height on each stick end; below the window floor on the block's
     # near end edge, clear of the stick. Front views drop Z.
     stick_mid_y = (spec.STICK_TOP_Y + spec.STICK_BOTTOM_Y) / 2.0
@@ -657,6 +662,12 @@ def _add_reference_dimensions(adapter: Any, front: Any) -> None:
             ),
             "IDisplayDimension",
         )
+        dimension_type = int(display.Type2)
+        if dimension_type not in (_LINEAR_DIMENSION, _HORIZONTAL_LINEAR_DIMENSION):
+            raise RuntimeError(
+                f"measuring-stick {label}: expected a linear dimension, "
+                f"got type {dimension_type}"
+            )
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         measured_mm = abs(float(dimension.SystemValue) * 1000.0)
         if abs(measured_mm - expected_mm) > 1e-4:

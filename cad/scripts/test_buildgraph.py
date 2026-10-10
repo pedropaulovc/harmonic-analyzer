@@ -1673,12 +1673,93 @@ def test_data_deps_of_ignores_prose_naming_a_dxf():
         fh.write(
             'PATH = REFERENCES_DIR / "real-xyz.dxf"\n'
             'NOTE = "OUTLINES PER SUPPLIED REAL-XYZ.DXF"\n'
+            'NOTE_MS = "NUMERAL OUTLINES PER SUPPLIED MS-STICK-NUMERALS.DXF"\n'
         )
         script = Path(fh.name)
     try:
         assert [Path(d).name for d in data_deps_of(script)] == ["real-xyz.dxf"]
     finally:
         script.unlink()
+
+
+def test_data_deps_of_keeps_existing_whitespace_filename(tmp_path, monkeypatch):
+    """Spaces in a real reference filename must not remove its input edge."""
+    monkeypatch.setattr(bg, "REFERENCES_DIR", tmp_path)
+    script = tmp_path / "build_fixture.py"
+    script.write_text('PATH = "nested/real engraving.dxf"\n', encoding="utf-8")
+    reference = tmp_path / "real engraving.dxf"
+    reference.write_text("original engraving", encoding="utf-8")
+
+    assert data_deps_of(script) == [str(reference.resolve())]
+    reference.write_text("changed engraving", encoding="utf-8")
+    assert data_deps_of(script) == [str(reference.resolve())]
+    reference.unlink()
+    assert data_deps_of(script) == []
+    reference.write_text("restored engraving", encoding="utf-8")
+    assert data_deps_of(script) == [str(reference.resolve())]
+
+
+def test_data_deps_of_keeps_whitespace_directory_path(tmp_path, monkeypatch):
+    """The full reference path wins over the historical basename fallback."""
+    monkeypatch.setattr(bg, "REFERENCES_DIR", tmp_path)
+    script = tmp_path / "build_fixture.py"
+    script.write_text('PATH = "engraving artwork/numerals.dxf"\n', encoding="utf-8")
+    reference = tmp_path / "engraving artwork" / "numerals.dxf"
+    reference.parent.mkdir()
+    reference.write_text("original engraving", encoding="utf-8")
+    fallback = tmp_path / "numerals.dxf"
+    fallback.write_text("basename fallback", encoding="utf-8")
+
+    assert data_deps_of(script) == [str(reference.resolve())]
+    reference.write_text("changed engraving", encoding="utf-8")
+    assert data_deps_of(script) == [str(reference.resolve())]
+    reference.unlink()
+    assert data_deps_of(script) == [str(fallback.resolve())]
+    fallback.unlink()
+    assert data_deps_of(script) == []
+    reference.write_text("restored engraving", encoding="utf-8")
+    assert data_deps_of(script) == [str(reference.resolve())]
+
+
+def test_data_deps_of_keeps_existing_absolute_whitespace_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(bg, "REFERENCES_DIR", tmp_path / "references")
+    reference = tmp_path / "real engraving.dxf"
+    reference.write_text("engraving", encoding="utf-8")
+    script = tmp_path / "build_fixture.py"
+    script.write_text(f'PATH = "{reference.as_posix()}"\n', encoding="utf-8")
+    assert data_deps_of(script) == [str(reference.resolve())]
+
+
+def test_data_deps_of_skips_missing_whitespace_prose_and_directories(
+    tmp_path, monkeypatch
+):
+    """Only an existing file disambiguates whitespace-bearing DXF literals."""
+    monkeypatch.setattr(bg, "REFERENCES_DIR", tmp_path)
+    script = tmp_path / "build_fixture.py"
+    script.write_text(
+        'NOTE = "OUTLINES PER SUPPLIED REAL-XYZ.DXF"\n'
+        'NOTE_MS = "NUMERAL OUTLINES PER SUPPLIED MS-STICK-NUMERALS.DXF"\n'
+        'PATH = "missing engraving.dxf"\n'
+        'DIRECTORY = "directory engraving.dxf"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "directory engraving.dxf").mkdir()
+    assert data_deps_of(script) == []
+
+
+def test_data_deps_of_does_not_probe_no_whitespace_literals(tmp_path, monkeypatch):
+    """Missing bare filenames retain their edges without checking existence."""
+    monkeypatch.setattr(bg, "REFERENCES_DIR", tmp_path)
+    script = tmp_path / "build_fixture.py"
+    script.write_text('PATH = "missing-engraving.dxf"\n', encoding="utf-8")
+
+    def unexpected_probe(path):
+        raise AssertionError(f"unexpected file probe: {path}")
+
+    monkeypatch.setattr(Path, "is_file", unexpected_probe)
+    assert data_deps_of(script) == [
+        str((tmp_path / "missing-engraving.dxf").resolve())
+    ]
 
 
 def test_data_deps_of_follows_a_same_tick_rewrite():

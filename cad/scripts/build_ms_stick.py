@@ -89,6 +89,8 @@ from ms_stick_spec import (
     HALF_TICK_LENGTH,
     MINOR_TICK_LENGTH,
     NUMERALS_DXF,
+    NUMERAL_HEIGHT_MM,
+    NUMERAL_GAP_MM,
     NUMERAL_AREA_MM2,
     REFERENCE_DIMENSIONS,
     SCALE_END_MARGIN,
@@ -186,9 +188,48 @@ async def _cut_tick(
 
 
 @_telemetry.traced("sketch.stick_manufacturing_chords")
-async def _manufacturing_chords(adapter) -> None:
-    """Model the physical engraving sizes, never the profile's overhang."""
+async def _manufacturing_chords(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Bind finished engraving sizes to their knobs, excluding profile overhang.
+
+    The tracked numeral artwork stays fixed. Its gaps therefore measure from
+    the editable tick to the original glyph edge, not to an imaginary moved DXF.
+    """
+    scale_x = '"ScaleStartX"'
+    edge_y = '"BodyWidth"'
+    glyph_x = SCALE_START_X + TICK_WIDTH / 2.0 + NUMERAL_GAP_MM
+    glyph_y = BODY_WIDTH - TICK_LENGTH - NUMERAL_GAP_MM
+    bindings = {
+        "ScaleStartReference": (scale_x, None, edge_y),
+        "ScaleEndReference": ('"ScaleEndMargin"', '"BodyLength" - "ScaleEndMargin"', edge_y),
+        "FullLengthReference": ('"TickLength"', scale_x, '"BodyWidth" - "TickLength"'),
+        "MinorLengthReference": (
+            '"MinorTickLength"',
+            f'{scale_x} + "DivisionSpacing" / {MINOR_PER_DIVISION}',
+            '"BodyWidth" - "MinorTickLength"',
+        ),
+        "HalfLengthReference": (
+            '"HalfTickLength"', f'{scale_x} + "DivisionSpacing" / 2',
+            '"BodyWidth" - "HalfTickLength"',
+        ),
+        "FullPitchReference": ('"DivisionSpacing"', scale_x, edge_y),
+        "MinorPitchReference": (
+            f'"DivisionSpacing" / {MINOR_PER_DIVISION}', scale_x, edge_y,
+        ),
+        "NumeralHeightReference": (
+            f"{NUMERAL_HEIGHT_MM}mm", f"{glyph_x}mm", f"{glyph_y}mm",
+        ),
+        "NumeralXGapReference": (
+            f'{glyph_x}mm - ({scale_x} + "TickWidth" / 2)',
+            f'{scale_x} + "TickWidth" / 2', f"{glyph_y}mm",
+        ),
+        "NumeralYGapReference": (
+            f'"BodyWidth" - "TickLength" - {glyph_y}mm',
+            f"{glyph_x}mm", f"{glyph_y}mm",
+        ),
+    }
     for feature, (name, start, end) in REFERENCE_DIMENSIONS.items():
+        dims = SketchDims()
+        size_expr, x_expr, y_expr = bindings[feature]
         check(feature, await adapter.create_sketch("Front"))
         set_sketch_direct_db(adapter, True)
         line = check(feature, await adapter.add_line(*start, *end))
@@ -206,11 +247,16 @@ async def _manufacturing_chords(adapter) -> None:
             abs(end[0] - start[0]) if horizontal else abs(end[1] - start[1]),
             feature,
         )
+        dims.record(name, size_expr)
         await anchor_point_to_origin(adapter, f"{line}.start", *start, feature)
+        if abs(start[0]) >= 1e-9:
+            dims.record(f"{name}AnchorX", x_expr)
+        if abs(start[1]) >= 1e-9:
+            dims.record(f"{name}AnchorY", y_expr)
         await ensure_fully_defined(adapter, feature)
         check(feature, await adapter.exit_sketch())
         name_last_feature(adapter, feature)
-        name_dimensions(adapter, feature, [name])
+        drive_jobs += dims.apply(adapter, feature)
 
 
 @_telemetry.traced("appearance.stick_manufacturing_chords")
@@ -472,6 +518,7 @@ async def build(adapter) -> dict[str, str]:
     if not mass.is_success:
         raise RuntimeError(f"measuring stick: get_mass_properties failed: {mass.error}")
     v_built = float(mass.data.volume)
+    await _manufacturing_chords(adapter, drive_jobs)
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
@@ -508,7 +555,6 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await report_mass_properties(adapter)
-    await _manufacturing_chords(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
         for name in names:
             if name in DRAWING_TOLERANCES:

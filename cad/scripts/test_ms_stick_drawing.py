@@ -5,11 +5,15 @@ from __future__ import annotations
 import asyncio
 import ast
 import math
+import re
 from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
+
+import _common as common
 
 import _drawing_common as drawing_common
 import build_ms_stick as builder
@@ -76,6 +80,116 @@ def test_reference_chords_measure_real_sizes_not_profile_overhangs() -> None:
         assert (start[0] == end[0]) != (start[1] == end[1])
         assert 0.0 <= min(start[0], end[0]) <= max(start[0], end[0]) <= spec.BODY_LENGTH
         assert 0.0 <= min(start[1], end[1]) <= max(start[1], end[1]) <= spec.BODY_WIDTH
+
+
+
+def test_reference_equations_follow_editable_tick_geometry(monkeypatch) -> None:
+    """Capture actual emitted dimensions and deferred jobs without a COM seat."""
+    features = {}
+
+    class Adapter:
+        def __init__(self):
+            self._sketch_entities = {}
+            self.dimensions = []
+
+        async def create_sketch(self, plane):
+            assert plane == "Front"
+            self.dimensions = []
+            return True
+
+        async def add_line(self, *coordinates):
+            self._sketch_entities["line"] = SimpleNamespace(ConstructionGeometry=False)
+            return "line"
+
+        async def add_sketch_constraint(self, *args):
+            return True
+
+        async def exit_sketch(self):
+            return True
+
+    adapter = Adapter()
+
+    async def dimension(adapter, first, second, kind, value, label):
+        adapter.dimensions.append(SimpleNamespace(value_mm=value))
+
+    async def fully_defined(adapter, label):
+        return None
+
+    def name_feature(adapter, feature):
+        features[feature] = adapter.dimensions
+        return feature
+
+    def rename(dimensions, feature, names):
+        for dim, name in zip(dimensions, names, strict=True):
+            dim.name = name
+
+    monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(builder, "check", lambda label, value: value)
+    monkeypatch.setattr(common, "check", lambda label, value: value)
+    monkeypatch.setattr(builder, "set_sketch_direct_db", lambda *args: None)
+    monkeypatch.setattr(builder, "dimension_between", dimension)
+    monkeypatch.setattr(common, "dimension_between", dimension)
+    monkeypatch.setattr(builder, "ensure_fully_defined", fully_defined)
+    monkeypatch.setattr(builder, "name_last_feature", name_feature)
+    monkeypatch.setattr(common, "_feature_by_name", lambda adapter, name: features[name])
+    monkeypatch.setattr(common, "_display_dimensions", lambda feature, name: feature)
+    monkeypatch.setattr(common, "_rename_dimensions", rename)
+    jobs = []
+    asyncio.run(builder._manufacturing_chords(adapter, jobs))
+    equations = dict(jobs)
+    knobs = {
+        "BodyLength": spec.BODY_LENGTH, "BodyWidth": spec.BODY_WIDTH,
+        "ScaleEndMargin": spec.SCALE_END_MARGIN, "TickWidth": spec.TICK_WIDTH,
+        "TickLength": spec.TICK_LENGTH, "MinorTickLength": spec.MINOR_TICK_LENGTH,
+        "HalfTickLength": spec.HALF_TICK_LENGTH,
+        "DivisionSpacing": spec.DIVISION_SPACING,
+    }
+
+    def values(**edits):
+        globals_ = knobs | edits
+        globals_["ScaleStartX"] = (
+            globals_["BodyLength"] - (spec.DIVISION_COUNT - 1)
+            * globals_["DivisionSpacing"] - globals_["ScaleEndMargin"]
+        )
+        result = {}
+        for name, expression in equations.items():
+            expression = re.sub(
+                r'"([^"]+)"', lambda match: str(globals_[match[1]]), expression,
+            ).replace("mm", "")
+            result[name] = eval(expression, {"__builtins__": {}}, {})
+        return result
+
+    baseline = values()
+    for feature, dimensions in features.items():
+        for dim in dimensions:
+            assert baseline[f"{dim.name}@{feature}"] == pytest.approx(dim.value_mm)
+    for knob, name, feature in (
+        ("TickLength", "FullTickLength", "FullLengthReference"),
+        ("MinorTickLength", "MinorTickLength", "MinorLengthReference"),
+        ("HalfTickLength", "HalfTickLength", "HalfLengthReference"),
+    ):
+        edited = values(**{knob: knobs[knob] + 0.2})
+        assert edited[f"{name}@{feature}"] == pytest.approx(knobs[knob] + 0.2)
+        assert (edited[f"{name}AnchorY@{feature}"] + edited[f"{name}@{feature}"]
+                == pytest.approx(spec.BODY_WIDTH))
+    edited = values(DivisionSpacing=spec.DIVISION_SPACING + 0.1)
+    assert edited["FullTickPitch@FullPitchReference"] == pytest.approx(spec.DIVISION_SPACING + 0.1)
+    assert edited["MinorTickPitch@MinorPitchReference"] == pytest.approx(
+        (spec.DIVISION_SPACING + 0.1) / spec.MINOR_PER_DIVISION,
+    )
+    assert values(TickLength=3.2)["NumeralYGap@NumeralYGapReference"] == pytest.approx(0.4)
+    assert values(TickWidth=0.6)["NumeralXGap@NumeralXGapReference"] == pytest.approx(0.5)
+    assert edited["NumeralXGap@NumeralXGapReference"] == pytest.approx(1.6)
+    assert edited["NumeralHeight@NumeralHeightReference"] == pytest.approx(spec.NUMERAL_HEIGHT_MM)
+
+
+def test_finish_preserves_polish_and_black_enamel_engraving_fill() -> None:
+    registry = Path(builder.__file__).resolve().parents[1] / "config" / "parts" / "ms-stick.yaml"
+    finish = yaml.safe_load(registry.read_text(encoding="utf-8"))["ms-stick"]["finish"]
+    assert "polished brass" in finish
+    assert "flat black enamel" in finish
+    assert "all engraving" in finish
+    assert "cured before final polish" in finish
 
 
 def test_spec_is_pure_and_drawing_never_reauthors_dimensions() -> None:
