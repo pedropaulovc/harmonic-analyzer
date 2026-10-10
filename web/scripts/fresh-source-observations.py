@@ -18,9 +18,12 @@ from __future__ import annotations
 import gzip
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
+
+_LINK_NOFOLLOW_SUPPORTED = os.link in os.supports_follow_symlinks
 
 WEB = Path(__file__).resolve().parents[1]
 FRESH_ROOT = WEB / "content/v39-source"
@@ -82,6 +85,7 @@ def check_namespace(path, *, historical_diagnostic=False, output=False, video_id
             for parent in declared.parents)
         if private_escape or not (path.is_relative_to(private) or external_temp):
             raise ValueError("Historical diagnostics require private .vite/verification-output or resolved output under the platform temporary directory, /tmp or /var/tmp outside the checkout")
+    return path
 
 
 def decode_observation_bytes(raw: bytes) -> bytes:
@@ -92,6 +96,55 @@ def decode_observation_bytes(raw: bytes) -> bytes:
 def encode_observation_bytes(decoded: bytes) -> bytes:
     """Use the existing deterministic gzip codec without JSON reserialization."""
     return _ENCODER.encode_observations(decoded)
+
+
+def write_output(path, contents, *, declared_path, historical_diagnostic):
+    """Publish supplied payloads through staged handles without serialization."""
+    path = Path(path)
+    declared_path = Path(declared_path)
+    if (
+        check_namespace(
+            declared_path, historical_diagnostic=historical_diagnostic,
+            output=True) != path
+        or check_namespace(
+            path, historical_diagnostic=historical_diagnostic,
+            output=True) != path
+    ):
+        raise ValueError("Output path changed after validation")
+    text = isinstance(contents, str)
+    if not historical_diagnostic and text:
+        raise TypeError("Current observation output requires a binary payload")
+    if historical_diagnostic:
+        for destination in (declared_path, path):
+            try:
+                destination.lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                raise FileExistsError(f"Historical diagnostics require a new output file: {destination}")
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".diagnostic-" if historical_diagnostic else ".observations-",
+        suffix=path.suffix if historical_diagnostic else ".gz", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(
+            descriptor, "w" if text else "wb", encoding="utf-8" if text else None,
+        ) as stream:
+            stream.write(contents)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if historical_diagnostic:
+            # Hard-link creation refuses every existing leaf, including dangling
+            # links that Windows O_CREAT|O_EXCL can follow.
+            if _LINK_NOFOLLOW_SUPPORTED:
+                os.link(temporary, path, follow_symlinks=False)
+            else:
+                os.link(temporary, path)
+        else:
+            os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def read_observation_bytes(path) -> bytes:

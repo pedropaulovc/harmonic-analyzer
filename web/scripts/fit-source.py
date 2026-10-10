@@ -1844,7 +1844,7 @@ def main():
         video_id=observations["source"]["videoId"],
     )
     if args.output:
-        contract.check_namespace(
+        output_path = contract.check_namespace(
             args.output, historical_diagnostic=args.historical_diagnostic,
             output=True, video_id=observations["source"]["videoId"],
         )
@@ -1854,11 +1854,13 @@ def main():
         historical_diagnostic=args.historical_diagnostic,
     )
     if args.output:
-        if args.historical_diagnostic:
-            common.write_observations(args.output, fitted)
-        else:
-            decoded = (json.dumps(fitted, indent=2) + "\n").encode("utf-8")
-            args.output.write_bytes(contract.encode_observation_bytes(decoded))
+        contents = json.dumps(fitted, indent=2) + "\n"
+        if args.output.suffix == ".gz":
+            contents = contract.encode_observation_bytes(contents.encode("utf-8"))
+        contract.write_output(
+            output_path, contents, declared_path=args.output,
+            historical_diagnostic=args.historical_diagnostic,
+        )
     summary = {
         key: value
         for key, value in report.items()

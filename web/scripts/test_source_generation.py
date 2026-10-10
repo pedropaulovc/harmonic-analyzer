@@ -1170,22 +1170,433 @@ class ObservationStorageBoundaryTests(unittest.TestCase):
                 with patch.object(common, 'WEB', web), self.assertRaises(error):
                     common.load_historical_observations('fixture')
 
-    def test_plain_canonical_observation_output_is_refused_before_writing(self):
+    def test_shared_writer_refuses_plain_and_gzip_immutable_canonical_outputs(self):
+        module = load_script('fresh-source-observations.py', 'immutable_canonical_output')
         with tempfile.TemporaryDirectory() as directory:
-            web = Path(directory)
+            web = Path(directory).resolve()
             content = web / 'content' / 'canonical-native'
             content.mkdir(parents=True)
-            path = content / 'fixture.observations.json'
-            with patch.object(common, 'WEB', web), self.assertRaisesRegex(
-                    ValueError, 'Canonical observation output must end in'):
-                common.write_observations(path, {'frames': []})
-            self.assertFalse(path.exists())
+            with patch.object(module, 'WEB', web):
+                for suffix in ('.json', '.json.gz'):
+                    path = content / f'fixture.observations{suffix}'
+                    payload = (
+                        module.encode_observation_bytes(b'{"frames": []}\n')
+                        if suffix == '.json.gz' else '{"frames": []}\n'
+                    )
+                    for historical in (False, True):
+                        with self.subTest(suffix=suffix, historical=historical), \
+                                self.assertRaises(ValueError):
+                            module.write_output(
+                                path, payload, declared_path=path,
+                                historical_diagnostic=historical)
+                        self.assertFalse(path.exists())
+                self.assertEqual(list(content.iterdir()), [])
+
+    def test_current_writer_refuses_text_payloads_without_creating_output_or_debris(self):
+        module = load_script('fresh-source-observations.py', 'current_output_text_refusal')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            destination = root / 'receipt.observations.json.gz'
+            validated = module.check_namespace(destination, output=True)
+            with self.assertRaisesRegex(TypeError, 'binary payload'):
+                module.write_output(
+                    validated, '{"pass": 1}\n', declared_path=destination,
+                    historical_diagnostic=False)
+            self.assertFalse(destination.exists())
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_current_writer_atomically_overwrites_existing_output_on_reruns(self):
+        module = load_script('fresh-source-observations.py', 'current_output_rerun')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            destination = root / 'receipt.observations.json.gz'
+            destination.write_bytes(module.encode_observation_bytes(b'{"pass": 0}\n'))
+            validated = module.check_namespace(destination, output=True)
+            for revision in (1, 2):
+                data = {'pass': revision, 'note': 'caf\u00e9'}
+                decoded = (json.dumps(data, indent=2) + '\n').encode('utf-8')
+                module.write_output(
+                    validated, module.encode_observation_bytes(decoded),
+                    declared_path=destination, historical_diagnostic=False)
+                self.assertEqual(destination.read_bytes(), module.encode_observation_bytes(decoded))
+                self.assertEqual(gzip.decompress(destination.read_bytes()), decoded)
+                self.assertEqual([path.name for path in root.iterdir()],
+                                 ['receipt.observations.json.gz'])
+
+    def test_current_writer_replaces_late_leaf_symlink_without_following_target(self):
+        module = load_script('fresh-source-observations.py', 'current_output_replace_race')
+        real_replace = os.replace
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            destination = root / 'receipt.observations.json.gz'
+            validated = module.check_namespace(destination, output=True)
+            target = root / 'sentinel.json.gz'
+            sentinel = b'atomic replacement must not follow this symlink'
+            target.write_bytes(sentinel)
+            data = {'pass': 1}
+            decoded = (json.dumps(data, indent=2) + '\n').encode('utf-8')
+            expected = module.encode_observation_bytes(decoded)
+            replacements = []
+
+            def insert_leaf_before_replace(staged, pinned):
+                staged = Path(staged)
+                replacements.append(staged)
+                self.assertEqual(staged.parent, validated.parent)
+                self.assertEqual(Path(pinned), validated)
+                self.assertEqual(staged.read_bytes(), expected)
+                destination.symlink_to(target)
+                return real_replace(staged, pinned)
+
+            with patch.object(module.os, 'replace', side_effect=insert_leaf_before_replace):
+                module.write_output(
+                    validated, expected, declared_path=destination, historical_diagnostic=False)
+            self.assertEqual(len(replacements), 1)
+            self.assertFalse(destination.is_symlink())
+            self.assertEqual(destination.read_bytes(), expected)
+            self.assertEqual(gzip.decompress(destination.read_bytes()), decoded)
+            self.assertEqual(target.read_bytes(), sentinel)
+            self.assertEqual(sorted(path.name for path in root.iterdir()),
+                             ['receipt.observations.json.gz', 'sentinel.json.gz'])
+
+    def test_current_writer_removes_staged_output_when_atomic_replace_fails(self):
+        module = load_script('fresh-source-observations.py', 'current_output_replace_failure')
+        real_replace = os.replace
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            destination = root / 'receipt.observations.json.gz'
+            validated = module.check_namespace(destination, output=True)
+            staged_outputs = []
+
+            def introduce_directory_before_replace(staged, pinned):
+                staged_outputs.append(Path(staged))
+                destination.mkdir()
+                return real_replace(staged, pinned)
+
+            with patch.object(module.os, 'replace', side_effect=introduce_directory_before_replace), \
+                    self.assertRaises(OSError):
+                module.write_output(
+                    validated, module.encode_observation_bytes(b'{"pass": 1}\n'),
+                    declared_path=destination, historical_diagnostic=False)
+            self.assertEqual(len(staged_outputs), 1)
+            self.assertFalse(staged_outputs[0].exists())
+            self.assertTrue(destination.is_dir())
+            self.assertEqual([path.name for path in root.iterdir()],
+                             ['receipt.observations.json.gz'])
 
 
 
 
 class HistoricalObservationNamespaceTests(unittest.TestCase):
     scripts = ('observe-source.py', 'fit-source.py')
+
+    def test_historical_writer_creates_new_plain_and_deterministic_gzip_outputs(self):
+        module = load_script('fresh-source-observations.py', 'historical_output_writer')
+        data = {'historicalDiagnostic': True, 'note': 'caf\u00e9'}
+        contents = json.dumps(data, indent=2) + '\n'
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            alias = root / 'external-alias'
+            alias.symlink_to(root, target_is_directory=True)
+            for name in ('receipt.json', 'receipt.json.gz', 'repeat.json.gz'):
+                declared = alias / name
+                validated = module.check_namespace(
+                    declared, historical_diagnostic=True, output=True)
+                self.assertEqual(validated, root / name)
+                payload = (
+                    module.encode_observation_bytes(contents.encode('utf-8'))
+                    if declared.suffix == '.gz' else contents
+                )
+                module.write_output(
+                    validated, payload, declared_path=declared, historical_diagnostic=True)
+            self.assertEqual((root / 'receipt.json').read_bytes(),
+                             contents.replace('\n', os.linesep).encode('utf-8'))
+            stored = (root / 'receipt.json.gz').read_bytes()
+            self.assertEqual(gzip.decompress(stored), contents.encode('utf-8'))
+            self.assertEqual(stored, module.encode_observation_bytes(contents.encode('utf-8')))
+            self.assertEqual(stored, (root / 'repeat.json.gz').read_bytes())
+
+    def test_historical_writer_refuses_existing_files_and_link_entries(self):
+        module = load_script('fresh-source-observations.py', 'historical_existing_output')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            sentinel = b'existing target must survive'
+            target = root / 'target.json'
+            target.write_bytes(sentinel)
+            existing = root / 'existing.json'
+            existing.write_bytes(sentinel)
+            linked = root / 'linked.json'
+            linked.symlink_to(target)
+            missing = root / 'missing.json'
+            dangling = root / 'dangling.json'
+            dangling.symlink_to(missing)
+            linked_directory = root / 'directory-link'
+            linked_directory.symlink_to(root, target_is_directory=True)
+            for destination in (existing, linked, dangling, linked_directory):
+                with self.subTest(destination=destination):
+                    validated = module.check_namespace(
+                        destination, historical_diagnostic=True, output=True)
+                    with self.assertRaises(FileExistsError):
+                        module.write_output(
+                            validated, '', declared_path=destination, historical_diagnostic=True)
+            self.assertEqual(existing.read_bytes(), sentinel)
+            self.assertEqual(target.read_bytes(), sentinel)
+            self.assertTrue(linked.is_symlink())
+            self.assertTrue(dangling.is_symlink())
+            self.assertTrue(linked_directory.is_symlink())
+            self.assertFalse(missing.exists())
+
+    def test_historical_writer_refuses_leaf_symlink_created_at_exclusive_publication(self):
+        module = load_script('fresh-source-observations.py', 'historical_output_link_race')
+        real_open = os.open
+        real_link = os.link
+        contents = json.dumps({'historicalDiagnostic': True}, indent=2) + '\n'
+        cases = (('.json', False), ('.json', True), ('.json.gz', False), ('.json.gz', True))
+        for suffix, dangling in cases:
+            with self.subTest(suffix=suffix, dangling=dangling), \
+                    tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                destination = root / f'receipt{suffix}'
+                sentinel_path = root / 'sentinel.json'
+                sentinel = b'late symlink target must survive'
+                sentinel_path.write_bytes(sentinel)
+                target = root / 'missing.json' if dangling else sentinel_path
+                validated = module.check_namespace(
+                    destination, historical_diagnostic=True, output=True)
+                opened = []
+                publications = []
+                payload = (
+                    module.encode_observation_bytes(contents.encode('utf-8'))
+                    if suffix == '.json.gz' else contents
+                )
+                expected = (
+                    payload if isinstance(payload, bytes)
+                    else payload.replace('\n', os.linesep).encode('utf-8')
+                )
+
+                def record_stage_open(filename, flags, mode=0o777, *, dir_fd=None):
+                    opened.append((Path(filename), flags))
+                    return real_open(filename, flags, mode, dir_fd=dir_fd)
+
+                def insert_leaf_before_link(staged, pinned, **kwargs):
+                    staged = Path(staged)
+                    publications.append((staged, Path(pinned)))
+                    self.assertEqual(staged.read_bytes(), expected)
+                    self.assertEqual(Path(pinned), validated)
+                    destination.symlink_to(target)
+                    if real_link in os.supports_follow_symlinks:
+                        self.assertFalse(kwargs['follow_symlinks'])
+                    return real_link(staged, pinned, **kwargs)
+
+                with patch.object(module.os, 'open', side_effect=record_stage_open), \
+                        patch.object(module.os, 'link', side_effect=insert_leaf_before_link), \
+                        self.assertRaises(OSError):
+                    module.write_output(
+                        validated, payload, declared_path=destination, historical_diagnostic=True)
+                self.assertEqual(len(opened), 1)
+                self.assertEqual(opened[0][0].parent, validated.parent)
+                self.assertNotEqual(opened[0][0], validated)
+                required = os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0)
+                self.assertEqual(opened[0][1] & required, required)
+                self.assertEqual(publications, [(opened[0][0], validated)])
+                self.assertFalse(opened[0][0].exists())
+                self.assertTrue(destination.is_symlink())
+                self.assertEqual(sentinel_path.read_bytes(), sentinel)
+                if dangling:
+                    self.assertFalse(target.exists())
+                self.assertEqual(sorted(path.name for path in root.iterdir()),
+                                 [destination.name, sentinel_path.name])
+
+    def test_historical_writer_publishes_staged_inode_and_refuses_late_destination(self):
+        module = load_script('fresh-source-observations.py', 'historical_output_handle_race')
+        real_fsync = os.fsync
+        real_link = os.link
+        contents = json.dumps({'historicalDiagnostic': True}, indent=2) + '\n'
+        decoded = contents.encode('utf-8')
+        cases = (('.json', False), ('.json', True), ('.json.gz', False), ('.json.gz', True))
+        for suffix, appears in cases:
+            with self.subTest(suffix=suffix, appears=appears), \
+                    tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                destination = root / f'receipt{suffix}'
+                target = root / 'sentinel.json'
+                sentinel = b'reopened path must not reach this target'
+                target.write_bytes(sentinel)
+                validated = module.check_namespace(
+                    destination, historical_diagnostic=True, output=True)
+                payload = module.encode_observation_bytes(decoded) if suffix == '.json.gz' else contents
+                expected = (
+                    payload if isinstance(payload, bytes)
+                    else payload.replace('\n', os.linesep).encode('utf-8')
+                )
+                written = []
+                publications = []
+
+                def insert_leaf_while_syncing_handle(descriptor):
+                    witness = os.dup(descriptor)
+                    try:
+                        os.lseek(witness, 0, os.SEEK_SET)
+                        actual = os.read(witness, len(expected) + 1)
+                        self.assertEqual(actual, expected)
+                        metadata = os.fstat(witness)
+                        written.append(((metadata.st_dev, metadata.st_ino), actual))
+                        if appears:
+                            destination.symlink_to(target)
+                        return real_fsync(descriptor)
+                    finally:
+                        # Close before writer cleanup so Windows can unlink the stage.
+                        os.close(witness)
+
+                def publish_staged_inode(staged, pinned, **kwargs):
+                    staged = Path(staged)
+                    self.assertEqual(staged.parent, root)
+                    self.assertNotEqual(staged, validated)
+                    metadata = staged.stat()
+                    self.assertEqual((metadata.st_dev, metadata.st_ino), written[0][0])
+                    self.assertEqual(Path(pinned), validated)
+                    publications.append(staged)
+                    if real_link in os.supports_follow_symlinks:
+                        self.assertFalse(kwargs['follow_symlinks'])
+                    return real_link(staged, pinned, **kwargs)
+
+                with patch.object(module.os, 'fsync', side_effect=insert_leaf_while_syncing_handle), \
+                        patch.object(module.os, 'link', side_effect=publish_staged_inode):
+                    if appears:
+                        with self.assertRaises(OSError):
+                            module.write_output(
+                                validated, payload, declared_path=destination, historical_diagnostic=True)
+                    else:
+                        module.write_output(
+                            validated, payload, declared_path=destination, historical_diagnostic=True)
+                self.assertEqual(len(written), 1)
+                self.assertEqual(len(publications), 1)
+                self.assertFalse(publications[0].exists())
+                if appears:
+                    self.assertTrue(destination.is_symlink())
+                else:
+                    self.assertFalse(destination.is_symlink())
+                    metadata = destination.stat()
+                    self.assertEqual((metadata.st_dev, metadata.st_ino), written[0][0])
+                    self.assertEqual(destination.read_bytes(), expected)
+                self.assertEqual(target.read_bytes(), sentinel)
+                self.assertEqual(sorted(path.name for path in root.iterdir()),
+                                 [destination.name, target.name])
+
+    def test_real_clis_refuse_leaf_symlink_created_during_diagnostic_computation(self):
+        original = common.load_historical_observations('NAsM30MAHLg')
+        # Keep one genuinely measured exposure without repeatedly serializing the full corpus.
+        original['frames'] = [next(frame for frame in original['frames'] if frame['landmarks'])]
+        for filename in self.scripts:
+            module = load_script(filename, f'historical_leaf_race_{filename}')
+            computation = '_observe_historical' if filename == 'observe-source.py' else '_run_computation'
+            for suffix in ('.json', '.json.gz'):
+                with self.subTest(script=filename, suffix=suffix), \
+                        tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary).resolve()
+                    observations = root / 'historical.json'
+                    observations.write_text(json.dumps(original), encoding='utf-8')
+                    inventory = root / 'unused-inventory.json'
+                    inventory.write_text('{}', encoding='utf-8')
+                    destination = root / f'receipt{suffix}'
+                    target = root / 'sentinel.json'
+                    sentinel = b'CLI computation-time symlink target must survive'
+                    target.write_bytes(sentinel)
+                    arguments = (
+                        ['--observations', str(observations), '--source', str(root / 'unused.mp4')]
+                        if filename == 'observe-source.py'
+                        else [str(observations), '--inventory', str(inventory)]
+                    )
+
+                    def insert_leaf_during_computation(data, *args):
+                        # Only computation is controlled: the real historical input,
+                        # diagnostic guards, namespace policy and filesystem writes run.
+                        self.assertEqual(data, original)
+                        destination.symlink_to(target)
+                        return data if filename == 'observe-source.py' else (data, {})
+
+                    with patch.object(module, computation, side_effect=insert_leaf_during_computation) as compute, \
+                            patch.object(sys, 'argv', [filename, *arguments,
+                                         '--historical-diagnostic', '--output', str(destination)]), \
+                            self.assertRaises((ValueError, OSError)):
+                        module.main()
+                    compute.assert_called_once()
+                    self.assertTrue(destination.is_symlink())
+                    self.assertEqual(target.read_bytes(), sentinel)
+
+    def test_real_current_clis_refuse_computation_races_and_replace_publication_races(self):
+        observations = HERE.parent / 'content/v39-source/XPQwKRt4Y2k.observations.json.gz'
+        inventory = HERE.parent / 'content/v39-source/native-inventory.json'
+        original = common.read_observations(observations)
+        real_replace = os.replace
+        for filename in self.scripts:
+            module = load_script(filename, f'current_leaf_race_{filename}')
+            computation = 'observe' if filename == 'observe-source.py' else 'run'
+            for phase in ('computation', 'publication'):
+                with self.subTest(script=filename, phase=phase), \
+                        tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary).resolve()
+                    destination = root / 'XPQwKRt4Y2k.observations.json.gz'
+                    target = root / 'sentinel.json.gz'
+                    sentinel = b'current CLI symlink target must survive'
+                    target.write_bytes(sentinel)
+                    arguments = (
+                        ['--observations', str(observations), '--source', str(root / 'unused.mp4'),
+                         '--inventory', str(inventory)]
+                        if filename == 'observe-source.py'
+                        else [str(observations), '--inventory', str(inventory)]
+                    )
+                    outputs = []
+                    replacements = []
+
+                    def isolate_computation(data, *args, **kwargs):
+                        # Consume actual current gzip input; only media/fit computation
+                        # is isolated. Namespace checks and all output I/O remain real.
+                        self.assertEqual(data, original)
+                        self.assertFalse(kwargs['historical_diagnostic'])
+                        output = copy.deepcopy(data)
+                        if filename == 'observe-source.py':
+                            output.setdefault('tracking', {})
+                        outputs.append(output)
+                        if phase == 'computation':
+                            destination.symlink_to(target)
+                        return (
+                            output if filename == 'observe-source.py'
+                            else (output, {'fits': [], 'missingCameraEvidence': []})
+                        )
+
+                    def insert_leaf_before_replace(staged, pinned):
+                        self.assertEqual(phase, 'publication')
+                        staged = Path(staged)
+                        self.assertEqual(staged.parent, root)
+                        self.assertEqual(Path(pinned), destination)
+                        replacements.append(staged)
+                        destination.symlink_to(target)
+                        return real_replace(staged, pinned)
+
+                    with patch.object(module, computation, side_effect=isolate_computation) as compute, \
+                            patch.object(os, 'replace', side_effect=insert_leaf_before_replace), \
+                            patch.object(sys, 'argv', [filename, *arguments,
+                                         '--output', str(destination)]), \
+                            redirect_stdout(io.StringIO()):
+                        if phase == 'computation':
+                            with self.assertRaisesRegex(ValueError, 'path changed after validation'):
+                                module.main()
+                        else:
+                            module.main()
+                    compute.assert_called_once()
+                    self.assertEqual(target.read_bytes(), sentinel)
+                    self.assertEqual(sorted(path.name for path in root.iterdir()),
+                                     [destination.name, target.name])
+                    if phase == 'computation':
+                        self.assertTrue(destination.is_symlink())
+                        self.assertEqual(replacements, [])
+                    else:
+                        self.assertEqual(len(replacements), 1)
+                        self.assertFalse(replacements[0].exists())
+                        self.assertFalse(destination.is_symlink())
+                        decoded = (json.dumps(outputs[0], indent=2) + '\n').encode('utf-8')
+                        self.assertEqual(gzip.decompress(destination.read_bytes()), decoded)
+                        self.assertEqual(destination.read_bytes(),
+                                         common.fresh.encode_observation_bytes(decoded))
 
     def test_clis_refuse_checkout_outputs_without_consuming_runtime_inputs_or_overwriting(self):
         original = common.load_historical_observations('NAsM30MAHLg')

@@ -1020,7 +1020,7 @@ def main():
         args.observations, historical_diagnostic=args.historical_diagnostic,
         video_id=observations["source"]["videoId"],
     )
-    contract.check_namespace(
+    output_path = contract.check_namespace(
         args.output, historical_diagnostic=args.historical_diagnostic,
         output=True, video_id=observations["source"]["videoId"],
     )
@@ -1029,11 +1029,13 @@ def main():
         observations, args.source, args.match_repeated_view,
         inventory=inventory, historical_diagnostic=args.historical_diagnostic,
     )
-    if args.historical_diagnostic:
-        common.write_observations(args.output, output)
-    else:
-        decoded = (json.dumps(output, indent=2) + "\n").encode("utf-8")
-        args.output.write_bytes(contract.encode_observation_bytes(decoded))
+    contents = json.dumps(output, indent=2) + "\n"
+    if args.output.suffix == ".gz":
+        contents = contract.encode_observation_bytes(contents.encode("utf-8"))
+    contract.write_output(
+        output_path, contents, declared_path=args.output,
+        historical_diagnostic=args.historical_diagnostic,
+    )
     print(
         json.dumps(
             {

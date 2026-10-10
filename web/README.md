@@ -277,6 +277,16 @@ Historical source diagnostics write only to resolved
 temporary directory (`tempfile.gettempdir()`), `/tmp` or `/var/tmp`.
 Public assets, other repository destinations and symlink escapes are refused
 before generation. Their receipts remain non-publishable historical evidence.
+All historical diagnostic CLIs write through exclusively created staged-file handles,
+flush and sync them, then atomically hard-link the completed files to pinned,
+validated paths. Existing files, symlinks (including dangling links) and reparse-point
+entries are never overwritten. The crank extractor also
+creates its support directory exclusively, refusing existing directories and
+symlink/reparse-point entries.
+Ordinary current observation outputs remain rerunnable: the observer and fitter
+write deterministic gzip through an exclusively created temporary file in the
+validated parent, flush and sync it, then atomically replace the pinned destination.
+A leaf symlink introduced at replacement is replaced, never followed.
 Temporary roots and output paths are resolved before comparison, including platform symlinks.
 The entire checkout remains excluded from external temporary permission even
 when the checkout itself is under a temporary root; private-root symlink escapes are refused.

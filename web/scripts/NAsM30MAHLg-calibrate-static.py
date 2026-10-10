@@ -5,6 +5,7 @@ This produces nonpublishable historical diagnostic evidence, not GPU acceptance.
 Source frames and framehash-all.txt must already exist; the helper never decodes
 or redistributes video. Require --historical-diagnostic and --output /tmp/...json.
 Full mechanism input deliberately stays null.
+Output must be a new file; .gz retains the deterministic pretty-JSON encoding.
 """
 
 import argparse
@@ -298,12 +299,16 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
-        output = args.output.resolve()
+        output = common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
     except ValueError as error:
         parser.error(str(error))
     packet = run(args.evidence, args.frames, args.inventory, historical_diagnostic=args.historical_diagnostic)
-    common.write_observations(output, packet)
+    contents = json.dumps(packet, indent=2) + "\n"
+    if output.suffix == ".gz":
+        contents = common.fresh.encode_observation_bytes(contents.encode("utf-8"))
+    common.fresh.write_output(
+        output, contents, declared_path=args.output,
+        historical_diagnostic=args.historical_diagnostic)
     print(json.dumps(packet["summary"]))
 
 
