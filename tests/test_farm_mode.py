@@ -1266,6 +1266,10 @@ def test_invalid_farm_selection_stops_before_preflight_or_actions(
     selection, monkeypatch, capsys
 ):
     from doit.dependency import Dependency
+    monkeypatch.setattr(
+        _farm, "producer_build",
+        lambda _label: pytest.fail("invalid selection acquired FIFO ownership"),
+    )
 
     monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
     preflights = []
@@ -1504,6 +1508,10 @@ def test_every_task_executing_command_gets_the_preflight_and_only_run_fans_out(
 
 def test_help_and_non_run_commands_skip_the_preflight(monkeypatch, capsys):
     monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
+    monkeypatch.setattr(
+        _farm, "producer_build",
+        lambda _label: pytest.fail("non-executing command acquired FIFO ownership"),
+    )
     def no_git(argv, **kwargs):
         pytest.fail(f"preflight launched {argv}")
 
@@ -1626,7 +1634,8 @@ def temporal_boundary(tmp_path, monkeypatch):
     outcome = {}
 
     class Handle:
-        async def result(self):
+        async def result(self, *, follow_runs):
+            assert follow_runs is False, "result must not follow a replacement run"
             if isinstance(outcome["result"], BaseException):
                 raise outcome["result"]
             return outcome["result"]
@@ -1713,7 +1722,8 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
             async def query(self, name, arg, **options):
                 return _farm.LeafStatus(arg, "bound", _farm.LeafBinding(BUILD_ID, wf_id, "exact-run"), [])
 
-            async def result(self):
+            async def result(self, *, follow_runs):
+                assert follow_runs is False
                 result_entered.set()
                 await release_result.wait()
                 return _leaf_result()
@@ -1763,7 +1773,7 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
 
 
 def test_run_leaf_submits_to_coordinator_and_waits_exact_binding(temporal_boundary):
-    from temporalio.common import WorkflowIDConflictPolicy
+    from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
 
     calls, resolve = temporal_boundary
     resolve(_leaf_result(worker_id="sw-02@7", attempt=2))
@@ -1800,6 +1810,7 @@ def test_run_leaf_submits_to_coordinator_and_waits_exact_binding(temporal_bounda
     assert options["id"] == "solidworks-build-fifo"
     assert options["task_queue"] == "solidworks-control"
     assert options["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
+    assert options["id_reuse_policy"] is WorkflowIDReusePolicy.REJECT_DUPLICATE
     assert "memo" not in options
     assert calls["handles"][-1] == (
         "leaf:part:pen_rod:" + "k" * 64 + ":900s",

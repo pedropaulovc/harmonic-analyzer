@@ -424,7 +424,7 @@ async def _connect_client(identity: str):
 
 
 async def _fifo_handle(client):
-    from temporalio.common import WorkflowIDConflictPolicy
+    from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
 
     await asyncio.wait_for(
         client.start_workflow(
@@ -432,6 +432,7 @@ async def _fifo_handle(client):
             id=WORKFLOW_BUILD_FIFO_ID,
             task_queue=TASK_QUEUE_CONTROL,
             id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         ),
         timeout=FIFO_RPC_TIMEOUT_S,
     )
@@ -488,6 +489,8 @@ class _ProducerBuild:
         self._executing = False
         self._reason = "finished"
         self._previous_id: str | None = None
+        self._lease_deadline: float | None = None
+        self._lease_wall: datetime | None = None
         self._thread = threading.Thread(
             target=self._run, name="farm-build-lease", daemon=True
         )
@@ -507,9 +510,9 @@ class _ProducerBuild:
             # A failure can race the transition from waiting to task execution.
             self.check()
             return self
-        except BaseException:
+        except BaseException as exc:
             self._executing = False
-            self._reason = "failed"
+            self._reason = "cancelled" if isinstance(exc, KeyboardInterrupt) else "failed"
             self._stop.set()
             if self._thread.ident is not None:
                 self._thread.join()
@@ -561,7 +564,19 @@ class _ProducerBuild:
         except BaseException as exc:
             self._fail(exc)
 
-    def _accept_status(self, status: BuildStatus, *, active: bool) -> bool:
+    def _lease_remaining(self) -> float:
+        if self._lease_deadline is None:
+            raise BuildOwnershipError("producer has no acknowledged lease")
+        remaining = self._lease_deadline - time.monotonic()
+        if remaining <= 0:
+            raise BuildOwnershipError("producer's acknowledged lease expired")
+        return remaining
+
+    def _accept_status(
+        self, status: BuildStatus, *, active: bool, renewed: bool = False
+    ) -> bool:
+        if self._lease_deadline is not None:
+            self._lease_remaining()
         deadline = datetime.fromisoformat(status.lease_deadline.replace("Z", "+00:00"))
         if (
             status.build_id != self.build_id
@@ -575,6 +590,13 @@ class _ProducerBuild:
                 f"coordinator refused build {self.build_id}: "
                 f"{status.producer_state}/{status.ownership_state}"
             )
+        if self._lease_wall is None or (renewed and deadline > self._lease_wall):
+            self._lease_wall = deadline
+            self._lease_deadline = time.monotonic() + (
+                deadline - datetime.now(timezone.utc)
+            ).total_seconds()
+        # Polls and duplicate heartbeats never extend the acknowledged lease.
+        self._lease_remaining()
         return status.ownership_state == "active"
 
     async def _serve(self) -> None:
@@ -601,25 +623,34 @@ class _ProducerBuild:
             heartbeat_due = time.monotonic() + FIFO_HEARTBEAT_INTERVAL_S
             sequence = 0
             while not self._stop.is_set():
+                remaining = self._lease_remaining()
                 if active:
                     self._ready.set()
                 if time.monotonic() >= heartbeat_due:
                     sequence += 1
-                    status = await _rpc_update(
-                        handle,
-                        "heartbeat_build",
-                        HeartbeatBuild(self.build_id, sequence),
-                        BuildStatus,
-                        f"heartbeat:{self.build_id}:{sequence}",
+                    status = await asyncio.wait_for(
+                        _rpc_update(
+                            handle,
+                            "heartbeat_build",
+                            HeartbeatBuild(self.build_id, sequence),
+                            BuildStatus,
+                            f"heartbeat:{self.build_id}:{sequence}",
+                        ),
+                        timeout=remaining,
                     )
-                    active = self._accept_status(status, active=active)
+                    active = self._accept_status(status, active=active, renewed=True)
                     heartbeat_due = time.monotonic() + FIFO_HEARTBEAT_INTERVAL_S
                 elif not active:
-                    status = await _rpc_query(
-                        handle, "build_status", BuildKey(self.build_id), BuildStatus
+                    status = await asyncio.wait_for(
+                        _rpc_query(
+                            handle, "build_status", BuildKey(self.build_id), BuildStatus
+                        ),
+                        timeout=remaining,
                     )
                     active = self._accept_status(status, active=False)
-                await asyncio.sleep(STATUS_POLL_INTERVAL_S)
+                await asyncio.sleep(
+                    min(STATUS_POLL_INTERVAL_S, self._lease_remaining())
+                )
         except BaseException as exc:
             self._reason = "failed"
             self._fail(exc)
@@ -819,7 +850,7 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
     _telemetry.info(f"Farm workflow attached: {wf_id}", **identity)
     _telemetry.event("farm.attached", **identity)
     try:
-        return await handle.result()
+        return await handle.result(follow_runs=False)
     except WorkflowFailureError as exc:
         if not isinstance(exc.cause, CancelledError):
             raise

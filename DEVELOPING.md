@@ -207,6 +207,10 @@ Temporal workflow closure, timeout, cancellation and producer lease expiry do
 not prove physical drain. Unknown or unconfirmed attempts block the FIFO
 fail-closed until physical-drain evidence is supplied through the pool operator
 surface.
+An already-running coordinator is reused, but a terminal coordinator cannot be
+recreated as an empty singleton: that would forget accepted work and drain
+obligations. Recovery requires physical-drain evidence and a reviewed,
+snapshot-aware recovery or history reset, not another producer launch.
 
 Protocol 5 is a clean cutover, not a rolling upgrade over protocol 4 histories.
 Migration requires an idle fleet, no outstanding reservations or unconfirmed
