@@ -16,11 +16,11 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `ch` / `CH` | Channel | 11 |
 | `dt` / `DT` | Drive train | 36 |
 | `fr` / `FR` | Frame | 5 |
-| `mg` / `MG` | Magnifier | 9 |
+| `mg` / `MG` | Magnifier | 10 |
 | `pd` / `PD` | Paper drive | 24 |
 | `pn` / `PN` | Pen | 6 |
 | `sm` / `SM` | Summing | 3 |
-| `vn` / `VN` | Vendor parts | 51 |
+| `vn` / `VN` | Vendor parts | 53 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence.
@@ -168,6 +168,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | `wheel-axle` | `mg-wheel-axle` | MHA-084 | MHA-MG-007 |
 | part | `wheel-bar` | `mg-wheel-bar` | MHA-085 | MHA-MG-008 |
 | part | `lever-wire` | `mg-lever-wire` | MHA-115 | MHA-MG-009 |
+| part | — | `mg-wheel-drum` | — | MHA-MG-010 |
 | part | `chain-inner-link` | `vn-chain-inner-link` | MHA-006 | MHA-VN-002 |
 | part | `chain-outer-link` | `vn-chain-outer-link` | MHA-007 | MHA-VN-003 |
 | part | `chain-sprocket` | `pd-chain-sprocket` | MHA-008 | MHA-PD-001 |
@@ -253,6 +254,8 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | — | `vn-magnifying-bracket-screw` | — | MHA-VN-050 |
 | part | — | `vn-cylinder-bank-spring` | — | MHA-VN-052 |
 | part | — | `vn-rocker-bank-spring` | — | MHA-VN-053 |
+| part | — | `vn-wheel-axle-back-washer` | — | MHA-VN-054 |
+| part | — | `vn-wheel-axle-front-washer` | — | MHA-VN-055 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -274,3 +277,6 @@ next free Number in its category and has no old stem or old Number.
 | retired | `vn-knife-hanger-washer` | MHA-VN-026 | no replacement: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor |
 | added | `vn-magnifying-bracket-screw` | MHA-VN-050 | screws the MHA-MG-001 magnifying bracket to the MHA-SM-003 summing lever |
 | added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
+| added | `mg-wheel-drum` | MHA-MG-010 | brass drum pressed on the MHA-MG-005 wheel spigot; carries the lever wire |
+| added | `vn-wheel-axle-back-washer` | MHA-VN-054 | brass #10 washer between the MHA-MG-008 wheel bar and the MHA-MG-005 wheel hub |
+| added | `vn-wheel-axle-front-washer` | MHA-VN-055 | brass #4 washer between the MHA-MG-010 drum and the MHA-VN-025 nut |

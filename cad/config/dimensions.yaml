@@ -1424,7 +1424,7 @@ sections:
       - - Magnification
         - 5×
         - —
-        - 'text; consistent: 100/20 = 5 ✓'
+        - 'text; consistent: 100/20 = 5 ✓. Model (rev 10, 2026-10-10): wire-centre ratio rim r 49.2 / drum r 9.85 = 4.995'
         - stated
         - high
       - - Spoke count
@@ -1433,8 +1433,8 @@ sections:
         - counted on the full-page photo p.51 (and photogrammetry `195607299`); an earlier extraction said 5 — wrong
         - stated
         - high
-      - - Wheel axle (M6.4)
-        - flange Ø35 × 3 seated on the bar front face; Ø5 stud × 14 the wheel bore rides; Ø9 × 4 retaining collar (photo's washer + hex nut collapsed to a collar — simplification) -- 2026-09-02 (ch21 p.51): the tip collar is now a Ø9 x 1 WASHER under a separate AF 8 x 3 hex nut (`vn-wheel-axle-nut` MHA-VN-025); stud 17 long, tip 3 proud
+      - - Wheel axle and stack (rev 10, 2026-10-10)
+        - 'steel 3/16 drill-rod pin (`mg-wheel-axle`, Ø4.7625) pressed into a reamed Ø.1865 bore through `mg-wheel-bar`, back end flush with the bar back face (no head, no flange); shank 28.5, then #4-40 UNC × 7.2 and a domed tip, 36.5 overall. Stack from the bar front: brass #10 washer (`vn-wheel-axle-back-washer` MHA-VN-054, 92916A480); cast-iron wheel hub Ø25 boss + Ø14.5 spigot, 19.6 long, reamed Ø.1890 bore running on the pin; brass drum Ø18.9 / Ø14.5 × 9 pressed on the spigot (`mg-wheel-drum` MHA-MG-010); brass #4 washer (`vn-wheel-axle-front-washer` MHA-VN-055, 92916A250); brass #4-40 hex nut + jam nut (`vn-wheel-axle-nut` MHA-VN-025, 92671A005, qty 2). Endshake 0.05–0.15 set with the nut'
         - —
         - p.50–51
         - scaled
@@ -1460,18 +1460,24 @@ sections:
       a horizontal support bar. The two annotated diameters self-validate against
       the stated magnification — strongest-sourced part in chapters 18–21.
       M6.4 placement: wheel at machine x −53 on the y-575.7 bar, wheel mid-plane
-      z −146.9 (axle flange on the bar front −138.9).
+      z −146.9 (back washer on the bar front −138.9).
 
-      Wires modeled (2026-07-04): the two amplification wires are now geometry —
-      straight rest-pose Ø0.8 steel rods (`mg-lever-wire` MHA-MG-009: fixture hook
-      (−150, 925.35, −137.95) → hub-groove tangent at z −142.77, a ~0.8° lean
-      ducking behind the rim ring into the hub's back groove band — see the
-      ch20 depth re-anchor; `pn-pen-wire` MHA-PN-006: rim 3-o'clock tangent →
-      pen-rod wire hole at y 513). The lever-wire ARTICULATES (ball joint at the
-      hook + axis-axis stand-off tangency to the hub) and carries the WIRE-1
-      yoke coupling to the wheel; wraps/tie-offs and compliance stay unmodeled;
-      every run stands ≥0.25 off its neighbours. Wire Ø photo-scaled
-      (hair-thin in the book; 0.8 keeps it renderable — low confidence).
+      Rev 10 wheel (2026-10-10): gray cast-iron spider, Ø25 hub boss and integral
+      Ø14.5 spigot carrying the pressed brass Ø18.9 drum; six tapered, filleted
+      spokes; rim U-groove R0.6 × 1.2 deep (pen-wire centre r 49.2). TIE 1 (lever
+      wire): Ø1.0 axial hole through the hub at r 9.85, 6 o'clock at rest seen from
+      the front. TIE 2 (pen wire): Ø1.0 radial hole from the groove bottom at 4:30.
+      Effective wire-centre ratio 49.2/9.85 = 4.995.
+
+      Wires modeled (2026-07-04, re-derived rev 10): the two amplification wires are
+      geometry — straight rest-pose Ø0.8 steel rods (`mg-lever-wire` MHA-MG-009:
+      fixture hook → tangent to the drum at about 2:25 seen from the front, on the
+      pen side, at the drum mid-plane z −154.91; `pn-pen-wire` MHA-PN-006: rim
+      groove 3-o'clock tangent at x 3.8 → pen-rod wire hole at y 513). The lever-wire
+      ARTICULATES (ball joint at the hook + axis-axis stand-off tangency to the drum)
+      and carries the WIRE-1 yoke coupling to the wheel; wraps/tie-offs and
+      compliance stay unmodeled; every run stands ≥0.25 off its neighbours. Wire Ø
+      photo-scaled (hair-thin in the book; 0.8 keeps it renderable — low confidence).
 
       ---
 - heading: Chapter 22 — Platen (pp. 54–55)
