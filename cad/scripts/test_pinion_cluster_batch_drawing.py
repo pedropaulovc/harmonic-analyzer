@@ -535,6 +535,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _annulus_limit(
                 3.9, 3.874, 7.9375
             ),
+            # MHA-VN-054 Ø2.0 dowels pressed into the arm's Ø1.995 blind reams,
+            # 6.0 long less 1.70 proud.
+            **_expected_numbered_pairs(
+                "vn-transgear-arm-plate-locating-pin",
+                range(1, 3),
+                "pd-transgear-arm",
+                2.0,
+                1.995,
+                6.0 - 1.70,
+            ),
             # R9-71: MHA-PD-020's Ø4.727 ream pressed on MHA-VN-041's Ø4.7625
             # shoulder over its 5.5 length.
             frozenset(("pd-transgear-pivot-spacer-1", "vn-transgear-pivot-screw-1")): (
