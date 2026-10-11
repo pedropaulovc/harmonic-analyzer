@@ -681,7 +681,7 @@ def _apply_neck_and_flat_limits(adapter: Any) -> None:
         adapter, "CoreFlatProfile", "FlatToolRadius", CORE_FLAT_TOOL_END_RADIUS,
         CORE_FLAT_TOOL_END_RADIUS_BAND, CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE,
     )
-    set_dimension_prefix(adapter, "CoreFlatProfile", "FlatEnd", "TOOL END FROM F ")
+    set_dimension_prefix(adapter, "CoreFlatProfile", "FlatEnd", "TOOL END FROM 12T FRONT FACE ")
 
 
 async def _journal_profile(adapter: Any) -> list[tuple[str, str]]:

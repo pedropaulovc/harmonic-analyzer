@@ -111,7 +111,15 @@ CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
 CUTTER_TEETH_RANGE = CUTTER_TEMPLATE.teeth_range
 VIRTUAL_TEETH = TEETH / _COS_HELIX**3
 HELIX_LEAD_MM = math.pi * PITCH_DIA / math.tan(math.radians(HELIX_ANGLE_DEG))
-GEAR_DATA_HELIX_PLACES = 4
+GEAR_DATA_HELIX_PLACES = 1
+# The helix angle is the controlling helix spec, at the title block's +/-1
+# deg; the lead it implies is REF. With the 16T spur's axis fixed, a helix
+# error d(beta) at the turned blank shifts the 64T normal pitch by
+# p_t sin(beta) d(beta), 0.013 mm at 1 deg, well inside the crossed mesh's
+# 0.069 worst-corner backlash (crank_mesh_stack.standard_check), so the
+# ordinary angular tolerance keeps backlash > 0 (machinist review: neither
+# helix nor lead was controlling).
+HELIX_ANGLE_TOLERANCE_DEG = 1.0
 GEAR_DATA_REFERENCE_PLACES = 3
 
 # The blank's outside diameter is the one tooth-system number the turner sets

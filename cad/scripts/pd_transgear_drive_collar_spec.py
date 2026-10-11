@@ -412,16 +412,20 @@ PIN_REAR_INSET_WORST = pin_rear_inset(
     LENGTH_FITTED_MIN, PIN_LENGTH + DRIVE_PIN_LENGTH_GRADE, min(PROUD_RANGE)
 )
 
+# The mating shaft, named on the sheet so the fit and the seat face are found.
+SHAFT_NUMBER = "MHA-PD-008"
+SHAFT_SEAT_FACE = f"{SHAFT_NUMBER} 12T FRONT FACE"
+
 # --- Fitted axial reaction -------------------------------------------------
 # With the rear face seated on the actual gear shoulder, body length IS the
 # front wheel seat's distance from F. No front pin or unreacted axial gap.
 BODY_REAR_FACE_FROM_F = 0.0
 BODY_LENGTH_CALLOUT = (
     f"FITTED {LENGTH_FITTED_MIN:.3f}-{LENGTH_FITTED_MAX:.3f}\n"
-    "REAR FACE TO FIT, SEATED ON GEAR FRONT F"
+    f"REAR FACE TO FIT, SEATED ON {SHAFT_SEAT_FACE}"
 )
 BODY_FACE_PHRASE = (
-    "FACE THE COLLAR REAR WITH THE REAR FACE SEATED ON GEAR FRONT F "
+    f"FACE THE COLLAR REAR WITH THE REAR FACE SEATED ON THE {SHAFT_SEAT_FACE} "
     "UNTIL THE KNOB-WHEEL FRONT MEETS THE CHAIN SETTING"
 )
 
@@ -463,7 +467,7 @@ for _ok, _what in (
         "a blind drive-pin hole leaves a floor under the wall floor",
     ),
     (PIN_REAR_INSET_WORST >= 0.0, "a pressed drive pin stands out of the rear face"),
-    (BODY_REAR_FACE_FROM_F == 0.0, "the collar has no axial reaction at gear front F"),
+    (BODY_REAR_FACE_FROM_F == 0.0, "the collar has no axial reaction at the 12T front face"),
 ):
     if not _ok:
         raise AssertionError(f"MHA-PD-022: {_what}")
@@ -471,8 +475,6 @@ for _ok, _what in (
 # Policy rule 6: the callout states the requirement, not a method; the
 # native +0.012/0.000 band already prints the curved portion's H7.
 BORE_CALLOUT = "TRUE D THRU"
-# The view shows the flat's side; the matched fit is the requirement.
-FLAT_ORIENTATION = "MATCH SHAFT D"
 PIN_HOLE_CALLOUT = "2X REAM THROUGH"
 # The overall, pilot front face to rear face, prints as a .X reference.
 OVERALL_LENGTH = LENGTH + PILOT_LENGTH
@@ -617,7 +619,7 @@ FIT_UP_NOTE = "\n".join(
         f"{FIT_UP_OFFSET_SET_TEXT} FORWARD OF THE {CRANK_CONFIG} FRONT FACE "
         "WITH THE ARM AND CRANK SHAFT PULLED FORWARD AND KNOB SHAFT PUSHED REARWARD. "
         "START LONG AND FACE THE REAR TO MOVE THE WHEEL REARWARD; KEEP THE REAR "
-        f"FACE ON F. FITTED BODY {LENGTH_FITTED_MIN:.3f}-{LENGTH_FITTED_MAX:.3f}. "
+        f"FACE ON THE {SHAFT_SEAT_FACE}. FITTED BODY {LENGTH_FITTED_MIN:.3f}-{LENGTH_FITTED_MAX:.3f}. "
         f"THE THUMBNUT SEATS ON THE PILOT, THE {KNOB_CONFIG} FREE UNDER IT. "
         f"STUD END PROUD OF THE THUMBNUT RIM: {STUD_CUT_PHRASE}.",
         width=FIT_UP_NOTE_WIDTH,
@@ -632,6 +634,7 @@ FIT_UP_NOTE = "\n".join(
 DRAWING_NOTES = "\n".join(
     (
         f"1. DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",
-        "2. TRUE D-BORE; CONTROLLED REAR ENTRY BREAK CLEARS SHAFT F CORNERS.",
+        f"2. D-BORE SLIDES ON {SHAFT_NUMBER} D-CORE: {BORE_CORE_CLEARANCE[0]:.3f}-"
+        f"{BORE_CORE_CLEARANCE[1]:.3f} CLEARANCE ON DIA.",
     )
 )

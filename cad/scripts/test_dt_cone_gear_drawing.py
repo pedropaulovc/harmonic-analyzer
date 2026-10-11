@@ -178,7 +178,8 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
             "TOOTH FORM", "BACKLASH WITH MATE", "ROOT RADIAL MIN/MAX", "WEB",
         ):
             assert physical_recipe in data, (teeth, physical_recipe)
-        assert ("TROCHOID RELIEF" in data) == (teeth == 6)
+        assert ("RELIEF BELOW R1.531" in data) == (teeth == 6)
+        assert "TIF" not in data
         assert notes.CYLINDER_MATE_NUMBER in data
         for obsolete in ("CONTACT RATIO", "RANGE ONLY", "MATCH FLANKS", "LONG ADDENDUM"):
             assert obsolete not in data
@@ -377,16 +378,17 @@ def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> 
 
 
 def test_custom_six_sheet_gives_grind_data_not_equations() -> None:
-    """Sheet DT6-FORM1 prints what the toolmaker grinds to (3 places, the
-    comparator check at the sheet's own scale), not the model's equations."""
+    """Sheet DT6-FORM1 prints what the toolmaker grinds to (3 places) as
+    reference; the cut T006 is accepted over pins, not on a comparator."""
     profile = spec.stock_form_profile(6)
     data = drawing.cutter_grind_data()
     lines = data.splitlines()
-    assert lines[0] == "DT6-FORM1 GROUND FORM TOOL, mm"
-    assert lines[-1] == "GRIND TO TEMPLATE; CHECK ON OPTICAL COMPARATOR AT 20:1"
+    assert lines[0] == "DT6-FORM1 GROUND FORM TOOL (REF), mm"
+    assert lines[-1] == "ACCEPT THE CUT T006 OVER PINS PER SHEET T006"
+    assert "COMPARATOR" not in data and "TIF" not in data
     assert "FORM DEPTH (PLUNGE FROM BLANK OD):  1.055" in lines
     assert "TIP ARC (FORMS GEAR ROOT):  R1.100" in lines
-    assert "TIF (RELIEF TO INVOLUTE):  R1.531 REF" in lines
+    assert "RELIEF MEETS INVOLUTE AT:  R1.531" in lines
     # Chords across the installed gap, which at T=0 IS the ground form:
     # the pitch chord closes on the tool's pitch tooth thickness.
     pitch = next(line for line in lines if line.startswith("WIDTH AT PITCH DIA 3.175 (CHORD)"))
@@ -399,6 +401,37 @@ def test_custom_six_sheet_gives_grind_data_not_equations() -> None:
     # Every decimal prints at 3 places.
     for number in re.findall(r"\d+\.\d+", data):
         assert len(number.split(".")[1]) == 3, number
+
+
+def test_t006_over_pins_acceptance_matches_the_closed_form_involute() -> None:
+    """The standard even-count over-pins formula on the nominal T006 (its
+    flank is DT6-FORM1's exact N6 PA20 involute) agrees with the sampled
+    model flank, and the thin limit reads below the thick one."""
+    profile = spec.stock_form_profile(6)
+    pitch_dia = 2.0 * profile.pitch_radius_mm
+    alpha = math.radians(spec.PRESSURE_ANGLE_DEG)
+    base_dia = pitch_dia * math.cos(alpha)
+    pin = spec.CUSTOM_SIX_PIN_DIA_MM
+
+    def involute(angle: float) -> float:
+        return math.tan(angle) - angle
+
+    target = (
+        profile.pitch_tooth_thickness_mm / pitch_dia + involute(alpha)
+        + pin / base_dia - math.pi / 6
+    )
+    low, high = 0.0, 1.4
+    for _ in range(80):
+        middle = (low + high) / 2.0
+        low, high = (middle, high) if involute(middle) < target else (low, middle)
+    closed_form = base_dia / math.cos(low) + pin
+    assert spec._over_pins_mm(profile, pin)[0] == pytest.approx(closed_form, abs=2e-4)
+    minimum, maximum = spec.custom_six_over_pins_limits_mm()
+    assert minimum < closed_form < maximum + 1e-3
+    assert maximum - minimum == pytest.approx(0.063, abs=0.002)
+    row = f"OVER 2 PINS \u00d81.20, OPPOSITE GAPS (mm):  {minimum:.3f} TO {maximum:.3f}"
+    assert row in notes.gear_data(6)
+    assert all("OVER 2 PINS" not in notes.gear_data(teeth) for teeth in spec.CONFIGURATION_TEETH[1:])
 
 
 def test_custom_gap_detail_crop_contains_every_real_boundary() -> None:

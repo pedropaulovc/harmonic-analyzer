@@ -1031,7 +1031,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "arm-plate-located": (
             f"CLAMP {_N['pd-transgear-arm']} AND {_N['pd-transgear-arm-plate']} "
-            "TOGETHER IN THE S-K JIG PER THEIR DRAWINGS; "
+            "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
+            f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE, PER THEIR DRAWINGS; "
             "MATCH-DRILL AND REAM THE LOCATING HOLES. "
             f"PRESS {TRANSGEAR_QUANTITIES['vn-transgear-arm-plate-locating-pin']} "
             f"{_N['vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
@@ -1151,17 +1152,20 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "THE SCREWS. UNCLAMP, LATCH, RE-RUN THE DEFINED ENGAGED-FEED WINDOW."
         ),
         "loaded-rack-geometry-checked": (
-            "HANGER LATCHED, KNOB HELD. WITH PAPER LOADED, RUN THE PLATEN THROUGH "
-            "THE WHOLE ENGAGED WINDOW: NO TIGHT SPOT, SHAKE AT EVERY TOOTH; ARM, "
-            "HOOK AND PLATEN STAY SEATED. ELSE RE-SEAT THE RACK OR GUIDES."
+            "HANGER LATCHED, PAPER LOADED. TRAVEL: TURN THE KNOB TO RUN THE "
+            "PLATEN THROUGH THE WHOLE ENGAGED WINDOW: NO TIGHT SPOT; ARM, HOOK "
+            "AND PLATEN STAY SEATED. BACKLASH: KNOB HELD, ROCK THE PLATEN ALONG "
+            "THE RACK AT BOTH ENDS AND THE MIDDLE OF THE WINDOW: SHAKE AT EACH. "
+            "ELSE RE-SEAT THE RACK OR GUIDES."
         ),
         "fitup-pose-set": (
             "HANGER LATCHED. PULL THE CRANK SHAFT FORWARD; PUSH THE KNOB SHAFT "
             f"REARWARD ({teeth} ON THE "
             f"RING, RING ON THE HUB). SLIDE THE COLLAR BACK AGAINST THE {teeth}; "
             f"{sprocket.KNOB_CONFIG} AND THUMBNUT ON FINGER-TIGHT, "
-            f"{steps.KNOB_HELD_BACK_TEXT}. TURN THE DISC SO A {teeth} GAP FACES S "
-            f"AND A {disc.TEETH}T TOOTH FACES K, WITHIN "
+            f"{steps.KNOB_HELD_BACK_TEXT}. TURN THE DISC SO, ON THE LINE THROUGH THE "
+            f"KNOB AND CLUSTER AXES, A {disc.TEETH}T TOOTH STANDS CENTRED IN A "
+            f"{teeth} GAP, WITHIN "
             f"{quality.reducer_setup_clock_deviation_mm():.2f} AT THE PITCH CIRCLE. "
             "TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH."
         ),
@@ -1184,13 +1188,13 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{steps.KNOB_HELD_BACK_TEXT}. {collar.BODY_FACE_PHRASE}: SET THE "
             f"{sprocket.KNOB_CONFIG} FRONT FACE {collar.FIT_UP_OFFSET_SET_TEXT} FORWARD "
             f"OF THE {sprocket.CRANK_CONFIG} FRONT FACE. START LONG; STRIP AND FACE "
-            "THE REAR TO MOVE THE WHEEL REARWARD, REFITTING WITH THE REAR FACE ON F. "
+            "THE REAR TO MOVE THE WHEEL REARWARD, REFITTING WITH THE REAR FACE SEATED. "
             f"FINISHED BODY WITHIN {_N['pd-transgear-drive-collar']}'S FITTED LIMITS; "
             f"ELSE REPORT. STEP {steps.step_number('fitup-accepted')} RE-CHECKS."
         ),
         "collar-shoulder-seated": (
             f"SEAT THE {_N['pd-transgear-drive-collar']} D-BORE ON THE SHAFT D-FLAT, "
-            "ITS REAR FACE BEARING ON THE ACTUAL GEAR FRONT F. "
+            f"ITS REAR FACE BEARING ON THE {_N['pd-transgear-knob-shaft']} 12T FRONT FACE. "
             f"{sprocket.KNOB_CONFIG} ON THE DRIVE DOWELS, NUT TIGHT ON THE PILOT."
         ),
         "stud-end-cut": (

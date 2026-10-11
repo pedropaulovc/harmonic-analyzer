@@ -378,8 +378,12 @@ async def build(adapter: Any) -> dict[str, str]:
             plan, (0.037, 0.108),
             edge_entity=visible_circle_edge(adapter, plan, BORE_DIA),
         ),
+        # C is the vertical +X side face, square to the X hole coordinates.
+        # The tag stands 11 mm below the top corner so its horizontal leader
+        # lands on that side face, not on the sloping top edge (machinist
+        # review 2026-10-11 read the corner landing as the sloped face).
         "datum:C": PmiDrawingPlacement(
-            plan, (0.128, 0.201),
+            plan, (0.128, 0.190),
             edge_entity=plan_edges.exact_line_through(
                 (EDGE_PLUS_X, (TOP_RIGHT[1] + NOTCH_RIGHT[1]) / 2.0, REAR_FACE_Z),
                 label="plate +X clock edge",

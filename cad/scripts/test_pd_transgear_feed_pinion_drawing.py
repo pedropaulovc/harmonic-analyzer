@@ -23,8 +23,6 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _layout_audit import TEXT_CLEARANCE_HEIGHTS
 from _layout_geometry import ARROW_TEXT_CLEARANCE_M, Box, estimate_text_box
 from _gear_quality import (
-    pinion_pitch_index_deviation_mm,
-    pitch_index_measurement_uncertainty_mm,
     toothspace_runout_tir_mm,
 )
 from _printed_tolerance import printed_band_mm
@@ -623,9 +621,6 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         spec.TEETH, spec.DIAMETRAL_PITCH, spec.PRESSURE_ANGLE_DEG
     )
     assert spec.PITCH_DIA == pytest.approx(spec.TEETH * spec.MODULE_MM)
-    assert spec.TOOTH_THICKNESS == pytest.approx(
-        spec.STOCK_PROFILE.pitch_tooth_thickness_mm
-    )
     assert spec.WHOLE_DEPTH == pytest.approx(
         spec.OUTSIDE_DIA / 2.0 - spec.STOCK_PROFILE.root_radius_min_mm
     )
@@ -639,7 +634,6 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         ("DIAMETRAL PITCH", f"{spec.DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.3f}"),
-        ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{spec.TOOTH_THICKNESS:.3f}"),
         ("WHOLE DEPTH (mm, REF)", f"{spec.WHOLE_DEPTH:.3f}"),
         (
             "CUTTER",
@@ -650,8 +644,12 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         ("MATES WITH", f"PLATEN RACK {spec.RACK_NUMBER}"),
     ):
         assert f"{label}:  {value}" in spec.GEAR_DATA
-    assert len(spec.GEAR_DATA.splitlines()) == 10
+    assert len(spec.GEAR_DATA.splitlines()) == 9
     assert "PROFILE SHIFT" not in spec.GEAR_DATA
+    # A form-cut tooth is a translated involute: its pitch thickness does
+    # not follow the generated-involute span relation, so only the span
+    # (the inspected quantity) is printed.
+    assert "CIRCULAR THICKNESS" not in spec.GEAR_DATA
     assert part.GEAR_DATA == spec.GEAR_DATA
 
 
@@ -727,8 +725,8 @@ def test_toothspace_control_is_source_owned_and_feature_local() -> None:
     assert spec.TOOTH_SPACE_CALLOUT.splitlines() == [
         f"TOOTH SPACE RUNOUT {grade:.2f} TIR TO {spec.BORE_DATUM}",
         f"\u00d8{spec.TOOTHSPACE_GAUGE_DIA_IN:.4f} in PIN, ALL {spec.TEETH} SPACES",
-        f"INDEX RANGE {spec.PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     ]
+    # Indexing is held by the dividing head; no index inspection is printed.
     assert max(map(len, spec.TOOTH_SPACE_CALLOUT.splitlines())) <= 70
     assert "CANDIDATE" not in spec.TOOTH_SPACE_CALLOUT
     assert "TIR" not in spec.DRAWING_NOTES
@@ -788,53 +786,3 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
     toward_note = math.atan2(note.ymin - landing[1], note.xmax - landing[0])
     assert contact_angle < toward_note < contact_angle + math.pi / 2.0
 
-
-def test_pitch_index_control_uses_quality_and_actual_reference_circle() -> None:
-    grade = pinion_pitch_index_deviation_mm()
-    uncertainty = pitch_index_measurement_uncertainty_mm()
-    assert spec.PITCH_INDEX_DEVIATION_MM == grade
-    assert spec.PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM == uncertainty
-    assert spec.PITCH_INDEX_REFERENCE_RADIUS_MM == spec.PITCH_DIA / 2.0
-    assert spec.PITCH_INDEX_STATIONS == tuple(range(spec.TEETH + 1))
-    assert f"INDEX RANGE {grade:.2f} MAX" in spec.TOOTH_SPACE_CALLOUT
-    # Uncertainty and the measuring method are internal, never printed.
-    assert "U " not in spec.TOOTH_SPACE_CALLOUT and "WRAP" not in spec.TOOTH_SPACE_CALLOUT
-    assert "PITCH INDEX" not in spec.DRAWING_NOTES
-
-
-def test_pitch_index_receiving_pays_two_station_uncertainties() -> None:
-    # Synthetic receiving inputs exercise the contract, not shop measurements.
-    measured = dict.fromkeys(spec.PITCH_INDEX_STATIONS, 0.0)
-    paid_uncertainty = 2.0 * spec.PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM
-    headroom = spec.PITCH_INDEX_DEVIATION_MM - paid_uncertainty
-    assert headroom > 0.0
-    assert spec.require_pitch_index_errors_mm(measured) == pytest.approx(paid_uncertainty)
-    measured[spec.TEETH // 2] = headroom / 2.0
-    assert spec.require_pitch_index_errors_mm(measured) == pytest.approx(
-        headroom / 2.0 + paid_uncertainty
-    )
-    # The wrap is an independent receiving station, not silently the first
-    # space reused with an assumed perfect closure.
-    measured[spec.TEETH] = spec.PITCH_INDEX_DEVIATION_MM
-    with pytest.raises(ValueError, match="REJECT paid pitch/index range"):
-        spec.require_pitch_index_errors_mm(measured)
-
-
-@pytest.mark.parametrize("missing_station", (0, spec.TEETH // 2, spec.TEETH))
-def test_pitch_index_receiving_requires_every_station_and_wrap(
-    missing_station: int,
-) -> None:
-    measured = dict.fromkeys(spec.PITCH_INDEX_STATIONS, 0.0)
-    del measured[missing_station]
-    with pytest.raises(ValueError, match="every specified station exactly once"):
-        spec.require_pitch_index_errors_mm(measured)
-
-
-@pytest.mark.parametrize("invalid_error", (True, math.inf, -math.inf, math.nan))
-def test_pitch_index_receiving_refuses_nonfinite_or_boolean_errors(
-    invalid_error: float | bool,
-) -> None:
-    measured = dict.fromkeys(spec.PITCH_INDEX_STATIONS, 0.0)
-    measured[spec.TEETH // 2] = invalid_error
-    with pytest.raises(ValueError, match="finite numeric millimetres"):
-        spec.require_pitch_index_errors_mm(measured)

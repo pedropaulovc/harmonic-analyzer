@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dt_cylinder_gear_spec as spec
+from stock_form_cutter import TOOTH_FORM_NOTE
 
 BORE_FIT_CALLOUT = (
     "FINISH BORE THRU; ALL 20 GEARS\n"
@@ -29,11 +30,11 @@ GEAR_DATA = "\n".join(
         f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
         f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.{spec.WHOLE_DEPTH_PLACES}f} "
         f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}",
-        f"FORM CUTTER (REF):  #{spec.CUTTER_NUMBER}, "
+        f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
         f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
         f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
         f"PITCH TOOTH THICKNESS (mm, REF):  {spec.PITCH_TOOTH_THICKNESS_MM:.3f}",
-        "TOOTH FORM:  TRANSLATED STOCK FORM; FINITE FLANKS AND OFF-CENTRE ROOT ARC",
+        f"TOOTH FORM:  {TOOTH_FORM_NOTE}",
     )
 )
 DRAWING_NOTES = "\n".join(

@@ -46,9 +46,6 @@ from _fit_close_running import SHAFT_G6_3_TO_6_MM
 from _fit_deviations import deviations
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import (
-    pinion_pitch_index_deviation_mm,
-    pitch_index_measurement_uncertainty_mm,
-    require_pitch_index_measurements_mm,
     shaft_turned_runout_mm,
     toothspace_runout_tir_mm,
 )
@@ -162,7 +159,6 @@ def manufactured_profiles() -> tuple[StockFormProfile, ...]:
 _PROFILE_CORNERS = manufactured_profiles()
 for _profile in _PROFILE_CORNERS:
     _profile.require_tip_land(0.25 * MODULE_MM)
-TOOTH_THICKNESS = STOCK_PROFILE.pitch_tooth_thickness_mm
 ROOT_DIA = 2.0 * STOCK_PROFILE.root_radius_min_mm
 ROOT_DIA_PLACES = 2
 ROOT_DIA_EXACT_MIN = min(2.0 * p.root_radius_min_mm for p in _PROFILE_CORNERS)
@@ -247,13 +243,6 @@ if CORE_TOTAL_RUNOUT != shaft_turned_runout_mm():
 # Pattern runout is a toothspace inspection, not mounting plate position.
 TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()
 TOOTH_SPACE_GAUGE_PIN_DIA_MM = 1.000  # use the actual certified diameter
-# Relative angular index is separate from radial TIR and span thickness.
-# Correct measured contact angles using the certified actual pin, then
-# convert against this real pitch-reference radius, NOT the pin centre.
-PITCH_INDEX_REFERENCE_RADIUS_MM = PITCH_DIA / 2.0
-PITCH_INDEX_DEVIATION_MM = pinion_pitch_index_deviation_mm()
-PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM = pitch_index_measurement_uncertainty_mm()
-PITCH_INDEX_STATIONS = tuple(range(TEETH + 1))  # include the full-circle wrap
 
 
 def tooth_space_gauge_contacts(actual_pin_dia_mm: float) -> tuple[GaugeContact, ...]:
@@ -264,31 +253,16 @@ def tooth_space_gauge_contacts(actual_pin_dia_mm: float) -> tuple[GaugeContact, 
     )
 
 
-def require_pitch_index_errors_mm(measured_index_errors_mm: dict[int, float]) -> float:
-    """Receive every space and the wrap about actual running journal A.
-
-    Station i is R_ref * (unwrapped corrected angle_i - datum_angle -
-    2*pi*i/TEETH), using ONE physical index datum without a floating best-fit
-    tooth axis. This does not replace radial TIR, thickness or absolute clock.
-    The returned max-minus-min range pays both calibration uncertainties.
-    """
-    return require_pitch_index_measurements_mm(
-        measured_index_errors_mm=measured_index_errors_mm,
-        required_stations=PITCH_INDEX_STATIONS,
-        relative_deviation_limit_mm=PITCH_INDEX_DEVIATION_MM,
-        absolute_measurement_uncertainty_mm=PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM,
-    )
-
-
 _GAUGE_CORNERS = tooth_space_gauge_contacts(TOOTH_SPACE_GAUGE_PIN_DIA_MM)
 TOOTH_SPACE_GAUGE_ROOT_AIR_MIN_MM = min(c.root_air_mm for c in _GAUGE_CORNERS)
 TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(c.tip_air_mm for c in _GAUGE_CORNERS)
+# Spacing is held by the dividing head and is not inspected; one pin in
+# every space on a radial indicator catches eccentricity and gross slips.
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
         f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A",
         f"\u00d8{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {TEETH} SPACES",
-        f"INDEX RANGE {PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     )
 )
 _GAUGE_CONTACT = toothspace_gauge_contact_mm(STOCK_PROFILE, TOOTH_SPACE_GAUGE_PIN_DIA_MM)
@@ -347,7 +321,8 @@ CORE_FLAT_REACH_PAST_SHOULDER_MIN = (
     FRONT_RELIEF_WIDTH_MIN - max(CORE_FLAT_CUT_END_LIMITS)
 )
 CORE_FLAT_TOOL_REACH_NOTE = (
-    "FLAT TOOL REACH .10 MIN PAST ACTUAL CORE SHOULDER; .05 MIN SHORT OF F."
+    "FLAT TOOL REACH .10 MIN PAST ACTUAL CORE SHOULDER;\n"
+    ".05 MIN SHORT OF 12T FRONT FACE."
 )
 FRONT_RELIEF_AREA_MIN = math.pi * FRONT_RELIEF_DIA_MIN**2 / 4.0
 if (
@@ -728,7 +703,6 @@ GEAR_DATA = gear_data_note(
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{TOOTH_THICKNESS:.3f}"),
         ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
         ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
         (
@@ -746,7 +720,8 @@ GEAR_DATA = gear_data_note(
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 DRAWING_NOTES = "\n".join((
     TOOTH_EDGE_NOTE,
-    "FRONT D-CORE SOLID; COLLAR REAR FACE BEARS ON F. NO FRONT CROSS HOLE.",
+    "FRONT D-CORE SOLID; COLLAR REAR FACE BEARS ON 12T FRONT FACE.",
+    "NO FRONT CROSS HOLE.",
 ))
 
 
