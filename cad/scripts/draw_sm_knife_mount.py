@@ -321,6 +321,17 @@ RIGHT_HALF_Y = (BLK_TOP - BLK_BOT) / 2.0 * SHEET_SCALE[0] / 1000.0
 # symbol a short leader up and right of it.
 TOP_SEAT_FINISH_EDGE_XY = (RIGHT_CENTER[0] - 0.006, RIGHT_CENTER[1] + RIGHT_HALF_Y)
 TOP_SEAT_FINISH_XY = (RIGHT_CENTER[0] + 0.004, RIGHT_CENTER[1] + RIGHT_HALF_Y + 0.010)
+# The bore's Ra 1.6 lands on the rim 30 deg below the centre line: at 0 deg
+# its leader left the rim on the 20.616's centre-height witness line and
+# crossed it 0.6 mm out (layout audit leader-crosses-line, run
+# 20261010T022724164Z).
+BORE_FINISH_RIM_DEG = -30.0
+BORE_FINISH_RIM_XY = (
+    FRONT_CENTER[0]
+    + R_BORE * math.cos(math.radians(BORE_FINISH_RIM_DEG)) * SHEET_SCALE[0] / 1000.0,
+    _front_y(BORE_CY)
+    + R_BORE * math.sin(math.radians(BORE_FINISH_RIM_DEG)) * SHEET_SCALE[0] / 1000.0,
+)
 
 
 def _set_sheet_precision(display: Any, *, label: str) -> None:
@@ -1034,7 +1045,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + R_BORE * SHEET_SCALE[0] / 1000.0, _front_y(BORE_CY)),
+        edge_xy=BORE_FINISH_RIM_XY,
         symbol_xy=(FRONT_CENTER[0] + 0.052, _front_y(BORE_CY) - 0.020),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_bore"),
         label="knife bore finish",
