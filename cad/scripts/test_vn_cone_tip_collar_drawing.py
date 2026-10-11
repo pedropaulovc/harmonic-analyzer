@@ -889,3 +889,25 @@ def test_datum_d_tags_the_thread_and_the_feeler_is_named() -> None:
     assert drawing.THREAD_LEFT_X + 0.010 < x < thread_right_x - 0.010
     assert y > thread_top_y + 0.005
     assert f"SET WITH A {COLLAR_FEELER:.2f} FEELER OFF T006 THRUST FACE." in spec.INSTALLATION_NOTES
+
+
+def test_installation_notes_name_the_journal_and_its_clearance() -> None:
+    """Machinist review of the round-2 build: the Ø0.849 bore named neither
+    the journal it slides on nor the fit. It names MHA-DT-004's terminal
+    journal at that drawing's finished limits, and the diametral clearance
+    the two bands give, which is the retention float the collar is sized on."""
+    shaft = _config.parts("dt-cone-gear-shaft")["number"]
+    land_low, land_high = lands.TERMINAL_FINISHED_DIA_LIMITS_MM
+    bore_low, bore_high = spec.BORE_FINISHED_DIA_LIMITS_MM
+    assert shaft == "MHA-DT-004"
+    assert (bore_low - land_high, bore_high - land_low) == pytest.approx(
+        (2.0 * lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, 2.0 * lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM)
+    )
+    lines = spec.INSTALLATION_NOTES.splitlines()
+    assert lines[:2] == [
+        f"FITS {shaft} TERMINAL JOURNAL \u00d8{land_low:.3f} TO {land_high:.3f};",
+        f"DIAMETRAL CLEARANCE {bore_low - land_high:.3f} TO {bore_high - land_low:.3f}.",
+    ]
+    assert lines[1] == "DIAMETRAL CLEARANCE 0.025 TO 0.105."
+    assert bore_low - land_high > 0.0
+    assert max(map(len, lines)) <= max(map(len, spec.DRAWING_NOTES.splitlines()))

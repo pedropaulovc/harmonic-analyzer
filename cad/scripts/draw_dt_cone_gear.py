@@ -263,10 +263,12 @@ def cutter_grind_data() -> str:
     the relief undefined (machinist review of the stack build). It now
     gives the cutting edge point by point at 3 places, read from the same
     profile the native cut uses (dt_cone_gear_spec.custom_six_form_points_mm),
-    with a one-sided form tolerance. T006 cuts at T=0 on a spur (helix 0)
-    gear, so its installed gap IS the ground form. The shop has no optical
-    comparator: the tool is checked against a template made to the table,
-    and the cut T006 over pins on its own sheet.
+    says how the points connect (the round-2 review: points alone let
+    templates differ between them), and gives a one-sided form tolerance.
+    T006 cuts at T=0 on a spur (helix 0) gear, so its installed gap IS the
+    ground form. The shop has no optical comparator: the tool is checked
+    against a template made to the table, and the cut T006 over pins on its
+    own sheet.
     """
     profile = stock_form_profile(6)
     template = profile.template
@@ -275,6 +277,7 @@ def cutter_grind_data() -> str:
     if profile.radial_translation_mm != 0.0 or profile.helix_angle_deg != 0.0:
         raise ValueError("DT6-FORM1's installed gap is its ground form only at T=0, helix 0")
     root = template.root_radius_mm
+    junction = template.relief_junction_radius_mm
     return "\n".join((
         f"{template.name} GROUND FORM TOOL, mm",
         "CUTTING EDGE, SYMMETRIC ABOUT TOOL CL:",
@@ -285,8 +288,8 @@ def cutter_grind_data() -> str:
             for radius, x, y in custom_six_form_points_mm()
         ),
         f"TIP: CONCAVE ARC R{root:.3f} ABOUT GEAR AXIS",
-        f"ABOVE R{template.relief_junction_radius_mm:.3f}: INVOLUTE, BASE "
-        f"R{template.base_radius_mm:.3f}",
+        f"TIP ARC TO R{junction:.3f}: STRAIGHT LINES ROW TO ROW",
+        f"ABOVE R{junction:.3f}: INVOLUTE, BASE R{template.base_radius_mm:.3f}",
         CUSTOM_SIX_FORM_TOLERANCE_NOTE,
         f"FORM DEPTH (PLUNGE FROM BLANK OD):  {profile.plunge_mm:.3f}",
         "INSPECT THE TOOL BY TEMPLATE TO THIS TABLE;",
@@ -312,6 +315,19 @@ DIMENSION_CALLOUTS = {
     # The origin circle is an inspection witness, not the off-centre root arc.
     "FloorDia": "ROOT ENVELOPE",
 }
+
+
+def callouts_above(teeth: int) -> dict[str, str]:
+    """Text over the value: the circle the tooth thickness is measured on.
+
+    The thickness is the arc on the pitch circle, but its witnesses are
+    straight lines, so without the circle it read as unmeasurable (machinist
+    review of the round-2 build). Below the shelf there is no room on the
+    large-gear sheets: there the callout's end already stands over the title
+    block, 1-2 mm above it.
+    """
+    pitch_dia = 2.0 * stock_form_profile(teeth).pitch_radius_mm
+    return {"ToothThickness": f"ON PITCH CIRCLE \u00d8{pitch_dia:.3f}"}
 
 
 def rendered_half_od(teeth: int) -> float:
@@ -1151,6 +1167,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
         set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+        set_dimension_callouts(adapter, annotations, callouts_above(teeth), location="above")
         assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
         _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
         _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")
