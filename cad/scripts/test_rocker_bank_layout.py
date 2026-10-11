@@ -194,14 +194,24 @@ def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
     assert shaft.NORTH_FLAT_STATION == bracket.EAR_T / 2
     assert bank.FLAT_OFFSET_MAX == pytest.approx((0.6099, 0.25), abs=5e-4)
     washer_thin = washer.STOCK_THICKNESS_RANGE[0]
-    ear_half_min = (bracket.EAR_T - bracket.EAR_T_BAND) / 2
+    # South: the flat and the tap both run from the ear's inboard face. North:
+    # the flat runs from the outboard face (the shaft's flush end), so the
+    # inboard face and the tap both lose the whole ear-thickness band to it.
     hub_free = (
-        ear_half_min + washer_thin + bank.ROCKER_SPRING_HEIGHT[0],
-        ear_half_min + washer_thin,
+        (bracket.EAR_T - bracket.EAR_T_BAND) / 2
+        + washer_thin
+        + bank.ROCKER_SPRING_HEIGHT[0],
+        bracket.EAR_T / 2 - bracket.EAR_T_BAND + washer_thin,
+    )
+    tap_band = (
+        bracket.SET_SCREW_STATION_BAND,
+        bracket.SET_SCREW_STATION_BAND + bracket.EAR_T_BAND,
     )
     assert bank.FLAT_RUN_MAX == pytest.approx(hub_free)
-    for offset, run_max in zip(bank.FLAT_OFFSET_MAX, hub_free, strict=True):
-        reach = offset + shaft.FLAT_STATION_BAND + bracket.SET_SCREW_STATION_BAND
+    for offset, run_max, band in zip(
+        bank.FLAT_OFFSET_MAX, hub_free, tap_band, strict=True
+    ):
+        reach = offset + shaft.FLAT_STATION_BAND + band
         assert reach + shaft.SET_SCREW_CUP_DIA / 2 <= shaft.FLAT_LENGTH_RANGE[0] / 2
         assert (
             offset + shaft.FLAT_STATION_BAND + shaft.FLAT_LENGTH_RANGE[1] / 2
