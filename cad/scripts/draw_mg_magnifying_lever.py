@@ -6,8 +6,12 @@ selectable silhouette edge, so coordinate picks are unreliable (the dome-tip
 pick fails) and the print rests on the auto-imported profile marks only: the far
 dome-centre station and the dome radius R3.  The outside diameter and the overall
 length ride the dome-radius callout + the notes (the note-based path the recipe
-pitfall endorses for un-pickable turned features).  The rod axis is local +X, so
-the FRONT view is the long side elevation and the RIGHT view is the circular end.
+pitfall endorses for un-pickable turned features).  The press zone the bracket
+collar grips -- the rod's last 10 -- is a band on that same Ø6, carried by the
+part's blanked ``PressZone`` reference sketch, which the FRONT view shows and
+dimensions (its length from the dome tip and its banded diameter).  The rod
+axis is local +X, so the FRONT view is the long side elevation and the RIGHT
+view is the circular end.
 
 Run with SolidWorks open::
 
@@ -34,6 +38,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_dimensions import set_dimension_callouts
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -41,7 +46,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from mg_magnifying_lever_spec import ROD_LENGTH
+from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, PRESS_ZONE_LENGTH, ROD_LENGTH
 
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_lever"]
@@ -72,10 +77,24 @@ FRONT_KEEP = {
     "RightDomeCentre": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.032),
     "DomeRadius": (RIGHT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.028),
 }
+# The press zone's two reference dims, at the rod's east (dome-tip) end: the
+# zone length above the rod, left of the dome-radius leader; the banded
+# diameter below-right of the tip, between the far-dome-centre dimension's
+# extension line and the end view.
+_ROD_TIP_X = FRONT_CENTER[0] + ROD_LENGTH * SHEET_SCALE[0] / 2000.0
+_PRESS_ZONE_MID_X = _ROD_TIP_X - PRESS_ZONE_LENGTH * SHEET_SCALE[0] / 2000.0
+PRESS_ZONE_KEEP = {
+    "PressZoneLen": (_PRESS_ZONE_MID_X - 0.006, FRONT_CENTER[1] + 0.013),
+    "PressZoneDia": (_ROD_TIP_X + 0.018, FRONT_CENTER[1] - 0.018),
+}
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
     "DomeRadius": "FULL R, BOTH ENDS - Ø6 ROD",
     "RightDomeCentre": "TO FAR DOME CENTRE",
+}
+PRESS_ZONE_CALLOUTS = {
+    "PressZoneLen": "PRESS ZONE, FROM TIP",
+    "PressZoneDia": "PRESS ZONE - MHA-MG-001 COLLAR",
 }
 
 
@@ -133,6 +152,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    # The part saves PressZone blanked (it would print in every assembly
+    # render); shown here per view, its two dimensions import and stay.
+    press_zone_annotations = curate_hidden_dimensions(
+        adapter,
+        front,
+        keep=PRESS_ZONE_KEEP,
+        view_label="front press zone",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(adapter, press_zone_annotations, PRESS_ZONE_CALLOUTS)
     # The end silhouette is circular; SolidWorks files it under the same
     # "hole" bit as a bored circle, so a disabled bit makes the API a no-op.
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):

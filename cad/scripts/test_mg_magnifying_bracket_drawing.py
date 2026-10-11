@@ -25,7 +25,11 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     marked = set().union(*mg_magnifying_bracket_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP) | set(drawing.BACK_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
-    assert marked == {"ArmWidth", "ArmDepth", "FlangeWidth", "FlangeDepth", "FlangeHeight", "MountingX0", "MountingX1", "MountingY0"}
+    assert marked == {
+        "CollarOd", "CollarBore", "CollarLen",
+        "ArmWidth", "ArmDepth", "FlangeWidth", "FlangeDepth", "FlangeHeight",
+        "MountingX0", "MountingX1", "MountingY0",
+    }
 
 
 def test_arm_and_flange_dim_names_are_disambiguated() -> None:
@@ -48,10 +52,20 @@ def test_bracket_is_uncoupled_from_the_assembly_nominals() -> None:
     assert "from build_mg_magnifying_bracket import" not in assembly
 
 
-def test_notes_carry_the_collar_and_fit_that_have_no_marked_dim() -> None:
+def test_notes_carry_only_what_no_marked_dim_shows() -> None:
     notes = mg_magnifying_bracket_spec.DRAWING_NOTES
-    assert "Ø12 OD" in notes
-    assert "Ø6.2" in notes
+    # The collar's OD, length and bore (with its band), the arm section and the
+    # mounting pattern are native dimensions now; the notes carry the press and
+    # its retention (the assembly print has no notes) plus the floor exception.
+    assert "Ø12" not in notes and "Ø6.2" not in notes and "Ø5.9" not in notes
+    assert "SLIP" not in notes and "GUIDE" not in notes
+    assert "ARM 10" not in notes and "SEAT ON SUMMING" not in notes
+    lines = notes.splitlines()
+    assert lines[:3] == [
+        "PRESS LEVER INTO COLLAR, END FLUSH WITH OUTER FACE.",
+        "RETAIN WITH LOCTITE 638.",
+        "ALTERNATIVE: SOFT SOLDER OR BRAZE.",
+    ]
     assert "AISI 1018" not in notes
     assert "BLACK-OXIDE" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
@@ -59,8 +73,39 @@ def test_notes_carry_the_collar_and_fit_that_have_no_marked_dim() -> None:
     assert "MATCH-DRILLED" not in notes
     assert "THICKNESS" not in notes
     assert "#4" not in notes and "CENTRES" not in notes
-    assert "SEAT ON SUMMING-LEVER FRONT" in notes
     assert "UNDRILLED" not in notes and "DO NOT RELEASE" not in notes
+    assert len(lines) <= 4
+
+
+def test_collar_press_seat_is_native_and_reads_the_lever_contract() -> None:
+    """The bore nominal and band are the lever geom's (one read point for the
+    joint); the build models the annulus on the Right plane so the end view
+    imports both circles, and sets the band on the bore natively."""
+    import mg_magnifying_lever_geom as lever
+
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert part.COLLAR_BORE_DIA is lever.COLLAR_BORE_DIA
+    assert part.COLLAR_BORE_BAND is lever.COLLAR_BORE_BAND
+    assert part.COLLAR_HALF_LEN is lever.COLLAR_HALF_LEN
+    assert "COLLAR_BORE = " not in source  # no bracket-side copy of the bore
+    assert 'await adapter.create_sketch("Right")' in source
+    assert 'names=(None, None, "CollarOd")' in source
+    assert 'names=(None, None, "CollarBore")' in source
+    assert "ExtrusionParameters(depth=2.0 * COLLAR_HALF_LEN, both_directions=True)" in source
+    assert 'name_dimensions(adapter, "Collar", ["CollarLen"])' in source
+    assert "create_revolve" not in source
+    assert (
+        '"CollarProfile", "CollarBore", *deviations(COLLAR_BORE_BAND)' in source
+    )
+    assert "(COLLAR_OD / 2.0) ** 2 - (COLLAR_BORE_DIA / 2.0) ** 2" in source
+    assert part.DRAWING_PRECISION["CollarProfile"] == {"CollarOd": 2, "CollarBore": 3}
+    assert part.DRAWING_PRECISION["Collar"] == {"CollarLen": 2}
+    assert drawing.RIGHT_KEEP.keys() == {"CollarOd", "CollarBore"}
+    assert "CollarLen" in drawing.TOP_KEEP
+    assert drawing.RIGHT_CALLOUTS.keys() == {"CollarOd", "CollarBore"}
+    assert "MHA-MG-003" in drawing.RIGHT_CALLOUTS["CollarBore"]
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts(adapter, right_annotations, RIGHT_CALLOUTS)" in drawing_source
 
 
 def test_collar_bore_takes_the_center_mark() -> None:
@@ -93,6 +138,9 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == config["material_specification"]
     assert config["finish"]
     assert int(config["quantity"]) == 1
+    # The collar is a press seat, not a running fit (user ruling 2026-10-11).
+    assert "fit_class" not in config
+    assert "press seat for the MHA-MG-003 lever rod" in config["process"]
 
 
 def test_mounting_rim_scan_uses_back_visible_entry_plane(monkeypatch) -> None:

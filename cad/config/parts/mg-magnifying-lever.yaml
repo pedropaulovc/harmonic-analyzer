@@ -5,5 +5,5 @@ mg-magnifying-lever:
   finish: machined
   quantity: 1
   tolerance_class: machined_block
-  fit_class: shaft_in_bushing
-  process: "machined (brass)"
+  fit_class: shaft_in_bushing   # the clamp block slides along the rod
+  process: "machined (brass); domed ends; the tip end pressed into the MHA-MG-001 bracket collar at assembly"

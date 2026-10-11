@@ -1,14 +1,15 @@
 r"""Create the curated machinist drawing for the magnifying-lever bracket.
 
 The bracket is the black fitting that affixes the Ø6 magnifying-lever rod to the
-summing plate: a revolved COLLAR tube (Ø12 OD, Ø6.2 bore, 10 long about local X)
-that the rod slips through, a rectangular ARM cantilevering +Z, and a mounting
+summing plate: an extruded COLLAR tube (Ø12 OD, 10 long about local X) whose
+bore is the rod's PRESS seat, a rectangular ARM cantilevering +Z, and a mounting
 FLANGE that butts the summing-plate front face.  The two extruded plan
 rectangles (arm, flange) carry the auto-imported marked dimensions on the TOP
-view, including the flange thickness band. Native counterbore callouts and
-banded coordinates face the -Z entries in the BACK view. Legacy collar
-dimensions and fit remain in the notes. The collar axis is local +X, so the
-RIGHT view shows the collar end as concentric circles (ASME centre mark).
+view, including the flange thickness band, and the collar's length rides there
+too. Native counterbore callouts and banded coordinates face the -Z entries in
+the BACK view. The collar axis is local +X, so the RIGHT view shows the collar
+end as concentric circles (ASME centre mark) and carries their native
+dimensions: the OD and the press-seat bore with its band.
 
 Run with SolidWorks open::
 
@@ -68,17 +69,16 @@ TOP_CENTER = (0.115, 0.180)
 FRONT_CENTER = (0.115, 0.110)
 # Supplemental entry view, not part of the aligned front/top/right group.
 BACK_CENTER = (0.245, 0.095)
-RIGHT_CENTER = (0.240, 0.180)
-ISO_CENTER = (0.340, 0.130)
-
 # The four plan dimensions ride the TOP view (both extruded rectangles lie on the
-# part's Top plane).  Arm/flange dim names are disambiguated in the build
-# (ArmWidth/ArmDepth vs FlangeWidth/FlangeDepth) so this keep map is unambiguous.
+# part's Top plane), as does the collar's mid-plane extrude length (along X).
+# Arm/flange dim names are disambiguated in the build (ArmWidth/ArmDepth vs
+# FlangeWidth/FlangeDepth) so this keep map is unambiguous.
 TOP_KEEP = {
     "ArmWidth": (0.088, 0.170),
     "ArmDepth": (0.142, 0.182),
     "FlangeWidth": (0.110, 0.216),
     "FlangeDepth": (0.089, 0.205),
+    "CollarLen": (0.095, 0.136),
 }
 BACK_KEEP = {
     "MountingX0": (0.205, 0.124),
@@ -86,7 +86,13 @@ BACK_KEEP = {
     "MountingY0": (0.203, 0.095),
 }
 FRONT_KEEP = {"FlangeHeight": (0.148, 0.110)}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+# The collar's end-on circles: the annulus sketch lies on the part's Right
+# plane, so its two diameters import here.  The collar centre sits right of the
+# view centre by half the arm's reach (the arm runs +Z, to the sheet's left).
+RIGHT_KEEP = {
+    "CollarOd": (RIGHT_CENTER[0] + 0.044, RIGHT_CENTER[1] + 0.016),
+    "CollarBore": (RIGHT_CENTER[0] + 0.044, RIGHT_CENTER[1] - 0.016),
+}
 # Blind-review round 1: the four plan values read unattached at a glance --
 # label each with the feature it controls.
 DIMENSION_CALLOUTS = {
@@ -94,6 +100,11 @@ DIMENSION_CALLOUTS = {
     "ArmDepth": "ARM LENGTH",
     "FlangeWidth": "FLANGE WIDTH",
     "FlangeDepth": "FLANGE DEPTH",
+    "CollarLen": "COLLAR LENGTH",
+}
+RIGHT_CALLOUTS = {
+    "CollarOd": "COLLAR OD",
+    "CollarBore": "PRESS SEAT, MHA-MG-003 ROD",
 }
 
 
@@ -170,8 +181,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, back, keep={}, view_label="back")
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    )
     set_dimension_callouts(adapter, top_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, right_annotations, RIGHT_CALLOUTS)
     rims = _mounting_rims(back)
 
     add_native_hole_callout(

@@ -16,6 +16,16 @@ the p.46/p.48 insets show the CLAMP sliding, not a 310 rod.
 Layout: rod axis along +X from the origin (tip of the pivot-end dome at
 x=0), profile revolved 360 deg about a centerline on the axis.
 
+``PressZone`` (blanked, on the Front plane): the last
+mg_magnifying_lever_geom.PRESS_ZONE_LENGTH of the rod, which is PRESSED into
+the MHA-MG-001 bracket collar and retained with Loctite 638 (user ruling
+2026-10-11). The rod is modelled at its nominal Ø6 end to end -- the zone is a
+band, not a step -- so no model edge bounds it; a construction witness along
+the rod's top outline over the zone, with the axis under it, carries the
+zone's length from the dome tip and its diameter with the press band natively
+(policy rule 2: the model, not a note, owns it; ch_rod_pivot_pin's
+``BlankReference``). The front view shows it.
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_mg_magnifying_lever.py
@@ -29,8 +39,10 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
+from _fit_deviations import deviations
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -38,18 +50,33 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
-from mg_magnifying_lever_geom import KNIFE_LOCAL_X, KNIFE_LOCAL_Y, ROD_DIA, ROD_LENGTH
+from mg_magnifying_lever_geom import (
+    KNIFE_LOCAL_X,
+    KNIFE_LOCAL_Y,
+    PRESS_ZONE_DIA,
+    PRESS_ZONE_DIA_BAND,
+    PRESS_ZONE_LENGTH,
+    PRESS_ZONE_X,
+    ROD_DIA,
+    ROD_LENGTH,
+)
 from mg_magnifying_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     END_VIEW_NOTE,
     ISO_VIEW_NOTE,
 )
@@ -58,6 +85,8 @@ PART_NAME = "mg-magnifying-lever"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
 R = ROD_DIA / 2.0
+if PRESS_ZONE_DIA != ROD_DIA:
+    raise AssertionError("the press zone is the modelled rod, not a step")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -65,12 +94,14 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the rod length and diameter. The mm
-    # suffix is load-bearing -- this is an INCH document and the equation manager
+    # Editable knobs (Tools > Equations): the rod length and diameter, and the
+    # press zone's length (the bracket collar's). The mm suffix is
+    # load-bearing -- this is an INCH document and the equation manager
     # reads BARE numbers in document units (an unsuffixed 165 = 165 in, blowing
     # the part up 25.4x).
     await set_global(adapter, "RodLength", f"{ROD_LENGTH}mm")
     await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
+    await set_global(adapter, "PressZoneLen", f"{PRESS_ZONE_LENGTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -160,6 +191,79 @@ async def build(adapter) -> dict[str, str]:
     v_rod = math.pi * R * R * (ROD_LENGTH - 2.0 * R) + 4.0 / 3.0 * math.pi * R**3
     await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
 
+    # REFERENCE sketch (blanked before save): the press zone -- see the module
+    # docstring. Witness along the rod's top outline over the zone (made
+    # construction, so the shown sketch prints no outline of its own), the
+    # axis segment under it carrying only relations. Three display dims, in
+    # creation order: the zone length between the witness's ends, the zone's
+    # end station from the origin (the dome tip; unmarked, the overall length
+    # is the note's), then the diameter to the witness's start -- doubled off
+    # the axis, the way the pivot pins print theirs.
+    zone = SketchDims()
+    check("create_sketch press zone", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    zone_axis = check(
+        "press zone axis",
+        await adapter.add_centerline(PRESS_ZONE_X[0], 0.0, PRESS_ZONE_X[1], 0.0),
+    )
+    zone_witness = check(
+        "press zone witness",
+        await adapter.add_line(PRESS_ZONE_X[0], R, PRESS_ZONE_X[1], R),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[zone_witness], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{zone_witness}: failed to become construction geometry")
+    for line in (zone_axis, zone_witness):
+        check(
+            f"press zone {line} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+    check(
+        "press zone axis on the rod axis",
+        await adapter.add_sketch_constraint(
+            f"{zone_axis}.start", "origin", "horizontal_points"
+        ),
+    )
+    for end in ("start", "end"):
+        check(
+            f"press zone axis {end} under the witness {end}",
+            await adapter.add_sketch_constraint(
+                f"{zone_axis}.{end}", f"{zone_witness}.{end}", "vertical_points"
+            ),
+        )
+    await dimension_between(
+        adapter,
+        f"{zone_witness}.start",
+        f"{zone_witness}.end",
+        "horizontal_distance",
+        PRESS_ZONE_LENGTH,
+        "press zone PressZoneLen",
+    )
+    zone.record("PressZoneLen", '"PressZoneLen"')
+    await dimension_between(
+        adapter,
+        f"{zone_witness}.end",
+        "origin",
+        "horizontal_distance",
+        PRESS_ZONE_X[1],
+        "press zone PressZoneEnd",
+    )
+    zone.record("PressZoneEnd", '"RodLength"')
+    await add_diametric_linear_dimension(
+        adapter,
+        zone_axis,
+        f"{zone_witness}.start",
+        ((PRESS_ZONE_X[0] + PRESS_ZONE_X[1]) / 2.0, R + 6.0),
+        "PressZoneDia",
+    )
+    zone.record("PressZoneDia", '"RodDia"')
+    await ensure_fully_defined(adapter, "press zone sketch")
+    check("exit_sketch press zone", await adapter.exit_sketch())
+    name_last_feature(adapter, "PressZone")
+    drive_jobs += zone.apply(adapter, "PressZone")
+
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
@@ -170,7 +274,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven rod (equations neutral)", v_rod, 0.005 * v_rod)
 
     # Named rod axis (local X through the origin = the revolve axis); the
-    # bracket collar is a loose guide around it (Ø6.2 over Ø6), not a mate.
+    # bracket collar is pressed onto the rod's east end, concentric with it.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "rod axis")
 
     # KnifeAxis (Axis2): the knife-edge pivot line, local Z through
@@ -184,9 +288,16 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: mark exactly the print's dimensions (the
-    # drawing recipe imports the marked set and must find every one of these),
-    # and stamp the make-critical title-block properties.
+    # Manufacturing drawing support: the press zone's diameter carries the
+    # geom's (upper, lower) stock band natively (policy rule 2), places come
+    # from the spec, then mark exactly the print's dimensions (the drawing
+    # recipe imports the marked set and must find every one of these) and
+    # stamp the make-critical title-block properties. The reference sketch is
+    # blanked for the assembly renders; the front view shows it per view.
+    set_dimension_bilateral_tolerance(
+        adapter, "PressZone", "PressZoneDia", *deviations(PRESS_ZONE_DIA_BAND)
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -199,6 +310,11 @@ async def build(adapter) -> dict[str, str]:
             "Iso View Note": ISO_VIEW_NOTE,
         },
     )
+    blank_reference_sketches(adapter, ("PressZone",))
+    # Annotation changes must leave the rod intact through the final rebuild,
+    # not merely at the earlier, pre-annotation equation check.
+    await force_rebuild(adapter)
+    await volume_check(adapter, "final rod (annotations neutral)", v_rod, 0.005 * v_rod)
     return await save_part_and_images(adapter, PART_NAME)
 
 
