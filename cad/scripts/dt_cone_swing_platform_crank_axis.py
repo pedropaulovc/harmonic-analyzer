@@ -7,13 +7,17 @@ drive train mates the crank to it.
 
 from __future__ import annotations
 
+import math
+
 from cone_line import (
     COS_I as _COS_I,
     PIVOT_XZ,
+    POST_STATION,
     SIN_I as _SIN_I,
     X_CRANK,
     Y_BASE_TOP,
     Y_CRANK,
+    cone_station,
 )
 from dt_cone_swing_platform_geometry import INCLINE_DEG
 
@@ -51,3 +55,29 @@ if CRANK_AXIS_OFF <= 0 or CRANK_AXIS_Y <= 0:
 # verify failure.
 CRANK_PLANE_ANGLE = INCLINE_DEG  # sign candidate (flip side)
 CRANK_SEAT_ANCHOR = (-CRANK_AXIS_OFF * _COS_I, -CRANK_AXIS_OFF * _SIN_I)
+
+
+def _swing(vector: tuple[float, float, float], angle_deg: float) -> tuple[float, float, float]:
+    """Turn a machine-frame vector by the platform's P1 swing about machine y."""
+    c, s = math.cos(math.radians(angle_deg)), math.sin(math.radians(angle_deg))
+    return c * vector[0] + s * vector[2], vector[1], -s * vector[0] + c * vector[2]
+
+
+def crank_axis_nominal_xy_mm(z_mm: float, angle_deg: float = 0.0) -> tuple[float, float]:
+    """Nominal machine (x, y) of the crank axis at the machine-z plane z_mm.
+
+    The axis passes the post station at Y_CRANK and runs along machine z;
+    a P1 swing turns it with the platform about the pivot.
+    """
+    if not math.isfinite(z_mm) or not math.isfinite(angle_deg):
+        raise ValueError("crank nominal axis requires finite Z and P1 angle")
+    pivot = (PIVOT_XZ[0], Y_BASE_TOP, PIVOT_XZ[1])
+    post = cone_station(POST_STATION)
+    post[1] = Y_CRANK
+    moved = _swing(tuple(post[i] - pivot[i] for i in range(3)), angle_deg)
+    centre = tuple(pivot[i] + moved[i] for i in range(3))
+    direction = _swing((0.0, 0.0, 1.0), angle_deg)
+    if abs(direction[2]) < 1e-12:
+        raise ValueError("nominal crank axis is parallel to the requested Z plane")
+    t = (z_mm - centre[2]) / direction[2]
+    return centre[0] + t * direction[0], centre[1] + t * direction[1]
