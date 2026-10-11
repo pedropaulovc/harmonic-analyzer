@@ -2902,11 +2902,7 @@ def task_verify():
     ]
     probe_deps = [
         str(probe.resolve()),
-        str((SCRIPTS_DIR / "_session.py").resolve()),
-        str((SCRIPTS_DIR / "_preferences.py").resolve()),
-        str((SCRIPTS_DIR / "_paths.py").resolve()),
-        str((SCRIPTS_DIR / "_check.py").resolve()),
-        str((SCRIPTS_DIR / "_com.py").resolve()),
+        str((SCRIPTS_DIR / "_common.py").resolve()),
         _sldasm("pn_pen"),
         _assembly_execution_token("pn_pen"),
         *_assembly_file_deps("pn_pen"),

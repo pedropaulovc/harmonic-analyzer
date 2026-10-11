@@ -7,11 +7,16 @@ import json
 import sys
 from typing import Any
 
-from _check import check
-from _com import _early_bound
-from _paths import CAD_ROOT, OUT_PNG, OUT_SLDASM, OUT_SLDPRT
-from _preferences import _preference_id
-from _session import run_build
+from _common import (
+    CAD_ROOT,
+    OUT_PNG,
+    OUT_SLDASM,
+    OUT_SLDPRT,
+    _early_bound,
+    _preference_id,
+    check,
+    run_build,
+)
 
 
 async def probe(adapter: Any) -> dict[str, str]:
@@ -52,6 +57,9 @@ async def probe(adapter: Any) -> dict[str, str]:
 
     before_hashes = native_hashes()
     metadata: dict[str, Any] = {
+        "infrastructure_base": "5035dbaa3278b82bc7428b68a192f328605846b7",
+        "geometry_equivalent_to": "6a85c3e5cfc97f3d78ce854f6d56e050a5a49d3b",
+        "base_reason": "Deployed farm protocol 4; CAD scripts/config/templates and adapter gitlink identical to task-start main (only _farm.py differs).",
         "assembly": assembly.relative_to(CAD_ROOT.parent).as_posix(),
         "read_only": True,
         "saved_model": False,
