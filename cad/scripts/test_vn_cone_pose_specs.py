@@ -370,7 +370,7 @@ def test_stop_inspection_floor_is_shared_by_the_nominal_seat_check(
 ) -> None:
     stop = _pure_spec("vn_swing_stop_screw_spec")
     holes = _pure_spec("_hole_spec")
-    assert stop.MIN_USEFUL_ENGAGEMENT_MM == 2.85
+    assert stop.MIN_USEFUL_ENGAGEMENT_MM == 4.27
     assert "Functional installation inspection" in stop.MIN_USEFUL_ENGAGEMENT_SOURCE
     assert "full-form" in stop.MIN_USEFUL_ENGAGEMENT_SOURCE
     seat = holes.HoleSpec(
