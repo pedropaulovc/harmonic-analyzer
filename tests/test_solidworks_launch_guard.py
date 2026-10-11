@@ -275,8 +275,16 @@ _SPACED = "C:\\never exists\\cad\\scripts\\build_tripwire_probe_never_exists.py"
         (["python", "-X", "utf8", "-u", _BUILD], None),
         (["worker", _BUILD], sys.executable),
         (["git", _BUILD], sys.executable),  # the executable, not argv[0], runs
+        (["git", "hash-object", _BUILD], sys.executable),
         (["probe"], _BUILD),
         (["python", "-m", "runpy", _BUILD], None),
+        # codex: `git -c alias.x="!python …build_x.py" x` runs the script.
+        (["git", "-c", f'alias.x="!python {_BUILD}"', "x"], None),
+        (["git", "-c", f"core.pager=python {_BUILD}", "log"], None),
+        (["git", "--config-env=core.pager=PROBE", "log", _BUILD], None),
+        (["git", "x", f"!python {_BUILD}"], None),
+        (["git", "status", _BUILD], None),  # not a read-only subcommand here
+        (["git", "-C", "repo", "-c", "core.pager=x", "show", _BUILD], None),
         (subprocess.list2cmdline(["echo", "probe"]) + " & python " + _BUILD, None),
         ("git hash-object x & python " + _BUILD, None),  # a chained second program
         (["cmd", "/c", subprocess.list2cmdline(["python", _BUILD, "--x"])], None),
@@ -304,6 +312,7 @@ def test_a_command_naming_a_com_script_counts(request, args, executable):
     [
         ["git", "hash-object", "--path", _BUILD],
         "git hash-object --path " + _BUILD,
+        ["git", "-C", "repo", "ls-files", _BUILD],
         ["C:\\Program Files\\Git\\cmd\\git.exe", "show", f"HEAD:{_BUILD}"],
         ["certutil", "-hashfile", _BUILD, "SHA256"],
         ["ruff", "check", _BUILD],
@@ -354,10 +363,25 @@ def test_pywin32_process_creation_is_refused(solidworks_launch_refusals):
 
 
 @pytest.mark.skipif(not hasattr(os, "spawnv"), reason="os.spawnv is unavailable")
-def test_spawn_of_a_com_build_script_is_refused(solidworks_launch_refusals):
+@pytest.mark.parametrize("entry", ["spawnv", "spawnl"])
+def test_spawn_of_a_com_build_script_is_refused(solidworks_launch_refusals, entry):
+    """Refused at ``os.spawnv`` itself: on POSIX it forks before any exec event."""
+    assert os.spawnv.__code__.co_name == "guarded_spawn"
+    argv = [sys.executable, str(MISSING_BUILD)]
+    if entry == "spawnv":
+        call = lambda: os.spawnv(os.P_WAIT, sys.executable, argv)  # noqa: E731
+    else:
+        call = lambda: os.spawnl(os.P_WAIT, sys.executable, *argv)  # noqa: E731
+    _expect_blocked(solidworks_launch_refusals, call)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="nt.spawnv is Windows-only")
+def test_spawn_below_os_is_refused(solidworks_launch_refusals):
+    import nt
+
     _expect_blocked(
         solidworks_launch_refusals,
-        lambda: os.spawnv(
+        lambda: nt.spawnv(
             os.P_WAIT, sys.executable, [sys.executable, str(MISSING_BUILD)]
         ),
     )

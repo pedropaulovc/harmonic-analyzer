@@ -43,8 +43,14 @@ _COM_SCRIPT_NAME = re.compile(
 # Programs that only read a script they name, judged by their first word (or,
 # for Python, its `-m` module). A shell operator voids the exemption: the
 # command could chain a second program.
-_SCRIPT_READERS = frozenset({"git", "ruff", "certutil"})
+_SCRIPT_READERS = frozenset({"ruff", "certutil"})
 _SCRIPT_READER_MODULES = frozenset({"py_compile"})
+# git reads only through these builtin subcommands, and only `-C <dir>` may come
+# before one. That refuses `-c`/`--config-env` (config such as a pager, an
+# external diff or a `!` shell alias runs any program) and every alias.
+_GIT_READ_SUBCOMMANDS = frozenset(
+    {"hash-object", "show", "log", "diff", "ls-files", "rev-parse"}
+)
 _PYTHONS = re.compile(r"(?:pythonw?[\d.]*|py)", re.IGNORECASE)
 _SHELL_OPERATORS = re.compile(r"[&|;<>\n]")
 # ctypes symbols that start a process or open a document (a part opens SolidWorks).
@@ -142,12 +148,20 @@ def _reads_only(args, executable=None):
     name = PureWindowsPath(program.strip("\"'")).name.lower().removesuffix(".exe")
     if name in _SCRIPT_READERS:
         return True
+    if name == "git":
+        return _git_reads_only(words[1:])
     return (
         bool(_PYTHONS.fullmatch(name))
         and len(words) > 2
         and words[1] == "-m"
         and words[2] in _SCRIPT_READER_MODULES
     )
+
+
+def _git_reads_only(words):
+    if words[:1] == ["-C"]:
+        words = words[2:]
+    return bool(words) and words[0] in _GIT_READ_SUBCOMMANDS
 
 
 def _com_script(args, executable=None):
@@ -222,6 +236,21 @@ def _install_launch_guard():
         return original_system(command)
 
     os.system = guarded_system
+
+    # On POSIX ``os.spawn*`` fork and exec in Python, so the child (not the test)
+    # meets the ``os.exec`` audit event; refuse at the entry points instead.
+    def guard_spawn(original):
+        @functools.wraps(original)
+        def guarded_spawn(mode, file, args, *rest):
+            if _acts_on_host(list(args), file):
+                _refuse(f"os.{original.__name__}", args)
+            return original(mode, file, args, *rest)
+
+        return guarded_spawn
+
+    for name in ("spawnv", "spawnve", "spawnvp", "spawnvpe"):
+        if hasattr(os, name):
+            setattr(os, name, guard_spawn(getattr(os, name)))
 
     if sys.platform == "win32":
         import _winapi
