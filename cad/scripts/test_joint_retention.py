@@ -301,8 +301,14 @@ def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:
     ruling = jr.RULINGS[row.exception]
     assert ruling.joint == joint_id
     assert "waived; light spring preload and small hub drag; Loctite 222" in ruling.granted
-    assert "WITH LOCTITE 222; SNUG." in channel.FITUP_STEPS
-    assert "TIGHTEN" not in channel.FITUP_STEPS
+    # This waiver belongs to the pivot bank, not the separate fulcrum stack:
+    # the latter tightens its crown screws and positively stakes both mouths.
+    rocker_fitup, fulcrum_fitup = channel.FITUP_NOTES
+    assert "WITH LOCTITE 222; SNUG." in rocker_fitup
+    assert "TIGHTEN" not in rocker_fitup
+    assert "TIGHTEN" in fulcrum_fitup
+    assert "STAKE" in fulcrum_fitup
+    assert jr._config.parts("vn-arbor-set-screw")["number"] not in fulcrum_fitup
 
     def unlocked(rulings) -> set[str]:
         findings = jr.audit(

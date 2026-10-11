@@ -26,6 +26,14 @@ NORTH_BRACKET_SET_REF = dt_drive_train_steps.step_ref(NORTH_BRACKET_SET_KEY)
 CYLINDER_STACK_KEY = "cylinder-stack-accepted"
 CYLINDER_STACK_REF = dt_drive_train_steps.step_ref(CYLINDER_STACK_KEY)
 RODS_PINNED_KEY = "rod-forks-pinned"
+# The fulcrum shaft's end keepers (MHA-CH-007) are reamed as a pair at the
+# bench, so their bores share one axis whatever their printed bore heights;
+# the pair is then set on the top frame by DRO with the shaft through both
+# (the frame's keeper taps are transferred from the foot holes), and the set
+# screws are staked once the shaft carries the lever bank.
+KEEPERS_PAIR_REAMED_KEY = "fulcrum-keepers-pair-reamed"
+KEEPERS_SET_KEY = "fulcrum-keepers-set"
+SET_SCREWS_STAKED_KEY = "fulcrum-set-screws-staked"
 
 SEQUENCE: tuple[str, ...] = (
     "rocker-stack-accepted",
@@ -36,6 +44,9 @@ SEQUENCE: tuple[str, ...] = (
     "shaft-cut-to-fit",
     "set-screws-driven",
     "preload-accepted",
+    KEEPERS_PAIR_REAMED_KEY,
+    KEEPERS_SET_KEY,
+    SET_SCREWS_STAKED_KEY,
 )
 
 _NUMBER = {key: index for index, key in enumerate(SEQUENCE, start=1)}

@@ -334,6 +334,10 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
+            # MHA-SM-004 #6-32 major in the #36 drill through the 8.0 end plug.
+            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                3.505, 2.705, 8.0
+            ),
         }
     )
 
@@ -479,6 +483,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # Stock 9490T1: #10-24 major, #25 drill, 0.75-in boss engagement.
             frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
+            ),
+            # MHA-SM-004 #6-32 major, #36 drill, 8.0 through-tapped end plug.
+            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                3.505, 2.705, 8.0
             ),
         },
         "pn-pen": {
@@ -684,9 +692,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "ch-channel-1/vn-frame-side-screw",
                 range(1, 3),
                 "fr-frame-1/fr-top-frame",
-                4.1656,
-                3.454,
-                8.6624,
+                2.1844,
+                1.778,
+                5.2207,
             ),
             # #743 PR2: MHA-VN-032 #8-32 x 3/4 through the 6.0 rocker-bracket
             # foot, one per bracket since the 2026-10-09 flip.
@@ -757,6 +765,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # channel j's bar or rod only. MHA-VN-034: each #4-40 apex set screw's
     # thread in its MHA-CH-008 ear's tap, over the R8 arch less the Ø6.5
     # bore's height at the Ø2.845 envelope's edge; screw n in bracket n.
+    # MHA-VN-055: each #1-72 x 5/32 keeper set screw in its own keeper's
+    # crown tap (#53 drill).
     channel_allowed = _interference_contracts.allowed_interference_pairs("ch-channel")
     assert channel_allowed == pytest.approx(
         {
@@ -779,6 +789,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                     2.845, 2.261, 8.0 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
                 )
                 for n in (1, 2)
+            },
+            **{
+                frozenset(
+                    (f"vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}")
+                ): _annulus_limit(1.854, 1.511, 3.96875)
+                for n in range(1, 3)
             },
         }
     )

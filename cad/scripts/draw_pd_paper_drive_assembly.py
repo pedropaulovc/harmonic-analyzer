@@ -1598,18 +1598,18 @@ def _place_assembled_sheet(adapter: Any) -> Any:
     """Front, right and isometric of the whole drive; returns the isometric,
     centred so its balloon ring keeps inside ISO_RING_LIMITS."""
     _activate_sheet(adapter, SHEET_NAMES[0])
-    for view_name, center in (
+    for orientation, center in (
         ("*Front", FRONT_CENTER),
         ("*Right", RIGHT_CENTER),
         ("*Isometric", ISO_CENTER),
     ):
         view = place_view(
-            adapter, str(SOURCE), view_name, *center, scale=ASSEMBLED_SCALE
+            adapter, str(SOURCE), orientation, *center, scale=ASSEMBLED_SCALE
         )
         # The isometric is the drawing's full-detail view.
-        role = ViewRole.FULL_DETAIL if view_name == "*Isometric" else ViewRole.PLAIN
+        role = ViewRole.FULL_DETAIL if orientation == "*Isometric" else ViewRole.PLAIN
         apply_view_configuration(
-            adapter, view, role=role, label=f"paper drive {view_name}"
+            adapter, view, role=role, label=f"paper drive {orientation}"
         )
     label = "sheet 1 isometric"
     scale, outline = step_down_to_fit(

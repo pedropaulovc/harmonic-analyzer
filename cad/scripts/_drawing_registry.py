@@ -544,6 +544,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="sm_gooseneck_spring_screw",
+        part="sm_gooseneck_spring_screw",
+        artifact_stem="sm-gooseneck-spring-screw",
+        script_name="draw_sm_gooseneck_spring_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ha_measuring_stick",
         part="ha_measuring_stick",
         artifact_stem="ha-measuring-stick",
@@ -1129,6 +1136,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="vn_arbor_set_screw",
         artifact_stem="vn-arbor-set-screw",
         script_name="draw_vn_arbor_set_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_fulcrum_set_screw",
+        part="vn_fulcrum_set_screw",
+        artifact_stem="vn-fulcrum-set-screw",
+        script_name="draw_vn_fulcrum_set_screw.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

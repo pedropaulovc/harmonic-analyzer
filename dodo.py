@@ -3151,6 +3151,8 @@ def task_check():
         # ... and #937: the cylinder-bank layout bands and MHA-VN-034's set screw.
         SCRIPTS_DIR / "test_vn_arbor_set_screw.py",
         SCRIPTS_DIR / "test_cylinder_bank_layout.py",
+        # ... and MHA-VN-055, the fulcrum keepers' #1-72 cup-point set screw.
+        SCRIPTS_DIR / "test_vn_fulcrum_set_screw.py",
         # ... and #936: the rocker-bank stack, the support's bracket seats, the
         # channel's cross-bank axial budget and the hole-callout process line.
         SCRIPTS_DIR / "test_channel_axial_budget.py",
@@ -3163,6 +3165,7 @@ def task_check():
         SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
         SCRIPTS_DIR / "test_ch_pivot_bracket_spec.py",
         SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",
+        SCRIPTS_DIR / "test_sm_gooseneck_spring_joint.py",
         # The amplitude bar's pressed MHA-CH-011 pin: its worst-case press,
         # running fit and flush-end gap budget, pinned to their sources.
         SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",
