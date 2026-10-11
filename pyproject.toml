@@ -11,7 +11,7 @@ requires-python = ">=3.12,<3.15"
 # diff tooling import directly.
 #   doit      - pipeline orchestrator (dodo.py)
 #   pyyaml    - cad/config registry parsing (_config.py, gen_dimensions.py)
-#   pillow    - PNG export/trim (_common, trim_renders, cad/comparisons/tools)
+#   pillow    - PNG export/trim (_part_save, trim_renders, cad/comparisons/tools)
 #   numpy     - geometry / Hausdorff diff (render_diff, release_diff)
 #   trimesh   - mesh diff (render_diff.py, the SolidWorks-free release diff)
 #   matplotlib- offline render fallback (render_diff_mpl)
@@ -48,7 +48,7 @@ dependencies = [
     # HTTP or to Azure Monitor Agent's local gRPC endpoint.
     "opentelemetry-exporter-otlp-proto-http>=1.20",
     "opentelemetry-exporter-otlp-proto-grpc>=1.20",
-    # The SolidWorks COM adapter + gate logic (verify.py, _common.py, _assembly.py
+    # The SolidWorks COM adapter + gate logic (verify.py, _session.py, _com.py, _assembly.py
     # all `from solidworks_mcp...`) lives in the sibling repo. Pulled in editable so
     # the whole pipeline runs from this one uv venv.
     "solidworks-mcp-python",

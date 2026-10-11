@@ -17,246 +17,27 @@ because live SW 2026 constrains imported datum positions and interprets
 imported FCF leader endpoints in model space (probed 2026-07-29,
 ``diagnostics/probe_pmi_plain_annotations.py``).
 
-Part tier only: imports ``_common`` + ``_gtol_spec`` + the adapter — never a
-drawing or assembly module (``check:partiso``).
+Part tier only: imports ``_com`` + the focused GD&T contracts and face
+resolver + the adapter — never a drawing or assembly module (``check:partiso``).
 """
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass
 from typing import Any, Sequence
 
 import _telemetry
-from _common import _bind, _com_invoke, _early_bound
-from _gtol_spec import (
-    GTOL_SYMBOLS,
-    ConeFace,
-    CylinderFace,
-    FaceSpec,
-    GeometricControl,
-    PartDatum,
-    PlanarFace,
-    SphereFace,
-    TorusFace,
-    gtol_frame_signature,
-    validate_part_pmi,
-)
+from _com import _early_bound
+from _gtol_controls import GeometricControl, PartDatum, validate_part_pmi
+from _gtol_face import FaceSpec
+from _gtol_face_read import face_geometry
+from _gtol_face_resolve import resolve_faces
+from _gtol_frame import gtol_frame_signature
+from _gtol_symbols import GTOL_SYMBOLS
 from _surface_finish import SurfaceFinishControl
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
-# swSurfaceTypes_e identities read via ISurface.Identity.
-_SURFACE_PLANE = 4001
-_SURFACE_CYLINDER = 4002
-_SURFACE_CONE = 4003
-_SURFACE_SPHERE = 4004
-_SURFACE_TORUS = 4005
-
 _GTOL_CURRENT_FORMAT = 2  # swGtolFormatType_e.GTOL_SW2022
 _SELECT_FACE = 2  # swSelectType_e.swSelFACES
-
-
-@dataclass(frozen=True)
-class _FaceGeometry:
-    face: Any
-    identity: int
-    parameters: tuple[float, ...]
-    outward_normal: tuple[float, float, float] | None
-    box: tuple[float, ...]
-
-
-def _unit(vector: Sequence[float]) -> tuple[float, float, float]:
-    x, y, z = (float(c) for c in vector)
-    norm = (x * x + y * y + z * z) ** 0.5
-    if norm == 0.0:
-        raise ValueError("zero-length direction")
-    return (x / norm, y / norm, z / norm)
-
-
-# The ISurface accessor that holds each supported identity's parameters.
-_PARAMETERS = {
-    _SURFACE_CYLINDER: "CylinderParams",
-    _SURFACE_CONE: "ConeParams2",
-    _SURFACE_PLANE: "PlaneParams",
-    _SURFACE_SPHERE: "SphereParams",
-    _SURFACE_TORUS: "TorusParams",
-}
-_SPEC_IDENTITY = {
-    CylinderFace: _SURFACE_CYLINDER,
-    ConeFace: _SURFACE_CONE,
-    PlanarFace: _SURFACE_PLANE,
-    SphereFace: _SURFACE_SPHERE,
-    TorusFace: _SURFACE_TORUS,
-}
-
-
-def _face_geometry(
-    face: Any, *, identities: frozenset[int] | None = None
-) -> _FaceGeometry | None:
-    """Read one face's surface identity, parameters, sense and box.
-
-    Every read is one raw round trip (``_common._com_invoke``): through the
-    generated wrapper each returned surface cost three more (type info and a
-    ``QueryInterface``) on every face a walk only steps over.  ``face`` comes
-    back as given.  With ``identities``, a face whose surface is not one of
-    them stops after its identity: no spec of another type can match it.
-    """
-    surface = _com_invoke(face, "IFace2", "GetSurface")
-    if surface is None:
-        return None
-    identity = int(_com_invoke(surface, "ISurface", "Identity"))
-    accessor = _PARAMETERS.get(identity)
-    if accessor is None or (identities is not None and identity not in identities):
-        return _FaceGeometry(face, identity, (), None, ())
-    parameters = tuple(_com_invoke(surface, "ISurface", accessor))
-    normal = None
-    if identity == _SURFACE_PLANE:
-        normal = _unit(parameters[0:3])
-        if bool(_com_invoke(face, "IFace2", "FaceInSurfaceSense")):
-            normal = (-normal[0], -normal[1], -normal[2])
-    return _FaceGeometry(
-        face=face,
-        identity=identity,
-        parameters=parameters,
-        outward_normal=normal,
-        box=tuple(_com_invoke(face, "IFace2", "GetBox") or ()),
-    )
-
-
-def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
-    tolerance_m = spec.tolerance_mm / 1000.0
-    if isinstance(spec, CylinderFace):
-        if geometry.identity != _SURFACE_CYLINDER:
-            return False
-        # CylinderParams: origin xyz, axis xyz, radius — meters.  The spec's
-        # tolerance is a DIAMETER tolerance, so compare diameter to diameter.
-        diameter_m = 2.0 * geometry.parameters[6]
-        if abs(diameter_m - spec.diameter_mm / 1000.0) > tolerance_m:
-            return False
-        stations = (spec.contains_x_mm, spec.contains_y_mm, spec.contains_z_mm)
-        if all(station is None for station in stations):
-            return True
-        if len(geometry.box) != 6:
-            return False
-        for axis, station in enumerate(stations):
-            if station is None:
-                continue
-            value = station / 1000.0
-            low = geometry.box[axis] - tolerance_m
-            high = geometry.box[axis + 3] + tolerance_m
-            if not low <= value <= high:
-                return False
-        return True
-    if isinstance(spec, ConeFace):
-        if geometry.identity != _SURFACE_CONE:
-            return False
-        # ConeParams2: origin xyz, axis xyz, reference radius, half-angle,
-        # reference direction xyz. The angle is radians.
-        if abs(math.degrees(geometry.parameters[7]) - spec.half_angle_degrees) > (
-            spec.tolerance_degrees
-        ):
-            return False
-        if spec.contains_x_mm is None:
-            return True
-        if len(geometry.box) != 6:
-            return False
-        x = spec.contains_x_mm / 1000.0
-        return geometry.box[0] - tolerance_m <= x <= geometry.box[3] + tolerance_m
-    if isinstance(spec, PlanarFace):
-        if geometry.identity != _SURFACE_PLANE or geometry.outward_normal is None:
-            return False
-        want = _unit(spec.normal)
-        if sum(a * b for a, b in zip(geometry.outward_normal, want)) < 0.999:
-            return False
-        offset = sum(
-            point * normal
-            for point, normal in zip(geometry.parameters[3:6], geometry.outward_normal)
-        )
-        if abs(offset - spec.offset_mm / 1000.0) > tolerance_m:
-            return False
-        if spec.contains_x_mm is None and spec.contains_z_mm is None:
-            return True
-        if len(geometry.box) != 6:
-            return False
-        for axis, station in ((0, spec.contains_x_mm), (2, spec.contains_z_mm)):
-            if station is None:
-                continue
-            value = station / 1000.0
-            low = geometry.box[axis] - tolerance_m
-            high = geometry.box[axis + 3] + tolerance_m
-            if not low <= value <= high:
-                return False
-        return True
-    if isinstance(spec, SphereFace):
-        if geometry.identity != _SURFACE_SPHERE:
-            return False
-        center = geometry.parameters[0:3]
-        radius = geometry.parameters[3]
-        if abs(2.0 * radius - spec.diameter_mm / 1000.0) > tolerance_m:
-            return False
-        if spec.center_mm is None:
-            return True
-        return all(
-            abs(actual - expected / 1000.0) <= tolerance_m
-            for actual, expected in zip(center, spec.center_mm)
-        )
-    if isinstance(spec, TorusFace):
-        if geometry.identity != _SURFACE_TORUS:
-            return False
-        center = geometry.parameters[0:3]
-        major_radius = geometry.parameters[6]
-        minor_radius = geometry.parameters[7]
-        if abs(major_radius - spec.major_radius_mm / 1000.0) > tolerance_m:
-            return False
-        if abs(minor_radius - spec.minor_radius_mm / 1000.0) > tolerance_m:
-            return False
-        if spec.center_mm is None:
-            return True
-        return all(
-            abs(actual - expected / 1000.0) <= tolerance_m
-            for actual, expected in zip(center, spec.center_mm)
-        )
-    raise TypeError(f"unsupported face spec: {spec!r}")
-
-
-@_telemetry.traced("pmi.resolve_faces")
-def _resolve_faces(model: Any, requests: dict[str, FaceSpec]) -> dict[str, Any]:
-    """Resolve every face spec in one document traversal.
-
-    The previous implementation retraversed every body and reread every
-    surface once per annotation (36 traversals across the ten migrated parts).
-    One traversal per part cuts that to ten and reads each face's COM geometry
-    once, while keeping the exact-one-match contract per annotation.  The walk
-    is raw and binds only the faces it returns; a face whose surface type no
-    request names costs two reads.
-    """
-    wanted = {_SPEC_IDENTITY.get(type(spec)) for spec in requests.values()}
-    # An unsupported spec reads every face so _face_matches still names it.
-    identities = None if None in wanted else frozenset(wanted)
-    matches: dict[str, list[Any]] = {label: [] for label in requests}
-    walked = 0
-    part = _early_bound(model, "IPartDoc")
-    for body in part.GetBodies2(0, False) or ():
-        face = _com_invoke(body, "IBody2", "GetFirstFace")
-        while face is not None:
-            walked += 1
-            geometry = _face_geometry(face, identities=identities)
-            if geometry is not None:
-                for label, spec in requests.items():
-                    if _face_matches(geometry, spec):
-                        matches[label].append(face)
-            face = _com_invoke(face, "IFace2", "GetNextFace")
-    _telemetry.annotate(requests=len(requests), faces=walked)
-
-    resolved: dict[str, Any] = {}
-    for label, candidates in matches.items():
-        if len(candidates) != 1:
-            raise RuntimeError(
-                f"{label}: face spec {requests[label]!r} matched "
-                f"{len(candidates)} faces; the spec must identify exactly one"
-            )
-        resolved[label] = _bind(candidates[0], "IFace2")
-    return resolved
 
 
 def _select_face(model: Any, face: Any, *, label: str) -> None:
@@ -285,8 +66,8 @@ def _verify_attachment(annotation: Any, spec: FaceSpec, *, label: str) -> None:
             f"{label}: annotation attachment mismatch: "
             f"entities={len(entities)}, types={entity_types!r}; expected one face"
         )
-    geometry = _face_geometry(entities[0])
-    if geometry is None or not _face_matches(geometry, spec):
+    geometry = face_geometry(entities[0])
+    if geometry is None or not spec.matches(geometry):
         raise RuntimeError(f"{label}: annotation attached to the wrong face")
 
 
@@ -316,7 +97,7 @@ def author_part_pmi(
         controls=len(controls),
         surface_finishes=len(surface_finishes),
     ):
-        resolved_faces = _resolve_faces(model, requests)
+        resolved_faces = resolve_faces(model, requests)
         for datum in datums:
             face = resolved_faces[datum.key]
             _select_face(model, face, label=f"datum {datum.letter}")

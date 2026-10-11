@@ -30,7 +30,10 @@ from typing import Any, NamedTuple
 from collections.abc import Iterable, Mapping, Sequence
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
+from _check import check
+from _com import _early_bound, _read_member
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_annotation_extent import (
     CLEAR_GAP_M,
     PLACE_SETTLE_M,

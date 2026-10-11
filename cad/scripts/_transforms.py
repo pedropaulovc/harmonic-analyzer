@@ -1,5 +1,5 @@
 """Placement math + STL bbox: Euler/rotation conversion, rotation-row
-constants and the cached STL bounding-box reader. Split out of _common so
+constants and the cached STL bounding-box reader. Kept separate from _session so
 assembly placement math can change without invalidating any part build.
 """
 from __future__ import annotations
@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 import struct
 
-from _common import OUT_STL
+from _paths import OUT_STL
 
 _STL_BBOX_CACHE: dict[str, tuple[tuple[float, float], ...]] = {}
 

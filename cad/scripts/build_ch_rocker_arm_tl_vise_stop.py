@@ -26,33 +26,33 @@ import math
 import sys
 from typing import Any
 
-from _common import (
-    SketchDims,
-    _feature_by_name,
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import (
     _display_dimensions,
     _dim_value_mm,
-    _early_bound,
     _rename_dimensions,
+    drive_dimension,
+    name_dimensions,
+    set_global,
+)
+from _extrude import extrude_at_offset
+from _feature_tree import _feature_by_name, name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
+    SketchDims,
     add_line_chain,
     anchor_point_to_origin,
     anchor_point_to_point,
-    apply_material,
-    check,
-    define_rectilinear_chain,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_rectilinear_chain
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -60,7 +60,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _holes import find_planar_face
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_vise_stop_spec import (

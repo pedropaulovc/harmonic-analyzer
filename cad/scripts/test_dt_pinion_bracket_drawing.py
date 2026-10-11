@@ -12,7 +12,9 @@ import build_dt_pinion_bracket as bracket
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import REAM_H7, REAM_SLIDE, deviations
+from _fit_ream_h7 import REAM_H7
+from _fit_ream_slide import REAM_SLIDE
+from _fit_deviations import deviations
 
 
 def test_required_drawing_paths() -> None:

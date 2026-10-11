@@ -31,11 +31,13 @@ import math
 from dataclasses import dataclass
 
 import _telemetry
-from _common import (
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check
+from _feature_tree import name_last_feature
+from _part_checks import volume_check
 from diagnostics.diag_mcmaster_lib import (
     _rev_frustum,
     insert_helix,
@@ -101,7 +103,9 @@ class HexHeadScrew:
 
 
 async def build_hex_head_screw(adapter, dims: HexHeadScrew) -> None:
-    from _common import add_line_chain, _early_bound, _feature_by_name, _read_member
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
+    from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 

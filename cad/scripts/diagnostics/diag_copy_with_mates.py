@@ -46,7 +46,12 @@ import pythoncom  # noqa: E402
 from win32com.client import VARIANT  # noqa: E402
 
 import _telemetry  # noqa: E402
-from _common import check, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _session import run_build  # noqa: E402
 from _assembly import (  # noqa: E402
     _mate_hard_error,
     component_names,

@@ -20,7 +20,11 @@ import time
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
-from _common import _early_bound  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound  # noqa: E402
 from _transforms import ROT_X_NEG90  # noqa: E402
 import _telemetry  # noqa: E402
 from build_pd_paper_drive_assembly import SPARE_GEAR_POS  # noqa: E402

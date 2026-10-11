@@ -21,24 +21,17 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    SketchDims,
-    _early_bound,
-    add_line_chain,
-    apply_material,
-    check,
-    define_rectilinear_chain,
-    drive_dimension,
-    ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
-)
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch_chains import define_rectilinear_chain
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,

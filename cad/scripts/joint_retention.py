@@ -40,6 +40,7 @@ import _config
 import ch_channel_assembly_steps
 import dt_drive_train_steps
 import pd_paper_drive_assembly_steps
+import sm_gooseneck_spring_screw_geom as gooseneck_screw
 
 
 class Enforcement(StrEnum):
@@ -583,7 +584,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_foot_screw",  # #4-40 fillister (90280A108), member into harmonic_base via pinion_spring foot (top level)
         "vn_frame_cross_screw",  # #10-32 UNF-2A x 1-3/4 (McMaster 90280A837), member: 4 into harmonic_base, 4 into top_frame
         "vn_frame_side_screw",  # #8-32 narrow fillister (McMaster 90280A194, MHA-VN-022); member, x2 into top_frame KeeperTaps (top-level row)
-        "sm_gooseneck",  # #6-32 UNC integral slotted spring screw in the brazed end-plug tap (member AND receiver, one component); also the post the frame's 1/4-20 set screw bears on
+        "sm_gooseneck",  # receiver: through-tapped brazed end plug; also the post gripped by the frame's set screw
+        "sm_gooseneck_spring_screw",  # made MHA-SM-004 fillister: clamps the counter-spring upper eye to the plug
         "vn_gooseneck_set_screw",  # 1/4-20 UNC square-head cup point (91410A538), member: into top_frame hub tap, grips summing gooseneck
         "vn_guide_lock_screw",  # #4-40 button head (McMaster 91255A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
         "vn_hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
@@ -639,7 +641,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_cone_gear",  # slides on the MHA-DT-004 D-flat, no thread
         "dt_cone_pivot_post",  # clamped part: counterbored clearance for MHA-VN-031; journals only
         "ch_connecting_rod",  # strap bore on cam + reamed pin hole (pressed MHA-CH-010 pin)
-        "vn_counter_spring",  # 1330K524 extension spring: eyes hook the gooseneck screw shank and the boss-hook eye, no thread
+        "vn_counter_spring",  # 1330K524 extension spring: upper eye clamped on the MHA-SM-004 screw, lower eye hooks the boss-hook eye, no thread
         "dt_crank_drive_gear",  # slides on the MHA-DT-004 D-flat against its collar, no thread
         "dt_crank_handle",  # oak handle, runs on the MHA-DT-032 shoulder
         "dt_crank_handle_butt_cup",  # bonded in the handle butt; pocket bored for the MHA-DT-032 head, no thread
@@ -1415,30 +1417,38 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="sm-summing/gooseneck-spring-screw",
         assembly="sm_summing",
-        member="sm_gooseneck",
+        member="sm_gooseneck_spring_screw",
         receiver="sm_gooseneck",
-        thread="#6-32 UNC",
+        thread=gooseneck_screw.THREAD,
         quantity=1,
-        installed_at="",
-        exposure=Exposure.OSCILLATING,
+        installed_at="model Manufacturing Notes: upper-eye clamp",
+        exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "the counter spring's double-loop top eye encircles the exposed shank coaxially and swings with "
-            "every rock of the summing lever, so its rubbing friction acts directly about the screw axis in "
-            "alternating senses"
+            "user ruling 2026-09-21: tighten the head to clamp the supplier upper-eye "
+            "band against the plug face. Clamp preload prevents eye rotation relative "
+            "to the screw and plug; the spring flexes below this static joint, not by "
+            "swivelling on the thread. No operating rubbing torque reaches the screw axis."
         ),
         axial_capture=(
-            "slotted round-head #6-32 x 14 set to 8.00 +/-0.25 exposed shank in the 6.0-deep tap in the "
-            "brazed end plug; the head does not seat on the end face (it is the eye retainer), so the screw "
-            "carries no clamp preload"
+            "made MHA-SM-004 fillister head clamps the double-loop band to the brazed "
+            "plug end face; full thread engagement is limited by the through-tapped "
+            "plug. The screw tip continues into the hollow arm, not into a blind bottom."
         ),
         lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
         evidence=(
-            "sm_gooseneck_spec.py DRAWING_NOTES items 3-5 (BRAZE PLUG, TAP #6-32 X 6.0, SPRING SCREW ... 8.00 "
-            "+/-0.25 SHANK EXPOSED ... MODELED INTEGRAL); build_sm_gooseneck.py docstring + 'EndScrew' revolve; "
-            "sm_gooseneck_geom.SCREW_SHANK_LEN/PLUG_T; build_sm_summing_assembly.py _assert_counter_spring_top_hang"
+            "user, 2026-09-21, binding upper-eye clamp ruling: static nonrotating "
+            "eye, no threadlocker; sm_gooseneck_spring_joint.py "
+            "ENGAGEMENT_MIN/HEAD_RETENTION_MIN/EYE_FULL_THREAD_OVERLAP_MIN/"
+            "SCREW_REACH/TIP_PROTRUSION_MIN; "
+            "build_sm_summing_assembly.py gooseneck spring screw lock_mate "
+            "(CAD restraint, not mechanical locking hardware); the installation "
+            "step is printed as note 3 on the MHA-SM-004 sheet "
+            "(sm_gooseneck_spring_screw_spec.CLAMP_INSTRUCTION, stamped as the "
+            "screw's Manufacturing Notes and property-linked by "
+            "draw_sm_gooseneck_spring_screw) and repeated in the summing "
+            "assembly's Manufacturing Notes property (UPPER_EYE_CLAMP_NOTES; the "
+            "legacy three-view summing sheet prints no notes until built out, "
+            "policy rule 9); _assert_counter_spring_top_hang"
         ),
     ),
     Joint(
@@ -1666,7 +1676,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_mg_magnifier_assembly.py:build ('thumb-screw (clamp)', lock_mate 'thumb-screw locked to clamp'; "
             "docstring 'Documented simplifications'); build_mg_magnifying_clamp.py ScrewHole HoleSpec('tapped','#4-40'); "
-            "mg_magnifying_clamp_spec.py DRAWING_NOTES; diag_mcmaster_thumb.py THUMB_SPECS['91882A221']"
+            "mg_magnifying_clamp_spec.py DRAWING_NOTES; _mcmaster_91882a221.py THUMB_SPEC"
         ),
     ),
     Joint(
@@ -2063,7 +2073,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "sm_summing", "build_sm_summing_assembly.py", "boss-hook keyed"
     ),
     "sm-summing/gooseneck-spring-screw": Occurrence(
-        "sm_summing", "sm_gooseneck_spec.py", "SPRING SCREW"
+        "sm_summing", "build_sm_summing_assembly.py", '"sm-gooseneck-spring-screw"'
     ),
     "pn-pen/hanger-screw-in-hanger": Occurrence(
         "pn_pen", "build_pn_pen_assembly.py", "HANGER_SCREW_POS"

@@ -17,8 +17,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-import _common  # noqa: F401  -- diagnostics import shim
-from _common import _early_bound, _read_member, check, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _com import _early_bound, _read_member  # noqa: E402
+from _session import run_build  # noqa: E402
 from _assembly import component_transform, place_component  # noqa: E402
 
 import build_dt_drive_train_assembly as dta  # noqa: E402

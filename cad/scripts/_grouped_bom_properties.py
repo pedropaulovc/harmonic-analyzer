@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import _telemetry
-from _common import _early_bound
+from _com import _early_bound
 
 
 # A shop fixture carries its parent part's Number plus ``-TL-nn``.

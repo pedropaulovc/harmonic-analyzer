@@ -34,23 +34,16 @@ import math
 import sys
 
 import _telemetry
-from _common import (
-    SketchDims,
-    _early_bound,
-    _read_member,
-    apply_material,
-    check,
-    define_circle,
-    drive_dimension,
-    ensure_fully_defined,
-    feature_name_by_type,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    set_global,
-)
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound, _read_member
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import feature_name_by_type, name_last_feature
+from _part_checks import report_mass_properties
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, ensure_fully_defined
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -58,7 +51,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _drawing_simplified import save_simplified_part
+from _simplified_part import save_simplified_part
 from _gear import build_fixed_gear, volume_check
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
@@ -101,8 +94,8 @@ MANUFACTURING_NOTES = "\n".join(
 PART_NAME = "pd-rack-pinion"
 MATERIAL = "Brass"  # ch. 23 photos: brass
 
-# The paper-drive assembly reads TEETH, DP and FACE_WIDTH from here
-# (test_buildgraph pins that edge).
+# The paper-drive assembly reads TEETH, DIAMETRAL_PITCH and FACE_WIDTH from
+# pd_rack_pinion_spec without folding this part builder into its recipe.
 DP = DIAMETRAL_PITCH
 BORE_DIAMETER = BORE_DIA
 

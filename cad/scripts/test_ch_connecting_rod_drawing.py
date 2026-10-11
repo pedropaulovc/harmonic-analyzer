@@ -337,7 +337,7 @@ def test_reamed_pin_hole_band_prints_at_the_value_s_places(
     import _drawing_marks
     import inspect
 
-    from _fit_limits import deviations
+    from _fit_deviations import deviations
 
     spec = ch_connecting_rod_spec
     value_places = ch_connecting_rod_notes.DRAWING_PRECISION["PinHoleProfile"][

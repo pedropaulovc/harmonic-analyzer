@@ -25,7 +25,8 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-import _common
+import _paths
+import _session
 import _seat_forensics  # noqa: E402
 import _telemetry
 import _watchdog
@@ -316,28 +317,28 @@ def test_run_build_cleans_up_when_session_setup_fails(
         "solidworks_mcp.adapters.pywin32_adapter",
         SimpleNamespace(PyWin32Adapter=constructor),
     )
-    monkeypatch.setattr(_common._watchdog, "start", Mock())
-    monkeypatch.setattr(_common._watchdog, "stop", Mock())
-    monkeypatch.setattr(_common, "discard_open_documents", Mock())
+    monkeypatch.setattr(_watchdog, "start", Mock())
+    monkeypatch.setattr(_watchdog, "stop", Mock())
+    monkeypatch.setattr(_session, "discard_open_documents", Mock())
     monkeypatch.setattr(
-        _common, "_resident_output_documents", lambda _adapter: ["stuck.SLDDRW"]
+        _session, "_resident_output_documents", lambda _adapter: ["stuck.SLDDRW"]
     )
-    monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
+    monkeypatch.setattr(_telemetry, "shutdown", Mock())
     monkeypatch.setattr(sys, "argv", ["build_probe.py"])
     monkeypatch.delenv("TRACEPARENT", raising=False)
     build = AsyncMock()
 
-    assert _common.run_build(build) == 1
+    assert _session.run_build(build) == 1
     build.assert_not_awaited()
     adapter.disconnect.assert_awaited_once_with()
     # Setup discarded once and failed on the survivor; teardown still discards
     # (the seat must be left empty even when the session never built).
-    assert _common.discard_open_documents.call_args_list == [
+    assert _session.discard_open_documents.call_args_list == [
         ((adapter,),),
         ((adapter,),),
     ]
-    _common._watchdog.start.assert_called_once_with()
-    _common._watchdog.stop.assert_called_once_with()
+    _watchdog.start.assert_called_once_with()
+    _watchdog.stop.assert_called_once_with()
 
 
 def _seat(
@@ -385,7 +386,7 @@ def _seat(
     return adapter, app
 
 
-def _session(
+def _run_session(
     monkeypatch: pytest.MonkeyPatch, adapter: SimpleNamespace
 ) -> SimpleNamespace:
     """Run one clean ``run_build`` session; return its warnings and success fields."""
@@ -395,30 +396,30 @@ def _session(
         "solidworks_mcp.adapters.pywin32_adapter",
         SimpleNamespace(PyWin32Adapter=Mock(return_value=adapter)),
     )
-    monkeypatch.setattr(_common._watchdog, "start", Mock())
-    monkeypatch.setattr(_common._watchdog, "stop", Mock())
-    monkeypatch.setattr(_common, "discard_open_documents", Mock())
-    monkeypatch.setattr(_common, "_resident_output_documents", lambda _adapter: [])
-    monkeypatch.setattr(_common, "_pin_default_part_template", Mock())
+    monkeypatch.setattr(_watchdog, "start", Mock())
+    monkeypatch.setattr(_watchdog, "stop", Mock())
+    monkeypatch.setattr(_session, "discard_open_documents", Mock())
+    monkeypatch.setattr(_session, "_resident_output_documents", lambda _adapter: [])
+    monkeypatch.setattr(_session, "_pin_default_part_template", Mock())
     # Seat provenance is resolved once per PROCESS and cached in a module
     # global, so one session's reading (or its failure) would otherwise leak
     # into every later test in the same pytest run.
     monkeypatch.setattr(_seat_forensics, "_seat_identity", {})
-    monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
+    monkeypatch.setattr(_telemetry, "shutdown", Mock())
     monkeypatch.setattr(sys, "argv", ["build_probe.py"])
     monkeypatch.delenv("TRACEPARENT", raising=False)
     session = SimpleNamespace(warnings=[], fields={})
     monkeypatch.setattr(
-        _common._telemetry,
+        _telemetry,
         "warn",
         lambda message, **_f: session.warnings.append(message),
     )
     monkeypatch.setattr(
-        _common._telemetry,
+        _telemetry,
         "success",
         lambda _message, **fields: session.fields.update(fields),
     )
-    assert _common.run_build(AsyncMock(return_value={})) == 0
+    assert _session.run_build(AsyncMock(return_value={})) == 0
     return session
 
 
@@ -436,10 +437,10 @@ def test_teardown_moves_the_seat_out_of_the_checkout(
     # on workers. Hard-coding gettempdir() would fail for an environmental
     # reason rather than a behavioural one.
     temp = str(_seat_forensics._seat_park_directory())
-    parked = str(_common.CAD_ROOT / "out" / "sldprt")
+    parked = str(_paths.CAD_ROOT / "out" / "sldprt")
     adapter, app = _seat(parked)
 
-    session = _session(monkeypatch, adapter)
+    session = _run_session(monkeypatch, adapter)
 
     assert session.warnings == []
     app.SetCurrentWorkingDirectory.assert_called_once_with(temp)
@@ -462,7 +463,7 @@ def test_a_seat_left_in_a_sibling_source_root_is_unparked_too(
     sibling = r"C:\harmonic\work\sources\6621e07aabfb412916eeae68\workspace\cad\out"
     adapter, app = _seat(sibling)
 
-    assert _session(monkeypatch, adapter).warnings == []
+    assert _run_session(monkeypatch, adapter).warnings == []
 
     app.SetCurrentWorkingDirectory.assert_called_once_with(temp)
 
@@ -472,7 +473,7 @@ def test_a_seat_already_parked_there_is_left_alone(
 ) -> None:
     adapter, app = _seat(str(_seat_forensics._seat_park_directory()))
 
-    assert _session(monkeypatch, adapter).warnings == []
+    assert _run_session(monkeypatch, adapter).warnings == []
 
     app.SetCurrentWorkingDirectory.assert_not_called()
 
@@ -482,9 +483,9 @@ def test_a_seat_that_refuses_to_move_warns_instead_of_failing_the_build(
 ) -> None:
     # Same standing as the teardown close: a directory this session cannot
     # release is the NEXT leaf's hazard, not a failure of work already done.
-    adapter, _app = _seat(str(_common.CAD_ROOT / "out" / "sldprt"), moved=False)
+    adapter, _app = _seat(str(_paths.CAD_ROOT / "out" / "sldprt"), moved=False)
 
-    warnings = _session(monkeypatch, adapter).warnings
+    warnings = _run_session(monkeypatch, adapter).warnings
 
     assert [w for w in warnings if "seat working directory" in w]
 
@@ -493,10 +494,10 @@ def test_a_move_the_seat_ignored_is_not_reported_as_released(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # SetCurrentWorkingDirectory answering True is not evidence: the readback is.
-    parked = str(_common.CAD_ROOT / "out" / "sldprt")
+    parked = str(_paths.CAD_ROOT / "out" / "sldprt")
     adapter, _app = _seat(parked, moved="ignored")
 
-    session = _session(monkeypatch, adapter)
+    session = _run_session(monkeypatch, adapter)
 
     assert [w for w in session.warnings if "did not move" in w]
     assert "seat_working_directory" not in session.fields
@@ -527,7 +528,7 @@ def test_an_empty_readback_from_the_park_directory_is_not_a_move(
     assert _seat_forensics._normal_path("") == _seat_forensics._normal_path(
         _seat_forensics._seat_park_directory()
     )
-    _adapter, app = _seat(str(_common.CAD_ROOT / "out" / "sldprt"), moved="blank")
+    _adapter, app = _seat(str(_paths.CAD_ROOT / "out" / "sldprt"), moved="blank")
 
     with pytest.raises(RuntimeError, match="unreadable after move"):
         _seat_forensics.release_seat_working_directory(app)
@@ -580,7 +581,8 @@ def test_a_temp_directory_inside_this_checkout_is_never_the_park_target(
     checkout = tmp_path / "workspace"
     inside = checkout / "cad" / "out"
     inside.mkdir(parents=True)
-    monkeypatch.setattr(_common, "CAD_ROOT", checkout / "cad")
+    monkeypatch.setattr(_paths, "CAD_ROOT", checkout / "cad")
+    monkeypatch.setattr(_session, "CAD_ROOT", checkout / "cad")
     monkeypatch.setattr(_seat_forensics.tempfile, "gettempdir", lambda: str(inside))
     # Without this the candidate is skipped as a non-directory and the
     # disposable filter never runs at all.
@@ -594,7 +596,7 @@ def test_a_temp_directory_inside_this_checkout_is_never_the_park_target(
         _seat_forensics._normal_path(checkout) not in _seat_forensics._normal_path(target).parents
     )
     adapter, app = _seat(str(inside / "sldprt"))
-    assert _session(monkeypatch, adapter).warnings == []
+    assert _run_session(monkeypatch, adapter).warnings == []
     app.SetCurrentWorkingDirectory.assert_called_once_with(str(target))
 
 
@@ -610,7 +612,8 @@ def test_a_sibling_source_root_is_not_a_park_target_either(
     sibling = work_root / "sources" / "bbb" / "workspace"
     (mine / "cad").mkdir(parents=True)
     sibling.mkdir(parents=True)
-    monkeypatch.setattr(_common, "CAD_ROOT", mine / "cad")
+    monkeypatch.setattr(_paths, "CAD_ROOT", mine / "cad")
+    monkeypatch.setattr(_session, "CAD_ROOT", mine / "cad")
     monkeypatch.setenv("FARM_WORK_ROOT", str(work_root))
     monkeypatch.setattr(_seat_forensics.tempfile, "gettempdir", lambda: str(sibling))
 
@@ -633,7 +636,7 @@ def test_a_close_that_fails_still_moves_the_seat_out_of_the_checkout(
     # ``StopIteration`` that ``_release_seat``'s ``except Exception`` turns
     # into a warning -- surfacing as a confusing assert on the setter.
     target = str(_seat_forensics._seat_park_directory())
-    _adapter, app = _seat(str(_common.CAD_ROOT / "out" / "sldasm"))
+    _adapter, app = _seat(str(_paths.CAD_ROOT / "out" / "sldasm"))
     monkeypatch.setattr(
         package_native,
         "_discard_open_documents",
@@ -671,7 +674,7 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
     # startup gate runs inside seat.identity and BEFORE seat.discard, the
     # session's first document operation.
     opened: list[str] = []
-    span, aspan = _common._telemetry.span, _common._telemetry.aspan
+    span, aspan = _telemetry.span, _telemetry.aspan
 
     def record_span(name, /, **attrs):
         opened.append(name)
@@ -681,11 +684,11 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
         opened.append(name)
         return aspan(name, **attrs)
 
-    monkeypatch.setattr(_common._telemetry, "span", record_span)
-    monkeypatch.setattr(_common._telemetry, "aspan", record_aspan)
+    monkeypatch.setattr(_telemetry, "span", record_span)
+    monkeypatch.setattr(_telemetry, "aspan", record_aspan)
     adapter, _app = _seat(str(_seat_forensics._seat_park_directory()))
 
-    _session(monkeypatch, adapter)
+    _run_session(monkeypatch, adapter)
 
     connect = opened.index("sw.connect")
     assert opened[connect + 1 : connect + 5] == [

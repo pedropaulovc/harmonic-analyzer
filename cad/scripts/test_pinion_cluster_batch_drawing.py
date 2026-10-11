@@ -334,6 +334,10 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
+            # MHA-SM-004 #6-32 major in the #36 drill through the 8.0 end plug.
+            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                3.505, 2.705, 8.0
+            ),
         }
     )
 
@@ -479,6 +483,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # Stock 9490T1: #10-24 major, #25 drill, 0.75-in boss engagement.
             frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
+            ),
+            # MHA-SM-004 #6-32 major, #36 drill, 8.0 through-tapped end plug.
+            frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
+                3.505, 2.705, 8.0
             ),
         },
         "pn-pen": {

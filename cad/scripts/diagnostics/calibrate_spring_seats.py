@@ -5,12 +5,13 @@ placement and only certify it (zero native overlap, bounded separation). That
 table goes stale whenever an anchor part moves -- the channel lever's spring
 hole, the gooseneck's arm end, the summing lever's tap stations, or a supplier
 end loop. This driver re-measures it with the same native predicates the gate
-uses, on the same three-part fixtures the retired in-build search used:
+uses, on the same native fixtures as the production seats:
 
 * channel: ``ch-channel-lever`` (at the station's solved tilt) + ``vn-spring-hook``
   + one ``9432K31`` length variant, per distinct calibrated amplitude;
 * counter: ``vn-boss-hook`` + one ``1330K524`` at the preset's balance length +
-  ``sm-gooseneck``, per preset (the gooseneck height is the measured output).
+  ``sm-gooseneck`` + made ``sm-gooseneck-spring-screw`` (MHA-SM-004), per preset
+  (the gooseneck and screw move together; the screw is the upper contact surface).
 
 Each contact's native collision/clear boundary is located to 1e-6 mm, and the
 component is then seated ``springs.boolean_stability_mm`` past it, on the clear
@@ -27,9 +28,14 @@ re-measured until both boundaries sit at the allowance within half of it.
 Every seed comes from ``spring_mount_geom`` (the catalogue-nominal poses),
 never from the table being replaced, so a stale table cannot bias the new one.
 
-Run with SolidWorks open (the parts must already be built)::
+Run on a licensed farm/native seat (the parts must already be built):
+``ch-channel-lever``, ``vn-spring-hook``, ``vn-boss-hook``, ``sm-gooseneck``
+and ``sm-gooseneck-spring-screw``. The counter refuses support parts that doit
+would rebuild (``_require_current_support_parts``), so build those two through
+doit first. The driver builds the supplier spring length variants itself; no
+summing assembly is needed to replace a stale seat::
 
-    uv run cad/scripts/diagnostics/calibrate_spring_seats.py --write
+    uv run cad/scripts/diagnostics/calibrate_spring_seats.py --presets neutral square --write
 
 Without ``--write`` the measurements only go to the JSON report.
 """
@@ -54,6 +60,9 @@ import channel_kinematics  # noqa: E402
 import vn_channel_spring_stock_geom as channel_stock  # noqa: E402
 import sm_gooseneck_geom  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
+import settled_spring_seats  # noqa: E402
+from _interference_contracts import allowed_interference_pairs  # noqa: E402
+from build_sm_summing_assembly import _assert_counter_spring_top_hang  # noqa: E402
 from _assembly import (  # noqa: E402
     assert_pose_ledger,
     check_no_interference,
@@ -62,20 +71,26 @@ from _assembly import (  # noqa: E402
     place_component,
     place_components_batch,
 )
-from _common import (  # noqa: E402
-    SPRING_BLACK,
-    _early_bound,
-    apply_color,
-    apply_material,
-    check,
-    force_rebuild,
-    run_build,
-    save_part_and_images,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _appearance import SPRING_BLACK, apply_color, apply_material  # noqa: E402
+from _check import check  # noqa: E402
+from _com import _early_bound  # noqa: E402
+from _part_save import save_part_and_images  # noqa: E402
+from _rebuild import force_rebuild  # noqa: E402
+from _session import run_build  # noqa: E402
 from _cwm import put_component_pose  # noqa: E402
 from _spring import build_spring  # noqa: E402
 from _stock_fastener import _blank_recipe_references  # noqa: E402
-from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rot_z_rows  # noqa: E402
+from _transforms import (
+    ROT_Y_180,
+    ROT_Y_POS90,
+    compose_rows,
+    euler_from_rows,
+    rot_z_rows,
+)  # noqa: E402
 from build_ch_channel_assembly import ARM_MID_DZ, FULCRUM, IDENTITY, z_station  # noqa: E402
 from dt_cone_pivot_post_installation import SUMMING_Z  # noqa: E402
 from diagnostics._seat_search import ContactSolution, solve_component_contact  # noqa: E402
@@ -308,10 +323,52 @@ async def _build_counter_variant(adapter, name: str, length_mm: float) -> None:
     _close_active_part(adapter)
 
 
+# The saved parts the counter fixture measures as the upper contact; the
+# emitted upper_support certificate states THEIR recipe's geometry.
+_SUPPORT_PART_STEMS = ("sm_gooseneck", "sm_gooseneck_spring_screw")
+
+
+def _require_current_support_parts() -> None:
+    """Refuse to certify ``upper_support`` from stale saved support parts.
+
+    ``counter_upper_support_geometry()`` is computed from the CURRENT source,
+    so it may only label a measurement of parts built from that source.
+    ``place_components_batch`` only checks that the SLDPRTs exist; this reuses
+    verify.py's freshness guard (doit's own ledger and ContentChecker, the
+    same verdict ``doit`` would rebuild on) but fails closed: a missing ledger
+    or a guard error refuses instead of warning.
+    """
+    from verify import _stale_in_db
+
+    ledger = Path(dodo.DOIT_CONFIG["dep_file"])
+    try:
+        db = json.loads(ledger.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(
+            f"cannot prove the counter support parts are current ({ledger}: {exc}); "
+            "build sm-gooseneck and sm-gooseneck-spring-screw through doit first"
+        ) from exc
+    producers = [
+        (
+            f"part:{stem}",
+            dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem),
+            dodo._sldprt(stem),
+        )
+        for stem in _SUPPORT_PART_STEMS
+    ]
+    stale = _stale_in_db(db, producers)
+    if stale:
+        raise RuntimeError(
+            "refusing to certify the counter upper support from stale saved parts "
+            "(rebuild them through doit, then recalibrate): " + "; ".join(stale)
+        )
+
+
 async def _calibrate_counter(
     adapter, preset: str, amplitudes: list[float], report: dict
 ) -> dict:
     """Measure one preset's counter seat; returns the ``presets.<name>.counter`` row."""
+    _require_current_support_parts()
     balance = spring_mounts.solve_bank_balance(amplitudes)
     if not balance.static_balance or balance.counter_pose is None:
         raise RuntimeError(f"{preset}: counter cannot balance the channel bank")
@@ -331,7 +388,8 @@ async def _calibrate_counter(
     try:
         check("create counter seat fixture", await adapter.create_assembly())
         fixture = _early_bound(adapter.currentModel, "IModelDoc2")
-        boss, counter, gooseneck = await place_components_batch(
+        screw_rows = ROT_Y_POS90
+        boss, counter, gooseneck, screw = await place_components_batch(
             adapter,
             [
                 {
@@ -355,10 +413,22 @@ async def _calibrate_counter(
                     "rows": ROT_Y_180,
                     "ground": True,
                 },
+                {
+                    "part": "sm-gooseneck-spring-screw",
+                    "position": [
+                        spring_mounts.GOOSENECK_END_X
+                        + sm_gooseneck_geom.SPRING_EYE_GAP,
+                        gooseneck_y + sm_gooseneck_geom.ARM_Y,
+                        SUMMING_Z,
+                    ],
+                    "rotation": euler_from_rows(screw_rows),
+                    "rows": screw_rows,
+                    "ground": True,
+                },
             ],
             label="counter seat fixture",
         )
-        titles = _owned_titles(adapter, fixture, [boss, counter, gooseneck])
+        titles = _owned_titles(adapter, fixture, [boss, counter, gooseneck, screw])
         allowance = _allowance_mm()
         lower = solve_component_contact(
             adapter,
@@ -372,14 +442,16 @@ async def _calibrate_counter(
         _land(adapter, counter, lower_direction, _correction_mm(lower, allowance))
         upper = solve_component_contact(
             adapter,
-            gooseneck,
+            screw,
             counter,
             upper_direction,
             bracket,
             label=f"{preset} counter upper",
             locate_only=True,
         )
-        _land(adapter, gooseneck, upper_direction, _correction_mm(upper, allowance))
+        upper_correction = _correction_mm(upper, allowance)
+        _land(adapter, screw, upper_direction, upper_correction)
+        _land(adapter, gooseneck, upper_direction, upper_correction)
         lower_check = solve_component_contact(
             adapter,
             counter,
@@ -391,7 +463,7 @@ async def _calibrate_counter(
         )
         upper_check = solve_component_contact(
             adapter,
-            gooseneck,
+            screw,
             counter,
             upper_direction,
             bracket,
@@ -403,7 +475,16 @@ async def _calibrate_counter(
                 raise RuntimeError(
                     f"{preset} counter {label}: landed pose is not seated ({contact!r})"
                 )
-        check_no_interference(adapter)
+        # The fixture variant has the same made-screw receiver joint as production;
+        # allow only that exact thread/plug overlap, never spring/support masks.
+        screw_pair = frozenset((screw, gooseneck))
+        production_pair = frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1"))
+        check_no_interference(
+            adapter,
+            allowed_pairs={
+                screw_pair: allowed_interference_pairs("sm-summing")[production_pair]
+            },
+        )
         actual_centre = component_origin(adapter, counter)
         actual_gooseneck_y = component_origin(adapter, gooseneck)[1]
     finally:
@@ -415,6 +496,7 @@ async def _calibrate_counter(
         lower_eye_xy=(seed.lower_eye_xy[0] + dx, seed.lower_eye_xy[1] + dy),
         upper_eye_xy=(seed.upper_eye_xy[0] + dx, seed.upper_eye_xy[1] + dy),
     )
+    _assert_counter_spring_top_hang(pose, actual_gooseneck_y)
     report["counter"].append(
         {
             "preset": preset,
@@ -434,6 +516,7 @@ async def _calibrate_counter(
     return {
         "pose": _pose_record(pose),
         "gooseneck_origin_y_mm": actual_gooseneck_y,
+        "upper_support": settled_spring_seats.counter_upper_support_geometry(),
         "final_distance_mm": {
             "lower": lower_check.seed_distance_mm,
             "upper": upper_check.seed_distance_mm,

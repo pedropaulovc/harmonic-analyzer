@@ -12,8 +12,8 @@ diameter and the catalogue wall, axis along model X, centred on the origin.
 The slot and end chamfers are left out because the catalogue gives no size
 for either.
 
-The size table is pure data: module import pulls in no SolidWorks helper,
-so the pin specs read it.
+The per-SKU size modules are pure data, so the pin specs read them without
+folding this recipe machinery into their cache inputs.
 """
 
 from __future__ import annotations
@@ -24,37 +24,34 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-MM_PER_IN = 25.4
-
-SPRING_PIN_SIZES = {
-    # part:        (nominal dia, length), mm
-    "98296A027": (MM_PER_IN / 16.0, MM_PER_IN / 2.0),  # 1/16 x 1/2
-    "98296A026": (MM_PER_IN / 16.0, 9.0 * MM_PER_IN / 16.0),  # 1/16 x 9/16
-    "98296A031": (MM_PER_IN / 16.0, 5.0 * MM_PER_IN / 8.0),  # 1/16 x 5/8
-}
-# Catalogue wall (every size above).
-WALL_T = 0.012 * MM_PER_IN
 
 
-def spring_pin_bore(part_no: str) -> float:
+def spring_pin_bore(size: tuple[float, float], wall_t: float) -> float:
     """The tube's bore, mm: the nominal diameter less the catalogue wall."""
-    return SPRING_PIN_SIZES[part_no][0] - 2.0 * WALL_T
+    return size[0] - 2.0 * wall_t
 
 
-def spring_pin_volume(part_no: str) -> float:
+def spring_pin_volume(size: tuple[float, float], wall_t: float) -> float:
     """The recipe's solid volume, mm^3: the nominal tube."""
-    dia, length = SPRING_PIN_SIZES[part_no]
-    return math.pi * (dia**2 - spring_pin_bore(part_no) ** 2) / 4.0 * length
+    dia, length = size
+    return math.pi * (dia**2 - spring_pin_bore(size, wall_t) ** 2) / 4.0 * length
 
 
-async def build_spring_pin(adapter, part_no: str) -> None:
-    from _common import check, define_circle, name_last_feature, volume_check
+async def build_spring_pin(adapter, size: tuple[float, float], wall_t: float) -> None:
+    if __package__:
+        from . import _script_paths  # noqa: F401
+    else:
+        import _script_paths  # noqa: F401
+    from _check import check  # noqa: E402 -- diagnostic path bootstrap
+    from _feature_tree import name_last_feature  # noqa: E402 -- diagnostic path bootstrap
+    from _part_checks import volume_check  # noqa: E402 -- diagnostic path bootstrap
+    from _sketch_circle import define_circle  # noqa: E402 -- diagnostic path bootstrap
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    dia, length = SPRING_PIN_SIZES[part_no]
+    dia, length = size
     check("create_sketch pin section", await adapter.create_sketch("Right"))
     await define_circle(adapter, 0.0, 0.0, dia / 2.0, "pin OD")
-    await define_circle(adapter, 0.0, 0.0, spring_pin_bore(part_no) / 2.0, "pin bore")
+    await define_circle(adapter, 0.0, 0.0, spring_pin_bore(size, wall_t) / 2.0, "pin bore")
     check("exit_sketch pin section", await adapter.exit_sketch())
     name_last_feature(adapter, "PinSection")
     check(
@@ -64,5 +61,5 @@ async def build_spring_pin(adapter, part_no: str) -> None:
         ),
     )
     name_last_feature(adapter, "PinBody")
-    volume = spring_pin_volume(part_no)
+    volume = spring_pin_volume(size, wall_t)
     await volume_check(adapter, "spring pin tube", volume, 0.005 * volume)

@@ -15,7 +15,8 @@ from __future__ import annotations
 import _config
 import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 
 # Face (the jaw-to-cap spacer) and spigot (the centring stub). Both axial
 # sizes print from the faced jaw face: the shoulder and the overall length.

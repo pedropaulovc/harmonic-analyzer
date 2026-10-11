@@ -45,7 +45,9 @@ from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 import _drawing_common
 from _drawing_common import (
     DrawingOutputs,

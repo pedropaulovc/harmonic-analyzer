@@ -12,14 +12,14 @@ import build_vn_arbor_set_screw as part
 import draw_vn_arbor_set_screw as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91375A106 as recipe
 
 IN = 25.4
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
-    metadata = STOCK_RECIPES["91375A106"]
+    metadata = discovered_recipes()["91375A106"]
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == recipe.build_91375A106.__name__
     assert part.SPEC.skus == ("91375A106",)

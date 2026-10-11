@@ -7,7 +7,8 @@ import re
 from pathlib import Path
 
 import _config
-import _fit_limits
+import _fit_deviations
+import _fit_shaft_h
 import dt_arbor_pedestal_spec
 import build_dt_cylinder_gear_shaft as part
 import dt_cylinder_gear_shaft_spec as spec
@@ -31,16 +32,16 @@ def test_every_marked_dimension_lands_where_a_turner_reads_it() -> None:
 
 def test_only_the_running_fit_carries_a_size_band() -> None:
     """The O.D. is the one critical feature; the length rides the title block."""
-    assert spec.SHAFT_DIA_BAND == _fit_limits.SHAFT_H
+    assert spec.SHAFT_DIA_BAND == _fit_shaft_h.SHAFT_H
     assert model_toleranced_dimensions(part) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
     }
 
 
 def test_shaft_band_closes_the_configured_running_fit() -> None:
-    lower, upper = _fit_limits.deviations(spec.SHAFT_DIA_BAND)
+    lower, upper = _fit_deviations.deviations(spec.SHAFT_DIA_BAND)
     shaft_limits = (spec.SHAFT_DIA + lower, spec.SHAFT_DIA + upper)
-    bore_lower, bore_upper = _fit_limits.deviations(dt_arbor_pedestal_spec.BORE_DIA_BAND)
+    bore_lower, bore_upper = _fit_deviations.deviations(dt_arbor_pedestal_spec.BORE_DIA_BAND)
     bore_limits = (
         dt_arbor_pedestal_spec.BORE_DIA + bore_lower,
         dt_arbor_pedestal_spec.BORE_DIA + bore_upper,

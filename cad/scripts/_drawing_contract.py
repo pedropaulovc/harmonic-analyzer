@@ -87,6 +87,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_ch_rod_pivot_pin.py",
         "draw_dt_cone_pivot_post_tl_cap_jaw_button.py",
         "draw_ch_rocker_arm_tl_pivot_screw.py",
+        "draw_sm_gooseneck_spring_screw.py",
         "draw_ch_rocker_arm_tl_pivot_washer.py",
         "draw_ch_rocker_arm_tl_profile_fixture.py",
         "draw_dt_cone_pivot_post_tl_bond_cradle.py",
@@ -743,7 +744,7 @@ def drawing_specification_violations(
         tree, "_surface_finish", frozenset({"surface_finish_by_key"})
     )
     fit_direct, fit_modules = _imported_functions(
-        tree, "_fit_limits", frozenset({"fit_limits", "band_text"})
+        tree, "_fit_text", frozenset({"fit_limits", "band_text"})
     )
     surface_direct, surface_modules = _imported_functions(
         tree, "_drawing_common", frozenset({"add_surface_finish"})

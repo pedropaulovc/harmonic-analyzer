@@ -16,17 +16,13 @@ from __future__ import annotations
 import sys
 
 import _config
-from _common import (
-    SPRING_BLACK,
-    apply_color,
-    apply_custom_properties,
-    apply_material,
-    check,
-    force_rebuild,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-)
+from _appearance import SPRING_BLACK, apply_color, apply_material
+from _check import check
+from _custom_properties import apply_custom_properties
+from _part_checks import report_mass_properties
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing
 from _saved_part_guard import require_saved_drawing_properties
 from _stock_fastener import _blank_recipe_references

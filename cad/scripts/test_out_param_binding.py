@@ -15,7 +15,7 @@ that looks like a clean result. That is what makes this trap expensive: it cost
 a full session chasing a "GetWhatsWrong is blind mid-build" defect that did not
 exist.
 
-The fix is structural rather than advisory: ``_common._early_bound`` now raises
+The fix is structural rather than advisory: ``_com._early_bound`` now raises
 instead of silently returning a raw dispatch, so on the build path every object
 IS early-bound and the byref form is never correct. These tests keep it that
 way, because a comment saying "consume the tuple" is exactly the kind of
@@ -49,7 +49,7 @@ _BYREF = re.compile(r"VT_BYREF")
 def _code_lines(path: Path) -> list[tuple[int, str]]:
     """(lineno, text) for real CODE only -- comments and strings dropped.
 
-    Tokenized rather than grepped: this file, ``_common._early_bound`` and the
+    Tokenized rather than grepped: this file, ``_com._early_bound`` and the
     memory notes all legitimately DISCUSS ``VT_BYREF`` in prose, and a plain
     text search cannot tell an explanation from a call.
     """
@@ -138,7 +138,7 @@ def test_no_byref_variants_on_the_build_path() -> None:
     ]
     assert not offenders, (
         "VT_BYREF on the build path. Every build-path object is early-bound "
-        "(_common._early_bound raises rather than returning a raw dispatch), so "
+        "(_com._early_bound raises rather than returning a raw dispatch), so "
         "[out] params ride the RETURN TUPLE -- call the method bare and unpack. "
         "A byref here stays unwritten and reads as 'no data':\n  "
         + "\n  ".join(offenders)
@@ -195,7 +195,7 @@ def test_no_caller_passes_the_removed_method_names() -> None:
     ==================================  ==================================
     shape                               why it would otherwise slip
     ----------------------------------  ----------------------------------
-    ``_common._early_bound(a, b, c)``   ``ast.Attribute``, not ``ast.Name``
+    ``_com._early_bound(a, b, c)``   ``ast.Attribute``, not ``ast.Name``
     ``_early_bound(a, b, m="x")``       extra arg is a keyword, not in ``args``
     ``_early_bound(a, b, *names)``      ``len(args)`` undercounts a splat
     ``_early_bound(a, b, c)``           the original positional form
@@ -221,7 +221,7 @@ def test_no_caller_passes_the_removed_method_names() -> None:
     [
         ("positional", '_early_bound(doc, "IModelDoc2", "GetWhatsWrong")'),
         ("multiline", '_early_bound(\n    doc,\n    "IAssemblyDoc",\n    "GetComponents",\n)'),
-        ("attribute", '_common._early_bound(doc, "IModelDoc2", "Save3")'),
+        ("attribute", '_com._early_bound(doc, "IModelDoc2", "Save3")'),
         ("keyword", '_early_bound(doc, "IModelDoc2", method="Save3")'),
         ("splat", "_early_bound(doc, iface, *names)"),
     ],
@@ -245,7 +245,7 @@ def test_the_arity_gate_passes_legal_calls(  # noqa: D103 - paired with the abov
     for source in (
         '_early_bound(doc, "IModelDoc2")',
         '_early_bound(adapter.currentModel, interface="IAssemblyDoc")',
-        '_common._early_bound(obj=doc, interface="IModelDoc2")',
+        '_com._early_bound(obj=doc, interface="IModelDoc2")',
     ):
         assert not _early_bound_arity_offenders(source), (
             f"false positive on a legal 2-arg call: {source!r}"
@@ -292,7 +292,7 @@ def test_early_bound_refuses_to_return_a_raw_dispatch() -> None:
     SolidWorks and no pywin32 -- the historic ``except Exception: return obj``
     is the single line that made binding invisible at 313 call sites.
     """
-    source = (SCRIPTS / "_common.py").read_text(encoding="utf-8")
+    source = (SCRIPTS / "_com.py").read_text(encoding="utf-8")
     body = _function_body(source, "_early_bound")
     assert "except Exception:" not in body, (
         "_early_bound must not swallow a binding failure -- returning the raw "

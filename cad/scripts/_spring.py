@@ -13,16 +13,12 @@ from typing import Any
 
 import _config
 import _telemetry
-from _common import (
-    POLISHED_STEEL,
-    apply_color,
-    apply_custom_properties,
-    apply_material,
-    check,
-    force_rebuild,
-    report_mass_properties,
-    save_part_and_images,
-)
+from _appearance import POLISHED_STEEL, apply_color, apply_material
+from _check import check
+from _custom_properties import apply_custom_properties
+from _part_checks import report_mass_properties
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing
 from _stock_fastener import _blank_recipe_references
 from diagnostics.diag_build_9432K31 import build_9432K31

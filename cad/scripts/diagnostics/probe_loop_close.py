@@ -29,7 +29,12 @@ import asyncio
 import math
 
 import _telemetry
-from _common import OUT_SLDASM, check, log
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _paths import OUT_SLDASM
 from build_motion_study import (
     ASM, _by_z_rank, _comp_xform, _components, _entity_ref, _find_one,
     _suppress_named, _suppress_recurring, _world,

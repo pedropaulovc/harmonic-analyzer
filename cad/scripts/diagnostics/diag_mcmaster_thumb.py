@@ -26,11 +26,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     bodies,
@@ -39,18 +41,11 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut,
 )
 
-THUMB_SPECS = {
-    "91882A221": dict(major_r=2.8448 / 2.0, pitch=0.635, length=11.1125,
-                      collar_r=6.35 / 2.0, collar_h=2.38125,
-                      head_r=9.525 / 2.0, head_h=2.38125),
-    "91882A425": dict(major_r=6.35 / 2.0, pitch=1.27, length=19.05,
-                      collar_r=12.7 / 2.0, collar_h=9.525,
-                      head_r=25.4 / 2.0, head_h=6.35),
-}
 
 
-async def build_thumb_screw(adapter, part_no: str):
-    from _common import (add_line_chain, _early_bound, _read_member)
+async def build_thumb_screw(adapter, s: dict[str, float]):
+    from _com import _early_bound, _read_member  # noqa: E402 -- diagnostic path bootstrap
+    from _sketch import add_line_chain  # noqa: E402 -- diagnostic path bootstrap
     from diagnostics.diag_mcmaster_lib import (combine_union, mass_properties,
                                    no_sketch_inference, split_at_plane)
     from solidworks_mcp.adapters.base import (CircularPatternParameters,
@@ -59,7 +54,6 @@ async def build_thumb_screw(adapter, part_no: str):
                                               MirrorFeatureParameters,
                                               RevolveParameters)
 
-    s = THUMB_SPECS[part_no]
     major_r, pitch, length = s["major_r"], s["pitch"], s["length"]
     collar_r, collar_h = s["collar_r"], s["collar_h"]
     head_r, head_h = s["head_r"], s["head_h"]

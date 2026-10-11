@@ -2,8 +2,8 @@ r"""Pure-data dimensional contract shared by the cylinder-gear arbor and drawing
 
 from __future__ import annotations
 
-from _fit_limits import SHAFT_H
-from _gtol_spec import CylinderFace
+from _fit_shaft_h import SHAFT_H
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 

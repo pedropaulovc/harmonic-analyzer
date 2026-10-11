@@ -26,34 +26,25 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    PANEL_BLACK,
-    SketchDims,
-    add_line_chain,
-    apply_color,
-    apply_material,
-    check,
-    define_circle,
-    define_rectilinear_chain,
-    drive_dimension,
-    ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
-)
+from _appearance import PANEL_BLACK, apply_color, apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi

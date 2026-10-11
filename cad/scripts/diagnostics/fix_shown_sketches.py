@@ -19,8 +19,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from _common import check, run_build  # noqa: E402
-from _common import _flag, _read_member  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _session import run_build  # noqa: E402
+from _com import _flag, _read_member  # noqa: E402
 
 import _telemetry  # noqa: E402
 

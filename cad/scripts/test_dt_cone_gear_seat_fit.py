@@ -16,7 +16,7 @@ import math
 
 import pytest
 
-import _fit_limits
+import _fit_shaft_h
 import build_dt_cone_gear_shaft
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_gear_spec as spec
@@ -35,7 +35,7 @@ def test_the_shaft_reads_the_land_bands_from_their_own_module() -> None:
     assert shaft.SECTION_DIA_BANDS is lands.SECTION_DIA_BANDS
     assert shaft.GEAR_SEAT_BAND is lands.GEAR_SEAT_BAND
     assert shaft.RUNNING_DIA_BAND is lands.RUNNING_DIA_BAND
-    assert lands.RUNNING_DIA_BAND is _fit_limits.SHAFT_H
+    assert lands.RUNNING_DIA_BAND is _fit_shaft_h.SHAFT_H
     assert build_dt_cone_gear_shaft.SECTION_DIA_BANDS is lands.SECTION_DIA_BANDS
     assert len(lands.SECTION_CONE_GEAR_TEETH) == len(shaft.SECTIONS)
     assert len(lands.SECTION_FLAT_AF) == len(shaft.SECTIONS)

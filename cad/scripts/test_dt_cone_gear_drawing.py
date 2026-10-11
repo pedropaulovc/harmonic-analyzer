@@ -11,6 +11,7 @@ import yaml
 
 import _config
 import _drawing_leaders
+import _cone_gear_geometry as geometry
 import build_dt_cone_gear as part
 import dt_cone_gear_notes as notes
 import dt_cone_gear_shaft_spec
@@ -31,7 +32,7 @@ def test_every_configuration_has_one_complete_sheet_and_native_scale() -> None:
     expected_teeth = tuple(range(6, 121, 6))
     expected_names = tuple(f"T{teeth:03d}" for teeth in expected_teeth)
     assert spec.CONFIGURATION_TEETH == expected_teeth
-    assert part.CONFIGS == tuple(zip(expected_names, expected_teeth, strict=True))
+    assert spec.CONFIGS == tuple(zip(expected_names, expected_teeth, strict=True))
     assert drawing.SHEET_NAMES == expected_names
     assert set(drawing.SHEET_SCALES) == set(expected_names)
 
@@ -160,7 +161,7 @@ def test_native_tooth_thickness_is_the_modelled_deepened_mesh_tooth() -> None:
         assert spec.tooth_thickness_mm(teeth) + upper == pytest.approx(thickest)
         # Thicker than standard at both limits: the deepened mesh.
         assert spec.tooth_thickness_mm(teeth) + lower > spec.STANDARD_TOOTH_THICKNESS
-        facts = part.cone_facts(teeth)
+        facts = geometry.cone_facts(teeth)
         assert facts["ToothThickness"] * spec.MM_PER_IN == pytest.approx(
             spec.tooth_thickness_mm(teeth)
         )
@@ -659,9 +660,9 @@ def test_each_configuration_stores_its_own_gap_floor_limits(
     _patch_floor_dimension(monkeypatch, tolerance)
     part._set_gap_floor_limits(object())
     assert tolerance.Type == 3  # swTolLIMIT
-    assert [call[3] for call in tolerance.calls] == [[name] for name, _ in part.CONFIGS]
+    assert [call[3] for call in tolerance.calls] == [[name] for name, _ in spec.CONFIGS]
     for (lower, upper, which, _names), (_name, teeth) in zip(
-        tolerance.calls, part.CONFIGS, strict=True
+        tolerance.calls, spec.CONFIGS, strict=True
     ):
         assert which == 3  # swSetValue_InSpecificConfigurations
         nominal = 2.0 * spec.floor_radius_mm(teeth)

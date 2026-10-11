@@ -28,8 +28,7 @@ import math
 from _printed_tolerance import printed_band_mm
 
 SCREW_THREAD = "#0-80"
-# MHA-VN-039, McMaster 91794A055 (diagnostics.diag_mcmaster_fillister sizes it).
-SCREW_SKU = "91794A055"
+# MHA-VN-039, McMaster 91794A055 (_mcmaster_91794a055 sizes it).
 SCREW_COUNT = 3
 SCREW_ANGLES_DEG = (0.0, 120.0, 240.0)
 # The flange's drilled clearance hole the disc's taps are spotted through.

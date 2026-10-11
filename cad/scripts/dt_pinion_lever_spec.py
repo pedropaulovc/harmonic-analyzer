@@ -11,7 +11,7 @@ part marks and drawing keeps in lockstep (``test_dt_pinion_lever_drawing.py``).
 
 from __future__ import annotations
 
-from _fit_limits import REAM_SLIDE
+from _fit_ream_slide import REAM_SLIDE
 from dt_pinion_lever_geometry import (
     BORE as BORE,
     BORE_DEPTH as BORE_DEPTH,

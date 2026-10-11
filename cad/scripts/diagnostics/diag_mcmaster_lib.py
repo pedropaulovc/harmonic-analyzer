@@ -37,13 +37,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    CAD_ROOT,
-    REFERENCES_DIR,
-    _early_bound,
-    _read_member,
-    check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _com import _early_bound, _read_member  # noqa: E402
+from _paths import CAD_ROOT, REFERENCES_DIR  # noqa: E402
 from _sketch_closure import (  # noqa: E402
     log_profile_geometry,
     record_sketch_closure,
@@ -275,7 +275,7 @@ def apply_sketch_preferences(
     them.  This is the repo's standing COM rule (truth-test only a real
     ``VARIANT_BOOL``; verify a void mutator by authoritative read-back) and the
     same shape that once produced a false dimension-prefix failure from
-    ``IDisplayDimension.SetText``.  ``_common._write_preferences`` verifies the
+    ``IDisplayDimension.SetText``.  ``_preferences._write_preferences`` verifies the
     same API the same way, for the same reason.
 
     Checking at all is what keeps two silent lies out: a seat that declines the
@@ -509,7 +509,7 @@ async def draw_closed_profile(
     are authored so that adjacent ends carry BIT-IDENTICAL coordinates, and
     an exact-coordinate endpoint written straight to the sketch DB is
     coalesced there at creation: the loop closes with no relation at all.
-    That is not an assumption, it is the behaviour ``_common.add_line_chain``
+    That is not an assumption, it is the behaviour ``_sketch.add_line_chain``
     has always relied on -- it authors ZERO closure relations and its loops
     close, on every worker, for every rectilinear part in the fleet.
 
@@ -621,7 +621,7 @@ def split_at_plane(adapter, plane_name: str, feature_name: str) -> list[dict]:
     import pythoncom
     from win32com.client import VARIANT
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
-    from _common import name_last_feature
+    from _feature_tree import name_last_feature
 
     model = adapter.currentModel
     fm = model.FeatureManager
@@ -671,7 +671,7 @@ def thread_sweep_cut(
         _flag_feature_methods,
         _select_named_feature,
     )
-    from _common import name_last_feature
+    from _feature_tree import name_last_feature
 
     model = adapter.currentModel
     model.ClearSelection2(True)
@@ -728,7 +728,7 @@ def thread_sweep_cut_modern(adapter, profile: str, path: str, feature_name: str)
     from solidworks_mcp.adapters.solidworks.features import (
         _select_named_feature,
     )
-    from _common import name_last_feature
+    from _feature_tree import name_last_feature
 
     SW_FM_SWEEP_CUT = 18  # swFeatureNameID_e.swFmSweepCut
     model = adapter.currentModel
@@ -765,7 +765,7 @@ def combine_union(adapter, feature_name: str = "BodyUnion"):
     """Vendor Combine: union every body back into one."""
     import pythoncom
     from win32com.client import VARIANT
-    from _common import name_last_feature
+    from _feature_tree import name_last_feature
 
     model = adapter.currentModel
     bl = bodies(adapter)
@@ -794,7 +794,7 @@ def insert_helix(
     feature_name: str,
 ):
     """InsertHelix on the ACTIVE sketch (it consumes it)."""
-    from _common import name_last_feature
+    from _feature_tree import name_last_feature
 
     adapter.currentModel.InsertHelix(
         reversed_dir,
@@ -834,14 +834,14 @@ async def trim_factory_shank(adapter, a, cut) -> None:
     ``no_sketch_inference``) so the cutting profile cannot snap to a nearby
     thread edge.
     """
-    from _common import (
+    from _dimensions import drive_dimension
+    from _feature_tree import name_last_feature
+    from _rebuild import force_rebuild
+    from _sketch import (
         SketchDims,
         add_line_chain,
         anchor_point_to_origin,
         dimension_between,
-        drive_dimension,
-        force_rebuild,
-        name_last_feature,
     )
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
@@ -1235,7 +1235,7 @@ async def run_replica(adapter, part_no: str, builder) -> dict[str, str]:
 
 def replica_main(part_no: str, builder) -> int:
     """`__main__` body for a single-part replica script."""
-    from _common import run_build
+    from _session import run_build
 
     async def build(adapter) -> dict[str, str]:
         return await run_replica(adapter, part_no, builder)

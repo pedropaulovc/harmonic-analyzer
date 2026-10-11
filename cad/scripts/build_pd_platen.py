@@ -32,29 +32,19 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    SketchDims,
-    add_line_chain,
-    apply_material,
-    apply_color,
-    PANEL_BLACK,
-    bbox_extent_check,
-    check,
-    define_circle,
-    define_rectilinear_chain,
-    drive_dimension,
-    ensure_fully_defined,
-    extrude_at_offset,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
-)
+from _appearance import apply_material, apply_color, PANEL_BLACK
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import name_last_feature
+from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 from pd_platen_spec import (
     CBORE_DEPTH,
@@ -74,7 +64,7 @@ from pd_platen_spec import (
 import _telemetry
 
 PART_NAME = "pd-platen"
-MATERIAL = "Brass"  # see _common.apply_material docstring
+MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
 # The plate envelope, the clip-screw receivers and the counterbored
 # guide-screw through-holes live in pd_platen_spec.py, which the clip, the guide
@@ -230,7 +220,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven platen (equations neutral)", v_final, 0.02 * v_sockets)
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _common palette
+    await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _appearance palette
 
     # Named slide axis (local X through the origin = Front Plane ∩ Top Plane) so
     # the platen runs as a prismatic joint along the rails in the M6 mated-DOF

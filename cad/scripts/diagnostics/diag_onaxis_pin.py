@@ -17,7 +17,13 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import check, run_build, set_sketch_direct_db
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check
+from _session import run_build
+from _sketch import set_sketch_direct_db
 
 PIN_X = 9.5
 PIN_R = 1.75
@@ -118,7 +124,8 @@ async def build(adapter: Any) -> dict[str, str]:
     check("create_part G", await adapter.create_part())
     check("create_sketch G blank", await adapter.create_sketch("Top"))
     rect = [(0.0, 0.0), (26.0, 0.0), (26.0, -5.0), (0.0, -5.0)]
-    from _common import add_line_chain, define_rectilinear_chain, ensure_fully_defined
+    from _sketch import add_line_chain, ensure_fully_defined
+    from _sketch_chains import define_rectilinear_chain
 
     lines = await add_line_chain(adapter, rect)
     await define_rectilinear_chain(adapter, lines, rect, label="G blank")

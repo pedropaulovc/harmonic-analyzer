@@ -1,0 +1,4 @@
+sliding_amplitude_bar_on_rocker:
+  side_clearance_mm: [0.05, 0.20]
+  note: "bar slides without binding through the full rocker sweep"
+

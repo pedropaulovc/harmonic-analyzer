@@ -27,7 +27,8 @@ from __future__ import annotations
 import ch_pivot_bracket_spec as bracket
 import ch_pivot_bracket_tl_angle_plate_spec as plate
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm
 

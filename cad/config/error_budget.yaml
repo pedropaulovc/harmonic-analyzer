@@ -7,7 +7,7 @@
 # output error each feature may consume), not geometry, so editing it never
 # rebuilds CAD. The nominal each feature is toleranced against stays in the
 # spec module named under `nominal` -- check:budget fails if that symbol moves.
-# The drawing-facing limits (tolerances.yaml, title_block.yaml, *_spec.py notes)
+# The drawing-facing limits (tolerances/, title_block.yaml, *_spec.py notes)
 # must agree with the `tolerance` here; check:budget pins the ones it can read.
 units: mm
 
@@ -186,7 +186,7 @@ critical_features:
     nominal: null
     quantity: phase
     class: channel
-    holds: "derived: half the cone<->cylinder gear_mesh backlash band (tolerances.yaml 0.05..0.20 mm) at the 120T pitch radius, one-directional cranking"
+    holds: "derived: half the cone<->cylinder gear_mesh backlash band (tolerances/gear_mesh.yaml 0.05..0.20 mm) at the 120T pitch radius, one-directional cranking"
   cone_flat_clock:
     tolerance: 0.25
     unit: deg

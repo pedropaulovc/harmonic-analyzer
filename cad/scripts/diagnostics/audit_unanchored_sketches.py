@@ -36,7 +36,7 @@ ANCHOR_TOKENS = (
     "anchor_point_to_point",
     '"origin"',
     "'origin'",
-    # these helpers add the origin anchor INTERNALLY (in _common.py), so a
+    # these helpers add the origin anchor INTERNALLY (in _sketch_chains.py), so a
     # block that routes its chain through one of them is anchored even though
     # the anchor call is not literally in the call-site block:
     "define_rectilinear_chain",

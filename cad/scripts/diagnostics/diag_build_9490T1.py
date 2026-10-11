@@ -86,16 +86,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    _early_bound,
-    add_line_chain,
-    check,
-    define_circle,
-    extrude_at_offset,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _com import _early_bound  # noqa: E402
+from _extrude import extrude_at_offset  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
+from _sketch import add_line_chain  # noqa: E402
+from _sketch_circle import define_circle  # noqa: E402
 from stock_anchor_geom import (  # noqa: E402
     ANCHOR_9490T1,
     PathArc,
@@ -361,6 +365,7 @@ def _face_counts(adapter) -> list[int]:
 # --------------------------------------------------------------------------
 # builder
 # --------------------------------------------------------------------------
+@stock_recipe("9490T1", threaded=True)
 async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = None):
     """Build 9490T1 into the current (empty) part.  Never opens or saves.
 

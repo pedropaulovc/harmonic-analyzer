@@ -8,7 +8,7 @@ from typing import Any
 
 import _telemetry
 from _assembly_drawing import build_simple_three_view_drawing
-from _common import run_build
+from _session import run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
 

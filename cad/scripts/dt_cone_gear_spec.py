@@ -5,7 +5,7 @@ package gives every configuration its own complete sheet: configuration-owned
 tip and bore diameters, common face width, and a native driving tooth-thickness
 dimension with the cone-specific deepened-mesh band.
 
-This module stays free of tolerances.yaml because assemblies import it.  The
+This module stays free of tolerances/ because assemblies import it.  The
 bore bands -- the round bore and its across-flat -- derive from the shaft's
 land bands (cone_shaft_land_bands) through the gear seat fit (gear_seat_fit),
 two small import-free modules; every other band is a cone-specific constant.
@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 
 import _config
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from cone_shaft_land_bands import (
     FLAT_AF_BAND,
@@ -40,6 +40,16 @@ TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
 TEETH = 120  # default/fundamental configuration
 CONFIGURATION_TEETH = tuple(range(6, 121, 6))
+
+# The full cone set: 20 gears, 6..120 teeth step 6 (DIMENSIONS.md ch. 12).
+CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
+DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
+TOOTH_GAP_PROFILE = "ToothGapProfile"
+TOOTH_GAP_CUT = "ToothGapCut"
+TOOTH_PATTERN_FEATURE = "ToothGapPattern"
+# Suppressed in each configuration's derived drawing configuration.
+SIMPLIFIED_FEATURES = (TOOTH_GAP_CUT, TOOTH_PATTERN_FEATURE)
+
 DIAMETRAL_PITCH = 49.82  # cad/config/machine/gear_train.yaml
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
@@ -71,7 +81,7 @@ STANDARD_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 # 0.023 mm at the drum pitch line, on T006; <= 0.004 on the rest).
 MESH_BACKLASH_MIN_MM = 0.06
 # (upper, lower) about the modelled mid thickness.  The 0.15 window is the
-# configured cone<->cylinder backlash window (tolerances.yaml gear_mesh
+# configured cone<->cylinder backlash window (tolerances/gear_mesh.yaml
 # 0.05..0.20) that error_budget.yaml's tooth-thickness mesh-lag term is
 # derived from.
 TOOTH_THICKNESS_BAND = (0.075, -0.075)
@@ -264,6 +274,17 @@ def floor_limits_mm(teeth: int) -> tuple[float, float]:
     _require_member(teeth)
     minimum = math.floor(2.0 * floor_radius_mm(teeth) * 1000.0 + 1e-6) / 1000.0
     return minimum, FLOOR_MAX_DIA_MM[teeth]
+
+
+def gap_floor_deviations_mm(teeth: int) -> tuple[float, float]:
+    """FloorDia's (lower, upper) LIMIT deviations from the modelled floor.
+
+    The printed limits are ``floor_limits_mm``; the dimension's nominal is the
+    modelled floor, so each limit is stored as its offset from it.
+    """
+    minimum, maximum = floor_limits_mm(teeth)
+    nominal = 2.0 * floor_radius_mm(teeth)
+    return minimum - nominal, maximum - nominal
 
 
 def floor_dip_mm(teeth: int) -> float:

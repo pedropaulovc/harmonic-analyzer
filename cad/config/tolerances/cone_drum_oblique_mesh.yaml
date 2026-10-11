@@ -1,0 +1,4 @@
+cone_drum_oblique_mesh:  # the inclined cone partial engagement
+  edge_slack_mm: 0.55              # PEN_EDGE_SLACK — deepest-tooth penetration guard
+  note: "oblique partial engagement; checker-arbitrated edge slacks 0.00..1.14"
+

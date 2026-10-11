@@ -29,7 +29,11 @@ from typing import Any, Literal
 
 import _telemetry
 from _assembly import configured_interference_manager
-from _common import _early_bound, _read_member
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound, _read_member
 from _cwm import put_component_pose
 from _native_spring_contact import native_component_interference
 
@@ -45,6 +49,14 @@ _MAX_ITERATIONS = 64
 # is strictly converged; an exact 1e-6 mm step can round to just above it.
 _HINT_PROBES = 5
 _HINT_FIRST_STEP_MM = 0.75 * _POSITION_CONVERGENCE_MM
+# A distance-steered step of s toward the contact must close the minimum
+# distance by at least this fraction of s, or the steering is abandoned for
+# bisection. A true gap closes at the cosine of the approach angle (0.4 is
+# the shallowest the offline fakes exercise); the native 2026-10-10 counter
+# upper run closed 2.2e-9 mm per 2.2e-6 mm step (ratio 1e-3): ClosestDistance
+# read the axially clamped screw-head/eye-face gap, parallel to the motion,
+# and 64 steered probes crept 1.5e-4 mm across a 0.25 mm bracket.
+_STEER_MIN_CLOSURE = 0.1
 
 
 @dataclass(frozen=True, slots=True)
@@ -296,6 +308,8 @@ class _ActualContact:
         expected = dict(self.originals)
         expected[self.moving] = target
         primary: BaseException | None = None
+        state: Literal["interfering", "clear"] | None = None
+        distance: float | None = None
         self.trials += 1
         try:
             self._put(target)
@@ -331,6 +345,8 @@ class _ActualContact:
                         f"{self.label}: native trial {self.trials} restored",
                         trial=self.trials,
                         offset_mm=offset_mm,
+                        state=state,
+                        distance_mm=distance,
                     )
 
 
@@ -494,6 +510,7 @@ def solve_component_contact(
                 by_secant = False
                 hinting = False
                 guarding = False
+                steered = False
                 if hint_active and hint_probes < _HINT_PROBES:
                     assert hint_offset_mm is not None
                     if hint_side is None:
@@ -516,6 +533,7 @@ def solve_component_contact(
                     candidate = hi - _POSITION_CONVERGENCE_MM
                     closing = True
                 elif steer:
+                    steered = True
                     candidate = hi - hi_distance
                     if (
                         use_secant
@@ -531,7 +549,7 @@ def solve_component_contact(
                 if candidate is not None and not lo < candidate < hi:
                     candidate = None
                 if candidate is None:
-                    closing = guarding = False
+                    closing = guarding = steered = False
                     candidate = lo + (hi - lo) / 2.0
                 elif not hinting:
                     jumps += 1
@@ -549,6 +567,23 @@ def solve_component_contact(
                         use_secant = False
                 else:
                     assert distance is not None
+                    if steered and hi_distance - distance < _STEER_MIN_CLOSURE * (
+                        hi - candidate
+                    ):
+                        # The clear probe stepped toward the contact but the
+                        # minimum distance barely shrank: it measures a
+                        # separation the motion does not close (a face
+                        # parallel to it), so it cannot locate this contact.
+                        steer = False
+                        _telemetry.event(
+                            "spring.contact.steer_abandoned",
+                            label=label,
+                            trial=pair.trials,
+                            step_mm=hi - candidate,
+                            previous_distance_mm=hi_distance,
+                            distance_mm=distance,
+                        )
+                        span.set_attribute("steer_abandoned_at_iteration", iterations)
                     previous_clear = (hi, hi_distance)
                     hi, hi_distance = candidate, distance
                     use_secant = True

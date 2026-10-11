@@ -7,7 +7,7 @@ OUTSIDE the assembly recipe/helper closure: load the recorded free-DOF manifest
 (``.<stem>.dof.json``, written by ``_assembly.write_dof_manifest``) and author
 its drive mates TRANSIENTLY on a reopened model, so verify:kinematics can sweep
 the mechanism (the pen Fourier sweep, the magnifier chain proof). Callers MUST
-discard the mutated document unsaved (``_common.discard_open_documents``).
+discard the mutated document unsaved (``_session.discard_open_documents``).
 
 Because this module is on NO assembly build closure, a change to it does not bump
 any .SLDASM digest -- so verify: tasks depend on it DIRECTLY (see POSTBUILD_PY in
@@ -27,7 +27,7 @@ from _assembly import (
     _mate,
     dof_manifest_path,
 )
-from _common import check
+from _check import check
 
 # Transiently authored drive mates are named ``DRIVE_<key>`` so the kinematics
 # sweeps can target them (e.g. the pen equation drives ``D1@DRIVE_pen_travel``).

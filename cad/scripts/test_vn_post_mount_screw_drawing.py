@@ -13,14 +13,14 @@ import build_vn_post_mount_screw as part
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
 import draw_vn_post_mount_screw as drawing
-from _fit_limits import deviations
+from _fit_deviations import deviations
 import vn_post_mount_screw_spec as spec
 from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_40923898 as recipe
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _msc_40923898 import FILLISTER_SIZE
 
 IN = 25.4
 # Screw head seated on the counterbore floor: its under-head face is this far
@@ -276,12 +276,12 @@ def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:
     stock; only MHA-VN-031's builder swapped in 3-1/2 in.  The row is the
     supplied screw; the cut-to-fit length is MHA-VN-031's own spec, applied by
     its trim, and the builder never mutates the shared row."""
-    assert FILLISTER_SIZES["40923898"][1] == pytest.approx(3.5 * 25.4)
-    assert spec.STOCK_LENGTH_MM == FILLISTER_SIZES["40923898"][1]
+    assert FILLISTER_SIZE[1] == pytest.approx(3.5 * 25.4)
+    assert spec.STOCK_LENGTH_MM == FILLISTER_SIZE[1]
     assert part.SHANK_LEN == spec.CUT_LENGTH_MM == 86.2
     assert not hasattr(part, "_supplied_stock_length")
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "FILLISTER_SIZES[SKU] =" not in source
+    assert "FILLISTER_SIZE =" not in source
 
 
 def _independent_removal() -> tuple[float, float]:
@@ -465,7 +465,7 @@ def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
-    metadata = STOCK_RECIPES["40923898"]
+    metadata = discovered_recipes()["40923898"]
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == recipe.build_40923898.__name__
     assert part.SPEC.skus == ("40923898",)

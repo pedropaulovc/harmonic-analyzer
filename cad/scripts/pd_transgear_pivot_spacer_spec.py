@@ -23,7 +23,7 @@ from __future__ import annotations
 import math
 
 import vn_transgear_pivot_screw_spec as SCREW
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 OD = 8.6

@@ -30,8 +30,8 @@ import _config
 import dt_crank_drive_gear_notes
 import dt_crank_drive_gear_spec
 import dt_crank_hub_geometry
-from _fit_limits import deviations
-from _gtol_spec import CylinderFace
+from _fit_deviations import deviations
+from _gtol_cylinder import CylinderFace
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 

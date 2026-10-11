@@ -51,7 +51,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl

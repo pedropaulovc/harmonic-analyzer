@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import _telemetry
-from _common import check
+from _check import check
 from _drawing_common import (
     DrawingOutputs,
     ViewRole,

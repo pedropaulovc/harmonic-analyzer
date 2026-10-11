@@ -161,7 +161,7 @@ def harness(tmp_path, monkeypatch):
 
     recipe.build = build
     modules = {
-        "_common": SimpleNamespace(_early_bound=lambda value, _kind: value),
+        "_com": SimpleNamespace(_early_bound=lambda value, _kind: value),
         "_drawing_common": common,
         "_gear_drawing_entities": SimpleNamespace(visible_circle_edge=lambda *_args: edge),
         "_telemetry": SimpleNamespace(span=lambda *_args, **_kwargs: nullcontext()),

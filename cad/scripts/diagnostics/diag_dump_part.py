@@ -1,7 +1,7 @@
 r"""Diagnostic: dump a ``.SLDPRT``'s complete recipe to JSON -- the harvest half
 of "edit in the GUI, re-author in the script".
 
-:func:`_common.dump_dimensions` answers "which named dims drive THIS feature".
+:func:`_dimensions.dump_dimensions` answers "which named dims drive THIS feature".
 This answers the whole question for a part nobody scripted: what would a build
 script have to call, in what order, with which numbers, to produce this file?
 Three passes, all READ-ONLY (the document is never saved):
@@ -58,7 +58,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
-from _common import _early_bound, _read_member, check, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _com import _early_bound, _read_member  # noqa: E402
+from _session import run_build  # noqa: E402
 
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
 FLAGS = {a for a in sys.argv[1:] if a.startswith("--")}
@@ -144,7 +150,7 @@ def _dimensions(feat):
     """Every display dimension of ``feat``, valued in its OWN unit.
 
     A sketch on a reference plane also enumerates that plane's angle/offset dim
-    first (the owner-filter caveat in ``_common._display_dimensions``), so the
+    first (the owner-filter caveat in ``_dimensions._display_dimensions``), so the
     owning feature is reported per row rather than assumed.
     """
     rows = []

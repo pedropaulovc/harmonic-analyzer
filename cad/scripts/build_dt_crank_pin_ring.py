@@ -19,24 +19,22 @@ from __future__ import annotations
 
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    define_circle,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from dt_crank_pin_ring_spec import (
     ARC_SAGITTA,
     JOINT_DIA,

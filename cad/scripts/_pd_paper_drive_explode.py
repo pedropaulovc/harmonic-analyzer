@@ -21,8 +21,8 @@ from typing import Any, Mapping, NamedTuple
 
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
-from _common import _early_bound
-from _drawing_simplified import simplified_name
+from _com import _early_bound
+from _simplified_names import simplified_name
 from pd_paper_drive_explode_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,

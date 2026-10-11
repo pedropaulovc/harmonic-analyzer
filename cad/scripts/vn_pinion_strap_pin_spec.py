@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import math
 
-from _fit_limits import REAM_SLIDE, SHAFT_H
+from _fit_ream_slide import REAM_SLIDE
+from _fit_shaft_h import SHAFT_H
 from _printed_tolerance import printed_deviations
 from dt_pinion_bracket_geometry import (
     CROSS_HOLE_CZ_PLACES,

@@ -20,7 +20,8 @@ from __future__ import annotations
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_filing_button_spec as button
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # Lapped body: slips into the smallest pivot bore the arm's reamed band

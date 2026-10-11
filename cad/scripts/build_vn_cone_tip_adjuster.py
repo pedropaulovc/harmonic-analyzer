@@ -5,27 +5,17 @@ from __future__ import annotations
 import sys
 from math import pi
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from diagnostics.diag_build_94025A164 import (
-    SS_CONE_Y,
-    SS_HALF,
-    SS_LEN,
-    SS_MAJOR_R,
-    SS_TIP_R,
-    build_94025A164,
-)
+from _simplified_part import save_simplified_part
+from _mcmaster_94025a164 import SS_HALF
+from diagnostics.diag_build_94025A164 import build_94025A164
 
 PART_NAME = "vn-cone-tip-adjuster"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-THREAD = "#10-32"
-BODY_DIA = 2.0 * SS_MAJOR_R
-BODY_LEN = SS_LEN
-CUP_DIA = 2.0 * SS_TIP_R
-CUP_DEPTH = SS_HALF - SS_CONE_Y
 
 
 async def build(adapter) -> dict[str, str]:
@@ -43,6 +33,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

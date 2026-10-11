@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import sys
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_91829A560 import build_91829A560
 
 PART_NAME = "vn-cone-pivot-screw"
@@ -26,6 +27,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
     )
 
 

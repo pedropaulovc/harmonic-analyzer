@@ -20,8 +20,11 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from _common import OUT_SLDASM, active_configuration_name, check, run_build
-from _common import discard_open_documents as _discard_open_documents
+from _check import check
+from _paths import OUT_SLDASM
+from _rebuild import active_configuration_name
+from _session import run_build
+from _session import discard_open_documents as _discard_open_documents
 from verify import REST, assert_gear_ratios
 
 import _telemetry

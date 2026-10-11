@@ -68,7 +68,7 @@ DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
 DRUM_TIP_X = X_DRUM - (122.0 / DP_TRAIN) * 25.4 / 2.0  # -85.80 at DP 49.82
 PEN_EDGE_SLACK = _config.fit(
     "cone_drum_oblique_mesh", "edge_slack_mm"
-)  # cad/config/tolerances.yaml
+)  # cad/config/tolerances/cone_drum_oblique_mesh.yaml
 PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.565
 X_PITCH = DRUM_TIP_X - ADDENDUM * SEC_I + PEN_MID  # -85.76 at DP 49.82
 

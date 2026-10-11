@@ -20,7 +20,9 @@ from typing import Any
 from dt_pinion_pivot_shaft_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _check import check
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_annotation_extent import gdt_box, place_callout_clear
 from _drawing_common import (
     DrawingOutputs,

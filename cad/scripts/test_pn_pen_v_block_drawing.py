@@ -8,7 +8,7 @@ import build_pn_pen_v_block as part
 import draw_pn_pen_v_block as drawing
 import pn_pen_v_block_spec
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 
 
 def test_required_drawing_paths() -> None:

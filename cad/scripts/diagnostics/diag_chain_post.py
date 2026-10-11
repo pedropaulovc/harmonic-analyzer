@@ -14,8 +14,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import _telemetry  # noqa: E402
-from _common import OUT_SLDPRT, check, run_build  # noqa: E402
-from _common import _flag, _read_member  # type: ignore[attr-defined]  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _paths import OUT_SLDPRT  # noqa: E402
+from _session import run_build  # noqa: E402
+from _com import _flag, _read_member  # type: ignore[attr-defined]  # noqa: E402
 
 # Placements copied from the assembly scripts (pre-mirror frames).
 CHAIN_POS = ([65.0, 241.78, -83.3], [0.0, 0.0, 0.0],

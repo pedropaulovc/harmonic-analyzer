@@ -34,6 +34,16 @@ behind the disc never meets a screw.  The model is that installed screw,
 
 import math
 
+from _mcmaster_91794a055 import (
+    HEAD_DIA,
+    HEAD_H,
+    IN,
+    PITCH,
+    SHANK_DIA,
+    SHANK_LEN,
+    SKU,
+    THREAD as THREAD,
+)
 from _printed_tolerance import printed_band_mm
 from pd_rack_pinion_spec import (
     ENGAGEMENT_FLOOR_D,
@@ -44,18 +54,6 @@ from pd_rack_pinion_spec import (
 )
 from pd_transgear_disc_hub_spec import FLANGE_THICK, FLANGE_THICK_PLACES
 
-IN = 25.4
-
-SKU = "91794A055"
-THREAD = "#0-80"
-THREAD_CLASS = "2A"
-
-# --- catalogue (Sketch1's named driving dimensions agree) -------------------
-SHANK_DIA = 0.060 * IN  # "Screw Size Decimal Equivalent@Sketch1" 1.524
-SHANK_LEN = 0.25 * IN  # "Length@Sketch1" 6.35, under the head
-HEAD_DIA = 0.096 * IN  # "Head Diameter@Sketch1" 2.4384
-HEAD_H = 0.055 * IN  # "Head Height@Sketch1" 1.397
-PITCH = IN / 80.0  # "Pitch@Sketch1" 0.3175
 
 # --- head (Revolve1 / Sketch2) ----------------------------------------------
 # "Approx Head Edge Flat" = Head Height * .7: the drafted side's height from

@@ -1,10 +1,10 @@
 # Part registry — drives custom properties (Part D) + BOM identity.
 #
 # Each part the build scripts save gets these stamped into its SolidWorks custom
-# properties (see _common.apply_custom_properties). Part numbers are frozen
+# properties (see _custom_properties.apply_custom_properties). Part numbers are frozen
 # MHA-XX-NNN identities: category prefix XX, parts 001 onward; assemblies use 000.
-# tolerance_class names a cad/config/tolerances.yaml `general:` class; fit_class
-# (when present) names a `fits:` group for the part's moving interface.
+# tolerance_class names a cad/config/tolerances/_base.yaml `general:` class;
+# fit_class (when present) names a tolerances/<group>.yaml moving-interface group.
 # revision/process/confidence are first-pass defaults — refine per part as needed.
 defaults:
   revision: A

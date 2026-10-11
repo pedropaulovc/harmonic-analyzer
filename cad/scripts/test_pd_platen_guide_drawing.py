@@ -275,7 +275,7 @@ def test_sheet_carries_no_notes_block_restating_the_position_frame() -> None:
 
 def test_bar_slide_face_carries_the_only_roughness_symbol() -> None:
     import build_pd_paper_drive_assembly as assembly
-    from _gtol_spec import PlanarFace
+    from _gtol_planar import PlanarFace
     from _surface_finish import MACHINED_UM
     from pd_platen_guide_spec import SURFACE_FINISHES
 

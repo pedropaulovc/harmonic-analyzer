@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import _common
+import _sketch
 
 import build_dt_pinion_lever as lever
 import draw_dt_pinion_lever as drawing
@@ -44,7 +44,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_bore_band_is_a_slip_fit_on_the_lift_rod() -> None:
     # U36: the pin carries the torque, so the bore only slides on the h-band
     # rod.  Codex P2 (#844): the repo's REAM_SLIDE band, never line-to-line.
-    from _fit_limits import REAM_SLIDE, SHAFT_H
+    from _fit_ream_slide import REAM_SLIDE
+    from _fit_shaft_h import SHAFT_H
     from dt_pinion_lift_rod_spec import ROD_DIA
 
     assert dt_pinion_lever_spec.BORE_BAND == REAM_SLIDE
@@ -207,7 +208,7 @@ def test_station_reference_sketches_are_saved_hidden() -> None:
     source = Path(lever.__file__).read_text(encoding="utf-8")
     assert set(re.findall(r'"(\w+Reference)"', source)) == set(expected)
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
-    # One shared helper in _common (restricted review), no local copy.
+    # One shared helper in _sketch (restricted review), no local copy.
     assert "def _blank_reference_sketches" not in source
     assert source.count(blank) == 1
     assert source.index(blank) < source.rindex(
@@ -217,9 +218,9 @@ def test_station_reference_sketches_are_saved_hidden() -> None:
 
 def test_station_reference_blank_reads_every_sketch_back_hidden(monkeypatch) -> None:
     sketches = dt_pinion_lever_spec.REFERENCE_SKETCHES
-    assert _run_blank(monkeypatch, _common, sketches, blanks=True) == list(sketches)
+    assert _run_blank(monkeypatch, _sketch, sketches, blanks=True) == list(sketches)
     with pytest.raises(RuntimeError, match="GripStationReference still visible"):
-        _run_blank(monkeypatch, _common, sketches, blanks=False)
+        _run_blank(monkeypatch, _sketch, sketches, blanks=False)
 
 
 def test_hub_detail_is_created_and_dimensioned_while_the_part_shows_them() -> None:

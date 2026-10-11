@@ -23,12 +23,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     insert_helix,
@@ -45,9 +49,11 @@ G5_PITCH = 25.4 / 18.0     # stored 1.411111
 G5_UNDERSIDE = 13.2953125   # (L + HH)/2 - HH: vendor origin is mid-overall
 
 
+@stock_recipe("92865A585", threaded=True)
 async def build_92865A585(adapter, truth=None):
-    from _common import (add_line_chain, _early_bound, _feature_by_name,
-                         _read_member)
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
+    from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 

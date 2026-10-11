@@ -11,7 +11,7 @@ What they pin is one property: **each shared vertex must be written as the
 same expression in both segments**, so the two doubles are bit-identical.
 That is what closes the profile.  An exact-coordinate endpoint written
 straight to the sketch database (``AddToDB``) is coalesced there at creation
--- the behaviour ``_common.add_line_chain`` has always relied on, since it
+-- the behaviour ``_sketch.add_line_chain`` has always relied on, since it
 authors no closure relation at all and its loops close -- so a vertex spelled
 two different ways is two vertices, and the loop stays open.
 
@@ -37,6 +37,7 @@ import math
 
 import pytest
 
+from _mcmaster_99607a213 import TS_SH_R
 from diagnostics.diag_build_91247A720 import (
     LOGO_APEX_CENTRE,
     LOGO_BOTTOM_LEFT_CENTRE,
@@ -48,7 +49,6 @@ from diagnostics.diag_build_99607A213 import (
     TS_FLARE_CENTRE,
     TS_FLARE_Z0,
     TS_FLARE_Z1,
-    TS_SH_R,
     flare_profile,
 )
 from diagnostics.sketch_profile import (

@@ -10,7 +10,19 @@ from pathlib import Path
 
 import pytest
 
-import _common
+import _appearance
+import _com
+import _custom_properties
+import _dimensions
+import _extrude
+import _feature_tree
+import _part_checks
+import _part_properties
+import _part_save
+import _rebuild
+import _session
+import _sketch
+import _sketch_rectangle
 import _config
 import _telemetry
 import build_vn_cone_tip_block_screw as part
@@ -18,7 +30,8 @@ import vn_cone_tip_block_screw_spec as screw
 import dt_cone_tip_block_spec as block
 import draw_vn_cone_tip_block_screw as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-from _stock_fastener import STOCK_RECIPES
+from _mcmaster_91251a108 import DIMS
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91251A108 as recipe
 from diagnostics import diag_mcmaster_lib
 from diagnostics import diag_mcmaster_socket_head as socket_head
@@ -30,7 +43,7 @@ def test_recipe_is_the_catalogue_screw() -> None:
     """91251A108 per mcmaster.com (2026-09-29): #4-40 x 3/8, socket head
     0.183 x 0.112, 3/32 hex drive; socket depth is ASME B18.3's #4 minimum
     key engagement, 0.055 in."""
-    dims = recipe.DIMS
+    dims = DIMS
     assert dims.part_no == "91251A108"
     assert dims.major_dia == pytest.approx(0.112 * IN)
     assert dims.pitch == pytest.approx(IN / 40.0)
@@ -154,15 +167,60 @@ def _record(monkeypatch, author) -> list[tuple]:
     monkeypatch.setattr(socket_head, "insert_helix", logger("insert_helix"))
     monkeypatch.setattr(socket_head, "offset_plane", logger("offset_plane"))
     monkeypatch.setattr(socket_head, "thread_sweep_cut", logger("thread_sweep_cut"))
-    monkeypatch.setattr(_common, "add_line_chain", async_logger("add_line_chain"))
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "add_line_chain", async_logger("add_line_chain"))
+    monkeypatch.setattr(_sketch_rectangle, "add_line_chain", async_logger("add_line_chain"))
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(
-        _common,
+        _dimensions,
         "_feature_by_name",
         lambda _adapter, name: adapter.obj(f"feature {name}"),
     )
     monkeypatch.setattr(
-        _common, "_read_member", lambda obj, name: getattr(obj, name)
+        _feature_tree,
+        "_feature_by_name",
+        lambda _adapter, name: adapter.obj(f"feature {name}"),
+    )
+    monkeypatch.setattr(
+        _sketch,
+        "_feature_by_name",
+        lambda _adapter, name: adapter.obj(f"feature {name}"),
+    )
+    monkeypatch.setattr(
+        _com, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _custom_properties, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _extrude, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _feature_tree, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _part_properties, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _rebuild, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _session, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _sketch, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _sketch_rectangle, "_read_member", lambda obj, name: getattr(obj, name)
     )
     monkeypatch.setattr(diag_mcmaster_lib, "no_sketch_inference", no_inference)
     monkeypatch.setattr(
@@ -180,7 +238,7 @@ def _record(monkeypatch, author) -> list[tuple]:
 def test_recipe_cuts_the_catalogue_socket_and_thread(monkeypatch) -> None:
     calls = _record(monkeypatch, recipe.build_91251A108)
     (cut,) = [c for c in calls if c[0] == "fm.FeatureCut4"]
-    assert cut[1][5] == recipe.DIMS.socket_depth / 1000.0
+    assert cut[1][5] == DIMS.socket_depth / 1000.0
     (helix,) = [c for c in calls if c[0] == "insert_helix"]
     assert helix[1][1:3] == (IN / 40.0, 0.375 * IN / (IN / 40.0) + 1.0)
     sweeps = [c for c in calls if c[0] == "thread_sweep_cut"]
@@ -191,7 +249,7 @@ def test_recipe_cuts_the_catalogue_socket_and_thread(monkeypatch) -> None:
 def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     monkeypatch,
 ) -> None:
-    metadata = STOCK_RECIPES["91251A108"]
+    metadata = discovered_recipes()["91251A108"]
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == recipe.build_91251A108.__name__
     assert metadata.threaded

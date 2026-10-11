@@ -13,7 +13,7 @@ LATE-BOUND PROBE: this script drives SolidWorks through its own
 ``GetObject``/``Dispatch`` (or a raw ``adapter.currentModel``), NOT the makepy
 wrapper, so its ``[out]`` params land in the ``VT_BYREF`` VARIANTs passed in
 rather than in the return tuple. That is the OPPOSITE of the build path, where
-``_common._early_bound`` guarantees an early-bound object and the outs ride the
+``_com._early_bound`` guarantees an early-bound object and the outs ride the
 return tuple. Both are correct for their binding -- mixing them is the trap that
 reads as "no data" instead of failing. See memory/sw-assembly-mate-diagnostics-api.md.
 """
@@ -23,9 +23,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # for _common
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # for CAD helpers
 
-from _common import OUT_SLDASM, OUT_SLDPRT, check, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _paths import OUT_SLDASM, OUT_SLDPRT  # noqa: E402
+from _session import run_build  # noqa: E402
 
 ASSEMBLY = OUT_SLDASM / "ha-harmonic-analyzer.SLDASM"
 PART = OUT_SLDPRT / "a-frame.SLDPRT"

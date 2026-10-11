@@ -1,7 +1,7 @@
 flowchart TD
     subgraph SRC["① Source of Truth (git-tracked)"]
         BS["build_*.py part scripts<br/>build_*_assembly.py"]
-        HELP["_common.py · _config.py<br/>_gear.py · _chain.py<br/>_nameplate_geometry.py"]
+        HELP["_session.py · _part_save.py · _config.py<br/>focused CAD helpers · _gear.py · _chain.py<br/>_nameplate_geometry.py"]
         CFG["cad/config/*.yaml<br/>machine · channels · dimensions<br/>parts · tolerances · materials"]
     end
 

@@ -10,16 +10,14 @@ from typing import Any
 import pytest
 
 import _drawing_common
-import _part_pmi
-from _gtol_spec import (
-    ConeFace,
-    CylinderFace,
-    PlanarFace,
-    SphereFace,
-    TorusFace,
-    gtol_frame_xml,
-)
-from _part_pmi import _FaceGeometry
+import _gtol_face_resolve
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _gtol_torus import TorusFace
+from _gtol_frame import gtol_frame_xml
+from _gtol_face import FaceGeometry
 from _surface_finish import SurfaceFinishControl
 
 
@@ -39,8 +37,8 @@ def _control() -> SurfaceFinishControl:
     return SurfaceFinishControl("bore", 1.6, CylinderFace(10.0))
 
 
-def _geometry(face: Any, diameter_mm: float) -> _FaceGeometry:
-    return _FaceGeometry(
+def _geometry(face: Any, diameter_mm: float) -> FaceGeometry:
+    return FaceGeometry(
         face=face,
         identity=4002,
         parameters=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, diameter_mm / 2000.0),
@@ -63,7 +61,7 @@ def test_surface_finish_accepts_controlled_face_for_every_entity_path(
     }
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        "_part_pmi._face_geometry", lambda face: geometries[id(face)]
+        "_gtol_face_read.face_geometry", lambda face: geometries[id(face)]
     )
 
     signatures = _drawing_common._validate_surface_finish_control_face(
@@ -82,7 +80,7 @@ def test_surface_finish_rejects_entity_without_controlled_face(
     selected = wrong_face if entity_type == "FACE" else entity
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        "_part_pmi._face_geometry", lambda face: _geometry(face, 6.0)
+        "_gtol_face_read.face_geometry", lambda face: _geometry(face, 6.0)
     )
 
     with pytest.raises(
@@ -904,7 +902,7 @@ def test_leader_landing_tolerance_is_one_millimetre(offset_m: float, accepted: b
             check()
 
 
-# _part_pmi._resolve_faces: the one raw walk the surface-finish faces come from.
+# _gtol_face_resolve.resolve_faces: the one raw walk the surface-finish faces come from.
 #
 # The doubles are raw dispatches, as SolidWorks hands them to the walk: they
 # answer ``InvokeTypes`` only and assert the whole (dispid, lcid, flags,
@@ -1007,7 +1005,7 @@ _SPECS = {
 @pytest.mark.parametrize("label", sorted(_SPECS))
 def test_each_spec_type_resolves_its_one_raw_face(label: str) -> None:
     faces = _faces()
-    resolved = _part_pmi._resolve_faces(_Part(*faces.values()), {label: _SPECS[label]})
+    resolved = _gtol_face_resolve.resolve_faces(_Part(*faces.values()), {label: _SPECS[label]})
     assert resolved[label]._oleobj_ is faces[label]
     # A face of a surface type the spec does not name stops at its identity.
     for name, face in faces.items():
@@ -1019,7 +1017,7 @@ def test_each_spec_type_resolves_its_one_raw_face(label: str) -> None:
 def test_mixed_spec_types_resolve_in_one_walk() -> None:
     faces = _faces()
     part = _Part(*faces.values())
-    resolved = _part_pmi._resolve_faces(part, dict(_SPECS))
+    resolved = _gtol_face_resolve.resolve_faces(part, dict(_SPECS))
     assert {label: face._oleobj_ for label, face in resolved.items()} == {
         label: faces[label] for label in _SPECS
     }
@@ -1034,16 +1032,16 @@ def test_a_twin_face_fails_the_exactly_one_contract(label: str) -> None:
     twin = _raw_face(face.identity, face.parameters, flipped=face.flipped)
     part = _Part(*faces.values(), twin)
     with pytest.raises(RuntimeError, match=f"^{label}: face spec .* matched 2 faces"):
-        _part_pmi._resolve_faces(part, {label: _SPECS[label]})
+        _gtol_face_resolve.resolve_faces(part, {label: _SPECS[label]})
 
 
 def test_coplanar_faces_still_fail_the_exactly_one_contract() -> None:
     with pytest.raises(RuntimeError, match="matched 2 faces"):
-        _part_pmi._resolve_faces(
+        _gtol_face_resolve.resolve_faces(
             _Part(*_faces().values()), {"face": PlanarFace((0.0, 0.0, 1.0), 20.0)}
         )
 
 
 def test_a_spec_no_face_matches_fails_the_exactly_one_contract() -> None:
     with pytest.raises(RuntimeError, match="matched 0 faces"):
-        _part_pmi._resolve_faces(_Part(*_faces().values()), {"bore": CylinderFace(9.0)})
+        _gtol_face_resolve.resolve_faces(_Part(*_faces().values()), {"bore": CylinderFace(9.0)})

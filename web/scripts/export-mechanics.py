@@ -232,52 +232,62 @@ def export_snapshot(
 ) -> None:
     snapshot_root = cad.parent
     sys.path.insert(0, str(cad / "scripts"))
-    # This released data table sits in a COM recipe whose unrelated imports
-    # pull telemetry/Windows machinery. Evaluate its exact assignment AST only:
-    # genuine supplier data, no substitute geometry and no COM function stubs.
+    # Historical released data tables sit in COM recipes whose unrelated
+    # imports pull telemetry/Windows machinery. Evaluate exact assignment ASTs
+    # only: genuine supplier data, no substitute geometry or COM function stubs.
     thumb_path = identity_map.source_file(cad, "scripts/diagnostics/diag_mcmaster_thumb.py")
     thumb_tree = ast.parse(thumb_path.read_text(), filename=str(thumb_path))
     thumb_assignment = next(
-        node
-        for node in thumb_tree.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "THUMB_SPECS"
-            for target in node.targets
+        (
+            node
+            for node in thumb_tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "THUMB_SPECS"
+                for target in node.targets
+            )
+        ),
+        None,
+    )
+    if thumb_assignment is not None:
+        thumb_module = types.ModuleType("diagnostics.diag_mcmaster_thumb")
+        thumb_module.__file__ = str(thumb_path)
+        # Pinned-commit assignment AST; not literal_eval-able (dict() calls, arithmetic).
+        thumb_code = compile(
+            ast.Module(body=[thumb_assignment], type_ignores=[]), str(thumb_path), "exec"
         )
-    )
-    thumb_module = types.ModuleType("diagnostics.diag_mcmaster_thumb")
-    thumb_module.__file__ = str(thumb_path)
-    # Pinned-commit assignment AST; not literal_eval-able (dict() calls, arithmetic).
-    thumb_code = compile(
-        ast.Module(body=[thumb_assignment], type_ignores=[]), str(thumb_path), "exec"
-    )
-    exec(thumb_code, thumb_module.__dict__)  # noqa: S102
-    sys.modules[thumb_module.__name__] = thumb_module
+        exec(thumb_code, thumb_module.__dict__)  # noqa: S102
+        sys.modules[thumb_module.__name__] = thumb_module
     fillister_path = identity_map.source_file(cad, "scripts/diagnostics/diag_mcmaster_fillister.py")
     fillister_tree = ast.parse(fillister_path.read_text(), filename=str(fillister_path))
+    # Historical released sources embed this table in the recipe. Current
+    # sources import pure per-SKU dimensions and need no recipe projection.
     fillister_assignment = next(
-        node
-        for node in fillister_tree.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "FILLISTER_SIZES"
-            for target in node.targets
+        (
+            node
+            for node in fillister_tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "FILLISTER_SIZES"
+                for target in node.targets
+            )
+        ),
+        None,
+    )
+    if fillister_assignment is not None:
+        fillister_module = types.ModuleType("diagnostics.diag_mcmaster_fillister")
+        fillister_module.__file__ = str(fillister_path)
+        cross_spec = identity_map.import_module(cad, "vn_frame_cross_screw_spec")
+        for name in ("SHANK_DIA", "SHANK_LEN", "HEAD_H", "HEAD_DIA", "PITCH"):
+            fillister_module.__dict__[name] = getattr(cross_spec, name)
+        # Pinned-commit assignment AST; references the injected cross-screw constants.
+        fillister_code = compile(
+            ast.Module(body=[fillister_assignment], type_ignores=[]),
+            str(fillister_path),
+            "exec",
         )
-    )
-    fillister_module = types.ModuleType("diagnostics.diag_mcmaster_fillister")
-    fillister_module.__file__ = str(fillister_path)
-    cross_spec = identity_map.import_module(cad, "vn_frame_cross_screw_spec")
-    for name in ("SHANK_DIA", "SHANK_LEN", "HEAD_H", "HEAD_DIA", "PITCH"):
-        fillister_module.__dict__[name] = getattr(cross_spec, name)
-    # Pinned-commit assignment AST; references the injected cross-screw constants.
-    fillister_code = compile(
-        ast.Module(body=[fillister_assignment], type_ignores=[]),
-        str(fillister_path),
-        "exec",
-    )
-    exec(fillister_code, fillister_module.__dict__)  # noqa: S102
-    sys.modules[fillister_module.__name__] = fillister_module
+        exec(fillister_code, fillister_module.__dict__)  # noqa: S102
+        sys.modules[fillister_module.__name__] = fillister_module
     modules = {
         name: identity_map.import_module(cad, name)
         for name in (
@@ -333,6 +343,14 @@ def export_snapshot(
     mount = modules["spring_mount_geom"]
     settled = modules["settled_spring_seats"]
     goose = modules["sm_gooseneck_geom"]
+    # Releases before MHA-SM-004 model the counter eye on the gooseneck's
+    # integral screw shank; later trees seat it on the separate made screw's
+    # #6-32 major diameter.
+    counter_screw_dia = (
+        goose.SCREW_SHANK_DIA
+        if hasattr(goose, "SCREW_SHANK_DIA")
+        else identity_map.import_module(cad, "sm_gooseneck_spring_screw_geom").MAJOR_DIA
+    )
     mag = modules["mg_magnifying_lever_geom"]
     lw = modules["mg_lever_wire_geom"]
     pw = modules["pn_pen_wire_geom"]
@@ -825,7 +843,7 @@ def export_snapshot(
             "loopTurns": counter.LOOP_TURNS,
             "loopRiseMm": counter.LOOP_RISE_MM,
             "loopHalfRiseMm": counter.LOOP_HALF_RISE_MM,
-            "screwRadiusMm": goose.SCREW_SHANK_DIA / 2.0,
+            "screwRadiusMm": counter_screw_dia / 2.0,
             "coilOutsideDiameterMm": counter.COIL_OD_MM,
             "wireDiameterMm": counter.WIRE_DIA_MM,
             "coilTurns": counter.COIL_TURNS,

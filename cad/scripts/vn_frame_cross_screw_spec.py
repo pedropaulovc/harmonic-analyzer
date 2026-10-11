@@ -5,10 +5,10 @@ fully threaded zinc-plated steel, flat tip. Native vendor reference:
 cad/references/mcmaster/90280A837.SLDPRT (local, never tracked).
 """
 
-THREAD = "#10-32"
-THREAD_CLASS = "2A"
-SHANK_DIA = 4.826
-SHANK_LEN = 44.45
-HEAD_DIA = 7.9502
-HEAD_H = 4.572
-PITCH = 0.79375
+from _mcmaster_90280a837 import (
+    HEAD_DIA as HEAD_DIA,
+    SHANK_DIA as SHANK_DIA,
+    SHANK_LEN as SHANK_LEN,
+    THREAD as THREAD,
+    THREAD_CLASS as THREAD_CLASS,
+)

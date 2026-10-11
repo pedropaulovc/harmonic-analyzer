@@ -56,28 +56,25 @@ import sys
 
 from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
 
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     anchor_point_to_origin,
-    apply_material,
     blank_sketch,
-    check,
-    define_circle,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _drawing_marks import (
@@ -88,7 +85,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
@@ -109,7 +106,7 @@ from ch_rocker_arm_spec import (
 import _config
 
 PART_NAME = "ch-rocker-arm"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: top edge R = amplitude bar length (stated)
 ARM_DEPTH = 16.0  # ch14: p.29 photo callout, perpendicular top-to-bottom depth
@@ -465,7 +462,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PivotHole")
     # Named axis through the pivot bore (Axis1): assembly mates select it by
     # NAME (Right ∩ Top+8), view-independent -- an internal bore wall never
-    # selects by screen-projected point. See _common.name_bore_axis.
+    # selects by screen-projected point. See _bore_axis.name_bore_axis.
     await name_bore_axis(
         adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
     )

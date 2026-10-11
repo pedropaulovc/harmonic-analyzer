@@ -56,13 +56,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     assert_profile_closed,
@@ -80,26 +84,23 @@ from diagnostics.sketch_profile import (  # noqa: E402
     minor_arc,
 )
 
-# --- Sketch1 driving dimensions (mm) -----------------------------------------
-MAJOR_R = 3.175  # Thread Size 6.35 / 2
-PITCH = 1.27
-LENGTH = 19.05  # stud under the head
-HEAD_R = 7.9375  # Head Diameter 15.875 / 2, over the knurl crests
-HEAD_H = 12.7
-RIM_CHAMFER = 0.79375  # Sketch37 45-deg rim triangle leg
-
-# --- vendor equations ---------------------------------------------------------
-TIP_CHAMFER = PITCH * 0.75  # D1@Chamfer2
-CORE_R = HEAD_R * 0.98  # D1@Sketch21 = HD * .98
-BAND_H = HEAD_H * 0.05  # D4@Sketch1 = HH * .05 (bands, Chamfer3/4)
-KNURL_COUNT = 131  # D1@CirPattern1 = HD[in] * 3.14 / .015
-KNURL_CREST_W = 0.127  # D3@Sketch26
-KNURL_FLANK_DEG = 20.0  # D1@Sketch26 = D2@Sketch26
-RUNOUT_DEPTH = 2.54  # Boss-Extrude7 dir1
-RUNOUT_DRAFT_DEG = 45.0
-
-H_SHARP = PITCH * math.sqrt(3.0) / 2.0
-ROOT_R = MAJOR_R - 0.75 * H_SHARP  # 2.350111
+from _mcmaster_93585a190 import (  # noqa: E402
+    MAJOR_R,
+    PITCH,
+    LENGTH,
+    HEAD_R,
+    HEAD_H,
+    RIM_CHAMFER,
+    TIP_CHAMFER,
+    CORE_R,
+    BAND_H,
+    KNURL_COUNT,
+    KNURL_CREST_W,
+    KNURL_FLANK_DEG,
+    RUNOUT_DEPTH,
+    RUNOUT_DRAFT_DEG,
+    ROOT_R,
+)
 
 
 def knurl_ridge_profile() -> tuple[Segment, ...]:
@@ -150,8 +151,10 @@ def rim_cut_profile() -> tuple[Segment, ...]:
     return (Line(a, b), Line(b, c), Line(c, a))
 
 
+@stock_recipe("93585A190", threaded=True)
 async def build_93585A190(adapter, truth=None):
-    from _common import _early_bound, _feature_by_name, _read_member
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
     from diagnostics.diag_mcmaster_lib import no_sketch_inference
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,

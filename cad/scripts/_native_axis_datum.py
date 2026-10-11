@@ -13,7 +13,7 @@ from typing import Any, Literal, Sequence
 
 import _drawing_common as drawing
 import _telemetry
-from _common import _early_bound
+from _com import _early_bound
 
 
 def _axis_parameters(

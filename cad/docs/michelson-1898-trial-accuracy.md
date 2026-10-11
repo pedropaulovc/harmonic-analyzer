@@ -10,7 +10,7 @@ Michelson and Stratton's published trials establish a **whole-device performance
 
 Use those values to judge the assembled and calibrated analyzer and to constrain a sensitivity-based tolerance budget. **Do not apply 0.7% or 2% directly to every part dimension.** The paper gives no dimensions, fits, clearances, runout limits, surface finishes, spring-rate tolerances, or allocation of total error among mechanisms.
 
-This document is the source of truth for the **historical trial benchmark and its permitted use**. The actual manufacturing limits remain authoritative in [`../config/tolerances.yaml`](../config/tolerances.yaml), [`../config/title_block.yaml`](../config/title_block.yaml), and the part/drawing specifications. A dimensional tolerance is justified only when a sensitivity calculation or assembled-machine test connects it to the performance envelope below.
+This document is the source of truth for the **historical trial benchmark and its permitted use**. The actual manufacturing limits remain authoritative in [`../config/tolerances/_base.yaml`](../config/tolerances/_base.yaml) and its per-fit-group siblings, [`../config/title_block.yaml`](../config/title_block.yaml), and the part/drawing specifications. A dimensional tolerance is justified only when a sensitivity calculation or assembled-machine test connects it to the performance envelope below.
 
 ## Source and method
 

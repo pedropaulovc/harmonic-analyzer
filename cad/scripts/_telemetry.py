@@ -25,7 +25,7 @@ What you get, **preconfigured on import** (zero env, no collector):
 
 Drop-in for the old helpers: ``progress()`` == the old ``log()``, ``success()``
 == the ``  OK  `` lines, ``warn()`` / ``error()`` == the ``!!`` / ``FAIL`` lines.
-``_common`` re-exports these so the 173 scripts importing ``log``/``check`` are
+``_check`` wraps these so scripts importing ``log``/``check`` are
 instrumented without touching their call sites.
 """
 
@@ -794,7 +794,7 @@ class _LiveStderr:
 # A Batch processor hands export to a background thread, so the cost leaves the #
 # critical path entirely. The trade is that queued records are lost if the      #
 # process dies without flushing -- covered on both exit paths we have:          #
-# ``_common.run_build`` calls :func:`shutdown` after the build session closes,  #
+# ``_session.run_build`` calls :func:`shutdown` after the build session closes,  #
 # and the watchdog flushes before its ``os._exit``. Console and file capture    #
 # deliberately stay on Simple processors: the console must stay live and        #
 # ``traces.jsonl``/``logs.jsonl`` must never lose a record to a queue.          #
@@ -1287,12 +1287,12 @@ def _log_extra(fields: Mapping[str, Any], service: str | None) -> dict[str, Any]
 # all 725k worker log rows in the 30 days to 2026-09-27 read ``success`` / ``info`` /
 # ``debug`` / ... in ``_telemetry.py``. :func:`_caller_stacklevel` points the record
 # at the first frame outside the plumbing instead: this module, contextlib's span
-# context managers, and ``_common``'s pure pass-through aliases (``log`` / a passing
+# context managers, and ``_check``'s pure pass-through aliases (``log`` / a passing
 # ``check``).
 _PLUMBING_FILES = frozenset(
     os.path.normcase(os.path.abspath(path)) for path in (__file__, contextlib.__file__)
 )
-_PASS_THROUGH_FUNCTIONS = frozenset({("_common.py", "log"), ("_common.py", "check")})
+_PASS_THROUGH_FUNCTIONS = frozenset({("_check.py", "log"), ("_check.py", "check")})
 
 
 @functools.lru_cache(maxsize=512)
@@ -1359,8 +1359,8 @@ def error(
     )
 
 
-# Historical aliases so ``_common`` (and anything importing from it) stays a
-# drop-in: ``progress`` == the old ``log()``, ``ok`` == a passing ``  OK  ``.
+# Logging aliases used by ``_check`` and other callers:
+# ``progress`` == the old ``log()``, ``ok`` == a passing ``  OK  ``.
 progress = debug
 ok = success
 
@@ -1432,7 +1432,7 @@ def _fill_error_cause(span: Any, description: str | None) -> None:
     """Give a span marked ERROR by hand the same ``error.*`` cause attributes a
     raising body gets.
 
-    ``_common.run_build`` run standalone catches the build's exception, records it
+    ``_session.run_build`` run standalone catches the build's exception, records it
     on its ``build.<target>`` root, sets ERROR and returns normally -- so the root
     exits clean and the raising branch of :func:`_exit_span` never sees the cause.
     The cause is taken from the newest recorded ``exception`` event, else the status
@@ -1536,7 +1536,7 @@ def traced(name: str, *, label_param: str | None = None):
     Works on both sync and async functions. ``label_param`` names a parameter
     whose value is copied onto the span as a ``label`` attribute (so e.g.
     ``define_circle(..., label="blank_od")`` traces as ``sketch.circle
-    label=blank_od``). This is how the per-operation ``_common`` helpers turn a
+    label=blank_od``). This is how the focused per-operation helpers turn a
     build into a tree of operation spans instead of one monolithic ``build`` span.
     """
 
@@ -1578,11 +1578,11 @@ def traced(name: str, *, label_param: str | None = None):
 # --------------------------------------------------------------------------- #
 # Build scripts call the SolidworksMCP adapter directly
 # (``await adapter.create_cut_extrude(...)``) far more often than through a traced
-# ``_common`` helper. 42.9 h of ``part.build``'s 79.4 h in the 30 days to 2026-09-27
+# focused helper. 42.9 h of ``part.build``'s 79.4 h in the 30 days to 2026-09-27
 # fell in no child span, and log-gap attribution put ~9 h of that on these direct
 # feature/sketch/document calls.
 
-# The adapter class the build processes construct (``_common.run_build``).
+# The adapter class the build processes construct (``_session.run_build``).
 _ADAPTER_MODULE = "solidworks_mcp.adapters.pywin32_adapter"
 _ADAPTER_CLASS = "PyWin32Adapter"
 
@@ -1747,7 +1747,7 @@ def _instrument_loaded_adapter() -> None:
 def build_session(
     label: str, /, **attributes: Any
 ) -> Generator[Span | None, None, None]:
-    """Root context for a build *process* (``_common.run_build``).
+    """Root context for a build *process* (``_session.run_build``).
 
     Under the doit spine a parent trace context is injected (``TRACEPARENT``), so
     this CONTINUES that trace: the build's operation spans attach directly to the
@@ -1934,7 +1934,7 @@ def shutdown() -> None:
     Covers BOTH signals: OTLP export is batched (see the block above
     :func:`_otlp_span_processor`), so anything still queued -- spans AND log records
     -- is only delivered because this runs. It is the reason the batch trade is safe:
-    ``_common.run_build`` calls this after the build session closes, and the watchdog
+    ``_session.run_build`` calls this after the build session closes, and the watchdog
     calls it before ``os._exit``.
 
     The auxiliary per-resource providers (build-infra) are deliberately NOT shut down:
@@ -1948,6 +1948,6 @@ def shutdown() -> None:
 
 
 # Preconfigure on import: a script that merely ``import _telemetry`` (directly
-# or transitively through ``_common``) gets console logging + tracing with no
+# or transitively through ``_check``) gets console logging + tracing with no
 # setup call. Mirrors "preconfigure console logging".
 configure()

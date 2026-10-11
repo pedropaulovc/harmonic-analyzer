@@ -43,26 +43,24 @@ import math
 import _config
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    define_circle,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _drawing_marks import (
@@ -91,7 +89,7 @@ from ch_channel_lever_spec import (
 )
 
 PART_NAME = "ch-channel-lever"
-MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
+MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 
 # Every nominal above comes from ch_channel_lever_spec -- the ONE source the
 # drawing reads too (DIMENSIONS.md ch17; the reach is set by the plumb spring

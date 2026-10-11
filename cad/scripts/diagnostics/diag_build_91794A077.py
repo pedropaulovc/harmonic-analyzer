@@ -17,8 +17,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
-from _common import check, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _session import run_build  # noqa: E402
+from _mcmaster_91794a077 import FILLISTER_SIZE  # noqa: E402
 from diagnostics.diag_mcmaster_fillister import build_fillister  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     OUT_DIR,
@@ -29,8 +37,9 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
 )
 
 
+@stock_recipe("91794A077", threaded=True)
 async def build_91794A077(adapter, truth=None):
-    await build_fillister(adapter, "91794A077")
+    await build_fillister(adapter, "91794A077", FILLISTER_SIZE)
 
 
 async def build_catalog(adapter) -> dict[str, str]:

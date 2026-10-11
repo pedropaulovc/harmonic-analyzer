@@ -7,13 +7,25 @@ import contextlib
 import math
 from pathlib import Path
 
-import _common
+import _appearance
+import _com
+import _custom_properties
+import _dimensions
+import _extrude
+import _feature_tree
+import _part_checks
+import _part_properties
+import _part_save
+import _rebuild
+import _session
+import _sketch
+import _sketch_rectangle
 import _config
 import build_vn_cone_tip_collar as part
 import vn_cone_tip_collar_spec as spec
 import draw_vn_cone_tip_collar as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_9414T1 as recipe
 from diagnostics import diag_mcmaster_lib
 
@@ -75,12 +87,37 @@ def _record(monkeypatch) -> list[tuple]:
             ("offset_plane", (name, off, base))
         ),
     )
-    monkeypatch.setattr(_common, "add_line_chain", add_line_chain)
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(_sketch_rectangle, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(
-        _common, "_feature_by_name", lambda _a, name: _Obj(adapter.events, name)
+        _dimensions, "_feature_by_name", lambda _a, name: _Obj(adapter.events, name)
     )
-    monkeypatch.setattr(_common, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(
+        _feature_tree, "_feature_by_name", lambda _a, name: _Obj(adapter.events, name)
+    )
+    monkeypatch.setattr(
+        _sketch, "_feature_by_name", lambda _a, name: _Obj(adapter.events, name)
+    )
+    monkeypatch.setattr(_com, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_custom_properties, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_extrude, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_feature_tree, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_part_properties, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_rebuild, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_session, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_sketch, "_read_member", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(_sketch_rectangle, "_read_member", lambda obj, name: getattr(obj, name))
     monkeypatch.setattr(
         diag_mcmaster_lib, "no_sketch_inference", lambda _a: contextlib.nullcontext()
     )
@@ -126,7 +163,7 @@ def test_recipe_volumes_are_consistent() -> None:
 
 
 def test_stock_build_uses_its_registered_recipe_on_the_origin(monkeypatch) -> None:
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == recipe.build_9414T1.__name__
     assert not metadata.threaded

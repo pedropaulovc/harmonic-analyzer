@@ -31,11 +31,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (
     assert_profile_closed,  # noqa: E402
     _rev_frustum,
@@ -51,15 +53,17 @@ from diagnostics.sketch_profile import (  # noqa: E402
     endpoint_merges,
     minor_arc,
 )
+from _mcmaster_91247a720 import (  # noqa: E402
+    GB_HH,
+    GB_HW,
+    GB_LEN,
+    GB_MAJOR_R,
+    GB_MTL,
+    GB_PITCH,
+    GB_UNDERSIDE,
+    GB_WASHER_T,
+)
 
-GB_MAJOR_R = 12.7 / 2.0
-GB_LEN = 50.8
-GB_HW = 19.05
-GB_HH = 7.9375
-GB_PITCH = 25.4 / 13.0     # stored 1.953846
-GB_MTL = 31.75
-GB_UNDERSIDE = 21.43125    # (L + HH)/2 - HH
-GB_WASHER_T = 0.2
 
 # --- raised triangle logo ring -----------------------------------------------
 # The vendor authored this as a mid-plane Extrude-Thin over a 6-segment
@@ -125,8 +129,9 @@ def logo_ring_profile() -> tuple[Segment, ...]:
 
 
 async def build_91247A720(adapter, truth=None):
-    from _common import (add_line_chain, _early_bound, _feature_by_name,
-                         _read_member)
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
+    from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import (mass_properties, no_sketch_inference,
                                    split_at_plane)
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters

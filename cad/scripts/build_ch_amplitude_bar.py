@@ -32,27 +32,18 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    IN,
-    SketchDims,
-    add_line_chain,
-    apply_material,
-    apply_color,
-    BAR_STEEL,
-    check,
-    define_circle,
-    drive_dimension,
-    ensure_fully_defined,
-    force_rebuild,
-    bbox_extent_check,
-    name_bore_axis,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
-)
+from _appearance import apply_material, apply_color, BAR_STEEL
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _paths import IN
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -61,7 +52,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -84,7 +75,7 @@ from ch_amplitude_bar_spec import (
 import _telemetry
 
 PART_NAME = "ch-amplitude-bar"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 BAR_LENGTH = 32.0 * IN - 4.5  # 808.3: legacy 32" minus the 4.5 top-frame-rederive
 # top trim (fulcrum chain -4.5, 2026-08-02; foot end untouched). MUST equal
@@ -324,7 +315,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, BAR_STEEL)  # ch30 plates: see _common palette
+    await apply_color(adapter, BAR_STEEL)  # ch30 plates: see _appearance palette
 
     # Verify the two book-sourced dims on the built solid (ch. 15).
     await bbox_extent_check(adapter, "bar width (annotated 6.35)", "x", BAR_WIDTH)

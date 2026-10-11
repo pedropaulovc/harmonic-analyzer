@@ -19,8 +19,9 @@ marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
-from _fit_limits import REAM_H7, REAM_SLIDE
-from _gtol_spec import CylinderFace
+from _fit_ream_h7 import REAM_H7
+from _fit_ream_slide import REAM_SLIDE
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
@@ -43,7 +44,7 @@ from dt_pinion_bracket_geometry import (
 import vn_pinion_strap_pin_spec as _strap_pin
 
 # --- Tolerance bands.  Only the three fitted bores carry one, and each traces
-# to a NAMED fit class in ``_fit_limits``; every other feature is governed by
+# to a NAMED fit class in ``_fit_ream_h7`` or ``_fit_ream_slide``; every other feature is governed by
 # its decimal places against the title block's general grades.  The strap's
 # former per-part numbers (a +/-0.10 bore centre distance, +/-0.05 on the seat
 # axis and through-thickness station, +/-0.05 on the bar thickness and a

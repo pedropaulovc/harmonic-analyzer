@@ -7,8 +7,8 @@ names the native faces and the face sets are read back by those names:
 
 1. :func:`name_feature_faces` walks the open part's solid bodies once,
    resolves every selector ``export_features.feature_selectors(stem)``
-   supplies with the same geometry matcher the part PMI uses
-   (``_part_pmi._face_matches``), and gives EVERY matching native face a
+   supplies with the same selector-owned geometry matcher the part PMI uses
+   (``FaceSpec.matches``), and gives EVERY matching native face a
    deterministic ASCII name (``IPartDoc::SetEntityName``, verified by
    ``IPartDoc::GetEntityName`` read-back).  A selector matching nothing, or a
    face claimed by two features, fails loud.
@@ -198,14 +198,12 @@ def assign_feature_patches(
 ) -> dict[str, list[int]]:
     """Map each feature to the indices of EVERY face in ``geometries`` it claims.
 
-    ``geometries`` are ``_part_pmi._FaceGeometry`` rows from one body walk.  A
+    ``geometries`` are ``_gtol_face.FaceGeometry`` rows from one body walk.  A
     face matched by several selectors of the same feature counts once; one
     matched by two features is ambiguous and fails, as does a selector that
     matches nothing.  Patches are ordered by their rounded box (then walk
     position) so the numbering follows geometry, not traversal order.
     """
-    from _part_pmi import _face_matches  # noqa: PLC0415 - keeps the parser COM-free
-
     problems: list[str] = []
     claims: dict[int, list[str]] = {}
     assigned: dict[str, list[int]] = {}
@@ -218,7 +216,7 @@ def assign_feature_patches(
         for spec in specs:
             hits = {
                 index for index, geometry in enumerate(geometries)
-                if _face_matches(geometry, spec)
+                if spec.matches(geometry)
             }
             if not hits:
                 problems.append(f"{feature}: selector {spec!r} matched no face")
@@ -249,25 +247,23 @@ def name_feature_faces(doc: Any, stem: str) -> dict[str, list[str]]:
     ``SetEntityName`` refuses it and overwriting would break that reference.
     """
     import _telemetry  # noqa: PLC0415
-    from _common import _bind, _com_invoke, _early_bound  # noqa: PLC0415
-    from _part_pmi import _SPEC_IDENTITY, _face_geometry  # noqa: PLC0415
+    from _com import _bind, _com_invoke, _early_bound  # noqa: PLC0415
+    from _gtol_face_read import face_geometry  # noqa: PLC0415
     from export_features import feature_selectors  # noqa: PLC0415
 
     selectors = feature_selectors(stem)
     if not selectors:
         raise FeatureFaceError(f"{stem}: export_features declares no feature")
-    wanted = {
-        _SPEC_IDENTITY.get(type(spec))
-        for specs in selectors.values() for spec in specs
-    }
-    identities = None if None in wanted else frozenset(wanted)
+    identities = frozenset(
+        spec.surface_identity for specs in selectors.values() for spec in specs
+    )
     with _telemetry.span("export.feature_faces", part=stem) as sp:
         part = _early_bound(doc, "IPartDoc")
         geometries = []
         for body in part.GetBodies2(_SOLID_BODY, False) or ():
             face = _com_invoke(body, "IBody2", "GetFirstFace")
             while face is not None:
-                geometry = _face_geometry(face, identities=identities)
+                geometry = face_geometry(face, identities=identities)
                 if geometry is not None:
                     geometries.append(geometry)
                 face = _com_invoke(face, "IFace2", "GetNextFace")

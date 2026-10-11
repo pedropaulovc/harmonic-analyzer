@@ -23,12 +23,12 @@ from __future__ import annotations
 import asyncio
 
 import _telemetry
-from _common import (
-    _flag,
-    _read_member,
-    check,
-    log,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _com import _flag, _read_member
 from _assembly_couplings import (
     gear_mate,
     rack_pinion_mate,

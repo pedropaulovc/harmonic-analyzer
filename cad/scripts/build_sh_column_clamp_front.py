@@ -17,7 +17,8 @@ from __future__ import annotations
 import sys
 
 from _clamp_arc import build_arc
-from _common import run_build, save_part_and_images
+from _part_save import save_part_and_images
+from _session import run_build
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,

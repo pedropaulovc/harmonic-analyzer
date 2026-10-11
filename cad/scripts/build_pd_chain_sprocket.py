@@ -26,25 +26,24 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    IN,
+from _appearance import apply_material
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties
+from _paths import IN
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    define_circle,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    set_global,
     set_sketch_direct_db,
 )
-from _drawing_simplified import save_simplified_part
+from _sketch_circle import define_circle
+from _simplified_part import save_simplified_part
 from _gear import volume_check
 
 PART_NAME = "pd-chain-sprocket"

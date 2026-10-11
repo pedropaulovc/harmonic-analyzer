@@ -19,26 +19,24 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    define_rectilinear_chain,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    extrude_at_offset,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_rectilinear_chain
 
 import _telemetry
 from _drawing_marks import (
@@ -93,7 +91,7 @@ async def _volume(adapter) -> float:
 
 def _resolve_native_mounting_dimensions(adapter) -> dict[str, str]:
     """Name the extrusion height; resolve Wizard roles without renaming them."""
-    from _common import _early_bound
+    from _com import _early_bound
     model = _early_bound(adapter.currentModel, "IPartDoc")
     flange = _early_bound(model.FeatureByName("Flange"), "IFeature")
     height = flange.Parameter("D1")
@@ -145,7 +143,7 @@ def _apply_native_mounting_annotations(adapter, native_names: dict[str, str]) ->
 
 async def _mounting_coordinate_dimensions(adapter) -> None:
     """Own mounting coordinates from the real west edge and lower face."""
-    from _common import anchor_point_to_point
+    from _sketch import anchor_point_to_point
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
     check("mounting coordinate sketch", await adapter.create_sketch("Front"))
     dimensions = SketchDims()

@@ -5,11 +5,11 @@ elevation + isometric views, the bend-radius / arm-run dimensions, and the
 manufacturing notes; every shared sheet/template, import, curation, and export
 behavior lives in ``_drawing_common``.
 
-The post is a polished chrome Ø16 tube: a tall vertical leg, a 90-degree bend
-(R51) at the top, and a horizontal arm whose plugged end face carries the
-axial slotted spring screw (Ø3.6 shank, Ø10 head) the counter spring's top eye
-hangs on.  The part is ~493 mm tall, so the sheet runs 1:3; the isometric
-drops to 1:4.
+The post is a polished chrome Ø16 x 2-wall tube with a tall vertical leg,
+an R51 quarter bend and a horizontal arm. Its flush brazed Ø12 x 8 end plug
+has an axial native #6-32 UNC-2B through tap; the made MHA-SM-004 spring screw
+is NOT part of this weldment. The approximately 501 mm tall post keeps the
+elevation at 1:3 and the isometric at 1:4.
 
 Run with SolidWorks open::
 
@@ -23,7 +23,10 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -35,6 +38,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
+from sm_gooseneck_spring_joint import TAP_DRILL_DIA, TAP_SPEC
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -50,24 +55,16 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)  # 1:3 whole sheet (~506 mm tall post)
+SHEET_SCALE = (1.0, 3.0)  # 1:3 whole sheet (~501 mm tall post)
 
 # Sheet layout (meters).  The elevation (front) shows the goose-neck profile
 # (leg + bend + arm) right of centre so the notes clear it; the isometric (1:4)
 # sits far right; the notes fill the lower-left.
 FRONT_CENTER = (0.180, 0.150)
 ISO_CENTER = (0.350, 0.150)
-# NO end-screw detail view. Four attempts (three commits + a bbox-shift fix)
-# on the arm-end feature it replaced (a lug + cross-pin) left
-# CreateDetailViewAt4 rendering an empty or near-empty circle even with the
-# fence verified ON the feature: the activated-view sketch transform anchors
-# the model ORIGIN at the view position while CreateDrawViewFromModelView3
-# centers the geometry BBOX there, and even a correctly-shifted fence produced
-# a detail whose content window did not match its fence. The plug + screw are
-# fully specified by notes 3-5 (sizes, locations, braze + tap schedule),
-# matching the note-based style the rest of this batch already uses, so the
-# detail adds legibility only -- not manufacturability -- and stays dropped
-# rather than iterated again.
+# No arm-end detail: this legacy sheet retains the model-stamped plug/tap
+# schedule in its notes. The separate made screw appears only in the assembly
+# package, so neither view needs an integral-head reference or detail fence.
 
 # Per-view survivors of the marked-dimension import: the bend radius (R51) and
 # the horizontal arm run, both on the Front-plane sweep path (so both project to
@@ -78,11 +75,34 @@ FRONT_KEEP = {
 }
 
 
+def _require_saved_tap(model: Any) -> None:
+    """Require the saved native receiver's size, class, ends and drill diameter."""
+    feature = _early_bound(model, "IPartDoc").FeatureByName("ThreadBore")
+    if feature is None:
+        raise RuntimeError("saved gooseneck has no native ThreadBore")
+    feature = _early_bound(feature, "IFeature")
+    if str(feature.GetTypeName2()) != "HoleWzd":
+        raise RuntimeError("saved gooseneck ThreadBore is not a native Hole Wizard tap")
+    definition = feature.GetDefinition()
+    if definition is None:
+        raise RuntimeError("saved gooseneck ThreadBore has no hole definition")
+    definition = _early_bound(definition, "IWizardHoleFeatureData2")
+    if str(definition.FastenerSize).strip() != TAP_SPEC.size:
+        raise RuntimeError("saved gooseneck ThreadBore has the wrong thread size")
+    _verify_tap_metadata(definition, TAP_SPEC, "saved gooseneck ThreadBore")
+    diameter = float(definition.ThruTapDrillDiameter) * 1000.0
+    if abs(diameter - TAP_DRILL_DIA) > DIAMETER_TOLERANCE_MM:
+        raise RuntimeError(
+            f"saved gooseneck tap drill {diameter:.3f} != {TAP_DRILL_DIA:.3f} mm"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open gooseneck source", await adapter.open_model(str(SOURCE)))
+    _require_saved_tap(adapter.currentModel)
     read_required_properties(
         adapter.currentModel,
         (

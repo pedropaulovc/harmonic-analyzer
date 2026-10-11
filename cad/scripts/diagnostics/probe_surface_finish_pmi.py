@@ -23,7 +23,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
-from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound, _read_member  # noqa: E402
+from _paths import CAD_ROOT  # noqa: E402
 from _surface_finish import surface_finish_by_key  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 from pd_transgear_pin_spec import SURFACE_FINISHES  # noqa: E402

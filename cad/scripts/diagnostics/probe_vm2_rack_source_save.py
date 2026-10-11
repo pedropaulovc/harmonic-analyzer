@@ -119,7 +119,11 @@ def main():
     if os.environ.get("HARMONIC_REMOTE_CACHE_MODE") != "off":
         raise RuntimeError("disable remote cache transfers")
 
-    from _common import _early_bound, _read_member
+    if __package__:
+        from . import _script_paths  # noqa: F401
+    else:
+        import _script_paths  # noqa: F401
+    from _com import _early_bound, _read_member
     import _drawing_common as common
     from _drawing_marks import _named_dimension
     import draw_pd_rack_pinion as recipe

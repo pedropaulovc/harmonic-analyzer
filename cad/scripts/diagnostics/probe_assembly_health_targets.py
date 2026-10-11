@@ -41,7 +41,12 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 import _assembly  # noqa: E402
-from _common import _early_bound, _read_member, check  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _com import _early_bound, _read_member  # noqa: E402
 import _telemetry  # noqa: E402
 from diagnostics._owned_native_session import (  # noqa: E402
     require_owned_diagnostic_environment,

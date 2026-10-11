@@ -641,11 +641,11 @@ def test_boss_wall_is_the_ruled_option_c_exception() -> None:
 
 
 def _cylinder(radius_mm: float, z_low: float, z_high: float):
-    from _part_pmi import _SURFACE_CYLINDER, _FaceGeometry
+    from _gtol_face import SURFACE_CYLINDER, FaceGeometry
 
-    return _FaceGeometry(
+    return FaceGeometry(
         face=None,
-        identity=_SURFACE_CYLINDER,
+        identity=SURFACE_CYLINDER,
         parameters=(0.0, 0.0, 0.0, 0.0, 0.0, -1.0, radius_mm / 1000.0),
         outward_normal=None,
         box=(-0.009, -0.009, z_low / 1000.0, 0.009, 0.009, z_high / 1000.0),
@@ -656,15 +656,13 @@ def test_boss_gate_face_is_the_outboard_stub_not_a_gap_floor() -> None:
     """The runtime boss gate's decision: the relieved gap floors share the
     boss radius over the teeth only, so a pinion whose boss dropped (diag v3,
     d6ca08eb7) has no face the gate accepts; an intact one has exactly one."""
-    from _part_pmi import _face_matches
-
     radius = spec.BOSS_DIA / 2.0
     gap_floors = [_cylinder(radius, 0.0, spec.FACE_WIDTH) for _ in range(spec.TEETH)]
     boss = _cylinder(radius, spec.FACE_WIDTH, spec.OVERALL_LENGTH)
     bore = _cylinder(spec.BORE_DIA / 2.0, 0.0, spec.OVERALL_LENGTH)
 
     def accepted(faces):
-        return [face for face in faces if _face_matches(face, part.BOSS_GATE_FACE)]
+        return [face for face in faces if part.BOSS_GATE_FACE.matches(face)]
 
     assert accepted([*gap_floors, bore, boss]) == [boss]
     assert accepted([*gap_floors, bore]) == []
@@ -726,10 +724,10 @@ class _Seat:
 
 @pytest.fixture
 def _plain_binding(monkeypatch):
-    import _common
-    import _part_pmi
+    import _com
+    import _gtol_face_resolve
 
-    for module in (_common, _part_pmi):
+    for module in (_com, _gtol_face_resolve):
         monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
 
 

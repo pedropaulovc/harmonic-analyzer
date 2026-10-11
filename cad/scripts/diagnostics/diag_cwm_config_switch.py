@@ -44,7 +44,13 @@ from _assembly import (  # noqa: E402
 # (cad/config/assemblies/dt-drive-train.yaml), the assembly this probe mirrors.
 activate_assembly_contract("dt-drive-train")
 from _assembly_postbuild import discard_open_documents  # noqa: E402
-from _common import _flag_only, check, log, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log  # noqa: E402
+from _com import _flag_only  # noqa: E402
+from _session import run_build  # noqa: E402
 from _cwm import (  # noqa: E402
     component_constrained_status,
     component_mate_count,

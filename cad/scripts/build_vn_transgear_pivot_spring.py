@@ -21,7 +21,7 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_9715K43 import build_9715K43

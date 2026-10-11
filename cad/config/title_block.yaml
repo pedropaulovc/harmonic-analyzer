@@ -7,13 +7,13 @@
 # each part's DimXpert block-tolerance document properties — keep the pairs in
 # agreement.
 #
-# Split from tolerances.yaml on purpose: the fit/general classes there are read
+# Separate from tolerances/ on purpose: the fit/general classes there are read
 # by assembly GEOMETRY (drive_train / paper_drive via _config.fit), so sharing
 # a file would send those assemblies down the ~500 s FULL rebuild path for a
 # display-string edit. In its own file, a title-block edit re-stamps parts and
 # REFRESHES dependents only.
 #
-# Coherence with the mm classes in tolerances.yaml: ±.02 in = 0.508 mm ≈
+# Coherence with the mm classes in tolerances/_base.yaml: ±.02 in = 0.508 mm ≈
 # visual_noncritical; ±.005 in = 0.127 mm ≈ machined_block.
 #
 # INTERIM (until the inch migration, issue #290): the ``display`` strings are

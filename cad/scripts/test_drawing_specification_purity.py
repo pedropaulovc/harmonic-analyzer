@@ -68,8 +68,8 @@ def test_detector_does_not_treat_unbanded_f_strings_as_tolerances(value: str) ->
 
 def test_detector_finds_fit_renderers_through_import_aliases() -> None:
     source = """
-from _fit_limits import fit_limits as limits
-import _fit_limits as bands
+from _fit_text import fit_limits as limits
+import _fit_text as bands
 
 FIRST = limits(6.0, (-0.1, 0.1))
 SECOND = bands.band_text((-0.1, 0.1))
@@ -124,7 +124,7 @@ add_surface_finish(
 def test_detector_requires_surface_finish_controls_from_a_part_spec() -> None:
     local_control = """
 from _drawing_common import add_surface_finish
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 add_surface_finish(

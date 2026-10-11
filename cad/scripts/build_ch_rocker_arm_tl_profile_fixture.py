@@ -25,28 +25,25 @@ import math
 import re
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound, _read_member
+from _dimensions import name_dimensions
+from _extrude import extrude_at_offset
+from _feature_tree import feature_name_by_type, name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    _read_member,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    define_circle,
-    define_rectilinear_chain,
     dimension_between,
     ensure_fully_defined,
-    extrude_at_offset,
-    feature_name_by_type,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    volume_check,
 )
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from _drawing_marks import (
     _named_dimension,
     apply_drawing_precision,
@@ -56,7 +53,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _holes import blind_hole_volume_mm3, wizard_holes
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -251,7 +248,7 @@ def _extrude_down_from_offset(adapter, height: float, top: float) -> str:
     above its plane (a start offset along the normal) and run ``height`` back
     down through it: a part seated in a pocket of the sketch plane's face, its
     own dimensions its height and its top above that face. Raw
-    ``FeatureExtrusion3``, as ``_common.extrude_at_offset``, whose single flip
+    ``FeatureExtrusion3``, as ``_extrude.extrude_at_offset``, whose single flip
     turns the offset and the direction together."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
