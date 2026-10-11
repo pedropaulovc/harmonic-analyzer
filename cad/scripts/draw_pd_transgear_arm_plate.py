@@ -62,11 +62,13 @@ from pd_transgear_arm_plate_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     BORE_DIA,
+    BOSS_DIA,
     BOSS_FACE_Z,
     EDGE_MINUS_X,
     EDGE_PLUS_X,
     END_R,
     FRONT_FACE_Z,
+    HUB_DIA,
     HUB_FACE_Z,
     KINK,
     NOTCH_LEFT,
@@ -237,23 +239,30 @@ FRAME_XY = {
     "plate_locator_2_position": (0.2183, FRAME_ROWS[1]),
 }
 # The thrust faces' finish symbols, on section A-A where each face is
-# edge-on: the pick lands on the face's line inside the bore (the bore's
-# far-half end edge, which bounds the face) and the symbol stands beyond the
-# face, inside the diameters' extension lines.  A symbol reaches about 1
-# left and 7.5 right of its point (model mm at 2:1, the Ra text running
-# right): the hub's stands far enough out that its text clears the hub face.
-# Model points, mm.
+# edge-on: the pick lands on the face's own cut edge, midway across the
+# annulus between the bore and the face's diameter (not at the bore mouth,
+# where it read as a note on the diameter beside it), and the symbol stands
+# level with it beyond the face, inside the diameters' extension lines.  A
+# symbol reaches about 1 left and 7.5 right of its point (model mm at 2:1,
+# the Ra text running right): the hub's stands far enough out that its text
+# clears the hub face. Model points, mm.
 FINISH_SYMBOL_REACH = (1.0, 7.5)
-_THRUST_PICK_Y = -BORE_DIA / 4.0
 _ModelPoint = tuple[float, float, float]
+
+
+def _annulus_mid_y(face_dia: float) -> float:
+    """Below the axis, midway across a thrust face's annulus."""
+    return -(BORE_DIA + face_dia) / 4.0
+
+
 FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint]] = {
     "hub_face": (
-        (0.0, _THRUST_PICK_Y, HUB_FACE_Z),
-        (0.0, _THRUST_PICK_Y, HUB_FACE_Z - 9.5),
+        (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z),
+        (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z - 9.5),
     ),
     "boss_face": (
-        (0.0, _THRUST_PICK_Y, BOSS_FACE_Z),
-        (0.0, _THRUST_PICK_Y, BOSS_FACE_Z + 4.0),
+        (0.0, _annulus_mid_y(BOSS_DIA), BOSS_FACE_Z),
+        (0.0, _annulus_mid_y(BOSS_DIA), BOSS_FACE_Z + 4.0),
     ),
 }
 

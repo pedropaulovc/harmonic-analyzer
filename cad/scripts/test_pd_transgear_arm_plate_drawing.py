@@ -375,6 +375,19 @@ def test_the_thrust_face_finishes_clear_their_face_and_the_diameters() -> None:
         assert text_near > far, key
 
 
+def test_each_thrust_face_finish_lands_on_its_own_face_annulus() -> None:
+    """Each leader meets its face between the bore and the face's diameter,
+    with the symbol level with that point, so it reads as the face's."""
+    for key, face_z, face_dia in (
+        ("hub_face", geometry.HUB_FACE_Z, geometry.HUB_DIA),
+        ("boss_face", geometry.BOSS_FACE_Z, geometry.BOSS_DIA),
+    ):
+        pick, symbol = drawing.FACE_FINISHES[key]
+        assert pick[2] == face_z, key
+        assert geometry.BORE_DIA / 2.0 + 0.5 < abs(pick[1]) < face_dia / 2.0 - 0.5, key
+        assert symbol[1] == pick[1], key
+
+
 def test_the_hole_height_text_stands_between_the_edge_and_the_corner_height() -> None:
     centre = drawing.PLAN_KEEP["ScrewHoleY"][0]
     text = f"[{_printed(geometry.SCREW_HOLES[0][1], 'ScrewHoleY')}]"
