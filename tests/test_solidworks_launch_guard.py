@@ -5,8 +5,11 @@ the guard's own message, so a guard regression fails here instead of reaching
 a real launch.
 """
 
+import contextlib
 import importlib
+import importlib.util
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +18,10 @@ import pytest
 
 BLOCKED = "SolidWorks launch blocked"
 MISSING_SHORTCUT = r"X:\launch-guard-test\never-exists\SOLIDWORKS Design.lnk"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+# A COM build script that does not exist: were the guard broken, the child
+# python would only fail to open it.
+MISSING_BUILD = REPO_ROOT / "cad" / "scripts" / "build_tripwire_probe_never_exists.py"
 
 
 def _expect_blocked(refusals, call):
@@ -89,9 +96,12 @@ def _require_refuser(module, attribute, name):
     [
         ("win32com.client", "Dispatch"),
         ("win32com.client", "DispatchEx"),
+        ("win32com.client", "GetActiveObject"),
         ("win32com.client.dynamic", "Dispatch"),
         ("win32com.client.gencache", "EnsureDispatch"),
+        ("pythoncom", "GetActiveObject"),
         ("comtypes.client", "CreateObject"),
+        ("comtypes.client", "GetActiveObject"),
     ],
 )
 def test_com_activation_of_solidworks_is_refused(
@@ -200,3 +210,198 @@ def test_swallowed_autostart_launch_still_fails_the_test(
     assert len(solidworks_launch_refusals) == 1
     assert "start_solidworks" in solidworks_launch_refusals[0]
     solidworks_launch_refusals.clear()
+
+
+@pytest.mark.parametrize(
+    "argv,cwd",
+    [
+        ([sys.executable, str(MISSING_BUILD)], None),
+        (
+            [sys.executable, "cad/scripts/draw_tripwire_probe_never_exists.py"],
+            str(REPO_ROOT),
+        ),
+        (
+            [sys.executable, "build_tripwire_probe_never_exists.py"],
+            str(MISSING_BUILD.parent),
+        ),
+        # verify.py exists in this checkout, so name one on a drive that does not.
+        (f'"{sys.executable}" "X:\\never-exists\\cad\\scripts\\verify.py"', None),
+    ],
+    ids=["absolute", "relative-to-cwd", "bare-in-scripts", "command-line"],
+)
+def test_com_build_script_child_is_refused(solidworks_launch_refusals, argv, cwd):
+    """The child every dodo COM task launches: python on a ``cad/scripts`` script."""
+    _expect_blocked(
+        solidworks_launch_refusals,
+        lambda: subprocess.run(argv, cwd=cwd, check=False, capture_output=True),
+    )
+
+
+def test_com_build_script_in_os_system_is_refused(solidworks_launch_refusals):
+    command = subprocess.list2cmdline([sys.executable, str(MISSING_BUILD)])
+    _expect_blocked(solidworks_launch_refusals, lambda: os.system(command))
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is not on PATH")
+def test_a_program_that_only_reads_a_build_script_passes(solidworks_launch_refusals):
+    """git hashes the file; only an interpreter or shell runs it."""
+    result = subprocess.run(
+        ["git", "hash-object", "--stdin", "--path", str(MISSING_BUILD)],
+        input=b"probe\n",
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert solidworks_launch_refusals == []
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="_winapi is Windows-only")
+def test_create_process_below_popen_is_refused(solidworks_launch_refusals):
+    """A ``Popen`` subclass or direct caller still meets ``_winapi.CreateProcess``."""
+    import _winapi
+
+    assert _winapi.CreateProcess.__name__ == "guarded_create_process"
+    command = subprocess.list2cmdline([sys.executable, str(MISSING_BUILD)])
+    with pytest.raises(RuntimeError, match=BLOCKED):
+        _winapi.CreateProcess(None, command, None, None, False, 0, None, None, None)
+    assert len(solidworks_launch_refusals) == 1
+    solidworks_launch_refusals.clear()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="pywin32 is Windows-only")
+def test_pywin32_process_creation_is_refused(solidworks_launch_refusals):
+    import win32api
+    import win32process
+
+    assert win32process.CreateProcess.__name__ == "guarded_create_process"
+    command = subprocess.list2cmdline([sys.executable, str(MISSING_BUILD)])
+    with pytest.raises(RuntimeError, match=BLOCKED):
+        win32process.CreateProcess(
+            None, command, None, None, False, 0, None, None, win32process.STARTUPINFO()
+        )
+    assert len(solidworks_launch_refusals) == 1
+    solidworks_launch_refusals.clear()
+    for attribute, args in (
+        ("ShellExecute", (0, "open", MISSING_SHORTCUT, None, None, 1)),
+        ("WinExec", (f'"{sys.executable}" "{MISSING_BUILD}"',)),
+    ):
+        _require_refuser(win32api, attribute, "refuse_solidworks_launch")
+        _expect_blocked(
+            solidworks_launch_refusals,
+            lambda attribute=attribute, args=args: getattr(win32api, attribute)(*args),
+        )
+
+
+@pytest.mark.skipif(not hasattr(os, "spawnv"), reason="os.spawnv is unavailable")
+def test_spawn_of_a_com_build_script_is_refused(solidworks_launch_refusals):
+    _expect_blocked(
+        solidworks_launch_refusals,
+        lambda: os.spawnv(
+            os.P_WAIT, sys.executable, [sys.executable, str(MISSING_BUILD)]
+        ),
+    )
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="nt.startfile is Windows-only")
+def test_startfile_below_os_is_refused(solidworks_launch_refusals):
+    import nt
+
+    # An unknown verb as well as a missing file: even unguarded, nothing opens.
+    _expect_blocked(
+        solidworks_launch_refusals,
+        lambda: nt.startfile(MISSING_SHORTCUT, "tripwire-no-such-verb"),
+    )
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="kernel32 is Windows-only")
+@pytest.mark.parametrize(
+    "library,symbol", [("kernel32", "CreateProcessW"), ("shell32", "ShellExecuteW")]
+)
+def test_ctypes_binding_of_a_process_launcher_is_refused(
+    solidworks_launch_refusals, library, symbol
+):
+    import ctypes
+
+    # Resolving the symbol is the refused step; nothing is ever called.
+    _expect_blocked(
+        solidworks_launch_refusals, lambda: getattr(ctypes.WinDLL(library), symbol)
+    )
+
+
+@contextlib.contextmanager
+def _fresh_dodo():
+    """A private dodo, loaded the way the recipe tests load it, without leaking
+    its process-wide doit patches."""
+    from doit.dependency import CHECKERS, Dependency, JsonDB
+
+    save_success, json_dump = Dependency.save_success, JsonDB.dump
+    checkers = dict(CHECKERS)
+    try:
+        spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        yield module
+    finally:
+        Dependency.save_success, JsonDB.dump = save_success, json_dump
+        CHECKERS.clear()
+        CHECKERS.update(checkers)
+
+
+def test_dodo_part_build_with_a_real_runner_is_refused(
+    solidworks_launch_refusals, monkeypatch, tmp_path
+):
+    """dodo's part path: a cache miss with no farm reaches ``_exec_com``."""
+    with _fresh_dodo() as dodo:
+        assert dodo._exec_com.__code__.co_name == "refuse_com_task"
+        monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
+        monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [])
+        monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [])
+        monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+        monkeypatch.setattr(dodo, "_probe_cache", lambda *_a: "miss")
+        monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+        monkeypatch.setattr(
+            dodo, "_com_seat", lambda _label: contextlib.nullcontext(0.0)
+        )
+        monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
+        monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+        with pytest.raises(RuntimeError, match=BLOCKED):
+            dodo._cached_part_action("ch_pivot_shaft", MISSING_BUILD)
+        assert "dodo._exec_com" in solidworks_launch_refusals[0]
+        assert not (tmp_path / "logs").exists()
+        solidworks_launch_refusals.clear()
+
+        with pytest.raises(RuntimeError, match=BLOCKED):
+            dodo._run_subprocess(
+                [sys.executable, str(MISSING_BUILD)], "part:ch_pivot_shaft"
+            )
+        assert "dodo._run_subprocess" in solidworks_launch_refusals[0]
+        solidworks_launch_refusals.clear()
+
+
+def test_dodo_com_paths_with_a_faked_runner_still_run(
+    solidworks_launch_refusals, monkeypatch, tmp_path
+):
+    """The guard keys on the runner: a test that fakes it keeps the real logic."""
+    ran = []
+    with _fresh_dodo() as dodo:
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(
+                dodo, "_run_subprocess", lambda cmd, *_a, **_kw: ran.append(cmd) or 0
+            )
+            dodo._exec_com([sys.executable, str(MISSING_BUILD)], "part:ch_pivot_shaft")
+        assert ran == [[sys.executable, str(MISSING_BUILD)]]
+
+        class FakePopen:
+            def __init__(self, cmd, **_kw):
+                ran.append(cmd)
+                self.stdout = iter(())
+
+            def wait(self):
+                return 0
+
+        monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
+        monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
+        command = [sys.executable, str(MISSING_BUILD)]
+        assert dodo._run_subprocess(command, "part:ch_pivot_shaft", "part-x") == 0
+        assert ran[-1] == command
+    assert solidworks_launch_refusals == []
