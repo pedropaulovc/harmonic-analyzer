@@ -14,6 +14,7 @@ import mg_magnifying_wheel_geom as geom
 import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED_UM, SEAT_UM
 
 
 def _called_names(path: str) -> list[str]:
@@ -38,9 +39,9 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is mg_magnifying_wheel_spec.DRAWING_DIMENSIONS
     marked = set().union(*mg_magnifying_wheel_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
     assert kept == marked
-    assert not set(drawing.FRONT_KEEP) & set(drawing.RIGHT_KEEP)
+    assert not set(drawing.FRONT_KEEP) & set(drawing.SECTION_KEEP)
     assert set(drawing.DIMENSION_CALLOUTS) | set(drawing.CALLOUTS_ABOVE) <= kept
 
 
@@ -146,14 +147,16 @@ def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
 def test_linked_notes_specify_the_spokes_and_ties() -> None:
     notes = mg_magnifying_wheel_spec.DRAWING_NOTES
     lines = notes.splitlines()
-    assert len(lines) <= 7
+    assert len(lines) <= 4
     assert all(len(line) <= 80 for line in lines)
     assert "6 TAPERED SPOKES" in notes and "CAST" not in notes
     assert "TIE 1" in notes and "TIE 2" in notes
-    # The bore's THRU - REAM callout carries the process; the notes do not.
+    # The bore's REAM THRU callout carries the process; the notes do not.
     assert "REAMED" not in notes
-    assert "CENTRED 7.09 FROM THE HUB BACK FACE" in notes
-    assert "PRESS FIT FOR MG-WHEEL-DRUM (MHA-MG-010)" in notes
+    # The two fits print on their own diameters, limits read from the mates.
+    assert "PRESS FIT" not in notes and "RUNS ON" not in notes
+    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"].endswith("<MOD-DIAM>4.758-4.768")
+    assert "<MOD-DIAM>14.500-14.518" in drawing.DIMENSION_CALLOUTS["SpigotDia"]
     assert "DO NOT" not in notes and "RELEASE" not in notes
     assert "GRAY-IRON" not in notes and "BLACK" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
@@ -166,11 +169,18 @@ def test_no_gdt_frames_and_one_sheet_dimension() -> None:
     calls = _called_names(drawing.__file__)
     assert calls.count("add_datum_feature") == 0
     assert calls.count("add_feature_control_frame") == 0
-    assert calls.count("add_surface_finish") == 0
+    # Policy rule 5: the running bore takes the machined grade, the pressed
+    # spigot the seat grade.
+    finishes = {
+        control.key: control.roughness_um
+        for control in mg_magnifying_wheel_spec.SURFACE_FINISHES
+    }
+    assert finishes == {
+        "mg_wheel_bore": MACHINED_UM,
+        "mg_wheel_spigot": SEAT_UM,
+    }
     # Only the rim's axial width is added on the sheet.
     assert calls.count("add_edge_dimension") == 1
-    assert "author_part_pmi" not in _called_names(part.__file__)
-    assert not hasattr(mg_magnifying_wheel_spec, "SURFACE_FINISHES")
     assert not hasattr(mg_magnifying_wheel_spec, "GEOMETRIC_TOLERANCES_MM")
 
 

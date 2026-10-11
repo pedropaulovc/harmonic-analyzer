@@ -19,7 +19,9 @@ from __future__ import annotations
 import itertools
 import math
 
+from _gtol_cylinder import CylinderFace
 from _printed_tolerance import angular_band_deg, printed_band_mm
+from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     BORE_BAND,
     BORE_DIA,
@@ -56,7 +58,7 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The face view carries the rim, bore, spoke, fillet and tie
-# dimensions; the side view carries the hub profile, the groove, the rim-bore
+# dimensions; SECTION A-A carries the hub profile, the groove, the rim-bore
 # rounds and the spoke thickness.  The rim's axial width is added on the
 # sheet. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -95,24 +97,22 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Tie2Profile": {"Tie2HoleDia": 2, "Tie2Angle": 0},
 }
 
-# The spoke web, the rim and the groove share the mid-plane the HubBackZ
-# dimension locates from the hub's back face (one axial origin; the spigot's
-# length reads from its own face, where the drum's length must match it).
+# Rule 6: the notes say only what no callout can.  The spigot's press fit and
+# the bore's running fit print on their own diameter callouts.
 DRAWING_NOTES = "\n".join(
     (
         f"{SPOKE_COUNT} TAPERED SPOKES, EQUALLY SPACED.",
-        f"SPOKE WEB, RIM AND GROOVE CENTRED {HUB_BACK_Z:.2f} FROM THE HUB BACK FACE.",
-        "GROOVE: FULL-RADIUS BOTTOM, PARALLEL WALLS TO THE RIM O.D.",
         "TIE 1: LEVER-WIRE TIE HOLE THROUGH THE BOSS.",
         "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
-        "SPIGOT: PRESS FIT FOR MG-WHEEL-DRUM (MHA-MG-010).",
-        "BORE RUNS ON THE MG-WHEEL-AXLE.",
     )
 )
-# The right view is a plain side elevation (hidden lines), NOT a cutting-plane
-# section -- labelled honestly so the sheet does not promise section geometry it
-# does not carry.
-SECTION_VIEW_NOTE = "SIDE VIEW SCALE 1:1"
+# Rule 5: the bore is a running journal on the axle; the spigot is the static
+# seat the drum is pressed onto.  The boss step the drum butts against is a
+# register face and carries no symbol.
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
+    SurfaceFinishControl("mg_wheel_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+    SurfaceFinishControl("mg_wheel_spigot", SEAT_UM, CylinderFace(SPIGOT_DIA)),
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 # --- walls and the groove seat at the worst PRINTED band (rule 12) -----------------
