@@ -99,9 +99,10 @@ checks the real flanks.
 The tolerances are ordinary ones for a hobby build of an 1898 machine. Cone
 blanks are OD +0/−0.05 mm and tooth thickness ±0.075 mm, and each cone and drum
 is set up for tooth cutting within 0.05 mm TIR of its finished bore
-(`dt_cone_gear_spec.py`; `tolerances.yaml`, `cone_drum_oblique_mesh`). T006
+(`dt_cone_gear_spec.py`; `cad/config/tolerances/cone_drum_oblique_mesh.yaml`). T006
 keeps its own thin-only bands (thickness +0/−0.04 mm, OD +0/−0.02 mm). Close
-running fits elsewhere use the ordinary H7/g6 class (`_fit_limits.py`).
+running fits elsewhere use the ordinary H7/g6 class (`_fit_ream_h7.py`,
+`_fit_close_running.py`).
 
 The cone centre distance is not fixed. It is set at assembly, so the gate is
 written for a set mesh (`cone_set_stack`, `dt_mesh_checks`,

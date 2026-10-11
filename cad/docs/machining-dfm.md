@@ -324,7 +324,7 @@ cut spirals ([BS-2](https://www.precisionmatthews.com/products/dividinghead-bs-2
 for the lead depend on the head and the table screw: `TODO(cut it first)`.
 
 Set each crank gear up for tooth cutting within 0.05 mm TIR of its finished bore
-(`tolerances.yaml` `crank_mesh.tooth_cutting_runout_tir_mm`, read by both gear specs). This is a
+(`cad/config/tolerances/crank_mesh.yaml`, `tooth_cutting_runout_tir_mm`, read by both gear specs). This is a
 setup allowance, not a gear accuracy grade.
 
 ### Paper drive
@@ -342,7 +342,7 @@ The rack is bought, not cut: SDP/SI A1B12-Y324, a 48 in brass 32DP 20° rack, 3/
 (4.7625 mm) square ([product page](https://shop.sdp-si.com/a-1b12-y324.html),
 [D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)), cut to 269.64 mm and soldered to the
 existing backer. Check it against the feed pinion before fitting; the pitch-index limit the model
-allows for it is in `tolerances.yaml` (`stock_form_quality.rack_pitch_index_deviation_mm`).
+allows for it is in `cad/config/tolerances/stock_form_quality.yaml` (`rack_pitch_index_deviation_mm`).
 
 The chain is 68 links of ANSI #25, 12:24 from the crank sprocket to the knob sprocket. The
 sprockets are made from McMaster 6793K blanks. The transgear arm and its plate are located by two
