@@ -165,6 +165,20 @@ def test_setup_must_hold_the_drawn_centre_distance_window_along_s_k() -> None:
     _receive(setup_error_xy_mm=_setup(tol, 0.0))
 
 
+def test_loaded_envelope_is_anchored_to_the_setup_reading() -> None:
+    accepted = _receive()
+    # Every loaded reading slips the same way: the travel from setup counts.
+    slip = 1.0
+    slipped = tuple(
+        replace(row, gear_plane_k_xy_mm=(row.gear_plane_k_xy_mm[0] + slip, row.gear_plane_k_xy_mm[1]))
+        for row in _readings()
+    )
+    with pytest.raises(ValueError, match="two-pose envelope"):
+        _receive(readings=slipped)
+    # A setup reading inside the loaded spread changes nothing.
+    assert _receive(setup_error_xy_mm=_setup(0.0, 0.0)) == pytest.approx(accepted)
+
+
 def test_actual_joint_receiver_requires_critical_setting_and_every_signed_loaded_site() -> None:
     import transgear_hanger_joints as joints
     inputs = dict(

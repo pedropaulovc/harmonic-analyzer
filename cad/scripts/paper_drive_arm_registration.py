@@ -148,8 +148,9 @@ def require_matched_registration(
 
     ``setup_error_xy_mm`` and every ``gear_plane_k_xy_mm`` are K's measured
     gear-plane position less its nominal, in the arm frame (x along the arm,
-    y across). Setup must lie in the drawn position circle AND in the drawn
-    S-K centre-distance window along S-K.
+    y across), so the setup reading anchors the loaded envelope. Setup must
+    lie in the drawn position circle AND in the drawn S-K centre-distance
+    window along S-K.
 
     Required load cases must come from the caller's physical operating-load
     envelope. This receiver checks observations; it does not fabricate or
@@ -179,9 +180,11 @@ def require_matched_registration(
                 or any(abs(delta) + measurement_uncertainty_mm
                        > ARM_PLATE_LOADED_NORMAL_CHANGE_MAX_MM for delta in row.seat_normal_changes_mm)):
             raise ValueError("recorded applied load/pose/seat observation is invalid or exceeds the grade")
+    # The envelope spans the setup reading too: a joint that slips off its
+    # accepted setting and stays there moves every loaded reading together.
+    poses = (tuple(setup_error_xy_mm), *(row.gear_plane_k_xy_mm for row in readings))
     widths = tuple(
-        max(row.gear_plane_k_xy_mm[axis] for row in readings)
-        - min(row.gear_plane_k_xy_mm[axis] for row in readings)
+        max(pose[axis] for pose in poses) - min(pose[axis] for pose in poses)
         + 2.0 * measurement_uncertainty_mm for axis in range(2)
     )
     if any(width > LOCATOR_COORDINATE_TRAVEL_MAX_MM for width in widths):
