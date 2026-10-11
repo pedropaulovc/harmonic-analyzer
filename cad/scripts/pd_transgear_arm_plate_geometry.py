@@ -254,6 +254,36 @@ for _name, (_nominal, _worst) in WALLS.items():
         raise AssertionError(f"arm-plate {_name} wall {_worst:.3f} < {WALL_TARGET}")
 
 
+def section_outline(
+    upper_left: tuple[float, float], upper_right: tuple[float, float],
+) -> tuple[tuple[tuple[float, float], ...], tuple[float, float]]:
+    """The native recipe's closed section outline below an upper edge.
+
+    Returns the polygon through the edge, the +X kink and its tangent, K, the
+    -X kink tangent and the -X kink, and the end round's sector angles about
+    K, from the -X tangent round the bottom to the +X one. The recipe's
+    volume oracle and the mass moments both read this one definition.
+    """
+    start = math.atan2(KINK_TANGENT[1], KINK_TANGENT[0])
+    end = math.atan2(KINK_TANGENT_RIGHT[1], KINK_TANGENT_RIGHT[0])
+    if not start < end:
+        raise AssertionError("the end round's sector must sweep round the bottom")
+    vertices = (
+        upper_left, upper_right, KINK_RIGHT, KINK_TANGENT_RIGHT, (0.0, 0.0), KINK_TANGENT, KINK,
+    )
+    return vertices, (start, end)
+
+
+def section_area_moments(
+    upper_left: tuple[float, float], upper_right: tuple[float, float],
+) -> tuple[float, float, float]:
+    """Exact area and first moments of one native section outline."""
+    vertices, (start, end) = section_outline(upper_left, upper_right)
+    polygon = ARM.polygon_area_moments(vertices)
+    sector = ARM.sector_area_moments(END_R, start, end)
+    return polygon[0] + sector[0], polygon[1] + sector[1], polygon[2] + sector[2]
+
+
 def nominal_material_properties(*, density_kg_m3: float = 7870.0) -> dict[str, object]:
     """Exact nominal native sections, cuts, mass and local 3D centre of mass."""
     if not math.isfinite(density_kg_m3) or density_kg_m3 <= 0.0:
@@ -267,20 +297,11 @@ def nominal_material_properties(*, density_kg_m3: float = 7870.0) -> dict[str, o
         for axis, coordinate in enumerate((x, y, z)):
             moments[axis] += amount * coordinate
 
-    def outline(left: tuple[float, float], right: tuple[float, float]) -> tuple[float, float, float]:
-        polygon = ARM.polygon_area_moments((
-            left, right, (END_R, 0.0), (0.0, 0.0), KINK_TANGENT, KINK,
-        ))
-        sector = ARM.sector_area_moments(
-            END_R, math.atan2(KINK_TANGENT[1], KINK_TANGENT[0]), 0.0,
-        )
-        return tuple(polygon[i] + sector[i] for i in range(3))
-
     for left, right, depth, z in (
         (TOP_LEFT, TOP_RIGHT, THICKNESS_OVER_ARM, THICKNESS_OVER_ARM / 2.0),
         (NOTCH_LEFT, NOTCH_RIGHT, NOTCH_DEPTH, -NOTCH_DEPTH / 2.0),
     ):
-        area, ax, ay = outline(left, right)
+        area, ax, ay = section_area_moments(left, right)
         add(area * depth, ax / area, ay / area, z)
     add(math.pi * (HUB_DIA / 2.0)**2 * HUB_LENGTH, 0.0, 0.0, HUB_FACE_Z + HUB_LENGTH / 2.0)
     add(math.pi * (BOSS_DIA / 2.0)**2 * BOSS_HEIGHT, 0.0, 0.0, REAR_FACE_Z + BOSS_HEIGHT / 2.0)

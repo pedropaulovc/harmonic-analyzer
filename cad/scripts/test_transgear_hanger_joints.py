@@ -93,6 +93,39 @@ def test_arm_and_plate_weight_inputs_are_actual_cut_geometry() -> None:
     assert plate.nominal_material_properties()["mass_kg"] < 0.2
 
 
+def test_plate_weight_input_is_the_native_recipe_volume() -> None:
+    """The analytic plate volume is the native recipe's: each section's own
+    outline (an independent shoelace over its vertices plus the end round's
+    sector) times its depth, less the recipe's cuts."""
+    import build_pd_transgear_arm_plate as recipe
+
+    def outline_area(left, right):
+        vertices, (start, end) = plate.section_outline(left, right)
+        # The sector runs from the vertex before K to the vertex after it.
+        k = vertices.index((0.0, 0.0))
+        for neighbour, angle in ((vertices[k + 1], start), (vertices[k - 1], end)):
+            assert math.hypot(*neighbour) == pytest.approx(plate.END_R)
+            assert math.atan2(neighbour[1], neighbour[0]) == pytest.approx(angle)
+        shoelace = sum(
+            x0 * y1 - x1 * y0
+            for (x0, y0), (x1, y1) in zip(vertices, vertices[1:] + vertices[:1])
+        )
+        return abs(shoelace) / 2.0 + plate.END_R**2 * (end - start) / 2.0
+
+    sections = (
+        outline_area(plate.TOP_LEFT, plate.TOP_RIGHT) * plate.THICKNESS_OVER_ARM
+        + outline_area(plate.NOTCH_LEFT, plate.NOTCH_RIGHT) * plate.NOTCH_DEPTH
+    )
+    assert recipe.V_PLATE + recipe.V_LOWER == pytest.approx(sections, rel=1e-12)
+    native = (
+        sections + recipe.V_HUB + recipe.V_BOSS - recipe.V_BORE - recipe.V_HOLES
+        - len(plate.SCREW_HOLES) * recipe.V_CSK
+        - len(plate.LOCATOR_SITES_MM) * math.pi * (plate.LOCATOR_HOLE_DIA_MM / 2.0)**2
+        * plate.THICKNESS_OVER_ARM
+    )
+    assert plate.nominal_material_properties()["volume_mm3"] == pytest.approx(native, rel=1e-12)
+
+
 def test_reference_entry_pays_published_fillet_and_independent_critical_axes() -> None:
     """Reference datum pose only, not an ISO pin-end whole-body certificate."""
     import vn_transgear_arm_plate_screw_spec as screw

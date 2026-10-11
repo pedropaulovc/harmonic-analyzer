@@ -110,6 +110,7 @@ from pd_transgear_arm_plate_geometry import (
     TOP_RIGHT,
     WIDTH,
     notch_face_y,
+    section_area_moments,
 )
 from pd_transgear_arm_plate_spec import (
     BORE_BAND,
@@ -157,39 +158,14 @@ _CSK_APEX_Z = REAR_FACE_Z - _R_CSK / math.tan(math.radians(_CSK_HALF_ANGLE))
 _NOTCH_CORNER_Y = notch_face_y(0.0)
 
 
-def _outline_area(upper_left: tuple[float, float], upper_right: tuple[float, float]):
-    """Area of the outline closed by the upper edge ``upper_left`` ->
-    ``upper_right``: the polygon through the edge, the +X kink and its
-    tangent, K, the -X kink tangent and the -X kink, plus the end round's
-    sector from the -X kink tangent round the bottom to the +X one."""
-    points = [
-        upper_left,
-        upper_right,
-        KINK_RIGHT,
-        KINK_TANGENT_RIGHT,
-        (0.0, 0.0),
-        KINK_TANGENT,
-        KINK,
-    ]
-    shoelace = sum(
-        x0 * y1 - x1 * y0
-        for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1], strict=True)
-    )
-    sweep = (
-        math.atan2(KINK_TANGENT_RIGHT[1], KINK_TANGENT_RIGHT[0])
-        - math.atan2(KINK_TANGENT[1], KINK_TANGENT[0])
-    ) % (2.0 * math.pi)
-    return 0.5 * abs(shoelace) + 0.5 * END_R**2 * sweep
-
-
 def _csk_removed() -> float:
     """One countersink cone past its clearance hole: frustum less the hole."""
     r, big, h = _R_HOLE, _R_CSK, CSK_DEPTH
     return math.pi * h / 3.0 * (big**2 + big * r + r**2) - math.pi * r**2 * h
 
 
-V_PLATE = _outline_area(TOP_LEFT, TOP_RIGHT) * THICKNESS_OVER_ARM
-V_LOWER = _outline_area(NOTCH_LEFT, NOTCH_RIGHT) * NOTCH_DEPTH
+V_PLATE = section_area_moments(TOP_LEFT, TOP_RIGHT)[0] * THICKNESS_OVER_ARM
+V_LOWER = section_area_moments(NOTCH_LEFT, NOTCH_RIGHT)[0] * NOTCH_DEPTH
 V_HUB = math.pi * _R_HUB**2 * HUB_LENGTH
 V_BOSS = math.pi * _R_BOSS**2 * BOSS_HEIGHT
 V_BORE = math.pi * _R_BORE**2 * HUB_TO_BOSS
