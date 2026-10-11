@@ -162,7 +162,6 @@ def manufactured_profiles() -> tuple[StockFormProfile, ...]:
 _PROFILE_CORNERS = manufactured_profiles()
 for _profile in _PROFILE_CORNERS:
     _profile.require_tip_land(0.25 * MODULE_MM)
-TOOTH_THICKNESS = STOCK_PROFILE.pitch_tooth_thickness_mm
 ROOT_DIA = 2.0 * STOCK_PROFILE.root_radius_min_mm
 ROOT_DIA_PLACES = 2
 ROOT_DIA_EXACT_MIN = min(2.0 * p.root_radius_min_mm for p in _PROFILE_CORNERS)
@@ -728,7 +727,6 @@ GEAR_DATA = gear_data_note(
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{TOOTH_THICKNESS:.3f}"),
         ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
         ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
         (

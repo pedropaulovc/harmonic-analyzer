@@ -623,9 +623,6 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         spec.TEETH, spec.DIAMETRAL_PITCH, spec.PRESSURE_ANGLE_DEG
     )
     assert spec.PITCH_DIA == pytest.approx(spec.TEETH * spec.MODULE_MM)
-    assert spec.TOOTH_THICKNESS == pytest.approx(
-        spec.STOCK_PROFILE.pitch_tooth_thickness_mm
-    )
     assert spec.WHOLE_DEPTH == pytest.approx(
         spec.OUTSIDE_DIA / 2.0 - spec.STOCK_PROFILE.root_radius_min_mm
     )
@@ -639,7 +636,6 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         ("DIAMETRAL PITCH", f"{spec.DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.3f}"),
-        ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{spec.TOOTH_THICKNESS:.3f}"),
         ("WHOLE DEPTH (mm, REF)", f"{spec.WHOLE_DEPTH:.3f}"),
         (
             "CUTTER",
@@ -650,8 +646,12 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
         ("MATES WITH", f"PLATEN RACK {spec.RACK_NUMBER}"),
     ):
         assert f"{label}:  {value}" in spec.GEAR_DATA
-    assert len(spec.GEAR_DATA.splitlines()) == 10
+    assert len(spec.GEAR_DATA.splitlines()) == 9
     assert "PROFILE SHIFT" not in spec.GEAR_DATA
+    # A form-cut tooth is a translated involute: its pitch thickness does
+    # not follow the generated-involute span relation, so only the span
+    # (the inspected quantity) is printed.
+    assert "CIRCULAR THICKNESS" not in spec.GEAR_DATA
     assert part.GEAR_DATA == spec.GEAR_DATA
 
 

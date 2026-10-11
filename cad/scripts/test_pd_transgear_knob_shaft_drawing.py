@@ -78,7 +78,6 @@ def test_native_stock_source_is_the_selected_12t_48dp_master() -> None:
         "DIAMETRAL PITCH:  48.00",
         "PRESSURE ANGLE:  20.0 DEG",
         f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
-        f"CIRCULAR THICKNESS AT PD (mm, REF):  {spec.TOOTH_THICKNESS:.3f}",
         f"WHOLE DEPTH (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
         "CUTTER:  #8, 12-13T",
         f"SPAN OVER 2 TEETH:  {lower:.4f}-{upper:.4f}",
