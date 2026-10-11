@@ -259,3 +259,76 @@ def test_calibrating_every_preset_passes_the_coverage_guard(tmp_path) -> None:
                 source="test",
             )
         )
+
+
+def test_counter_support_certificate_refuses_stale_or_unproven_parts(
+    tmp_path, monkeypatch
+) -> None:
+    """upper_support labels the CURRENT recipe, so the driver refuses to measure
+    support parts doit would rebuild, and refuses when it cannot tell."""
+    import verify
+    from diagnostics import calibrate_spring_seats as driver
+
+    ledger = tmp_path / ".doit.db"
+    monkeypatch.setitem(driver.dodo.DOIT_CONFIG, "dep_file", str(ledger))
+    seen: list[list[str]] = []
+
+    def fake_stale(db, producers):
+        seen.append([task for task, _, _ in producers])
+        return db.get("stale", [])
+
+    monkeypatch.setattr(verify, "_stale_in_db", fake_stale)
+    with pytest.raises(RuntimeError, match="cannot prove the counter support"):
+        driver._require_current_support_parts()
+
+    ledger.write_text('{"stale": ["part:sm_gooseneck_spring_screw: x changed"]}')
+    with pytest.raises(RuntimeError, match="refusing to certify .* stale"):
+        driver._require_current_support_parts()
+
+    ledger.write_text("{}")
+    driver._require_current_support_parts()
+    assert seen[-1] == ["part:sm_gooseneck", "part:sm_gooseneck_spring_screw"]
+
+
+class _ParallelFaceDistance(_FakeContact):
+    """ClosestDistance held by a separation the motion does not close.
+
+    Native 2026-10-10 neutral counter upper run: the made screw moves along -Y
+    into the counter spring's upper eye while its head face stays clamped
+    2.2e-6 mm off the eye's side face (SPRING_EYE_GAP is the eye's occupied
+    width), parallel to the motion. Every steered probe read the same 2.2e-6
+    mm, crept that far, and the search exhausted 64 iterations.
+    """
+
+    creep = 0.0
+
+    def evaluate(self, offset_mm: float):
+        state, _distance = super().evaluate(offset_mm)
+        if state == "interfering":
+            return state, None
+        return state, 2.2e-6 + self.creep * (offset_mm - self.contact)
+
+
+@pytest.mark.parametrize("creep", [0.0, 1e-3])
+@pytest.mark.parametrize("contact", [-0.0312345678, 0.0731234567, -0.124])
+def test_distance_the_motion_does_not_close_falls_back_to_bisection(
+    monkeypatch, creep, contact
+) -> None:
+    monkeypatch.setattr(search, "_ActualContact", _ParallelFaceDistance)
+    monkeypatch.setattr(_ParallelFaceDistance, "creep", creep)
+    monkeypatch.setattr(_ParallelFaceDistance, "contact", contact)
+    solution = search.solve_component_contact(
+        object(),
+        "screw",
+        "counter",
+        (0.0, -1.0, 0.0),
+        0.125,
+        label="fake counter upper",
+        locate_only=True,
+    )
+
+    assert solution.certificate == "bracketed_native_contact"
+    # One stalled steer, then bisection of the 0.25 mm bracket to 1e-6 mm.
+    assert solution.iterations <= 22
+    assert solution.interfering_offset_mm < contact <= solution.clear_offset_mm
+    assert solution.clear_offset_mm - solution.interfering_offset_mm <= 1e-6
