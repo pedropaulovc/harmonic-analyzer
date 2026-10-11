@@ -193,19 +193,23 @@ BORE_CALLOUT = "REAM THRU"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
 CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK"
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
-# What each projected frame controls and where its zone runs. Every zone
-# starts at mounting face A (z = 0): the screw holes' and countersinks' 7.0
-# run rearward through the plate to the seated head contact
+# Which face each face view shows, and what each projected frame controls
+# and where its zone runs. The plan (left, *Front) looks at the rear face
+# (z = REAR_FACE_Z), where build_pd_transgear_arm_plate cuts the countersinks;
+# the back view (centre, *Back) looks at mounting face A (z = 0). Every zone
+# starts at A: the screw holes' and countersinks' 7.0 run through the plate
+# toward the rear face, to the seated head contact
 # (transgear_hanger_joints.PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM, from A);
-# the knob bore's runs forward through the arm to the chain plane
-# (paper_drive_arm_registration.K_PROJECTED_HEIGHT_MM, from the plate mount).
+# the knob bore's runs out of A toward the hub, through the arm to the chain
+# plane (paper_drive_arm_registration.K_PROJECTED_HEIGHT_MM).
 _P = PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM
 PROJECTED_ZONE_NOTE = "\n".join((
-    "3. PROJECTED ZONES START AT MOUNTING FACE A:",
-    f"   MOUNTING-FACE VIEW, \u00d8{SCREW_HOLE_DIA:.1f} HOLES: HOLE BORE, {_P:.1f} REARWARD;",
-    f"   REAR-FACE VIEW, \u00d8{PLATE.CSK_DIA:.1f} CSK: CONE AXIS, {_P:.1f} REARWARD;",
-    f"   \u00d8{BORE_DIA:g} KNOB BORE: BORE AXIS, "
-    f"{REGISTRATION.K_PROJECTED_HEIGHT_MM:.1f} FORWARD.",
+    f"3. LEFT VIEW: REAR FACE, CARRIES THE \u00d8{PLATE.CSK_DIA:.1f} {CSK_CALLOUT}.",
+    "   CENTRE VIEW: MOUNTING FACE A.",
+    f"4. PROJECTED ZONES START AT FACE A: \u00d8{SCREW_HOLE_DIA:.1f} HOLE BORES",
+    f"   (CENTRE VIEW) AND CSK CONES (LEFT VIEW) {_P:.1f} TOWARD THE",
+    f"   REAR FACE; \u00d8{BORE_DIA:g} KNOB BORE "
+    f"{REGISTRATION.K_PROJECTED_HEIGHT_MM:.1f} TOWARD THE HUB.",
 ))
 
 ISO_VIEW_SCALE = (1, 1)
