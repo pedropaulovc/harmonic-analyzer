@@ -47,13 +47,8 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _drawing_marks import (
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    _named_dimension,
-)
+from _drawing_precision import apply_drawing_precision, _named_dimension
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _fastener_catalog import fastener
 from _fit_deviations import deviations
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener

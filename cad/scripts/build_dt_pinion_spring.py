@@ -62,13 +62,9 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _holes import blind_cut_dia_mm, wizard_holes
-from _drawing_marks import (
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_precision import apply_drawing_precision
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _saved_part_guard import require_saved_drawing_properties
 from dt_pinion_spring_spec import (
     DRAWING_DIMENSIONS,

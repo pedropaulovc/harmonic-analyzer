@@ -336,7 +336,7 @@ BORE_BAND_PLACES = 3
 # The band is UNIFORM, not per land, for two reasons.  BoreCutDia is one model
 # dimension across all 20 configurations, and SOLIDWORKS 2026 rejects the
 # per-configuration IDimensionTolerance.SetValues2 on some dimension types
-# (_drawing_marks).  And T006's named web (U40) caps the largest bore under its
+# (_drawing_tolerances).  And T006's named web (U40) caps the largest bore under its
 # printed MIN floor: a per-land +0.085 would cut that web to 0.604.  So the one
 # band is the intersection of the gear seat fit over every land that carries a
 # gear, with its upper limit the lower of two named limits.

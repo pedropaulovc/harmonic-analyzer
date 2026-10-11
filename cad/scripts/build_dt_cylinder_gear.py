@@ -93,16 +93,10 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _drawing_marks import (
-    add_angular_reference_dimension,
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_angular_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_dimension_insert import add_angular_reference_dimension
+from _drawing_precision import apply_drawing_precision
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_angular_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
 from _gear import build_fixed_gear, volume_check

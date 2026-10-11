@@ -98,13 +98,9 @@ from magnifying_bracket_joint_layout import (
     RECEIVER_DIMENSION_BANDS,
     DRILL_LATERAL_WALL_MIN,
 )
-from _drawing_marks import (
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
-    set_dimension_display_precision,
-)
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _drawing_precision import set_dimension_display_precision
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from sm_summing_lever_notes import (
@@ -874,7 +870,7 @@ def _band_held_dimension(display, dimension, band: float, label: str) -> None:
     """Symmetric tolerance + 2-place display on an already-resolved dimension
     (the by-name ``set_dimension_symmetric_tolerance`` contract, minus lookup)."""
     from _com import _bind, _early_bound
-    from _drawing_marks import _set_tolerance_precision
+    from _drawing_tolerances import _set_tolerance_precision
 
     display = _bind(display, "IDisplayDimension")
     dimension = _bind(dimension, "IDimension")
