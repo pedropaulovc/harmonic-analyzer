@@ -3469,8 +3469,8 @@ def _datum_seated_on_frame(source: AnnotationGeometry, target: AnnotationGeometr
     xmax = max(max(s.x0, s.x1) for s in borders) - COLLINEAR_TOL_M
     ymin = min(min(s.y0, s.y1) for s in borders) + COLLINEAR_TOL_M
     ymax = max(max(s.y0, s.y1) for s in borders) - COLLINEAR_TOL_M
-    vertices = [(x, y) for arrow in arrows for x, y in ((arrow.x0, arrow.y0), (arrow.x1, arrow.y1))]
-    if any(xmin < x < xmax and ymin < y < ymax for x, y in vertices):
+    interior = Box(xmin, ymin, xmax, ymax)
+    if any(_segment_enters_box(arrow, interior) for arrow in arrows):
         return False
     return any(
         all(
@@ -3480,6 +3480,33 @@ def _datum_seated_on_frame(source: AnnotationGeometry, target: AnnotationGeometr
         for arrow in arrows
         for border in borders
     )
+
+
+def _segment_enters_box(segment: Segment, box: Box) -> bool:
+    """Whether a stretch of ``segment`` of positive length lies strictly inside
+    ``box`` (Liang-Barsky clip against the open box). Touching a border at a
+    point, or running along it, does not enter; a triangle edge whose ends
+    both sit on or outside the frame can still cross its interior."""
+    if box.xmin >= box.xmax or box.ymin >= box.ymax:
+        return False
+    dx, dy = segment.x1 - segment.x0, segment.y1 - segment.y0
+    low, high = 0.0, 1.0
+    for p, q in (
+        (-dx, segment.x0 - box.xmin),
+        (dx, box.xmax - segment.x0),
+        (-dy, segment.y0 - box.ymin),
+        (dy, box.ymax - segment.y0),
+    ):
+        if p == 0:
+            if q <= 0:
+                return False
+            continue
+        t = q / p
+        if p < 0:
+            low = max(low, t)
+            continue
+        high = min(high, t)
+    return low < high
 
 
 def find_extensions_near_text(sheet: SheetGeometry, *, clearance: float = ARROW_TEXT_CLEARANCE_M) -> list[Finding]:

@@ -4177,11 +4177,27 @@ def test_a_datum_seated_on_its_frame_is_attached_not_near_its_text():
     read it as an arrow crowding foreign text.  Raised 0.3 mm off the
     border into the frame, the same tag is not seated there and gates; seated
     on the border but pointing into the frame, its apex crowds the 0.13 and
-    gates too (CodeRabbit, #1320)."""
+    gates too (CodeRabbit, #1320).  So does a triangle that crosses a frame
+    shorter than it is tall: no vertex lies inside the frame, but its slanted
+    edges run through it, beside the frame's text (cross-family review, #1320)."""
+    import dataclasses
+
     from _layout_audit import find_arrows_near_text
+    from _layout_geometry import Box
+
+    through = _knife_mount_datum_b(0.0, into_frame=True)
+    gtol, datum = through.annotations
+    short = dataclasses.replace(
+        gtol,
+        text_boxes=(Box(0.155, 0.2125, 0.159, 0.2135),),
+        segments=tuple(
+            dataclasses.replace(s, y0=min(s.y0, 0.214), y1=min(s.y1, 0.214)) for s in gtol.segments
+        ),
+    )
+    through = dataclasses.replace(through, annotations=(short, datum))
 
     assert find_arrows_near_text(_knife_mount_datum_b(0.0)) == []
-    for sheet in (_knife_mount_datum_b(0.0003), _knife_mount_datum_b(0.0, into_frame=True)):
+    for sheet in (_knife_mount_datum_b(0.0003), _knife_mount_datum_b(0.0, into_frame=True), through):
         (finding,) = find_arrows_near_text(sheet)
         assert (finding.kind, finding.a, finding.b) == (
             "arrow-near-text",
