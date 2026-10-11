@@ -894,13 +894,13 @@ def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> Non
     faced = _step_body("collar-rear-faced-to-fit")
     assert collar.BODY_FACE_PHRASE in faced
     assert "START LONG; STRIP AND FACE THE REAR" in faced
-    assert "REFITTING WITH THE REAR FACE ON F" in faced
+    assert "REFITTING WITH THE REAR FACE SEATED" in faced
     assert (
         f"FINISHED BODY WITHIN {_number('pd-transgear-drive-collar')}'S FITTED LIMITS"
     ) in faced
     seated = _step_body("collar-shoulder-seated")
     assert "D-BORE ON THE SHAFT D-FLAT" in seated
-    assert "REAR FACE BEARING ON THE ACTUAL GEAR FRONT F" in seated
+    assert "REAR FACE BEARING ON THE MHA-PD-008 12T FRONT FACE" in seated
     assert "ON THE DRIVE DOWELS" in seated
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
     assert collar.LENGTH_FITTED_MIN <= collar.LENGTH <= collar.LENGTH_FITTED_MAX

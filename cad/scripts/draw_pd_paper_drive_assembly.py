@@ -1184,13 +1184,13 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{steps.KNOB_HELD_BACK_TEXT}. {collar.BODY_FACE_PHRASE}: SET THE "
             f"{sprocket.KNOB_CONFIG} FRONT FACE {collar.FIT_UP_OFFSET_SET_TEXT} FORWARD "
             f"OF THE {sprocket.CRANK_CONFIG} FRONT FACE. START LONG; STRIP AND FACE "
-            "THE REAR TO MOVE THE WHEEL REARWARD, REFITTING WITH THE REAR FACE ON F. "
+            "THE REAR TO MOVE THE WHEEL REARWARD, REFITTING WITH THE REAR FACE SEATED. "
             f"FINISHED BODY WITHIN {_N['pd-transgear-drive-collar']}'S FITTED LIMITS; "
             f"ELSE REPORT. STEP {steps.step_number('fitup-accepted')} RE-CHECKS."
         ),
         "collar-shoulder-seated": (
             f"SEAT THE {_N['pd-transgear-drive-collar']} D-BORE ON THE SHAFT D-FLAT, "
-            "ITS REAR FACE BEARING ON THE ACTUAL GEAR FRONT F. "
+            f"ITS REAR FACE BEARING ON THE {_N['pd-transgear-knob-shaft']} 12T FRONT FACE. "
             f"{sprocket.KNOB_CONFIG} ON THE DRIVE DOWELS, NUT TIGHT ON THE PILOT."
         ),
         "stud-end-cut": (
