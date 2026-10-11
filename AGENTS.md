@@ -799,10 +799,10 @@ fastener-row guard. This makes a hidden read fail rather than reuse an artefact
 whose cache key omits the group's input.
 
 Fit helpers are file-granular too: `_fit_deviations.py` owns numerical bands
-and validation, `_fit_ream_slide.py`, `_fit_shaft_h.py`, and `_fit_ream_h7.py`
-own the individual fit classes, and `_fit_text.py` owns drawing text renderers.
-Geometry imports numerical helpers without folding text formatting, and a
-fit-class edit reaches only consumers that import that class.
+and validation; `_fit_ream_slide.py`, `_fit_shaft_h.py`, and `_fit_ream_h7.py`
+own the individual fit classes. Geometry imports numerical helpers, and a
+fit-class edit reaches only consumers that import that class. Drawing tolerances
+come from the model/spec, not separate text renderers.
 
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
 that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF

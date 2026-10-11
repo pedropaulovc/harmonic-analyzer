@@ -702,7 +702,7 @@ KEEPER_INNER_LINE_XY = (
 KEEPER_INNER_TEXT_XY = (0.264, 0.084)
 KEEPER_SOCKET_QUALIFIER = "FROM SOCKET AXIS"
 KEEPER_SEAT_QUALIFIER = "2X KEEPER SEAT"
-# The part's own seat-facing note (Manufacturing Notes B, five rows), under
+# The part's own seat-facing note (Manufacturing Notes B, three rows), under
 # the plan: its top a clearance under the inner-edge location row, which runs
 # one line gap below the plan.
 KEEPER_SEAT_NOTE_XY = (

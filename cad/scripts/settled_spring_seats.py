@@ -12,6 +12,8 @@ from numbers import Real
 
 import _config
 from spring_mount_geom import SpringPose
+import sm_gooseneck_geom
+import sm_gooseneck_spring_screw_geom as spring_screw
 
 _UNIT_AXIS_ABS_TOL = 1e-12
 _CENTRE_ABS_TOL_MM = 1e-9
@@ -169,9 +171,48 @@ def channel_seat(amplitude_mm: float) -> SettledSpring:
     raise ValueError(f"No native spring calibration for amplitude {amplitude_mm!r} mm")
 
 
+def counter_upper_support_geometry() -> dict[str, str | float]:
+    """Identify the actual upper support measured by the native fixture.
+
+    Older integral-shank and purchased-screw certificates do not measure this
+    made support. Channel measurements are unchanged; the analytic force and
+    clearance model never depends on a native certificate.
+    """
+    return {
+        "component": "sm-gooseneck-spring-screw",
+        "number": "MHA-SM-004",
+        "thread": spring_screw.THREAD,
+        "pitch_mm": spring_screw.PITCH,
+        "underhead_length_mm": spring_screw.LENGTH,
+        "major_dia_mm": spring_screw.MAJOR_DIA,
+        "head_dia_mm": spring_screw.HEAD_DIA,
+        "head_height_mm": spring_screw.HEAD_H,
+        "crown_rise_mm": spring_screw.CROWN_RISE,
+        "slot_width_mm": spring_screw.SLOT_WIDTH,
+        "slot_depth_mm": spring_screw.SLOT_DEPTH,
+        "relief_dia_mm": spring_screw.RELIEF_DIA,
+        "relief_width_mm": spring_screw.RELIEF_WIDTH,
+        "relief_lead_mm": spring_screw.RELIEF_LEAD,
+        "tip_chamfer_mm": spring_screw.TIP_CHAMFER,
+        "clamp_gap_mm": sm_gooseneck_geom.SPRING_EYE_GAP,
+        "arm_end_x_mm": sm_gooseneck_geom.ARM_END_X,
+        "spring_eye_x_mm": sm_gooseneck_geom.SPRING_EYE_X,
+        "plug_length_mm": sm_gooseneck_geom.PLUG_LENGTH,
+    }
+
+
 def counter_seat() -> tuple[SettledSpring, float]:
     """Return the fixed counter placement and gooseneck height for this bank."""
     record = _active_preset()["counter"]
+    if record.get("upper_support") != counter_upper_support_geometry():
+        raise ValueError(
+            "Stale counter native calibration: upper support must be the "
+            "made MHA-SM-004 screw in its clamped gap. Rebuild "
+            "sm-gooseneck-spring-screw and sm-gooseneck, then run "
+            "diagnostics/calibrate_spring_seats.py --presets neutral square --write "
+            "on a licensed farm/native seat; older support measurements cannot "
+            "certify this joint."
+        )
     return (
         _spring(record, expected_clocking="half_turn"),
         _pose_number(record["gooseneck_origin_y_mm"], "gooseneck_origin_y_mm"),

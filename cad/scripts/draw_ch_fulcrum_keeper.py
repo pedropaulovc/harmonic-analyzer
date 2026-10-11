@@ -42,6 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from ch_fulcrum_keeper_spec import (
@@ -57,6 +58,7 @@ from ch_fulcrum_keeper_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -112,11 +114,19 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 FOOT_HOLE_CALLOUT_XY = (0.126, 0.202)
 # The tap is cut at the bench; its mouth is staked over the seated set screw
 # at the channel assembly (policy rule 9's lock, joint_retention), so the
-# callout says so ahead of the native size row.
+# callout says so ahead of the native size row.  Machinist review r13: as two
+# 86 mm rows centred at x 50 the block ran 5.7 mm past the left inner border
+# (x 12.7).  Three rows of at most 24 characters (~61 mm printed, 2.56 mm a
+# character in r13) centred at x 58 start at x ~27, ~15 mm in from it, and end
+# left of the plan's lower-left corner (93.5, 214) and of LugThickness's
+# "6.000" (x >= 92.4, top 178.7); the leader still rises from the shoulder's
+# right end to the tap's lower rim, ~10 mm left of the foot-hole shoulder.
 SET_SCREW_PROCESS = (
-    f"TAP TO BORE; STAKE MOUTH 2 PLACES\n"
-    f"AT ASSEMBLY PER {steps.step_ref(steps.SET_SCREWS_STAKED_KEY)}\n"
+    "TAP TO BORE; STAKE MOUTH\n"
+    "2 PLACES AT ASSEMBLY PER\n"
+    f"{steps.step_ref(steps.SET_SCREWS_STAKED_KEY)}\n"
 )
+SET_SCREW_CALLOUT_XY = (0.058, 0.196)
 # The two keepers' bores are drilled and reamed through in one pass at their
 # installed spacing (one straight line whatever LugRise prints) and each crown
 # is then rounded about its own bore: bench instructions of the pair-ream
@@ -149,12 +159,29 @@ TOP_KEEP = {
         TOP_CENTER[1] + SCREW_FROM_SIDE * SHEET_SCALE[0] / 2000.0,
     ),
 }
+# The end view's diameters take the near-side leader style (one arrow on the
+# rim facing the text, no chord through the bore) and stand in clear paper on
+# either side of the view; the width moves under it.  Machinist review r13
+# (and its layout audit): with the width dimension above the crown, the crown
+# callout over it and the bore callout right of the crown, the three texts
+# overlapped one another and the crown/bore outline, and the Ø14 chord ran
+# through the bore and across the 14.0 dimension line.  A diametric leader
+# runs from the shoulder end facing the centre straight at it (r13: 30.1 and
+# 32.0 deg, both exactly the bend-to-centre bearing), so:
+# - Depth: below the foot; its extension lines leave the bottom corners (r13
+#   drew them up from y 98.8) and stop ~7 mm under the view.
+# - CrownDia: above-left, between the front view's crown stack (x <= 112)
+#   and the end view; the leader lands on the crown arc at ~124 deg, clear of
+#   every other line, the block ~9 mm under the foot-hole callout.
+# - BoreDia: below-right, under the isometric note (>= 5 mm air); the leader
+#   leaves the bore at ~-55 deg and crosses only the lug's right edge.
 RIGHT_KEEP = {
-    "Depth": (0.225, 0.172),
+    "Depth": (0.225, 0.090),
     "LugRise": (0.196, 0.126),
-    "CrownDia": (0.225, 0.180),
-    "BoreDia": (0.258, 0.156),
+    "CrownDia": (0.168, 0.180),
+    "BoreDia": (0.304, 0.124),
 }
+NEAR_SIDE_DIAMETERS = ("CrownDia", "BoreDia")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -230,6 +257,11 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    for name in NEAR_SIDE_DIAMETERS:
+        matches = [a for a in right_annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+        set_near_side_diameter(matches[0], f"keeper {name}")
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
@@ -251,7 +283,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=(TAP_X_SHEET - TAP_R_SHEET, TOP_CENTER[1]),
-        callout_xy=(0.050, 0.200),
+        callout_xy=SET_SCREW_CALLOUT_XY,
         label="crown set-screw tap",
         process=SET_SCREW_PROCESS,
     )
