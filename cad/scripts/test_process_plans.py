@@ -243,6 +243,7 @@ def _complete(synthetic):
         "expected_exit": 0,
         "inputs": inputs,
         "step_sha256": tomllib.loads(manifest.read_text())["step_sha256"],
+        "verification": "checked",
     }
     _write_report(directory, report)
     return out, manifest, bound, report
@@ -275,6 +276,19 @@ def test_required_outputs_uses_installed_inspection_names(synthetic, monkeypatch
     monkeypatch.setattr(prechips.report, "inspection_sketch_names", names)
     assert bound.parent / "installed-api-sentinel.png" in plans.required_outputs(bound)
     assert seen == [plan]
+
+
+def test_verification_rejects_tampered_report_with_unchanged_hash(synthetic):
+    out, _, bound, report = _complete(synthetic)
+    plans.verify_traveler(STEM, out)
+    original_hash = report["hash"]
+    report["verification"] = "planned"
+    (bound.parent / "report.json").write_text(json.dumps(report), encoding="utf-8")
+    assert report["hash"] == original_hash
+    assert report_hash(report) != original_hash
+    with pytest.raises(plans.TravelerIncomplete, match="report hash"):
+        plans.verify_traveler(STEM, out)
+    assert not plans.traveler_complete(STEM, out)
 
 
 @pytest.mark.parametrize(

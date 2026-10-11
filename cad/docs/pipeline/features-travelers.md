@@ -171,6 +171,8 @@ Completeness is derived from the plan: one `setup-S<ordinal>.png` per setup plus
 every name from `prechips.report.inspection_sketch_names(plan)`. The report must
 record matching SHA-256 hashes for every render under `inputs["render:…"]`,
 declare `expected_exit == 0`, and match the manifest's `step_sha256`.
+Its `hash` must equal `prechips.report.report_hash(report)`, so editing report
+metadata without regenerating its canonical content hash also invalidates it.
 Its input digests must also match the bound plan, scoped feature manifest and
 STEP, inventory, shop policy and cutting data. Verification regenerates the
 tracked plan and shop bindings in memory and requires byte equality with the

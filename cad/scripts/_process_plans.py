@@ -432,6 +432,8 @@ def _verified_traveler_bytes(
     stem: str, out: Path = CAD_OUT, manifest: Path | None = None
 ) -> dict[Path, bytes]:
     """Snapshot and validate exactly the traveler and shop files a release ships."""
+    from prechips.report import report_hash
+
     directory = traveler_dir(stem, out)
     try:
         plan_path_bound = directory / "plan.toml"
@@ -444,6 +446,10 @@ def _verified_traveler_bytes(
                 raise TravelerIncomplete(f"{stem}: missing {name}")
             snapshots[path] = path.read_bytes()
         report = json.loads(snapshots[directory / "report.json"])
+        if not isinstance(report, dict) or report.get("hash") != report_hash(report):
+            raise TravelerIncomplete(
+                f"{stem}: report hash differs from canonical content"
+            )
         if report.get("expected_exit") != 0:
             raise TravelerIncomplete(f"{stem}: report expected_exit is not 0")
         manifest_path = (
@@ -517,16 +523,7 @@ def _verified_traveler_bytes(
         return snapshots
     except TravelerIncomplete:
         raise
-    except (
-        OSError,
-        UnicodeError,
-        tomllib.TOMLDecodeError,
-        json.JSONDecodeError,
-        KeyError,
-        TypeError,
-        AttributeError,
-        PlanBindError,
-    ) as exc:
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         raise TravelerIncomplete(f"{stem}: cannot verify traveler ({exc})") from exc
 
 
