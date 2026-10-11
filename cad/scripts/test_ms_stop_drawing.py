@@ -498,7 +498,9 @@ def test_match_drilling_does_not_eliminate_absolute_end_ligament_limits() -> Non
         + spec.PLATE_SCREW_MAJOR_DIA / 2.0
     ) < 1.5
     assert spec.MATCH_DRILL_MASTER == "MS-STOP-PLATE"
-    assert spec.MATCH_DRILL_DATUM_ALIGNMENT == "LEFT END AND THUMBSCREW-SIDE EDGES ALIGNED"
+    assert spec.MATCH_DRILL_DATUM_ALIGNMENT == (
+        "DIMENSIONED END AND THUMBSCREW-SIDE DATUM EDGES ALIGNED"
+    )
 
 
 @pytest.mark.parametrize("master_band", [0.0, 0.1, 0.2, 0.51])
@@ -706,8 +708,8 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     assert pilot.splitlines() == [
         "LAYOUT ON THIS PLATE; PILOT",
         f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}",
-        "CLAMPED WITH LEFT END AND",
-        "THUMBSCREW-SIDE EDGES ALIGNED",
+        "CLAMPED WITH DIMENSIONED END AND",
+        "THUMBSCREW-SIDE DATUM EDGES ALIGNED",
     ]
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
         spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
