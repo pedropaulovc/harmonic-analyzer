@@ -8,40 +8,19 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-import _config
-import _drawing_attachment
-import _drawing_balloons
-import _drawing_centerline
-import _drawing_common
-import _drawing_view_display
-import _drawing_dimension_import
-import _drawing_dimensions
-import _drawing_edge_dimensions
-import _drawing_edges
-import _drawing_finish
-import _drawing_gdt
-import _drawing_hole_callout
-import _drawing_layout_collect
-import _drawing_leader_notes
-import _drawing_notes
-import _drawing_projection
-import _drawing_sections
-import _drawing_selection
-import _drawing_selection_probe
-import _drawing_sheets
-import _drawing_tables
-import _drawing_view_configuration
 import solidworks_mcp.adapters
 
-import draw_fr_rocker_arm_support as drawing
-import build_fr_rocker_arm_support as support
+import _config
+import _drawing_sections
 import build_fr_frame_assembly as frame
+import build_fr_rocker_arm_support as support
 import build_vn_lag_screw as stock_screw
-import vn_lag_screw_spec as screw
+import draw_fr_rocker_arm_support as drawing
+import fr_rocker_arm_support_drawing_spec as drawing_spec
 import fr_rocker_arm_support_section_spec as section
 import fr_rocker_arm_support_spec as placement
-import fr_rocker_arm_support_drawing_spec as drawing_spec
 import rocker_bracket_seat_layout as seats
+import vn_lag_screw_spec as screw
 
 
 def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
@@ -332,39 +311,8 @@ def _section_doubles(
         swApp=SimpleNamespace(GetMathUtility=lambda: math_utility),
         _get_attr_or_call=lambda obj, name: _member(obj, name),
     )
-    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda obj, _: obj)
     monkeypatch.setattr(_drawing_sections, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_balloons, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_dimension_import, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_edge_dimensions, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_gdt, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_layout_collect, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_leader_notes, "view_name", lambda *_: "Front")
     monkeypatch.setattr(_drawing_sections, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_selection, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_selection_probe, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_tables, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_projection, "double_array", tuple)
     monkeypatch.setattr(_drawing_sections, "double_array", tuple)
     monkeypatch.setattr(
         solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda obj, *_: obj

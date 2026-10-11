@@ -17,20 +17,26 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    curate_dimensions,
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import (
     _INSERT_DIMS_MARKED,
     curate_view_dimensions,
@@ -42,18 +48,11 @@ from _drawing_dimensions import (
     set_reference_dimensions,
 )
 from _drawing_notes import add_property_linked_note
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    curate_dimensions,
-    dimension_name,
-    view_name,
-)
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from pd_transgear_removable_spec import (
     DEFAULT_CONFIG,
     DRAWING_DIMENSIONS,

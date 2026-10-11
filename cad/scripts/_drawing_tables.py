@@ -1,24 +1,23 @@
 """Drawing hole tables, BOM tables and hole-group tags.
 
-Separate module so edits re-key only recipes that use this concern.
+Hole-table and BOM recipes share native schedules and datum tags here, while
+drawings without tables stay independent.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Literal
 from pathlib import Path
-from typing import Sequence
-from _com import _early_bound
+from typing import Any, Literal, Sequence
+
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
-from solidworks_mcp.adapters.com_variant import bool_array
-from solidworks_mcp.adapters.com_variant import bstr_array
-from solidworks_mcp.adapters.com_variant import dispatch_array
+from solidworks_mcp.adapters.com_variant import bool_array, bstr_array, dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import view_name
+
+from _com import _early_bound
 from _drawing_common import rebuild_drawing
 from _drawing_selection import _activate_and_select_view, _select_edge
+import _telemetry
 
 
 def add_hole_group_tags(

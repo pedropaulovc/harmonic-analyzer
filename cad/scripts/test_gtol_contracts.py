@@ -6,11 +6,9 @@ import pytest
 
 from _drawing_gdt import PmiDrawingPlacement
 from _gtol_cone import ConeFace
-from _gtol_cylinder import CylinderFace
 from _gtol_controls import GeometricControl, PartDatum, validate_part_pmi
-from _gtol_planar import PlanarFace
-from _gtol_sphere import SphereFace
-from _gtol_torus import TorusFace
+from _gtol_cylinder import CylinderFace
+from _gtol_face import FaceGeometry
 from _gtol_frame import (
     TRANSLATION_GLYPH,
     gtol_frame_datums,
@@ -18,7 +16,9 @@ from _gtol_frame import (
     gtol_frame_xml,
     translation_print_problem,
 )
-from _gtol_face import FaceGeometry
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _gtol_torus import TorusFace
 
 
 

@@ -1,21 +1,27 @@
 """Drawing surface-finish placement and controlled-face validation.
 
-Separate module so edits re-key only recipes that use this concern.
+Surface-finish drawings validate controlled faces and place marks here without
+re-keying sheets that have no finish requirements.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Sequence
-from _surface_finish import SurfaceFinishControl
-from _com import _early_bound
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
 import os
-from _drawing_annotation_style import _LEADER_BENT, _LEADER_SIDE_SMART
-from _drawing_attachment import _assert_attached_to, _assert_leader_lands
+from typing import Any, Sequence
+
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+
+from _com import _early_bound
+from _drawing_attachment import (
+    _LEADER_BENT,
+    _LEADER_SIDE_SMART,
+    _assert_attached_to,
+    _assert_leader_lands,
+)
 from _drawing_common import rebuild_drawing
 from _drawing_selection import _select_annotation_entity
+from _surface_finish import SurfaceFinishControl
+import _telemetry
 
 
 def _surface_finish_entity_faces(

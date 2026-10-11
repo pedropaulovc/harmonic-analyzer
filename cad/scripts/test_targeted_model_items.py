@@ -17,10 +17,10 @@ appended to that selection (measured in
 from __future__ import annotations
 
 import pytest
+import solidworks_mcp.adapters.solidworks.drawing
 
 import _drawing_dimension_import
 import _telemetry
-import solidworks_mcp.adapters.solidworks.drawing
 import fr_harmonic_base_spec
 import fr_tube_frame_spec
 
@@ -52,7 +52,9 @@ def test_one_feature_is_selected_once_for_all_of_its_kept_names() -> None:
 
 def test_every_marked_dimension_of_a_real_spec_resolves_to_its_feature() -> None:
     for spec in (fr_tube_frame_spec, fr_harmonic_base_spec):
-        owner = _drawing_dimension_import._feature_by_dimension_name(spec.DRAWING_DIMENSIONS)
+        owner = _drawing_dimension_import._feature_by_dimension_name(
+            spec.DRAWING_DIMENSIONS
+        )
         for feature, names in spec.DRAWING_DIMENSIONS.items():
             for name in names:
                 assert owner[name] == feature
@@ -284,7 +286,9 @@ def test_a_derived_view_is_qualified_by_its_base_view() -> None:
 def test_the_component_qualifier_is_read_back_per_view() -> None:
     """The middle qualifier is the view's own root component, never the part stem."""
     adapter, drawing, view = _seat(view="Drawing View2", component="fr-tube-frame-2")
-    _drawing_dimension_import.insert_feature_dimensions(adapter, view, ("AnnulusProfile",))
+    _drawing_dimension_import.insert_feature_dimensions(
+        adapter, view, ("AnnulusProfile",)
+    )
     assert view.child_context == [False]
     assert (
         "select",
@@ -340,9 +344,7 @@ def test_kept_dimensions_are_placed_again_only_after_a_delete_or_a_drift(
 
     recorded: dict[str, object] = {}
     monkeypatch.setattr(_drawing_dimension_import, "curate_dimensions", curate)
-    monkeypatch.setattr(
-        _telemetry, "annotate", lambda **attrs: recorded.update(attrs)
-    )
+    monkeypatch.setattr(_telemetry, "annotate", lambda **attrs: recorded.update(attrs))
     curated = _drawing_dimension_import.curate_view_dimensions(
         FakeAdapter(None),
         object(),

@@ -12,9 +12,9 @@ import math
 import time
 from typing import Any
 
-import _telemetry
 from _com import _early_bound
 from _drawing_edges import visible_view_entities
+import _telemetry
 
 
 def _span_attrs(**attributes: float) -> None:

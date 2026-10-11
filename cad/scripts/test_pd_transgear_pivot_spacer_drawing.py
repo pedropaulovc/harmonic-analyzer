@@ -9,16 +9,16 @@ from types import SimpleNamespace
 import pytest
 
 import _config
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 import _drawing_edges
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 import _gtol_face
+from _layout_geometry import Box, estimate_text_box
+from _surface_finish import MACHINED_UM
 import build_pd_transgear_pivot_spacer as part
 import draw_pd_transgear_pivot_spacer as drawing
 import pd_transgear_pivot_spacer_spec as spec
 import vn_transgear_pivot_screw_spec as screw
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from _layout_geometry import Box, estimate_text_box
-from _surface_finish import MACHINED_UM
 
 
 def test_required_drawing_paths() -> None:

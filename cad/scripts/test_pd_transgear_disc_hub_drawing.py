@@ -7,36 +7,36 @@ import asyncio
 import importlib.util
 import itertools
 import math
-import re
 from pathlib import Path
+import re
 from types import SimpleNamespace
 
 import pytest
 
 import _appearance
+from _assembly_contract import assembly_contract
 import _bore_axis
 import _check
+import _config
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+import _drawing_edges
+from _drawing_registry import DRAWINGS_BY_NAME
+import _gtol_face
+from _layout_geometry import Box, estimate_text_box
 import _part_properties
 import _part_save
+import _printed_tolerance
 import _rebuild
 import _sketch
 import _sketch_chains
 import _sketch_circle
 import _sketch_rectangle
-import _config
-import _drawing_edges
-import _gtol_face
-import _printed_tolerance
 import build_pd_transgear_disc_hub as part
 import draw_pd_transgear_disc_hub as drawing
 import pd_paper_drive_assembly_steps as steps
-import transgear_cluster_fit as cluster_fit
 import pd_transgear_disc_hub_geometry as joint
 import pd_transgear_disc_hub_spec as spec
-from _assembly_contract import assembly_contract
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME
-from _layout_geometry import Box, estimate_text_box
+import transgear_cluster_fit as cluster_fit
 
 WALL_FLOOR = 2.0
 DRILL_PLUS = _config.title_block("drilled_hole")["plus_mm"]

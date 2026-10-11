@@ -1,23 +1,24 @@
 """Attached, leadered and property-linked drawing callouts.
 
-Separate module so edits re-key only recipes that use this concern.
+Drawings with attached callouts share leadered-note placement here without
+making plain note schedules depend on view-entity selection.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from _com import _early_bound
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
-from solidworks_mcp.adapters.solidworks.drawing import add_note
-from solidworks_mcp.adapters.com_variant import dispatch_array
 import math
-from solidworks_mcp.adapters.solidworks.drawing import view_name
-from _drawing_annotation_style import _LEADER_SIDE_SMART
-from _drawing_attachment import _assert_attached_to
+from typing import Any
+
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.com_variant import dispatch_array
+from solidworks_mcp.adapters.solidworks.drawing import add_note, view_name
+
+from _com import _early_bound
+from _drawing_attachment import _LEADER_SIDE_SMART, _assert_attached_to
 from _drawing_common import rebuild_drawing
 from _drawing_notes import property_link
 from _drawing_selection import _select_edge, _select_view_entity
+import _telemetry
 
 
 @_telemetry.traced("drawing.linked_callout", label_param="property_name")

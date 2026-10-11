@@ -29,14 +29,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+
 from _com import _early_bound
 from _drawing_common import rebuild_drawing
-from _drawing_gdt_layout import _GDT_TYPES, _gdt_element
-from _drawing_layout_collect import _ANNOT_DIM
-from _drawing_sheet_region import sheet_drawable_region
 from _drawing_layout_check import DrawableRegion, LeaderSegment, _segment_crosses_box
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from _drawing_layout_collect import _ANNOT_DIM, _GDT_TYPES, _gdt_element
+from _drawing_sheet_region import sheet_drawable_region
+import _telemetry
 
 Box = tuple[float, float, float, float]
 

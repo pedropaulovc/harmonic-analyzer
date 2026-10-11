@@ -1,20 +1,20 @@
 """Drawing dimension text, references, precision and arc endpoints.
 
-Separate module so edits re-key only recipes that use this concern.
+Dimensioned drawings apply text, references, precision and arc endpoints here
+without coupling those edits to model-item import.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Iterable
-from typing import Literal
-from solidworks_mcp.adapters.solidworks.drawing import TOL_BASIC
-from _com import _early_bound
+from typing import Any, Iterable, Literal
+
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name
+from solidworks_mcp.adapters.solidworks.drawing import TOL_BASIC, dimension_name
+
+from _com import _early_bound
 from _drawing_common import rebuild_drawing
 from _drawing_scan import _span_scan_attrs
+import _telemetry
 
 
 _DIMENSION_TEXT_CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow

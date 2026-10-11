@@ -14,29 +14,22 @@ number is generated from the ``*_SHEET`` constants, never typed.
 from __future__ import annotations
 
 import argparse
+from datetime import UTC, datetime
 import hashlib
+from itertools import combinations
 import math
+from pathlib import Path
 import re
 import sys
 import textwrap
-from datetime import UTC, datetime
-from itertools import combinations
-from pathlib import Path
 from typing import Any, Callable, Literal, NamedTuple, Sequence
 
-import _config
-import _seat_forensics
-import _telemetry
-import ch_rocker_thrust_washer_spec as rocker_washer
-import cylinder_bank_layout as bank
-import dt_drive_train_steps as steps
-import pinion_rig_fitup as FITUP
-import pinion_rig_tip_gap as TIP_GAP
-from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY, RODS_PINNED_REF
-from ch_channel_assembly_steps import step_ref as channel_step_ref
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+
 from _check import check
 from _com import _early_bound
-from _session import run_build
+import _config
 from _drawing_balloons import (
     BalloonLanding,
     _spread_balloons,
@@ -45,21 +38,22 @@ from _drawing_balloons import (
     balloon_item_resolved,
 )
 from _drawing_common import (
-    DrawingOutputs,
     _SW_SHADED_EDGES,
+    DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
-from _drawing_view_display import set_hidden_lines_removed
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_layout_collect import (
     _leader_segments_of,
     check_drawing_layout,
     collect_layout_elements,
 )
 from _drawing_projection import model_point_in_view
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
@@ -70,25 +64,35 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
     view_configuration,
 )
-from _simplified_names import simplified_name
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_view_display import set_hidden_lines_removed
 from _dt_drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
-from dt_cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
-from dt_cone_gear_stack import COUNT as CONE_GEAR_COUNT, STACK_L20_ACCEPT
+import _seat_forensics
+from _session import run_build
+from _simplified_names import simplified_name
+import _telemetry
+from ch_channel_assembly_steps import (
+    NORTH_BRACKET_SET_KEY,
+    RODS_PINNED_REF,
+    step_ref as channel_step_ref,
+)
+import ch_rocker_thrust_washer_spec as rocker_washer
 from cone_stack_end_play import COLLAR_FEELER, SHAFT_END_PLAY
+import cylinder_bank_layout as bank
+from dt_cone_gear_stack import COUNT as CONE_GEAR_COUNT, STACK_L20_ACCEPT
+from dt_cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
 from dt_cone_tip_block_spec import ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT
+from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
 from dt_crank_pinion_spec import (
     SEAT_FEELER_MM as PINION_SEAT_FEELER,
+    SHAFT_END_RECESS_MAX as PINION_RECESS_MAX,
+    SHAFT_END_RECESS_MIN as PINION_RECESS_MIN,
     T120_FITUP_ASSEMBLY_CHECK,
 )
-from dt_crank_pinion_spec import SHAFT_END_RECESS_MAX as PINION_RECESS_MAX
-from dt_crank_pinion_spec import SHAFT_END_RECESS_MIN as PINION_RECESS_MIN
-from dt_crank_seat_washer_spec import GAP_MAX as WASHER_GAP_MAX
-from dt_crank_seat_washer_spec import GAP_MIN as WASHER_GAP_MIN
+from dt_crank_seat_washer_spec import (
+    GAP_MAX as WASHER_GAP_MAX,
+    GAP_MIN as WASHER_GAP_MIN,
+)
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
-from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
-from vn_keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 from dt_drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -99,9 +103,11 @@ from dt_drive_train_assembly_spec import (
     cluster_members,
     unclassified_stems,
 )
+import dt_drive_train_steps as steps
 from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+import pinion_rig_fitup as FITUP
+import pinion_rig_tip_gap as TIP_GAP
+from vn_keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 
 SPEC = DRAWINGS_BY_NAME["dt_drive_train_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
@@ -157,7 +163,7 @@ BANK_SHEET = 7
 FIT_SHEET = 8
 CHECKS_SHEET = 9
 # Every view at 1:2 or smaller prints the teeth/thread-free "Default
-# Simplified" configuration (the assembly view policy in _drawing_common); the
+# Simplified" configuration (the policy in _drawing_view_configuration); the
 # user asked for the ENTIRE drive train at 1:2 or larger with every modeled
 # tooth and thread, so sheet 10 carries it. Continuations are appended after
 # that sheet: no existing sheet number or pointer moves.

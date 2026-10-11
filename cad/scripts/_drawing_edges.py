@@ -1,22 +1,22 @@
 """Drawing-view visible edges and silhouette geometry.
 
-Separate module so edits re-key only recipes that use this concern.
+Geometry-driven annotations scan visible edges and silhouettes here without
+making session-only drawings depend on geometry probes.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Mapping
-from typing import Sequence
-from _com import _com_invoke
-from _com import _early_bound
-import _telemetry
 from dataclasses import dataclass
 import math
+from typing import Any, Mapping, Sequence
+
 from solidworks_mcp.adapters.solidworks.drawing import (
     visible_component_entities as visible_component_entities,
 )
+
+from _com import _com_invoke, _early_bound
 from _drawing_projection import model_points_in_view
+import _telemetry
 
 
 def _edge_endpoint_key(adapter: Any, edge: Any) -> tuple[float, ...] | None:

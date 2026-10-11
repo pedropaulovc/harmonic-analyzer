@@ -1,21 +1,23 @@
 """Drawing-view configurations, exploded state and full-detail assertions.
 
-Separate module so edits re-key only recipes that use this concern.
+Assembly and simplified-view drawings select configurations and exploded states
+here without re-keying ordinary part sheets.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from _com import _early_bound
-import _telemetry
 import enum
-from _simplified_names import simplified_name
+from typing import Any
+
+from _com import _early_bound
 from _drawing_common import (
     _SW_SHADED,
     _SW_SHADED_EDGES,
     is_pictorial_orientation,
     rebuild_drawing,
 )
+from _simplified_names import simplified_name
+import _telemetry
 
 
 # Assembly drawing view configurations (the user's ruling, 2026-09-27, widened

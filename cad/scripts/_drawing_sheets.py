@@ -1,21 +1,22 @@
 """Blank drawing-sheet creation and pictorial-sheet placement.
 
-Separate module so edits re-key only recipes that use this concern.
+Multi-sheet recipes create blank and pictorial sheets here without coupling
+single-sheet templates to sheet-placement changes.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Sequence
-from _com import _early_bound
-import _telemetry
 from dataclasses import dataclass
-from solidworks_mcp.adapters.solidworks.drawing import iter_views
+from typing import Any, Sequence
+
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import place_view
-from _drawing_view_display import set_hidden_lines_removed
+from solidworks_mcp.adapters.solidworks.drawing import iter_views, place_view
+
+from _com import _early_bound
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
+from _drawing_view_display import set_hidden_lines_removed
+import _telemetry
 
 
 @dataclass(frozen=True)

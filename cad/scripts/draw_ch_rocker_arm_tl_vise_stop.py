@@ -24,23 +24,25 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from ch_rocker_arm_tl_vise_stop_spec import (
     ARM_INNER_Y,
     ARM_TOP_Z,
@@ -48,21 +50,20 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     BOTTOM_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    NOSE_PIN_CALLOUT,
     FINGER_END_Y,
     FINGER_FRONT_X,
     FINGER_TOP_Z,
+    NOSE_PIN_CALLOUT,
     NOSE_Y,
     NOSE_Z,
     NOTCH_TOP_Z,
     REAR_Y,
     SCREW_GRIP,
+    SCREW_HOLE_CALLOUT,
     SCREW_Y,
     SCREW_Z,
-    SCREW_HOLE_CALLOUT,
     SEAT_X,
 )
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vise_stop"]
 PART_STEM = SPEC.artifact_stem

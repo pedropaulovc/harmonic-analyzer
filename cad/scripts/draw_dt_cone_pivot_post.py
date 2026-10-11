@@ -3,9 +3,9 @@ r"""Create the curated machinist drawing for the v2 cone pivot post.
 The SLDPRT remains authoritative.  This recipe places the plan, the front
 elevation, a true-shape cone-journal view, a native section through the cone
 bore plane and a pictorial isometric on one sheet, and imports exactly the
-model dimensions ``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks; shared
-sheet/template, import, curation and export behaviour lives in
-``_drawing_common``.
+model dimensions ``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The casting has two axes and they are not parallel: the crank journal runs
 along part +Z and the cone journal is yawed 12.5182 degrees about the vertical
@@ -25,19 +25,22 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
-import sys
 from collections.abc import Mapping
 from datetime import UTC, datetime
+import math
+import sys
 from typing import Any
 
-import _seat_forensics
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
-from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -46,9 +49,8 @@ from _drawing_common import (
     read_required_properties,
     rebuild_drawing,
     set_high_quality_shaded_with_edges,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -60,17 +62,21 @@ from _drawing_dimensions import (
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
-from _drawing_sections import create_section_view
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name
-from _drawing_hidden_sketches import (
-    curate_view_dimensions as curate_hidden_owner_dimensions,
-)
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+import _seat_forensics
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_cone_gear_shaft_spec import POST_JOURNAL_RIM_BREAK
 from dt_cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
@@ -92,11 +98,6 @@ from dt_cone_pivot_post_spec import (
     INCLINE_DEG,
     PART_DATUMS,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    place_view,
 )
 
 

@@ -5,38 +5,19 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+import solidworks_mcp.adapters
 
 import _config
 import _drawing_attachment
-import _drawing_balloons
-import _drawing_centerline
-import _drawing_common
-import _drawing_view_display
-import _drawing_dimension_import
-import _drawing_dimensions
 import _drawing_edge_dimensions
-import _drawing_edges
-import _drawing_finish
-import _drawing_gdt
-import _drawing_hole_callout
-import _drawing_layout_collect
-import _drawing_leader_notes
-import _drawing_notes
-import _drawing_sections
-import _drawing_selection
-import _drawing_selection_probe
-import _drawing_sheets
-import _drawing_tables
-import _drawing_view_configuration
-import solidworks_mcp.adapters
-import build_sm_summing_lever as lever_build
-import draw_sm_summing_lever as drawing
-import rocker_bank_layout
-import sm_summing_lever_spec
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges
 from _hole_spec import blind_cut_dia_mm
+import build_sm_summing_lever as lever_build
+import draw_sm_summing_lever as drawing
 from dt_cone_pivot_post_installation import SUMMING_Z
+import rocker_bank_layout
+import sm_summing_lever_spec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
@@ -127,26 +108,7 @@ def _dimension(mm: float, attached: tuple[object, ...]):
 @pytest.fixture
 def identity(monkeypatch):
     monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda value, *_args: value
     )

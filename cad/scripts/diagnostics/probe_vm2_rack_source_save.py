@@ -123,12 +123,28 @@ def main():
         from . import _script_paths  # noqa: F401
     else:
         import _script_paths  # noqa: F401
+    import solidworks_mcp.adapters.solidworks.drawing
+
+    from _buildgraph import module_deps_of
     from _com import _early_bound, _read_member
     import _drawing_dimension_import
-    import solidworks_mcp.adapters.solidworks.drawing
     from _drawing_precision import _named_dimension
-    import draw_pd_rack_pinion as recipe
     from diagnostics._owned_native_session import run_owned_diagnostic
+    import draw_pd_rack_pinion as recipe
+
+    # Include the recipe's static closure and owners called by this probe's
+    # import/readback instrumentation; adapter provenance is recorded separately.
+    helper_scripts = [
+        Path(recipe.__file__),
+        *(ROOT / "cad/scripts" / name for name in (
+            "_com.py", "_drawing_precision.py", "_drawing_dimension_import.py",
+        )),
+    ]
+    helper_paths = sorted({
+        path
+        for script in helper_scripts
+        for path in (str(script), *module_deps_of(script))
+    } - {str(Path(recipe.__file__))})
 
     async def probe(adapter):
         app = adapter.swApp
@@ -149,7 +165,7 @@ def main():
             "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "adapter": subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "probe_sha256": digest(__file__), "recipe_sha256": digest(recipe.__file__),
-            "helper_sha256": digest(solidworks_mcp.adapters.solidworks.drawing.__file__),
+            "helper_sha256": {path: digest(path) for path in helper_paths},
             "pid": int(app.GetProcessID()), "revision": str(app.RevisionNumber()),
             "started_utc": datetime.now(timezone.utc).isoformat(),
             "scope": "partial diagnostic, no datum or manufacturing acceptance",

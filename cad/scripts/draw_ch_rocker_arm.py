@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the rocker arm.
 
 The SLDPRT remains authoritative.  This recipe supplies only the rocker-arm
-views, dimension layout, hole callouts, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, dimension layout, hole callouts, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The strap is a long thin curved seesaw (~292 mm tip to tip, 16 mm deep, 2.5 mm
 thick).  The print shows the profile (front), a 1:1 end view that carries the
@@ -22,48 +22,53 @@ import math
 import sys
 from typing import Any
 
-from _gear_drawing_entities import visible_circle_edge
-from ch_rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
 
-import _telemetry
-from _hole_spec import blind_cut_dia_mm
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _drawing_dimensions import set_basic_dimension
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
-from _drawing_hole_callout import add_native_hole_callout
-from _drawing_layout_collect import check_drawing_layout
-from _drawing_notes import add_property_linked_note
-from _drawing_scan import _zoomed_on
-from _drawing_selection import _select_view_entity
-from _drawing_sheet_region import sheet_drawable_region
 
 # The part saves TopEdgeReference hidden (#880): this form shows it in the
 # view that imports its dimension.
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_layout_collect import check_drawing_layout
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_scan import _zoomed_on
+from _drawing_selection import _select_view_entity
+from _drawing_sheet_region import sheet_drawable_region
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _gear_drawing_entities import visible_circle_edge
+from _hole_spec import blind_cut_dia_mm
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from ch_rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_NOTES
 from ch_rocker_arm_spec import (
+    ARM_DEPTH,
     ARM_THICKNESS,
+    GEOMETRIC_TOLERANCES_MM,
     HUB_DIA,
     PIVOT_HOLE_DIA,
     R_TOP,
-    ROD_HOLE_X,
     ROD_HOLE_SPEC,
+    ROD_HOLE_X,
     ROD_HOLE_Y,
     SURFACE_FINISHES,
     TIP_FACE,
@@ -71,10 +76,6 @@ from ch_rocker_arm_spec import (
     TOP_EDGE_ABOVE_PIVOT,
     TOP_END_X,
     TOP_END_Y,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

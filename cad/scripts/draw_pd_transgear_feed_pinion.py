@@ -18,20 +18,22 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
@@ -39,12 +41,16 @@ from _drawing_gdt import add_feature_control_frame
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
-from _drawing_sections import create_section_view
-from solidworks_mcp.adapters.solidworks.drawing import view_name
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
+from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
     BORE_DIA,
@@ -62,8 +68,6 @@ from pd_transgear_feed_pinion_spec import (
     OVERALL_LENGTH,
     SURFACE_FINISHES,
 )
-from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_feed_pinion"]

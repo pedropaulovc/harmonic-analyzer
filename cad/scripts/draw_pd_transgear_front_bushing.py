@@ -24,11 +24,15 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -36,9 +40,8 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -47,15 +50,16 @@ from _drawing_dimensions import (
 )
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _layout_geometry import audit_sheet, format_findings
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
 from pd_paper_drive_assembly_steps import step_ref
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import place_view
 from pd_transgear_front_bushing_spec import (
     BORE_CALLOUT,
     BORE_DIA,

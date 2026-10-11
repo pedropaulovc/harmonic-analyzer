@@ -20,20 +20,24 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound, _read_member
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
@@ -41,12 +45,15 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note, draw_note_table
 from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_scan import _zoomed_on
 from _drawing_sections import create_section_view
 from _drawing_selection import _select_view_entity
 from _drawing_sheets import create_blank_drawing_sheets
-from solidworks_mcp.adapters.solidworks.drawing import view_name
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from ch_rocker_arm_tl_profile_fixture_spec import (
     CLAMP_STUD_DRILL_DIA,
     CLAMP_STUD_POINTS,
@@ -79,12 +86,6 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     ROD_PIN_HOLE_XY,
     SECTION_LABEL,
     STAND_POCKET_DEPTH,
-)
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    place_view,
 )
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_profile_fixture"]

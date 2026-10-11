@@ -3,6 +3,7 @@
 import asyncio
 from contextlib import nullcontext
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -10,6 +11,8 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+
+import _buildgraph
 
 
 class Document:
@@ -149,7 +152,26 @@ def harness(tmp_path, monkeypatch):
         dimension_name=lambda _adapter, item: item.name,
         render_pdf_png=lambda _pdf, png, **_kwargs: png.write_bytes(b"fake rendered PNG"),
     )
-    recipe = SimpleNamespace(SOURCE=source, ROD_DIA=6.35, __file__=__file__)
+    scripts = root / "cad/scripts"
+    scripts.mkdir()
+    helper_sources = {
+        "_com.py": "",
+        "_drawing_common.py": "",
+        "_drawing_gdt.py": "import _drawing_attachment\n",
+        "_drawing_attachment.py": "import _com\n",
+        "_drawing_selection.py": "",
+        "_gear_drawing_entities.py": "",
+    }
+    helper_paths = {}
+    for name, content in helper_sources.items():
+        path = scripts / name
+        path.write_text(content, encoding="utf-8")
+        helper_paths[name] = path
+    recipe_path = scripts / "draw_dt_pinion_lift_rod.py"
+    recipe_path.write_text("import _drawing_gdt\n", encoding="utf-8")
+    local_modules = {path.stem: path for path in (*helper_paths.values(), recipe_path)}
+    monkeypatch.setattr(_buildgraph, "_local_modules", lambda: local_modules)
+    recipe = SimpleNamespace(SOURCE=source, ROD_DIA=6.35, __file__=str(recipe_path))
     recipe.add_datum_feature = lambda *_args, **_kwargs: None
 
     async def build(_adapter):
@@ -380,6 +402,11 @@ def test_attachment_closure_skips_stale_part_and_hashes_final_evidence(harness):
     assert report["source_sha256_after_close"] == report["source_sha256_before"]
     assert report["exports"]["png"]["sha256"]
     assert len(report["closed_without_save"]) == 1
+    assert report["helper_sha256"] == {
+        str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in h.helper_paths.values()
+    }
+    assert list(report["helper_sha256"]) == sorted(report["helper_sha256"])
 
 
 @pytest.mark.parametrize("result, file_mode", [(False, "write"), (1, "write"), (0, "missing")])

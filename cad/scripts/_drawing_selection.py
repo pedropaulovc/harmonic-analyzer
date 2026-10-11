@@ -1,16 +1,19 @@
 """Drawing-view entity selection and annotation activation.
 
-Separate module so edits re-key only recipes that use this concern.
+Annotation authors share these view-picking primitives without pulling
+dimension-import or BOM-balloon logic into unrelated drawings.
 """
 
 from __future__ import annotations
 
 from typing import Any
-from _com import _early_bound
-import _seat_forensics
+
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import view_name
+
+from _com import _early_bound
+import _seat_forensics
 
 
 def _select_view_entity(

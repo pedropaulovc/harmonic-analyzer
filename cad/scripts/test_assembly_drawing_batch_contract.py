@@ -8,6 +8,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import _assembly_drawing
+from _drawing_common import DrawingOutputs
+from _drawing_registry import DRAWINGS, DrawingLayout
+from _drawing_view_configuration import (
+    ASSEMBLY_VIEW_CONFIGURATION,
+    SIMPLIFIED_VIEW_CONFIGURATION,
+)
 import draw_ch_channel_assembly
 import draw_dt_drive_train_assembly
 import draw_fr_frame_assembly
@@ -16,12 +22,6 @@ import draw_mg_magnifier_assembly
 import draw_pd_paper_drive_assembly
 import draw_pn_pen_assembly
 import draw_sm_summing_assembly
-from _drawing_common import DrawingOutputs
-from _drawing_view_configuration import (
-    ASSEMBLY_VIEW_CONFIGURATION,
-    SIMPLIFIED_VIEW_CONFIGURATION,
-)
-from _drawing_registry import DRAWINGS, DrawingLayout
 from test_simplified_helpers import HLR, FakeDrawing, FakeView
 
 

@@ -870,7 +870,6 @@ def test_tip_view_imports_the_break_by_feature(monkeypatch) -> None:
     """Targeted import: only the deburr cutter's profile is selected; the
     entire-model import is never called."""
     import _drawing_dimension_import
-    import _drawing_dimensions
 
     break_annotation = object()
     calls: list[str] = []
@@ -886,11 +885,6 @@ def test_tip_view_imports_the_break_by_feature(monkeypatch) -> None:
     monkeypatch.setattr(_drawing_dimension_import, "insert_marked_dimensions", entire)
     monkeypatch.setattr(
         _drawing_dimension_import,
-        "dimension_name",
-        lambda adapter, item: "CutEndBreak" if item is break_annotation else "",
-    )
-    monkeypatch.setattr(
-        _drawing_dimensions,
         "dimension_name",
         lambda adapter, item: "CutEndBreak" if item is break_annotation else "",
     )

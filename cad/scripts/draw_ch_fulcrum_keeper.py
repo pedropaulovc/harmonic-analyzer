@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the fulcrum-shaft end keeper.
 
 The SLDPRT remains authoritative.  This recipe supplies only the keeper's
-views, dimension layout, hole callout, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, dimension layout, hole callout, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The sheet runs at 2:1 (the bracket is ~16.5 x 32.2 x 14); the isometric
 carries an explicit 1:1 override so it stays clear of the title block.  Four
@@ -25,26 +25,32 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
-import ch_channel_assembly_steps as steps
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
+
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimensions import set_dimension_callouts
-from _drawing_hole_callout import add_native_hole_callout
-from _drawing_notes import add_property_linked_note
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leaders import set_near_side_diameter
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
+import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
     BORE_PAIR_CALLOUT,
     CBORE_DIA_MM,
@@ -55,11 +61,6 @@ from ch_fulcrum_keeper_spec import (
     SCREW_FROM_SIDE,
     SCREW_X,
     SET_SCREW_HOLE_SPEC,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    dimension_name,
-    place_view,
 )
 
 

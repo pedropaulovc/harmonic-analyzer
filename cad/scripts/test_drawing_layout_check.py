@@ -2,7 +2,7 @@
 
 Exercises the collision / sheet-overflow logic on plain boxes so a regression in
 the audit is caught without a COM seat. The live element collection lives in
-``_drawing_common`` and is exercised end-to-end by the drawing builds.
+``_drawing_layout_collect`` and is exercised end-to-end by the drawing builds.
 
 The ``*_real_boxes_*`` cases are positive controls: the element boxes measured
 off the shipped, visually-inspected lever-bushing and platen-guide drawings must
@@ -12,43 +12,21 @@ print.
 
 from __future__ import annotations
 
+import ast
 import math as _math
+from pathlib import Path
 import sys
 from types import SimpleNamespace
 
 import pytest
+import solidworks_mcp.adapters
 
 import _config
-import _drawing_attachment
 import _drawing_balloon_display
 import _drawing_balloons
-import _drawing_centerline
 import _drawing_common
-import _drawing_view_display
-import _drawing_dimension_import
-import _drawing_dimensions
-import _drawing_edge_dimensions
 import _drawing_edges
-import _drawing_finish
-import _drawing_gdt
-import _drawing_gdt_layout
-import _drawing_hole_callout
 import _drawing_layout_audit
-import _drawing_layout_collect
-import _drawing_leader_notes
-import _drawing_notes
-import _drawing_projection
-import _drawing_scan
-import _drawing_sections
-import _drawing_selection
-import _drawing_selection_probe
-import _drawing_sheets
-import _drawing_tables
-import _drawing_view_configuration
-import _layout_audit
-import _telemetry
-import solidworks_mcp.adapters
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
     DEFAULT_OVERLAP_TOL_M,
@@ -60,12 +38,18 @@ from _drawing_layout_check import (
     LeaderSegment,
     Overlap,
     audit_layout,
-    format_findings,
     find_leader_crossings,
     find_leader_leader_crossings,
     find_overflows,
     find_overlaps,
+    format_findings,
 )
+import _drawing_layout_collect
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+import _drawing_scan
+import _drawing_view_display
+import _layout_audit
+import _telemetry
 
 
 # ASME B sheet used by every project drawing (meters).
@@ -199,27 +183,7 @@ def test_hidden_lines_visible_forces_a_verified_hlr_transition(monkeypatch):
         SetDisplayMode4=set_mode,
         GetDisplayMode2=lambda: mode["value"],
     )
-    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
 
     _drawing_view_display.set_hidden_lines_visible(_FakeAdapter(None), view)
 
@@ -232,27 +196,7 @@ def test_hidden_lines_visible_rejects_a_stale_hlv_transition(monkeypatch):
         SetDisplayMode4=lambda _parent, value, *_rest: calls.append(value) or False,
         GetDisplayMode2=lambda: _drawing_view_display._SW_HLV,
     )
-    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
 
     with pytest.raises(RuntimeError, match="transition drawing view through HLR"):
         _drawing_view_display.set_hidden_lines_visible(_FakeAdapter(None), view)
@@ -291,68 +235,12 @@ def _sheet_views(monkeypatch, views_by_sheet):
     ddoc = SimpleNamespace(
         ActivateSheet=lambda name: active.update(sheet=name) or name in views_by_sheet
     )
-    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: ddoc)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: ddoc)
-    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: ddoc)
     monkeypatch.setattr(
         _drawing_common, "iter_views", lambda _adapter: iter(views_by_sheet[active["sheet"]])
     )
     monkeypatch.setattr(
-        _drawing_layout_collect, "iter_views", lambda _adapter: iter(views_by_sheet[active["sheet"]])
-    )
-    monkeypatch.setattr(
-        _drawing_sheets, "iter_views", lambda _adapter: iter(views_by_sheet[active["sheet"]])
-    )
-    monkeypatch.setattr(
-        _drawing_balloons, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
         _drawing_common, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
-        _drawing_dimension_import, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
-        _drawing_edge_dimensions, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
-        _drawing_gdt, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
-        _drawing_layout_collect, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
-        _drawing_leader_notes, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
-        _drawing_sections, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
-        _drawing_selection, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
-        _drawing_selection_probe, "view_name", lambda _adapter, view: view.GetName2()
-    )
-    monkeypatch.setattr(
-        _drawing_tables, "view_name", lambda _adapter, view: view.GetName2()
     )
 
 
@@ -480,7 +368,7 @@ def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
     sheet_gdt = SimpleNamespace(
         GetLeaderCount=0,
         GetSpecificAnnotation=SimpleNamespace(GetPosition=[-0.02, 0.0, 0.0]),
-        GetType=_drawing_gdt_layout._ANNOT_GTOL,
+        GetType=_drawing_layout_collect._ANNOT_GTOL,
         GetName="template-gdt",
         GetPosition=[-0.02, 0.0, 0.0],
         OwnerType=1,
@@ -1008,7 +896,7 @@ def _datum_tag(x, y, lines, label="A", *, primitives=()):
     )
     return SimpleNamespace(
         GetPosition=[x, y, 0.0],
-        GetType=lambda: _drawing_gdt_layout._ANNOT_DATUM,
+        GetType=lambda: _drawing_layout_collect._ANNOT_DATUM,
         GetName=lambda: label,
         GetLeaderCount=lambda: 0,  # the whole point: it registers none
         GetSpecificAnnotation=lambda: spec,
@@ -1265,7 +1153,7 @@ def _gdt(x, y, kind, label):
     annotation = SimpleNamespace(
         GetPosition=[x, y, 0.0], GetType=lambda k=kind: k, GetName=lambda n=label: n
     )
-    return _drawing_gdt_layout._gdt_element(_FakeAdapter(None), annotation, label, kind)
+    return _drawing_layout_collect._gdt_element(_FakeAdapter(None), annotation, label, kind)
 
 
 def test_surface_finish_box_matches_the_measured_symbol_anatomy():
@@ -1275,12 +1163,12 @@ def test_surface_finish_box_matches_the_measured_symbol_anatomy():
     is the wrong SHAPE here, not merely the wrong size.
     """
     ax, ay = 0.100, 0.200
-    element = _gdt(ax, ay, _drawing_gdt_layout._ANNOT_SFSYM, "Ra")
+    element = _gdt(ax, ay, _drawing_layout_collect._ANNOT_SFSYM, "Ra")
 
-    assert element.xmin == ax - _drawing_gdt_layout._SF_BOX_LEFT_M
-    assert element.xmax == ax + _drawing_gdt_layout._SF_BOX_RIGHT_M
+    assert element.xmin == ax - _drawing_layout_collect._SF_BOX_LEFT_M
+    assert element.xmax == ax + _drawing_layout_collect._SF_BOX_RIGHT_M
     assert element.ymin == ay  # the vertex IS the bottom edge
-    assert element.ymax == ay + _drawing_gdt_layout._SF_BOX_UP_M
+    assert element.ymax == ay + _drawing_layout_collect._SF_BOX_UP_M
     # The body is far wider than tall and sits entirely above its anchor.
     assert element.xmax - element.xmin > 2 * (element.ymax - element.ymin)
 
@@ -1310,7 +1198,7 @@ def _gdt_with_geometry(
     )
     if primitives is None:
         annotation.GetDisplayData = lambda: _display_data(lines, triangles, texts)
-    return _drawing_gdt_layout._gdt_element(_FakeAdapter(None), annotation, label, kind)
+    return _drawing_layout_collect._gdt_element(_FakeAdapter(None), annotation, label, kind)
 
 
 def test_control_frame_is_measured_from_its_rendered_lines():
@@ -1335,7 +1223,7 @@ def test_control_frame_is_measured_from_its_rendered_lines():
         ((0.1137, 0.0865), (0.1049, 0.1268)),
     ]  # diagonal
     el = _gdt_with_geometry(
-        ax, ay, _drawing_gdt_layout._ANNOT_GTOL, "pos", lines=frame + leader
+        ax, ay, _drawing_layout_collect._ANNOT_GTOL, "pos", lines=frame + leader
     )
 
     # The FRAME hangs down-right of the anchor (its top-left corner), so the
@@ -1365,7 +1253,7 @@ def test_datum_tag_box_spans_its_leader_and_triangle():
     leader = [((ax, 0.1562), (ax, ay))]
     tri = [((0.2086, 0.1537), (0.2114, 0.1537), (0.2100, 0.1562))]
     el = _gdt_with_geometry(
-        ax, ay, _drawing_gdt_layout._ANNOT_DATUM, "A", lines=box + leader, triangles=tri
+        ax, ay, _drawing_layout_collect._ANNOT_DATUM, "A", lines=box + leader, triangles=tri
     )
 
     assert el.ymin == pytest.approx(0.1366)  # box bottom
@@ -1419,12 +1307,12 @@ def test_a_leadered_frames_igtol_primitives_never_box_it(monkeypatch):
     nominal square at its position, and says so in a trace event."""
     events = _recorded_events(monkeypatch)
     el = _gdt_with_geometry(
-        0.065, 0.232, _drawing_gdt_layout._ANNOT_GTOL, "cylindricity",
+        0.065, 0.232, _drawing_layout_collect._ANNOT_GTOL, "cylindricity",
         primitives=_MHA062_CYLINDRICITY_PRIMITIVES,
     )
     placeholder = (0.062808, 0.208112, 0.069883, 0.215112)
     assert (el.xmin, el.ymin, el.xmax, el.ymax) != pytest.approx(placeholder)
-    half = _drawing_gdt_layout._NOMINAL_GDT_HALF_M
+    half = _drawing_layout_collect._NOMINAL_GDT_HALF_M
     assert (el.xmin, el.ymax) == pytest.approx((0.065 - half, 0.232 + half))
     assert [(name, attrs["symbol"]) for name, attrs in events] == [("gdt_box.fallback", "cylindricity")]
 
@@ -1483,7 +1371,7 @@ def test_a_frame_is_boxed_from_its_display_data():
     top-left at GetPosition) plus its leader down to (114.63, 140.63)."""
     texts = [(t, (x * MM, y * MM), h * MM) for t, (x, y), h in _KNIFE_FCF_TEXTS]
     el = _gdt_with_geometry(
-        0.147, 0.16863, _drawing_gdt_layout._ANNOT_GTOL, "position",
+        0.147, 0.16863, _drawing_layout_collect._ANNOT_GTOL, "position",
         lines=_m(_KNIFE_FCF_LINES), texts=texts,
     )
     assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx(
@@ -1495,17 +1383,17 @@ def test_a_frame_attached_to_a_dimension_is_boxed_from_its_display_data():
     """Main's review: the dimension-attached fallback is a DATUM rule. A frame
     hung under a dimension reads its display data like any other; the nominal
     square is wrong for an FCF by construction."""
-    dimension = _drawing_gdt_layout._SEL_DIMENSION
+    dimension = _drawing_layout_collect._SEL_DIMENSION
     frame = _gdt_with_geometry(
-        0.147, 0.16863, _drawing_gdt_layout._ANNOT_GTOL, "position",
+        0.147, 0.16863, _drawing_layout_collect._ANNOT_GTOL, "position",
         lines=_m(_KNIFE_FCF_LINES), attached_to=(dimension,),
     )
     assert (frame.xmin, frame.xmax) == pytest.approx((0.11463, 0.17641))
     datum = _gdt_with_geometry(
-        0.115, 0.18737, _drawing_gdt_layout._ANNOT_DATUM, "A",
+        0.115, 0.18737, _drawing_layout_collect._ANNOT_DATUM, "A",
         lines=_m(_KNIFE_DATUM_LINES), attached_to=(dimension,),
     )
-    half = _drawing_gdt_layout._NOMINAL_GDT_HALF_M
+    half = _drawing_layout_collect._NOMINAL_GDT_HALF_M
     assert (datum.xmin, datum.xmax) == pytest.approx((0.115 - half, 0.115 + half))
 
 
@@ -1515,7 +1403,7 @@ def test_a_datum_tag_is_boxed_and_led_from_its_display_data():
     is set aside."""
     tri = [((0.1164, 0.16937), (0.1136, 0.16937), (0.1150, 0.17182))]
     el = _gdt_with_geometry(
-        0.115, 0.18737, _drawing_gdt_layout._ANNOT_DATUM, "A",
+        0.115, 0.18737, _drawing_layout_collect._ANNOT_DATUM, "A",
         lines=_m(_KNIFE_DATUM_LINES), triangles=tri,
         texts=[("A", (0.11327, 0.18809), 0.0035)],
     )
@@ -1563,7 +1451,7 @@ def test_mha062_cylindricity_frame_is_boxed_where_it_prints():
         ("0.01", (0.074822, 0.225722), 0.0035, 0.009051),
     ]
     el = _gdt_with_geometry(
-        0.065, 0.232, _drawing_gdt_layout._ANNOT_GTOL, "cylindricity",
+        0.065, 0.232, _drawing_layout_collect._ANNOT_GTOL, "cylindricity",
         lines=_MHA062_CYLINDRICITY, texts=texts,
     )
     assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.05865, 0.214826, 0.085295, 0.232))
@@ -1584,7 +1472,7 @@ def test_mha062_crown_frame_carries_its_below_frame_text_at_its_own_width(monkey
     box = _layout_audit.display_box({**display, "lines": []})  # the text alone
     assert (box.xmin, box.xmax) == pytest.approx((0.245, 0.27914))
     el = _gdt_with_geometry(
-        0.245, 0.228, _drawing_gdt_layout._ANNOT_GTOL, "crown", lines=_MHA062_CROWN, texts=texts
+        0.245, 0.228, _drawing_layout_collect._ANNOT_GTOL, "crown", lines=_MHA062_CROWN, texts=texts
     )
     assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.245, 0.206399, 0.28745, 0.228))
     assert not [name for name, _attrs in events if name == "gdt_box.text_estimated"]
@@ -1593,7 +1481,7 @@ def test_mha062_crown_frame_carries_its_below_frame_text_at_its_own_width(monkey
 def test_a_run_without_a_reported_width_is_estimated_and_logged(monkeypatch):
     events = _recorded_events(monkeypatch)
     _gdt_with_geometry(
-        0.245, 0.228, _drawing_gdt_layout._ANNOT_GTOL, "crown", lines=_MHA062_CROWN,
+        0.245, 0.228, _drawing_layout_collect._ANNOT_GTOL, "crown", lines=_MHA062_CROWN,
         texts=[("BOTH CROWNS", (0.245, 0.215444), 0.0035)],
     )
     assert [(name, attrs) for name, attrs in events] == [
@@ -1611,7 +1499,7 @@ def test_mha062_datum_a_is_boxed_and_led_where_it_prints():
     """Rendered: box centred on its leader at x 0.055, 0.0514..0.0585 x
     0.2293..0.2360, no jog. The display data says exactly that."""
     el = _gdt_with_geometry(
-        0.055, 0.229, _drawing_gdt_layout._ANNOT_DATUM, "A", lines=_MHA062_DATUM_A,
+        0.055, 0.229, _drawing_layout_collect._ANNOT_DATUM, "A", lines=_MHA062_DATUM_A,
         triangles=[((0.0564, 0.2177), (0.0536, 0.2177), (0.055, 0.22015))],
         texts=[("A", (0.053274, 0.229722), 0.0035, 0.003451)],
     )
@@ -1628,8 +1516,8 @@ def test_unmeasurable_gdt_falls_back_to_the_nominal_square():
     A dropped symbol is worse than a coarse one: it leaves the audit silent on a
     symbol placed clear off the sheet.
     """
-    half = _drawing_gdt_layout._NOMINAL_GDT_HALF_M
-    for kind in (_drawing_gdt_layout._ANNOT_DATUM, _drawing_gdt_layout._ANNOT_GTOL):
+    half = _drawing_layout_collect._NOMINAL_GDT_HALF_M
+    for kind in (_drawing_layout_collect._ANNOT_DATUM, _drawing_layout_collect._ANNOT_GTOL):
         element = _gdt(0.100, 0.200, kind, "tag")
         assert (element.xmin, element.ymin) == (0.100 - half, 0.200 - half)
         assert (element.xmax, element.ymax) == (0.100 + half, 0.200 + half)
@@ -1642,13 +1530,13 @@ def test_surface_finish_over_the_top_border_is_now_caught():
     +/-8 mm box topped out at 0.263 and reported clean, while the real body
     reached ay+0.018 = 0.273 and printed over the border.
     """
-    ra = _gdt(0.030, 0.255, _drawing_gdt_layout._ANNOT_SFSYM, "Ra")
+    ra = _gdt(0.030, 0.255, _drawing_layout_collect._ANNOT_SFSYM, "Ra")
     overflows = find_overflows([ra], ZONE_REGION)
     assert overflows, "the Ra body crosses the top zone bound and must be flagged"
     assert "top" in format_findings([], overflows).lower()
 
     # The old symmetric box is the negative control: it does NOT reach the bound.
-    half = _drawing_gdt_layout._NOMINAL_GDT_HALF_M
+    half = _drawing_layout_collect._NOMINAL_GDT_HALF_M
     old = _el(
         "Ra",
         0.030 - half,
@@ -1666,7 +1554,7 @@ def test_surface_finish_over_the_top_border_is_now_caught():
 def test_surface_finish_clear_of_the_border_still_passes():
     """Positive control: draw-D's verified-safe bounds must audit clean."""
     for ax, ay in ((0.045, 0.1045), (0.133, 0.1992)):
-        ra = _gdt(ax, ay, _drawing_gdt_layout._ANNOT_SFSYM, "Ra")
+        ra = _gdt(ax, ay, _drawing_layout_collect._ANNOT_SFSYM, "Ra")
         assert not find_overflows([ra], ZONE_REGION)
 
 
@@ -1811,7 +1699,29 @@ def test_no_sheet_is_exempt_from_a_leader_crossing(monkeypatch, stem):
 def test_the_grandfather_machinery_is_gone():
     """A tripwire on the retirement: re-adding an allowlist must be a deliberate
     act that trips a test, not a quiet way to make a red build green."""
-    assert not hasattr(_drawing_layout_collect, "_KNOWN_LEADER_CROSSINGS")
+    sources = sorted(Path(__file__).resolve().parent.glob("_drawing_*.py"))
+    assert sources, "no drawing-helper sources found"
+    assert {"_drawing_common.py", "_drawing_layout_collect.py"} <= {
+        source.name for source in sources
+    }
+    for source in sources:
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        bindings = {
+            node.id
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+        }
+        bindings.update(
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        )
+        bindings.update(
+            node.asname or node.name.split(".")[0]
+            for node in ast.walk(tree)
+            if isinstance(node, ast.alias)
+        )
+        assert "_KNOWN_LEADER_CROSSINGS" not in bindings, source
 
 
 # --- the shared-terminus exemption must not swallow real crossings -----------
@@ -2120,27 +2030,7 @@ class _MovingBalloon(_FakeNote):
 
 
 def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(monkeypatch):
-    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
     note = _MovingBalloon()
     model = SimpleNamespace(
         GetCurrentSheet=lambda: SimpleNamespace(GetMagneticLinesCount=lambda: 0),
@@ -2164,27 +2054,7 @@ def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(m
 
 @pytest.mark.parametrize("pixels_per_metre,accepted", ((1000.0, True), (2000.0, False)))
 def test_balloon_placement_acceptance_tracks_current_viewport_resolution(monkeypatch, pixels_per_metre, accepted):
-    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
     note = _MovingBalloon(pixel_error_m=0.00075)
     model = SimpleNamespace(
         GetCurrentSheet=lambda: SimpleNamespace(GetMagneticLinesCount=lambda: 0),
@@ -2621,21 +2491,8 @@ def _balloon(monkeypatch, sheet, view, anchors, items=(("dt-cone-gear", "1"),)):
 
     events = []
     monkeypatch.setattr(_drawing_balloons, "model_points_in_view", project)
-    monkeypatch.setattr(_drawing_edges, "model_points_in_view", project)
-    monkeypatch.setattr(_drawing_projection, "model_points_in_view", project)
     monkeypatch.setattr(_drawing_balloons, "_spread_balloons", lambda *a, **k: None)
     monkeypatch.setattr(_drawing_balloons, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_centerline, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_dimension_import, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_finish, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_gdt, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_hole_callout, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_leader_notes, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_sections, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_tables, "rebuild_drawing", lambda *a, **k: None)
-    monkeypatch.setattr(_drawing_view_configuration, "rebuild_drawing", lambda *a, **k: None)
     monkeypatch.setattr(
         _drawing_balloons, "_balloon_item_number", lambda _adapter, note, label: note.item
     )

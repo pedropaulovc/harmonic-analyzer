@@ -1,15 +1,17 @@
 """Property-linked drawing notes and aligned note schedules.
 
-Separate module so edits re-key only recipes that use this concern.
+Recipes share property-linked notes and aligned schedules here without
+depending on leader attachment or dimension-authoring code.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Sequence
+from typing import Any, Sequence
+
+from solidworks_mcp.adapters.solidworks.drawing import add_note
+
 from _com import _early_bound
 import _telemetry
-from solidworks_mcp.adapters.solidworks.drawing import add_note
 
 
 def property_link(property_name: str) -> str:

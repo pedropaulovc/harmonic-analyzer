@@ -1,36 +1,32 @@
 """Drawing BOM balloon anchors, placement and landing verification.
 
-Separate module so edits re-key only recipes that use this concern.
+Assembly BOM drawings plan component anchors and prove balloon landings here
+without re-keying ordinary part annotations.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Iterable
-from typing import Literal
-from typing import Mapping
-from pathlib import Path
-from typing import Sequence
-from _com import _bind
-from _com import _com_invoke
-from _com import _early_bound
-from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
-from dataclasses import dataclass
-import math
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from dataclasses import dataclass, replace
 from itertools import product
+import math
+from pathlib import Path
 import re
-from dataclasses import replace
 import sys
+from typing import Any, Iterable, Literal, Mapping, Sequence
+
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
 from solidworks_mcp.adapters.solidworks.drawing import view_name
+
+from _com import _bind, _com_invoke, _early_bound
 from _drawing_attachment import _assert_leader_lands
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_common import rebuild_drawing
 from _drawing_projection import model_points_in_view
 from _drawing_scan import _HIT_ZOOM_HALF, _span_scan_attrs, _zoomed_on
 from _drawing_selection import _activate_and_select_view, _select_view_entity
+import _telemetry
 
 
 # Ink gap left between two balloon circles pushed apart on the ring. Their radius

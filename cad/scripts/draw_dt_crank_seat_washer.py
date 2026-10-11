@@ -15,19 +15,21 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -36,10 +38,12 @@ from _drawing_dimensions import (
 )
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
-from dt_drive_train_steps import step_ref
+import _telemetry
 from dt_crank_seat_washer_spec import (
     BORE_CALLOUT,
     DRAWING_DIMENSIONS,
@@ -50,10 +54,7 @@ from dt_crank_seat_washer_spec import (
     THICKNESS,
     THICKNESS_CALLOUT,
 )
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
+from dt_drive_train_steps import step_ref
 
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_seat_washer"]

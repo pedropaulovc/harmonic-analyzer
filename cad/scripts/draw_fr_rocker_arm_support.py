@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the rocker-arm support.
 
 The SLDPRT remains authoritative.  This recipe supplies only the support's
-views, dimension layout, hole table, and make-critical annotations; every
-shared sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, dimension layout, hole table, and make-critical annotations;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The support is a painted gray-iron frame with a trapezoidal wall, two opposed
 pockets leaving a 9.525 central web, a through cavity, a chamfered window rim,
@@ -23,22 +23,26 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    place_view,
+    view_name,
+    visible_component_entities,
+)
 
-import _config
-import _telemetry
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
+import _config
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
 from _drawing_edge_dimensions import add_edge_dimension
@@ -46,17 +50,17 @@ from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
+from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_tables import create_view_theoretical_datum, insert_hole_table
-from solidworks_mcp.adapters.solidworks.drawing import (
-    view_name,
-    visible_component_entities,
-)
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gtol_cylinder import CylinderFace
-from _hole_spec import blind_cut_dia_mm
 from _gtol_face_resolve import resolve_faces
+from _hole_spec import blind_cut_dia_mm
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from build_fr_rocker_arm_support import (
     BIG,
     BOSS_DEPTH,
@@ -64,20 +68,14 @@ from build_fr_rocker_arm_support import (
     CHAMFER,
     DRAWING_DIMENSIONS,
     HALF_Y,
-    HOLES,
     HOLE_DIA,
+    HOLES,
     NARROW,
     WEB,
     WIDE,
 )
 from fr_rocker_arm_support_drawing_spec import SURFACE_FINISHES
 from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB_PLACES
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    place_view,
-)
 
 
 SPEC = DRAWINGS_BY_NAME["fr_rocker_arm_support"]

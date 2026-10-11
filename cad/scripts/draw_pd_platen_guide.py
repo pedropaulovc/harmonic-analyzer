@@ -1,8 +1,9 @@
 r"""Create the curated machinist drawing for the platen guide.
 
 The SLDPRT remains authoritative.  This recipe supplies only the platen-guide
-views, dimensions, hole groups, GD&T and surface symbol; shared sheet/template,
-leader, reopen, and artifact behavior lives in ``_drawing_common``.
+views, dimensions, hole groups, GD&T and surface symbol;
+sheet/template and export behavior lives in ``_drawing_common``.
+Leader behavior lives in ``_drawing_attachment``.
 
 Run with SolidWorks open::
 
@@ -15,27 +16,22 @@ import argparse
 import sys
 from typing import Any
 
-from pd_platen_guide_spec import (
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION_BY_NAME,
-    GEOMETRIC_TOLERANCES_MM,
-    SURFACE_FINISHES,
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    place_view,
+    remove_notes_matching,
 )
 
-import _telemetry
-from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision
 from _drawing_edges import visible_view_entities
@@ -43,18 +39,25 @@ from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
-from _drawing_tables import insert_hole_table
-from _surface_finish import surface_finish_by_key
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_pd_platen_guide import GUIDE_LENGTH
-from build_pd_platen_guide import HOLE_X as REAR_X
-from build_pd_platen_guide import SCREW_STATION_X as FRONT_X
-from pd_platen_guide_spec import TAPPED_HOLE_SPEC
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    place_view,
-    remove_notes_matching,
+from _drawing_tables import insert_hole_table
+from _drawing_view_display import set_hidden_lines_removed
+from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
+from _paths import CAD_ROOT
+from _session import run_build
+from _surface_finish import surface_finish_by_key
+import _telemetry
+from build_pd_platen_guide import (
+    GUIDE_LENGTH,
+    HOLE_X as REAR_X,
+    SCREW_STATION_X as FRONT_X,
+)
+from pd_platen_guide_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    GEOMETRIC_TOLERANCES_MM,
+    SURFACE_FINISHES,
+    TAPPED_HOLE_SPEC,
 )
 
 

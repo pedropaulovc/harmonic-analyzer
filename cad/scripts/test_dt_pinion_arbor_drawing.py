@@ -2010,9 +2010,7 @@ def test_a_journal_land_the_model_does_not_carry_fails_loud(monkeypatch) -> None
 
 
 def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypatch) -> None:
-    import _drawing_balloons
     import _drawing_edges
-    import _drawing_projection
 
     face = _ShaftFace(spec.SHAFT_DIA, 0.0, 20.0)
     lower = _Silhouette(face, -1.0)
@@ -2021,17 +2019,7 @@ def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypat
     stub.ends = (stub.ends[0], (0.0, stub.ends[1][1], 0.015))
     view = _ProfileView([lower, stub])
     monkeypatch.setattr(
-        _drawing_balloons,
-        "model_points_in_view",
-        lambda adapter, v, points, *, label, names=None: [v.sheet(p) for p in points],
-    )
-    monkeypatch.setattr(
         _drawing_edges,
-        "model_points_in_view",
-        lambda adapter, v, points, *, label, names=None: [v.sheet(p) for p in points],
-    )
-    monkeypatch.setattr(
-        _drawing_projection,
         "model_points_in_view",
         lambda adapter, v, points, *, label, names=None: [v.sheet(p) for p in points],
     )

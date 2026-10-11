@@ -1,11 +1,13 @@
 """Drawing-sheet drawable regions and zone margins.
 
-Separate module so edits re-key only recipes that use this concern.
+Annotation placement and layout checks share template margins here without
+making either depend on element collection.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
 from _drawing_layout_check import DrawableRegion
 import _telemetry
 

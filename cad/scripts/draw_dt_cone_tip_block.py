@@ -3,40 +3,48 @@ r"""Create the simplicity-policy machinist drawing for the cone tip block."""
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
+from enum import Enum
 import math
 import re
 import sys
-from dataclasses import dataclass
-from enum import Enum
 from typing import Any
 
-import _drawing_hidden_sketches as hidden_sketches
-import _drawing_leaders
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
+import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
+import _drawing_leaders
 from _drawing_projection import model_point_in_view
-from _drawing_sections import create_section_view
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     ADJUSTER_BORE_DIA,
@@ -61,13 +69,6 @@ from dt_cone_tip_block_spec import (
     SLIT_W,
     SURFACE_FINISHES,
     printed_value_text,
-)
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    place_view,
-    view_name,
 )
 
 

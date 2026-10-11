@@ -1,15 +1,18 @@
 """Offline contracts for the paper-drive assembly and its drawing (MHA-PD-000)."""
 
+from itertools import product
 import math
 import re
-from itertools import product
 
 import pytest
 
 import _assembly
+from _assembly_contract import assembly_contract
 import _chain as chain
 import _config
 import _drawing_balloons
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 import build_pd_paper_drive_assembly as assembly
 import draw_pd_paper_drive_assembly as drawing
 import dt_drive_train_steps
@@ -18,16 +21,13 @@ import fr_nameplate_spec as nameplate
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
 import pd_transgear_drive_collar_spec as collar
-import transgear_cluster_fit as cluster_fit
 import pd_transgear_front_bushing_spec as front_bushing
-import vn_transgear_knob_cup_pin_spec as cup_pin
 import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
 import pd_transgear_rear_bushing_spec as rear_bushing
 import pd_transgear_removable_spec as sprocket
-from _assembly_contract import assembly_contract
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+import transgear_cluster_fit as cluster_fit
+import vn_transgear_knob_cup_pin_spec as cup_pin
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 # Default-format note text, measured on r743-rocker-fix3's render (leaf

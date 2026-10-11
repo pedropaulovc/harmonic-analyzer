@@ -18,25 +18,26 @@ import sys
 import textwrap
 from typing import Any
 
-import _config
-import _telemetry
-import ch_channel_assembly_steps as steps
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+
 from _check import check
 from _com import _early_bound
-from _session import run_build
+import _config
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
 )
+from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_configuration import (
     ViewRole,
     apply_view_configuration,
     assert_full_detail_view,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
-from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
+from _session import run_build
+import _telemetry
+import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_PLACES,
@@ -46,8 +47,9 @@ from ch_fulcrum_keeper_spec import (
     PAIR_REAMER_DIA_IN,
     PAIR_REAMER_OAL_IN,
 )
-from channel_frame_geom import LEVER_FULCRUM_XY
+from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
 from ch_pivot_shaft_spec import DOME_HEIGHT
+from channel_frame_geom import LEVER_FULCRUM_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
     COUNT,
@@ -55,7 +57,6 @@ from rocker_bank_layout import (
     ROCKER_SPRING_SET,
     STACK_L20_ACCEPT,
 )
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["ch_channel_assembly"]

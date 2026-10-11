@@ -12,12 +12,12 @@ Learned building the crank-arm and rocker-arm-support prints (2026-07-11, PRs #2
 
 1. **Always pass an explicit `scale=` to `place_view`.** A view placed without one can silently auto-scale (the rocker-arm-support bottom view came in at 1:2 on a 1:1 sheet), which shifts every coordinate-based `SelectByID2` pick on that view. Symptom: "failed to select … vertex/edge" with coordinates that look right.
 2. **Hole-table edge picks must land ON the circle's rim**, not the hole center — offset the pick by the hole radius (tap-drill radius for wizard holes).
-3. **`IView.GetOutline` pads the geometry with a whitespace margin** — never derive edge-pick coordinates from it (the submodule's `add_overall_dimension` does, and misses). Use `_drawing_common.add_edge_dimension` with explicit sheet points computed from the known layout.
+3. **`IView.GetOutline` pads the geometry with a whitespace margin** — never derive edge-pick coordinates from it (the submodule's `add_overall_dimension` does, and misses). Use `_drawing_edge_dimensions.add_edge_dimension` with explicit sheet points computed from the known layout.
 4. **A chamfer that touches the datum corner moves the hole-table origin.** The rocker support's 1.27 rim chamfer trims the foot seat to 175.26×60.96, so X/Y LOCs measure from the trimmed corner — self-consistent with the physical part, but state it in a note or the pattern reads asymmetric.
 5. **A through-tapped Hole Wizard hole renders "⤓ 0.000" thread depth in the native hole table** — add a note ("DEPTH 0.000 MEANS TAPPED THRU") rather than fighting the callout.
 6. **Sheet-size budget:** a 178 mm part with four views does NOT fit ASME B at 1:1 (notes collide, table clips the border) — pick sheet scale for the whole sheet (1:2) instead of per-view overrides, so the title-block `$PRP:"SW-Sheet Scale"` stays honest. ~5.3 mm per note line, ~2.3 mm per character at the default template font.
 
-Learned building the drawing **layout audit** (`_drawing_layout_check.py` + `_drawing_common.collect_layout_elements`, PR #269, 2026-07-12) — how drawing elements are actually laid out in COM:
+Learned building the drawing **layout audit** (`_drawing_layout_check.py` + `_drawing_layout_collect.collect_layout_elements`, PR #269, 2026-07-12) — how drawing elements are actually laid out in COM:
 
 7. **Hole tables anchor to the SHEET view, not the drawing view they tabulate.** `IView.GetAnnotations()` does NOT return tables — use `IView.GetTableAnnotations()`, and scan the sheet view (`GetFirstView`) for them, not just the real views (`InsertHoleTable3` on a view still parents the table to the sheet). Table box (TopLeft anchor): position from the table's `GetAnnotation().GetPosition()` is the top-left corner; width = Σ`GetColumnWidth(i)`, height = Σ`GetRowHeight(i)`, box grows right and DOWN.
 8. **Free notes are OWNED by whatever view was active when `add_note`/`InsertNote` ran** — the general-notes block lands on a drawing view but is positioned far away in the sheet margin, so it is NOT inside that view's `GetOutline`. Enumerate notes per real view via `GetAnnotations()` (type 6 = swNote), box each with `INote.GetExtent()` (6 doubles, LL/UR in sheet meters).
@@ -41,7 +41,7 @@ BOM + auto-balloons):
     view's configuration explicitly afterwards:
     `IBomFeature.SetConfigurations(True, bool_array([True]), bstr_array([cfg]))`
     (the documented path for top-level tables), then rebuild — 8 rows + QTY
-    appear. `_drawing_common.insert_bom_table` owns this.
+    appear. `_drawing_tables.insert_bom_table` owns this.
 16. **`AutoBalloon5` drops balloons for components with no visible geometry in
     the view.** On the HLR front view only 7 of the pen's 8 components
     ballooned (the hanger screw is fully occluded behind the strap). Balloon
@@ -51,7 +51,7 @@ BOM + auto-balloons):
     leader-polluted-box dead end as #13's `IDisplayData`), so neighboring
     balloons' extent boxes always intersect near the view. Never place or box
     balloons by extent: place them by their `IAnnotation.GetPosition` anchor
-    (`_drawing_common._spread_balloons` re-rings them evenly on an ellipse just
+    (`_drawing_balloons._spread_balloons` re-rings them evenly on an ellipse just
     outside the view outline, slots assigned by landed angle so leaders don't
     cross), and the layout audit boxes a `IsBomBalloon` note as a ±6 mm nominal
     square around that anchor (`_NOMINAL_BALLOON_HALF_M`), scope `NON_VIEW`.

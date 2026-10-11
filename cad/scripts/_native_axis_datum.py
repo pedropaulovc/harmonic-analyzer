@@ -11,9 +11,9 @@ import math
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
+from _com import _early_bound
 import _drawing_selection
 import _telemetry
-from _com import _early_bound
 
 
 def _axis_parameters(

@@ -1,8 +1,9 @@
 r"""Create the curated machinist drawing for the ruled measuring stick.
 
 The SLDPRT remains authoritative.  This recipe supplies only the bar's ruled-face
-view, the overall envelope dimensions, and the graduation notes; every shared
-sheet/template, import, curation, and export behavior lives in ``_drawing_common``.
+view, the overall envelope dimensions, and the graduation notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The stick is a half-hard brass bar (200 x 8 x 3) with a 0-10 scale engraved 0.5
 deep across a 142 mm span (14.2 mm pitch, ``build_measuring_stick``), one longer
@@ -23,23 +24,24 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
-import build_ha_measuring_stick as part
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
+import build_ha_measuring_stick as part
 
 
 SPEC = DRAWINGS_BY_NAME["ha_measuring_stick"]

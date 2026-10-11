@@ -1,15 +1,15 @@
 """Drawing scene-probe zoom isolation and aggregate scan-span attributes.
 
-Separate module so edits re-key only recipes that use this concern.
+Annotation picks share isolated zoom probes and scan-span attributes here
+without coupling them to drawing export policy.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Iterator
-from typing import Sequence
-import _telemetry
 import contextlib
+from typing import Any, Iterator, Sequence
+
+import _telemetry
 
 
 def _span_scan_attrs(**attributes: float) -> None:

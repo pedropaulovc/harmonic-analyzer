@@ -7,45 +7,47 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    delete_view,
+    dimension_name,
+    iter_views,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_finish import add_surface_finish
-from _drawing_notes import add_property_linked_note
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from cylinder_bank_layout import ARBOR_DOME_HEIGHT, ARBOR_LENGTH
 from dt_cylinder_gear_shaft_spec import (
+    DOME_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    DOME_CALLOUT,
     LENGTH_CALLOUT,
     SHAFT_DIA,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import (
-    delete_view,
-    iter_views,
-    place_view,
 )
 
 

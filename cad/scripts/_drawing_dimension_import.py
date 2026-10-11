@@ -1,25 +1,26 @@
 """Drawing model-item import and dimension curation.
 
-Separate module so edits re-key only recipes that use this concern.
+Recipes carrying model dimensions share feature import and curation here, while
+hand-authored edge dimensions remain independent.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Iterable
-from typing import Literal
-from typing import Mapping
-from typing import Sequence
-from _com import _early_bound
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
-from solidworks_mcp.adapters.solidworks.drawing import curate_dimensions
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 import math
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 import time
-from solidworks_mcp.adapters.solidworks.drawing import view_name
+from typing import Any, Iterable, Literal, Mapping, Sequence
+
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    curate_dimensions,
+    dimension_name,
+    view_name,
+)
+
+from _com import _early_bound
 from _drawing_common import rebuild_drawing
+import _telemetry
 
 
 # swInsertAnnotation_e flags used by the curated model-item import. Hole Wizard

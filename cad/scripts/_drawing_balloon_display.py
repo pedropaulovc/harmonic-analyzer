@@ -1,13 +1,15 @@
 """Rendered drawing balloon-circle geometry.
 
-Separate module so edits re-key only recipes that use this concern.
+Layout inspection reads rendered balloon circles here independently of assembly
+anchor planning and BOM authoring.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 import math
+from typing import Any
+
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 
 
 def rendered_balloon_circle(note: Any, *, label: str) -> tuple[float, float, float]:

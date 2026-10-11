@@ -1984,6 +1984,7 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
 
 def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
     import ast
+
     import _drawing_hole_callout
 
     native = "<hw-threaddesc>\n<hw-threaddepth>\n<hw-tapdrldia> <hw-tapdrldepth>"

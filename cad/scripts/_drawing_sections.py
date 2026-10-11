@@ -1,17 +1,20 @@
 """Drawing section-view cutting-line creation and verification.
 
-Separate module so edits re-key only recipes that use this concern.
+Sectioned-part drawings create and prove cutting lines here without coupling
+unsectioned sheets to section-authoring changes.
 """
 
 from __future__ import annotations
 
 from typing import Any
-from _com import _early_bound
+
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import view_name
+
+from _com import _early_bound
 from _drawing_common import rebuild_drawing
+import _telemetry
 
 
 # The section cutting line is a GEOMETRIC DATUM, not annotation: the plane it

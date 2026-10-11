@@ -1,11 +1,13 @@
 """Hidden-line drawing-view display modes and verified transitions.
 
-Separate module so edits re-key only recipes that use this concern.
+Hidden-line views pin verified display transitions here while shaded-only
+drawings retain only universal display policy.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
 from _com import _early_bound
 
 

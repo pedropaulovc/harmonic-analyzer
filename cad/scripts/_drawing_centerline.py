@@ -1,15 +1,17 @@
 """Drawing-view centerline authoring.
 
-Separate module so edits re-key only recipes that use this concern.
+Axis and section drawings author native centerlines here without pulling
+section creation into centerline-only sheets.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
 from _com import _early_bound
-import _telemetry
 from _drawing_common import rebuild_drawing
 from _drawing_selection import _select_view_entity
+import _telemetry
 
 
 @_telemetry.traced("drawing.centerline", label_param="label")

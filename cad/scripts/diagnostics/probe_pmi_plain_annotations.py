@@ -34,11 +34,12 @@ if __package__:
     from . import _script_paths  # noqa: F401
 else:
     import _script_paths  # noqa: F401
+from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
+
 from _com import _early_bound, _read_member  # noqa: E402
-from _paths import CAD_ROOT  # noqa: E402
 from _drawing_projection import model_point_in_view  # noqa: E402
 from _drawing_sections import create_section_view  # noqa: E402
-from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
+from _paths import CAD_ROOT  # noqa: E402
 from mg_wheel_axle_spec import (  # noqa: E402
     GEOMETRIC_CONTROLS,
     PART_DATUMS,

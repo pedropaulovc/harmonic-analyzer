@@ -1,9 +1,10 @@
 r"""Create the curated machinist drawing for the pinion swing bracket.
 
 The SLDPRT remains authoritative.  This recipe supplies only the strap's
-views and its dimension/callout placement; every shared sheet/template,
-import, curation and export behaviour lives in ``_drawing_common``, and every
-nominal, decimal place and tolerance band is imported from the model.
+views and its dimension/callout placement;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
+Every nominal, decimal place and tolerance band is imported from the model.
 
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
 bracket carries no datums and no feature-control frames, and it carries no
@@ -37,20 +38,21 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -59,30 +61,30 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
-from _drawing_layout_collect import check_drawing_layout
-from _drawing_sections import create_section_view
-from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
+from _drawing_layout_collect import check_drawing_layout
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_pinion_bracket_spec import (
     ARBOR_BORE,
     C2C,
     CROSS_HOLE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    PIN_DROP,
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
+    PIN_DROP,
     PIVOT_BORE,
     R_END,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

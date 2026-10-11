@@ -1,43 +1,66 @@
 """Universal drawing session, document policy, export and finalization core.
 
-Separate module so edits re-key only recipes that use this concern.
-Only the shared session/finalize core remains here; specialized authoring
-helpers live in concern-specific modules, without a re-export facade.
+Every drawing needs the new_project_drawing/finalize_drawing closure here;
+metadata stamping and process-global center-mark registration share that
+lifecycle rather than adding modules with no useful cache isolation.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Callable
-from _drawing_registry import DRAWING_TEMPLATES
-from _drawing_registry import DrawingLayout
-from typing import Iterable
-from typing import Mapping
-from pathlib import Path
-from typing import Sequence
-from _source_identity import _build_id
-import _config
-from _com import _early_bound
-from _com import _read_member
-import _seat_forensics
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
-from _session import _visible_document_paths
-from _custom_properties import apply_custom_properties
 from dataclasses import dataclass
-from solidworks_mcp.adapters.solidworks.drawing import iter_views
-from _drawing_registry import layout_report_path
 import math
-from solidworks_mcp.adapters.solidworks.drawing import new_drawing
-from solidworks_mcp.adapters.solidworks.drawing import (
-    remove_notes_matching as remove_notes_matching,
-)
-from _drawing_layout_audit import run_layout_audit
-from solidworks_mcp.adapters.solidworks.drawing import save_drawing
-from solidworks_mcp.adapters.solidworks.drawing import set_units_mm
+from pathlib import Path
 import time
-from solidworks_mcp.adapters.solidworks.drawing import view_name
-import _drawing_center_mark_observer  # noqa: F401 -- register the adapter observer
+from typing import Any, Callable, Iterable, Mapping, Sequence
+
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
+from solidworks_mcp.adapters.solidworks.drawing import (
+    iter_views,
+    new_drawing,
+    remove_notes_matching as remove_notes_matching,
+    save_drawing,
+    set_units_mm,
+    view_name,
+)
+
+from _com import _early_bound, _read_member
+import _config
+from _custom_properties import apply_custom_properties
+from _drawing_layout_audit import run_layout_audit
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
+import _seat_forensics
+from _session import _visible_document_paths
+from _source_identity import _build_id
+import _telemetry
+
+
+def _record_center_marks(counts: dict[str, Any]) -> None:
+    """Every auto_center_marks call's centre-mark count, before and after
+    AutoInsertCenterMarks2, as a span event (#913: each mark printed twice on
+    30 views). after == 2 x before would point at a template auto-insert the
+    explicit call repeats; before == 0 at duplicates made some other way.
+
+    The observer is process-global and set when this module is imported, so
+    a script that never imports _drawing_common records nothing (every
+    auto_center_marks caller does). OTel attributes must be primitives: a
+    count whose read raised arrives as None and is sent as -1, named in
+    ``read_failed``.
+    """
+    attributes = {key: value for key, value in counts.items() if value is not None}
+    failed = sorted(key for key, value in counts.items() if value is None)
+    for key in failed:
+        attributes[key] = -1
+    if failed:
+        attributes["read_failed"] = failed
+    _telemetry.event("center_marks.auto_insert", **attributes)
+    _telemetry.debug(
+        f"center marks {counts.get('view')!r}: {counts.get('before')} -> {counts.get('after')}"
+        f" (holes={counts.get('holes')}, slots={counts.get('slots')}, ok={counts.get('ok')})"
+    )
+
+
+_sw_drawing.CENTER_MARK_OBSERVER = _record_center_marks
 
 
 # These ints are READ OFF the installed swconst.tlb, not the published docs: the
@@ -658,6 +681,20 @@ def rebuild_drawing(adapter: Any, *, label: str) -> None:
     is read off ``traces.jsonl`` instead of guessed.
     """
     adapter.currentModel.EditRebuild3()
+
+
+def stamp_drawing_summary(
+    adapter: Any, drawing_model: Any, fields: dict[int, str]
+) -> None:
+    """Write and read-verify the drawing document summary metadata."""
+    model_doc = _sw_type_info.early_bound_or_flag(drawing_model, "IModelDoc2")
+    for field, value in fields.items():
+        # SummaryInfo is a property: early binding splits it into a getter
+        # (SummaryInfo(field)) and a setter (SetSummaryInfo(field, value)).
+        # A 2-arg SummaryInfo(field, value) put only worked under late binding.
+        model_doc.SetSummaryInfo(field, value)
+        if model_doc.SummaryInfo(field) != value:
+            raise RuntimeError(f"drawing summary field {field} did not persist")
 
 
 # An isometric/pictorial view's axis-aligned outline is mostly empty diagonal

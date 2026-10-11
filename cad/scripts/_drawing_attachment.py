@@ -1,13 +1,15 @@
-"""Drawing annotation attachment identity and leader-landing assertions.
+"""Drawing attachment identity, leader styles and landing assertions.
 
-Separate module so edits re-key only recipes that use this concern.
+Datum, finish and callout authors share attachment proofs and leader styles
+here, independently of drawing-session and export policy.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from _com import _early_bound
 import math
+from typing import Any
+
+from _com import _early_bound
 
 
 _SEL_EDGE = 1  # swSelectType_e.swSelEDGES
@@ -17,6 +19,16 @@ _SEL_SILHOUETTE = 46  # swSelectType_e.swSelSILHOUETTES
 
 
 _SEL_FACE = 2  # swSelectType_e.swSelFACES
+
+
+# swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
+# is bent: a straight leader runs at whatever angle its anchor-to-text vector
+# happens to take, which is what drove the old Ra symbol's leader diagonally
+# across two views. A bent leader lands its elbow horizontally at the text.
+_LEADER_BENT = 2
+
+
+_LEADER_SIDE_SMART = 0
 
 
 # How far a leader may land from its requested attachment point.  Measured on

@@ -34,10 +34,6 @@ if __package__:
     from . import _script_paths  # noqa: F401
 else:
     import _script_paths  # noqa: F401
-from _check import check  # noqa: E402
-from _session import run_build  # noqa: E402
-from _drawing_tables import insert_hole_table  # noqa: E402
-from _holes import HoleSpec, _early, _flag, wizard_holes  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import null_callout  # noqa: E402
 from solidworks_mcp.adapters.solidworks.drawing import (  # noqa: E402
     new_drawing,
@@ -45,6 +41,11 @@ from solidworks_mcp.adapters.solidworks.drawing import (  # noqa: E402
     save_drawing,
     set_units_mm,
 )
+
+from _check import check  # noqa: E402
+from _drawing_tables import insert_hole_table  # noqa: E402
+from _holes import HoleSpec, _early, _flag, wizard_holes  # noqa: E402
+from _session import run_build  # noqa: E402
 
 
 REPRO_DIR = (

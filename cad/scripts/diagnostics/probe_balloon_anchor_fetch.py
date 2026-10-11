@@ -26,14 +26,21 @@ if __package__:
     from . import _script_paths  # noqa: F401
 else:
     import _script_paths  # noqa: F401
+from solidworks_mcp.adapters import sw_type_info  # noqa: E402
+from solidworks_mcp.adapters.solidworks.drawing import (  # noqa: E402
+    new_drawing,
+    place_view,
+)
+
 from _check import check  # noqa: E402
 from _com import _early_bound  # noqa: E402
-from _session import run_build  # noqa: E402
-from _drawing_balloons import _drawing_component_children, _drawing_component_stems  # noqa: E402
+from _drawing_balloons import (  # noqa: E402
+    _drawing_component_children,
+    _drawing_component_stems,
+)
 from _drawing_common import set_high_quality_shaded_with_edges  # noqa: E402
 from _drawing_edges import _edge_endpoint_key  # noqa: E402
-from solidworks_mcp.adapters import sw_type_info  # noqa: E402
-from solidworks_mcp.adapters.solidworks.drawing import new_drawing, place_view  # noqa: E402
+from _session import run_build  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[2] / "out" / "reports" / "probe-balloon-anchor.json"
 STEM = "fr-nameplate"

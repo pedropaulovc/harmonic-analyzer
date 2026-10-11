@@ -34,22 +34,24 @@ import math
 import sys
 from typing import Any
 
-from sm_knife_mount_spec import DRAWING_REFERENCE_PRECISION, GEOMETRIC_TOLERANCES_MM
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
+    place_view,
+    remove_notes_matching,
+    view_name,
+)
 
-import _telemetry
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -67,13 +69,16 @@ from _drawing_gdt import (
     assert_frame_datums_defined,
 )
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
-from _drawing_sections import create_section_view
-from solidworks_mcp.adapters.solidworks.drawing import view_name
-from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from build_sm_knife_mount import BORE_CENTRE_DEPTH
 from sm_knife_mount_spec import (
     BLK_BOT,
@@ -82,11 +87,13 @@ from sm_knife_mount_spec import (
     BORE_CY,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
+    GEOMETRIC_TOLERANCES_MM,
     HOLE_ROW_FACE_DISTANCE,
     PIN_HOLE_CALLOUT,
-    PIN_HOLE_PAIR_CALLOUT,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
+    PIN_HOLE_PAIR_CALLOUT,
     PIN_HOLE_SIDE_DISTANCE,
     PIN_HOLE_SPAN,
     PIN_HOLE_X,
@@ -97,12 +104,6 @@ from sm_knife_mount_spec import (
     STUD_TAP_THREAD_DEPTH,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    dimension_name,
-    place_view,
-    remove_notes_matching,
 )
 
 

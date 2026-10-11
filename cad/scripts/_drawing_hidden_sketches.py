@@ -53,18 +53,19 @@ The measured behaviour this code rests on (summing lever, SolidWorks 2026):
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 import contextlib
 import hashlib
-from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+import solidworks_mcp.adapters.solidworks.drawing as _sw_drawing
+
+from _com import _early_bound, _read_member
 import _drawing_common
 import _drawing_dimension_import
-import solidworks_mcp.adapters.solidworks.drawing
 import _telemetry
-from _com import _early_bound, _read_member
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
 # swVisibilityState_e
 _VISIBILITY_HIDDEN = 1
@@ -148,7 +149,7 @@ def _show_hidden_owners(
     adapter: Any, view: Any, features: Sequence[str], *, view_label: str
 ) -> list[str]:
     """Detect the view's part-hidden owner sketches and show them in the view."""
-    name = solidworks_mcp.adapters.solidworks.drawing.view_name(adapter, view)
+    name = _sw_drawing.view_name(adapter, view)
     hidden, report = _model_hidden_sketches(view, features)
     _telemetry.info(f"hidden-sketch check {name}: {report}; showing {hidden}")
     if not hidden:
@@ -247,10 +248,10 @@ def curate_view_dimensions(
         )
         if unnamed:
             annotations = _drawing_dimension_import.delete_unnamed_imports(adapter, annotations)
-    curated = solidworks_mcp.adapters.solidworks.drawing.curate_dimensions(
+    curated = _sw_drawing.curate_dimensions(
         adapter, annotations, delete=extra, reposition=dict(keep)
     )
-    names = [solidworks_mcp.adapters.solidworks.drawing.dimension_name(adapter, annotation) for annotation in curated]
+    names = [_sw_drawing.dimension_name(adapter, annotation) for annotation in curated]
     present = set(names)
     missing = sorted(set(keep) - present)
     if missing:
@@ -271,7 +272,7 @@ def curate_view_dimensions(
     ):
         # See ``_drawing_dimension_import.curate_view_dimensions``: a pass that deleted,
         # or a kept dimension read back off its point, is placed again.
-        curated = solidworks_mcp.adapters.solidworks.drawing.curate_dimensions(adapter, curated, reposition=dict(keep))
+        curated = _sw_drawing.curate_dimensions(adapter, curated, reposition=dict(keep))
     part_shown = [sketch for block in _PART_SHOWN for sketch in block.sketches]
     if hidden or part_shown:
         _assert_dimensions_visible(adapter, curated, hidden, view_label=view_label)
@@ -296,7 +297,7 @@ def curate_view_dimensions(
         block.annotations.extend(
             (view_label, item, annotation)
             for annotation in curated
-            if (item := solidworks_mcp.adapters.solidworks.drawing.dimension_name(adapter, annotation)) in owned
+            if (item := _sw_drawing.dimension_name(adapter, annotation)) in owned
         )
     return curated
 
@@ -305,7 +306,7 @@ def _assert_dimensions_visible(
     adapter: Any, curated: Sequence[Any], hidden: Sequence[str], *, view_label: str
 ) -> None:
     states = {
-        solidworks_mcp.adapters.solidworks.drawing.dimension_name(adapter, annotation): int(
+        _sw_drawing.dimension_name(adapter, annotation): int(
             _read_member(_early_bound(annotation, "IAnnotation"), "Visible")
         )
         for annotation in curated
@@ -359,7 +360,7 @@ def _show_base_view_sketches(
 ) -> None:
     """Show ``sketches`` per view, for good, in the projected view a derived
     view is cut from: the derived view's items select through it."""
-    name = solidworks_mcp.adapters.solidworks.drawing.view_name(adapter, view)
+    name = _sw_drawing.view_name(adapter, view)
     orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
     if _drawing_common.is_pictorial_orientation(orientation):
         raise RuntimeError(

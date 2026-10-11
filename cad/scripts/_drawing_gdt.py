@@ -1,32 +1,37 @@
 """Drawing datums, feature-control frames and model-owned PMI projection.
 
-Separate module so edits re-key only recipes that use this concern.
+Datum and feature-control-frame drawings share GD&T authoring and model PMI
+projection here without re-keying unconstrained sheets.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Sequence
-from _gtol_symbols import GTOL_SYMBOLS as _GTOL_SYMBOLS
-from _com import _early_bound
-from _gtol_frame import gtol_frame_signature as _gtol_frame_signature
-from _gtol_frame import gtol_frame_xml as _gtol_frame_xml
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
-from _gtol_frame import translation_print_problem as _translation_print_problem
 from dataclasses import dataclass
-from solidworks_mcp.adapters.com_variant import dispatch_array
 import math
+from typing import Any, Sequence
+
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import view_name
-from _drawing_annotation_style import _LEADER_BENT, _LEADER_SIDE_SMART
+
+from _com import _early_bound
 from _drawing_attachment import (
     _ATTACHMENT_SELECT_TYPES,
+    _LEADER_BENT,
+    _LEADER_SIDE_SMART,
     _assert_attached_to,
     _assert_leader_lands,
     _expected_pick,
 )
 from _drawing_common import rebuild_drawing
 from _drawing_selection import _select_annotation_entity
+from _gtol_frame import (
+    gtol_frame_signature as _gtol_frame_signature,
+    gtol_frame_xml as _gtol_frame_xml,
+    translation_print_problem as _translation_print_problem,
+)
+from _gtol_symbols import GTOL_SYMBOLS as _GTOL_SYMBOLS
+import _telemetry
 
 
 @dataclass(frozen=True)

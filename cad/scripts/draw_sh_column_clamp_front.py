@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the column clamp, front arc.
 
 The SLDPRT remains authoritative.  This recipe supplies only the front-arc
-views, dimension layout, hole callouts, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, dimension layout, hole callouts, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The sheet runs at 2:1 (the arc is 48 mm ear tip to ear tip); the isometric
 carries an explicit 1:1 override so it stays clear of the title block.  Third
@@ -23,20 +23,19 @@ import math
 import sys
 from typing import Any
 
-from sh_column_clamp_front_spec import GEOMETRIC_TOLERANCES_MM
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
 
-import _telemetry
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     set_basic_dimension,
@@ -48,16 +47,17 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from sh_column_clamp_front_spec import (
     ARC_DEPTH,
     ARC_HEIGHT,
     BORE_RADIUS,
     EAR_HOLE_DIA,
     EAR_HOLE_Z,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
+    GEOMETRIC_TOLERANCES_MM,
 )
 
 

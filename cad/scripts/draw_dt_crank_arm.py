@@ -24,33 +24,34 @@ import re
 import sys
 from typing import Any
 
-import _telemetry
-from _hole_spec import blind_cut_dia_mm
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed
 from _drawing_dimensions import (
     assert_imported_precision,
-    set_dimension_callouts,
     set_arc_endpoints_to_max,
+    set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_attached_note
-from _drawing_notes import add_property_linked_note
-from solidworks_mcp.adapters.solidworks.drawing import view_name
-from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
@@ -58,7 +59,14 @@ from _drawing_leaders import (
     points_inside,
     set_near_side_diameter,
 )
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _hole_spec import blind_cut_dia_mm
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
+from dt_crank_arm_notes import HUB_SEAT_CALLOUT, SEAM_CALLOUT
 from dt_crank_arm_spec import (
     ANCHOR_HOLE_SPEC,
     ANCHOR_SCREW_X,
@@ -70,17 +78,10 @@ from dt_crank_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    REFERENCE_DIMENSIONS,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
-)
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from dt_crank_arm_notes import HUB_SEAT_CALLOUT, SEAM_CALLOUT
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    dimension_name,
-    place_view,
+    REFERENCE_DIMENSIONS,
 )
 
 

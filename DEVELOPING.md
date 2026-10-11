@@ -754,19 +754,19 @@ every import, including `TYPE_CHECKING`, at file granularity. This keeps edits t
 one selector or frame representation out of unrelated spec/cache closures while
 still invalidating every consumer of the changed module.
 
-Drawing recipes follow the same direct-import rule. `_drawing_common` holds only
-the universal session, document-policy, export and finalization core. Specialized
+Drawing recipes follow the same direct-import rule. `_drawing_common` holds the
+universal session, document-policy, export and finalization core, summary stamping
+and the adapter's process-global center-mark observer registration. Specialized
 authoring lives in `_drawing_notes`, `_drawing_leader_notes`, `_drawing_gdt`,
 `_drawing_finish`, `_drawing_sections`, `_drawing_centerline`,
 `_drawing_hole_callout`, `_drawing_dimension_import`, `_drawing_dimensions`,
-`_drawing_edge_dimensions`, `_drawing_tables` and `_drawing_balloons`. Selection,
-attachment assertions, projection, visible edges, view configurations, sheet
-creation and layout collection have separate helpers too. Hidden-line policy lives
-in `_drawing_view_display`, and summary stamping in `_drawing_summary`; neither
-belongs to the universal core. Import the concern
-that owns the operation, never an aggregate facade. The small
-`_drawing_center_mark_observer` remains a core dependency because importing the
-core registers the adapter's process-global center-mark observer.
+`_drawing_edge_dimensions`, `_drawing_tables` and `_drawing_balloons`.
+Hole-callout selection probes live in `_drawing_hole_callout`; annotation style
+and attachment assertions in `_drawing_attachment`; GD&T layout and element
+collection in `_drawing_layout_collect`. Selection, projection, visible edges,
+view configurations and sheet creation have separate helpers too. Hidden-line
+policy lives in `_drawing_view_display`. Import the concern that owns the
+operation, never an aggregate facade.
 
 Local Python dependencies are file-granular, including imports inside functions.
 Stock fastener metadata therefore lives beside each diagnostic SKU callable

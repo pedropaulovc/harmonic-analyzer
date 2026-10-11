@@ -33,19 +33,22 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _drawing_dimensions import (
     assert_imported_precision,
     set_arc_endpoints_to_max,
@@ -53,11 +56,14 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name
-from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from build_pd_latch_hook import FAR_FACE_POINT, FLAT_GAP
 from pd_latch_hook_geometry import (
     ARM_N,
@@ -93,11 +99,6 @@ from pd_latch_hook_spec import (
     ROUND_CALLOUT,
     SCREW_HOLE_CALLOUT,
     SCREW_HOLE_MATE,
-)
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 SPEC = DRAWINGS_BY_NAME["pd_latch_hook"]

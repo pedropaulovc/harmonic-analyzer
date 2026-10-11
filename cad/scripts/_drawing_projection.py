@@ -1,15 +1,17 @@
 """Model-space to drawing-view projection.
 
-Separate module so edits re-key only recipes that use this concern.
+Geometry-based annotations project model points through views here, separately
+from entity selection and dimension import.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Sequence
+from typing import Any, Sequence
+
+from solidworks_mcp.adapters.com_variant import double_array
+
 from _com import _com_invoke
 import _telemetry
-from solidworks_mcp.adapters.com_variant import double_array
 
 
 def _projection_frame(adapter: Any, view: Any) -> tuple[Any, Any]:

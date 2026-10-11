@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the channel (top) lever.
 
 The SLDPRT remains authoritative.  This recipe supplies only the channel-lever
-views, dimension layout, hole callouts, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, dimension layout, hole callouts, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The lever is a long thin third-class lever (~188 mm nose-to-tip, 9.5 mm tall,
 3.0 mm thick).  The sheet runs at 1:1 with a small 1:4 isometric; the 3.0 x 9.5
@@ -20,38 +20,6 @@ import argparse
 import sys
 from typing import Any
 
-from ch_channel_lever_spec import GEOMETRIC_TOLERANCES_MM
-
-import _telemetry
-from _hole_spec import blind_cut_dia_mm
-from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
-from _drawing_common import (
-    DrawingOutputs,
-    finalize_drawing,
-    new_project_drawing,
-    read_required_properties,
-)
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_basic_dimension
-from _drawing_edge_dimensions import add_edge_dimension
-from _drawing_gdt import add_datum_feature, add_feature_control_frame
-from _drawing_hole_callout import add_native_hole_callout
-from _drawing_notes import add_property_linked_note
-from _drawing_registry import DRAWINGS_BY_NAME
-from ch_channel_lever_spec import (
-    BAR_PIN_HOLE_SPEC,
-    BAR_PIN_X,
-    BAR_TALL,
-    LEVER_SPRING_X,
-    LEVER_THICKNESS,
-    PIVOT_HOLE_DIA,
-    SPRING_EYE_HOLE_SPEC,
-    TIP_END_X,
-)
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -59,6 +27,38 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
     view_name,
+)
+
+from _check import check
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    stamp_drawing_summary,
+)
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_basic_dimension
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _hole_spec import blind_cut_dia_mm
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
+from ch_channel_lever_spec import (
+    BAR_PIN_HOLE_SPEC,
+    BAR_PIN_X,
+    BAR_TALL,
+    GEOMETRIC_TOLERANCES_MM,
+    LEVER_SPRING_X,
+    LEVER_THICKNESS,
+    PIVOT_HOLE_DIA,
+    SPRING_EYE_HOLE_SPEC,
+    TIP_END_X,
 )
 
 

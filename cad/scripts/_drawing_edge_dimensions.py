@@ -1,18 +1,20 @@
 """Drawing edge-dimension authoring and measured-attachment verification.
 
-Separate module so edits re-key only recipes that use this concern.
+Geometry-defined dimensions select edges and verify measured distances here
+separately from imported model dimensions.
 """
 
 from __future__ import annotations
 
-from typing import Any
-from typing import Literal
-from _com import _early_bound
+from typing import Any, Literal
+
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-import _telemetry
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import view_name
+
+from _com import _early_bound
 from _drawing_attachment import _is_same_attachment
+import _telemetry
 
 
 def add_edge_dimension(

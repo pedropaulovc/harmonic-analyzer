@@ -111,10 +111,13 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-import _telemetry  # noqa: E402
 from _drawing_common import is_pictorial_orientation  # noqa: E402
 from _drawing_layout_check import DrawableRegion  # noqa: E402
 from _drawing_registry import DRAWING_TEMPLATES  # noqa: E402
+from _layout_audit import (
+    classify_segments as classify_callout_segments,  # noqa: E402
+    replace_text,  # noqa: E402
+)
 from _layout_geometry import (  # noqa: E402
     AnnotationGeometry,
     Box,
@@ -127,8 +130,7 @@ from _layout_geometry import (  # noqa: E402
     estimate_text_box,
     format_findings,
 )
-from _layout_audit import classify_segments as classify_callout_segments  # noqa: E402
-from _layout_audit import replace_text  # noqa: E402
+import _telemetry  # noqa: E402
 
 # swAnnotationType_e (enums/swAnnotationType_e.md)
 _ANNOT_DATUM = 2

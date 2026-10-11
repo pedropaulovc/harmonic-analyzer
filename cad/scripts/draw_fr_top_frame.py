@@ -1,9 +1,10 @@
 r"""Create the curated machinist drawing for the green-painted top-frame casting.
 
 The SLDPRT remains authoritative.  This recipe supplies only native model
-dimensions, associative hole callouts, and the views of the casting; shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``. GEOMETRY defines the frame windows and T-rail section;
+dimensions, associative hole callouts, and the views of the casting;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
+GEOMETRY defines the frame windows and T-rail section;
 HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
 cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
 holds the hub location, true-axis side view and the removed set-pocket
@@ -29,31 +30,34 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    dimension_name,
+    place_view,
+    view_name,
+)
 
-import _telemetry
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
-from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
 )
-from _drawing_summary import stamp_drawing_summary
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
-    set_reference_dimension,
     set_basic_dimension,
-    offset_dimension_text,
     set_dimension_callouts,
+    set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import ViewEdges, scan_view_edges
@@ -62,86 +66,94 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
+from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_scan import _zoomed_on
 from _drawing_sections import create_section_view
 from _drawing_selection import _select_view_entity
 from _drawing_sheets import (
     FaceLabel,
     PictorialView,
-    place_pictorial_sheet,
     create_blank_drawing_sheets,
+    place_pictorial_sheet,
 )
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gtol_face_resolve import resolve_faces
+from _mcmaster_90280a837 import (
+    SHANK_DIA as CROSS_SCREW_SHANK_DIA,
+    SHANK_LEN as CROSS_SCREW_SHANK_LEN,
+)
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from build_fr_top_frame import (
     BAR_POCKET_Z,
     BAR_WEB_X0,
     BAR_WEB_X1,
     BAR_X0,
     BAR_X1,
-    BORE_DIA,
     BORE_CHAMFER,
-    COUNTERBORE_MAX_FLOOR_OFFSET,
-    CAP_RECESS_DIAMETER,
-    CAP_RECESS_FLOOR_Y,
+    BORE_DIA,
     BOSS_ABOVE,
     BOSS_BELOW,
+    BOSS_DIA,
+    CAP_RECESS_DIAMETER,
+    CAP_RECESS_FLOOR_Y,
+    COLUMN_X,
+    COUNTERBORE_DIA,
+    COUNTERBORE_MAX_FLOOR_OFFSET,
+    EDGE_CHAMFER,
     FLANGE,
     FLANGE_BOT_Y,
-    GUSSET,
-    EDGE_CHAMFER,
-    ROOT_FILLET_R,
-    OUTER_Z,
-    RAIL_W_FR,
-    RAIL_W_SIDE,
-    INNER_X,
-    INNER_Z,
-    LAND_X0,
-    LAND_X1,
-    RING_HEIGHT,
-    WEB_T,
-    WEB_IN_X,
-    WEB_OUT_X,
-    WEB_IN_Z,
-    WEB_OUT_Z,
-    REAR_COLUMN_Z,
-    BOSS_DIA,
-    COLUMN_X,
     FRONT_COLUMN_Z,
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
     GOOSENECK_Z,
+    GUSSET,
     HALF_H,
+    HANGER_X,
     HUB_BOSS_DIA,
     HUB_BOSS_DROP,
-    HUB_GUSSET_T,
     HUB_GUSSET_HALF_IN,
     HUB_GUSSET_HALF_OUT,
+    HUB_GUSSET_T,
+    INNER_X,
+    INNER_Z,
     KEEPER_TAP_SPEC,
     KEEPER_TAP_X,
     KEEPER_TAP_Z_FRONT,
     KEEPER_TAP_Z_REAR,
+    LAND_X0,
+    LAND_X1,
     OUTER_X,
+    OUTER_Z,
+    PIN_HOLE_X,
+    RAIL_W_FR,
+    RAIL_W_SIDE,
+    REAR_COLUMN_Z,
+    RING_HEIGHT,
+    ROOT_FILLET_R,
     SET_POCKET_DEPTH,
-    COUNTERBORE_DIA,
     SET_TAP_SPEC,
     SIDE_TAP_DRILL_DIA,
-    HANGER_X,
-    PIN_HOLE_X,
     SLOT_FLAT,
     SLOT_X,
     STUD_Z_FRONT,
     STUD_Z_REAR,
     TAP_DRILL_MM,
     TOP_SCREW_SEAT_Z,
+    WEB_IN_X,
+    WEB_IN_Z,
+    WEB_OUT_X,
+    WEB_OUT_Z,
+    WEB_T,
 )
 from fr_top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    FLANGE_THICKNESS_MM,
     GEOMETRIC_TOLERANCES_MM,
     HANGER_CBORE_DIA,
     HANGER_CLEARANCE_DIA,
@@ -161,18 +173,8 @@ from fr_top_frame_spec import (
     KEEPER_SEAT_LENGTH_MM,
     KEEPER_SEAT_WIDTH_MM,
     KEEPER_TAP_CALLOUT_PRECISION,
-    FLANGE_THICKNESS_MM,
     PRINTED_LINEAR_BAND_MM,
     SURFACE_FINISHES,
-)
-from _mcmaster_90280a837 import (
-    SHANK_DIA as CROSS_SCREW_SHANK_DIA,
-    SHANK_LEN as CROSS_SCREW_SHANK_LEN,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    place_view,
 )
 
 SPEC = DRAWINGS_BY_NAME["fr_top_frame"]

@@ -18,7 +18,6 @@ from pathlib import Path
 import pytest
 
 import _drawing_dimension_import
-import solidworks_mcp.adapters.solidworks.drawing
 import _drawing_hidden_sketches as hidden_sketches
 from test_targeted_model_items import (
     FakeAdapter,
@@ -38,7 +37,7 @@ def _no_com_curate(monkeypatch) -> None:
     def curate(adapter, annotations, *, delete=(), reposition=None):
         survivors = []
         for a in annotations:
-            name = solidworks_mcp.adapters.solidworks.drawing.dimension_name(adapter, a)
+            name = hidden_sketches._sw_drawing.dimension_name(adapter, a)
             if name in delete:
                 continue
             if reposition and name in reposition:
@@ -46,8 +45,7 @@ def _no_com_curate(monkeypatch) -> None:
             survivors.append(a)
         return survivors
 
-    monkeypatch.setattr(_drawing_dimension_import, "curate_dimensions", curate)
-    monkeypatch.setattr(solidworks_mcp.adapters.solidworks.drawing, "curate_dimensions", curate)
+    monkeypatch.setattr(hidden_sketches._sw_drawing, "curate_dimensions", curate)
 
 
 class FakeSketchFeature:
@@ -169,7 +167,7 @@ def test_a_part_hidden_sketch_is_shown_in_the_view_and_left_shown() -> None:
     measured that a per-view re-blank hides the dimensions it delivered."""
     adapter, drawing, view = _hidden_seat()
     curated = _curate(adapter, view, ("ArcCentreX", "Length"))
-    assert sorted(solidworks_mcp.adapters.solidworks.drawing.dimension_name(adapter, a) for a in curated) == [
+    assert sorted(hidden_sketches._sw_drawing.dimension_name(adapter, a) for a in curated) == [
         "ArcCentreX",
         "Length",
     ]
@@ -495,7 +493,8 @@ def test_dimensions_that_survive_the_part_reblank_pass(tmp_path, monkeypatch) ->
 # --- routing guard: which drawings must use this module --------------------
 # #743 canary (r743-canary, drawing:cylinder_gear_shaft): the part blanked its
 # DomeReference sketch and the drawing kept DomeHeight, but it imported
-# curate_view_dimensions from _drawing_common, so DomeHeight never arrived.
+# curate_view_dimensions from what is now _drawing_dimension_import, so
+# DomeHeight never arrived.
 # Run r743-diag-a (fbaf8bb09) swapped only the import and the dimension
 # imported. Nothing stopped the wrong helper, so this guard does.
 _SCRIPTS = Path(hidden_sketches.__file__).resolve().parent
@@ -657,7 +656,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
 
 def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None:
     """A drawing that reads a sketch its part blanks must curate through
-    _drawing_hidden_sketches: _drawing_common's targeted import delivers
+    _drawing_hidden_sketches: _drawing_dimension_import's targeted import delivers
     nothing from a hidden childless sketch."""
     from _drawing_registry import DRAWINGS_BY_NAME
 

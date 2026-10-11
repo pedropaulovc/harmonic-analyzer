@@ -29,17 +29,18 @@ if __package__:
     from . import _script_paths  # noqa: F401
 else:
     import _script_paths  # noqa: F401
+from solidworks_mcp.adapters.base import ExtrusionParameters
+
 from _check import check
 from _com import _early_bound
-from _session import run_build
 from _drawing_common import new_project_drawing
 from _drawing_edges import visible_view_entities
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_registry import DrawingLayout
 from _hole_spec import HoleSpec
 from _holes import blind_hole_volume_mm3, wizard_holes
+from _session import run_build
 from diagnostics.diag_mcmaster_lib import no_sketch_inference
-from solidworks_mcp.adapters.base import ExtrusionParameters
 
 ROOT = Path(__file__).resolve().parents[3]
 

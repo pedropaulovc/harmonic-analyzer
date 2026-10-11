@@ -1,7 +1,7 @@
 """Repro: can this seat AUTHOR DimXpert geometric tolerances on a PART?
 
 Backs the open question behind the drawing-purity audit: every feature control
-frame the project ships is authored per-SHEET (``_drawing_common.
+frame the project ships is authored per-SHEET (``_drawing_gdt.
 add_feature_control_frame``, 125 ``tolerance="..."`` literals across 55 drawing
 scripts).  Moving them to model PMI needs FIVE mechanics to hold, none of them
 previously exercised here.  This probe answers each one with a logged return
@@ -383,9 +383,9 @@ async def _probe() -> int:
             _telemetry.info(
                 f"  {characteristic}: GetFormat()={fmt} "
                 "(2 = swGtolFormatType_e.GTOL_SW2022, the only format "
-                "_drawing_common accepts)"
+                "_drawing_gdt accepts)"
             )
-            # Mirror the PROVEN drawing-side recipe (_drawing_common.
+            # Mirror the PROVEN drawing-side recipe (_drawing_gdt.
             # add_feature_control_frame): count -> AddFrame if none ->
             # GetFrame(1); a None frame means an OLD-format Gtol, seeded via
             # SetFrameSymbols2/SetFrameValues2 then ConvertFormat; finally the

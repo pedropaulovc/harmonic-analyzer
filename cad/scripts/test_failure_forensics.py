@@ -2118,30 +2118,9 @@ def test_hole_callout_refusal_survives_an_exploding_telemetry_sink(tmp_path, mon
     snapshot. The span event is let through so the ``debug`` call after it is
     actually reached (the two share one guarded block); the sink records which
     names it blew up on, so the test proves both sites were exercised. Scoped to
-    the drawing module's telemetry handle -- the span machinery and
+    ``_drawing_hole_callout._telemetry`` -- the span machinery and
     ``capture_com_failure``'s own guarded record keep working."""
-    import _drawing_balloons
-    import _drawing_center_mark_observer
-    import _drawing_centerline
-    import _drawing_common
-    import _drawing_dimension_import
-    import _drawing_dimensions
-    import _drawing_edge_dimensions
-    import _drawing_edges
-    import _drawing_finish
-    import _drawing_gdt
-    import _drawing_gdt_layout
     import _drawing_hole_callout
-    import _drawing_layout_collect
-    import _drawing_leader_notes
-    import _drawing_notes
-    import _drawing_projection
-    import _drawing_scan
-    import _drawing_sections
-    import _drawing_sheet_region
-    import _drawing_sheets
-    import _drawing_tables
-    import _drawing_view_configuration
 
     exploded: list[str] = []
 
@@ -2156,28 +2135,7 @@ def test_hole_callout_refusal_survives_an_exploding_telemetry_sink(tmp_path, mon
                 return explode
             return getattr(_telemetry, name)
 
-    monkeypatch.setattr(_drawing_balloons, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_center_mark_observer, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_centerline, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_common, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_dimension_import, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_dimensions, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_edge_dimensions, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_edges, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_finish, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_gdt, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_gdt_layout, "_telemetry", _ExplodingSink())
     monkeypatch.setattr(_drawing_hole_callout, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_layout_collect, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_leader_notes, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_notes, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_projection, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_scan, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_sections, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_sheet_region, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_sheets, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_tables, "_telemetry", _ExplodingSink())
-    monkeypatch.setattr(_drawing_view_configuration, "_telemetry", _ExplodingSink())
 
     _refuse_rod_pin_callout(tmp_path)
 
@@ -2194,9 +2152,9 @@ def test_selection_description_never_raises_for_an_unreadable_entity():
     """Every read is guarded: an entity no probe can read reports each failure
     by key and still returns, because the before snapshot runs on the success
     path of every hole callout."""
-    import _drawing_selection_probe
+    import _drawing_hole_callout
 
-    bag = _drawing_selection_probe.describe_selected_entity(
+    bag = _drawing_hole_callout.describe_selected_entity(
         _DrawingAdapter(model=object()),
         object(),
         object(),
@@ -2563,17 +2521,8 @@ def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(
     capture_telemetry, monkeypatch
 ):
     import math
-    import _drawing_balloons
-    import _drawing_common
-    import _drawing_dimension_import
-    import _drawing_edge_dimensions
-    import _drawing_gdt
-    import _drawing_layout_collect
-    import _drawing_leader_notes
-    import _drawing_sections
+
     import _drawing_selection
-    import _drawing_selection_probe
-    import _drawing_tables
     import draw_ch_rocker_arm
 
     bore = object()
@@ -2612,17 +2561,7 @@ def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(
     spans, logs = capture_telemetry
     drawing = _Drawing()
     centre = (0.2, 0.15)
-    monkeypatch.setattr(_drawing_balloons, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_drawing_common, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_drawing_dimension_import, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_drawing_edge_dimensions, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_drawing_gdt, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_drawing_layout_collect, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_drawing_leader_notes, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_drawing_sections, "view_name", lambda adapter, view: "Drawing View2")
     monkeypatch.setattr(_drawing_selection, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_drawing_selection_probe, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_drawing_tables, "view_name", lambda adapter, view: "Drawing View2")
     monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
     with _telemetry.span("drawing.pivot_datum"):
         xy = draw_ch_rocker_arm._pick_pivot_bore(
