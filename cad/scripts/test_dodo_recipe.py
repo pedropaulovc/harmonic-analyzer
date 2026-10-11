@@ -3414,3 +3414,124 @@ def test_feature_cache_and_status_share_the_parsed_yaml_key(tmp_path, monkeypatc
     assert probes == [before, unchanged, changed]
     assert f"MISS {before[:12]}  {label}" in messages
     assert f"MISS {changed[:12]}  {label}" in messages
+
+
+@pytest.fixture
+def synthetic_prechips_task(tmp_path, monkeypatch):
+    import _process_plans
+    import export_features
+
+    dodo = _load_dodo()
+    stem = "ch_rocker_arm"
+    root = tmp_path / "process"
+    source = root / stem / "plan.toml"
+    source.parent.mkdir(parents=True)
+    source.write_text('features = "unused"\n')
+    shop = root / "shop"
+    shop.mkdir()
+    for name in _process_plans.SHOP_FILES:
+        (shop / name).write_text("version = 1\n")
+    (shop / "inventory.toml").write_text(
+        '[fixtures.test]\ncad = "ch_rocker_arm_tl_test"\n'
+    )
+    monkeypatch.setattr(_process_plans, "PROCESS_ROOT", root)
+    monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", (stem,))
+    spec = dodo.SCRIPTS_DIR / "ch_rocker_arm_tl_test_spec.py"
+    helper = dodo.SCRIPTS_DIR / "_synthetic_fixture_dimensions.py"
+    monkeypatch.setattr(_process_plans, "shop_spec_modules", lambda: ("ch_rocker_arm_tl_test_spec",))
+    original = dodo._executed_closure
+
+    def closure(command):
+        if command == [str(spec)]:
+            return [str(spec), str(helper)]
+        return original(command)
+
+    monkeypatch.setattr(dodo, "_executed_closure", closure)
+    return dodo, _process_plans, export_features, stem, source, spec, helper
+
+
+def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_task):
+    dodo, plans, exporter, stem, source, spec, helper = synthetic_prechips_task
+    task = next(dodo.task_prechips())
+    assert task["name"] == stem
+    assert task["task_dep"] == ["package:features"]
+    deps = {str(path) for path in task["file_dep"]}
+    expected = {
+        str(source), *(str(path) for path in plans.shop_paths()),
+        str(spec), str(helper), str(dodo.REPO_ROOT / "pyproject.toml"),
+        str(dodo.REPO_ROOT / "uv.lock"), str(dodo.REPO_ROOT / "dodo.py"),
+        str(dodo.SCRIPTS_DIR / "_telemetry.py"),
+        *(str(path) for path in exporter.bundle_paths(stem)),
+    }
+    assert expected <= deps
+    assert str(dodo.SCRIPTS_DIR / "prechips_traveler.py") in deps
+    assert str(dodo.SCRIPTS_DIR / "_process_plans.py") in deps
+    directory = plans.traveler_dir(stem, dodo.CAD_OUT)
+    targets = {str(path) for path in task["targets"]}
+    assert {
+        str(directory / "plan.toml"), str(directory / "report.json"),
+        str(directory / "traveler.html"),
+        str(dodo.CAD_OUT / "reports" / f"prechips-{stem}.ok"),
+    } <= targets
+    assert (plans.traveler_complete, [stem, dodo.CAD_OUT]) in task["uptodate"]
+    action, args = task["actions"][0]
+    assert action is dodo._run_stamped
+    assert args[3] == f"prechips:{stem}"
+    assert "prechips_traveler.py" in " ".join(map(str, args[0]))
+    assert stem in args[0]
+
+
+def test_prechips_build_release_edges_and_stage(synthetic_prechips_task):
+    dodo, _, _, stem, _, _, _ = synthetic_prechips_task
+    for task in (dodo.task_build(), dodo.task_release()):
+        assert f"prechips:{stem}" in task["task_dep"]
+    assert dodo._stage_name(f"prechips:{stem}") == "prechips-traveler"
+    assert not any(name.startswith("traveler_") for name in dodo._CHECK_NAMES)
+    assert not any(task["name"].startswith("traveler_") for task in dodo.task_check())
+
+
+def test_prechips_failed_action_never_writes_stamp(tmp_path, monkeypatch):
+    dodo = _load_dodo()
+    stamp = tmp_path / "prechips-synthetic.ok"
+    def fail(*args, **kwargs):
+        raise RuntimeError("synthetic strict traveler exit 2")
+    monkeypatch.setattr(dodo, "_run", fail)
+    with pytest.raises(RuntimeError, match="exit 2"):
+        dodo._run_stamped(["synthetic-only"], "traveler", str(stamp), "prechips:ch_rocker_arm")
+    assert not stamp.exists()
+
+
+def test_recipe_enrolls_strict_traveler_tests():
+    dodo = _load_dodo()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    deps = {Path(path).name for path in recipe["file_dep"]}
+    assert {"test_process_plans.py", "test_prechips_traveler.py"} <= deps
+    command = " ".join(str(arg) for _, args in recipe["actions"] for arg in args[0])
+    assert "test_process_plans.py" in command
+    assert "test_prechips_traveler.py" in command
+
+
+def test_features_export_depends_on_release_revision_and_bundle_paths():
+    import export_features
+    dodo = _load_dodo()
+    assert str(dodo.RELEASE_VERSION_FILE) in {
+        str(path) for path in dodo._feature_export_file_deps()
+    }
+    assert {str(path) for path in export_features.bundle_paths("ch_rocker_arm")} <= {
+        str(path) for path in dodo._feature_export_outputs()
+    }
+
+
+def test_prechips_rejects_unexported_enrollment(monkeypatch):
+    import _process_plans
+    dodo = _load_dodo()
+    monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", ("synthetic_not_exported",))
+    with pytest.raises(AssertionError, match="synthetic_not_exported"):
+        list(dodo.task_prechips())
+
+
+def test_prechips_empty_enrollment_has_no_tasks(monkeypatch):
+    import _process_plans
+    dodo = _load_dodo()
+    monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", ())
+    assert list(dodo.task_prechips()) == []
