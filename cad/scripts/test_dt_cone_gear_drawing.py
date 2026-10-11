@@ -132,8 +132,9 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
 
 
 def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
-    assert spec.BORE_DIA_BAND is spec.BORE_DIA_BAND
-    assert spec.BORE_DIA_BAND[0] <= spec.BORE_BAND_FIT_UPPER
+    assert spec.BORE_DIA_BAND == pytest.approx(
+        (spec.BORE_BAND_FIT_UPPER, spec.BORE_BAND_LOWER)
+    )
     assert spec.BORE_DIA_BAND[0] <= spec.terminal_web_bore_upper_mm()
     assert spec.BORE_DIA_BAND[0] - spec.BORE_DIA_BAND[1] >= 0.02 - 1e-9
     assert spec.BORE_AF_BAND == pytest.approx((0.02, 0.01))
