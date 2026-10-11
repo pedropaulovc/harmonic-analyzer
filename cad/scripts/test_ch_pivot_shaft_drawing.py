@@ -194,7 +194,7 @@ def test_the_layout_checks_the_flat_at_its_printed_limits() -> None:
     FLAT_STATION_BAND; they must be the limits the sheet prints (and the
     feature export carries), so a precision change cannot leave the layout
     proving a band the machinist never sees (Astra on #1344)."""
-    from _feature_requirements import limits
+    from _printed_limits import limits
 
     p = spec.DRAWING_PRECISION_BY_NAME
     assert list(spec.FLAT_LENGTH_RANGE) == pytest.approx(limits(spec.FLAT_LENGTH, p["FlatLength"]))
