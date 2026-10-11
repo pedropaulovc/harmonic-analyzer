@@ -77,10 +77,14 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
 from build_fr_top_frame import (
+    BAR_POCKET_Z,
+    BAR_WEB_X0,
+    BAR_WEB_X1,
     BAR_X0,
     BAR_X1,
     BORE_DIA,
     BORE_CHAMFER,
+    COUNTERBORE_MAX_FLOOR_OFFSET,
     CAP_RECESS_DIAMETER,
     CAP_RECESS_FLOOR_Y,
     BOSS_ABOVE,
@@ -122,7 +126,7 @@ from build_fr_top_frame import (
     KEEPER_TAP_Z_REAR,
     OUTER_X,
     SET_POCKET_DEPTH,
-    SPOTFACE_DIA,
+    COUNTERBORE_DIA,
     SET_TAP_SPEC,
     SIDE_TAP_DRILL_DIA,
     HANGER_X,
@@ -136,6 +140,7 @@ from build_fr_top_frame import (
 )
 from fr_top_frame_spec import (
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
@@ -158,7 +163,12 @@ from fr_top_frame_spec import (
     KEEPER_SEAT_WIDTH_MM,
     KEEPER_TAP_CALLOUT_PRECISION,
     FLANGE_THICKNESS_MM,
+    PRINTED_LINEAR_BAND_MM,
     SURFACE_FINISHES,
+)
+from _mcmaster_90280a837 import (
+    SHANK_DIA as CROSS_SCREW_SHANK_DIA,
+    SHANK_LEN as CROSS_SCREW_SHANK_LEN,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -375,6 +385,32 @@ BOSS_ABOVE_RAIL_LINE_XY = (
 # boss-height comment in the A-A recipe for what the long leader crossed.
 BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
 
+# A-A's joint note. The near wall between the flush counterbore floor and
+# the socket bore only starts the thread; the far casting wall carries the
+# MHA-VN-027 joint. Rule 12, print-worst: the stock shank, less the most
+# outboard printed floor (16.1 + band) and the largest printed socket radius.
+_SOCKET_DIA_PLACES = DRAWING_PRECISION["BoreProfile"]["B0Dia"]
+CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
+    CROSS_SCREW_SHANK_LEN
+    - COUNTERBORE_MAX_FLOOR_OFFSET
+    - (round(BORE_DIA, _SOCKET_DIA_PLACES) + PRINTED_LINEAR_BAND_MM[_SOCKET_DIA_PLACES])
+    / 2.0
+)  # 14.4
+if CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < 1.5 * CROSS_SCREW_SHANK_DIA:
+    raise AssertionError(
+        "far casting wall engages MHA-VN-027 under 1.5D at the printed bands"
+    )
+# The engagement follows from the printed floor and socket; the note states
+# it, it adds no acceptance limit of its own. Three rows from y 32 mm end
+# 15.3 mm up, inside the sheet frame (rows print 5.56 mm apart).
+CROSS_TAP_SECTION_NOTE = (
+    "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-VN-027\n"
+    f"FAR WALL CARRIES THE JOINT: {CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT:.1f}"
+    " FULL THREAD\n"
+    f"AT PRINT LIMITS (1.5D = {1.5 * CROSS_SCREW_SHANK_DIA:.1f})"
+)
+CROSS_TAP_SECTION_NOTE_XY = (0.040, 0.032)
+
 # Sheet 5: hub location, true-axis side view, removed set-pocket section.
 HUB_TOP_CENTER = (0.145, 0.200)
 HUB_LEFT_CENTER = (0.145, 0.095)
@@ -385,10 +421,12 @@ HUB_SECTION_CAPTION_XY = (0.330, 0.178)
 POCKET_DEPTH_TEXT_XY = (0.330, 0.238)
 POCKET_DEPTH_OFFSET_XY = (0.378, 0.242)
 # In the left window, right of the bore (clears leader-crosses-line Ra 3.2 x
-# RibWidth 27.0 at x 60): was (0.030, 0.160), its 35 mm tail cut the 27.0
+# RibWidth at x 60): was (0.030, 0.160), its 35 mm tail cut the RibWidth
 # line.  The leader now lands on the bore's lower-right rim (-45 deg on the
-# sheet) from an 8 mm tail at y 195, passing 2.2 mm over the 27.0 extension
-# line's end (84.0, 194.5) and 2.0 mm under the D-D cutting line.
+# sheet) from an 8 mm tail at y 195, passing 2.2 mm over the RibWidth
+# extension line's end (84.0, 194.5, read at the 27.0 rib; the 28.0 rib moves
+# each side 0.5 model mm, at most 0.25 on the sheet) and 2.0 mm under the D-D
+# cutting line.
 HUB_BORE_FINISH_SYMBOL_XY = (0.108, 0.195)
 HUB_BORE_FINISH_TAIL = 0.008
 # One ramp, three numbers: the 60.0 feather span, the 8.0 drop below the
@@ -543,11 +581,25 @@ HANGER_SLOT_WIDTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[1] + STUD_Z_FRONT * _HUB_BOTTOM_M_PER_MM,
 )
 HANGER_SLOT_WIDTH_OFFSET_XY = (0.060, 0.137)
+# The crossbar pockets' length stands outside the plan, so nothing inside
+# the frame reads as part of it: its dimension line at model x -256, 12.2
+# left of the Ø45 barrels, 7.0 left of detail C's fence (r 38 about the
+# gooseneck) and 12.0 inside the sheet frame; its extension lines run at
+# y 177 / 223, under and over that fence and between the corner bosses.
+# The block (three rows, 24.6 x 17.5 mm as farm c75ac06 printed it) parks
+# on an offset leader above the plan's top-left corner: 3.0 inside the
+# sheet frame's left edge, 2.45 under its top, 1.9 over the plan's top and
+# 2.7 off the top-left boss.
+POCKET_LENGTH_TEXT_XY = (
+    HUB_BOTTOM_CENTER[0] - 256.0 * _HUB_BOTTOM_M_PER_MM,
+    HUB_BOTTOM_CENTER[1],
+)
+POCKET_LENGTH_OFFSET_XY = (0.028, 0.2555)
 
-# Sheet 1, Section E-E: the side rails and the full-height central web, cut
-# clear of every hole station (keeper taps at z -82.8 / 81.7, hangers at
-# -84.0 / 90.1, corner bosses at z +/-112), so the section carries rail and
-# web stock only.
+# Sheet 1, Section E-E: the side rails and the crossbar T, cut inside the
+# crossbar pockets (|z| <= 69, where the crossbar is a T) and clear of every hole
+# station (keeper taps at z -82.8 / 81.7, hangers at -84.0 / 90.1, corner
+# bosses at z +/-112), so the section carries rail and T stock only.
 SIDE_SECTION_Z = -56.0
 # Removed sections are centred on the cut span, so each centre puts the
 # dimensioned profile where it sat when the full cut drew its twin as well:
@@ -562,8 +614,13 @@ RAIL_SECTION_NOTE_XY = (0.270, 0.1525)
 SIDE_SECTION_CENTER = (0.3183, 0.106)
 SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
-SIDE_SECTION_NOTE_XY = (0.290, 0.133)
-SIDE_WEB_TEXT_XY = (0.335, 0.120)
+# The E-E note sits 2.0 above where it was so the side web's 13.0 (its top
+# at 124.5 mm) keeps 2.1 of air under the note's last line, and the web
+# text sits 8 mm left so its 37.5 mm qualifier row ends at 345.8 mm, 4.1
+# short of the crossbar flange's 8.0 dimension line at 349.9 (farm
+# 30394c1da: the row ran 3.8 mm past that line, text-on-line).
+SIDE_SECTION_NOTE_XY = (0.290, 0.135)
+SIDE_WEB_TEXT_XY = (0.327, 0.120)
 # Where each removed section prints the rail centreline it cuts, sheet x:
 # B-B at z 112 and E-E / D-D at x -197, as on b49e1, the #946 layout-audit
 # leaf that every typed text point in B-B, E-E and D-D was tuned against.
@@ -572,6 +629,25 @@ SIDE_WEB_TEXT_XY = (0.335, 0.120)
 RAIL_SECTION_PROFILE_X = 0.35643
 SIDE_SECTION_PROFILE_X = 0.29666
 HUB_SECTION_PROFILE_X = 0.33198
+# E-E's crossbar T dimensions: each dimension line stands one 5 mm gap off
+# the T (the web's below its underside, the flange's right of its +X face)
+# and its text parks on a leader at the right of the section, under the side
+# rail web's text and right of the caption.
+_SIDE_SECTION_M_PER_MM = SIDE_SECTION_SCALE[0] / SIDE_SECTION_SCALE[1] / 1000.0
+
+
+def _side_section_xy(x: float, y: float) -> tuple[float, float]:
+    """Sheet point of model ``(x, y)`` in E-E, profile pinned at x -197."""
+    return (
+        SIDE_SECTION_PROFILE_X + (x + COLUMN_X) * _SIDE_SECTION_M_PER_MM,
+        SIDE_SECTION_CENTER[1] + y * _SIDE_SECTION_M_PER_MM,
+    )
+
+
+CROSSBAR_WEB_LINE_XY = _side_section_xy(HANGER_X, -HALF_H - 20.0)
+CROSSBAR_WEB_TEXT_XY = (0.382, 0.094)
+CROSSBAR_FLANGE_LINE_XY = _side_section_xy(BAR_X1 + 20.0, (HALF_H + FLANGE_BOT_Y) / 2.0)
+CROSSBAR_FLANGE_TEXT_XY = (0.382, 0.108)
 
 # #955 (layoutcheck on b49e1): three cutting-plane letters printed on ink.
 # B's outer letter sat on the +Z rail's outer edge and the 183.9, E's outer
@@ -790,7 +866,7 @@ HUB_TOP_CALLOUTS = {
     "GnDia": "DRILL THRU\nSAME X AS\nLEFT SOCKETS",
     "RibWidth": "FULL-HEIGHT PAD\nCENTRED ON BORE",
 }
-DETAIL_FRONT_KEEP = {"S1Dia": (0.045, 0.256)}
+DETAIL_FRONT_KEEP = {"CB1Dia": (0.045, 0.256)}
 DETAIL_SECTION_KEEP = {
     "CapRecessDia": (0.140, 0.170),
     # The cap-seat depth reads beside its own band, not under it: the column
@@ -802,7 +878,7 @@ DETAIL_CALLOUTS = {
     "C0Dia": "4X BOSS",
     "B0Dia": "4X SOCKET / REF\nMATCH-FIT ASSIGNED TUBE",
 }
-FRONT_CALLOUTS = {"S1Dia": "4X SPOTFACE"}
+FRONT_CALLOUTS = {"CB1Dia": "4X COUNTERBORE"}
 SECTION_CALLOUTS = {
     "CapRecessDia": "4X CAP RECESS",
     "CapRecessDepth": "4X\nCAP SEAT",
@@ -1702,7 +1778,8 @@ def _position_view_caption(
 def _gusset_ramp_angle(adapter: Any, view: Any, view_edges: ViewEdges) -> None:
     """Define the exposed ramp, not the buried sketch flat inside the boss."""
     ramp_points = (
-        (-WEB_OUT_X, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT+HUB_BOSS_DROP),
+        # the rail underside's C2-broken edge, as in the boss-drop pick
+        (-WEB_OUT_X+EDGE_CHAMFER, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT+HUB_BOSS_DROP),
         (GOOSENECK_X-HUB_GUSSET_T/2, -HALF_H-HUB_BOSS_DROP/2,
          GOOSENECK_Z+(HUB_GUSSET_HALF_IN+HUB_GUSSET_HALF_OUT)/2),
     )
@@ -2249,21 +2326,42 @@ async def build(adapter: Any) -> dict[str, str]:
     # Every imported dimension's places are the part's; the whole print's
     # imports are collected here and read back once, before export.
     imported_annotations = [*geometry_annotations]
+    # The plan extremes are the corner-boss barrels, whose plan outline is
+    # the upper boss's top C2 lower circle, R22.5 at EDGE_CHAMFER under the
+    # boss top.  The break's upper R20.5 circle sits 2.0 inside it, and a
+    # sheet-point hit test on the R22.5 outline resolved to the R20.5 circle
+    # (farm a03283b49: width 435 for 439), so both ends of both overall
+    # dimensions are the scanned R22.5 circles themselves.
+    def plan_barrel(x: float, z: float, label: str) -> Any:
+        return geometry_top_edges.circle_at(
+            (x, HALF_H+BOSS_ABOVE-EDGE_CHAMFER, z), BOSS_DIA/2,
+            axis=(0.0, 1.0, 0.0), label=label,
+            center_tol_mm=1e-4, radius_tol_mm=1e-4,
+        ).edge
+
     _checked_dimension(
         adapter, geometry_top,
-        p0=(-PLAN_HALF_X, HALF_H+BOSS_ABOVE, FRONT_COLUMN_Z),
-        p1=(PLAN_HALF_X, HALF_H+BOSS_ABOVE, FRONT_COLUMN_Z),
+        p0=(-PLAN_HALF_X, HALF_H+BOSS_ABOVE-EDGE_CHAMFER, FRONT_COLUMN_Z),
+        p1=(PLAN_HALF_X, HALF_H+BOSS_ABOVE-EDGE_CHAMFER, FRONT_COLUMN_Z),
         text_xy=(GEOMETRY_TOP_CENTER[0], 0.2565), label="overall casting width",
         expected_mm=2*PLAN_HALF_X, orientation="horizontal", maximum=True,
         reference=True, suffix="OVERALL",
+        entities=(
+            plan_barrel(-COLUMN_X, FRONT_COLUMN_Z, "overall width, east barrel"),
+            plan_barrel(COLUMN_X, FRONT_COLUMN_Z, "overall width, west barrel"),
+        ),
     )
     _checked_dimension(
         adapter, geometry_top,
-        p0=(-COLUMN_X, HALF_H+BOSS_ABOVE, -PLAN_HALF_Z),
-        p1=(-COLUMN_X, HALF_H+BOSS_ABOVE, PLAN_HALF_Z),
+        p0=(-COLUMN_X, HALF_H+BOSS_ABOVE-EDGE_CHAMFER, -PLAN_HALF_Z),
+        p1=(-COLUMN_X, HALF_H+BOSS_ABOVE-EDGE_CHAMFER, PLAN_HALF_Z),
         text_xy=(0.022, 0.145), label="overall casting depth",
         expected_mm=2*PLAN_HALF_Z, orientation="vertical", maximum=True,
         reference=True,
+        entities=(
+            plan_barrel(-COLUMN_X, FRONT_COLUMN_Z, "overall depth, front barrel"),
+            plan_barrel(-COLUMN_X, REAR_COLUMN_Z, "overall depth, rear barrel"),
+        ),
     )
     _checked_dimension(
         adapter, geometry_top,
@@ -2289,9 +2387,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, geometry_top,
         p0=(BAR_X0, HALF_H-EDGE_CHAMFER, 0.0),
         p1=(BAR_X1, HALF_H-EDGE_CHAMFER, 0.0),
-        text_xy=(GEOMETRY_TOP_CENTER[0], 0.1095), label="central web width",
+        text_xy=(GEOMETRY_TOP_CENTER[0], 0.1095), label="crossbar flange width",
         expected_mm=BAR_X1-BAR_X0, orientation="horizontal", exact_linear=True,
-        suffix="CENTRAL WEB", edges=geometry_top_edges,
+        suffix="CROSSBAR FLANGE", edges=geometry_top_edges,
     )
     # B-B is a REMOVED section: the cutting line crosses the +Z rail alone
     # (the -Z rail is its mirror), so the section shows the one T profile the
@@ -2384,12 +2482,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, rail_section, label="B-B T rail section", cut_surface_only=True, removed=True
     )
     # B-B cuts the front/rear rails only, so the 34.2 side rails and the
-    # 22.0 central web had no web thickness, root radius or rim chamfer
-    # anywhere on the print, yet the keeper taps and the hanger holes are cut
-    # into exactly that stock.  E-E is a second removed section: its cutting
-    # line runs from outside the left side rail to just past the central web,
-    # so the print shows the one side rail it dimensions and the full-height
-    # web beside it -- not the right rail's identical, unannotated twin.
+    # crossbar had no web thickness, root radius or rim chamfer anywhere on
+    # the print, yet the keeper taps and the hanger holes are cut into
+    # exactly that stock.  E-E is a second removed section: its cutting line
+    # runs from outside the left side rail to just past the crossbar, so the
+    # print shows the one side rail it dimensions and the crossbar T beside
+    # it, its web and flange dimensioned at the T's own station between the
+    # gussets -- not the right rail's identical, unannotated twin.
     side_cut = [
         model_point_in_view(
             adapter, geometry_top, (x/1000.0, 0.0, z/1000.0),
@@ -2409,21 +2508,38 @@ async def build(adapter: Any) -> dict[str, str]:
         SIDE_SECTION_PROFILE_X, label="E-E",
     )
     set_hidden_lines_removed(adapter, side_section)
+    side_section_edges = scan_view_edges(side_section, label="E-E side rail section")
     _checked_dimension(
         adapter, side_section,
         p0=(-WEB_OUT_X, 0.0, SIDE_SECTION_Z),
         p1=(-WEB_IN_X, 0.0, SIDE_SECTION_Z),
         text_xy=SIDE_WEB_TEXT_XY, label="side rail web thickness",
         expected_mm=WEB_T, orientation="horizontal", exact_linear=True,
-        suffix="2X SIDE RAIL WEB",
-        edges=scan_view_edges(side_section, label="E-E side rail section"),
+        suffix="2X SIDE RAIL WEB", edges=side_section_edges,
     )
+    # The crossbar T: its web below the flange's R3 roots and above the
+    # bottom C2, its flange from the top face to the 1.5 underside flat
+    # outboard of the root.
+    flange_flat_x = BAR_X0 + (BAR_WEB_X0 - ROOT_FILLET_R - BAR_X0) / 2.0
+    for p0, p1, expected, xy, offset, orientation, label, qualifier in (
+        ((BAR_WEB_X0, 0.0, SIDE_SECTION_Z), (BAR_WEB_X1, 0.0, SIDE_SECTION_Z),
+         WEB_T, CROSSBAR_WEB_LINE_XY, CROSSBAR_WEB_TEXT_XY, "horizontal",
+         "crossbar web thickness", "CROSSBAR WEB"),
+        ((HANGER_X, HALF_H, SIDE_SECTION_Z), (flange_flat_x, FLANGE_BOT_Y, SIDE_SECTION_Z),
+         FLANGE, CROSSBAR_FLANGE_LINE_XY, CROSSBAR_FLANGE_TEXT_XY, "vertical",
+         "crossbar flange thickness", "CROSSBAR FLANGE"),
+    ):
+        _checked_dimension(
+            adapter, side_section, p0=p0, p1=p1, text_xy=xy, label=label,
+            expected_mm=expected, orientation=orientation, exact_linear=True,
+            suffix=qualifier, offset_text=offset, edges=side_section_edges,
+        )
     _position_view_caption(adapter, side_section, SIDE_SECTION_CAPTION_XY)
     if add_note(
-        adapter, "E-E: LEFT SIDE RAIL AND FULL-HEIGHT CENTRAL WEB\nRIGHT SIDE RAIL IDENTICAL",
+        adapter, "E-E: LEFT SIDE RAIL AND CROSSBAR T\nRIGHT RAIL IDENTICAL; T FLANGE UNDERSIDE SHARP",
         *SIDE_SECTION_NOTE_XY,
     ) is None:
-        raise RuntimeError("failed to identify the cut side rail and central web")
+        raise RuntimeError("failed to identify the cut side rail and crossbar T")
     _assert_section_display(
         adapter, side_section, label="E-E side rail section", cut_surface_only=True, removed=True
     )
@@ -2618,8 +2734,11 @@ async def build(adapter: Any) -> dict[str, str]:
             suffix=suffix, reference=reference,
         )
     detail_top_note = add_note(adapter, HOLE_STATION_NOTE, *HOLE_STATION_NOTE_XY)
+    # Aligned under the hole-station note at x 30 mm: from x 40 the 70-character
+    # C2 line ran 2.4 mm into the title block (farm 30394c1da keep-out); it
+    # now ends near 208 mm, 7.6 short of the block's left edge at 216.
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.040, 0.045, char_height=0.0035,
+        adapter, "Manufacturing Notes", HOLE_STATION_NOTE_XY[0], 0.045, char_height=0.0035,
     )
     if not ddoc.ActivateSheet("CROSS-TAPS"):
         raise RuntimeError("failed to activate top-frame cross-tap sheet")
@@ -2647,8 +2766,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="top-frame corner section",
     )
     # Rule 7: hidden lines only where they inform.  The cross-taps this
-    # elevation calls out are spotfaced from the face it looks at, so the
-    # Ø9.0 spotface rim and the tap drill circle inside it are VISIBLE ink
+    # elevation calls out are counterbored from the face it looks at, so the
+    # Ø9.0 counterbore rim and the tap drill circle inside it are VISIBLE ink
     # and the 10-32 callout, its native drill/thread depths and the
     # 22.7 tap-axis-below-boss-top dimension keep their attachments without
     # them.  What the dashed lines added was the far end's sockets, cap
@@ -2660,7 +2779,7 @@ async def build(adapter: Any) -> dict[str, str]:
     detail_front_edges = scan_view_edges(detail_front, label="holes/sockets front")
     detail_section_edges = scan_view_edges(detail_section, label="A-A socket section")
     # A-A's owned axes: the screw axis the section cuts along, and the two
-    # socket bore axes it crosses -- the datum the spotface floors are
+    # socket bore axes it crosses -- the datum the counterbore floors are
     # located from.
     _screw_axis, *bore_axes = _add_view_centerlines(
         adapter, detail_section,
@@ -2695,21 +2814,21 @@ async def build(adapter: Any) -> dict[str, str]:
     section_callouts.update(SECTION_CALLOUTS)
     set_dimension_callouts(adapter, section_annotations, section_callouts)
     imported_annotations += section_annotations
-    spotface_annotations = [
+    counterbore_annotations = [
         annotation for annotation in detail_front_dimensions
-        if dimension_name(adapter, annotation) == "S1Dia"
+        if dimension_name(adapter, annotation) == "CB1Dia"
     ]
-    if len(spotface_annotations) != 1:
-        raise RuntimeError("expected one native spotface profile diameter")
-    spotface_display = _early_bound(
-        spotface_annotations[0].GetSpecificAnnotation(), "IDisplayDimension"
+    if len(counterbore_annotations) != 1:
+        raise RuntimeError("expected one native counterbore profile diameter")
+    counterbore_display = _early_bound(
+        counterbore_annotations[0].GetSpecificAnnotation(), "IDisplayDimension"
     )
-    spotface_dimension = _early_bound(spotface_display.GetDimension2(0), "IDimension")
-    if not str(spotface_dimension.FullName).startswith("S1Dia@SpotFaceRearProfile@"):
-        raise RuntimeError(f"wrong native spotface feature: {spotface_dimension.FullName}")
-    spotface_value = abs(float(spotface_dimension.SystemValue))*1000.0
-    if abs(spotface_value-SPOTFACE_DIA) > 1e-6:
-        raise RuntimeError(f"native spotface profile diameter measured {spotface_value:g}")
+    counterbore_dimension = _early_bound(counterbore_display.GetDimension2(0), "IDimension")
+    if not str(counterbore_dimension.FullName).startswith("CB1Dia@CounterboreRearProfile@"):
+        raise RuntimeError(f"wrong native counterbore feature: {counterbore_dimension.FullName}")
+    counterbore_value = abs(float(counterbore_dimension.SystemValue))*1000.0
+    if abs(counterbore_value-COUNTERBORE_DIA) > 1e-6:
+        raise RuntimeError(f"native counterbore profile diameter measured {counterbore_value:g}")
     boss_pick_z = REAR_COLUMN_Z+(CAP_RECESS_DIAMETER+BOSS_DIA)/4
     # Both boss-height callouts used to park their text across the sheet from
     # the dimension line it belongs to, and the leader back paid for it: the
@@ -2770,7 +2889,8 @@ async def build(adapter: Any) -> dict[str, str]:
         suffix="X 45 DEG\nCAP / GOOSENECK TOP", edges=detail_section_edges,
     )
     upper_boss_edge = detail_front_edges.circle_at(
-        (COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z), BOSS_DIA/2, axis=(0.0, 1.0, 0.0),
+        (COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z), BOSS_DIA/2-EDGE_CHAMFER,
+        axis=(0.0, 1.0, 0.0),
         label="front view outer boss rim on the upper boss plane",
         center_tol_mm=1e-4, radius_tol_mm=1e-4,
     ).edge
@@ -2792,11 +2912,11 @@ async def build(adapter: Any) -> dict[str, str]:
         candidates = [item for item in section_floor_edges if abs(item[1][2]-plane_z) < 1e-6]
         if not candidates:
             raise RuntimeError(
-                f"section has no native spotface floor edge on Z={plane_z:g}; "
+                f"section has no native counterbore floor edge on Z={plane_z:g}; "
                 f"native vertical edge midpoints={[point for _, point in section_floor_edges]}"
             )
         opposed_floors.append(max(candidates, key=lambda item: item[1][1]))
-    # The spotface floors are located from the socket bore AXIS the shop
+    # The counterbore floors are located from the socket bore AXIS the shop
     # indicates, not from the frame midplane (a centre it would first have
     # to derive from the socket pattern -- codex round 5, policy rule 7):
     # the rear floor from the rear bore axis, the front pair being its
@@ -2805,7 +2925,7 @@ async def build(adapter: Any) -> dict[str, str]:
     floor_from_axis = add_edge_dimension(
         adapter, detail_section,
         p0=(0.0, 0.0), p1=(0.0, 0.0),
-        text_xy=(0.3535, 0.112), label="spotface floor from socket axis",
+        text_xy=(0.3535, 0.112), label="counterbore floor from socket axis",
         orientation="horizontal",
         entity_types=("SKETCHSEGMENT", "EDGE"),
         entities=(bore_axes[1], opposed_floors[1][0]),
@@ -2817,24 +2937,28 @@ async def build(adapter: Any) -> dict[str, str]:
     expected = TOP_SCREW_SEAT_Z - REAR_COLUMN_Z
     if abs(measured - expected) > 1e-5:
         raise RuntimeError(
-            f"spotface floor from socket axis: measured {measured:g}, expected {expected:g} mm"
+            f"counterbore floor from socket axis: measured {measured:g}, expected {expected:g} mm"
         )
-    _set_derived_precision(floor_from_axis, label="spotface floor from socket axis")
+    _set_derived_precision(floor_from_axis, label="counterbore floor from socket axis")
     floor_annotation = _early_bound(floor_from_axis.GetAnnotation(), "IAnnotation")
     set_dimension_callouts(
         adapter, [floor_annotation],
-        {dimension_name(adapter, floor_annotation): "4X SPOTFACE FLOOR\nFROM SOCKET AXIS"},
+        {dimension_name(adapter, floor_annotation): "4X COUNTERBORE FLOOR\nFROM SOCKET AXIS"},
     )
+    # "4X COUNTERBORE FLOOR" is 56.7 mm wide: centred at x 392 its shoulder
+    # ran 1.5 past the right border (farm 30394c1da), and 3.3 under the 47.3
+    # read as one callout with it.  At (387, 110.5) the shoulder ends near
+    # 415.6, 3.5 inside the border, and the block keeps 4.8 under the 47.3.
     offset_dimension_text(
         adapter, [floor_annotation],
-        {dimension_name(adapter, floor_annotation): (0.392, 0.112)},
+        {dimension_name(adapter, floor_annotation): (0.387, 0.1105)},
     )
     _checked_dimension(
         adapter, detail_section,
         p0=opposed_floors[0][1], p1=opposed_floors[1][1],
-        text_xy=(0.290, 0.100), label="opposed spotface floor separation",
+        text_xy=(0.290, 0.100), label="opposed counterbore floor separation",
         expected_mm=2*TOP_SCREW_SEAT_Z, orientation="horizontal",
-        suffix="2 PAIRS SPOTFACE FLOORS",
+        suffix="2 PAIRS COUNTERBORE FLOORS",
         entities=(opposed_floors[0][0], opposed_floors[1][0]),
         reference=True,
     )
@@ -2850,9 +2974,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="front/rear column-retention bottoming taps",
         # The native "2X" is the count in THIS view (one tap per end on the
         # face shown); the process lines carry the four-place scope for the
-        # spotface, drill depth and thread depth alike, since the machinist
+        # counterbore, drill depth and thread depth alike, since the machinist
         # sets up from the total (codex round 3).
-        process="4X TOTAL: 2X PER END, BOTH WALLS\nALL DEPTHS FROM SPOTFACE\nBOTTOMING TAP, 4X TOTAL",
+        process="4X TOTAL: 2X PER END, BOTH WALLS\nALL DEPTHS FROM COUNTERBORE\nBOTTOMING TAP, 4X TOTAL",
     )
     set_hole_callout_precision(
         cross_tap_callout, {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
@@ -2871,7 +2995,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # #946: the leader lands on the cap seat's near (outboard) ledge and
     # leaves through the boss's outer face midway between the cross tap's
-    # spotface and the boss top, as far from both as that face allows.
+    # counterbore and the boss top, as far from both as that face allows.
     cap_seat_tip = model_point_in_view(
         adapter,
         detail_section,
@@ -2887,7 +3011,7 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_section,
         (
             COLUMN_X/1000.0,
-            (SPOTFACE_DIA/2 + HALF_H + BOSS_ABOVE)/2/1000.0,
+            (COUNTERBORE_DIA/2 + HALF_H + BOSS_ABOVE)/2/1000.0,
             (FRONT_COLUMN_Z-BOSS_DIA/2)/1000.0,
         ),
         label="cap seat finish leader entry",
@@ -2917,9 +3041,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if (
         add_note(
             adapter,
-            "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-VN-027",
-            0.040,
-            0.025,
+            CROSS_TAP_SECTION_NOTE,
+            *CROSS_TAP_SECTION_NOTE_XY,
         )
         is None
     ):
@@ -3076,8 +3199,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # Both picks are entities, not sheet hit-tests: under hidden-lines-removed
     # the boss's bottom rim and the rail underside beyond the feather are the
     # only ink at those stations, and a coordinate pick that lands on nothing
-    # fails without saying which edge it wanted.
-    rail_underside_point = (-WEB_OUT_X, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT+HUB_BOSS_DROP)
+    # fails without saying which edge it wanted.  Both are the C2 breaks'
+    # inner edges on the underside planes: the rail web's bottom face ends
+    # 2 inside its outer face, the boss bottom face 2 inside its barrel.
+    rail_underside_point = (
+        -WEB_OUT_X+EDGE_CHAMFER, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT+HUB_BOSS_DROP
+    )
     boss_bottom_center = (GOOSENECK_X, -HALF_H-HUB_BOSS_DROP, GOOSENECK_Z)
     _checked_dimension(
         adapter, detail_left,
@@ -3091,7 +3218,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 rail_underside_point, label="hub boss underside drop, rail underside"
             ).edge,
             detail_left_edges.circle_at(
-                boss_bottom_center, HUB_BOSS_DIA/2, axis=(0.0, 1.0, 0.0),
+                boss_bottom_center, HUB_BOSS_DIA/2-EDGE_CHAMFER, axis=(0.0, 1.0, 0.0),
                 label="hub boss underside drop, boss bottom rim",
             ).edge,
         ),
@@ -3113,7 +3240,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _gusset_ramp_angle(adapter, detail_left, detail_left_edges)
     set_hidden_lines_removed(adapter, detail_left)
     left_note = add_note(
-        adapter, "HUB SIDE / REMOVED VIEW SCALE 1:2",
+        adapter, "HUB SIDE / REMOVED VIEW SCALE 1:2\nRIB BOTTOMS, GUSSETS, POCKET RIM SHARP",
         *HUB_LEFT_NOTE_XY,
     )
     if (
@@ -3150,21 +3277,39 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, bottom_dimensions, {"HubDia": "CYLINDRICAL BOSS"})
     imported_annotations += bottom_dimensions
     # The locator is drawn at the title block's own scale, so it names
-    # itself and says nothing a reader can already read off the title block.
-    if add_note(adapter, "UNDERSIDE LOCATOR", *HUB_BOTTOM_NOTE_XY) is None:
+    # itself and says nothing a reader can already read off the title block
+    # beyond the knife seats' exception to the C2 note: the bar-side and
+    # gusset-hypotenuse bottoms under both seats keep the title-block break.
+    if add_note(
+        adapter, "UNDERSIDE LOCATOR\nBAR/GUSSET BOTTOMS AT SEATS SHARP",
+        *HUB_BOTTOM_NOTE_XY,
+    ) is None:
         raise RuntimeError("failed to label underside locator")
     _checked_dimension(
         adapter, hub_bottom_parent,
-        p0=(LAND_X0, -HALF_H, -(INNER_Z+WEB_IN_Z)/2),
-        p1=(LAND_X1, -HALF_H, -(INNER_Z+WEB_IN_Z)/2),
+        # The land ends' outline is the C2 breaks' upper edge.
+        p0=(LAND_X0, -HALF_H+EDGE_CHAMFER, -(INNER_Z+WEB_IN_Z)/2),
+        p1=(LAND_X1, -HALF_H+EDGE_CHAMFER, -(INNER_Z+WEB_IN_Z)/2),
         text_xy=(0.105, 0.145), label="crossbar junction land",
         expected_mm=LAND_X1-LAND_X0, orientation="horizontal",
         exact_linear=True, edges=hub_bottom_edges,
-        suffix="FULL-THICKNESS LAND\n2X CENTRED ON CENTRAL WEB",
+        suffix="FULL-THICKNESS LAND\n2X CENTRED ON CROSSBAR",
         # The 23 mm land is narrower than its own qualifier, so the text
         # between the extension lines had both running through it (codex
         # round 4): pull it out to the right, on a jog, clear of them.
         offset_text=LAND_TEXT_OFFSET_XY,
+    )
+    # The pocket ends' outline is likewise the C2 breaks' upper edge, between
+    # the outer corner's break and the web.
+    pocket_pick_x = (BAR_X0 + EDGE_CHAMFER + BAR_WEB_X0) / 2.0
+    _checked_dimension(
+        adapter, hub_bottom_parent,
+        p0=(pocket_pick_x, -HALF_H+EDGE_CHAMFER, -BAR_POCKET_Z),
+        p1=(pocket_pick_x, -HALF_H+EDGE_CHAMFER, BAR_POCKET_Z),
+        text_xy=POCKET_LENGTH_TEXT_XY, label="crossbar pocket length",
+        expected_mm=2*BAR_POCKET_Z, orientation="vertical",
+        exact_linear=True, edges=hub_bottom_edges,
+        suffix="2X POCKET\nCENTRED", offset_text=POCKET_LENGTH_OFFSET_XY,
     )
     # The knife-hanger dowel pattern: datum B the front round hole, datum C
     # the rear one; each slot located to the near round hole, free along the

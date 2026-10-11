@@ -82,56 +82,61 @@ def test_four_cross_taps_are_bottoming_10_32_with_tooling_lead() -> None:
         TOP_CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH - 2.0 * depth_tolerance
         >= 2.0 * pitch
     )
-    assert part.SPOTFACE_FLOOR == TOP_SCREW_SEAT_Z
-    full_seat_limit = abs(part.FRONT_COLUMN_Z) + math.sqrt(
-        (part.BOSS_DIA / 2.0) ** 2 - (part.SPOTFACE_DIA / 2.0) ** 2
+    assert part.COUNTERBORE_FLOOR == TOP_SCREW_SEAT_Z
+    # The stock head's top must sit below the mouth's lowest point on the
+    # boss barrel, which is at the counterbore's widest |x|.
+    mouth_low = abs(part.FRONT_COLUMN_Z) + math.sqrt(
+        (part.BOSS_DIA / 2.0) ** 2 - (part.COUNTERBORE_DIA / 2.0) ** 2
     )
-    assert part.SPOTFACE_FLOOR < full_seat_limit
-    assert part.SPOTFACE_PLANE - part.SPOTFACE_FLOOR == pytest.approx(2.3)
-    assert part.SPOTFACE_SEAT_MARGIN == pytest.approx(1.4454076850485819)
-    assert part.SPOTFACE_PRINTED_SEAT_MARGIN == pytest.approx(
-        math.sqrt(22.1**2 - 4.9**2) - 21.4
+    assert part.COUNTERBORE_FLOOR + part.CROSS_SCREW_HEAD_H < mouth_low
+    assert part.COUNTERBORE_PLANE > abs(part.FRONT_COLUMN_Z) + part.BOSS_DIA / 2.0
+    places = spec.DRAWING_PRECISION["CounterboreRearProfile"]["CB1Dia"]
+    smallest_counterbore = (
+        round(part.COUNTERBORE_DIA, places) - spec.PRINTED_LINEAR_BAND_MM[places]
     )
-    assert part.SPOTFACE_PRINTED_SEAT_MARGIN >= 0.1
+    assert smallest_counterbore > part.CROSS_SCREW_HEAD_DIA
 
 
 @pytest.mark.parametrize("boss_direction", (-1, 1))
 @pytest.mark.parametrize("seat_direction", (-1, 1))
 @pytest.mark.parametrize("floor_direction", (-1, 1))
-def test_full_spotface_stays_on_material_at_every_printed_band_corner(
+def test_cross_screw_head_stays_below_the_counterbore_mouth_at_every_printed_band_corner(
     boss_direction: int, seat_direction: int, floor_direction: int
 ) -> None:
     boss_places = spec.DRAWING_PRECISION["BossUpProfile"]["C0Dia"]
-    seat_places = spec.DRAWING_PRECISION["SpotFaceRearProfile"]["S1Dia"]
-    floor_places = spec.DRAWING_REFERENCE_PRECISION["spotface floor from socket axis"]
+    seat_places = spec.DRAWING_PRECISION["CounterboreRearProfile"]["CB1Dia"]
+    floor_places = spec.DRAWING_REFERENCE_PRECISION[
+        "counterbore floor from socket axis"
+    ]
     boss_radius = (
         round(part.BOSS_DIA, boss_places)
         + boss_direction * spec.PRINTED_LINEAR_BAND_MM[boss_places]
     ) / 2.0
-    seat_radius = (
-        round(part.SPOTFACE_DIA, seat_places)
+    counterbore_radius = (
+        round(part.COUNTERBORE_DIA, seat_places)
         + seat_direction * spec.PRINTED_LINEAR_BAND_MM[seat_places]
     ) / 2.0
     floor_offset = (
-        round(part.SPOTFACE_FLOOR - abs(part.FRONT_COLUMN_Z), floor_places)
+        round(part.COUNTERBORE_FLOOR - abs(part.FRONT_COLUMN_Z), floor_places)
         + floor_direction * spec.PRINTED_LINEAR_BAND_MM[floor_places]
     )
-    # The widest points of the seat disk are its only limiting XZ points
-    # on a Y-axis cylinder; every other point has a smaller |X| coordinate.
-    assert math.hypot(seat_radius, floor_offset) < boss_radius
-    margin = math.sqrt(boss_radius**2 - seat_radius**2) - floor_offset
-    assert margin >= 0.1
+    # The mouth's lowest point on a Y-axis barrel is at the counterbore's
+    # widest |X|; the head is flush when its top stays below it.
+    mouth_low = math.sqrt(boss_radius**2 - counterbore_radius**2)
+    recess = mouth_low - (floor_offset + part.CROSS_SCREW_HEAD_H)
+    assert recess > 0.0
+    assert counterbore_radius > part.CROSS_SCREW_HEAD_DIA / 2.0
     if (boss_direction, seat_direction, floor_direction) == (-1, 1, 1):
-        assert margin == pytest.approx(part.SPOTFACE_PRINTED_SEAT_MARGIN)
+        assert recess == pytest.approx(part.COUNTERBORE_PRINTED_HEAD_RECESS)
 
 
 def test_cross_tap_ends_stay_in_the_real_boss_and_side_web_union() -> None:
     # The inward boss edge is not a free wall: the full-height side-rail
     # web continues past it and contains the whole far thread/drill envelope.
     major_dia = 4.826
-    thread_end_z = part.SPOTFACE_FLOOR - CASTING_FULL_THREAD_DEPTH
+    thread_end_z = part.COUNTERBORE_FLOOR - CASTING_FULL_THREAD_DEPTH
     drill_point_z = (
-        part.SPOTFACE_FLOOR
+        part.COUNTERBORE_FLOOR
         - TOP_CASTING_TAP_DRILL_DEPTH
         - part.SIDE_TAP_DRILL_DIA / 2.0 * part.DRILL_POINT_H
     )
@@ -296,26 +301,29 @@ def test_boss_additions_match_an_independent_t_section_area_integral() -> None:
     assert actual_lower == pytest.approx(28519.255654222216)
 
 
-def test_reseated_spotface_and_cross_tap_volumes_match_smooth_integrals() -> None:
+def test_counterbore_and_cross_tap_volumes_match_smooth_integrals() -> None:
     # Substitute x=r*sin(theta) so the disk-chord endpoints are smooth.
     # This is independent of the builder's linear-X integration grids.
     boss_radius = part.BOSS_DIA / 2.0
-    spot_radius = part.SPOTFACE_DIA / 2.0
+    counterbore_radius = part.COUNTERBORE_DIA / 2.0
     tap_radius = part.SIDE_TAP_DRILL_DIA / 2.0
     bore_radius = part.BORE_DIA / 2.0
-    floor_offset = part.SPOTFACE_FLOOR - abs(part.FRONT_COLUMN_Z)
-    assert part.SPOTFACE_PLANE > abs(part.FRONT_COLUMN_Z) + boss_radius
+    floor_offset = part.COUNTERBORE_FLOOR - abs(part.FRONT_COLUMN_Z)
+    assert part.COUNTERBORE_PLANE > abs(part.FRONT_COLUMN_Z) + boss_radius
     steps = 4096
     theta_step = math.pi / steps
-    spot_volume = tap_volume = 0.0
+    counterbore_volume = tap_volume = 0.0
     for index in range(steps):
         theta = -math.pi / 2.0 + (index + 0.5) * theta_step
         sine, cosine = math.sin(theta), math.cos(theta)
-        spot_volume += (
+        counterbore_volume += (
             2.0
-            * spot_radius**2
+            * counterbore_radius**2
             * cosine**2
-            * (math.sqrt(boss_radius**2 - (spot_radius * sine) ** 2) - floor_offset)
+            * (
+                math.sqrt(boss_radius**2 - (counterbore_radius * sine) ** 2)
+                - floor_offset
+            )
             * theta_step
         )
         tap_volume += (
@@ -329,7 +337,7 @@ def test_reseated_spotface_and_cross_tap_volumes_match_smooth_integrals() -> Non
             * theta_step
         )
     tap_volume += math.pi / 3.0 * tap_radius**3 * part.DRILL_POINT_H
-    assert part._spotface_removal() == pytest.approx(spot_volume, abs=0.01)
+    assert part._counterbore_removal() == pytest.approx(counterbore_volume, abs=0.01)
     assert part._side_tap_removal() == pytest.approx(tap_volume, abs=0.01)
 
 
@@ -346,11 +354,11 @@ def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
     assert root_chord == pytest.approx(21.540659228538015)
     assert side_run == pytest.approx(180.91868154292396)
     assert front_rear_run == pytest.approx(350.918681542924)
-    assert outer_run == pytest.approx(1036.674726171696)
-    assert window_run == pytest.approx(896.674726171696)
     fillet_area = (1.0 - math.pi / 4.0) * part.ROOT_FILLET_R**2
-    assert part._t_root_add() == pytest.approx(fillet_area * (outer_run + window_run))
-    assert part._t_root_add() == pytest.approx(3734.103089406865)
+    crossbar_run = 2.0 * 2.0 * part.BAR_POCKET_Z
+    assert part._t_root_add() == pytest.approx(
+        fillet_area * (outer_run + window_run + crossbar_run)
+    )
     points = part._outer_corner_top_edges()
     assert len(points) == 8
     for x, y, z in points:
@@ -363,6 +371,192 @@ def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "outer_corner_edges = _outer_corner_top_edges()" in source
     assert "] + outer_corner_edges" in " ".join(source.split())
+
+
+def test_crossbar_t_keeps_the_hanger_holes_in_the_full_depth_junctions() -> None:
+    # The T stops short of the gusset legs, leaving a full-depth bar side
+    # long enough to take its own C2; the web is centred on the knife line
+    # and every hanger hole stays beyond the pocket ends.
+    assert part.INNER_Z - part.GUSSET - part.BAR_POCKET_Z > 2.0 * part.EDGE_CHAMFER
+    assert (part.BAR_WEB_X0 + part.BAR_WEB_X1) / 2.0 == part.HANGER_X
+    assert part.BAR_WEB_X1 - part.BAR_WEB_X0 == part.WEB_T
+    assert part.BAR_X0 < part.BAR_WEB_X0 - part.ROOT_FILLET_R
+    assert part.BAR_WEB_X1 + part.ROOT_FILLET_R < part.BAR_X1
+    band = spec.PRINTED_LINEAR_BAND_MM[1]
+    pocket_end = part.BAR_POCKET_Z + 2.0 * band
+    for station in (part.STUD_Z_FRONT, part.STUD_Z_REAR):
+        largest_hole_r = (part.HANGER_CBORE_DIA + spec.PRINTED_LINEAR_BAND_MM[2]) / 2.0
+        wall = abs(station) - band - largest_hole_r - pocket_end
+        assert wall >= 2.0
+    assert min(part.BAR_POCKET_HOLE_WALLS.values()) >= 2.0
+
+
+def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
+    # Each print-worst hull holds the nominal block and reaches at least the
+    # unskewed stack: the station at its .X band and half the slip, the
+    # worse .X row-to-face reach.
+    import sm_knife_mount_spec as mount
+
+    reach = max(
+        mount.HOLE_ROW_FACE_DISTANCE + mount.HOLE_ROW_FACE_TOL,
+        mount.SUPPORT_Z_THICK
+        + mount.BLOCK_SIZE_TOL
+        - (mount.HOLE_ROW_FACE_DISTANCE - mount.HOLE_ROW_FACE_TOL),
+    )
+    band = spec.PRINTED_LINEAR_BAND_MM[1]
+    slip = spec.HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
+    for mount_name, station in (
+        ("front", part.STUD_Z_FRONT),
+        ("rear", part.STUD_Z_REAR),
+    ):
+        hull = part.KNIFE_SEAT_FOOTPRINTS[mount_name]
+        nominal = [
+            (
+                part.HANGER_X + sx * mount.BLK_HALF_X,
+                station + sz * mount.SUPPORT_Z_THICK / 2.0,
+            )
+            for sx in (-1.0, 1.0)
+            for sz in (-1.0, 1.0)
+        ]
+        assert part._plan_gap(hull, nominal) == 0.0
+        zs = [abs(z) for _x, z in hull]
+        assert min(zs) <= abs(station) - band - slip - reach
+        assert max(zs) >= abs(station) + band + slip + reach
+
+
+def test_c2_breaks_stay_clear_of_both_print_worst_knife_seats() -> None:
+    # Every finished underside C2 band keeps 0.5 off both seats; the pocket
+    # ends bind the front seat.  The sharp bar sides and gusset hypotenuses
+    # beyond the pockets are exactly the edges a C2 would put under it.
+    _groups, clearance = part._external_edge_breaks()
+    assert clearance == part.KNIFE_SEAT_C2_CLEARANCE
+    assert min(clearance.values()) >= part.KNIFE_SEAT_C2_MIN_CLEARANCE == 0.5
+    reach = part.EDGE_CHAMFER + part._C2_LEG_BAND + part._EDGE_LOCATION_BAND
+    gusset_z = part.INNER_Z - part.GUSSET
+    front = part.KNIFE_SEAT_FOOTPRINTS["front"]
+    bar_side_band = [
+        (part.BAR_X0 - part._EDGE_LOCATION_BAND, -part.BAR_POCKET_Z),
+        (part.BAR_X0 + reach, -part.BAR_POCKET_Z),
+        (part.BAR_X0 + reach, -gusset_z),
+        (part.BAR_X0 - part._EDGE_LOCATION_BAND, -gusset_z),
+    ]
+    assert part._plan_gap(bar_side_band, front) < 0.5
+    hypotenuse_band = [
+        (part.BAR_X0, -gusset_z),
+        (part.BAR_X0 - part.GUSSET, -part.INNER_Z),
+        (part.BAR_X0 - part.GUSSET + reach * math.sqrt(2.0), -part.INNER_Z),
+        (part.BAR_X0 + reach * math.sqrt(2.0), -gusset_z),
+    ]
+    assert part._plan_gap(hypotenuse_band, front) < 0.5
+
+
+def test_c2_picks_are_convex_and_the_gusset_junctions_are_not() -> None:
+    # The solid-angle probe reads the plan's turns: the bar-side to gusset
+    # junction is re-entrant, a pocket-end outer corner and a bar-side
+    # bottom are right-angled and convex.
+    gusset_z = part.INNER_Z - part.GUSSET
+    for x_bar in (part.BAR_X0, part.BAR_X1):
+        for sz in (-1.0, 1.0):
+            assert (
+                part._interior_angle((x_bar, 0.0, sz * gusset_z), (0.0, 1.0, 0.0))
+                == 225.0
+            )
+            assert (
+                part._interior_angle(
+                    (x_bar, -part.HALF_H / 2.0, sz * part.BAR_POCKET_Z), (0.0, 1.0, 0.0)
+                )
+                == 90.0
+            )
+    for x, y, z in _external_break_points():
+        assert not (abs(abs(z) - gusset_z) < 1e-9 and x in (part.BAR_X0, part.BAR_X1))
+
+
+def _external_break_points() -> list[list[float]]:
+    return [
+        point for picks, _, _ in part.EXTERNAL_EDGE_BREAKS.values() for point in picks
+    ]
+
+
+def test_c2_breaks_split_into_connected_chains_in_build_order() -> None:
+    groups, _clearance = part._external_edge_breaks()
+    assert groups == part.EXTERNAL_EDGE_BREAKS
+    assert list(groups) == [
+        "RailRunBreaks",
+        "CrossbarBreaks",
+        "WestWindowBreaks",
+        "HubRailBreaks",
+        "OuterCornerBreaks",
+        "BossRimBreaks",
+    ]
+    for feature, (picks, removal, shared) in groups.items():
+        assert picks and removal > 0.0, feature
+    # The boss rims are closed circles and the rail runs die into boss
+    # barrels at both ends: neither shares a vertex.
+    assert groups["RailRunBreaks"][2] == groups["BossRimBreaks"][2] == 0
+    # Each rib-side bottom ends on the web face, at its web bottom's end, in
+    # the same feature.
+    hub = groups["HubRailBreaks"][0]
+    for z_rib in (
+        part.GOOSENECK_Z - part.HUB_RIB_W / 2.0,
+        part.GOOSENECK_Z + part.HUB_RIB_W / 2.0,
+    ):
+        assert [(-part.OUTER_X - part.WEB_OUT_X) / 2.0, -part.HALF_H, z_rib] in hub
+
+
+def test_c2_chains_leave_no_sliver_between_features(monkeypatch) -> None:
+    assert part._segment_gap((0, 0, 0), (1, 0, 0), (1, 0, 0), (1, 1, 0)) == 0.0
+    assert part._segment_gap((0, 0, 0), (2, 0, 0), (1, 1, 1), (1, 1, 3)) == (
+        pytest.approx(math.sqrt(2.0))
+    )
+    assert part._segment_gap((0, 0, 0), (1, 0, 0), (3, 0, 0), (4, 0, 0)) == 2.0
+    # The nearest two breaks that do not meet stand 4.5 apart (a pocket end);
+    # demanding a land that wide trips the guard.
+    monkeypatch.setattr(part, "C2_SLIVER_MIN", 0.6)
+    with pytest.raises(AssertionError, match="sliver"):
+        part._external_edge_breaks()
+
+
+def test_hub_boss_chord_stays_inside_the_web_at_the_rib_sides() -> None:
+    def margin(rib_w: float) -> float:
+        chord = math.sqrt(max((part.HUB_BOSS_DIA / 2.0) ** 2 - (rib_w / 2.0) ** 2, 0.0))
+        return part.WEB_T / 2.0 - chord
+
+    assert part.HUB_BOSS_RIB_CHORD_MARGIN == pytest.approx(margin(part.HUB_RIB_W))
+    assert part.HUB_BOSS_RIB_CHORD_MARGIN >= part.HUB_BOSS_RIB_CHORD_MIN_MARGIN == 0.5
+    # The old 27-wide rib let the boss poke 0.038 past the web there.
+    assert margin(27.0) < 0.0
+
+
+def test_external_edge_breaks_select_distinct_edges_and_skip_the_noted_ones() -> None:
+    points = _external_break_points()
+    assert len(points) == 75
+    assert len({tuple(round(value, 6) for value in point) for point in points}) == len(
+        points
+    )
+    # No two picks share an edge's 0.5 mm selection radius.
+    for i, a in enumerate(points):
+        for b in points[i + 1 :]:
+            assert math.dist(a, b) > 0.5
+    # The crossbar flange's underside edges, the bar-side and gusset
+    # hypotenuse bottoms beyond the pockets and the hub rib's outer and inner
+    # bottom edges stay sharp: none is picked.
+    for x, y, z in points:
+        assert not (
+            y == part.FLANGE_BOT_Y
+            and x in (part.BAR_X0, part.BAR_X1)
+            and abs(z) < part.BAR_POCKET_Z
+        )
+        assert not (
+            y == -part.HALF_H
+            and x in (-part.OUTER_X, -part.INNER_X)
+            and part.GOOSENECK_Z - part.HUB_RIB_W / 2.0
+            < z
+            < part.GOOSENECK_Z + part.HUB_RIB_W / 2.0
+        )
+        if y == -part.HALF_H and part.BAR_POCKET_Z < abs(z) < part.INNER_Z:
+            # No bar-side bottom; no hypotenuse bottom (x off the bar).
+            assert not part.BAR_X0 - part.GUSSET <= x <= part.BAR_X0
+            assert not part.BAR_X1 <= x <= part.BAR_X1 + part.GUSSET
 
 
 def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
@@ -846,8 +1040,13 @@ def _cap_seat_geometry():
     )
     face_z = part.FRONT_COLUMN_Z - part.BOSS_DIA / 2.0
     top = part.HALF_H + part.BOSS_ABOVE
-    entry = _section(face_z, (part.SPOTFACE_DIA / 2.0 + top) / 2.0)
-    return tip, entry, _section(face_z, top), _section(face_z, part.SPOTFACE_DIA / 2.0)
+    entry = _section(face_z, (part.COUNTERBORE_DIA / 2.0 + top) / 2.0)
+    return (
+        tip,
+        entry,
+        _section(face_z, top),
+        _section(face_z, part.COUNTERBORE_DIA / 2.0),
+    )
 
 
 def _section_detour(start, tip):
@@ -874,8 +1073,8 @@ def test_cap_seat_finish_leader_takes_the_short_way_to_its_ledge() -> None:
     """#946 / b49e1: the cap seat Ra 3.2 stood below-left of A-A and its
     leader climbed 24.7 mm through the hatching to the far ledge, 16.6 mm
     past the approach.  It now lands on the near ledge through the boss's
-    outer face, between the cross tap's spotface and the boss top."""
-    tip, entry, top, spotface_top = _cap_seat_geometry()
+    outer face, between the cross tap's counterbore and the boss top."""
+    tip, entry, top, counterbore_top = _cap_seat_geometry()
     symbol = drawing.cap_seat_finish_placement(tip, entry)
     bend = (symbol[0] + drawing.FINISH_LEADER_TAIL, symbol[1])
     # The bend, the entry and the tip are one straight leader.
@@ -883,7 +1082,7 @@ def test_cap_seat_finish_leader_takes_the_short_way_to_its_ledge() -> None:
     assert cross == pytest.approx(0.0, abs=1e-12)
     over, approach, detour = _section_detour(bend, tip)
     assert detour <= LEADER_DETOUR_TARGET, (over, approach, detour)
-    assert spotface_top[1] < entry[1] < top[1]
+    assert counterbore_top[1] < entry[1] < top[1]
     # The symbol's ink stays off the part.
     assert bend[0] + drawing.CAP_SEAT_FINISH_INK_PAST_BEND <= entry[0] - drawing.INK_CLEARANCE
 
@@ -1171,7 +1370,7 @@ def test_b_outer_arrow_keeps_off_the_window_width() -> None:
 def test_section_cuts_cross_the_same_stock() -> None:
     """The moved ends keep what each removed section shows: B cuts the
     rail's plain T between the junction land and the corner boss, E runs
-    from outside the left rail past the central web, D from outside the hub
+    from outside the left rail past the crossbar T, D from outside the hub
     rail past its inner face, each at its own station."""
     ends = drawing.section_cut_ends()
     (bx, b_outer), (bx_inner, b_inner) = ends["B"]
@@ -1435,6 +1634,39 @@ def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
         assert 0.013 < x < TITLE_BLOCK[0] and 0.125 < y < 0.270, name
 
 
+def test_overall_plan_extremes_pick_the_barrel_circles_as_entities() -> None:
+    # Farm a03283b49: a sheet-point pick on the boss barrel's R22.5 plan
+    # outline resolved to the top C2 break's R20.5 circle 2.0 inside it
+    # (width 435 for 439).  Both overall dimensions select the scanned
+    # R22.5 circles, on the upper boss's C2 lower circle plane.
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    calls = {
+        ast.literal_eval(keyword.value): call
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call) and _called_name(call) == "_checked_dimension"
+        for keyword in call.keywords
+        if keyword.arg == "label" and isinstance(keyword.value, ast.Constant)
+    }
+    for label in ("overall casting width", "overall casting depth"):
+        keywords = {keyword.arg: keyword.value for keyword in calls[label].keywords}
+        entities = keywords["entities"]
+        assert isinstance(entities, ast.Tuple) and len(entities.elts) == 2
+        assert all(_called_name(item) == "plan_barrel" for item in entities.elts)
+        assert ast.literal_eval(keywords["maximum"]) is True
+    barrel = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "plan_barrel"
+    )
+    text = ast.unparse(barrel)
+    assert "geometry_top_edges.circle_at(" in text
+    assert "HALF_H + BOSS_ABOVE - EDGE_CHAMFER" in text
+    assert "BOSS_DIA / 2" in text
+    assert drawing.PLAN_HALF_X == part.COLUMN_X + part.BOSS_DIA / 2.0
+
+
 def test_no_datum_tag_is_attached_to_a_circle_by_edge_object() -> None:
     # Farm run 20261009T164113078Z: datum B, attached to the scanned round
     # dowel-hole circle as an edge object, ignored SetPosition2 and stayed at
@@ -1579,6 +1811,69 @@ def test_rear_slot_frame_stands_clear_of_section_f_f() -> None:
     assert knee[0] > bar_right
     assert outline.xmax < centre[0] + part.INNER_X * m_per_mm
     assert outline.ymin > max(drawing.HANGER_SLOT_FRAME_XY["front"][1], drawing.HANGER_DATUM_SYMBOL_XY["B"][1] + 0.007)
+
+
+def test_pocket_length_dimension_stands_outside_the_plan() -> None:
+    # The 138.0 line, its extension lines and its text stay out of the plan
+    # silhouette and detail C's fence; the text block is 24.6 x 17.5 mm as
+    # farm c75ac06 printed it.
+    from _layout_geometry import Box, Segment, segment_box_distance
+
+    centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
+    line_x, _ = drawing.POCKET_LENGTH_TEXT_XY
+    text_x, text_y = drawing.POCKET_LENGTH_OFFSET_XY
+    text = Box(text_x - 0.0123, text_y - 0.00875, text_x + 0.0123, text_y + 0.00875)
+    clearance = 0.00178
+    plan_left = centre[0] - drawing.PLAN_HALF_X * m_per_mm
+    plan_top = centre[1] + drawing.PLAN_HALF_Z * m_per_mm
+    fence_x = centre[0] + part.GOOSENECK_X * m_per_mm
+    fence_y = centre[1] + part.GOOSENECK_Z * m_per_mm
+    fence_r = (part.HUB_GUSSET_HALF_OUT + part.HUB_BOSS_DROP) * m_per_mm
+    pocket = [centre[1] + sz * part.BAR_POCKET_Z * m_per_mm for sz in (-1.0, 1.0)]
+    sheet_x0, _, _, sheet_y1 = drawing.SHEET_FRAME
+    # The line runs left of the barrels and the fence, inside the sheet.
+    assert sheet_x0 + drawing.INK_CLEARANCE < line_x < fence_x - fence_r - clearance
+    assert line_x < plan_left - clearance
+    # The extension lines pass under and over the fence, between the bosses.
+    boss_r = part.BOSS_DIA / 2.0 * m_per_mm
+    for y in pocket:
+        assert abs(y - fence_y) > fence_r + clearance
+        for boss_z in (part.FRONT_COLUMN_Z, part.REAR_COLUMN_Z):
+            assert abs(y - (centre[1] + boss_z * m_per_mm)) > boss_r + clearance
+    # The text sits above the plan's top-left corner, inside the sheet frame.
+    assert text.xmin > sheet_x0 + drawing.INK_CLEARANCE
+    assert text.ymax < sheet_y1 - drawing.INK_CLEARANCE
+    assert text.ymin > plan_top + clearance
+    boss_x = centre[0] - part.COLUMN_X * m_per_mm
+    boss_y = centre[1] + part.REAR_COLUMN_Z * m_per_mm
+    nearest = (
+        min(max(boss_x, text.xmin), text.xmax),
+        min(max(boss_y, text.ymin), text.ymax),
+    )
+    assert math.dist(nearest, (boss_x, boss_y)) > boss_r + clearance
+    assert (
+        segment_box_distance(Segment(line_x, pocket[0], line_x, pocket[1]), text) > 0.0
+    )
+
+
+def test_section_note_states_the_far_wall_print_worst_engagement() -> None:
+    import build_fr_frame_assembly as assembly
+    from _mcmaster_90280a837 import SHANK_DIA
+
+    engagement = drawing.CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
+    # Rule 12: the printed bands only shorten the far-wall engagement, and
+    # the shortest still holds 1.5D.
+    assert 1.5 * SHANK_DIA <= engagement < assembly.TOP_FAR_CASTING_ENGAGEMENT
+    note = drawing.CROSS_TAP_SECTION_NOTE
+    assert f"{engagement:.1f} FULL THREAD" in note
+    # Rule 6: short notes, short of the title block and inside the frame.
+    lines = note.splitlines()
+    x, y = drawing.CROSS_TAP_SECTION_NOTE_XY
+    assert len(lines) <= 4
+    assert x + 0.0027 * max(len(line) for line in lines) < TITLE_BLOCK[0]
+    # Rows print 5.56 mm apart (farm c75ac06, sheet 6 callout rows).
+    bottom = y - 0.00556 * len(lines)
+    assert bottom > drawing.SHEET_FRAME[1] + drawing.INK_CLEARANCE
 
 
 def _segments_apart(a, b) -> bool:
@@ -2946,7 +3241,10 @@ def test_keeper_seats_split_after_the_solid_and_qualify_once_before_pmi() -> Non
         for call in ast.walk(node)
         if isinstance(call, ast.Call) and _called_name(call) == "volume_check"
     )
-    assert "'bore top breaks'" in statements[last_material]
+    assert statements[last_material].startswith(
+        "for feature, (picks, v_chain, shared) in EXTERNAL_EDGE_BREAKS.items():"
+    )
+    assert "f'external edge breaks {feature}'" in statements[last_material]
     rebuilds = [
         i for i, s in enumerate(statements) if s == "await force_rebuild(adapter)"
     ]

@@ -20,7 +20,6 @@ def test_cross_screws_clear_tubes_and_engage_both_casting_sides() -> None:
     assert frame.TOP_CROSS_TAP_SPEC.kind == "tapped_bottoming"
     assert frame.TUBE_CROSS_HOLE_DIAMETER > cross_screw.SHANK_DIA
     assert math.isclose(frame.BASE_FAR_CASTING_ENGAGEMENT, 10.70, abs_tol=1e-9)
-    assert math.isclose(frame.TOP_FAR_CASTING_ENGAGEMENT, 11.10, abs_tol=1e-9)
     assert (
         min(
             frame.BASE_FAR_CASTING_ENGAGEMENT,
@@ -33,7 +32,7 @@ def test_cross_screws_clear_tubes_and_engage_both_casting_sides() -> None:
 
 def test_upper_stock_screw_keeps_casting_engagement_at_the_printed_bands() -> None:
     floor_places = top_frame_spec.DRAWING_REFERENCE_PRECISION[
-        "spotface floor from socket axis"
+        "counterbore floor from socket axis"
     ]
     bore_places = top_frame_spec.DRAWING_PRECISION["BoreProfile"]["B0Dia"]
     max_floor_offset = (
@@ -45,8 +44,8 @@ def test_upper_stock_screw_keeps_casting_engagement_at_the_printed_bands() -> No
         + top_frame_spec.PRINTED_LINEAR_BAND_MM[bore_places]
     ) / 2.0
     minimum_engagement = cross_screw.SHANK_LEN - max_floor_offset - max_bore_radius
-    assert math.isclose(minimum_engagement, 9.90, abs_tol=1e-9)
-    assert minimum_engagement >= cross_screw.SHANK_DIA
+    # Rule 12: the flush counterbore floor still leaves 1.5D of far thread.
+    assert minimum_engagement >= 1.5 * cross_screw.SHANK_DIA
     full_thread = frame.TOP_CROSS_TAP_SPEC.overrides_mm["ThreadDepth"]
     minimum_thread_reserve = (
         full_thread - top_frame_spec.PRINTED_LINEAR_BAND_MM[1] - cross_screw.SHANK_LEN
