@@ -84,6 +84,7 @@ from pd_transgear_arm_spec import (
     PIN_HOLE_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
+    PROJECTED_ZONE_NOTE,
     SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
@@ -130,9 +131,13 @@ END_CENTER = (0.357, FRONT_CENTER[1])
 # B-B (run 20261010T001620278Z: B-B's label printed on the isometric).
 ISO_CENTER = (0.184, 0.037)
 ISO_NOTE_XY = (0.080, 0.022)
-# Bottom left, clear of the section's floor-depth text and of the title block.
-NOTES_XY = (0.014, 0.048)
-NOTES_TEXT = matched_locator_notes(_config.parts("pd-transgear-arm-plate")["number"])
+# Bottom left, clear of the section's floor-depth text above and of the
+# isometric caption below.
+NOTES_XY = (0.014, 0.060)
+NOTES_TEXT = "\n".join((
+    matched_locator_notes(_config.parts("pd-transgear-arm-plate")["number"]),
+    PROJECTED_ZONE_NOTE,
+))
 # Under the end view's pin callout; its label clears the title block.
 LOCATOR_SECTION_CENTER = (0.370, 0.120)
 # The front view centres on the outline's bounding box (x -R .. tip).

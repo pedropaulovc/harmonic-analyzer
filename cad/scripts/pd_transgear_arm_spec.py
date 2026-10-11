@@ -173,6 +173,14 @@ PLATE_TAP_EDGE_BREAK_CALLOUT = (
     f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES"
 )
 SPOT_FACE_CALLOUT = "COUNTERBORE, REAR FACE"
+# Where each projected zone starts and which way it runs: the plate taps'
+# zones run rearward into the MHA-PD-019 plate on the rear face; the pin
+# bore's runs forward from front face A to the chain plane.
+PROJECTED_ZONE_NOTE = "\n".join((
+    "3. PROJECTED ZONES RUN OUT OF THE PART:",
+    f"   PLATE TAPS {ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:.1f} REARWARD FROM REAR FACE;",
+    f"   PIN BORE {REGISTRATION.S_PROJECTED_HEIGHT_MM:.1f} FORWARD FROM FRONT FACE A.",
+))
 # Two short lines: the text stands under the section's pivot end, inside the
 # left border.
 FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE"
