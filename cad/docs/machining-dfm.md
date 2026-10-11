@@ -347,8 +347,10 @@ The reducer is 12:120 at 48DP, and the two 48DP cutters are the same #2 and #8 s
 use. Both 12T pinions carry the stock #8 form, and each hub is shaped so the cutter runs out clear.
 The rack is bought, not cut: SDP/SI A1B12-Y324, a 48 in brass 32DP 20° rack, 3/16 × 3/16 in
 (4.7625 mm) square ([product page](https://shop.sdp-si.com/a-1b12-y324.html),
-[D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)), cut to 269.64 mm and soldered to the
-existing backer. Check it against the feed pinion before fitting; the pitch-index limit the model
+[D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)), cut to the printed 269.6 mm callout
+(`cad/config/parts/pd-platen-rack.yaml`) and soldered to the existing backer. The 269.64 mm
+CAD nominal is not the shop cut length; `pd_platen_rack_spec.DRAWING_PRECISION` prints it
+to one decimal place under the ordinary .X band. Check it against the feed pinion before fitting; the pitch-index limit the model
 allows for it is in `cad/config/tolerances/stock_form_quality.yaml` (`rack_pitch_index_deviation_mm`).
 
 The chain is 68 links of ANSI #25, 12:24 from the crank sprocket to the knob sprocket. The
