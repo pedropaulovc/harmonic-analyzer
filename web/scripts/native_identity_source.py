@@ -328,7 +328,10 @@ def magnifier_installation(path: Path) -> dict[str, float]:
             return -value if isinstance(node.op, ast.USub) else value
         if isinstance(node, ast.BinOp) and type(node.op) in operations:
             return operations[type(node.op)](number(node.left, active), number(node.right, active))
-        raise ValueError(f"Missing, ambiguous or nonnumeric magnifier installation datum in {path}")
+        raise ValueError(
+            f"Missing, ambiguous or nonnumeric magnifier installation datum "
+            f"{ast.unparse(node)!r} in {path}"
+        )
 
     return {
         name: number(ast.Name(id=name, ctx=ast.Load()), frozenset())

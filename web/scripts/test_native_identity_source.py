@@ -135,6 +135,14 @@ class MagnifierInstallationTests(unittest.TestCase):
     def test_released_literal_and_dependency_datums_are_exact(self):
         self.assertEqual(self.parse_source(self.SOURCE), self.EXPECTED)
 
+    def test_new_fixture_contract_is_refused_by_missing_datum_name(self):
+        source = self.SOURCE.replace(
+            "FIXTURE_Y0 = 915.7\n",
+            "from mg_output_fixture_geom import FIXTURE_AXIS_Y\n",
+        )
+        with self.assertRaisesRegex(ValueError, "datum 'FIXTURE_Y0'"):
+            self.parse_source(source)
+
     def test_module_rebinding_cannot_return_stale_installed_points(self):
         for rebinding in (
             "VROD_TOP_Y += 10.0\n",
