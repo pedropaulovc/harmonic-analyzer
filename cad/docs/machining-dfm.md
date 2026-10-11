@@ -36,14 +36,17 @@ geometry is casting-shaped, not milling-shaped.
      Break the two long torque corners of the terminal flat no more than 0.02 mm; the 0.420 AF
      already pays for that break. The model leaves these corners sharp and the sheet prints the break
      as a callout, `TORQUE CORNERS: STONE BURR ONLY, 0.02 MAX`, because it is below the title block's
-     R0.25 edge break. The stepped collar (Ø17.05 body, Ø6.40 × 3.5 nose, 11.5 overall) has a
+     R0.25 edge break. The stepped collar (Ø17.48 body, Ø6.40 × 3.5 nose, 11.5 overall;
+     `vn_cone_tip_collar_spec.OUTER_DIA`) has a
      finished bore of Ø0.849 ±0.030 and a radial #2-56 through tap. Fit the stock McMaster
      94355A213 #2-56 × 5/16 in flat-point screw unaltered, with no dog. To fit the collar, hold the
      gear stack south on the shaft's thrust collar, set the original 0.45 ±0.10 feeler off the
      T006 thrust face, seat both collar bore ends on the round back of the terminal, snug the
      stock flat point on the D-flat, then remove the feeler.
-     Never run or swing a loose collar. The post and stack setup steps are listed in
-     `dt_tip_collar_air.installation_requirements()`.
+     Never run or swing a loose collar. Installation notes are in
+     `vn_cone_tip_collar_spec.INSTALLATION_NOTES`; `dt_tip_collar_air.py` owns the
+     printed-tolerance air stack over the swing, using arithmetic closure when it clears
+     everywhere, otherwise RSS of the same terms.
 
 - **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
   | family | qty | why CNC |
