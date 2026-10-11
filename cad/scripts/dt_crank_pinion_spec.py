@@ -634,7 +634,18 @@ TURNED_BAND_FITUP_NOTE = (
     "TURNED BAND MAY BE TURNED DOWN PER MHA-DT-000 T120 CHECK, "
     f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN."
 )
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, TURNED_BAND_FITUP_NOTE))
+# Section A-A cuts through a tooth, so the band reads as a solid ring and the
+# spaces seem to stop against it (machinist review of the stack build). They
+# do not: the band is the teeth turned down, and the spaces run the whole face
+# width out over the boss, turned to the root (BOSS_DIA = ROOT_DIA_MIN), which
+# is where the form cutter runs out. The boss's .X band allows it above the
+# root, so a cutter mark on the boss is permitted, not a reject.
+TOOTH_RUNOUT_NOTE = (
+    "TEETH RUN FULL LENGTH THROUGH THE TURNED BAND; CUTTER RUNOUT INTO BOSS OK."
+)
+if not BOSS_DIA <= ROOT_DIA_MIN:
+    raise AssertionError("the 16T boss must be turned to the root for the cutter runout")
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, TOOTH_RUNOUT_NOTE, TURNED_BAND_FITUP_NOTE))
 # The MHA-DT-000 crank step's T120 check (user, 2026-09-30, #1154), printed by
 # draw_dt_drive_train_assembly: the pinion on its seat feeler, MHA-DT-010 and T120
 # pushed toward each other (taking up every running play), turned by hand and

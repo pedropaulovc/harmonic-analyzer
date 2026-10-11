@@ -32,7 +32,7 @@ def root_to_bore_web_min_mm(teeth: int) -> float:
 def cutter_description(teeth: int) -> str:
     template = spec.stock_form_profile(teeth).template
     if template.cutter_number is None:
-        return f"{template.name}, TEMPLATE ON LAST SHEET (REF); NOT STOCK"
+        return f"{template.name} PER LAST SHEET; NOT STOCK"
     minimum, maximum = template.teeth_range
     upper = "UP" if maximum is None else str(maximum)
     return f"#{template.cutter_number} {minimum}-{upper}T; TEMPLATE {template.reference_teeth}T"
@@ -74,7 +74,8 @@ def gear_data(teeth: int) -> str:
         ("WEB MIN (mm, REF)", f"{web:.2f}"),
     )
     if teeth == 6:
-        # The custom form is reference only; the cut gear is accepted here.
+        # DT6-FORM1's edge is defined on the last sheet; the cut gear is
+        # accepted here.
         low, high = spec.custom_six_over_pins_limits_mm()
         rows += ((
             f"OVER 2 PINS \u00d8{spec.CUSTOM_SIX_PIN_DIA_MM:.2f}, OPPOSITE GAPS (mm)",

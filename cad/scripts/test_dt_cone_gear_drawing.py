@@ -175,10 +175,13 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
         assert f"T{teeth:03d}" in data
         assert f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG" in data
         for physical_recipe in (
-            "CUTTER", "TEMPLATE", "TOOL T", "PLUNGE", "WHOLE DEPTH",
+            "CUTTER", "TOOL T", "PLUNGE", "WHOLE DEPTH",
             "TOOTH FORM", "BACKLASH WITH MATE", "ROOT RADIAL MIN/MAX", "WEB",
         ):
             assert physical_recipe in data, (teeth, physical_recipe)
+        # Stock cutters name their template; DT6-FORM1's edge is the last sheet.
+        cutter = "DT6-FORM1 PER LAST SHEET; NOT STOCK" if teeth == 6 else "; TEMPLATE "
+        assert cutter in data, teeth
         assert ("RELIEF BELOW R1.531" in data) == (teeth == 6)
         assert "TIF" not in data
         assert notes.CYLINDER_MATE_NUMBER in data
@@ -378,30 +381,64 @@ def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> 
     assert max(map(len, detail.splitlines())) <= notes.CUTTER_DETAIL_LINE_CHARS
 
 
-def test_custom_six_sheet_gives_grind_data_not_equations() -> None:
-    """Sheet DT6-FORM1 prints what the toolmaker grinds to (3 places) as
-    reference; the cut T006 is accepted over pins, not on a comparator."""
+def test_custom_six_sheet_defines_the_tool_edge_point_by_point() -> None:
+    """Sheet DT6-FORM1 defines the cutting edge the toolmaker grinds to (3
+    places, one-sided form tolerance); the tool is checked by template and
+    the cut T006 over pins, not on a comparator."""
     profile = spec.stock_form_profile(6)
+    template = profile.template
     data = drawing.cutter_grind_data()
     lines = data.splitlines()
-    assert lines[0] == "DT6-FORM1 GROUND FORM TOOL (REF), mm"
+    assert lines[0] == "DT6-FORM1 GROUND FORM TOOL, mm"
     assert lines[-1] == "ACCEPT THE CUT T006 OVER PINS PER SHEET T006"
+    assert "(REF)" not in data
     assert "COMPARATOR" not in data and "TIF" not in data
+    assert "INSPECT THE TOOL BY TEMPLATE TO THIS TABLE;" in lines
     assert "FORM DEPTH (PLUNGE FROM BLANK OD):  1.055" in lines
-    assert "TIP ARC (FORMS GEAR ROOT):  R1.100" in lines
-    assert "RELIEF MEETS INVOLUTE AT:  R1.531" in lines
-    # Chords across the installed gap, which at T=0 IS the ground form:
-    # the pitch chord closes on the tool's pitch tooth thickness.
-    pitch = next(line for line in lines if line.startswith("WIDTH AT PITCH DIA 3.175 (CHORD)"))
-    chord = float(pitch.rsplit(" ", 1)[1])
-    half_gap = math.asin(chord / (2.0 * profile.pitch_radius_mm))
-    thickness = profile.pitch_radius_mm * (profile.angular_pitch_rad - 2.0 * half_gap)
-    assert thickness == pytest.approx(profile.pitch_tooth_thickness_mm, abs=0.002)
-    assert "WIDTH AT BLANK OD 4.310 (CHORD):  1.953" in lines
+    assert "TIP: CONCAVE ARC R1.100 ABOUT GEAR AXIS" in lines
+    assert "ABOVE R1.531: INVOLUTE, BASE R1.492" in lines
+    # Wide only, by half the T006 thinning band (0/-0.04 on thickness).
+    assert spec.CUSTOM_SIX_FORM_TOLERANCE_MM == pytest.approx(0.02)
+    assert "FORM TOLERANCE: X +0.020 / -0.000" in lines
+    points = spec.custom_six_form_points_mm()
+    rows = [line for line in lines if line.startswith("R") and "   X" in line]
+    assert rows == [f"R{r:.3f}   X{x:.3f}   Y{y:.3f}" for r, x, y in points]
+    assert points[0] == (template.root_radius_mm, 0.0, 0.0)
+    # The tip corner sits on the root circle; the last row is the blank OD.
+    r, x, y = points[1]
+    assert math.hypot(x, y + template.root_radius_mm) == pytest.approx(template.root_radius_mm)
+    assert points[-1][0] == profile.blank_radius_mm
+    # Closed-form cross-checks against the native profile: the pitch and
+    # blank-OD rows are the tool's pitch thickness and the profile's tip chord.
+    by_radius = {round(r, 6): x for r, x, _ in points}
+    pitch_half_gap = math.asin(by_radius[round(profile.pitch_radius_mm, 6)] / profile.pitch_radius_mm)
+    thickness = profile.pitch_radius_mm * (profile.angular_pitch_rad - 2.0 * pitch_half_gap)
+    assert thickness == pytest.approx(profile.pitch_tooth_thickness_mm, abs=1e-6)
+    assert by_radius[round(profile.blank_radius_mm, 6)] == pytest.approx(
+        profile.blank_radius_mm * math.sin(profile.tip_half_angle_rad), abs=1e-9
+    )
+    # Relief and involute meet at the junction row.
+    junction = template.relief_junction_radius_mm
+    assert template.relief_half_angle_rad(junction) == pytest.approx(
+        spec.custom_six_gap_half_angle_rad(junction + 1e-9), abs=1e-6
+    )
+    # A straight line between neighbours stays within 0.006 of the edge.
+    for (r0, x0, y0), (r1, x1, y1) in zip(points[1:], points[2:]):
+        length = math.hypot(x1 - x0, y1 - y0)
+        for index in range(1, 20):
+            radius = r0 + (r1 - r0) * index / 20
+            angle = spec.custom_six_gap_half_angle_rad(radius)
+            px = radius * math.sin(angle)
+            py = radius * math.cos(angle) - template.root_radius_mm
+            off = abs((px - x0) * (y1 - y0) - (py - y0) * (x1 - x0)) / length
+            assert off < 0.006, (r0, r1, off)
     assert "(t)" not in data and "sin" not in data and "SOURCE" not in data
     # Every decimal prints at 3 places.
     for number in re.findall(r"\d+\.\d+", data):
         assert len(number.split(".")[1]) == 3, number
+    # The note stays clear of the title block (4.6 mm a line, run
+    # 20261011T114502461Z render of this sheet).
+    assert drawing.CUTTER_DETAIL_POS[1] - len(lines) * 0.0046 > 0.100
 
 
 def test_t006_over_pins_acceptance_matches_the_closed_form_involute() -> None:

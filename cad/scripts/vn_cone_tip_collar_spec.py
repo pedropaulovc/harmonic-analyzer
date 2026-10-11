@@ -132,8 +132,24 @@ SET_SCREW_SEAT_RADIUS = (
     TERMINAL_FLAT_AF_MM - TERMINAL_DIA_MM / 2.0 - INSTALLED_BORE_AXIS_OFFSET_MM
 )
 SET_SCREW_END_RADIUS = SET_SCREW_SEAT_RADIUS + SET_SCREW_LENGTH
-TAP_DRILL_DEPTH = 7.6
 TAP_FULL_DEPTH = 6.8
+# Both depths print at .XX under the title block's band. The drill must still
+# run one pitch (the bottoming tap's lead) past the deepest full thread when
+# the drill is at its shallowest (main's tapped-hole rule, sm_knife_mount_spec
+# STUD_TAP_RUNOUT_MIN). 7.6 left 7.09 against 7.31 (machinist review of the
+# stack build); the drill is the depth to deepen, as the wall behind it is wide
+# ("blind drill to opposite OD" below).
+TAP_DRILL_DEPTH = math.ceil(
+    (TAP_FULL_DEPTH + 2.0 * ROUTINE_BAND_MM + SET_SCREW_PITCH) * 10.0
+) / 10.0
+TAP_RUNOUT_WORST_MM = (TAP_DRILL_DEPTH - ROUTINE_BAND_MM) - (
+    TAP_FULL_DEPTH + ROUTINE_BAND_MM
+)
+if TAP_RUNOUT_WORST_MM < SET_SCREW_PITCH:
+    raise AssertionError(
+        f"collar tap drill runs {TAP_RUNOUT_WORST_MM:.3f} past the deepest full "
+        f"thread, under one pitch ({SET_SCREW_PITCH:.3f})"
+    )
 TAP_DRILL_DIA = TAP_DRILL_MM[SET_SCREW_THREAD]
 TAP_DEPTH_PRECISION = 2
 SET_SCREW_HOLE = HoleSpec(
