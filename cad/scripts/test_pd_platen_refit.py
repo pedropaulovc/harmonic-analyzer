@@ -210,6 +210,24 @@ def test_guide_lock_stations_sweep_clear_of_the_hanger(
         assembly._assert_lock_station_sweep()
 
 
+def test_clip_screw_bosses_sweep_clear_of_the_bar_and_hanger(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The rear clip-screw bosses ride the platen back across its whole feed:
+    # they pass above the bar's top edge and clear every fixed hanger section.
+    lines: list[str] = []
+    monkeypatch.setattr(assembly, "log", lines.append)
+    assembly._assert_lock_station_sweep()
+    (line,) = lines
+    assert "clip-screw bosses " in line
+    assert "clip-screw bosses on the bar " in line
+    # Negative control: a boss station dropped onto the bar's top edge.
+    x, _ = assembly.CLIP_SCREW_XY[0]
+    monkeypatch.setattr(assembly, "CLIP_SCREW_XY", ((x, assembly.BAR_TOP_Y),))
+    with pytest.raises(AssertionError, match="clip-screw boss"):
+        assembly._assert_lock_station_sweep()
+
+
 @pytest.mark.parametrize(
     ("deviation", "looser", "collides"),
     [

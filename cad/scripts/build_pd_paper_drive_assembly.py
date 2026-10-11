@@ -201,6 +201,8 @@ from pd_platen_spec import (  # noqa: E402
     PLATE_HEIGHT,
     PLATE_THICKNESS,
     PLATE_WIDTH,
+    SOCKET_BOSS_DIA as PLATEN_SOCKET_BOSS_DIA,
+    SOCKET_BOSS_H as PLATEN_BOSS_H,
     SOCKET_SPEC as PLATEN_SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT as PLATEN_SOCKET_ENGAGEMENT,
     SOCKET_XY as PLATEN_SOCKET_XY,
@@ -1393,13 +1395,13 @@ def _grown(
 
 
 def _assert_lock_station_sweep() -> None:
-    """Conservatively sweep each guide-lock section unbounded in x; this is
-    stricter than the separately enforced finite engaged-feed domain. Its
-    (y, z) section must clear every fixed part behind the bar at every platen
-    position, and the plates the bar's
-    back face, by LOCK_SWEEP_FLOOR at the printed worst case (contract lock
-    sweep; R9-31 fits the low guide-lock screw heads so they pass the hanger
-    arm)."""
+    """Conservatively sweep each guide-lock section and clip-screw boss
+    unbounded in x; this is stricter than the separately enforced finite
+    engaged-feed domain. Its (y, z) section must clear every fixed part
+    behind the bar at every platen position, the plates the bar's back face
+    and the bosses its top edge, by LOCK_SWEEP_FLOOR at the printed worst case
+    (contract lock sweep; R9-31 fits the low guide-lock screw heads so they
+    pass the hanger arm)."""
     # How far the lock stack's faces can stand from the model: forward (the
     # thickest bar, the shallowest rail, the thinnest strip) and rearward.
     front_forward = _BAR_DEPTH_DEV[1] - _GUIDE_DEPTH_DEV[0]
@@ -1459,6 +1461,25 @@ def _assert_lock_station_sweep() -> None:
                 ),
             ),
         ]
+    # The clip-screw socket bosses ride the platen back too, SOCKET_BOSS_H
+    # proud of it, their screw tips flush in them; the thinnest bar carries
+    # the back rearward. The undrawn platen takes .XXX on the boss Ø and
+    # station, and twice it rearward: the tallest boss, or the tip left proud
+    # of the shortest one by a thin plate.
+    boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0
+    bosses = [
+        (
+            f"clip-screw boss y{y:.1f}",
+            _grown(
+                (y - boss_r, y + boss_r, BAR_FRONT_Z, BAR_FRONT_Z + PLATEN_BOSS_H),
+                2.0 * _PLATEN_THICKNESS_BAND,
+                0.0,
+                -_BAR_DEPTH_DEV[0] + 2.0 * _PLATEN_THICKNESS_BAND,
+            ),
+        )
+        for y in sorted({y for _, y in CLIP_SCREW_XY})
+    ]
+    moving += bosses
     tip_y = _on_arm(ARM.TIP_STATION)[1]
     plate_corner_y = max(
         _on_arm(ARM_PLATE.BORE_STATION + u, ARM_PLATE.BORE_OFFSET + v)[1]
@@ -1584,6 +1605,10 @@ def _assert_lock_station_sweep() -> None:
                     f" < {LOCK_SWEEP_FLOOR})"
                 )
             minima[fixed_label] = min(minima.get(fixed_label, math.inf), gap)
+            if moving_label.startswith("clip-screw boss"):
+                minima["clip-screw bosses"] = min(
+                    minima.get("clip-screw bosses", math.inf), gap
+                )
     # The plates bridge behind the bar: the thickest bar and the shallowest
     # rail bring their front faces closest to its back face.
     bar_gap = LOCK_Z0 - front_forward - BAR_BACK_Z
@@ -1608,6 +1633,21 @@ def _assert_lock_station_sweep() -> None:
             f" (worst-case gap {rack_gap:.3f} < {LOCK_SWEEP_FLOOR})"
         )
     minima["platen rack"] = rack_gap
+    # The bosses stand inside the bar's depth, so they must pass above its top
+    # edge; a top rail printed short drops the hung platen toward it.
+    bar = _grown(
+        (BAR_TOP_Y - BAR_HEIGHT, BAR_TOP_Y, BAR_FRONT_Z, BAR_BACK_Z),
+        -min(_GUIDE_HEIGHT_DEV[0], 0.0),
+        0.0,
+        0.0,
+    )
+    boss_bar_gap = min(_section_gap(section, bar) for _, section in bosses)
+    if boss_bar_gap < LOCK_SWEEP_FLOOR:
+        raise AssertionError(
+            "the platen's clip-screw bosses would sweep into the bar"
+            f" (worst-case gap {boss_bar_gap:.3f} < {LOCK_SWEEP_FLOOR})"
+        )
+    minima["clip-screw bosses on the bar"] = boss_bar_gap
     log(
         "guide-lock station sweep clears the hanger at the printed worst case: "
         + ", ".join(f"{label} {gap:.3f}" for label, gap in minima.items())
