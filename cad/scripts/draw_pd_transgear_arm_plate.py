@@ -83,6 +83,7 @@ from pd_transgear_arm_plate_spec import (
     LOCATOR_CALLOUT,
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
+    PROJECTED_ZONE_NOTE,
     BORE_CALLOUT,
     CSK_CALLOUT,
     DRAWING_DIMENSIONS,
@@ -126,9 +127,20 @@ BACK_CENTER = (0.206, PLAN_CENTER[1])
 SECTION_CENTER = (0.326, PLAN_CENTER[1])
 ISO_CENTER = (0.390, 0.225)
 ISO_NOTE_XY = (0.353, 0.180)
-# Bottom left, clear of the plan view and of the title block.
-NOTES_XY = (0.014, 0.048)
-NOTES_TEXT = matched_locator_notes(_config.parts("pd-transgear-arm")["number"])
+# Bottom left, under the plan view's bore frame (its bottom y 0.081) and
+# left of the title block.
+NOTES_XY = (0.014, 0.072)
+# Characters per line that keep the block left of the title block.
+NOTES_WIDTH = 62
+NOTES_TEXT = "\n".join((
+    matched_locator_notes(
+        _config.parts("pd-transgear-arm")["number"],
+        _config.parts("pd-transgear-arm-plate")["number"],
+        on_arm=False,
+        width=NOTES_WIDTH,
+    ),
+    PROJECTED_ZONE_NOTE,
+))
 
 _TOP = TOP_LEFT[1]  # the plate's highest point (the top edge's -X corner)
 _SECTION_TOP = arm_upper_edge_y(0.0)

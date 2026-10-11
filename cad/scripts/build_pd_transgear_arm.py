@@ -86,8 +86,6 @@ from pd_transgear_arm_geometry import (
     LOCATOR_HOLE_BAND_MM,
     LOCATOR_BLIND_DEPTH_MM,
     LOCATOR_BLIND_DEPTH_BAND_MM,
-    KNOB_BORE_STATION,
-    KNOB_BORE_OFFSET,
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
@@ -294,8 +292,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ("LocatorY2", abs(LOCATOR_SITES_MM[1][1])),
         ("LocatorDia", LOCATOR_HOLE_DIA_MM),
         ("LocatorDepth", LOCATOR_BLIND_DEPTH_MM),
-        ("ReducerDeltaX", abs(KNOB_BORE_STATION - PIN_STATION)),
-        ("ReducerDeltaY", abs(KNOB_BORE_OFFSET)),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -626,25 +622,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "horizontal_distance",
             x,
             f"{name} reference",
-        )
-        stations.record(name, f'"{name}"')
-    reducer_line = check(
-        "drawn reducer setup reference",
-        await adapter.add_line(PIN_STATION, 0.0, KNOB_BORE_STATION, KNOB_BORE_OFFSET),
-    )
-    _as_construction(adapter, reducer_line)
-    check(
-        "reducer reference on actual S station",
-        await adapter.add_sketch_constraint(
-            f"{reducer_line}.start", f"{reference_lines[0]}.end", "coincident"
-        ),
-    )
-    for kind, name, value in (
-        ("horizontal_distance", "ReducerDeltaX", abs(KNOB_BORE_STATION - PIN_STATION)),
-        ("vertical_distance", "ReducerDeltaY", abs(KNOB_BORE_OFFSET)),
-    ):
-        await dimension_between(
-            adapter, f"{reducer_line}.start", f"{reducer_line}.end", kind, value, name,
         )
         stations.record(name, f'"{name}"')
     await ensure_fully_defined(adapter, "station reference sketch")

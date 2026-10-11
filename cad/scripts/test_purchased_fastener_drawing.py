@@ -6,6 +6,7 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 
 import _purchased_fastener_drawing as purchased
 from _drawing_registry import DrawingLayout
@@ -93,8 +94,9 @@ class _Note:
         return True
 
 
+@pytest.mark.parametrize("hidden_lines_removed", (False, True))
 def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, hidden_lines_removed: bool
 ) -> None:
     source = tmp_path / "test-fastener.SLDPRT"
     source.touch()
@@ -187,8 +189,17 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         return view
 
     monkeypatch.setattr(purchased, "place_view", place_view)
-    monkeypatch.setattr(purchased, "set_hidden_lines_removed", lambda *_args: None)
-    monkeypatch.setattr(purchased, "set_hidden_lines_visible", lambda *_args: None)
+    modes: dict[str, str] = {}
+    monkeypatch.setattr(
+        purchased,
+        "set_hidden_lines_removed",
+        lambda _adapter, view: modes.update({view.GetOrientationName(): "HLR"}),
+    )
+    monkeypatch.setattr(
+        purchased,
+        "set_hidden_lines_visible",
+        lambda _adapter, view: modes.update({view.GetOrientationName(): "HLV"}),
+    )
     monkeypatch.setattr(purchased, "_fit_views", lambda _draw, _views, _cells: (1, 1))
     monkeypatch.setattr(
         purchased,
@@ -228,7 +239,21 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "finalize_drawing", finalize)
 
-    result = asyncio.run(purchased.build_purchased_fastener_drawing(_Adapter(source), spec))
+    result = asyncio.run(
+        purchased.build_purchased_fastener_drawing(
+            _Adapter(source), spec, hidden_lines_removed=hidden_lines_removed
+        )
+    )
+
+    # The isometric is always hidden-lines-removed; Front/Top/Right show
+    # their hidden edges unless the sheet asks for them removed.
+    orthographic = "HLR" if hidden_lines_removed else "HLV"
+    assert modes == {
+        "*Front": orthographic,
+        "*Top": orthographic,
+        "*Right": orthographic,
+        "*Isometric": "HLR",
+    }
 
     assert result == {"pdf": str(outputs["pdf"])}
     assert ("new", layout) in calls

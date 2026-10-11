@@ -359,7 +359,8 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert drawing.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert inspection.splitlines()[0] == (
-        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO FEED BORE A (ASSY)"
+        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO "
+        "MHA-PD-010 BORE, ASSEMBLED"
     )
     assert len(inspection.splitlines()) == 2
     assert "INDEX" not in inspection

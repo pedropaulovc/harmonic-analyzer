@@ -1,0 +1,13 @@
+vn-fulcrum-set-screw:
+  title: Fulcrum Shaft Set Screw
+  number: MHA-VN-055
+  stock_name: Alloy Steel Cup-Tip Set Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91375A942]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, Rockwell C45; McMaster-Carr 91375A942"
+  finish: black oxide
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

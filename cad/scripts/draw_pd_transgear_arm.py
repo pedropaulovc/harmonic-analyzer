@@ -134,8 +134,15 @@ ISO_NOTE_XY = (0.080, 0.022)
 # Bottom left, clear of the section's floor-depth text above and of the
 # isometric caption below.
 NOTES_XY = (0.014, 0.060)
+# Characters per line that keep the block left of the isometric view.
+NOTES_WIDTH = 52
 NOTES_TEXT = "\n".join((
-    matched_locator_notes(_config.parts("pd-transgear-arm-plate")["number"]),
+    matched_locator_notes(
+        _config.parts("pd-transgear-arm")["number"],
+        _config.parts("pd-transgear-arm-plate")["number"],
+        on_arm=True,
+        width=NOTES_WIDTH,
+    ),
     PROJECTED_ZONE_NOTE,
 ))
 # Under the end view's pin callout; its label clears the title block.
@@ -202,9 +209,6 @@ FRONT_KEEP = {
     "LocatorY1": (_LOCATOR_X - 0.0075, _front_y(LOCATOR_SITES_MM[0][1]) - 0.006),
     "LocatorY2": (_LOCATOR_X + 0.00725, _front_y(LOCATOR_SITES_MM[1][1]) + 0.006),
     "LocatorDia1": (0.245, _front_y(PIVOT_END_R) + 0.021),
-    # Right of section B's lower label; ReducerDeltaY inside the left border.
-    "ReducerDeltaX": (_front_x(PIN_STATION) - 0.020, _UNDER_FRONT - 0.005),
-    "ReducerDeltaY": (0.032, FRONT_CENTER[1] - 0.029),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper

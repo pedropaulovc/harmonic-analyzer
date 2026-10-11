@@ -4,7 +4,8 @@ catalog-only MSC 40923906 model.
 
 The McMaster vendor drives every derived number off 5 named dims via
 equations, reproduced here and reused as modeling conventions for the MSC
-row. The 90280A837 and 91794A112 extensions await their native comparison:
+row. The 90280A837, 91794A112 and 91794A080 extensions have no completed
+native comparison:
 
 - slot width = HeadDia*0.135, slot depth = width*1.5 (from the dome apex)
 - head cylinder band = HeadHeight*0.8; dome = spherical cap (centre on

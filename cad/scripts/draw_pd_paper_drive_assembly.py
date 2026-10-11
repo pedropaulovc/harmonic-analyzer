@@ -1084,7 +1084,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "SPOT-DRILL THE DISC THROUGH THE "
             f"{hub_geometry.SCREW_COUNT} FLANGE HOLES; DRILL AND TAP {disc_screw.THREAD}. "
             f"FIX WITH {hub_geometry.SCREW_COUNT} {_N['vn-transgear-disc-screw']} SCREWS. "
-            f"LOCK SCREWS; RECHECK ALL {disc.TEETH} SPACES; "
+            f"RECHECK ALL {disc.TEETH} SPACES; "
             "THEN MATCH-MARK DISC AND HUB."
         ),
         "disc-screws-cut": (

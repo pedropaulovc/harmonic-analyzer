@@ -23,6 +23,7 @@ def test_reducer_centre_sits_inside_its_derived_window() -> None:
     # tight extreme (centre less the 0.05 TIR shift) bounds it below, CR 1.2
     # at the minimum tips above. The centre is the window's midpoint.
     centre = disc.CENTRE_DISTANCE
+    assert disc.CENTRE_DISTANCE_WINDOW == (35.097, 35.105)
     assert mesh.reducer_runout_shift_mm() == pytest.approx(0.05)
     assert mesh.reducer_mesh(35.097).interference_margin_min_mm >= 0.0
     assert mesh.reducer_mesh(35.096).interference_margin_min_mm < 0.0
