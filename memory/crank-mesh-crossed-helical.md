@@ -61,7 +61,7 @@ at tighter slacks (helix twist at the engaged band), so the seed formula must
 be re-checked with the study whenever the slack changes. Helix/backlash knobs
 (2026-07, old profile): gear_train.crank_drive_backlash_mm / crank_drive_helix_slices.
 Current: the 0.15 thinning knob is retired; 64T thickness is
-tolerances.crank_mesh.gear64_tooth_thickness_deviations_mm [+0.100, −0.050], fit class
+tolerances.crank_mesh.gear64_tooth_thickness_deviations_mm [−0.050, −0.200] (upper, lower), fit class
 tolerances.crank_mesh.c2c_slack_mm. See [[ch30-gt-re-anchor]],
 [[load-bearing-claims-need-a-repro]].
 
