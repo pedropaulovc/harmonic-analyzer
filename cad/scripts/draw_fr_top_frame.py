@@ -84,6 +84,7 @@ from build_fr_top_frame import (
     BAR_X1,
     BORE_DIA,
     BORE_CHAMFER,
+    COUNTERBORE_MAX_FLOOR_OFFSET,
     CAP_RECESS_DIAMETER,
     CAP_RECESS_FLOOR_Y,
     BOSS_ABOVE,
@@ -139,6 +140,7 @@ from build_fr_top_frame import (
 )
 from fr_top_frame_spec import (
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
@@ -161,7 +163,12 @@ from fr_top_frame_spec import (
     KEEPER_SEAT_WIDTH_MM,
     KEEPER_TAP_CALLOUT_PRECISION,
     FLANGE_THICKNESS_MM,
+    PRINTED_LINEAR_BAND_MM,
     SURFACE_FINISHES,
+)
+from _mcmaster_90280a837 import (
+    SHANK_DIA as CROSS_SCREW_SHANK_DIA,
+    SHANK_LEN as CROSS_SCREW_SHANK_LEN,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -378,6 +385,32 @@ BOSS_ABOVE_RAIL_LINE_XY = (
 # boss-height comment in the A-A recipe for what the long leader crossed.
 BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
 
+# A-A's joint note. The near wall between the flush counterbore floor and
+# the socket bore only starts the thread; the far casting wall carries the
+# MHA-VN-027 joint. Rule 12, print-worst: the stock shank, less the most
+# outboard printed floor (16.1 + band) and the largest printed socket radius.
+_SOCKET_DIA_PLACES = DRAWING_PRECISION["BoreProfile"]["B0Dia"]
+CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
+    CROSS_SCREW_SHANK_LEN
+    - COUNTERBORE_MAX_FLOOR_OFFSET
+    - (round(BORE_DIA, _SOCKET_DIA_PLACES) + PRINTED_LINEAR_BAND_MM[_SOCKET_DIA_PLACES])
+    / 2.0
+)  # 14.4
+if CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < 1.5 * CROSS_SCREW_SHANK_DIA:
+    raise AssertionError(
+        "far casting wall engages MHA-VN-027 under 1.5D at the printed bands"
+    )
+# The engagement follows from the printed floor and socket; the note states
+# it, it adds no acceptance limit of its own. Three rows from y 32 mm end
+# 15.3 mm up, inside the sheet frame (rows print 5.56 mm apart).
+CROSS_TAP_SECTION_NOTE = (
+    "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-VN-027\n"
+    f"FAR WALL CARRIES THE JOINT: {CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT:.1f}"
+    " FULL THREAD\n"
+    f"AT PRINT LIMITS (1.5D = {1.5 * CROSS_SCREW_SHANK_DIA:.1f})"
+)
+CROSS_TAP_SECTION_NOTE_XY = (0.040, 0.032)
+
 # Sheet 5: hub location, true-axis side view, removed set-pocket section.
 HUB_TOP_CENTER = (0.145, 0.200)
 HUB_LEFT_CENTER = (0.145, 0.095)
@@ -548,23 +581,20 @@ HANGER_SLOT_WIDTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[1] + STUD_Z_FRONT * _HUB_BOTTOM_M_PER_MM,
 )
 HANGER_SLOT_WIDTH_OFFSET_XY = (0.060, 0.137)
-# The crossbar pockets' length, in the open left window between the two
-# hanger stations: its dimension line at model x -126, left of the front
-# slot frame (sheet x 78..117 over y 178..185, which a line any further
-# right would cut) and 2.2 right of the detail fence's native "C" label.
-# Centred on that line its three rows ran over the label (farm 30394c1da:
-# text-clearance and text-on-line on detail circle C), so they park on a
-# jog to the right at the same height: model x -81, the widest row
-# (2X POCKET, 24.3 mm) spanning 70.9..95.1 mm, 2.9 off the line, 6.2 short
-# of the crossbar, 7.7 over the slot frame and 9 under the F arrow's tip.
+# The crossbar pockets' length stands outside the plan, so nothing inside
+# the frame reads as part of it: its dimension line at model x -256, 12.2
+# left of the Ø45 barrels, 7.0 left of detail C's fence (r 38 about the
+# gooseneck) and 12.0 inside the sheet frame; its extension lines run at
+# y 177 / 223, under and over that fence and between the corner bosses.
+# The block (three rows, 24.6 x 17.5 mm as farm c75ac06 printed it) parks
+# on an offset leader above the plan's top-left corner: 3.0 inside the
+# sheet frame's left edge, 2.45 under its top, 1.9 over the plan's top and
+# 2.7 off the top-left boss.
 POCKET_LENGTH_TEXT_XY = (
-    HUB_BOTTOM_CENTER[0] - 126.0 * _HUB_BOTTOM_M_PER_MM,
+    HUB_BOTTOM_CENTER[0] - 256.0 * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1],
 )
-POCKET_LENGTH_OFFSET_XY = (
-    HUB_BOTTOM_CENTER[0] - 81.0 * _HUB_BOTTOM_M_PER_MM,
-    HUB_BOTTOM_CENTER[1],
-)
+POCKET_LENGTH_OFFSET_XY = (0.028, 0.2555)
 
 # Sheet 1, Section E-E: the side rails and the crossbar T, cut inside the
 # crossbar pockets (|z| <= 69, where the crossbar is a T) and clear of every hole
@@ -3011,9 +3041,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if (
         add_note(
             adapter,
-            "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-VN-027",
-            0.040,
-            0.025,
+            CROSS_TAP_SECTION_NOTE,
+            *CROSS_TAP_SECTION_NOTE_XY,
         )
         is None
     ):

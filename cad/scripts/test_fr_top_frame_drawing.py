@@ -1813,39 +1813,67 @@ def test_rear_slot_frame_stands_clear_of_section_f_f() -> None:
     assert outline.ymin > max(drawing.HANGER_SLOT_FRAME_XY["front"][1], drawing.HANGER_DATUM_SYMBOL_XY["B"][1] + 0.007)
 
 
-def test_pocket_length_text_clears_the_detail_label_and_slot_frame() -> None:
-    # Farm run 30394c1da: centred on its line at x 68 mm, the 138.0 block
-    # printed over detail circle C's native label [59.9, 198.5]..[65.8,
-    # 205.0] mm (text-clearance and text-on-line).  The block (three rows,
-    # 24.3 x 14.6 mm on that run) parks on a jog right of the line.
+def test_pocket_length_dimension_stands_outside_the_plan() -> None:
+    # The 138.0 line, its extension lines and its text stay out of the plan
+    # silhouette and detail C's fence; the text block is 24.6 x 17.5 mm as
+    # farm c75ac06 printed it.
     from _layout_geometry import Box, Segment, segment_box_distance
 
     centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
-    line_x, line_y = drawing.POCKET_LENGTH_TEXT_XY
+    line_x, _ = drawing.POCKET_LENGTH_TEXT_XY
     text_x, text_y = drawing.POCKET_LENGTH_OFFSET_XY
-    assert text_y == line_y
-    text = Box(text_x - 0.01215, text_y - 0.0073, text_x + 0.01215, text_y + 0.0073)
+    text = Box(text_x - 0.0123, text_y - 0.00875, text_x + 0.0123, text_y + 0.00875)
+    clearance = 0.00178
+    plan_left = centre[0] - drawing.PLAN_HALF_X * m_per_mm
+    plan_top = centre[1] + drawing.PLAN_HALF_Z * m_per_mm
     fence_x = centre[0] + part.GOOSENECK_X * m_per_mm
     fence_y = centre[1] + part.GOOSENECK_Z * m_per_mm
     fence_r = (part.HUB_GUSSET_HALF_OUT + part.HUB_BOSS_DROP) * m_per_mm
-    # The label prints 2.9..8.8 mm right of the fence, -2.5..+4.0 mm about it.
-    label = Box(
-        fence_x + fence_r + 0.0029,
-        fence_y - 0.0025,
-        fence_x + fence_r + 0.0088,
-        fence_y + 0.0040,
-    )
     pocket = [centre[1] + sz * part.BAR_POCKET_Z * m_per_mm for sz in (-1.0, 1.0)]
-    line = Segment(line_x, pocket[0], line_x, pocket[1])
-    fx, fy = drawing.HANGER_SLOT_FRAME_XY["front"]
-    ox0, oy0, ox1, oy1 = drawing.HANGER_SLOT_FRAME_OUTLINE
-    frame = Box(fx + ox0, fy + oy0, fx + ox1, fy + oy1)
-    assert text.xmin - label.xmax >= 0.00178
-    assert segment_box_distance(line, label) >= 0.00178
-    assert text.xmin - line_x >= 0.002
-    assert text.ymin - frame.ymax >= 0.00178
-    assert line_x < frame.xmin
-    assert text.xmax < centre[0] + part.BAR_X0 * m_per_mm - 0.002
+    sheet_x0, _, _, sheet_y1 = drawing.SHEET_FRAME
+    # The line runs left of the barrels and the fence, inside the sheet.
+    assert sheet_x0 + drawing.INK_CLEARANCE < line_x < fence_x - fence_r - clearance
+    assert line_x < plan_left - clearance
+    # The extension lines pass under and over the fence, between the bosses.
+    boss_r = part.BOSS_DIA / 2.0 * m_per_mm
+    for y in pocket:
+        assert abs(y - fence_y) > fence_r + clearance
+        for boss_z in (part.FRONT_COLUMN_Z, part.REAR_COLUMN_Z):
+            assert abs(y - (centre[1] + boss_z * m_per_mm)) > boss_r + clearance
+    # The text sits above the plan's top-left corner, inside the sheet frame.
+    assert text.xmin > sheet_x0 + drawing.INK_CLEARANCE
+    assert text.ymax < sheet_y1 - drawing.INK_CLEARANCE
+    assert text.ymin > plan_top + clearance
+    boss_x = centre[0] - part.COLUMN_X * m_per_mm
+    boss_y = centre[1] + part.REAR_COLUMN_Z * m_per_mm
+    nearest = (
+        min(max(boss_x, text.xmin), text.xmax),
+        min(max(boss_y, text.ymin), text.ymax),
+    )
+    assert math.dist(nearest, (boss_x, boss_y)) > boss_r + clearance
+    assert (
+        segment_box_distance(Segment(line_x, pocket[0], line_x, pocket[1]), text) > 0.0
+    )
+
+
+def test_section_note_states_the_far_wall_print_worst_engagement() -> None:
+    import build_fr_frame_assembly as assembly
+    from _mcmaster_90280a837 import SHANK_DIA
+
+    engagement = drawing.CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
+    # Rule 12: the printed bands only shorten the far-wall engagement, and
+    # the shortest still holds 1.5D.
+    assert 1.5 * SHANK_DIA <= engagement < assembly.TOP_FAR_CASTING_ENGAGEMENT
+    note = drawing.CROSS_TAP_SECTION_NOTE
+    assert f"{engagement:.1f} FULL THREAD" in note
+    # Rule 6: short notes, short of the title block and inside the frame.
+    lines = note.splitlines()
+    x, y = drawing.CROSS_TAP_SECTION_NOTE_XY
+    assert len(lines) <= 4
+    assert x + 0.0027 * max(len(line) for line in lines) < TITLE_BLOCK[0]
+    # Rows print 5.56 mm apart (farm c75ac06, sheet 6 callout rows).
+    bottom = y - 0.00556 * len(lines)
+    assert bottom > drawing.SHEET_FRAME[1] + drawing.INK_CLEARANCE
 
 
 def _segments_apart(a, b) -> bool:
