@@ -177,12 +177,12 @@ FRONT_KEEP = {
     # The two tie Ø callouts hang off the face, the block's leader from its
     # shoulder's near end (the shoulder runs 7.3 mm under the point).  Run 8
     # put TIE 1's block across its own sloped leader in the 240-300 window:
-    # now below the wheel, its top 3.2 mm under the OD, the shoulder starting
-    # 2 mm right of the hole, so the leader drops near-vertically clear of
-    # the text.
+    # now below the wheel, its top (DRILL THRU over the stacked Ø) 3.2 mm
+    # under the OD, the shoulder starting 2 mm right of the hole, so the
+    # leader drops near-vertically clear of the text.
     "Tie1HoleDia": _face(
         _TIE1[0] + 2.0 + _CALLOUT_SHOULDER_LEFT,
-        -RIM_OUTER_DIA / 2.0 - 3.2 - _CALLOUT_ABOVE,
+        -RIM_OUTER_DIA / 2.0 - 3.2 - _CALLOUT_ABOVE - _TEXT_LINE * 1000.0,
     ),
     "Tie2Angle": _face(*_polar(_TIE2_INNER, sum(_TIE2_ANGLE_SECTOR) / 2.0, 10.0)),
     # TIE 2's Ø is a linear width across the radial hole: its extension lines
@@ -190,7 +190,8 @@ FRONT_KEEP = {
     # the text's projection onto the axis.  Run 8 hung the block ON that foot,
     # so both lines ran through it: now 18 mm to the axis's upper side, past
     # the OD, the block's projection 66 mm out along the axis, and a one-line
-    # "TIE 2" (the hole's run, groove to rim bore, is in the notes).
+    # "TIE 2" under it (the hole's run, groove to rim bore, is in the notes).
+    # Its DRILL THRU stands over the Ø, ~3.6 mm off the OD at its near corner.
     "Tie2HoleDia": _face(
         *_polar(_polar((0.0, 0.0), _TIE2_OUTWARD, 66.0), _TIE2_OUTWARD - 90.0, 18.0)
     ),
@@ -296,9 +297,18 @@ DIMENSION_CALLOUTS = {
     "HubFilletR": "12X",
     "RimFilletR": "12X",
     "CastRoundR": "2X RIM BORE EDGES",
-    "Tie1HoleDia": "THRU - TIE 1",
+    "Tie1HoleDia": "TIE 1",
     "Tie2HoleDia": "TIE 2",
 }
+# The tie holes' operation stands over their Ø, keeping each block as narrow
+# as its stacked Ø.
+CALLOUTS_ABOVE = {
+    "Tie1HoleDia": "DRILL THRU",
+    "Tie2HoleDia": "DRILL THRU",
+}
+# Seven note lines, top-left anchored, under TIE 1's block (now a line deeper)
+# and left of the title block.
+NOTES_XY = (0.020, 0.066)
 
 RIGHT_HALF_RIM = RIM_AXIAL * SHEET_SCALE[0] / 2000.0
 # The rim's axial width spans its two OD corner circles (r = RIM_OUTER_DIA/2 at
@@ -491,6 +501,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     axis, tie1 = model_points_in_view(
         adapter,
         front,
@@ -543,7 +554,7 @@ async def build(adapter: Any) -> dict[str, str]:
         iso,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(
         adapter, "Section View Note", RIGHT_CENTER[0] - 0.022, 0.075
     )

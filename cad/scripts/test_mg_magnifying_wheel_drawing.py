@@ -41,7 +41,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.RIGHT_KEEP)
-    assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    assert set(drawing.DIMENSION_CALLOUTS) | set(drawing.CALLOUTS_ABOVE) <= kept
 
 
 def test_every_marked_dimension_has_model_places() -> None:
@@ -145,10 +145,15 @@ def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
 
 def test_linked_notes_specify_the_spokes_and_ties() -> None:
     notes = mg_magnifying_wheel_spec.DRAWING_NOTES
-    assert len(notes.splitlines()) <= 4
-    assert "6 TAPERED CAST SPOKES" in notes
+    lines = notes.splitlines()
+    assert len(lines) <= 7
+    assert all(len(line) <= 80 for line in lines)
+    assert "6 TAPERED SPOKES" in notes and "CAST" not in notes
     assert "TIE 1" in notes and "TIE 2" in notes
-    assert "REAMED" in notes
+    # The bore's THRU - REAM callout carries the process; the notes do not.
+    assert "REAMED" not in notes
+    assert "CENTRED 7.09 FROM THE HUB BACK FACE" in notes
+    assert "PRESS FIT FOR MG-WHEEL-DRUM (MHA-MG-010)" in notes
     assert "DO NOT" not in notes and "RELEASE" not in notes
     assert "GRAY-IRON" not in notes and "BLACK" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes

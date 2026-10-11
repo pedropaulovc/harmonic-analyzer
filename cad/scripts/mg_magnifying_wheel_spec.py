@@ -29,6 +29,7 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     GROOVE_BOTTOM_DIA,
     GROOVE_R,
     GROOVE_R_BAND,
+    HUB_BACK_Z,
     HUB_DIA,
     HUB_DIA_BAND,
     HUB_FILLET_R,
@@ -94,12 +95,18 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Tie2Profile": {"Tie2HoleDia": 2, "Tie2Angle": 0},
 }
 
+# The spoke web, the rim and the groove share the mid-plane the HubBackZ
+# dimension locates from the hub's back face (one axial origin; the spigot's
+# length reads from its own face, where the drum's length must match it).
 DRAWING_NOTES = "\n".join(
     (
-        f"{SPOKE_COUNT} TAPERED CAST SPOKES, EQUALLY SPACED.",
+        f"{SPOKE_COUNT} TAPERED SPOKES, EQUALLY SPACED.",
+        f"SPOKE WEB, RIM AND GROOVE CENTRED {HUB_BACK_Z:.2f} FROM THE HUB BACK FACE.",
+        "GROOVE: FULL-RADIUS BOTTOM, PARALLEL WALLS TO THE RIM O.D.",
         "TIE 1: LEVER-WIRE TIE HOLE THROUGH THE BOSS.",
         "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
-        "BORE REAMED; RUNS ON THE MG-WHEEL-AXLE.",
+        "SPIGOT: PRESS FIT FOR MG-WHEEL-DRUM (MHA-MG-010).",
+        "BORE RUNS ON THE MG-WHEEL-AXLE.",
     )
 )
 # The right view is a plain side elevation (hidden lines), NOT a cutting-plane
