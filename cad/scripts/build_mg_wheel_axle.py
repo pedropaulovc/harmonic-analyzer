@@ -52,6 +52,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _fit_deviations import deviations
+from _part_pmi import author_part_pmi
 from mg_wheel_axle_spec import (
     BACK_Y,
     DOME_H,
@@ -69,6 +70,7 @@ from mg_wheel_axle_spec import (
     THREAD_END_Y,
     THREAD_LEN,
     THREAD_LEN_BAND,
+    SURFACE_FINISHES,
     THREAD_MAJOR,
     TIP_Y,
 )
@@ -222,6 +224,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

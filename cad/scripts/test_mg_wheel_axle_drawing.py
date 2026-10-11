@@ -16,6 +16,7 @@ import mg_wheel_bar_geom
 import mg_wheel_group as group
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED_UM
 
 
 def test_required_drawing_paths() -> None:
@@ -91,21 +92,23 @@ def test_tolerances_are_native_on_the_model() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
-def test_no_pmi_or_surface_finish() -> None:
+def test_journal_finish_and_no_gdt() -> None:
     for module in (part, drawing):
         source = Path(module.__file__).read_text(encoding="utf-8")
         for token in (
-            "author_part_pmi",
             "project_part_pmi",
-            "add_surface_finish",
             "add_feature_control_frame(",
             "add_datum_feature(",
             "GEOMETRIC_CONTROLS",
             "PART_DATUMS",
         ):
             assert token not in source, (module.__name__, token)
-    for name in ("GEOMETRIC_CONTROLS", "PART_DATUMS", "SURFACE_FINISHES"):
+    for name in ("GEOMETRIC_CONTROLS", "PART_DATUMS"):
         assert not hasattr(spec, name)
+    # The wheel runs on the shank: a journal, machined grade (rule 5).
+    assert [(c.key, c.roughness_um) for c in spec.SURFACE_FINISHES] == [
+        ("mg_axle_journal", MACHINED_UM)
+    ]
 
 
 def test_thread_callout_and_notes() -> None:
@@ -119,6 +122,10 @@ def test_thread_callout_and_notes() -> None:
     flat = " ".join(notes.splitlines())
     assert "UNTIL THE SHANK STEP STANDS 19.50 +/-0.05 FROM THE BAR FRONT FACE" in flat
     assert "(BACK END ~FLUSH)" in notes
+    assert "REAMED BORE" not in notes
+    assert drawing.DIMENSION_CALLOUTS["PinDia"] == (
+        "PRESS FIT IN MG-WHEEL-BAR\n<MOD-DIAM>4.737-4.747 REAMED BORE"
+    )
     assert "DEBURR" not in notes
     assert "X.XX" not in notes
 

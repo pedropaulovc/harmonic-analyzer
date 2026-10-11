@@ -16,21 +16,27 @@ from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
     add_property_linked_note,
+    add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from mg_wheel_axle_spec import (
     BACK_Y,
+    BAR_BORE_LIMITS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    PIN_DIA,
     STEP_Y,
+    SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_END_Y,
     THREAD_MAJOR,
@@ -83,8 +89,10 @@ SIDE_KEEP = {
     "ShankLength": ((BACK_X + STEP_X) / 2.0, _ROW_Y[0]),
     "ThreadLength": ((STEP_X + THREAD_END_X) / 2.0, _ROW_Y[0]),
     "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[1]),
-    # The shank's dimension line crosses the shank near the step.
-    "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.030),
+    # The shank's dimension line crosses the shank near the step; its text
+    # runs left from the line, the fit callout's two lines under it, so the
+    # block stands high enough to keep them off the shank.
+    "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.045),
     # Below-right of the tip, clear of the thread callout above it.
     "DomeR": (TIP_X + 0.015, SIDE_CENTER[1] - 0.015),
 }
@@ -101,6 +109,20 @@ THREAD_PICK = (
     SIDE_CENTER[1] + THREAD_MAJOR / 2.0 * _S / 1000.0,
 )
 THREAD_NOTE_XY = (THREAD_END_X + 0.012, SIDE_CENTER[1] + 0.042)
+# The pin's press fit prints on its own Ø (policy rule 6), the bar bore's
+# limits read from the bar's geom.
+DIMENSION_CALLOUTS = {
+    "PinDia": (
+        "PRESS FIT IN MG-WHEEL-BAR\n"
+        f"<MOD-DIAM>{BAR_BORE_LIMITS[0]:.3f}-{BAR_BORE_LIMITS[1]:.3f} REAMED BORE"
+    ),
+}
+# The journal's finish (policy rule 5) lands on the shank's top silhouette
+# between the Ø line and the step, where the wheel runs; the symbol stands
+# just above, left of the thread callout's leader.
+JOURNAL_FINISH_PICK = (STEP_X - 0.012, SIDE_CENTER[1] + PIN_DIA / 2.0 * _S / 1000.0)
+JOURNAL_FINISH_SYMBOL = (STEP_X - 0.010, SIDE_CENTER[1] + 0.020)
+FINISH_CHAR_HEIGHT = 0.0025
 # A point on the shank face, clear of the Ø dimension line.
 CENTERLINE_PICK = (BACK_X + 0.020, SIDE_CENTER[1] + 0.003)
 # Bottom-left, above the title-block line.
@@ -199,6 +221,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, side_annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(adapter, side_annotations, DIMENSION_CALLOUTS)
     add_view_centerline(
         adapter,
         side,
@@ -213,6 +236,17 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=spt(*THREAD_NOTE_XY),
         label="wheel axle thread callout",
         entity_type="SILHOUETTE",
+    )
+    add_surface_finish(
+        adapter,
+        side,
+        edge_xy=spt(*JOURNAL_FINISH_PICK),
+        entity_type="SILHOUETTE",
+        symbol_xy=spt(*JOURNAL_FINISH_SYMBOL),
+        leader_attach_xy=spt(*JOURNAL_FINISH_PICK),
+        control=surface_finish_by_key(SURFACE_FINISHES, "mg_axle_journal"),
+        label="wheel axle journal finish",
+        char_height=FINISH_CHAR_HEIGHT,
     )
 
     # x=0.020: a note is left-aligned on its anchor, so the ink starts here,

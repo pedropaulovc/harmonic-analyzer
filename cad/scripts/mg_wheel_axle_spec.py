@@ -14,7 +14,9 @@ assembly's d = 0); the pin runs y = BACK_Y (back end) .. TIP_Y.
 from __future__ import annotations
 
 import mg_wheel_bar_geom as _bar
+from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4
 
@@ -78,18 +80,24 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 }
 
 # The bar's reamed bore the pin presses into, its limits printed to three
-# places (mg_wheel_group.BAR_PRESS proves the interference at both corners).
-_BAR_BORE = (
+# places on the pin's own Ø callout (policy rule 6; mg_wheel_group.BAR_PRESS
+# proves the interference at both corners).
+BAR_BORE_LIMITS = (
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1],
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0],
 )
-_BAR_BORE_IN = f"{_bar.AXLE_BORE_DIA / MM_PER_IN:.4f}".lstrip("0")
+# Rule 6: the notes say only the press gauge no view can.
 DRAWING_NOTES = "\n".join(
     (
-        f"PRESS INTO MG-WHEEL-BAR Ø{_BAR_BORE[0]:.3f}-{_BAR_BORE[1]:.3f} "
-        f"REAMED BORE (Ø{_BAR_BORE_IN})",
-        f"UNTIL THE SHANK STEP STANDS {PRESS_GAUGE:.2f} +/-{PRESS_GAUGE_TOL:.2f} "
-        "FROM THE BAR FRONT FACE",
-        "(BACK END ~FLUSH); RED LOCTITE 271 OPTIONAL.",
+        "PRESS INTO MG-WHEEL-BAR UNTIL THE SHANK STEP STANDS",
+        f"{PRESS_GAUGE:.2f} +/-{PRESS_GAUGE_TOL:.2f} FROM THE BAR FRONT FACE "
+        "(BACK END ~FLUSH);",
+        "RED LOCTITE 271 OPTIONAL.",
     )
+)
+# Rule 5: the magnifying wheel runs on the shank, a shaft-in-bushing journal,
+# so the one Ø3/16 face carries the machined grade (its pressed length in the
+# bar is the same face).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
+    SurfaceFinishControl("mg_axle_journal", MACHINED_UM, CylinderFace(PIN_DIA)),
 )
