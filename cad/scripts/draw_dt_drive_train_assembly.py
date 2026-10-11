@@ -62,7 +62,7 @@ from _drawing_common import (
     set_view_exploded_state,
     view_configuration,
 )
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _dt_drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS

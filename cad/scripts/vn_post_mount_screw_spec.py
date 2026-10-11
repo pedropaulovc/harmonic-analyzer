@@ -27,11 +27,11 @@ import _config
 import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as platform
 from _fit_deviations import deviations
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _msc_40923898 import FILLISTER_SIZE
 
 SKU = "40923898"
 THREAD = "1/4-20"
-THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
+THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZE
 
 # Head seated on the MHA-DT-005 counterbore floor: the under-head face to the
 # plate's top face, at the model's nominal post.

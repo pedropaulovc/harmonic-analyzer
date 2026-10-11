@@ -180,7 +180,7 @@ assert math.isclose(LEVER_X0 - KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), (
 assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9), (
     "magnifying-lever KnifeAxis y drifted from the knife-edge contact ridge"
 )
-from build_vn_thumb_screw import (  # noqa: E402
+from _mcmaster_91882a221 import (  # noqa: E402
     HEAD_STACK_LEN as THUMB_HEAD_STACK_LEN,
     SHANK_LEN as THUMB_SHANK_LEN,
 )

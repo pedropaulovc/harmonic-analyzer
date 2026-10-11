@@ -23,6 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     check,
@@ -45,6 +47,7 @@ G5_PITCH = 25.4 / 18.0     # stored 1.411111
 G5_UNDERSIDE = 13.2953125   # (L + HH)/2 - HH: vendor origin is mid-overall
 
 
+@stock_recipe("92865A585", threaded=True)
 async def build_92865A585(adapter, truth=None):
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)

@@ -27,6 +27,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 from _common import add_line_chain, check, name_last_feature, volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
 from vn_transgear_pivot_spring_spec import (  # noqa: E402
@@ -54,6 +56,7 @@ def spring_section() -> list[tuple[float, float]]:
     ]
 
 
+@stock_recipe("9715K43", threaded=False)
 async def build_9715K43(adapter, truth=None):
     from solidworks_mcp.adapters.base import RevolveParameters
 

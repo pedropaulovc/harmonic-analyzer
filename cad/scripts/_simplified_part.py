@@ -1,4 +1,9 @@
-r"""Derived ``<configuration> Simplified`` configurations for assembly drawing views.
+r"""Part-tier simplified-configuration derivation and persistence.
+
+Separate from pure naming, BOM policy and assembly component fingerprints so
+part-saving edits re-key only builders that derive simplified parts.
+
+Derived ``<configuration> Simplified`` configurations for assembly drawing views.
 
 Modeled gear teeth and helical thread grooves print black in a small-scale line
 view of an assembly (the user's ruling, 2026-09-27). Every gear and threaded
@@ -50,7 +55,6 @@ Default's geometry is untouched.
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Iterable, Sequence
 from typing import Any
 
@@ -66,77 +70,13 @@ from _common import (
     stale_configurations,
     whats_wrong,
 )
-
-SIMPLIFIED_SUFFIX = " Simplified"
-SIMPLIFIED_COMMENT = "drawing views: modeled gear teeth and screw threads suppressed"
+from _simplified_bom import USER_SPECIFIED, BomIdentity, child_bom_identity
+from _simplified_names import is_simplified, simplified_comment, simplified_name
 
 _SUPPRESS = 0  # swFeatureSuppressionAction_e.swSuppressFeature
 _SPECIFY_CONFIGURATION = 3  # swInConfigurationOpts_e.swSpecifyConfiguration
-_DOCUMENT_NAME = 1  # swBOMPartNumberSource_e.swBOMPartNumber_DocumentName
-_CONFIGURATION_NAME = 2  # swBOMPartNumberSource_e.swBOMPartNumber_ConfigurationName
-_PARENT_NAME = 4  # swBOMPartNumberSource_e.swBOMPartNumber_ParentName
-_USER_SPECIFIED = 8  # swBOMPartNumberSource_e.swBOMPartNumber_UserSpecified
 _REPLACE_VALUE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 _SAVE_SILENT = 1  # swSaveAsOptions_e.swSaveAsOptions_Silent
-
-# (BOMPartNoSource, AlternateName, UseAlternateNameInBOM, Description,
-#  UseDescriptionInBOM) of one configuration.
-type BomIdentity = tuple[int, str, bool, str, bool]
-
-
-def simplified_name(configuration: str) -> str:
-    """The derived drawing configuration of ``configuration``."""
-    if is_simplified(configuration):
-        raise ValueError(f"{configuration!r} is already a simplified configuration")
-    return configuration + SIMPLIFIED_SUFFIX
-
-
-def is_simplified(configuration: str) -> bool:
-    return configuration.endswith(SIMPLIFIED_SUFFIX)
-
-
-def simplified_comment(identity: str) -> str:
-    """A derived configuration's comment: the policy plus what it suppresses."""
-    return f"{SIMPLIFIED_COMMENT} [{identity}]"
-
-
-def components_identity(rows: Iterable[tuple[str, str, str]]) -> str:
-    """Order-free fingerprint of an assembly's simplified components.
-
-    One row per top-level component: its name, the configuration it references
-    in ``Default Simplified`` and that configuration's own comment.
-    """
-    digest = hashlib.sha256(repr(sorted(rows)).encode("utf-8")).hexdigest()
-    return f"components {digest[:16]}"
-
-
-def child_bom_identity(
-    parent: BomIdentity, parent_name: str, grandparent_name: str | None
-) -> BomIdentity:
-    """The BOM identity that makes ``<parent> Simplified`` print ``parent``'s number.
-
-    "Link to Parent Configuration" (``ParentName``) prints the parent
-    configuration's NAME, not its part number (SOLIDWORKS help, Component
-    Options). So a parent numbered by its own name hands the child a link, but a
-    parent that is itself linked prints ITS parent's name, which the child must
-    pin as a user-specified number: a link would print the parent's name. The
-    document name and a user-specified number carry over unchanged.
-    """
-    source, alternate, use_alternate, description, use_description = parent
-    if source == _DOCUMENT_NAME:
-        return (source, "", use_alternate, description, use_description)
-    if source == _CONFIGURATION_NAME:
-        return (_PARENT_NAME, "", use_alternate, description, use_description)
-    if source == _PARENT_NAME:
-        if grandparent_name is None:
-            raise ValueError(
-                f"{parent_name!r} links its part number to a parent configuration "
-                "it does not have"
-            )
-        return (_USER_SPECIFIED, grandparent_name, True, description, use_description)
-    if source == _USER_SPECIFIED:
-        return (source, alternate, use_alternate, description, use_description)
-    raise ValueError(f"{parent_name!r}: unknown BOM part-number source {source}")
 
 
 def _bstr_array(names: Sequence[str]) -> Any:
@@ -168,7 +108,9 @@ def _expected_child_identity(model: Any, parent: str) -> BomIdentity:
     return child_bom_identity(
         _bom_identity(configuration),
         parent,
-        None if grandparent is None else str(_early_bound(grandparent, "IConfiguration").Name),
+        None
+        if grandparent is None
+        else str(_early_bound(grandparent, "IConfiguration").Name),
     )
 
 
@@ -177,7 +119,11 @@ def _property_manager(model: Any, configuration: str) -> Any:
     # parameterised CustomPropertyManager property is not a method on the
     # early-bound IModelDocExtension wrapper.
     extension = _read_member(model, "Extension")
-    manager = extension.CustomPropertyManager(configuration) if extension is not None else None
+    manager = (
+        extension.CustomPropertyManager(configuration)
+        if extension is not None
+        else None
+    )
     if manager is None:
         raise RuntimeError(f"CustomPropertyManager unavailable for {configuration!r}")
     return _early_bound(manager, "ICustomPropertyManager")
@@ -200,7 +146,7 @@ def _copy_bom_identity(model: Any, parent: str, child: str) -> None:
     # The source must be set first: any non-user-specified source clears the
     # alternate name (IConfiguration.BOMPartNoSource remarks).
     target.BOMPartNoSource = expected[0]
-    if expected[0] == _USER_SPECIFIED:
+    if expected[0] == USER_SPECIFIED:
         target.AlternateName = expected[1]
     target.UseAlternateNameInBOM = expected[2]
     target.Description = expected[3]
@@ -217,7 +163,9 @@ def _copy_bom_identity(model: Any, parent: str, child: str) -> None:
             manager.Add3(field, kind, value, _REPLACE_VALUE)
     copied = _configuration_properties(model, child)
     missing = {
-        field: value for field, value in properties.items() if copied.get(field) != value
+        field: value
+        for field, value in properties.items()
+        if copied.get(field) != value
     }
     if missing:
         raise RuntimeError(
@@ -227,7 +175,9 @@ def _copy_bom_identity(model: Any, parent: str, child: str) -> None:
 
 def _hard_faults(adapter: Any, model: Any) -> list[str]:
     return [
-        f"{name} ({code})" for name, code, warning in whats_wrong(adapter, model) if not warning
+        f"{name} ({code})"
+        for name, code, warning in whats_wrong(adapter, model)
+        if not warning
     ]
 
 
@@ -260,7 +210,9 @@ def _suppression(feature: Any, configurations: Sequence[str]) -> tuple[bool, ...
     """
     states: list[bool] = []
     for name in configurations:
-        answer = tuple(feature.IsSuppressed2(_SPECIFY_CONFIGURATION, _bstr_array([name])) or ())
+        answer = tuple(
+            feature.IsSuppressed2(_SPECIFY_CONFIGURATION, _bstr_array([name])) or ()
+        )
         if len(answer) != 1:
             raise RuntimeError(
                 f"{feature.Name}: IsSuppressed2 for {name!r} returned {answer!r}, expected one state"
@@ -304,9 +256,13 @@ def _assert_parents_keep_features(
     report: list[str] = []
     for feature in targets:
         states = dict(zip(order, _suppression(feature, order), strict=True))
-        lacking += [f"{feature.Name} in {parent}" for parent in parents if states[parent]]
+        lacking += [
+            f"{feature.Name} in {parent}" for parent in parents if states[parent]
+        ]
         if others:
-            report.append(f"{feature.Name} {({name: states[name] for name in others})!r}")
+            report.append(
+                f"{feature.Name} { ({name: states[name] for name in others})!r}"
+            )
     if report:
         _telemetry.info(
             f"{part_name}: no simplified child for {others}; suppressed there: "
@@ -343,9 +299,13 @@ def add_simplified_configurations(
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
     already = [name for name in names if is_simplified(name)]
     if already:
-        raise RuntimeError(f"{part_name}: simplified configurations already exist: {already}")
+        raise RuntimeError(
+            f"{part_name}: simplified configurations already exist: {already}"
+        )
     if active not in names:
-        raise RuntimeError(f"{part_name}: active configuration {active!r} not in {names}")
+        raise RuntimeError(
+            f"{part_name}: active configuration {active!r} not in {names}"
+        )
     parents = _simplified_parents(part_name, names, parents)
     targets = _features(model, part_name, features)
     _assert_parents_keep_features(part_name, targets, parents, names)
@@ -364,7 +324,10 @@ def add_simplified_configurations(
             failures.append(f"{child}: AddConfiguration2 returned None")
             continue
         derived_from = _early_bound(created, "IConfiguration").GetParent()
-        if derived_from is None or str(_early_bound(derived_from, "IConfiguration").Name) != parent:
+        if (
+            derived_from is None
+            or str(_early_bound(derived_from, "IConfiguration").Name) != parent
+        ):
             failures.append(f"{child}: not derived from {parent}")
             continue
         if active_configuration_name(adapter, model) != child and not bool(
@@ -375,7 +338,11 @@ def add_simplified_configurations(
         refused = [
             str(feature.Name)
             for feature in targets
-            if not bool(feature.SetSuppression2(_SUPPRESS, _SPECIFY_CONFIGURATION, _bstr_array([child])))
+            if not bool(
+                feature.SetSuppression2(
+                    _SUPPRESS, _SPECIFY_CONFIGURATION, _bstr_array([child])
+                )
+            )
         ]
         if refused:
             failures.append(f"{child}: SetSuppression2 refused {refused}")
@@ -399,7 +366,9 @@ def add_simplified_configurations(
         )
     assert_simplified_configurations(adapter, part_name, features, parents)
     _telemetry.annotate(
-        configurations=len(parents), features=len(targets), feature_names=",".join(features)
+        configurations=len(parents),
+        features=len(targets),
+        feature_names=",".join(features),
     )
     _telemetry.success(
         f"{part_name}: {len(children)} simplified configuration(s) suppress {list(features)}"
@@ -428,7 +397,9 @@ def assert_simplified_configurations(
     )
     targets = _features(model, part_name, features)
     comment = simplified_comment(", ".join(features))
-    failures: list[str] = [f"orphan simplified configurations {orphans}"] if orphans else []
+    failures: list[str] = (
+        [f"orphan simplified configurations {orphans}"] if orphans else []
+    )
     for parent in parents:
         child = simplified_name(parent)
         if child not in names:
@@ -436,10 +407,15 @@ def assert_simplified_configurations(
             continue
         configuration = _configuration(model, child)
         derived_from = configuration.GetParent()
-        if derived_from is None or str(_early_bound(derived_from, "IConfiguration").Name) != parent:
+        if (
+            derived_from is None
+            or str(_early_bound(derived_from, "IConfiguration").Name) != parent
+        ):
             failures.append(f"{child}: not derived from {parent}")
         if str(configuration.Comment or "") != comment:
-            failures.append(f"{child}: comment {configuration.Comment!r} != {comment!r}")
+            failures.append(
+                f"{child}: comment {configuration.Comment!r} != {comment!r}"
+            )
         for feature in targets:
             states = _suppression(feature, [parent, child])
             if states != (False, True):
@@ -452,13 +428,16 @@ def assert_simplified_configurations(
             failures.append(f"{child}: BOM identity {identity!r} != {expected!r}")
     if failures:
         raise RuntimeError(
-            f"{part_name}: simplified configuration readback failed: " + "; ".join(failures)
+            f"{part_name}: simplified configuration readback failed: "
+            + "; ".join(failures)
         )
     _telemetry.annotate(parents=len(parents), features=len(targets))
 
 
 def _close_part(adapter: Any) -> None:
-    adapter.swApp.CloseDoc(str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle()))
+    adapter.swApp.CloseDoc(
+        str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
+    )
     adapter.currentModel = None
 
 
@@ -471,7 +450,9 @@ def _save3_in_place(model: Any, *, label: str) -> None:
         ok, errors, warnings = bool(result), 0, 0
     _telemetry.info(f"{label}: Save3 ok={ok}, errors={errors}, warnings={warnings}")
     if not ok or errors:
-        raise RuntimeError(f"{label}: Save3 failed: ok={ok}, errors={errors}, warnings={warnings}")
+        raise RuntimeError(
+            f"{label}: Save3 failed: ok={ok}, errors={errors}, warnings={warnings}"
+        )
 
 
 @_telemetry.traced("simplified.persist", label_param="part_name")
@@ -490,7 +471,9 @@ def persist_configurations_in_place(adapter: Any, part_name: str) -> None:
     active = active_configuration_name(adapter, model)
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
     if active not in names:
-        raise RuntimeError(f"{part_name}: active configuration {active!r} not in {names}")
+        raise RuntimeError(
+            f"{part_name}: active configuration {active!r} not in {names}"
+        )
     failures: list[str] = []
     for name in [name for name in names if name != active] + [active]:
         if active_configuration_name(adapter, model) != name and not bool(
@@ -511,12 +494,17 @@ def persist_configurations_in_place(adapter: Any, part_name: str) -> None:
             failures.append(f"{name}: rebuild-save mark did not set")
     if failures:
         raise RuntimeError(
-            f"{part_name}: configurations did not finalize for the save: " + "; ".join(failures)
+            f"{part_name}: configurations did not finalize for the save: "
+            + "; ".join(failures)
         )
     stale = stale_configurations(model, names)
     if stale:
-        raise RuntimeError(f"{part_name}: configurations {stale} are stale at the final save")
-    _save3_in_place(model, label=f"{part_name}: persist {len(names)} marked configuration(s)")
+        raise RuntimeError(
+            f"{part_name}: configurations {stale} are stale at the final save"
+        )
+    _save3_in_place(
+        model, label=f"{part_name}: persist {len(names)} marked configuration(s)"
+    )
     _telemetry.annotate(config_count=len(names), active=active)
 
 
@@ -560,7 +548,9 @@ async def save_simplified_part(
     the way a placing assembly loads it, then the readback runs on the file.
     """
     artefacts = await save_part_and_images(adapter, part_name, views)
-    await derive_simplified_on_saved_part(adapter, part_name, features, artefacts["part"])
+    await derive_simplified_on_saved_part(
+        adapter, part_name, features, artefacts["part"]
+    )
     check(f"reopen saved {part_name}", await adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, part_name)
     assert_simplified_configurations(adapter, part_name, features)

@@ -23,6 +23,7 @@ import sys
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_91829A205 import build_91829A205
 from vn_transgear_pivot_screw_spec import SKU
 
@@ -37,6 +38,7 @@ async def build(adapter) -> dict[str, str]:
         part_name=PART_NAME,
         components=(StockComponent(sku=SKU, author=build_91829A205),),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

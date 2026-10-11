@@ -26,6 +26,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     check,
@@ -39,15 +41,18 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     replica_main,
     thread_sweep_cut,
 )
+from _mcmaster_91410a538 import (  # noqa: E402
+    SQ_CHAMFER_DEG,
+    SQ_CUP_RIM_R,
+    SQ_HH,
+    SQ_LEN,
+    SQ_MAJOR_R,
+    SQ_PITCH,
+)
 
-SQ_MAJOR_R = 6.35 / 2.0
-SQ_LEN = 15.875
-SQ_HH = 4.7625
-SQ_PITCH = 1.27
-SQ_CUP_RIM_R = 1.739789   # Sketch2 solved rim; 45/59 deg from its dims
-SQ_CHAMFER_DEG = 75.0     # head chamfer cones (Sketch3 D1/D2)
 
 
+@stock_recipe("91410A538", threaded=True)
 async def build_91410A538(adapter, truth=None):
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)

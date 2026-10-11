@@ -3,8 +3,8 @@ r"""Purchased cone lock knob (McMaster 93585A190) nominals and seat check.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: the thread, the stud/head dims and the seat-fit check the harmonic
 base, the swing-platform geometry and the drive train read. The dims come from
-the constants of the 93585A190 replica recipe
-(``diagnostics/diag_build_93585A190.py``, SolidWorks-free at import).
+the constants of the 93585A190 pure vendor source
+(``_mcmaster_93585a190.py``, SolidWorks-free at import).
 Consumers read them here, not from ``build_vn_cone_lock_knob``, whose stock build
 recipe would otherwise ride their cache keys (#880).
 
@@ -16,7 +16,7 @@ what stands at plate height when the knob fences the notch mouth.
 from __future__ import annotations
 
 from _hole_spec import HoleSpec
-from diagnostics.diag_build_93585A190 import (
+from _mcmaster_93585a190 import (
     HEAD_H as _HEAD_H,
     HEAD_R as _HEAD_R,
     LENGTH as _LENGTH,

@@ -263,7 +263,7 @@ from vn_guide_lock_screw_spec import (  # noqa: E402
     SHANK_DIA as LOCK_SCREW_SHANK_DIA,
     SHANK_LEN as LOCK_SCREW_SHANK_LEN,
 )
-from build_pd_platen_rack import (  # noqa: E402
+from _platen_rack_geometry import (  # noqa: E402
     ADDENDUM as RACK_ADDENDUM,
     BAR_HEIGHT as RACK_BAR_HEIGHT,
     BAR_LENGTH as RACK_BAR_LENGTH,
@@ -302,13 +302,13 @@ RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # 282.984 (Rx180: local y 0..12 maps dow
 RACK_BACK_Z = BAR_FRONT_Z + RACK_BAR_THICKNESS  # -132.9 (on the platen back)
 
 # --- transgear (the real six-gear train) -------------------------------------
-from build_pd_rack_pinion import (  # noqa: E402
-    DP as DISC_DP,
+from pd_rack_pinion_spec import (  # noqa: E402
+    DIAMETRAL_PITCH as DISC_DP,
     FACE_WIDTH as DISC_FACE,
     TEETH as DISC_TEETH,
 )
-from build_pd_transgear_feed_pinion import (  # noqa: E402
-    DP as FEED_DP,
+from pd_transgear_feed_pinion_spec import (  # noqa: E402
+    DIAMETRAL_PITCH as FEED_DP,
     FACE_WIDTH as FEED_FACE,
     TEETH as FEED_TEETH,
 )

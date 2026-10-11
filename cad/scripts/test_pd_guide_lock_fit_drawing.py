@@ -56,7 +56,7 @@ def test_lock_screw_engages_1_5d_in_the_guide_at_the_worst_case() -> None:
 
 
 def test_the_quarter_inch_screw_is_refused(monkeypatch) -> None:
-    from diagnostics import diag_build_91255A108 as recipe
+    import _mcmaster_91255a108 as recipe
 
     monkeypatch.setattr(recipe, "DIMS", replace(recipe.DIMS, length=0.25 * IN))
     with pytest.raises(AssertionError, match="MHA-VN-046 guide-lock screw"):

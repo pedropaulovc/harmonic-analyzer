@@ -14,7 +14,7 @@ import pd_platen_spec as platen
 import build_pd_platen_clip as clip
 import build_pd_platen_guide as guide
 import build_pd_platen_paper as paper
-import build_pd_platen_rack as rack
+import _platen_rack_geometry as rack
 import build_pd_support_bar as support
 import vn_fillister_screw_spec as fillister
 from _printed_tolerance import printed_deviations

@@ -39,7 +39,7 @@ from _gtol_frame import gtol_frame_signature as _gtol_frame_signature
 from _gtol_frame import gtol_frame_xml as _gtol_frame_xml
 from _gtol_frame import translation_print_problem as _translation_print_problem
 from _surface_finish import SurfaceFinishControl
-from _drawing_simplified import simplified_name
+from _simplified_names import simplified_name
 from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
@@ -3064,7 +3064,7 @@ def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
 # Simplified" (_assembly.sync_simplified_configuration), whatever it carries:
 # an exploded view shows that configuration's own explode (the builders author
 # it there too), and a BOM or balloons bind to its components, whose BOM
-# identity is their parent's (_drawing_simplified.child_bom_identity). Only a
+# identity is their parent's (_simplified_bom.child_bom_identity). Only a
 # larger view, a pure SHADED one (tone, no edge ink) and the drawing's
 # designated full-detail view keep the full-detail Default. Part drawings
 # never call this.

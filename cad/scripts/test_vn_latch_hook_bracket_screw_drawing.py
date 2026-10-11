@@ -11,7 +11,7 @@ import pd_support_bar_spec as bar
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _hole_spec import blind_cut_dia_mm
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_90280A108 as recipe
 
 STEM = "vn-latch-hook-bracket-screw"
@@ -26,7 +26,7 @@ def test_catalogue_row_is_the_foot_screw_sku() -> None:
     assert FASTENERS["vn-foot-screw"].skus == stock.skus
     assert row["number"] == "MHA-VN-043"
     assert row["quantity"] == 2
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert metadata.threaded is True
 

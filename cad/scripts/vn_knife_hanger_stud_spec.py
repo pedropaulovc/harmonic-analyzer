@@ -4,7 +4,7 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: the thread, length and head dims the summing assembly's reach stack
 and the crossbar counterbore read to prove MHA-VN-024 is the screw the knife
 mount and the crossbar were sized for.  The vendor dims are ``DIMS`` in
-``diagnostics/diag_build_91251A157.py`` (SolidWorks-free at import), as
+``_mcmaster_91251a157.py`` (SolidWorks-free at import), as
 ``vn_cone_tip_block_screw_spec`` reads 91251A108's.
 
 Catalogue (https://www.mcmaster.com/91251A157/): black-oxide alloy steel
@@ -15,7 +15,7 @@ threaded (3/4 in minimum thread length), flat tip; head Ø0.226 x 0.138 in,
 
 from __future__ import annotations
 
-from diagnostics.diag_build_91251A157 import DIMS
+from _mcmaster_91251a157 import DIMS
 
 SKU = DIMS.part_no
 THREAD = "#6-32"

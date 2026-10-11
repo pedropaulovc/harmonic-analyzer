@@ -24,6 +24,7 @@ import sys
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_91251A108 import build_91251A108
 
 PART_NAME = "vn-cone-tip-block-screw"
@@ -39,6 +40,7 @@ async def build(adapter) -> dict[str, str]:
             StockComponent(sku="91251A108", author=build_91251A108),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

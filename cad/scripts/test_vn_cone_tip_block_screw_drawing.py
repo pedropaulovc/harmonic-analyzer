@@ -18,7 +18,8 @@ import vn_cone_tip_block_screw_spec as screw
 import dt_cone_tip_block_spec as block
 import draw_vn_cone_tip_block_screw as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-from _stock_fastener import STOCK_RECIPES
+from _mcmaster_91251a108 import DIMS
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91251A108 as recipe
 from diagnostics import diag_mcmaster_lib
 from diagnostics import diag_mcmaster_socket_head as socket_head
@@ -30,7 +31,7 @@ def test_recipe_is_the_catalogue_screw() -> None:
     """91251A108 per mcmaster.com (2026-09-29): #4-40 x 3/8, socket head
     0.183 x 0.112, 3/32 hex drive; socket depth is ASME B18.3's #4 minimum
     key engagement, 0.055 in."""
-    dims = recipe.DIMS
+    dims = DIMS
     assert dims.part_no == "91251A108"
     assert dims.major_dia == pytest.approx(0.112 * IN)
     assert dims.pitch == pytest.approx(IN / 40.0)
@@ -180,7 +181,7 @@ def _record(monkeypatch, author) -> list[tuple]:
 def test_recipe_cuts_the_catalogue_socket_and_thread(monkeypatch) -> None:
     calls = _record(monkeypatch, recipe.build_91251A108)
     (cut,) = [c for c in calls if c[0] == "fm.FeatureCut4"]
-    assert cut[1][5] == recipe.DIMS.socket_depth / 1000.0
+    assert cut[1][5] == DIMS.socket_depth / 1000.0
     (helix,) = [c for c in calls if c[0] == "insert_helix"]
     assert helix[1][1:3] == (IN / 40.0, 0.375 * IN / (IN / 40.0) + 1.0)
     sweeps = [c for c in calls if c[0] == "thread_sweep_cut"]
@@ -191,7 +192,7 @@ def test_recipe_cuts_the_catalogue_socket_and_thread(monkeypatch) -> None:
 def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     monkeypatch,
 ) -> None:
-    metadata = STOCK_RECIPES["91251A108"]
+    metadata = discovered_recipes()["91251A108"]
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == recipe.build_91251A108.__name__
     assert metadata.threaded

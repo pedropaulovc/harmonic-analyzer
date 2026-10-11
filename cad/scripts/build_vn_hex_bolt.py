@@ -7,6 +7,7 @@ import sys
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_92865A585 import (
     G5_HH,
     G5_HW,
@@ -38,6 +39,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
     )
 
 

@@ -9,7 +9,7 @@ import pytest
 
 import _config
 import ch_fulcrum_keeper_spec as keeper
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _mcmaster_90280a194 import FILLISTER_SIZE
 import build_fr_top_frame as part
 import draw_fr_top_frame as drawing
 from fr_frame_attachment_spec import (
@@ -103,7 +103,7 @@ def test_cross_tap_major_thread_and_drill_point_clear_the_far_wall() -> None:
 
 
 def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
-    major, length, _, _, pitch = FILLISTER_SIZES["90280A194"]
+    major, length, _, _, pitch = FILLISTER_SIZE
     insertion = length - (keeper.FOOT_H - keeper.CBORE_DEPTH_MM)
     spec = part.KEEPER_TAP_SPEC
     full_thread = spec.overrides_mm.get("ThreadDepth", spec.depth_mm)

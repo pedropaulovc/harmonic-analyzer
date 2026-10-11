@@ -56,6 +56,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+from _shoulder_screw_geometry import (  # noqa: E402
+    _slot_strip_area,
+    _slotted_rim_chamfer_volume,
+    _undercut_volume,
+)
+
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     CAD_ROOT,
@@ -76,39 +83,30 @@ REPLICA = OUT_DIR / "91829A560-replica.SLDPRT"
 REPORT = OUT_DIR / "91829A560-replica-report.json"
 VENDOR = REFERENCES_DIR / "mcmaster" / "91829A560.SLDPRT"
 
-# --- vendor dims (all mm/deg, straight from the harvest) -------------------
-HEAD_DIA = 9.525  # Head Diameter@Sketch1
-HEAD_T = 4.7625  # Head Height@Sketch1
-SHOULDER_DIA = 6.35  # Shoulder Diameter@Sketch1
-SHOULDER_LEN = 6.35  # Shoulder Length@Sketch1
-THREAD_MAJOR = 4.826  # Screw Size Decimal Equivalent@Sketch1
-THREAD_LEN = 9.525  # Thread Length@Sketch1
-UNDERHEAD_LEN = SHOULDER_LEN + THREAD_LEN  # 15.875
-SLOT_W = 1.524  # D1@Sketch8
-SLOT_D = 1.905  # D1@Cut-Extrude2
-HEAD_CHAMFER = 0.309563  # D1@Chamfer1 (45 deg)
-TIP_CHAMFER = 0.43434  # D1@Chamfer2 (45 deg)
-UC_LAND_DIA = 3.3528  # CADA@Sketch5 (diametric)
-UC_W = 1.6002  # CADB@Sketch5 (fillet + land; also the split-plane offset)
-PITCH = 1.058333  # Pitch@Helix/Spiral2 (#10-24: 25.4/24)
-REVS = 9.0  # 9000@Helix/Spiral2
-
-# Undercut (vendor Sketch5): R-UC_FILLET quarter-round upper boundary tangent
-# to the land, then the land, then the 45-deg lower flank up to the major.
-UC_LAND_R = UC_LAND_DIA / 2.0  # 1.6764
-UC_FILLET = THREAD_MAJOR / 2.0 - UC_LAND_R  # 0.7366 (fillet R == flank rise)
-UC_LAND = UC_W - UC_FILLET  # 0.8636
-UC_SPAN = UC_LAND + 2.0 * UC_FILLET  # 2.3368 (junction -> flank@major)
-
-# Thread cutter (vendor Sketch10): UN form.  H is the sharp-V height; the
-# groove is the V truncated to a P/8 flat at the root and capped at a 15P/16
-# top width (the vendor's D1 = P dims the CONSTRUCTION sharp-V only).
-H_SHARP = PITCH * math.sqrt(3.0) / 2.0
-ROOT_R = THREAD_MAJOR / 2.0 - 0.75 * H_SHARP  # 1.725585 (vendor: 1.7256)
-ROOT_FLAT = PITCH / 8.0  # 0.132292 == vendor D2@Sketch10
-CUT_TOP_W = 15.0 * PITCH / 16.0  # 0.992187 (vendor: 0.9922)
-CUT_TOP_R = ROOT_R + (CUT_TOP_W - ROOT_FLAT) / 2.0 * math.sqrt(3.0)  # 2.470292
-CUT_CENTRE_Y = -UNDERHEAD_LEN - 7.0 * PITCH / 16.0  # -16.338 (vendor, in air)
+from _mcmaster_91829a560 import (  # noqa: E402
+    HEAD_DIA,
+    HEAD_T,
+    SHOULDER_DIA,
+    SHOULDER_LEN,
+    THREAD_MAJOR,
+    THREAD_LEN,
+    UNDERHEAD_LEN,
+    SLOT_W,
+    SLOT_D,
+    HEAD_CHAMFER,
+    TIP_CHAMFER,
+    UC_W,
+    PITCH,
+    REVS,
+    UC_LAND_R,
+    UC_FILLET,
+    UC_LAND,
+    ROOT_R,
+    ROOT_FLAT,
+    CUT_TOP_W,
+    CUT_TOP_R,
+    CUT_CENTRE_Y,
+)
 
 # --- vendor ground truth (mass + 20-face B-rep) ----------------------------
 VENDOR_VOLUME = 633.4188
@@ -122,38 +120,6 @@ VENDOR_FACE_AREAS = sorted([
 
 SW_BODY_ADD = 15903  # swBodyOperationType_e.SWBODYADD
 SW_FM_SWEEP_CUT = 18  # swFeatureNameID_e.swFmSweepCut
-
-
-def _slot_strip_area(r: float, w: float) -> float:
-    """Plan area of a width-w strip across a radius-r circle (exact)."""
-    h = w / 2.0
-    return 2.0 * (h * math.sqrt(r * r - h * h) + r * r * math.asin(h / r))
-
-
-def _slotted_rim_chamfer_volume(r: float, chamfer: float, slot_w: float) -> float:
-    """45-degree rim-chamfer volume remaining after a centered through-slot."""
-    centroid_radius = r - chamfer / 3.0
-    slot_half = slot_w / 2.0
-    if not 0.0 < slot_half < centroid_radius:
-        raise ValueError("slot must remove less than the full chamfer rim")
-    full_volume = math.pi * chamfer**2 * centroid_radius
-    missing_fraction = 2.0 * math.asin(slot_half / centroid_radius) / math.pi
-    return full_volume * (1.0 - missing_fraction)
-
-
-def _undercut_volume(major_r: float, land_r: float, land_w: float) -> float:
-    """Vendor undercut: quarter-fillet + land + one 45-deg flank, revolved.
-
-    Fillet band (height R = major_r - land_r, boundary radius
-    ``major_r - sqrt(R^2 - t^2)``):  pi * ( (pi/2)*major_r*R^2 - (2/3)*R^3 ).
-    """
-    rise = major_r - land_r
-    v_fillet = math.pi * (
-        (math.pi / 2.0) * major_r * rise**2 - (2.0 / 3.0) * rise**3
-    )
-    v_land = math.pi * (major_r**2 - land_r**2) * land_w
-    v_flank = math.pi * (major_r**2 * rise - (major_r**3 - land_r**3) / 3.0)
-    return v_fillet + v_land + v_flank
 
 
 def _mass_properties(adapter) -> dict:
@@ -218,6 +184,7 @@ def _offset_plane(adapter, name: str, offset_mm: float):
     return name
 
 
+@stock_recipe("91829A560", threaded=True)
 async def build_91829A560(adapter, truth=None):
     import pythoncom
     from win32com.client import VARIANT

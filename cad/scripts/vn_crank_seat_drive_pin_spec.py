@@ -17,15 +17,15 @@ face at y = 0, the rounded lead end at y = LENGTH.
 
 from __future__ import annotations
 
-from diagnostics.diag_mcmaster_dowel import (
+from _mcmaster_98381a434 import (
     DIA_BAND_IN,  # noqa: F401 -- re-exported: catalogue diameter tolerance (in)
-    DOWEL_SIZES,
+    DOWEL_SIZE,
     MM_PER_IN,  # noqa: F401 -- re-exported with the inch band
 )
 from pd_transgear_removable_spec import DRIVE_PIN_DIA, DRIVE_PIN_PROUD
 
 SKU = "98381A434"
-DIA, LENGTH = DOWEL_SIZES[SKU]  # 2.38125 x 6.35
+DIA, LENGTH = DOWEL_SIZE  # 2.38125 x 6.35
 # Pressed to the blind hole's floor, the pin stands the interface's proud
 # length out of the crank collar's seat face.
 PRESS_DEPTH = LENGTH - DRIVE_PIN_PROUD  # 3.95

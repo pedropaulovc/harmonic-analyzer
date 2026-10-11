@@ -40,6 +40,16 @@ TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
 TEETH = 120  # default/fundamental configuration
 CONFIGURATION_TEETH = tuple(range(6, 121, 6))
+
+# The full cone set: 20 gears, 6..120 teeth step 6 (DIMENSIONS.md ch. 12).
+CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
+DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
+TOOTH_GAP_PROFILE = "ToothGapProfile"
+TOOTH_GAP_CUT = "ToothGapCut"
+TOOTH_PATTERN_FEATURE = "ToothGapPattern"
+# Suppressed in each configuration's derived drawing configuration.
+SIMPLIFIED_FEATURES = (TOOTH_GAP_CUT, TOOTH_PATTERN_FEATURE)
+
 DIAMETRAL_PITCH = 49.82  # cad/config/machine/gear_train.yaml
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
@@ -264,6 +274,17 @@ def floor_limits_mm(teeth: int) -> tuple[float, float]:
     _require_member(teeth)
     minimum = math.floor(2.0 * floor_radius_mm(teeth) * 1000.0 + 1e-6) / 1000.0
     return minimum, FLOOR_MAX_DIA_MM[teeth]
+
+
+def gap_floor_deviations_mm(teeth: int) -> tuple[float, float]:
+    """FloorDia's (lower, upper) LIMIT deviations from the modelled floor.
+
+    The printed limits are ``floor_limits_mm``; the dimension's nominal is the
+    modelled floor, so each limit is stored as its offset from it.
+    """
+    minimum, maximum = floor_limits_mm(teeth)
+    nominal = 2.0 * floor_radius_mm(teeth)
+    return minimum - nominal, maximum - nominal
 
 
 def floor_dip_mm(teeth: int) -> float:

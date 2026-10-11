@@ -58,7 +58,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _drawing_simplified import save_simplified_part
+from _simplified_part import save_simplified_part
 from _gear import build_fixed_gear, volume_check
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
@@ -101,8 +101,8 @@ MANUFACTURING_NOTES = "\n".join(
 PART_NAME = "pd-rack-pinion"
 MATERIAL = "Brass"  # ch. 23 photos: brass
 
-# The paper-drive assembly reads TEETH, DP and FACE_WIDTH from here
-# (test_buildgraph pins that edge).
+# The paper-drive assembly reads TEETH, DIAMETRAL_PITCH and FACE_WIDTH from
+# pd_rack_pinion_spec without folding this part builder into its recipe.
 DP = DIAMETRAL_PITCH
 BORE_DIAMETER = BORE_DIA
 

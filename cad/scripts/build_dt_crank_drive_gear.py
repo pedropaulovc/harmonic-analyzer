@@ -55,7 +55,6 @@ import sys
 
 import _config
 import _telemetry
-import cone_shaft_land_bands
 from _common import (
     IN,
     SketchDims,
@@ -84,15 +83,15 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _drawing_simplified import save_simplified_part
 from _fit_deviations import deviations
+from _simplified_part import save_simplified_part
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
 from dt_crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
-from gear_seat_fit import GEAR_SEAT_CLEARANCE, seat_bore_band
 from dt_crank_drive_gear_spec import (
     BORE_AF,
     BORE_AF_BAND,
+    BORE_DIA_BAND,
     BORE_SOUTH_CHAMFER,
     BORE_SOUTH_CHAMFER_BAND,
     CUTTER_DIAMETRAL_PITCH,
@@ -182,19 +181,6 @@ BORE_DIAMETER = 0.375 * IN
 HELIX_DEG = _config.machine("gear_train", "crank_drive_helix_deg")
 BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 
-# A printable slide fit on the Sec1 gear-seat land. The round and flat
-# clearances are independent: BoreDia sets radial runout; BoreAF limits
-# angular play on the local +X flat. No joining compound is involved.
-_LAND_UPPER, _LAND_LOWER = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
-if (_LAND_UPPER, _LAND_LOWER) != cone_shaft_land_bands.GEAR_SEAT_BAND:
-    raise AssertionError("the 64T no longer rides a gear-seat land")
-BORE_DIA_BAND = seat_bore_band(cone_shaft_land_bands.GEAR_SEAT_BAND)
-BORE_DIAMETRAL_CLEARANCE = (
-    round(BORE_DIA_BAND[1] - _LAND_UPPER, 6),
-    round(BORE_DIA_BAND[0] - _LAND_LOWER, 6),
-)
-if BORE_DIAMETRAL_CLEARANCE != GEAR_SEAT_CLEARANCE:
-    raise AssertionError("64T bore lost its round slide-fit clearance")
 
 
 async def build(adapter) -> dict[str, str]:

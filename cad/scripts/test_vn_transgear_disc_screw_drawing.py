@@ -17,9 +17,9 @@ import build_vn_transgear_disc_screw as part
 import draw_vn_transgear_disc_screw as drawing
 import vn_transgear_disc_screw_spec as screw
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91794A055 as entry
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _mcmaster_91794a055 import FILLISTER_SIZE
 
 IN = 25.4
 
@@ -34,8 +34,8 @@ def test_spec_is_the_catalogue_screw() -> None:
     assert screw.SHANK_LEN == pytest.approx(0.25 * IN)
     assert screw.HEAD_DIA == pytest.approx(0.096 * IN)
     assert screw.HEAD_H == pytest.approx(0.055 * IN)
-    # The hub spec reads the same screw off the fillister size table.
-    assert FILLISTER_SIZES[screw.SKU] == pytest.approx(
+    # The hub spec reads the same screw's pure per-SKU fillister dimensions.
+    assert FILLISTER_SIZE == pytest.approx(
         (screw.SHANK_DIA, screw.SHANK_LEN, screw.HEAD_H, screw.HEAD_DIA, screw.PITCH)
     )
 
@@ -314,7 +314,7 @@ def test_recipe_refuses_a_cut_it_cannot_draw(cut_length, cut_end_break) -> None:
 def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     monkeypatch,
 ) -> None:
-    metadata = STOCK_RECIPES[screw.SKU]
+    metadata = discovered_recipes()[screw.SKU]
     assert metadata.module == entry.__name__
     assert metadata.callable_name == entry.build_91794A055.__name__
     assert metadata.threaded

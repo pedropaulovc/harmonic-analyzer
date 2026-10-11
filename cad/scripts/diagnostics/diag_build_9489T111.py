@@ -94,6 +94,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     _early_bound,
@@ -400,6 +402,7 @@ async def _hex_nut(adapter, bolt_volume: float) -> float:
 # --------------------------------------------------------------------------
 # builder
 # --------------------------------------------------------------------------
+@stock_recipe("9489T111", threaded=True)
 async def build_9489T111(
     adapter,
     truth=None,

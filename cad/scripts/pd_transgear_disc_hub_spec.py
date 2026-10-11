@@ -59,14 +59,13 @@ import transgear_cluster_fit as FIT
 import pd_transgear_feed_pinion_spec as SLEEVE
 from _fit_deviations import deviations
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from _mcmaster_91794a055 import FILLISTER_SIZE
 from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
     BOLT_CIRCLE_PLACES,
     BOLT_CIRCLE_POSITION_TOL,
     SCREW_COUNT,
     SCREW_HOLE_DIA,
-    SCREW_SKU,
     SPIGOT_DIA,
     SPIGOT_DIA_BAND,
     SPIGOT_DIA_PLACES,
@@ -91,7 +90,7 @@ if SLEEVE.DISC_NUMBER != DISC_NUMBER:
 
 # --- screw (MHA-VN-039, McMaster 91794A055) ------------------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, SCREW_HEAD_H, SCREW_HEAD_DIA, _SCREW_PITCH = (
-    FILLISTER_SIZES[SCREW_SKU]
+    FILLISTER_SIZE
 )
 # Head diameter allowance over the catalogue size (contract §8, "head +0.05").
 SCREW_HEAD_DIA_ALLOWANCE = 0.05

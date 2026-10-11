@@ -18,7 +18,7 @@ import transgear_hanger_joints as joints
 import vn_transgear_pivot_screw_spec as screw
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91829A205 as entry
 
 IN = 25.4
@@ -259,7 +259,7 @@ def test_replica_gate_reads_the_vendor_com_in_the_part_frame(monkeypatch) -> Non
 def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     monkeypatch,
 ) -> None:
-    metadata = STOCK_RECIPES[screw.SKU]
+    metadata = discovered_recipes()[screw.SKU]
     assert metadata.module == entry.__name__
     assert metadata.callable_name == entry.build_91829A205.__name__
     assert metadata.threaded

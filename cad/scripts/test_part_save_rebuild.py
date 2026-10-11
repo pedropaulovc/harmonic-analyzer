@@ -398,7 +398,7 @@ def test_only_the_known_helpers_create_configurations_outside_builders() -> None
         for path in SCRIPTS.glob("_*.py")
         if re.search(r"\bAddConfiguration\d*\(", path.read_text(encoding="utf-8"))
     }
-    assert creators == {"_assembly", "_drawing_simplified"}
+    assert creators == {"_assembly", "_simplified_part"}
 
 
 def _assert_reopened_then_tripwire(source: str) -> None:
@@ -423,6 +423,6 @@ def test_every_configuration_builder_proves_its_saved_caches_on_reopen(stem) -> 
 
 
 def test_the_simplified_part_save_proves_its_saved_caches_on_reopen() -> None:
-    import _drawing_simplified
+    import _simplified_part
 
-    _assert_reopened_then_tripwire(inspect.getsource(_drawing_simplified.save_simplified_part))
+    _assert_reopened_then_tripwire(inspect.getsource(_simplified_part.save_simplified_part))

@@ -92,8 +92,8 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _drawing_simplified import save_simplified_part
 from _fit_deviations import deviations
+from _simplified_part import save_simplified_part
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_removable_notes import DRAWING_NOTES, GEAR_DATA

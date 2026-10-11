@@ -40,10 +40,10 @@ from _common import (
     set_isometric_view,
     whats_wrong,
 )
-from _drawing_simplified import (
+from _simplified_identity import components_identity
+from _simplified_names import (
     SIMPLIFIED_COMMENT,
     SIMPLIFIED_SUFFIX,
-    components_identity,
     is_simplified,
     simplified_comment,
     simplified_name,
@@ -2290,7 +2290,7 @@ def sync_simplified_configuration(
 
     Every assembly-drawing view at 1:2 or smaller that inks edges references
     it, so modeled gear teeth and screw threads do not print black
-    (``_drawing_simplified``). The rule is the
+    (``_simplified_names``). The rule is the
     uniform ``<parent> Simplified`` name, so a subassembly's own ``Default
     Simplified`` is picked up the same way as a part's ``T24 Simplified``; a
     component whose model has no such configuration keeps its parent one.
@@ -2747,7 +2747,7 @@ async def reconcile_saved_rebuild_state(
     build's reconcile held. So every other configuration is shown and
     ``EditRebuild3``-ed first and the rest configuration last, each marked for
     rebuild-save and read back (the part-side finalization,
-    ``_drawing_simplified.persist_configurations_in_place``), before the one
+    ``_simplified_part.persist_configurations_in_place``), before the one
     ``Save3``. The saved file is then reopened the way that gate opens it and
     must read clean, so an artifact that would fail it is never cached; a dirty
     reopen raises naming each configuration's saved state.

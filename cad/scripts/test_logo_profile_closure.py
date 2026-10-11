@@ -37,6 +37,7 @@ import math
 
 import pytest
 
+from _mcmaster_99607a213 import TS_SH_R
 from diagnostics.diag_build_91247A720 import (
     LOGO_APEX_CENTRE,
     LOGO_BOTTOM_LEFT_CENTRE,
@@ -48,7 +49,6 @@ from diagnostics.diag_build_99607A213 import (
     TS_FLARE_CENTRE,
     TS_FLARE_Z0,
     TS_FLARE_Z1,
-    TS_SH_R,
     flare_profile,
 )
 from diagnostics.sketch_profile import (

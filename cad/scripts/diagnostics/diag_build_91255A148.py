@@ -54,6 +54,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     check,
@@ -196,6 +198,7 @@ if HEAD_H - SOCKET_DEPTH <= BAND_H:
     raise ValueError("91255A148 socket floor falls into the head's band")
 
 
+@stock_recipe("91255A148", threaded=True)
 async def build_91255A148(adapter, truth=None):
     from _common import _feature_by_name, _early_bound, _read_member, add_line_chain
     from solidworks_mcp.adapters.base import RevolveParameters

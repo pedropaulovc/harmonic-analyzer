@@ -14,9 +14,9 @@ import build_vn_transgear_latch_pin as part
 import vn_transgear_latch_pin_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_98381A474 as recipe
-from diagnostics.diag_mcmaster_dowel import MM_PER_IN
+from _mcmaster_98381a474 import DOWEL_SIZE, MM_PER_IN
 
 STEM = "vn-transgear-latch-pin"
 
@@ -29,7 +29,7 @@ def test_catalogue_row_is_the_registered_mcmaster_dowel() -> None:
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"]
     assert row["number"] == "MHA-VN-042"
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_98381A474
     assert metadata.threaded is False
@@ -45,13 +45,13 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch) -> None:
     assert not hasattr(recipe, "replica_main")
     seen: list = []
 
-    async def fake_catalog(adapter, part_no):
-        seen.append(part_no)
+    async def fake_catalog(adapter, part_no, size, ends):
+        seen.append((part_no, size, ends))
         return {}
 
     monkeypatch.setattr(recipe, "build_catalog", fake_catalog)
     asyncio.run(recipe._catalog(None))
-    assert seen == [spec.SKU]
+    assert seen == [(spec.SKU, (spec.DIA, spec.LENGTH), spec.ENDS)]
 
 
 def test_no_vendor_model_of_the_new_pin_is_tracked() -> None:
@@ -77,7 +77,7 @@ def test_pressed_and_proud_lengths_are_the_whole_pin() -> None:
 def test_the_chamfered_end_is_the_pressed_end() -> None:
     from diagnostics.diag_mcmaster_dowel import dowel_section
 
-    section = dowel_section(spec.SKU)
+    section = dowel_section(DOWEL_SIZE, spec.ENDS)
     pressed_face = max(rad for rad, y in section if y == 0.0)
     lead_face = max(rad for rad, y in section if y == spec.LENGTH)
     assert pressed_face == pytest.approx(spec.ENDS.point_dia / 2.0)

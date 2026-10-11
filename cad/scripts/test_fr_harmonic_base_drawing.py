@@ -1522,9 +1522,9 @@ def test_hold_down_is_the_specified_screw() -> None:
 
 
 def test_specified_hold_down_screw_fits_a_derived_seat_without_the_blocker() -> None:
-    import build_vn_lag_screw as screw
+    from vn_lag_screw_spec import LENGTH_MM
 
-    length, _replay = screw.REPLAYS[screw.SPECIFIED_SKU]
+    length = LENGTH_MM
     assert length == 19.05  # 3/4 in under the head
     engagement = length - part.SUPPORT_FOOT_THICKNESS - part.HOLD_DOWN_BEARING_OFFSET
     diameter = part.THREAD_MAJOR_MM[part.HOLD_DOWN_THREAD]

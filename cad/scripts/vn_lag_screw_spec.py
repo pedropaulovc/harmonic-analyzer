@@ -5,17 +5,17 @@ review specified the 3/4 in 92240A540 over the 5/8 in 92240A539.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: the thread identity and the head/shank/bearing dims the frame
 assembly and the harmonic base's hold-down seats read. The vendor dims are the
-named constants of ``diagnostics/diag_build_92240A539.py`` (SolidWorks-free at
+named constants of ``_mcmaster_92240a540.py`` (SolidWorks-free at
 import). Consumers read them here, not from ``build_vn_lag_screw``, whose stock
 build recipe would otherwise ride their cache keys (#880).
 """
 
 from __future__ import annotations
 
-from diagnostics import diag_build_92240A539, diag_build_92240A540
-from diagnostics.diag_build_92240A539 import (
+from _mcmaster_92240a540 import (
     HEX_HEIGHT_MM,
     HEX_WIDTH_MM,
+    LENGTH_MM,
     MAJOR_DIAMETER_MM,
     PITCH_MM,
     WASHER_DEPTH_MM,
@@ -27,11 +27,6 @@ from diagnostics.diag_build_92240A539 import (
 # the catalog row (which would fold that row into every consumer's key);
 # build_vn_lag_screw refuses a catalog row that names another SKU.
 SPECIFIED_SKU = "92240A540"
-LENGTHS_MM = {
-    "92240A539": diag_build_92240A539.LENGTH_MM,
-    "92240A540": diag_build_92240A540.LENGTH_MM,
-}
-LENGTH_MM = LENGTHS_MM[SPECIFIED_SKU]
 
 HEAD_AF = HEX_WIDTH_MM
 HEAD_H = HEX_HEIGHT_MM

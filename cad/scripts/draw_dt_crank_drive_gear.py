@@ -55,7 +55,7 @@ from _drawing_leaders import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from build_dt_crank_drive_gear import BORE_DIAMETRAL_CLEARANCE
+from dt_crank_drive_gear_spec import BORE_DIAMETRAL_CLEARANCE
 from dt_crank_drive_gear_notes import GEAR_DATA, SHAFT_MATE_NUMBER
 from gear_seat_fit import FLAT_AF_CLEARANCE
 from dt_crank_drive_gear_spec import (

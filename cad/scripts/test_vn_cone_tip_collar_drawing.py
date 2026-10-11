@@ -13,7 +13,7 @@ import build_vn_cone_tip_collar as part
 import vn_cone_tip_collar_spec as spec
 import draw_vn_cone_tip_collar as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-from _stock_fastener import STOCK_RECIPES
+from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_9414T1 as recipe
 from diagnostics import diag_mcmaster_lib
 
@@ -126,7 +126,7 @@ def test_recipe_volumes_are_consistent() -> None:
 
 
 def test_stock_build_uses_its_registered_recipe_on_the_origin(monkeypatch) -> None:
-    metadata = STOCK_RECIPES[spec.SKU]
+    metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == recipe.build_9414T1.__name__
     assert not metadata.threaded

@@ -58,6 +58,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     add_line_chain,
@@ -68,7 +70,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diagnostics.diag_build_91829A560 import (  # noqa: E402
+from _shoulder_screw_geometry import (  # noqa: E402
     _slot_strip_area,
     _slotted_rim_chamfer_volume,
     _undercut_volume,
@@ -148,6 +150,7 @@ def _tail_body(boxes: list[dict]) -> str:
     return below[0]
 
 
+@stock_recipe("91829A205", threaded=True)
 async def build_91829A205(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
