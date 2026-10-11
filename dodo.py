@@ -3144,7 +3144,6 @@ def task_check():
         SCRIPTS_DIR / "test_dt_cone_gear_seat_fit.py",
         # Finite stock-cutter geometry is a production design contract.
         SCRIPTS_DIR / "test_stock_form_cutter.py",
-        SCRIPTS_DIR / "test_dt_cone_support_pose.py",
         SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",

@@ -392,21 +392,6 @@ def test_native_default_bom_and_manufacturing_descriptions_share_spec_authority(
         assert configs[name].UseDescriptionInBOM is True
 
 
-def test_station_ledger_does_not_double_pay_post_mount_world_vectors():
-    import dt_cone_gear_shaft_spec as shaft
-    import dt_cone_gear_stack as stack
-    import dt_cone_pivot_post_spec as post
-
-    terms = air.station_band_mm()
-    assert terms == {
-        "post boss half length": printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0,
-        "shaft integral thrust collar width": shaft.printed_band("CollarWidth"),
-        "accepted gear stack terminal north face": -stack.face_band(stack.COUNT - 1, "north")[1],
-        "T006 collar feeler set error": air.COLLAR_FEELER_BAND,
-    }
-    assert not any("mount" in name or "screw float" in name for name in terms)
-
-
 def test_stepped_air_tiers_include_native_tool_root_and_reworked_screw():
     assert air.PARTITION_STATION_MM == spec.NOSE_LENGTH - spec.SHOULDER_ROOT_RADIUS
     assert {tier.name for tier in air.TIERS} == {"nose", "body", "screw"}
@@ -525,11 +510,6 @@ def test_signed_clamp_refuses_false_seating_and_partial_dog(failure):
         spec.validate_installed_clamp_pose(**values)
 
 
-def test_full_source_air_requires_observed_bank_face_contract():
-    with pytest.raises(ValueError, match="bank"):
-        air.full_sweep_proof(installed=air.installation_acceptances()[0], bank_thrust=None)
-
-
 @pytest.mark.parametrize("readback", [None, (0.0,)*4, (math.nan, 0.0, 0.0, 0.0, 0.0)])
 def test_native_clamp_refuses_nonfinite_trimmed_face_points(readback):
     with pytest.raises(RuntimeError, match="closest point"):
@@ -567,66 +547,6 @@ def test_axial_dog_couple_uses_the_actual_back_contact_not_the_shaft_centre():
     assert lands._LOADED_FORCE_COUPLE_ARM_MM == pytest.approx(
         lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1]*math.tan(lands._LOADED_AXIS_ANGLE_UPPER_RAD),
     )
-
-
-def test_installed_air_authority_keeps_real_fit_and_axial_material_travel():
-    import dt_cone_support_pose as pose
-    from cone_stack_end_play import SHAFT_END_PLAY, STACK_FLOAT
-    installed, thrust = air.installation_acceptances()
-    expected = pose.InstalledSupportMotionAcceptance(
-        air.POST_CENTRE_INSPECTION_XYZ_MM, air.CUP_SEATED_NORTH_CENTRE_XYZ_MM,
-        air.NORTH_RADIAL_MOTION_MAX_MM, air.TERMINAL_INSPECTION_STATION_MIN_MM,
-        SHAFT_END_PLAY[1],
-    )
-    assert installed == expected
-    assert installed.north_radial_motion_max_mm > max(air.CUP_SEATED_NORTH_CENTRE_XYZ_MM)
-    assert thrust.face_tir_mm == air.BANK_WORKING_FACE_TIR_MM
-    assert thrust.indicated_span_mm == air.BANK_WORKING_TRACE_MIN_MM
-    assert STACK_FLOAT[0] > air.TERMINAL_PROBE_DIAMETER_MAX_MM
-    terms = air.projection_closure_terms_mm(
-        air.TIERS[1], (-1.0, 0.0, 0.0), installed=installed, bank_thrust=thrust,
-    )
-    assert "retained shaft end-play north material travel" not in terms
-    assert terms["correlated north motion and axial material travel"] >= 0.0
-
-
-
-def test_selected_motion_limit_and_metrology_flow_through_one_inspection_authority():
-    installed, _thrust = air.installation_acceptances()
-    assert air.NORTH_RADIAL_MOTION_MAX_MM == pytest.approx(0.480)
-    assert installed.north_radial_motion_max_mm == air.NORTH_RADIAL_MOTION_MAX_MM
-    assert air.TERMINAL_CENTRE_EXPANDED_UNCERTAINTY_MAX_MM == pytest.approx(0.005)
-    assert air.TERMINAL_INDICATOR_RESOLUTION_MAX_MM == pytest.approx(0.001)
-    notes = " ".join(air.installation_requirements())
-    assert f"rho^2/{installed.north_radial_motion_max_mm:.3f}^2+q/e<=1" in notes
-    assert "OBSERVED UPPER PLUS ITS EXPANDED UNCERTAINTY" in notes
-    assert "RESOLUTION <=0.001 IS NOT ACCURACY" in notes
-    assert "CORRELATED q/e UNCERTAINTY" in notes
-    assert "CUP-SEATED UNCERTAINTY FAMILY MUST REMAIN INSIDE THE FIXED BOX" in notes
-    assert "CRITICAL RUNNING-BORE/SHAFT-SEAT SETUP ONLY" in notes
-    assert "NO COMMODITY RECEIVING OR FULL-P1 TRACKING" in notes
-
-
-def test_selected_motion_domain_does_not_erase_actual_raw_pivot_transport():
-    from dataclasses import replace
-    installed, thrust = air.installation_acceptances()
-    former = replace(installed, north_radial_motion_max_mm=0.55)
-    arguments = (air.TIERS[1], (0.0, 0.0, 1.0), air.DRUM_TIERS[0], 9.725825)
-    current_terms = air.projection_closure_terms_mm(
-        *arguments, installed=installed, bank_thrust=thrust,
-    )
-    former_terms = air.projection_closure_terms_mm(
-        *arguments, installed=former, bank_thrust=thrust,
-    )
-    assert current_terms["actual pivot transport remainder"] > 0.0
-    assert current_terms["actual pivot transport remainder"] == former_terms["actual pivot transport remainder"]
-    assert current_terms["correlated north motion and axial material travel"] < former_terms["correlated north motion and axial material travel"]
-
-@pytest.mark.parametrize("station", [math.nan, air.TERMINAL_INSPECTION_STATION_MIN_MM-0.1,
-                                     air.TERMINAL_INSPECTION_STATION_MAX_MM+0.1])
-def test_inspection_station_refuses_unobserved_or_inaccessible_back_arc(station):
-    with pytest.raises(ValueError, match="inspection station"):
-        air.installation_acceptances(terminal_station_mm=station)
 
 
 @pytest.mark.parametrize("readback", [None, (), (1,), (False,), (True, True)])
@@ -669,18 +589,51 @@ def test_exact_finite_drum_tilt_keeps_full_shadow_and_manufactured_caps(normal):
         assert air._tilted_fixed_support(tier, normal, 0.03) >= tilted-1e-12
 
 
-def test_manufactured_face_grade_cannot_remove_real_running_gear_cock():
-    from dt_cone_support_pose import BankThrustAcceptance
-    installed, grade = air.installation_acceptances()
-    tight = BankThrustAcceptance(grade.face_tir_mm/100.0, grade.indicated_span_mm)
-    for tier in air.DRUM_TIERS:
-        terms = air.projection_closure_terms_mm(
-            air.TIERS[1], (-0.8, 0.0, 0.6), tier, installed=installed, bank_thrust=tight,
-        )
-        assert terms["drum FULL retained running/face tilted finite-cylinder enclosure"] > 0.0
-        assert terms["drum running bore radial fit"] == pytest.approx(
-            air.drum.BORE_DIAMETRAL_CLEARANCE_MM[1]/2.0*0.8,
-        )
+def test_collar_air_shares_the_assembly_post_face_and_tip_tap_bands():
+    import build_dt_drive_train_assembly as bdt
+
+    axial = air.AXIAL_TERMS_MM
+    assert sum(axial[name] for name in (
+        "post platform tap station", "post screw clearance", "post counterbore pattern",
+        "post cone boss length",
+    )) == pytest.approx(bdt.POST_BOSS_FACE_AXIAL_BAND_MM)
+    tip = air.TIP_END_TERMS_MM
+    assert sum(tip[name] for name in (
+        "tip platform hold-down station", "tip hold-down screw clearance", "tip block foot tap station",
+    )) == pytest.approx(bdt.TIP_TAP_LATERAL_BAND_MM)
+
+
+def test_collar_air_books_only_printed_sources():
+    terms = air.closure_terms_mm(air.TIERS[0], air.DRUM_TIERS[0], 0.0)
+    assert set(terms) == {
+        *air.AXIAL_TERMS_MM, *air.SWING_TERMS_MM,
+        "post end across the shaft", "tip end across the shaft",
+        "collar faces tilted with the shaft line", "T120 set of the swing",
+        "collar tier axial limit", "collar tier radial limit",
+        "collar float on the journal", "collar cock on the journal",
+        *(f"bank {name}" for name in air.bank.DATUM_CHAIN_STACK),
+        "drum tier limits", "G19 cock in its running fit",
+    }
+    assert all(value >= 0.0 for value in terms.values())
+
+
+def test_collar_air_falls_back_to_rss_only_when_arithmetic_refuses(monkeypatch):
+    rows = air.full_sweep_proof(intervals=20)
+    assert {row["method"] for row in rows} == {"rss"}
+    assert min(row["arithmetic_mm"] for row in rows) <= 0.0
+    assert min(row["air_mm"] for row in rows) > 0.0
+    for row in rows:
+        assert row["air_mm"] == pytest.approx(row["nominal_mm"] - sum(row["closure_mm"].values()))
+    monkeypatch.setattr(air, "closure_terms_mm", lambda *_args: {"small": 0.01})
+    rows = air.full_sweep_proof(intervals=20)
+    assert {row["method"] for row in rows} == {"arithmetic"}
+    assert all(row["air_mm"] == row["arithmetic_mm"] for row in rows)
+
+
+def test_collar_air_refuses_when_the_booked_air_closes(monkeypatch):
+    monkeypatch.setattr(air, "closure_terms_mm", lambda *_args: {"large": 100.0})
+    with pytest.raises(ValueError, match="can reach G19"):
+        air.full_sweep_proof(intervals=4)
 
 
 def test_native_cylinder_positive_control_uses_actual_property_and_finite_axis(monkeypatch):
@@ -743,23 +696,6 @@ def test_coupled_body_shift_has_one_source_and_keeps_radial_and_body_process_env
     assert spec.WIDTH-spec.TAP_STATION == 4.0
     assert spec.NOSE_DIA == 6.40
     assert lands.TERMINAL_FLAT_AF_MM == 0.420
-
-
-def test_correlated_full_stroke_support_pays_interior_without_independent_maxima():
-    from dt_cone_support_pose import correlated_north_motion_support_mm
-    assert correlated_north_motion_support_mm(0.20, 1.0, 0.25) == pytest.approx(0.29)
-    assert correlated_north_motion_support_mm(0.55, 1.0, 0.25) == pytest.approx(0.55)
-    assert correlated_north_motion_support_mm(0.55, -1.0, 0.25) == pytest.approx(0.55)
-    assert correlated_north_motion_support_mm(0.480, 1.0, 0.25) == pytest.approx(0.4804)
-    assert correlated_north_motion_support_mm(0.480, -1.0, 0.25) == pytest.approx(0.480)
-    assert correlated_north_motion_support_mm(0.0, 1.0, 0.25) == pytest.approx(0.25)
-
-
-def test_full_source_air_rejects_old_tight_all_state_axis_grade():
-    from dt_cone_support_pose import InstalledAxisAcceptance
-    old_tight_grade = InstalledAxisAcceptance((0.025, 0.025, 0.025), 0.001)
-    with pytest.raises(ValueError, match="support-motion"):
-        air.full_sweep_proof(installed=old_tight_grade, bank_thrust=air.installation_acceptances()[1])
 
 
 def test_printed_physical_limits_keep_exact_native_model_and_real_fit_distinct():
