@@ -617,7 +617,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
         "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #8-32 fulcrum-keeper taps (top-level row)
         "pd_transgear_arm",  # MHA-PD-018: 2x #8-32 plate taps through (pd_transgear_arm_spec), receiver; the pin MHA-PD-023 is pressed in a reamed hole
-        "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster91790A199, MHA-VN-040), 1-in stock cut to fit; member:2 into transgear_arm
+        "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A199, MHA-VN-040), 1-in stock cut to fit; member: 2 into transgear_arm
         "vn_transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-VN-039), cut to fit; member: 3 through the hub flange into rack_pinion
         "pd_transgear_knob_shaft",  # MHA-PD-008: #8-32 UNC die-cut front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-VN-048)
         "vn_transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 91829A205, MHA-VN-041), member into the support_bar's blind pivot tap

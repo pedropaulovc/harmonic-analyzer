@@ -220,7 +220,7 @@ PLATE_TAP_MOUTH_DIA_MAX_MM = (
     blind_cut_dia_mm(PLATE_TAP_SPEC)
     + 2.0 * max(PLATE_TAP_ENTRY_BREAK_MAX_MM, PLATE_TAP_EXIT_BREAK_MAX_MM)
 )
-# Pay the ordinary angular row at its smallest half-angle, not nominal45.
+# Pay the ordinary angular row at its smallest half-angle, not nominal 45.
 PLATE_TAP_ENTRY_LOSS_MAX_MM = PLATE_TAP_ENTRY_BREAK_MAX_MM / math.tan(
     math.radians((TAP_EDGE_BREAK_ANGLE_DEG - angular_band_deg()) / 2.0)
 )

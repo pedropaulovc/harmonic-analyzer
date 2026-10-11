@@ -1,5 +1,5 @@
-r"""McMaster 91790A199 -- 18-8 stainless steel slotted82deg oval head screw,
-8-32 x1in from the top of the bevel, fully threaded.
+r"""McMaster 91790A199 -- 18-8 stainless steel slotted 82 deg oval head screw,
+8-32 x 1 in from the top of the bevel, fully threaded.
 
 The chosen SKU was read live at https://www.mcmaster.com/91790A199/ on
 2026-10-09; ``vn_transgear_arm_plate_screw_spec`` owns catalogue dimensions

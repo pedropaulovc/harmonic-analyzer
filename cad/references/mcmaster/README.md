@@ -450,12 +450,12 @@ Catalog specifications checked on September 10, 2026:
   was read live on October 9, 2026 in isolated Chromium (HTTP 200): passivated
   316 stainless, ISO 2338-m6, diameter 2.002–2.008 mm, nominal length 6 mm,
   both ends chamfered. The supplier does not publish a length or chamfer
-  band. [ISO 2338:1997 Table1](https://cdn.standards.iteh.ai/samples/20001/5b26cece48c448b782c0de1eccb5b16c/ISO-2338-1997.pdf)
-  bounds nominal6-mm stock to5.75–6.25 mm;
+  band. [ISO 2338:1997 Table 1](https://cdn.standards.iteh.ai/samples/20001/5b26cece48c448b782c0de1eccb5b16c/ISO-2338-1997.pdf)
+  bounds nominal 6-mm stock to 5.75–6.25 mm;
   [c≈0.35 mm](https://fullerfasteners.com/tech/iso-2338-specifications-parallel-pins/)
   is approximate, not a hard end limit or full-cylinder certificate.
   `vn_transgear_arm_plate_locating_pin_spec.py` owns the ordinary installation
-  fits and proud set. The whole standard length family has at least0.17 mm
+  fits and proud set. The whole standard length family has at least 0.17 mm
   bottom air in the custom arm blind hole. `diag_build_93600A189.py` uses the
   existing nominal-cylinder recipe: catalogue-only, no vendor model, no
   replica gate and no new commodity receiving procedure.

@@ -217,7 +217,7 @@ NECK_D_BORE_AIR_MIN = (
     - (CORE_TOTAL_RUNOUT + FRONT_RELIEF_TOTAL_RUNOUT) / 2.0 - D_CENTRE_FLOAT_MAX
 )
 # Under drive use the actual minimum core-flat plane, with NO favourable
-# bore-float credit. This is why the neck is4.000, not the old4.050 proposal.
+# bore-float credit. This is why the neck is 4.000, not the old 4.050 proposal.
 NECK_TORQUE_FLAT_AIR_MIN = (
     _CORE_FLAT_MIN - FRONT_RELIEF_DIA_MAX / 2.0
     - (CORE_TOTAL_RUNOUT + FRONT_RELIEF_TOTAL_RUNOUT) / 2.0
