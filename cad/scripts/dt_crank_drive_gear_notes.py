@@ -49,9 +49,12 @@ GEAR_DATA = gear_data_note(
             f"{spec.ROOT_DIA_MIN:.3f}-{spec.ROOT_DIA_MAX:.3f} / {spec.WHOLE_DEPTH:.3f}",
         ),
         (
-            "HELIX AT PITCH DIA / LEAD (mm/rev, REF)",
-            f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} DEG "
-            f"{spec.HELIX_HAND} / "
+            "HELIX AT PITCH DIA",
+            f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} "
+            f"\u00b1{spec.HELIX_ANGLE_TOLERANCE_DEG:g} DEG {spec.HELIX_HAND}",
+        ),
+        (
+            "LEAD (mm/rev, REF)",
             f"{spec.HELIX_LEAD_MM:.{spec.GEAR_DATA_REFERENCE_PLACES}f}",
         ),
         (
@@ -72,12 +75,7 @@ GEAR_DATA = gear_data_note(
             "TOOTH CUTTING SETUP, ACCEPT AT SETUP",
             f"{spec.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
         ),
-        (
-            "TOOTH FORM",
-            f"FULL-DEPTH NORMAL-{spec.CUTTER_DIAMETRAL_PITCH:g}DP "
-            f"PA{spec.CUTTER_PRESSURE_ANGLE_DEG:g} STOCK #{spec.CUTTER_NUMBER}/"
-            f"{spec.CUTTER_TEMPLATE.reference_teeth}T; NOMINAL NORMAL-SECTION SCREW SWEEP",
-        ),
+        ("TOOTH FORM", "HELICAL INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER"),
         ("MATES WITH", "CRANK PINION MHA-DT-010, 16T STOCK #7/14T STRAIGHT SPUR"),
     ]
 )

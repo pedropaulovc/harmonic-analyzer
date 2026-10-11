@@ -284,7 +284,8 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "PITCH DIAMETER (mm, REF)",
         "ACTUAL ROOT DIA MIN-MAX / MAX CUT DEPTH (mm, REF)",
         "FORM CUTTER / REFERENCE TEETH / VIRTUAL TEETH (REF)",
-        "HELIX AT PITCH DIA / LEAD (mm/rev, REF)",
+        "HELIX AT PITCH DIA",
+        "LEAD (mm/rev, REF)",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL (mm), ACCEPT ON THIS PART",
         "TRANSVERSE BACKLASH WITH MHA-DT-010, ACCEPT AT ASSEMBLY (mm)",
         "TOOTH FORM",
@@ -398,9 +399,18 @@ def test_gear_data_states_the_helix_and_its_hand() -> None:
     # or straight-cut part would get wrong.
     data = notes.GEAR_DATA
     assert (
-        f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} DEG RIGHT HAND"
+        f"HELIX AT PITCH DIA:  {spec.HELIX_ANGLE_DEG:.1f} \u00b11 DEG RIGHT HAND"
     ) in data
-    assert "NOMINAL NORMAL-SECTION SCREW SWEEP" in data
+    assert f"LEAD (mm/rev, REF):  {spec.HELIX_LEAD_MM:.3f}" in data
+    assert "SCREW SWEEP" not in data
+    # The ordinary +/-1 deg helix keeps the worst-corner crossed-mesh backlash
+    # positive: the 64T normal pitch moves p_t sin(beta) per radian.
+    import crank_mesh_stack
+    transverse_pitch = math.pi * spec.PITCH_DIA / spec.TEETH
+    pitch_shift = transverse_pitch * math.sin(math.radians(spec.HELIX_ANGLE_DEG)) * math.radians(
+        spec.HELIX_ANGLE_TOLERANCE_DEG
+    )
+    assert pitch_shift < crank_mesh_stack.standard_check().backlash_min_mm / 2.0
     # The hand follows the recipe's twist sense: the tooth azimuth advances
     # counter-clockwise about +z with increasing z (_gear._TWIST_CCW = +1).
     assert spec.HELIX_HAND == "RIGHT HAND"
