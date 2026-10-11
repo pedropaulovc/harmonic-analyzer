@@ -1,4 +1,4 @@
-"""Offline source contracts for VN050; no native or load-family certificate."""
+"""Offline source contracts for MHA-VN-054; no native or load-family certificate."""
 from __future__ import annotations
 
 import asyncio

@@ -231,6 +231,8 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert f"CUT TO {spec.CUT_LENGTH_MM:.2f} MM" in installation
     assert "SOFT-SOLDER TO BACKER" in installation
     assert "SET MESH AT ASSEMBLY" in installation
+    for method in ("WIRE", "SECANT", "INDICATOR", " U +/-"):
+        assert method not in installation
     # Policy option (c): the sheet carries the flank requirement only; the
     # assembly's rack step carries no measuring method.
     callout = spec.rack_flank_inspection_callout_text()

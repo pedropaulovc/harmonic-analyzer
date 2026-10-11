@@ -248,7 +248,7 @@ so the offline stale-feature check can see that the builder creates them.
 harness deadline.** `scripts/farm-run.ps1` started with `hub` (`persist: true`)
 is the only sanctioned way for an agent to submit `--executor farm` work; the
 full contract, parameters, run records and recovery procedure live in
-[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Six rules bind every
+[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Seven rules bind every
 such build:
 
 - No finite local timer. A cold leaf has measured 61.5 min and a full closure
@@ -288,6 +288,14 @@ such build:
   you are about to use before fanning parallel agents out over the farm. A green
   `check:math` is local-only and a submitter cache hit dispatches nothing;
   neither is evidence of dispatch.
+- Never submit `-Targets "build"` inside a dev/test loop. A cache miss on any
+  part, drawing or shared helper cascades through its assemblies into
+  `assembly:ha_harmonic_analyzer`, `drawing:ha_harmonic_analyzer_assembly` and
+  `verify_soundness:ha_harmonic_analyzer`, the slowest leaves on the farm, so
+  every iteration pays for them. While iterating, launch only the leaves the
+  change touches (`-Targets "drawing:dt_cone_gear,drawing:pd_transgear_arm"`;
+  doit pulls in their real dependencies). Run the full `build` once, as the
+  merge gate, after the loop has converged.
 - Hand off the run id and `-LogDirectory` — plus the hub name, worktree,
   pushed HEAD, pool, exact targets and leaf budget — rather than letting a
   successor recreate the command. The successor tracks the run with the same

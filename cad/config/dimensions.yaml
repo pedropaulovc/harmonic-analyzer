@@ -1548,9 +1548,9 @@ sections:
         - scaled
         - low
       - - Rack and backer (current model)
-        - 'Purchased SDP/SI A1B12-Y324 brass rack stock, 32DP PA20, 48 in long, 3/16 in square (4.7625 × 4.7625), cut to 269.64 and centred across the existing 269.64 × 7.2375 × 6 brass backer; fabricated MHA-PD-005 compound envelope 269.64 × 12 × 6 retained. Teeth-down crests at nominal y 270.6996859 and backer top at 282.6996859; backer band z −138.9..−132.9, tooth strip z −138.28125..−133.51875. Rack is soft-soldered to the backer, which is soldered to the platen. Stock end-tooth phase is uncontrolled; set mesh at assembly, not by cutting or indexing teeth.'
+        - 'Purchased SDP/SI A 1B12-Y324 brass rack stock, 32DP PA20, 48 in long, 3/16 in square (4.7625 × 4.7625), cut to 269.64 and centred across the existing 269.64 × 7.2375 × 6 brass backer; fabricated MHA-PD-005 compound envelope 269.64 × 12 × 6 retained. Teeth-down crests at nominal y 270.6996859 and backer top at 282.6996859; backer band z −138.9..−132.9, tooth strip z −138.28125..−133.51875. Rack is soft-soldered to the backer, which is soldered to the platen. Stock end-tooth phase is uncontrolled; set mesh at assembly, not by cutting or indexing teeth.'
         - —
-        - 'Purchased stock: [SDP/SI A1B12-Y324](https://shop.sdp-si.com/a-1b12-y324.html) and [D820 Gears catalog](https://sdp-si.com/D820/PDFS/Gears.pdf), p. 1-193 (Y = PA20; face width and thickness = 3/16 in; 4 ft brass stock). Commercial rack with no published pitch-accuracy grade; no inventory or quality-certification claim. Nominal CAD tooth representation: 108 gaps at p = 2.493639169 mm; FIRST_GAP_X = 1.246819584 is a nominal CAD phase only, not a stock end-tooth or manufacturing control. Historical ch22 back-side photo: exposed band ~10–12 tall, not 30; preceding DP30 / PA14.5 model used 101 gaps at p ≈ 2.660 mm and is not the current tooth specification.'
+        - 'Purchased stock: [SDP/SI A 1B12-Y324](https://shop.sdp-si.com/a-1b12-y324.html) and [D820 Gears catalog](https://sdp-si.com/D820/PDFS/Gears.pdf), p. 1-193 (Y = PA20; face width and thickness = 3/16 in; 4 ft brass stock). Commercial rack with no published pitch-accuracy grade; no inventory or quality-certification claim. Nominal CAD tooth representation: 108 gaps at p = 2.493639169 mm; FIRST_GAP_X = 1.246819584 is a nominal CAD phase only, not a stock end-tooth or manufacturing control. Historical ch22 back-side photo: exposed band ~10–12 tall, not 30; preceding DP30 / PA14.5 model used 101 gaps at p ≈ 2.660 mm and is not the current tooth specification.'
         - catalog + modeled + historical scaling
         - low
       - - Support bar + two-piece clamps (rework E1/E2)
@@ -1664,7 +1664,7 @@ sections:
       - - Rack and feed pinion pitch (current model)
         - 32DP PA20; m = 0.79375 mm; rack pitch = 2.493639169 mm
         - —
-        - 'Current selection: `pd_transgear_feed_pinion_spec` and `pd_platen_rack_spec`; the rack is purchased SDP/SI A1B12-Y324 stock, not teeth cut with a rack cutter. Historical M4c rack pitch measurement 2.66 mm suggested DP30; retained as photo provenance, not a specification of the present rack. The M4c 120T/OD-105 read was superseded by the separate reducer-disc topology.'
+        - 'Current selection: `pd_transgear_feed_pinion_spec` and `pd_platen_rack_spec`; the rack is purchased SDP/SI A 1B12-Y324 stock, not teeth cut with a rack cutter. Historical M4c rack pitch measurement 2.66 mm suggested DP30; retained as photo provenance, not a specification of the present rack. The M4c 120T/OD-105 read was superseded by the separate reducer-disc topology.'
         - modeled + historical scaling
         - med
       - - Reducer disc ("fourth gear"; part `pd-rack-pinion`)
@@ -1826,7 +1826,7 @@ sections:
       finite stock #2/55T master, permanently meshing (3) at the physical
       centre specified by `pd_rack_pinion_spec` and the mounted arm geometry;
       (5) independent 12T 32DP PA20 feed sleeve cut with the stock #8/12T
-      master; and (6) purchased SDP/SI A1B12-Y324 32DP PA20 rack, cut to the
+      master; and (6) purchased SDP/SI A 1B12-Y324 32DP PA20 rack, cut to the
       platen length and soft-soldered to its brass backer.
       Knob-bearing and plate-screw stations follow the physical reducer
       centre; rack mounting height follows the finite feed contact law.
@@ -2253,7 +2253,7 @@ sections:
          120T 48DP PA20 disc (#2/55T finite stock master), integral 12T
          48DP PA20 knob pinion (#8/12T master), independent integral 12T
          32DP PA20 feed sleeve (#8/12T master), and purchased SDP/SI
-         A1B12-Y324 32DP PA20 rack on its fabricated backer.
+         A 1B12-Y324 32DP PA20 rack on its fabricated backer.
          The selected physical ANSI #25 chain remains 68 links, pitch 6.35,
          centreline length 431.8, on crank T12 / knob T24; closure must
          preserve that selection. Feed remains 1.496183501 mm/crank rev

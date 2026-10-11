@@ -539,18 +539,29 @@ def blank_dia_band(teeth: int) -> tuple[float, float]:
 # gear cut on centre, so the tool's edge IS the T006 gap. Each point is given
 # at its radius R from the gear axis, in the tool's frame: X across from the
 # tool centerline, Y along it from the tip center (the root on the gap
-# centerline). The radii keep a straight line between neighbours within
-# 0.006 of the curve. The edge may grind wide, never narrow, by half the T006
-# thinning band: a uniformly wide tool cuts the thin-limit tooth that the
-# backlash, drum-tip relief clearance and over-pins limits already cover, and
-# a wider relief only adds drum-tip air.
+# centerline). The tip is the root arc; above the junction the edge is the
+# standard involute, and its rows are check points on it.
+#
+# Between the tip and the junction the edge is the straight lines between the
+# rows (machinist review of the round-2 build: points alone let templates
+# differ between them). The model's relief is a drum-tip trochoid, which no
+# shop can lay out, so its rows are the corners where tangents to it at the
+# relief stations meet. The relief bulges toward the tooth, so those tangent
+# lines never cut inside it: the drawn relief is the model's or wider (by at
+# most 0.006), and a wider relief only adds drum-tip air. The
+# corners print rounded toward the tooth, the end rows (on the tip arc and on
+# the involute) to the nearest place.
+#
+# The edge may grind wide, never narrow, by half the T006 thinning band: a
+# uniformly wide tool cuts the thin-limit tooth that the backlash, drum-tip
+# relief clearance and over-pins limits already cover.
 CUSTOM_SIX_FORM_TOLERANCE_MM = -CUSTOM_SIX_TOOTH_THICKNESS_BAND[1] / 2.0
 CUSTOM_SIX_FORM_TOLERANCE_NOTE = (
     f"FORM TOLERANCE: X +{CUSTOM_SIX_FORM_TOLERANCE_MM:.3f} / -0.000"
 )
-_CUSTOM_SIX_FORM_RADII_MM = (
-    1.110, 1.125, 1.150, 1.200, 1.250, 1.300, 1.400, 1.500, 1.750, 1.900, 2.000,
-)
+_CUSTOM_SIX_RELIEF_STATIONS_MM = (1.110, 1.125, 1.150, 1.200, 1.250, 1.300, 1.400, 1.500)
+_CUSTOM_SIX_INVOLUTE_RADII_MM = (1.750, 1.900, 2.000)
+_FORM_PLACES = 1000.0
 
 
 def custom_six_gap_half_angle_rad(radius_mm: float) -> float:
@@ -563,20 +574,57 @@ def custom_six_gap_half_angle_rad(radius_mm: float) -> float:
     return template.half_space_base_angle_rad + roll - math.atan(roll)
 
 
+def _relief_point_and_tangent(radius_mm: float):
+    """Table (X, Y) and tangent of the model relief at ``radius_mm``."""
+    template = cutter_template(6)
+    phi = template.relief_parameter_at_radius(radius_mm)
+    radial, across = template.relief_point(phi)
+    d_radial, d_across = template.relief_derivative(phi)
+    return (across, radial - template.root_radius_mm), (d_across, d_radial)
+
+
+def _row(x: float, y: float, root: float) -> tuple[float, float, float]:
+    return math.hypot(x, y + root), x, y
+
+
 @lru_cache(maxsize=None)
 def custom_six_form_points_mm() -> tuple[tuple[float, float, float], ...]:
     """(R, X, Y) along DT6-FORM1's edge, tip center first, up to the blank OD."""
     template = cutter_template(6)
     profile = stock_form_profile(6)
     root = template.root_radius_mm
-    radii = sorted({
-        root, *_CUSTOM_SIX_FORM_RADII_MM, template.relief_junction_radius_mm,
-        profile.pitch_radius_mm, profile.blank_radius_mm,
-    })
-    if radii[0] != root or radii[-1] != profile.blank_radius_mm:
-        raise ValueError("T006 form stations must run from the root to the blank OD")
-    points = [(root, 0.0, 0.0)]
-    for radius in radii:
+    junction = template.relief_junction_radius_mm
+    stations = (root, *_CUSTOM_SIX_RELIEF_STATIONS_MM, junction)
+    if not all(a < b for a, b in zip(stations, stations[1:])):
+        raise ValueError("T006 relief stations must rise from the root to the junction")
+    tangents = [_relief_point_and_tangent(radius) for radius in stations]
+    corners = []
+    for (p0, d0), (p1, d1) in zip(tangents, tangents[1:]):
+        # Rising toward the tip, the edge must turn toward the centerline.
+        cross = d0[0] * d1[1] - d0[1] * d1[0]
+        if cross <= 0.0:
+            raise ValueError("T006 relief must bulge toward the tooth between stations")
+        reach = ((p1[0] - p0[0]) * d1[1] - (p1[1] - p0[1]) * d1[0]) / cross
+        corners.append((p0[0] + reach * d0[0], p0[1] + reach * d0[1]))
+
+    def nearest(value: float) -> float:
+        return round(value * _FORM_PLACES) / _FORM_PLACES
+
+    (tip_x, tip_y), (junction_x, junction_y) = tangents[0][0], tangents[-1][0]
+    points = [(root, 0.0, 0.0), _row(nearest(tip_x), nearest(tip_y), root)]
+    points += [
+        _row(
+            math.ceil(x * _FORM_PLACES) / _FORM_PLACES,
+            math.floor(y * _FORM_PLACES) / _FORM_PLACES,
+            root,
+        )
+        for x, y in corners
+    ]
+    points.append(_row(nearest(junction_x), nearest(junction_y), root))
+    for radius in sorted({*_CUSTOM_SIX_INVOLUTE_RADII_MM, profile.pitch_radius_mm,
+                          profile.blank_radius_mm}):
+        if not junction < radius <= profile.blank_radius_mm:
+            raise ValueError("T006 involute check points must lie above the junction")
         angle = custom_six_gap_half_angle_rad(radius)
         points.append((radius, radius * math.sin(angle), radius * math.cos(angle) - root))
     return tuple(points)
