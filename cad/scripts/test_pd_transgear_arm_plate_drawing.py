@@ -457,3 +457,36 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
     below = [name for name, point in keep.items() if point[1] < -geometry.END_R]
     assert below == ["HubToBoss"]
     assert -geometry.END_R - keep["HubToBoss"][1] < _CAPTION_CLEAR_MODEL
+
+
+def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
+    """Both sheets state the setting and acceptance, and every zone's origin."""
+    import draw_pd_transgear_arm as arm_drawing
+    import pd_rack_pinion_spec as disc
+
+    numbers = {
+        key: _config.parts(key)["number"]
+        for key in ("pd-transgear-arm", "pd-transgear-arm-plate")
+    }
+    for text, mate in (
+        (arm_drawing.NOTES_TEXT, numbers["pd-transgear-arm-plate"]),
+        (drawing.NOTES_TEXT, numbers["pd-transgear-arm"]),
+    ):
+        flat = " ".join(line.strip() for line in text.splitlines())
+        assert f"MATCH-DRILLED WITH {mate}," in flat
+        tol = f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
+        assert f"KNOB BORE CLAMPED {disc.CENTRE_DISTANCE:.3f} {tol} FROM" in flat
+        assert f"CENTRES STILL WITHIN {tol}" in flat
+        assert "NO SHAKE, NO DAYLIGHT" in flat
+        assert "ACCEPTANCE" not in flat
+        assert "PROJECTED ZONES START AT" in flat
+    plate_notes = " ".join(line.strip() for line in drawing.NOTES_TEXT.splitlines())
+    projected = [
+        control for control in drawing.GEOMETRIC_CONTROLS
+        if control.projected_zone_height_mm is not None
+    ]
+    assert projected
+    for control in projected:
+        assert f"{control.projected_zone_height_mm:.1f}" in plate_notes
+    for feature in ("HOLE BORE", "CONE AXIS", "KNOB BORE: BORE AXIS"):
+        assert feature in plate_notes

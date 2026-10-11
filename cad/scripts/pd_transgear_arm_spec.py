@@ -170,13 +170,16 @@ PLATE_TAP_EDGE_BREAK_CALLOUT = (
     f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES"
 )
 SPOT_FACE_CALLOUT = "COUNTERBORE, REAR FACE"
-# Where each projected zone starts and which way it runs: the plate taps'
-# zones run rearward into the MHA-PD-019 plate on the rear face; the pin
-# bore's runs forward from front face A to the chain plane.
+# Where each projected zone starts and which way it runs. Both start at
+# front face A (z = 0): the plate taps' run rearward through the arm into
+# the MHA-PD-019 plate to the seated screw-head contact
+# (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A);
+# the pin bore's runs forward to the chain plane
+# (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM).
 PROJECTED_ZONE_NOTE = "\n".join((
-    "3. PROJECTED ZONES RUN OUT OF THE PART:",
-    f"   PLATE TAPS {ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:.1f} REARWARD FROM REAR FACE;",
-    f"   PIN BORE {REGISTRATION.S_PROJECTED_HEIGHT_MM:.1f} FORWARD FROM FRONT FACE A.",
+    "3. PROJECTED ZONES START AT FRONT FACE A: PLATE TAPS",
+    f"   {ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:.1f} REARWARD; PIN BORE "
+    f"{REGISTRATION.S_PROJECTED_HEIGHT_MM:.1f} FORWARD.",
 ))
 # Two short lines: the text stands under the section's pivot end, inside the
 # left border.

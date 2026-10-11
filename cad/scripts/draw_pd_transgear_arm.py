@@ -134,8 +134,15 @@ ISO_NOTE_XY = (0.080, 0.022)
 # Bottom left, clear of the section's floor-depth text above and of the
 # isometric caption below.
 NOTES_XY = (0.014, 0.060)
+# Characters per line that keep the block left of the isometric view.
+NOTES_WIDTH = 52
 NOTES_TEXT = "\n".join((
-    matched_locator_notes(_config.parts("pd-transgear-arm-plate")["number"]),
+    matched_locator_notes(
+        _config.parts("pd-transgear-arm")["number"],
+        _config.parts("pd-transgear-arm-plate")["number"],
+        on_arm=True,
+        width=NOTES_WIDTH,
+    ),
     PROJECTED_ZONE_NOTE,
 ))
 # Under the end view's pin callout; its label clears the title block.

@@ -228,6 +228,13 @@ TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(contact.tip_air_mm for contact in _GAUGE_
 MESH_PINION_TEETH = 12
 MESH_ANGLE_DEG = -168.0
 CENTRE_DISTANCE = 35.101
+# The window above, as the setting the arm and plate sheets print: the knob
+# bore is held CENTRE_DISTANCE +/- this from the pin bore when the pair is
+# match-drilled, and must still be there with the plate screwed down.
+CENTRE_DISTANCE_WINDOW = (35.097, 35.105)
+CENTRE_DISTANCE_SET_TOL = (CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE_WINDOW[0]) / 2.0
+if abs(sum(CENTRE_DISTANCE_WINDOW) / 2.0 - CENTRE_DISTANCE) > 1e-9:
+    raise AssertionError("CENTRE_DISTANCE is the midpoint of its window")
 STANDARD_CENTRE_DISTANCE = (TEETH + MESH_PINION_TEETH) * MODULE_MM / 2.0
 CENTRE_EXTENSION = CENTRE_DISTANCE - STANDARD_CENTRE_DISTANCE
 

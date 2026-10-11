@@ -20,9 +20,11 @@ no hardware stop or reduced paper stroke is implied. No SolidWorks or live proof
 from __future__ import annotations
 
 import math
+import textwrap
 
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
+import pd_transgear_arm_geometry as arm_geometry
 import pd_transgear_feed_pinion_spec as feed_pinion
 import paper_drive_mesh_check as mesh_check
 import paper_drive_rack_travel as rack_travel
@@ -138,19 +140,35 @@ def step_ref(key: str) -> str:
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"
 
 
-def matched_locator_notes(mate_number: str) -> str:
-    """The arm's and the plate's two sheet notes: requirement and step only.
+def matched_locator_notes(
+    arm_number: str, plate_number: str, *, on_arm: bool, width: int
+) -> str:
+    """The arm's and the plate's two sheet notes: each requirement with its value.
 
-    The matched-pair procedure and its acceptance print at these steps
-    (drawing-simplicity rule 6: no method text on a part sheet).
+    The sheet states the setting and the acceptance the pair must meet; the
+    procedure stays at the cited steps (drawing-simplicity rule 6). The
+    centre distance and its setting window are the reducer mesh's
+    (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW).
     """
+    mate = plate_number if on_arm else arm_number
+    knob, pin = ("ITS KNOB BORE", "PIN BORE") if on_arm else ("KNOB BORE", "ITS PIN BORE")
+    disc = arm_geometry.DISC
+    centres = (
+        f"{knob} CLAMPED {disc.CENTRE_DISTANCE:.3f} "
+        f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f} FROM {pin}"
+    )
+    located, fitted = step_number("arm-plate-located"), step_number("arm-plate-fitted")
+    if fitted != located + 1:
+        raise AssertionError("the matched-pair notes cite two consecutive steps")
+    notes = (
+        f"1. LOCATING HOLES MATCH-DRILLED WITH {mate}, {centres}.",
+        "2. PLATE ON THE DOWELS, SCREWS TIGHT: NO SHAKE, NO DAYLIGHT, "
+        f"CENTRES STILL WITHIN \u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}. "
+        f"{DRAWING_NUMBER} STEPS {located}-{fitted}.",
+    )
     return "\n".join(
-        (
-            f"1. LOCATING HOLES MATCH-DRILLED WITH {mate_number};",
-            f"   {step_ref('arm-plate-located')}.",
-            "2. PLATE SEAT ACCEPTANCE:",
-            f"   {step_ref('arm-plate-fitted')}.",
-        )
+        "\n".join(textwrap.wrap(note, width, subsequent_indent="   ", break_on_hyphens=False))
+        for note in notes
     )
 
 

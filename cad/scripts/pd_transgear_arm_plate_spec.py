@@ -193,6 +193,20 @@ BORE_CALLOUT = "REAM THRU"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
 CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK"
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
+# What each projected frame controls and where its zone runs. Every zone
+# starts at mounting face A (z = 0): the screw holes' and countersinks' 7.0
+# run rearward through the plate to the seated head contact
+# (transgear_hanger_joints.PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM, from A);
+# the knob bore's runs forward through the arm to the chain plane
+# (paper_drive_arm_registration.K_PROJECTED_HEIGHT_MM, from the plate mount).
+_P = PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM
+PROJECTED_ZONE_NOTE = "\n".join((
+    "3. PROJECTED ZONES START AT MOUNTING FACE A:",
+    f"   MOUNTING-FACE VIEW, \u00d8{SCREW_HOLE_DIA:.1f} HOLES: HOLE BORE, {_P:.1f} REARWARD;",
+    f"   REAR-FACE VIEW, \u00d8{PLATE.CSK_DIA:.1f} CSK: CONE AXIS, {_P:.1f} REARWARD;",
+    f"   \u00d8{BORE_DIA:g} KNOB BORE: BORE AXIS, "
+    f"{REGISTRATION.K_PROJECTED_HEIGHT_MM:.1f} FORWARD.",
+))
 
 ISO_VIEW_SCALE = (1, 1)
 ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE[1]}"
