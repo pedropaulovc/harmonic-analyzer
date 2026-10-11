@@ -1,9 +1,9 @@
-"""Build the custom MHA-VN-016 collar and reworked 94355A213 set screw.
+"""Build the custom MHA-VN-016 collar and its stock 94355A213 set screw.
 
 Default contains both bodies in the installed pose; Collar and SetScrew are
 manufacturing configurations. Threads are native cosmetic/Hole Wizard
-features, not a vendor-model claim. Only the ground dog is reworked; retained
-stock socket geometry is pictorial and excluded from manufacturing marks.
+features, not a vendor-model claim. The screw is used as supplied: its flat
+point and socket are pictorial stock geometry, not manufacturing marks.
 """
 
 from __future__ import annotations
@@ -45,7 +45,6 @@ from _drawing_marks import (
 from _fit_deviations import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _holes import wizard_holes
-from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry, blank_sketch_feature
 from diagnostics.diag_mcmaster_lib import offset_plane
 from solidworks_mcp.adapters.com_variant import null_variant
@@ -184,46 +183,43 @@ async def _screw(adapter, jobs):
 
     y = spec.TAP_STATION
     x = spec.SET_SCREW_SEAT_RADIUS
-    dog_r = spec.DOG_DIA / 2.0
+    point_r = spec.SET_SCREW_FACTORY_POINT_MIN_DIA / 2.0
     screw_r = spec.SET_SCREW_MAJOR_DIA / 2.0
+    chamfer = (screw_r - point_r) / math.tan(math.radians(spec.SET_SCREW_FACTORY_POINT_MIN_ANGLE_DEG))
     end = spec.SET_SCREW_END_RADIUS
-    points = [(x, y), (x, y + dog_r), (x + spec.DOG_LENGTH, y + dog_r),
-              (x + spec.DOG_LENGTH, y + screw_r), (end, y + screw_r), (end, y)]
-    check("ground screw profile", await adapter.create_sketch("Front"))
+    points = [(x, y), (x, y + point_r), (x + chamfer, y + screw_r), (end, y + screw_r), (end, y)]
+    check("stock screw profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     # Main's revolved-pin pattern (build_ch_bar_pivot_pin): the axis runs
     # exactly the closing edge's endpoints, so they merge and the axis needs
-    # no relation of its own; every profile line is horizontal or vertical,
-    # one corner is anchored to the origin, and the rest are dimensions. The
-    # farm run at f68549253 left the former fixed-line scheme (stock lines and
-    # a longer, unmerged axis fixed) under-defined.
+    # no relation of its own; every profile line but the point chamfer is
+    # horizontal or vertical, one corner is anchored to the origin, and the
+    # rest are dimensions.
     axis = check("screw axis", await adapter.add_centerline(x, y, end, y))
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     dims = SketchDims()
-    for index, line in enumerate(lines):
-        direction = "vertical" if index % 2 == 0 else "horizontal"
-        check("screw profile direction", await adapter.add_sketch_constraint(line, None, direction))
+    for index, direction in ((0, "vertical"), (2, "horizontal"), (3, "vertical"), (4, "horizontal")):
+        check("screw profile direction", await adapter.add_sketch_constraint(lines[index], None, direction))
+    # The supplied flat point at its least P and its 45-degree chamfer.
+    await dimension_between(adapter, f"{lines[0]}.start", f"{lines[0]}.end",
+                            "vertical_distance", point_r, "stock flat point radius")
+    dims.record("PointRadius")
     await dimension_between(adapter, f"{lines[1]}.start", f"{lines[1]}.end",
-                            "horizontal_distance", spec.DOG_LENGTH, "ground dog length")
-    dims.record("DogLength", '"DogLength"')
-    display = await add_diametric_linear_dimension(adapter, axis, lines[1], (x + 0.5, y + 2.0), "ground dog diameter")
-    dim = _early_bound(display.GetDimension2(0), "IDimension")
-    if abs(float(dim.SystemValue) * 1000.0 - spec.DOG_DIA) > 1e-6:
-        raise RuntimeError("ground dog native diameter differs from the contract")
-    dims.record("DogDia", '"DogDia"')
+                            "horizontal_distance", chamfer, "stock point chamfer")
+    dims.record("PointChamfer")
     # The stock screw's own length and major diameter, then its end corner.
-    await dimension_between(adapter, f"{lines[5]}.start", f"{lines[5]}.end",
+    await dimension_between(adapter, f"{lines[4]}.start", f"{lines[4]}.end",
                             "horizontal_distance", spec.SET_SCREW_LENGTH, "stock screw length")
     dims.record("ScrewLength")
     await add_diametric_linear_dimension(
-        adapter, axis, lines[3], (end - 1.0, y + screw_r + 2.0), "stock screw major diameter"
+        adapter, axis, lines[2], (end - 1.0, y + screw_r + 2.0), "stock screw major diameter"
     )
     dims.record("ScrewMajorDia")
-    await anchor_point_to_origin(adapter, f"{lines[5]}.start", end, y, "stock screw end corner")
+    await anchor_point_to_origin(adapter, f"{lines[4]}.start", end, y, "stock screw end corner")
     dims.record("ScrewEndStation")
     dims.record("ScrewAxisStation")
-    await ensure_fully_defined(adapter, "ground screw profile")
+    await ensure_fully_defined(adapter, "stock screw profile")
     check("exit screw profile", await adapter.exit_sketch())
     name_last_feature(adapter, "SetScrewProfile")
     jobs.extend(dims.apply(adapter, "SetScrewProfile"))
@@ -232,12 +228,12 @@ async def _screw(adapter, jobs):
     )))
     name_last_feature(adapter, "SetScrew")
     # Edges stay sharp in the model: the title block's break covers the
-    # collar, and the dog's tighter limit is a printed callout on its Ø.
+    # collar, and the screw is stock.
     # A native external thread keeps the stock thread identity on the model.
     check("stock screw thread", await adapter.add_thread(AddThreadParameters(
         edge_point=[end, y + screw_r, 0.0], standard="ansi_inch",
         size=spec.SET_SCREW_THREAD, end_type="blind",
-        depth=spec.SET_SCREW_LENGTH - spec.DOG_LENGTH,
+        depth=spec.SET_SCREW_LENGTH - chamfer,
     )))
     _plane(adapter, "SocketFace", end, base="Right Plane")
     check("stock socket sketch", await adapter.create_sketch("SocketFace"))
@@ -284,10 +280,10 @@ def _manufacturing_configurations(adapter):
 
 
 def _functional_dimension_types(adapter):
-    """Author part-owned BASIC location and MAX root process limit."""
+    """Author part-owned MAX limits."""
     for feature, name, kind in (
-        ("SetScrewTap", "TapStation", 1),  # swTolBASIC
         ("TapRootGauge", "TapRootLimit", 6),  # swTolMAX
+        ("ShoulderRoot", "ShoulderRadius", 6),  # swTolMAX
     ):
         _display, dimension = _named_dimension(adapter, feature, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
@@ -320,7 +316,6 @@ async def build(adapter) -> dict[str, str]:
                         ("ShoulderRadius", spec.SHOULDER_ROOT_RADIUS),
                         ("TapStation", spec.TAP_STATION),
                         ("CollarWidth", spec.WIDTH), ("FlatDistance", spec.FLAT_DISTANCE),
-                        ("DogDia", spec.DOG_DIA), ("DogLength", spec.DOG_LENGTH),
                         ("TapRootLimit", spec.THREAD_ENVELOPE_DIA)):
         await set_global(adapter, name, f"{value}mm")
     jobs = []
@@ -342,8 +337,6 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "InstalledShaftAxis")
     set_dimension_bilateral_tolerance(adapter, "RingProfile", "BoreDia", *deviations(spec.BORE_MODEL_DIA_BAND))
-    set_dimension_bilateral_tolerance(adapter, "SetScrewProfile", "DogDia", *deviations(spec.DOG_DIA_BAND))
-    set_dimension_bilateral_tolerance(adapter, "ShoulderRoot", "ShoulderRadius", *deviations(spec.SHOULDER_ROOT_BAND))
     _functional_dimension_types(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
@@ -369,7 +362,6 @@ async def build(adapter) -> dict[str, str]:
         if len(bodies) != expected:
             raise RuntimeError(f"{configuration} has {len(bodies)} solids, expected {expected}")
     _activate_configuration(adapter, "Default")
-    author_part_pmi(adapter, datums=spec.PART_DATUMS, controls=spec.GEOMETRIC_CONTROLS)
     blank_sketch_feature(model, _feature_by_name(adapter, "TapRootGauge"), "tap root limit gauge")
     blank_reference_geometry(adapter, (
         ("ScrewAxis", "AXIS"), ("InstalledShaftAxis", "AXIS"), ("SocketFace", "PLANE"),

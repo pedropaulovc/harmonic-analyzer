@@ -50,7 +50,7 @@ recipes:
 | 91882A425 | — (diagnostic recipe; `vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `vn-tube-frame-cap` | Metal Round Cap |
 | 9414T1 | — (historical MHA-VN-016 until the 2026-10-08 terminal redesign) | Set Screw Shaft Collar for 1/16" Diameter |
-| 94355A213 | `vn-cone-tip-collar` screw stock, ground to the custom dog-tip drawing | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
+| 94355A213 | `vn-cone-tip-collar` set screw, fitted as supplied | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
 | 92865A585 | `vn-hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 93075A194 | `vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
@@ -267,21 +267,21 @@ Catalog specifications checked on September 10, 2026:
   October 8, 2026: 18-8 stainless flat-tip headless set screw, #2-56 UNC-3A,
   5/16-inch long, 0.035-inch hex, basic major 0.086 inch, Rockwell B80,
   ASME B18.3. The custom MHA-VN-016 collar is turned steel, not purchased;
-  this genuine screw's tip is ground to its native dog diameter, length and
-  edge-break dimensions. The page gives no socket depth or end break.
+  this genuine screw is fitted unaltered. The page gives no socket depth or
+  end break.
   [ASME B18.3-2012 Table 14](https://www.finesz.com/pic/ASME%20B18.3.pdf)
   supplies the #2 minimum key engagement (0.060 inch), flat-point minimum
   diameter (0.039 inch), 45-degree minimum point angle, 30–45-degree socket
   face chamfer and ±0.01-inch length tolerance for this length. The retained
-  factory depiction is not vendor-exact geometry or a rework instruction.
+  factory depiction is not vendor-exact geometry.
   [BBI's ASME thread limits](https://www.brightonbest.com/download/pds/PDS_Thread_Details_Inch_Series.pdf)
   give the #2-56 3A pitch-diameter minimum, 0.0728 inch; the
   [2B UNC chart](https://amesweb.info/Screws/unc-thread-chart.aspx) gives the
-  receiver maximum, 0.0772 inch. The terminal flat reader books their radial
-  play and tilt with the collar's native position control. Because 2B gives
+  receiver maximum, 0.0772 inch. The collar's landing gate books their radial
+  play and tilt with the tap's printed centring and angle. Because 2B gives
   no internal major/root maximum, the custom print separately controls the
   native MAX root gauge diameter; its wall proof does not invent a standard
-  maximum. The same package prints the BASIC tap location and datum frame.
+  maximum. The tap station prints at .XXX.
   94355A212 (#2-56 x 1/4 inch, also verified) loses because the shorter
   screw buries its drive at the collar's worst-case radial flat.
 - [90280A197](https://www.mcmaster.com/90280A197/) was read live on

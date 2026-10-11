@@ -45,28 +45,44 @@ def test_one_actual_terminal_reader_preserves_named_classes():
     )
 
 
-def test_terminal_flat_derives_complete_dog_fit_and_position_budget():
-    radius_min = (lands.TERMINAL_DIA_MM + lands.RUNNING_DIA_BAND[1]) / 2.0
-    needed = lands.TERMINAL_REQUIRED_HALF_CHORD_MM
-    cap = radius_min + math.sqrt(radius_min**2 - needed**2)
-    assert lands.TERMINAL_FLAT_AF_MM == math.floor(cap * 100.0) / 100.0
-    assert lands.TERMINAL_HALF_CHORD_MIN_MM >= needed
-    assert 0.0 < lands.TERMINAL_FLAT_OFFSET_MAX_MM < radius_min
-    assert lands.TIP_SCREW_THREAD_RADIAL_PLAY_MM == pytest.approx((0.0772 - 0.0728) * 25.4 / 2.0)
-    assert lands.TIP_SCREW_DOG_AXIS_OFFSET_MM == pytest.approx(
-        (lands.TIP_SCREW_THREAD_RADIAL_PLAY_MM + spec.TAP_POSITION_RADIUS_MM)
-        * (1.0 + 2.0 * lands.TIP_SCREW_FREE_PROJECTION_MM / spec.REQUIRED_FULL_ENGAGEMENT_MM),
+def test_terminal_flat_keeps_round_guidance_and_lands_the_stock_point():
+    # Round guidance: the deepest printed flat on the largest land still
+    # stops short of the axis, so the round wraps past it.
+    af_low, af_high = lands.TERMINAL_FINISHED_AF_LIMITS_MM
+    land_low, land_high = lands.TERMINAL_FINISHED_DIA_LIMITS_MM
+    assert lands.TERMINAL_FLAT_OFFSET_MIN_MM == pytest.approx(af_low - land_high / 2.0)
+    assert lands.TERMINAL_FLAT_OFFSET_MIN_MM > 0.0
+    assert lands.TERMINAL_FLAT_OFFSET_MAX_MM == pytest.approx(af_high - land_low / 2.0)
+    assert lands.TERMINAL_HALF_CHORD_MIN_MM == pytest.approx(
+        math.sqrt((land_low / 2.0) ** 2 - lands.TERMINAL_FLAT_OFFSET_MAX_MM**2)
     )
-    assert lands.TIP_SCREW_DOG_ENVELOPE_RADIUS_MM == pytest.approx(
-        (spec.DOG_DIA + spec.DOG_DIA_BAND[0] + lands.TIP_SCREW_DOG_TOTAL_RUNOUT_MM) / 2.0,
+    assert spec.SET_SCREW_THREAD_RADIAL_PLAY_MM == pytest.approx((0.0772 - 0.0728) * 25.4 / 2.0)
+
+
+def test_stock_flat_point_overlaps_the_d_flat_at_every_printed_limit():
+    """Overlap gate: every lateral term is a printed tolerance, and the
+    least point face must still overlap the least flat face."""
+    float_max = (spec.BORE_FINISHED_DIA_LIMITS_MM[1] - lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0]) / 2.0
+    terms = spec.SCREW_POINT_LATERAL_OFFSETS_MM
+    assert set(terms) == {"tap centring", "tap angle", "screw thread play", "collar float"}
+    assert terms["tap centring"] == printed_band_mm(2)
+    assert terms["collar float"] == pytest.approx(float_max)
+    assert spec.TAP_ANGLE_RAD == pytest.approx(math.radians(1.0))
+    assert spec.SCREW_POINT_RADIUS_MIN_MM == pytest.approx(0.039 * 25.4 / 2.0)
+    assert spec.FLAT_FACE_HALF_WIDTH_MIN_MM == pytest.approx(
+        lands.TERMINAL_HALF_CHORD_MIN_MM - lands.TERMINAL_FLAT_EDGE_BREAK_MAX
     )
-    assert spec.SCREW_CONTROLS[0].characteristic == "total_runout"
-    assert spec.SCREW_CONTROLS[0].datums == ("D",)
-    assert spec.SCREW_CONTROLS[0].tolerance == f"{lands.TIP_SCREW_DOG_TOTAL_RUNOUT_MM:.2f}"
-    assert spec.DOG_SIDE_MARGIN_MM > 0.0
-    assert spec.DOG_SIDE_MARGIN_MM == pytest.approx(
-        lands.TERMINAL_HALF_CHORD_MIN_MM - lands.TERMINAL_REQUIRED_HALF_CHORD_MM
+    offset = sum(terms.values())
+    assert spec.SCREW_LANDING_MARGIN_MM == pytest.approx(
+        spec.FLAT_FACE_HALF_WIDTH_MIN_MM + spec.SCREW_POINT_RADIUS_MIN_MM - offset
     )
+    assert spec.SCREW_LANDING_MARGIN_MM > 0.0
+    # Centre margin is reported only: the point's centre may leave the flat.
+    assert spec.SCREW_POINT_CENTRE_MARGIN_MM == pytest.approx(
+        spec.SCREW_LANDING_MARGIN_MM - spec.SCREW_POINT_RADIUS_MIN_MM
+    )
+    # Negative control: one more point radius of offset loses the landing.
+    assert spec.screw_landing_margin_mm(offset + spec.SCREW_LANDING_MARGIN_MM + 1e-6) < 0.0
 
 
 def test_terminal_web_guard_reads_current_cutter_floor(monkeypatch):
@@ -87,20 +103,25 @@ def test_terminal_web_guard_reads_current_cutter_floor(monkeypatch):
     assert gears.terminal_web_bore_upper_mm() <= expected_cap + 1e-9
 
 
-def test_custom_wall_target_uses_loose_printed_bands():
+def test_custom_wall_target_uses_printed_bands():
     routine = printed_band_mm(2)
-    assert spec.WIDTH_BAND_MM == spec.ROUTINE_BAND_MM == routine
+    axial = printed_band_mm(3)
+    assert spec.ROUTINE_BAND_MM == routine
+    assert spec.WIDTH_BAND_MM == spec.AXIAL_BAND_MM == spec.TAP_STATION_BAND_MM == axial
     assert spec.OUTER_DIA < spec.STOCK_DIA
-    assert min(spec.WORST_WALLS_MM.values()) >= spec.WALL_TARGET_MM >= spec.WALL_FLOOR_MM
+    assert min(spec.WORST_WALLS_MM.values()) >= spec.WALL_TARGET_MM == 2.0
     envelope = spec.THREAD_ENVELOPE_DIA
     assert envelope > spec.SET_SCREW_MAJOR_DIA
+    # The through hole's 1 degree carries its far exit along the axis.
+    od_max_r = (spec.OUTER_DIA + routine) / 2.0
+    drift = math.tan(math.radians(1.0)) * (spec.FLAT_DISTANCE + routine + od_max_r)
     assert spec.WORST_WALLS_MM["tap to south shoulder"] == pytest.approx(
-        spec.TAP_STATION - spec.NOSE_LENGTH - routine
-        - envelope / 2.0 - spec.EDGE_BREAK - spec.TAP_POSITION_RADIUS_MM,
+        spec.TAP_STATION - axial - spec.NOSE_LENGTH - axial
+        - envelope / 2.0 - spec.EDGE_BREAK - drift,
     )
     assert spec.WORST_WALLS_MM["tap to north face"] == pytest.approx(
-        spec.WIDTH - routine - spec.TAP_STATION
-        - envelope / 2.0 - spec.EDGE_BREAK - spec.TAP_POSITION_RADIUS_MM,
+        spec.WIDTH - axial - spec.TAP_STATION - axial
+        - envelope / 2.0 - spec.EDGE_BREAK - drift,
     )
     assert spec.WORST_WALLS_MM["nose bore to round OD"] == pytest.approx(
         (spec.NOSE_DIA - routine) / 2.0
@@ -109,33 +130,29 @@ def test_custom_wall_target_uses_loose_printed_bands():
     assert spec.TAP_STATION == (spec.NOSE_LENGTH + spec.WIDTH) / 2.0
     assert spec.WORST_WALLS_MM["tap to flat side rims"] == pytest.approx(
         math.sqrt(((spec.OUTER_DIA - routine) / 2.0)**2 - (spec.FLAT_DISTANCE + routine)**2)
-        - envelope / 2.0 - spec.EDGE_BREAK - spec.TAP_POSITION_RADIUS_MM,
+        - envelope / 2.0 - spec.EDGE_BREAK - routine,
     )
+    # Every axial term feeding a tap wall prints at .XXX.
+    for name in ("TapStation", "NoseLength", "CollarWidth"):
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == 3
 
 
 def test_full_thread_counts_male_and_female_incomplete_ends():
     assert spec.SET_SCREW_HOLE.kind == "tapped"
     assert spec.SET_SCREW_HOLE.size == spec.SET_SCREW_THREAD
-    assert spec.SET_SCREW_HOLE.depth_mm == spec.TAP_DRILL_DEPTH
-    assert spec.SET_SCREW_HOLE.overrides_mm["ThreadDepth"] == spec.TAP_FULL_DEPTH
-    assert spec.TAP_DRILL_DEPTH > spec.TAP_FULL_DEPTH
-    # Shallowest drill still runs one pitch past the deepest full thread,
-    # both at the title block's .XX (machinist review: 7.09 vs 7.31).
-    shallowest_drill = spec.TAP_DRILL_DEPTH - spec.ROUTINE_BAND_MM
-    deepest_thread = spec.TAP_FULL_DEPTH + spec.ROUTINE_BAND_MM
-    assert shallowest_drill - deepest_thread >= spec.SET_SCREW_PITCH
-    assert spec.WORST_WALLS_MM["blind drill to opposite OD"] >= spec.WALL_TARGET_MM
+    assert spec.SET_SCREW_HOLE.end == "through_all"
+    assert not spec.SET_SCREW_HOLE.overrides_mm
     bore_max = spec.BORE_FINISHED_DIA_LIMITS_MM[1]
     land_min = lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0]
     float_max = (bore_max - land_min) / 2.0
     flat_max = lands.TERMINAL_FLAT_AF_MM + lands.FLAT_AF_BAND[0] - land_min / 2.0
-    male_start = (
-        flat_max + float_max + spec.DOG_LENGTH + spec.ROUTINE_BAND_MM + spec.SET_SCREW_PITCH
-        + lands.TIP_SCREW_MAJOR_AXIAL_PROJECTION_MM + lands.TIP_SCREW_DOG_AXIAL_PROJECTION_MM
-    )
-    female_start = spec.FLAT_DISTANCE + 2.0 * spec.ROUTINE_BAND_MM - spec.TAP_FULL_DEPTH + spec.SET_SCREW_PITCH
-    female_end = spec.FLAT_DISTANCE - spec.ROUTINE_BAND_MM - spec.EDGE_BREAK - spec.SET_SCREW_PITCH
     flat_min = lands.TERMINAL_FLAT_AF_MM + lands.FLAT_AF_BAND[1] - lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1]/2.0
+    tilt = spec.SET_SCREW_MAJOR_DIA / 2.0 * math.sin(spec.SET_SCREW_MAX_AXIS_ANGLE_RAD)
+    point_chamfer = (spec.SET_SCREW_MAJOR_DIA - spec.SET_SCREW_FACTORY_POINT_MIN_DIA) / 2.0
+    male_start = flat_max + float_max + 2.0 * tilt + point_chamfer + spec.SET_SCREW_PITCH
+    # The through hole is whole only outside the bore it crosses.
+    female_start = bore_max / 2.0 + spec.EDGE_BREAK + spec.SET_SCREW_PITCH
+    female_end = spec.FLAT_DISTANCE - spec.ROUTINE_BAND_MM - spec.EDGE_BREAK - spec.SET_SCREW_PITCH
     face_chamfer_max = (
         (spec.SET_SCREW_MAJOR_DIA - spec.SET_SCREW_SOCKET_AF) / 2.0
         / math.tan(math.radians(spec.SET_SCREW_END_FACE_MIN_ANGLE_DEG))
@@ -147,23 +164,17 @@ def test_full_thread_counts_male_and_female_incomplete_ends():
     )
     assert spec.WORST_FULL_ENGAGEMENT_MM == pytest.approx(min(female_end, male_end) - max(male_start, female_start))
     assert spec.WORST_FULL_ENGAGEMENT_MM >= 1.5 * spec.SET_SCREW_MAJOR_DIA
-    assert spec.WORST_SOCKET_ACCESS_MM > 0.0
-    flat_min = lands.TERMINAL_FLAT_AF_MM + lands.FLAT_AF_BAND[1] - lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1]/2.0
-    float_max = (spec.BORE_FINISHED_DIA_LIMITS_MM[1]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0])/2.0
     expected_access = (
         flat_min - float_max + spec.SET_SCREW_LENGTH - spec.SET_SCREW_LENGTH_BAND_MM
         - spec.FLAT_DISTANCE - spec.ROUTINE_BAND_MM
         - spec._STOCK_AXIAL_PROJECTION_LOSS_MM
     )
     assert spec.WORST_SOCKET_ACCESS_MM == pytest.approx(expected_access)
+    assert spec.WORST_SOCKET_ACCESS_MM > 0.0
     assert expected_access - spec.IN / 16.0 <= 0.0  # the verified 1/4-inch screw is too short
 
 
-def test_ground_dog_remains_wholly_on_the_d_flat():
-    assert spec.DOG_SIDE_MARGIN_MM > 0.0
-    assert spec.DOG_LENGTH > spec.ROUTINE_BAND_MM
-    assert spec.DOG_DIA + spec.DOG_DIA_BAND[1] > 2.0 * spec.DOG_EDGE_BREAK
-    assert spec.DOG_LENGTH - spec.ROUTINE_BAND_MM >= spec._STOCK_POINT_CHAMFER_MAX_MM
+def test_stock_screw_stays_inside_the_rotating_envelope():
     assert spec.ROTATING_ENVELOPE_RADIUS_MM >= (spec.OUTER_DIA + spec.ROUTINE_BAND_MM) / 2.0
     flat_max = lands.TERMINAL_FLAT_AF_MM + lands.FLAT_AF_BAND[0] - lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0]/2.0
     float_max = (spec.BORE_FINISHED_DIA_LIMITS_MM[1]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0])/2.0
@@ -230,99 +241,33 @@ def test_manufacturing_configs_restore_the_installed_parent(monkeypatch):
     assert {name for config, name in suppressions if config == "SetScrew"} == set(part.COLLAR_FEATURES)
 
 
-def test_native_marks_and_complete_two_sheet_manufacturing_package():
+def test_native_marks_and_single_sheet_collar_drawing():
     sheet = DRAWINGS_BY_NAME["vn_cone_tip_collar"]
     assert drawing.SPEC is sheet
     assert sheet.artifact_stem == part.PART_NAME
     assert sheet.script == Path(drawing.__file__).resolve()
-    assert drawing.SHEET_NAMES == ("Collar", "SetScrew")
-    assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
+    assert drawing.SHEET_SCALE == (4, 1)
+    assert not hasattr(drawing, "SHEET_NAMES")
     assert set(spec.DRAWING_DIMENSIONS) == set(spec.DRAWING_PRECISION)
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         assert names == set(spec.DRAWING_PRECISION[feature])
-    assert set(drawing.SCREW_KEEP) == {"DogDia", "DogLength"}
     assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) | set(drawing.BORE_KEEP) == {
         "CollarDia", "NoseDia", "BoreDia", "FlatDistance",
         "CollarWidth", "NoseLength", "ShoulderRadius",
     }
     assert set(drawing.TAP_KEEP) == {"TapStation", "TapRootLimit"}
-    assert spec.BORE_DIA * spec.BORE_VIEW_SCALE[0] / spec.BORE_VIEW_SCALE[1] >= 28.0
-    assert set(spec.PART_DATUMS) == set(spec.COLLAR_DATUMS + spec.SCREW_DATUMS)
-    assert set(spec.GEOMETRIC_CONTROLS) == set(spec.COLLAR_CONTROLS + spec.SCREW_CONTROLS)
-    assert "GROUND DOG TIP" in spec.DRAWING_NOTES
-    assert len(spec.DRAWING_NOTES.splitlines()) <= 4
-    # One line: an above callout's line break prints nothing (main's guard).
-    assert spec.DOG_EDGE_CALLOUT == f"STONE DOG EDGE {spec.DOG_EDGE_BREAK:.2f} MAX"
-    assert drawing._printable_above_callouts({"DogDia": spec.DOG_EDGE_CALLOUT})
-    with pytest.raises(RuntimeError, match="do not print"):
-        drawing._printable_above_callouts({"DogDia": "DOG EDGE:\nSTONE"})
-
-
-def test_screw_faces_come_from_the_view_one_per_spec(monkeypatch):
-    """4323e8d1e and 7924d573e: a part-document face selected into the view
-    read back as another face. The pick is from the view's own faces."""
-    from _gtol_face import FaceGeometry
-
-    def cylinder(diameter_mm, x0_mm, x1_mm):
-        radius = diameter_mm / 2000.0
-        return FaceGeometry(
-            face=object(), identity=4002,
-            parameters=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, radius),
-            outward_normal=None,
-            box=(x0_mm / 1000.0, -radius, -radius, x1_mm / 1000.0, radius, radius),
-        )
-
-    seat = spec.SET_SCREW_SEAT_RADIUS
-    major = cylinder(spec.SET_SCREW_MAJOR_DIA, seat + spec.DOG_LENGTH, seat + spec.DOG_LENGTH + 5.0)
-    dog = cylinder(spec.DOG_DIA, seat, seat + spec.DOG_LENGTH)
-    faces = {id(g.face): g for g in (major, dog)}
-    monkeypatch.setattr(drawing, "visible_view_entities", lambda _v, kind, label: [g.face for g in faces.values()] if kind == 3 else [])
-    monkeypatch.setattr(drawing, "face_geometry", lambda face: faces[id(face)])
-    specs = {
-        **{datum.key: datum.face for datum in spec.SCREW_DATUMS},
-        **{control.key: control.face for control in spec.SCREW_CONTROLS},
-    }
-    picked = drawing._view_faces(None, specs, label="screw")
-    assert picked == {"datum:D": major.face, "ground_dog_runout": dog.face}
-    faces.pop(id(dog.face))
-    with pytest.raises(RuntimeError, match="ground_dog_runout .* matched 0 of the view's 1"):
-        drawing._view_faces(None, specs, label="screw")
-    twin = cylinder(spec.SET_SCREW_MAJOR_DIA, seat + spec.DOG_LENGTH, seat + spec.DOG_LENGTH + 5.0)
-    faces[id(twin.face)] = twin
-    with pytest.raises(RuntimeError, match="datum:D .* matched 2"):
-        drawing._view_faces(None, specs, label="screw")
-
-
-def test_blind_tap_qualifier_retains_native_depth_variables():
-    definitions = {
-        5: "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>",
-        6: "",
-        7: "<MOD-DIAM> <hw-thrutapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>",
-        8: "",
-    }
-    display = SimpleNamespace(
-        GetText=lambda part: definitions[part],
-        SetText=lambda part, text: definitions.__setitem__(part + 4, text),
-    )
-    drawing._require_full_thread_callout(display)
-    assert definitions[5].endswith("<hw-threaddepth> FULL THREAD")
-    assert "<hw-tapdrldepth>" in definitions[7]
     assert drawing.TAP_SCALE == spec.RADIAL_TAP_VIEW_SCALE
-
-
-def test_radial_tap_position_is_model_owned_and_complete():
-    control, = spec.COLLAR_CONTROLS
-    assert control.key == "radial_tap_position"
-    assert control.characteristic == "position"
-    assert control.tolerance_zone == "diametral"
-    assert control.datums == ("A", "B", "C")
-    assert float(control.tolerance) == spec.TAP_POSITION_DIA_MM
-    assert tuple(datum.letter for datum in spec.COLLAR_DATUMS) == control.datums
-    assert spec.THREAD_ENVELOPE_DIA == round(spec.THREAD_ENVELOPE_DIA, 2)
+    assert spec.BORE_DIA * spec.BORE_VIEW_SCALE[0] / spec.BORE_VIEW_SCALE[1] >= 28.0
+    # The stock screw has no sheet, no datums and no geometric controls.
+    for retired in ("PART_DATUMS", "GEOMETRIC_CONTROLS", "SCREW_NOTES"):
+        assert not hasattr(spec, retired)
+    assert spec.DRAWING_NOTES == "3/4 STEEL BAR STOCK OK."
+    assert "94355A213" not in spec.DRAWING_NOTES
+    assert "SNUG 94355A213 SET SCREW ON D-FLAT, THEN REMOVE LEAF." in spec.INSTALLATION_NOTES
 
 
 @pytest.mark.parametrize("refuse", [False, True])
-def test_part_basic_and_max_types_are_authored_and_read_back(monkeypatch, refuse):
+def test_part_max_types_are_authored_and_read_back(monkeypatch, refuse):
     class Tolerance:
         __slots__ = ("value",)
 
@@ -338,7 +283,7 @@ def test_part_basic_and_max_types_are_authored_and_read_back(monkeypatch, refuse
             if not refuse:
                 self.value = value
 
-    tolerances = {name: Tolerance() for name in ("TapStation", "TapRootLimit")}
+    tolerances = {name: Tolerance() for name in ("TapRootLimit", "ShoulderRadius")}
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(part, "_named_dimension", lambda _adapter, _feature, name: (
         None, SimpleNamespace(Tolerance=tolerances[name]),
@@ -349,13 +294,13 @@ def test_part_basic_and_max_types_are_authored_and_read_back(monkeypatch, refuse
     else:
         part._functional_dimension_types(object())
         assert {name: tol.Type for name, tol in tolerances.items()} == {
-            "TapStation": 1, "TapRootLimit": 6,
+            "TapRootLimit": 6, "ShoulderRadius": 6,
         }
 
 
-def test_drawing_refuses_lost_basic_location_or_root_max_type(monkeypatch):
-    annotations = ["TapStation", "TapRootLimit"]
-    types = {"TapStation": 1, "TapRootLimit": 6}
+@pytest.mark.parametrize("expected", [drawing.TAP_DIMENSION_TYPES, drawing.SIDE_DIMENSION_TYPES])
+def test_drawing_refuses_a_lost_max_type(monkeypatch, expected):
+    types = dict(expected)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     rows = [SimpleNamespace(
@@ -363,14 +308,22 @@ def test_drawing_refuses_lost_basic_location_or_root_max_type(monkeypatch):
         GetSpecificAnnotation=lambda name=name: SimpleNamespace(
             GetDimension2=lambda _index: SimpleNamespace(Tolerance=SimpleNamespace(Type=types[name])),
         ),
-    ) for name in annotations]
-    drawing._assert_functional_dimension_types(object(), rows)
-    for name in annotations:
-        original = types[name]
+    ) for name in types]
+    drawing._assert_functional_dimension_types(object(), rows, expected)
+    for name in expected:
         types[name] = 0
         with pytest.raises(RuntimeError, match="lost native types"):
-            drawing._assert_functional_dimension_types(object(), rows)
-        types[name] = original
+            drawing._assert_functional_dimension_types(object(), rows, expected)
+        types[name] = expected[name]
+
+
+def test_shoulder_root_prints_max_and_the_air_stack_books_it():
+    """Machinist review of the r3 build asked about R0.25 0.00/-0.25: it is a
+    tool-nose root, sharp to 0.25 all good, so it prints R0.25 MAX."""
+    assert drawing.SIDE_DIMENSION_TYPES == {"ShoulderRadius": 6}
+    assert not hasattr(spec, "SHOULDER_ROOT_BAND")
+    nose = air.TIERS[0]
+    assert nose.north_upper_mm >= spec.SHOULDER_ROOT_RADIUS
 
 
 def test_native_default_bom_and_manufacturing_descriptions_share_spec_authority(monkeypatch):
@@ -392,16 +345,25 @@ def test_native_default_bom_and_manufacturing_descriptions_share_spec_authority(
         assert configs[name].UseDescriptionInBOM is True
 
 
-def test_stepped_air_tiers_include_native_tool_root_and_reworked_screw():
+def test_stepped_air_tiers_include_native_tool_root_and_stock_screw():
     assert air.PARTITION_STATION_MM == spec.NOSE_LENGTH - spec.SHOULDER_ROOT_RADIUS
     assert {tier.name for tier in air.TIERS} == {"nose", "body", "screw"}
     nose, body, screw = air.TIERS
     assert nose.north_mm == body.south_mm == air.PARTITION_STATION_MM
+    assert nose.north_upper_mm == spec.AXIAL_BAND_MM + spec.SHOULDER_ROOT_RADIUS
     assert nose.radius_mm + nose.radius_upper_mm == (spec.NOSE_DIA + spec.ROUTINE_BAND_MM) / 2.0
-    assert body.south_lower_mm == -spec.ROUTINE_BAND_MM
+    assert body.south_lower_mm == -spec.AXIAL_BAND_MM
     assert body.north_mm + body.north_upper_mm == spec.WIDTH + spec.WIDTH_BAND_MM
-    assert screw.south_lower_mm < -spec.TAP_POSITION_RADIUS_MM
+    screw_reach = spec.SET_SCREW_LENGTH + spec.SET_SCREW_LENGTH_BAND_MM
+    assert screw.south_lower_mm == pytest.approx(
+        -(spec.TAP_STATION_BAND_MM + screw_reach * math.sin(spec.SET_SCREW_MAX_AXIS_ANGLE_RAD))
+    )
     assert screw.radius_mm > spec.SET_SCREW_END_RADIUS
+    assert screw.radius_mm + screw.radius_upper_mm == pytest.approx(math.hypot(
+        spec._POINT_PLANE_MAX + screw_reach,
+        spec.SET_SCREW_MAJOR_DIA / 2.0 + spec.TAP_LATERAL_BAND_MM
+        + screw_reach * math.sin(spec.SET_SCREW_MAX_AXIS_ANGLE_RAD),
+    ))
 
 
 def test_filled_cylinder_projection_is_three_dimensional_not_z_only():
@@ -454,64 +416,8 @@ def test_already_active_configuration_never_misreads_false_as_failure(monkeypatc
     assert calls == ["Collar"]
 
 
-def _finite_loaded_case():
-    shaft_radius = spec.BORE_DIA / 2.0
-    bore_radius = spec.BORE_MODEL_DIA_MM / 2.0
-    offset = bore_radius - shaft_radius
-    witnesses = tuple(spec.BackArcWitness(
-        (-shaft_radius, y, 0.0), (offset-bore_radius, y, 0.0),
-        (offset, 0.0, 0.0), (0.0, 1.0, 0.0), shaft_radius, bore_radius,
-    ) for y in (spec.EDGE_BREAK+0.00002, spec.WIDTH-spec.EDGE_BREAK-0.00002))
-    return {
-        "back_arc_witnesses": witnesses,
-        "dog_tip_centre_mm": (lands.TERMINAL_FLAT_AF_MM-shaft_radius, spec.TAP_STATION, 0.0),
-        "dog_axis_to_socket": (1.0, 0.0, 0.0),
-        "dog_radius_mm": spec.DOG_DIA/2.0,
-        "flat_offset_mm": lands.TERMINAL_FLAT_AF_MM-shaft_radius,
-        "flat_half_chord_mm": math.sqrt(shaft_radius**2-(lands.TERMINAL_FLAT_AF_MM-shaft_radius)**2),
-        "flat_axial_limits_mm": (0.0, spec.WIDTH+1.0),
-    }
-
-
-def test_signed_two_ended_clamp_is_not_the_loose_d_envelope():
-    record = spec.validate_installed_clamp_pose(**_finite_loaded_case())
-    assert all(value > 0.0 for value in record["positive_end_reactions"])
-    assert sum(record["positive_end_reactions"]) == pytest.approx(1.0)
-    assert all(offset[0] > 0.0 for offset in record["back_arc_offsets_mm"])
-    assert record["loaded_radial_float_mm"] < record["loose_d_journal_offset_mm"]
-    assert record["whole_dog_side_margin_mm"] > 0.0
-    assert record["whole_dog_end_margin_mm"] > 0.0
-
-
-@pytest.mark.parametrize("failure", ["concentric", "wrong_back", "missing_end", "unseated",
-                                      "wrong_force", "whole_side", "whole_end", "nonfinite"])
-def test_signed_clamp_refuses_false_seating_and_partial_dog(failure):
-    from dataclasses import replace
-    values = _finite_loaded_case()
-    witnesses = list(values["back_arc_witnesses"])
-    if failure == "concentric":
-        witnesses = [replace(w, bore_axis_origin_mm=(0.0, 0.0, 0.0)) for w in witnesses]
-    elif failure == "wrong_back":
-        witnesses = [replace(w, shaft_point_mm=(-w.shaft_point_mm[0], w.shaft_point_mm[1], 0.0)) for w in witnesses]
-    elif failure == "missing_end":
-        witnesses = witnesses[:1]
-    elif failure == "unseated":
-        witnesses[1] = replace(witnesses[1], bore_point_mm=(-0.3, witnesses[1].bore_point_mm[1], 0.0))
-    elif failure == "wrong_force":
-        values["dog_axis_to_socket"] = (-1.0, 0.0, 0.0)
-    elif failure == "whole_side":
-        values["flat_half_chord_mm"] = values["dog_radius_mm"] + lands.TERMINAL_FLAT_EDGE_BREAK_MAX/2.0
-    elif failure == "whole_end":
-        values["flat_axial_limits_mm"] = (0.0, spec.TAP_STATION+values["dog_radius_mm"]/2.0)
-    else:
-        values["dog_tip_centre_mm"] = (math.nan, spec.TAP_STATION, 0.0)
-    values["back_arc_witnesses"] = tuple(witnesses)
-    with pytest.raises(ValueError):
-        spec.validate_installed_clamp_pose(**values)
-
-
 @pytest.mark.parametrize("readback", [None, (0.0,)*4, (math.nan, 0.0, 0.0, 0.0, 0.0)])
-def test_native_clamp_refuses_nonfinite_trimmed_face_points(readback):
+def test_native_air_refuses_nonfinite_trimmed_face_points(readback):
     with pytest.raises(RuntimeError, match="closest point"):
         native_air._closest(SimpleNamespace(GetClosestPointOn=lambda *_args: readback),
                             (0.0, 0.0, 0.0), "actual trimmed face")
@@ -533,20 +439,6 @@ def test_configuration_transition_requires_actual_bool_and_name(monkeypatch, tra
     adapter = SimpleNamespace(currentModel=SimpleNamespace(ShowConfiguration2=lambda _name: transition_result))
     with pytest.raises(RuntimeError, match="activate"):
         part._activate_configuration(adapter, "Collar")
-
-
-def test_axial_dog_couple_uses_the_actual_back_contact_not_the_shaft_centre():
-    values = _finite_loaded_case()
-    angle = lands.TIP_SCREW_TO_JOURNAL_MAX_AXIS_ANGLE_RAD/2.0
-    values["dog_axis_to_socket"] = (math.cos(angle), math.sin(angle), 0.0)
-    result = spec.validate_installed_clamp_pose(**values)
-    south, north = (w.shaft_point_mm[1] for w in values["back_arc_witnesses"])
-    lever = values["dog_tip_centre_mm"][0] - values["back_arc_witnesses"][0].shaft_point_mm[0]
-    expected = ((spec.TAP_STATION-south)-lever*math.tan(angle))/(north-south)
-    assert result["positive_end_reactions"][1] == pytest.approx(expected)
-    assert lands._LOADED_FORCE_COUPLE_ARM_MM == pytest.approx(
-        lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1]*math.tan(lands._LOADED_AXIS_ANGLE_UPPER_RAD),
-    )
 
 
 @pytest.mark.parametrize("readback", [None, (), (1,), (False,), (True, True)])
@@ -650,36 +542,11 @@ def test_native_cylinder_positive_control_uses_actual_property_and_finite_axis(m
         native_air._cylinders(body, 1.0, (0.0, 1.0, 0.0), "negative")
 
 
-def test_manufacturing_bore_datum_uses_the_real_in_band_native_radius():
-    # A attaches on the bore's native surface, at the in-band model diameter.
-    x, _, z = drawing.DATUM_A_MODEL_MM
-    assert math.hypot(x, z) == pytest.approx(spec.BORE_MODEL_DIA_MM / 2.0)
-    low, high = spec.BORE_FINISHED_DIA_LIMITS_MM
-    assert low <= spec.BORE_MODEL_DIA_MM <= high
-    # Machinist review of the stack build: on the 4:1 end view the tag read
-    # as pointing at the bore centre. On the 40:1 bore view the leader lands
-    # on the bore surface and the tag stands level with it, outside the crop.
-    numerator, denominator = spec.BORE_VIEW_SCALE
-    surface = spec.BORE_MODEL_DIA_MM / 2.0 * numerator / denominator / 1000.0
-    view = object()
-    for side in (-1.0, 1.0):
-        edge = (drawing.BORE_CENTER[0] + side * surface, drawing.BORE_CENTER[1])
-        placement = drawing.datum_a_placement(view, edge)
-        assert placement.view is view
-        assert placement.attachment_xy == edge
-        assert placement.position[1] == edge[1]
-        reach = abs(placement.position[0] - drawing.BORE_CENTER[0])
-        assert reach == pytest.approx(surface + drawing.DATUM_A_LEADER_M)
-        assert reach > drawing.bore_crop_radius_m()
-        assert 0.0 < placement.position[0] < 0.420
-
-
 def test_custom_body_is_smallest_printed_od_retaining_existing_wall_target():
     required = 2.0*max(spec.BODY_RADIUS_REQUIREMENTS_MM.values())+spec.ROUTINE_BAND_MM
     assert spec.OUTER_DIA >= required
     assert spec.OUTER_DIA-0.01 < required
     assert spec.WALL_TARGET_MM == 2.0
-    assert spec.WALL_FLOOR_MM == 1.5
     assert min(spec.WORST_WALLS_MM.values()) >= spec.WALL_TARGET_MM
 
 
@@ -706,42 +573,6 @@ def test_printed_physical_limits_keep_exact_native_model_and_real_fit_distinct()
     minimum = (spec.BORE_FINISHED_DIA_LIMITS_MM[0]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1])/2.0
     maximum = (spec.BORE_FINISHED_DIA_LIMITS_MM[1]-lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0])/2.0
     assert (minimum, maximum) == pytest.approx((lands.TIP_COLLAR_MIN_RADIAL_FLOAT_MM, lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM))
-
-
-def test_actual_printed_maximum_round_sizes_are_not_rejected_as_hidden_model_digits():
-    values = _finite_loaded_case()
-    r = lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1]/2.0
-    R = spec.BORE_FINISHED_DIA_LIMITS_MM[1]/2.0
-    gap = R-r
-    values["back_arc_witnesses"] = tuple(
-        spec.BackArcWitness((-r, y, 0.0), (gap-R, y, 0.0),
-                            (gap, 0.0, 0.0), (0.0, 1.0, 0.0), r, R)
-        for y in (spec.EDGE_BREAK, spec.WIDTH-spec.EDGE_BREAK)
-    )
-    a = lands.TERMINAL_FLAT_AF_MM-r
-    values["dog_tip_centre_mm"] = (a, spec.TAP_STATION, 0.0)
-    values["flat_offset_mm"] = a
-    values["flat_half_chord_mm"] = math.sqrt(r*r-a*a)
-    result = spec.validate_installed_clamp_pose(**values)
-    assert min(result["positive_end_reactions"]) > 0.0
-
-
-def test_round_readbacks_outside_actual_printed_limits_are_not_masked():
-    values = _finite_loaded_case()
-    r = lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1]/2.0+0.001
-    R = spec.BORE_FINISHED_DIA_LIMITS_MM[1]/2.0+0.001
-    gap = R-r
-    values["back_arc_witnesses"] = tuple(
-        spec.BackArcWitness((-r, y, 0.0), (gap-R, y, 0.0),
-                            (gap, 0.0, 0.0), (0.0, 1.0, 0.0), r, R)
-        for y in (spec.EDGE_BREAK, spec.WIDTH-spec.EDGE_BREAK)
-    )
-    a = lands.TERMINAL_FLAT_AF_MM-r
-    values["dog_tip_centre_mm"] = (a, spec.TAP_STATION, 0.0)
-    values["flat_offset_mm"] = a
-    values["flat_half_chord_mm"] = math.sqrt(r*r-a*a)
-    with pytest.raises(ValueError, match="finished limits"):
-        spec.validate_installed_clamp_pose(**values)
 
 
 def test_original_journal_span_pays_north_withdrawal_once():
@@ -773,9 +604,9 @@ def test_all_land_physical_limit_readers_share_native_print_precision(section, n
 
 def test_each_view_asserts_only_the_precision_it_keeps() -> None:
     # 027369849: each view asserted the whole map and failed on names that
-    # live on other views or the screw sheet.
+    # live on other views.
     keeps = (drawing.END_KEEP.keys() | drawing.SIDE_KEEP.keys(), drawing.TAP_KEEP.keys(),
-             drawing.BORE_KEEP.keys(), drawing.SCREW_KEEP.keys())
+             drawing.BORE_KEEP.keys())
     for keep in keeps:
         assert set(drawing._precision(keep)) == set(keep)
 
@@ -786,17 +617,11 @@ def test_tap_view_keeps_the_blanked_root_gauge_limit() -> None:
     assert "TapRootLimit" in spec.DRAWING_DIMENSIONS["TapRootGauge"]
 
 
-def test_datum_d_tags_the_thread_and_the_feeler_is_named() -> None:
-    """Machinist review of the stack build: datum D (the thread axis) sat at
-    the shoulder end and read as the shoulder face, and the collar's setting
-    feeler had no thickness on the sheet."""
+def test_the_setting_feeler_is_named() -> None:
+    """Machinist review of the stack build: the collar's setting feeler had
+    no thickness on the sheet."""
     from cone_stack_end_play import COLLAR_FEELER
 
-    thread_right_x = drawing.DOG_LEFT_X + spec.SET_SCREW_LENGTH * drawing.SCREW_SCALE / 1000.0
-    thread_top_y = drawing.SCREW_CENTER[1] + spec.SET_SCREW_MAJOR_DIA * drawing.SCREW_SCALE / 2000.0
-    x, y = drawing.DATUM_D_XY
-    assert drawing.THREAD_LEFT_X + 0.010 < x < thread_right_x - 0.010
-    assert y > thread_top_y + 0.005
     assert f"SET WITH A {COLLAR_FEELER:.2f} FEELER OFF T006 THRUST FACE." in spec.INSTALLATION_NOTES
 
 
@@ -819,4 +644,5 @@ def test_installation_notes_name_the_journal_and_its_clearance() -> None:
     ]
     assert lines[1] == "DIAMETRAL CLEARANCE 0.025 TO 0.105."
     assert bore_low - land_high > 0.0
-    assert max(map(len, lines)) <= max(map(len, spec.DRAWING_NOTES.splitlines()))
+    # The longest line the notes box has printed (the old supply line).
+    assert max(map(len, lines)) <= 55
