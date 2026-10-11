@@ -248,9 +248,6 @@ from build_pd_platen_clip import (  # noqa: E402
     HOLE_INSET as CLIP_HOLE_INSET,
     HOLE_Y as CLIP_HOLE_Y,
     HOLE_DIA as CLIP_HOLE_DIA,
-    SCREW_SEAT_BOSS_H,
-    SCREW_SEAT_DIA,
-    SCREW_SEAT_STACK,
 )
 from vn_clamp_screw_spec import (  # noqa: E402
     HEAD_DIA as CLAMP_SCREW_HEAD_DIA,
@@ -1032,7 +1029,7 @@ CHAIN_PLANE_ENVELOPES = (
         "platen-clip screw heads (the platen group's frontmost)",
         None,
         0.0,
-        PLATE_FRONT_Z - SCREW_SEAT_STACK - FILLISTER_HEAD_H,
+        PLATE_FRONT_Z - CLIP_THICKNESS - FILLISTER_HEAD_H,
         PLATE_FRONT_Z,
     ),
 )
@@ -1133,9 +1130,9 @@ def _assert_fastener_stacks() -> None:
     )
     nonnegative("lock screw tip inside the guide", LOCK_SCREW_TIP_INSIDE_MIN)
 
-    # Clip bosses use exactly the non-threaded remainder of the shank; the
-    # platen and its rear socket bosses are through-tapped for 4.5 mm
-    # engagement, and the tip is flush with the boss.
+    # Clip heads sit directly on the flat 0.8 brass sheet (no seat boss); the
+    # platen and its rear socket bosses are through-tapped for the remaining
+    # 5.55 mm of shank, and the tip is flush with the boss.
     if (PLATEN_SOCKET_SPEC.kind, PLATEN_SOCKET_SPEC.size, PLATEN_SOCKET_SPEC.end) != (
         "tapped",
         "#4-40",
@@ -1145,19 +1142,10 @@ def _assert_fastener_stacks() -> None:
     nonnegative(
         "clip shank radial clearance", (CLIP_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0
     )
-    nonnegative(
-        "clip head seat radial margin", (SCREW_SEAT_DIA - FILLISTER_HEAD_DIA) / 2.0
-    )
-    if abs(CLIP_THICKNESS + SCREW_SEAT_BOSS_H - SCREW_SEAT_STACK) > 1e-9:
-        raise AssertionError(
-            "clip boss no longer provides the derived screw seat stack"
-        )
     valid_engagement(
         "clip #4-40 engagement", PLATEN_SOCKET_ENGAGEMENT, FILLISTER_SHANK_DIA
     )
-    clip_tip_clearance = (
-        SCREW_SEAT_STACK + PLATEN_SOCKET_ENGAGEMENT - FILLISTER_SHANK_LEN
-    )
+    clip_tip_clearance = CLIP_THICKNESS + PLATEN_SOCKET_ENGAGEMENT - FILLISTER_SHANK_LEN
     nonnegative("clip screw rear protrusion clearance", clip_tip_clearance)
     if abs(clip_tip_clearance) > 1e-9:
         raise AssertionError("clip screw tip is not flush with the socket boss")
@@ -2527,10 +2515,7 @@ async def build(adapter) -> dict[str, str]:
     # The platen owns the feed DOF, so each seed stays lock-mated to that moving
     # body. Native X patterns replicate the regular grids and remain driven by
     # their seeds as the platen travels.
-    clip_targets = [
-        [x, y, PLATE_FRONT_Z - CLIP_THICKNESS - SCREW_SEAT_BOSS_H]
-        for x, y in CLIP_SCREW_XY
-    ]
+    clip_targets = [[x, y, PLATE_FRONT_Z - CLIP_THICKNESS] for x, y in CLIP_SCREW_XY]
     clip_max_x = max(target[0] for target in clip_targets)
     clip_seed_target = min(
         (target for target in clip_targets if target[0] == clip_max_x),

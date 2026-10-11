@@ -1843,9 +1843,9 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="clips-fitted",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps each brass paper clip to the platen, and both travel together as one body. The clip's spring-rail reaction acts along the screw axis (preload only), and two screws per clip stop the clip turning, so no operating torque acts about either screw axis",
-        axial_capture="fillister head on the clip's integral seat boss (SCREW_SEAT_STACK); shank through the clip #4 clearance into the platen's through #4-40 tap, 4.0 mm engagement, tip flush with the platen back",
+        axial_capture="fillister head directly on the clip's flat 0.8 brass sheet (no seat boss); shank through the clip #4 clearance into the platen's through #4-40 tap and rear boss, 5.55 mm engagement (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT), tip flush with the boss",
         lock=Lock.NONE,
-        evidence="build_pd_paper_drive_assembly.py:build ('platen clip-screw grid') and _assert_fastener_stacks (clip #4-40 engagement, tip flush); draw_pd_paper_drive_assembly._step_text 'clips-fitted'; pd_platen_spec.SOCKET_SPEC tapped #4-40 through; build_pd_platen_clip.SCREW_SEAT_STACK",
+        evidence="build_pd_paper_drive_assembly.py:build ('platen clip-screw grid') and _assert_fastener_stacks (clip #4-40 engagement, tip flush); draw_pd_paper_drive_assembly._step_text 'clips-fitted'; pd_platen_spec.SOCKET_SPEC tapped #4-40 through; build_pd_platen_clip.CLIP_THICKNESS",
     ),
     Joint(
         id="pd-paper-drive/guide-screw-in-guide",

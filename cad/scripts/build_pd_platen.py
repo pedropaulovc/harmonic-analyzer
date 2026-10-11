@@ -9,7 +9,7 @@ build_pd_platen_guide.py). Fastener holes:
 * four clip-screw #4-40 through receivers at the resized plate's extreme
   left/right edges (x 5.3928/264.2472), matching the resized clips'
   7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
-  through a Ø7 x 0.65 boss on the back face for >= 1.5D engagement;
+  through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement;
 * ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
   at the guide rail centrelines: bottom row y 13, top row y 47 (machine
   318 / 352 with the plate at y 305).

@@ -68,41 +68,60 @@ def test_platen_clip_is_one_center_bridged_sheet() -> None:
         clip.SCREW_RAIL_WIDTH + clip.NOTCH_WIDTH + clip.SPRING_RAIL_WIDTH,
         clip.CLIP_WIDTH,
     )
+    # ch22 img03: equal 32-px rails either side of a 4-px slit.
+    assert math.isclose(clip.SCREW_RAIL_WIDTH, clip.SPRING_RAIL_WIDTH)
+    assert math.isclose(clip.NOTCH_WIDTH / clip.CLIP_WIDTH, 4.0 / 68.0)
     assert math.isclose(
-        2.0 * clip.NOTCH_LENGTH + clip.CENTER_BRIDGE_LENGTH,
-        clip.CLIP_LENGTH,
+        clip.BRIDGE_X0 + clip.CENTER_BRIDGE_LENGTH + clip.BRIDGE_X0, clip.CLIP_LENGTH
     )
-    assert clip.CENTER_BRIDGE_LENGTH == 5.0
+    assert math.isclose(clip.SLIT_END_RADIUS * 2.0, clip.NOTCH_WIDTH)
+    flat_plan_area = (
+        clip.CLIP_LENGTH * clip.SCREW_RAIL_WIDTH
+        - (4.0 - math.pi)
+        / 2.0
+        * (clip.SCREW_RAIL_END_RADIUS**2 + clip.SCREW_RAIL_SLIT_RADIUS**2)
+        + clip.CENTER_BRIDGE_LENGTH * clip.NOTCH_WIDTH
+        - math.pi * clip.SLIT_END_RADIUS**2
+    )
     spring_plan_area = (
-        (clip.CLIP_LENGTH - 2.0 * clip.SPRING_END_RADIUS)
-        * clip.SPRING_RAIL_WIDTH
+        clip.MID_SURFACE_LENGTH * clip.SPRING_RAIL_WIDTH
         + math.pi * clip.SPRING_END_RADIUS**2
     )
     expected = (
-        clip.CLIP_LENGTH * clip.SCREW_RAIL_WIDTH
-        + clip.CENTER_BRIDGE_LENGTH * clip.NOTCH_WIDTH
-        + spring_plan_area
-        - 2.0 * math.pi * (clip.HOLE_DIA / 2.0) ** 2
-    ) * clip.SHEET_T + (
-        2.0
-        * math.pi
-        * ((clip.SCREW_SEAT_DIA / 2.0) ** 2 - (clip.HOLE_DIA / 2.0) ** 2)
-        * clip.SCREW_SEAT_BOSS_H
-    )
+        flat_plan_area + spring_plan_area - 2.0 * math.pi * (clip.HOLE_DIA / 2.0) ** 2
+    ) * clip.SHEET_T
     assert math.isclose(clip.V_FINAL, expected)
+    assert not hasattr(clip, "SCREW_SEAT_BOSS_H")
 
 
-def test_platen_clip_free_halves_arch_and_return_to_sheet_plane() -> None:
-    stations = clip.ARCH_FRONT_XZ
-    assert stations[0] == (clip.SPRING_END_RADIUS, 0.0)
-    assert stations[-1] == (clip.CLIP_LENGTH - clip.SPRING_END_RADIUS, 0.0)
-    bridge_x0 = (clip.CLIP_LENGTH - clip.CENTER_BRIDGE_LENGTH) / 2.0
-    bridge_x1 = bridge_x0 + clip.CENTER_BRIDGE_LENGTH
-    assert stations[3] == (bridge_x0, 0.0)
-    assert stations[4] == (bridge_x1, 0.0)
-    assert [z for _, z in stations].count(-clip.ARCH_RISE) == 2
+def test_platen_clip_free_halves_bow_smoothly_and_return_to_sheet_plane() -> None:
+    # Three equal tangent arcs per free half (concave, crown, concave): the
+    # run and the rise close, so the bow lands back in the sheet plane at the
+    # bridge with no crease.
+    r, a = clip.BEND_RADIUS, clip.BEND_ANGLE
+    assert math.isclose(4.0 * r * math.sin(a), clip.BOW_RUN)
+    assert math.isclose(2.0 * r * (1.0 - math.cos(a)), clip.ARCH_RISE)
     assert clip.ARCH_RISE == 1.5
+    assert clip.BOW_RUN == pytest.approx(clip.BRIDGE_X0 - clip.HOLE_INSET)
+    # Gentle brass bend, far above the sheet thickness.
+    assert r > 20.0 * clip.SHEET_T
+    near = clip._bow_points(clip.HOLE_INSET, 0.0)
+    for key in ("p1", "p2"):
+        assert math.dist(near[key], near["c2"]) == pytest.approx(r)
+    assert math.dist(near["p1"], near["c1"]) == pytest.approx(r)
+    assert math.dist(near["p2"], near["c3"]) == pytest.approx(r)
+    assert near["c2"][1] + r == pytest.approx(clip.ARCH_RISE)
+    # The end round lies wholly on the flat tip, before the bow lifts.
+    assert 2.0 * clip.SPRING_END_RADIUS <= clip.HOLE_INSET
     assert math.isclose(clip.SPRING_END_RADIUS * 2.0, clip.SPRING_RAIL_WIDTH)
+
+
+def test_platen_clip_screws_seat_on_the_flat_sheet_with_full_engagement() -> None:
+    assert clip.CLIP_THICKNESS + platen.SOCKET_THREAD_ENGAGEMENT == pytest.approx(
+        fillister.SHANK_LEN
+    )
+    assert platen.SOCKET_THREAD_ENGAGEMENT >= 1.5 * clip.THREAD_MAJOR_MM["#4-40"]
+    assert platen.SOCKET_BOSS_H == pytest.approx(1.70)
 
 
 def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> None:
@@ -110,15 +129,10 @@ def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> 
     assert clip.HOLE_Y - clip.HOLE_DIA / 2.0 > 0.0
     assert clip.HOLE_Y + clip.HOLE_DIA / 2.0 < clip.SCREW_RAIL_WIDTH
     assert tuple(row[3] for row in assembly.CLIP_PLACEMENTS) == (90.0, -90.0)
-    assert math.isclose(
-        clip.SPRING_RAIL_Y0 - (clip.HOLE_Y + clip.SCREW_SEAT_DIA / 2.0),
-        clip.CLIP_SCREW_HEAD_CLEARANCE,
-    )
-    assert clip.SCREW_SEAT_DIA > clip.HEAD_DIA
-    assert (
+    assert clip.HEAD_TO_SPRING_RAIL == pytest.approx(
         clip.SPRING_RAIL_Y0 - (clip.HOLE_Y + clip.HEAD_DIA / 2.0)
-        > clip.CLIP_SCREW_HEAD_CLEARANCE
     )
+    assert clip.HEAD_TO_SPRING_RAIL > 0.25
 
     plate_mid_x = assembly.PLATE_X0 + assembly.PLATE_WIDTH / 2.0
     expected_y = sorted(

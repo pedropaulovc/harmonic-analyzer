@@ -912,7 +912,7 @@ for x, y in p.CLIP_SCREW_XY:
     expect(
         PD,
         f"vn-fillister-screw-{_fs}",
-        [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS - p.SCREW_SEAT_BOSS_H],
+        [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
         IDENTITY,
         f"clip screw {_fs}",
         **_SOLV,

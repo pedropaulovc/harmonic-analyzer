@@ -1519,7 +1519,7 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads HOLE_DIA, LOCK_THICK, LOCK_WIDTH"
     ),
     ("build_pd_paper_drive_assembly.py", "build_pd_platen_clip"): (
-        "dtrefactor: reads CLIP_LENGTH, CLIP_THICKNESS, HOLE_DIA, HOLE_INSET, HOLE_Y, SCREW_SEAT_BOSS_H, SCREW_SEAT_DIA, SCREW_SEAT_STACK"
+        "dtrefactor: reads CLIP_LENGTH, CLIP_THICKNESS, HOLE_DIA, HOLE_INSET, HOLE_Y"
     ),
     ("build_pd_paper_drive_assembly.py", "build_pd_platen_guide"): (
         "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_TIP_INSIDE_MIN, LOCK_STATION_X, SCREW_STATION_X"
