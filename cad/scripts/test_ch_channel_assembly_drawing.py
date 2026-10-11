@@ -156,6 +156,14 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
 def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     printed = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_STEPS)]
     assert printed == list(range(1, len(steps.SEQUENCE) + 1))
+    assert len(steps.SEQUENCE) == 11
+    assert steps.SEQUENCE[6:] == (
+        "set-screws-driven",
+        "preload-accepted",
+        steps.KEEPERS_PAIR_REAMED_KEY,
+        steps.KEEPERS_SET_KEY,
+        steps.SET_SCREWS_STAKED_KEY,
+    )
 
 
 def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> None:
@@ -186,13 +194,87 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
 
 
 def test_the_step_block_fits_the_field_right_of_the_isometric() -> None:
-    left, top = drawing.FITUP_NOTE_XY
-    right_limit, bottom_limit = drawing.FITUP_FIELD_LIMIT
-    lines = drawing.FITUP_STEPS.splitlines()
-    assert left + max(map(len, lines)) * NOTE_CHAR_WIDTH < right_limit
-    assert top - len(lines) * NOTE_LINE_PITCH > bottom_limit
-    # The isometric's right edge sat at x ~0.248 on the v36 render.
-    assert left > 0.248 + 0.015
+    rocker, fulcrum = drawing.FITUP_NOTES
+    assert drawing.FITUP_STEPS == f"{rocker}\n{fulcrum}"
+    for note, (left, top), (right_limit, bottom_limit) in (
+        (rocker, drawing.FITUP_NOTE_XY, drawing.FITUP_FIELD_LIMIT),
+        (fulcrum, drawing.FULCRUM_NOTE_XY, drawing.FULCRUM_FIELD_LIMIT),
+    ):
+        lines = note.splitlines()
+        assert left + max(map(len, lines)) * NOTE_CHAR_WIDTH < right_limit
+        assert top - len(lines) * NOTE_LINE_PITCH > bottom_limit
+    # The isometric's right edge sat at x ~0.248 on the v36 render; on the
+    # v41 render the front and right views end at y ~0.079 and the title
+    # block starts at x ~0.218.
+    assert drawing.FITUP_NOTE_XY[0] > 0.248 + 0.015
+    assert drawing.FULCRUM_NOTE_XY[1] < 0.079
+    assert drawing.FULCRUM_FIELD_LIMIT[0] < 0.218
+    assert rocker.startswith("ROCKER BANK FIT-UP\n1. ")
+    assert fulcrum.startswith(
+        f"FULCRUM SHAFT FIT-UP\n{steps.step_number(steps.KEEPERS_PAIR_REAMED_KEY)}. "
+    )
+
+
+def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
+    """GPT review F5/F6 and round 3 (PR #1311): the two keeper bores share one
+    axis only if they are reamed through in one pass at their installed
+    spacing, feet on one flat; the actual shaft gauges that line in the
+    clamped setup. The pair is then set on the top frame by DRO with the
+    shaft through both, and each crown tap's mouth is staked over its set
+    screw (rule 9's lock). The keeper print points at these steps."""
+    import ch_fulcrum_keeper_spec as keeper
+    import draw_ch_fulcrum_keeper as keeper_drawing
+    from channel_frame_geom import LEVER_FULCRUM_XY
+    from frame_column_stations import COLUMN_X
+
+    number = _config.parts("ch-fulcrum-keeper")["number"]
+    fulcrum_shaft = _config.parts("ch-fulcrum-shaft")["number"]
+    top_frame = _config.parts("fr-top-frame")["number"]
+    assert steps.SEQUENCE[-3:] == drawing.FULCRUM_KEYS
+    assert drawing.FULCRUM_KEYS == (
+        steps.KEEPERS_PAIR_REAMED_KEY,
+        steps.KEEPERS_SET_KEY,
+        steps.SET_SCREWS_STAKED_KEY,
+    )
+    places = keeper.KEEPER_FITUP_PLACES
+    front, rear = keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
+    reamed = _step_body(steps.KEEPERS_PAIR_REAMED_KEY)
+    # The controlling operation: installed spacing (KEEPERS_SET_KEY's two faces),
+    # one common flat, axis set to it, one pass with a reamer that reaches.
+    assert keeper.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(rear - front) == 142.0
+    assert f"CLAMP BOTH {number}, FEET OUTBOARD ON ONE FLAT" in reamed
+    assert f"INNER LUG FACES {rear - front:.{places}f} APART" in reamed
+    assert "BORE AXIS PARALLEL TO THE FLAT" in reamed
+    assert "DRILL AND REAM BOTH IN ONE PASS, 12 IN 0.2514 REAMER" in reamed
+    assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
+    assert "ROUND EACH CROWN ON ITS BORE" in reamed
+    assert (
+        f"ACCEPT IF THE {fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED."
+        in reamed
+    )
+    fitted = _step_body(steps.KEEPERS_SET_KEY)
+    assert f"{top_frame} ON THE MILL:" in fitted
+    # Main's ruling: X off the receiving web, Z off the upper-left socket.
+    assert keeper.KEEPER_FITUP_X_FROM_WEB_MM == pytest.approx(
+        LEVER_FULCRUM_XY[0] - COLUMN_X
+    )
+    x = f"{keeper.KEEPER_FITUP_X_FROM_WEB_MM:.{places}f}"
+    assert f"{x} WEST OF THE RAIL WEB CENTRE BELOW IT" in fitted
+    z = f"Z {front:.{places}f} AND {rear:.{places}f} FROM THE UPPER-LEFT SOCKET"
+    assert z in fitted
+    assert f"WITHIN {keeper.KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}" in fitted
+    assert "TRANSFER EACH FOOT HOLE INTO THE RAIL" in fitted
+    staked = _step_body(steps.SET_SCREWS_STAKED_KEY)
+    assert "STAKE EACH TAP MOUTH AT 2 POINTS" in staked
+    # The keeper print cites these steps by key.
+    assert keeper_drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(
+        f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
+    )
+    assert keeper_drawing.DIMENSION_CALLOUTS["CrownDia"].endswith(
+        f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
+    )
+    staking = steps.step_ref(steps.SET_SCREWS_STAKED_KEY)
+    assert staking in keeper_drawing.SET_SCREW_PROCESS
 
 
 def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
