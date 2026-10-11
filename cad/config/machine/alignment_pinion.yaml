@@ -28,9 +28,9 @@ alignment_pinion:                  # ch25 — engages the cylinder-gear set for 
     certificate: current contact, root-air and backlash must use the actual
     stock-form mesh, including printed tip, process bands and opening corner.
     Main selects FITUP/zeroing use: actual UNION continuity/no-gap,
-    positive backlash, root air at least0.20 mm and handover at most0.005 mm
-    must hold over the full retained centre range and all16 manufacturing
-    profile pairs. Flank/flank coverage is diagnostic only; no greater-than1.1
+    positive backlash, root air at least 0.20 mm and handover at most 0.005 mm
+    must hold over the full retained centre range and all 16 manufacturing
+    profile pairs. Flank/flank coverage is diagnostic only; no greater-than 1.1
     alignment criterion or borrowed cone backlash ceiling is asserted.
     Named union coverage is a non-contact-ratio functional measure, not an
     ideal involute CR claim. A pointwise corner sample is not an all-phase
