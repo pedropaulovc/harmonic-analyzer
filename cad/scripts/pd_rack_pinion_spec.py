@@ -385,6 +385,7 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 
 
 KNOB_NUMBER = "MHA-PD-008"
+FEED_PINION_NUMBER = "MHA-PD-010"
 # What a machinist needs to cut and check the teeth; design parameters stay
 # in this module (Main ruling 2026-10-10).
 GEAR_DATA = gear_data_note(
@@ -411,10 +412,14 @@ DRAWING_NOTES = BORE_FRONT_CHAMFER_NOTE
 
 # Spacing is held by the dividing head and is not inspected; one pin in
 # every space on a radial indicator catches eccentricity and gross slips.
+# The axis is the feed pinion's running bore with the disc fitted on the
+# cluster (MHA-PD-000's disc-transfer step), named by its part number so it
+# cannot be read as this disc's own pilot datum A.
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
-        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO FEED BORE A (ASSY)",
+        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO "
+        f"{FEED_PINION_NUMBER} BORE, ASSEMBLED",
         f"\u00d8{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {TEETH} SPACES",
     )
 )
