@@ -643,10 +643,8 @@ PURCHASED_RACK_NOTE = (
     f"PURCHASED RACK: {PURCHASED_RACK_SUPPLIER} {PURCHASED_RACK_SKU}; "
     f"{PURCHASED_RACK_LENGTH_IN:g} IN"
 )
-GEAR_DATA = (
-    f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA; "
-    f"{PURCHASED_RACK_MATERIAL.upper()}"
-)
+# The material is the title block's; the note does not repeat it.
+GEAR_DATA = f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA"
 # A purchased rack is received by its two stock sizes; its pitch accuracy is
 # the catalogue part's, checked only by the running mesh at assembly.
 INCOMING_RACK_INSPECTION_NOTE = (

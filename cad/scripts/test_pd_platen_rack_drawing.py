@@ -200,7 +200,7 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert f"{spec.PURCHASED_RACK_LENGTH_IN:g} IN" in spec.PURCHASED_RACK_NOTE
     assert f"{feed.DIAMETRAL_PITCH:g} DP" in spec.GEAR_DATA
     assert f"{feed.PRESSURE_ANGLE_DEG:g}\N{DEGREE SIGN} PA" in spec.GEAR_DATA
-    assert spec.PURCHASED_RACK_MATERIAL.upper() in spec.GEAR_DATA
+    assert spec.PURCHASED_RACK_MATERIAL.upper() not in spec.GEAR_DATA.upper()
     assert "SOFT-SOLDERED" in spec.DRAWING_NOTES
     assert "PHASE NOT CONTROLLED" in spec.DRAWING_NOTES
     assert "SET MESH AT ASSEMBLY" in spec.DRAWING_NOTES
