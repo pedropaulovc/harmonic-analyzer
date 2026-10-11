@@ -21,6 +21,7 @@ import ch_channel_lever_spec
 import vn_channel_spring_stock_geom as channel_stock
 import vn_counter_spring_stock_geom as counter_stock
 import sm_gooseneck_geom
+import sm_gooseneck_spring_screw_geom as spring_screw
 import sm_summing_lever_spec
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
@@ -40,7 +41,7 @@ COUNTER_ANCHOR_XY = (
     KNIFE[1] + sm_summing_lever_spec.ANCHOR_H / 2.0 - ANCHOR_9490T1.thread_start_y_mm,
 )
 GOOSENECK_END_X = COLUMN_X - sm_gooseneck_geom.ARM_END_X
-COUNTER_UPPER_EYE_X = GOOSENECK_END_X + sm_gooseneck_geom.SCREW_SHANK_LEN / 2.0
+COUNTER_UPPER_EYE_X = COLUMN_X - sm_gooseneck_geom.SPRING_EYE_X
 
 _channel = _config.parts("vn-channel-spring-installed")
 _counter = _config.parts("vn-counter-spring")
@@ -216,10 +217,10 @@ _COUNTER_LOWER_OFFSET = _counter_lower_offset()
 
 
 def counter_upper_support_offset(axis: tuple[float, float]) -> float:
-    """Ideal circular-wire support seed for the counter's half-turn clocking."""
+    """Seat the eye on full-thread major diameter, not the partial die relief."""
     ux, uy = axis
     radius = counter_stock.COIL_MEAN_RADIUS_MM
-    tube = counter_stock.WIRE_RADIUS_MM + sm_gooseneck_geom.SCREW_SHANK_DIA / 2.0
+    tube = counter_stock.WIRE_RADIUS_MM + spring_screw.MAJOR_DIA / 2.0
     omega = 2.0 * math.pi * counter_stock.LOOP_TURNS
     half_interval = math.asin(tube / radius) / omega
 
@@ -389,7 +390,7 @@ def counter_half_turn_clearances(
     eye_x = counter_stock.end_centers_mm(pose.length_mm)[1][0]
     start_x = counter_stock.coil_end_x_mm(pose.length_mm) + wire
     rows = pose.rotation_rows
-    head_x = GOOSENECK_END_X + sm_gooseneck_geom.SCREW_SHANK_LEN
+    head_x = GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP
     tube_gap = head_gap = math.inf
     steps = 1024
     for index in range(steps + 1):
@@ -414,8 +415,8 @@ def counter_half_turn_clearances(
         head_gap = min(
             head_gap,
             math.hypot(
-                max(head_x - x, x - head_x - sm_gooseneck_geom.SCREW_HEAD_T, 0.0),
-                max(radial - sm_gooseneck_geom.SCREW_HEAD_DIA / 2.0, 0.0),
+                max(head_x - x, x - head_x - spring_screw.HEAD_H, 0.0),
+                max(radial - spring_screw.HEAD_DIA / 2.0, 0.0),
             )
             - wire,
         )
