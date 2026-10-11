@@ -63,7 +63,6 @@ from pd_transgear_arm_plate_geometry import (
     LOCATOR_HOLE_DIA_MM,
     BORE_DIA,
     BOSS_FACE_Z,
-    CSK_DIA,
     EDGE_MINUS_X,
     EDGE_PLUS_X,
     END_R,
@@ -223,16 +222,13 @@ FINISH_CHAR_HEIGHT = 0.0025
 # Position frames, sheet metres. A frame's xy is its top-left corner; it is
 # about 59 mm wide with a projected zone (44 mm without), and its leader
 # leaves the end nearer the feature through a 6.3 mm shoulder (measured on
-# run 20261009T214031408Z). The frames stand in three rows above the views
-# and each leader drops beside, never through, the plan's stacked
-# X-dimension text (sheet x 0.069..0.097): countersink 1's left of it,
-# countersink 2's right of it. The back view mirrors X, so its hole frames
-# sit outboard of their own holes (no crossing) and the two through-bore
-# locator leaders drop between the hole leaders.
+# run 20261009T214031408Z). The frames stand in three rows above the back
+# view, which mirrors X, so its hole frames sit outboard of their own holes
+# (no crossing) and the two through-bore locator leaders drop between the
+# hole leaders. The plan carries no frame: each countersink is coaxial with
+# its hole (note 3).
 FRAME_ROWS = (0.262, 0.250, 0.238)
 FRAME_XY = {
-    "plate_countersink_1_position": (0.071, FRAME_ROWS[0]),
-    "plate_countersink_2_position": (0.1143, FRAME_ROWS[1]),
     "plate_hole_1_position": (0.228, FRAME_ROWS[2]),
     "plate_hole_2_position": (0.1174, FRAME_ROWS[2]),
     "plate_locator_1_position": (0.2098, FRAME_ROWS[0]),
@@ -368,11 +364,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     # These are the same native feature datums and circular zones authored
-    # on the part, not +/- positions retyped on a drawing. *Front sees +Z:
-    # countersink mouths are on RearFace. The drill mouths and the through
-    # locator bores' rims on the Front sketch (z = 0) are visible in *Back;
-    # the plan's drill mouth hides behind the cone, whose same-radius throat
-    # is at RearFace - CSK_DEPTH.
+    # on the part, not +/- positions retyped on a drawing. The drill mouths
+    # and the through locator bores' rims on the Front sketch (z = 0) are
+    # visible in *Back; the plan (*Front) carries datum C's clock edge.
     plan_edges = scan_view_edges(plan, label="plate rear-face locating PMI")
     back_edges = scan_view_edges(back, label="plate mounting-face drill PMI")
     placements = {
@@ -410,15 +404,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 ).edge,
             )
             for index, (x, y) in enumerate(SCREW_HOLES, 1)
-        },
-        **{
-            f"plate_countersink_{index}_position": PmiDrawingPlacement(
-                plan, FRAME_XY[f"plate_countersink_{index}_position"],
-                edge_entity=plan_edges.circle_at(
-                    (x, y, REAR_FACE_Z), CSK_DIA / 2.0,
-                    axis=(0.0, 0.0, 1.0), label=f"plate countersink {index} projected position",
-                ).edge,
-            ) for index, (x, y) in enumerate(SCREW_HOLES, 1)
         },
         # Below the end radius's text and right of the bore finish symbol.
         "knob_projected_axis": PmiDrawingPlacement(

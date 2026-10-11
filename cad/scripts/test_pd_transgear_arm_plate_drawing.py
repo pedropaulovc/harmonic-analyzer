@@ -488,10 +488,12 @@ def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
     assert projected
     for control in projected:
         assert f"{control.projected_zone_height_mm:.1f}" in plate_notes
-    assert "LEFT VIEW: REAR FACE, CARRIES THE" in plate_notes
+    assert "LEFT VIEW: REAR FACE;" in plate_notes
+    assert f"CSK COAXIAL WITH ITS \u00d8{geometry.SCREW_HOLE_DIA:.1f} HOLE." in plate_notes
     assert "CENTRE VIEW: MOUNTING FACE A." in plate_notes
-    for feature in ("HOLE BORES (CENTRE VIEW)", "CSK CONES (LEFT VIEW)", "KNOB BORE"):
+    for feature in ("HOLE BORES (CENTRE VIEW)", "KNOB BORE"):
         assert feature in plate_notes
+    assert "CSK CONES" not in plate_notes
     # The countersinks are cut from the rear face, which *Front (the left
     # view) looks at; *Back (the centre view) looks at face A.
     assert geometry.REAR_FACE_Z > 0.0

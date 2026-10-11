@@ -22,7 +22,6 @@ station (``KINK``, read off the book's notch crop) and the rear boss
 
 from __future__ import annotations
 
-from _gtol_cone import ConeFace
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -133,16 +132,9 @@ GEOMETRIC_CONTROLS = tuple(
     )
     for index, (x, y) in enumerate(SCREW_HOLES, 1)
 )
+# Each countersink is coaxial with its drilled hole (sheet note 3) and so
+# rides the hole's frame; it carries no position frame of its own.
 GEOMETRIC_CONTROLS += (
-    *(
-        GeometricControl(
-            f"plate_countersink_{index}_position", "position",
-            f"{REDUCER_POSITION_DIAMETER:.3f}",
-            ConeFace(CSK_ANGLE_DEG / 2.0, contains_x_mm=x),
-            ("A", "B", "C"), "diametral",
-            projected_zone_height_mm=PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM,
-        ) for index, (x, _y) in enumerate(SCREW_HOLES, 1)
-    ),
     GeometricControl(
         "knob_projected_axis", "perpendicularity",
         f"{REGISTRATION.AXIS_PROJECTED_ZONE_DIAMETER_MM:.3f}",
@@ -197,19 +189,18 @@ HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
 # and where its zone runs. The plan (left, *Front) looks at the rear face
 # (z = REAR_FACE_Z), where build_pd_transgear_arm_plate cuts the countersinks;
 # the back view (centre, *Back) looks at mounting face A (z = 0). Every zone
-# starts at A: the screw holes' and countersinks' 7.0 run through the plate
-# toward the rear face, to the seated head contact
+# starts at A: the screw holes' 7.0 runs through the plate toward the rear
+# face, to the seated head contact
 # (transgear_hanger_joints.PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM, from A);
 # the knob bore's runs out of A toward the hub, through the arm to the chain
 # plane (paper_drive_arm_registration.K_PROJECTED_HEIGHT_MM).
 _P = PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM
 PROJECTED_ZONE_NOTE = "\n".join((
-    f"3. LEFT VIEW: REAR FACE, CARRIES THE \u00d8{PLATE.CSK_DIA:.1f} {CSK_CALLOUT}.",
-    "   CENTRE VIEW: MOUNTING FACE A.",
+    f"3. LEFT VIEW: REAR FACE; EACH \u00d8{PLATE.CSK_DIA:.1f} {CSK_CALLOUT} COAXIAL WITH",
+    f"   ITS \u00d8{SCREW_HOLE_DIA:.1f} HOLE. CENTRE VIEW: MOUNTING FACE A.",
     f"4. PROJECTED ZONES START AT FACE A: \u00d8{SCREW_HOLE_DIA:.1f} HOLE BORES",
-    f"   (CENTRE VIEW) AND CSK CONES (LEFT VIEW) {_P:.1f} TOWARD THE",
-    f"   REAR FACE; \u00d8{BORE_DIA:g} KNOB BORE "
-    f"{REGISTRATION.K_PROJECTED_HEIGHT_MM:.1f} TOWARD THE HUB.",
+    f"   (CENTRE VIEW) {_P:.1f} TOWARD THE REAR FACE; \u00d8{BORE_DIA:g} KNOB BORE",
+    f"   {REGISTRATION.K_PROJECTED_HEIGHT_MM:.1f} TOWARD THE HUB.",
 ))
 
 ISO_VIEW_SCALE = (1, 1)
