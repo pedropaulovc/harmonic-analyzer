@@ -1,14 +1,14 @@
 r"""MHA-PD-017 transgear-disc-hub: the brass hub and flange in front of the 120T disc.
 
-R9-68 (rev 5): a Ø13.2 turned hub whose bore slides on the pinion sleeve's
-(MHA-PD-010) Ø9 boss and drives through its D-flat, with a Ø25.1 × 2.4 flange
+The retained Ø13.2 turned hub has an H7 bore matching the pinion sleeve's
+(MHA-PD-010) h6 boss and drives through its D-flat, with a Ø25.1 × 2.4 flange
 and a Ø13.1 h6 rear spigot.  The spigot passes the 120T disc's (MHA-PD-006)
 bore, which pilots on it, and its end seats on the sleeve's step face (the
 12T's tooth ends); the flange's rear face clamps the disc's front face, the
 spigot's length ahead of the step.  Three #0-80 fillister screws (MHA-VN-039)
 pass the flange's Ø1.7 holes on the Ø19 circle into the disc's taps
 (``pd_transgear_disc_hub_geometry``; the taps are spotted through these holes at
-assembly, R9-9).  The bore is Ø9 H7 round over its whole length; the flat
+assembly, R9-9). The bore's round diameter is H7 over its whole length; the flat
 only drives, from the flange's rear face forward, and starts clear ahead of
 the sleeve flat's end wall.  Nothing fastens the hub axially: the spigot
 bears rearward on the step, and the MHA-PD-025 front bushing, held by the
@@ -22,11 +22,11 @@ is drilled through the hub wall and the sleeve's boss in one operation at
 assembly (R9-8), centred on the hub body (R9-60), so the sheet carries a
 match-drill note, not a free drilled hole.
 
-Sizes (policy rule 12): the body is the smallest .XXX diameter that keeps
-2.0 of wall over the bore and its flat, the circle the smallest that keeps
-the screw heads 1.0 clear of the body and the disc's taps 2.0 from its bore,
-and the flange the smallest .XXX diameter that keeps 2.0 from the holes to
-its rim, each at the printed worst case and each on a 0.1 step.
+Sizes (policy rule 12): the Ø13.2 body and Ø13.1 spigot retain the R9-68
+outer envelope after the sleeve's boss is reduced for the finite cutter.
+The smaller matching bore increases their walls; neither diameter is a
+new minimum. The bolt circle and flange retain the screw-head air and
+hole-to-rim walls of that joint, all at the printed worst case.
 
 Printed lengths, from the flange's rear face: the spigot 3.650 .XXX (it
 places the disc on the step) and the flange 2.400 .XXX (the
@@ -75,7 +75,7 @@ from pd_transgear_disc_hub_geometry import (
 )
 
 # The mating parts the sheet names, by name and number (policy rule 2): the
-# feed pinion whose Ø9 boss and flat the hub's bore slides on, the disc that
+# feed pinion whose h6 boss and flat the hub's bore slides on, the disc that
 # pilots on the spigot, and the disc screws.
 SLEEVE_NUMBER = "MHA-PD-010"
 SLEEVE_NAME = "FEED PINION"
@@ -141,11 +141,11 @@ HUB_FRONT_Z = SPIGOT_LENGTH - HUB_LENGTH  # -10.05
 # 6-10 mm.  The flat at local -Y only drives the disc's torque; its plane sits
 # FLAT_TO_AXIS from the axis, printed with a band above the sleeve flat's
 # (0, -0.015) for a 0.020-0.050 clearance.
-BORE_DIA = 9.0
+BORE_DIA = SLEEVE.BOSS_DIA
 BORE_PLACES = 3
 BORE_BAND = (0.015, 0.0)  # (upper, lower) deviations, H7
 BORE_DEVIATIONS = deviations(BORE_BAND)
-FLAT_TO_AXIS = 3.5
+FLAT_TO_AXIS = SLEEVE.FLAT_TO_AXIS
 FLAT_TO_AXIS_PLACES = 3
 FLAT_TO_AXIS_BAND = (0.035, 0.020)  # (upper, lower) deviations
 FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
@@ -194,6 +194,25 @@ if FLAT_END_CLEARANCE_WORST <= 0.0:
         f"the sleeve's flat end wall reaches the hub's flat: {FLAT_END_CLEARANCE_WORST:.3f}"
     )
 
+# Available unbroken D-flat face, not a load or torque rating. Standard edge
+# breaks are not subtracted here. The flat plane and its axial stations are
+# retained while the smaller boss narrows its chord.
+FLAT_DRIVE_WIDTH = 2.0 * math.sqrt(
+    (SLEEVE.BOSS_DIA / 2.0) ** 2 - SLEEVE.FLAT_TO_AXIS**2
+)
+FLAT_DRIVE_WIDTH_MIN = 2.0 * math.sqrt(
+    ((SLEEVE.BOSS_DIA + SLEEVE.BOSS_DIA_BAND[1]) / 2.0) ** 2
+    - (SLEEVE.FLAT_TO_AXIS + SLEEVE.FLAT_TO_AXIS_BAND[0]) ** 2
+)
+FLAT_DRIVE_LENGTH_MIN = (
+    SLEEVE.OVERALL_LENGTH
+    - SLEEVE.STATION_TOL
+    - FIT.HUB_NOSE_WINDOW[1]
+    - (SLEEVE.FACE_WIDTH + SLEEVE.FACE_WIDTH_BAND + SPIGOT_LENGTH_MAX)
+)
+FLAT_DRIVE_FACE_AREA_MIN = FLAT_DRIVE_WIDTH_MIN * FLAT_DRIVE_LENGTH_MIN
+
+
 # Round engagement on the boss: from the boss's first full round (the step,
 # or behind it the form cutter's run-out slots at their deepest) to the hub
 # front face at the nose window's furthest back on the shortest sleeve.  The
@@ -203,47 +222,43 @@ ROUND_ENGAGEMENT_MIN = (
     - SLEEVE.STATION_TOL
     - FIT.HUB_NOSE_WINDOW[1]
     - max(SLEEVE.FACE_WIDTH + SLEEVE.FACE_WIDTH_BAND, SLEEVE.CUTTER_RUNOUT_END_WORST)
-)  # 13.411
+)
 
 # --- the seat: the spigot's end on the sleeve's step ---------------------------
-# The step face is the 12T's tooth ends between the boss (r 4.5) and the tip
-# circle: the gaps run below the boss.  The spigot's end bears on those
-# islands from its bore's edge break to the smallest tip circle (the teeth's
-# edges are never broken, TOOTH_EDGE_NOTE).
+# The step face is the pinion's end between the boss and the tip circle.
+# The spigot's end bears from its bore's edge break to the smallest tip
+# circle (the tooth edges are never broken, TOOTH_EDGE_NOTE).
 EDGE_BREAK_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])  # 0.25
 _BORE_MAX = BORE_DIA + BORE_BAND[0]
-SEAT_INNER_R = _BORE_MAX / 2.0 + EDGE_BREAK_MAX  # 4.7575
-SEAT_CONTACT_R = (SLEEVE.OUTSIDE_DIA + SLEEVE.OUTSIDE_DIA_BAND[1]) / 2.0  # 5.877
+SEAT_INNER_R = _BORE_MAX / 2.0 + EDGE_BREAK_MAX
+SEAT_CONTACT_R = (SLEEVE.OUTSIDE_DIA + SLEEVE.OUTSIDE_DIA_BAND[1]) / 2.0
 
 
-def _inv(angle: float) -> float:
-    return math.tan(angle) - angle
-
-
-def tooth_half_angle(radius: float) -> float:
-    """Half the angle one 12T tooth subtends at ``radius`` (rad): the involute
-    above the base circle, the radial flank below it."""
-    pitch_r = SLEEVE.PITCH_DIA / 2.0
-    phi = math.radians(SLEEVE.PRESSURE_ANGLE_DEG)
-    base_r = pitch_r * math.cos(phi)
-    thickness = math.pi * SLEEVE.MODULE_MM / 2.0  # circular, at the pitch circle
-    phi_r = math.acos(base_r / max(radius, base_r))
-    return thickness / (2.0 * pitch_r) + _inv(phi) - _inv(phi_r)
-
-
-def tooth_island_area(inner_r: float, outer_r: float, steps: int = 2000) -> float:
-    """Area of the 12T's tooth ends between two radii (mm^2), midpoint rule."""
-    h = (outer_r - inner_r) / steps
-    return sum(
-        2.0 * SLEEVE.TEETH * tooth_half_angle(r) * r * h
-        for r in (inner_r + (i + 0.5) * h for i in range(steps))
-    )
-
-
-if tooth_half_angle(SEAT_CONTACT_R) <= 0.0:
-    raise AssertionError("the 12T's teeth are pointed inside the seat")
+# A real form cutter leaves partial-depth gaps at the step. Use the sleeve
+# owner's bounded end-envelope sections, never a full-depth ideal involute.
+# Compare every printed setting/tip/step/full-depth corner on the common
+# contact annulus; smaller step-minus-depth and inward tool translation can
+# only remove more of that annulus.
 SEAT_ANNULUS_AREA = math.pi * (SEAT_CONTACT_R**2 - SEAT_INNER_R**2)
-SEAT_CONTACT_AREA = tooth_island_area(SEAT_INNER_R, SEAT_CONTACT_R)
+_SEAT_AREA_BOUNDS = tuple(
+    SLEEVE.step_seat_area_bounds_mm2(
+        SEAT_INNER_R,
+        SEAT_CONTACT_R,
+        profile=profile,
+        station_mm=SLEEVE.FACE_WIDTH + face_deviation,
+        full_depth_mm=SLEEVE.FULL_DEPTH + depth_deviation,
+    )
+    for profile in SLEEVE.manufactured_profiles()
+    for face_deviation in (-SLEEVE.FACE_WIDTH_BAND, SLEEVE.FACE_WIDTH_BAND)
+    for depth_deviation in (-SLEEVE.FULL_DEPTH_BAND, SLEEVE.FULL_DEPTH_BAND)
+)
+SEAT_CONTACT_AREA_BOUNDS = (
+    min(lower for lower, _upper in _SEAT_AREA_BOUNDS),
+    min(upper for _lower, upper in _SEAT_AREA_BOUNDS),
+)
+SEAT_CONTACT_AREA = SEAT_CONTACT_AREA_BOUNDS[0]
+if not 0.0 < SEAT_CONTACT_AREA <= SEAT_CONTACT_AREA_BOUNDS[1] <= SEAT_ANNULUS_AREA:
+    raise AssertionError("the finite cutter leaves no bounded spigot seat")
 SEAT_ISLAND_FRACTION = SEAT_CONTACT_AREA / SEAT_ANNULUS_AREA
 
 # --- geometric control --------------------------------------------------------
@@ -349,9 +364,9 @@ def hole_to_rim_worst(flange_dia: float, bolt_circle_dia: float) -> float:
 
 
 HUB_WALL_NOMINAL = (HUB_DIA - BORE_DIA) / 2.0
-HUB_WALL_WORST, FLAT_WALL_WORST = body_walls_worst(HUB_DIA)  # 2.0275, 3.000
+HUB_WALL_WORST, FLAT_WALL_WORST = body_walls_worst(HUB_DIA)
 SPIGOT_WALL_NOMINAL = (SPIGOT_DIA - BORE_DIA) / 2.0
-SPIGOT_WALL_WORST = (SPIGOT_DIA_MIN - _BORE_MAX) / 2.0  # 2.037
+SPIGOT_WALL_WORST = (SPIGOT_DIA_MIN - _BORE_MAX) / 2.0
 HEAD_TO_HUB_NOMINAL = BOLT_CIRCLE_DIA / 2.0 - SCREW_HEAD_DIA / 2.0 - HUB_DIA / 2.0
 HEAD_TO_HUB_WORST = head_air_worst(BOLT_CIRCLE_DIA, HUB_DIA)  # 1.526
 HOLE_TO_RIM_NOMINAL = FLANGE_DIA / 2.0 - BOLT_CIRCLE_DIA / 2.0 - SCREW_HOLE_DIA / 2.0

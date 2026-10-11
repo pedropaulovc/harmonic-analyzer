@@ -538,11 +538,46 @@ def _imported_name(tree: ast.Module, name: str) -> str | None:
     return None
 
 
+def _helper_blanked_parameters(module: str, function: str) -> dict[str, str | None]:
+    """Parameters a repo helper passes to blank_reference_sketches as its
+    sketch names (paper_drive_stock_native.author_span blanks its own
+    ``feature``), each with its string default, or None without one."""
+    path = _SCRIPTS / f"{module}.py"
+    if not path.exists():
+        return {}
+    for node in _tree(path).body:
+        if not (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function):
+            continue
+        arguments = node.args
+        positional = arguments.posonlyargs + arguments.args
+        defaults: dict[str, ast.expr | None] = dict.fromkeys(a.arg for a in positional + arguments.kwonlyargs)
+        defaults.update(zip((a.arg for a in positional[len(positional) - len(arguments.defaults):]), arguments.defaults))
+        defaults.update((a.arg, d) for a, d in zip(arguments.kwonlyargs, arguments.kw_defaults) if d is not None)
+        blanked: dict[str, str | None] = {}
+        for call in ast.walk(node):
+            if not (isinstance(call, ast.Call) and _called_name(call) == "blank_reference_sketches"):
+                continue
+            sketches = call.args[1]
+            for item in sketches.elts if isinstance(sketches, (ast.Tuple, ast.List)) else ():
+                if isinstance(item, ast.Name) and item.id in defaults:
+                    default = defaults[item.id]
+                    blanked[item.id] = default.value if isinstance(default, ast.Constant) else None
+        return blanked
+    return {}
+
+
 def _blanked_sketches(build: Path) -> set[str]:
     """Every sketch a part build hides with _sketch.blank_sketch, or with
     _sketch.blank_reference_sketches (which calls it per sketch) over a
-    literal tuple or the build's REFERENCE_SKETCHES."""
+    literal tuple or the build's REFERENCE_SKETCHES, directly or through a
+    repo helper that blanks the sketch it authors (keyword or default name)."""
     tree = _tree(build)
+    helpers = {
+        alias.asname or alias.name: (node.module, alias.name)
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module
+        for alias in node.names
+    }
     names: set[str] = set()
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -558,6 +593,16 @@ def _blanked_sketches(build: Path) -> set[str]:
             names |= _reference_sketches(tree)
             continue
         if called != "blank_sketch":
+            if isinstance(node.func, ast.Name) and node.func.id in helpers:
+                passed = {k.arg: k.value for k in node.keywords if k.arg}
+                for parameter, default in _helper_blanked_parameters(*helpers[node.func.id]).items():
+                    value = passed.get(parameter)
+                    if isinstance(value, ast.Constant):
+                        names.add(value.value)
+                    elif value is None and default is not None:
+                        names.add(default)
+                    else:
+                        raise LookupError(f"{called} blanks a computed sketch name ({parameter})")
             continue
         sketch = node.args[1]
         if isinstance(sketch, ast.Constant):
@@ -651,6 +696,12 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
         "JournalPlanReference",
         "CrankBossStationReference",
     }
+    # Blanked inside paper_drive_stock_native.author_span/author_root_envelope
+    # (PD farm run 9, drawing:pd_rack_pinion and :pd_transgear_feed_pinion:
+    # SpanProfile/RootInspectionProfile dimensions missing from the import).
+    assert found["pd_rack_pinion"] == {"SpanProfile", "RootInspectionProfile"}
+    assert found["pd_transgear_feed_pinion"] == {"SpanProfile"}
+    assert found["pd_transgear_knob_shaft"] == {"SpanProfile", "RootInspectionProfile"}
 
 
 def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None:

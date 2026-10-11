@@ -446,14 +446,12 @@ async def build_stock_fastener(
     if color is not None:
         await apply_color(adapter, color)
     stock = fastener(part_name)
-    apply_custom_properties(
-        adapter,
-        {
-            "Stock Name": stock.stock_name,
-            "Supplier": stock.supplier,
-            "Supplier SKUs": ", ".join(stock.skus),
-        },
-    )
+    properties = {
+        "Stock Name": stock.stock_name,
+        "Supplier": stock.supplier,
+        "Supplier SKUs": ", ".join(stock.skus),
+    }
+    apply_custom_properties(adapter, properties)
     await report_mass_properties(adapter)
     return await _save_stock_part(
         adapter, part_name, threaded=threaded, save_threaded_part=save_threaded_part

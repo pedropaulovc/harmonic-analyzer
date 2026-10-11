@@ -1,0 +1,21 @@
+vn-transgear-arm-plate-locating-pin:
+  title: Transgear Arm Plate Locating Dowel
+  number: MHA-VN-054
+  stock_name: Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [93600A189]
+  material: 316 stainless steel
+  material_specification: "316 stainless steel dowel pin, ISO 2338-m6, 2 mm +0.008/+0.002 diameter x 6 mm nominal length; McMaster-Carr 93600A189"
+  finish: passivated
+  # https://www.mcmaster.com/93600A189/
+  # Live primary page verified 2026-10-09T00:41:03Z; both ends chamfered.
+  # Published ISO2338:1997 length limits for nominal6mm are5.75..6.25.
+  # Its endc≈0.35 is reference only, not a supplier maximum.
+  installation_notes: |-
+    McMASTER 93600A189 / 316 SS / PASSIVATED
+    2 x 6 NOMINAL; ISO2338-m6, BOTH ENDS CHAMFERED
+    TWO MATCHED LOCATORS / PRESS ARM; SLIP PLATE
+    SCREWS CLAMP ONLY; DO NOT BOTTOM IN ARM
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased

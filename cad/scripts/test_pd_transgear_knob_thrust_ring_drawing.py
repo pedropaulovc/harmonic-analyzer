@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import math
 from pathlib import Path
 
 import pytest
@@ -60,6 +61,21 @@ def test_the_bore_and_the_float_stop_carry_their_bands_on_the_model() -> None:
     assert min(spec.ID_BAND) == 0.0 < max(spec.ID_BAND)
 
 
+def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
+    assert spec.ID == pytest.approx(6.05)
+    assert spec.ID_BAND == pytest.approx((0.10, 0.0))
+    assert spec.LENGTH == pytest.approx(5.2)
+    assert spec.LENGTH_TOL == pytest.approx(0.05)
+    assert part.V_RING == pytest.approx(
+        math.pi * ((spec.OD / 2.0) ** 2 - (spec.ID / 2.0) ** 2) * spec.LENGTH
+    )
+    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": spec.BORE_CALLOUT}
+    assert "DRILL" in spec.BORE_CALLOUT and "REAM" not in spec.BORE_CALLOUT
+    assert drawing._sheet_x(spec.LENGTH) - drawing._sheet_x(0.0) == pytest.approx(
+        spec.LENGTH * drawing._S / 1000.0
+    )
+
+
 def test_wall_holds_at_the_worst_case_the_sheet_prints() -> None:
     """Policy rule 12: the smallest O.D. its printed row accepts over the
     largest bore its band accepts."""
@@ -82,7 +98,9 @@ def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
     # Positive control: the title block as it is.
     assert _ring_spec_fresh().WALL_WORST == pytest.approx(spec.WALL_WORST)
     # Negative control: an O.D. row loose enough to thin the wall under 2.0.
-    monkeypatch.setattr(_printed_tolerance, "printed_band_mm", lambda _places: 1.0)
+    monkeypatch.setattr(
+        _printed_tolerance, "printed_deviations", lambda _value, _places: (-4.0, 4.0)
+    )
     with pytest.raises(AssertionError, match="floor"):
         _ring_spec_fresh()
 

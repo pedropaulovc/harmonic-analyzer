@@ -19,6 +19,8 @@ PURE_SPECS = (
     "vn_swing_stop_screw_spec",
     "_mcmaster_94025a164",
     "vn_foot_screw_spec",
+    "vn_fillister_screw_spec",
+    "vn_transgear_latch_pin_spec",
 )
 
 
@@ -45,6 +47,9 @@ def _pure_local_closure(module_name: str) -> set[str]:
         "diagnostics",
         "_com",
         "_session",
+        "_visibility",
+        "_telemetry",
+        "_watchdog",
         "_holes",
         "_assembly",
         "_drawing_common",
@@ -64,7 +69,7 @@ def _pure_local_closure(module_name: str) -> set[str]:
         for imported in _imports(_source_tree(current)):
             root = imported.split(".", 1)[0]
             assert root not in forbidden_roots and not root.startswith(
-                ("build_", "diag_")
+                ("build_", "draw_", "diag_")
             ), f"native import in pure closure: {current} -> {imported}"
             local = SCRIPTS / f"{imported.replace('.', '/')}.py"
             if local.is_file():
@@ -100,9 +105,20 @@ def test_pose_vendor_specs_have_no_native_import_closure(module_name: str) -> No
     assert _pure_spec(module_name).__name__ == module_name
 
 
-def test_pure_closure_guard_has_a_real_native_positive_control() -> None:
+@pytest.mark.parametrize(
+    "module_name",
+    (
+        "diagnostics.diag_build_94025A164",
+        "diagnostics.diag_build_90114A511",
+        "diagnostics.diag_mcmaster_fillister",
+        "diagnostics.diag_mcmaster_dowel",
+    ),
+)
+def test_pure_closure_guard_has_a_real_native_positive_control(
+    module_name: str,
+) -> None:
     with pytest.raises(AssertionError, match="native import in pure closure"):
-        _pure_local_closure("diagnostics.diag_build_94025A164")
+        _pure_local_closure(module_name)
 
 
 @pytest.mark.parametrize(

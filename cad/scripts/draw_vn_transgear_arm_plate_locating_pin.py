@@ -1,5 +1,4 @@
-"""Create the purchased reference drawing for the drive-collar cross pin."""
-
+"""Purchased reference drawing for MHA-VN-054 McMaster 93600A189."""
 from __future__ import annotations
 
 import argparse
@@ -11,8 +10,7 @@ from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
-
-SPEC = DRAWINGS_BY_NAME["vn_transgear_collar_cross_pin"]
+SPEC = DRAWINGS_BY_NAME["vn_transgear_arm_plate_locating_pin"]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -21,7 +19,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("part", choices=[SPEC.artifact_stem])
+    parser.add_argument("part", choices=[SPEC.artifact_stem], nargs="?", default=SPEC.artifact_stem)
     return parser.parse_args()
 
 

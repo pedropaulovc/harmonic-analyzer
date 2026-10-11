@@ -1,14 +1,10 @@
 r"""Reproduction script: translational-gearing reducer disc MHA-PD-006 (book ch. 23).
 
-The large thin brass disc gear -- the "fourth gear" of the 4/4 video: 120
-teeth (narrated count, CONFIRMED by an FFT ring count on the ch30 p002
-front view, ~115-119 peak) at DP 38 (disc OD measures ~82 +-2.5; 120T DP38
-gives PD 80.21 / OD 81.55, and the measured rack/disc pitch ratio ~1.27
-matches 2.660/2.101). It does NOT touch the rack (the old 96T DP30
-"rack-pinion" role is REFUTED -- paper-drive rework E7/E8): it is the fixed
-reduction wheel, driven 12:120 by the knob shaft's 12T DP38, slipped on the
-pinion sleeve's Ø9 boss and screwed to the brass hub's flange (MHA-PD-017)
-by three #0-80 fillister screws (MHA-VN-039).
+The large thin brass reducer disc retains the narrated 120 physical teeth,
+cut by the finite PA20 48DP stock #2/reference-55 master. It does not
+touch the rack: the finite stock #8/reference-12 knob pinion drives it 12:120.
+Its bore pilots on the brass hub's Ø13.1 spigot, and three #0-80 fillister
+screws (MHA-VN-039) clamp it to that hub's flange (MHA-PD-017).
 
 Every size is ``pd_rack_pinion_spec``'s; the screw pattern is
 ``pd_transgear_disc_hub_geometry``'s (the one authority the flange shares).
@@ -19,7 +15,7 @@ the disc's FRONT face (z = 0, the flange seat), the body runs z = 0..3 and
 
 Features: ``GearBlank`` / ``GearBlankProfile`` (the toothed disc's blank,
 renamed so its depth prints as ``FaceWidth``), the tooth gap + pattern,
-``BoreProfile`` / ``Bore`` (Ø9 through) and ``DiscTaps`` (native Hole
+``BoreProfile`` / ``Bore`` (hub-spigot bore through) and ``DiscTaps`` (native Hole
 Wizard #0-80 taps through, placed from the rear face on the bolt circle; no
 countersink, each mouth's 0.10 burr break is not modelled, R9-63).
 
@@ -49,13 +45,20 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_prefix,
     set_dimension_bilateral_tolerance,
 )
 from _simplified_part import save_simplified_part
-from _gear import build_fixed_gear, volume_check
+from _fit_deviations import deviations
+from _gear import build_stock_form_gear, volume_check
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
+from paper_drive_stock_native import (
+    apply_span_limits,
+    author_root_envelope,
+    author_span,
+)
 from pd_rack_pinion_spec import (
     BORE_DEVIATIONS,
     BORE_DIA,
@@ -65,13 +68,22 @@ from pd_rack_pinion_spec import (
     DRAWING_PRECISION,
     FACE_WIDTH,
     GEAR_DATA,
-    PRESSURE_ANGLE_DEG,
+    OUTSIDE_DIA_BAND,
+    PRESSURE_ANGLE_DEG,  # noqa: F401 - the drawing test reads it off the part
+    SPAN_DEVIATIONS,
+    SPAN_NOMINAL,
+    SPAN_PLACES,
+    SPAN_PREFIX,
+    SPAN_TEETH,
+    STOCK_PROFILE,
     SURFACE_FINISHES,
     TAP_CENTRES,
     TAP_DRILL_DIA,
     TAP_SPEC,
     TAP_TO_BORE_WALL_WORST,
-    TEETH,
+    TEETH,  # noqa: F401 - the drawing test reads it off the part
+    TOOTH_SPACE_CALLOUT,
+    TOOTH_SPACE_CALLOUT_PROPERTY,
 )
 from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
@@ -117,22 +129,28 @@ TAP_PLACEMENT_DIMS = [
 
 
 def _rename_gear_blank(adapter) -> None:
-    """Name build_fixed_gear's blank extrude and its sketch so the disc
-    thickness prints as the native ``FaceWidth``."""
+    """Name the native stock blank and its sketch for imported dimensions."""
     blank_name = feature_name_by_type(adapter, "Extrusion")
     if not blank_name:
         raise RuntimeError("rack-pinion gear blank extrusion is missing")
-    blank = _early_bound(
-        _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(blank_name),
-        "IFeature",
-    )
+    raw_blank = _early_bound(
+        adapter.currentModel, "IPartDoc"
+    ).FeatureByName(blank_name)
+    if raw_blank is None:
+        raise RuntimeError("rack-pinion gear blank extrusion could not be retrieved")
+    blank = _early_bound(raw_blank, "IFeature")
     raw_profile = _read_member(blank, "GetFirstSubFeature")
     if raw_profile is None:
         raise RuntimeError("rack-pinion gear blank profile is missing")
     profile = _early_bound(raw_profile, "IFeature")
     blank.Name = "GearBlank"
     profile.Name = "GearBlankProfile"
-    if str(blank.Name) != "GearBlank" or str(profile.Name) != "GearBlankProfile":
+    actual_blank_name = blank.Name
+    actual_profile_name = profile.Name
+    if (
+        type(actual_blank_name) is not str or actual_blank_name != "GearBlank"
+        or type(actual_profile_name) is not str or actual_profile_name != "GearBlankProfile"
+    ):
         raise RuntimeError("rack-pinion gear blank feature names did not persist")
 
 
@@ -143,21 +161,20 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
-    # document units. The toothed-disc geometry (teeth/DP) is authored by the
-    # shared _gear helper with literal-numeric curve expressions.
+    # document units. The complete axial disc's finite tooth geometry is
+    # authored by StockFormProfile through the shared native stock helper.
     await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
     await set_global(adapter, "BoltCircleDia", f"{BOLT_CIRCLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    disc = await build_fixed_gear(
-        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PRESSURE_ANGLE_DEG
-    )
+    disc = await build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)
     _rename_gear_blank(adapter)
     drive_jobs += [
         (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
     ]
+    name_dimensions(adapter, "GearBlankProfile", ["OutsideDia"])
     expected = disc.volume
 
     # Shaft bore (on-axis circle at the origin: only the diameter is a dim, so
@@ -225,6 +242,12 @@ async def build(adapter) -> dict[str, str]:
     ).name
     # Hidden but still selectable by name for the assembly's mates.
     blank_reference_geometry(adapter, ((gear_axis, "AXIS"),))
+    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES)
+    await author_root_envelope(adapter, STOCK_PROFILE)
+    set_dimension_prefix(
+        adapter, "RootInspectionProfile", "RootEnvelope", "AXIS ROOT "
+    )
+    await volume_check(adapter, "inspection sketches neutral", expected, 0.01 * V_BORE)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
@@ -233,13 +256,22 @@ async def build(adapter) -> dict[str, str]:
         f" tap to bore wall {TAP_TO_BORE_WALL_WORST:.2f} worst"
     )
 
-    # The bore's reamed slip band on the sleeve boss is the one model band;
-    # the other printed places (and so the general-tolerance row each
-    # dimension claims) are authored on the model.
+    # Functional bore, supported blank and controlling span bands live on
+    # native model dimensions; the drawing only imports their authored ink.
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    set_dimension_bilateral_tolerance(
+        adapter, "GearBlankProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND)
+    )
+    apply_span_limits(
+        adapter,
+        nominal_mm=SPAN_NOMINAL,
+        deviations=SPAN_DEVIATIONS,
+        places=SPAN_PLACES,
+        prefix=SPAN_PREFIX,
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -247,7 +279,11 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {"Gear Data": GEAR_DATA, "Manufacturing Notes": MANUFACTURING_NOTES},
+        {
+            "Gear Data": GEAR_DATA,
+            "Manufacturing Notes": MANUFACTURING_NOTES,
+            TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT,
+        },
     )
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 

@@ -13,8 +13,8 @@ import pd_transgear_removable_spec as band
 import pd_platen_spec as platen
 import build_pd_platen_clip as clip
 import build_pd_platen_guide as guide
-import build_pd_platen_paper as paper
-import _platen_rack_geometry as rack
+import paper_drive_geom as paper_geometry
+import pd_platen_rack_spec as rack
 import build_pd_support_bar as support
 import vn_fillister_screw_spec as fillister
 from _printed_tolerance import printed_deviations
@@ -39,7 +39,10 @@ def test_the_rack_is_flush_with_the_platen_and_a_gap_sits_over_the_stud() -> Non
     assert gaps == pytest.approx(round(gaps), abs=1e-9)
     shift = assembly.PLATE_X0 - assembly.PLATE_X0_PHOTO
     assert abs(shift) <= rack.PITCH / 2.0
-    assert shift == pytest.approx(-0.0355, abs=5e-5)
+    photo_gap = (
+        assembly.STUD_XY[0] - assembly.PLATE_X0_PHOTO - rack.FIRST_GAP_X
+    ) / rack.PITCH
+    assert shift == pytest.approx((photo_gap - round(photo_gap)) * rack.PITCH)
     assembly._assert_rack_mesh()
 
 
@@ -51,10 +54,10 @@ def test_platen_furniture_cascades_with_resized_envelope() -> None:
     clip_y0 = platen.PLATE_HEIGHT - clip.CLIP_LENGTH
     assert math.isclose(platen.SOCKET_XY[0][1], clip_y0 + clip.HOLE_INSET)
     assert math.isclose(platen.SOCKET_XY[1][1], platen.PLATE_HEIGHT - clip.HOLE_INSET)
-    side_margin = (platen.PLATE_WIDTH - paper.PAPER_WIDTH) / 2.0
+    side_margin = (platen.PLATE_WIDTH - paper_geometry.RECORDING_PAPER_WIDTH_MM) / 2.0
     assert math.isclose(side_margin, 18.2007)
     assert math.isclose(
-        platen.PLATE_HEIGHT - paper.PAPER_HEIGHT - 3.0,
+        platen.PLATE_HEIGHT - paper_geometry.RECORDING_PAPER_HEIGHT_MM - 3.0,
         51.32,
     )
 
@@ -141,7 +144,7 @@ def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> 
 
 
 def test_cascaded_drive_geometry_closes() -> None:
-    assert rack.GAP_COUNT == 101
+    assert rack.GAP_COUNT == math.floor(rack.BAR_LENGTH / rack.PITCH)
     assembly._assert_rack_mesh()
     assembly._assert_gear_mesh()
     assembly._assert_knob_shaft_clearance()
@@ -151,15 +154,15 @@ def test_cascaded_drive_geometry_closes() -> None:
 def test_chain_slack_run_clears_the_chain_plane_parts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # R9-30: the sag the 68-link loop forces must clear every placed part in
+    # R9-30: the solved integer-link sag must clear every placed part in
     # the chain plane -- in plane, or axially by the band the chain sweeps.
     assembly._assert_chain_slack_clearance()
     run = assembly._slack_run_points()
     assert math.isclose(
-        math.dist(run[0], assembly.KNOB_SHAFT_XY), chain.PITCH_R_T24, abs_tol=1e-3
+        math.dist(run[0], assembly.KNOB_SHAFT_XY), chain.KNOB_PITCH_R, abs_tol=1e-3
     )
     crank_xy = (-assembly.CHAIN_CRANK_CENTRE[0], assembly.CHAIN_CRANK_CENTRE[1])
-    assert math.isclose(math.dist(run[-1], crank_xy), chain.PITCH_R_T12, abs_tol=1e-3)
+    assert math.isclose(math.dist(run[-1], crank_xy), chain.CRANK_PITCH_R, abs_tol=1e-3)
     # A part sitting on the sag's midpoint in the chain plane is refused...
     probe_xy = run[len(run) // 2]
     envelopes = assembly.CHAIN_PLANE_ENVELOPES
@@ -240,7 +243,7 @@ def test_guide_lock_sweep_judges_every_section_at_its_printed_band(
 def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     # One chain plane, the spec's, for the links and both wheels.
     assert assembly.CHAIN_MID_Z == band.CHAIN_MID_Z
-    # Both wheels (crank T12, knob T24) sit on the one band: front face at
+    # Both selected wheels sit on the one band: front face at
     # the band front, rear face on the seat face (the knob side's is the
     # MHA-PD-022 drive collar's front face, set in front of the 12T's face F).
     knob_seat_z = assembly.KNOB_COLLAR_Z0
@@ -266,18 +269,15 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
 def test_knob_drive_collar_sits_between_the_seat_and_the_12t(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Round 10: the seat collar is no longer turned on the knob shaft; it is
-    # the separate 4.0-long MHA-PD-022, set at fit-up SET_NOMINAL in front of the
-    # 12T's front face F.  Pushed fully rearward its rear face meets F, and
-    # the disc's front face still stands behind F.
-    assert collar.LENGTH == 4.0
+    # The separate MHA-PD-022 collar is faced at fit-up so its rear face
+    # seats on the 12T's front face F; the disc's front face stands behind F.
+    assert collar.LENGTH == collar.SET_NOMINAL
+    assert collar.SEAT_MIN_FROM_F <= collar.LENGTH <= collar.SEAT_MAX_FROM_F
     assert math.isclose(assembly.KNOB_SHAFT_Z0, -148.1)
     assert math.isclose(
         assembly.KNOB_COLLAR_REAR_Z, assembly.KNOB_COLLAR_Z0 + collar.LENGTH
     )
-    travel = assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_REAR_Z
-    assert math.isclose(travel, collar.REARWARD_TRAVEL_NOMINAL)
-    assert min(collar.REARWARD_TRAVEL_RANGE) > 0.0
+    assert math.isclose(assembly.KNOB_COLLAR_REAR_Z, assembly.KNOB_SHAFT_Z0)
     assert assembly.DISC_Z0 - assembly.KNOB_SHAFT_Z0 > 0.0
     assembly._assert_knob_shaft_clearance()
     # Negative control: a disc 0.05 behind F binds on the collar pushed

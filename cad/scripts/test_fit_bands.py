@@ -79,6 +79,11 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " blank_dia_band(12), tooth_thickness_band(12))",
         "each",
     ),
+    # _apply_neck_and_flat_limits passes each native LIMIT band in turn.
+    ("build_pd_transgear_knob_shaft", "band"): (
+        "(FRONT_CORNER_RADIUS_BAND, CORE_FLAT_CUT_END_BAND, CORE_FLAT_TOOL_END_RADIUS_BAND)",
+        "each",
+    ),
     # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth)
     ("_cone_gear_readback", "band"): (
         "(blank_dia_band(6), tooth_thickness_band(6),"
@@ -146,13 +151,32 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
         "names of the formed dimensions the contact corners perturb, not a band"
     ),
-    ("vn_transgear_arm_plate_screw_spec", "STOCK_LENGTH_BAND"): (
-        "the oval-head screw's B18.6.3 length tolerance (plus, minus): indexed "
-        "for the shortest stock left proud of the arm before its cut"
-    ),
     ("vn_transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
         "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the stock's reach past the disc's rear face before its cut"
+    ),
+    ("pd_rack_pinion_spec", "_SPAN_DESIGN_SETTING_BAND"): (
+        "the cutter radial-setting design band the printed span limits are solved from"
+    ),
+    ("pd_rack_pinion_spec", "RADIAL_SETTING_BAND"): (
+        "the cutter radial setting implied by the printed span limits (a machine setting)"
+    ),
+    ("pd_transgear_feed_pinion_spec", "_SPAN_DESIGN_SETTING_BAND"): (
+        "the cutter radial-setting design band the printed span limits are solved from"
+    ),
+    ("pd_transgear_knob_shaft_spec", "_SPAN_DESIGN_SETTING_BAND"): (
+        "the cutter radial-setting design band the printed span limits are solved from"
+    ),
+    ("pd_transgear_knob_shaft_spec", "RADIAL_SETTING_BAND"): (
+        "the cutter radial setting implied by the printed span limits (a machine setting)"
+    ),
+    ("pd_transgear_drive_collar_spec", "FLAT_BAND"): (
+        "the D-flat's FLAT_LIMITS as deviations for the flat-to-core clearance "
+        "corners; the sheet prints the native LIMIT"
+    ),
+    ("pd_transgear_thumbnut_spec", "CSK_HALF_ANGLE_BAND"): (
+        "half the title block's angular band on the 90 deg countersink, for the "
+        "seat-cone corners; not a size fit"
     ),
     ("vn_guide_lock_screw_spec", "SHANK_LEN_BAND"): (
         "the button-head screw's B18.6.3 length tolerance (plus, minus): "
@@ -246,13 +270,9 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
         "sets it natively on PivotDia"
     ),
-    ("vn_transgear_collar_cross_pin_spec", "HOLE_BAND"): (
-        "the spring pin's drilled cross hole (functional, R9-11): indexed for "
-        "HOLE_MAX against the B18.8.2 window and the fit-up step's limits"
-    ),
     ("vn_transgear_knob_cup_pin_spec", "HOLE_BAND"): (
-        "MHA-VN-037's cross-hole band reused for the hole match-drilled through "
-        "cup and journal: indexed for HOLE_MAX against the B18.8.2 window"
+        "the retained cup pin's hole match-drilled through cup and journal: "
+        "indexed for HOLE_MAX against the B18.8.2 catalogue window"
     ),
     ("vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "

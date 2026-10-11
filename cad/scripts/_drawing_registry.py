@@ -593,6 +593,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pd_platen_rack",
+        part="pd_platen_rack",
+        artifact_stem="pd-platen-rack",
+        script_name="draw_pd_platen_rack.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_rack_pinion",
         part="pd_rack_pinion",
         artifact_stem="pd-rack-pinion",
@@ -964,6 +971,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_transgear_arm_plate_locating_pin",
+        part="vn_transgear_arm_plate_locating_pin",
+        artifact_stem="vn-transgear-arm-plate-locating-pin",
+        script_name="draw_vn_transgear_arm_plate_locating_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_transgear_pivot_screw",
         part="vn_transgear_pivot_screw",
         artifact_stem="vn-transgear-pivot-screw",
@@ -996,13 +1010,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="pd_transgear_drive_collar",
         artifact_stem="pd-transgear-drive-collar",
         script_name="draw_pd_transgear_drive_collar.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="vn_transgear_collar_cross_pin",
-        part="vn_transgear_collar_cross_pin",
-        artifact_stem="vn-transgear-collar-cross-pin",
-        script_name="draw_vn_transgear_collar_cross_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

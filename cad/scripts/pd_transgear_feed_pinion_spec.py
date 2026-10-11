@@ -1,9 +1,10 @@
 r"""Pure-data dimensional contract shared by the feed-pinion sleeve and its drawing.
 
 The transgear pinion sleeve (MHA-PD-010, R9-68): one turned steel sleeve that
-runs on the MHA-PD-023 pin's Ø3.9 shank and carries, rear to front, the 12T
-DP30 feed pinion that meshes the platen rack and, past one step, the Ø9 h6
-boss.  The brass hub (MHA-PD-017) slides on the boss: its rear spigot passes
+runs on the MHA-PD-023 pin's Ø3.9 shank and carries, rear to front, the
+independent 12T 32DP PA20 finite stock-form feed pinion and the Ø8.2 h6 boss.
+The pinion meshes the purchased standard platen rack. The brass hub
+slides on the boss; its rear spigot passes through
 the 120T disc's (MHA-PD-006) bore, which pilots on it, and seats its end on the
 step face, so the step is the rear stop of hub and disc; the hub drives
 through the boss's D-flat, which is drive only (its end wall stands behind
@@ -36,10 +37,27 @@ import math
 import pd_rack_pinion_spec
 import pd_transgear_pin_spec
 from _fit_deviations import deviations
+from _gear_fit_limits import gear_tip_band_mm
+from _gear_quality import (
+    pinion_pitch_index_deviation_mm,
+    pitch_index_measurement_uncertainty_mm,
+    require_pitch_index_measurements_mm,
+    toothspace_runout_tir_mm,
+)
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_transgear_disc_hub_geometry import SPIGOT_LENGTH, SPIGOT_LENGTH_BAND
+from paper_drive_stock_envelope import (
+    cutter_end_section_area_bounds_mm2,
+    cutter_end_volume_bounds_mm3,
+)
+from paper_drive_stock_inspection import toothspace_gauge_contact_mm
+from stock_form_cutter import (
+    CutterTemplate,
+    StockFormProfile,
+    translation_for_tangent_span,
+)
 
 MM_PER_IN = 25.4
 
@@ -55,34 +73,184 @@ RACK_NUMBER = "MHA-PD-005"
 if pd_rack_pinion_spec.HUB_NUMBER != HUB_NUMBER:
     raise AssertionError("the disc's fit note names another hub than this sheet")
 
-# --- 12T DP30 feed pinion ------------------------------------------------------
+# --- Independent 12T 32DP PA20 finite stock-form feed pinion -------------------
+# Physical tooth count is NOT the reducer pinion count. The ordinary #8
+# master is translated rigidly; this is not a generated profile shift x.
 TEETH = 12
-DIAMETRAL_PITCH = 30.0  # meshes the DP30 platen rack (the ch. 23 scale anchor)
-PRESSURE_ANGLE_DEG = 14.5
-MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN  # 10.160
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN  # 11.853
-# Printed .XXX with its own +0/-0.10.  Functional reason for the band inside
-# the .XXX row: the row's +0.13 on the diameter would take half the 0.133
-# standard tip clearance (0.157/P) to the rack's roots, so the tip may only
-# shrink.
-OUTSIDE_DIA_BAND = (0.0, -0.10)  # (upper, lower)
-# Root at the 1.25/P full-depth dedendum (contract §2.3, root 8.043); the
-# model cuts exactly this floor (``_gear.build_fixed_gear`` dedendum 1.25).
-DEDENDUM_FACTOR = 1.25
-ROOT_DIA = (TEETH - 2.0 * DEDENDUM_FACTOR) / DIAMETRAL_PITCH * MM_PER_IN  # 8.0433
-WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
-# The root prints as a single MIN limit, the floor of the cutter's depth, so
-# the wall under it holds whatever deeper-rooted cutter the shop uses above
-# it.  swTolMIN prints the dimension's NOMINAL followed by "MIN", so the
-# nominal rounds to the floor at the places it prints.
-ROOT_DIA_PLACES = 2
-ROOT_DIA_MIN = math.floor(ROOT_DIA * 10**ROOT_DIA_PLACES) / 10**ROOT_DIA_PLACES  # 8.04
-ROOT_DIA_TOL_TYPE = 5  # swTolType_e.swTolMIN (offline API docs, enums/swTolType_e)
-if round(ROOT_DIA, ROOT_DIA_PLACES) != ROOT_DIA_MIN:
-    raise AssertionError(
-        f"root Ø{ROOT_DIA:.4f} does not print as its {ROOT_DIA_MIN} MIN"
+DIAMETRAL_PITCH = 32.0
+PRESSURE_ANGLE_DEG = 20.0
+CUTTER_TEMPLATE = CutterTemplate(12, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG)
+CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
+CUTTER_TOOTH_RANGE = CUTTER_TEMPLATE.teeth_range
+MODULE_MM = CUTTER_TEMPLATE.module_mm
+DEDENDUM_FACTOR = (
+    CUTTER_TEMPLATE.pitch_radius_mm - CUTTER_TEMPLATE.root_radius_mm
+) / MODULE_MM
+PITCH_DIA = TEETH * MODULE_MM
+# The #8 form is translated s outward along each gap bisector. At 0.210
+# (printed limits 0.19992..0.22002) the rack mesh at the loose 0.14 datum and
+# the 11.48 minimum OD has contact ratio 1.245 by the closed form in
+# paper_drive_mesh_check (translation treated as the untranslated involute
+# with rack and tip moved in by s*cos(pi/N)) and 1.248 by stepping the
+# generated flank through mesh (test_paper_drive_mesh_check). Both clear 1.2;
+# the interference margin is 0.070 mm. A smaller s raises contact ratio but
+# brings the rack crest nearer the pinion's interference point.
+RADIAL_SETTING = 0.210
+_SPAN_DESIGN_SETTING_BAND = (0.010, -0.010)
+OUTSIDE_DIA = 11.50
+GEAR_CONTACT_CLASS = "contact_critical"
+OUTSIDE_DIA_BAND = gear_tip_band_mm(GEAR_CONTACT_CLASS)
+STOCK_PROFILE = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, RADIAL_SETTING
+)
+# A real parallel-tangent span controls the manufactured thickness. The
+# provisional ±.010 translation defines the design span; OUTWARD printed
+# limits then define the actual accepted translation family used everywhere.
+SPAN_TEETH = 2
+SPAN_PLACES = 4
+SPAN_NOMINAL = STOCK_PROFILE.tangent_span_mm(SPAN_TEETH)
+_SPAN_DESIGN_PROFILES = tuple(
+    StockFormProfile(
+        TEETH, CUTTER_TEMPLATE, (OUTSIDE_DIA + tip) / 2.0, RADIAL_SETTING + setting
     )
+    for setting in _SPAN_DESIGN_SETTING_BAND
+    for tip in OUTSIDE_DIA_BAND
+)
+_SPAN_GEOMETRY_ERROR = max(
+    profile.geometry_error_bound_mm for profile in _SPAN_DESIGN_PROFILES
+)
+_SPAN_CORNERS = tuple(
+    (
+        profile.tangent_span_mm(SPAN_TEETH) - 2.0 * profile.geometry_error_bound_mm,
+        profile.tangent_span_mm(SPAN_TEETH) + 2.0 * profile.geometry_error_bound_mm,
+    )
+    for profile in _SPAN_DESIGN_PROFILES
+)
+SPAN_LIMITS = (
+    math.floor(min(row[0] for row in _SPAN_CORNERS) * 10**SPAN_PLACES)
+    / 10**SPAN_PLACES,
+    math.ceil(max(row[1] for row in _SPAN_CORNERS) * 10**SPAN_PLACES)
+    / 10**SPAN_PLACES,
+)
+SPAN_BAND = (SPAN_LIMITS[1] - SPAN_NOMINAL, SPAN_LIMITS[0] - SPAN_NOMINAL)
+SPAN_DEVIATIONS = deviations(SPAN_BAND)
+SPAN_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+SPAN_PREFIX = f"SPAN {SPAN_TEETH} TEETH "
+_SPAN_SENSITIVITY = 2.0 * math.sin(math.pi * SPAN_TEETH / TEETH)
+_SPAN_ROUNDING_ALLOWANCE = (
+    10**-SPAN_PLACES + 4.0 * _SPAN_GEOMETRY_ERROR
+) / _SPAN_SENSITIVITY
+_SPAN_INVERSE_BOUNDS = (
+    RADIAL_SETTING + _SPAN_DESIGN_SETTING_BAND[1] - _SPAN_ROUNDING_ALLOWANCE,
+    RADIAL_SETTING + _SPAN_DESIGN_SETTING_BAND[0] + _SPAN_ROUNDING_ALLOWANCE,
+)
+RADIAL_SETTING_LIMITS = tuple(
+    translation_for_tangent_span(
+        TEETH,
+        CUTTER_TEMPLATE,
+        limit + sign * 2.0 * _SPAN_GEOMETRY_ERROR,
+        SPAN_TEETH,
+        translation_bounds_mm=_SPAN_INVERSE_BOUNDS,
+    )
+    for limit, sign in zip(SPAN_LIMITS, (-1.0, 1.0), strict=True)
+)
+RADIAL_SETTING_BAND = (
+    RADIAL_SETTING_LIMITS[1] - RADIAL_SETTING,
+    RADIAL_SETTING_LIMITS[0] - RADIAL_SETTING,
+)
+
+
+def manufactured_profiles() -> tuple[StockFormProfile, ...]:
+    """Actual PRINTED-span-derived translation × accepted tip corners."""
+    return tuple(
+        StockFormProfile(TEETH, CUTTER_TEMPLATE, (OUTSIDE_DIA + tip) / 2.0, setting)
+        for setting in RADIAL_SETTING_LIMITS
+        for tip in OUTSIDE_DIA_BAND
+    )
+
+
+_PROFILE_CORNERS = manufactured_profiles()
+TOOTH_THICKNESS = STOCK_PROFILE.pitch_tooth_thickness_mm
+ROOT_DIA = 2.0 * STOCK_PROFILE.root_radius_min_mm
+ROOT_DIA_PLACES = 2
+# A native physical lower-limit witness owns the wall floor. Translated root
+# arcs are not concentric; deepest ground X is a distinct run-out quantity.
+ROOT_DIA_MIN = math.floor(
+    min(2.0 * profile.root_radius_min_mm for profile in _PROFILE_CORNERS)
+    * 10**ROOT_DIA_PLACES
+) / 10**ROOT_DIA_PLACES
+ROOT_DEPTH_X_MIN = min(
+    profile.root_point(profile.root_half_angle_rad)[0]
+    for profile in _PROFILE_CORNERS
+)
+WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
+ROOT_DIA_TOL_TYPE = 5  # swTolType_e.swTolMIN
+TIP_LAND_MIN = min(profile.tip_land_mm for profile in _PROFILE_CORNERS)
+FINITE_GROUND_TIP_AIR_MIN = min(
+    math.hypot(*profile.flank_point(CUTTER_TEMPLATE.flank_parameter_max))
+    - profile.blank_radius_mm
+    for profile in _PROFILE_CORNERS
+)
+# Inspection uses one certified actual-size pin at each space, with the
+# mandrel centred in the running bore. A free span does not inspect runout.
+TOOTHSPACE_GAUGE_DIA_IN = 1.0 / 16.0
+TOOTHSPACE_GAUGE_DIA_MM = TOOTHSPACE_GAUGE_DIA_IN * MM_PER_IN
+TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()
+if not math.isfinite(TOOTH_SPACE_RUNOUT_TIR_MM) or TOOTH_SPACE_RUNOUT_TIR_MM <= 0.0:
+    raise ValueError("feed toothspace inspection requires a positive configured TIR limit")
+# The actual rear-face flank edge of the indexed straight stock pass.
+TOOTH_SPACE_INSPECTION_PHASE_RAD = math.pi / TEETH
+TOOTH_SPACE_INSPECTION_END_MM = 0.0
+# Relative angular index is a separate inspection from radial TIR and span
+# thickness. Its linear errors refer to the drawn pitch-reference circle,
+# not the certified measuring pin's centre radius.
+PITCH_INDEX_REFERENCE_RADIUS_MM = PITCH_DIA / 2.0
+PITCH_INDEX_DEVIATION_MM = pinion_pitch_index_deviation_mm()
+PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM = pitch_index_measurement_uncertainty_mm()
+PITCH_INDEX_STATIONS = tuple(range(TEETH + 1))  # station TEETH is the full wrap
+
+for _profile in _PROFILE_CORNERS:
+    _profile.require_tip_land(0.25 * MODULE_MM)
+    toothspace_gauge_contact_mm(_profile, TOOTHSPACE_GAUGE_DIA_MM)
+    _tip_air = (
+        math.hypot(*_profile.flank_point(CUTTER_TEMPLATE.flank_parameter_max))
+        - _profile.blank_radius_mm
+    )
+    if _tip_air <= _profile.geometry_error_bound_mm:
+        raise AssertionError("finite ground tip/closure reaches the accepted blank")
+
+
+def require_pitch_index_errors_mm(measured_index_errors_mm: dict[int, float]) -> float:
+    """Receive every calibrated space index, including the full-circle wrap.
+
+    At station i the error is R_ref * (observed_angle_i - datum_angle -
+    2*pi*i/TEETH). Angles are unwrapped, actual-pin/contact corrected, and
+    measured about the actual running bore A against one physical index
+    datum; a floating best-fit tooth axis must not remove eccentricity.
+    This relative-index receiving control does not replace radial TIR,
+    tooth-span thickness, or the separately controlled absolute drive clock.
+    The returned range includes both stations' calibration uncertainty.
+    """
+    return require_pitch_index_measurements_mm(
+        measured_index_errors_mm=measured_index_errors_mm,
+        required_stations=PITCH_INDEX_STATIONS,
+        relative_deviation_limit_mm=PITCH_INDEX_DEVIATION_MM,
+        absolute_measurement_uncertainty_mm=PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM,
+    )
+
+
+
+# This band is a named tooth-centred rack-normal DATUM setup, not all-phase
+# running backlash. Invert the actual translated-profile normal-contact law:
+# b=2(H-r)tan(a)-2s*sin(a+pi/N)/cos(a).
+RACK_BACKLASH = 0.13
+RACK_BACKLASH_RANGE = (0.12, 0.14)
+_PA = math.radians(PRESSURE_ANGLE_DEG)
+RACK_MESH_EXTENSION = (
+    RACK_BACKLASH
+    + 2.0 * RADIAL_SETTING * math.sin(_PA + math.pi / TEETH) / math.cos(_PA)
+) / (2.0 * math.tan(_PA))
+RACK_AXIS_DISTANCE = PITCH_DIA / 2.0 + RACK_MESH_EXTENSION
 
 # --- axial stations from the rear face (z 0) -----------------------------------
 # OVERALL_LENGTH and FLAT_END_STATION print ±0.05 (R9-5; the knob chain and
@@ -98,9 +266,9 @@ FACE_WIDTH_BAND = printed_band_mm(FACE_WIDTH_PLACES)
 OVERALL_LENGTH = 27.35
 
 # --- diameters -----------------------------------------------------------------
-# The boss is the hub's locating fit: turned h6 under the hub's Ø9 H7 bore
-# (pd_transgear_disc_hub_spec checks the pair).
-BOSS_DIA = 9.0
+# The boss is the hub's locating fit: turned h6 under the matching H7 bore
+# (pd_transgear_disc_hub_spec consumes this diameter and checks the pair).
+BOSS_DIA = 8.2
 BOSS_DIA_BAND = (0.0, -0.009)  # (upper, lower) deviations, h6
 BOSS_DIA_PLACES = 3
 
@@ -109,6 +277,14 @@ BOSS_DIA_PLACES = 3
 # square to the bore (datum A), faced in the setup that reams the bore; the
 # zone is the face's extent, the 12T's tip circle.
 BORE_DATUM = "A"
+TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
+TOOTH_SPACE_CALLOUT = "\n".join(
+    (
+        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO {BORE_DATUM}",
+        f"\u00d8{TOOTHSPACE_GAUGE_DIA_IN:.4f} in PIN, ALL {TEETH} SPACES",
+        f"INDEX RANGE {PITCH_INDEX_DEVIATION_MM:.2f} MAX",
+    )
+)
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "step face perpendicularity to bore": "0.005",
 }
@@ -137,18 +313,17 @@ FLAT_CUTTER_FLUTE_MIN = 12.0
 if FLAT_CUTTER_FLUTE_MIN < FLAT_LENGTH_MAX + 0.5:
     raise AssertionError("the flat's end mill cannot reach the end wall on its flutes")
 
-# --- bore: a running fit on the MHA-PD-023 pin ----------------------------------------
-# A running fit exists only if both size bands are narrower than the clearance
-# they claim (tolerance-policy step 6b): +0.030/+0.012 over the pin's
-# 0/−0.008 gives 0.012..0.038 diametral.
-BORE_DIA = pd_transgear_pin_spec.DIA  # 3.9
-BORE_DIA_BAND = (0.030, 0.012)  # (upper, lower) deviations, reamed
+# G7 bore on the preserved MHA-PD-023 h6 pin: +0.016/+0.004 over 0/-0.008
+# gives 0.004..0.024 diametral clearance. The true finite root at every
+# radial-setting corner retains the 2.0 mm wall.
+BORE_DIA = pd_transgear_pin_spec.DIA
+BORE_DIA_BAND = (0.016, 0.004)  # (upper, lower), G7 at 3-6 mm
 BORE_PLACES = 3
 _PIN_UPPER, _PIN_LOWER = pd_transgear_pin_spec.DIA_BAND
 BORE_DIAMETRAL_CLEARANCE = (
     round(BORE_DIA_BAND[1] - _PIN_UPPER, 3),
     round(BORE_DIA_BAND[0] - _PIN_LOWER, 3),
-)  # 0.012 .. 0.038
+)
 if BORE_DIAMETRAL_CLEARANCE[0] <= 0.0:
     raise AssertionError(f"sleeve bore binds on the pin: {BORE_DIAMETRAL_CLEARANCE}")
 BORE_PROCESS_CALLOUT = "REAM THRU"
@@ -180,27 +355,22 @@ DISC_REAR_MIN = (
 if pd_rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
     raise AssertionError("the disc's bore overlaps the 12T's tips radially")
 
-# --- 12T form-cutter run-out (R9-67, on the knob shaft's R9-21) ---------------
-# The 12T is cut with a form cutter on a dividing head from the open rear
-# face: full depth from the rear face to FULL_DEPTH, then the cutter's arc runs
-# out behind that station, leaving partial-depth gaps over the rest of the
-# teeth and, at its deepest, short slots in the boss ahead of the step,
-# under the hub spigot's bore.  The section prints the full-depth station as a
-# native baseline dimension from the rear face with its .XXX band, and the
-# run-out's end (where the cutter rises clear of the Ø9 boss) as a native MAX
-# limit (construction witnesses in ``SleeveProfile``, each named by its model
-# prefix); the note gives the largest cutter that keeps that window.  The
-# model cuts full depth over the whole tooth length and leaves the slots out
-# (0.05 long at the nominal cutter).
-FULL_DEPTH = 10.20
+# --- Physical finite-disc cutter run-out (R9-67) -------------------------------
+# A straight pass from the rear face stops at FULL_DEPTH; the actual disc
+# cutter then leaves its revolved finite ground-form end envelope. The
+# remaining face has partial-depth gaps, not full-depth analytic teeth.
+# CUTTER_RUNOUT_MAX is the retained native maximum station; the geometric
+# endpoint over the boss uses the deepest template X, never a root norm.
+FULL_DEPTH = 10.15
 FULL_DEPTH_PLACES = 3
 CUTTER_RUNOUT_MAX = 13.80  # from the rear face, a limit
 CUTTER_RUNOUT_PLACES = 2
-CUTTER_DIA_MAX_IN = 1.00
-CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN  # 25.4
+CUTTER_DIA_MAX_IN = 2.25
+CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN
+CUTTER_SKU = "10-289-328"
 FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
-FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND  # 10.07
-FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND  # 10.33
+FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND
+FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND
 # swTolMAX prints the dimension's NOMINAL followed by "MAX", so the witness
 # sits at the limit; its deviations record "anywhere behind the shortest full
 # depth, up to the limit".
@@ -210,7 +380,9 @@ if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
     raise AssertionError("the run-out limit does not print at its places")
 FULL_DEPTH_PREFIX = "12T FULL DEPTH "
 CUTTER_RUNOUT_PREFIX = "CUTTER RUN-OUT "
-CUTTER_NOTE = f"12T FORM CUTTER \u00d8{CUTTER_DIA_MAX_IN:.2f} in MAX."
+# Numerical interval widths, not manufacturing tolerance or runout grades.
+ENDCUT_VOLUME_ERROR_MM3 = 0.02
+STEP_SEAT_AREA_ERROR_MM2 = 0.002
 
 
 def cutter_runout(cutter_dia: float, rise: float) -> float:
@@ -222,21 +394,85 @@ def cutter_runout(cutter_dia: float, rise: float) -> float:
         raise ValueError(f"rise {rise} is off a Ø{cutter_dia} cutter")
     return (radius**2 - (radius - rise) ** 2) ** 0.5
 
+def endcut_volume_bounds_mm3(
+    *,
+    profile: StockFormProfile = STOCK_PROFILE,
+    face_width_mm: float = FACE_WIDTH,
+    full_depth_mm: float = FULL_DEPTH,
+    boss_radius_mm: float = BOSS_DIA / 2.0,
+    overall_length_mm: float = OVERALL_LENGTH,
+    absolute_error_mm3: float = ENDCUT_VOLUME_ERROR_MM3,
+) -> tuple[float, float]:
+    """ONE indexed gap's extra endcut behind its straight axial pass."""
+    if profile.teeth != TEETH or profile.template != CUTTER_TEMPLATE:
+        raise ValueError("feed end-envelope requires its declared stock master")
+    if not 0.0 < full_depth_mm < face_width_mm < overall_length_mm:
+        raise ValueError("invalid straight-pass/face/boss stations")
+    intervals = (
+        (profile.blank_radius_mm, 0.0, face_width_mm - full_depth_mm),
+        (boss_radius_mm, face_width_mm - full_depth_mm, overall_length_mm - full_depth_mm),
+    )
+    bounds = [
+        cutter_end_volume_bounds_mm3(
+            profile, CUTTER_DIA_MAX, outer_radius_mm=radius, inner_radius_mm=0.0,
+            start_offset_mm=start, end_offset_mm=end,
+            absolute_error_mm3=absolute_error_mm3 / 2.0,
+        )
+        for radius, start, end in intervals
+    ]
+    return (
+        max(0.0, math.nextafter(math.fsum(row[0] for row in bounds), -math.inf)),
+        math.nextafter(math.fsum(row[1] for row in bounds), math.inf),
+    )
 
-# The rack's worst reach from the rear face is the assembly's stack
-# (build_pd_paper_drive_assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST), which
-# asserts FULL_DEPTH_MIN covers it.  The boss at its largest radius over the
-# shallowest-printed gap floor (the root's MIN), 4.500 − 4.020 = 0.48, runs
-# out 3.46 behind the deepest full-depth station, 13.79, inside the 13.80
-# limit.  The slots end under the hub's spigot (the hub's spec takes them off
-# its round engagement, ROUND_ENGAGEMENT_MIN) and stand behind the disc's
-# nearest rear face (13.86) by RUNOUT_DISC_CLEARANCE: the disc sits on the
-# spigot, radially outside the boss, so the margin only keeps the slots'
-# end behind the disc's plane.
-RUNOUT_RISE_WORST = (BOSS_DIA + BOSS_DIA_BAND[0]) / 2.0 - ROOT_DIA_MIN / 2.0
+
+def step_seat_area_bounds_mm2(
+    inner_radius_mm: float,
+    outer_radius_mm: float,
+    *,
+    profile: StockFormProfile = STOCK_PROFILE,
+    station_mm: float = FACE_WIDTH,
+    full_depth_mm: float = FULL_DEPTH,
+    absolute_error_mm2: float = STEP_SEAT_AREA_ERROR_MM2,
+) -> tuple[float, float]:
+    """Retained annular step material after ALL actual finite end-envelope gaps."""
+    if profile.teeth != TEETH or profile.template != CUTTER_TEMPLATE:
+        raise ValueError("feed step envelope requires its declared stock master")
+    outer = min(outer_radius_mm, profile.blank_radius_mm)
+    if not (
+        math.isfinite(inner_radius_mm)
+        and math.isfinite(outer_radius_mm)
+        and 0.0 <= inner_radius_mm <= outer
+        and math.isfinite(station_mm)
+        and math.isfinite(full_depth_mm)
+        and station_mm >= full_depth_mm >= 0.0
+    ):
+        raise ValueError("invalid step annulus or end-envelope station")
+    if inner_radius_mm == outer:
+        return 0.0, 0.0
+    lower_cut, upper_cut = cutter_end_section_area_bounds_mm2(
+        profile, CUTTER_DIA_MAX, outer_radius_mm=outer, inner_radius_mm=inner_radius_mm,
+        offset_mm=station_mm - full_depth_mm,
+        absolute_error_mm2=absolute_error_mm2 / profile.teeth,
+    )
+    annulus = math.pi * (outer * outer - inner_radius_mm * inner_radius_mm)
+    padding = 256 * math.ulp(annulus)
+    return (
+        max(0.0, math.nextafter(annulus - profile.teeth * upper_cut - padding, -math.inf)),
+        min(annulus, math.nextafter(annulus - profile.teeth * lower_cut + padding, math.inf)),
+    )
+
+
+
+# The assembly's RACK_FRONT_FROM_SLEEVE_REAR_WORST asserts FULL_DEPTH_MIN
+# covers the complete axial rack reach. The boss at its largest radius over the
+# deepest finite root X bounds any boss run-out at the latest full-depth
+# station. The retained limit keeps the cutting envelope behind the disc
+# and under the hub spigot; no particular boss slot is presumed.
+RUNOUT_RISE_WORST = (BOSS_DIA + BOSS_DIA_BAND[0]) / 2.0 - ROOT_DEPTH_X_MIN
 CUTTER_RUNOUT_END_WORST = FULL_DEPTH_MAX + cutter_runout(
     CUTTER_DIA_MAX, RUNOUT_RISE_WORST
-)  # 13.79
+)
 RUNOUT_DISC_CLEARANCE = 0.05
 if FULL_DEPTH_MAX >= FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]:
     raise AssertionError("the 12T full-depth window reaches the step")
@@ -277,11 +513,10 @@ if abs(OIL_HOLE_TOOTH_OFFSET_DEG - GAP_CENTRE_PHASE_DEG) > 1e-9:
 # --- walls (rule 12: target 2.0, floor 1.5, at the printed bands) --------------
 WALL_TARGET = 2.0
 WALL_FLOOR = 1.5
-_BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]  # 3.930
-# Under the root: (8.0433 − 3.900)/2 = 2.072 nominal; (8.04 MIN − 3.930)/2 = 2.055.
+_BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]
+# The native root MIN is below every true translated-root corner.
 ROOT_WALL = (ROOT_DIA - BORE_DIA) / 2.0
 ROOT_WALL_WORST = (ROOT_DIA_MIN - _BORE_MAX) / 2.0
-# Boss: (9 − 3.9)/2 = 2.55; (8.991 − 3.93)/2 = 2.53.
 BOSS_WALL = (BOSS_DIA - BORE_DIA) / 2.0
 BOSS_WALL_WORST = (BOSS_DIA + BOSS_DIA_BAND[1] - _BORE_MAX) / 2.0
 WALLS = (
@@ -291,9 +526,8 @@ WALLS = (
 for _name, _nominal, _worst in WALLS:
     if _worst < WALL_TARGET:
         raise AssertionError(f"sleeve wall {_name} {_worst:.3f} under {WALL_TARGET}")
-# Under the flat: 3.5 − 1.95 = 1.55 nominal; 3.485 − 1.965 = 1.52 at the
-# worst case, under the 2.0 target (the Named exceptions row): it is judged
-# against the 1.5 floor and printed as a MIN, floored at two places.
+# The D-flat wall retains its existing named 1.5 mm floor. Its size and band
+# are unchanged; the smaller G7 bore raises rather than spends that margin.
 FLAT_WALL = FLAT_TO_AXIS - BORE_DIA / 2.0
 FLAT_WALL_WORST = round(FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[1] - _BORE_MAX / 2.0, 6)
 FLAT_WALL_PRINTED = math.floor(FLAT_WALL_WORST * 100.0) / 100.0  # 1.52
@@ -327,6 +561,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "CutterRunout",
     },
     "FlatProfile": {"FlatToAxis", "FlatEnd"},
+    "SpanProfile": {"ToothSpan"},
 }
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -344,6 +579,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "FlatToAxis": FLAT_TO_AXIS_PLACES,
         "FlatEnd": STATION_PLACES,
     },
+    "SpanProfile": {"ToothSpan": SPAN_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
@@ -362,8 +598,9 @@ BORE_DEVIATIONS = deviations(BORE_DIA_BAND)
 BOSS_DIA_DEVIATIONS = deviations(BOSS_DIA_BAND)
 FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 OUTSIDE_DIA_DEVIATIONS = deviations(OUTSIDE_DIA_BAND)
-# swTolMIN records the floor as its lower deviation from the model nominal.
-ROOT_DIA_DEVIATIONS = (ROOT_DIA_MIN - ROOT_DIA, 0.0)
+# The root witness's nominal IS the printed physical MIN limit.
+ROOT_DIA_DEVIATIONS = (0.0, 0.0)
+RADIAL_SETTING_DEVIATIONS = deviations(RADIAL_SETTING_BAND)
 
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
@@ -371,17 +608,21 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
-# Rule 6's gear-data block: the tooth system the views cannot dimension.  The
-# tip, root and tooth length print as native dimensions on the section.
+# What a machinist needs to cut and check the teeth; design parameters stay
+# in this module (Main ruling 2026-10-10).
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.2f}"),
-        ("TOOTH FORM", "SPUR INVOLUTE, FULL DEPTH"),
+        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.3f}"),
+        ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{TOOTH_THICKNESS:.3f}"),
+        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.3f}"),
+        ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
+        (
+            f"SPAN OVER {SPAN_TEETH} TEETH",
+            f"{min(SPAN_LIMITS):.{SPAN_PLACES}f}-{max(SPAN_LIMITS):.{SPAN_PLACES}f}",
+        ),
         ("MATES WITH", f"PLATEN RACK {RACK_NUMBER}"),
     ]
 )
@@ -390,5 +631,7 @@ GEAR_DATA = gear_data_note(
 # and the tooth ends seat the hub's spigot.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 # Named exception: MHA-PD-010 flat wall (drawing-simplicity-policy.md, "Named exceptions").
+# A shop note states the requirement, not the measuring method or the cutter
+# choice (Main ruling 2026-10-10): the run-out length is dimensioned.
 FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, CUTTER_NOTE, FLAT_WALL_NOTE))
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, FLAT_WALL_NOTE))

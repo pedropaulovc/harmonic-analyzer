@@ -2340,6 +2340,10 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "vn_knife_mount_dowel_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",
+        # Edge-break row sizes the knob tip and the rack window/lateral stacks.
+        "paper_drive_geom",
+        "paper_drive_rack_travel",
+        "pd_transgear_knob_shaft_spec",
     }
 )
 

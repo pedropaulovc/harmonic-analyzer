@@ -42,10 +42,11 @@ BOLT_CIRCLE_POSITION_TOL = printed_band_mm(BOLT_CIRCLE_PLACES) / 2.0
 if len(SCREW_ANGLES_DEG) != SCREW_COUNT:
     raise AssertionError("one pattern angle per disc screw")
 
-# The hub's spigot (R9-68): Ø13.1 h6 (ISO, 10-18 mm) in the disc's H7 bore,
-# the smallest h6 size that keeps 2.0 of wall over the hub's Ø9 H7 bore at
-# the worst case.  Its length runs from the flange's rear face (the disc's
-# front face) to its end on the sleeve's step, printed .XXX.
+# The retained hub spigot (R9-68): Ø13.1 h6 (ISO, 10-18 mm) in the disc's
+# H7 bore, preserving the disc pilot and screw-to-bore wall envelope. The
+# sleeve-matched hub bore may be smaller without changing this outer pilot.
+# Its length runs from the flange's rear face to its end on the sleeve's
+# step, printed .XXX.
 SPIGOT_DIA = 13.1
 SPIGOT_DIA_BAND = (0.0, -0.011)  # (upper, lower) deviations, h6
 SPIGOT_DIA_PLACES = 3

@@ -1,8 +1,8 @@
 r"""Reproduction script: transgear thumbnut (MHA-PD-013; ch. 23 pp. 58-59; 1 used).
 
-The knurled brass nut on the knob shaft's 1/4-20 stud that clamps the
-removable chain wheel (T24) against the drive collar; its seat face bears on
-the wheel's front face only (``pd_transgear_thumbnut_spec``).
+The custom knurled #8-32 UNC-2B brass nut seats on the collar's front pilot.
+The T24 chain wheel floats under it; the collar's rear face reacts on F
+(``pd_transgear_thumbnut_spec`` and the linked assembly fit procedure).
 
 Layout (part frame, ``pd_transgear_thumbnut_spec``): axis local +Y (``Axis1``),
 seat face on the Top Plane (y = 0), rim at y = OVERALL_LENGTH.
@@ -19,7 +19,7 @@ seat face on the Top Plane (y = 0), rim at y = OVERALL_LENGTH.
 * ``StemProfile``: the waist and flange as a stepped profile revolved onto
   the head's rear face.  Its dimensions are both diameters and the waist
   length; the flange length is the remainder of the overall length.
-* ``ThreadBore``: one Hole Wizard 1/4-20 UNC-2B tapped hole, through all
+* ``ThreadBore``: one Hole Wizard #8-32 UNC-2B tapped hole, through all
   from the seat face.
 * ``DishProfile``: the dished front face, a cone cut from the rim's Ø down
   to a flat floor, dimensioned by both diameters and the depth from the
@@ -52,6 +52,7 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
+    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
     dimension_between,
@@ -60,16 +61,22 @@ from _sketch import (
 )
 from _sketch_chains import define_polygon_chain
 from _drawing_marks import (
+    _named_dimension,
     add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_angular_tolerance,
 )
 from _holes import wizard_holes
 from _visibility import blank_reference_geometry
 from pd_transgear_thumbnut_spec import (
     CSK_DIA,
+    CSK_DIA_DEVIATIONS,
+    CSK_DIA_TOL_TYPE,
+    CSK_HALF_ANGLE_BAND,
+    CSK_HALF_ANGLE_DEG,
     DISH_DEPTH,
     DISH_DIA,
     DISH_FLOOR_CORNER,
@@ -80,14 +87,12 @@ from pd_transgear_thumbnut_spec import (
     DRAWING_PRECISION,
     FLANGE_DIA,
     FLANGE_LENGTH,
-    FRONT_CSK_APEX_Y,
     HEAD_DIA,
     HEAD_LENGTH,
     HEAD_REAR_Y,
     KNURL_ROOT_DIA,
     KNURL_TEETH,
     OVERALL_LENGTH,
-    REAR_CSK_APEX_Y,
     REAR_CSK_BREAK,
     RIM_Y,
     TAP_DRILL_DIA,
@@ -105,15 +110,31 @@ FLANGE_R = FLANGE_DIA / 2.0
 WAIST_R = WAIST_DIA / 2.0
 DRILL_R = TAP_DRILL_DIA / 2.0
 CSK_R = CSK_DIA / 2.0
-# How far each countersink cutter runs past its cone into air (radially).
-# The front one stays inside the dish floor's edge, so it cuts no cone.
-_CSK_OVERRUN = 0.5
-if CSK_R + _CSK_OVERRUN >= DISH_FLOOR_CORNER[0]:
-    raise AssertionError("front countersink cutter reaches the dish's cone")
 # How far the flute seed's flanks run past the crests, as a multiple of the
 # root-to-crest flank, so the cutter closes outside the head.
 _FLUTE_FLANK_RUN = 1.6
 _FLUTE_HALF_ANGLE = math.pi / KNURL_TEETH
+
+
+def _countersink_max_limit(adapter, name: str) -> None:
+    """The saved native MAX owns the actual cone, never a hole-note override."""
+    _display, dimension = _named_dimension(adapter, "CountersinkProfile", name)
+    if abs(float(dimension.SystemValue) * 1000.0 - CSK_DIA) > 1e-6:
+        raise RuntimeError(f"{name}: native countersink diameter differs from source")
+    tolerance = dimension.Tolerance
+    if tolerance is None:
+        raise RuntimeError(f"{name}: native countersink tolerance is missing")
+    tolerance = _early_bound(tolerance, "IDimensionTolerance")
+    tolerance.Type = CSK_DIA_TOL_TYPE
+    low, high = (value / 1000.0 for value in CSK_DIA_DEVIATIONS)
+    if tolerance.SetValues(low, high) is not True:
+        raise RuntimeError(f"{name}: countersink MAX envelope was rejected")
+    if (
+        int(tolerance.Type) != CSK_DIA_TOL_TYPE
+        or abs(float(tolerance.GetMinValue()) - low) > 1e-12
+        or abs(float(tolerance.GetMaxValue()) - high) > 1e-12
+    ):
+        raise RuntimeError(f"{name}: countersink MAX envelope did not persist")
 
 
 def knurl_seed_points() -> list[tuple[float, float]]:
@@ -192,8 +213,10 @@ async def build(adapter) -> dict[str, str]:
         ("DishDia", DISH_DIA),
         ("DishFloorDia", DISH_FLOOR_DIA),
         ("DishDepth", DISH_DEPTH),
+        ("CountersinkDia", CSK_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
+    await set_global(adapter, "CountersinkHalfAngle", f"{CSK_HALF_ANGLE_DEG}deg")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -449,36 +472,60 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Dish")
     volume = await volume_check(adapter, "dished face", volume - V_DISH, 0.01 * V_DISH)
 
-    # --- Both entry countersinks: one revolved cut --------------------------
-    # Rear: the region under the cone y = REAR_CSK_APEX_Y - ρ; front: the
-    # region over the cone y = FRONT_CSK_APEX_Y + ρ.  Each triangle's apex is
-    # on the axis and its far edge in air; the centerline merges into both
-    # apexes.
-    reach = CSK_R + _CSK_OVERRUN
-    rear = [
-        (0.0, REAR_CSK_APEX_Y),
-        (reach, REAR_CSK_APEX_Y - reach),
-        (0.0, REAR_CSK_APEX_Y - reach),
-    ]
-    front = [
-        (0.0, FRONT_CSK_APEX_Y),
-        (reach, FRONT_CSK_APEX_Y + reach),
-        (0.0, FRONT_CSK_APEX_Y + reach),
-    ]
+    # --- Both actual entry cones, one shared native diameter/half-angle ----
+    apex = CSK_R / math.tan(math.radians(CSK_HALF_ANGLE_DEG))
+    profiles = (
+        ("rear", [(0.0, apex), (CSK_R, 0.0), (0.0, 0.0)], 0.0,
+         "CountersinkDia", "CountersinkHalfAngle"),
+        ("front", [(0.0, DISH_FLOOR_Y - apex), (CSK_R, DISH_FLOOR_Y),
+                   (0.0, DISH_FLOOR_Y)], DISH_FLOOR_Y,
+         "FrontCountersinkDia", "FrontCountersinkHalfAngle"),
+    )
+    countersink = SketchDims()
     check("create_sketch countersinks", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    check(
+    csk_axis = check(
         "countersink axis",
-        await adapter.add_centerline(0.0, REAR_CSK_APEX_Y, 0.0, FRONT_CSK_APEX_Y),
+        await adapter.add_centerline(0.0, 0.0, 0.0, DISH_FLOOR_Y),
     )
-    rear_lines = await add_line_chain(adapter, rear)
-    front_lines = await add_line_chain(adapter, front)
+    chains = [(profile, await add_line_chain(adapter, profile[1])) for profile in profiles]
     set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(adapter, rear_lines, rear, label="rear countersink")
-    await define_polygon_chain(adapter, front_lines, front, label="front countersink")
+    for label, first, second, relation in (
+        ("countersink axis vertical", csk_axis, None, "vertical"),
+        ("countersink axis seat", f"{csk_axis}.start", "origin", "coincident"),
+        ("countersink axis floor", f"{csk_axis}.end", f"{chains[1][1][1]}.end", "coincident"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, relation))
+    for (label, points, seat_y, dia_name, angle_name), lines in chains:
+        cone, base, axis = lines
+        for i in range(3):
+            check(
+                f"{label} countersink junction {i}",
+                await adapter.add_sketch_constraint(
+                    f"{lines[i]}.end", f"{lines[(i + 1) % 3]}.start", "coincident"
+                ),
+            )
+        check(f"{label} countersink base", await adapter.add_sketch_constraint(base, None, "horizontal"))
+        check(f"{label} countersink axis", await adapter.add_sketch_constraint(axis, None, "vertical"))
+        if seat_y == 0.0:
+            check("rear countersink seat", await adapter.add_sketch_constraint(f"{base}.end", "origin", "coincident"))
+        else:
+            await anchor_point_to_origin(adapter, f"{base}.end", 0.0, seat_y, f"{label} countersink seat")
+            countersink.record(None, '"OverallLength" - "DishDepth"')
+        await add_diametric_linear_dimension(
+            adapter, csk_axis, f"{base}.start",
+            text_xy=(CSK_R + 1.0, seat_y), label=f"{label} countersink diameter",
+        )
+        countersink.record(dia_name, '"CountersinkDia"')
+        check(
+            f"{label} countersink half-angle",
+            await adapter.add_sketch_dimension(cone, axis, "angular", CSK_HALF_ANGLE_DEG),
+        )
+        countersink.record(angle_name, '"CountersinkHalfAngle"')
     await ensure_fully_defined(adapter, "countersink profiles")
     check("exit_sketch countersinks", await adapter.exit_sketch())
     name_last_feature(adapter, "CountersinkProfile")
+    drive_jobs += countersink.apply(adapter, "CountersinkProfile")
     check(
         "revolve countersinks",
         await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
@@ -516,9 +563,16 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # Every printed dimension is governed by its places (the spec's
-    # DRAWING_PRECISION): no model band.  No roughness symbol: the seat face
-    # is a clamp face (policy rule 5).
+    # Model-owned controls on both actual cones; general printed bands govern
+    # the remaining turned sizes. The seat is a clamp, not a running face.
+    for name in ("CountersinkDia", "FrontCountersinkDia"):
+        _countersink_max_limit(adapter, name)
+    set_dimension_symmetric_angular_tolerance(
+        adapter, "CountersinkProfile", "CountersinkHalfAngle", max(CSK_HALF_ANGLE_BAND)
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter, "CountersinkProfile", "FrontCountersinkHalfAngle", max(CSK_HALF_ANGLE_BAND)
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

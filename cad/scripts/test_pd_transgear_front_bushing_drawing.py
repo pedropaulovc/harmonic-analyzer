@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import math
 from pathlib import Path
 
 import pytest
@@ -95,6 +96,37 @@ def test_the_rear_face_covers_the_hub_front_face_past_its_bore() -> None:
     assert spec.HUB_FACE_OVERLAP_WORST == pytest.approx(overlap)
     hub_r_min = (hub.HUB_DIA - printed_band_mm(hub.HUB_DIA_PLACES)) / 2.0
     assert (spec.OD + printed_band_mm(spec.OD_PLACES)) / 2.0 < hub_r_min
+
+
+def test_the_unchanged_bushing_bears_on_the_smaller_d_flat_sleeve_nose() -> None:
+    """The current steel nose still has a bearing face within the bushing's
+    rear face at every size limit, with both title-block edge breaks paid.
+    This is geometric contact, not a load or torque certification."""
+    sleeve = fit.SLEEVE
+    assert spec.BORE_DIA == sleeve.BORE_DIA == pin.DIA
+    assert spec.BORE_DIA_BAND == sleeve.BORE_DIA_BAND == fit.BORE_DIA_BAND
+    assert fit.BORE_DIAMETRAL_CLEARANCE == pytest.approx(
+        (
+            sleeve.BORE_DIA_BAND[1] - pin.DIA_BAND[0],
+            sleeve.BORE_DIA_BAND[0] - pin.DIA_BAND[1],
+        )
+    )
+    nose_r = (sleeve.BOSS_DIA + sleeve.BOSS_DIA_BAND[1]) / 2.0 - hub.EDGE_BREAK_MAX
+    flat = (
+        sleeve.FLAT_TO_AXIS + sleeve.FLAT_TO_AXIS_BAND[1] - hub.EDGE_BREAK_MAX
+    )
+    inner_r = max(
+        spec.BORE_DIA + spec.BORE_DIA_BAND[0],
+        sleeve.BORE_DIA + sleeve.BORE_DIA_BAND[0],
+    ) / 2.0 + hub.EDGE_BREAK_MAX
+    bushing_r = (spec.OD - printed_band_mm(spec.OD_PLACES)) / 2.0 - hub.EDGE_BREAK_MAX
+    assert inner_r < flat < nose_r < bushing_r
+    removed_cap = nose_r**2 * math.acos(flat / nose_r) - flat * math.sqrt(
+        nose_r**2 - flat**2
+    )
+    bearing_area = math.pi * (nose_r**2 - inner_r**2) - removed_cap
+    assert bearing_area > 0.0
+    assert fit.HUB_NOSE_WINDOW[0] >= 0.0
 
 
 def test_every_accepted_part_set_is_faced_from_the_blank() -> None:

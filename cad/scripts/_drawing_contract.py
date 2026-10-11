@@ -81,6 +81,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_dt_pinion_spring.py",
         "draw_ch_pivot_shaft.py",
         "draw_vn_post_mount_screw.py",
+        "draw_pd_platen_rack.py",
         "draw_pd_rack_pinion.py",
         "draw_ch_rocker_thrust_washer.py",
         "draw_ch_bar_pivot_pin.py",
@@ -225,6 +226,10 @@ def _simple_assignments(tree: ast.AST) -> dict[str, ast.expr]:
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             if node.value is not None:
                 assignments[node.target.id] = node.value
+        elif isinstance(node, ast.For) and isinstance(node.target, ast.Name):
+            # A loop element has its iterable's provenance: selecting one row
+            # of a spec-owned tuple is the same as indexing it.
+            assignments[node.target.id] = node.iter
     return assignments
 
 

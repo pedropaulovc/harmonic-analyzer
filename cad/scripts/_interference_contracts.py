@@ -376,20 +376,14 @@ def _cross_pin_overlap_mm3(pin_od: float, pin_id: float, shaft_d: float) -> floa
     return solid(pin_od) - solid(pin_id)
 
 
-# MHA-VN-037, a 1/16-in tube with a 0.012-in wall, lies diametrally across
-# MHA-PD-008's Ø6.35 core, whose hole is drilled at assembly and not modelled.
-_CROSS_PIN_CORE_MM3 = _cross_pin_overlap_mm3(
-    25.4 / 16.0, 25.4 / 16.0 - 2.0 * 0.012 * 25.4, 6.35
-)
-
-# MHA-VN-048 (98296A031), the same tube 5/8 long, lies diametrally across the
-# MHA-PD-008 journal's rear end (Ø8.5) and both walls of the MHA-PD-016 cup ring,
+# MHA-VN-048 (98296A031), a 1/16-in tube with a 0.012-in wall, 5/8 long, lies
+# diametrally across the MHA-PD-008 journal's rear end and the MHA-PD-016 cup ring,
 # in a hole match-drilled through both at assembly and not modelled (R9-70,
 # K-1): its chord through the journal, and the rest of its length in the cup
 # (its ends stay inside the cup's O.D.).
 _CUP_PIN_OD = 25.4 / 16.0
 _CUP_PIN_ID = _CUP_PIN_OD - 2.0 * 0.012 * 25.4
-_CUP_PIN_JOURNAL_MM3 = _cross_pin_overlap_mm3(_CUP_PIN_OD, _CUP_PIN_ID, 8.5)
+_CUP_PIN_JOURNAL_MM3 = _cross_pin_overlap_mm3(_CUP_PIN_OD, _CUP_PIN_ID, 6.0)
 _CUP_PIN_CUP_MM3 = (
     math.pi / 4.0 * (_CUP_PIN_OD**2 - _CUP_PIN_ID**2) * (5.0 * 25.4 / 8.0)
     - _CUP_PIN_JOURNAL_MM3
@@ -414,12 +408,11 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # reads as contact: the MHA-PD-017 hub's D-bore on the sleeve's Ø9 boss and
 # D-flat, the MHA-VN-042 dowel in the arm's Ø3.175 ream, the sleeve and both
 # bushings on the MHA-PD-023 pin (Ø3.9), the disc bore on the boss (Ø9), the
-# knob journal in the plate bore (Ø8.5), the collar bore on the core
-# (Ø6.35), the MHA-VN-037 pin in the collar's 1.8 slot, the MHA-VN-038 dowels
-# in the T24's Ø2.5 holes, every screw in its clearance hole, and the
-# MHA-PD-014 latch hook: its base on the bar's back face under the MHA-VN-043
-# heads, their shanks through its Ø3.2 holes, and the MHA-VN-042 pin through
-# its Ø3.3 pin hole.
+# knob journal in the plate bore (Ø6), the D-collar bore on the core
+# (Ø4.9), the MHA-VN-038 dowels in the T24's Ø2.5 holes, every screw in its
+# clearance hole, and the MHA-PD-014 latch hook: its base on the bar's back
+# face under the MHA-VN-043 heads, their shanks through its Ø3.2 holes, and
+# the MHA-VN-042 pin through its Ø3.3 pin hole.
 _PAPER_DRIVE_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "vn-clamp-screw",
@@ -503,6 +496,16 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _smooth_annulus_limit_mm3(
         3.9, 3.874, 7.9375
     ),
+    # The two MHA-VN-054 dowels (vn_transgear_arm_plate_locating_pin_spec,
+    # Ø2.0 model) pressed into the arm's Ø1.995 blind reams
+    # (pd_transgear_arm_geometry) over their 6.0 - 1.70 proud insertion: the
+    # press. They slip in the plate's Ø2.015 holes, so that pair has no row.
+    **_numbered_pairs(
+        "vn-transgear-arm-plate-locating-pin",
+        range(1, 3),
+        "pd-transgear-arm",
+        _smooth_annulus_limit_mm3(2.0, 1.995, 6.0 - 1.70),
+    ),
     # MHA-PD-020 (pd_transgear_pivot_spacer_spec, Ø4.727 ream) pressed on the
     # MHA-VN-041 Ø4.7625 shoulder over its whole 5.5 length (R9-71): the press.
     frozenset(("pd-transgear-pivot-spacer-1", "vn-transgear-pivot-screw-1")): (
@@ -542,18 +545,14 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         "pd-transgear-arm-plate",
         1.10 * 0.00809042475,
     ),
-    # MHA-PD-013's 1/4-20 tap drill 5.105 (pd_transgear_thumbnut_spec) on MHA-PD-008's
-    # Ø6.22 thread blank at the nominal collar setting: the tip 23.9 in front
-    # of F, the nut seated on the collar's pilot (R9-70), 6.2 (collar set,
-    # pd_transgear_drive_collar_spec) + 2.9 (the fitted pilot) in front of F, so
-    # 23.9 - 6.2 - 2.9 = 14.8, all on the blank (it starts 7.5 in front of F,
-    # behind the nut's seat at 9.1).
+    # MHA-PD-013's #8-32 tap drill 3.454 on MHA-PD-008's Ø4.070 thread blank:
+    # at the nominal fitted collar length 6.2, whose rear face reacts on F,
+    # the nut seats on the pilot 2.9 in front of the wheel seat. The overlap
+    # is 23.9 - 6.2 - 2.9 = 14.8, entirely on the blank, which starts 7.5
+    # in front of F, behind the nut's seat at 9.1.
     frozenset(
         ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
-    ): _smooth_annulus_limit_mm3(6.22, 5.105, 23.9 - 6.2 - 2.9),
-    # The cross pin's whole tube chord through the core (above).
-    frozenset(("vn-transgear-collar-cross-pin-1", "pd-transgear-knob-shaft-1")): 1.10
-    * _CROSS_PIN_CORE_MM3,
+    ): _smooth_annulus_limit_mm3(4.070, 3.454, 23.9 - 6.2 - 2.9),
     # The two MHA-VN-038 dowels pressed into the MHA-PD-022 collar's through reams,
     # the crank-seat twin (the collar's PIN_HOLE_DIA is the seat interface's
     # DRIVE_PIN_HOLE_DIA): the pin's length behind the seat face.

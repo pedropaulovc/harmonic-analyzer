@@ -26,6 +26,7 @@ GOLD = REPO / "cad" / "out" / "reports" / "pose-golden"
 
 import _telemetry  # status goes through telemetry, not bare print (AGENTS.md)
 import spring_mount_geom
+import paper_drive_geom
 
 fails = []
 
@@ -881,8 +882,8 @@ for i, (_sx, clip_x, clip_y, rz) in enumerate(p.CLIP_PLACEMENTS):
         f"platen-clip x{clip_x:+.0f} Rz{rz:+.0f}",
         **_SOLV,
     )
-_paper_side = (p.PLATE_WIDTH - p.PAPER_WIDTH) / 2.0
-_paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - p.PAPER_HEIGHT - 3.0
+_paper_side = (p.PLATE_WIDTH - paper_drive_geom.RECORDING_PAPER_WIDTH_MM) / 2.0
+_paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - paper_drive_geom.RECORDING_PAPER_HEIGHT_MM - 3.0
 expect(
     PD,
     "pd-platen-paper-1",
@@ -1035,14 +1036,6 @@ for i, (x, y) in enumerate(p.KNOB_DRIVE_PIN_XY):
         f"knob drive pin {i + 1}",
         **_SOLV,
     )
-expect(
-    PD,
-    "vn-transgear-collar-cross-pin-1",
-    [*_K, p.CROSS_PIN_Z0],
-    IDENTITY,
-    "collar cross pin",
-    **_SOLV,
-)
 expect(
     PD,
     "pd-transgear-knob-shaft-1",

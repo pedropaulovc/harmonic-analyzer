@@ -223,19 +223,20 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "vn-transgear-arm-plate-screw": _stock(
         "vn-transgear-arm-plate-screw",
         "18-8 Stainless Steel Oval Head Slotted Screw",
-        "91790A196",
+        "91790A199",
         material="AISI 304",
+    ),
+    "vn-transgear-arm-plate-locating-pin": _stock(
+        "vn-transgear-arm-plate-locating-pin",
+        "Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin",
+        "93600A189",
+        material="AISI 304",  # native library stand-in; purchased grade remains 316
     ),
     "vn-transgear-pivot-screw": _stock(
         "vn-transgear-pivot-screw",
         "Slotted 18-8 Stainless Steel Precision Shoulder Screw",
         "91829A205",
         material="AISI 304",
-    ),
-    "vn-transgear-collar-cross-pin": _stock(
-        "vn-transgear-collar-cross-pin",
-        "1050-1095 Spring Steel Slotted Spring Pin",
-        "98296A026",
     ),
     "vn-transgear-knob-cup-pin": _stock(
         "vn-transgear-knob-cup-pin",

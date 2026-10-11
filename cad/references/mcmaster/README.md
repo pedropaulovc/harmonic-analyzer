@@ -37,7 +37,7 @@ recipes:
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | `vn-gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
-| 91790A196 | `vn-transgear-arm-plate-screw` (catalogue-only; no vendor model; SKU not yet read live) | 18-8 Stainless Steel Oval Head Slotted Screw |
+| 91790A199 | `vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A077 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
@@ -54,6 +54,7 @@ recipes:
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `vn-cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 93600A189 | `vn-transgear-arm-plate-locating-pin` (catalogue-only; no vendor model) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
 | 9714K24 | `vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
@@ -445,6 +446,19 @@ Catalog specifications checked on September 10, 2026:
   long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no
   replica gate.
+- [93600A189](https://www.mcmaster.com/93600A189/), MHA-VN-054, quantity two,
+  was read live on October 9, 2026 in isolated Chromium (HTTP 200): passivated
+  316 stainless, ISO 2338-m6, diameter 2.002–2.008 mm, nominal length 6 mm,
+  both ends chamfered. The supplier does not publish a length or chamfer
+  band. [ISO 2338:1997 Table1](https://cdn.standards.iteh.ai/samples/20001/5b26cece48c448b782c0de1eccb5b16c/ISO-2338-1997.pdf)
+  bounds nominal6-mm stock to5.75–6.25 mm;
+  [c≈0.35 mm](https://fullerfasteners.com/tech/iso-2338-specifications-parallel-pins/)
+  is approximate, not a hard end limit or full-cylinder certificate.
+  `vn_transgear_arm_plate_locating_pin_spec.py` owns the ordinary installation
+  fits and proud set. The whole standard length family has at least0.17 mm
+  bottom air in the custom arm blind hole. `diag_build_93600A189.py` uses the
+  existing nominal-cylinder recipe: catalogue-only, no vendor model, no
+  replica gate and no new commodity receiving procedure.
 - [98381A473](https://www.mcmaster.com/98381A473/) (`vn-knife-mount-dowel`,
   MHA-VN-051, two; formerly `vn-transgear-latch-pin`) was read live on
   September 30, 2026:
@@ -512,29 +526,45 @@ Catalog specifications checked on September 10, 2026:
   91794A055` runs the replica gate against the vendor's volume 13.8241 mm³,
   surface 64.5474 mm² and 26-face area multiset. Evidence SHA-256: native
   SLDPRT `3b7b3ee38a51864b0c9d495e44ade30c80816d4b5498b8801211b8edb82676dc`.
-- [91790A196](https://www.mcmaster.com/91790A196/) (`vn-transgear-arm-plate-screw`,
-  MHA-VN-040, two) holds the transgear arm plate on the arm: each head sits flush
-  in a plate countersink and the thread enters the arm's through tap; at
-  assembly each tip is cut flush with the arm's front face and the cut end
-  broken 0.1 max (R9-44: with the ASME B18.6.3 length band, +0/-0.03 in, no
-  fixed length gives 1.5D in the tap and keeps the tip out of the guide-lock
-  sweep). The SKU is [INFERENCE]: the 5/8 in length of the series by the
-  90280A numbering this file records (194 = 1/2 in, 197 = 3/4 in), not yet
-  read live; the vendor check is pending. The 91790A series was read live on
-  September 30, 2026 at 3/8 in (91790A192) and 1/2 in: 18-8 stainless steel,
-  bright, slotted 82° oval head, 8-32 UNC class 2A, fully threaded, ASME
-  B18.6.3; head Ø0.312 in, 0.152 in total height of which the oval top is
-  0.052 in; the length is measured from the top of the bevel. The page gives
-  no slot, tip or crown radius, so `diag_mcmaster_oval.py` models the crown
-  as a spherical cap through the head rim, runs the 82° bevel down to the
-  thread major (the catalog's 0.100 in bevel reaches the cone's theoretical
-  sharp, inside the shank), and takes the slot, tip and thread-runout laws
-  of the 90280A fillister family (slot 0.135 of the head Ø wide and 1.5
-  widths deep). Its catalog build is the supplied 5/8 in screw; the
-  production part draws it cut to the installed length with the break in
-  place of the factory tip. It is catalogue-only: no vendor model is
-  downloaded or kept here, so it has no replica gate, and its standalone
-  diagnostic is a catalog-only run.
+- [91790A199](https://www.mcmaster.com/91790A199/) (`vn-transgear-arm-plate-screw`,
+  MHA-VN-040, two) was positively read live at 2026-10-09T07:17:13.553Z:
+  18-8 stainless steel, slotted standard oval head, #8-32 UNC right-hand
+  class 2A, fully threaded, ASME B18.6.3, flat tip. Supplied length is
+  1 in (25.40 mm) from the **top of the bevel**, not the crown. The longer
+  raw stock is cut to the unchanged installed fit, preserving the oval/
+  slotted look and quantity. Bench-fit the matched joint, remove/pre-cut
+  **off mechanism before the guide-lock sweep**, trim flush to 0.20 mm
+  proud of the arm front face and break the cut end 0.10 mm MAX, then
+  refit the same matched hardware.
+  The page's nominal head Ø0.312 in, total height 0.152 in, oval-top
+  height 0.052 in and nominal 82° angle are not supplier tolerance bands.
+  The native head is an ASME/reference construction, not a vendor solid
+  or a measured hardware profile. Conservative published
+  [ASME B18.6.3-2013 Table 7](https://www.finesz.com/pic/ASMEB18.6.3-2013.pdf)
+  gives maximum head Ø0.312 in, maximum protrusion F0.091 in above
+  standard gaging diameter G0.267 in, and included bearing angle 80–82°.
+  Side height H0.100, crown C0.052 and total O0.152 are **REF**, not MAX.
+  The whole-metal crown/cone/fillet cap derives from F/G, the minimum
+  permitted non-thread body diameter and fillet radius 15% basic diameter.
+  The distinct first-full-thread cap uses the GO-ring bearing datum at
+  maximum Class 2A major diameter, then two pitches; it does not charge
+  the fillet twice. These are published standard geometry bounds, not
+  new incoming gage procedures. The head-axis true-position diameter is
+  6% maximum head diameter; stock straightness is 0.006 in/in.
+  The oval **overall** length Lo=L+C receives the standard -0.03-in
+  tolerance. With no positive crown REF credit, Lo MIN is 24.638 mm.
+  The longer A199 raw stock leaves the factory-tip two-pitch region
+  outside the retained cut screw. Custom plate clearance accommodates
+  the maximum fillet; both arm tap entry and exit breaks are 0.10 mm MAX.
+  Critical matched S-K, running-fit and signed seat/load inspections
+  remain separate. No commodity stock-pair receipt, crown cap, q0 gauge,
+  GO-profile procedure or pin-full-span body certificate is required.
+  The purchased sheet retains its ordinary four-line stock/cut note.
+  The populated page offered a 2-D PDF and required login for CAD;
+  no availability or vendor 3-D claim is made. No vendor model is kept
+  here, so this is catalogue-only with no replica gate.
+  `diag_build_91790A199.py` is its supplied-stock diagnostic; production
+  geometry is cut to the same installed shape.
 - [97431A260](https://www.mcmaster.com/97431A260/) (`vn-transgear-retaining-ring`,
   MHA-VN-047, R9-68) is pushed sideways into the MHA-PD-023 pin's groove in front
   of the MHA-PD-025 front bushing and closes the disc cluster's float. Its page

@@ -19,8 +19,8 @@ number: MHA-PD-000
 # free_dof (+ free_dof_per_active_channel x active channels): the operational
 #   DOF the saved model ships free (verify:soundness).
 flip_invert:
-  - crank wheel axial
-  - knob wheel axial
+  - crank chain wheel axial
+  - knob chain wheel axial
   # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
   # disc" in the PR #196 real-train rework; same mate, same learned side.
   # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
@@ -35,10 +35,9 @@ allowed_free_stems:
   - pd-platen-paper
   - pd-platen-rack
   - pd-rack-pinion
-  - vn-transgear-collar-cross-pin  # lock-mated to the drive collar
   - pd-transgear-disc-hub  # disc cluster: hub, screws and feed pinion lock to the disc
   - vn-transgear-disc-screw
-  - pd-transgear-drive-collar  # mated to the knob T24 (Axis1, RearFace, Right Plane)
+  - pd-transgear-drive-collar  # shaft D-core coaxial and clocked; actual rear face seated on gear front F
   - pd-transgear-feed-pinion
   - pd-transgear-knob-cup  # knob stack: rides the knob shaft (lock-mated)
   - vn-transgear-knob-cup-pin  # pins the cup to the knob shaft's journal
@@ -53,7 +52,7 @@ allowed_free_stems:
 # T24/T18 is loose (codex #189 :679). Kept as reference data only.
 required_free_stems:
   - pd-transgear-removable
-# The freed crank (T12) spin; the knob T24 is belt-coupled and the platen is
+# The freed crank (T12) spin; the knob T24 is chain-coupled and the platen is
 # rack-coupled (no DOF of their own).
 free_dof: 1
 # carries_chain: wraps the roller chain, so verify:soundness's interference

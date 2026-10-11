@@ -12,12 +12,10 @@ may import it; no part build does.
   worst = that - one pitch (first thread).  The tap's entry countersink lies
   inside the neck zone and costs nothing more (contract §7, ruling R9-7).
   Approved below 1.5 D (the named exception).
-* MHA-VN-040 plate screws (5/8 stock, cut to fit) in the MHA-PD-018 arm's through
-  #8-32 taps: the bevel top sits flush with the MHA-PD-019 plate's rear face and
-  each tip is cut at assembly flush with the arm's front face, so the thread
-  in the arm is the arm less its two tap countersinks.  Every stock screw,
-  head riding its countersink on the plate-to-arm pitch mismatch, must stand
-  proud of the arm far enough for the cut to take its incomplete lead.
+* MHA-VN-040 OVAL plate screws (verified1in stock, pre-cut OFF MECHANISM)
+  use published ASME head, eccentricity, fillet and thread-length bounds.
+  Critical gear-centre/seat controls remain separate; nominal CAD pose is
+  not a stock-pin whole-body or positive-load retention certificate.
 * The MHA-PD-020 spacer pressed on the MHA-VN-041 shoulder, and the MHA-VN-049
   spring's room under the head: shoulder - spacer - spot-face floor (from
   the arm's front face).  The spring holds the arm on the spacer, so the
@@ -43,6 +41,7 @@ import pd_latch_hook_spec as HOOK_SPEC
 import pd_support_bar_spec as BAR
 import pd_transgear_arm_geometry as ARM
 import pd_transgear_arm_plate_geometry as PLATE
+import paper_drive_arm_registration as REGISTRATION
 import vn_transgear_arm_plate_screw_spec as PLATE_SCREW
 import vn_transgear_pivot_screw_spec as PIVOT
 import vn_transgear_latch_pin_spec as LATCH_PIN
@@ -137,59 +136,21 @@ SPRING_PRELOAD_N = (
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MIN),
 )  # 19.2 .. 38.9
 
-# --- Hanger tilt: fixed in the bar's frame by the spacer ---------------------
-# Preloaded on the spacer's rear face, the arm stands square to the screw
-# axis within the spacer's two face perpendicularities over the smallest
-# face it seats on; the shoulder's float in the arm bore no longer tilts it.
-# The term does not change in service: the spacer is pressed on the screw.
+# --- Seated spacer face-grade enclosure --------------------------------------
+# These are the spacer's geometric grades, conditional on staying seated.
+# The source-qualified physical operating-domain proof owns actual masses,
+# coupled loads and seat retention; preload/friction proxies do not certify it.
 HANGER_TILT = (
     SPACER.REAR_FACE_PERPENDICULARITY + SPACER.FRONT_FACE_PERPENDICULARITY
-) / SPACER.FACE_PERPENDICULARITY_ZONE_DIA  # rad
-_FREE_PIVOT_TILT = 0.042144  # rad, the unpreloaded arm on its bore clearance
-if not 0.0 < HANGER_TILT < _FREE_PIVOT_TILT / 10.0:
-    raise AssertionError(f"the hanger tilt {HANGER_TILT:.6f} rad lost the spacer")
+) / SPACER.FACE_PERPENDICULARITY_ZONE_DIA  # conservative angular enclosure
 
-# --- Gravity against the preload's friction and tilt hold --------------------
-# The hanger must still swing down onto the latch hook on its own weight,
-# and the preload must hold the arm square on the spacer against the
-# hanger's weight standing forward of it.  [INFERENCE: masses from the
-# parts' analytic volumes (steel 7870, brass 8500 kg/m3) and levers from
-# the assembly's stations; mu 0.3 dry steel and brass.]
-HANGER_MASS_KG = 0.530  # [INFERENCE]
-HANGER_GRAVITY_TORQUE_NMM = 187.65  # [INFERENCE] about P, at the hook
-HANGER_TILT_MOMENT_NMM = 36.4  # [INFERENCE] CG forward of the spacer face
-PIVOT_FRICTION_MU = 0.3  # [INFERENCE]
-# The arm turns on the spacer's rear face (mean radius of the annulus from
-# the arm bore to the smallest O.D.) and on the spring under the head (mean
-# of its I.D. and the head).
-_R_IN = ARM.PIVOT_BORE_DIA / 2.0
-_R_OUT = SPACER.FACE_PERPENDICULARITY_ZONE_DIA / 2.0
-_SPACER_FACE_R = 2.0 / 3.0 * (_R_OUT**3 - _R_IN**3) / (_R_OUT**2 - _R_IN**2)
-_SPRING_HEAD_R = (SPRING.ID + PIVOT.HEAD_DIA) / 4.0
-PIVOT_FRICTION_TORQUE_MAX_NMM = (
-    PIVOT_FRICTION_MU * SPRING_PRELOAD_N[1] * (_SPACER_FACE_R + _SPRING_HEAD_R)
-)  # 78
-HANGER_SWING_MARGIN = HANGER_GRAVITY_TORQUE_NMM / PIVOT_FRICTION_TORQUE_MAX_NMM
-if HANGER_SWING_MARGIN < 2.0:
-    raise AssertionError(
-        f"the pivot's friction {PIVOT_FRICTION_TORQUE_MAX_NMM:.1f} N.mm can hold "
-        f"the hanger off the hook ({HANGER_GRAVITY_TORQUE_NMM:.1f} N.mm)"
-    )
-HANGER_TILT_HOLD_NMM = SPRING_PRELOAD_N[0] * _R_OUT  # 81
-HANGER_TILT_HOLD_MARGIN = HANGER_TILT_HOLD_NMM / HANGER_TILT_MOMENT_NMM
-if HANGER_TILT_HOLD_MARGIN < 2.0:
-    raise AssertionError(
-        f"the weakest preload holds {HANGER_TILT_HOLD_NMM:.1f} N.mm against the "
-        f"hanger's {HANGER_TILT_MOMENT_NMM:.1f} N.mm tilt moment"
-    )
 
-# Head and spring in the spot face; the shoulder in the arm bore at the
-# smallest bore the .XXX row accepts on the largest shoulder; the spring's
-# I.D. on the shoulder, floating to the spot face's wall.
+# Head and spring in the spot face; the arm bore is matched to THIS measured
+# shoulder. Stock OD variation is correlated and never added again as play.
+# The spring's I.D. may float on the stock shoulder to the spot-face wall.
 HEAD_RADIAL_CLEARANCE = (ARM.SPOT_FACE_DIA - PIVOT.HEAD_DIA) / 2.0
-SHOULDER_RADIAL_CLEARANCE = (
-    ARM.PIVOT_BORE_DIA - ARM.PIVOT_BORE_DIA_BAND - _SHOULDER_MAX
-) / 2.0
+SHOULDER_RADIAL_CLEARANCE = ARM.PIVOT_BORE_DIAMETRAL_CLEARANCE[0] / 2.0
+PIVOT_RADIAL_FLOAT_MAX = ARM.PIVOT_BORE_DIAMETRAL_CLEARANCE[1] / 2.0
 SPRING_RIM_CLEARANCE = (
     ARM.SPOT_FACE_DIA - SPRING.OD - (SPRING.ID - _SHOULDER_MIN)
 ) / 2.0  # 0.21
@@ -200,89 +161,130 @@ if min(HEAD_RADIAL_CLEARANCE, SHOULDER_RADIAL_CLEARANCE, SPRING_RIM_CLEARANCE) <
 if PLATE_SCREW.THREAD != ARM.PLATE_TAP_SPEC.size:
     raise AssertionError("the plate screws' thread is not the arm's plate tap")
 if abs(PLATE_SCREW.HEAD_DIA - PLATE.CSK_DIA) > 1e-9:
-    raise AssertionError("the plate's countersink is not the oval head's Ø")
+    raise AssertionError("the nominal countersink does not match the reference oval head")
 if PLATE_SCREW.HEAD_ANGLE_DEG != PLATE.CSK_ANGLE_DEG:
-    raise AssertionError("the plate's countersink angle is not the head's")
-# Both screws enter their taps only if the plate's hole pitch and the arm's
-# tap pitch disagree by no more than the shanks' float in the two holes.  Each
-# part's pitch moves by both its holes' printed position bands (the arm's
-# tap stations and the plate's hole stations, ±HOLE_POSITION_BAND each, the
-# bands both builds apply); the smallest drilled hole floats on the largest
-# (basic) #8-32 major.
-PLATE_SCREW_PITCH_MISMATCH_MAX = 2.0 * ARM.HOLE_POSITION_BAND + 2.0 * (
-    PLATE.HOLE_POSITION_BAND
-)
-# Two holes, each letting its shank stand (hole - shank) / 2 off centre.
-PLATE_SCREW_PITCH_FLOAT = PLATE.SCREW_HOLE_DIA - PLATE_SCREW.THREAD_MAJOR
-PLATE_SCREW_PITCH_MARGIN = PLATE_SCREW_PITCH_FLOAT - PLATE_SCREW_PITCH_MISMATCH_MAX
-if PLATE_SCREW_PITCH_MARGIN <= 0.0:
-    raise AssertionError(
-        "MHA-VN-040 screws cannot enter both arm taps: plate-to-arm pitch mismatch "
-        f"{PLATE_SCREW_PITCH_MISMATCH_MAX:.3f} > shank float "
-        f"{PLATE_SCREW_PITCH_FLOAT:.3f}"
-    )
-# The heads, snugged together and then tightened in turn (the MHA-PD-000 step),
-# seat off their countersinks' axes by half that mismatch, opposite ways.  An
-# 82° head seated e off its countersink's axis rides up the cone by
-# e / tan(41°) before it bears, and the screw stops that much short in the arm.
-PLATE_SCREW_SEAT_ECCENTRICITY = PLATE_SCREW_PITCH_MISMATCH_MAX / 2.0
-if PLATE_SCREW_SEAT_ECCENTRICITY > PLATE_SCREW_PITCH_FLOAT / 2.0:
-    raise AssertionError("an MHA-VN-040 shank bears in its hole before its head seats")
-PLATE_SCREW_ECCENTRIC_LIFT = PLATE_SCREW_SEAT_ECCENTRICITY / math.tan(
-    math.radians(PLATE.CSK_ANGLE_DEG / 2.0)
-)
-# Each countersink takes thread to where its 45-degree leg meets the tap
-# drill, not the major (R9-63): 0.423 at Ø4.3 over the Ø3.454 drill.
-_PLATE_TAP_CSK_LOSS = ARM.PLATE_TAP_MOUTH_LOSS_MAX
-# A countersink cut large or small by its printed band seats the oval head
-# sunk or proud of the plate's rear face by this much.
-PLATE_SCREW_SEAT_SHIFT = (
-    PLATE.CSK_DIA_BAND / 2.0 / math.tan(math.radians(PLATE.CSK_ANGLE_DEG / 2.0))
-)
-# R9-44: with ASME B18.6.3's +0/-0.03 in length band no stock length both
-# holds 1.5 D in the arm and keeps its tip out of the guide-lock sweep, so
-# the 5/8 screws are cut at assembly, flush to PLATE_SCREW_CUT_PROUD_MAX
-# proud of the arm's front face, the cut edge broken (MHA-DT-032's filed tip).
+    raise AssertionError("the nominal countersink angle does not match the reference head")
 PLATE_SCREW_CUT_PROUD_MAX = 0.2
-# Before the cut, the shortest stock screw in the thickest plate and arm, its
-# head proud on a small countersink and riding its eccentric seat, still
-# stands proud of the arm by its first thread past the highest cut, so every
-# cut takes the incomplete lead and leaves full thread to the face.
-PLATE_SCREW_STOCK_PROUD_MIN = (
-    PLATE_SCREW.STOCK_LENGTH
-    - PLATE_SCREW.STOCK_LENGTH_BAND[1]
-    - (PLATE.THICKNESS_OVER_ARM + PLATE.BAND_XX)
-    - PLATE_SCREW_SEAT_SHIFT
-    - PLATE_SCREW_ECCENTRIC_LIFT
-    - (ARM.THICKNESS + ARM.THICKNESS_BAND)
+PLATE_SCREW_THREAD_RADIAL_PLAY_MAX_MM = (
+    ARM.PLATE_TAP_PITCH_DIA_LIMITS_MM[1] - PLATE_SCREW.THREAD_PITCH_DIA_LIMITS_MM[0]
+) / 2.0
+_PLATE_TAP_ENTRY_LOSS = ARM.PLATE_TAP_ENTRY_LOSS_MAX_MM
+_PLATE_TAP_EXIT_LOSS = max(ARM.PLATE_TAP_EXIT_LOSS_MAX_MM, PLATE_SCREW.CUT_END_BREAK_MAX)
+PLATE_SCREW_INTERNAL_THREAD_SPAN_MIN_MM = (
+    ARM.THICKNESS - ARM.THICKNESS_BAND - _PLATE_TAP_ENTRY_LOSS - _PLATE_TAP_EXIT_LOSS
 )
-if (
-    PLATE_SCREW_STOCK_PROUD_MIN
-    < PLATE_SCREW_CUT_PROUD_MAX + PLATE_SCREW.FIRST_THREAD_LOSS
-):
-    raise AssertionError(
-        f"MHA-VN-040 stock screw stands {PLATE_SCREW_STOCK_PROUD_MIN:.3f} proud of "
-        "the arm: too short to cut its lead off"
+# The gear-plane K location is directly controlled. Its finite displacement,
+# plus the screw's K-relative radius, bounds the seat-height lever for ANY
+# yaw; no pin-end/full-cylinder span or manufactured body-yaw certificate.
+_CLAMP_CONTACT_XY_LEVER_MM = (
+    math.hypot(ARM.PLATE_SCREW_MID_STATION - PLATE.BORE_STATION, PLATE.BORE_OFFSET)
+    + REGISTRATION.REDUCER_AXIS_SETUP_RADIUS_MM
+    + REGISTRATION.LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM
+    + max(math.hypot(x, y) for x, y in PLATE.SCREW_HOLES)
+    + PLATE_SCREW.HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM
+)
+PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM = (
+    REGISTRATION.ARM_PLATE_LOADED_NORMAL_CHANGE_MAX_MM
+    + _CLAMP_CONTACT_XY_LEVER_MM * math.tan(REGISTRATION.ARM_PLATE_TILT_MAX_RAD)
+)
+_PLATE_MIN = PLATE.THICKNESS_OVER_ARM - PLATE.THICKNESS_OVER_ARM_BAND
+_PLATE_MAX = PLATE.THICKNESS_OVER_ARM + PLATE.THICKNESS_OVER_ARM_BAND
+_HEAD_THREAD_AXIAL_MAX = (
+    PLATE_SCREW.HEAD_TOP_TO_THREAD_GAGE_MAX_MM + PLATE_SCREW.UNTHREADED_UNDER_HEAD_MAX_MM
+)
+_HEAD_RADIUS_MAX = PLATE_SCREW.HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM
+_TAP_AXIS_TILT_MAX = math.atan(ARM.REDUCER_POSITION_DIAMETER / ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM)
+
+
+def _plate_screw_thread_contact_min_mm() -> float:
+    """Finite interval contraction from a whole-angle support bound.
+
+    The first full thread is within two published pitches of its GO-ring
+    bearing datum. Pay that distinct gage-plane height, eccentric radial
+    support, both true seat-height signs and the cut-end/exit overlap. The
+    initial support is hypot(A,R) over EVERY acute orientation; subsequent
+    contact-span bounds restrict thread tilt by its endpoint pitch-clearance
+    disks. Four refinements are outward enclosures, not sampled corners.
+    """
+    contact = PLATE_SCREW_INTERNAL_THREAD_SPAN_MIN_MM - max(
+        0.0, math.hypot(_HEAD_THREAD_AXIAL_MAX, _HEAD_RADIUS_MAX)
+        - _PLATE_MIN + PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM,
     )
+    for _ in range(4):
+        if contact <= 2.0 * PLATE_SCREW_THREAD_RADIAL_PLAY_MAX_MM:
+            raise ValueError("published stock has no bounded positive threaded contact span")
+        tilt = _TAP_AXIS_TILT_MAX + math.asin(
+            2.0 * PLATE_SCREW_THREAD_RADIAL_PLAY_MAX_MM / contact
+        )
+        support_angle = min(tilt, math.atan2(_HEAD_RADIUS_MAX, _HEAD_THREAD_AXIAL_MAX))
+        intrusion = max(
+            0.0, _HEAD_THREAD_AXIAL_MAX * math.cos(support_angle)
+            + _HEAD_RADIUS_MAX * math.sin(support_angle)
+            - _PLATE_MIN + PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM,
+        )
+        contact = max(contact, PLATE_SCREW_INTERNAL_THREAD_SPAN_MIN_MM - intrusion)
+    return contact
+
+
+PLATE_SCREW_ENGAGEMENT_WORST = _plate_screw_thread_contact_min_mm()
+PLATE_SCREW_THREAD_TILT_MAX_RAD = math.asin(
+    2.0 * PLATE_SCREW_THREAD_RADIAL_PLAY_MAX_MM / PLATE_SCREW_ENGAGEMENT_WORST
+)
+PLATE_SCREW_AXIS_TILT_MAX_RAD = PLATE_SCREW_THREAD_TILT_MAX_RAD + _TAP_AXIS_TILT_MAX
+# Only a seated BEARING contact must be below these projected-axis caps;
+# neither XML serialization nor P14.7 asserts that every crown point is there.
+PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM = (
+    ARM.THICKNESS + ARM.THICKNESS_BAND + _PLATE_MAX + PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM
+)
+PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM = _PLATE_MAX + PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM
+if (PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM > ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM
+        or PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM > PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM):
+    raise AssertionError("seated clamp contact exceeds an actually drawn projected-axis height")
+# Lo is OVERALL. Correlating it with TOTAL head height removes the unknown
+# crown/bevel split without turning .100 REF or .312 nominal into maxima.
+# The two extreme points' radial separation includes the complete head cap
+# and basic shank radius; no nominal coaxial-head or factory-point credit.
+_STOCK_CONTACT_TO_TIP_RADIAL_MAX_MM = (
+    _HEAD_RADIUS_MAX + PLATE_SCREW.THREAD_MAJOR / 2.0 + PLATE_SCREW.STOCK_BODY_STRAIGHTNESS_MAX_MM
+)
+PLATE_SCREW_STOCK_PROUD_MIN = (
+    (PLATE_SCREW.STOCK_OVERALL_LENGTH_MIN_MM - PLATE_SCREW.HEAD_WHOLE_METAL_HEIGHT_MAX_MM)
+    * math.cos(PLATE_SCREW_AXIS_TILT_MAX_RAD)
+    - _STOCK_CONTACT_TO_TIP_RADIAL_MAX_MM * math.sin(PLATE_SCREW_AXIS_TILT_MAX_RAD)
+    - (ARM.THICKNESS + ARM.THICKNESS_BAND) - _PLATE_MAX - PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM
+)
+PLATE_SCREW_STOCK_LEAD_MARGIN_MM = (
+    PLATE_SCREW_STOCK_PROUD_MIN - PLATE_SCREW_CUT_PROUD_MAX
+    - PLATE_SCREW.POINT_CHAMFER_LENGTH_MAX_MM
+)
+if PLATE_SCREW_STOCK_LEAD_MARGIN_MM < 0.0:
+    raise AssertionError("MHA-VN-040 published-standard stock cannot retain the full-thread cut")
+# Separate complete-metal cap, already paying the actual standard fillet;
+# do not add the fillet twice or use total O=.152 REF as a maximum.
+_WHOLE_HEAD_HEIGHT_MAX_MM = PLATE_SCREW.HEAD_WHOLE_METAL_HEIGHT_MAX_MM
+PLATE_SCREW_WHOLE_HEAD_ARM_LOCAL_Z_MAX_MM = (
+    PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM + _WHOLE_HEAD_HEIGHT_MAX_MM
+    + PLATE_SCREW.HEAD_DIA_MAX_MM * math.sin(PLATE_SCREW_AXIS_TILT_MAX_RAD)
+)
+PLATE_SCREW_WHOLE_HEAD_RADIAL_SUPPORT_MAX_MM = (
+    max(_HEAD_RADIUS_MAX, PLATE_SCREW.THREAD_MAJOR / 2.0 + PLATE_SCREW.UNDER_HEAD_FILLET_RADIUS_MAX_MM)
+    + _WHOLE_HEAD_HEIGHT_MAX_MM * math.sin(PLATE_SCREW_AXIS_TILT_MAX_RAD)
+)
+# Native/reference datum pose only. ISO's approximate pin-end dimension
+# cannot certify every manufactured body's yaw or this complete entry pose.
+PLATE_SCREW_REFERENCE_ENTRY_MARGIN_MM = (
+    PLATE.SCREW_HOLE_DIA / 2.0
+    - (PLATE_SCREW.THREAD_MAJOR / 2.0 + PLATE_SCREW.UNDER_HEAD_FILLET_RADIUS_MAX_MM)
+    / math.cos(_TAP_AXIS_TILT_MAX + REGISTRATION.ARM_PLATE_TILT_MAX_RAD)
+    - ARM.REDUCER_POSITION_RADIUS - PLATE.REDUCER_POSITION_RADIUS
+)
 PLATE_SCREW_ENGAGEMENT_NOMINAL = min(
     PLATE_SCREW.LENGTH - PLATE.THICKNESS_OVER_ARM, ARM.THICKNESS
 )
-# Thinnest arm stock, cut flush: full thread from the rear tap countersink to
-# the front face, where the front countersink and the cut-end break overlap.
-PLATE_SCREW_ENGAGEMENT_WORST = (
-    ARM.THICKNESS
-    - ARM.THICKNESS_BAND
-    - _PLATE_TAP_CSK_LOSS
-    - max(_PLATE_TAP_CSK_LOSS, PLATE_SCREW.CUT_END_BREAK_MAX)
-)
-PLATE_SCREW_ENGAGEMENT_NOMINAL_D = (
-    PLATE_SCREW_ENGAGEMENT_NOMINAL / PLATE_SCREW.THREAD_MAJOR
-)
+PLATE_SCREW_ENGAGEMENT_NOMINAL_D = PLATE_SCREW_ENGAGEMENT_NOMINAL / PLATE_SCREW.THREAD_MAJOR
 PLATE_SCREW_ENGAGEMENT_WORST_D = PLATE_SCREW_ENGAGEMENT_WORST / PLATE_SCREW.THREAD_MAJOR
 if PLATE_SCREW_ENGAGEMENT_WORST_D < ENGAGEMENT_TARGET_D:
-    raise AssertionError(
-        f"MHA-VN-040 worst engagement {PLATE_SCREW_ENGAGEMENT_WORST_D:.3f}D < 1.5D"
-    )
+    raise AssertionError(f"MHA-VN-040 worst engagement {PLATE_SCREW_ENGAGEMENT_WORST_D:.3f}D < 1.5D")
 # The modelled (cut) tip ends short of (positive) or proud of (negative) the
 # arm's front face: flush.
 PLATE_SCREW_TIP_INSIDE_NOMINAL = ARM.THICKNESS - (
@@ -296,34 +298,37 @@ if abs(PLATE_SCREW_TIP_INSIDE_NOMINAL) > 1e-9:
 # the lock-station sweep clear of this.
 PLATE_SCREW_TIP_PROUD_MAX = PLATE_SCREW_CUT_PROUD_MAX
 
-# The plate's notch face clears the arm's lower edge (the screws locate the
-# plate).  Closing it, in plate-frame y: the face's .X corner heights, the
-# holes' Y station, and the screws' float in the largest drilled holes on the
-# thinnest 2A major -- each hole shifting c either way, a rigid plate moves a
-# notch corner by up to (|1 - t| + |t|) c, t the corner's x along the screw
-# pitch.  Across the edge (the face is parallel to it) the arm's .X outline
-# then stands out toward the face.
-_NOTCH_FLOAT = (
-    PLATE.SCREW_HOLE_DIA + PLATE.DRILL_GROWTH - PLATE_SCREW.THREAD_MAJOR_MIN
-) / 2.0
-_HOLE_X = sorted(x for x, _y in PLATE.SCREW_HOLES)
-_NOTCH_LEVER = max(
-    abs(1.0 - t) + abs(t)
-    for t in (
-        (corner[0] - _HOLE_X[0]) / (_HOLE_X[1] - _HOLE_X[0])
-        for corner in (PLATE.NOTCH_LEFT, PLATE.NOTCH_RIGHT)
+
+def require_arm_plate_joint_inspection(
+    *, setup_error_xy_mm: tuple[float, float],
+    registration_readings: tuple[REGISTRATION.RegistrationReading, ...],
+    required_load_cases: tuple[str, ...], measurement_uncertainty_mm: float,
+    own_datum_patterns_accepted: tuple[bool, bool], free_hand_assembly: bool,
+) -> tuple[float, float]:
+    """Require actual critical S-K setting and signed seat/load readings.
+
+    No commodity receiving records or blanket ALL-parts acceptance boolean.
+    Every named applied load and all three signed normal sites are recorded.
+    The finite recorded load list is not a continuous retention certificate.
+    """
+    return REGISTRATION.require_matched_registration(
+        setup_error_xy_mm=setup_error_xy_mm, readings=registration_readings,
+        required_load_cases=required_load_cases,
+        measurement_uncertainty_mm=measurement_uncertainty_mm,
+        own_datum_patterns_accepted=own_datum_patterns_accepted,
+        free_hand_assembly=free_hand_assembly,
     )
+
+
+# Graded reference-pose notch clearance only; no unsupported pin-full-span
+# manufactured-body yaw inference. Actual gear-plane/seat controls are direct.
+NOTCH_REFERENCE_AIR_WORST_MM = (
+    (PLATE.NOTCH_RELIEF - PLATE.NOTCH_BAND) * math.cos(ARM.EDGE_LEAN) - ARM.BAND_X
 )
-NOTCH_AIR_WORST = (
-    PLATE.NOTCH_RELIEF
-    - PLATE.NOTCH_BAND
-    - PLATE.HOLE_POSITION_BAND
-    - _NOTCH_LEVER * _NOTCH_FLOAT
-) * math.cos(ARM.EDGE_LEAN) - ARM.BAND_X
-if NOTCH_AIR_WORST <= 0.0:
+if NOTCH_REFERENCE_AIR_WORST_MM <= 0.0:
     raise AssertionError(
-        f"MHA-PD-019 notch face meets the arm's lower edge: worst air "
-        f"{NOTCH_AIR_WORST:.3f}"
+        f"MHA-PD-019 reference notch face meets the arm's lower edge: "
+        f"{NOTCH_REFERENCE_AIR_WORST_MM:.3f}"
     )
 
 # --- MHA-VN-042 latch pin pressed to the floor of the arm's end-face hole ---------
@@ -394,12 +399,9 @@ _LATCH_THETA = math.radians(HOOK.ARM_ANGLE_DEG)  # -32.56 deg
 HOOK_SCREW_SHIFT = (BAR.HOLE_POSITION_BAND + HOOK_SPEC.POSITION_TOL) * math.sqrt(
     2.0
 ) + HOOK_SPEC.HEAD_FLOAT_MAX
-_BORE_FLOAT = (
-    ARM.PIVOT_BORE_DIA
-    + ARM.PIVOT_BORE_DIA_BAND
-    - PIVOT.SHOULDER_DIA
-    - min(PIVOT.SHOULDER_DIA_LIMITS)
-) / 2.0
+# Full radial circle in the worst in-plane load direction; no spacer/head
+# friction is credited to shrink it.
+_BORE_FLOAT = PIVOT_RADIAL_FLOAT_MAX
 
 
 def hook_screw_drift(
@@ -481,7 +483,7 @@ def latch_pin_far_face_margin(
         px = _LATCH_PIVOT[0] + pivot_shift * u0x
         py = _LATCH_PIVOT[1] + pivot_shift * u0y
         full = ARM.TIP_STATION + tip * tip_band + proud - LATCH_PIN.CROWN_R
-        lateral = side * ARM.HOLE_POSITION_BAND
+        lateral = side * ARM.LATCH_PIN_HEIGHT_BAND
         centre = (px + full * ux - uy * lateral, py + full * uy + ux * lateral, 0.0)
         # The far face: screwed, formed and sheet bands along U, then the
         # ear's lean about the base (along machine X at the pin's height).

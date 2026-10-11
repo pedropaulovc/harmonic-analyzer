@@ -1,9 +1,9 @@
 r"""Create the manufacturing drawing for the transgear thumbnut (MHA-PD-013).
 
 The face view is the ``*Top`` orientation, looking at the dished front face:
-it carries the native 1/4-20 through-thread callout with both countersinks
-named under its thread line.  Section A-A cuts it on the nut axis through the
-Front plane, the plane of the turned profiles and of two knurl crests, so the
+it carries the native #8-32 UNC-2B through-thread callout. Both actual entry
+cones have model-owned MAX diameter and half-angle controls in section.
+Section A-A uses the Front plane through the axis and two knurl crests, so the
 knurl diameter, the head, waist and flange, the overall length from the seat
 face and the dish's rim and floor diameters and its depth to the floor print
 on solid cut edges.  No roughness symbol: the seat face clamps the wheel
@@ -31,6 +31,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
     rebuild_drawing,
     set_dimension_callouts,
@@ -40,6 +41,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from pd_transgear_thumbnut_spec import (
+    CSK_DIA,
     CSK_QUALIFIER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -50,10 +52,12 @@ from pd_transgear_thumbnut_spec import (
     OVERALL_LENGTH,
     TAP_DRILL_DIA,
     WAIST_LENGTH,
+    THREAD,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -106,9 +110,9 @@ def _section_y(model_y_mm: float) -> float:
 # dish depth's text stands above its rim extension line: at 3:1 the depth is
 # shorter than the text is tall.  The waist and the flange are dimensioned
 # across their own cut, each dimension line at its feature's height and its
-# text out to the right: an extension line from either, run past the rim or
-# the seat face, would cross the other's hatching, and nothing prints below
-# the seat face, where the native SECTION A-A caption hangs.
+# text out to the right: an extension line run past the rim or seat would
+# cross another feature's hatching. The cone diameter sits below the seat,
+# left of the caption; the half-angle's short arc stays at the actual cone.
 _STEM_TEXT_X = _section_x(HEAD_DIA / 2.0) + 0.021
 SECTION_KEEP = {
     "HeadDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.030),
@@ -129,12 +133,19 @@ SECTION_KEEP = {
     ),
     "FlangeDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH / 2.0)),
     "WaistDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH + WAIST_LENGTH / 2.0)),
+    # A sheet-outboard angular anchor makes the native cone/axis arc huge
+    # (4e9a4df). First place its arc just beyond the actual rear cone, then
+    # offset only its text; the imported model association stays unchanged.
+    "CountersinkDia": (_section_x(-HEAD_DIA / 2.0) - 0.025, _section_y(0.0) - 0.008),
+    "CountersinkHalfAngle": (_section_x(CSK_DIA / 2.0 + 0.6), _section_y(-0.6)),
 }
+COUNTERSINK_ANGLE_TEXT_XY = (0.264, _section_y(0.0) - 0.008)
 # The face view prints only the native thread callout.
 FACE_KEEP: dict[str, tuple[float, float]] = {}
 # Above the knurl diameter, the outermost of the rim's stack: the below lane
 # would run into the dish chord.
 DIMENSION_CALLOUTS_ABOVE = {"HeadDia": KNURL_CALLOUT}
+DIMENSION_CALLOUTS_BELOW = {"CountersinkDia": CSK_QUALIFIER}
 
 
 def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
@@ -285,40 +296,44 @@ def _seat_and_rim(
     return seat, rim
 
 
-def _thread_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Append the countersink line to the one compartment holding the thread."""
-    if set(definitions) != {5, 6, 7, 8}:
-        raise RuntimeError(f"unexpected thread callout parts: {definitions!r}")
-    thread_parts = [
-        part for part, text in definitions.items() if "<hw-threadclass>" in text
-    ]
-    if len(thread_parts) != 1:
-        raise RuntimeError(f"thread line is not in one callout part: {definitions!r}")
-    updated = dict(definitions)
-    part = thread_parts[0]
-    updated[part] = f"{updated[part].rstrip()}\n{CSK_QUALIFIER}"
-    return updated
+def _assert_native_thread(display: Any) -> None:
+    """Read the real Hole Wizard callout; never substitute typed dimensions."""
+    display = _early_bound(display, "IDisplayDimension")
+    texts = [display.GetText(part) for part in (1, 2, 3, 4)]
+    if any(not isinstance(text, str) for text in texts):
+        raise RuntimeError("thumbnut native thread callout has an invalid readback")
+    resolved = "".join(texts).replace(" ", "").replace("#", "").upper()
+    if THREAD.replace("#", "") not in resolved or "UNC" not in resolved or "2B" not in resolved:
+        raise RuntimeError(f"thumbnut native thread callout does not carry the source thread: {texts!r}")
 
 
-def _set_thread_callout_text(display: Any) -> None:
-    """Name both countersinks under the native through-thread line."""
-    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    updated = _thread_callout_definitions(definitions)
-    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
-        if updated[definition_part] != definitions[definition_part]:
-            display.SetText(writable_part, updated[definition_part])
-    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
-    thread = [text for text in resolved.values() if "UNC" in text]
-    if (
-        persisted != updated
-        or len(thread) != 1
-        or not thread[0].rstrip().endswith(CSK_QUALIFIER)
-    ):
-        raise RuntimeError(
-            "thumbnut countersink line did not persist: "
-            f"definitions={persisted!r}, resolved={resolved!r}"
-        )
+def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the native rear cone/axis arc local and move only its text outboard."""
+    name = "CountersinkHalfAngle"
+    matches = [item for item in annotations if dimension_name(adapter, item) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"thumbnut needs one native {name}, got {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    # An inherited offset would move only text, leaving the old long arc.
+    display.OffsetText = False
+    if bool(display.OffsetText):
+        raise RuntimeError("thumbnut countersink angle offset could not be reset")
+    if not annotation.SetPosition2(*SECTION_KEEP[name], 0.0):
+        raise RuntimeError("failed to position the thumbnut countersink angle arc")
+    arc_position = annotation.GetPosition()
+    if not arc_position or math.dist(
+        (float(arc_position[0]), float(arc_position[1])), SECTION_KEEP[name]
+    ) > 1e-5:
+        raise RuntimeError(f"thumbnut countersink angle arc did not persist: {arc_position!r}")
+    offset_dimension_text(adapter, [annotation], {name: COUNTERSINK_ANGLE_TEXT_XY})
+    if not bool(display.OffsetText):
+        raise RuntimeError("thumbnut countersink angle text did not stay offset")
+    position = annotation.GetPosition()
+    if not position or math.dist(
+        (float(position[0]), float(position[1])), COUNTERSINK_ANGLE_TEXT_XY
+    ) > 1e-5:
+        raise RuntimeError(f"thumbnut countersink angle text did not persist: {position!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -399,6 +414,10 @@ async def build(adapter: Any) -> dict[str, str]:
         _printable_above_callouts(DIMENSION_CALLOUTS_ABOVE),
         location="above",
     )
+    set_dimension_callouts(
+        adapter, section_annotations, DIMENSION_CALLOUTS_BELOW, location="below"
+    )
+    _place_countersink_angle(adapter, section_annotations)
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the thumbnut face view")
     # The tap-drill edge under the front countersink: the one visible circle
@@ -408,9 +427,9 @@ async def build(adapter: Any) -> dict[str, str]:
         face,
         edge=visible_circle_edge(adapter, face, TAP_DRILL_DIA),
         callout_xy=THREAD_CALLOUT_XY,
-        label="1/4-20 through thread",
+        label=f"{THREAD} UNC-2B through thread",
     )
-    _set_thread_callout_text(thread_callout)
+    _assert_native_thread(thread_callout)
 
     return await finalize_drawing(
         adapter,
@@ -418,9 +437,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Transgear Thumbnut Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # SolidWorks pins its own "1/4-20 Tapped Hole" note to the face view
-        # once the tap carries a hole callout; the callout already states the
-        # thread.  Its leader drops onto the countersink right beside the
+        # SolidWorks pins its own tapped-hole note to the face view once the
+        # real native callout exists; it repeats the same thread.
         # tap drill, so the callout's radial leader crossed it (run
         # 20261001T151531763Z), and it cannot route clear while the callout's
         # text stays inside the left border.  finalize removes it before its

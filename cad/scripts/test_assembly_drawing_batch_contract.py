@@ -131,7 +131,6 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                 for name in (
                     "pd_paper_drive_assembly_steps.py",
                     "dt_drive_train_steps.py",
-                    "vn_transgear_collar_cross_pin_spec.py",
                     "pd_transgear_drive_collar_spec.py",
                     "vn_transgear_disc_screw_spec.py",
                     "vn_transgear_pivot_screw_spec.py",

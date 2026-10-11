@@ -127,7 +127,7 @@ _INSERTED_SOURCES = {
     "sh_column_clamp_back sh_column_clamp_front vn_fillister_screw pd_guide_lock vn_guide_lock_screw pd_latch_hook "
     "vn_latch_hook_bracket_screw "
     "pd_platen pd_platen_clip pd_platen_guide pd_platen_paper pd_platen_rack pd_rack_pinion pd_support_bar "
-    "pd_transgear_arm pd_transgear_arm_plate vn_transgear_arm_plate_screw vn_transgear_collar_cross_pin "
+    "pd_transgear_arm pd_transgear_arm_plate vn_transgear_arm_plate_locating_pin vn_transgear_arm_plate_screw "
     "pd_transgear_disc_hub vn_transgear_disc_screw pd_transgear_drive_collar pd_transgear_feed_pinion "
     "pd_transgear_knob_cup vn_transgear_knob_cup_pin vn_transgear_knob_drive_pin "
     "pd_transgear_knob_shaft pd_transgear_knob_thrust_ring vn_transgear_latch_pin vn_transgear_pivot_screw "
@@ -143,6 +143,50 @@ _INSERTED_SOURCES = {
 @pytest.mark.parametrize("assembly", ASSEMBLY_ORDER)
 def test_all_assembly_references_match_inserted_source_manifests(assembly):
     assert set(references_of(assembly)) == set(_INSERTED_SOURCES[assembly].split())
+
+
+def test_arm_plate_locating_pin_has_real_assembly_dependents() -> None:
+    """The inserted locating dowels must be produced before the paper drive."""
+    stem = "vn_transgear_arm_plate_locating_pin"
+    assert stem in part_stems(), "dependency census requires a real producer"
+    assert stem in references_of("pd_paper_drive")
+    assert set(dependents_of(stem)) == {"pd_paper_drive", "ha_harmonic_analyzer"}
+
+
+def test_retired_front_pin_is_not_allocated_but_rear_cup_pin_is() -> None:
+    from _drawing_registry import DRAWINGS_BY_NAME
+    from _fastener_catalog import FASTENERS
+    from _test_stock_recipes import discovered_recipes
+
+    obsolete = "vn_transgear_collar_cross_pin"
+    retained = "vn_transgear_knob_cup_pin"
+    parts = set(part_stems())
+    assert retained in parts
+    assert retained in DRAWINGS_BY_NAME
+    assert FASTENERS[retained.replace("_", "-")].skus == ("98296A031",)
+    assert "98296A031" in discovered_recipes()
+    assert obsolete not in parts
+    assert obsolete not in DRAWINGS_BY_NAME
+    assert obsolete.replace("_", "-") not in FASTENERS
+    assert "98296A026" not in discovered_recipes()
+    assert not (
+        bg.CONFIG_DIR / "parts" / f"{obsolete.replace('_', '-')}.yaml"
+    ).exists()
+    for name in (
+        f"build_{obsolete}.py",
+        f"draw_{obsolete}.py",
+        f"{obsolete}_spec.py",
+        f"test_{obsolete}_drawing.py",
+    ):
+        assert not (SCRIPTS_DIR / name).exists()
+    for source in (
+        "build_pd_paper_drive_assembly.py",
+        "draw_pd_paper_drive_assembly.py",
+        f"build_{retained}.py",
+    ):
+        dependencies = _helper_names(source)
+        assert f"{retained}_spec" in dependencies
+        assert f"{obsolete}_spec" not in dependencies
 
 
 def _source_references(tmp_path, monkeypatch, source, parts=("ch_rocker_arm",)):
@@ -1490,9 +1534,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ),
     ("build_pd_paper_drive_assembly.py", "build_pd_platen_guide"): (
         "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_TIP_INSIDE_MIN, LOCK_STATION_X, SCREW_STATION_X"
-    ),
-    ("build_pd_paper_drive_assembly.py", "build_pd_platen_paper"): (
-        "dtrefactor: reads PAPER_HEIGHT, PAPER_WIDTH"
     ),
     ("build_pd_paper_drive_assembly.py", "build_pd_support_bar"): (
         "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X"
