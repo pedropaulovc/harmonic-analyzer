@@ -1,9 +1,14 @@
 """Part-side drawing dimension marks and manufacturing properties.
 
-Imported ONLY by parts that ship a manufacturing drawing (see
-``_drawing_registry``). Separate from dimension precision, tolerances, prefix
-text and insertion helpers so edits to those concerns do not widen the cache
-blast radius to every part that carries drawing marks or properties.
+Used by parts that ship a manufacturing drawing (see ``_drawing_registry``)
+and by ``_drawing_precision`` for the shared ``_feature_tree`` traversal.
+Deliberately separate from ``_part_properties`` so
+adding a drawing to one part never shifts the recipe digest of the ~100 parts
+that carry no drawing.
+
+Separate from dimension precision, tolerances, prefix text and insertion helpers
+so edits to those concerns do not widen the cache blast radius to every part
+that carries drawing marks or properties.
 
 The drawing recipe (``draw_<part>.py``) later imports exactly the dimensions a
 part marks here (``swInsertDimensionsMarkedForDrawing``), so the SLDPRT stays

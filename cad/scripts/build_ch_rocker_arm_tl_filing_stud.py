@@ -37,7 +37,11 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
-from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_filing_stud_spec import (
     BODY_DIA,

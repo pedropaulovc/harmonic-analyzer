@@ -180,7 +180,9 @@ def test_display_precision_times_each_com_step_on_its_own_span(
     )
     monkeypatch.setattr(_drawing_precision, "_early_bound", lambda value, _type: value)
     monkeypatch.setattr(
-        _drawing_precision._telemetry, "annotate", lambda **attrs: annotated.append(attrs)
+        _drawing_precision._telemetry,
+        "annotate",
+        lambda **attrs: annotated.append(attrs),
     )
 
     _drawing_precision.set_dimension_display_precision(object(), "Boss", "D1", 3)

@@ -70,7 +70,11 @@ from _holes import (
     wizard_holes,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _part_pmi import author_part_pmi
 from sm_knife_mount_spec import (

@@ -1,4 +1,8 @@
-"""Model-dimension display precision, separate to limit cache blast radius."""
+"""Model-dimension display precision and named-dimension resolution.
+
+Separate to limit cache blast radius. Tolerance and prefix helpers import the
+shared ``_named_dimensions`` / ``_named_dimension`` resolution owned here.
+"""
 
 from __future__ import annotations
 
