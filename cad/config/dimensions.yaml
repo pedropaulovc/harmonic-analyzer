@@ -1745,11 +1745,11 @@ sections:
         - '4/4 video narration ("Behind and attached to the fourth gear is the fifth gear. This gear has twelve teeth and engages the rack."); current `pd_transgear_feed_pinion_spec` retains independent 12T 32DP PA20 teeth cut by a finite rigidly translated #8/12T stock master, not a generated shift. Precise/Penn cutter [10-289-328](https://www.penntoolco.com/precise-20-involute-h-s-s-gear-cutter-8-diametral-pitch-32-cutter-diameter-2-1-4-hole-size-1/) has vendor-verified body OD 57.15 and arbor bore 25.4; ground depth/form accuracy are unpublished, with 2.25-module master depth Main''s design premise. Historical rack scaling suggested DP30; user field report said 10T, but the narrated 12T was kept (PR #196).'
         - counted + derived
         - med
-      - - 12T pinion angular-index inspection
-        - 'Both integral pinions require all 12 spaces plus the full-circle wrap station (13 measured stations) against one running-axis index datum. Convert angular errors to millimetres at the pitch-reference radius, not the measuring-pin centre radius: knob Ø6.350/R3.175 with nominal Ø1.000 gauge; feed Ø9.525/R4.7625 with nominal 1/16 in (1.5875) gauge. Index range is 0.010 MAX (about 0.1° at these radii, held by a dividing head). No floating best-fit tooth axis or omission of the wrap. Relative index is independent of the 0.05 radial tooth-space TIR, tangent-span thickness and the reducer setup clock.'
+      - - Pinion and disc angular index
+        - 'Not inspected on the part drawings: the stock-form teeth are indexed on a dividing head, which holds the spacing far inside the 0.010 relative index the feed budget allows (about 0.1° at the 12T pitch radii). The printed tooth-space control is the 0.05 radial TIR over one pin in every space, which also catches gross indexing slips. The budget term stays in `paper_drive_geom`.'
         - —
-        - '`pd_transgear_knob_shaft_spec` and `pd_transgear_feed_pinion_spec`: `PITCH_INDEX_REFERENCE_RADIUS_MM`, `PITCH_INDEX_STATIONS`, `require_pitch_index_errors_mm`, gauge-contact helpers and Tooth Space Inspection properties; `_gear_quality` index readers'
-        - specified index control
+        - '`fits.stock_form_quality.pinion_pitch_index_deviation_mm` through `_gear_quality.pinion_pitch_index_deviation_mm`; `paper_drive_geom` feed budget'
+        - process allowance
         - high
       - - Matched reducer absolute setup clock
         - 'With the disc cluster on its feed running bore and the hanger latched, turn the disc so an integral 12T gap faces S and a 120T tooth faces K, judged on their flanks, within 0.05 at each pitch circle (MHA-PD-000 fit-up pose step). Set once. Separate from all-space index, tooth-space TIR and tooth thickness.'

@@ -29,12 +29,7 @@ from __future__ import annotations
 import math
 
 from _fit_deviations import deviations
-from _gear_quality import (
-    pinion_pitch_index_deviation_mm,
-    pitch_index_measurement_uncertainty_mm,
-    require_pitch_index_measurements_mm,
-    toothspace_runout_tir_mm,
-)
+from _gear_quality import toothspace_runout_tir_mm
 from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
@@ -199,13 +194,6 @@ for _profile in _PROFILE_CORNERS:
 # eccentricity on a radial indicator. A freely translated span cannot do so.
 TOOTH_SPACE_GAUGE_PIN_DIA_MM = 1.0  # nominal; use the actual certified diameter
 TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()  # assembled cluster, inclusive of pilot float
-# Relative index is separate from span thickness and radial TIR. Convert the
-# actual-pin/contact-corrected angular observations at this pitch-reference
-# radius, not the measuring pin's centre radius.
-PITCH_INDEX_REFERENCE_RADIUS_MM = PITCH_DIA / 2.0
-PITCH_INDEX_DEVIATION_MM = pinion_pitch_index_deviation_mm()
-PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM = pitch_index_measurement_uncertainty_mm()
-PITCH_INDEX_STATIONS = tuple(range(TEETH + 1))  # station TEETH is the full wrap
 
 
 def tooth_space_gauge_contacts(actual_pin_dia_mm: float) -> tuple[GaugeContact, ...]:
@@ -213,24 +201,6 @@ def tooth_space_gauge_contacts(actual_pin_dia_mm: float) -> tuple[GaugeContact, 
     return tuple(
         toothspace_gauge_contact_mm(profile, actual_pin_dia_mm)
         for profile in manufactured_profiles()
-    )
-
-
-def require_pitch_index_errors_mm(measured_index_errors_mm: dict[int, float]) -> float:
-    """Receive every calibrated assembled running-bore index, including wrap.
-
-    At station i the error is R_ref * (observed_angle_i - datum_angle -
-    2*pi*i/TEETH). Angles are unwrapped and actual-pin/contact corrected about
-    the assembled feed running bore A against one physical index datum; a
-    floating best-fit tooth axis must not remove eccentricity. Relative
-    index does not replace radial TIR, span thickness or absolute drive clock.
-    The returned range pays both stations' calibration uncertainty.
-    """
-    return require_pitch_index_measurements_mm(
-        measured_index_errors_mm=measured_index_errors_mm,
-        required_stations=PITCH_INDEX_STATIONS,
-        relative_deviation_limit_mm=PITCH_INDEX_DEVIATION_MM,
-        absolute_measurement_uncertainty_mm=PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM,
     )
 
 
@@ -439,12 +409,13 @@ GEAR_DATA = gear_data_note(
 # history (Main ruling 2026-10-10).
 DRAWING_NOTES = BORE_FRONT_CHAMFER_NOTE
 
+# Spacing is held by the dividing head and is not inspected; one pin in
+# every space on a radial indicator catches eccentricity and gross slips.
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
         f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO FEED BORE A (ASSY)",
         f"\u00d8{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {TEETH} SPACES",
-        f"INDEX RANGE {PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     )
 )
 

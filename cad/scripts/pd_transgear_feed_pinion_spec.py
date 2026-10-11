@@ -38,12 +38,7 @@ import pd_rack_pinion_spec
 import pd_transgear_pin_spec
 from _fit_deviations import deviations
 from _gear_fit_limits import gear_tip_band_mm
-from _gear_quality import (
-    pinion_pitch_index_deviation_mm,
-    pitch_index_measurement_uncertainty_mm,
-    require_pitch_index_measurements_mm,
-    toothspace_runout_tir_mm,
-)
+from _gear_quality import toothspace_runout_tir_mm
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -200,13 +195,6 @@ if not math.isfinite(TOOTH_SPACE_RUNOUT_TIR_MM) or TOOTH_SPACE_RUNOUT_TIR_MM <= 
 # The actual rear-face flank edge of the indexed straight stock pass.
 TOOTH_SPACE_INSPECTION_PHASE_RAD = math.pi / TEETH
 TOOTH_SPACE_INSPECTION_END_MM = 0.0
-# Relative angular index is a separate inspection from radial TIR and span
-# thickness. Its linear errors refer to the drawn pitch-reference circle,
-# not the certified measuring pin's centre radius.
-PITCH_INDEX_REFERENCE_RADIUS_MM = PITCH_DIA / 2.0
-PITCH_INDEX_DEVIATION_MM = pinion_pitch_index_deviation_mm()
-PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM = pitch_index_measurement_uncertainty_mm()
-PITCH_INDEX_STATIONS = tuple(range(TEETH + 1))  # station TEETH is the full wrap
 
 for _profile in _PROFILE_CORNERS:
     _profile.require_tip_land(0.25 * MODULE_MM)
@@ -217,26 +205,6 @@ for _profile in _PROFILE_CORNERS:
     )
     if _tip_air <= _profile.geometry_error_bound_mm:
         raise AssertionError("finite ground tip/closure reaches the accepted blank")
-
-
-def require_pitch_index_errors_mm(measured_index_errors_mm: dict[int, float]) -> float:
-    """Receive every calibrated space index, including the full-circle wrap.
-
-    At station i the error is R_ref * (observed_angle_i - datum_angle -
-    2*pi*i/TEETH). Angles are unwrapped, actual-pin/contact corrected, and
-    measured about the actual running bore A against one physical index
-    datum; a floating best-fit tooth axis must not remove eccentricity.
-    This relative-index receiving control does not replace radial TIR,
-    tooth-span thickness, or the separately controlled absolute drive clock.
-    The returned range includes both stations' calibration uncertainty.
-    """
-    return require_pitch_index_measurements_mm(
-        measured_index_errors_mm=measured_index_errors_mm,
-        required_stations=PITCH_INDEX_STATIONS,
-        relative_deviation_limit_mm=PITCH_INDEX_DEVIATION_MM,
-        absolute_measurement_uncertainty_mm=PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM,
-    )
-
 
 
 # This band is a named tooth-centred rack-normal DATUM setup, not all-phase
@@ -276,12 +244,13 @@ BOSS_DIA_PLACES = 3
 # square to the bore (datum A), faced in the setup that reams the bore; the
 # zone is the face's extent, the 12T's tip circle.
 BORE_DATUM = "A"
+# Spacing is held by the dividing head and is not inspected; one pin in
+# every space on a radial indicator catches eccentricity and gross slips.
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
         f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO {BORE_DATUM}",
         f"\u00d8{TOOTHSPACE_GAUGE_DIA_IN:.4f} in PIN, ALL {TEETH} SPACES",
-        f"INDEX RANGE {PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     )
 )
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {

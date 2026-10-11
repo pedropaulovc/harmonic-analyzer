@@ -328,89 +328,6 @@ def test_native_builder_consumes_one_full_axial_profile_and_physical_inspection(
     }
 
 
-def test_disc_pitch_index_uses_actual_reference_and_live_quality_readers() -> None:
-    from _gear_quality import (
-        pinion_pitch_index_deviation_mm,
-        pitch_index_measurement_uncertainty_mm,
-    )
-
-    assert spec.PITCH_INDEX_REFERENCE_RADIUS_MM == spec.PITCH_DIA / 2.0 == 31.75
-    gauge = spec.tooth_space_gauge_contacts(spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)[0]
-    assert spec.PITCH_INDEX_REFERENCE_RADIUS_MM != pytest.approx(gauge.center_radius_mm)
-    assert spec.PITCH_INDEX_DEVIATION_MM == pinion_pitch_index_deviation_mm() > 0.0
-    uncertainty = pitch_index_measurement_uncertainty_mm()
-    assert spec.PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM == uncertainty > 0.0
-    assert spec.PITCH_INDEX_STATIONS == tuple(range(121))
-    assert spec.TOOTH_SPACE_CALLOUT.splitlines() == [
-        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO FEED BORE A (ASSY)",
-        "Ø1.000 PIN, ALL 120 SPACES",
-        f"INDEX RANGE {spec.PITCH_INDEX_DEVIATION_MM:.2f} MAX",
-    ]
-    assert "U " not in spec.TOOTH_SPACE_CALLOUT  # uncertainty is method, not printed
-    tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
-    for field, getter in (
-        ("PITCH_INDEX_DEVIATION_MM", "pinion_pitch_index_deviation_mm"),
-        ("PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM", "pitch_index_measurement_uncertainty_mm"),
-    ):
-        assignment = next(node for node in tree.body if isinstance(node, ast.Assign)
-                          and any(isinstance(target, ast.Name) and target.id == field
-                                  for target in node.targets))
-        assert isinstance(assignment.value, ast.Call)
-        assert isinstance(assignment.value.func, ast.Name)
-        assert assignment.value.func.id == getter
-        assert not assignment.value.args and not assignment.value.keywords
-    receiver = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
-                    and node.name == "require_pitch_index_errors_mm")
-    call = next(node for node in ast.walk(receiver) if isinstance(node, ast.Call))
-    assert isinstance(call.func, ast.Name)
-    assert call.func.id == "require_pitch_index_measurements_mm"
-    assert not call.args
-    assert {keyword.arg: ast.unparse(keyword.value) for keyword in call.keywords} == {
-        "measured_index_errors_mm": "measured_index_errors_mm",
-        "required_stations": "PITCH_INDEX_STATIONS",
-        "relative_deviation_limit_mm": "PITCH_INDEX_DEVIATION_MM",
-        "absolute_measurement_uncertainty_mm": "PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM",
-    }
-
-
-def test_disc_index_receiving_requires_every_space_wrap_and_paid_uncertainty() -> None:
-    """Synthetic receiving records exercise the contract, not shop qualification."""
-    uncertainty = spec.PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM
-    grade = spec.PITCH_INDEX_DEVIATION_MM
-    assert 0.0 < 2.0 * uncertainty <= grade
-    measured = dict.fromkeys(spec.PITCH_INDEX_STATIONS, 0.0)
-    assert spec.require_pitch_index_errors_mm(measured) == pytest.approx(2.0 * uncertainty)
-    near_limit = dict(measured)
-    near_limit[57] = 0.999 * (grade - 2.0 * uncertainty)
-    assert spec.require_pitch_index_errors_mm(near_limit) <= grade
-    shifted = {station: value + 0.1 for station, value in near_limit.items()}
-    assert spec.require_pitch_index_errors_mm(shifted) == pytest.approx(
-        spec.require_pitch_index_errors_mm(near_limit)
-    )
-    for missing in (0, 57, spec.TEETH):
-        incomplete = {station: value for station, value in measured.items()
-                      if station != missing}
-        with pytest.raises(ValueError, match="every specified station"):
-            spec.require_pitch_index_errors_mm(incomplete)
-    extra = dict(measured)
-    extra[spec.TEETH + 1] = 0.0
-    with pytest.raises(ValueError, match="every specified station"):
-        spec.require_pitch_index_errors_mm(extra)
-    for invalid in (math.nan, math.inf, -math.inf, True, None, "0"):
-        nonfinite = dict(measured)
-        nonfinite[57] = invalid
-        with pytest.raises(ValueError, match="finite numeric"):
-            spec.require_pitch_index_errors_mm(nonfinite)
-    unpaid = dict(measured)
-    unpaid[57] = grade - uncertainty  # raw range fits; range + 2U does not
-    with pytest.raises(ValueError, match="REJECT paid pitch/index range"):
-        spec.require_pitch_index_errors_mm(unpaid)
-    full_range = dict(measured)
-    full_range[57], full_range[58] = grade, -grade
-    with pytest.raises(ValueError, match="REJECT paid pitch/index range"):
-        spec.require_pitch_index_errors_mm(full_range)
-
-
 def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -> None:
     assert spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM == 1.0
     from _gear_quality import toothspace_runout_tir_mm
@@ -444,7 +361,8 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert inspection.splitlines()[0] == (
         f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO FEED BORE A (ASSY)"
     )
-    assert len(inspection.splitlines()) == 3
+    assert len(inspection.splitlines()) == 2
+    assert "INDEX" not in inspection
     assert max(map(len, inspection.splitlines())) <= 70
     assert "TO A" not in inspection  # local part A is only the 13.1 pilot
     # The sheet states the requirement; the method and history stay off it.
@@ -514,7 +432,7 @@ def test_expanded_gear_data_stays_above_the_bore_fit_note() -> None:
     assert data.ymax <= 0.2667
 
 
-def test_four_row_index_control_fits_the_upper_right_note_lane() -> None:
+def test_tooth_space_control_fits_the_upper_right_note_lane() -> None:
     control = estimate_text_box(
         spec.TOOTH_SPACE_CALLOUT,
         anchor=drawing.TOOTH_SPACE_CALLOUT_XY,

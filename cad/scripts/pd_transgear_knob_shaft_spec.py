@@ -46,9 +46,6 @@ from _fit_close_running import SHAFT_G6_3_TO_6_MM
 from _fit_deviations import deviations
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import (
-    pinion_pitch_index_deviation_mm,
-    pitch_index_measurement_uncertainty_mm,
-    require_pitch_index_measurements_mm,
     shaft_turned_runout_mm,
     toothspace_runout_tir_mm,
 )
@@ -246,13 +243,6 @@ if CORE_TOTAL_RUNOUT != shaft_turned_runout_mm():
 # Pattern runout is a toothspace inspection, not mounting plate position.
 TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()
 TOOTH_SPACE_GAUGE_PIN_DIA_MM = 1.000  # use the actual certified diameter
-# Relative angular index is separate from radial TIR and span thickness.
-# Correct measured contact angles using the certified actual pin, then
-# convert against this real pitch-reference radius, NOT the pin centre.
-PITCH_INDEX_REFERENCE_RADIUS_MM = PITCH_DIA / 2.0
-PITCH_INDEX_DEVIATION_MM = pinion_pitch_index_deviation_mm()
-PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM = pitch_index_measurement_uncertainty_mm()
-PITCH_INDEX_STATIONS = tuple(range(TEETH + 1))  # include the full-circle wrap
 
 
 def tooth_space_gauge_contacts(actual_pin_dia_mm: float) -> tuple[GaugeContact, ...]:
@@ -263,31 +253,16 @@ def tooth_space_gauge_contacts(actual_pin_dia_mm: float) -> tuple[GaugeContact, 
     )
 
 
-def require_pitch_index_errors_mm(measured_index_errors_mm: dict[int, float]) -> float:
-    """Receive every space and the wrap about actual running journal A.
-
-    Station i is R_ref * (unwrapped corrected angle_i - datum_angle -
-    2*pi*i/TEETH), using ONE physical index datum without a floating best-fit
-    tooth axis. This does not replace radial TIR, thickness or absolute clock.
-    The returned max-minus-min range pays both calibration uncertainties.
-    """
-    return require_pitch_index_measurements_mm(
-        measured_index_errors_mm=measured_index_errors_mm,
-        required_stations=PITCH_INDEX_STATIONS,
-        relative_deviation_limit_mm=PITCH_INDEX_DEVIATION_MM,
-        absolute_measurement_uncertainty_mm=PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM,
-    )
-
-
 _GAUGE_CORNERS = tooth_space_gauge_contacts(TOOTH_SPACE_GAUGE_PIN_DIA_MM)
 TOOTH_SPACE_GAUGE_ROOT_AIR_MIN_MM = min(c.root_air_mm for c in _GAUGE_CORNERS)
 TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(c.tip_air_mm for c in _GAUGE_CORNERS)
+# Spacing is held by the dividing head and is not inspected; one pin in
+# every space on a radial indicator catches eccentricity and gross slips.
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
         f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A",
         f"\u00d8{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {TEETH} SPACES",
-        f"INDEX RANGE {PITCH_INDEX_DEVIATION_MM:.2f} MAX",
     )
 )
 _GAUGE_CONTACT = toothspace_gauge_contact_mm(STOCK_PROFILE, TOOTH_SPACE_GAUGE_PIN_DIA_MM)
