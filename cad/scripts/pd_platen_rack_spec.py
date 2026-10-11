@@ -618,8 +618,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "EndStockProfile": {"RackDepth", "RackHeight", "RackInset", "SeamHeight"},
     "OverallHeightReference": {"OverallHeight"},
 }
+# The cut length and the backer's two sizes serve no fit, so they print one
+# place under the general .X band; the operating window and the cut-end
+# section maxima are paid at those bands. The rack's inset on the backer and
+# the purchased stock's reference sizes keep two places.
+_ONE_PLACE = frozenset({"Length", "BackerDepth", "SeamHeight"})
 DRAWING_PRECISION = {
-    feature: {name: 2 for name in names}
+    feature: {name: 1 if name in _ONE_PLACE else 2 for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME = {

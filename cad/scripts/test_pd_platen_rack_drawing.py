@@ -108,11 +108,7 @@ def test_composite_sizes_have_native_controls_and_stock_references() -> None:
     assert "Length" not in spec.DRAWING_REFERENCE_DIMENSIONS
     assert drawing.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
     assert builder.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
-    assert all(
-        printed_band_mm(places) == printed_band_mm(2)
-        for places in spec.DRAWING_PRECISION_BY_NAME.values()
-    )
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) <= {1, 2}
 
 
 def test_model_authors_and_hides_the_seam_witness_without_changing_the_solid() -> None:
@@ -228,7 +224,8 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     installation = row["installation_notes"]
     lines = installation.splitlines()
     assert len(lines) <= 4 and all(len(line) <= 70 for line in lines)
-    assert f"CUT TO {spec.CUT_LENGTH_MM:.2f} MM" in installation
+    places = spec.DRAWING_PRECISION_BY_NAME["Length"]
+    assert f"CUT TO {spec.CUT_LENGTH_MM:.{places}f} MM" in installation
     assert "SOFT-SOLDER TO BACKER" in installation
     assert "SET MESH AT ASSEMBLY" in installation
     for method in ("WIRE", "SECANT", "INDICATOR", " U +/-"):
