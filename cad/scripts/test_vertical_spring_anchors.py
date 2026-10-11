@@ -55,10 +55,10 @@ def test_gooseneck_arm_end_hangs_the_counter_eye_over_its_anchor() -> None:
     assert spring_mount_geom.COUNTER_UPPER_EYE_X == pytest.approx(
         anchor_x, abs=PLUMB_TOL_MM
     )
-    # Stated the other way: the arm end face is the only free term, so it is the
-    # thing a future edit must keep, not the eye position it produces.
+    # The plug face is half the supplier's clamped band inboard of its eye
+    # datum; the made MHA-SM-004 screw's head is the other half outboard.
     assert sm_gooseneck_geom.ARM_END_X == pytest.approx(
-        spring_mount_geom.COLUMN_X - anchor_x + sm_gooseneck_geom.SCREW_SHANK_LEN / 2.0,
+        spring_mount_geom.COLUMN_X - anchor_x + sm_gooseneck_geom.SPRING_EYE_GAP / 2.0,
         abs=PLUMB_TOL_MM,
     )
 
