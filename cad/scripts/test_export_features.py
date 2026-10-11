@@ -33,7 +33,9 @@ def _load(path: Path) -> dict:
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
-def _plane(normal: tuple[float, float, float], point_mm: tuple[float, float, float]) -> FaceGeometry:
+def _plane(
+    normal: tuple[float, float, float], point_mm: tuple[float, float, float]
+) -> FaceGeometry:
     return FaceGeometry(None, 4001, (*normal, *(v / 1000 for v in point_mm)), normal, ())
 
 
@@ -148,7 +150,13 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
         assert selectors[manifest["datums"][datum.letter]["feature"]] == (datum.face,)
     # A same-diameter face away from the drawing journal must not become A.
     diameter = exporter.cone.BORE_DIA / 1000
-    remote = FaceGeometry(None, 4002, (0, 0, 0, 0, 0, 1, diameter / 2), None, (-diameter, 0, -0.1, diameter, 0.005, 0.1))
+    remote = FaceGeometry(
+        None,
+        4002,
+        (0, 0, 0, 0, 0, 1, diameter / 2),
+        None,
+        (-diameter, 0, -0.1, diameter, 0.005, 0.1),
+    )
     assert not selectors["journal_bore"][0].matches(remote)
 
 

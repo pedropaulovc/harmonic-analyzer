@@ -44,7 +44,7 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   Inserted at its exact authored transform and locked to the fixed base.
 * top-frame x1: the green one-piece casting at mid-plane Y = 1017.95 (side
   rails 34.2 wide / front-rear rails 38 wide x 36.5 tall, band
-  y 999.7..1036.2; corner bosses Ø52.2 rise to 1040.7), bored around the
+  y 999.7..1036.2; corner bosses Ø45 rise to 1040.7), bored around the
   four columns; its east rail (-X) carries the gooseneck hub and its west
   rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
 * tube-frame-cap x4: intact stock McMaster 9275K141 push-on caps seated on the

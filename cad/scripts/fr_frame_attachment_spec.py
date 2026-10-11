@@ -23,7 +23,7 @@ COLUMN_BOTTOM_Y = SOCKET_MOUTH_Y - COLUMN_SOCKET_DEPTH
 BASE_SCREW_Y = COLUMN_BOTTOM_Y + 12.7
 BASE_SCREW_SEAT_Z = 133.0
 TOP_SCREW_Y = 1017.95
-TOP_SCREW_SEAT_Z = 137.6
+TOP_SCREW_SEAT_Z = 132.6  # Ø45/Ø9/.X bands retain >=0.1 full-seat margin
 SCREW_SPOTFACE_DIAMETER = 9.0
 # The casting is tapped continuously across the interrupted column socket.
 # Tube walls are clearance-drilled separately after matching their positions.
@@ -31,6 +31,10 @@ CASTING_FULL_THREAD_DEPTH = 46.0
 # 49 MIN: the tap drill keeps two bottoming-tap pitches past the deepest
 # printed thread (46.00 + 0.51 .XX band), not just past its nominal.
 CASTING_TAP_DRILL_DEPTH = 49.0
+# Upper and lower screws share the same stock 1-3/4 in SKU and full thread.
+# The upper sheet prints depths to .X (±0.8): 3.2 mm lead retains two
+# bottoming-tap pitches at worst case; the lower .XX drill stays unchanged.
+TOP_CASTING_TAP_DRILL_DEPTH = CASTING_FULL_THREAD_DEPTH + 3.2
 TUBE_CROSS_HOLE_DIAMETER = 5.0
 
 CAP_TOP_Y = 1044.8
