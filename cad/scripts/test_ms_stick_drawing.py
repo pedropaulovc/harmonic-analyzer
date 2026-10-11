@@ -752,13 +752,15 @@ def test_unchanged_dxf_owns_surface_outlines_and_shallow_envelope_volume(monkeyp
     import _dxf_text as dxf
     import gen_ms_stick_numerals_dxf as generator
 
-    artwork = spec.NUMERALS_DXF.read_bytes()
+    # Git may materialize this text asset with CRLF; glyph identity is the
+    # canonical LF payload, not a workstation's checkout newline convention.
+    artwork = dxf.normalize_newlines(spec.NUMERALS_DXF.read_bytes())
     import hashlib
 
     assert hashlib.sha256(artwork).hexdigest() == (
         "685cada7499cae0c6cc3e482ab687f875e68488fcde6060a0856433ef225569c"
     )
-    assert dxf.normalize_newlines(artwork) == generator.render()
+    assert artwork == generator.render()
     rings = [ring for ring, closed in dxf.read_lwpolylines(artwork.decode("ascii")) if closed]
     volume = builder.numeral_envelope_volume(rings, spec.NUMERAL_DEPTH, spec.NUMERAL_DRAFT_ANGLE_DEG)
     shallow_prism = dxf.net_area(rings) * spec.NUMERAL_DEPTH
@@ -767,7 +769,7 @@ def test_unchanged_dxf_owns_surface_outlines_and_shallow_envelope_volume(monkeyp
     assert volume < spec.NUMERAL_AREA_MM2 * spec.TICK_DEPTH / 4.0
     monkeypatch.setattr(spec, "NUMERAL_DEPTH", 0.15)
     monkeypatch.setattr(spec, "NUMERAL_DRAFT_ANGLE_DEG", 20.0)
-    assert generator.render() == dxf.normalize_newlines(artwork)
+    assert generator.render() == artwork
 
 
 def test_native_numeral_cut_enables_inward_draft_and_drives_own_depth(monkeypatch) -> None:
