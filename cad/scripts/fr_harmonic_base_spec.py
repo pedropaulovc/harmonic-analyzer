@@ -10,6 +10,7 @@ silently drift.
 
 from __future__ import annotations
 
+import _config
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
@@ -335,6 +336,14 @@ DRAWING_REFERENCE_PRECISION = 1
 # harmless, shallower leaves an unfaced ring the head would rock on, so the
 # general .X band is wrong in one direction here. The model carries the band.
 SPOTFACE_DEPTH_BAND_MM = (0.5, 0.0)  # (upper, lower) deviations, like _fit_deviations
+
+# The MHA-FR-001 pivot seat is located from the MHA-DT-002 pedestal seats in one
+# setup (Main ruling 2026-10-10). Its +- band is the same configured term
+# cone_set_stack books as the pivot seat position, so the sheet prints what the
+# stack assumes.
+PIVOT_SEAT_POSITION_BAND_MM = float(
+    _config.fit("cone_drum_oblique_mesh", "pivot_seat_position_mm")
+)
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names

@@ -2305,7 +2305,12 @@ def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
     near = min(sheet.PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, sheet.PIVOT_SCREW_XZ))
     dx = sheet.PIVOT_SCREW_XZ[0] - near[0]
     dy = near[1] - sheet.PIVOT_SCREW_XZ[1]
-    assert f"X {dx:.2f}, Y {dy:.2f} <MOD-PM>0.05" in sheet.PIVOT_SEAT_STEP
+    import cone_set_stack
+    import fr_harmonic_base_spec as base_spec
+
+    band = base_spec.PIVOT_SEAT_POSITION_BAND_MM
+    assert band == cone_set_stack.PIVOT_SEAT_POSITION_MM
+    assert f"X {dx:.2f}, Y {dy:.2f} <MOD-PM>{band:.2f}" in sheet.PIVOT_SEAT_STEP
     assert "ONE SETUP" in sheet.PIVOT_SEAT_STEP
     assert "MHA-DT-002" in sheet.PIVOT_SEAT_STEP
     lines = sheet.PIVOT_SEAT_STEP.split("\n")
