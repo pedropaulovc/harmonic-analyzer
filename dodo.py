@@ -2892,6 +2892,46 @@ def task_verify():
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
+    # Throwaway route-B probe: independent of the geometry recipe.
+    probe = SCRIPTS_DIR / "probe_pen_shadow_render.py"
+    probe_dir = CAD_OUT / "png" / "pn-pen-shadow-probe"
+    probe_outputs = [
+        probe_dir / "shadows-on.png",
+        probe_dir / "shadows-off.png",
+        REPORTS / "pn-pen-shadow-render.json",
+    ]
+    probe_deps = [
+        str(probe.resolve()),
+        str((SCRIPTS_DIR / "_session.py").resolve()),
+        str((SCRIPTS_DIR / "_preferences.py").resolve()),
+        str((SCRIPTS_DIR / "_paths.py").resolve()),
+        str((SCRIPTS_DIR / "_check.py").resolve()),
+        str((SCRIPTS_DIR / "_com.py").resolve()),
+        _sldasm("pn_pen"),
+        _assembly_execution_token("pn_pen"),
+        *_assembly_file_deps("pn_pen"),
+    ]
+    yield {
+        "name": "pn_pen_shadow_render",
+        "task_dep": ["assembly:pn_pen"],
+        "file_dep": probe_deps,
+        "targets": [str(path) for path in probe_outputs],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "verify:pn_pen_shadow_render",
+                    [sys.executable, str(probe.resolve())],
+                    probe_deps,
+                    probe_outputs,
+                    "pn-pen-shadow-render",
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
     child_stamps = [
         str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
         for stem in ASSEMBLY_ORDER

@@ -1,0 +1,118 @@
+"""Throwaway route-B native pen render A/B; never saves the source model."""
+
+from __future__ import annotations
+
+import json
+import sys
+from typing import Any
+
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT, OUT_PNG, OUT_SLDASM
+from _preferences import _preference_id
+from _session import run_build
+
+
+async def probe(adapter: Any) -> dict[str, str]:
+    sw = _early_bound(adapter.swApp, "ISldWorks")
+
+    def enum(name: str) -> int:
+        value = _preference_id(adapter, name)
+        if value is None:
+            raise RuntimeError(f"SolidWorks named constant unavailable: {name}")
+        return value
+
+    prefs = {
+        name: enum(name)
+        for name in (
+            "swDisplayShadowsInShadedMode",
+            "swDisplayAmbientOcclusionShadows",
+        )
+    }
+    initial = {name: bool(sw.GetUserPreferenceToggle(value)) for name, value in prefs.items()}
+    assembly = OUT_SLDASM / "pn-pen.SLDASM"
+    output_dir = OUT_PNG / "pn-pen-shadow-probe"
+    report = CAD_ROOT / "out" / "reports" / "pn-pen-shadow-render.json"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    metadata: dict[str, Any] = {
+        "assembly": assembly.relative_to(CAD_ROOT.parent).as_posix(),
+        "read_only": True,
+        "saved_model": False,
+        "revision": str(sw.RevisionNumber()),
+        "preference_ids": prefs,
+        "initial_preferences": initial,
+        "camera": "isometric, zoom-to-fit once; current view for both captures",
+        "captures": [],
+    }
+    artefacts: dict[str, str] = {}
+    try:
+        opened = sw.OpenDoc6(
+            str(assembly.resolve()),
+            enum("swDocASSEMBLY"),
+            enum("swOpenDocOptions_Silent") | enum("swOpenDocOptions_ReadOnly"),
+            "Default",
+            0,
+            0,
+        )
+        model, errors, warnings = opened
+        metadata["open_errors"] = int(errors)
+        metadata["open_warnings"] = int(warnings)
+        if model is None or errors:
+            raise RuntimeError(f"Read-only assembly open failed: errors={errors}, warnings={warnings}")
+        adapter.currentModel = model
+        model.ShowNamedView2("", enum("swIsometricView"))
+        adapter._zoom_to_fit(model)
+        for shadows, filename in ((True, "shadows-on.png"), (False, "shadows-off.png")):
+            sw.SetUserPreferenceToggle(prefs["swDisplayAmbientOcclusionShadows"], False)
+            sw.SetUserPreferenceToggle(prefs["swDisplayShadowsInShadedMode"], shadows)
+            observed = {name: bool(sw.GetUserPreferenceToggle(value)) for name, value in prefs.items()}
+            if observed != {
+                "swDisplayShadowsInShadedMode": shadows,
+                "swDisplayAmbientOcclusionShadows": False,
+            }:
+                raise RuntimeError(f"Render preference readback mismatch: {observed}")
+            model.GraphicsRedraw2()
+            image = output_dir / filename
+            image.unlink(missing_ok=True)
+            result = await adapter.export_image({
+                "file_path": str(image.resolve()),
+                "format_type": "png",
+                "width": 1600,
+                "height": 1000,
+                "view_orientation": "current",
+            })
+            check(f"native capture {filename}", result)
+            if not image.is_file() or image.stat().st_size == 0:
+                raise RuntimeError(f"Native image capture produced no file: {image}")
+            after = {name: bool(sw.GetUserPreferenceToggle(value)) for name, value in prefs.items()}
+            if after != observed:
+                raise RuntimeError(f"Capture changed preferences: before={observed}, after={after}")
+            metadata["captures"].append({
+                "path": image.relative_to(CAD_ROOT.parent).as_posix(),
+                "observed_preferences": after,
+                "bytes": image.stat().st_size,
+            })
+            artefacts[filename] = str(image)
+    finally:
+        restoration_errors = []
+        for name, value in prefs.items():
+            try:
+                sw.SetUserPreferenceToggle(value, initial[name])
+                if bool(sw.GetUserPreferenceToggle(value)) != initial[name]:
+                    raise RuntimeError(f"Failed to restore {name}")
+            except Exception as exc:
+                restoration_errors.append(f"{name}: {exc}")
+        metadata["restored_preferences"] = {
+            name: bool(sw.GetUserPreferenceToggle(value)) for name, value in prefs.items()
+        }
+        metadata["restoration_errors"] = restoration_errors
+        report.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+        if restoration_errors:
+            raise RuntimeError("; ".join(restoration_errors))
+    artefacts["metadata"] = str(report)
+    return artefacts
+
+
+if __name__ == "__main__":
+    sys.exit(run_build(probe))
