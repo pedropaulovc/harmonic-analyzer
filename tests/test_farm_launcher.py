@@ -234,7 +234,15 @@ if sys.argv[1] == "sync":
             )
             + "\\n"
         )
-    time.sleep(float(os.environ.get("UV_STUB_SYNC_DELAY", "0")))
+    release = os.environ.get("UV_STUB_SYNC_RELEASE")
+    if release:
+        arrivals = Path(os.environ["UV_STUB_SYNC_ARRIVALS"])
+        (arrivals / Path(os.environ["VIRTUAL_ENV"]).name).touch()
+        deadline = time.monotonic() + float(os.environ["UV_STUB_SYNC_GUARD"])
+        while not Path(release).exists():
+            if time.monotonic() >= deadline:
+                raise AssertionError(f"sync release never arrived: {release}")
+            time.sleep(0.05)
     (Path(os.environ["VIRTUAL_ENV"]) / "synced.txt").write_text(
         str(os.getpid()), encoding="utf-8"
     )
@@ -1007,26 +1015,50 @@ def test_launches_share_one_environment_synced_once(tmp_path: Path) -> None:
 def test_concurrent_launches_publish_one_environment_and_both_build(
     tmp_path: Path,
 ) -> None:
-    """Two launchers creating the same environment each sync privately; one
-    publishes, the other adopts it, and neither touches the other's sync."""
+    """Force both private syncs to overlap, then race their publication."""
     fixture = _launcher_fixture(tmp_path)
+    arrivals = tmp_path / "sync arrivals"
+    arrivals.mkdir()
+    release = tmp_path / "release syncs"
     processes = []
     invocations = []
-    for index in range(2):
-        environment = dict(fixture["environment"])
-        environment["UV_STUB_SYNC_DELAY"] = "3"
-        invocations.append(tmp_path / f"uv invocation {index}.json")
-        environment["UV_STUB_INVOCATION"] = str(invocations[-1])
-        processes.append(
-            subprocess.Popen(
-                _command(fixture, "part:pen_rod", tag=f"racer{index}"),
-                env=environment,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+    try:
+        for index in range(2):
+            environment = dict(fixture["environment"])
+            environment["UV_STUB_SYNC_ARRIVALS"] = str(arrivals)
+            environment["UV_STUB_SYNC_RELEASE"] = str(release)
+            environment["UV_STUB_SYNC_GUARD"] = str(HANG_GUARD_S)
+            invocations.append(tmp_path / f"uv invocation {index}.json")
+            environment["UV_STUB_INVOCATION"] = str(invocations[-1])
+            processes.append(
+                subprocess.Popen(
+                    _command(fixture, "part:pen_rod", tag=f"racer{index}"),
+                    env=environment,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
             )
-        )
-    results = [process.communicate(timeout=HANG_GUARD_S) for process in processes]
+        # Process start times say nothing about when preparation reaches uv.
+        # Hold the first sync until the second has entered its own staging env;
+        # otherwise a slow starter legitimately reuses the published winner.
+        def both_syncs_arrived() -> bool | None:
+            if len(list(arrivals.iterdir())) == 2:
+                return True
+            if any(process.poll() is not None for process in processes):
+                return False
+            return None
+
+        assert _wait_for(
+            processes[-1],
+            both_syncs_arrived,
+            "both private environment syncs",
+            Path(fixture["log_directory"]),
+        ), _observed(Path(fixture["log_directory"]))
+    finally:
+        # Release and reap even when preparation fails; never strand a stub.
+        release.touch()
+        results = [process.communicate(timeout=HANG_GUARD_S) for process in processes]
 
     for process, (stdout, stderr) in zip(processes, results):
         assert process.returncode == 0, (stdout, stderr)

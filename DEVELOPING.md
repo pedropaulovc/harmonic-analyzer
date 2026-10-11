@@ -292,9 +292,13 @@ surfaced as `[cache_missing] exit 0`. The launcher therefore never runs
    `uv sync --frozen --no-editable --active`), writes the
    `.farm-run-environment.json` marker, and only after uv has exited renames
    it to `<key>`. No launcher ever syncs into or deletes a directory another
-   one may be using, even when a killed launcher's uv outlives it; two
-   launchers racing on one key both sync, one rename wins, and the other
-   discards its copy and adopts the winner's. `--no-editable` keeps the
+   one may be using, even when a killed launcher's uv outlives it. If both
+   launchers reach preparation before publication, both sync, one rename wins,
+   and the other discards its copy and adopts the winner's. A launcher reaching
+   preparation after publication reuses it without syncing, even if the two
+   launches overlapped in time. The concurrency contract test holds both private
+   syncs at an explicit release gate to exercise the rename race without assuming
+   any relative startup speed. `--no-editable` keeps the
    environment free of pointers into any snapshot, so snapshots come and go
    while it is in use, and `--relocatable` keeps its entry points valid
    across the rename.
