@@ -56,9 +56,21 @@ inspection = "toleranced_features"
 finish_route = "*"
 
 [numbers]
-# Values the shop has not yet chosen or sourced stay "unknown" (docs/policy.md:
-# "rather than copying unsourced shop folklore"). The rules that read them
-# report ? until Pedro supplies a cited value.
-refixture_budget_mm = "unknown"
-stickout_ld_max = "unknown"
-thin_wall_floor_mm = "unknown"
+# Values approved by Pedro 2026-10-11 from researched candidates; each cite
+# says whether the number is published or a shop decision.
+max_filing_stock_mm = 2.0
+refixture_budget_mm = 0.05
+stickout_ld_max = 3.0
+thin_wall_floor_mm = 3.0
+
+[numbers_cite]
+max_filing_stock_mm = "Gopalan College of Engineering and Management, Workshop Practice Lab manual, PDF p.25, fitting step 7: 'Removing small amount (1 mm to 2mm) of material Files can be used.' Upper endpoint adopted as the shop cap (Pedro, 2026-10-11). https://www.gopalancolleges.com/gcem/course-material/mechanical/lab-manual/sem-II/workshop-manual-15wsl24.pdf"
+refixture_budget_mm = "SHOP DECISION (Pedro, 2026-10-11), planning threshold, not a measured capability: two 0.001 in indicator alignments (US Army lathe guide, 'A dial indicator can then be used to finish aligning the workpiece to within 0.001 inch.') rounded to 0.05 mm. https://www.americanmachinetools.com/how_to_use_a_lathe.htm"
+stickout_ld_max = "US Army lathe guide, Turning Work in Chucks: 'If the work extends more than three times the diameter of the workpiece from the chuck or collet, additional support must be used such as a steady rest or a tailstock center support.' https://www.americanmachinetools.com/how_to_use_a_lathe.htm"
+thin_wall_floor_mm = "SHOP DECISION (Pedro, 2026-10-11), cautious protective-holding trigger; no published numeric floor. Carr Lane, Work Supports: 'This support is well suited for parts with thin cross sections where excessive pressure can distort the part.' https://www.carrlane.com/engineering-resources/technical-information/manual-workholding/locating-devices/work-supports"
+
+[numbers_verify]
+max_filing_stock_mm = false
+refixture_budget_mm = false
+stickout_ld_max = false
+thin_wall_floor_mm = false

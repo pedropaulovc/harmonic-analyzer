@@ -84,10 +84,11 @@ note = "AUTHOR'S CHOICE: bench frame, datum-B side up; X0 Y0 on the pivot axis, 
 cite = ["AUTHOR'S CHOICE", "features.toml pivot_bore.at [0, 8, 0]", "features.toml hub_faces.upper_z 3.52825"]
 
 # ---------------------------------------------------------------------------------------
-# S1: rotary table, raw blank flat on the table, datum-B side up, the pivot over the
-# table's centre bore. Skim the upper hub face, spot, drill and ream the pivot bore on the
-# table axis, turn the table to finish the upper hub OD down to datum B (Pedro
-# 2026-10-11), then spot and drill the rod hole while the bore is on the axis.
+# S1: mill table, raw blank flat on the table, datum-B side up, one strap clamp across each
+# raw blank end. Skim the upper hub face, stair-mill the upper hub OD outside its line down
+# to datum B (Pedro 2026-10-11: the 336 mm blank cannot swing on the rotary table; the hub
+# is filed to buttons in S6), then spot, drill and ream the pivot bore and spot and drill
+# the rod hole.
 [[setups]]
 id = "S1"
 machine = "PM-30MV"
@@ -102,39 +103,41 @@ top_z = 7.9375
 bottom_z = 0.0
 
 [setups.hold]
-fixture = "rotary-table-6"
-pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+fixture = "pm30mv-table"
+pose = { origin_mm = [0.0, 0.0, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-50.0, 3.55, 7.9375], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [50.0, 3.55, 7.9375], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "none", note = "under the left blank end, below its clamp", pose = { origin_mm = [-158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "none", note = "under the bar at X-60", pose = { origin_mm = [-60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "none", note = "under the bar at X+60", pose = { origin_mm = [60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "none", note = "under the right blank end, below its clamp", pose = { origin_mm = [158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "two table strap clamps on the raw top, one each side of the hub 30-70 mm out, inside the table rim"
+clamp = "AUTHOR'S CHOICE: the raw blank on the four strap shim stacks (any equal height; the S4 set at nominal 2.719), so the letter D drill, the reamer and the #47 drill break through into air above the table; then one strap clamp across each raw blank end (X 160-168 either side), over its stack"
 
 [setups.zero.x]
-edge = "rotary table centre bore"
-method = "indicate"
-gauge = "dti"
-from = "indicated"
-edge_mm = 0.0
+edge = "left sawn blank end, finder tip at Z +4"
+edge_mm = -168.0
+from = "-x"
+tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.y]
-edge = "rotary table centre bore"
-method = "indicate"
-gauge = "dti"
-from = "indicated"
-edge_mm = 0.0
+edge = "front (Y-) bar edge as rolled, finder tip at Z +4"
+edge_mm = -12.4
+from = "-y"
+tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
 method = "measure_then_set"
 gauge = "micrometers/0-1in"
-measure = "raw bar thickness (as rolled, both faces raw) at the blank end, with the 0-1 in micrometer before clamping; the top then stands that far above the table"
+measure = "raw bar thickness (as rolled, both faces raw) at the blank end, with the 0-1 in micrometer before clamping; the top then stands that far above the work's underside (Z0, on the shim stacks)"
 measure_before_hold = true
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
@@ -149,20 +152,11 @@ z_face = "hub_faces"
 edge_mm = 7.497
 paper_mm = 0.05
 method = "spindle stopped; lower the tool on the hub faces through cigarette paper (0.05) until the paper drags, then Axis Set Z"
-after_op = 10
-before_ops = [20]
-
-[[setups.zero.tool_touches]]
-tool = "drill-index-115/D"
-z_face = "hub_faces"
-edge_mm = 7.497
-paper_mm = 0.05
-method = "spindle stopped; lower the tool on the hub faces through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 20
 before_ops = [30]
 
 [[setups.zero.tool_touches]]
-tool = "reamers-metric/6.5mm"
+tool = "drill-index-115/D"
 z_face = "hub_faces"
 edge_mm = 7.497
 paper_mm = 0.05
@@ -171,7 +165,7 @@ after_op = 30
 before_ops = [40]
 
 [[setups.zero.tool_touches]]
-tool = "endmills-lms-6784/3-4in-4fl"
+tool = "reamers-metric/6.5mm"
 z_face = "hub_faces"
 edge_mm = 7.497
 paper_mm = 0.05
@@ -208,11 +202,29 @@ direction = "climb"
 to_z = 7.497
 doc_mm = 0.4405
 approach_mm = 5.0
-stock_removal_bounds = { x = [-15.0, 15.0], y = [-10.3, 10.3], z = [7.497, 8.5] }
-contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-5.4, 5.4], y = [2.6, 13.4], z = [3.52825, 3.96875] } }
+stock_removal_bounds = { x = [-15.5, 15.5], y = [-15.5, 15.5], z = [7.497, 8.5] }
+contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-10.8, 10.8], y = [-2.8, 18.8], z = [3.52825, 3.96875] } }
 
 [[setups.ops]]
 op = 20
+do = "rough_profile"
+feature = "hub_od"
+faces = ["#75/ADVANCED_FACE[1]/HAF_HUB_OD__P02", "#463/ADVANCED_FACE[15]/HAF_HUB_OD__P02"]
+tool = "endmills-lms-6784/3-8in-4fl"
+holder = "r8-collets-lms-4860/3-8in"
+direction = "climb"
+to_z = 5.21875
+doc_mm = 1.0
+approach_mm = 5.0
+# AUTHOR'S CHOICE: stairs (one handwheel moves at a time) at 0 allowance down to datum B:
+# the stair corners touch the nominal hub circle and the 0.15 cusp is what the S6 file
+# takes to the hub buttons. A nonzero leave cannot be kept: its guard covers the datum-B
+# floor beside the hub, and the stairs must reach the foot of the hub OD (ledger L34).
+rough_allowance_mm = 0.0
+contour = { method = "stairs", cusp_mm = 0.15 }
+
+[[setups.ops]]
+op = 30
 do = "spot"
 feature = "pivot_bore"
 tool = "center-drills-lms-4859/2"
@@ -221,7 +233,7 @@ to_z = 6.0
 approach_mm = 3.0
 
 [[setups.ops]]
-op = 30
+op = 40
 do = "drill"
 feature = "pivot_bore"
 tool = "drill-index-115/D"
@@ -230,26 +242,13 @@ to_z = -2.5
 approach_mm = 3.0
 
 [[setups.ops]]
-op = 40
+op = 50
 do = "ream"
 feature = "pivot_bore"
 tool = "reamers-metric/6.5mm"
 holder = "drill-chuck-r8"
 to_z = -1.5
 approach_mm = 3.0
-
-[[setups.ops]]
-op = 50
-do = "finish_profile"
-feature = "hub_od"
-faces = ["#75/ADVANCED_FACE[1]/HAF_HUB_OD__P02", "#463/ADVANCED_FACE[15]/HAF_HUB_OD__P02"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
-direction = "climb"
-to_z = 5.21875
-doc_mm = 1.0
-approach_mm = 3.0
-contour = { method = "rotary_table", step_deg = 90.0, centre_by = "indicate", centre_feature = "pivot_bore" }
 
 [[setups.ops]]
 op = 60
@@ -270,9 +269,9 @@ to_z = -1.0
 approach_mm = 3.0
 
 # ---------------------------------------------------------------------------------------
-# S2: rotary table, turned over onto the raw upper face (the finished upper hub stands
-# 0.44 below it, inside the ring); indicate the reamed bore true to the table axis, skim
-# the lower hub face and finish the lower hub OD down to the lower strap face.
+# S2: mill table, turned over onto the raw upper face (the finished upper hub stands 0.44
+# below it); one strap clamp across each raw blank end. Indicate the reamed bore, skim the
+# lower hub face and stair-mill the lower hub OD outside its line down to the strap face.
 [[setups]]
 id = "S2"
 machine = "PM-30MV"
@@ -287,17 +286,17 @@ top_z = 7.9375
 bottom_z = 0.0
 
 [setups.hold]
-fixture = "rotary-table-6"
+fixture = "pm30mv-table"
 pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-50.0, -3.55, 7.9375], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [50.0, -3.55, 7.9375], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "two table strap clamps on the raw top, one each side of the hub 30-70 mm out, inside the table rim"
+clamp = "one strap clamp across each raw blank end (X 160-168 either side), straight onto the mill table"
 
 [setups.zero]
 transfer = { from = "S1", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", runout_limit_mm = 0.02 }
@@ -331,15 +330,6 @@ paper_mm = 0.05
 check_jog_mm = 1.0
 retouch_after = []
 
-[[setups.zero.tool_touches]]
-tool = "endmills-lms-6784/3-4in-4fl"
-z_face = "hub_faces"
-edge_mm = 7.497
-paper_mm = 0.05
-method = "spindle stopped; lower the tool on the hub faces through cigarette paper (0.05) until the paper drags, then Axis Set Z"
-after_op = 10
-before_ops = [20]
-
 [[setups.ops]]
 op = 10
 do = "finish_face"
@@ -351,21 +341,23 @@ direction = "climb"
 to_z = 7.497
 doc_mm = 0.4405
 approach_mm = 5.0
-stock_removal_bounds = { x = [-15.0, 15.0], y = [-10.3, 10.3], z = [7.497, 8.5] }
-contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-5.4, 5.4], y = [2.6, 13.4], z = [-3.96875, -3.52825] } }
+stock_removal_bounds = { x = [-15.5, 15.5], y = [-15.5, 15.5], z = [7.497, 8.5] }
+contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-10.8, 10.8], y = [-2.8, 18.8], z = [-3.96875, -3.52825] } }
 
 [[setups.ops]]
 op = 20
-do = "finish_profile"
+do = "rough_profile"
 feature = "hub_od"
 faces = ["#91/ADVANCED_FACE[2]/HAF_HUB_OD__P01", "#266/ADVANCED_FACE[10]/HAF_HUB_OD__P01"]
-tool = "endmills-lms-6784/3-4in-4fl"
-holder = "r8-collets-lms-4860/3-4in"
+tool = "endmills-lms-6784/3-8in-4fl"
+holder = "r8-collets-lms-4860/3-8in"
 direction = "climb"
 to_z = 5.21875
 doc_mm = 1.0
-approach_mm = 3.0
-contour = { method = "rotary_table", step_deg = 90.0, centre_by = "indicate", centre_feature = "pivot_bore" }
+approach_mm = 5.0
+# AUTHOR'S CHOICE: as S1 op 20, stairs at 0 allowance, the 0.15 cusp left for the S6 file.
+rough_allowance_mm = 0.0
+contour = { method = "stairs", cusp_mm = 0.15 }
 
 # ---------------------------------------------------------------------------------------
 # S3: mill table, datum-B side up on the raw lower face, a strap across each raw blank
@@ -433,13 +425,22 @@ check_jog_mm = 1.0
 retouch_after = []
 
 [[setups.zero.tool_touches]]
-tool = "drill-index-115/#29"
+tool = "drill-index-115/#33"
 z_face = "strap_datum_b"
 edge_mm = 5.21875
 paper_mm = 0.05
 method = "spindle stopped; lower the tool on the strap datum b through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 10
 before_ops = [20]
+
+[[setups.zero.tool_touches]]
+tool = "drill-index-115/#29"
+z_face = "strap_datum_b"
+edge_mm = 5.21875
+paper_mm = 0.05
+method = "spindle stopped; lower the tool on the strap datum b through cigarette paper (0.05) until the paper drags, then Axis Set Z"
+after_op = 20
+before_ops = [30]
 
 [[setups.ops]]
 op = 10
@@ -459,11 +460,13 @@ op = 20
 do = "rough_profile"
 feature = "profile_outer"
 faces = ["#178/ADVANCED_FACE[6]/HAF_PROFILE_OUTER__P02"]
-tool = "drill-index-115/#29"
+tool = "drill-index-115/#33"
 holder = "drill-chuck-r8"
 direction = "climb"
 to_z = 2.6
 approach_mm = 3.0
+# AUTHOR'S CHOICE: #33 (r 1.435) at 0.3 leaves 1.735 for the file, under the shop's 2.0 cap.
+# The convex R816 chain needs 0.3: at 0.25 the #29 chain gouged the arc (prechips#180).
 rough_allowance_mm = 0.3
 # AUTHOR'S CHOICE: the box stops the chain at the R816 arc ends (holes to X+-135.6), so the
 # printed joins up the tapers are clipped off and the tapers and tip lands stay whole as
@@ -480,7 +483,7 @@ holder = "drill-chuck-r8"
 direction = "climb"
 to_z = 2.6
 approach_mm = 3.0
-rough_allowance_mm = 0.3
+rough_allowance_mm = 0.25
 contour = { method = "chain_drill", pitch_mm = 4.2 }
 
 # ---------------------------------------------------------------------------------------
@@ -563,9 +566,12 @@ stock_removal_bounds = { x = [-156.2, 156.2], y = [-30.5, 17.3], z = [5.21875, 8
 contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-146.6, 146.6], y = [-4.4, 33.7], z = [-3.96875, -1.25] }, keep_out = [{ at = [0.0, 8.0], dia_mm = 11.0 }] }
 
 # ---------------------------------------------------------------------------------------
-# S5: fitting bench. Scribe the outline from the template pinned in the reamed bore, break
+# S5: fitting bench, the work on the shop-made filing stand (two end blocks under the raw
+# blank ends, a pedestal under the lower hub face), a clamp across each blank end and one on
+# the upper hub face. Scribe the outline from the template pinned in the reamed bore, break
 # out the chain-drill webs, hacksaw through the two taper-and-land tabs just outside the
-# scribed line and file the outline, tapers and tip lands included, to the line.
+# scribed line and file the outline, tapers and tip lands included, to the line. The
+# clamped hub holds the arm and the clamped ends hold the frame when the tabs part.
 [[setups]]
 id = "S5"
 machine = "fitting-bench"
@@ -580,12 +586,18 @@ top_z = 0.4405            # the raw blank ends still stand (arm carried on its t
 bottom_z = -7.4970
 
 [setups.hold]
-fixture = "bench-vise-4in"
-pose = { origin_mm = [0.0, 0.0, -20.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+fixture = "rocker-filing-stand"
+pose = { origin_mm = [0.0, 0.0, -7.497], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+clamps = [
+  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-158.0, 6.65, 0.4405], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "across the left raw blank end, over the end block" },
+  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [158.0, 6.65, 0.4405], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "across the right raw blank end, over the end block" },
+  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [0.0, 0.0, 0.0], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "on the upper hub face (7.06 thick), over the hub pedestal" },
+]
+clamp_order = [1, 2, 3]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "bench vise, soft jaws on the hub faces"
+clamp = "AUTHOR'S CHOICE: stand on the bench; lay the work on the two end blocks and the hub pedestal, clamp each raw blank end onto its block, then the upper hub face onto the pedestal; the outline overhangs the stand all round for the hacksaw and the file"
 
 [[setups.ops]]
 op = 10
@@ -626,10 +638,12 @@ feature = "tip_land_neg_x"
 guide = { template = "arm-outline-template", gauge = "arm-outline-template" }
 
 # ---------------------------------------------------------------------------------------
-# S6: finishing bench. Deburr, inspect, send out for black oxide.
+# S6: fitting bench. File both hub ODs to the hardened filing buttons pinned through the
+# reamed pivot bore (Pedro 2026-10-11). The button stud's tail is gripped in the bench vise;
+# the arm is clamped between the buttons by the M5 nut and never touches the jaws.
 [[setups]]
 id = "S6"
-machine = "finishing-bench"
+machine = "fitting-bench"
 frame = "top"
 coolant = "none"
 deburr_mm = 0.25
@@ -637,8 +651,44 @@ deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "S5"
 
 [setups.stock_state]
-top_z = 0.0
-bottom_z = -7.0565
+top_z = 0.4405           # prechips carries the S5 offcut frame (raw blank ends) on: no op drops a held-split piece (ledger L33)
+bottom_z = -7.4970
+
+[setups.hold]
+fixture = "bench-vise-4in"
+pose = { origin_mm = [0.0, 0.0, -21.0565], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+clamps = [
+  { ref = "hub-filing-buttons", restraint = "press", pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "M5 nut on the stud presses the upper button; the lower button seats on the stud head" },
+]
+clamp_order = [1]
+support = "none"
+grip_on = "AUTHOR'S CHOICE: the button stud tail in the vise jaws; the arm is clamped between the buttons and never touches the jaws"
+fixed_jaw = "not_applicable"
+grip_mm = "not_applicable"
+stop = "AUTHOR'S CHOICE: none; steady the arm by hand against the file stroke"
+clamp = "close the bench vise on the stud tail, head up, 5 mm of bare tail between the jaw tops and the head; drop the lower button over the stud onto the head; slide the pivot bore over the stud, lower hub face down on the button; drop the upper button onto the upper hub face and run the M5 nut down by hand until it seats the stack. Loosen the nut to turn the arm on the stud as the filing goes round."
+
+[[setups.ops]]
+op = 10
+do = "file_to_line"
+feature = "hub_od"
+guide = { buttons = "hub-filing-buttons", bore = "pivot_bore", gauge = "radius-gauge" }
+note = "File the stairs left by S1 op 20 and S2 op 20 down to the hardened button rims, upper hub against the upper button and lower hub against the lower one; use a safe-edge file, safe edge toward the strap face; stop when the file rides on the button without cutting."
+
+# ---------------------------------------------------------------------------------------
+# S7: finishing bench. Deburr, inspect, send out for black oxide.
+[[setups]]
+id = "S7"
+machine = "finishing-bench"
+frame = "top"
+coolant = "none"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "S6"
+
+[setups.stock_state]
+top_z = 0.4405           # as S6: the offcut frame is still in the kernel stock (ledger L33)
+bottom_z = -7.4970
 
 [setups.hold]
 fixture = "finishing-rest-plate"

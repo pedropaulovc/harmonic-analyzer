@@ -74,6 +74,22 @@ cite = [
   "AUTHOR'S CHOICE: below 1/2 in, half the UF low end, 0.001 in = 0.0254 mm/tooth",
 ]
 
+# Chain drilling below 3 mm (S3 op 20, #33 drill). prechips looks up a rough_profile
+# chain_drill under operation "profile" (prechips#185), so this row carries the HSS drill
+# row's numbers for that band; it is not an end-mill row.
+[[cut]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+operation = "profile"
+diameter_range = [2.0, 2.99]
+sfm = 60.0
+chip_load_mm_per_tooth = 0.0127
+cite = [
+  "LMS Drilling & Reaming table, row Plain carbon steels (1018): drilling 60-100 ft/min; low end used",
+  "UF drill feed table, row Under 1/8 in: up to 0.002 in/rev; AUTHOR'S CHOICE 0.001 in/rev = 0.0254 mm/rev, / 2 flutes = 0.0127 mm/tooth",
+  "Workaround for prechips#185: the drill row's numbers under operation profile",
+]
+
 # --- Drills, HSS ----------------------------------------------------------------------
 [[cut]]
 material_class = "low_carbon_steel"
