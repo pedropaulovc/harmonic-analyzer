@@ -13,7 +13,6 @@ from _common import (
     OUT_SLDASM,
     OUT_SLDPRT,
     _early_bound,
-    _preference_id,
     check,
     run_build,
 )
@@ -21,9 +20,24 @@ from _common import (
 
 async def probe(adapter: Any) -> dict[str, str]:
     sw = _early_bound(adapter.swApp, "ISldWorks")
+    import pythoncom
+    from solidworks_mcp.adapters.sw_type_info import _find_aux_tlb
+
+    typelib_path = _find_aux_tlb("swconst.tlb")
+    if typelib_path is None:
+        raise RuntimeError("Installed SolidWorks swconst.tlb not found")
+    typelib = pythoncom.LoadTypeLib(str(typelib_path))
+    named_constants = {}
+    for index in range(typelib.GetTypeInfoCount()):
+        if typelib.GetTypeInfoType(index) != pythoncom.TKIND_ENUM:
+            continue
+        info = typelib.GetTypeInfo(index)
+        for variable in range(info.GetTypeAttr()[9]):
+            descriptor = info.GetVarDesc(variable)
+            named_constants[info.GetNames(descriptor[0])[0]] = int(descriptor[1])
 
     def enum(name: str) -> int:
-        value = _preference_id(adapter, name)
+        value = named_constants.get(name)
         if value is None:
             raise RuntimeError(f"SolidWorks named constant unavailable: {name}")
         return value
@@ -64,6 +78,8 @@ async def probe(adapter: Any) -> dict[str, str]:
         "read_only": True,
         "saved_model": False,
         "revision": str(sw.RevisionNumber()),
+        "enum_source": str(typelib_path),
+        "enum_typelib_identity": [str(item) for item in typelib.GetLibAttr()],
         "preference_ids": prefs,
         "initial_preferences": initial,
         "camera": "isometric, zoom-to-fit once; current view for both captures",
