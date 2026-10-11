@@ -45,8 +45,14 @@ geometry is casting-shaped, not milling-shaped.
      stock flat point on the D-flat, then remove the feeler.
      Never run or swing a loose collar. Installation notes are in
      `vn_cone_tip_collar_spec.INSTALLATION_NOTES`; `dt_tip_collar_air.py` owns the
-     printed-tolerance air stack over the swing, using arithmetic closure when it clears
-     everywhere, otherwise RSS of the same terms.
+     air stack over the whole swing. Use worst-case arithmetic over every source if it
+     clears everywhere; otherwise use the statistical method everywhere: nominal air
+     minus the arithmetic sum of `IN_SERVICE_CLEARANCES`, minus the RSS of independent
+     printed manufacturing and set tolerances, minus the swing-interval arc allowance.
+     Fastener and running clearances, thread centring, cup freedom, collar float and
+     cock, and G19 cock can all be taken up together; never put them in the RSS.
+     The current calculated least nose air is 0.0749 mm (`dt_tip_collar_air.require_air()`),
+     not a measured clearance.
 
 - **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
   | family | qty | why CNC |
