@@ -339,6 +339,16 @@ _TEXT_BELOW_KEEP_MODEL = 1.6
 _SECTION_LABEL_MODEL = 2.1
 _CAPTION_CLEAR_MODEL = 6.0
 _INNER_BORDER_X = 0.4191  # ASME B landscape inner border, right
+_TITLE_BLOCK_LEFT_X = 0.216  # the title block's left edge, below y 0.066
+_NOTE_CHAR_MM = 2.5  # a sheet note's character pitch (measured on the r3 sheet)
+_CAPTION_HEIGHT = 0.0035
+# The 1:1 isometric's half extents, sheet m: 44 x 52 measured on the r3
+# sheet for the 31.75 bar, plus its widening to 38.1 foreshortened (cos 30
+# across, sin 30 up).
+_ISO_HALF_WIDTH_SHEET = (44.0 + 6.35 * math.cos(math.radians(30.0))) / 2.0 / 1000.0
+_ISO_HALF_HEIGHT_SHEET = (52.0 + 6.35 * 0.5) / 2.0 / 1000.0
+# The plan and back views centre on the plate's model y extent.
+_PLAN_MID_Y = (geometry.TOP_LEFT[1] - geometry.END_R) / 2.0
 _GAP = 0.004  # sheet m between neighbouring texts
 # The locator callout's leader leaves its text block's lower right, this far
 # (model mm) from the kept text point (measured on the r3 sheet).
@@ -436,11 +446,29 @@ def test_the_views_texts_clear_their_neighbours_and_the_border() -> None:
         drawing.SECTION_KEEP["HubDia"][2] - _half_width_model(hub_text)
     )
     assert hub_left - back_right >= _GAP
-    # The caption starts right of the over-arm wall and ends inside the border.
-    caption_left = drawing.ISO_NOTE_XY[0]
-    caption_right = caption_left + len(spec.ISOMETRIC_VIEW_NOTE) * _CHAR_MM / 1000.0
-    assert caption_left - _section_sheet_x(geometry.REAR_FACE_Z) >= _GAP
-    assert _INNER_BORDER_X - caption_right >= 0.002
+    # The section's boss Ø ends inside the border.
+    boss_text = "\u00d8" + _printed(geometry.BOSS_DIA, "BossDia")
+    boss_right = _section_sheet_x(
+        drawing.SECTION_KEEP["BossDia"][2] + _half_width_model(boss_text)
+    )
+    assert _INNER_BORDER_X - boss_right >= 0.002
+    # The isometric stands between the notes and the title block, its
+    # caption above it and below the back view's edge dimensions.
+    notes_right = drawing.NOTES_XY[0] + drawing.NOTES_WIDTH * _NOTE_CHAR_MM / 1000.0
+    iso_left = drawing.ISO_CENTER[0] - _ISO_HALF_WIDTH_SHEET
+    assert iso_left - notes_right >= _GAP
+    assert _TITLE_BLOCK_LEFT_X - (drawing.ISO_CENTER[0] + _ISO_HALF_WIDTH_SHEET) >= _GAP
+    assert all(
+        len(line) <= drawing.NOTES_WIDTH for line in drawing.NOTES_TEXT.splitlines()
+    )
+    edge_text_bottom = (
+        drawing.PLAN_CENTER[1]
+        + (drawing.BACK_KEEP["EdgeLeftX"][1] - _PLAN_MID_Y) * drawing.SHEET_SCALE[0] / 1000.0
+        - _TEXT_BELOW_KEEP_MODEL * drawing.SHEET_SCALE[0] / 1000.0
+    )
+    caption_y = drawing.ISO_NOTE_XY[1]
+    assert edge_text_bottom - caption_y >= 0.002
+    assert caption_y - _CAPTION_HEIGHT - (drawing.ISO_CENTER[1] + _ISO_HALF_HEIGHT_SHEET) >= 0.0
 
 
 def test_the_first_plan_row_clears_the_cutting_line_arrow() -> None:
@@ -450,7 +478,8 @@ def test_the_first_plan_row_clears_the_cutting_line_arrow() -> None:
         + _SECTION_LABEL_MODEL
     )
     nearest_row = min(
-        drawing.PLAN_KEEP[name][1] for name in ("ScrewHoleX1", "ScrewHoleX2", "LocatorX1")
+        drawing.PLAN_KEEP[name][1]
+        for name in ("ScrewHoleX1", "ScrewHoleX2", "LocatorX1")
     )
     assert nearest_row - _TEXT_BELOW_KEEP_MODEL - arrow_top >= 1.0
 
@@ -462,7 +491,8 @@ def test_the_reamed_hole_leader_crosses_no_plan_dimension_line() -> None:
         "ScrewHoleX1": (geometry.SCREW_HOLES[0][0], 0.0),
         "ScrewHoleX2": (geometry.SCREW_HOLES[1][0], 0.0),
         "LocatorX1": (geometry.LOCATOR_SITES_MM[0][0], 0.0),
-        "Width": (geometry.EDGE_MINUS_X, geometry.EDGE_PLUS_X),
+        "EdgeLeftX": (geometry.EDGE_MINUS_X, 0.0),
+        "EdgeRightX": (0.0, geometry.EDGE_PLUS_X),
     }
     text_x, text_y, _ = drawing.PLAN_KEEP["LocatorDia1"]
     start_x = text_x + _LOCATOR_LEADER_START_MODEL[0]

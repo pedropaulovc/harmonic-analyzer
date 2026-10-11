@@ -1,13 +1,16 @@
 r"""Pure transgear-arm-plate (MHA-PD-019) geometry shared by the plate, its
 screws, the knob-shaft stack and the paper-drive assembly.
 
-Book ch. 23 (t157 / p.63; ruling 3): a piece of 1-1/4 in steel bar screwed
-across the MHA-PD-018 arm by two 8-32 oval-head screws.  It carries the knob
-shaft's running bore on axis K, a front hub (the thrust ring's seat) and a
-rear boss (the cup runs behind it).  Its rear portion is 5 thick where it
-lies over the arm; below the arm's lower edge it drops the arm's thickness
-(7.9375) more to the arm's front face, so the step (the "notch") wraps that
-edge, NOTCH_RELIEF clear of it. Two matched stock dowels locate; screws clamp.
+Book ch. 23 (t157 / p.63; ruling 3): a piece of steel bar screwed across the
+MHA-PD-018 arm by two 8-32 oval-head screws.  The book's 1-1/4 in bar is
+widened to 1-1/2 in so the outline can stand symmetric about K (the 1-1/4 in
+bar centred on K leaves the -X countersink under the wall target).  It
+carries the knob shaft's running bore on axis K, a front hub (the thrust
+ring's seat) and a rear boss (the cup runs behind it).  Its rear portion is
+5 thick where it lies over the arm; below the arm's lower edge it drops the
+arm's thickness (7.9375) more to the arm's front face, so the step (the
+"notch") wraps that edge, NOTCH_RELIEF clear of it. Two matched stock
+dowels locate; screws clamp.
 
 Local frame (same axes as the arm, so the assembly places both with one
 rotation about Z):
@@ -37,29 +40,23 @@ BORE_STATION = ARM.KNOB_BORE_STATION
 BORE_OFFSET = ARM.KNOB_BORE_OFFSET
 
 # --- Section ----------------------------------------------------------------
-END_R = 12.5  # full round about K; the +X edge is tangent to it
-WIDTH = 2.0 * (END_R - ARM.PLATE_CENTRELINE_OFFSET)  # 31.75, 1-1/4 in bar
+END_R = 12.5  # full round about K; both tapers are tangent to it
+WIDTH = 38.1  # 1-1/2 in bar, symmetric about K
 THICKNESS_OVER_ARM = 5.0  # unchanged nominal; .XX bounds the locator dowel span
 THICKNESS_OVER_ARM_PLACES = 2
 THICKNESS_OVER_ARM_BAND = printed_band_mm(THICKNESS_OVER_ARM_PLACES)
 NOTCH_DEPTH = ARM.THICKNESS  # the section below the arm reaches its front face
 THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.9375
 
-# Edges along the plate's long axis, in the plate frame (x from K).
-EDGE_PLUS_X = END_R
-EDGE_MINUS_X = END_R - WIDTH
-# The −X edge runs parallel to the long axis down to the kink, then straight
+# Edges along the plate's long axis, in the plate frame (x from K): the
+# outline is symmetric about the long axis through K, so the screws' midpoint
+# (the arm's PLATE_SCREW_MID_STATION) sits off the plate's centreline.
+EDGE_PLUS_X = WIDTH / 2.0
+EDGE_MINUS_X = -WIDTH / 2.0
+# Each edge runs parallel to the long axis down to its kink, then straight
 # to tangency with the end round.  [INFERENCE] kink station from the notch
 # crop (row ≈ 790): arm y -20.
 KINK_Y = -20.0 - BORE_OFFSET
-
-# The screws' midpoint must be the plate's centreline, the station the arm
-# taps are laid out on.
-if (
-    abs(BORE_STATION + (EDGE_PLUS_X + EDGE_MINUS_X) / 2.0 - ARM.PLATE_SCREW_MID_STATION)
-    > 5e-4
-):
-    raise AssertionError("plate centreline is off the arm's plate-screw midpoint")
 
 
 def arm_upper_edge_y(x: float) -> float:
@@ -86,9 +83,11 @@ def notch_face_y(x: float) -> float:
 TOP_LEFT = (EDGE_MINUS_X, arm_upper_edge_y(EDGE_MINUS_X))
 TOP_RIGHT = (EDGE_PLUS_X, arm_upper_edge_y(EDGE_PLUS_X))
 KINK = (EDGE_MINUS_X, KINK_Y)
+KINK_RIGHT = (EDGE_PLUS_X, KINK_Y)
 _KINK_DIST = math.hypot(*KINK)
 _TANGENT_ANGLE = math.atan2(KINK[1], KINK[0]) + math.acos(END_R / _KINK_DIST)
 KINK_TANGENT = (END_R * math.cos(_TANGENT_ANGLE), END_R * math.sin(_TANGENT_ANGLE))
+KINK_TANGENT_RIGHT = (-KINK_TANGENT[0], KINK_TANGENT[1])
 NOTCH_LEFT = (EDGE_MINUS_X, notch_face_y(EDGE_MINUS_X))
 NOTCH_RIGHT = (EDGE_PLUS_X, notch_face_y(EDGE_PLUS_X))
 if NOTCH_LEFT[1] <= KINK[1]:
@@ -191,6 +190,8 @@ _NOTCH_DISTANCE = (
     - NOTCH_RELIEF * math.cos(ARM.EDGE_LEAN)
 )
 _NEAR_HOLE = min(SCREW_HOLES, key=lambda xy: math.hypot(*xy))
+# The nearer side edge to either hole's axis (the -X hole sits nearer its edge).
+_HOLE_TO_EDGE = min(SCREW_HOLES[0][0] - EDGE_MINUS_X, EDGE_PLUS_X - SCREW_HOLES[-1][0])
 WALLS: dict[str, tuple[float, float]] = {
     "hub over the bore": (
         (HUB_DIA - BORE_DIA) / 2.0,
@@ -217,9 +218,8 @@ WALLS: dict[str, tuple[float, float]] = {
         THICKNESS_OVER_ARM - THICKNESS_OVER_ARM_BAND - _CSK_DEPTH_MAX,
     ),
     "countersinks to the side edges": (
-        SCREW_HOLES[0][0] - EDGE_MINUS_X - CSK_DIA / 2.0,
-        SCREW_HOLES[0][0]
-        - EDGE_MINUS_X
+        _HOLE_TO_EDGE - CSK_DIA / 2.0,
+        _HOLE_TO_EDGE
         - CSK_DIA_LIMITS_MM[1] / 2.0
         - BAND_X
         - REDUCER_POSITION_RADIUS,

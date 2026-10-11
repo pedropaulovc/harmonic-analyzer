@@ -53,11 +53,11 @@ from pd_transgear_arm_plate_geometry import (
 BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
 
 # Places each printed dimension carries (contract §12):
-# the outline (end radius, bar width, top corners, kink), the boss Ø, the
-# notch face's corner heights (it only clears the arm's edge) are routine .X.
-# The over-arm thickness retains .XX for the real cone floor and standard-
-# stock full-thread margin. The enlarged clearance permits an ordinary .X CSK.
-# The hub Ø and notch depth retain .XX; the arm's stock
+# the outline (end radius, both side edges from K, top corners, kinks), the
+# boss Ø, the notch face's corner heights (it only clears the arm's edge) are
+# routine .X. The over-arm thickness retains .XX for the real cone floor and
+# standard-stock full-thread margin. The enlarged clearance permits an
+# ordinary .X CSK. The hub Ø and notch depth retain .XX; the arm's stock
 # thickness it takes (7.94; R9-26; at .X the lower section's front face
 # enters the guide-lock screw heads' sweep); the hub face's station from the
 # mounting face is .XXX (the chain plane, contract §13: the disc-to-platen air
@@ -196,11 +196,12 @@ HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
 # plane (paper_drive_arm_registration.K_PROJECTED_HEIGHT_MM).
 _P = PLATE.CLAMP_PLATE_PROJECTED_HEIGHT_MM
 PROJECTED_ZONE_NOTE = "\n".join((
-    f"3. LEFT VIEW: REAR FACE; EACH \u00d8{PLATE.CSK_DIA:.1f} {CSK_CALLOUT} COAXIAL WITH",
-    f"   ITS \u00d8{SCREW_HOLE_DIA:.1f} HOLE. CENTRE VIEW: MOUNTING FACE A.",
-    f"4. PROJECTED ZONES START AT FACE A: \u00d8{SCREW_HOLE_DIA:.1f} HOLE BORES",
-    f"   (CENTRE VIEW) {_P:.1f} TOWARD THE REAR FACE; \u00d8{BORE_DIA:g} KNOB BORE",
-    f"   {REGISTRATION.K_PROJECTED_HEIGHT_MM:.1f} TOWARD THE HUB.",
+    f"3. LEFT VIEW: REAR FACE; EACH \u00d8{PLATE.CSK_DIA:.1f} {CSK_CALLOUT}",
+    f"   COAXIAL WITH ITS \u00d8{SCREW_HOLE_DIA:.1f} HOLE. CENTRE VIEW:",
+    "   MOUNTING FACE A.",
+    f"4. PROJECTED ZONES START AT FACE A: \u00d8{SCREW_HOLE_DIA:.1f} HOLE",
+    f"   BORES (CENTRE VIEW) {_P:.1f} TOWARD THE REAR FACE;",
+    f"   \u00d8{BORE_DIA:g} KNOB BORE {REGISTRATION.K_PROJECTED_HEIGHT_MM:.1f} TOWARD THE HUB.",
 ))
 
 ISO_VIEW_SCALE = (1, 1)
@@ -214,7 +215,15 @@ ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE
 # not marked: the thickness over the arm, the hub station and the hub-to-boss
 # length already fix the boss face.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PlateOutline": {"EndR", "Width", "TopLeftY", "TopRightY", "KinkY"},
+    "PlateOutline": {
+        "EndR",
+        "EdgeLeftX",
+        "EdgeRightX",
+        "TopLeftY",
+        "TopRightY",
+        "KinkY",
+        "KinkRightY",
+    },
     "Plate": {"ThicknessOverArm"},
     "LowerOutline": {"NotchLeftY", "NotchRightY"},
     "LowerSection": {"NotchDepth"},
@@ -227,10 +236,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateOutline": {
         "EndR": OUTLINE_PLACES,
-        "Width": OUTLINE_PLACES,
+        "EdgeLeftX": OUTLINE_PLACES,
+        "EdgeRightX": OUTLINE_PLACES,
         "TopLeftY": OUTLINE_PLACES,
         "TopRightY": OUTLINE_PLACES,
         "KinkY": OUTLINE_PLACES,
+        "KinkRightY": OUTLINE_PLACES,
     },
     "Plate": {"ThicknessOverArm": THICKNESS_PLACES},
     "LowerOutline": {"NotchLeftY": NOTCH_PLACES, "NotchRightY": NOTCH_PLACES},
