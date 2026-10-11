@@ -68,6 +68,7 @@ from _cone_gear_readback import assert_saved_configuration_topology
 from dt_cone_gear_notes import CUTTER_DETAIL_SHEET
 from dt_cone_gear_spec import (
     BORE_SURFACE_FINISHES,
+    CUSTOM_SIX_FORM_TOLERANCE_MM,
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -80,6 +81,7 @@ from dt_cone_gear_spec import (
     gap_floor_deviations_mm,
     outside_dia_mm,
     tooth_thickness_mm,
+    custom_six_form_points_mm,
     stock_form_profile,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -253,17 +255,18 @@ def cutter_detail_window_mm() -> tuple[float, float, float]:
 
 
 def cutter_grind_data() -> str:
-    """What the toolmaker grinds DT6-FORM1 to, for reference.
+    """What the toolmaker grinds DT6-FORM1 to and how it is accepted.
 
     The sheet once printed the part's "Cutter Profile" property: parametric
     equations with 17-digit floats, which no shop grinds to (eye pass of
-    run 20261010T051729717Z). The equations stay in the model; the sheet
-    gives the form's outline sizes at 3 places, read from the same profile
-    the native cut uses. T006 cuts at T=0 on a spur (helix 0) gear, so its
-    installed gap IS the ground form, and the widths are chords across that
-    gap. The form is reference only: the shop has no optical comparator
-    (machinist review of the stack build), so the cut T006 is accepted over
-    pins on its own sheet (dt_cone_gear_spec.custom_six_over_pins_limits_mm).
+    run 20261010T051729717Z). Then it printed reference chords, which left
+    the relief undefined (machinist review of the stack build). It now
+    gives the cutting edge point by point at 3 places, read from the same
+    profile the native cut uses (dt_cone_gear_spec.custom_six_form_points_mm),
+    with a one-sided form tolerance. T006 cuts at T=0 on a spur (helix 0)
+    gear, so its installed gap IS the ground form. The shop has no optical
+    comparator: the tool is checked against a template made to the table,
+    and the cut T006 over pins on its own sheet.
     """
     profile = stock_form_profile(6)
     template = profile.template
@@ -271,27 +274,22 @@ def cutter_grind_data() -> str:
         raise ValueError("T006 must use the specified DT6-FORM1 custom cutter")
     if profile.radial_translation_mm != 0.0 or profile.helix_angle_deg != 0.0:
         raise ValueError("DT6-FORM1's installed gap is its ground form only at T=0, helix 0")
-    pitch_radius = profile.pitch_radius_mm
-    pitch_half_gap = (
-        profile.angular_pitch_rad - profile.pitch_tooth_thickness_mm / pitch_radius
-    ) / 2.0
-    blank_radius = profile.blank_radius_mm
-    rows = (
-        ("FORM DEPTH (PLUNGE FROM BLANK OD)", f"{profile.plunge_mm:.3f}"),
-        ("TIP ARC (FORMS GEAR ROOT)", f"R{template.root_radius_mm:.3f}"),
-        (
-            f"WIDTH AT PITCH DIA {2.0 * pitch_radius:.3f} (CHORD)",
-            f"{2.0 * pitch_radius * math.sin(pitch_half_gap):.3f}",
-        ),
-        (
-            f"WIDTH AT BLANK OD {2.0 * blank_radius:.3f} (CHORD)",
-            f"{2.0 * blank_radius * math.sin(profile.tip_half_angle_rad):.3f}",
-        ),
-        ("RELIEF MEETS INVOLUTE AT", f"R{template.relief_junction_radius_mm:.3f}"),
-    )
+    root = template.root_radius_mm
     return "\n".join((
-        f"{template.name} GROUND FORM TOOL (REF), mm",
-        *(f"{label}:  {value}" for label, value in rows),
+        f"{template.name} GROUND FORM TOOL, mm",
+        "CUTTING EDGE, SYMMETRIC ABOUT TOOL CL:",
+        "X ACROSS CL, Y ALONG CL FROM TIP CENTER,",
+        "AT RADIUS R FROM THE GEAR AXIS",
+        *(
+            f"R{radius:.3f}   X{x:.3f}   Y{y:.3f}"
+            for radius, x, y in custom_six_form_points_mm()
+        ),
+        f"TIP: CONCAVE ARC R{root:.3f} ABOUT GEAR AXIS",
+        f"ABOVE R{template.relief_junction_radius_mm:.3f}: INVOLUTE, BASE "
+        f"R{template.base_radius_mm:.3f}",
+        f"FORM TOLERANCE: X +{CUSTOM_SIX_FORM_TOLERANCE_MM:.3f} / -0.000",
+        f"FORM DEPTH (PLUNGE FROM BLANK OD):  {profile.plunge_mm:.3f}",
+        "INSPECT THE TOOL BY TEMPLATE TO THIS TABLE;",
         "ACCEPT THE CUT T006 OVER PINS PER SHEET T006",
     ))
 
@@ -1222,8 +1220,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # cutter_grind_data).
     if add_note(adapter, cutter_grind_data(), *CUTTER_DETAIL_POS) is None:
         raise RuntimeError("failed to add the DT6-FORM1 grind data")
+    # The crop is the gap the edge cuts, an illustration only: the table
+    # defines the edge (machinist review of the stack build).
     if add_note(
-        adapter, "T006 INSTALLED GAP - SEE T006 FOR FINISHED GEAR",
+        adapter, "T006 GAP = TOOL EDGE (ILLUSTRATION; USE TABLE)",
         0.230, 0.092,
     ) is None:
         raise RuntimeError("failed to label the installed gap on the cutter detail")

@@ -534,6 +534,51 @@ def blank_dia_band(teeth: int) -> tuple[float, float]:
     return CUSTOM_SIX_BLANK_DIA_BAND if teeth == 6 else BLANK_DIA_BAND
 
 
+# DT6-FORM1's cutting edge, defined for the toolmaker (machinist review of the
+# stack build: reference widths left the relief undefined). T006 is a spur
+# gear cut on centre, so the tool's edge IS the T006 gap. Each point is given
+# at its radius R from the gear axis, in the tool's frame: X across from the
+# tool centerline, Y along it from the tip center (the root on the gap
+# centerline). The radii keep a straight line between neighbours within
+# 0.006 of the curve. The edge may grind wide, never narrow, by half the T006
+# thinning band: a uniformly wide tool cuts the thin-limit tooth that the
+# backlash, drum-tip relief clearance and over-pins limits already cover, and
+# a wider relief only adds drum-tip air.
+CUSTOM_SIX_FORM_TOLERANCE_MM = -CUSTOM_SIX_TOOTH_THICKNESS_BAND[1] / 2.0
+_CUSTOM_SIX_FORM_RADII_MM = (
+    1.110, 1.125, 1.150, 1.200, 1.250, 1.300, 1.400, 1.500, 1.750, 1.900, 2.000,
+)
+
+
+def custom_six_gap_half_angle_rad(radius_mm: float) -> float:
+    """Half the T006 gap's angle at ``radius_mm``: the relief below the
+    junction, the standard involute (closed form) above it."""
+    template = cutter_template(6)
+    if radius_mm < template.relief_junction_radius_mm:
+        return template.relief_half_angle_rad(radius_mm)
+    roll = math.sqrt((radius_mm / template.base_radius_mm) ** 2 - 1.0)
+    return template.half_space_base_angle_rad + roll - math.atan(roll)
+
+
+@lru_cache(maxsize=None)
+def custom_six_form_points_mm() -> tuple[tuple[float, float, float], ...]:
+    """(R, X, Y) along DT6-FORM1's edge, tip center first, up to the blank OD."""
+    template = cutter_template(6)
+    profile = stock_form_profile(6)
+    root = template.root_radius_mm
+    radii = sorted({
+        root, *_CUSTOM_SIX_FORM_RADII_MM, template.relief_junction_radius_mm,
+        profile.pitch_radius_mm, profile.blank_radius_mm,
+    })
+    if radii[0] != root or radii[-1] != profile.blank_radius_mm:
+        raise ValueError("T006 form stations must run from the root to the blank OD")
+    points = [(root, 0.0, 0.0)]
+    for radius in radii:
+        angle = custom_six_gap_half_angle_rad(radius)
+        points.append((radius, radius * math.sin(angle), radius * math.cos(angle) - root))
+    return tuple(points)
+
+
 def configuration_number(part_number: str, teeth: int) -> str:
     """Return one configuration sheet's drawing number, e.g. ``MHA-DT-003-T006``."""
     _require_member(teeth)
