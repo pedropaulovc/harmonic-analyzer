@@ -280,5 +280,5 @@ next free Number in its category and has no old stem or old Number.
 | added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
 | added | `mg-wheel-drum` | MHA-MG-010 | brass drum pressed on the MHA-MG-005 wheel spigot; carries the lever wire |
 | added | `vn-wheel-axle-back-washer` | MHA-VN-054 | brass #10 washer between the MHA-MG-008 wheel bar and the MHA-MG-005 wheel hub |
-| added | `vn-wheel-axle-front-washer` | MHA-VN-055 | brass #4 washer between the MHA-MG-010 drum and the MHA-VN-025 nut |
+| added | `vn-wheel-axle-front-washer` | MHA-VN-055 | brass #4 washer between the MHA-MG-005 wheel spigot face and the first MHA-VN-025 nut; its Ø7.1 OD bears inside the Ø14.5 spigot end, clear of the MHA-MG-010 drum |
 | added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |
