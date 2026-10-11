@@ -134,15 +134,15 @@ def test_the_flat_is_a_true_chord_clocked_to_one_place() -> None:
         assert spec.bore_flat_segment_area_mm2(teeth) == pytest.approx(
             radius**2 * math.acos(offset / radius) - offset * half_chord
         )
-    assert lands.TERMINAL_HALF_CHORD_MIN_MM >= lands.TERMINAL_REQUIRED_HALF_CHORD_MM
     minimum_land_radius = (
         lands.TERMINAL_DIA_MM + lands.RUNNING_DIA_BAND[1]
     ) / 2.0
     assert 0.0 < lands.TERMINAL_FLAT_OFFSET_MAX_MM < minimum_land_radius
-    assert lands.TERMINAL_HALF_CHORD_MIN_MM - (
-        lands.TIP_SCREW_DOG_PROJECTED_RADIUS_MM
-        + lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM + lands.TIP_SCREW_DOG_AXIS_OFFSET_MM
-    ) >= lands.TERMINAL_FLAT_EDGE_BREAK_MAX
+    # Round guidance: the deepest flat on the largest land stops short of the axis.
+    assert lands.TERMINAL_FLAT_OFFSET_MIN_MM == pytest.approx(
+        lands.TERMINAL_FINISHED_AF_LIMITS_MM[0] - lands.TERMINAL_FINISHED_DIA_LIMITS_MM[1] / 2.0
+    )
+    assert lands.TERMINAL_FLAT_OFFSET_MIN_MM > 0.0
 
 
 def test_retained_seat_band_is_input_and_qualified_web_is_acceptance() -> None:

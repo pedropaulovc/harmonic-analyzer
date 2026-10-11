@@ -182,7 +182,10 @@ if abs(PIVOT_SHAFT_FLAT_STATIONS[1] - _shaft.NORTH_FLAT_STATION) > 1e-9:
 # flush by straightedge, and at the south ear the stack's acceptance excess,
 # the spring blade's set error and both washers' stock bands (the north one
 # moves the datum ear with the shaft's flush end, the south one the blade-set
-# ear), which move the south ear along the shaft.
+# ear), which move the south ear along the shaft. Both flats are stationed
+# from the north end, set on the north ear's OUTBOARD face, while the south
+# ear is set from the north ear's INBOARD face (through the stack), so the
+# north ear's thickness band also moves the south flat off its ear.
 SHAFT_FLUSH_SET_BAND = 0.25
 _WASHER_DEV = (
     _washer.STOCK_THICKNESS_RANGE[0] - _washer.THICKNESS,
@@ -193,21 +196,34 @@ SOUTH_EAR_SET_RANGE = (
     ROCKER_SPRING_SET_BAND - 2.0 * _WASHER_DEV[0],
 )
 FLAT_OFFSET_MAX = (
-    SHAFT_FLUSH_SET_BAND + max(abs(v) for v in SOUTH_EAR_SET_RANGE),
+    SHAFT_FLUSH_SET_BAND
+    + _bracket.EAR_T_BAND
+    + max(abs(v) for v in SOUTH_EAR_SET_RANGE),
     SHAFT_FLUSH_SET_BAND,
 )  # (south, north)
 # How far a flat may run from its ear's mid-plane before a hub's bore rides
 # over its edge: half the thinnest ear, the thinnest washer, and at the south
 # ear the shortest spring set. Under the ear, the washer and the spring the
-# flat is harmless (none of them runs on the shaft).
+# flat is harmless (none of them runs on the shaft). The north flat is set
+# from the ear's OUTBOARD face (the shaft's flush end), so the inboard face
+# the hub runs on closes by the whole ear-thickness band, not half of it.
 FLAT_RUN_MAX = (
     (_bracket.EAR_T - _bracket.EAR_T_BAND) / 2.0
     + _washer.STOCK_THICKNESS_RANGE[0]
     + ROCKER_SPRING_HEIGHT[0],
-    (_bracket.EAR_T - _bracket.EAR_T_BAND) / 2.0 + _washer.STOCK_THICKNESS_RANGE[0],
+    _bracket.EAR_T / 2.0 - _bracket.EAR_T_BAND + _washer.STOCK_THICKNESS_RANGE[0],
 )  # (south, north)
-for _offset, _run_max in zip(FLAT_OFFSET_MAX, FLAT_RUN_MAX, strict=True):
-    _reach = _offset + _shaft.FLAT_STATION_BAND + _bracket.SET_SCREW_STATION_BAND
+# The tap is held from the ear's inboard face. At the south ear that face is
+# the flat's reference too; at the north ear the flat is set from the
+# outboard face, so the ear-thickness band also lies between flat and tap.
+SET_SCREW_TO_FLAT_BAND = (
+    _bracket.SET_SCREW_STATION_BAND,
+    _bracket.SET_SCREW_STATION_BAND + _bracket.EAR_T_BAND,
+)  # (south, north)
+for _offset, _run_max, _tap_band in zip(
+    FLAT_OFFSET_MAX, FLAT_RUN_MAX, SET_SCREW_TO_FLAT_BAND, strict=True
+):
+    _reach = _offset + _shaft.FLAT_STATION_BAND + _tap_band
     # The cup lands wholly on the flat...
     if _reach + _shaft.SET_SCREW_CUP_DIA / 2.0 > _shaft.FLAT_LENGTH_RANGE[0] / 2.0:
         raise AssertionError("a set-screw cup runs off its flat at worst case")

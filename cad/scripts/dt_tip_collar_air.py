@@ -51,6 +51,7 @@ import _mcmaster_94025a164 as adjuster
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 from cone_stack_end_play import COLLAR_FEELER_BAND
+from cone_shaft_land_bands import TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
 from dt_cone_swing_platform_geometry import manufactured_p1_stop_enclosure
 
 Vector = tuple[float, float, float]
@@ -83,22 +84,22 @@ PARTITION_STATION_MM = collar.NOSE_LENGTH - collar.SHOULDER_ROOT_RADIUS
 _MIN_STOCK_Y = collar.TAP_STATION - collar.SET_SCREW_MAJOR_DIA / 2.0
 _STOCK_R = math.hypot(collar.SET_SCREW_END_RADIUS, collar.SET_SCREW_MAJOR_DIA / 2.0)
 _MAX_STOCK_Y_LOSS = (
-    collar.TAP_POSITION_RADIUS_MM
+    collar.TAP_STATION_BAND_MM
     + (collar.SET_SCREW_LENGTH + collar.SET_SCREW_LENGTH_BAND_MM)
-    * math.sin(collar.TIP_SCREW_MAX_AXIS_ANGLE_RAD)
-    + collar.TIP_SCREW_DOG_TOTAL_RUNOUT_MM / 2.0
+    * math.sin(collar.SET_SCREW_MAX_AXIS_ANGLE_RAD)
 )
 _MAX_STOCK_R = math.hypot(
-    collar._FLAT_MAX + collar._FLOAT_MAX + collar.SET_SCREW_LENGTH
-    + collar.SET_SCREW_LENGTH_BAND_MM,
-    collar.SET_SCREW_MAJOR_DIA / 2.0 + _MAX_STOCK_Y_LOSS,
+    collar._POINT_PLANE_MAX + collar.SET_SCREW_LENGTH + collar.SET_SCREW_LENGTH_BAND_MM,
+    collar.SET_SCREW_MAJOR_DIA / 2.0 + collar.TAP_LATERAL_BAND_MM
+    + (collar.SET_SCREW_LENGTH + collar.SET_SCREW_LENGTH_BAND_MM)
+    * math.sin(collar.SET_SCREW_MAX_AXIS_ANGLE_RAD),
 )
 TIERS = (
     CollarTier("nose", 0.0, PARTITION_STATION_MM, collar.NOSE_DIA / 2.0,
-               0.0, collar.ROUTINE_BAND_MM + collar.SHOULDER_ROOT_RADIUS,
+               0.0, collar.AXIAL_BAND_MM + collar.SHOULDER_ROOT_RADIUS,
                collar.ROUTINE_BAND_MM / 2.0),
     CollarTier("body", PARTITION_STATION_MM, collar.WIDTH, collar.OUTER_DIA / 2.0,
-               -collar.ROUTINE_BAND_MM, collar.WIDTH_BAND_MM, collar.ROUTINE_BAND_MM / 2.0),
+               -collar.AXIAL_BAND_MM, collar.WIDTH_BAND_MM, collar.ROUTINE_BAND_MM / 2.0),
     CollarTier("screw", _MIN_STOCK_Y,
                collar.TAP_STATION + collar.SET_SCREW_MAJOR_DIA / 2.0,
                _STOCK_R, -_MAX_STOCK_Y_LOSS, _MAX_STOCK_Y_LOSS,
@@ -293,7 +294,7 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     # The collar on its journal: nose size, float and cock (vn_cone_tip_collar).
     terms["collar tier axial limit"] = -tier.south_lower_mm * along
     terms["collar tier radial limit"] = tier.radius_upper_mm * across
-    cock = collar.TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
+    cock = TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
     bore_upper_r = collar.BORE_FINISHED_DIA_LIMITS_MM[1] / 2.0
     terms["collar float on the journal"] = (
         collar.TIP_COLLAR_MAX_RADIAL_FLOAT_MM + bore_upper_r * (1.0 / math.cos(cock) - 1.0)

@@ -73,7 +73,7 @@ def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None
         "ShaftLength": 1,
         "DomeHeight": 1,
         "Radius": 1,
-        "FlatLength": 1,
+        "FlatLength": 2,
         "FlatAF": 3,
         "NorthFlatStation": 2,
         "SouthFlatStation": 2,
@@ -187,6 +187,22 @@ def test_the_cup_seats_on_the_flat_at_its_shallowest() -> None:
     # side; the deepest flat still leaves most of the round.
     assert spec.flat_chord(spec.FLAT_DEPTH_RANGE[0]) >= spec.SET_SCREW_CUP_DIA + 1.0
     assert spec.FLAT_DEPTH_RANGE[1] < spec.SHAFT_DIA / 4.0
+
+
+def test_the_layout_checks_the_flat_at_its_printed_limits() -> None:
+    """rocker_bank_layout's worst cases read FLAT_LENGTH_RANGE and
+    FLAT_STATION_BAND; they must be the limits the sheet prints (and the
+    feature export carries), so a precision change cannot leave the layout
+    proving a band the machinist never sees (Astra on #1344)."""
+    from _feature_requirements import limits
+
+    p = spec.DRAWING_PRECISION_BY_NAME
+    assert list(spec.FLAT_LENGTH_RANGE) == pytest.approx(limits(spec.FLAT_LENGTH, p["FlatLength"]))
+    for name in ("NorthFlatStation", "SouthFlatStation"):
+        low, high = limits(spec.NORTH_FLAT_STATION, p[name])
+        assert (high - low) / 2 == pytest.approx(spec.FLAT_STATION_BAND)
+    low, high = limits(spec.FLAT_AF, p["FlatAF"])
+    assert (high - low) / 2 == pytest.approx(spec.LINEAR_3PL)
 
 
 def test_each_flat_stays_inside_its_ear() -> None:

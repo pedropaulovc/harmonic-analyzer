@@ -83,21 +83,15 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
 def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
     lands = cone_shaft_land_bands
     assert dt_cone_gear_shaft_spec.TERMINAL_FLAT_EDGE_BREAK_MAX is lands.TERMINAL_FLAT_EDGE_BREAK_MAX
-    radius = (lands.TERMINAL_DIA_MM + lands.RUNNING_DIA_BAND[1]) / 2.0
-    flat = lands.SECTION_FLAT_AF[-1] - radius
-    half_chord = math.sqrt(radius**2 - flat**2)
-    dog = (
-        lands.TIP_SCREW_DOG_PROJECTED_RADIUS_MM
-        + lands.TIP_COLLAR_MAX_RADIAL_FLOAT_MM + lands.TIP_SCREW_DOG_AXIS_OFFSET_MM
+    collar = vn_cone_tip_collar_spec
+    # The stock point's landing books the stoned corners at their MAX ...
+    assert collar.FLAT_FACE_HALF_WIDTH_MIN_MM == pytest.approx(
+        lands.TERMINAL_HALF_CHORD_MIN_MM - lands.TERMINAL_FLAT_EDGE_BREAK_MAX
     )
-    assert half_chord - lands.TERMINAL_FLAT_EDGE_BREAK_MAX > dog
-    # The title block's R0.25 would eat the dog's flat: the override is real,
-    # and no break above the land radius less the dog budget fits at all.
-    assert half_chord - 0.25 < dog
-    assert lands.TERMINAL_FLAT_EDGE_BREAK_MAX <= radius - dog
-    assert lands.TERMINAL_REQUIRED_HALF_CHORD_MM == pytest.approx(
-        dog + lands.TERMINAL_FLAT_EDGE_BREAK_MAX
-    )
+    assert collar.SCREW_LANDING_MARGIN_MM > 0.0
+    # ... and the title block's R0.25 would lose the landing: the override is real.
+    widened = collar.SCREW_LANDING_MARGIN_MM + lands.TERMINAL_FLAT_EDGE_BREAK_MAX - 0.25
+    assert widened < 0.0
     # The model keeps the corners sharp; the limit is printed once, above the
     # terminal across-flat.
     source = Path(part.__file__).read_text(encoding="utf-8")

@@ -71,6 +71,7 @@ from pd_transgear_arm_plate_geometry import (
     HUB_DIA,
     HUB_FACE_Z,
     KINK,
+    KINK_RIGHT,
     NOTCH_LEFT,
     NOTCH_RIGHT,
     REAR_FACE_Z,
@@ -113,26 +114,28 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# At 2:1 the geometry-derived plan, back view and section A-A stand side by
-# side above the title block (x > 0.216 below y 0.066), the isometric in the
-# upper right. The section stands far enough right that its hub diameter
-# clears the back view's notch height, and the isometric's caption starts
-# right of the section's over-arm wall and ends inside the border (x 0.419).
+# The plate is 56 x 38 in plan and 29 deep: at 2:1 the plan, the back view
+# and section A-A stand side by side above the title block (x > 0.216 below
+# y 0.066). The section stands far enough right that its hub diameter clears
+# the back view's notch height and its boss diameter ends inside the border
+# (x 0.419), which leaves no room beside it for the isometric: that stands
+# in the lower strip between the notes and the title block, its caption
+# above it, under the back view's edge dimensions.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 # 12 mm lower than run 20261010T001620278Z, whose top frame row and locator
 # callout printed above the border; section A-A's caption still clears the
 # title block (it reached y 0.085).
 PLAN_CENTER = (0.080, 0.153)
-BACK_CENTER = (0.206, PLAN_CENTER[1])
-SECTION_CENTER = (0.326, PLAN_CENTER[1])
-ISO_CENTER = (0.390, 0.225)
-ISO_NOTE_XY = (0.353, 0.180)
-# Bottom left, under the plan view's bore frame (its bottom y 0.081) and
-# left of the title block.
-NOTES_XY = (0.014, 0.072)
-# Characters per line that keep the block left of the title block.
-NOTES_WIDTH = 62
+BACK_CENTER = (0.218, PLAN_CENTER[1])
+SECTION_CENTER = (0.343, PLAN_CENTER[1])
+ISO_CENTER = (0.180, 0.045)
+ISO_NOTE_XY = (0.150, 0.081)
+# Bottom left, under the plan view's bore frame (its bottom y 0.081), left
+# of the isometric.
+NOTES_XY = (0.014, 0.075)
+# Characters per line that keep the block left of the isometric.
+NOTES_WIDTH = 50
 NOTES_TEXT = "\n".join((
     matched_locator_notes(
         _config.parts("pd-transgear-arm")["number"],
@@ -173,22 +176,24 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, PLAN_ROWS[1], _Z_PLAN),
     "KinkY": (EDGE_MINUS_X - 5.0, KINK[1] / 2.0, _Z_PLAN),
     "TopLeftY": (EDGE_MINUS_X - 11.0, TOP_LEFT[1] / 2.0, _Z_PLAN),
+    "KinkRightY": (EDGE_PLUS_X + 5.0, KINK_RIGHT[1] / 2.0, _Z_PLAN),
     "ScrewHoleY": (EDGE_PLUS_X + 9.5, SCREW_HOLES[0][1] / 2.0, _Z_PLAN),
     "TopRightY": (EDGE_PLUS_X + 19.0, TOP_RIGHT[1] / 2.0, _Z_PLAN),
     "EndR": (0.7071 * END_R + 6.0, -0.7071 * END_R - 6.0, _Z_PLAN),
     "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
-    "ScrewHoleDia": (EDGE_MINUS_X - 8.0, _TOP + 8.0, _Z_PLAN),
+    "ScrewHoleDia": (EDGE_MINUS_X - 6.0, _TOP + 8.0, _Z_PLAN),
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 8.0, _Z_PLAN),
     "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2], _Z_PLAN),
     # High enough that its callout lines clear the screw-hole callout; three
     # short lines keep its left edge inside the border. Its leader runs down
     # to locator 1 left of every location dimension line.
-    "LocatorDia1": (EDGE_MINUS_X - 7.0, _TOP + 23.75, _Z_PLAN),
+    "LocatorDia1": (EDGE_MINUS_X - 4.5, _TOP + 23.75, _Z_PLAN),
 }
 # Back view (the mounting face): the notch face's corner heights, outboard,
-# and the plate width below the end round, clear of every leader.
+# and both side edges from K below the end round, clear of every leader.
 BACK_KEEP: dict[str, tuple[float, float, float]] = {
-    "Width": ((EDGE_MINUS_X + EDGE_PLUS_X) / 2.0, _BOTTOM - 7.0, 0.0),
+    "EdgeLeftX": (EDGE_MINUS_X / 2.0, _BOTTOM - 7.0, 0.0),
+    "EdgeRightX": (EDGE_PLUS_X / 2.0, _BOTTOM - 7.0, 0.0),
     "NotchLeftY": (EDGE_MINUS_X - 4.0, NOTCH_LEFT[1] / 2.0, FRONT_FACE_Z),
     "NotchRightY": (EDGE_PLUS_X + 4.0, NOTCH_RIGHT[1] / 2.0, FRONT_FACE_Z),
     "LocatorY1": (EDGE_MINUS_X - 8.0, LOCATOR_SITES_MM[0][1] / 2.0, 0.0),
@@ -232,11 +237,15 @@ FINISH_CHAR_HEIGHT = 0.0025
 # hole leaders. The plan carries no frame: each countersink is coaxial with
 # its hole (note 3).
 FRAME_ROWS = (0.262, 0.250, 0.238)
+# The back view's holes and locators stand where they did on run
+# 20261009T214031408Z plus _BACK_FEATURE_SHIFT (the view moved right and
+# now centres on K), so each frame keeps its leader's measured run.
+_BACK_FEATURE_SHIFT = 0.01875
 FRAME_XY = {
-    "plate_hole_1_position": (0.228, FRAME_ROWS[2]),
-    "plate_hole_2_position": (0.1174, FRAME_ROWS[2]),
-    "plate_locator_1_position": (0.2098, FRAME_ROWS[0]),
-    "plate_locator_2_position": (0.2183, FRAME_ROWS[1]),
+    "plate_hole_1_position": (0.228 + _BACK_FEATURE_SHIFT, FRAME_ROWS[2]),
+    "plate_hole_2_position": (0.1174 + _BACK_FEATURE_SHIFT, FRAME_ROWS[2]),
+    "plate_locator_1_position": (0.2098 + _BACK_FEATURE_SHIFT, FRAME_ROWS[0]),
+    "plate_locator_2_position": (0.2183 + _BACK_FEATURE_SHIFT, FRAME_ROWS[1]),
 }
 # The thrust faces' finish symbols, on section A-A where each face is
 # edge-on: the pick lands on the face's own cut edge, midway across the
@@ -418,7 +427,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         # Below the end radius's text and right of the bore finish symbol.
         "knob_projected_axis": PmiDrawingPlacement(
-            plan, (0.092, 0.088),
+            plan, (0.085, 0.088),
             edge_entity=visible_circle_edge(adapter, plan, BORE_DIA),
         ),
         **{

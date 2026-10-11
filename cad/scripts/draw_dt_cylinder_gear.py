@@ -102,13 +102,22 @@ NOTCH_DETAIL_DIMENSIONS = {
 # the bore clear of the notch-phase extension lines.  The cam diameter is
 # dropped outside the gear's lower-right quadrant: its diagonal no longer
 # crosses the bore-fit leader, and the phase text keeps the clear upper lane.
+#
+# An angular dimension's arc radius is the distance from the gear centre
+# (sheet ~(105.1, 270.6) mm) to its text.  On the r4b sheet the (90°) text at
+# (145, 360) drew a 98 mm arc: it reached x 203 through the side view's cam
+# silhouette (x 199.7), and the notch radial's extension rose to y 369 into
+# the gear data's last row (bottom y 368.3).  At (178, 321), r 88.6, the arc
+# stops at x 193.7 and y 359.2.  That arc would cut the old one-row 70 mm
+# notch-phase callout at (152, 334), so the callout wraps to three rows
+# (~40 x 16 mm) at (131, 337): inside the arc by >= 5 mm, above the cam
+# finish symbol (top y 325) and right of the detail label A (x <= 106.7).
 FRONT_KEEP = {
     "BoreDia": (0.056, 0.336),
     "CamDia": (0.175, 0.235),
     "CamCy": (0.175, 0.279),
-    "NotchPhase": (0.152, 0.334),
-    # Left of centre so "(90°)" keeps clear of the STACKS note above 7.0565.
-    "PatternNotchPhase": (0.145, 0.360),
+    "NotchPhase": (0.131, 0.337),
+    "PatternNotchPhase": (0.178, 0.321),
 }
 RIGHT_KEEP = {
     "OutsideDia": (0.248, RIGHT_CENTER[1]),
@@ -119,7 +128,7 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_FIT_CALLOUT,
     "NotchWidth": "ALIGNMENT NOTCH",
     "NotchDepth": "FROM OD",
-    "NotchPhase": "NOTCH CCW FROM CAM LOBE",
+    "NotchPhase": "NOTCH CCW\nFROM CAM LOBE",
 }
 # Decimal places are the part's (cylinder_gear_spec.DRAWING_PRECISION,
 # applied by build_cylinder_gear); the sheet only reads them back.
