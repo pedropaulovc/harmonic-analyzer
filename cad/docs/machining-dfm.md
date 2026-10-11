@@ -37,10 +37,11 @@ geometry is casting-shaped, not milling-shaped.
      already pays for that break. The model leaves these corners sharp and the sheet prints the break
      as a callout, `TORQUE CORNERS: STONE BURR ONLY, 0.02 MAX`, because it is below the title block's
      R0.25 edge break. The stepped collar (Ø17.05 body, Ø6.40 × 3.5 nose, 11.5 overall) has a
-     finished bore of Ø0.849 ±0.030. Its set screw's ground dog prints the same way:
-     `DOG EDGE: STONE BURR ONLY, 0.02 MAX`. To fit the collar, hold the gear stack south on the shaft's thrust collar,
-     set the original 0.45 ±0.10 feeler off the T006 thrust face, seat both collar bore ends on the
-     round back of the terminal, snug the ground dog wholly on the unbroken flat, then remove the feeler.
+     finished bore of Ø0.849 ±0.030 and a radial #2-56 through tap. Fit the stock McMaster
+     94355A213 #2-56 × 5/16 in flat-point screw unaltered, with no dog. To fit the collar, hold the
+     gear stack south on the shaft's thrust collar, set the original 0.45 ±0.10 feeler off the
+     T006 thrust face, seat both collar bore ends on the round back of the terminal, snug the
+     stock flat point on the D-flat, then remove the feeler.
      Never run or swing a loose collar. The post and stack setup steps are listed in
      `dt_tip_collar_air.installation_requirements()`.
 
