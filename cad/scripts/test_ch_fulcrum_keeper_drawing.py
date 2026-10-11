@@ -46,8 +46,9 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     # spacing, that covers the faced rail seats' flatness (ch_fulcrum_shaft_spec).
     assert spec.BORE_DIA == 6.35
     assert spec.BORE_DIA_BAND == (0.050, 0.035)  # (upper, lower)
-    assert spec.BORE_PAIR_CALLOUT.startswith("DRILL AND REAM IN ONE PASS WITH THE")
-    assert "AT ITS INSTALLED\nSPACING, FEET ON ONE FLAT" in spec.BORE_PAIR_CALLOUT
+    assert spec.BORE_PAIR_CALLOUT.startswith("PAIR-REAM WITH THE MATING MHA-CH-007")
+    pair_ream = " ".join(spec.BORE_PAIR_CALLOUT.split())
+    assert "AT INSTALLED SPACING; THE MHA-CH-004 SHAFT SLIDES THROUGH BOTH" in pair_ream
 
 
 def test_crown_set_screw_tap_stops_at_the_bore() -> None:
@@ -147,7 +148,7 @@ def test_print_carries_no_datums_or_frames_and_cites_the_fitup_steps() -> None:
     pair_ream = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(f"PER {pair_ream}")
     assert drawing.DIMENSION_CALLOUTS["CrownDia"].endswith(f"PER {pair_ream}")
-    assert "STAKE MOUTH 2 PLACES" in drawing.SET_SCREW_PROCESS
+    assert "STAKE MOUTH 2 PLACES" in " ".join(drawing.SET_SCREW_PROCESS.split())
     assert steps.step_ref(steps.SET_SCREWS_STAKED_KEY) in drawing.SET_SCREW_PROCESS
 
 
@@ -217,6 +218,163 @@ def test_foot_hole_leader_routes_clear_of_the_crown_tap() -> None:
     assert x >= 0.1082 + 0.003
 
 
+# Printed text metrics of farm run r13 (20261011T024120388Z, layout audit):
+# 3.5 mm capitals on a 5.56 mm pitch, a tolerance stack's upper row 4.53 mm
+# over the value, 2.48-2.76 mm a character (2.8 bounds it), each block within
+# 1.1 mm of its requested centre. A diametric's shoulder runs under its last
+# row and 1.6 mm past the end facing the centre; its leader runs from there
+# straight at the centre (r13: 30.1 and 32.0 deg, the bend-to-centre bearing).
+_CAP = 0.0035
+_PITCH = 0.00556
+_STACK = 0.00453
+_CHAR = 0.0028
+_PLACEMENT_SLACK = 0.0011
+_SHOULDER_RUN = 0.0016
+_AIR = 0.003 + _PLACEMENT_SLACK
+
+
+def _text_block(xy, rows, *, stack=False):
+    from _layout_geometry import Box
+
+    width = max(map(len, rows)) * _CHAR
+    height = (len(rows) - 1) * _PITCH + _CAP + (_STACK if stack else 0.0)
+    return Box(xy[0] - width / 2, xy[1] - height / 2, xy[0] + width / 2, xy[1] + height / 2)
+
+
+def _box_gap(a, b) -> float:
+    return math.hypot(
+        max(b.xmin - a.xmax, a.xmin - b.xmax, 0.0), max(b.ymin - a.ymax, a.ymin - b.ymax, 0.0)
+    )
+
+
+def _shoulder_leader(block, target, radius):
+    """Bend (shoulder end facing ``target``) to the rim point toward it."""
+    from _layout_geometry import Segment
+
+    facing_right = (block.xmin + block.xmax) / 2.0 < target[0]
+    bend = (block.xmax + _SHOULDER_RUN if facing_right else block.xmin - _SHOULDER_RUN, block.ymin)
+    reach = math.dist(bend, target)
+    rim = (
+        target[0] + radius * (bend[0] - target[0]) / reach,
+        target[1] + radius * (bend[1] - target[1]) / reach,
+    )
+    return Segment(*rim, *bend)
+
+
+def test_end_view_callouts_stand_clear_of_the_part_and_each_other() -> None:
+    # Machinist review r13: the Ø14 crown callout, the 14.0 width, the Ø6.350
+    # limits and the pair-ream note overprinted one another and the crown and
+    # bore, and the Ø14 leader crossed the 14.0 line. Each now stands in its
+    # own clear paper with a near-side leader, the width under the foot.
+    from _layout_audit import _segment_crossing
+    from _layout_geometry import Box, Segment, segment_box_distance
+
+    spec = ch_fulcrum_keeper_spec
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    cx = drawing.RIGHT_CENTER[0]
+    bottom = drawing.RIGHT_CENTER[1] - spec.CROWN_TOP_Y * scale / 2.0
+    centre = (cx, bottom + spec.SHAFT_AXIS_H * scale)
+    half = spec.KEEPER_WIDTH * scale / 2.0
+    crown_r = spec.CROWN_DIA * scale / 2.0
+    body = Box(cx - half, bottom, cx + half, centre[1])
+    assert drawing.NEAR_SIDE_DIAMETERS == ("CrownDia", "BoreDia")
+    keep = drawing.RIGHT_KEEP
+    callouts = drawing.DIMENSION_CALLOUTS
+    blocks = {
+        "CrownDia": _text_block(
+            keep["CrownDia"], ["Ø14.0", *callouts["CrownDia"].splitlines()]
+        ),
+        "BoreDia": _text_block(
+            keep["BoreDia"], ["Ø6.350 +0.035", *callouts["BoreDia"].splitlines()], stack=True
+        ),
+        "Depth": _text_block(keep["Depth"], ["14.0"]),
+    }
+    leaders = {
+        "CrownDia": _shoulder_leader(blocks["CrownDia"], centre, crown_r),
+        "BoreDia": _shoulder_leader(blocks["BoreDia"], centre, spec.BORE_DIA * scale / 2.0),
+    }
+    # The crown is a half round: its leader lands on the arc above the axis.
+    assert leaders["CrownDia"].y0 > centre[1] + 0.003
+    # Neighbours, r13's printed extents (mm): the isometric note and view,
+    # the foot-hole callout, the 25.20 text; the inner border and title block.
+    neighbours = {
+        "iso note": Box(0.3098, 0.1459, 0.3694, 0.1502),
+        "iso view": Box(0.3136, 0.165, 0.3464, 0.215),
+        "foot-hole callout": Box(0.1035, 0.1964, 0.1469, 0.2055),
+        "25.20": Box(0.1889, 0.1232, 0.2031, 0.1267),
+        "title block": Box(0.216, 0.0, 0.4318, 0.066),
+    }
+    for name, block in blocks.items():
+        assert 0.0127 + 0.003 <= block.xmin and block.xmax <= 0.4318 - 0.0127 - 0.003, name
+        assert block.ymax <= 0.2794 - 0.0127 - 0.003, name
+        assert _box_gap(block, body) >= _AIR, name
+        nearest = (
+            min(max(centre[0], block.xmin), block.xmax),
+            min(max(centre[1], block.ymin), block.ymax),
+        )
+        assert math.dist(nearest, centre) - crown_r >= _AIR, name
+        for other, box in neighbours.items():
+            assert _box_gap(block, box) >= _AIR, (name, other)
+        for other, box in blocks.items():
+            if other != name:
+                assert _box_gap(block, box) >= _AIR, (name, other)
+        for other, leader in leaders.items():
+            if other != name:
+                assert segment_box_distance(leader, block) >= 0.003, (other, name)
+    assert _segment_crossing(leaders["CrownDia"], leaders["BoreDia"]) is None
+    # Neither leader meets the width or LugRise dimension lines or their
+    # extension lines (r13: extension lines 1 mm off the outline).
+    depth_line = keep["Depth"][1] - 0.0028
+    lug_rise_x = keep["LugRise"][0]
+    lines = [
+        Segment(cx - half, depth_line, cx + half, depth_line),
+        Segment(cx - half, bottom - 0.001, cx - half, depth_line - 0.001),
+        Segment(cx + half, bottom - 0.001, cx + half, depth_line - 0.001),
+        Segment(lug_rise_x, bottom, lug_rise_x, centre[1]),
+        Segment(lug_rise_x - 0.001, bottom, cx + half - 0.001, bottom),
+        Segment(lug_rise_x - 0.001, centre[1], cx + half - 0.001, centre[1]),
+    ]
+    for name, leader in leaders.items():
+        for line in lines:
+            assert _segment_crossing(leader, line) is None, (name, line)
+    # The width stands under the foot, its text clear of the outline.
+    assert blocks["Depth"].ymax <= bottom - _AIR
+
+
+def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
+    # Machinist review r13: the tap/staking block ran 5.70 mm past the left
+    # inner border (x 12.7 mm). Reflowed to rows of at most 24 characters,
+    # the whole block and its leader shoulder stand inside with air, clear of
+    # the plan, of LugThickness's text and of the foot-hole callout.
+    from _layout_audit import _segment_crossing
+    from _layout_geometry import Box, Segment, point_segment_distance
+
+    spec = ch_fulcrum_keeper_spec
+    rows = ["Ø 1.51 THRU", *drawing.SET_SCREW_PROCESS.splitlines(), "1-72 UNF - 2B THRU"]
+    assert max(map(len, rows)) <= 24
+    block = _text_block(drawing.SET_SCREW_CALLOUT_XY, rows)
+    assert block.xmin >= 0.0127 + _AIR
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    cy = drawing.TOP_CENTER[1]
+    plan = Box(
+        drawing._front_x(-spec.LUG_HALF_T),
+        cy - spec.KEEPER_WIDTH * scale / 2.0,
+        drawing._front_x(spec.FOOT_TIP_X),
+        cy + spec.KEEPER_WIDTH * scale / 2.0,
+    )
+    lug_thickness_text = Box(0.0924, 0.1752, 0.1066, 0.1787)  # r13 printed
+    foot_hole = Box(0.1035, 0.1964, 0.1469, 0.2055)  # r13 printed
+    for other in (plan, lug_thickness_text, foot_hole):
+        assert _box_gap(block, other) >= _AIR, other
+    bend = (block.xmax + _SHOULDER_RUN, block.ymin)
+    leader = Segment(*bend, drawing.TAP_X_SHEET, cy - drawing.TAP_R_SHEET)
+    foot_hole_leader = Segment(0.1035592, 0.1963903, 0.1146083, 0.224464)  # r13 printed
+    assert _segment_crossing(leader, foot_hole_leader) is None
+    assert point_segment_distance((foot_hole.xmin, foot_hole.ymin), leader) >= 0.003
+    assert point_segment_distance((plan.xmin, plan.ymin), leader) >= 0.003
+
+
+
 def test_the_auto_tapped_hole_note_is_removed() -> None:
     # Farm run r8: SolidWorks' own "#1-72 Tapped Hole" note restated the tap
     # callout's thread and its leader ran 4.07 mm through the SetScrewLocation
@@ -227,9 +385,11 @@ def test_the_auto_tapped_hole_note_is_removed() -> None:
     assert "tapped hole" not in ch_fulcrum_keeper_spec.DRAWING_NOTES.lower()
 
 
-def test_notes_cover_the_finish_the_tap_and_the_screw() -> None:
+def test_notes_cover_the_grade_the_tap_and_the_screw() -> None:
     notes = ch_fulcrum_keeper_spec.DRAWING_NOTES
-    assert "BLACK OXIDE" in notes
+    assert "AISI 1018" in notes
+    # The finish is the title block's Finish field; the note does not restate it.
+    assert "BLACK OXIDE" not in notes.upper()
     # The pair ream is on the bore callout (KEEPERS_PAIR_REAMED_KEY), not a note.
     assert "REAM" not in notes
     assert "MHA-CH-004" in notes

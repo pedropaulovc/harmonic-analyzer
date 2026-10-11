@@ -116,10 +116,10 @@ if not (
     and PAIR_REAMER_RANGE_MM[1] <= BORE_DIA_BAND[0]
 ):
     raise AssertionError("the pair reamer's toleranced size is off the bore band")
-# What the bench cannot see is the rail. Both foot seats on MHA-FR-002 are
-# faced in one setup (the frame's machined keeper-seat callout, which pins
-# this constant), so they lie within one zone KEEPER_SEAT_FLATNESS_BUDGET_MM
-# thick. Inside it the seats can stand the zone apart in height, roll
+# What the bench cannot see is the rail. Both foot seats on MHA-FR-002 lie
+# within one common zone KEEPER_SEAT_FLATNESS_BUDGET_MM thick (the frame's
+# machined keeper-seat note, which pins this constant). Inside it the seats
+# can stand the zone apart in height, roll
 # opposite ways across KEEPER_WIDTH (each lug centre SHAFT_AXIS_H x roll
 # sideways) and each pitch zone/KEEPER_SEAT_LENGTH_MM along the shaft. The
 # shaft takes the straight line through both lug centres, so each lug spends
@@ -145,11 +145,13 @@ if BORE_DIA_BAND[1] - SHAFT_H[0] < (
     BORE_RUNNING_MIN_CLEARANCE_MM + BORE_SEAT_ALLOWANCE_MM
 ):
     raise AssertionError("the keeper bore band does not cover the rail-seat budget")
+# The pair-ream instruction on the bore callout, short enough to stand in one
+# clear block beside the end view (machinist review r13: four 75-97 mm rows
+# overprinted the crown, the bore and the width dimension).
 BORE_PAIR_CALLOUT = (
-    "DRILL AND REAM IN ONE PASS WITH THE\n"
-    "MATING MHA-CH-007 AT ITS INSTALLED\n"
-    "SPACING, FEET ON ONE FLAT: THE\n"
-    "MHA-CH-004 SHAFT SLIDES THROUGH BOTH"
+    "PAIR-REAM WITH THE MATING MHA-CH-007\n"
+    "AT INSTALLED SPACING; THE MHA-CH-004\n"
+    "SHAFT SLIDES THROUGH BOTH"
 )
 CROWN_ABOUT_BORE_CALLOUT = "ROUND ABOUT THE REAMED BORE"
 
@@ -394,7 +396,7 @@ KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
 # no frames and no datums (policy).
 DRAWING_NOTES = "\n".join(
     (
-        "1. MAKE FROM AISI 1018 BAR; BLACK OXIDE AFTER MACHINING.",
+        "1. MATERIAL: AISI 1018 COLD-FINISHED STEEL BAR.",
         "2. CROWN TAP FOR THE MHA-VN-055 CUP-POINT SET SCREW; FOOT HOLE",
         "   FOR THE MHA-VN-022 #2-56 FILLISTER, HEAD FLUSH.",
         "3. 2 REQUIRED, ONE PER MHA-CH-004 FULCRUM-SHAFT END (SECOND",

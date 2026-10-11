@@ -1967,12 +1967,14 @@ def test_keeper_seat_note_is_the_part_property_carrying_the_keeper_budget() -> N
     assert spec.KEEPER_SEAT_FLATNESS_BUDGET_MM is budget
     assert "fr_top_frame_spec" not in Path(keeper.__file__).read_text(encoding="utf-8")
     lines = spec.DRAWING_NOTES_B.splitlines()
-    assert len(lines) == 4
-    assert lines[0] == "FACE BOTH KEEPER SEATS IN ONE SETUP."
-    assert f"WITHIN ONE COMMON {budget:.2f} FLATNESS ZONE" in lines[1]
-    assert "SIZE TO ACTUAL KEEPER CONTACT" in lines[2]
-    assert f"PLUS {spec.KEEPER_SEAT_EDGE_MARGIN_MM:.2f} EACH EDGE" in lines[2]
-    assert lines[3] == "KEEPER LOCATING SEATS: Ra 3.2 UM."
+    # The common zone is the requirement; how the shop holds it (one setup)
+    # is its method, which the note does not order (machinist review r13).
+    assert len(lines) == 3
+    assert lines[0] == f"BOTH SEATS WITHIN ONE COMMON {budget:.2f} FLATNESS ZONE."
+    assert "SIZE TO ACTUAL KEEPER CONTACT" in lines[1]
+    assert f"PLUS {spec.KEEPER_SEAT_EDGE_MARGIN_MM:.2f} EACH EDGE" in lines[1]
+    assert lines[2] == "KEEPER LOCATING SEATS: Ra 3.2 UM."
+    assert "SETUP" not in spec.DRAWING_NOTES_B
     builder = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Manufacturing Notes B": DRAWING_NOTES_B' in builder
     # The keeper sheet links the property; its own executable strings never
