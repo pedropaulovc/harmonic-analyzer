@@ -53,8 +53,9 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   only. The R22.5 bosses bulge 5.4 beyond the side rails and 3.5 beyond
   the front/rear rails, but no longer reach the plan corners (25.56 from
   their centres): window corners and short outer-corner rim runs remain.
-  Edges too short or too close to a feature for C2 stay sharp (listed in
-  _external_edge_breaks); hole and bore low ends stay sharp.
+  Edges too short, too close to a feature or under a knife-mount seat for
+  C2 stay sharp (listed in _external_edge_breaks); hole and bore low ends
+  stay sharp.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -433,6 +434,12 @@ THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
 # bottom, except where an edge cannot take it (_external_edge_breaks).
 ROOT_FILLET_R = 3.0  # internal web/flange T-root blends (cast root, ch19 img04)
 EDGE_CHAMFER = 2.0  # external edge breaks, 45 deg (one grinding pass)
+# Print-worst reach of a finished C2 band into the underside: the edge off
+# its nominal by two .X bands (as the pocket end) and the whole-mm note's
+# leg at the loosest printed row.
+_EDGE_LOCATION_BAND = 2.0 * PRINTED_LINEAR_BAND_MM[1]
+_C2_LEG_BAND = PRINTED_LINEAR_BAND_MM[1]
+KNIFE_SEAT_C2_MIN_CLEARANCE = 0.5
 BORE_CHAMFER = 1.0  # note 9: C1 x 45 TOP-end bore breaks; low ends stay sharp
 
 if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
@@ -505,30 +512,79 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
         raise AssertionError(
             f"crossbar pocket leaves {_value:.3f} mm to the {_label} at the printed bands"
         )
-# The knife-mount top seat stays whole (print-worst): its face nearest the
-# pocket stands from the mount's dowel row by the worse of the row-to-face
-# .X distance and the .X depth less the far row-to-face distance, plus the
-# whole .X block width skewed by the title-block angle; the row sits on the
-# frame's hanger station at its .X band plus half the dowel slip. That edge
-# must stand >= 0.5 beyond the pocket end's C2 band.
-_SEAT_REACH = max(
-    KNIFE_MOUNT.HOLE_ROW_FACE_DISTANCE + KNIFE_MOUNT.HOLE_ROW_FACE_TOL,
-    (KNIFE_MOUNT.SUPPORT_Z_THICK + KNIFE_MOUNT.BLOCK_SIZE_TOL)
-    - (KNIFE_MOUNT.HOLE_ROW_FACE_DISTANCE - KNIFE_MOUNT.HOLE_ROW_FACE_TOL),
-) + (2.0 * KNIFE_MOUNT.BLK_HALF_X + KNIFE_MOUNT.BLOCK_SIZE_TOL) * math.tan(
-    math.radians(angular_band_deg())
-)  # 9.033
-KNIFE_SEAT_PRINTED_MIN_Z = (
-    _POCKET_STATION - HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0 - _SEAT_REACH
-)  # 74.093
-BAR_POCKET_SEAT_CLEARANCE = KNIFE_SEAT_PRINTED_MIN_Z - (
-    _POCKET_END + EDGE_CHAMFER
-)  # 1.293
-if BAR_POCKET_SEAT_CLEARANCE < 0.5:
-    raise AssertionError(
-        f"crossbar pocket-end C2 band comes within {BAR_POCKET_SEAT_CLEARANCE:.3f} mm"
-        " of the knife-mount top seat at the printed bands (needs 0.5)"
+
+
+# Knife-mount top seats (rule 12, print-worst): each block's footprint on
+# the crossbar underside, (x, z), is the convex hull of its corners over
+# every printed extreme -- its round dowel hole at the hanger's .X x and z
+# stations from the sockets, the .XXX dowel-hole offset from the hanger
+# axis and half the dowel slip; the block's +X face 5.65 (.XX) off its round
+# hole, its widest .X width, the worse .X row-to-face reach either side; the
+# whole turned through the title-block angle about the round dowel.
+# _external_edge_breaks keeps every finished C2 band 0.5 off both hulls.
+# The front hull overhangs the crossbar's sharp sides short of the gusset
+# legs (the 24-wide block on the 22-wide bar); that overhang is not a break.
+def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Counter-clockwise convex hull (monotone chain) of plan points."""
+    ordered = sorted(set(points))
+
+    def turn(o, a, b) -> float:
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list[tuple[float, float]] = []
+    upper: list[tuple[float, float]] = []
+    for point in ordered:
+        while len(lower) >= 2 and turn(lower[-2], lower[-1], point) <= 0.0:
+            lower.pop()
+        lower.append(point)
+    for point in reversed(ordered):
+        while len(upper) >= 2 and turn(upper[-2], upper[-1], point) <= 0.0:
+            upper.pop()
+        upper.append(point)
+    return lower[:-1] + upper[:-1]
+
+
+def _knife_seat_footprint(station_z: float, z_label: str) -> list[tuple[float, float]]:
+    """Print-worst (x, z) hull of one knife-mount block's top seat."""
+    slip = HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
+    x_band = (
+        PRINTED_LINEAR_BAND_MM[
+            DRAWING_REFERENCE_PRECISION["hanger x from left sockets"]
+        ]
+        + HANGER_PIN_X_TOL
+        + slip
     )
+    z_band = PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION[z_label]] + slip
+    reach = max(
+        KNIFE_MOUNT.HOLE_ROW_FACE_DISTANCE + KNIFE_MOUNT.HOLE_ROW_FACE_TOL,
+        (KNIFE_MOUNT.SUPPORT_Z_THICK + KNIFE_MOUNT.BLOCK_SIZE_TOL)
+        - (KNIFE_MOUNT.HOLE_ROW_FACE_DISTANCE - KNIFE_MOUNT.HOLE_ROW_FACE_TOL),
+    )
+    width = 2.0 * KNIFE_MOUNT.BLK_HALF_X + KNIFE_MOUNT.BLOCK_SIZE_TOL
+    turn = math.radians(angular_band_deg())
+    corners = []
+    for dx in (-x_band, x_band):
+        for dz in (-z_band, z_band):
+            for side in (
+                KNIFE_MOUNT.PIN_HOLE_SIDE_DISTANCE - KNIFE_MOUNT.PIN_HOLE_SIDE_TOL,
+                KNIFE_MOUNT.PIN_HOLE_SIDE_DISTANCE + KNIFE_MOUNT.PIN_HOLE_SIDE_TOL,
+            ):
+                for u in (side, side - width):
+                    for v in (-reach, reach):
+                        for t in (-turn, turn):
+                            corners.append(
+                                (
+                                    PIN_HOLE_X + dx + u * math.cos(t) - v * math.sin(t),
+                                    station_z + dz + u * math.sin(t) + v * math.cos(t),
+                                )
+                            )
+    return _convex_hull(corners)
+
+
+KNIFE_SEAT_FOOTPRINTS = {
+    "front": _knife_seat_footprint(STUD_Z_FRONT, "front hanger z from upper sockets"),
+    "rear": _knife_seat_footprint(STUD_Z_REAR, "rear hanger z from upper sockets"),
+}
 if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
 # The unified tap table rounds its nominal major; the actual stock major
@@ -1213,27 +1269,143 @@ def _bore_chamfer_removal() -> float:
     return 4.0 * ring(CAP_RECESS_DIAMETER) + ring(GOOSENECK_BORE_DIA)
 
 
-def _external_edge_breaks() -> tuple[list[list[float]], float]:
-    """Selection points and analytic removal for the C2 ExternalEdgeBreaks.
+def _casting_occupies(x: float, y: float, z: float) -> bool:
+    """Whether the solid casting, as the C2 breaks find it, holds (x, y, z).
+
+    The rail T-ring, hub rib, junction lands, crossbar with its gussets and T
+    pockets, corner bosses and hub boss -- exact around every C2 pick (bores,
+    holes, V-gussets and the earlier top breaks lie clear of them).
+    """
+    ax, az = abs(x), abs(z)
+    in_ring_height = -HALF_H <= y <= HALF_H
+    if FLANGE_BOT_Y <= y <= HALF_H and ax <= OUTER_X and az <= OUTER_Z:
+        if not (ax < INNER_X and az < INNER_Z):
+            return True
+    if in_ring_height:
+        if WEB_IN_X <= ax <= WEB_OUT_X and az <= WEB_OUT_Z:
+            return True
+        if WEB_IN_Z <= az <= WEB_OUT_Z and ax <= WEB_OUT_X:
+            return True
+        if LAND_X0 <= x <= LAND_X1 and INNER_Z <= az <= WEB_IN_Z:
+            return True
+        if (
+            -OUTER_X <= x <= -INNER_X
+            and GOOSENECK_Z - HUB_RIB_W / 2.0 <= z <= GOOSENECK_Z + HUB_RIB_W / 2.0
+        ):
+            return True
+        if BAR_X0 <= x <= BAR_X1 and az <= INNER_Z:
+            pocket = (
+                y < FLANGE_BOT_Y
+                and az < BAR_POCKET_Z
+                and (x < BAR_WEB_X0 or x > BAR_WEB_X1)
+            )
+            if not pocket:
+                return True
+        spread = az - (INNER_Z - GUSSET)
+        if 0.0 <= spread and az <= INNER_Z and BAR_X0 - spread <= x <= BAR_X1 + spread:
+            return True
+    if -(HALF_H + BOSS_BELOW) <= y <= HALF_H + BOSS_ABOVE:
+        if math.hypot(ax - COLUMN_X, az - abs(FRONT_COLUMN_Z)) <= BOSS_DIA / 2.0:
+            return True
+    if -(HALF_H + HUB_BOSS_DROP) <= y <= -HALF_H:
+        if math.hypot(x - GOOSENECK_X, z - GOOSENECK_Z) <= HUB_BOSS_DIA / 2.0:
+            return True
+    return False
+
+
+def _interior_angle(
+    point: tuple[float, float, float], axis: tuple[float, float, float]
+) -> float:
+    """The solid's angle (deg) about the edge through ``point`` along ``axis``:
+    the share of 72 rays round it, a hair long, that land in the casting."""
+    norm = math.sqrt(sum(a * a for a in axis))
+    a = tuple(value / norm for value in axis)
+    ref = (0.0, 1.0, 0.0) if abs(a[1]) < 0.9 else (1.0, 0.0, 0.0)
+    u = (
+        a[1] * ref[2] - a[2] * ref[1],
+        a[2] * ref[0] - a[0] * ref[2],
+        a[0] * ref[1] - a[1] * ref[0],
+    )
+    u_norm = math.sqrt(sum(value * value for value in u))
+    u = tuple(value / u_norm for value in u)
+    w = (
+        a[1] * u[2] - a[2] * u[1],
+        a[2] * u[0] - a[0] * u[2],
+        a[0] * u[1] - a[1] * u[0],
+    )
+    rays, reach = 72, 1e-3
+    inside = 0
+    for k in range(rays):
+        theta = 2.0 * math.pi * (k + 0.5) / rays
+        c, s = math.cos(theta), math.sin(theta)
+        inside += _casting_occupies(
+            *(point[i] + reach * (c * u[i] + s * w[i]) for i in range(3))
+        )
+    return 360.0 * inside / rays
+
+
+def _plan_gap(a: list[tuple[float, float]], b: list[tuple[float, float]]) -> float:
+    """Distance between two convex plan polygons; 0.0 when they overlap."""
+
+    def separated(p: list[tuple[float, float]], q: list[tuple[float, float]]) -> bool:
+        for i, (x0, z0) in enumerate(p):
+            x1, z1 = p[(i + 1) % len(p)]
+            nx, nz = z1 - z0, x0 - x1
+            p_dots = [nx * x + nz * z for x, z in p]
+            q_dots = [nx * x + nz * z for x, z in q]
+            if max(p_dots) < min(q_dots) or max(q_dots) < min(p_dots):
+                return True
+        return False
+
+    if not (separated(a, b) or separated(b, a)):
+        return 0.0
+
+    def to_segment(point, s0, s1) -> float:
+        dx, dz = s1[0] - s0[0], s1[1] - s0[1]
+        t = ((point[0] - s0[0]) * dx + (point[1] - s0[1]) * dz) / (dx * dx + dz * dz)
+        t = min(1.0, max(0.0, t))
+        return math.hypot(point[0] - s0[0] - t * dx, point[1] - s0[1] - t * dz)
+
+    return min(
+        to_segment(point, poly[i], poly[(i + 1) % len(poly)])
+        for point_set, poly in ((a, b), (b, a))
+        for point in point_set
+        for i in range(len(poly))
+    )
+
+
+def _external_edge_breaks() -> tuple[list[list[float]], float, dict[str, float]]:
+    """Selection points, analytic removal and knife-seat clearance for the
+    C2 ExternalEdgeBreaks.
 
     Every external convex edge the top-rim and bore-top breaks left, once
     the T-section crossbar exists: the flange undersides (outer, window and
     the eight short outer-corner runs), the four outer vertical corners, the
     web bottoms, the junction lands' free edges, the crossbar web bottoms,
-    pocket-end bottoms and outer corners, the bar's full-depth side bottoms
-    beyond the pockets, the gusset hypotenuse bottoms and their 135-degree
-    vertical corners, the hub rib's free corners, and the corner/hub boss
-    rims.
+    pocket-end bottoms and outer corners, the hub rib's free corners, and
+    the corner/hub boss rims.
     Straight edges remove ``c^2 sin(angle) / 2`` per mm over their run to the
     face that ends them; outer rims remove ``pi c^2 (R - c/3)``. Corner
     patches and the ends dying into boss barrels are left to the tolerance.
 
+    Every pick must be the convex edge it claims: its solid angle, measured
+    on ``_casting_occupies``, is below 180 degrees and equals the angle its
+    removal uses, or the module fails to import. Every break reaching the
+    underside keeps its print-worst band (``_EDGE_LOCATION_BAND`` off the
+    edge, ``EDGE_CHAMFER + _C2_LEG_BAND`` into the face) at least
+    ``KNIFE_SEAT_C2_MIN_CLEARANCE`` off both print-worst knife-seat hulls;
+    the returned dict is each seat's least clearance.
+
     Not broken C2: the crossbar flange's underside edges (only a 1.5 flat
-    beside the R3 web root), the hub rib's outer and inner bottom edges
-    (2.1 to the Ø30 hub boss, so C2 leaves a 0.1 land), the tapered hub
-    V-gusset edges (they feather into the underside), the 2-deep set-screw
-    pocket rim (C2 would consume the whole pocket wall), and every hole,
-    bore, counterbore, tap, slot and keeper split-line edge.
+    beside the R3 web root), the crossbar's full-depth side bottoms from
+    each pocket end to its gusset leg and the gusset hypotenuse bottoms
+    (both knife-mount seats sit over them at the printed bands), the hub
+    rib's outer and inner bottom edges (2.1 to the Ø30 hub boss, so C2
+    leaves a 0.1 land), the tapered hub V-gusset edges (they feather into
+    the underside), the 2-deep set-screw pocket rim (C2 would consume the
+    whole pocket wall), and every hole, bore, counterbore, tap, slot and
+    keeper split-line edge. The vertical junctions of the bar sides with
+    the gusset hypotenuses are re-entrant (225 degrees), not edges to break.
     """
     c = EDGE_CHAMFER
     z_col = abs(FRONT_COLUMN_Z)
@@ -1250,27 +1422,85 @@ def _external_edge_breaks() -> tuple[list[list[float]], float]:
     y_bottom = -HALF_H
     points: list[list[float]] = []
     removal = 0.0
+    # (edge, plan polygon of its print-worst band on the underside)
+    underside_bands: list[
+        tuple[tuple[float, float, float], list[tuple[float, float]]]
+    ] = []
+    band_in = _EDGE_LOCATION_BAND + c + _C2_LEG_BAND
 
-    def edge(point: tuple[float, float, float], length: float, angle: float) -> None:
+    def convex(point: tuple[float, float, float], axis, angle: float) -> None:
+        measured = _interior_angle(point, axis)
+        if measured >= 180.0 or abs(measured - angle) > 5.0:
+            raise AssertionError(
+                f"C{c:g} pick at {point} claims a convex {angle:g}-degree edge;"
+                f" the casting holds {measured:g} degrees round it"
+            )
+
+    def edge(
+        point: tuple[float, float, float],
+        length: float,
+        angle: float,
+        axis: tuple[float, float, float],
+    ) -> None:
         nonlocal removal
         if length <= 2.0 * c:
             raise AssertionError(
                 f"edge at {point} is too short for C{c:g}: {length:.3f}"
             )
+        convex(point, axis, angle)
         points.append(list(point))
         removal += 0.5 * c * c * math.sin(math.radians(angle)) * length
+        x, y, z = point
+        if axis[1] == 0.0 and y == y_bottom:
+            # Its band runs the edge's length and the location band past
+            # each end, the location band outboard and band_in into the face.
+            half = length / 2.0 + _EDGE_LOCATION_BAND
+            dx, dz = axis[0], axis[2]
+            nx, nz = dz, -dx
+            if not _casting_occupies(x + 0.01 * nx, y_bottom + 0.01, z + 0.01 * nz):
+                nx, nz = -nx, -nz
+            underside_bands.append(
+                (
+                    point,
+                    [
+                        (x + s * half * dx + t * nx, z + s * half * dz + t * nz)
+                        for s, t in (
+                            (-1.0, -_EDGE_LOCATION_BAND),
+                            (1.0, -_EDGE_LOCATION_BAND),
+                            (1.0, band_in),
+                            (-1.0, band_in),
+                        )
+                    ],
+                )
+            )
+        elif axis[1] == 1.0 and abs(y - length / 2.0 - y_bottom) < 1e-9:
+            # A vertical break bevels the underside's corner: a band_in square.
+            underside_bands.append(
+                (
+                    point,
+                    [
+                        (x + sx * band_in, z + sz * band_in)
+                        for sx, sz in (
+                            (-1.0, -1.0),
+                            (1.0, -1.0),
+                            (1.0, 1.0),
+                            (-1.0, 1.0),
+                        )
+                    ],
+                )
+            )
 
     def along_x(z: float, y: float, x0: float, x1: float, angle: float = 90.0) -> None:
         lo, hi = sorted((x0, x1))
-        edge(((lo + hi) / 2.0, y, z), hi - lo, angle)
+        edge(((lo + hi) / 2.0, y, z), hi - lo, angle, (1.0, 0.0, 0.0))
 
     def along_y(x: float, z: float, y0: float, y1: float, angle: float = 90.0) -> None:
         lo, hi = sorted((y0, y1))
-        edge((x, (lo + hi) / 2.0, z), hi - lo, angle)
+        edge((x, (lo + hi) / 2.0, z), hi - lo, angle, (0.0, 1.0, 0.0))
 
     def along_z(x: float, y: float, z0: float, z1: float, angle: float = 90.0) -> None:
         lo, hi = sorted((z0, z1))
-        edge((x, y, (lo + hi) / 2.0), hi - lo, angle)
+        edge((x, y, (lo + hi) / 2.0), hi - lo, angle, (0.0, 0.0, 1.0))
 
     # Flange underside, outer: west/east (rib-split) and front/rear runs
     # between the bosses, the eight short runs outside the boss barrels, and
@@ -1312,25 +1542,15 @@ def _external_edge_breaks() -> tuple[list[list[float]], float]:
         along_x(sz * INNER_Z, y_bottom, LAND_X0, BAR_X0 - GUSSET)
         along_x(sz * INNER_Z, y_bottom, BAR_X1 + GUSSET, LAND_X1)
     # Crossbar: web bottoms; per pocket end its bottom and its outer vertical
-    # corner; the bar's full-depth side bottoms from the pocket end to the
-    # gusset leg; the gusset hypotenuse bottoms and the full-height
-    # 135-degree vertical corners where the bar sides meet the hypotenuses.
+    # corner. Beyond the pocket ends the knife-mount seats sit over the bar
+    # sides and gusset hypotenuses, whose bottoms stay sharp.
     for x_web in (BAR_WEB_X0, BAR_WEB_X1):
         along_z(x_web, y_bottom, -BAR_POCKET_Z, BAR_POCKET_Z)
-    hypotenuse = GUSSET * math.sqrt(2.0)
-    gusset_z = INNER_Z - GUSSET
     for sz in (-1.0, 1.0):
         along_x(sz * BAR_POCKET_Z, y_bottom, BAR_X0, BAR_WEB_X0)
         along_x(sz * BAR_POCKET_Z, y_bottom, BAR_WEB_X1, BAR_X1)
-        for x_bar, sx in ((BAR_X0, -1.0), (BAR_X1, 1.0)):
+        for x_bar in (BAR_X0, BAR_X1):
             along_y(x_bar, sz * BAR_POCKET_Z, y_bottom, y_under)
-            along_z(x_bar, y_bottom, sz * BAR_POCKET_Z, sz * gusset_z)
-            edge(
-                (x_bar + sx * GUSSET / 2.0, y_bottom, sz * (INNER_Z - GUSSET / 2.0)),
-                hypotenuse,
-                90.0,
-            )
-            along_y(x_bar, sz * gusset_z, y_bottom, HALF_H - c, angle=135.0)
     # Hub rib: the four free vertical corners and its side bottoms out to the
     # hub boss barrel.
     for z_rib in (rib_lo, rib_hi):
@@ -1342,11 +1562,34 @@ def _external_edge_breaks() -> tuple[list[list[float]], float]:
     for sx in (-1.0, 1.0):
         for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z):
             for y_rim in (HALF_H + BOSS_ABOVE, -(HALF_H + BOSS_BELOW)):
-                points.append([sx * (COLUMN_X + r_boss), y_rim, z_world])
+                rim = (sx * (COLUMN_X + r_boss), y_rim, z_world)
+                convex(rim, (0.0, 0.0, 1.0), 90.0)
+                points.append(list(rim))
                 removal += math.pi * c * c * (r_boss - c / 3.0)
-    points.append([GOOSENECK_X - r_hub, -(HALF_H + HUB_BOSS_DROP), GOOSENECK_Z])
+    hub_rim = (GOOSENECK_X - r_hub, -(HALF_H + HUB_BOSS_DROP), GOOSENECK_Z)
+    convex(hub_rim, (0.0, 0.0, 1.0), 90.0)
+    points.append(list(hub_rim))
     removal += math.pi * c * c * (r_hub - c / 3.0)
-    return points, removal
+    # Neither knife-mount seat may sit on, or within the clearance of, a
+    # finished C2 band.
+    seat_clearance = {}
+    for mount, footprint in KNIFE_SEAT_FOOTPRINTS.items():
+        gap, nearest = min(
+            (_plan_gap(band, footprint), where) for where, band in underside_bands
+        )
+        if gap < KNIFE_SEAT_C2_MIN_CLEARANCE:
+            raise AssertionError(
+                f"C{c:g} break at {nearest} comes within {gap:.3f} mm of the "
+                f"print-worst {mount} knife-mount seat (needs "
+                f"{KNIFE_SEAT_C2_MIN_CLEARANCE:g})"
+            )
+        seat_clearance[mount] = gap
+    return points, removal, seat_clearance
+
+
+EXTERNAL_EDGE_BREAK_POINTS, EXTERNAL_EDGE_BREAK_REMOVAL, KNIFE_SEAT_C2_CLEARANCE = (
+    _external_edge_breaks()
+)
 
 
 def _open_underside_sketch(
@@ -2564,12 +2807,12 @@ async def build(adapter) -> dict[str, str]:
         adapter, "bore top breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
     )
 
-    # 18b. C2 x 45 on every remaining external convex edge (87 edges, see
+    # 18b. C2 x 45 on every remaining external convex edge (75 edges, see
     #      _external_edge_breaks for the list and the edges left unbroken).
-    break_points, v_external = _external_edge_breaks()
+    v_external = EXTERNAL_EDGE_BREAK_REMOVAL
     check(
         "chamfer external edges",
-        await adapter.add_chamfer(EDGE_CHAMFER, break_points),
+        await adapter.add_chamfer(EDGE_CHAMFER, EXTERNAL_EDGE_BREAK_POINTS),
     )
     name_last_feature(adapter, "ExternalEdgeBreaks")
     volume = await volume_check(

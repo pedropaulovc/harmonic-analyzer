@@ -464,17 +464,21 @@ KEEPER_TAP_CALLOUT_PRECISION = {
 KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit.
-# The C2 general break overrides the title block's 0.25 max break on the edges
-# the model chamfers.  The edges too short or too close to a feature for C2
-# (build_fr_top_frame._external_edge_breaks) are the "UNLESS NOTED": section
-# E-E's note names the crossbar flange underside, the hub side view's note the
-# hub rib bottoms, V-gussets and set-screw pocket rim; they keep the title
-# block break.  Rule 6 caps this block at four lines.
+# The C2 general break overrides the title block's 0.25 max break on the
+# convex casting edges the model chamfers; hole, bore, counterbore, tap and
+# slot mouths keep the title-block break (the counterbore and tap walls are
+# proved without a chamfer).  The edges too short, too close to a feature or
+# under a knife seat for C2 (build_fr_top_frame._external_edge_breaks) are
+# the "UNLESS NOTED": section E-E's note names the crossbar flange underside,
+# the hub side view's note the hub rib bottoms, V-gussets and set-screw
+# pocket rim, the underside locator's the bar and gusset bottoms at the knife
+# seats; they keep the title block break.  Rule 6 caps this block at four
+# lines of at most 70 characters.
 DRAWING_NOTES = (
     "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-FR-003 TUBE.\n"
     "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
     "RETAIN CORNER AND ORIENTATION MATCH MARKS.\n"
-    "BREAK ALL EXTERNAL EDGES C2 X 45 DEG UNLESS NOTED."
+    "CONVEX CASTING EDGES C2 X 45 UNLESS NOTED; HOLE EDGES PER TITLE BLOCK."
 )
 DRAWING_NOTES_B = (
     "FACE BOTH KEEPER SEATS IN ONE SETUP.\n"

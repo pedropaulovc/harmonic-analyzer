@@ -393,34 +393,90 @@ def test_crossbar_t_keeps_the_hanger_holes_in_the_full_depth_junctions() -> None
     assert min(part.BAR_POCKET_HOLE_WALLS.values()) >= 2.0
 
 
-def test_crossbar_pocket_end_breaks_clear_the_knife_mount_seat() -> None:
-    # Print-worst: the mount's seat face nearest the pocket, from the dowel
-    # row at the near station's .X band and half the slip, by the worse
-    # .X row-to-face stack and the block's width skewed by the title-block
-    # angle, stays 0.5 beyond the pocket end's C2 band even with both ends
-    # of the pocket a full .X band long.
+def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
+    # Each print-worst hull holds the nominal block and reaches at least the
+    # unskewed stack: the station at its .X band and half the slip, the
+    # worse .X row-to-face reach.
     import sm_knife_mount_spec as mount
-    from _printed_tolerance import angular_band_deg
 
-    band = spec.PRINTED_LINEAR_BAND_MM[1]
     reach = max(
         mount.HOLE_ROW_FACE_DISTANCE + mount.HOLE_ROW_FACE_TOL,
         mount.SUPPORT_Z_THICK
         + mount.BLOCK_SIZE_TOL
         - (mount.HOLE_ROW_FACE_DISTANCE - mount.HOLE_ROW_FACE_TOL),
-    ) + (2.0 * mount.BLK_HALF_X + mount.BLOCK_SIZE_TOL) * math.tan(
-        math.radians(angular_band_deg())
     )
-    near_station = min(abs(part.STUD_Z_FRONT), abs(part.STUD_Z_REAR))
-    seat_edge = near_station - band - spec.HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0 - reach
-    pocket_band = part.BAR_POCKET_Z + 2.0 * band + part.EDGE_CHAMFER
-    assert seat_edge - pocket_band >= 0.5
-    assert part.BAR_POCKET_SEAT_CLEARANCE >= seat_edge - pocket_band
-    assert part.BAR_POCKET_SEAT_CLEARANCE >= 0.5
+    band = spec.PRINTED_LINEAR_BAND_MM[1]
+    slip = spec.HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
+    for mount_name, station in (
+        ("front", part.STUD_Z_FRONT),
+        ("rear", part.STUD_Z_REAR),
+    ):
+        hull = part.KNIFE_SEAT_FOOTPRINTS[mount_name]
+        nominal = [
+            (
+                part.HANGER_X + sx * mount.BLK_HALF_X,
+                station + sz * mount.SUPPORT_Z_THICK / 2.0,
+            )
+            for sx in (-1.0, 1.0)
+            for sz in (-1.0, 1.0)
+        ]
+        assert part._plan_gap(hull, nominal) == 0.0
+        zs = [abs(z) for _x, z in hull]
+        assert min(zs) <= abs(station) - band - slip - reach
+        assert max(zs) >= abs(station) + band + slip + reach
+
+
+def test_c2_breaks_stay_clear_of_both_print_worst_knife_seats() -> None:
+    # Every finished underside C2 band keeps 0.5 off both seats; the pocket
+    # ends bind the front seat.  The sharp bar sides and gusset hypotenuses
+    # beyond the pockets are exactly the edges a C2 would put under it.
+    _points, _removal, clearance = part._external_edge_breaks()
+    assert clearance == part.KNIFE_SEAT_C2_CLEARANCE
+    assert min(clearance.values()) >= part.KNIFE_SEAT_C2_MIN_CLEARANCE == 0.5
+    reach = part.EDGE_CHAMFER + part._C2_LEG_BAND + part._EDGE_LOCATION_BAND
+    gusset_z = part.INNER_Z - part.GUSSET
+    front = part.KNIFE_SEAT_FOOTPRINTS["front"]
+    bar_side_band = [
+        (part.BAR_X0 - part._EDGE_LOCATION_BAND, -part.BAR_POCKET_Z),
+        (part.BAR_X0 + reach, -part.BAR_POCKET_Z),
+        (part.BAR_X0 + reach, -gusset_z),
+        (part.BAR_X0 - part._EDGE_LOCATION_BAND, -gusset_z),
+    ]
+    assert part._plan_gap(bar_side_band, front) < 0.5
+    hypotenuse_band = [
+        (part.BAR_X0, -gusset_z),
+        (part.BAR_X0 - part.GUSSET, -part.INNER_Z),
+        (part.BAR_X0 - part.GUSSET + reach * math.sqrt(2.0), -part.INNER_Z),
+        (part.BAR_X0 + reach * math.sqrt(2.0), -gusset_z),
+    ]
+    assert part._plan_gap(hypotenuse_band, front) < 0.5
+
+
+def test_c2_picks_are_convex_and_the_gusset_junctions_are_not() -> None:
+    # The solid-angle probe reads the plan's turns: the bar-side to gusset
+    # junction is re-entrant, a pocket-end outer corner and a bar-side
+    # bottom are right-angled and convex.
+    gusset_z = part.INNER_Z - part.GUSSET
+    for x_bar in (part.BAR_X0, part.BAR_X1):
+        for sz in (-1.0, 1.0):
+            assert (
+                part._interior_angle((x_bar, 0.0, sz * gusset_z), (0.0, 1.0, 0.0))
+                == 225.0
+            )
+            assert (
+                part._interior_angle(
+                    (x_bar, -part.HALF_H / 2.0, sz * part.BAR_POCKET_Z), (0.0, 1.0, 0.0)
+                )
+                == 90.0
+            )
+    for x, y, z in part.EXTERNAL_EDGE_BREAK_POINTS:
+        assert not (abs(abs(z) - gusset_z) < 1e-9 and x in (part.BAR_X0, part.BAR_X1))
 
 
 def test_external_edge_breaks_select_distinct_edges_and_skip_the_noted_ones() -> None:
-    points, removal = part._external_edge_breaks()
+    points, removal, _clearance = part._external_edge_breaks()
+    assert points == part.EXTERNAL_EDGE_BREAK_POINTS
+    assert removal == part.EXTERNAL_EDGE_BREAK_REMOVAL
     assert len({tuple(round(value, 6) for value in point) for point in points}) == len(
         points
     )
@@ -429,16 +485,9 @@ def test_external_edge_breaks_select_distinct_edges_and_skip_the_noted_ones() ->
     for i, a in enumerate(points):
         for b in points[i + 1 :]:
             assert math.dist(a, b) > 0.5
-    # The crossbar flange's underside edges and the hub rib's outer and inner
-    # bottom edges stay sharp: none is picked.  Between each pocket end and
-    # its gusset leg the full-depth bar side bottoms are broken.
-    for sz in (-1.0, 1.0):
-        for x_bar in (part.BAR_X0, part.BAR_X1):
-            assert [
-                x_bar,
-                -part.HALF_H,
-                sz * (part.BAR_POCKET_Z + part.INNER_Z - part.GUSSET) / 2.0,
-            ] in points
+    # The crossbar flange's underside edges, the bar-side and gusset
+    # hypotenuse bottoms beyond the pockets and the hub rib's outer and inner
+    # bottom edges stay sharp: none is picked.
     for x, y, z in points:
         assert not (
             y == part.FLANGE_BOT_Y
@@ -452,6 +501,10 @@ def test_external_edge_breaks_select_distinct_edges_and_skip_the_noted_ones() ->
             < z
             < part.GOOSENECK_Z + part.HUB_RIB_W / 2.0
         )
+        if y == -part.HALF_H and part.BAR_POCKET_Z < abs(z) < part.INNER_Z:
+            # No bar-side bottom; no hypotenuse bottom (x off the bar).
+            assert not part.BAR_X0 - part.GUSSET <= x <= part.BAR_X0
+            assert not part.BAR_X1 <= x <= part.BAR_X1 + part.GUSSET
 
 
 def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:

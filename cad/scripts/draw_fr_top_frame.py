@@ -3206,8 +3206,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, bottom_dimensions, {"HubDia": "CYLINDRICAL BOSS"})
     imported_annotations += bottom_dimensions
     # The locator is drawn at the title block's own scale, so it names
-    # itself and says nothing a reader can already read off the title block.
-    if add_note(adapter, "UNDERSIDE LOCATOR", *HUB_BOTTOM_NOTE_XY) is None:
+    # itself and says nothing a reader can already read off the title block
+    # beyond the knife seats' exception to the C2 note: the bar-side and
+    # gusset-hypotenuse bottoms under both seats keep the title-block break.
+    if add_note(
+        adapter, "UNDERSIDE LOCATOR\nBAR/GUSSET BOTTOMS AT SEATS SHARP",
+        *HUB_BOTTOM_NOTE_XY,
+    ) is None:
         raise RuntimeError("failed to label underside locator")
     _checked_dimension(
         adapter, hub_bottom_parent,
