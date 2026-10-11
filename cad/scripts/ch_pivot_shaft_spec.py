@@ -50,9 +50,14 @@ if not 0.0 < DOME_HEIGHT <= SHAFT_DIA / 2.0:
 LENGTH_CALLOUT = "CUT TO FIT: SPAN OVER BOTH MHA-CH-008 EARS"
 DOME_CALLOUT = "BOTH ENDS"
 
-LINEAR_1PL = 0.8  # title-block .X band
-LINEAR_2PL = 0.508  # title-block .XX band
-LINEAR_3PL = 0.127  # title-block .XXX band
+# The title block's PRINTED bands, which an accepted part is checked against
+# (not the inch grades behind them: .XX prints +/-0.51, not 0.508). Literals,
+# pinned to the title block by test_ch_pivot_shaft_drawing: reading _config
+# here would put title_block on rocker_bank_layout's and every channel
+# part's recipe.
+LINEAR_1PL = 0.8
+LINEAR_2PL = 0.51
+LINEAR_3PL = 0.13
 
 # --- set-screw flats (user, 2026-10-10) ----------------------------------------
 # One flat under each ear's apex screw, on the ear's mid-plane: the north one
@@ -64,7 +69,7 @@ FLAT_STATION_BAND = LINEAR_2PL  # stations print at .XX
 SET_SCREW_CUP_DIA = SET_SCREW_POINT_DIA  # 1.575
 # Depth: 0.5, the common set-screw flat on a 1/4 shaft (about 0.08D). It
 # prints as the across-flat, which a micrometer reads, at .XXX, so the depth
-# runs 0.373..0.627; at its shallowest the flat's chord (2.99) still takes
+# runs 0.37..0.63; at its shallowest the flat's chord (2.97) still takes
 # the cup with 0.5 to spare each side, the screw itself rolling the flat
 # square under it as it is driven.
 FLAT_DEPTH = 0.5
@@ -80,12 +85,13 @@ def flat_chord(depth: float) -> float:
 
 if flat_chord(FLAT_DEPTH_RANGE[0]) < SET_SCREW_CUP_DIA + 2.0 * 0.5:
     raise AssertionError("a shallow flat is too narrow for the set-screw cup")
-# Length: 5.0 at .X (4.2..5.8). The cup must stay wholly on the flat over the
-# fit-up's axial wander (rocker_bank_layout checks it, 2.01 of the 2.1 half
-# length at the south ear), and no rocker hub may ride over the flat's edge
-# (also checked there).
+# Length: 5.0 at .XX (4.49..5.51). The cup must stay wholly on the flat over
+# the fit-up's axial wander (rocker_bank_layout checks it: 2.11 of the 2.245
+# half length at the south ear, which .X's 2.1 could not hold once the north
+# ear's thickness band joined the south chain), and no rocker hub may ride
+# over the flat's edge (also checked there).
 FLAT_LENGTH = 5.0
-FLAT_LENGTH_RANGE = (FLAT_LENGTH - LINEAR_1PL, FLAT_LENGTH + LINEAR_1PL)
+FLAT_LENGTH_RANGE = (FLAT_LENGTH - LINEAR_2PL, FLAT_LENGTH + LINEAR_2PL)
 
 # Probe station (part z, mm) that names the O6.35 face: the body clear of the
 # north flat.
@@ -116,14 +122,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places are the tolerance (policy rule 2). The O.D. carries the
 # running band at three places (1/4 in = 6.350 exactly), the across-flat the
 # depth band its sizing above assumes. The dome only has to read as a dome
-# and the flat's length is checked at .X. The stations hold each flat under
+# and the flat's length is checked at .XX. The stations hold each flat under
 # its screw at .XX. The cylinder length is a REFERENCE the cut-to-fit callout
 # governs: one place, like the dome's reference sphere radius.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDia": 3, "ShaftLength": 1},
     "NorthCapProfile": {"DomeHeight": 1, "Radius": 1},
     "FlatProfile": {
-        "FlatLength": 1,
+        "FlatLength": 2,
         "FlatAF": 3,
         "NorthFlatStation": 2,
         "SouthFlatStation": 2,
