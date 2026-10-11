@@ -379,6 +379,9 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         check.index(t012),
         check.index(t120),
         check.index("TIGHTEN MHA-VN-032"),
+        # CodeRabbit on #1272: the shims block the swing, so they come out
+        # before the T120 feeler set.
+        check.index("SWING OUT AND REMOVE THE SHIMS"),
         check.index(f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-VN-013"),
         check.index("DO NOT LOOSEN MHA-DT-002 AFTER THIS SET; IF YOU DO, REDO BOTH STEPS"),

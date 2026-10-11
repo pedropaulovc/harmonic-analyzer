@@ -52,19 +52,21 @@ LIFT_Y = PIVOT_Y + LIFT_BORE_RISE
 # Do not substitute the level parked line of centres in mesh calculations.
 _PIVOT_TO_DRUM = math.hypot(X_DRUM - PIVOT_X, Y_DRIVE - PIVOT_Y)
 _PARKED_AXIS_ANGLE = math.atan2(APINION_Y - PIVOT_Y, APINION_X - PIVOT_X)
-_ENGAGED_AXIS_ANGLE = math.atan2(Y_DRIVE - PIVOT_Y, X_DRUM - PIVOT_X) - math.acos(
-    max(
-        -1.0,
-        min(
-            1.0,
-            (
-                STRAP_C2C**2
-                + _PIVOT_TO_DRUM**2
-                - ENGAGED_CENTER_DISTANCE_MM**2
-            )
-            / (2.0 * STRAP_C2C * _PIVOT_TO_DRUM),
-        ),
+# Law of cosines in the pivot / pinion / drum triangle. Outside [-1, 1] the
+# strap cannot put the pinion at the configured centre at all; clamping would
+# silently pose it at another centre, so refuse instead.
+_ENGAGED_COS = (
+    STRAP_C2C**2 + _PIVOT_TO_DRUM**2 - ENGAGED_CENTER_DISTANCE_MM**2
+) / (2.0 * STRAP_C2C * _PIVOT_TO_DRUM)
+if not -1.0 <= _ENGAGED_COS <= 1.0:
+    raise ValueError(
+        f"engaged centre {ENGAGED_CENTER_DISTANCE_MM:.4f} mm is unreachable: the "
+        f"{STRAP_C2C:.4f} mm strap about a pivot {_PIVOT_TO_DRUM:.4f} mm from the "
+        f"drum reaches only {abs(STRAP_C2C - _PIVOT_TO_DRUM):.4f}.."
+        f"{STRAP_C2C + _PIVOT_TO_DRUM:.4f} mm"
     )
+_ENGAGED_AXIS_ANGLE = math.atan2(Y_DRIVE - PIVOT_Y, X_DRUM - PIVOT_X) - math.acos(
+    _ENGAGED_COS
 )
 ENGAGED_SWING_RAD = _ENGAGED_AXIS_ANGLE - _PARKED_AXIS_ANGLE
 _SWING_C, _SWING_S = math.cos(ENGAGED_SWING_RAD), math.sin(ENGAGED_SWING_RAD)

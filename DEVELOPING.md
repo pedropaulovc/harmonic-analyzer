@@ -1200,7 +1200,8 @@ dirty native part state. An open part must have
 `(ReadOnly, ReplaceFileName, DiscardChanges, ForceReload)`, with integer status 0
 required. It reacquires the document and named annotation handles and rejects
 changed native unit context. Already-closed files open read-only/silent through
-connected-compatible `OpenDoc7`; the target is closed in `finally`, even after a
+`OpenDoc6` (never `OpenDoc7`, whose ViewOnly spec cannot be told from a load still
+in progress); the target is closed in `finally`, even after a
 failed open that loaded it, and void `CloseDoc` is verified by native lookup.
 Caller-held document, feature, face and annotation handles become stale after
 reload; reacquire them from the refreshed `adapter.currentModel`.
