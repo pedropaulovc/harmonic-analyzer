@@ -650,10 +650,14 @@ CONE_CRANK_STEPS = _note_text(
         # lateral error is taken up by turning MHA-DT-005 on its screws'
         # clearance (TIP_LATERAL_CAPACITY_MM in build_drive_train_assembly),
         # so the fitter centres the tip in the cup before locking the post
-        # (Codex P1 on #1136, 9e9982c5d).
+        # (Codex P1 on #1136, 9e9982c5d).  User decision 2026-10-12: the post
+        # is held pushed toward the tip block while it is turned and its
+        # screws tightened, so its screw clearance can only carry the shaft
+        # north, away from G19 (dt_tip_collar_air).
         "3. PUSH THE STACK ONTO THE MHA-DT-004 COLLAR. PUSH MHA-VN-016 ONTO A",
         f"   {COLLAR_FEELER:.2f} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT.",
-        "   THREAD MHA-VN-017 INTO MHA-DT-021 TO THE TIP. TURN MHA-DT-005 ON ITS",
+        "   THREAD MHA-VN-017 INTO MHA-DT-021 TO THE TIP. HOLD MHA-DT-005 PUSHED",
+        "   TOWARD MHA-DT-021 ALONG THE SHAFT THROUGHOUT: TURN MHA-DT-005 ON ITS",
         "   SCREWS UNTIL THE TIP CENTRES IN THE CUP; TIGHTEN BOTH MHA-VN-031",
         "   AND RECHECK. THREAD MHA-VN-017 ON UNTIL MHA-DT-004 JUST STOPS",
         "   SHUTTLING AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",

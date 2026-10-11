@@ -484,15 +484,35 @@ def test_exact_finite_drum_tilt_keeps_full_shadow_and_manufactured_caps(normal):
 def test_collar_air_shares_the_assembly_post_face_and_tip_tap_bands():
     import build_dt_drive_train_assembly as bdt
 
+    # The assembly books the post band symmetrically; the collar air books it
+    # less the screw clearance the pushed post takes up (MHA-DT-000 step 3).
     axial = air.AXIAL_TERMS_MM
     assert sum(axial[name] for name in (
         "post platform tap station", "post screw clearance", "post counterbore pattern",
         "post cone boss length",
-    )) == pytest.approx(bdt.POST_BOSS_FACE_AXIAL_BAND_MM)
+    )) + air.POST_SCREW_CLEARANCE_TAKEN_UP_MM == pytest.approx(bdt.POST_BOSS_FACE_AXIAL_BAND_MM)
     tip = air.TIP_END_TERMS_MM
     assert sum(tip[name] for name in (
         "tip platform hold-down station", "tip hold-down screw clearance", "tip block foot tap station",
     )) == pytest.approx(bdt.TIP_TAP_LATERAL_BAND_MM)
+
+
+def test_collar_air_gains_the_pushed_posts_axial_clearance(monkeypatch):
+    import draw_dt_drive_train_assembly as sheet
+
+    assert "HOLD MHA-DT-005 PUSHED TOWARD MHA-DT-021 ALONG THE SHAFT" in " ".join(
+        sheet.CONE_CRANK_STEPS.split())
+    taken = air.POST_SCREW_CLEARANCE_TAKEN_UP_MM
+    assert taken > 0.0 and air.AXIAL_TERMS_MM["post screw clearance"] == pytest.approx(0.0)
+    # Only the along-shaft share goes; the across and tilt shares stay.
+    assert air.POST_END_TERMS_MM["post screw clearance"] == pytest.approx(taken)
+    pushed = {(r["tier"], r["drum_tier"], r["angle_deg"]): r for r in air.full_sweep_proof()}
+    monkeypatch.setitem(air.AXIAL_TERMS_MM, "post screw clearance", taken)
+    loose = {(r["tier"], r["drum_tier"], r["angle_deg"]): r for r in air.full_sweep_proof()}
+    for key in (k for k in pushed if k[0] == "nose"):
+        along = abs(air.collar_pose_frame(key[2])[1][2])
+        assert pushed[key]["air_mm"] - loose[key]["air_mm"] == pytest.approx(taken * along)
+
 
 
 def test_collar_air_bounds_the_released_tip_by_the_post_journal_not_the_vendor_cup():

@@ -11,8 +11,9 @@ drawing prints (part sheets, the title block, the assembly steps) or a stock
 fastener/thread class, read from the spec the drawing prints it from:
 
 * along the shaft: the post's mounting (as build_dt_drive_train_assembly's
-  POST_BOSS_FACE_AXIAL_BAND_MM books it), the shaft's thrust collar, the
-  gear stack's terminal north face and the collar's feeler set;
+  POST_BOSS_FACE_AXIAL_BAND_MM books it, less the screw clearance the
+  pushed post takes up), the shaft's thrust collar, the gear stack's
+  terminal north face and the collar's feeler set;
 * across the shaft, at the post end: the post's tapped-hole station, its
   screws' clearance, its counterbore pattern and its running fit;
 * across the shaft, at the tip end: the hold-down tap (as
@@ -238,10 +239,25 @@ _JOURNAL_ENGAGED_MIN = (
 )
 _TIP_RELEASE = 2.0 * (2.0 * _JOURNAL_FLOAT) * _SUPPORT_SPAN / _JOURNAL_ENGAGED_MIN
 
+# MHA-DT-000 step 3 (user decision 2026-10-12) holds the post pushed toward
+# the tip block while it is turned and its screws are tightened.  The screws
+# sit at +/-ATTACHMENT_X: turning the post by theta moves them +/-theta*X
+# in their holes, and the post's remaining translation is the lens where
+# both screws stay inside their clearance.  That lens is symmetric about the
+# centred pose (whatever the turn), so the pushed post stands at or north of
+# centre along the shaft at every turn the tip needs: its clearance can only
+# carry the collar away from G19, and its along-shaft share is booked 0.
+# Held pushed through the turn, the post still reaches every tip position
+# TIP_LATERAL_CAPACITY_MM allows, because the lens shrinks to the centred
+# pose at the full turn.  The push holds only the post's position along the
+# shaft; where it lands across the shaft depends on the turn, so the
+# across-shaft and face-tilt shares (POST_END_TERMS_MM) stay booked in full.
+POST_SCREW_CLEARANCE_TAKEN_UP_MM = _POST_FLOAT
+
 # Along the shaft, from the post's mounting to the collar's south face.
 AXIAL_TERMS_MM = {
     "post platform tap station": plate.POST_MOUNT_STATION_TOL_MM,
-    "post screw clearance": _POST_FLOAT,
+    "post screw clearance": _POST_FLOAT - POST_SCREW_CLEARANCE_TAKEN_UP_MM,
     "post counterbore pattern": _MOUNT_X_BAND * _SIN_I,
     "post cone boss length": printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0,
     "shaft thrust collar width": shaft.printed_band("CollarWidth"),
