@@ -1,6 +1,6 @@
 r"""McMaster 92916A250 -- brass washer for #4 screw, ID 0.120 x OD 0.281 in.
 
-Used as vn-wheel-axle-front-washer (MHA-VN-055).  The catalogue facts and the part frame
+Used as vn-wheel-axle-front-washer (MHA-VN-056).  The catalogue facts and the part frame
 are ``vn_wheel_axle_front_washer_spec``'s.  The model is one Top-plane ID x OD annulus
 extruded blind MODEL_THICKNESS (the catalogue range's nominal) along +Y from
 the y = 0 face.  The production build turns the body so the recipe's +Y is

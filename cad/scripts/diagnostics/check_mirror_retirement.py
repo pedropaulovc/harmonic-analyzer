@@ -727,6 +727,20 @@ expect(
     IDENTITY,
     "keeper foot screw -z",
 )
+expect(
+    CH,
+    "vn-fulcrum-set-screw-1",
+    [c.FULCRUM[0], c.SET_SCREW_SEAT_Y, c.FULCRUM_SHAFT_Z + c.KEEPER_Z_OFF],
+    IDENTITY,
+    "keeper set screw +z",
+)
+expect(
+    CH,
+    "vn-fulcrum-set-screw-2",
+    [c.FULCRUM[0], c.SET_SCREW_SEAT_Y, c.FULCRUM_SHAFT_Z - c.KEEPER_Z_OFF],
+    IDENTITY,
+    "keeper set screw -z",
+)
 _SOLV = dict(pos_tol=0.005, row_tol=1e-5)
 for j in range(1, 20):
     z_gap = c.z_station(j) + c.ARM_MID_DZ - c.PITCH / 2.0

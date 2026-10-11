@@ -21,7 +21,8 @@ _EXPECTED = {
     "vn-fillister-screw": (("90114A511",), "MHA-VN-006", 19),
     "vn-foot-screw": (("90280A108",), "MHA-VN-020", 1),
     "vn-guide-lock-screw": (("91255A108",), "MHA-VN-046", 8),
-    "vn-frame-side-screw": (("90280A194",), "MHA-VN-022", 2),
+    "vn-frame-side-screw": (("91794A080",), "MHA-VN-022", 2),
+    "vn-fulcrum-set-screw": (("91375A942",), "MHA-VN-055", 2),
     "vn-frame-cross-screw": (("90280A837",), "MHA-VN-027", 8),
     "vn-gooseneck-set-screw": (("91410A538",), "MHA-VN-023", 1),
     "vn-hanger-screw": (("93075A194",), "MHA-VN-007", 1),
@@ -51,7 +52,7 @@ _EXPECTED = {
     "vn-rocker-bank-spring": (("9714K24",), "MHA-VN-053", 1),
     "vn-wheel-axle-nut": (("92671A005",), "MHA-VN-025", 2),
     "vn-wheel-axle-back-washer": (("92916A480",), "MHA-VN-054", 1),
-    "vn-wheel-axle-front-washer": (("92916A250",), "MHA-VN-055", 1),
+    "vn-wheel-axle-front-washer": (("92916A250",), "MHA-VN-056", 1),
     "vn-spring-hook": (("9489T111",), "MHA-VN-012", 20),
     "vn-tube-frame-cap": (("9275K141",), "MHA-VN-028", 4),
 }

@@ -20,7 +20,7 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `pd` / `PD` | Paper drive | 24 |
 | `pn` / `PN` | Pen | 6 |
 | `sm` / `SM` | Summing | 4 |
-| `vn` / `VN` | Vendor parts | 53 |
+| `vn` / `VN` | Vendor parts | 54 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence.
@@ -98,9 +98,9 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 ## Identity migration table
 
-The table covers 151 part families (the 149 current families plus the two retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
+The table covers 154 part families (the 151 current families plus the three retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
-Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws.
+Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws. MHA-VN-026 `vn-knife-hanger-washer` (MHA-131) is retired: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor.
 
 | Kind | Old stem | Canonical stem | Old Number | Current Number |
 |---|---|---|---|---|
@@ -253,10 +253,12 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | `transgear-knob-cup-pin` | `vn-transgear-knob-cup-pin` | MHA-183 | MHA-VN-048 |
 | part | `transgear-pivot-spring` | `vn-transgear-pivot-spring` | MHA-184 | MHA-VN-049 |
 | part | — | `vn-magnifying-bracket-screw` | — | MHA-VN-050 |
+| part | — | `vn-knife-mount-dowel` | — | MHA-VN-051 |
 | part | — | `vn-cylinder-bank-spring` | — | MHA-VN-052 |
 | part | — | `vn-rocker-bank-spring` | — | MHA-VN-053 |
 | part | — | `vn-wheel-axle-back-washer` | — | MHA-VN-054 |
-| part | — | `vn-wheel-axle-front-washer` | — | MHA-VN-055 |
+| part | — | `vn-fulcrum-set-screw` | — | MHA-VN-055 |
+| part | — | `vn-wheel-axle-front-washer` | — | MHA-VN-056 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -282,5 +284,5 @@ next free Number in its category and has no old stem or old Number.
 | added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
 | added | `mg-wheel-drum` | MHA-MG-010 | brass drum pressed on the MHA-MG-005 wheel spigot; carries the lever wire |
 | added | `vn-wheel-axle-back-washer` | MHA-VN-054 | brass #10 washer between the MHA-MG-008 wheel bar and the MHA-MG-005 wheel hub |
-| added | `vn-wheel-axle-front-washer` | MHA-VN-055 | brass #4 washer between the MHA-MG-005 wheel spigot face and the first MHA-VN-025 nut; its Ø7.1 OD bears inside the Ø14.5 spigot end, clear of the MHA-MG-010 drum |
+| added | `vn-wheel-axle-front-washer` | MHA-VN-056 | brass #4 washer between the MHA-MG-005 wheel spigot face and the first MHA-VN-025 nut; its Ø7.1 OD bears inside the Ø14.5 spigot end, clear of the MHA-MG-010 drum |
 | added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |

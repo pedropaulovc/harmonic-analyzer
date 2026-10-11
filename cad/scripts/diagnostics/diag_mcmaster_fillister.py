@@ -2,8 +2,8 @@ r"""Shared recipe for the McMaster 90280A* narrow fillister head screws, and
 the 91794A112 stainless fillister screw on the same #4-40 head.
 
 The vendor drives every derived number off 5 named dims via equations,
-reproduced here. The 90280A837 and 91794A112 extensions await their native
-comparison:
+reproduced here. The 90280A837, 91794A112 and 91794A080 extensions have no
+completed native comparison:
 
 - slot width = HeadDia*0.135, slot depth = width*1.5 (from the dome apex)
 - head cylinder band = HeadHeight*0.8; dome = spherical cap (centre on

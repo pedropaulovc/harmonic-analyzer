@@ -23,7 +23,7 @@ recipes:
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90280A194 | `vn-frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A194 | — (diagnostic recipe; a former `vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `vn-clamp-screw`, `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -35,11 +35,13 @@ recipes:
 | 91255A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model; SKU not yet read live) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
+| 91375A942 | `vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | `vn-gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
 | 91790A196 | `vn-transgear-arm-plate-screw` (catalogue-only; no vendor model; SKU not yet read live) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A077 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A080 | `vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A205 | `vn-transgear-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91829A560 | `vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
@@ -70,6 +72,46 @@ recipes:
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
+
+Live catalogue verification on October 9, 2026:
+
+- [91375A942](https://www.mcmaster.com/91375A942/) is selected for the two
+  MHA-VN-055 fulcrum-shaft set screws (one per MHA-CH-007 keeper crown, on
+  the shaft's flat). Its product-detail table required login; the
+  [public #1-72 black-oxide cup-point family table](https://www.mcmaster.com/products/cup-point-set-screws/thread-size~1-72/finish~black-oxide/)
+  and the part's 2-D PDF were read live in a browser on October 9, 2026
+  instead. The title is “Alloy Steel Cup-Tip Set Screw, Black-Oxide, 1-72
+  Thread, 5/32" Long”; its row states length **5/32 in**, drive size
+  **0.035 in**, hardness **Rockwell C45**, package quantity **10**, and
+  package price **$7.43**. The filtered family fields state **Alloy Steel**,
+  **Black Oxide**, **Headless**, **Hex** drive, **UNF**, **Fine** thread
+  spacing, **Unified Standard Class 3A**, **Right Hand**, **ASME B18.3** and
+  **ASTM F912**. The 2-D PDF gives major diameter **0.073 in**, length
+  **0.156 in** and the **0.035 in** hex; it gives no cup dimension, so the
+  cup diameter is the ASME B18.3 #1 maximum, 0.040 in. The #1-72 thread
+  follows the keeper's crown tap (rule 12). 5/32 supersedes the 1/8 in
+  91375A753 (same family row, $9.31/10), whose installed engagement fell
+  to 1.40D at the worst case, under rule 12 (Main ruling A, 2026-10-10);
+  the superseded #6-32 candidate was 91375A182 (#6-32 x 5/32). No vendor
+  model is harvested: `diagnostics.diag_build_91375A942` scales the
+  91375A106 recipe's laws to the #1-72 pitch and the catalogue hex, family
+  assumptions, not verified vendor geometry.
+
+Live catalogue verification on October 10, 2026:
+
+- [91794A080](https://www.mcmaster.com/91794A080/) replaces 90280A110 (and,
+  before it, 90280A194) as the two MHA-VN-022 frame-side screws that hold the
+  fulcrum keepers' feet. The
+  [public #2-56 fillister family table](https://www.mcmaster.com/products/fillister-head-machine-screws/thread-size~2-56/?s=fillister-head-machine-screws)
+  was read live in a browser on October 10, 2026: in the “Stainless Steel
+  Fillister Head Slotted Screws” table, length **7/16 in**, head diameter
+  **0.14 in**, head height **0.083 in**, **Fully Threaded**, tensile strength
+  **70,000 psi**, package quantity **100**. The 90280A steel family has no
+  #2-56 size. The smaller thread follows the transferred top-frame tap: the
+  #4-40 tap left too thin a rule-12 ligament under the keeper foot. The head
+  and thread are the 91794A077 row's, so the shared fillister recipe builds it
+  from the length alone; no vendor SLDPRT has been harvested for it.
+  `diagnostics.diag_build_90280A194` stays as a diagnostic recipe.
 
 Live catalog verification on October 8, 2026:
 
@@ -575,7 +617,7 @@ Catalog specifications checked on September 10, 2026:
   MHA-VN-025, two), [92916A480](https://www.mcmaster.com/92916A480/)
   (`vn-wheel-axle-back-washer`, MHA-VN-054, one) and
   [92916A250](https://www.mcmaster.com/92916A250/)
-  (`vn-wheel-axle-front-washer`, MHA-VN-055, one) carry the magnifying wheel
+  (`vn-wheel-axle-front-washer`, MHA-VN-056, one) carry the magnifying wheel
   on the 3/16 mg-wheel-axle (mg wheel rev 10). The back washer sits between
   the mg-wheel-bar's front face and the hub; the front washer sits on the
   #4-40 end against the spigot face, the first nut is run down until the

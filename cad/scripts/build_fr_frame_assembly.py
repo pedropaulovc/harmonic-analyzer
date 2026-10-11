@@ -44,7 +44,7 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   Inserted at its exact authored transform and locked to the fixed base.
 * top-frame x1: the green one-piece casting at mid-plane Y = 1017.95 (side
   rails 34.2 wide / front-rear rails 38 wide x 36.5 tall, band
-  y 999.7..1036.2; corner bosses Ø52.2 rise to 1040.7), bored around the
+  y 999.7..1036.2; corner bosses Ø45 rise to 1040.7), bored around the
   four columns; its east rail (-X) carries the gooseneck hub and its west
   rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
 * tube-frame-cap x4: intact stock McMaster 9275K141 push-on caps seated on the
@@ -264,7 +264,7 @@ CROSS_SCREW_THREAD_RESERVE = CASTING_FULL_THREAD_DEPTH - CROSS_SCREW_SHANK_LEN
 if TUBE_CROSS_HOLE_DIAMETER <= CROSS_SCREW_SHANK_DIA:
     raise AssertionError("tube cross drilling does not clear the stock cross screw")
 if CROSS_SCREW_HEAD_DIA <= 5.0:
-    raise AssertionError("stock cross-screw head cannot bear on the spot seat")
+    raise AssertionError("stock cross-screw head cannot bear on its Ø9 seat")
 if (CROSS_SCREW_THREAD_CLASS, BASE_CROSS_TAP_SPEC.thread_class) != ("2A", "2B"):
     raise AssertionError("lower cross screw requires class 2A/2B thread pairing")
 if (CROSS_SCREW_THREAD_CLASS, TOP_CROSS_TAP_SPEC.thread_class) != ("2A", "2B"):
@@ -842,7 +842,8 @@ async def build(adapter) -> dict[str, str]:
         assert_component_placed(adapter, np_screw, np_target, NAMEPLATE_SCREW_ROWS)
 
     # Eight stock cross screws: four at the lower base sockets and four at the
-    # top-frame bosses. Every under-head plane seats on its Ø9 spotface. Front
+    # top-frame bosses. Each under-head plane seats on its Ø9 floor: a spotface
+    # on the base, a flush counterbore on the top frame. Front
     # screws point +Z; rear screws point -Z, traversing both Ø5 tube walls and
     # reaching the far casting wall.
     for joint, screw_y, seat_z in (

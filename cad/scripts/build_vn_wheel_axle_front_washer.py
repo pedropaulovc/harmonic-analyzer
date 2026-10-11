@@ -1,4 +1,4 @@
-r"""Purchased MHA-VN-055 wheel-axle front washer: McMaster 92916A250.
+r"""Purchased MHA-VN-056 wheel-axle front washer: McMaster 92916A250.
 
 A brass #4 washer (``vn_wheel_axle_front_washer_spec``) on the
 mg-wheel-axle's #4-40 end between the magnifying wheel's spigot face and the
