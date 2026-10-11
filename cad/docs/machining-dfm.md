@@ -19,9 +19,10 @@ geometry is casting-shaped, not milling-shaped.
      The terminal journal was cut to 1/32 in so the 48DP PA20 gap floor keeps at least the 0.62 mm
      web floor, the one named web exception ([`gear-standard.md`](./gear-standard.md#what-it-costs)).
      The single hardest part in the machine. These teeth are cut as involute flanks closed by a gap
-     floor printed as a MIN diameter; T006's floor, cut by DT6-FORM1, is Ø2.136 MIN / Ø2.201 MAX. After a forced T006
-     rebuild, `build_dt_cone_gear.py` measures the native floor edges and requires them at the printed
-     MIN radius within 0.002 mm. T012 shares the 1/32 in terminal and its web is 2.02 mm at the worst
+     floor with printed diameter limits; T006's floor, cut by DT6-FORM1, is Ø2.136 MIN / Ø2.201 MAX.
+     After a forced T006 rebuild, `build_dt_cone_gear.py` compares the native minimum and maximum
+     root radii with the nominal finite-arc envelope within 0.002 mm. The printed limits enclose
+     the manufacturing corners, not just that nominal envelope. T012 shares the 1/32 in terminal and its web is 2.02 mm at the worst
      case, over the 2.0 target; the T018 and T024 webs meet the target on the S1 bores.
      Period mitigation: the tip gears were a harder yellow metal.
   2. **`sm-summing-lever` knife edge** — the sharp top-vertex ridge of a hex trunnion that protrudes
@@ -148,10 +149,12 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 ## Recommended actions (gaps this pass surfaced)
 
 1. **Retain the executable native wall guard for the smallest cone gear.** After a forced T006
-   rebuild, `build_dt_cone_gear.py` measures the native floor edges directly, requires the printed MIN
-   floor radius (`dt_cone_gear_spec.floor_radius_min_mm`) within 0.002 mm and at least one floor edge per
-   tooth, and rejects a non-positive web at the maximum allowed bore; `test_dt_cone_gear_drawing` pins
-   the T006 web exception (`WEB_EXCEPTIONS_MM`). Keep both when changing the tooth profile or bore bands.
+   rebuild, `build_dt_cone_gear.py` measures the native floor edges directly and compares both radial
+   extrema with `dt_cone_gear_spec.floor_radius_min_mm` / `floor_radius_max_mm` within 0.002 mm.
+   These are the nominal finite-arc envelope; the separate printed diameters from `floor_limits_mm`
+   also enclose the manufacturing corners. The guard checks the native web at the maximum allowed
+   bore against the retained web requirement; `test_dt_cone_gear_drawing` pins the T006 web exception
+   (`WEB_EXCEPTIONS_MM`). Keep both when changing the tooth profile or bore bands.
 2. **Decide the `sm-summing-lever` fabrication method** (cast / fabricate / hog) and the **knife-edge
    insert** now — it drives whether this is a 5-setup nightmare or two simple operations, and it is the
    critical interface.
