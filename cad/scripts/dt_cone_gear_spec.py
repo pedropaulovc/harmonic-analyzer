@@ -545,6 +545,9 @@ def blank_dia_band(teeth: int) -> tuple[float, float]:
 # backlash, drum-tip relief clearance and over-pins limits already cover, and
 # a wider relief only adds drum-tip air.
 CUSTOM_SIX_FORM_TOLERANCE_MM = -CUSTOM_SIX_TOOTH_THICKNESS_BAND[1] / 2.0
+CUSTOM_SIX_FORM_TOLERANCE_NOTE = (
+    f"FORM TOLERANCE: X +{CUSTOM_SIX_FORM_TOLERANCE_MM:.3f} / -0.000"
+)
 _CUSTOM_SIX_FORM_RADII_MM = (
     1.110, 1.125, 1.150, 1.200, 1.250, 1.300, 1.400, 1.500, 1.750, 1.900, 2.000,
 )

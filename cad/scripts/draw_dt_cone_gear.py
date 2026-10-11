@@ -68,7 +68,7 @@ from _cone_gear_readback import assert_saved_configuration_topology
 from dt_cone_gear_notes import CUTTER_DETAIL_SHEET
 from dt_cone_gear_spec import (
     BORE_SURFACE_FINISHES,
-    CUSTOM_SIX_FORM_TOLERANCE_MM,
+    CUSTOM_SIX_FORM_TOLERANCE_NOTE,
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -287,7 +287,7 @@ def cutter_grind_data() -> str:
         f"TIP: CONCAVE ARC R{root:.3f} ABOUT GEAR AXIS",
         f"ABOVE R{template.relief_junction_radius_mm:.3f}: INVOLUTE, BASE "
         f"R{template.base_radius_mm:.3f}",
-        f"FORM TOLERANCE: X +{CUSTOM_SIX_FORM_TOLERANCE_MM:.3f} / -0.000",
+        CUSTOM_SIX_FORM_TOLERANCE_NOTE,
         f"FORM DEPTH (PLUNGE FROM BLANK OD):  {profile.plunge_mm:.3f}",
         "INSPECT THE TOOL BY TEMPLATE TO THIS TABLE;",
         "ACCEPT THE CUT T006 OVER PINS PER SHEET T006",
