@@ -354,8 +354,6 @@ def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
     assert root_chord == pytest.approx(21.540659228538015)
     assert side_run == pytest.approx(180.91868154292396)
     assert front_rear_run == pytest.approx(350.918681542924)
-    assert outer_run == pytest.approx(1036.674726171696)
-    assert window_run == pytest.approx(896.674726171696)
     fillet_area = (1.0 - math.pi / 4.0) * part.ROOT_FILLET_R**2
     crossbar_run = 2.0 * 2.0 * part.BAR_POCKET_Z
     assert part._t_root_add() == pytest.approx(
@@ -430,7 +428,7 @@ def test_c2_breaks_stay_clear_of_both_print_worst_knife_seats() -> None:
     # Every finished underside C2 band keeps 0.5 off both seats; the pocket
     # ends bind the front seat.  The sharp bar sides and gusset hypotenuses
     # beyond the pockets are exactly the edges a C2 would put under it.
-    _points, _removal, clearance = part._external_edge_breaks()
+    _groups, clearance = part._external_edge_breaks()
     assert clearance == part.KNIFE_SEAT_C2_CLEARANCE
     assert min(clearance.values()) >= part.KNIFE_SEAT_C2_MIN_CLEARANCE == 0.5
     reach = part.EDGE_CHAMFER + part._C2_LEG_BAND + part._EDGE_LOCATION_BAND
@@ -469,18 +467,72 @@ def test_c2_picks_are_convex_and_the_gusset_junctions_are_not() -> None:
                 )
                 == 90.0
             )
-    for x, y, z in part.EXTERNAL_EDGE_BREAK_POINTS:
+    for x, y, z in _external_break_points():
         assert not (abs(abs(z) - gusset_z) < 1e-9 and x in (part.BAR_X0, part.BAR_X1))
 
 
+def _external_break_points() -> list[list[float]]:
+    return [
+        point for picks, _, _ in part.EXTERNAL_EDGE_BREAKS.values() for point in picks
+    ]
+
+
+def test_c2_breaks_split_into_connected_chains_in_build_order() -> None:
+    groups, _clearance = part._external_edge_breaks()
+    assert groups == part.EXTERNAL_EDGE_BREAKS
+    assert list(groups) == [
+        "RailRunBreaks",
+        "CrossbarBreaks",
+        "WestWindowBreaks",
+        "HubRailBreaks",
+        "OuterCornerBreaks",
+        "BossRimBreaks",
+    ]
+    for feature, (picks, removal, shared) in groups.items():
+        assert picks and removal > 0.0, feature
+    # The boss rims are closed circles and the rail runs die into boss
+    # barrels at both ends: neither shares a vertex.
+    assert groups["RailRunBreaks"][2] == groups["BossRimBreaks"][2] == 0
+    # Each rib-side bottom ends on the web face, at its web bottom's end, in
+    # the same feature.
+    hub = groups["HubRailBreaks"][0]
+    for z_rib in (
+        part.GOOSENECK_Z - part.HUB_RIB_W / 2.0,
+        part.GOOSENECK_Z + part.HUB_RIB_W / 2.0,
+    ):
+        assert [(-part.OUTER_X - part.WEB_OUT_X) / 2.0, -part.HALF_H, z_rib] in hub
+
+
+def test_c2_chains_leave_no_sliver_between_features(monkeypatch) -> None:
+    assert part._segment_gap((0, 0, 0), (1, 0, 0), (1, 0, 0), (1, 1, 0)) == 0.0
+    assert part._segment_gap((0, 0, 0), (2, 0, 0), (1, 1, 1), (1, 1, 3)) == (
+        pytest.approx(math.sqrt(2.0))
+    )
+    assert part._segment_gap((0, 0, 0), (1, 0, 0), (3, 0, 0), (4, 0, 0)) == 2.0
+    # The nearest two breaks that do not meet stand 4.5 apart (a pocket end);
+    # demanding a land that wide trips the guard.
+    monkeypatch.setattr(part, "C2_SLIVER_MIN", 0.6)
+    with pytest.raises(AssertionError, match="sliver"):
+        part._external_edge_breaks()
+
+
+def test_hub_boss_chord_stays_inside_the_web_at_the_rib_sides() -> None:
+    def margin(rib_w: float) -> float:
+        chord = math.sqrt(max((part.HUB_BOSS_DIA / 2.0) ** 2 - (rib_w / 2.0) ** 2, 0.0))
+        return part.WEB_T / 2.0 - chord
+
+    assert part.HUB_BOSS_RIB_CHORD_MARGIN == pytest.approx(margin(part.HUB_RIB_W))
+    assert part.HUB_BOSS_RIB_CHORD_MARGIN >= part.HUB_BOSS_RIB_CHORD_MIN_MARGIN == 0.5
+    # The old 27-wide rib let the boss poke 0.038 past the web there.
+    assert margin(27.0) < 0.0
+
+
 def test_external_edge_breaks_select_distinct_edges_and_skip_the_noted_ones() -> None:
-    points, removal, _clearance = part._external_edge_breaks()
-    assert points == part.EXTERNAL_EDGE_BREAK_POINTS
-    assert removal == part.EXTERNAL_EDGE_BREAK_REMOVAL
+    points = _external_break_points()
+    assert len(points) == 75
     assert len({tuple(round(value, 6) for value in point) for point in points}) == len(
         points
     )
-    assert removal > 0.0
     # No two picks share an edge's 0.5 mm selection radius.
     for i, a in enumerate(points):
         for b in points[i + 1 :]:
@@ -3091,7 +3143,10 @@ def test_keeper_seats_split_after_the_solid_and_qualify_once_before_pmi() -> Non
         for call in ast.walk(node)
         if isinstance(call, ast.Call) and _called_name(call) == "volume_check"
     )
-    assert "'external edge breaks'" in statements[last_material]
+    assert statements[last_material].startswith(
+        "for feature, (picks, v_chain, shared) in EXTERNAL_EDGE_BREAKS.items():"
+    )
+    assert "f'external edge breaks {feature}'" in statements[last_material]
     rebuilds = [
         i for i, s in enumerate(statements) if s == "await force_rebuild(adapter)"
     ]

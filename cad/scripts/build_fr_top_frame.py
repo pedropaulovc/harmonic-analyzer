@@ -34,7 +34,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   knife-mount seats) the bar is a T like the rails: the 22-wide, 8-tall
   top flange over a 13.0 web centred on the knife line through the
   underside, with R3 roots.
-* Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 27 wide,
+* Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 28 wide,
   O17 clearance bore for the O16 counter-spring post, underside boss
   O30 x 8 with twin V-gussets (ch30 p004), a 16 x 16 x 2 cast pocket and
   a 1/4-20 tap through the rib to the bore for the square-head set screw
@@ -70,7 +70,9 @@ counterbores -> column bores -> gooseneck bore -> wizard holes (#6 SHCS
 hanger counterbores) -> dowel slip holes -> wizard holes (side-screw
 taps, set-screw tap, keeper taps) -> internal T-root fillets (R3) ->
 external top-rim breaks (C2) -> C1 bore top lead-ins -> remaining
-external edge breaks (C2) -> keeper-seat split lines.
+external edge breaks (C2, one feature per connected chain: rail runs,
+crossbar, west window, hub rail, outer corners, boss rims) -> keeper-seat
+split lines.
 Wizard holes come after the face cuts so every seat face is final; the
 edge breaks and zero-volume split lines follow the solid features.
 Analytic volume checks after every feature; boss additions and top-rim
@@ -353,7 +355,7 @@ for _cut, _contours in (
 
 # --- Gooseneck hub (old gooseneck-clamp function, merged) -------------------
 GOOSENECK_Z = SUMMING_Z
-HUB_RIB_W = 27.0  # full-height rib band across the east rail
+HUB_RIB_W = 28.0  # full-height rib band across the east rail
 HUB_BOSS_DIA = 30.0  # underside boss around the bore exit
 HUB_BOSS_DROP = 8.0  # boss bottom local -26.25
 HUB_GUSSET_T = 7.0  # V-gusset thickness along X (x -200.5..-193.5)
@@ -434,6 +436,8 @@ THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
 # bottom, except where an edge cannot take it (_external_edge_breaks).
 ROOT_FILLET_R = 3.0  # internal web/flange T-root blends (cast root, ch19 img04)
 EDGE_CHAMFER = 2.0  # external edge breaks, 45 deg (one grinding pass)
+# Least land two separate C2 features may leave between their faces.
+C2_SLIVER_MIN = 0.1
 # Print-worst reach of a finished C2 band into the underside: the edge off
 # its nominal by two .X bands (as the pocket end) and the whole-mm note's
 # leg at the loosest printed row.
@@ -587,6 +591,21 @@ KNIFE_SEAT_FOOTPRINTS = {
 }
 if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
+# The hub boss's chord at each rib side face stays inside the east-rail web,
+# so each rib-side bottom and its web bottom meet at one clean vertex that a
+# single C2 feature blends, with no boss-top sliver between their ends (at
+# 27 wide the boss poked 0.038 past the web there).  NOMINAL, on purpose:
+# this is a native-modelling guard on the CAD's topology, not a fit -- on a
+# real casting the printed bands only move where the hand-broken edges blend.
+HUB_BOSS_RIB_CHORD_MIN_MARGIN = 0.5
+HUB_BOSS_RIB_CHORD_MARGIN = WEB_T / 2.0 - math.sqrt(
+    max((HUB_BOSS_DIA / 2.0) ** 2 - (HUB_RIB_W / 2.0) ** 2, 0.0)
+)
+if HUB_BOSS_RIB_CHORD_MARGIN < HUB_BOSS_RIB_CHORD_MIN_MARGIN:
+    raise AssertionError(
+        f"hub boss chord at the rib sides leaves {HUB_BOSS_RIB_CHORD_MARGIN:.3f}"
+        f" mm inside the east-rail web (needs {HUB_BOSS_RIB_CHORD_MIN_MARGIN:g})"
+    )
 # The unified tap table rounds its nominal major; the actual stock major
 # must also fit. Use the larger diameter for every receiver-wall guard.
 KEEPER_TAP_THREAD_MAJOR_DIA = max(
@@ -1046,8 +1065,9 @@ def _hub_boss_add_volume() -> float:
     """Volume the hub under-boss extrude (circle, y 0..-26.25) adds.
 
     Covered cells (hub rib plan or web ring) already hold -18.25..0, so the
-    boss adds only the 8 below; the web-setback slivers (circle past the web
-    faces, under the flange) are empty below +10.25 and gain the full 26.25.
+    boss adds only the 8 below; a cell past the web faces, under the flange,
+    would be empty below +10.25 and gain the full 26.25 (none while
+    HUB_BOSS_RIB_CHORD_MARGIN holds: the circle leaves the rib inside the web).
     """
     r = HUB_BOSS_DIA / 2.0
     rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0
@@ -1374,19 +1394,57 @@ def _plan_gap(a: list[tuple[float, float]], b: list[tuple[float, float]]) -> flo
     )
 
 
-def _external_edge_breaks() -> tuple[list[list[float]], float, dict[str, float]]:
-    """Selection points, analytic removal and knife-seat clearance for the
-    C2 ExternalEdgeBreaks.
+def _segment_gap(
+    p0: tuple[float, ...],
+    p1: tuple[float, ...],
+    q0: tuple[float, ...],
+    q1: tuple[float, ...],
+) -> float:
+    """Least distance between 3D segments p0-p1 and q0-q1 (both non-degenerate)."""
+    d1 = [b - a for a, b in zip(p0, p1)]
+    d2 = [b - a for a, b in zip(q0, q1)]
+    r = [a - b for a, b in zip(p0, q0)]
+    a = sum(v * v for v in d1)
+    e = sum(v * v for v in d2)
+    f = sum(u * v for u, v in zip(d2, r))
+    b = sum(u * v for u, v in zip(d1, d2))
+    c = sum(u * v for u, v in zip(d1, r))
+    denom = a * e - b * b
+    s = min(max((b * f - c * e) / denom, 0.0), 1.0) if denom > 1e-12 else 0.0
+    t = (b * s + f) / e
+    if t < 0.0:
+        t, s = 0.0, min(max(-c / a, 0.0), 1.0)
+    elif t > 1.0:
+        t, s = 1.0, min(max((b - c) / a, 0.0), 1.0)
+    return math.dist(
+        [p + s * d for p, d in zip(p0, d1)], [q + t * d for q, d in zip(q0, d2)]
+    )
+
+
+def _external_edge_breaks() -> tuple[
+    dict[str, tuple[list[list[float]], float, int]], dict[str, float]
+]:
+    """The C2 external edge breaks as one chamfer feature per edge group, in
+    build order (feature name -> picks, analytic removal, shared vertices),
+    and each knife seat's least clearance to them.
 
     Every external convex edge the top-rim and bore-top breaks left, once
     the T-section crossbar exists: the flange undersides (outer, window and
     the eight short outer-corner runs), the four outer vertical corners, the
     web bottoms, the junction lands' free edges, the crossbar web bottoms,
-    pocket-end bottoms and outer corners, the hub rib's free corners, and
-    the corner/hub boss rims.
+    pocket-end bottoms and outer corners, the hub rib's free corners and
+    side bottoms, and the corner/hub boss rims.
     Straight edges remove ``c^2 sin(angle) / 2`` per mm over their run to the
     face that ends them; outer rims remove ``pi c^2 (R - c/3)``. Corner
     patches and the ends dying into boss barrels are left to the tolerance.
+
+    Groups are the connected chains of breaks, long simple runs first and
+    the outer corners and boss rims last, so a native failure names its
+    chain and each chain's volume is proved on its own. Breaks that share a
+    vertex must sit in one group (SolidWorks blends that corner only within
+    a feature); any other two breaks keep ``2c + C2_SLIVER_MIN`` apart, or
+    the module fails to import. ``shared`` counts the pairs of a group's
+    breaks that meet at a vertex.
 
     Every pick must be the convex edge it claims: its solid angle, measured
     on ``_casting_occupies``, is below 180 degrees and equals the angle its
@@ -1414,14 +1472,20 @@ def _external_edge_breaks() -> tuple[list[list[float]], float, dict[str, float]]
     side_cut = math.sqrt(r_boss**2 - (RAIL_W_SIDE / 2.0) ** 2)  # 14.624
     fr_cut = math.sqrt(r_boss**2 - (RAIL_W_FR / 2.0) ** 2)  # 12.052
     web_cut = math.sqrt(r_boss**2 - (WEB_T / 2.0) ** 2)  # 21.540
-    hub_web_cut = math.sqrt(r_hub**2 - (WEB_T / 2.0) ** 2)  # 13.518
-    hub_rib_cut = math.sqrt(r_hub**2 - (HUB_RIB_W / 2.0) ** 2)  # 6.538
     rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0
     rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0
     y_under = FLANGE_BOT_Y
     y_bottom = -HALF_H
-    points: list[list[float]] = []
-    removal = 0.0
+    # feature name -> (picks, analytic removal, shared vertices), build order
+    groups: dict[str, tuple[list[list[float]], float, int]] = {}
+    segments: list[tuple[str, tuple[float, ...], tuple[float, ...]]] = []
+    group = ""
+
+    def start(name: str) -> None:
+        nonlocal group
+        group = name
+        groups[name] = ([], 0.0, 0)
+
     # (edge, plan polygon of its print-worst band on the underside)
     underside_bands: list[
         tuple[tuple[float, float, float], list[tuple[float, float]]]
@@ -1442,14 +1506,22 @@ def _external_edge_breaks() -> tuple[list[list[float]], float, dict[str, float]]
         angle: float,
         axis: tuple[float, float, float],
     ) -> None:
-        nonlocal removal
         if length <= 2.0 * c:
             raise AssertionError(
                 f"edge at {point} is too short for C{c:g}: {length:.3f}"
             )
         convex(point, axis, angle)
-        points.append(list(point))
-        removal += 0.5 * c * c * math.sin(math.radians(angle)) * length
+        picks, volume, _ = groups[group]
+        picks.append(list(point))
+        removal = 0.5 * c * c * math.sin(math.radians(angle)) * length
+        groups[group] = (picks, volume + removal, 0)
+        segments.append(
+            (
+                group,
+                tuple(point[i] - axis[i] * length / 2.0 for i in range(3)),
+                tuple(point[i] + axis[i] * length / 2.0 for i in range(3)),
+            )
+        )
         x, y, z = point
         if axis[1] == 0.0 and y == y_bottom:
             # Its band runs the edge's length and the location band past
@@ -1502,45 +1574,18 @@ def _external_edge_breaks() -> tuple[list[list[float]], float, dict[str, float]]
         lo, hi = sorted((z0, z1))
         edge((x, y, (lo + hi) / 2.0), hi - lo, angle, (0.0, 0.0, 1.0))
 
-    # Flange underside, outer: west/east (rib-split) and front/rear runs
-    # between the bosses, the eight short runs outside the boss barrels, and
-    # the four vertical outer corners below the top-rim break.
+    start("RailRunBreaks")
+    # Long single runs whose both ends die into corner-boss barrels: the
+    # west and front/rear outer flange undersides, the west web bottoms and
+    # the front/rear outer web bottoms.
     along_z(OUTER_X, y_under, -(z_col - side_cut), z_col - side_cut)
-    along_z(-OUTER_X, y_under, -(z_col - side_cut), rib_lo)
-    along_z(-OUTER_X, y_under, rib_hi, z_col - side_cut)
     for sz in (-1.0, 1.0):
         along_x(sz * OUTER_Z, y_under, -(COLUMN_X - fr_cut), COLUMN_X - fr_cut)
-    for sx in (-1.0, 1.0):
-        for sz in (-1.0, 1.0):
-            along_z(sx * OUTER_X, y_under, sz * (z_col + side_cut), sz * OUTER_Z)
-            along_x(sz * OUTER_Z, y_under, sx * (COLUMN_X + fr_cut), sx * OUTER_X)
-            along_y(sx * OUTER_X, sz * OUTER_Z, y_under, HALF_H - c)
-    # Flange underside, window: west, east (rib-split), front/rear (land-split).
-    along_z(INNER_X, y_under, -INNER_Z, INNER_Z)
-    along_z(-INNER_X, y_under, -INNER_Z, rib_lo)
-    along_z(-INNER_X, y_under, rib_hi, INNER_Z)
-    for sz in (-1.0, 1.0):
-        along_x(sz * INNER_Z, y_under, -INNER_X, LAND_X0)
-        along_x(sz * INNER_Z, y_under, LAND_X1, INNER_X)
-    # Web bottoms: side rails between the corner bosses (the east pair split
-    # by the hub boss), front/rear outer faces, front/rear window faces
-    # (land-split).
     for x_web in (WEB_OUT_X, WEB_IN_X):
         along_z(x_web, y_bottom, -(z_col - web_cut), z_col - web_cut)
-        along_z(-x_web, y_bottom, -(z_col - web_cut), GOOSENECK_Z - hub_web_cut)
-        along_z(-x_web, y_bottom, GOOSENECK_Z + hub_web_cut, z_col - web_cut)
     for sz in (-1.0, 1.0):
         along_x(sz * WEB_OUT_Z, y_bottom, -(COLUMN_X - web_cut), COLUMN_X - web_cut)
-        along_x(sz * WEB_IN_Z, y_bottom, -(COLUMN_X - web_cut), LAND_X0)
-        along_x(sz * WEB_IN_Z, y_bottom, LAND_X1, COLUMN_X - web_cut)
-    # Junction lands: the free vertical corners, end bottoms and the short
-    # window-face bottoms beside the gussets.
-    for sz in (-1.0, 1.0):
-        for x_land in (LAND_X0, LAND_X1):
-            along_y(x_land, sz * INNER_Z, y_bottom, y_under)
-            along_z(x_land, y_bottom, sz * INNER_Z, sz * WEB_IN_Z)
-        along_x(sz * INNER_Z, y_bottom, LAND_X0, BAR_X0 - GUSSET)
-        along_x(sz * INNER_Z, y_bottom, BAR_X1 + GUSSET, LAND_X1)
+    start("CrossbarBreaks")
     # Crossbar: web bottoms; per pocket end its bottom and its outer vertical
     # corner. Beyond the pocket ends the knife-mount seats sit over the bar
     # sides and gusset hypotenuses, whose bottoms stay sharp.
@@ -1551,25 +1596,107 @@ def _external_edge_breaks() -> tuple[list[list[float]], float, dict[str, float]]
         along_x(sz * BAR_POCKET_Z, y_bottom, BAR_WEB_X1, BAR_X1)
         for x_bar in (BAR_X0, BAR_X1):
             along_y(x_bar, sz * BAR_POCKET_Z, y_bottom, y_under)
-    # Hub rib: the four free vertical corners and its side bottoms out to the
-    # hub boss barrel.
+    start("WestWindowBreaks")
+    # The west window's flange underside, round its corners into the
+    # front/rear runs to the junction lands, the lands' free vertical
+    # corners, end bottoms and short window-face bottoms (to the sharp
+    # gusset hypotenuse), and the front/rear window web bottoms the land
+    # ends meet.
+    along_z(INNER_X, y_under, -INNER_Z, INNER_Z)
+    for sz in (-1.0, 1.0):
+        along_x(sz * INNER_Z, y_under, LAND_X1, INNER_X)
+        along_y(LAND_X1, sz * INNER_Z, y_bottom, y_under)
+        along_z(LAND_X1, y_bottom, sz * INNER_Z, sz * WEB_IN_Z)
+        along_x(sz * INNER_Z, y_bottom, BAR_X1 + GUSSET, LAND_X1)
+        along_x(sz * WEB_IN_Z, y_bottom, LAND_X1, COLUMN_X - web_cut)
+    start("HubRailBreaks")
+    # The east (hub) side, all one chain: the outer and window flange
+    # undersides split by the hub rib, the rib's four free vertical
+    # corners, its side bottoms out to the web faces (each meeting its web
+    # bottom at one vertex: the boss chord stays inside the web), the east
+    # web bottoms, and the east window's front/rear runs, land edges and
+    # window web bottoms as on the west.
+    along_z(-OUTER_X, y_under, -(z_col - side_cut), rib_lo)
+    along_z(-OUTER_X, y_under, rib_hi, z_col - side_cut)
+    along_z(-INNER_X, y_under, -INNER_Z, rib_lo)
+    along_z(-INNER_X, y_under, rib_hi, INNER_Z)
     for z_rib in (rib_lo, rib_hi):
         for x_face in (-OUTER_X, -INNER_X):
             along_y(x_face, z_rib, y_bottom, y_under)
-        along_x(z_rib, y_bottom, -OUTER_X, GOOSENECK_X - hub_rib_cut)
-        along_x(z_rib, y_bottom, GOOSENECK_X + hub_rib_cut, -INNER_X)
-    # Boss rims: the four corner bosses top and bottom, and the hub boss.
+        along_x(z_rib, y_bottom, -OUTER_X, -WEB_OUT_X)
+        along_x(z_rib, y_bottom, -WEB_IN_X, -INNER_X)
+    for x_web in (WEB_OUT_X, WEB_IN_X):
+        along_z(-x_web, y_bottom, -(z_col - web_cut), rib_lo)
+        along_z(-x_web, y_bottom, rib_hi, z_col - web_cut)
+    for sz in (-1.0, 1.0):
+        along_x(sz * INNER_Z, y_under, -INNER_X, LAND_X0)
+        along_y(LAND_X0, sz * INNER_Z, y_bottom, y_under)
+        along_z(LAND_X0, y_bottom, sz * INNER_Z, sz * WEB_IN_Z)
+        along_x(sz * INNER_Z, y_bottom, LAND_X0, BAR_X0 - GUSSET)
+        along_x(sz * WEB_IN_Z, y_bottom, -(COLUMN_X - web_cut), LAND_X0)
+    start("OuterCornerBreaks")
+    # Per plan corner: the two short flange-underside runs outside the boss
+    # barrel and the vertical corner up to the top-rim break, which all meet
+    # at the corner's underside vertex.
+    for sx in (-1.0, 1.0):
+        for sz in (-1.0, 1.0):
+            along_z(sx * OUTER_X, y_under, sz * (z_col + side_cut), sz * OUTER_Z)
+            along_x(sz * OUTER_Z, y_under, sx * (COLUMN_X + fr_cut), sx * OUTER_X)
+            along_y(sx * OUTER_X, sz * OUTER_Z, y_under, HALF_H - c)
+    # Boss rims: the four corner bosses top and bottom, and the hub boss --
+    # closed circles that meet no other break.
+    start("BossRimBreaks")
+    rims: list[tuple[tuple[float, float, float], float]] = []
+
+    def rim(centre: tuple[float, float, float], radius: float, sx: float) -> None:
+        # Picked on the outboard (sx) side of the circle.
+        point = (centre[0] + sx * radius, centre[1], centre[2])
+        convex(point, (0.0, 0.0, 1.0), 90.0)
+        picks, volume, _ = groups[group]
+        picks.append(list(point))
+        groups[group] = (picks, volume + math.pi * c * c * (radius - c / 3.0), 0)
+        rims.append((centre, radius))
+
     for sx in (-1.0, 1.0):
         for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z):
             for y_rim in (HALF_H + BOSS_ABOVE, -(HALF_H + BOSS_BELOW)):
-                rim = (sx * (COLUMN_X + r_boss), y_rim, z_world)
-                convex(rim, (0.0, 0.0, 1.0), 90.0)
-                points.append(list(rim))
-                removal += math.pi * c * c * (r_boss - c / 3.0)
-    hub_rim = (GOOSENECK_X - r_hub, -(HALF_H + HUB_BOSS_DROP), GOOSENECK_Z)
-    convex(hub_rim, (0.0, 0.0, 1.0), 90.0)
-    points.append(list(hub_rim))
-    removal += math.pi * c * c * (r_hub - c / 3.0)
+                rim((sx * COLUMN_X, y_rim, z_world), r_boss, sx)
+    rim((GOOSENECK_X, -(HALF_H + HUB_BOSS_DROP), GOOSENECK_Z), r_hub, -1.0)
+    # Any two breaks either share a vertex -- then one feature must cut both,
+    # so SolidWorks blends that corner -- or stay 2c + C2_SLIVER_MIN apart, so
+    # no two C2 faces leave a sliver between them. Each group's shared
+    # vertices size its volume tolerance.
+    reach = 2.0 * c + C2_SLIVER_MIN
+    for i, (group_a, p0, p1) in enumerate(segments):
+        for group_b, q0, q1 in segments[i + 1 :]:
+            gap = _segment_gap(p0, p1, q0, q1)
+            if gap < 1e-9:
+                if group_a != group_b:
+                    raise AssertionError(
+                        f"C{c:g} breaks in {group_a} and {group_b} meet at a vertex"
+                        f" near {p0}..{p1}; one feature must cut both"
+                    )
+                picks, volume, shared = groups[group_a]
+                groups[group_a] = (picks, volume, shared + 1)
+            elif gap < reach:
+                raise AssertionError(
+                    f"C{c:g} breaks {p0}..{p1} ({group_a}) and {q0}..{q1}"
+                    f" ({group_b}) stop {gap:.3f} mm apart; C{c:g} faces"
+                    f" would leave a sliver under {C2_SLIVER_MIN:g}"
+                )
+        for centre, radius in rims:
+            gap = min(
+                math.hypot(
+                    math.hypot(p[0] - centre[0], p[2] - centre[2]) - radius,
+                    p[1] - centre[1],
+                )
+                for k in range(201)
+                for p in [tuple(p0[j] + (p1[j] - p0[j]) * k / 200.0 for j in range(3))]
+            )
+            if gap < reach:
+                raise AssertionError(
+                    f"C{c:g} break {p0}..{p1} comes {gap:.3f} mm from a boss rim"
+                )
     # Neither knife-mount seat may sit on, or within the clearance of, a
     # finished C2 band.
     seat_clearance = {}
@@ -1584,12 +1711,10 @@ def _external_edge_breaks() -> tuple[list[list[float]], float, dict[str, float]]
                 f"{KNIFE_SEAT_C2_MIN_CLEARANCE:g})"
             )
         seat_clearance[mount] = gap
-    return points, removal, seat_clearance
+    return groups, seat_clearance
 
 
-EXTERNAL_EDGE_BREAK_POINTS, EXTERNAL_EDGE_BREAK_REMOVAL, KNIFE_SEAT_C2_CLEARANCE = (
-    _external_edge_breaks()
-)
+EXTERNAL_EDGE_BREAKS, KNIFE_SEAT_C2_CLEARANCE = _external_edge_breaks()
 
 
 def _open_underside_sketch(
@@ -2706,8 +2831,8 @@ async def build(adapter) -> dict[str, str]:
     x_shelf_in = COLUMN_X - WEB_T / 2.0  # 190.5
     z_shelf_out = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.5
     z_shelf_in = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.5
-    rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0  # -10.41
-    rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0  # +16.59
+    rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0  # -10.91
+    rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0  # +17.09
     root_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (WEB_T / 2.0) ** 2)
     east_mid_lo = (-abs(FRONT_COLUMN_Z) + root_cut + rib_lo) / 2.0
     east_mid_hi = (rib_hi + abs(FRONT_COLUMN_Z) - root_cut) / 2.0
@@ -2807,20 +2932,21 @@ async def build(adapter) -> dict[str, str]:
         adapter, "bore top breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
     )
 
-    # 18b. C2 x 45 on every remaining external convex edge (75 edges, see
-    #      _external_edge_breaks for the list and the edges left unbroken).
-    v_external = EXTERNAL_EDGE_BREAK_REMOVAL
-    check(
-        "chamfer external edges",
-        await adapter.add_chamfer(EDGE_CHAMFER, EXTERNAL_EDGE_BREAK_POINTS),
-    )
-    name_last_feature(adapter, "ExternalEdgeBreaks")
-    volume = await volume_check(
-        adapter,
-        "external edge breaks",
-        volume - v_external,
-        0.03 * v_external + 150.0,
-    )
+    # 18b. C2 x 45 on every remaining external convex edge (75 edges), one
+    #      chamfer feature per connected chain so a native failure names its
+    #      chain and each chain's volume is proved on its own (see
+    #      _external_edge_breaks for the chains and the edges left unbroken).
+    #      Each pair of breaks meeting at a vertex adds half a c^3 corner
+    #      patch to the tolerance; barrel-end error sits inside the 3%.
+    for feature, (picks, v_chain, shared) in EXTERNAL_EDGE_BREAKS.items():
+        check(f"chamfer {feature}", await adapter.add_chamfer(EDGE_CHAMFER, picks))
+        name_last_feature(adapter, feature)
+        volume = await volume_check(
+            adapter,
+            f"external edge breaks {feature}",
+            volume - v_chain,
+            0.03 * v_chain + 0.5 * EDGE_CHAMFER**3 * shared + 10.0,
+        )
 
     # 19. Machined keeper-seat regions on the unchanged rail-top plane.
     # Split boundaries, not a cut or raised pad: volume and all stacks stay fixed.

@@ -388,10 +388,12 @@ HUB_SECTION_CAPTION_XY = (0.330, 0.178)
 POCKET_DEPTH_TEXT_XY = (0.330, 0.238)
 POCKET_DEPTH_OFFSET_XY = (0.378, 0.242)
 # In the left window, right of the bore (clears leader-crosses-line Ra 3.2 x
-# RibWidth 27.0 at x 60): was (0.030, 0.160), its 35 mm tail cut the 27.0
+# RibWidth at x 60): was (0.030, 0.160), its 35 mm tail cut the RibWidth
 # line.  The leader now lands on the bore's lower-right rim (-45 deg on the
-# sheet) from an 8 mm tail at y 195, passing 2.2 mm over the 27.0 extension
-# line's end (84.0, 194.5) and 2.0 mm under the D-D cutting line.
+# sheet) from an 8 mm tail at y 195, passing 2.2 mm over the RibWidth
+# extension line's end (84.0, 194.5, read at the 27.0 rib; the 28.0 rib moves
+# each side 0.5 model mm, at most 0.25 on the sheet) and 2.0 mm under the D-D
+# cutting line.
 HUB_BORE_FINISH_SYMBOL_XY = (0.108, 0.195)
 HUB_BORE_FINISH_TAIL = 0.008
 # One ramp, three numbers: the 60.0 feather span, the 8.0 drop below the
