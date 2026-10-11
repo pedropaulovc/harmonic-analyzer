@@ -221,12 +221,15 @@ RULINGS: dict[str, Ruling] = {
         joint="pd-paper-drive/thumbnut-on-knob-shaft",
         granted=(
             "user, 2026-10-03, joint-specific rule-9 ruling on the machinist review of "
-            "6c385465d: no lock on the MHA-PD-013 thumbnut. The T24 floats 0.05-0.15 under the "
+            "6c385465d: no lock on the MHA-PD-013 thumbnut; re-granted 2026-10-11 for "
+            "#8-32 after the inch change. The T24 floats 0.05-0.15 under the "
             "flange and turns against it only by its drive-pin backlash, ±0.9° per reversal "
             "((Ø2.5 +0.10 hole - Ø2.381 pin) / 2 on the R7 circle). Any drag it passes is "
             "μ F r_m = 0.15 × 1 N × 5.68 = 0.85 N·mm [INFERENCE: chain axial pull ≤1 N], "
-            "against ~360 N·mm to back off a hand-tight nut [INFERENCE: ~400 N preload, μ "
-            "0.15 on the 1/4-20 flank and the pilot seat], over 100x. Every positive lock "
+            "against ~330 N·mm to back off a hand-tight nut [INFERENCE: ~400 N preload, μ "
+            "0.15 on the #8-32 flank (d2 3.65, P 0.794) and on the pilot seat at the 10-03 "
+            "mean radius 4.24; F (0.5 d2 μ / cos 30° - P / 2π + μ r)], over 300x. "
+            "Every positive lock "
             "tried broke a wall or the chain's envelope: a 98335A049 hairpin across the "
             "flange sweeps r ~23 inside the chain band (plates' inner edge r 21.2)"
         ),
