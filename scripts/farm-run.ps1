@@ -108,6 +108,12 @@ param(
     [ValidateRange(0, 600)]
     [int]$SettleSeconds = 30,
 
+    # Protocol 5: bound reconciliation may need operator recovery. A timeout
+    # leaves the reservation unresolved; it never releases FIFO ownership.
+    [Parameter(ParameterSetName = 'Cancel')]
+    [ValidateRange(0, 600)]
+    [int]$BindingWaitSeconds = 30,
+
     [Parameter(ParameterSetName = 'List')]
     [ValidateSet('running', 'succeeded', 'failed', 'cancelled', 'launcher-died')]
     [string]$State,
@@ -734,6 +740,7 @@ function Read-RunLog {
     #   TaskError - taskid:<task>                   (doit, then a traceback whose
     #                                                last exception line says why)
     $parsed = [ordered]@{
+        build_id = $null
         leaves = [ordered]@{}
         hits = 0
         task_errors = [System.Collections.Generic.List[string]]::new()
@@ -753,6 +760,11 @@ function Read-RunLog {
     $awaitingCause = $null
     foreach ($raw in $text.Substring(0, $complete).Split("`n")) {
         $line = $raw.TrimEnd("`r")
+        if ($line -match 'Farm build registered: (\S+)') {
+            $parsed['build_id'] = $Matches[1]
+            $parsed['events'].Add("farm build registered $($Matches[1])")
+            continue
+        }
         $workflow = [System.Text.RegularExpressions.Regex]::Match(
             $line, 'Farm workflow (requested|attached): (\S+)'
         )
@@ -822,6 +834,10 @@ function Add-RunRequests {
     }
     foreach ($file in @(Get-ChildItem -LiteralPath $Directory -Filter '*.json' -File | Sort-Object -Property Name)) {
         $request = Read-RunRecord -Path $file.FullName
+        if ($file.Name -eq 'build.json') {
+            $Parsed['build_id'] = $request['build_id']
+            continue
+        }
         $task = $request['task']
         $leaf = $Parsed['leaves'][$task]
         if ($null -eq $leaf) {
@@ -829,11 +845,13 @@ function Add-RunRequests {
                 task = $task
                 state = 'requested'
                 workflow_id = $request['workflow_id']
+                build_id = $request['build_id']
                 error = $null
             }
             $Parsed['events'].Add("leaf $task requested $($request['workflow_id']) (request record; not in the log)")
             continue
         }
+        $leaf['build_id'] = $request['build_id']
         if ($null -eq $leaf['workflow_id']) {
             # The log saw the task fail but lost the line naming its workflow.
             $leaf['workflow_id'] = $request['workflow_id']
@@ -855,6 +873,28 @@ function Get-RunStatus {
     $state = if ($null -ne $done) { $done['state'] } elseif ($alive) { 'running' } else { 'launcher-died' }
     $log = Read-RunLog -Path $record['log']
     Add-RunRequests -Parsed $log -Directory $record['requests']
+    if ($log['build_id']) {
+        if ($record['build_id'] -and $record['build_id'] -ne $log['build_id']) {
+            throw 'durable build identity disagrees with run record'
+        }
+        if (-not $record['build_id']) {
+            $record['build_id'] = $log['build_id']
+            # Persist before cleanup can remove the durable request directory.
+            $temporary = "$RecordPath.$([guid]::NewGuid().ToString('N')).tmp"
+            try {
+                [System.IO.File]::WriteAllText(
+                    $temporary, ($record | ConvertTo-Json -Depth 8 -Compress),
+                    [System.Text.UTF8Encoding]::new($false)
+                )
+                [System.IO.File]::Move($temporary, $RecordPath, $true)
+            }
+            finally {
+                if (Test-Path -LiteralPath $temporary) {
+                    Remove-Item -LiteralPath $temporary -Force
+                }
+            }
+        }
+    }
     $leaves = @($log['leaves'].Values)
     $inFlight = @($leaves | Where-Object { $_['state'] -in @('requested', 'attached') })
     # A leaf the build saw fail may still be running on the farm: a client
@@ -868,6 +908,7 @@ function Get-RunStatus {
     }
     $status = [ordered]@{
         run_id = $record['run_id']
+        build_id = $record['build_id']
         tag = $record['tag']
         state = $state
         exit_code = if ($null -ne $done) { $done['exit_code'] } else { $null }
@@ -1444,7 +1485,8 @@ function Invoke-RunCancel {
         [Parameter(Mandatory)][string]$Directory,
         [Parameter(Mandatory)][string]$RecordPath,
         [Parameter(Mandatory)][string]$Why,
-        [Parameter(Mandatory)][int]$SettleSeconds
+        [Parameter(Mandatory)][int]$SettleSeconds,
+        [Parameter(Mandatory)][int]$BindingWaitSeconds
     )
 
     $snapshot = Get-RunStatus -RecordPath $RecordPath
@@ -1474,7 +1516,22 @@ function Invoke-RunCancel {
     }
 
     # Re-read: the log is final now that nothing writes it.
-    $unsettled = @((Get-RunStatus -RecordPath $RecordPath).status['unsettled_workflows'])
+    $finalSnapshot = Get-RunStatus -RecordPath $RecordPath
+    $record = $finalSnapshot.record
+    $unsettled = @($finalSnapshot.status['unsettled_workflows'])
+    $buildId = $record['build_id']
+    if ($buildId) {
+        $unsettled = @($finalSnapshot.status['leaves'] | Where-Object { $_['workflow_id'] } | ForEach-Object { $_['workflow_id'] })
+    }
+    if ($buildId) {
+        $closed = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('close-build', $buildId, '--reason', 'cancelled')
+        if ($closed.code -ne 0) {
+            $errors.Add("close-build $buildId failed: $($closed.output -join ' ')")
+        }
+        else {
+            Write-RunEvent -RunId $runId -Text "closed farm build $buildId`: cancelled"
+        }
+    }
 
     $reason = "$Why (farm-run.ps1 -Cancel $runId)"
     # Returns one outcome whose `event` the caller prints: anything this block
@@ -1483,7 +1540,89 @@ function Invoke-RunCancel {
         param([string]$WorkflowId)
 
         $outcome = [ordered]@{ workflow_id = $WorkflowId; outcome = $null; detail = $null; event = $null }
-        $query = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('status', '--json', $WorkflowId)
+        $statusArguments = @('status', '--json')
+        $bindingRun = $null
+        if ($buildId) {
+            # Accepted reservations can bind long after the local producer dies.
+            # Never substitute workflow absence for the coordinator's answer.
+            $bindingWait = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($true) {
+                $reservation = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @(
+                    'leaf-status', '--build-id', $buildId, '--workflow-id', $WorkflowId, '--json'
+                )
+                if ($reservation.code -ne 0) {
+                    $outcome['outcome'] = 'unresolved'
+                    $outcome['detail'] = $reservation.output -join ' '
+                    $outcome['event'] = "unresolved reservation $WorkflowId"
+                    $errors.Add("leaf-status $WorkflowId failed: $($outcome['detail'])")
+                    return $outcome
+                }
+                $reservationLine = $reservation.output | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1
+                $leafStatus = $reservationLine | ConvertFrom-Json -AsHashtable
+                $key = $leafStatus['key']
+                if ($null -eq $key -or $key['build_id'] -ne $buildId -or $key['workflow_id'] -ne $WorkflowId) {
+                    throw "invalid coordinator reservation for $WorkflowId"
+                }
+                $reservationState = $leafStatus['state']
+                if ($leafStatus['error_code'] -or $reservationState -eq 'recovery_required') {
+                    $outcome['outcome'] = 'unresolved'
+                    $outcome['detail'] = "$($leafStatus['error_code']): $($leafStatus['error'])"
+                    $outcome['event'] = "unresolved reservation $WorkflowId`: operator recovery required"
+                    $errors.Add("reservation $WorkflowId requires operator recovery: $($outcome['detail'])")
+                    return $outcome
+                }
+                if ($reservationState -eq 'missing_closed') {
+                    if ($null -ne $leafStatus['binding'] -or @($leafStatus['unconfirmed_attempts']).Count -gt 0) {
+                        throw "invalid missing_closed reservation for $WorkflowId"
+                    }
+                    # No retained reservation remains to reconcile. This also
+                    # covers accepted, physically drained history later pruned;
+                    # never infer submission history or a run from the ID.
+                    $outcome['outcome'] = 'settled-untracked'
+                    $outcome['detail'] = 'producer fenced closed; reservation is no longer tracked'
+                    $outcome['event'] = "settled untracked reservation $WorkflowId`: producer fenced closed"
+                    return $outcome
+                }
+                if ($reservationState -notin @('reserved', 'bound', 'admitted', 'terminal', 'drained')) {
+                    throw "invalid coordinator reservation state for $WorkflowId"
+                }
+                $binding = $leafStatus['binding']
+                if ($null -ne $binding) {
+                    if ($binding['build_id'] -ne $buildId -or $binding['workflow_id'] -ne $WorkflowId -or -not $binding['run_id']) {
+                        throw "invalid coordinator binding for $WorkflowId"
+                    }
+                    $bindingRun = $binding['run_id']
+                    $outcome['run_id'] = $bindingRun
+                    $statusArguments += @('--run-id', $bindingRun)
+                    break
+                }
+                if ($reservationState -eq 'drained' -and @($leafStatus['unconfirmed_attempts']).Count -eq 0) {
+                    $outcome['outcome'] = 'already-closed'
+                    $outcome['detail'] = 'coordinator confirmed reservation physically drained'
+                    $outcome['event'] = "already closed $WorkflowId`: reservation drained"
+                    return $outcome
+                }
+                if ($reservationState -ne 'reserved') {
+                    $outcome['outcome'] = 'unresolved'
+                    $outcome['detail'] = "unbound reservation state: $reservationState"
+                    $outcome['event'] = "unresolved reservation $WorkflowId"
+                    $errors.Add("reservation $WorkflowId is $reservationState without an exact binding")
+                    return $outcome
+                }
+                $remaining = $BindingWaitSeconds - $bindingWait.Elapsed.TotalSeconds
+                if ($remaining -le 0) {
+                    $outcome['outcome'] = 'unresolved'
+                    $outcome['detail'] = "accepted reservation still pending after $BindingWaitSeconds s; FIFO ownership remains fenced"
+                    $outcome['event'] = "unresolved reservation $WorkflowId`: binding wait exhausted"
+                    $errors.Add("reservation $WorkflowId has no exact binding after $BindingWaitSeconds s; retry -Cancel or use operator recovery")
+                    return $outcome
+                }
+                # Stream progress without adding strings to the outcome.
+                Write-RunEvent -RunId $runId -Text "pending reservation $WorkflowId`: $reservationState; waiting for exact binding" | Out-Host
+                Start-Sleep -Milliseconds ([int][Math]::Ceiling([Math]::Min(1, $remaining) * 1000))
+            }
+        }
+        $query = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments ($statusArguments + @($WorkflowId))
         if ($query.code -ne 0) {
             $text = $query.output -join ' '
             $outcome['detail'] = $text
@@ -1491,6 +1630,12 @@ function Invoke-RunCancel {
                 $outcome['outcome'] = 'error'
                 $errors.Add("farm.py status $WorkflowId exited $($query.code): $text")
                 $outcome['event'] = "error $WorkflowId"
+                return $outcome
+            }
+            if ($buildId) {
+                $outcome['outcome'] = 'unresolved'
+                $outcome['event'] = "unresolved bound workflow $WorkflowId"
+                $errors.Add("bound workflow $WorkflowId/$bindingRun not found; reservation remains unresolved")
                 return $outcome
             }
             # Requested, but the farm has no record of it (yet: see below).
@@ -1535,7 +1680,11 @@ function Invoke-RunCancel {
             $outcome['event'] = "kept $WorkflowId`: $($outcome['detail'])"
             return $outcome
         }
-        $cancelled = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('cancel', '--why', $reason, $WorkflowId)
+        $cancelArguments = @('cancel', '--why', $reason)
+        if ($bindingRun) {
+            $cancelArguments += @('--run-id', $bindingRun)
+        }
+        $cancelled = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments ($cancelArguments + @($WorkflowId))
         $outcome['detail'] = $cancelled.output -join ' '
         $outcome['outcome'] = 'cancelled'
         if ($cancelled.code -ne 0) {
@@ -1654,7 +1803,7 @@ if ($PSCmdlet.ParameterSetName -ne 'Launch') {
                 switch ($PSCmdlet.ParameterSetName) {
                     'Status' { Invoke-RunStatus -RecordPath $selected }
                     'Watch' { Invoke-RunWatch -RecordPath $selected -PollSeconds $PollSeconds }
-                    'Cancel' { Invoke-RunCancel -Directory $trackedDirectory -RecordPath $selected -Why $Why -SettleSeconds $SettleSeconds }
+                    'Cancel' { Invoke-RunCancel -Directory $trackedDirectory -RecordPath $selected -Why $Why -SettleSeconds $SettleSeconds -BindingWaitSeconds $BindingWaitSeconds }
                 }
             }
         }
@@ -1994,11 +2143,38 @@ catch {
     [System.Console]::Error.WriteLine($diagnostic)
 }
 
+$refreshFailure = $null
+if ($startupRecordWritten) {
+    try {
+        $runRecord = (Get-RunStatus -RecordPath $recordPath).record
+    }
+    catch {
+        # The original record still describes this launch, but cannot prove
+        # the current durable build identity. Keep it for the terminal marker,
+        # never as authority to remove the snapshot or settle farm work.
+        $refreshFailure = "run status refresh failed; snapshot kept: $($_.Exception.Message)"
+    }
+}
+
 try {
-    $cleanup = Complete-Snapshot `
-        -Worktree $resolvedWorktree `
-        -SnapshotPath $snapshotPath `
-        -OutputsPath $outputsPath
+    if ($null -ne $refreshFailure) {
+        $snapshotOutputs = Join-Path $snapshotPath 'cad\out'
+        $cleanup = [ordered]@{
+            outputs = if (Test-Path -LiteralPath $snapshotOutputs -PathType Container) { $snapshotOutputs } else { $null }
+            outputs_preserved = $false
+            # Intentionally retained, not a failed attempt to move outputs:
+            # metadata uncertainty must not overwrite the actual build exit.
+            outputs_stranded = $false
+            snapshot_removed = -not (Test-Path -LiteralPath $snapshotPath)
+            cleanup_errors = @($refreshFailure)
+        }
+    }
+    else {
+        $cleanup = Complete-Snapshot `
+            -Worktree $resolvedWorktree `
+            -SnapshotPath $snapshotPath `
+            -OutputsPath $outputsPath
+    }
 }
 catch {
     # Never let cleanup cost the terminal record.

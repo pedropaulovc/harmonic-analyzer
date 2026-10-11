@@ -19,7 +19,7 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `mg` / `MG` | Magnifier | 9 |
 | `pd` / `PD` | Paper drive | 24 |
 | `pn` / `PN` | Pen | 6 |
-| `sm` / `SM` | Summing | 3 |
+| `sm` / `SM` | Summing | 4 |
 | `vn` / `VN` | Vendor parts | 52 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
@@ -98,7 +98,7 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 ## Identity migration table
 
-The table covers 153 part families (the 150 current families plus the three retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
+The table covers 154 part families (the 151 current families plus the three retired identities below) and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
 Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws. MHA-VN-026 `vn-knife-hanger-washer` (MHA-131) is retired: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor.
 
@@ -204,6 +204,7 @@ Retired identities keep their rows here for historical lookup but have no regist
 | part | `gooseneck` | `sm-gooseneck` | MHA-032 | MHA-SM-001 |
 | part | `knife-mount` | `sm-knife-mount` | MHA-037 | MHA-SM-002 |
 | part | `summing-lever` | `sm-summing-lever` | MHA-073 | MHA-SM-003 |
+| part | — | `sm-gooseneck-spring-screw` | — | MHA-SM-004 |
 | part | `boss-hook` | `vn-boss-hook` | MHA-005 | MHA-VN-001 |
 | part | `channel-spring-installed` | `vn-channel-spring-installed` | MHA-011 | MHA-VN-004 |
 | part | `counter-spring` | `vn-counter-spring` | MHA-019 | MHA-VN-005 |
@@ -276,3 +277,4 @@ next free Number in its category and has no old stem or old Number.
 | retired | `vn-knife-hanger-washer` | MHA-VN-026 | no replacement: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor |
 | added | `vn-magnifying-bracket-screw` | MHA-VN-050 | screws the MHA-MG-001 magnifying bracket to the MHA-SM-003 summing lever |
 | added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
+| added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |
