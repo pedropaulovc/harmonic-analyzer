@@ -14,7 +14,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
-from _common import check, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _session import run_build  # noqa: E402
+from _stock_recipe import stock_recipe  # noqa: E402
+from _mcmaster_90114a124 import FILLISTER_SIZE, SKU  # noqa: E402
 from diagnostics.diag_mcmaster_fillister import build_fillister  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     OUT_DIR,
@@ -23,11 +30,11 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     export_views,
     mass_properties,
 )
-from vn_ms_stop_plate_screw_spec import SKU  # noqa: E402
 
 
+@stock_recipe("90114A124", threaded=True)
 async def build_90114A124(adapter, truth=None):
-    await build_fillister(adapter, SKU)
+    await build_fillister(adapter, SKU, FILLISTER_SIZE)
 
 
 async def build_catalog(adapter) -> dict[str, str]:

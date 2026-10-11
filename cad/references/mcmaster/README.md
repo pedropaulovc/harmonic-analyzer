@@ -620,7 +620,9 @@ Catalog specifications checked on September 10, 2026:
   The brass fillister series starts at #2-56 (near M2); the existing brass
   90114A511 has a larger #4-40 / Ø0.183 in head, while the existing #0-80
   91794A055 is stainless, so neither meets this small brass joint.
-  `vn_ms_stop_plate_screw_spec.py` owns the stated dimensions.
+  `_mcmaster_90114a124.py` owns the stated dimensions and the per-SKU size
+  passed to the native fillister author, whose local `@stock_recipe` declaration
+  identifies the threaded SKU without a shared recipe registry.
   `diag_build_90114A124.py` follows the existing catalogue-only
   `91794A077` fillister-family recipe: its dome, slot and thread/runout
   details are family assumptions, not measurements of a vendor solid.

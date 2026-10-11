@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import ms_stick_spec as stick
 import ms_stop_spec as stop
-import vn_ms_stop_plate_screw_spec as plate_screw
-import vn_thumb_screw_spec as thumb
+import _mcmaster_90114a124 as plate_screw
+import _mcmaster_91882a221 as thumb
 
 ASM_NAME = "ms-measuring-stick"
 DRAWING_NUMBER = "MHA-MS-000"

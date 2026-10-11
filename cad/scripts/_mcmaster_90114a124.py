@@ -1,4 +1,4 @@
-"""Catalogue dimensions for the two MHA-VN-054 brass stop-plate screws.
+"""Pure McMaster 90114A124 catalogue dimensions for its recipe and assemblies.
 
 McMaster 90114A124 product table and 2-D drawing read live on 2026-10-09:
 https://www.mcmaster.com/90114A124/. The smallest brass fillister in that
@@ -16,3 +16,5 @@ LENGTH = 0.25 * 25.4
 HEAD_H = 0.083 * 25.4
 HEAD_DIA = 0.14 * 25.4
 PITCH = 25.4 / 56.0
+
+FILLISTER_SIZE = (MAJOR_DIA, LENGTH, HEAD_H, HEAD_DIA, PITCH)

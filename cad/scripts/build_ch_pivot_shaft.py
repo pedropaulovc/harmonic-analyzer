@@ -34,6 +34,7 @@ import sys
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -42,7 +43,6 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
     dimension_between,
