@@ -11,6 +11,7 @@ import paper_drive_mesh_check as mesh
 import pd_platen_rack_spec as rack
 import pd_rack_pinion_spec as disc
 import pd_transgear_feed_pinion_spec as feed
+import pd_transgear_knob_shaft_spec as knob
 
 
 def test_both_meshes_pass_the_standard_gates() -> None:
@@ -18,21 +19,22 @@ def test_both_meshes_pass_the_standard_gates() -> None:
     assert mesh.reducer_mesh().failures() == []
 
 
-def test_reducer_centre_sits_inside_its_derived_window() -> None:
-    # pd_rack_pinion_spec states the window: the interference point at the
-    # tight extreme (centre less the 0.05 TIR shift) bounds it below, CR 1.2
-    # at the minimum tips above. The centre is the window's midpoint.
-    centre = disc.CENTRE_DISTANCE
-    assert disc.CENTRE_DISTANCE_WINDOW == (35.097, 35.105)
-    assert mesh.reducer_runout_shift_mm() == pytest.approx(0.05)
-    assert mesh.reducer_mesh(35.097).interference_margin_min_mm >= 0.0
-    assert mesh.reducer_mesh(35.096).interference_margin_min_mm < 0.0
-    assert mesh.reducer_mesh(35.105).contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
-    assert mesh.reducer_mesh(35.106).contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
-    assert centre == pytest.approx((35.097 + 35.105) / 2.0)
-    assert mesh.reducer_mesh(centre).failures() == []
-    # The superseded 35.183 centre fails the contact-ratio gate.
-    assert "contact ratio" in " ".join(mesh.reducer_mesh(35.183).failures())
+def test_reducer_centre_window_is_bounded_by_the_two_gates() -> None:
+    # The window's ends are where the gates bite (to the printed micron): the
+    # interference point at the tight extreme below, the contact-ratio floor
+    # above. The centre is the window's midpoint and passes every gate.
+    low, high = disc.CENTRE_DISTANCE_WINDOW
+    step = 0.001
+    assert mesh.reducer_runout_shift_mm() == pytest.approx(
+        (knob.TOOTH_SPACE_RUNOUT_TIR_MM + disc.TOOTH_SPACE_RUNOUT_TIR_MM) / 2.0
+    )
+    assert mesh.reducer_mesh(low).interference_margin_min_mm >= 0.0
+    assert mesh.reducer_mesh(low - step).interference_margin_min_mm < 0.0
+    assert mesh.reducer_mesh(high).contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
+    assert mesh.reducer_mesh(high + step).contact_ratio_min < mesh.CONTACT_RATIO_FLOOR
+    assert disc.CENTRE_DISTANCE == pytest.approx((low + high) / 2.0)
+    assert disc.CENTRE_DISTANCE_SET_TOL == pytest.approx((high - low) / 2.0)
+    assert mesh.reducer_mesh(disc.CENTRE_DISTANCE).failures() == []
 
 
 @pytest.mark.parametrize("field", [
