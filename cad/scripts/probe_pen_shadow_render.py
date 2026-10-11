@@ -74,6 +74,7 @@ async def probe(adapter: Any) -> dict[str, str]:
         "infrastructure_base": "5035dbaa3278b82bc7428b68a192f328605846b7",
         "geometry_equivalent_to": "6a85c3e5cfc97f3d78ce854f6d56e050a5a49d3b",
         "base_reason": "Deployed farm protocol 4; CAD scripts/config/templates and adapter gitlink identical to task-start main (only _farm.py differs).",
+        "exported_graph_membership": "verify:pn_pen_shadow_render registered in build/release verification closure",
         "assembly": assembly.relative_to(CAD_ROOT.parent).as_posix(),
         "read_only": True,
         "saved_model": False,
