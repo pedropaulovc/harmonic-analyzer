@@ -4,7 +4,8 @@ The 2026-10-10 user Option B ruling keeps the 200 x 8 x 3 blank and
 groove geometry, shifting the whole scale and numeral DXF 1.00 mm left.
 Model dimensions own the manufacturing values, bands and decimal places.
 The release supplies the engraved native/STEP model and its ruled-face/detail
-drawings, not the generated build-input DXF. Refer numeral outlines to that model.
+drawings, not the generated build-input DXF. Name its pinned outline font on the
+print while retaining the native model as the exact numeral-outline authority.
 """
 
 from __future__ import annotations
@@ -96,7 +97,9 @@ DRAWING_TOLERANCES = {
     "NumeralXGap": NUMERAL_TOLERANCE_MM,
     "NumeralYGap": NUMERAL_TOLERANCE_MM,
 }
-DRAWING_NOTES = "NUMERAL OUTLINES: ms-stick.SLDPRT"
+# gen_ms_stick_numerals_dxf uses _dxf_text's pinned DejaVuSans.ttf closed loops,
+# not a single-stroke font or a constant-width graduation cutter path.
+DRAWING_NOTES = "NUMERALS: DEJAVU SANS OUTLINES\nNUMERAL OUTLINES: ms-stick.SLDPRT"
 NUMERAL_PLACEMENT_NOTE = (
     "NUMERALS 0-9 RIGHT OF FULL TICKS;\n"
     "10 LEFT OF FINAL FULL TICK.\n"

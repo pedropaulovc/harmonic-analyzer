@@ -20,6 +20,55 @@ import build_ms_stick as builder
 import draw_ms_stick as drawing
 import ms_stick_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import Box
+
+
+def test_numeral_detail_ink_clears_border_and_placement_note() -> None:
+    """Translate r4 native ink/extents, not guessed annotation anchor boxes.
+
+    Evidence: 20261011T045740079Z run's layout-audit/ms-stick.json,
+    ENGRAVING Detail F. Retaining scale and relative dimension placement makes
+    these measured offsets reusable; acceptance is clearance, not coordinates.
+    """
+    dx = drawing.NUMERAL_CENTER[0] - 0.140
+    dy = drawing.NUMERAL_CENTER[1] - 0.135
+    for name, old_xy in (
+        ("NumeralHeight", (0.145, 0.183)),
+        ("NumeralXGap", (0.075, 0.170)),
+        ("NumeralYGap", (0.075, 0.155)),
+    ):
+        # A rigid move preserves witness geometry and space between callouts.
+        assert math.dist(drawing.NUMERAL_KEEP[name],
+                         (old_xy[0] + dx, old_xy[1] + dy)) < 1e-9
+    assert drawing.DETAIL_SCALE == (6.0, 1.0)
+    # The label's measured leader/witness start is farther left than PDF ink.
+    end_gap_left = drawing.NUMERAL_KEEP["NumeralYGap"][0] - 0.0618528
+    assert end_gap_left - 0.0127 >= 0.005
+    title_and_scale = Box(
+        0.1239223 + dx, 0.0721882 + dy,
+        0.1552167 + dx, 0.0887072 + dy,
+    )
+    note_x, note_y = drawing.NUMERAL_NOTE_XY
+    placement_note = Box(
+        note_x - 0.0001881, note_y - 0.0135771,
+        note_x + 0.0793988, note_y + 0.0001369,
+    )
+    assert title_and_scale.gap(placement_note) >= 0.004
+    assert placement_note.ymax <= title_and_scale.ymin - 0.004
+    assert placement_note.xmin >= 0.0127 + 0.005
+    assert placement_note.ymin >= 0.0127 + 0.005
+
+
+def test_numeral_font_note_preserves_cad_outline_authority() -> None:
+    """Name the actual closed-outline font without permitting substitute glyphs."""
+    import _dxf_text as dxf_text
+    import gen_ms_stick_numerals_dxf as numeral_generator
+
+    assert dxf_text.DEJAVU_SANS.name == "DejaVuSans.ttf"
+    assert numeral_generator.dxf is dxf_text
+    assert "NUMERALS: DEJAVU SANS OUTLINES" in spec.DRAWING_NOTES
+    assert "NUMERAL OUTLINES: ms-stick.SLDPRT" in spec.DRAWING_NOTES
+    assert "CHOICE" not in spec.DRAWING_NOTES
 
 
 def test_builder_authors_model_owned_numeral_placement_property(monkeypatch) -> None:

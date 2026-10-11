@@ -9,6 +9,9 @@ The *Bottom view is turned 180 degrees to preserve that X direction and
 show the true third-angle underside; its current transform locates the tap.
 Native callout positions centre their text; reserve the full two-line tap
 instruction inside the print border and keep the thumb callout off the title.
+The finalizer owns precise Shaded With Edges on the isometric. Its dark
+source appearance is not overridden here: no verified drawing-view-only
+lighting API is available, and even transient part appearance edits are banned.
 """
 
 from __future__ import annotations

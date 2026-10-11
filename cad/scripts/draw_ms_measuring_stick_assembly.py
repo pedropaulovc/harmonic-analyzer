@@ -100,15 +100,15 @@ TITLE_BLOCK = (
 
 # Sheet 1: the 200-long stick at full size, top view above the front
 # (third-angle), and the clamp section beside them, magnified so the window,
-# roof and thumbscrew tip read. The two reference dimensions run in the gap
-# between front and top, the clamp setup note below the front.
+# roof and thumbscrew tip read. The references and the centre-index criterion
+# run in the gap between front and top; the setup note repeats that criterion.
 FRONT_CENTER = (0.135, 0.190)
 TOP_CENTER = (0.135, 0.248)
 CLAMP_SECTION_CENTER = (0.340, 0.165)
 CLAMP_SECTION_SCALE = (4.0, 1.0)
 CLAMP_SECTION_LABEL = "A"
-STOP_POSITION_TEXT_Y = 0.214
-OVERALL_LENGTH_TEXT_Y = 0.227
+STOP_POSITION_TEXT_Y = 0.220
+OVERALL_LENGTH_TEXT_Y = 0.237
 SETUP_NOTE_XY = (0.030, 0.160)
 SETUP_NOTE_WIDTH = 52  # characters; default-format note text
 
@@ -155,7 +155,8 @@ EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.415 + EXPLODED_GROUP_SHIFT_Y)
 # Sheet 3: the order and checks down the left; the finished isometric right.
 ASSEMBLY_ISO_CENTER = (0.315, 0.170)
 STEPS_XY = (0.018, 0.258)
-CHECKS_XY = (0.018, 0.140)
+# Leave space for the deeper pilot/full-thread instruction and centre setting.
+CHECKS_XY = (0.018, 0.105)
 STEPS_LINE_WIDTH = 58  # characters; default-format note text
 
 BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in spec.BOM_ORDER}

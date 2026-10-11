@@ -128,6 +128,13 @@ EXPLODE_STEPS = (
 
 # --- Fitter package text ------------------------------------------------------
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
+# Assembly setting acceptance, not a component manufacturing dimension: index
+# the selected graduation to the block centre/THUMB_AXIS_X, never its near face.
+SETTING_TOLERANCE_MM = 0.10
+SETTING_CRITERION = (
+    f"{stop.STOP_MARK:.1f} MARK ON BLOCK CENTRE "
+    f"(THUMBSCREW AXIS), ±{SETTING_TOLERANCE_MM:.2f} mm ALONG STICK"
+)
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order; the explode above runs steps 2-5 backwards. Each line
 # names the parts as the BOM's DESCRIPTION column does. The block and its
@@ -135,17 +142,18 @@ EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
 ASSEMBLY_STEPS = (
     "1. MATCH-DRILL THE PAIR: CLAMP THE STOP COVER PLATE ON THE STOP BLOCK, "
     f"OUTLINES ALIGNED; PILOT BOTH SCREW HOLES DIA {stop.PLATE_TAP_DRILL_DIA:.2f} "
-    "THROUGH PLATE INTO BLOCK IN ONE PASS. REMOVE THE PLATE; OPEN ITS HOLES TO "
-    f"DIA {stop.PLATE_CLEARANCE_DIA:.1f}; BOTTOMING-TAP THE BLOCK HOLES "
-    f"{plate_screw.THREAD}. MARK BLOCK AND PLATE AS A PAIR.",
+    f"THROUGH PLATE TO {stop.PLATE_TAP_DRILL_DEPTH:.1f} mm CYLINDRICAL DEPTH "
+    "INTO BLOCK IN ONE PASS (DEPTH EXCLUDES PLATE). REMOVE THE PLATE; OPEN ITS "
+    f"HOLES TO DIA {stop.PLATE_CLEARANCE_DIA:.1f}; BOTTOMING-TAP THE BLOCK HOLES "
+    f"{plate_screw.THREAD} TO {stop.PLATE_TAP_THREAD_DEPTH:.1f} mm FULL THREAD "
+    "DEPTH INTO BLOCK. MARK BLOCK AND PLATE AS A PAIR.",
     f"2. START THE {thumb.THREAD} KNURLED THUMBSCREW UP INTO THE STOP BLOCK FROM "
     "ITS UNDERSIDE; KEEP THE TIP BELOW THE WINDOW FLOOR.",
     "3. LAY THE GRADUATED STICK, GRADUATED FACE UP, INTO THE BLOCK WINDOW FROM "
     "ITS OPEN SIDE.",
     "4. FIT ITS OWN STOP COVER PLATE OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE "
     f"BOTH {plate_screw.THREAD} BRASS FILLISTER SCREWS UNTIL THE HEADS SEAT.",
-    "5. LOCATE THE STOP BLOCK'S NEAR FACE FROM THE LEFT STICK END USING THE "
-    "LOCATION REFERENCE ON SHEET 1; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
+    f"5. SET {SETTING_CRITERION}; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
     "ITS TIP CLAMPS THE STICK AGAINST THE ROOF.",
 )
 ASSEMBLY_CHECKS = (
@@ -154,20 +162,20 @@ ASSEMBLY_CHECKS = (
     "CHECK: BOTH SCREW HEADS SEAT ON THE COVER AND THE COVER LIES FLAT ON THE BLOCK.",
 )
 CLAMPED_SETUP_NOTE = (
-    "CLAMPED SETUP: LOCATE THE BLOCK'S NEAR FACE FROM THE LEFT STICK END "
-    "USING THE LOCATION REFERENCE ABOVE; THEN CLAMP. GRADUATED FACE AGAINST "
-    "THE ROOF; THUMBSCREW TIP ON THE STICK UNDERSIDE."
+    f"CLAMPED SETUP: SET {SETTING_CRITERION}; THEN CLAMP. "
+    "GRADUATED FACE AGAINST THE ROOF; THUMBSCREW TIP ON THE STICK UNDERSIDE."
 )
 
 # --- Reference dimensions (sheet 1, front view) -------------------------------
 # Parenthesized REFERENCE values only: the stick and stop drawings own every
-# size and its tolerance. OVERALL is the stick end to end; the STOP POSITION
-# is the stop's near (X=0) face from the stick's scale-start end (part x=0)
-# with the STOP_MARK division on the thumbscrew axis -- the mark less half
-# the block.
+# size and its tolerance. OVERALL is the stick end to end; the near (X=0)
+# face reference is the mark less half the block, NOT a second setting target.
+# Only SETTING_CRITERION above defines the assembly setting acceptance.
 REFERENCE_OVERALL_LENGTH = STICK_X_MAX - STICK_X_MIN
 REFERENCE_STOP_FACE = BLOCK_ORIGIN[0] - STICK_X_MIN
-STOP_POSITION_CALLOUT = f"STOP AT {stop.STOP_MARK:.1f} MARK"
+STOP_POSITION_CALLOUT = "NEAR FACE REF ONLY\n" + SETTING_CRITERION.replace(
+    " (THUMBSCREW AXIS), ", "\n(THUMBSCREW AXIS)\n"
+)
 DRAWING_REFERENCE_PRECISION = 1
 
 assert STICK_SIDE_CLEARANCE > 0.0, STICK_SIDE_CLEARANCE

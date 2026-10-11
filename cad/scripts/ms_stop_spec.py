@@ -135,6 +135,9 @@ PLATE_DRAWING_PRECISION = {
 # Depth and cover length still need .XX; their .X bands would breach 1.5 mm.
 BLOCK_DRAWING_PRECISION["BlockProfile"].update(BlockLength=1, BlockHeight=1)
 PLATE_DRAWING_PRECISION["PlateProfile"]["PlateHeight"] = 1
+# Only the cover's cosmetic corners use .X; the block chamfer retains .XX.
+# Its native angle prints as 45 degrees, without redundant decimal places.
+PLATE_DRAWING_PRECISION["RoofChamfers"].update(RoofChamferSize=1, RoofChamferAngle=0)
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
 BLOCK_MATING_FACE_NOTE = "STOP-PLATE MATING FACE"

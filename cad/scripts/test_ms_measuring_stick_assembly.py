@@ -250,11 +250,10 @@ def test_fitter_package_covers_rule_9() -> None:
         assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in text.splitlines())
     assert drawing.ASSEMBLY_STEPS.count("\n") >= len(spec.ASSEMBLY_STEPS)
     for instruction in (spec.ASSEMBLY_STEPS[-1], spec.CLAMPED_SETUP_NOTE):
-        assert "NEAR FACE FROM THE LEFT STICK END" in instruction
-        assert "LOCATION REFERENCE" in instruction
-        assert "THUMBSCREW AXIS" not in instruction
-    assert "SHEET 1" in spec.ASSEMBLY_STEPS[-1]
-    assert "REFERENCE ABOVE; THEN CLAMP" in spec.CLAMPED_SETUP_NOTE
+        assert spec.SETTING_CRITERION in instruction
+        assert "NEAR FACE" not in instruction
+        assert "LOCATION REFERENCE" not in instruction
+    assert "NEAR FACE REF ONLY" in spec.STOP_POSITION_CALLOUT
     assert drawing.EXPLODED_CAPTION == spec.EXPLODED_CAPTION == (
         "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
     )
@@ -582,6 +581,96 @@ def test_reference_dimensions_follow_the_spec() -> None:
         < drawing.OVERALL_LENGTH_TEXT_Y
         < drawing.TOP_CENTER[1]
     )
+
+
+@pytest.mark.parametrize(
+    "mark,tolerance,drill_depth,thread_depth",
+    ((2.5, 0.15, 8.2, 6.5), (1.5, 0.08, 7.6, 6.1)),
+)
+def test_fitter_text_tracks_mutated_setting_and_depth_specs(
+    monkeypatch, mark, tolerance, drill_depth, thread_depth
+) -> None:
+    """Evaluate real spec expressions with changed shop values, not COM mocks."""
+    monkeypatch.setattr(stop, "STOP_MARK", mark)
+    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DEPTH", drill_depth)
+    monkeypatch.setattr(stop, "PLATE_TAP_THREAD_DEPTH", thread_depth)
+    tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
+    assignments = [
+        node for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "SETTING_TOLERANCE_MM"
+            for target in node.targets
+        )
+    ]
+    assert len(assignments) == 1
+    assignments[0].value = ast.copy_location(
+        ast.Constant(tolerance), assignments[0].value
+    )
+    namespace = {"__name__": "mutated_ms_assembly_spec"}
+    exec(compile(ast.fix_missing_locations(tree), spec.__file__, "exec"), namespace)
+    changed = SimpleNamespace(**namespace)
+    assert changed.STICK_MARK_X == pytest.approx(
+        stick.SCALE_START_X + mark * stick.DIVISION_SPACING
+    )
+    assert changed.STICK_ORIGIN[0] + changed.STICK_MARK_X == pytest.approx(
+        stop.THUMB_AXIS_X
+    )
+    assert changed.REFERENCE_STOP_FACE == pytest.approx(
+        changed.STICK_MARK_X - stop.THUMB_AXIS_X
+    )
+    assert changed.SETTING_TOLERANCE_MM == tolerance
+    for text in (
+        changed.STOP_POSITION_CALLOUT,
+        changed.CLAMPED_SETUP_NOTE,
+        changed.ASSEMBLY_STEPS[-1],
+    ):
+        assert f"{mark:.1f} MARK ON BLOCK CENTRE" in text
+        assert "THUMBSCREW AXIS" in text
+        assert f"±{tolerance:.2f} mm ALONG STICK" in text
+    pilot = changed.ASSEMBLY_STEPS[0]
+    assert f"{drill_depth:.1f} mm CYLINDRICAL DEPTH INTO BLOCK" in pilot
+    assert "DEPTH EXCLUDES PLATE" in pilot
+    assert "BOTTOMING-TAP" in pilot
+    assert f"{thread_depth:.1f} mm FULL THREAD DEPTH INTO BLOCK" in pilot
+    assert changed.PLATE_SCREW_TAP_RESERVE == pytest.approx(
+        thread_depth - changed.PLATE_SCREW_ENGAGED
+    )
+    _assert_fitter_text_spacing(changed)
+
+
+def _assert_fitter_text_spacing(fitter) -> None:
+    """Conservative offline text envelopes; the parent owns native ink review."""
+    line_pitch = 0.0035  # default note cap height plus interline allowance
+    steps = drawing._wrapped(
+        fitter.ASSEMBLY_STEPS, width=drawing.STEPS_LINE_WIDTH,
+        heading="ASSEMBLY SEQUENCE",
+    )
+    setup = drawing._wrapped(
+        (fitter.CLAMPED_SETUP_NOTE,), width=drawing.SETUP_NOTE_WIDTH
+    )
+    assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in steps.splitlines())
+    assert all(len(line) <= drawing.SETUP_NOTE_WIDTH for line in setup.splitlines())
+    assert (
+        drawing.STEPS_XY[1] - len(steps.splitlines()) * line_pitch
+        > drawing.CHECKS_XY[1] + line_pitch
+    )
+    assert drawing.SETUP_NOTE_XY[1] - len(setup.splitlines()) * line_pitch > 0.090
+    # The four-line callout stays above the front silhouette; the overall
+    # reference remains above it and below the top view.
+    assert (
+        drawing.STOP_POSITION_TEXT_Y
+        - len(fitter.STOP_POSITION_CALLOUT.splitlines()) * line_pitch
+        > drawing.FRONT_CENTER[1] + 0.012
+    )
+    assert drawing.OVERALL_LENGTH_TEXT_Y > drawing.STOP_POSITION_TEXT_Y + line_pitch
+    assert drawing.OVERALL_LENGTH_TEXT_Y < drawing.TOP_CENTER[1] - line_pitch
+
+
+def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
+    assert spec.SETTING_TOLERANCE_MM == pytest.approx(0.10)
+    assert f"±{spec.SETTING_TOLERANCE_MM:.2f} mm ALONG STICK" in spec.SETTING_CRITERION
+    _assert_fitter_text_spacing(spec)
 
 
 @pytest.mark.parametrize(

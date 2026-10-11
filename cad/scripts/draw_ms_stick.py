@@ -3,7 +3,9 @@ r"""Four-sheet manufacturing package for the unchanged graduated brass stick.
 BAR gives the envelope and left-origin scale station. GRADUATIONS enlarges
 the full/minor pitch; TICK LENGTHS gives groove width and each length a local
 detail without cross-strip extension lines. ENGRAVING separates numeral
-dimensions from the open-edge Top detail for the square-bottom groove depth.
+dimensions from the open-edge Top detail for the square-bottom groove depth;
+the numeral detail and its dimensions leave air at the left border, with its
+placement note below the detail title and scale.
 Native probes import TickDepth in Top but not in a removed cut-only section.
 All sizes, bands and places come from the part; scale is never shrunk to fit.
 Part-spec coordinates are millimetres; model-point projection takes metres.
@@ -50,10 +52,12 @@ DEPTH_PARENT_CENTER = (0.330, 0.210)
 DEPTH_CENTER = (0.330, 0.125)
 DEPTH_RADIUS_MM = 2.0
 NUMERAL_PARENT_CENTER = (0.130, 0.210)
-NUMERAL_CENTER = (0.140, 0.135)
+# r4 sheet 4: full-tick-end callout starts 62 mm left of its placement.
+# Shift the entire detail/dimension group right without changing its scale.
+NUMERAL_CENTER = (0.165, 0.135)
 # The fence includes the real full-tick endpoint and both numeral gap anchors.
 NUMERAL_RADIUS_MM = 7.0
-NUMERAL_NOTE_XY = (0.045, 0.090)
+NUMERAL_NOTE_XY = (0.045, 0.068)
 FRONT_KEEP = {
     "BodyLength": (0.155, 0.205), "BodyWidth": (0.275, 0.175),
     "ScaleStartX": (0.180, 0.150),
@@ -76,9 +80,9 @@ LENGTH_DETAILS = (
      {"HalfTickLength": (0.300, 0.185)}, 4.0),
 )
 NUMERAL_KEEP = {
-    "NumeralHeight": (0.145, 0.183),
-    "NumeralXGap": (0.075, 0.170),
-    "NumeralYGap": (0.075, 0.155),
+    "NumeralHeight": (0.170, 0.183),
+    "NumeralXGap": (0.100, 0.170),
+    "NumeralYGap": (0.100, 0.155),
 }
 DEPTH_KEEP = {"TickDepth": (0.330, 0.180)}
 DIMENSION_CALLOUTS = {

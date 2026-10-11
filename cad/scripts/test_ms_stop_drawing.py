@@ -147,9 +147,12 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     if hasattr(drawing, "BOTTOM_KEEP"):
         keeps |= set(drawing.BOTTOM_KEEP)
     assert marked == keeps == set(precision) == set(values)
-    loose = {"BlockLength", "BlockHeight"} if builder is block else {"PlateHeight"}
+    loose = {"BlockLength", "BlockHeight"} if builder is block else {"PlateHeight", "RoofChamferSize"}
     assert {name for name, places in precision.items() if places == 1} == loose
-    assert all(places == (1 if name in loose else 2) for name, places in precision.items())
+    assert all(places == (
+        0 if builder is plate and name == "RoofChamferAngle"
+        else 1 if name in loose else 2
+    ) for name, places in precision.items())
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
     assert not any(character.isdigit() for character in spec.BLOCK_DRAWING_NOTES + spec.PLATE_DRAWING_NOTES)
 
@@ -283,7 +286,7 @@ class _StopMathUtility:
         ("cover mating face", "*Left", (0.0105, 0.01255, 0.0), (0.293, 0.207)),
     ]),
     (plate_drawing, [
-        ("two cover clearance holes", "*Back", (0.0187, 0.004, -0.001), (0.1422, 0.1578)),
+        ("two cover clearance holes", "*Back", (0.0023, 0.004, -0.001), (0.2078, 0.1578)),
     ]),
 ], ids=["block-plate-and-subsequent-thumb", "plate-clearance"])
 def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
@@ -339,6 +342,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         monkeypatch.setattr(drawing, "_remove_general_thread_class", lambda *a: None)
     else:
         monkeypatch.setattr(drawing, "_style_pilot_diameter", lambda *a: None)
+        monkeypatch.setattr(drawing, "_style_plate_chamfer", lambda *a: None)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *a, **kw: True)
     callouts = []
 
@@ -393,6 +397,14 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] - bottom.Position[0] > 0.010
         assert callout_positions["thumbscrew tap through floor"] == (0.060, 0.063)
         assert callout_positions["two cover blind taps"] == (0.065, 0.138)
+    else:
+        # The native pilot's construction circle is at X=3.5, the same
+        # right-sheet hole selected for the opened clearance callout.
+        assert callout_positions["two cover clearance holes"] == (0.265, 0.155)
+        assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.265, 0.190)
+        assert callout_positions["two cover clearance holes"][0] > front_map.apply(
+            (0.0, center[1], center[2])
+        )[0]
     # Capture the entire block build before checking: the second (thumb) pick
     # must remain covered even when the preceding plate pick used wrong units.
     assert len(utility.points) == len(callouts) == len(cases)
@@ -421,7 +433,9 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
                 if drawing is plate_drawing
                 else (spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_TAP_DRILL_DIA)
             )
-            mouth = (holes[1][0] + diameter / 2.0, holes[1][1], holes[1][2])
+            hole = holes[0] if drawing is plate_drawing else holes[1]
+            mouth = (hole[0] + (-diameter if drawing is plate_drawing else diameter) / 2.0,
+                     hole[1], hole[2])
         assert xyz == pytest.approx(tuple(value / 1000.0 for value in mouth))
         assert edge_xy == pytest.approx(expected_xy)
         assert abs(edge_xy[0] - view.Position[0]) < 0.043
@@ -437,9 +451,11 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
                 0.217 if drawing is plate_drawing else 0.197
             )
             wrong_units_x = transform.apply(mouth)[0]
-            assert wrong_units_x < -70.0
-            # The original failing caller picked the other rim. Preserve that
-            # observed negative-X signature as well as the new left-sheet pick.
+            assert wrong_units_x == pytest.approx(
+                -8.983 if drawing is plate_drawing else -73.503
+            )
+            # Preserve the original failing other-rim negative-X signature
+            # as well as the plate's new concentric right-sheet pick.
             original = (holes[0][0] + diameter / 2.0, holes[0][1], holes[0][2])
             assert transform.apply(original)[0] == pytest.approx(
                 -18.583 if drawing is plate_drawing else -17.503
@@ -532,6 +548,43 @@ def test_pilot_callout_refuses_unapplied_native_quantity_prefix(monkeypatch) -> 
     monkeypatch.setattr(plate_drawing, "dimension_name", lambda *a: "PilotDrillDiameter")
     with pytest.raises(RuntimeError, match="did not persist"):
         plate_drawing._style_pilot_diameter(object(), [annotation])
+
+
+@pytest.mark.parametrize("refusal", [None, "prefix"])
+def test_plate_chamfer_keeps_native_size_and_angle_with_quantity_prefixes(monkeypatch, refusal) -> None:
+    natives = {
+        "RoofChamferSize": _StopDisplay("", hole=False, refusal=refusal),
+        "RoofChamferAngle": _StopDisplay("", hole=False, refusal=refusal),
+    }
+    annotations = [
+        SimpleNamespace(name=name, GetSpecificAnnotation=lambda native=native: native)
+        for name, native in natives.items()
+    ]
+    monkeypatch.setattr(plate_drawing, "dimension_name", lambda _adapter, item: item.name)
+    if refusal:
+        with pytest.raises(RuntimeError, match="chamfer prefix did not persist"):
+            plate_drawing._style_plate_chamfer(object(), annotations)
+    else:
+        plate_drawing._style_plate_chamfer(object(), annotations)
+        assert natives["RoofChamferSize"].prefix == "2X "
+        assert natives["RoofChamferAngle"].prefix == "X "
+    assert spec.PLATE_DRAWING_PRECISION["RoofChamfers"] == {
+        "RoofChamferSize": 1, "RoofChamferAngle": 0,
+    }
+    assert spec.BLOCK_DRAWING_PRECISION["RoofChamfers"] == {
+        "RoofChamferSize": 2, "RoofChamferAngle": 2,
+    }
+
+
+@pytest.mark.parametrize("names", [[], ["RoofChamferSize"], ["RoofChamferAngle"]])
+def test_plate_chamfer_refuses_missing_native_dimensions(monkeypatch, names) -> None:
+    annotations = [
+        SimpleNamespace(name=name, GetSpecificAnnotation=lambda: _StopDisplay("", hole=False))
+        for name in names
+    ]
+    monkeypatch.setattr(plate_drawing, "dimension_name", lambda _adapter, item: item.name)
+    with pytest.raises(RuntimeError, match="missing native plate chamfer"):
+        plate_drawing._style_plate_chamfer(object(), annotations)
 
 
 def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:

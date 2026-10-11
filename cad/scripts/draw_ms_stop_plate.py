@@ -5,8 +5,9 @@ head-side edge. The aligned end view gives thickness; the native clearance
 callout gives the decimal drill size, never merely a screw designation.
 The shared millimetre hole-mouth coordinates convert to COM metres before
 projection into the cover-side *Back view.
-Native callout positions centre their text; the full drill instruction and
-the linked process notes stay inside the print border, clear of the title.
+The two native, model-owned drill steps point to the same concentric hole
+pair from the right, clear of the overall and hole-location extension lines.
+Chamfer quantity and angle prefixes preserve the imported native values.
 """
 
 from __future__ import annotations
@@ -41,17 +42,14 @@ RIGHT_CENTER = (0.310, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.090)
 FRONT_KEEP = {
     "PlateLength": (0.175, 0.235), "PlateHeight": (0.105, 0.170),
-    "RoofChamferSize": (0.257, 0.229), "RoofChamferAngle": (0.236, 0.211),
+    "RoofChamferSize": (0.257, 0.229), "RoofChamferAngle": (0.273, 0.229),
     "PlateLeftFromEnd": (0.175, 0.115),
     "PlateRightFromEnd": (0.175, 0.095),
     "PlateFromHeadFace": (0.115, 0.148),
-    "PilotDrillDiameter": (0.066, 0.245),
+    "PilotDrillDiameter": (0.265, 0.190),
 }
 RIGHT_KEEP = {"PlateThickness": (0.310, 0.225)}
 DIMENSION_CALLOUTS = {
-    # Moving the native size to the right removes the full-width witness
-    # line that looked like a long-edge bevel. Both native values stay live.
-    "RoofChamferSize": "2 CORNERS",
     "PilotDrillDiameter": (
         "PILOT; MATCH-DRILL WITH\n"
         f"MS-STOP-BLOCK ({_config.parts('ms-stop-block')['number']})\n"
@@ -71,13 +69,34 @@ def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
     if int(native.Type2) != 6:  # swDiameterDimension
         raise RuntimeError("match-drill pilot is not a native model diameter")
     # The importer shows this construction circle inside the opened clearance.
-    # Its native diameter leader identifies the earlier PILOT step; THEN OPEN
-    # below remains associated with the actual finished clearance edge.
+    # Both steps identify this same hole pair; their separate native dimensions
+    # retain the pilot model value and the finished Hole Wizard value.
     definition = str(native.GetText(5) or "")
     prefix = f"2X {definition}"
     native.SetText(1, prefix)
     if str(native.GetText(5) or "") != prefix:
         raise RuntimeError("native pilot quantity prefix did not persist")
+
+
+def _style_plate_chamfer(adapter: Any, annotations: list[Any]) -> None:
+    """Compose 2X size X angle from two live, model-precision dimensions."""
+    remaining = {"RoofChamferSize": "2X ", "RoofChamferAngle": "X "}
+    for annotation in annotations:
+        prefix = remaining.pop(dimension_name(adapter, annotation), None)
+        if prefix is None:
+            continue
+        native = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        # Prefix only: SetText(All) would suppress the model-owned value.
+        definition = str(native.GetText(5) or "")
+        revised = prefix + definition
+        native.SetText(1, revised)
+        if str(native.GetText(5) or "") != revised:
+            raise RuntimeError("native plate chamfer prefix did not persist")
+    if remaining:
+        raise RuntimeError(f"missing native plate chamfer dimensions: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -106,14 +125,17 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _style_pilot_diameter(adapter, annotations)
+    _style_plate_chamfer(adapter, annotations)
     edge = model_point_in_view(
         adapter, front, (
-            (part.PLATE_HOLE_XS[1] + part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
+            (part.PLATE_HOLE_XS[0] - part.PLATE_CLEARANCE_DIA / 2.0) / 1000.0,
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MIN / 1000.0,
         ), label="plate clearance mouth")
-    # Left-sheet hole and upper-left text keep the leader clear of its mate,
-    # the hole baselines, and the vertical overall-height dimension text.
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.070, 0.215),
+    # *Back reverses X: this is the right-sheet hole, concentric with the
+    # imported pilot. Two adjacent native callouts avoid an unverified note
+    # dimension-link format while keeping both 2X quantities and sizes live.
+    # Both leaders stay right of the overall-height and hole-location lanes.
+    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.265, 0.155),
                            label="two cover clearance holes", process="THEN OPEN")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")
