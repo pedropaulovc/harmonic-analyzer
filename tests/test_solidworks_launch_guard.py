@@ -255,6 +255,51 @@ def test_a_program_that_only_reads_a_build_script_passes(solidworks_launch_refus
     assert solidworks_launch_refusals == []
 
 
+def _root_conftest(request):
+    root = REPO_ROOT / "conftest.py"
+    for plugin in request.config.pluginmanager.get_plugins():
+        if Path(getattr(plugin, "__file__", "") or "").resolve() == root:
+            return plugin
+    raise LookupError(root)
+
+
+_BUILD = str(MISSING_BUILD)
+
+
+@pytest.mark.parametrize(
+    "args,executable",
+    [
+        ([_BUILD], None),
+        (["python", _BUILD], None),
+        (["python", "-X", "utf8", "-u", _BUILD], None),
+        (["worker", _BUILD], sys.executable),
+        (subprocess.list2cmdline(["echo", "probe"]) + " & python " + _BUILD, None),
+        (["cmd", "/c", subprocess.list2cmdline(["python", _BUILD, "--x"])], None),
+        (["cmd", "/c", "python", _BUILD], None),
+        (["uv", "run", "--with", "x", "python", _BUILD], None),
+        (["uv", "run", _BUILD], None),
+        (["pwsh", "-NoProfile", "-File", _BUILD], None),
+    ],
+)
+def test_a_build_script_in_command_position_counts(request, args, executable):
+    assert _root_conftest(request)._com_script(args, executable)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["git", "hash-object", "--path", _BUILD],
+        ["certutil", "-hashfile", _BUILD, "SHA256"],
+        ["uv", "run", "ruff", "check", _BUILD],
+        ["python", "-m", "py_compile", _BUILD],
+        ["python", "-c", "print(1)", _BUILD],
+        ["python", "other.py", _BUILD],
+    ],
+)
+def test_a_build_script_only_read_does_not_count(request, args):
+    assert _root_conftest(request)._com_script(args) is None
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="_winapi is Windows-only")
 def test_create_process_below_popen_is_refused(solidworks_launch_refusals):
     """A ``Popen`` subclass or direct caller still meets ``_winapi.CreateProcess``."""
@@ -375,6 +420,19 @@ def test_dodo_part_build_with_a_real_runner_is_refused(
                 [sys.executable, str(MISSING_BUILD)], "part:ch_pivot_shaft"
             )
         assert "dodo._run_subprocess" in solidworks_launch_refusals[0]
+        solidworks_launch_refusals.clear()
+
+        # Faking only ``run`` leaves the logged path's real ``Popen``.
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(dodo.subprocess, "run", lambda *_a, **_kw: None)
+            with pytest.raises(RuntimeError, match=BLOCKED):
+                dodo._run_subprocess(
+                    [sys.executable, str(MISSING_BUILD)],
+                    "part:ch_pivot_shaft",
+                    "part-ch_pivot_shaft",
+                )
+        assert "dodo._run_subprocess" in solidworks_launch_refusals[0]
+        assert not (tmp_path / "logs").exists()
         solidworks_launch_refusals.clear()
 
 

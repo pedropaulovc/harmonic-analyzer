@@ -37,11 +37,33 @@ _COM_SCRIPT = re.compile(
     r"|release_seat_documents)\.py$",
     re.IGNORECASE,
 )
-# Programs that run a script named in their arguments. Anything else (git
-# hash-object, a linter) only reads the file.
-_SCRIPT_RUNNERS = re.compile(
-    r"(?:pythonw?[\d.]*|py|uvx?|cmd|powershell|pwsh)(?:\.exe)?", re.IGNORECASE
+# Only a script in COMMAND position runs: the program itself, the first
+# non-option argument of a Python interpreter, the command `uv run` starts, a
+# script `powershell -File` runs, or a command a shell starts (`cmd /c`,
+# `powershell -Command`, or after `&`, `|`, `;`). `git hash-object`,
+# `uv run ruff check` and `python -m py_compile` only read the file.
+_PYTHONS = re.compile(r"(?:pythonw?[\d.]*|py)(?:\.exe)?", re.IGNORECASE)
+_UVS = re.compile(r"uvx?(?:\.exe)?", re.IGNORECASE)
+_SHELLS = re.compile(r"(?:cmd|powershell|pwsh)(?:\.exe)?", re.IGNORECASE)
+# `uv run` options whose value is the next word (not the command).
+_UV_RUN_VALUE_OPTIONS = frozenset(
+    {
+        "--with",
+        "--with-editable",
+        "--with-requirements",
+        "--project",
+        "--directory",
+        "--python",
+        "-p",
+        "--group",
+        "--extra",
+        "--package",
+        "--env-file",
+        "--index",
+    }
 )
+_SHELL_COMMAND_FLAGS = frozenset({"/c", "/k", "-c", "-command"})
+_SHELL_SEPARATOR = re.compile(r"(&&|\|\||[&|;()])")
 # ctypes symbols that start a process or open a document (a part opens SolidWorks).
 _NATIVE_LAUNCHERS = frozenset(
     {
@@ -111,34 +133,93 @@ def _text(part):
     )
 
 
-def _com_script(args, cwd=None):
-    """The COM build script ``args`` would run, resolved against ``cwd``, if any.
+def _split_command(text):
+    """Words of a command string, with each shell separator as its own word."""
+    try:
+        pieces = shlex.split(text, posix=False)
+    except ValueError:  # an unbalanced quote: CreateProcess still runs it
+        pieces = text.split()
+    words = []
+    for piece in pieces:
+        if piece[:1] in "\"'":
+            words.append(piece.strip("\"'"))
+        else:
+            words.extend(w for w in _SHELL_SEPARATOR.split(piece) if w)
+    return words
 
-    Only a script the program executes counts: the program itself, or an
-    argument of an interpreter or shell.
-    """
+
+def _executed_words(args, executable=None):
+    """The words of ``args`` that the process tree would execute as programs."""
     if isinstance(args, (list, tuple)):
-        tokens = [_text(part) for part in args]
+        words = [_text(part) for part in args]
     else:
-        try:
-            tokens = shlex.split(_text(args), posix=False)
-        except ValueError:  # an unbalanced quote: CreateProcess still runs it
-            tokens = _text(args).split()
-    tokens = [token.strip("\"'") for token in tokens]
-    if not tokens:
-        return None
-    if not _SCRIPT_RUNNERS.fullmatch(PureWindowsPath(tokens[0]).name):
-        tokens = tokens[:1]
+        words = _split_command(_text(args))
+    if executable is not None and words:
+        words[0] = _text(executable)
+    executed = []
+    program = None  # None: the next word is in command position
+    skip_value = run_seen = False
+    for index, word in enumerate(words):
+        if _SHELL_SEPARATOR.fullmatch(word):
+            program = None
+            continue
+        if skip_value:
+            skip_value = False
+            continue
+        if program is None:
+            if word.startswith("-"):  # an option before the command (`uv run -q`)
+                skip_value = run_seen and word in _UV_RUN_VALUE_OPTIONS
+                continue
+            name = PureWindowsPath(word).name
+            if _PYTHONS.fullmatch(name):
+                program = "python"
+            elif _UVS.fullmatch(name):
+                program, run_seen = "uv", False
+            elif _SHELLS.fullmatch(name):
+                program = "shell"
+            else:
+                executed.append(word)
+                program = "other"
+        elif program == "python":
+            # The first non-option word is the script (or the -m module or -c
+            # code); the words after it are the script's own arguments.
+            if word in ("-X", "-W"):
+                skip_value = True
+            elif not word.startswith("-"):
+                executed.append(word)
+                program = "other"
+        elif program == "uv":
+            if word == "run" and not run_seen:
+                run_seen, program = True, None
+        elif program == "shell":
+            flag = word.lower()
+            if flag in _SHELL_COMMAND_FLAGS:
+                program = "shell-command"
+            elif flag == "-file":
+                program = "shell-file"
+        elif program == "shell-command":
+            # The rest is the shell's command line: one argument or loose words.
+            rest = [w for part in words[index:] for w in _split_command(part)]
+            executed.extend(_executed_words(rest))
+            break
+        elif program == "shell-file":
+            executed.append(word)
+            program = "other"
+    return executed
+
+
+def _com_script(args, executable=None, cwd=None):
+    """The COM build script ``args`` would run, resolved against ``cwd``, if any."""
     base = _text(cwd) if cwd else os.getcwd()
-    for token in tokens:
-        path = os.path.normpath(os.path.join(base, token))
+    for word in _executed_words(args, executable):
+        path = os.path.normpath(os.path.join(base, word))
         if _COM_SCRIPT.search(path):
             return path
     return None
 
 
 def _acts_on_host(args, executable=None, cwd=None):
-    return _launches_solidworks(args, executable) or _com_script(args, cwd)
+    return _launches_solidworks(args, executable) or _com_script(args, executable, cwd)
 
 
 def _refuse_create_process(module_name, original):
@@ -165,8 +246,8 @@ def _audit(event, args):
     elif event == "os.startfile":
         _refuse("os.startfile", args[0])
     elif event in ("os.spawn", "os.exec"):
-        argv = args[2] if event == "os.spawn" else args[1]
-        if _acts_on_host(list(argv)):
+        path, argv = (args[1], args[2]) if event == "os.spawn" else args[:2]
+        if _acts_on_host(list(argv), path):
             _refuse(event, argv)
     elif event == "os.system":
         if _acts_on_host(args[0]):
@@ -310,11 +391,15 @@ def _install_activation_guard():
 # as it finishes executing. Collaborator identity, not the call, decides: a
 # test that fakes ``_run_subprocess`` or dodo's ``subprocess.run``/``Popen`` is
 # already hermetic and keeps exercising the real ``_exec_com``.
-def _runs_real_subprocess(module):
+def _runs_real_subprocess(module, log_stem):
+    """Whether dodo's ``_run_subprocess`` would start a real child.
+
+    It logs through ``Popen`` when given a log stem and calls ``run`` (which
+    itself uses ``Popen``) otherwise.
+    """
     runner = getattr(module, "subprocess", None)
-    return (
-        getattr(runner, "Popen", None) is _REAL_POPEN
-        and getattr(runner, "run", None) is _REAL_RUN
+    return getattr(runner, "Popen", None) is _REAL_POPEN and (
+        log_stem is not None or getattr(runner, "run", None) is _REAL_RUN
     )
 
 
@@ -326,14 +411,14 @@ def _guard_dodo(module):
 
     @functools.wraps(run_subprocess)
     def refuse_com_subprocess(cmd, label, log_stem=None, *, task=None):
-        if _runs_real_subprocess(module) and _com_script(cmd):
+        if _runs_real_subprocess(module, log_stem) and _com_script(cmd):
             _refuse("dodo._run_subprocess", f"{label}: {cmd}")
         return run_subprocess(cmd, label, log_stem, task=task)
 
     @functools.wraps(exec_com)
     def refuse_com_task(cmd, label, log_stem=None, *, task=None):
         if module._run_subprocess is refuse_com_subprocess and _runs_real_subprocess(
-            module
+            module, log_stem
         ):
             _refuse("dodo._exec_com", f"{label}: {cmd}")
         return exec_com(cmd, label, log_stem, task=task)
