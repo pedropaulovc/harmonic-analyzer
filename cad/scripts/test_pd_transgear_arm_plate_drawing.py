@@ -340,6 +340,9 @@ _SECTION_LABEL_MODEL = 2.1
 _CAPTION_CLEAR_MODEL = 6.0
 _INNER_BORDER_X = 0.4191  # ASME B landscape inner border, right
 _GAP = 0.004  # sheet m between neighbouring texts
+# The locator callout's leader leaves its text block's lower right, this far
+# (model mm) from the kept text point (measured on the r3 sheet).
+_LOCATOR_LEADER_START_MODEL = (7.0, -5.5)
 
 
 def _half_width_model(text: str) -> float:
@@ -434,9 +437,34 @@ def test_the_first_plan_row_clears_the_cutting_line_arrow() -> None:
         + _SECTION_LABEL_MODEL
     )
     nearest_row = min(
-        drawing.PLAN_KEEP[name][1] for name in ("ScrewHoleX1", "ScrewHoleX2", "Width")
+        drawing.PLAN_KEEP[name][1] for name in ("ScrewHoleX1", "ScrewHoleX2", "LocatorX1")
     )
     assert nearest_row - _TEXT_BELOW_KEEP_MODEL - arrow_top >= 1.0
+
+
+def test_the_reamed_hole_leader_crosses_no_plan_dimension_line() -> None:
+    """The locator callout's leader runs from its text to locator 1 without
+    crossing a location or size dimension line standing above the plan."""
+    spans = {
+        "ScrewHoleX1": (geometry.SCREW_HOLES[0][0], 0.0),
+        "ScrewHoleX2": (geometry.SCREW_HOLES[1][0], 0.0),
+        "LocatorX1": (geometry.LOCATOR_SITES_MM[0][0], 0.0),
+        "Width": (geometry.EDGE_MINUS_X, geometry.EDGE_PLUS_X),
+    }
+    text_x, text_y, _ = drawing.PLAN_KEEP["LocatorDia1"]
+    start_x = text_x + _LOCATOR_LEADER_START_MODEL[0]
+    start_y = text_y + _LOCATOR_LEADER_START_MODEL[1]
+    site_x, site_y = geometry.LOCATOR_SITES_MM[0]
+    checked = 0
+    for name, (x0, x1) in spans.items():
+        if name not in drawing.PLAN_KEEP:
+            continue
+        row = drawing.PLAN_KEEP[name][1]
+        assert site_y < row < start_y, name
+        leader_x = start_x + (site_x - start_x) * (start_y - row) / (start_y - site_y)
+        assert not min(x0, x1) <= leader_x <= max(x0, x1), name
+        checked += 1
+    assert checked
 
 
 def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:

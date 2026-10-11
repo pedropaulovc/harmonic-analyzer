@@ -160,15 +160,15 @@ SECTION_LINE_MODEL = (
 # stand outboard of each side, the hole height's wide toleranced text wholly
 # between the edge and the top-corner height's dimension line.
 # Rows 4 apart (8 mm on the sheet: 4.4 mm air between 3.6 mm texts) keep the
-# width's witness lines under the locator diameter's shoulder: at 5 apart
-# they rose to 246.2 mm, through its shoulder at 245.5 mm (farm run
-# 20261009T224545531Z, shoulder-crosses-line), and that four-line callout
-# cannot rise further inside the top border.
+# locator's witness lines under the locator diameter's shoulder (at 5 apart
+# a top row rose through it: farm run 20261009T224545531Z,
+# shoulder-crosses-line). The width stands under the centre view instead:
+# across the top it was the one dimension line the reamed-hole leader had
+# to cross (machinist review of the r3 sheets).
 PLAN_ROWS = tuple(_SECTION_TOP + 8.0 + 4.0 * row for row in range(3))
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ScrewHoleX2": (SCREW_HOLES[1][0] / 2.0, PLAN_ROWS[0], _Z_PLAN),
     "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, PLAN_ROWS[1], _Z_PLAN),
-    "Width": ((EDGE_MINUS_X + EDGE_PLUS_X) / 2.0, PLAN_ROWS[2], _Z_PLAN),
     "KinkY": (EDGE_MINUS_X - 5.0, KINK[1] / 2.0, _Z_PLAN),
     "TopLeftY": (EDGE_MINUS_X - 11.0, TOP_LEFT[1] / 2.0, _Z_PLAN),
     "ScrewHoleY": (EDGE_PLUS_X + 9.5, SCREW_HOLES[0][1] / 2.0, _Z_PLAN),
@@ -177,14 +177,16 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
     "ScrewHoleDia": (EDGE_MINUS_X - 8.0, _TOP + 8.0, _Z_PLAN),
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 8.0, _Z_PLAN),
-    "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2] + 5.0, _Z_PLAN),
-    # High enough that its callout lines clear the screw-hole callout, and
-    # its right end clears countersink 1's frame leader; three short lines
-    # keep its left edge inside the border.
+    "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2], _Z_PLAN),
+    # High enough that its callout lines clear the screw-hole callout; three
+    # short lines keep its left edge inside the border. Its leader runs down
+    # to locator 1 left of every location dimension line.
     "LocatorDia1": (EDGE_MINUS_X - 7.0, _TOP + 23.75, _Z_PLAN),
 }
-# Back view (the mounting face): the notch face's corner heights, outboard.
+# Back view (the mounting face): the notch face's corner heights, outboard,
+# and the plate width below the end round, clear of every leader.
 BACK_KEEP: dict[str, tuple[float, float, float]] = {
+    "Width": ((EDGE_MINUS_X + EDGE_PLUS_X) / 2.0, _BOTTOM - 7.0, 0.0),
     "NotchLeftY": (EDGE_MINUS_X - 4.0, NOTCH_LEFT[1] / 2.0, FRONT_FACE_Z),
     "NotchRightY": (EDGE_PLUS_X + 4.0, NOTCH_RIGHT[1] / 2.0, FRONT_FACE_Z),
     "LocatorY1": (EDGE_MINUS_X - 8.0, LOCATOR_SITES_MM[0][1] / 2.0, 0.0),
