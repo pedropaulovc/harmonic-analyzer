@@ -120,14 +120,21 @@ written for a set mesh (`cone_set_stack`, `dt_mesh_checks`,
   1.0 at the nominal centre (1.088) and must not bind at any tolerance corner.
   Its open-corner ratio is reference only.
 
-Everything else these checks print is reference (REF): the RSS-corner contact
-ratios and the arithmetic worst-corner interference. Among T012–T120 only T012
+Everything else these drive-train checks print is reference (REF): the RSS-corner
+contact ratios and the arithmetic worst-corner interference. Among T012–T120 only T012
 overlaps at the arithmetic worst corner, by 0.322 mm. That is a fit-up note on
 the assembly sheet: if T012 binds after the set, back the swing off or stone
 the T012 tip.
 
 The alignment pinion only meshes while the readout is zeroed, with the notches
 set by eye. It must not bind; its contact ratio is reported, not gated.
+
+The paper reducer has two mandatory contact-ratio gates, both at the minimum
+printed tips: at least 1.2 at its nominal 35.101 mm centre, and at least 1.1
+at the loose runout extreme (the centre opened by both tooth-space runouts).
+These are `paper_drive_mesh_check.CONTACT_RATIO_FLOOR` and
+`RUNOUT_CONTACT_RATIO_FLOOR` (user decision 2026-10-11); the centre comes from
+`pd_rack_pinion_spec.CENTRE_DISTANCE`.
 
 ### Setting the cone mesh
 
