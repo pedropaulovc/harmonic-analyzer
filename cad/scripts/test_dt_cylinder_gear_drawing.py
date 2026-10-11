@@ -103,6 +103,16 @@ def test_tooth_system_and_reference_cutter_are_spec_owned() -> None:
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
 
 
+def test_drum_prints_the_tooth_runout_the_cone_mesh_stack_books() -> None:
+    import cone_set_stack
+
+    assert notes.TOOTH_RUNOUT_TIR_MM == cone_set_stack.TOOTH_RUNOUT_TIR_MM
+    assert (
+        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.2f} "
+        "TIR MAX TO FINISHED BORE"
+    ) in notes.GEAR_DATA
+
+
 def test_cam_and_notch_oracles_use_actual_off_centre_root_material() -> None:
     import math
 

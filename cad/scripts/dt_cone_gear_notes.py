@@ -11,6 +11,7 @@ import re
 import textwrap
 from dataclasses import replace
 
+import cone_set_stack
 import dt_cone_gear_spec as spec
 import dt_mesh_checks
 
@@ -72,6 +73,9 @@ def gear_data(teeth: int) -> str:
         ("BACKLASH WITH MATE (mm, REF)", f"{minimum:.2f} TO {maximum:.2f}"),
         ("ROOT RADIAL MIN/MAX (mm, REF)", f"{profile.root_radius_min_mm:.3f} / {profile.root_radius_max_mm:.3f}"),
         ("WEB MIN (mm, REF)", f"{web:.2f}"),
+        # cone_set_stack books each gear's tooth runout about its bore.
+        ("TOOTH CUTTING SETUP, ACCEPT AT SETUP",
+         f"{cone_set_stack.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE"),
     )
     if teeth == 6:
         # DT6-FORM1's edge is defined on the last sheet; the cut gear is

@@ -596,6 +596,16 @@ def test_actual_web_prints_as_a_fact(teeth: int) -> None:
     assert f"WEB MIN (mm, REF):  {math.floor(web * 100.0) / 100.0:.2f}" in data
 
 
+@pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
+def test_each_sheet_prints_the_tooth_runout_the_mesh_stack_books(teeth: int) -> None:
+    import cone_set_stack
+
+    assert (
+        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.2f} "
+        "TIR MAX TO FINISHED BORE"
+    ) in notes.gear_data(teeth)
+
+
 _REVIEW_RECORD_TEXT = re.compile(
     r"RULE \d|U\d\d|EXCEPTION|BOOK FIDELITY|POLICY|RULING"
 )
