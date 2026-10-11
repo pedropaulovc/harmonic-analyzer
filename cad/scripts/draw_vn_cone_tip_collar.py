@@ -88,6 +88,28 @@ BORE_NOTE_XY = (BORE_CENTER[0] - 0.025, BORE_CENTER[1] - 0.026)
 # level with the bore axis: past the 20.6 mm crop circle, under CollarDia's
 # lower extension line (y 136 mm) and above the bore note.
 DATUM_A_LEADER_M = 0.022
+# The model point datum A attaches to: on the bore's in-band native surface.
+DATUM_A_MODEL_MM = (-spec.BORE_MODEL_DIA_MM / 2.0, 1.0, 0.0)
+
+
+def bore_crop_radius_m() -> float:
+    """Sheet radius of the 40:1 bore view's circular crop."""
+    return spec.BORE_FINISHED_DIA_LIMITS_MM[1] * spec.BORE_VIEW_SCALE[0] / (
+        2000.0 * spec.BORE_VIEW_SCALE[1]
+    ) + 0.003
+
+
+def datum_a_placement(view, bore_edge: tuple[float, float]) -> PmiDrawingPlacement:
+    """Datum A on the bore surface point ``bore_edge``, its tag level with
+    it and ``DATUM_A_LEADER_M`` further out from the bore axis."""
+    side = -1.0 if bore_edge[0] < BORE_CENTER[0] else 1.0
+    return PmiDrawingPlacement(
+        view=view,
+        position=(bore_edge[0] + side * DATUM_A_LEADER_M, bore_edge[1]),
+        attachment_xy=bore_edge,
+    )
+
+
 # Sheet 2 views are centred on the SCREW, not on the view box: the views are
 # placed in Default, whose box holds the collar too, and the SetScrew
 # configuration then left the screw 85 mm right of where its view was placed,
@@ -287,9 +309,7 @@ def _bore_view(adapter):
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    radius = spec.BORE_FINISHED_DIA_LIMITS_MM[1] * spec.BORE_VIEW_SCALE[0] / (
-        2000.0 * spec.BORE_VIEW_SCALE[1]
-    ) + 0.003
+    radius = bore_crop_radius_m()
     points = []
     for x, y in (BORE_CENTER, (BORE_CENTER[0] + radius, BORE_CENTER[1])):
         point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
@@ -393,16 +413,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # the stack build); it is tagged on the 40:1 bore view instead, on the
     # bore's own surface, opposite the diameter's leader.
     bore = _bore_view(adapter)
-    bore_edge = point(bore, (-spec.BORE_MODEL_DIA_MM / 2.0, 1.0, 0.0), "collar bore datum")
-    bore_side = -1.0 if bore_edge[0] < BORE_CENTER[0] else 1.0
+    bore_edge = point(bore, DATUM_A_MODEL_MM, "collar bore datum")
     project_part_pmi(
         adapter,
         placements={
-            "datum:A": PmiDrawingPlacement(
-                view=bore,
-                position=(bore_edge[0] + bore_side * DATUM_A_LEADER_M, bore_edge[1]),
-                attachment_xy=bore_edge,
-            ),
+            "datum:A": datum_a_placement(bore, bore_edge),
             "datum:B": PmiDrawingPlacement(
                 view=side, position=(0.168, 0.162),
                 attachment_xy=point(side, (0.0, 0.0, spec.NOSE_DIA / 2.0 - spec.EDGE_BREAK), "collar south datum"),
