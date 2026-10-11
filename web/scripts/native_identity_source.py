@@ -332,40 +332,7 @@ def magnifier_installation(path: Path) -> dict[str, float]:
 
     return {
         name: number(ast.Name(id=name, ctx=ast.Load()), frozenset())
-        for name in ("LEVER_ROD_Y", "LEVER_ROD_Z", "VROD_TOP_Y")
-    }
-
-
-def output_fixture_installation(clamp_x: float, fixture, rod_dia: float, thumb, transforms) -> dict:
-    """Rest poses of the output fixture and its thumb screw from drawing-free owners.
-
-    ``fixture`` is ``mg_output_fixture_geom`` (rod-centred origin, hex axis local
-    +X, yaw about the vertical rod), ``thumb`` is ``_mcmaster_91882a221`` and
-    ``transforms`` is ``_transforms``; none imports a COM recipe. The derivation
-    mirrors ``build_mg_magnifier_assembly``'s ``FIXTURE_*`` constants and
-    ``test_native_identity_source`` proves the two agree, so the exporters never
-    import the recipe for these poses.
-    """
-    rows = transforms.rows_from_euler([0.0, 180.0 + fixture.FIXTURE_YAW_DEG, 0.0])
-    position = [clamp_x, fixture.FIXTURE_AXIS_Y, fixture.VROD_Z]
-
-    def along_axis(distance: float) -> list[float]:
-        return [origin + distance * rows[0][axis] for axis, origin in enumerate(position)]
-
-    # Backed-out screw: tip tangent to the rod, origin at the outer head face.
-    tip_x = rod_dia / 2.0
-    outer_x = tip_x + thumb.SHANK_LEN + thumb.HEAD_STACK_LEN
-    return {
-        "fixturePositionMm": position,
-        "fixtureRows": rows,
-        "hookMm": [
-            origin + sum(fixture.HOOK_LOCAL[i] * rows[i][axis] for i in range(3))
-            for axis, origin in enumerate(position)
-        ],
-        "screwPositionMm": along_axis(outer_x),
-        "screwRows": transforms.compose_rows(transforms.ROT_Y_180, rows),
-        "screwShankLocalMm": [thumb.SHANK_LEN + thumb.HEAD_STACK_LEN, 0.0, 0.0],
-        "screwTipMm": along_axis(tip_x),
+        for name in ("LEVER_ROD_Y", "LEVER_ROD_Z", "VROD_TOP_Y", "FIXTURE_Y0")
     }
 
 

@@ -34,7 +34,6 @@ from native_identity_source import (
     CadIdentityMap,
     glb_nodes,
     magnifier_installation,
-    output_fixture_installation,
     project_model_paths,
     validate_release_pair,
     wheel_wire_pitch_radii,
@@ -346,10 +345,8 @@ def export_snapshot(
             "dt_cone_swing_platform_geometry",
             "vn_cone_lock_knob_spec",
             "vn_swing_stop_screw_spec",
-            "mg_magnifying_vertical_rod_geom",
-            "mg_output_fixture_geom",
-            "_mcmaster_91882a221",
-            "_transforms",
+            "mg_magnifying_vertical_rod_spec",
+            "mg_output_fixture_spec",
             "_chain",
         )
     }
@@ -385,11 +382,6 @@ def export_snapshot(
     installation = modules["dt_cone_pivot_post_installation"]
     magnifier_layout = magnifier_installation(
         identity_map.source_file(cad, "scripts/build_mg_magnifier_assembly.py")
-    )
-    vrod = modules["mg_magnifying_vertical_rod_geom"]
-    fixture_geom = modules["mg_output_fixture_geom"]
-    fixture_rest = output_fixture_installation(
-        lw.CLAMP_X, fixture_geom, vrod.ROD_DIA, modules["_mcmaster_91882a221"], modules["_transforms"]
     )
     feed_senses = recipe_literal_constants(
         identity_map.source_file(cad, "scripts/build_kinematic_probe.py"), ("GEAR_SENSE", "FEED_SIGN")
@@ -522,29 +514,6 @@ def export_snapshot(
         "ha-harmonic-analyzer/mg-magnifier/mg-magnifying-wheel-1",
         [0.0, 0.0, 0.0],
         [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
-    )
-    # The yawed hex fixture and its placed (second) thumb screw: the wire leaves
-    # the model-owned groove tangent, and the backed-out screw's shank tip is
-    # tangent to the vertical rod along the fixture's spigot axis.
-    check(
-        "ha-harmonic-analyzer/mg-magnifier/mg-output-fixture-1",
-        [0.0, 0.0, 0.0],
-        fixture_rest["fixturePositionMm"],
-    )
-    check(
-        "ha-harmonic-analyzer/mg-magnifier/mg-output-fixture-1",
-        list(fixture_geom.HOOK_LOCAL),
-        list(lw.WIRE_START),
-    )
-    check(
-        "ha-harmonic-analyzer/mg-magnifier/vn-thumb-screw-2",
-        [0.0, 0.0, 0.0],
-        fixture_rest["screwPositionMm"],
-    )
-    check(
-        "ha-harmonic-analyzer/mg-magnifier/vn-thumb-screw-2",
-        fixture_rest["screwShankLocalMm"],
-        fixture_rest["screwTipMm"],
     )
     check(
         "ha-harmonic-analyzer/pn-pen/pn-pen-marker-1",
@@ -917,22 +886,29 @@ def export_snapshot(
             "clampRestMm": [
                 lw.CLAMP_X, magnifier_layout["LEVER_ROD_Y"], magnifier_layout["LEVER_ROD_Z"]
             ],
-            "fixtureRestMm": fixture_rest["fixturePositionMm"],
-            # Drawing-free owners: the fixture's rod-centred axis height and hex
-            # half-extent, the rod's straight land and the clamp's bore station.
-            # The full hex body must remain on the straight rod, below the clamp.
+            "fixtureRestMm": [
+                lw.CLAMP_X,
+                magnifier_layout["FIXTURE_Y0"],
+                lw.HOOK_Z
+                + modules["mg_magnifying_vertical_rod_spec"].ROD_DIA / 2
+                + lw.WIRE_DIA / 2
+                + lw.CLEARANCE,
+            ],
+            # Read the exact archived assembly's rod top and collar datums.
+            # Full collar must remain on the straight rod, below the clamp.
             "fixtureOffsetRangeM": [
                 (
                     magnifier_layout["VROD_TOP_Y"]
-                    - vrod.ROD_LENGTH
-                    + vrod.ROD_DIA / 2
-                    - (fixture_geom.FIXTURE_AXIS_Y - fixture_geom.HEX_CORNER_RADIUS)
+                    - modules["mg_magnifying_vertical_rod_spec"].ROD_LENGTH
+                    + modules["mg_magnifying_vertical_rod_spec"].ROD_DIA / 2
+                    - magnifier_layout["FIXTURE_Y0"]
                 )
                 / 1000,
                 (
                     magnifier_layout["LEVER_ROD_Y"]
                     - modules["mg_magnifying_clamp_geom"].LEVER_BORE_Y
-                    - (fixture_geom.FIXTURE_AXIS_Y + fixture_geom.HEX_CORNER_RADIUS)
+                    - modules["mg_output_fixture_spec"].COLLAR_HEIGHT
+                    - magnifier_layout["FIXTURE_Y0"]
                 )
                 / 1000,
             ],
