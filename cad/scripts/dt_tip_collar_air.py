@@ -15,10 +15,12 @@ fastener/thread class, read from the spec the drawing prints it from:
   gear stack's terminal north face and the collar's feeler set;
 * across the shaft, at the post end: the post's tapped-hole station, its
   screws' clearance, its counterbore pattern and its running fit;
-* across the shaft, at the tip end (the tip centres in the cup, step 3): the
-  hold-down tap (as TIP_TAP_LATERAL_BAND_MM), the adjuster passage centre,
-  the block's square on its one screw at the title block's angular band and
-  the cup screw's float and cock in its thread;
+* across the shaft, at the tip end: the hold-down tap (as
+  TIP_TAP_LATERAL_BAND_MM), the adjuster passage centre, the block's square
+  on its one screw at the title block's angular band, the cup screw's float
+  and cock in its thread, and the shaft tip's radial freedom in the cup once
+  the cup is backed off for SHAFT_END_PLAY (the shaft swings on its post
+  journal to take it, so it also tilts the collar's faces).
 * the swing: the reamed pivot on the stock shoulder, the base pivot seat to
   the pedestal seats, the pivot thread and the T120 set (cone_set_stack);
 * the collar on the shaft: its nose size, its float and cock on the journal;
@@ -35,9 +37,9 @@ The projections of one error are summed into that one source, never combined
 as separate scatter.  The sources are then of two kinds:
 
 * clearances (IN_SERVICE_CLEARANCES): fastener and running clearances, thread
-  centring, the cup screw in its thread, the collar's float and cock and
-  G19's cock in its bore.  The parts can take them all up together, so they
-  add arithmetically;
+  centring, the cup screw in its thread, the shaft tip in the backed-off cup,
+  the collar's float and cock and G19's cock in its bore.  The parts can take
+  them all up together, so they add arithmetically;
 * printed manufacturing and set tolerances: independent of each other, so
   they combine as a root sum of squares.
 
@@ -66,8 +68,12 @@ import vn_cone_tip_collar_spec as collar
 import _mcmaster_94025a164 as adjuster
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
-from cone_stack_end_play import COLLAR_FEELER_BAND
-from cone_shaft_land_bands import TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
+from cone_stack_end_play import COLLAR_FEELER_BAND, SHAFT_END_PLAY
+from cone_shaft_land_bands import (
+    TERMINAL_FINISHED_DIA_LIMITS_MM,
+    TERMINAL_FLAT_OFFSET_MIN_MM,
+    TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD,
+)
 from dt_cone_swing_platform_geometry import manufactured_p1_stop_enclosure
 
 Vector = tuple[float, float, float]
@@ -158,7 +164,7 @@ _SIN_I, _COS_I = cone_line.SIN_I, cone_line.COS_I
 _SUPPORT_SPAN = shaft.T006_TIP_STATION - cone_line.POST_STATION
 # The cup screw's #10-32 UNF-2B internal pitch diameter MAX against the
 # purchased 94025A164's class 2A minimum: the cup floats and cocks in its
-# thread over the block's depth. The tip centres in the cup (step 3).
+# thread over the block's depth.
 _INTERNAL_PITCH_MAX = 0.1736 * 25.4
 _THREAD_FLOAT = (_INTERNAL_PITCH_MAX - adjuster.EXTERNAL_PITCH_DIA_MIN_MM) / 2.0
 _MIN_EMBED = tip.ADJUSTER_MIN_ENGAGEMENT_D * THREAD_MAJOR_MM[tip.ADJUSTER_THREAD]
@@ -168,6 +174,24 @@ _BLOCK_DEPTH_MAX = tip.BLOCK_Z + printed_band_mm(tip.BLOCK_DEPTH_PLACES)
 _CUP_REACH = math.hypot(
     abs(tip.FOOT_TAP_OFFSET_X) + printed_band_mm(tip.PASSAGE_CENTER_PLACES),
     abs(shaft.T006_TIP_STATION - cone_line.TIP_BLOCK_STATION) + _BLOCK_DEPTH_MAX / 2.0,
+)
+# Step 3 seats the tip in the cup, then backs the cup off for SHAFT_END_PLAY.
+# At the far end of that stroke the 45 deg cup wall stands SHAFT_END_PLAY *
+# tan(45) clear of the seated tip, and the shaft, swinging on its post
+# journal, can carry the tip that far across the cup.  The terminal's D-flat
+# runs out through the tip, so toward the flat the D's two corners, not its
+# round, meet the wall: a Ø2r D with its flat o off the axis, moved d toward
+# the flat, reaches the wall circle r + e when r^2 + 2*o*d + d^2 = (r + e)^2.
+# The largest terminal and the shallowest flat (printed limits) give the most
+# room; any edge break only lets the tip seat deeper on its break, which
+# gives less.  The shaft turns, so the flat can face any way: the larger of
+# the two directions is booked.
+_TERMINAL_R_MAX = TERMINAL_FINISHED_DIA_LIMITS_MM[1] / 2.0
+_CUP_WALL_R = _TERMINAL_R_MAX + SHAFT_END_PLAY[1] * (adjuster.CUP_DIA / 2.0) / adjuster.CUP_DEPTH
+_TIP_CAPTURE = max(
+    _CUP_WALL_R - _TERMINAL_R_MAX,
+    math.sqrt(TERMINAL_FLAT_OFFSET_MIN_MM**2 + _CUP_WALL_R**2 - _TERMINAL_R_MAX**2)
+    - TERMINAL_FLAT_OFFSET_MIN_MM,
 )
 
 # Along the shaft, from the post's mounting to the collar's south face.
@@ -194,6 +218,7 @@ TIP_END_TERMS_MM = {
     "tip passage centre": printed_band_mm(tip.PASSAGE_CENTER_PLACES),
     "tip block square on its one screw": _CUP_REACH * math.sin(_ANGULAR_RAD),
     "tip cup in its thread": _THREAD_FLOAT + _BLOCK_DEPTH_MAX * (2.0 * _THREAD_FLOAT / _MIN_EMBED),
+    "shaft tip in the backed-off cup": _TIP_CAPTURE,
 }
 # The swing's frame (cone_set_stack's set-at-assembly terms).
 SWING_TERMS_MM = {
@@ -209,6 +234,7 @@ IN_SERVICE_CLEARANCES = frozenset({
     "post running journal fit",
     "tip hold-down screw clearance",
     "tip cup in its thread",
+    "shaft tip in the backed-off cup",
     "platform pivot bore on the shoulder",
     "pivot thread centring",
     "collar float on the journal",

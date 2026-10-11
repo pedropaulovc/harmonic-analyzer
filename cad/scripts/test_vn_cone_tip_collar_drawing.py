@@ -495,6 +495,20 @@ def test_collar_air_shares_the_assembly_post_face_and_tip_tap_bands():
     )) == pytest.approx(bdt.TIP_TAP_LATERAL_BAND_MM)
 
 
+def test_collar_air_books_the_shaft_tip_across_the_backed_off_cup():
+    from cone_shaft_land_bands import TERMINAL_FINISHED_DIA_LIMITS_MM, TERMINAL_FLAT_OFFSET_MIN_MM
+    from cone_stack_end_play import SHAFT_END_PLAY
+
+    capture = air.TIP_END_TERMS_MM["shaft tip in the backed-off cup"]
+    assert "shaft tip in the backed-off cup" in air.IN_SERVICE_CLEARANCES
+    r, o, e = TERMINAL_FINISHED_DIA_LIMITS_MM[1] / 2.0, TERMINAL_FLAT_OFFSET_MIN_MM, SHAFT_END_PLAY[1]
+    # Toward the round the 45 deg wall gives exactly the end play; toward the
+    # D-flat the corners meet the wall circle r + e, which gives more.
+    assert capture > e
+    assert r * r + 2.0 * o * capture + capture * capture == pytest.approx((r + e) ** 2)
+
+
+
 def test_collar_air_books_each_printed_source_once():
     terms = air.closure_terms_mm(air.TIERS[0], air.DRUM_TIERS[0], 0.0)
     assert set(terms) == {
@@ -515,7 +529,8 @@ def test_collar_air_books_each_printed_source_once():
 
 
 def test_collar_air_adds_clearances_and_rss_only_the_tolerances(monkeypatch):
-    rows = air.full_sweep_proof(intervals=20)
+    # The released resolution: the interval arc is part of the closing stack.
+    rows = air.full_sweep_proof()
     assert {row["method"] for row in rows} == {"statistical"}
     assert min(row["arithmetic_mm"] for row in rows) <= 0.0
     assert min(row["air_mm"] for row in rows) > 0.0
