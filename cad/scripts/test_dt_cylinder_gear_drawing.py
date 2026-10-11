@@ -93,10 +93,10 @@ def test_tooth_system_and_reference_cutter_are_spec_owned() -> None:
         f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
         f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.3f} "
         f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}",
-        f"FORM CUTTER (REF):  #{spec.CUTTER_NUMBER}, "
+        f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
         f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
         f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
-        "TOOTH FORM:  TRANSLATED STOCK FORM; FINITE FLANKS AND OFF-CENTRE ROOT ARC",
+        "TOOTH FORM:  SPUR INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER",
     ):
         assert row in notes.GEAR_DATA
     assert "NONSTANDARD" not in notes.GEAR_DATA

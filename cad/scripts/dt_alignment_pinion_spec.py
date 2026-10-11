@@ -17,7 +17,7 @@ from _gear_fit_limits import gear_tip_band_mm
 from _printed_tolerance import printed_deviations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from stock_form_cutter import CutterTemplate, StockFormProfile
+from stock_form_cutter import TOOTH_FORM_NOTE, CutterTemplate, StockFormProfile
 
 
 MM_PER_IN = 25.4
@@ -87,9 +87,10 @@ ENGAGED_CENTER_DISTANCE_MM = (
 ENGAGED_CENTER_RADIAL_STACK_MM = float(
     _config.machine("alignment_pinion", "engaged_center_radial_stack_mm")
 )
-# Inspect the actual translated-template flanks, not an unrolled ideal N32
-# involute.  The core refuses a span whose tangent contacts leave finite support.
-TOOTH_FORM = "TRANSLATED STOCK FORM; FINITE FLANKS AND OFF-CENTRE ROOT ARC"
+# The stock #4 cutter, plunged on the gear axis, defines the form; the span
+# below is its acceptance.  The core refuses a span whose tangent contacts
+# leave the cut flanks.
+TOOTH_FORM = TOOTH_FORM_NOTE
 
 BORE_DIA = 8.0  # Ø8 arbor through-bore (build_dt_pinion_arbor.py)
 # Slip fit bonded with Loctite 638, not a press: a press over the full 143.2
@@ -223,7 +224,7 @@ GEAR_DATA = gear_data_note(
             f"{WHOLE_DEPTH:.3f}",
         ),
         (
-            "FORM CUTTER (REF)",
+            "FORM CUTTER",
             f"#{CUTTER_NUMBER}, {CUTTER_TEETH_RANGE[0]}-{CUTTER_TEETH_RANGE[1]}T; "
             f"{CUTTER_REFERENCE_TEETH}T REFERENCE",
         ),
