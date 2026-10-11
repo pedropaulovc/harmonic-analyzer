@@ -970,8 +970,11 @@ def test_reference_dimensions_select_owned_visible_end_edges(
 
     monkeypatch.setattr(drawing_common, "_project_through", project)
     monkeypatch.setattr(drawing, "_assert_dimension_ink_on_sheet", lambda *a, **kw: None)
-    monkeypatch.setattr(drawing, "_model_item_paths", lambda *a: ())
-    monkeypatch.setattr(drawing, "_show_view_sketches", lambda *a, **kw: None)
+    shown = []
+    monkeypatch.setattr(
+        drawing, "_show_base_view_sketches",
+        lambda adapter, view, sketches, *, label: shown.append(tuple(sketches)),
+    )
 
     def import_setting(*args, **kwargs):
         assert kwargs["dimensions_by_feature"] == spec.DRAWING_DIMENSIONS
@@ -1037,6 +1040,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         assert not hasattr(displays[-1], "precision")
         return
     settled = drawing._add_assembly_dimensions(adapter, front)
+    assert shown == [(spec.SETTING_FEATURE,)]
     assert [(edge, append) for edge, append, view in selections] == [
         (start, False), (end, True)
     ]

@@ -34,7 +34,6 @@ from _drawing_common import (
     DrawingOutputs,
     ViewRole,
     _edge_endpoint_key,
-    _model_item_paths,
     curate_view_dimensions,
     add_component_bom_balloons,
     add_edge_dimension,
@@ -55,7 +54,7 @@ from _drawing_common import (
     visible_component_entities,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from _drawing_hidden_sketches import _show_view_sketches
+from _drawing_hidden_sketches import _show_base_view_sketches
 from _simplified_names import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
@@ -660,10 +659,11 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
                 "IDisplayDimension",
             )
         else:
-            draw = _early_bound(adapter.currentModel, "IDrawingDoc")
-            _show_view_sketches(
-                draw, (spec.SETTING_FEATURE,),
-                paths=_model_item_paths(adapter, front), label="clamped setting",
+            # The shared helper activates the view and selects through the
+            # raw model dispatch: an early-bound IDrawingDoc does not declare
+            # ClearSelection2 (farm run 20261011T185358102Z-b24055aa).
+            _show_base_view_sketches(
+                adapter, front, (spec.SETTING_FEATURE,), label="clamped setting",
             )
             annotations = curate_view_dimensions(
                 adapter, front, keep={spec.SETTING_DIMENSION: text_xy},
