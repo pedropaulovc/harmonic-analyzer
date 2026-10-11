@@ -89,8 +89,9 @@ NOSE_LENGTH = TIP_COLLAR_NOSE_LENGTH_MM
 WIDTH = TIP_COLLAR_WIDTH_MM
 WIDTH_BAND_MM = TIP_COLLAR_WIDTH_BAND_MM
 TAP_STATION = TIP_COLLAR_TAP_STATION_MM
+# The turned shoulder's tool-nose root prints R0.25 MAX: any root from sharp
+# up to 0.25 is good, and the collar air stack (dt_tip_collar_air) books 0.25.
 SHOULDER_ROOT_RADIUS = 0.25
-SHOULDER_ROOT_BAND = (0.0, -SHOULDER_ROOT_RADIUS)
 # The title block's free-edge break: the wall, thread and contact budgets
 # book it, but the model leaves the edges sharp (the title block prints it).
 EDGE_BREAK = TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM
@@ -447,8 +448,10 @@ if DOG_LENGTH - ROUTINE_BAND_MM < _STOCK_POINT_CHAMFER_MAX_MM:
 if DOG_SIDE_MARGIN_MM <= 0.0 or WORST_SOCKET_ACCESS_MM <= 0.0:
     raise AssertionError("complete dog fit/position budget fails or socket is buried")
 
-DRAWING_NOTES = "\n".join((
-    "COLLAR: 3/4 STEEL BAR STOCK OK.",
+# Each sheet carries only its own part's notes: the collar sheet printed the
+# screw's lines too (machinist review of the r3 build).
+DRAWING_NOTES = "3/4 STEEL BAR STOCK OK."
+SCREW_NOTES = "\n".join((
     "SUPPLY MCMASTER 94355A213; RETAIN STOCK THREAD AND HEX.",
     "GROUND DOG TIP; BREAK TIP EDGE ONLY AS DIMENSIONED.",
     "DATUM D: RETAINED STOCK THREAD AXIS.",

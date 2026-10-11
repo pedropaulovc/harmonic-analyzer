@@ -249,8 +249,11 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
     assert spec.BORE_DIA * spec.BORE_VIEW_SCALE[0] / spec.BORE_VIEW_SCALE[1] >= 28.0
     assert set(spec.PART_DATUMS) == set(spec.COLLAR_DATUMS + spec.SCREW_DATUMS)
     assert set(spec.GEOMETRIC_CONTROLS) == set(spec.COLLAR_CONTROLS + spec.SCREW_CONTROLS)
-    assert "GROUND DOG TIP" in spec.DRAWING_NOTES
-    assert len(spec.DRAWING_NOTES.splitlines()) <= 4
+    assert spec.DRAWING_NOTES == "3/4 STEEL BAR STOCK OK."
+    assert "94355A213" not in spec.DRAWING_NOTES
+    assert "RETAIN STOCK THREAD AND HEX" in spec.SCREW_NOTES
+    assert "GROUND DOG TIP" in spec.SCREW_NOTES
+    assert len(spec.SCREW_NOTES.splitlines()) <= 4
     # One line: an above callout's line break prints nothing (main's guard).
     assert spec.DOG_EDGE_CALLOUT == f"STONE DOG EDGE {spec.DOG_EDGE_BREAK:.2f} MAX"
     assert drawing._printable_above_callouts({"DogDia": spec.DOG_EDGE_CALLOUT})
@@ -338,7 +341,7 @@ def test_part_basic_and_max_types_are_authored_and_read_back(monkeypatch, refuse
             if not refuse:
                 self.value = value
 
-    tolerances = {name: Tolerance() for name in ("TapStation", "TapRootLimit")}
+    tolerances = {name: Tolerance() for name in ("TapStation", "TapRootLimit", "ShoulderRadius")}
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(part, "_named_dimension", lambda _adapter, _feature, name: (
         None, SimpleNamespace(Tolerance=tolerances[name]),
@@ -349,13 +352,13 @@ def test_part_basic_and_max_types_are_authored_and_read_back(monkeypatch, refuse
     else:
         part._functional_dimension_types(object())
         assert {name: tol.Type for name, tol in tolerances.items()} == {
-            "TapStation": 1, "TapRootLimit": 6,
+            "TapStation": 1, "TapRootLimit": 6, "ShoulderRadius": 6,
         }
 
 
-def test_drawing_refuses_lost_basic_location_or_root_max_type(monkeypatch):
-    annotations = ["TapStation", "TapRootLimit"]
-    types = {"TapStation": 1, "TapRootLimit": 6}
+@pytest.mark.parametrize("expected", [drawing.TAP_DIMENSION_TYPES, drawing.SIDE_DIMENSION_TYPES])
+def test_drawing_refuses_lost_basic_location_or_max_type(monkeypatch, expected):
+    types = dict(expected)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     rows = [SimpleNamespace(
@@ -363,14 +366,22 @@ def test_drawing_refuses_lost_basic_location_or_root_max_type(monkeypatch):
         GetSpecificAnnotation=lambda name=name: SimpleNamespace(
             GetDimension2=lambda _index: SimpleNamespace(Tolerance=SimpleNamespace(Type=types[name])),
         ),
-    ) for name in annotations]
-    drawing._assert_functional_dimension_types(object(), rows)
-    for name in annotations:
-        original = types[name]
+    ) for name in types]
+    drawing._assert_functional_dimension_types(object(), rows, expected)
+    for name in expected:
         types[name] = 0
         with pytest.raises(RuntimeError, match="lost native types"):
-            drawing._assert_functional_dimension_types(object(), rows)
-        types[name] = original
+            drawing._assert_functional_dimension_types(object(), rows, expected)
+        types[name] = expected[name]
+
+
+def test_shoulder_root_prints_max_and_the_air_stack_books_it():
+    """Machinist review of the r3 build asked about R0.25 0.00/-0.25: it is a
+    tool-nose root, sharp to 0.25 all good, so it prints R0.25 MAX."""
+    assert drawing.SIDE_DIMENSION_TYPES == {"ShoulderRadius": 6}
+    assert not hasattr(spec, "SHOULDER_ROOT_BAND")
+    nose = air.TIERS[0]
+    assert nose.north_upper_mm >= spec.SHOULDER_ROOT_RADIUS
 
 
 def test_native_default_bom_and_manufacturing_descriptions_share_spec_authority(monkeypatch):
@@ -819,4 +830,5 @@ def test_installation_notes_name_the_journal_and_its_clearance() -> None:
     ]
     assert lines[1] == "DIAMETRAL CLEARANCE 0.025 TO 0.105."
     assert bore_low - land_high > 0.0
-    assert max(map(len, lines)) <= max(map(len, spec.DRAWING_NOTES.splitlines()))
+    # The longest line the notes box has printed (the old supply line).
+    assert max(map(len, lines)) <= 55

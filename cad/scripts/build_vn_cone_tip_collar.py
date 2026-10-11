@@ -284,10 +284,11 @@ def _manufacturing_configurations(adapter):
 
 
 def _functional_dimension_types(adapter):
-    """Author part-owned BASIC location and MAX root process limit."""
+    """Author part-owned BASIC location and MAX limits."""
     for feature, name, kind in (
         ("SetScrewTap", "TapStation", 1),  # swTolBASIC
         ("TapRootGauge", "TapRootLimit", 6),  # swTolMAX
+        ("ShoulderRoot", "ShoulderRadius", 6),  # swTolMAX
     ):
         _display, dimension = _named_dimension(adapter, feature, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
@@ -343,7 +344,6 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "InstalledShaftAxis")
     set_dimension_bilateral_tolerance(adapter, "RingProfile", "BoreDia", *deviations(spec.BORE_MODEL_DIA_BAND))
     set_dimension_bilateral_tolerance(adapter, "SetScrewProfile", "DogDia", *deviations(spec.DOG_DIA_BAND))
-    set_dimension_bilateral_tolerance(adapter, "ShoulderRoot", "ShoulderRadius", *deviations(spec.SHOULDER_ROOT_BAND))
     _functional_dimension_types(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
@@ -352,6 +352,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(adapter, PART_NAME, {
         "Description": spec.BOM_DESCRIPTION,
         "Manufacturing Notes": spec.DRAWING_NOTES,
+        "Screw Notes": spec.SCREW_NOTES,
         "Installation Notes": spec.INSTALLATION_NOTES,
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
         "Radial Tap View Note": spec.RADIAL_TAP_VIEW_NOTE,

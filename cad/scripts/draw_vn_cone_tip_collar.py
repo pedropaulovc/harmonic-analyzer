@@ -263,8 +263,12 @@ def _require_full_thread_callout(display):
         raise RuntimeError("collar tap full-thread qualifier did not persist")
 
 
-def _assert_functional_dimension_types(adapter, annotations):
-    expected = {"TapStation": 1, "TapRootLimit": 6}  # BASIC / MAX
+# Native tolerance types the part authors: BASIC 1, MAX 6.
+TAP_DIMENSION_TYPES = {"TapStation": 1, "TapRootLimit": 6}
+SIDE_DIMENSION_TYPES = {"ShoulderRadius": 6}
+
+
+def _assert_functional_dimension_types(adapter, annotations, expected):
     observed = {}
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
@@ -274,7 +278,7 @@ def _assert_functional_dimension_types(adapter, annotations):
             tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
             observed[name] = int(tolerance.Type)
     if observed != expected:
-        raise RuntimeError(f"collar functional location/root limit lost native types: {observed}")
+        raise RuntimeError(f"collar BASIC/MAX dimensions lost native types: {observed}")
 
 
 def _centre_view(adapter, view, model_mm, sheet_xy, *, label):
@@ -352,9 +356,9 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open custom collar", await adapter.open_model(str(SOURCE)))
     read_required_properties(adapter.currentModel, (
         "Number", "Revision", "Title", "Material Specification", "Finish",
-        "Quantity", "Manufacturing Notes", "Isometric View Note", "Radial Tap View Note",
-        "Bore View Note", "Installation Notes",
-    ), required=("Number", "Material Specification", "Manufacturing Notes",
+        "Quantity", "Manufacturing Notes", "Screw Notes", "Isometric View Note",
+        "Radial Tap View Note", "Bore View Note", "Installation Notes",
+    ), required=("Number", "Material Specification", "Manufacturing Notes", "Screw Notes",
                  "Radial Tap View Note", "Bore View Note", "Installation Notes"))
     drawing, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALES["Collar"], layout=SPEC.layout,
@@ -383,6 +387,7 @@ async def build(adapter: Any) -> dict[str, str]:
                                        view_label="collar turning view", dimensions_by_feature=spec.DRAWING_DIMENSIONS)
     marks = end_marks + side_marks
     assert_imported_precision(adapter, marks, _precision(END_KEEP | SIDE_KEEP))
+    _assert_functional_dimension_types(adapter, side_marks, SIDE_DIMENSION_TYPES)
     # TapRootGauge is a blanked sketch: main's hidden-owner importer shows it
     # in this view for the import (draw_ch_rocker_arm_tl_pivot_screw).
     tap_marks = hidden_sketches.curate_view_dimensions(
@@ -390,7 +395,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, tap_marks, _precision(TAP_KEEP))
-    _assert_functional_dimension_types(adapter, tap_marks)
+    _assert_functional_dimension_types(adapter, tap_marks, TAP_DIMENSION_TYPES)
     set_dimension_callouts(adapter, tap_marks, {"TapRootLimit": "TAP ROOT"})
     # Source geometry is asymmetric and the views are rotated: use the native
     # model-to-sheet transform rather than assuming the view's box centre is
@@ -507,7 +512,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=spec.SCREW_DATUMS, controls=spec.SCREW_CONTROLS,
         label="ground dog relative to retained stock thread",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.080)
+    add_property_linked_note(adapter, "Screw Notes", 0.016, 0.080)
     add_property_linked_note(adapter, "Isometric View Note", *SCREW_ISO_NOTE_XY)
     for sheet in SHEET_NAMES:
         if not ddoc.ActivateSheet(sheet):
