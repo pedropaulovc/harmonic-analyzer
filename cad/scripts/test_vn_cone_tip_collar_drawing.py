@@ -721,8 +721,11 @@ def test_native_cylinder_positive_control_uses_actual_property_and_finite_axis(m
 
 def test_manufacturing_bore_datum_uses_the_real_in_band_native_radius():
     source = inspect.getsource(drawing)
-    assert '(spec.BORE_MODEL_DIA_MM / 2.0, 1.0, 0.0), "collar bore datum"' in source
-    assert '(spec.BORE_DIA / 2.0, 1.0, 0.0), "collar bore datum"' not in source
+    assert '(bore, (-spec.BORE_MODEL_DIA_MM / 2.0, 1.0, 0.0), "collar bore datum")' in source
+    assert 'spec.BORE_DIA / 2.0, 1.0, 0.0), "collar bore datum"' not in source
+    # Machinist review of the stack build: on the 4:1 end view the tag read as
+    # pointing at the bore centre, so A is tagged on the 40:1 bore view.
+    assert '"datum:A": PmiDrawingPlacement(\n                view=bore,' in source
     builder = inspect.getsource(part.build)
     assert '"InstalledShaftAxis"' in builder
     assert "-spec.INSTALLED_BORE_AXIS_OFFSET_MM" in builder

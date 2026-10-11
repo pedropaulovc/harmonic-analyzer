@@ -84,6 +84,10 @@ TAP_NOTE_XY = (TAP_CENTER[0] - 0.030, TAP_CENTER[1] + 0.025)
 BORE_CENTER = (0.300, 0.110)
 BORE_KEEP = {"BoreDia": (BORE_CENTER[0] + 0.035, BORE_CENTER[1] + 0.032)}
 BORE_NOTE_XY = (BORE_CENTER[0] - 0.025, BORE_CENTER[1] - 0.026)
+# Datum A's tag stands this far out from the bore's surface on the 40:1 view,
+# level with the bore axis: past the 20.6 mm crop circle, under CollarDia's
+# lower extension line (y 136 mm) and above the bore note.
+DATUM_A_LEADER_M = 0.022
 # Sheet 2 views are centred on the SCREW, not on the view box: the views are
 # placed in Default, whose box holds the collar too, and the SetScrew
 # configuration then left the screw 85 mm right of where its view was placed,
@@ -380,12 +384,24 @@ async def build(adapter: Any) -> dict[str, str]:
         tap, (spec.FLAT_DISTANCE, spec.TAP_STATION, spec.TAP_DRILL_DIA / 2.0),
         "collar tap outer mouth",
     )
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.080)
+    add_property_linked_note(adapter, "Installation Notes", 0.016, 0.048)
+    add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.160)
+    add_property_linked_note(adapter, "Radial Tap View Note", *TAP_NOTE_XY)
+    # Datum A is the Ø0.849 bore. At 4:1 the end view draws it as a 3 mm
+    # circle, so its tag read as pointing at the centre (machinist review of
+    # the stack build); it is tagged on the 40:1 bore view instead, on the
+    # bore's own surface, opposite the diameter's leader.
+    bore = _bore_view(adapter)
+    bore_edge = point(bore, (-spec.BORE_MODEL_DIA_MM / 2.0, 1.0, 0.0), "collar bore datum")
+    bore_side = -1.0 if bore_edge[0] < BORE_CENTER[0] else 1.0
     project_part_pmi(
         adapter,
         placements={
             "datum:A": PmiDrawingPlacement(
-                view=end, position=(0.120, 0.210),
-                attachment_xy=point(end, (spec.BORE_MODEL_DIA_MM / 2.0, 1.0, 0.0), "collar bore datum"),
+                view=bore,
+                position=(bore_edge[0] + bore_side * DATUM_A_LEADER_M, bore_edge[1]),
+                attachment_xy=bore_edge,
             ),
             "datum:B": PmiDrawingPlacement(
                 view=side, position=(0.168, 0.162),
@@ -413,11 +429,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "hw-threaddepth": spec.TAP_DEPTH_PRECISION,
     }, label="collar tap drill and full thread depths")
     _require_full_thread_callout(callout)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.080)
-    add_property_linked_note(adapter, "Installation Notes", 0.016, 0.048)
-    add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.160)
-    add_property_linked_note(adapter, "Radial Tap View Note", *TAP_NOTE_XY)
-    _bore_view(adapter)
 
     if not ddoc.ActivateSheet("SetScrew"):
         raise RuntimeError("cannot activate ground screw sheet")
