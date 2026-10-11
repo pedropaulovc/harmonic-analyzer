@@ -231,7 +231,9 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   64T OD 65.21 → 71.04 mm. To make room the crank and the cone journals rise
   4.732 mm together, the cone pivot post grows from 86 to 94.732 mm (head 26.6 mm),
   the swing platform loses its relief pocket under the 64T, and the post
-  mounting screw becomes a 4 in 1/4-20 (MSC 40923906) cut to 94.9 mm.
+  mounting screw becomes a 4 in 1/4-20 (MSC 40923906), with a 94.9 mm REF cut
+  length. Cut each screw to its own matched hole: end flush to 0.3 mm short of
+  the platform underside, never proud, with 0.90D minimum engagement.
 - Paper drive: the reducer keeps its 12:120 counts, which fit the photographed
   1898 disc best, but is cut at 48DP with the cone cutters. The disc shrinks from
   OD 81.55 mm to 64.54 mm, about 21% smaller. The change is deliberate: one
