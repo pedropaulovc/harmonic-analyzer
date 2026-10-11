@@ -54,8 +54,9 @@ def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
     assert pd_guide_lock_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
 
 
-# Title block: .X ±0.8; drilled holes +0.10/-0.
+# Title block: .X ±0.8, .XX ±0.51; drilled holes +0.10/-0.
 _ONE_PLACE = 0.8
+_TWO_PLACES = 0.51
 _DRILLED_PLUS = 0.10
 _CHAR_WIDTH = 0.00276  # sheet m per character of 3.5-mm note text
 
@@ -66,7 +67,7 @@ def _ligaments(hole_y: float) -> dict[str, float]:
     xs = [x for x, _ in pd_guide_lock_spec.HOLE_XY]
     return {
         "guide-side edge": hole_y - band - r_max,
-        "far edge": (15.65 - 0.50) - hole_y - band - r_max,
+        "far edge": (9.5 - _TWO_PLACES) - hole_y - band - r_max,
         "left edge": min(xs) - band - r_max,
         "right edge": (22.0 - _ONE_PLACE) - max(xs) - band - r_max,
     }
@@ -82,7 +83,7 @@ def test_screw_holes_keep_the_ligament_floor_at_the_printed_worst_case() -> None
     worst = _ligaments(hole_y)
     assert min(worst.values()) >= 1.5
     assert pd_guide_lock_spec.HOLE_LIGAMENTS_WORST == pytest.approx(worst)
-    assert pd_guide_lock_spec.LOCK_HEIGHT_BAND == (0.0, -0.50)
+    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Height"] == 2
     assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Width"] == 1
 
 
@@ -92,7 +93,7 @@ def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
     holes = pd_guide_lock_spec.DRAWING_DIMENSIONS["ScrewHoles"]
     assert holes == {"Hole1X", "Hole2X", "Hole1Y"} <= set(drawing.FRONT_KEEP)
     assert {pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME[name] for name in holes} == {3}
-    assert drawing.DIMENSION_PREFIXES == {"Hole1Y": "2X "}
+    assert drawing.DIMENSION_PREFIXES["Hole1Y"] == "2X "
     assert len({y for _, y in pd_guide_lock_spec.HOLE_XY}) == 1
 
 
@@ -117,6 +118,65 @@ def test_the_hole_y_text_stays_inside_the_border_and_under_the_plate() -> None:
     assert x - 2.0 * half > 0.0127  # right-aligned or centred, inside
     assert y < drawing.BOTTOM_EDGE_Y - 0.004
     assert x + half < drawing.LEFT_EDGE_X  # clear of Hole1X's extension
+
+
+def test_the_four_rounded_corners_print_once_4x_clear_of_the_holes() -> None:
+    """2026-10-11 (user): the plate's corners are rounded per the ch22 back
+    photo (R ~1.75 measured -> R1.8); one printed 4X radius at .X, and the
+    holes stay outside every corner's R x R square at the printed worst case,
+    so their edge ligaments still run to straight edges."""
+    import inspect
+
+    r = pd_guide_lock_spec.CORNER_R
+    assert r == pytest.approx(1.8)
+    assert pd_guide_lock_spec.DRAWING_DIMENSIONS["Corners"] == {"CornerR"}
+    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["CornerR"] == 1
+    # A custom prefix replaces SolidWorks' own "R" (farm run
+    # 20261012T061737079Z printed "4X 1.8"), so the prefix carries it.
+    assert drawing.DIMENSION_PREFIXES["CornerR"] == "4X R"
+    source = inspect.getsource(lock.build)
+    assert '("Corners", "CornerR", ((LOCK_WIDTH, LOCK_HEIGHT),))' in source
+    assert '"OtherCorners"' in source
+    assert source.count("'\"LockCornerR\"'") == 1  # both fillets, one drive loop
+    r_max = r + _ONE_PLACE
+    x_min = min(x for x, _ in pd_guide_lock_spec.HOLE_XY) - 0.035
+    x_from_right = (
+        pd_guide_lock_spec.LOCK_WIDTH
+        - _ONE_PLACE
+        - max(x for x, _ in pd_guide_lock_spec.HOLE_XY)
+        - 0.035
+    )
+    assert min(x_min, x_from_right) > r_max
+
+
+def test_the_printed_radius_owns_the_top_right_arc_its_text_stands_off() -> None:
+    """The printed fillet's only edge is the top-right corner, and the text
+    lies up-right of that arc's centre (inside the arc's 0-90 deg sweep), so
+    the leader runs from the arc straight out to the text over no geometry."""
+    import math
+
+    x, y = drawing.FRONT_KEEP["CornerR"]
+    r_sheet = pd_guide_lock_spec.CORNER_R * drawing.SHEET_SCALE[0] / 1000.0
+    cx = drawing.RIGHT_EDGE_X - r_sheet
+    cy = drawing._sheet_y(pd_guide_lock_spec.LOCK_HEIGHT) - r_sheet
+    angle = math.degrees(math.atan2(y - cy, x - cx))
+    assert 15.0 < angle < 75.0
+
+
+def test_the_corner_radius_stands_off_the_top_right_corner() -> None:
+    """The 4X R text rides above and right of the plate: clear of the Height's
+    extension lines (left), the drill callout below it, and the right view."""
+    x, y = drawing.FRONT_KEEP["CornerR"]
+    half = len("4X R1.8") * _CHAR_WIDTH / 2.0
+    top_edge_y = drawing._sheet_y(pd_guide_lock_spec.LOCK_HEIGHT)
+    assert y > top_edge_y + 0.010
+    assert x - half > drawing.RIGHT_EDGE_X
+    assert y > drawing.HOLE_CALLOUT_XY[1] + 0.015
+    right_view_left = (
+        drawing.RIGHT_CENTER[0]
+        - pd_guide_lock_spec.LOCK_THICK * drawing.SHEET_SCALE[0] / 2000.0
+    )
+    assert x + half < right_view_left
 
 
 def test_the_plate_is_1_16_sheet_under_its_own_mill_band() -> None:

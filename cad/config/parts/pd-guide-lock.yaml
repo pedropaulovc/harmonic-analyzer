@@ -8,4 +8,4 @@ pd-guide-lock:
   finish: black oxide
   quantity: 4
   tolerance_class: machined_block
-  process: "cut from 1/16 in sheet: saw and file the outline, drill the screw holes (steel)"
+  process: "cut from 1/16 in sheet: saw and file the outline, file the four corner radii, drill the screw holes (steel)"

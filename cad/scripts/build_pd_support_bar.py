@@ -5,8 +5,9 @@ steel bar clamped across the two front columns by the two-piece column
 clamps (build_sh_column_clamp_front.py and build_sh_column_clamp_back.py), carrying the hanging platen
 (guides + locks on the platen back) and, on its own back face, the ch. 23
 transgear hanger (pivot screw MHA-VN-041) and the latch hook (MHA-PD-014).
-Cross-section 22 tall x 9 deep (ch22 back-side wear band + ch30 front
-view); 452 long so the ends run ~29 past each column (ch30 p002).
+Cross-section 28 tall x 9 deep (it fills the platen's guide channel to a
+1.0 bottom-rail clearance; ``pd_support_bar_spec.BAR_HEIGHT`` carries the
+photo chain); 452 long so the ends run ~29 past each column (ch30 p002).
 
 Holes (all along local Z, the machine front-back axis):
 * 4x clamp-screw counterbores flanking each column (x +-197 -+ 17.5):

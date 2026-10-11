@@ -109,10 +109,11 @@ _POSITION = (2 * 0.035**2) ** 0.5 + 0.20 / 2.0
 _SET_MIN = _CLEARANCE_MIN - _POSITION
 _SET_MAX = _CLEARANCE_MAX + _POSITION
 # Holes at x 4 and 18 (±0.035) from the left edge of the 22 (.X ±0.8) plate,
-# y 3.5 from its guide-side edge; R9-61's 15.65 height, +0/-0.50.
+# y 3.5 from its guide-side edge; the 9.5 height at .XX (±0.51).
 _HOLE_X = (4.0, 18.0)
 _HOLE_Y = 3.5
-_HEIGHT = 15.65
+_HEIGHT = 9.5
+_HEIGHT_BAND = 0.51
 # Old (R9-59) model: a set plate only translates, so its far edge recedes.
 _OLD_FAR_REACH = -_SET_MIN
 
@@ -164,12 +165,14 @@ def _set_plate_reach(e1, e2, w1, w2, c1, c2, width):
 def test_a_set_plate_skews_at_the_reviewed_hole_errors() -> None:
     """Review of 8689c2a0d: opposite hole-position errors (lock ±0.035, guide
     tap ±0.0999) on the tightest holes skew the set plate about 1.104°, and
-    its far corner comes 0.04458 toward the spacer instead of receding."""
+    its far corner comes 0.04458 toward the spacer on the 15.65 plate
+    (0.04574 on the 9.5: the skew's cosine draws a nearer far edge in less)
+    instead of receding."""
     reach = _set_plate_reach(
         (0.0, 0.035), (0.0, -0.035), (0.0, -0.0999), (0.0, 0.0999),
         _CLEARANCE_MIN, _CLEARANCE_MIN, 22.0,
     )  # fmt: skip
-    assert reach[0] == pytest.approx(0.04458, abs=3e-4)
+    assert reach[0] == pytest.approx(0.04574, abs=3e-4)
     assert reach[0] > _OLD_FAR_REACH
     assert screw.LOCK_SET_EDGE_REACH[0] >= reach[0]
 
@@ -183,7 +186,7 @@ def test_a_set_plate_skews_further_on_unequal_hole_clearances() -> None:
         (0.035, 0.035), (-0.035, -0.035), (0.0, -0.1), (0.0, 0.1),
         _CLEARANCE_MAX, _CLEARANCE_MIN, 22.8,
     )  # fmt: skip
-    assert reach[0] == pytest.approx(0.1034, abs=5e-4)
+    assert reach[0] == pytest.approx(0.1059, abs=5e-4)  # 0.1034 on the 15.65
     # The spec's closed form: the gain window over the shortest pitch, times
     # the longest overhang, less the least gain.
     overhang = 22.8 - _HOLE_X[1] + 0.035
@@ -216,20 +219,21 @@ def test_the_set_plate_envelope_bounds_every_corner_of_the_bands() -> None:
     assert far > _OLD_FAR_REACH and guide_side > _SET_MAX
 
 
-def _spacer_gap(monkeypatch, assembly) -> float:
+def _sweep_gap(monkeypatch, assembly, label: str) -> float:
     lines: list[str] = []
     monkeypatch.setattr(assembly, "log", lines.append)
     assembly._assert_lock_station_sweep()
     (line,) = lines
-    return float(re.search(r"pivot spacer (-?\d+\.\d+)", line).group(1))
+    return float(re.search(rf"{label} (-?\d+\.\d+)", line).group(1))
 
 
 def test_set_locks_clear_the_pivot_spacer_in_the_sweep(monkeypatch) -> None:
     """R9-61: the bar prints the pivot tap ±0.065, and each set plate's far
-    edge stands its skewed reach toward the bar; the 15.65 plate keeps the
-    floor through both.  R9-71: the spacer is pressed on the shoulder, so its
-    O.D. no longer floats off the screw axis (it took 0.14645 on the old
-    Ø5.030 bore over the Ø4.7371 shoulder)."""
+    edge stands its skewed reach and its height band toward the bar. The
+    9.5 plate (user ruling 2026-10-11) keeps the spacer far off; the 15.65
+    plate it replaces needed a +0/-0.50 band to pass it, and at .XX runs into
+    it. R9-71: the spacer is pressed on the shoulder, so its O.D. no longer
+    floats off the screw axis."""
     import build_pd_paper_drive_assembly as assembly
 
     assert spacer.BORE_DIA_MAX < (0.1875 - 0.001) * IN
@@ -237,57 +241,116 @@ def test_set_locks_clear_the_pivot_spacer_in_the_sweep(monkeypatch) -> None:
     far_reach = (22.8 - _HOLE_X[1] + 0.035) * (_SET_MAX - _SET_MIN) / 13.93 - _SET_MIN
     pivot_y = assembly.PIVOT_XY[1]
     bottom_rail, top_rail = assembly.GUIDE_Y
-    bottom_far = bottom_rail - 1.0 + _HEIGHT
-    top_far = top_rail + 5.0 + 1.0 - _HEIGHT
-    gap = min(
-        pivot_y - spacer_r - (bottom_far + far_reach),
-        (top_far - far_reach) - (pivot_y + spacer_r),
+
+    def gap_at(height: float) -> float:
+        bottom_far = bottom_rail - 1.0 + height + _HEIGHT_BAND
+        top_far = top_rail + 5.0 + 1.0 - height - _HEIGHT_BAND
+        return min(
+            pivot_y - spacer_r - (bottom_far + far_reach),
+            (top_far - far_reach) - (pivot_y + spacer_r),
+        )
+
+    gap = gap_at(_HEIGHT)
+    assert gap == pytest.approx(5.928, abs=1e-3)
+    assert _sweep_gap(monkeypatch, assembly, "pivot spacer") == pytest.approx(
+        gap, abs=1e-3
     )
-    assert gap == pytest.approx(0.142 + 0.14645, abs=1e-3)
-    assert gap >= assembly.LOCK_SWEEP_FLOOR
-    assert _spacer_gap(monkeypatch, assembly) == pytest.approx(gap, abs=1e-3)
-    # The 16-high plate the old model passed still runs into the spacer.
+    # The 15.65 plate at the same .XX band runs into the spacer.
+    assert gap_at(15.65) < assembly.LOCK_SWEEP_FLOOR
     monkeypatch.setattr(
         assembly,
         "LOCK_PLATE_Y",
         (
-            (bottom_rail - 1.0, bottom_rail - 1.0 + 16.0),
-            (top_rail + 6.0 - 16.0, top_rail + 6.0),
+            (bottom_rail - 1.0, bottom_rail - 1.0 + 15.65),
+            (top_rail + 6.0 - 15.65, top_rail + 6.0),
         ),
     )
-    with pytest.raises(AssertionError, match="pivot spacer"):
+    with pytest.raises(AssertionError, match="sweep into the pivot spacer"):
         assembly._assert_lock_station_sweep()
 
 
 def test_the_bar_pivot_tap_band_moves_the_spacer_in_the_sweep(monkeypatch) -> None:
     """R9-61: the spacer hangs on the bar's pivot tap, so each 0.01 of the
-    tap's printed position band costs 0.01 of the spacer gap, and a band
-    wider than the gap's margin is refused."""
+    tap's printed position band costs 0.01 of the spacer gap."""
     import build_pd_paper_drive_assembly as assembly
     import pd_support_bar_spec as bar
 
-    gap = _spacer_gap(monkeypatch, assembly)
+    gap = _sweep_gap(monkeypatch, assembly, "pivot spacer")
     monkeypatch.setattr(bar, "HOLE_POSITION_BAND", bar.HOLE_POSITION_BAND + 0.01)
-    assert _spacer_gap(monkeypatch, assembly) == pytest.approx(gap - 0.01, abs=2e-3)
-    monkeypatch.setattr(
-        bar,
-        "HOLE_POSITION_BAND",
-        bar.HOLE_POSITION_BAND + (gap - assembly.LOCK_SWEEP_FLOOR) + 0.01,
+    assert _sweep_gap(monkeypatch, assembly, "pivot spacer") == pytest.approx(
+        gap - 0.01, abs=2e-3
     )
-    with pytest.raises(AssertionError, match="pivot spacer"):
-        assembly._assert_lock_station_sweep()
 
 
-def test_sweep_refuses_a_lock_set_toward_the_spacer(monkeypatch) -> None:
+def test_sweep_refuses_a_lock_set_toward_the_latch_hook(monkeypatch) -> None:
+    """With the spacer far off, the latch hook's base is the nearest part a
+    bottom plate's far edge moves toward."""
     import build_pd_paper_drive_assembly as assembly
 
     far, guide_side = assembly.LOCK_SET_EDGE_REACH
-    # A far edge reaching 0.01 past the spacer gap's margin over the sweep
-    # floor runs under it.
-    margin = _spacer_gap(monkeypatch, assembly) - assembly.LOCK_SWEEP_FLOOR
+    # A far edge reaching 0.01 past the hook gap's margin over the sweep
+    # floor runs into it.
+    margin = (
+        _sweep_gap(monkeypatch, assembly, "latch hook base and ear")
+        - assembly.LOCK_SWEEP_FLOOR
+    )
+    assert margin < _sweep_gap(monkeypatch, assembly, "pivot spacer") - 0.1
     monkeypatch.setattr(
         assembly, "LOCK_SET_EDGE_REACH", (far + margin + 0.01, guide_side)
     )
     monkeypatch.setattr(assembly, "log", lambda *_a: None)
-    with pytest.raises(AssertionError, match="pivot spacer"):
+    with pytest.raises(AssertionError, match="latch hook base and ear"):
         assembly._assert_lock_station_sweep()
+
+
+def _retention(monkeypatch, assembly) -> dict[str, float]:
+    lines: list[str] = []
+    monkeypatch.setattr(assembly, "log", lines.append)
+    assembly._assert_lock_retention()
+    (line,) = lines
+    return {
+        key: float(re.search(rf"{pattern} (-?\d+\.\d+)", line).group(1))
+        for key, pattern in (
+            ("clearance", "bottom rail under the bar"),
+            ("bottom", r"bottom plates \(hanging\) overlap"),
+            ("top", r"top plates \(lifted\) overlap"),
+        )
+    }
+
+
+def test_one_lock_size_retains_the_platen_on_both_rails(monkeypatch) -> None:
+    """User ruling 2026-10-11: the 28 bar runs 1.0 over the bottom rail and
+    the one 9.5 plate overlaps it 2.5 there and 3.5 at the top rail. At the
+    printed worst case (bar .XXX ±0.13, rail and plate heights .XX ±0.51, the
+    set plate's guide-side reach) the bottom rail still clears the bar and
+    each set plate still overlaps it, the top plates with the platen lifted
+    until its bottom rail meets the bar."""
+    import build_pd_paper_drive_assembly as assembly
+    import pd_support_bar_spec as bar
+
+    assert bar.BAR_HEIGHT == 28.0 and bar.BAR_HEIGHT_BAND == 0.13
+    bottom_rail, top_rail = assembly.GUIDE_Y
+    bar_bottom = top_rail - 28.0
+    assert bar_bottom - (bottom_rail + 5.0) == pytest.approx(1.0)
+    reach = assembly.LOCK_SET_EDGE_REACH[1] + _HEIGHT_BAND
+    lift = 1.0 + 0.13 + 0.51
+    expected = {
+        "clearance": 1.0 - 0.13 - 0.51,
+        "bottom": (bottom_rail - 1.0 + _HEIGHT) - reach - (bar_bottom + 0.13),
+        "top": top_rail - (top_rail + 6.0 - _HEIGHT) - reach - lift,
+    }
+    assert _retention(monkeypatch, assembly) == pytest.approx(expected, abs=1e-3)
+    assert expected["bottom"] == pytest.approx(2.5 - reach - 0.13)
+    assert min(expected.values()) >= assembly.LOCK_SWEEP_FLOOR
+    # A plate 0.5 shorter keeps the hanging platen's bottom rail but would
+    # lose the lifted platen's top rail.
+    monkeypatch.setattr(
+        assembly,
+        "LOCK_PLATE_Y",
+        (
+            (bottom_rail - 1.0, bottom_rail - 1.0 + _HEIGHT - 0.5),
+            (top_rail + 6.0 - _HEIGHT + 0.5, top_rail + 6.0),
+        ),
+    )
+    with pytest.raises(AssertionError, match="top plates"):
+        assembly._assert_lock_retention()

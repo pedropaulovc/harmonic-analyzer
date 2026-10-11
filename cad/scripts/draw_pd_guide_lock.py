@@ -5,10 +5,10 @@ views, dimension layout and hole callout;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The sheet runs at 4:1 (the plate is 22 x 15.65, cut from 1/16 sheet); the
-isometric carries an explicit 2:1 override so it stays clear of the title
-block.  A flat plate needs only the face view (front), one thickness view
-(right) and the iso.
+The sheet runs at 4:1 (the plate is 22 x 9.5, cut from 1/16 sheet, its four
+corners rounded); the isometric carries an explicit 2:1 override so it stays
+clear of the title block.  A flat plate needs only the face view (front), one
+thickness view (right) and the iso.
 No frames and no datums (policy rule 3): the screw holes locate by +/-
 coordinates from the plate's corner, authored on the part.
 
@@ -72,10 +72,10 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
 
-# Sheet layout (meters).  The front view's model bbox is 22 x 15.65 (the plate
-# face); at 4:1 the view is 88 x 62.6 mm, x 0.091..0.179.  Third angle: the
-# right view (the 1/16 sheet edge-on) sits to its right, past the hole
-# callout; the isometric rides top-right.
+# Sheet layout (meters).  The front view's model bbox is 22 x 9.5 (the plate
+# face); at 4:1 the view is 88 x 38 mm, x 0.091..0.179, y 0.131..0.169.
+# Third angle: the right view (the 1/16 sheet edge-on) sits to its right,
+# past the hole callout; the isometric rides top-right.
 FRONT_CENTER = (0.135, 0.150)
 RIGHT_CENTER = (0.265, 0.150)
 ISO_CENTER = (0.340, 0.200)
@@ -102,19 +102,25 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Width stacks below the front view under the two hole X
 # coordinates; Height sits left of the plate and the shared hole Y outboard
-# of it, its text under the plate's bottom-left corner; the sheet thickness
-# rides above the right view, its one-line as-supplied stock callout in the
-# clear field above the value.
+# of it, its text under the plate's bottom-left corner; the 4X corner radius
+# stands off the top-right corner, its leader landing on that arc clear of
+# the Height's extension lines on the left and the hole callout below; the
+# sheet thickness rides above the right view, its one-line as-supplied stock
+# callout in the clear field above the value.
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], 0.088),
+    "Width": (FRONT_CENTER[0], 0.100),
     "Height": (0.071, FRONT_CENTER[1]),
-    "Hole1X": (0.103, 0.104),
-    "Hole2X": (0.127, 0.096),
-    "Hole1Y": (0.061, 0.110),
+    "Hole1X": (0.103, 0.116),
+    "Hole2X": (0.127, 0.108),
+    "Hole1Y": (0.061, 0.122),
+    "CornerR": (0.200, 0.186),
 }
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.196)}
-# Both holes stand on the one Y coordinate the part prints (Hole1Y).
-DIMENSION_PREFIXES = {"Hole1Y": "2X "}
+RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.184)}
+# Both holes stand on the one Y coordinate the part prints (Hole1Y); the one
+# printed fillet stands for all four equal corners (CornerR). A custom prefix
+# replaces SolidWorks' own radius "R", so it carries it ("4X 1.8" printed
+# without, farm run 20261012T061737079Z).
+DIMENSION_PREFIXES = {"Hole1Y": "2X ", "CornerR": "4X R"}
 DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
 # The bent leader elbows at the text's LEFT end and enters hole 2 from its
 # upper-right quadrant, crossing only the plate's right edge; the text stands
@@ -189,8 +195,8 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # The places and the explicit bands (height, sheet thickness, hole
-    # coordinates) are authored on the part (the paper-drive lock-station
+    # The places and the explicit bands (sheet thickness, hole coordinates)
+    # are authored on the part (the paper-drive lock-station
     # sweep and the screw set window read the same spec); the sheet only
     # proves the import kept the places. The hole size ships as a native
     # wizard callout below.
