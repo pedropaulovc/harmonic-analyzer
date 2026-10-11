@@ -1077,8 +1077,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "disc-taps-transferred": (
             "MOUNT THE CLUSTER ON A MANDREL IN THE "
-            f"{_N['pd-transgear-feed-pinion']} BORE. WITH THE {_N['pd-rack-pinion']} "
-            "PIN IN EACH TOOTH SPACE IN TURN, TAP THE DISC CENTRAL, FACE SQUARE, "
+            f"{_N['pd-transgear-feed-pinion']} BORE. WITH A "
+            f"\u00d8{disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} GAUGE PIN IN EACH "
+            f"{_N['pd-rack-pinion']} TOOTH SPACE IN TURN, TAP THE DISC CENTRAL, FACE SQUARE, "
             f"TILL THE DIAL READS {quality.toothspace_runout_tir_mm():.2f} TIR MAX. "
             "SPOT-DRILL THE DISC THROUGH THE "
             f"{hub_geometry.SCREW_COUNT} FLANGE HOLES; DRILL AND TAP {disc_screw.THREAD}. "
