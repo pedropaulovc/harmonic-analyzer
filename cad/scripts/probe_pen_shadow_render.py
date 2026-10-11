@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from typing import Any
 
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT, OUT_PNG, OUT_SLDASM
+from _paths import CAD_ROOT, OUT_PNG, OUT_SLDASM, OUT_SLDPRT
 from _preferences import _preference_id
 from _session import run_build
 
@@ -35,6 +36,21 @@ async def probe(adapter: Any) -> dict[str, str]:
     report = CAD_ROOT / "out" / "reports" / "pn-pen-shadow-render.json"
     output_dir.mkdir(parents=True, exist_ok=True)
     report.parent.mkdir(parents=True, exist_ok=True)
+    native_paths = [
+        *OUT_SLDASM.glob("*.SLDASM"),
+        *OUT_SLDPRT.glob("*.SLDPRT"),
+    ]
+
+    def native_hashes() -> dict[str, str]:
+        hashes = {}
+        for path in native_paths:
+            with path.open("rb") as stream:
+                hashes[path.relative_to(CAD_ROOT.parent).as_posix()] = (
+                    hashlib.file_digest(stream, "sha256").hexdigest()
+                )
+        return hashes
+
+    before_hashes = native_hashes()
     metadata: dict[str, Any] = {
         "assembly": assembly.relative_to(CAD_ROOT.parent).as_posix(),
         "read_only": True,
@@ -107,9 +123,15 @@ async def probe(adapter: Any) -> dict[str, str]:
             name: bool(sw.GetUserPreferenceToggle(value)) for name, value in prefs.items()
         }
         metadata["restoration_errors"] = restoration_errors
+        after_hashes = native_hashes()
+        metadata["native_sha256_before"] = before_hashes
+        metadata["native_sha256_after"] = after_hashes
+        metadata["native_files_unchanged"] = before_hashes == after_hashes
         report.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         if restoration_errors:
             raise RuntimeError("; ".join(restoration_errors))
+        if before_hashes != after_hashes:
+            raise RuntimeError("Read-only render probe changed native model bytes")
     artefacts["metadata"] = str(report)
     return artefacts
 
