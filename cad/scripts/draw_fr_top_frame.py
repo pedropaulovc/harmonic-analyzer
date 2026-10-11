@@ -549,11 +549,20 @@ HANGER_SLOT_WIDTH_TEXT_XY = (
 )
 HANGER_SLOT_WIDTH_OFFSET_XY = (0.060, 0.137)
 # The crossbar pockets' length, in the open left window between the two
-# hanger stations: its dimension line at model x -126, its three-row text
-# breaking it at the plan's mid-height, above the front slot frame's row and
-# right of the hub rail.
+# hanger stations: its dimension line at model x -126, left of the front
+# slot frame (sheet x 78..117 over y 178..185, which a line any further
+# right would cut) and 2.2 right of the detail fence's native "C" label.
+# Centred on that line its three rows ran over the label (farm 30394c1da:
+# text-clearance and text-on-line on detail circle C), so they park on a
+# jog to the right at the same height: model x -81, the widest row
+# (2X POCKET, 24.3 mm) spanning 70.9..95.1 mm, 2.9 off the line, 6.2 short
+# of the crossbar, 7.7 over the slot frame and 9 under the F arrow's tip.
 POCKET_LENGTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[0] - 126.0 * _HUB_BOTTOM_M_PER_MM,
+    HUB_BOTTOM_CENTER[1],
+)
+POCKET_LENGTH_OFFSET_XY = (
+    HUB_BOTTOM_CENTER[0] - 81.0 * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1],
 )
 
@@ -575,8 +584,13 @@ RAIL_SECTION_NOTE_XY = (0.270, 0.1525)
 SIDE_SECTION_CENTER = (0.3183, 0.106)
 SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
-SIDE_SECTION_NOTE_XY = (0.290, 0.133)
-SIDE_WEB_TEXT_XY = (0.335, 0.120)
+# The E-E note sits 2.0 above where it was so the side web's 13.0 (its top
+# at 124.5 mm) keeps 2.1 of air under the note's last line, and the web
+# text sits 8 mm left so its 37.5 mm qualifier row ends at 345.8 mm, 4.1
+# short of the crossbar flange's 8.0 dimension line at 349.9 (farm
+# 30394c1da: the row ran 3.8 mm past that line, text-on-line).
+SIDE_SECTION_NOTE_XY = (0.290, 0.135)
+SIDE_WEB_TEXT_XY = (0.327, 0.120)
 # Where each removed section prints the rail centreline it cuts, sheet x:
 # B-B at z 112 and E-E / D-D at x -197, as on b49e1, the #946 layout-audit
 # leaf that every typed text point in B-B, E-E and D-D was tuned against.
@@ -2690,8 +2704,11 @@ async def build(adapter: Any) -> dict[str, str]:
             suffix=suffix, reference=reference,
         )
     detail_top_note = add_note(adapter, HOLE_STATION_NOTE, *HOLE_STATION_NOTE_XY)
+    # Aligned under the hole-station note at x 30 mm: from x 40 the 70-character
+    # C2 line ran 2.4 mm into the title block (farm 30394c1da keep-out); it
+    # now ends near 208 mm, 7.6 short of the block's left edge at 216.
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.040, 0.045, char_height=0.0035,
+        adapter, "Manufacturing Notes", HOLE_STATION_NOTE_XY[0], 0.045, char_height=0.0035,
     )
     if not ddoc.ActivateSheet("CROSS-TAPS"):
         raise RuntimeError("failed to activate top-frame cross-tap sheet")
@@ -2898,9 +2915,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [floor_annotation],
         {dimension_name(adapter, floor_annotation): "4X COUNTERBORE FLOOR\nFROM SOCKET AXIS"},
     )
+    # "4X COUNTERBORE FLOOR" is 56.7 mm wide: centred at x 392 its shoulder
+    # ran 1.5 past the right border (farm 30394c1da), and 3.3 under the 47.3
+    # read as one callout with it.  At (387, 110.5) the shoulder ends near
+    # 415.6, 3.5 inside the border, and the block keeps 4.8 under the 47.3.
     offset_dimension_text(
         adapter, [floor_annotation],
-        {dimension_name(adapter, floor_annotation): (0.392, 0.112)},
+        {dimension_name(adapter, floor_annotation): (0.387, 0.1105)},
     )
     _checked_dimension(
         adapter, detail_section,
@@ -3259,7 +3280,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=POCKET_LENGTH_TEXT_XY, label="crossbar pocket length",
         expected_mm=2*BAR_POCKET_Z, orientation="vertical",
         exact_linear=True, edges=hub_bottom_edges,
-        suffix="2X POCKET\nCENTRED",
+        suffix="2X POCKET\nCENTRED", offset_text=POCKET_LENGTH_OFFSET_XY,
     )
     # The knife-hanger dowel pattern: datum B the front round hole, datum C
     # the rear one; each slot located to the near round hole, free along the

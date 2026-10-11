@@ -1813,6 +1813,41 @@ def test_rear_slot_frame_stands_clear_of_section_f_f() -> None:
     assert outline.ymin > max(drawing.HANGER_SLOT_FRAME_XY["front"][1], drawing.HANGER_DATUM_SYMBOL_XY["B"][1] + 0.007)
 
 
+def test_pocket_length_text_clears_the_detail_label_and_slot_frame() -> None:
+    # Farm run 30394c1da: centred on its line at x 68 mm, the 138.0 block
+    # printed over detail circle C's native label [59.9, 198.5]..[65.8,
+    # 205.0] mm (text-clearance and text-on-line).  The block (three rows,
+    # 24.3 x 14.6 mm on that run) parks on a jog right of the line.
+    from _layout_geometry import Box, Segment, segment_box_distance
+
+    centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
+    line_x, line_y = drawing.POCKET_LENGTH_TEXT_XY
+    text_x, text_y = drawing.POCKET_LENGTH_OFFSET_XY
+    assert text_y == line_y
+    text = Box(text_x - 0.01215, text_y - 0.0073, text_x + 0.01215, text_y + 0.0073)
+    fence_x = centre[0] + part.GOOSENECK_X * m_per_mm
+    fence_y = centre[1] + part.GOOSENECK_Z * m_per_mm
+    fence_r = (part.HUB_GUSSET_HALF_OUT + part.HUB_BOSS_DROP) * m_per_mm
+    # The label prints 2.9..8.8 mm right of the fence, -2.5..+4.0 mm about it.
+    label = Box(
+        fence_x + fence_r + 0.0029,
+        fence_y - 0.0025,
+        fence_x + fence_r + 0.0088,
+        fence_y + 0.0040,
+    )
+    pocket = [centre[1] + sz * part.BAR_POCKET_Z * m_per_mm for sz in (-1.0, 1.0)]
+    line = Segment(line_x, pocket[0], line_x, pocket[1])
+    fx, fy = drawing.HANGER_SLOT_FRAME_XY["front"]
+    ox0, oy0, ox1, oy1 = drawing.HANGER_SLOT_FRAME_OUTLINE
+    frame = Box(fx + ox0, fy + oy0, fx + ox1, fy + oy1)
+    assert text.xmin - label.xmax >= 0.00178
+    assert segment_box_distance(line, label) >= 0.00178
+    assert text.xmin - line_x >= 0.002
+    assert text.ymin - frame.ymax >= 0.00178
+    assert line_x < frame.xmin
+    assert text.xmax < centre[0] + part.BAR_X0 * m_per_mm - 0.002
+
+
 def _segments_apart(a, b) -> bool:
     """True when two segments neither cross nor touch."""
 
