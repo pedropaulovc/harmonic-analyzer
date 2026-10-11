@@ -165,14 +165,24 @@ this task family.
 
 Outputs live under `cad/out/travelers/<stem>/`: the bound plan, `report.json`,
 printable `traveler.html`, setup PNGs and operation inspection PNGs. The full
-wrapper deletes the old report before binding so a binding error or consumer
-failure cannot leave an old success certificate beside new inputs.
+wrapper deletes the old report and HTML before binding so a binding error or
+consumer failure cannot retain a previous traveler generation.
 Completeness is derived from the plan: one `setup-S<ordinal>.png` per setup plus
 every name from `prechips.report.inspection_sketch_names(plan)`. The report must
 record matching SHA-256 hashes for every render under `inputs["render:…"]`,
 declare `expected_exit == 0`, and match the manifest's `step_sha256`.
 Its `hash` must equal `prechips.report.report_hash(report)`, so editing report
 metadata without regenerating its canonical content hash also invalidates it.
+prechips 0.1 does not record an HTML digest itself. After a successful default
+run, the wrapper adds `inputs["traveler:html"]` with the exact HTML path,
+SHA-256 and original `source_report_hash`, then recomputes the report's canonical
+hash. The HTML's `prechips-report` meta tag keeps that original upstream hash,
+avoiding a circular HTML/report hash. Verification requires the recorded HTML
+bytes and recomputes the original report hash without this HA-added record;
+both identities must match. An existing HTML certificate cannot be resealed.
+This is hashed report material, not a free-standing sidecar, and verification
+does not regenerate HTML or invoke FreeCAD. Native artifact binding is tracked
+in [prechips issue #183](https://github.com/pedropaulovc/prechips/issues/183).
 Its input digests must also match the bound plan, scoped feature manifest and
 STEP, inventory, shop policy and cutting data. Verification regenerates the
 tracked plan and shop bindings in memory and requires byte equality with the

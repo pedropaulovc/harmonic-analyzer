@@ -238,7 +238,6 @@ def _complete(synthetic):
             "path": name,
             "sha256": hashlib.sha256(data).hexdigest(),
         }
-    (directory / "traveler.html").write_text("<html>synthetic traveler</html>")
     report = {
         "expected_exit": 0,
         "inputs": inputs,
@@ -246,6 +245,13 @@ def _complete(synthetic):
         "verification": "checked",
     }
     _write_report(directory, report)
+    (directory / "traveler.html").write_text(
+        '<html><head><meta name="prechips-report" '
+        f'content="{report["hash"]}"></head>synthetic traveler</html>',
+        encoding="utf-8",
+    )
+    plans.bind_traveler_html(STEM, out)
+    report = json.loads((directory / "report.json").read_bytes())
     return out, manifest, bound, report
 
 
@@ -289,6 +295,71 @@ def test_verification_rejects_tampered_report_with_unchanged_hash(synthetic):
     with pytest.raises(plans.TravelerIncomplete, match="report hash"):
         plans.verify_traveler(STEM, out)
     assert not plans.traveler_complete(STEM, out)
+
+
+def test_verification_rejects_edited_html(synthetic, tmp_path):
+    out, manifest, bound, _ = _complete(synthetic)
+    plans.verify_traveler(STEM, out)
+    html = bound.parent / "traveler.html"
+    html.write_bytes(
+        html.read_bytes().replace(b"synthetic traveler", b"stale instructions")
+    )
+    with pytest.raises(plans.TravelerIncomplete, match="traveler.html.*sha256"):
+        plans.verify_traveler(STEM, out)
+    assert not plans.traveler_complete(STEM, out)
+    stage = tmp_path / "stage"
+    staged_manifest = stage / "features" / STEM / "features.toml"
+    staged_manifest.parent.mkdir(parents=True)
+    staged_manifest.write_bytes(manifest.read_bytes())
+    (staged_manifest.parent / "ch-rocker-arm.STEP").write_bytes(
+        (manifest.parent / "ch-rocker-arm.STEP").read_bytes()
+    )
+    with pytest.raises(plans.TravelerIncomplete, match="traveler.html.*sha256"):
+        plans.stage_travelers(out, stage)
+
+
+def test_html_record_is_inside_the_hashed_report(synthetic):
+    out, _, bound, report = _complete(synthetic)
+    html_record = report["inputs"]["traveler:html"]
+    assert (
+        html_record["sha256"]
+        == hashlib.sha256((bound.parent / "traveler.html").read_bytes()).hexdigest()
+    )
+    assert report["hash"] == report_hash(report)
+    html_record["sha256"] = "0" * 64
+    (bound.parent / "report.json").write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(plans.TravelerIncomplete, match="report hash"):
+        plans.verify_traveler(STEM, out)
+
+
+def test_html_binding_cannot_reseal_an_existing_certificate(synthetic):
+    out, _, bound, _ = _complete(synthetic)
+    report_bytes = (bound.parent / "report.json").read_bytes()
+    (bound.parent / "traveler.html").write_bytes(b"edited instructions")
+    with pytest.raises(plans.TravelerIncomplete, match="already bound"):
+        plans.bind_traveler_html(STEM, out)
+    assert (bound.parent / "report.json").read_bytes() == report_bytes
+
+
+def test_html_binding_rejects_another_upstream_generation(synthetic):
+    out, _, bound, report = _complete(synthetic)
+    html_record = report["inputs"].pop("traveler:html")
+    report["hash"] = html_record["source_report_hash"]
+    _write_report(bound.parent, report)
+    html = bound.parent / "traveler.html"
+    html.write_bytes(
+        html.read_bytes().replace(html_record["source_report_hash"].encode(), b"0" * 64)
+    )
+    with pytest.raises(plans.TravelerIncomplete, match="identify its source report"):
+        plans.bind_traveler_html(STEM, out)
+
+
+def test_verification_authenticates_html_source_generation(synthetic):
+    out, _, bound, report = _complete(synthetic)
+    report["inputs"]["traveler:html"]["source_report_hash"] = "0" * 64
+    _write_report(bound.parent, report)
+    with pytest.raises(plans.TravelerIncomplete, match="upstream report generation"):
+        plans.verify_traveler(STEM, out)
 
 
 @pytest.mark.parametrize(

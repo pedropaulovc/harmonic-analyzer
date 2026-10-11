@@ -38,6 +38,8 @@ def main(argv: list[str] | None = None) -> int:
             with _telemetry.span("prechips.bind", stem=args.stem):
                 # A failed bind or consumer run must not retain an old certificate.
                 (directory / "report.json").unlink(missing_ok=True)
+                if not args.check:
+                    (directory / "traveler.html").unlink(missing_ok=True)
                 if args.check:
                     inventory, policy, cutting_data = _process_plans.bind_shop(
                         args.out, directory=directory / "_shop"
@@ -76,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         elif not args.check:
             try:
                 with _telemetry.span("prechips.verify", stem=args.stem):
+                    _process_plans.bind_traveler_html(args.stem, args.out)
                     _process_plans.verify_traveler(args.stem, args.out)
             except _process_plans.TravelerIncomplete as exc:
                 root.record_exception(exc)

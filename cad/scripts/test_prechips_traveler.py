@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import hashlib
+import json
 import logging
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from prechips.report import canonical_bytes, report_hash
 
 import prechips_traveler as wrapper
 import _process_plans as plans
@@ -100,6 +103,16 @@ def wrapper_stubs(tmp_path, monkeypatch):
 
     def cli(argv):
         calls["cli"].append(argv)
+        if calls.get("exit", 0) == 0 and argv[0] == "traveler":
+            directory.mkdir(parents=True, exist_ok=True)
+            report = {"expected_exit": 0, "inputs": {}}
+            report["hash"] = report_hash(report)
+            (directory / "report.json").write_bytes(canonical_bytes(report))
+            (directory / "traveler.html").write_text(
+                '<html><meta name="prechips-report" '
+                f'content="{report["hash"]}">synthetic traveler</html>',
+                encoding="utf-8",
+            )
         return calls.get("exit", 0)
 
     monkeypatch.setattr(wrapper.cli, "main", cli)
@@ -149,6 +162,14 @@ def test_traveler_success_passes_bound_paths_and_captures_telemetry(
     assert "synthetic-freecad-kernel" in caplog.text + " ".join(logs)
     assert calls["verify"]
     assert calls["verify"][0][0] == ("ch_rocker_arm", out)
+    report = json.loads((directory / "report.json").read_bytes())
+    html_record = report["inputs"]["traveler:html"]
+    assert html_record["path"] == "traveler.html"
+    assert (
+        html_record["sha256"]
+        == hashlib.sha256((directory / "traveler.html").read_bytes()).hexdigest()
+    )
+    assert report["hash"] == report_hash(report)
     assert [span.name for span in calls["spans"]] == [
         "prechips_traveler",
         "prechips.bind",
@@ -222,6 +243,27 @@ def test_zero_exit_with_incomplete_traveler_is_failure(wrapper_stubs, monkeypatc
     root = calls["spans"][0]
     assert root.statuses[-1].status_code is wrapper._telemetry.StatusCode.ERROR
     assert isinstance(root.exceptions[-1], plans.TravelerIncomplete)
+
+
+def test_zero_exit_without_fresh_html_cannot_certify_old_html(
+    wrapper_stubs, monkeypatch
+):
+    out, directory, _, _, calls, _ = wrapper_stubs
+    directory.mkdir(parents=True)
+    html = directory / "traveler.html"
+    html.write_bytes(b"old instructions")
+
+    def no_html(argv):
+        assert not html.exists()
+        report = {"expected_exit": 0, "inputs": {}}
+        report["hash"] = report_hash(report)
+        (directory / "report.json").write_bytes(canonical_bytes(report))
+        return 0
+
+    monkeypatch.setattr(wrapper.cli, "main", no_html)
+    assert wrapper.main(["ch_rocker_arm", "--out", str(out)]) == 1
+    assert not html.exists()
+    assert not calls["verify"]
 
 
 def test_cli_bad_input_removes_old_success_report(wrapper_stubs, monkeypatch):

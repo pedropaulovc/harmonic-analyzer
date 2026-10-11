@@ -428,6 +428,45 @@ def required_outputs(bound_plan: Path) -> tuple[Path, ...]:
     )
 
 
+def bind_traveler_html(stem: str, out: Path = CAD_OUT) -> None:
+    """Bind fresh HTML to its upstream report inside the hashed HA envelope."""
+    from prechips.report import canonical_bytes, report_hash
+
+    directory = traveler_dir(stem, out)
+    report_path = directory / "report.json"
+    try:
+        report = json.loads(report_path.read_bytes())
+        if not isinstance(report, dict) or report.get("hash") != report_hash(report):
+            raise TravelerIncomplete(
+                f"{stem}: report hash differs from canonical content"
+            )
+        if report.get("expected_exit") != 0:
+            raise TravelerIncomplete(f"{stem}: report expected_exit is not 0")
+        records = report.get("inputs")
+        if not isinstance(records, dict):
+            raise TravelerIncomplete(f"{stem}: report inputs is not an object")
+        if "traveler:html" in records:
+            raise TravelerIncomplete(f"{stem}: HTML is already bound to this report")
+        source_hash = report["hash"]
+        html_bytes = (directory / "traveler.html").read_bytes()
+        marker = f'<meta name="prechips-report" content="{source_hash}">'.encode()
+        if marker not in html_bytes:
+            raise TravelerIncomplete(
+                f"{stem}: traveler.html does not identify its source report"
+            )
+        records["traveler:html"] = {
+            "path": "traveler.html",
+            "sha256": hashlib.sha256(html_bytes).hexdigest(),
+            "source_report_hash": source_hash,
+        }
+        report["hash"] = report_hash(report)
+        report_path.write_bytes(canonical_bytes(report))
+    except TravelerIncomplete:
+        raise
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise TravelerIncomplete(f"{stem}: cannot bind traveler HTML ({exc})") from exc
+
+
 def _verified_traveler_bytes(
     stem: str, out: Path = CAD_OUT, manifest: Path | None = None
 ) -> dict[Path, bytes]:
@@ -520,6 +559,31 @@ def _verified_traveler_bytes(
                 raise TravelerIncomplete(
                     f"{stem}: {path.name} render record missing or sha256 differs"
                 )
+        html_record = records.get("traveler:html")
+        html_bytes = snapshots[directory / "traveler.html"]
+        if (
+            not isinstance(html_record, dict)
+            or html_record.get("path") != "traveler.html"
+            or html_record.get("sha256") != hashlib.sha256(html_bytes).hexdigest()
+        ):
+            raise TravelerIncomplete(
+                f"{stem}: traveler.html record missing or sha256 differs"
+            )
+        source_report = {
+            **report,
+            "inputs": {
+                key: value for key, value in records.items() if key != "traveler:html"
+            },
+        }
+        source_hash = report_hash(source_report)
+        marker = f'<meta name="prechips-report" content="{source_hash}">'.encode()
+        if (
+            html_record.get("source_report_hash") != source_hash
+            or marker not in html_bytes
+        ):
+            raise TravelerIncomplete(
+                f"{stem}: traveler.html differs from its upstream report generation"
+            )
         return snapshots
     except TravelerIncomplete:
         raise
