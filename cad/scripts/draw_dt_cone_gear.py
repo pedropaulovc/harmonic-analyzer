@@ -317,6 +317,19 @@ DIMENSION_CALLOUTS = {
 }
 
 
+def callouts_above(teeth: int) -> dict[str, str]:
+    """Text over the value: the circle the tooth thickness is measured on.
+
+    The thickness is the arc on the pitch circle, but its witnesses are
+    straight lines, so without the circle it read as unmeasurable (machinist
+    review of the round-2 build). Below the shelf there is no room on the
+    large-gear sheets: there the callout's end already stands over the title
+    block, 1-2 mm above it.
+    """
+    pitch_dia = 2.0 * stock_form_profile(teeth).pitch_radius_mm
+    return {"ToothThickness": f"ON PITCH CIRCLE \u00d8{pitch_dia:.3f}"}
+
+
 def rendered_half_od(teeth: int) -> float:
     numerator, denominator = _SCALE_BY_TEETH[teeth]
     return outside_dia_mm(teeth) * numerator / (denominator * 2000.0)
@@ -1154,6 +1167,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
         set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+        set_dimension_callouts(adapter, annotations, callouts_above(teeth), location="above")
         assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
         _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
         _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")

@@ -246,6 +246,21 @@ def test_root_envelope_is_the_actual_translated_arc_not_a_bisector_circle() -> N
     assert drawing.DIMENSION_CALLOUTS["FloorDia"] == "ROOT ENVELOPE"
 
 
+def test_tooth_thickness_names_the_pitch_circle_it_is_measured_on() -> None:
+    """Machinist review of the round-2 build: straight witnesses with no
+    circle left the circular thickness unmeasurable. Over the value, the
+    callout names the pitch circle (N / 48 in), no wider than the label
+    under it."""
+    assert drawing.DIMENSION_CALLOUTS["ToothThickness"] == "CIRCULAR TOOTH THICKNESS"
+    for teeth in spec.CONFIGURATION_TEETH:
+        above = drawing.callouts_above(teeth)
+        assert set(above) == {"ToothThickness"}
+        pitch_dia = teeth / spec.DIAMETRAL_PITCH * 25.4
+        assert above["ToothThickness"] == f"ON PITCH CIRCLE \u00d8{pitch_dia:.3f}"
+        assert len(above["ToothThickness"]) <= len(drawing.DIMENSION_CALLOUTS["ToothThickness"])
+        assert pitch_dia / 2.0 == pytest.approx(spec.stock_form_profile(teeth).pitch_radius_mm)
+
+
 def test_refused_rows_block_the_complete_native_family(monkeypatch: pytest.MonkeyPatch) -> None:
     visited = []
 
@@ -776,7 +791,9 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         # The thickness callout, measured on the T006 PDF of run
         # 20261010T051729717Z: its text spans x 136.2-200.4, y 100.0-116.5 mm
         # round its keep (136.24, 107.76) mm, starting at its dimension line
-        # (the keep x) and running right, with its leader above.
+        # (the keep x) and running right, with its leader above. The pitch
+        # circle line over the value adds one 4.9 mm row (run
+        # 20261011T155111413Z).
         ctt_x, ctt_y = drawing.front_keep(teeth)["ToothThickness"]
         clock_box = (
             clock_x - drawing.BORE_CLOCK_TEXT_HALF_WIDTH,
@@ -784,7 +801,7 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
             clock_x + drawing.BORE_CLOCK_TEXT_HALF_WIDTH,
             clock_y + drawing.BORE_CLOCK_TEXT_HALF_HEIGHT,
         )
-        ctt_box = (ctt_x - 0.001, ctt_y - 0.0078, ctt_x + 0.0642, ctt_y + 0.0088)
+        ctt_box = (ctt_x - 0.001, ctt_y - 0.0078, ctt_x + 0.0642, ctt_y + 0.0137)
         assert _drawing_annotation_extent.boxes_clear(clock_box, ctt_box), teeth
         # The clock's arc centres where the flat crosses the axis and swings
         # through its text, in the quadrant right of the flat and above the
