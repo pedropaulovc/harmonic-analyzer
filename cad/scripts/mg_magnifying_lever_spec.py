@@ -3,20 +3,19 @@ the part build (``build_mg_magnifying_lever.py``) and its manufacturing drawing
 (``draw_mg_magnifying_lever.py``).
 
 PURE DATA, no SolidWorks/COM imports.  The turned-rod nominals live in the
-drawing-FREE ``mg_magnifying_lever_geom`` module so the assembly can import the
-knife-axis station without pulling this drawing contract into its recipe
-closure; they are re-exported here unchanged for the drawing-side consumers and
-the offline lockstep test (``test_mg_magnifying_lever_drawing.py``), which asserts
-the part marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
+drawing-FREE ``mg_magnifying_lever_geom`` module (the rod length and the
+configured stations) and the config-free ``mg_lever_press_fit_geom`` (the press
+zone the collar grips) so the assembly can import the knife-axis station without
+pulling this drawing contract into its recipe closure; the two the drawing
+places views by are re-exported here unchanged for the drawing-side consumers
+and the offline lockstep test (``test_mg_magnifying_lever_drawing.py``), which
+asserts the part marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 """
 
 from __future__ import annotations
 
-from mg_magnifying_lever_geom import (  # noqa: F401 (re-export)
-    PRESS_ZONE_LENGTH,
-    ROD_DIA,
-    ROD_LENGTH,
-)
+from mg_lever_press_fit_geom import PRESS_ZONE_LENGTH  # noqa: F401 (re-export)
+from mg_magnifying_lever_geom import ROD_LENGTH  # noqa: F401 (re-export)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The rod is a REVOLVED capsule (hemispherical ends): a smooth

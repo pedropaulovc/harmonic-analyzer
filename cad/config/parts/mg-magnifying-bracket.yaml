@@ -5,6 +5,6 @@ mg-magnifying-bracket:
   quantity: 1
   tolerance_class: machined_block
   # No fit_class: the collar is a PRESS seat for the MHA-MG-003 lever rod (user
-  # ruling 2026-10-11; limits in mg_magnifying_lever_geom), not a running fit;
+  # ruling 2026-10-11; limits in mg_lever_press_fit_geom), not a running fit;
   # the rest of the part is static (the screwed seat on the summing lever).
   process: "machined from solid stock or casting; collar bore reamed as the press seat for the MHA-MG-003 lever rod, retained at assembly"

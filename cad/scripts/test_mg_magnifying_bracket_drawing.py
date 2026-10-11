@@ -77,16 +77,20 @@ def test_notes_carry_only_what_no_marked_dim_shows() -> None:
     assert len(lines) <= 4
 
 
-def test_collar_press_seat_is_native_and_reads_the_lever_contract() -> None:
-    """The bore nominal and band are the lever geom's (one read point for the
-    joint); the build models the annulus on the Right plane so the end view
-    imports both circles, and sets the band on the bore natively."""
+def test_collar_press_seat_is_native_and_reads_the_press_contract() -> None:
+    """The bore nominal and band are mg_lever_press_fit_geom's (one config-free
+    read point for the joint; the collar length stays the configured station's);
+    the build models the annulus on the Right plane so the end view imports
+    both circles, and sets the band on the bore natively."""
+    import mg_lever_press_fit_geom as press
     import mg_magnifying_lever_geom as lever
 
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert part.COLLAR_BORE_DIA is lever.COLLAR_BORE_DIA
-    assert part.COLLAR_BORE_BAND is lever.COLLAR_BORE_BAND
+    assert part.COLLAR_BORE_DIA is press.COLLAR_BORE_DIA
+    assert part.COLLAR_BORE_BAND is press.COLLAR_BORE_BAND
     assert part.COLLAR_HALF_LEN is lever.COLLAR_HALF_LEN
+    assert 2.0 * part.COLLAR_HALF_LEN == press.PRESS_ZONE_LENGTH
+    assert "from mg_lever_press_fit_geom import COLLAR_BORE_BAND, COLLAR_BORE_DIA" in source
     assert "COLLAR_BORE = " not in source  # no bracket-side copy of the bore
     assert 'await adapter.create_sketch("Right")' in source
     assert 'names=(None, None, "CollarOd")' in source

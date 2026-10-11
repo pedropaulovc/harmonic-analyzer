@@ -2,7 +2,7 @@ r"""Reproduction script: magnifying-lever bracket (book ch. 20, pp. 46-49).
 
 The black fitting that affixes the magnifying lever rod to the summing
 lever: a flange butted against the coefficients plate's front edge FACE
-and a forward arm ending in a collar (O12, bore mg_magnifying_lever_geom
+and a forward arm ending in a collar (O12, bore mg_lever_press_fit_geom
 .COLLAR_BORE_DIA) the O6 rod is PRESSED into and retained with Loctite 638
 (p.46 "firmly affixed"; user ruling 2026-10-11). The collar/rod sit at the
 plate centreline (machine y 979.7, after the 2026-08-02 Cascade-A drop). The
@@ -10,7 +10,7 @@ flange seats flush on the summing lever's installed front face and carries
 two native #2 counterbores entering -Z. Joint geometry and hole
 specifications are owned by magnifying_bracket_joint_layout, independently
 of assemblies; the press fit (bore nominal, band, engagement, budget) by the
-lever's drawing-free geom module, which the lever print and this one share.
+config-free mg_lever_press_fit_geom, which the lever print and this one share.
 
 Run (SolidWorks already open)::
 
@@ -52,11 +52,8 @@ from mg_magnifying_bracket_spec import (
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
-from mg_magnifying_lever_geom import (
-    COLLAR_BORE_BAND,
-    COLLAR_BORE_DIA,
-    COLLAR_HALF_LEN as LEVER_COLLAR_HALF_LEN,
-)
+from mg_lever_press_fit_geom import COLLAR_BORE_BAND, COLLAR_BORE_DIA
+from mg_magnifying_lever_geom import COLLAR_HALF_LEN as LEVER_COLLAR_HALF_LEN
 from magnifying_bracket_joint_layout import (
     BRACKET_HOLE_POINTS,
     CLEARANCE_DIA,
@@ -78,7 +75,7 @@ MATERIAL = "Plain Carbon Steel"  # black hardware
 
 COLLAR_OD = 12.0  # rod collar (low)
 # The bore is the press seat for the O6 lever rod: nominal and band come from
-# the lever's geom module (ONE read point for the joint, like the half length).
+# mg_lever_press_fit_geom (ONE config-free read point for the joint).
 # Half the collar length along X. CONFIG owns it
 # (output.magnifier_collar_half_len_mm): the error
 # budget derives the magnifier's minimum pose from the collar face, so the
@@ -393,7 +390,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Native model dimensions own the flange, head-seat and press-seat bands;
     # the print imports the plan dimensions and exposes the stepped holes by
-    # callout. The bore band is the lever geom's (upper, lower) press contract.
+    # callout. The bore band is mg_lever_press_fit_geom's (upper, lower) contract.
     native_mounting_names = _resolve_native_mounting_dimensions(adapter)
     await _mounting_coordinate_dimensions(adapter)
     set_dimension_symmetric_tolerance(

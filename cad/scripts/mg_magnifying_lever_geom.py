@@ -1,6 +1,6 @@
 r"""Magnifying-lever nominal geometry -- the drawing-FREE constant block shared
 by the part build, its ``_spec`` (drawing contract), ``build_mg_magnifying_bracket``
-(which imports the collar it presses onto) and ``build_mg_magnifier_assembly``
+(which imports the collar length it carries) and ``build_mg_magnifier_assembly``
 (which imports the knife-axis station).
 
 PURE DATA, no SolidWorks/COM and no drawing imports.  Kept SEPARATE from
@@ -10,15 +10,21 @@ it imports a constant from, so the drawing contract (notes / marked-dimension
 map) must NOT live here, else a print-note edit would move the assembly's recipe
 digest and force a needless rebuild.  ``_spec`` re-exports these for its
 drawing-side consumers and adds only the drawing data.
+
+The collar PRESS FIT (rod diameter, zone length, bore, bands, budget) is
+``mg_lever_press_fit_geom`` -- CONFIG-free, because this module reads the
+collar and clamp stations from output.yaml and the shared interference contract
+must not drag that config into unrelated closures.  Here the configured collar
+window is asserted to BE that zone, the rod's tip flush with its outer face.
 """
 
 from __future__ import annotations
 
 import _config
+from mg_lever_press_fit_geom import PRESS_ZONE_LENGTH
 
-# --- rod nominals (DIMENSIONS.md ch20; Ø6 photo-scaled, low) ------------------
+# --- rod nominals (DIMENSIONS.md ch20) ----------------------------------------
 ROD_LENGTH = 165.0  # calibrated p1, x -200..-35 (med; supersedes the 310 "4x" guess)
-ROD_DIA = 6.0  # round brass rod (low)
 
 # --- knife-edge pivot axis (KnifeAxis = Axis2) --------------------------------
 # The lever does NOT spin in the bracket collar: it EXTENDS FROM the pivoted
@@ -56,66 +62,16 @@ CLAMP_LOCAL_X: float = float(
     _config.machine("output", "magnifier_clamp_station_mm")
 )  # as-built clamp centre (machine x +150, p.46/48 insets)
 
-# --- bracket collar press fit (the MHA-MG-001 collar on this rod's east end) ---
-# p.46 "firmly affixed to the summing lever" (user ruling 2026-10-11): the rod's
-# last PRESS_ZONE_LENGTH is PRESSED into the bracket collar's bore and retained
-# with Loctite 638 (soft solder or braze the alternative), its east dome tip
-# flush with the collar's outer face. The rod is modelled at its nominal
-# diameter end to end; the press zone carries its own band natively on the
-# lever print (stock-select or lap), and the collar bore its band on the
-# bracket print -- both (upper, lower) deviations for _fit_deviations. The
-# bracket build imports the bore from HERE (as it does COLLAR_HALF_LEN) so the
-# joint has ONE read point, and _interference_contracts restates the triple
-# (PRESS_ZONE_DIA, COLLAR_BORE_DIA, COLLAR_ENGAGEMENT) as literals its test
-# pins to these names.
-PRESS_ZONE_DIA = ROD_DIA  # the model's rod, 6.000
-PRESS_ZONE_DIA_BAND = (0.0, -0.008)  # (upper, lower): select or lap the stock
+# --- the press zone's station on this rod -------------------------------------
+# The bracket collar's window in lever-local x. Its length and the rod's tip
+# flush with the collar's outer face are the press contract's assumptions
+# (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT), so a station or collar-length
+# edit in output.yaml that breaks either fails loud here.
 PRESS_ZONE_X = (COLLAR_LOCAL_X - COLLAR_HALF_LEN, COLLAR_LOCAL_X + COLLAR_HALF_LEN)
-PRESS_ZONE_LENGTH = PRESS_ZONE_X[1] - PRESS_ZONE_X[0]  # the collar's length
-COLLAR_BORE_DIA = 5.976  # bored to size on the bracket
-COLLAR_BORE_BAND = (0.008, 0.0)  # (upper, lower)
-# The rod's cylinder ends where its east dome starts (ROD_LENGTH - ROD_DIA / 2),
-# so the collar grips this much STRAIGHT rod from its inner face; the dome's
-# shrinking diameter inside the collar bears nothing.
-COLLAR_ENGAGEMENT = (ROD_LENGTH - ROD_DIA / 2.0) - PRESS_ZONE_X[0]
-# ANSI B4.1 table 8, class FN2 (medium drive fit) for the rod's size range
-# 0.12..0.24 in: 0.2 .. 1.0 thou of diametral interference. The heaviest press
-# this joint may reach at its tightest band corner.
-MM_PER_IN = 25.4
-_FN2_SIZE_RANGE_IN = (0.12, 0.24)
-PRESS_INTERFERENCE_MAX_FN2 = 0.0010 * MM_PER_IN
-
-
-def press_fit_budget() -> dict[str, float]:
-    """Worst-case diametral interference of the collar press (mm) from the two
-    printed bands, and the straight engagement that interference acts over.
-    ``interference_min`` is the loosest corner (smallest rod in the largest
-    bore); ``interference_max`` the tightest."""
-    rod_max = PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[0]
-    rod_min = PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[1]
-    bore_max = COLLAR_BORE_DIA + COLLAR_BORE_BAND[0]
-    bore_min = COLLAR_BORE_DIA + COLLAR_BORE_BAND[1]
-    return {
-        "interference_nominal": PRESS_ZONE_DIA - COLLAR_BORE_DIA,
-        "interference_min": rod_min - bore_max,
-        "interference_max": rod_max - bore_min,
-        "engagement": COLLAR_ENGAGEMENT,
-    }
-
-
-PRESS_FIT_BUDGET = press_fit_budget()
-if not (
-    _FN2_SIZE_RANGE_IN[0] * MM_PER_IN < PRESS_ZONE_DIA <= _FN2_SIZE_RANGE_IN[1] * MM_PER_IN
-):
-    raise AssertionError("PRESS_INTERFERENCE_MAX_FN2 is the 0.12..0.24 in row")
-if PRESS_FIT_BUDGET["interference_min"] <= 0.0:
-    raise AssertionError("the collar press must interfere at its loosest band corner")
-if PRESS_FIT_BUDGET["interference_max"] > PRESS_INTERFERENCE_MAX_FN2 + 1e-9:
-    raise AssertionError("the collar press exceeds ANSI FN2 at its tightest band corner")
+if abs((PRESS_ZONE_X[1] - PRESS_ZONE_X[0]) - PRESS_ZONE_LENGTH) > 1e-9:
+    raise AssertionError("the configured collar window is not the press zone's length")
 if abs(ROD_LENGTH - PRESS_ZONE_X[1]) > 1e-9:
     raise AssertionError("the rod's east tip must end flush with the collar's outer face")
-if COLLAR_ENGAGEMENT <= 0.0 or COLLAR_ENGAGEMENT >= PRESS_ZONE_LENGTH:
-    raise AssertionError("the dome must start inside the collar, past its inner face")
 
 
 def clamp_radius_band(block_depth: float) -> tuple[float, float, float]:

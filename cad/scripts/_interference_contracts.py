@@ -62,7 +62,7 @@ from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT as _PINION_BLOCK_HEIGHT
 from vn_slotted_screw_spec import SHANK_DIA as _BLOCK_SCREW_DIA
 from vn_slotted_screw_spec import SHANK_LEN as _BLOCK_SCREW_LENGTH
 from vn_slotted_screw_spec import THREAD as _BLOCK_SCREW_THREAD
-from mg_magnifying_lever_geom import (
+from mg_lever_press_fit_geom import (
     COLLAR_BORE_DIA as _MG_COLLAR_BORE_DIA,
     COLLAR_ENGAGEMENT as _MG_COLLAR_ENGAGEMENT,
     PRESS_ZONE_DIA as _MG_LEVER_PRESS_DIA,

@@ -39,39 +39,58 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert "dimensions_by_feature=DRAWING_DIMENSIONS" in source
 
 
-def test_press_zone_is_a_native_band_from_the_drawing_free_geom() -> None:
+def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> None:
     """The collar press (user ruling 2026-10-11): the rod's last 10 carry a
-    0/-0.008 band natively on the blanked PressZone sketch; the bore nominal
-    and band live beside them in the geom module so the bracket build, this
-    build and the assembly's allowance read ONE source; the worst-case
-    budget is computed there, not typed anywhere."""
+    0/-0.008 band natively on the blanked PressZone sketch; the rod diameter,
+    zone length, bore nominal and band live in mg_lever_press_fit_geom so the
+    bracket build, this build and the assembly's allowance read ONE source
+    that pulls NO machine config; the worst-case budget is computed there, not
+    typed anywhere. The lever geom keeps the configured station and asserts it
+    is that zone, tip flush."""
+    import ast
+
     import pytest
 
+    import mg_lever_press_fit_geom as press
     import mg_magnifying_lever_geom as geom
 
-    assert geom.PRESS_ZONE_DIA == geom.ROD_DIA == 6.0
-    assert geom.PRESS_ZONE_DIA_BAND == (0.0, -0.008)
-    assert geom.COLLAR_BORE_DIA == 5.976
-    assert geom.COLLAR_BORE_BAND == (0.008, 0.0)
+    press_source = Path(press.__file__).read_text(encoding="utf-8")
+    imported = [
+        node for node in ast.parse(press_source).body
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    ]
+    assert [node.module for node in imported] == ["__future__"], (
+        "the press contract must stay config-free (no _config/output.yaml closure)"
+    )
+    assert press.PRESS_ZONE_DIA == press.ROD_DIA == 6.0
+    assert press.PRESS_ZONE_LENGTH == 10.0
+    assert press.PRESS_ZONE_DIA_BAND == (0.0, -0.008)
+    assert press.COLLAR_BORE_DIA == 5.976
+    assert press.COLLAR_BORE_BAND == (0.008, 0.0)
+    # The configured collar window is the zone, and the rod ends flush with it.
     assert geom.PRESS_ZONE_X == (
         geom.COLLAR_LOCAL_X - geom.COLLAR_HALF_LEN,
         geom.COLLAR_LOCAL_X + geom.COLLAR_HALF_LEN,
     )
     assert geom.PRESS_ZONE_X == (155.0, 165.0)
-    assert geom.PRESS_ZONE_LENGTH == 2.0 * geom.COLLAR_HALF_LEN == 10.0
+    assert geom.PRESS_ZONE_X[1] - geom.PRESS_ZONE_X[0] == press.PRESS_ZONE_LENGTH
     assert geom.PRESS_ZONE_X[1] == geom.ROD_LENGTH  # tip flush with the outer face
+    assert not hasattr(geom, "COLLAR_BORE_DIA") and not hasattr(geom, "ROD_DIA")
     # Straight rod inside the collar: from its inner face to where the dome starts.
-    assert geom.COLLAR_ENGAGEMENT == pytest.approx(7.0)
-    budget = geom.press_fit_budget()
-    assert budget == geom.PRESS_FIT_BUDGET
+    assert press.COLLAR_ENGAGEMENT == press.PRESS_ZONE_LENGTH - press.ROD_DIA / 2.0
+    assert press.COLLAR_ENGAGEMENT == pytest.approx(7.0)
+    budget = press.press_fit_budget()
+    assert budget == press.PRESS_FIT_BUDGET
     assert budget["interference_nominal"] == pytest.approx(0.024)
     assert budget["interference_min"] == pytest.approx(0.008)
     assert budget["interference_max"] == pytest.approx(0.024)
-    assert budget["engagement"] == geom.COLLAR_ENGAGEMENT
+    assert budget["engagement"] == press.COLLAR_ENGAGEMENT
     assert 0.0 < budget["interference_min"] <= budget["interference_max"]
     # ANSI B4.1 FN2 for 0.12..0.24 in: 1.0 thou at the tightest.
-    assert geom.PRESS_INTERFERENCE_MAX_FN2 == pytest.approx(0.0254)
-    assert budget["interference_max"] <= geom.PRESS_INTERFERENCE_MAX_FN2
+    assert press.PRESS_INTERFERENCE_MAX_FN2 == pytest.approx(0.0254)
+    assert budget["interference_max"] <= press.PRESS_INTERFERENCE_MAX_FN2
+    assert part.PRESS_ZONE_DIA_BAND is press.PRESS_ZONE_DIA_BAND
+    assert part.PRESS_ZONE_X is geom.PRESS_ZONE_X
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name_last_feature(adapter, "PressZone")' in source
     assert '"PressZone", "PressZoneDia", *deviations(PRESS_ZONE_DIA_BAND)' in source
@@ -127,9 +146,12 @@ def test_final_forced_volume_guard_follows_annotations_before_publication() -> N
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # The knife-axis station the assembly imports lives in the drawing-FREE geom
     # module, so a print-note edit cannot enter the assembly's recipe closure.
+    import mg_lever_press_fit_geom as press
     import mg_magnifying_lever_geom as geom
 
-    assert (geom.ROD_DIA, geom.ROD_LENGTH) == (6.0, 165.0)
+    assert (press.ROD_DIA, geom.ROD_LENGTH) == (6.0, 165.0)
+    assert mg_magnifying_lever_spec.ROD_LENGTH is geom.ROD_LENGTH
+    assert mg_magnifying_lever_spec.PRESS_ZONE_LENGTH is press.PRESS_ZONE_LENGTH
     assert hasattr(geom, "KNIFE_LOCAL_X") and hasattr(geom, "KNIFE_LOCAL_Y")
     assembly = (
         Path(part.__file__)

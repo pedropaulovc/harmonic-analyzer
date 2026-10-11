@@ -1241,14 +1241,15 @@ def monte_carlo(
 
 def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     """An OFFLINE estimate -- not a CAD gate -- of wire 1's straight rest run
-    with the clamp against the bracket collar: the hook (which rides the clamp
-    at machine x = LEVER_X0 - clamp local x, the same y/z as built) to the drum
-    tangent (mg_lever_wire_geom.tangent_end), versus the wheel's pen-side faces
-    (mg_lever_wire_geom.run_gaps). Reported so the waiver in
+    with the clamp against the bracket collar: the hook rides at the clamp's
+    station plus its derived groove-tangent X offset, with the as-built y/z, to
+    the drum tangent (mg_lever_wire_geom.tangent_end), versus the wheel's
+    pen-side faces (mg_lever_wire_geom.run_gaps). Reported so the waiver in
     error_budget.yaml is an informed one; the proof is a seat build of the
     magnifier at that pose (#748)."""
     lever_x0 = mg_lever_wire_geom.CLAMP_X + mg_magnifying_lever_geom.CLAMP_LOCAL_X  # 200
     hook_x = lever_x0 - (mg_magnifying_lever_geom.KNIFE_LOCAL_X - nom.lever_r_min)
+    hook_x += mg_lever_wire_geom.HOOK_X - mg_lever_wire_geom.CLAMP_X
     hook = (hook_x, mg_lever_wire_geom.HOOK_Y, mg_lever_wire_geom.HOOK_Z)
     end = mg_lever_wire_geom.tangent_end(hook[0], hook[1])
     gaps = mg_lever_wire_geom.run_gaps(hook, end)

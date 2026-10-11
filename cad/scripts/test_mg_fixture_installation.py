@@ -105,7 +105,7 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
     from _interference_contracts import allowed_interference_pairs, _smooth_annulus_limit_mm3
     from _hole_spec import TAP_DRILL_MM
     from _mcmaster_91882a221 import SHANK_DIA
-    from mg_magnifying_lever_geom import COLLAR_BORE_DIA, COLLAR_ENGAGEMENT, PRESS_ZONE_DIA
+    from mg_lever_press_fit_geom import COLLAR_BORE_DIA, COLLAR_ENGAGEMENT, PRESS_ZONE_DIA
 
     pairs = allowed_interference_pairs("mg-magnifier")
     top = allowed_interference_pairs("ha-harmonic-analyzer")

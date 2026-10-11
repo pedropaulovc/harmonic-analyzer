@@ -187,12 +187,12 @@ LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 # (along Z) -- it does NOT spin in the press-fitted, bonded bracket collar.
 # The ridge is the summing sub's knife line; assert the lever part's local
 # KnifeAxis lands exactly on it, so a knife move fails loud here.
+from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA  # noqa: E402
 from mg_magnifying_lever_geom import (  # noqa: E402
     CLAMP_LOCAL_X,
     COLLAR_LOCAL_X,
     KNIFE_LOCAL_X,
     KNIFE_LOCAL_Y,
-    ROD_DIA as LEVER_ROD_DIA,
 )
 from spring_mount_geom import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 

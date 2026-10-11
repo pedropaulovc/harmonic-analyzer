@@ -11,7 +11,7 @@ drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 The bracket is a three-feature fitting: an extruded COLLAR tube (Ø12 OD, 10
 long about local X) whose bore is the PRESS seat for the Ø6 magnifying-lever
-rod (nominal and band from ``mg_magnifying_lever_geom``, the joint's one read
+rod (nominal and band from ``mg_lever_press_fit_geom``, the joint's one read
 point), a rectangular ARM cantilevering +Z to the summing plate, and a mounting
 FLANGE that butts the plate's front face.  The two plan rectangles carry the
 auto-importable marked dimensions, including the flange thickness band; the

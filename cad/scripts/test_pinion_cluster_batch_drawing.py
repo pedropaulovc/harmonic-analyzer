@@ -21,7 +21,7 @@ import dt_pinion_lever_spec
 import dt_pinion_pivot_shaft_spec
 import dt_pinion_pivot_block_geometry
 import dt_pinion_spring_spec
-import mg_magnifying_lever_geom
+import mg_lever_press_fit_geom
 import mg_magnifying_vertical_rod_geom
 import mg_output_fixture_geom
 import vn_post_mount_screw_spec
@@ -472,9 +472,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")
             ): _annulus_limit(
-                mg_magnifying_lever_geom.PRESS_ZONE_DIA,
-                mg_magnifying_lever_geom.COLLAR_BORE_DIA,
-                mg_magnifying_lever_geom.COLLAR_ENGAGEMENT,
+                mg_lever_press_fit_geom.PRESS_ZONE_DIA,
+                mg_lever_press_fit_geom.COLLAR_BORE_DIA,
+                mg_lever_press_fit_geom.COLLAR_ENGAGEMENT,
             ),
         },
         "sm-summing": {

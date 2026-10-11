@@ -697,9 +697,9 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     built = eb._minimum_pose_wire_estimate(
         dataclasses.replace(nom, lever_r_min=nom.lever_r_built)
     )
-    assert built["hook_x_mm"] == pytest.approx(mg_lever_wire_geom.CLAMP_X)
+    assert built["hook_x_mm"] == pytest.approx(mg_lever_wire_geom.HOOK_X)
     assert built["wire_length_mm"] == pytest.approx(mg_lever_wire_geom.WIRE_LEN, abs=1e-3)
-    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < mg_lever_wire_geom.CLAMP_X
+    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < mg_lever_wire_geom.HOOK_X
 
 
 def test_rod_drive_is_on_the_crank_side(nom):

@@ -17,7 +17,7 @@ Layout: rod axis along +X from the origin (tip of the pivot-end dome at
 x=0), profile revolved 360 deg about a centerline on the axis.
 
 ``PressZone`` (blanked, on the Front plane): the last
-mg_magnifying_lever_geom.PRESS_ZONE_LENGTH of the rod, which is PRESSED into
+mg_lever_press_fit_geom.PRESS_ZONE_LENGTH of the rod, which is PRESSED into
 the MHA-MG-001 bracket collar and retained with Loctite 638 (user ruling
 2026-10-11). The rod is modelled at its nominal Ø6 end to end -- the zone is a
 band, not a step -- so no model edge bounds it; a construction witness along
@@ -63,14 +63,16 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from mg_magnifying_lever_geom import (
-    KNIFE_LOCAL_X,
-    KNIFE_LOCAL_Y,
+from mg_lever_press_fit_geom import (
     PRESS_ZONE_DIA,
     PRESS_ZONE_DIA_BAND,
     PRESS_ZONE_LENGTH,
-    PRESS_ZONE_X,
     ROD_DIA,
+)
+from mg_magnifying_lever_geom import (
+    KNIFE_LOCAL_X,
+    KNIFE_LOCAL_Y,
+    PRESS_ZONE_X,
     ROD_LENGTH,
 )
 from mg_magnifying_lever_spec import (
