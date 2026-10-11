@@ -132,15 +132,10 @@ async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         await adapter.create_cut_extrude(ExtrusionParameters(depth=NUMERAL_DEPTH)),
     )
     name_last_feature(adapter, "Numerals")
-    dimensions = dump_dimensions(adapter, "Numerals")
-    depths = [row["index"] for row in dimensions
-              if abs(row["value_mm"] - NUMERAL_DEPTH) < 1e-6
-              and row["full_name"].split("@")[1] == "Numerals"]
-    if len(depths) != 1:
-        raise RuntimeError(f"Numerals: cannot identify own native depth: {dimensions}")
-    names = [None] * (depths[0] + 1)
-    names[depths[0]] = "NumeralDepth"
-    name_dimensions(adapter, "Numerals", names)
+    # The adapter cut carries D1 (direction-1 blind depth) and an unused D2 at
+    # the same value; D1 is the depth, as for TickDepth@Tick0Cut. The post-save
+    # GetDepth(True) readback below independently proves the value.
+    name_dimensions(adapter, "Numerals", ["NumeralDepth"])
     drive_jobs.append(("NumeralDepth@Numerals", '"NumeralDepth"'))
     _assert_numeral_cut(adapter)
 

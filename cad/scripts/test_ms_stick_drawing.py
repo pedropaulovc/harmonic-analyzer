@@ -771,9 +771,6 @@ def test_numeral_cut_uses_its_own_depth_and_drives_it(monkeypatch) -> None:
     monkeypatch.setattr(builder, "_feature_by_name", lambda actual, name: feature)
     monkeypatch.setattr(builder, "name_last_feature", lambda actual, name: name)
     monkeypatch.setattr(builder, "name_dimensions", lambda actual, feature, values: names.append((feature, values)))
-    monkeypatch.setattr(builder, "dump_dimensions", lambda actual, feature: [
-        {"index": 0, "full_name": "D1@Numerals@ms-stick", "value_mm": spec.NUMERAL_DEPTH},
-    ])
     jobs = []
     asyncio.run(builder._cut_numerals(Adapter(), jobs))
     assert depths == [spec.NUMERAL_DEPTH]
