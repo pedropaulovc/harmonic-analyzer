@@ -54,7 +54,9 @@ import sys
 from typing import Any
 
 from _chain import CRANK_PITCH_R, loop_point_tangent
-from _common import OUT_SLDASM, check, log, run_build
+from _check import check, log
+from _paths import OUT_SLDASM
+from _session import run_build
 from _assembly import (
     angle_driver,
     component_names,
@@ -399,7 +401,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # directly): render the DRIVEN pose for a visual proof of the moved
         # train -- crank +30 deg, everything downstream displaced. The model
         # still discards unsaved below; only PNGs are written.
-        from _common import OUT_PNG
+        from _paths import OUT_PNG
         png_dir = OUT_PNG / "pd-paper-drive"
         png_dir.mkdir(parents=True, exist_ok=True)
         for view in ("front", "isometric"):

@@ -12,6 +12,8 @@ import yaml
 
 import _config
 import _drawing_leaders
+import _cone_gear_geometry as geometry
+import _cone_gear_readback as readback
 import build_dt_cone_gear as part
 import dt_cone_gear_notes as notes
 import dt_cone_gear_shaft_spec
@@ -35,7 +37,7 @@ def test_every_configuration_has_one_complete_sheet_and_native_scale() -> None:
     )
     expected_names = tuple(f"T{teeth:03d}" for teeth in expected_teeth)
     assert spec.CONFIGURATION_TEETH == expected_teeth
-    assert part.CONFIGS == tuple(zip(expected_names, expected_teeth, strict=True))
+    assert spec.CONFIGS == tuple(zip(expected_names, expected_teeth, strict=True))
     assert drawing.GEAR_SHEET_NAMES == expected_names
     assert drawing.SHEET_NAMES == (*expected_names, notes.CUTTER_DETAIL_SHEET)
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
@@ -130,7 +132,7 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
 
 
 def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
-    assert part.BORE_DIA_BAND is spec.BORE_DIA_BAND
+    assert spec.BORE_DIA_BAND is spec.BORE_DIA_BAND
     assert spec.BORE_DIA_BAND[0] <= spec.BORE_BAND_FIT_UPPER
     assert spec.BORE_DIA_BAND[0] <= spec.terminal_web_bore_upper_mm()
     assert spec.BORE_DIA_BAND[0] - spec.BORE_DIA_BAND[1] >= 0.02 - 1e-9
@@ -155,9 +157,9 @@ def test_native_tooth_inspection_reads_the_actual_installed_cutter() -> None:
         assert profile.pitch_tooth_thickness_mm == pytest.approx(spec.tooth_thickness_mm(teeth))
         assert 2.0 * profile.blank_radius_mm == pytest.approx(spec.outside_dia_mm(teeth))
         assert profile.pitch_tooth_thickness_mm + lower > 0.0
-        assert part._expected_configuration_volume(teeth) == pytest.approx((
+        assert readback._expected_configuration_volume(teeth) == pytest.approx((
             math.pi * profile.blank_radius_mm**2
-            - teeth * profile.gap_area_mm2 - part.bore_area_mm2(teeth)
+            - teeth * profile.gap_area_mm2 - geometry.bore_area_mm2(teeth)
         ) * spec.FACE_WIDTH)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "*deviations(TOOTH_THICKNESS_BAND)" in source
@@ -184,16 +186,16 @@ def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
 
 
 def test_native_gap_features_are_distinct_and_preserve_real_template_topology() -> None:
-    features = [name for teeth in spec.CONFIGURATION_TEETH for name in part.tooth_features(teeth)]
+    features = [name for teeth in spec.CONFIGURATION_TEETH for name in spec.tooth_features(teeth)]
     assert len(set(features)) == 3 * len(spec.CONFIGURATION_TEETH)
-    assert len(part.SIMPLIFIED_FEATURES) == 2 * len(spec.CONFIGURATION_TEETH)
-    assert part.SIMPLIFIED_FEATURES_BY_CONFIGURATION == {
-        f"T{teeth:03d}": part.tooth_features(teeth)[1:] for teeth in spec.CONFIGURATION_TEETH
+    assert len(spec.SIMPLIFIED_FEATURES) == 2 * len(spec.CONFIGURATION_TEETH)
+    assert spec.SIMPLIFIED_FEATURES_BY_CONFIGURATION == {
+        f"T{teeth:03d}": spec.tooth_features(teeth)[1:] for teeth in spec.CONFIGURATION_TEETH
     }
     for teeth in spec.CONFIGURATION_TEETH:
         profile = spec.stock_form_profile(teeth)
         core = profile.cut_order_native_segments(
-            unit_scale=1.0 / spec.MM_PER_IN, clearance_radius_mm=part.R_CLEAR_MM
+            unit_scale=1.0 / spec.MM_PER_IN, clearance_radius_mm=geometry.R_CLEAR_MM
         )
         expected_entities = 8 if profile.template.root_radius_mm < profile.template.base_radius_mm else 6
         assert len(core) == expected_entities
@@ -205,7 +207,7 @@ def test_native_gap_features_are_distinct_and_preserve_real_template_topology() 
         if teeth != 6:
             assert profile.template.reference_teeth <= teeth
             assert profile.template.reference_teeth in (12, 17, 21, 26, 35, 55)
-        assert all(name.endswith(f"T{teeth:03d}") for name in part.tooth_features(teeth))
+        assert all(name.endswith(f"T{teeth:03d}") for name in spec.tooth_features(teeth))
         assert profile.contains_material(
             profile.pitch_radius_mm, 0.0, rotate_rad=math.pi / teeth
         ), f"T{teeth:03d} must seed a physical tooth on +X"
@@ -262,7 +264,7 @@ def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.Mon
     template = CutterTemplate(12, spec.DIAMETRAL_PITCH, spec.PRESSURE_ANGLE_DEG)
     profile = StockFormProfile(12, template, template.tip_radius_mm + 0.05, 0.1)
     root = next(segment for segment in profile.native_segments(
-        unit_scale=1.0, clearance_radius_mm=part.R_CLEAR_MM
+        unit_scale=1.0, clearance_radius_mm=geometry.R_CLEAR_MM
     ) if segment.kind == "root_arc")
 
     z = part.FACE_WIDTH / 1000.0
@@ -315,8 +317,8 @@ def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.Mon
     flank = type("Flank", (), {"GetBox": lambda self: (-0.01, -0.01, 0.0, 0.01, 0.01, z)})()
     faces = [Face(0.0, []), flank, Face(part.FACE_WIDTH, [Line(), *edges])]
     body = type("Body", (), {"GetFaces": lambda self: faces})()
-    monkeypatch.setattr(part, "stock_form_profile", lambda _teeth: profile)
-    minimum, maximum, count = part._native_root_envelope_mm(body, teeth=profile.teeth)
+    monkeypatch.setattr(readback, "stock_form_profile", lambda _teeth: profile)
+    minimum, maximum, count = readback._native_root_envelope_mm(body, teeth=profile.teeth)
     assert count == profile.teeth
     assert minimum == pytest.approx(profile.root_radius_min_mm)
     assert maximum == pytest.approx(profile.root_radius_max_mm)
@@ -325,22 +327,22 @@ def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.Mon
     # A gap that did not cut through leaves its root off the far face.
     faces[-1].edges.pop()
     with pytest.raises(RuntimeError, match="native root arcs on the exit face"):
-        part._native_root_envelope_mm(body, teeth=profile.teeth)
+        readback._native_root_envelope_mm(body, teeth=profile.teeth)
 
 
 def test_root_envelope_reads_the_body_and_failures_name_their_call() -> None:
     # f68549253: the reopened audit passed the IPartDoc where the reader calls
     # IBody2.GetFaces, and every configuration failed as an anonymous
     # DISP_E_MEMBERNOTFOUND.
-    source = inspect.getsource(part._configuration_topology)
+    source = inspect.getsource(readback._configuration_topology)
     assert "_native_root_envelope_mm(bodies[0], teeth=teeth)" in source
     try:
-        part._exit_face(object())
+        readback._exit_face(object())
     except AttributeError as exc:
-        site = part._failure_site(exc)
+        site = readback._failure_site(exc)
     assert '_com_invoke(body, "IBody2", "GetFaces")' in site
     assert "in _exit_face" in site
-    assert "_failure_site(exc)" in inspect.getsource(part.assert_saved_configuration_topology)
+    assert "_failure_site(exc)" in inspect.getsource(readback.assert_saved_configuration_topology)
 
 
 def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:
@@ -855,7 +857,7 @@ def _patch_floor_dimension(monkeypatch: pytest.MonkeyPatch, tolerance: object) -
         assert (feature, name) == (spec.GAP_FLOOR_SKETCH, "FloorDia")
         return object(), dimension
 
-    monkeypatch.setattr(part, "_named_dimension", named)
+    monkeypatch.setattr(readback, "_named_dimension", named)
 
 
 def test_each_configuration_stores_its_own_gap_floor_limits(
@@ -867,9 +869,9 @@ def test_each_configuration_stores_its_own_gap_floor_limits(
     _patch_floor_dimension(monkeypatch, tolerance)
     part._set_gap_floor_limits(object())
     assert tolerance.Type == 3  # swTolLIMIT
-    assert [call[3] for call in tolerance.calls] == [[name] for name, _ in part.CONFIGS]
+    assert [call[3] for call in tolerance.calls] == [[name] for name, _ in spec.CONFIGS]
     for (lower, upper, which, _names), (_name, teeth) in zip(
-        tolerance.calls, part.CONFIGS, strict=True
+        tolerance.calls, spec.CONFIGS, strict=True
     ):
         assert which == 3  # swSetValue_InSpecificConfigurations
         nominal = 2.0 * spec.floor_radius_min_mm(teeth)
@@ -905,12 +907,12 @@ def test_every_configuration_stores_its_own_blank_and_thickness_band(
         ("ToothThickness", spec.tooth_thickness_band),
     ):
         calls = tolerances[name].calls
-        assert [call[3] for call in calls] == [[c] for c, _ in part.CONFIGS]
-        for (lower, upper, which, _names), (_c, teeth) in zip(calls, part.CONFIGS, strict=True):
+        assert [call[3] for call in calls] == [[c] for c, _ in spec.CONFIGS]
+        for (lower, upper, which, _names), (_c, teeth) in zip(calls, spec.CONFIGS, strict=True):
             assert which == 3
             upper_mm, lower_mm = band_for(teeth)
             assert (lower * 1000.0, upper * 1000.0) == pytest.approx((lower_mm, upper_mm))
-    source = inspect.getsource(part.assert_saved_configuration_topology)
+    source = inspect.getsource(readback.assert_saved_configuration_topology)
     assert "_assert_configuration_bands(adapter, configuration, teeth)" in source
     assert "GetMinValue" not in inspect.getsource(part._set_configuration_bands)
 

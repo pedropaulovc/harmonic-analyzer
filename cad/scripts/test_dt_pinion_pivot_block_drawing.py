@@ -16,7 +16,7 @@ from _drawing_contract import (
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import REAM_SLIDE
+from _fit_ream_slide import REAM_SLIDE
 from _hole_spec import blind_cut_dia_mm
 
 
@@ -58,7 +58,7 @@ def test_engaged_pinion_centre_and_clocking_share_the_pivot_swing() -> None:
 def test_live_stock_block_screw_keeps_full_threads_at_the_longest_grip() -> None:
     import dt_pinion_pivot_block_geometry as geometry
     import vn_slotted_screw_spec as screw
-    from vn_fillister_screw_spec import FILLISTER_SIZES
+    from _mcmaster_90280a203 import FILLISTER_SIZE
 
     entry = _config.title_block("edge_break")
     entry_loss = max(float(entry["radius_mm"]), float(entry["chamfer_max_mm"]))
@@ -67,7 +67,7 @@ def test_live_stock_block_screw_keeps_full_threads_at_the_longest_grip() -> None
         - screw.PITCH - entry_loss
     )
     assert full_threads >= 1.5 * screw.SHANK_DIA
-    assert FILLISTER_SIZES["90280A203"] == (
+    assert FILLISTER_SIZE == (
         screw.SHANK_DIA, screw.SHANK_LEN, screw.HEAD_H, screw.HEAD_DIA, screw.PITCH
     )
     # The formerly registered 1-1/4-in stock fails before either end deduction.

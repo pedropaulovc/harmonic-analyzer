@@ -61,27 +61,25 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import (
-    IN,
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties
+from _part_save import save_part_and_images
+from _paths import IN
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    name_bore_axis,
-    check,
-    define_circle,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -89,7 +87,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _gear import volume_check
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -118,7 +116,7 @@ from dt_cone_gear_shaft_spec import (
 from solidworks_mcp.adapters.com_variant import double_array
 
 PART_NAME = "dt-cone-gear-shaft"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 # SECTIONS and SECTION_KNOBS live in the shared pure-data spec.  FRONT_STUB
 # follows the current cone-line post station; the journal spans the post boss

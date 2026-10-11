@@ -551,7 +551,8 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     constant, never sheet text, and it bounds yaw and tilt to about 0.08 deg
     over the boss.  A alone would leave tilt free.
     """
-    from _gtol_spec import CylinderFace, PlanarFace
+    from _gtol_cylinder import CylinderFace
+    from _gtol_planar import PlanarFace
 
     assert spec.GEOMETRIC_TOLERANCES_MM == {}
     journal, foot = spec.PART_DATUMS
@@ -794,7 +795,7 @@ def test_north_cone_boss_end_carries_the_running_finish() -> None:
     """#914: the shaft collar runs on the north boss end face (rule 5)."""
     import math
 
-    from _gtol_spec import PlanarFace
+    from _gtol_planar import PlanarFace
     from dt_cone_pivot_post_installation import POST_ROTATION_Y_DEG
 
     control = surface_finish_by_key(spec.SURFACE_FINISHES, "cone_boss_north_face")

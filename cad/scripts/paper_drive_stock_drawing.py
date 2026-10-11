@@ -19,7 +19,7 @@ import math
 from typing import Any, NamedTuple
 
 import _telemetry
-from _common import _com_invoke, _early_bound
+from _com import _com_invoke, _early_bound
 from _drawing_common import (
     _VIEW_ENTITY_EDGE,
     _assert_leader_lands,

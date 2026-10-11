@@ -14,7 +14,7 @@ import math
 
 from _printed_tolerance import printed_band_mm
 from gear_seat_fit import seat_bore_band
-from _fit_limits import SHAFT_H
+from _fit_shaft_h import SHAFT_H
 
 # Diameter bands, one NAMED class per land, applied to the model dimension
 # by build_dt_cone_gear_shaft -- never "+0.00/-0.02" typed as sheet callout text.
@@ -32,7 +32,7 @@ RUNNING_DIA_BAND = SHAFT_H
 # small fraction of the ~0.51 mm module, so mesh runout does not suffer.
 # 2.5x the h band, which a micrometer holds on a manual lathe; -0.10 would
 # allow ~20% of the module in runout on hand-cut teeth.  Spec-local on
-# purpose: _fit_limits is imported fleet-wide.
+# purpose: _fit_shaft_h is imported by every ground-shaft h-band user.
 GEAR_SEAT_BAND = (0.000, -0.050)
 SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
     RUNNING_DIA_BAND,  # Sec0: pivot journal

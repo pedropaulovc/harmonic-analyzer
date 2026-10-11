@@ -12,7 +12,7 @@ hold the block's yaw.
 Catalogue: 1/8 x 3/4 alloy-steel dowel, Round x Chamfer ends, diameter
 +0.0001/+0.0003 in, Rockwell C47 min, ASME B18.8.2; the size row, the end
 forms (read off the vendor model ``cad/references/mcmaster/98381A473.SLDPRT``)
-and the diameter band are ``vn_transgear_latch_pin_spec``'s.  No
+and the diameter band are ``_mcmaster_98381a473``'s.  No
 recommended hole size is stated; the press is the knife mount's own reamed
 hole (``sm_knife_mount_spec.PIN_HOLE_DIA_BAND``), the slip the crossbar's
 (``fr_top_frame_spec.HANGER_PIN_HOLE_DIA``).
@@ -32,21 +32,20 @@ on the knife mount's hole floor.
 from __future__ import annotations
 
 import _config
-from vn_transgear_latch_pin_spec import (
+from _mcmaster_98381a473 import (
     DIA_BAND_IN,
-    DOWEL_ENDS,
-    DOWEL_SIZES,
+    ENDS,
+    DOWEL_SIZE,
     MM_PER_IN,
 )
 
 SKU = "98381A473"
-DIA, LENGTH = DOWEL_SIZES[SKU]  # 3.175 x 19.05
+DIA, LENGTH = DOWEL_SIZE  # 3.175 x 19.05
 # Catalogue diameter band over nominal, mm, as (upper, lower) deviations:
 # +0.00762 / +0.00254 (the catalogue row lists it low-first).
 DIA_BAND = tuple(band * MM_PER_IN for band in reversed(DIA_BAND_IN))
 DIA_MAX = DIA + max(DIA_BAND)  # 3.18262
 DIA_MIN = DIA + min(DIA_BAND)  # 3.17754
-ENDS = DOWEL_ENDS[SKU]
 # The pressed end's chamfer: the length of it that grips nothing.
 CHAMFER_LEN = ENDS.chamfer_len(DIA)  # 0.443
 # The family's length grade, +/-0.010 in (``dt_crankshaft_spec``'s

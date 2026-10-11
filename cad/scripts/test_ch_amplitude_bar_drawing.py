@@ -227,7 +227,7 @@ def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
     """Main ruling B 2026-09-27: the foot notch floor's Ra 0.8 is a native
     finish symbol on the floor in DETAIL A, authored on the part, not a note."""
     import ch_amplitude_bar_drawing_spec as finish_spec
-    from _gtol_spec import PlanarFace
+    from _gtol_planar import PlanarFace
     from _surface_finish import GROUND, surface_finish_by_key
 
     control = surface_finish_by_key(finish_spec.SURFACE_FINISHES, "bottom_notch_floor")

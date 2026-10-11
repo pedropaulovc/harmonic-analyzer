@@ -13,7 +13,13 @@ from __future__ import annotations
 import asyncio
 
 import _telemetry
-from _common import OUT_SLDASM, _early_bound, _flag, _flag_only, _read_member, log
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log
+from _com import _early_bound, _flag, _flag_only, _read_member
+from _paths import OUT_SLDASM
 from _assembly_postbuild import author_dof_drives, load_dof_manifest
 
 _ERR = {

@@ -8,7 +8,7 @@ takes the 3/16 length of the crank's 3/32 dowel, and its holes are reamed
 THROUGH the collar body, the press depth set from the seat face by a stop.
 
 Catalogue: 3/32 x 3/16 alloy-steel dowel, Round x Chamfer ends; the size row
-and the diameter tolerance are ``vn_transgear_latch_pin_spec``'s.
+and the diameter tolerance are ``diagnostics.diag_mcmaster_dowel``'s.
 
 Part frame: axis local +Y through the origin; the pressed (chamfered) end
 face at y = 0, the rounded lead end at y = LENGTH.
@@ -16,11 +16,15 @@ face at y = 0, the rounded lead end at y = LENGTH.
 
 from __future__ import annotations
 
-import vn_transgear_latch_pin_spec
+from _mcmaster_98381a433 import (
+    DIA_BAND_IN,  # noqa: F401 -- re-exported: catalogue diameter tolerance (in)
+    DOWEL_SIZE,
+    MM_PER_IN,  # noqa: F401 -- re-exported with the inch band
+)
 from pd_transgear_removable_spec import DRIVE_PIN_DIA, DRIVE_PIN_PROUD, PLATE, PLATE_BAND
 
 SKU = "98381A433"
-DIA, LENGTH = vn_transgear_latch_pin_spec.DOWEL_SIZES[SKU]  # 2.38125 x 4.7625
+DIA, LENGTH = DOWEL_SIZE  # 2.38125 x 4.7625
 if abs(DIA - DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError(f"{SKU} is not the seat interface's drive pin")
 

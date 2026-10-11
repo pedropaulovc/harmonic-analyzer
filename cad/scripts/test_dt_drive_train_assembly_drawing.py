@@ -27,8 +27,8 @@ BUILDER = SCRIPTS / "build_dt_drive_train_assembly.py"
 RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
 # Step 10 sets the channel's north MHA-CH-008 on the frame's MHA-FR-005 (#936 P1 b),
-# offset by the miced MHA-CH-005 shoulder (#948 ruling R, PR #1292).
-EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008", "MHA-CH-005"})
+# offset by the miced north MHA-CH-009 washer (user, 2026-10-10).
+EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008", "MHA-CH-009"})
 # Named installation assemblies are external interfaces, not drive-train BOM rows.
 EXTERNAL_NUMBERS |= frozenset(
     assembly_contract(stem).number
@@ -1166,7 +1166,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     rounded inward so a part inside the print is inside the model band."""
     import math
 
-    import ch_pivot_shaft_spec as pivot_shaft
+    import ch_rocker_thrust_washer_spec as rocker_washer
     import cylinder_bank_layout as bank
     import fr_harmonic_base_spec as base
     import rocker_bank_layout as rockers
@@ -1204,15 +1204,18 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     )
     assert steps.index("MIC ONE MHA-DT-026, W") < steps.index("FACE TO Y")
     # Step 10: the north MHA-CH-008 ear inner face on the same DRO zero, its
-    # target offset north by the miced MHA-CH-005 shoulder's excess.
+    # target offset north by the miced north MHA-CH-009 washer's excess; the
+    # plain shaft threads through the set ear, so the bracket stays down.
     ear_y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
     ear_band = rockers.NORTH_EAR_LOCATE_BAND
-    shoulder = f"{pivot_shaft.SHOULDER_LENGTH:.3f}"
+    rocker_washer_thick = f"{rocker_washer.THICKNESS:.3f}"
     assert (
         f"EAR INNER FACE TO Y {limits(ear_y - ear_band, ear_y + ear_band, 2)} "
-        f"LESS (S - {shoulder})" in steps
+        f"LESS (W - {rocker_washer_thick})" in steps
     )
-    assert steps.index("MIC THE MHA-CH-005 SHOULDER, S") < steps.index("EAR INNER FACE")
+    assert steps.index("MIC ONE MHA-CH-009, W") < steps.index("EAR INNER FACE")
+    assert "LIFT IT OFF" not in steps
+    assert "SHOULDER" not in steps
     # The front strap is set one spring-set blade off the front washer, the
     # MHA-VN-052 beside it; the bank then has no end play to read.
     assert f"A {bank.BANK_SPRING_SET:.2f} BLADE BETWEEN ITS STRAP" in steps

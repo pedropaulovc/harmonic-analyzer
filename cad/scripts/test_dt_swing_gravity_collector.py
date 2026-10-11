@@ -139,14 +139,14 @@ def test_source_slices_do_not_import_builders_or_transform_common(tmp_path):
     scripts = tmp_path / "cad/scripts"
     scripts.mkdir(parents=True)
     (scripts / "build_test.py").write_text(
-        "from _common import forbidden\n"
+        "from _com import forbidden\n"
         "from _transforms import axis\n"
         "raise RuntimeError('builder module executed')\n"
         "VALUE = 2 * axis(0.0)\n",
         encoding="utf-8",
     )
     (scripts / "_transforms.py").write_text(
-        "import math\nfrom _common import forbidden\n"
+        "import math\nfrom _com import forbidden\n"
         "raise RuntimeError('transform module executed')\n"
         "def axis(angle):\n    return math.cos(angle)\n",
         encoding="utf-8",
@@ -163,7 +163,7 @@ def test_source_slices_do_not_import_builders_or_transform_common(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "name", ["build_test", "_common", "pythoncom", "win32com.client"]
+    "name", ["build_test", "_com", "_session", "pythoncom", "win32com.client"]
 )
 def test_forbidden_imports_stay_blocked_when_cached(tmp_path, monkeypatch, name):
     scripts = tmp_path / "cad/scripts"
@@ -180,10 +180,13 @@ def test_forbidden_imports_stay_blocked_when_cached(tmp_path, monkeypatch, name)
 def test_export_units_refuse_scaling_or_origin_guessing(tmp_path, units, origin):
     scripts = tmp_path / "cad/scripts"
     scripts.mkdir(parents=True)
-    (scripts / "_common.py").write_text(
+    (scripts / "_preferences.py").write_text(
         "PREF_STL_UNITS = 211\nTOGGLE_STL_NO_TRANSLATE = 71\n"
         f"STL_EXPORT_PREFERENCES = Preferences(integers={{PREF_STL_UNITS: {units}}}, "
-        f"toggles={{TOGGLE_STL_NO_TRANSLATE: {origin}}})\n"
+        f"toggles={{TOGGLE_STL_NO_TRANSLATE: {origin}}})\n",
+        encoding="utf-8",
+    )
+    (scripts / "_part_save.py").write_text(
         "async def export_part_stl(adapter):\n"
         "    await enforce_preferences(adapter, STL_EXPORT_PREFERENCES)\n",
         encoding="utf-8",

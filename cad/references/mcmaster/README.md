@@ -146,7 +146,9 @@ Catalog specifications checked on September 10, 2026:
   Evidence SHA-256: native SLDPRT
   `0257bc44e4273a32536e58829d52ec552e04b631a472ae080a067f29b38eac39`.
 - [91375A106](https://www.mcmaster.com/91375A106/), selected for MHA-VN-034
-  (#743), is a black-oxide alloy steel hex socket cup-point set screw:
+  (#743; since 2026-10-10 also one in each MHA-CH-008 pivot-bracket ear's
+  apex, on the rocker pivot shaft's flat), is a black-oxide alloy steel hex
+  socket cup-point set screw:
   #4-40 UNC class 3A, 1/4 in long, Rockwell C45, 0.050 in hex drive. Its
   supplied SolidWorks model was harvested read-only on September 26, 2026:
   volume 25.8601 mm^3, area 95.038 mm^2, 28 faces
@@ -390,10 +392,12 @@ Catalog specifications checked on September 10, 2026:
   head hex drive screw, #4-40 UNC class 3A, right hand, 1/4 in under the
   head, fully threaded, flat tip, standard-profile head Ø0.213 in x 0.059 in,
   1/16 in hex drive, 140 ksi, Rockwell C39, ASME B18.3 / ASTM F835. The page
-  gives nothing else, so `diag_build_91255A106.py` carries the 91255A148
-  vendor-measured laws over in proportion: flat top 7/5 of the hex, band
-  0.15 of the head height at 10 deg, fillets 0.05, socket floor 0.55, the
-  60 deg countersink. It is catalogue-only: no vendor model is downloaded or
+  gives nothing else, so `diagnostics/diag_mcmaster_button_head.py` and
+  `_button_head_dimensions.py` carry the 91255A148 vendor-measured laws over
+  in proportion: flat top 7/5 of the hex, band 0.15 of the head height at
+  10 deg, fillets 0.05, socket floor 0.55, the 60 deg countersink.
+  `_mcmaster_91255a106.py` and `_mcmaster_91255a108.py` hold their separate
+  SKU dimensions. It is catalogue-only: no vendor model is downloaded or
   kept here, so it has no replica gate, and its standalone diagnostic is a
   catalog-only run. Lost: 91255A105 (3/16 in; shortens the lock stack) and
   18-8 stainless 92949A106 (same head and length, 70 ksi, Rockwell B55;
@@ -403,8 +407,9 @@ Catalog specifications checked on September 10, 2026:
   of the guide's blind tap at the worst case, so the guide's lock receivers
   became through taps and the screw 3/8 in under the head (2.02D at the
   worst case). [INFERENCE] 91255A108 is the 3/8 in length of the same
-  91255A series; its page has not been read live. `diag_build_91255A108.py`
-  builds it with the 91255A106 recipe at that length; it is catalogue-only.
+  91255A series; its page has not been read live. `_mcmaster_91255a108.py`
+  carries that size, and `diag_mcmaster_button_head.py` builds it with the
+  shared laws at that length; it is catalogue-only.
 - [98296A027](https://www.mcmaster.com/98296A027/) was read live on
   September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
   diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,
@@ -422,11 +427,12 @@ Catalog specifications checked on September 10, 2026:
   0.062-0.065 in hole. It is pressed through the knob cup and the knob
   shaft's journal in a hole match-drilled at assembly. No vendor SLDPRT has
   been harvested for it yet.
-- All three spring pins are rows of `diagnostics/diag_mcmaster_spring_pin.py`,
-  which models each as installed, a 1/16 in tube with the catalog wall,
-  without slot or chamfer; `diag_build_98296A026.py`,
-  `diag_build_98296A027.py` and `diag_build_98296A031.py` are its per-size
-  runs.
+- The three spring pins have separate data in `_mcmaster_98296a026.py`,
+  `_mcmaster_98296a027.py` and `_mcmaster_98296a031.py`, passed to
+  `diagnostics/diag_mcmaster_spring_pin.py`. The shared recipe models each
+  as installed, a 1/16 in tube with the catalog wall, without slot or
+  chamfer; `diag_build_98296A026.py`, `diag_build_98296A027.py` and
+  `diag_build_98296A031.py` are its per-size runs.
 - [98381A434](https://www.mcmaster.com/98381A434/) (`vn-crank-seat-drive-pin`,
   MHA-VN-044, crank only) was read live on September 30, 2026: alloy steel dowel pin,
   unplated, 3/32 in diameter (+0.0001 to +0.0003 in), 1/4 in long, end shape
@@ -612,8 +618,8 @@ Catalog specifications checked on September 10, 2026:
   the working point taken as linear [INFERENCE]); the part carries the
   library's `Plain Carbon Steel`.
 - [9714K24](https://www.mcmaster.com/9714K24/) (`vn-rocker-bank-spring`,
-  MHA-VN-053, one) sits on the MHA-CH-005 pivot shaft between the MHA-CH-009
-  washer and the south MHA-CH-008 ear, set by a 0.60 blade, and holds the
+  MHA-VN-053, one) sits on the MHA-CH-005 pivot shaft between the south
+  MHA-CH-009 washer and the south MHA-CH-008 ear, set by a 0.60 blade, and holds the
   20-hub stack north on its datum. Its page was read live on October 9, 2026:
   Wave Disc Spring, high-carbon steel, stackable; ID 0.265 in -0.02/+0.01, OD
   0.367 in -0.02/+0.01, thickness 0.006 in, height 0.03 in (free); compressed

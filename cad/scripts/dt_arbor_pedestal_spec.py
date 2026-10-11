@@ -8,7 +8,8 @@ from __future__ import annotations
 from math import sqrt
 
 from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 

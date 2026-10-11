@@ -16,8 +16,9 @@ from pathlib import Path
 from typing import Any
 
 import _telemetry
-from _common import _early_bound
-from _gtol_spec import GeometricControl, gtol_frame_signature
+from _com import _early_bound
+from _gtol_controls import GeometricControl
+from _gtol_frame import gtol_frame_signature
 
 
 # Official swLengthUnit_e values, not a guessed conversion-factor direction.

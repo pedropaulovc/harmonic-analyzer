@@ -508,7 +508,7 @@ def _calls(path: str) -> dict[str, ast.Call]:
 
 
 def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _common
+    import _part_properties
     import _drawing_marks
 
     required = ast.literal_eval(
@@ -518,7 +518,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
             if k.arg == "required"
         )
     )
-    carried = dict(_common.part_properties(part.PART_NAME))
+    carried = dict(_part_properties.part_properties(part.PART_NAME))
     stamp = _calls(part.__file__)["apply_drawing_properties"]
     assert [ast.unparse(a) for a in stamp.args[:2]] == ["adapter", "PART_NAME"]
     extra = {
@@ -690,7 +690,7 @@ def test_native_flat_limits_refuse_missing_or_unwritten_controls(
 
 def _capture_fixture(monkeypatch, *, length=None, rear_gap=0.0, clock_error=0.0, missing=None):
     import build_pd_paper_drive_assembly as assembly
-    import _part_pmi
+    import _gtol_face_resolve
 
     length = spec.LENGTH if length is None else length
 
@@ -714,9 +714,9 @@ def _capture_fixture(monkeypatch, *, length=None, rear_gap=0.0, clock_error=0.0,
     if missing == "face":
         # Use the real face resolver for the missing-metal refusal, not a
         # test-only accepted-face flag or a replacement reaction annotation.
-        monkeypatch.setattr(_part_pmi, "_early_bound", lambda value, _kind: value)
+        monkeypatch.setattr(_gtol_face_resolve, "_early_bound", lambda value, _kind: value)
     else:
-        monkeypatch.setattr(_part_pmi, "_resolve_faces", lambda _model, requests: requests)
+        monkeypatch.setattr(_gtol_face_resolve, "resolve_faces", lambda _model, requests: requests)
     calls = []
 
     def world_point(_adapter, name, local):

@@ -25,12 +25,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _stock_recipe import stock_recipe  # noqa: E402
+
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     _spherical_cap_volume,
@@ -39,30 +43,40 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     replica_main,
     thread_sweep_cut,
 )
-import vn_fillister_screw_spec
+
+from _mcmaster_90114a511 import (  # noqa: E402
+    BF_MAJOR_R,
+    BF_LEN,
+    BF_HH,
+    BF_HEAD_R,
+    BF_PITCH,
+    BF_SLOT_W,
+    BF_SLOT_D,
+)
 
 
+@stock_recipe("90114A511", threaded=True)
 async def build_90114A511(adapter, truth=None):
-    from _common import add_line_chain
+    from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
-    major_r, head_r = vn_fillister_screw_spec.BF_MAJOR_R, vn_fillister_screw_spec.BF_HEAD_R
-    pitch = vn_fillister_screw_spec.BF_PITCH
-    band = vn_fillister_screw_spec.BF_HH * 0.75
-    dome_h = vn_fillister_screw_spec.BF_HH - band
-    apex_y = vn_fillister_screw_spec.BF_HH
+    major_r, head_r = BF_MAJOR_R, BF_HEAD_R
+    pitch = BF_PITCH
+    band = BF_HH * 0.75
+    dome_h = BF_HH - band
+    apex_y = BF_HH
     tip_ch = 0.75 * pitch
     h_sharp = pitch * math.sqrt(3.0) / 2.0
     root_r = major_r - 0.75 * h_sharp
     cap_R = (head_r ** 2 + dome_h ** 2) / (2.0 * dome_h)
-    fillet_r = vn_fillister_screw_spec.BF_HH * 0.05
+    fillet_r = BF_HH * 0.05
 
     check("create_sketch profile", await adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk_mgr.CreateCenterLine(0.0, apex_y / 1000.0, 0.0,
-                                   0.0, -vn_fillister_screw_spec.BF_LEN / 1000.0, 0.0) is None:
+                                   0.0, -BF_LEN / 1000.0, 0.0) is None:
             raise RuntimeError("90114 profile: CreateCenterLine failed")
     yc = apex_y - cap_R
     ang_mid = (math.pi / 2.0 + math.atan2(band - yc, head_r)) / 2.0
@@ -79,9 +93,9 @@ async def build_90114A511(adapter, truth=None):
             (head_r, band),
             (head_r, 0.0),
             (major_r, 0.0),
-            (major_r, -(vn_fillister_screw_spec.BF_LEN - tip_ch)),
-            (major_r - tip_ch, -vn_fillister_screw_spec.BF_LEN),
-            (0.0, -vn_fillister_screw_spec.BF_LEN),
+            (major_r, -(BF_LEN - tip_ch)),
+            (major_r - tip_ch, -BF_LEN),
+            (0.0, -BF_LEN),
             (0.0, apex_y),
         ], close=False)
     check("exit_sketch profile", await adapter.exit_sketch())
@@ -91,7 +105,7 @@ async def build_90114A511(adapter, truth=None):
     name_last_feature(adapter, "Body")
     v = (_spherical_cap_volume(head_r, dome_h)
          + math.pi * head_r ** 2 * band
-         + math.pi * major_r ** 2 * (vn_fillister_screw_spec.BF_LEN - tip_ch)
+         + math.pi * major_r ** 2 * (BF_LEN - tip_ch)
          + _rev_frustum(tip_ch, major_r, major_r - tip_ch))
     await volume_check(adapter, "revolved body", v, 0.005 * v)
 
@@ -108,15 +122,15 @@ async def build_90114A511(adapter, truth=None):
     check("create_sketch slot", await adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
         await add_line_chain(adapter, [
-            (-vn_fillister_screw_spec.BF_SLOT_W / 2.0, apex_y + 0.5),
-            (vn_fillister_screw_spec.BF_SLOT_W / 2.0, apex_y + 0.5),
-            (vn_fillister_screw_spec.BF_SLOT_W / 2.0, apex_y - vn_fillister_screw_spec.BF_SLOT_D),
-            (-vn_fillister_screw_spec.BF_SLOT_W / 2.0, apex_y - vn_fillister_screw_spec.BF_SLOT_D),
+            (-BF_SLOT_W / 2.0, apex_y + 0.5),
+            (BF_SLOT_W / 2.0, apex_y + 0.5),
+            (BF_SLOT_W / 2.0, apex_y - BF_SLOT_D),
+            (-BF_SLOT_W / 2.0, apex_y - BF_SLOT_D),
         ])
     check("exit_sketch slot", await adapter.exit_sketch())
     name_last_feature(adapter, "SlotProfile")
     check("cut slot", await adapter.create_cut_extrude(ExtrusionParameters(
-        depth=2.0 * vn_fillister_screw_spec.BF_HEAD_R * 2.0, both_directions=True)))
+        depth=2.0 * BF_HEAD_R * 2.0, both_directions=True)))
     name_last_feature(adapter, "DriverSlot")
 
     body_boxes = split_at_plane(adapter, "Top Plane", "HeadSplit")
@@ -135,17 +149,17 @@ async def build_90114A511(adapter, truth=None):
     # ours +y with reverse=False, so the clockwise flag must invert
     # (proven on 93075A194, where clockwise=True left a mirror thread
     # whose sweep end slivers read +0.0575 mm^3 across every phase).
-    offset_plane(adapter, "TipPlane", -vn_fillister_screw_spec.BF_LEN)
+    offset_plane(adapter, "TipPlane", -BF_LEN)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, major_r / 1000.0) is None:
             raise RuntimeError("helix seed circle failed")
-    insert_helix(adapter, pitch, vn_fillister_screw_spec.BF_LEN / pitch + 1.0, clockwise=False,
+    insert_helix(adapter, pitch, BF_LEN / pitch + 1.0, clockwise=False,
                  reversed_dir=False, start_angle_rad=math.pi / 2.0,
                  feature_name="ThreadHelix")
 
-    cy = -vn_fillister_screw_spec.BF_LEN - 7.0 * pitch / 16.0
+    cy = -BF_LEN - 7.0 * pitch / 16.0
     top_r = major_r + h_sharp / 16.0
     check("create_sketch cutter", await adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):

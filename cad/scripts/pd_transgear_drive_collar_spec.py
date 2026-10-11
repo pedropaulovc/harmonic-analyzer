@@ -38,7 +38,7 @@ from __future__ import annotations
 import math
 import textwrap
 
-from _fit_limits import REAM_H7
+from _fit_ream_h7 import REAM_H7
 from _printed_tolerance import (
     angular_band_deg,
     drilled_oversize_mm,

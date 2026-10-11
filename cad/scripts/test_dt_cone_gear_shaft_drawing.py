@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 import _config
-import _fit_limits
+import _fit_shaft_h
 import build_dt_cone_gear_shaft as part
 import build_dt_drive_train_assembly as drive
 import dt_cone_gear_shaft_spec
@@ -30,11 +30,11 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 # Which NAMED band each land rides (U27, 2026-09-23): the two running lands
 # keep the shared h band, the three gear seats open to GEAR_SEAT_BAND.
 _EXPECTED_LAND_BANDS = (
-    ("RUNNING_DIA_BAND", _fit_limits.SHAFT_H),
+    ("RUNNING_DIA_BAND", _fit_shaft_h.SHAFT_H),
     ("GEAR_SEAT_BAND", dt_cone_gear_shaft_spec.GEAR_SEAT_BAND),
     ("GEAR_SEAT_BAND", dt_cone_gear_shaft_spec.GEAR_SEAT_BAND),
     ("GEAR_SEAT_BAND", dt_cone_gear_shaft_spec.GEAR_SEAT_BAND),
-    ("RUNNING_DIA_BAND", _fit_limits.SHAFT_H),
+    ("RUNNING_DIA_BAND", _fit_shaft_h.SHAFT_H),
 )
 
 
@@ -55,7 +55,7 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     stops a local retype from silently forking a named class.
     """
     spec = dt_cone_gear_shaft_spec
-    assert spec.RUNNING_DIA_BAND is _fit_limits.SHAFT_H
+    assert spec.RUNNING_DIA_BAND is _fit_shaft_h.SHAFT_H
     assert spec.GEAR_SEAT_BAND == (0.000, -0.050)
     assert _lands_ride_named_bands(spec.SECTION_DIA_BANDS)
     # Positive control: an equal-valued local retype of either class is caught.
@@ -972,11 +972,11 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         cone_line.TIP_BLOCK_NORTH_FACE - dt_cone_tip_block_spec.ADJUSTER_EMBED
     )
     # Vendor Sketch2 Line7: the pure stock spec owns the actual cup, not this shaft.
-    import vn_cone_tip_adjuster_spec
-    assert dt_cone_gear_shaft_spec.CUP_DEPTH == vn_cone_tip_adjuster_spec.CUP_DEPTH
+    import _mcmaster_94025a164
+    assert dt_cone_gear_shaft_spec.CUP_DEPTH == _mcmaster_94025a164.CUP_DEPTH
     assert dt_cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(
         dt_cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION
-        + vn_cone_tip_adjuster_spec.CUP_DEPTH
+        + _mcmaster_94025a164.CUP_DEPTH
     )
     assert dt_cone_gear_shaft_spec.SHAFT_LENGTH == (
         dt_cone_gear_shaft_spec.FRONT_STUB + dt_cone_gear_shaft_spec.T006_TIP_STATION

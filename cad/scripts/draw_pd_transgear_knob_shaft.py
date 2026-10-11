@@ -24,7 +24,10 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -44,7 +47,7 @@ from _drawing_common import (
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _part_pmi import _resolve_faces
+from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_transgear_knob_shaft_spec import (
@@ -354,7 +357,7 @@ async def build(adapter: Any) -> dict[str, str]:
     controls = {control.key: control for control in GEOMETRIC_CONTROLS}
     if set(controls) != set(GEOMETRIC_TOLERANCES_MM):
         raise RuntimeError("knob shaft frames do not cover the spec's geometric controls")
-    control_faces = _resolve_faces(
+    control_faces = resolve_faces(
         _early_bound(_early_bound(side, "IView").ReferencedDocument, "IModelDoc2"),
         {key: control.face for key, control in controls.items()},
     )

@@ -14,7 +14,9 @@ tangent edge; +Z through the thickness to the REAR face (z = THICKNESS).
 from __future__ import annotations
 
 import math
-from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _gtol_controls import GeometricControl, PartDatum
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import blind_cut_dia_mm
 
 import vn_transgear_latch_pin_spec as LATCH_PIN

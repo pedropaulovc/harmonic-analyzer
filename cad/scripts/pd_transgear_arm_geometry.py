@@ -30,7 +30,7 @@ from fractions import Fraction
 import pd_rack_pinion_spec as DISC
 import pd_support_bar_spec as BAR
 import vn_transgear_pivot_screw_spec as PIVOT
-from _fit_limits import measured_close_running_clearance_mm
+from _fit_close_running import measured_close_running_clearance_mm
 from _gear_quality import reducer_position_diameter_mm
 from _printed_tolerance import angular_band_deg
 import pd_transgear_pivot_spacer_spec as SPACER

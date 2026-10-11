@@ -12,8 +12,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import _telemetry  # noqa: E402
-from _common import check, run_build  # noqa: E402
-from _common import _flag  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _session import run_build  # noqa: E402
+from _com import _flag  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 ASM = ROOT / "out" / "sldasm" / "ch-channel.SLDASM"

@@ -42,7 +42,8 @@ import math
 import pd_rack_pinion_spec as DISC
 import _config
 
-from _fit_limits import SHAFT_G6_3_TO_6_MM, deviations
+from _fit_close_running import SHAFT_G6_3_TO_6_MM
+from _fit_deviations import deviations
 from _gear_fit_limits import gear_tip_band_mm
 from _gear_quality import (
     pinion_pitch_index_deviation_mm,
@@ -52,7 +53,8 @@ from _gear_quality import (
     toothspace_runout_tir_mm,
 )
 from paper_drive_stock_inspection import GaugeContact, toothspace_gauge_contact_mm
-from _gtol_spec import CylinderFace, GeometricControl, PartDatum
+from _gtol_controls import GeometricControl, PartDatum
+from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl

@@ -12,18 +12,18 @@ import math
 from typing import Any, NamedTuple
 
 import _telemetry
-from _common import (
-    SketchDims,
-    _early_bound,
+from _check import check
+from _com import _early_bound
+from _feature_tree import name_last_feature
+from _sketch import (
     add_line_chain,
     anchor_point_to_origin,
     blank_reference_sketches,
-    check,
-    define_circle,
     dimension_between,
     ensure_fully_defined,
-    name_last_feature,
+    SketchDims,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import _named_dimension, set_dimension_prefix
 from _gear import equation_curve
 from _visibility import blank_reference_geometry

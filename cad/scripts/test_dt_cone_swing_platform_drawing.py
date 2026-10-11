@@ -20,7 +20,7 @@ import dt_cone_swing_platform_geometry as geometry
 import dt_cone_swing_platform_spec as spec
 import draw_dt_cone_swing_platform as drawing
 import pytest
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
 

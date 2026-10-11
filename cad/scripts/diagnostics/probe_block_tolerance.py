@@ -1,6 +1,6 @@
 """Repro: which DimXpert block-tolerance doc-property prefs accept writes.
 
-Backs the get-only claim in ``_common.apply_block_tolerances``: on this seat
+Backs the get-only claim in ``_part_properties.apply_block_tolerances``: on this seat
 (3DEXPERIENCE R2026x) the tolerance METHOD (637) and the linear Tolerance 1/2
 VALUES (123/124, meters) set fine, while the decimals prefs (405/406) and the
 angular value (126, radians) reject every write — ``SetUserPreference*``
@@ -26,7 +26,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _read_member  # noqa: E402
+from _part_properties import (
     _PREF_ANGULAR_VALUE,
     _PREF_DIMXPERT_METHOD,
     _PREF_OPT_NONE,
@@ -34,8 +39,7 @@ from _common import (  # noqa: E402
     _PREF_TOL1_VALUE,
     _PREF_TOL2_DECIMALS,
     _PREF_TOL2_VALUE,
-    _read_member,
-)
+)  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 
 IN = 0.0254

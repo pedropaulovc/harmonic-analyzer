@@ -291,6 +291,41 @@ def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_dowel() -> None:
     assert retired not in jr.UNTHREADED_STOCK
 
 
+def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:
+    """PR #1317 Codex review: the MHA-VN-034 cups hold the rocked MHA-CH-005
+    shaft, an exposed joint. The user waived rule 9 for it (2026-10-10): snug
+    with Loctite 222, the step that drives them says so."""
+    import draw_ch_channel_assembly as channel
+
+    joint_id = "ch-channel/pivot-bracket-apex-set-screw"
+    (row,) = [j for j in jr.JOINTS if j.id == joint_id]
+    assert row.exposure is Exposure.OSCILLATING
+    assert row.lock is Lock.THREADLOCKER_ONLY
+    assert row.lock_step == row.installed_at == "set-screws-driven"
+    ruling = jr.RULINGS[row.exception]
+    assert ruling.joint == joint_id
+    assert "waived; light spring preload and small hub drag; Loctite 222" in ruling.granted
+    assert "WITH LOCTITE 222; SNUG." in channel.FITUP_STEPS
+    assert "TIGHTEN" not in channel.FITUP_STEPS
+
+    def unlocked(rulings) -> set[str]:
+        findings = jr.audit(
+            jr.JOINTS,
+            jr.build_inventory(),
+            threaded=jr.THREADED_PARTS,
+            unthreaded=jr.UNTHREADED_PARTS,
+            purchased=jr.purchased_parts(),
+            unthreaded_stock=jr.UNTHREADED_STOCK,
+            required=jr.REQUIRED_JOINTS,
+            rulings=rulings,
+        )
+        return {f.subject for f in findings if f.kind is Kind.UNLOCKED}
+
+    assert joint_id not in unlocked(jr.RULINGS)
+    without = {k: v for k, v in jr.RULINGS.items() if k != row.exception}
+    assert joint_id in unlocked(without)
+
+
 def test_a_static_clamp_must_say_why_no_operating_torque_reaches_it() -> None:
     unreasoned = dataclasses.replace(SCREW, exposure_reason="  ")
     assert _kinds(_audit((STUD, CAP, unreasoned, NUT))) == {

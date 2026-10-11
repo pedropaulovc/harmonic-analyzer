@@ -748,7 +748,7 @@ def drawing_specification_violations(
         tree, "_surface_finish", frozenset({"surface_finish_by_key"})
     )
     fit_direct, fit_modules = _imported_functions(
-        tree, "_fit_limits", frozenset({"fit_limits", "band_text"})
+        tree, "_fit_text", frozenset({"fit_limits", "band_text"})
     )
     surface_direct, surface_modules = _imported_functions(
         tree, "_drawing_common", frozenset({"add_surface_finish"})

@@ -21,7 +21,12 @@ from __future__ import annotations
 import asyncio
 
 import _telemetry
-from _common import _flag, _read_member, log
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log
+from _com import _flag, _read_member
 
 
 def _features(adapter, model):

@@ -7,7 +7,8 @@ from typing import Any
 import pytest
 
 import _native_projected_zone as native
-from _gtol_spec import CylinderFace, GeometricControl
+from _gtol_controls import GeometricControl
+from _gtol_cylinder import CylinderFace
 
 
 # Independent installed-schema oracle; neither native readback nor expectations

@@ -5,22 +5,17 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _simplified_part import save_simplified_part
 from diagnostics.diag_build_91882A221 import build_91882A221
-from diagnostics.diag_mcmaster_thumb import THUMB_SPECS
+from _mcmaster_91882a221 import HEAD_STACK_LEN
 
 PART_NAME = "vn-thumb-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-_THUMB = THUMB_SPECS["91882A221"]
-HEAD_DIA = 2.0 * _THUMB["head_r"]
-HEAD_H = _THUMB["head_h"]
-HEAD_STACK_LEN = _THUMB["collar_h"] + _THUMB["head_h"]
-SHANK_DIA = 2.0 * _THUMB["major_r"]
-SHANK_LEN = _THUMB["length"]
 
 
 async def build(adapter) -> dict[str, str]:
@@ -38,6 +33,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        save_threaded_part=save_simplified_part,
     )
 
 

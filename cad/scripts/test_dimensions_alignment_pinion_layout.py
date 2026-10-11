@@ -33,7 +33,7 @@ import dt_pinion_spring_geometry as spring
 import gen_dimensions
 import vn_post_mount_screw_spec as post_screw
 import vn_cone_tip_collar_spec as tip_collar
-import vn_cone_tip_adjuster_spec as tip_adjuster
+import _mcmaster_94025a164 as tip_adjuster
 import vn_cone_pivot_screw_spec as pivot_screw
 import vn_swing_stop_screw_spec as stop_screw
 

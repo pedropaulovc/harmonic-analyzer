@@ -17,7 +17,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import _common
+import _bore_axis
+import _part_save
+import _rebuild
 import _visibility
 import build
 import visibility_debt
@@ -301,7 +303,7 @@ def test_every_configuration_is_checked_with_itself_active(
         {"T006": [("Axis1", "axis")], "T012": [], "T120": []}, active="T120"
     )
     monkeypatch.setattr(
-        _common, "active_configuration_name", lambda _adapter, _model=None: model.active
+        _rebuild, "active_configuration_name", lambda _adapter, _model=None: model.active
     )
     monkeypatch.setattr(
         _visibility,
@@ -348,7 +350,7 @@ def test_part_save_checks_before_the_first_save() -> None:
         _part_tree(_Feature("StationReference", "ProfileFeature", SHOWN)), saves
     )
     with pytest.raises(RuntimeError, match="StationReference"):
-        asyncio.run(_common.save_part_and_images(adapter, "dt-crank-arm"))
+        asyncio.run(_part_save.save_part_and_images(adapter, "dt-crank-arm"))
     assert saves == []
 
 
@@ -358,7 +360,7 @@ def test_a_shown_plane_reaching_the_save_fails_it() -> None:
     saves: list[str] = []
     model = _part_tree(_Feature("Axis1", "RefAxis", SHOWN))
     with pytest.raises(RuntimeError, match="axis 'Axis1'"):
-        asyncio.run(_common.save_part_and_images(_adapter(model, saves), "dt-crank-arm"))
+        asyncio.run(_part_save.save_part_and_images(_adapter(model, saves), "dt-crank-arm"))
     assert model.by_name["Axis1"].Visible == SHOWN
     assert saves == []
 
@@ -528,7 +530,7 @@ def test_name_bore_axis_hides_the_planes_and_axis_it_creates() -> None:
         currentModel=model, create_plane=create_plane, create_axis=create_axis
     )
     axis = asyncio.run(
-        _common.name_bore_axis(adapter, "Front Plane", 4.0, "Top Plane", 0.0, "bore")
+        _bore_axis.name_bore_axis(adapter, "Front Plane", 4.0, "Top Plane", 0.0, "bore")
     )
     assert axis == "Axis1"
     assert [f.Name for f in model.features if f.Visible == SHOWN] == []

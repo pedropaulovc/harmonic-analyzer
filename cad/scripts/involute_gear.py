@@ -30,7 +30,8 @@ from typing import Any
 
 import _config
 import _telemetry
-from _common import _early_bound, _read_member, check
+from _check import check
+from _com import _early_bound, _read_member
 
 DP = _config.machine("gear_train", "diametral_pitch")
 PA_DEG = float(_config.machine("gear_train", "pressure_angle_deg"))

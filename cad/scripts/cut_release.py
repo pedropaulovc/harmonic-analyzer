@@ -86,7 +86,8 @@ import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from _common import CAD_ROOT, OUT_SLDASM, log
+from _check import log
+from _paths import CAD_ROOT, OUT_SLDASM
 import _config
 from _drawing_registry import DRAWINGS
 from export_models import stage_release_neutral

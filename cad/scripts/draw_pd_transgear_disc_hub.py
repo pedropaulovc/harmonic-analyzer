@@ -28,7 +28,10 @@ from dataclasses import dataclass
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     ViewEdge,
@@ -50,9 +53,9 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _native_axis_datum import add_native_axis_datum
-from _part_pmi import _face_geometry, _face_matches
+from _gtol_face_read import face_geometry
 from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_disc_hub_spec import (
     BORE_DATUM,
@@ -323,11 +326,11 @@ def controlled_face(rim: ViewEdge, frame: FaceFrame) -> Any:
     faces with exactly one such plane, or this raises naming each face."""
     adjacent = rim.edge.GetTwoAdjacentFaces2() or ()
     faces = tuple(face for face in adjacent if face is not None)
-    geometries = [_face_geometry(face) for face in faces]
+    geometries = [face_geometry(face) for face in faces]
     matches = [
         geometry.face
         for geometry in geometries
-        if geometry is not None and _face_matches(geometry, frame.face)
+        if geometry is not None and frame.face.matches(geometry)
     ]
     if len(faces) != 2 or len(matches) != 1:
         described = "; ".join(

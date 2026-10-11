@@ -43,7 +43,8 @@ DENSITIES = {"Brass": 8500.0, "Plain Carbon Steel": 7800.0}
 GRAVITY_M_S2 = 9.80665
 WELD_TOLERANCE_MM = 1e-5
 BLOCKED_IMPORTS = (
-    "_common",
+    "_com",
+    "_session",
     "_transforms",
     "dodo",
     "pythoncom",
@@ -251,7 +252,8 @@ class SourceSlices:
         return {name: self.get(filename, name) for name in names}
 
     def export_units(self):
-        path, tree, definitions, _namespace = self.module("_common.py")
+        path, _tree, definitions, _namespace = self.module("_preferences.py")
+        exporter_path, tree, _definitions, _namespace = self.module("_part_save.py")
 
         def literal(name):
             return ast.literal_eval(definitions[name].value)
@@ -301,13 +303,13 @@ class SourceSlices:
             for node in ast.walk(exporter)
         ):
             raise RuntimeError(
-                "native STL exporter no longer enforces declared preferences"
+                f"native STL exporter no longer enforces declared preferences: {exporter_path}"
             )
         return {
             "coordinate_unit": "mm",
             "scale_to_mm": 1.0,
             "origin_preserved": True,
-            "source": "cad/scripts/_common.py",
+            "source": "cad/scripts/_preferences.py",
             "preference": "PREF_STL_UNITS=211, applied value 0 (swMM)",
             "declaration_line": call.lineno,
         }

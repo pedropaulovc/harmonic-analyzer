@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 import _drawing_marks
-from _fit_limits import REAM_SLIDE
+from _fit_ream_slide import REAM_SLIDE
 from dt_pinion_cam_pin_spec import PIN_DIA_BAND
 from dt_pinion_cam_spec import BORE_BAND as CAM_BORE_BAND
 from dt_pinion_lever_spec import BORE_BAND as LEVER_BORE_BAND

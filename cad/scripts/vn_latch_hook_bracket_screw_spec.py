@@ -17,7 +17,7 @@ head and its stock band are the hook's (``pd_latch_hook_geometry``).
 
 from __future__ import annotations
 
-from vn_swing_stop_screw_spec import FILLISTER_SIZE
+from _mcmaster_90280a108 import FILLISTER_SIZE
 from pd_latch_hook_geometry import SHEET_T, SHEET_T_MINUS, SHEET_T_PLUS
 
 SKU = "90280A108"

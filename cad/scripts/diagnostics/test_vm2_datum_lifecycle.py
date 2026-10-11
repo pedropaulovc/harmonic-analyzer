@@ -19,7 +19,7 @@ def probe(tmp_path, monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "ROOT", tmp_path.resolve())
-    monkeypatch.setitem(sys.modules, "_common", SimpleNamespace(_early_bound=lambda value, _kind: value))
+    monkeypatch.setitem(sys.modules, "_com", SimpleNamespace(_early_bound=lambda value, _kind: value))
     monkeypatch.setitem(sys.modules, "dt_pinion_lift_rod_spec", SimpleNamespace(ROD_DIA=6.35, __file__=__file__))
     monkeypatch.setitem(sys.modules, "pd_rack_pinion_spec", SimpleNamespace(BORE_DIA=5.0, __file__=__file__))
     for stem in ("dt-pinion-lift-rod", "pd-rack-pinion"):

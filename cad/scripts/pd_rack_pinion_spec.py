@@ -28,25 +28,24 @@ from __future__ import annotations
 
 import math
 
-from _fit_limits import deviations
+from _fit_deviations import deviations
 from _gear_quality import (
     pinion_pitch_index_deviation_mm,
     pitch_index_measurement_uncertainty_mm,
     require_pitch_index_measurements_mm,
     toothspace_runout_tir_mm,
 )
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from vn_fillister_screw_spec import FILLISTER_SIZES
+from _mcmaster_91794a055 import FILLISTER_SIZE
 from paper_drive_stock_inspection import GaugeContact, toothspace_gauge_contact_mm
 from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
     BOLT_CIRCLE_POSITION_TOL,
     SCREW_COUNT,
     SCREW_HOLE_DIA,
-    SCREW_SKU,
     SCREW_THREAD,
     SPIGOT_DIA,
     SPIGOT_DIA_BAND,
@@ -310,9 +309,7 @@ BORE_FRONT_CHAMFER_NOTE = (
 )
 
 # --- screw (MHA-VN-039) -------------------------------------------------------------
-SCREW_MAJOR_DIA, SCREW_LENGTH, _HEAD_H, _HEAD_DIA, SCREW_PITCH = FILLISTER_SIZES[
-    SCREW_SKU
-]
+SCREW_MAJOR_DIA, SCREW_LENGTH, _HEAD_H, _HEAD_DIA, SCREW_PITCH = FILLISTER_SIZE
 
 # --- #0-80 taps --------------------------------------------------------------------
 TAP_SPEC = HoleSpec("tapped", SCREW_THREAD)

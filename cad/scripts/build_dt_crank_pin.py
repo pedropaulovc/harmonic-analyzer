@@ -17,23 +17,21 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
-    apply_material,
-    check,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    define_circle,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -56,7 +54,7 @@ from dt_crank_pin_spec import (
 )
 
 PART_NAME = "dt-crank-pin"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 
 async def build(adapter) -> dict[str, str]:

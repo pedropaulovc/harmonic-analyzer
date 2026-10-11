@@ -24,7 +24,7 @@ import pytest
 
 import _config
 import _purchased_fastener_drawing as purchased
-from _common import part_properties
+from _part_properties import part_properties
 from _drawing_registry import DRAWINGS
 
 SCRIPTS = Path(__file__).resolve().parent

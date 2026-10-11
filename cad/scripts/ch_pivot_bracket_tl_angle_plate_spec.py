@@ -17,7 +17,9 @@ The bought plate is X 0..PLATE_LENGTH, the base Y 0..BASE_THICK by
 Z -PLATE_WIDTH..0 and the upright Y BASE_THICK..PLATE_HEIGHT by
 Z -UPRIGHT_THICK..0. The inventory's fixture frame (bracket plan setup frame
 TC: front upright face Y=0, plate behind the part on +Y, Z up with Z0 the
-bracket's faced outer face) is a rigid copy of it:
+bracket's faced outer face -- the foot's ear-end face at FOOT_Z0, in the
+plane of the ear's inboard face, the face fit-up sets and the hold-down
+station is given from) is a rigid copy of it:
 TC = (x - PLATE_LENGTH/2, -z, y - (PLATE_HEIGHT + PART_PROUD[c])) for
 configuration c: the N bracket's longer foot raises its faced outer face, and
 so its Z0, N_RAISE higher than the S one's. The ledge's model frame is this one translated by
@@ -31,7 +33,8 @@ import math
 import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_spec as bracket
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm
 
@@ -72,12 +75,12 @@ _LEDGE_HEIGHT_FLOOR = (
 )
 _LEDGE_BAND = _LEDGE_HEIGHT_FLOOR - limits(_LEDGE_HEIGHT_FLOOR, 1)[0]
 _LEDGE_HEIGHT = math.ceil(round((_LEDGE_HEIGHT_FLOOR + _LEDGE_BAND) * 10.0, 6)) / 10.0
-LEDGE_TOP_Y = round(BLOCK_HEIGHT + _LEDGE_HEIGHT, 6)  # 78.5
+LEDGE_TOP_Y = round(BLOCK_HEIGHT + _LEDGE_HEIGHT, 6)  # 77.7
 PART_PROUD = {
     name: LEDGE_TOP_Y + foot_len - PLATE_HEIGHT
     for name, foot_len in sides.FOOT_LEN.items()
-}  # S 5.24, N 6.94
-N_RAISE = PART_PROUD["N"] - PART_PROUD[LEDGE_CONFIG]  # 1.70
+}  # S 5.24, N 6.85
+N_RAISE = PART_PROUD["N"] - PART_PROUD[LEDGE_CONFIG]  # 1.61
 PART_PROUD_WORST = (
     BLOCK_HEIGHT
     + limits(_LEDGE_HEIGHT, 1)[0]
@@ -112,7 +115,7 @@ SCREW_HEAD_ECCENTRICITY_MAX = 0.006 * 25.4 / 2.0  # 0.0762
 SCREW_HEAD_GAP_MIN = 0.3
 SCREW_HALF_PITCH = 5.0
 SCREW_BELOW_LEDGE_TOP = 10.5
-SCREW_Y = round(LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP, 6)  # 68.0
+SCREW_Y = round(LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP, 6)  # 67.2
 TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 
 # Bridge studs: 3/8-16 studs through letter-X clearance holes, 40.0 apart
@@ -126,8 +129,10 @@ TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 # the plate PLATE_HEIGHT_ALLOWANCE short): 80.7, 8.2 under the nominal plate
 # top, leaving 2.06 (80.8 would leave 1.96).
 # STUD_BELOW_PART_TOP under each configuration's outer face (the prechips S4
-# hold's Setup Z, S -13.44, N -15.14). A bar up to 2 * (13.44 - EAR_T) = 14.9
-# wide clears the S ear.
+# hold's Setup Z, S -13.44, N -15.05). The S ear occupies the top EAR_T = 8
+# of the part and stands EAR_TOP_Y - FOOT_H = 27.2 off the foot top, so a bar
+# centred on the stud row clears it only up to 2 * (13.44 - EAR_T) = 10.88
+# wide.
 STUD_DIA = 9.525
 STUD_SPEC = HoleSpec("drilled_letter", "X")
 STUD_HALF_PITCH = 20.0

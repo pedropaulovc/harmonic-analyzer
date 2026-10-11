@@ -7,9 +7,17 @@ Fits are therefore shared parameters applied uniformly, never per-part magic num
 
 ## Source of truth
 
-Fit classes and clearances live in [`cad/config/tolerances.yaml`](../config/tolerances.yaml)
+General classes live in [`cad/config/tolerances/_base.yaml`](../config/tolerances/_base.yaml);
+fit classes and clearances live in its per-fit-group sibling YAML files
 and flow into geometry and into part custom properties. The build scripts read named fit
 classes; they do not hardcode clearance numbers.
+
+`tolerances/_base.yaml` owns units and general classes; each
+`tolerances/<group>.yaml` owns one fit group. `_config._doc("tolerances")`
+aggregates the unchanged document shape. Literal `_config.fit("<group>", ...)`
+reads key only that group; dynamic or unknown groups and fit references retain
+the whole family. Build subprocesses receive `HARMONIC_FIT_GROUPS` from their
+recipe's config dependencies and refuse reads outside that set.
 
 Accuracy-driven limits on the **critical features** live in
 [`cad/config/error_budget.yaml`](../config/error_budget.yaml) and are derived — not asserted —
@@ -78,8 +86,8 @@ chain; a limit that cannot cite each step is a habit, not a requirement.
 
 ### Drive-train gear tips and standard mesh checks
 
-Gear tips take `fits.gear_tip` in `tolerances.yaml` (read through
-`_fit_limits.gear_tip_band_mm`), not the routine title-block band: an oversize
+Gear tips take `fits.gear_tip` in `tolerances/gear_tip.yaml` (read through
+`_gear_fit_limits.gear_tip_band_mm`), not the routine title-block band: an oversize
 tip eats root air and an undersize tip shortens the path of contact.
 `contact_critical` (+0.00/−0.02 mm) is the 32T alignment and 120T cylinder
 grade; `standard` (+0.00/−0.10 mm) is for tips whose mesh budget allows it.
@@ -503,7 +511,7 @@ leaves its targets.
 ## Current analytic clearance assertions (kept, being migrated)
 
 The build scripts already assert clearance margins analytically (and raise on violation) — these
-are the concrete realizations of the classes above, being lifted into `tolerances.yaml`:
+are the concrete realizations of the classes above, being lifted into `tolerances/`:
 
 - spring-eye threading margins into the lever hole / under the tab;
 - oblique cone↔drum mesh set point (edge slack, `cone_set_stack`). The engaged cone centre is
