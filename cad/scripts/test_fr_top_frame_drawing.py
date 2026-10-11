@@ -1634,6 +1634,39 @@ def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
         assert 0.013 < x < TITLE_BLOCK[0] and 0.125 < y < 0.270, name
 
 
+def test_overall_plan_extremes_pick_the_barrel_circles_as_entities() -> None:
+    # Farm a03283b49: a sheet-point pick on the boss barrel's R22.5 plan
+    # outline resolved to the top C2 break's R20.5 circle 2.0 inside it
+    # (width 435 for 439).  Both overall dimensions select the scanned
+    # R22.5 circles, on the upper boss's C2 lower circle plane.
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    calls = {
+        ast.literal_eval(keyword.value): call
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call) and _called_name(call) == "_checked_dimension"
+        for keyword in call.keywords
+        if keyword.arg == "label" and isinstance(keyword.value, ast.Constant)
+    }
+    for label in ("overall casting width", "overall casting depth"):
+        keywords = {keyword.arg: keyword.value for keyword in calls[label].keywords}
+        entities = keywords["entities"]
+        assert isinstance(entities, ast.Tuple) and len(entities.elts) == 2
+        assert all(_called_name(item) == "plan_barrel" for item in entities.elts)
+        assert ast.literal_eval(keywords["maximum"]) is True
+    barrel = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "plan_barrel"
+    )
+    text = ast.unparse(barrel)
+    assert "geometry_top_edges.circle_at(" in text
+    assert "HALF_H + BOSS_ABOVE - EDGE_CHAMFER" in text
+    assert "BOSS_DIA / 2" in text
+    assert drawing.PLAN_HALF_X == part.COLUMN_X + part.BOSS_DIA / 2.0
+
+
 def test_no_datum_tag_is_attached_to_a_circle_by_edge_object() -> None:
     # Farm run 20261009T164113078Z: datum B, attached to the scanned round
     # dowel-hole circle as an edge object, ignored SetPosition2 and stayed at

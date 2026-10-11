@@ -2282,8 +2282,19 @@ async def build(adapter: Any) -> dict[str, str]:
     # Every imported dimension's places are the part's; the whole print's
     # imports are collected here and read back once, before export.
     imported_annotations = [*geometry_annotations]
-    # The plan extremes are the boss barrels, whose top edge is the C2
-    # break's lower circle, R22.5 at EDGE_CHAMFER under the boss top.
+    # The plan extremes are the corner-boss barrels, whose plan outline is
+    # the upper boss's top C2 lower circle, R22.5 at EDGE_CHAMFER under the
+    # boss top.  The break's upper R20.5 circle sits 2.0 inside it, and a
+    # sheet-point hit test on the R22.5 outline resolved to the R20.5 circle
+    # (farm a03283b49: width 435 for 439), so both ends of both overall
+    # dimensions are the scanned R22.5 circles themselves.
+    def plan_barrel(x: float, z: float, label: str) -> Any:
+        return geometry_top_edges.circle_at(
+            (x, HALF_H+BOSS_ABOVE-EDGE_CHAMFER, z), BOSS_DIA/2,
+            axis=(0.0, 1.0, 0.0), label=label,
+            center_tol_mm=1e-4, radius_tol_mm=1e-4,
+        ).edge
+
     _checked_dimension(
         adapter, geometry_top,
         p0=(-PLAN_HALF_X, HALF_H+BOSS_ABOVE-EDGE_CHAMFER, FRONT_COLUMN_Z),
@@ -2291,6 +2302,10 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(GEOMETRY_TOP_CENTER[0], 0.2565), label="overall casting width",
         expected_mm=2*PLAN_HALF_X, orientation="horizontal", maximum=True,
         reference=True, suffix="OVERALL",
+        entities=(
+            plan_barrel(-COLUMN_X, FRONT_COLUMN_Z, "overall width, east barrel"),
+            plan_barrel(COLUMN_X, FRONT_COLUMN_Z, "overall width, west barrel"),
+        ),
     )
     _checked_dimension(
         adapter, geometry_top,
@@ -2299,6 +2314,10 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.022, 0.145), label="overall casting depth",
         expected_mm=2*PLAN_HALF_Z, orientation="vertical", maximum=True,
         reference=True,
+        entities=(
+            plan_barrel(-COLUMN_X, FRONT_COLUMN_Z, "overall depth, front barrel"),
+            plan_barrel(-COLUMN_X, REAR_COLUMN_Z, "overall depth, rear barrel"),
+        ),
     )
     _checked_dimension(
         adapter, geometry_top,
