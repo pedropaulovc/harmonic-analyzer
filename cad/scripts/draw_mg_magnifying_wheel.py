@@ -15,11 +15,13 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
 from _check import check
+from _com import _early_bound
 from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
@@ -30,27 +32,41 @@ from _drawing_common import (
     assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
+    model_points_in_view,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     scan_view_edges,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _drawing_leaders import (
+    assert_leaders_clear,
+    dimension_segments,
+    set_near_side_diameter,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
+from mg_magnifying_wheel_geom import HUB_BACK_Z, HUB_FRONT_Z, SPOKE_X0
 from mg_magnifying_wheel_spec import (
+    BORE_DIA,
     CAST_ROUND_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    HUB_DIA,
+    HUB_FILLET_R,
     RIM_AXIAL,
+    RIM_FILLET_R,
     RIM_INNER_DIA,
     RIM_OUTER_DIA,
+    TIE1_CLOCK_DEG,
+    TIE1_R,
+    TIE2_CLOCK_DEG,
+    clock_to_local_deg,
+    fillet,
 )
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_wheel"]
@@ -78,30 +94,138 @@ DRAWING_PRECISION_BY_NAME = {
     for name, digits in names.items()
 }
 
-# Face view: text in the windows between the spokes (spokes at 0, 60, ... deg).
+# Face view.  The sheet's front view is the model's XY plane at 1:1 (sheet x
+# = model x), so each text point below is derived from the feature it names.
+# Every text sits in a window between the spokes (spokes at 0, 60, ... deg),
+# and no leader or shoulder may cross another's line (policy rule 8).  Farm
+# run 7 (396077c3e) failed on exactly that: the native Ø100 and Ø88 lines
+# ran rim to rim through the centre, so the Tie1Y and SpokeRootWidth
+# shoulders under them crossed them.  The three diameters now take one arrow
+# on their near rim (set_near_side_diameter), so nothing but the bore's own
+# short leader enters the face.
+#
+# A dimension's position is its text block's mid-height above the point its
+# leader or shoulder meets (run 7 readback: the one-line Tie1Y shoulder ran
+# 2.8 mm under its point, the two-line SpokeRootWidth one 5.6 mm), and its
+# text runs away from the feature it measures.
+_TEXT_LINE = 0.0056
+
+
+def _face(x_mm: float, y_mm: float) -> tuple[float, float]:
+    """A model XY point (mm) on the sheet (m)."""
+    return (
+        FRONT_CENTER[0] + x_mm * SHEET_SCALE[0] / 1000.0,
+        FRONT_CENTER[1] + y_mm * SHEET_SCALE[0] / 1000.0,
+    )
+
+
+def _polar(origin_mm: tuple[float, float], bearing_deg: float, reach_mm: float):
+    """The model point ``reach_mm`` from ``origin_mm`` along ``bearing_deg``."""
+    bearing = math.radians(bearing_deg)
+    return (
+        origin_mm[0] + reach_mm * math.cos(bearing),
+        origin_mm[1] + reach_mm * math.sin(bearing),
+    )
+
+
+def _over(attach_mm: tuple[float, float], lines: int) -> tuple[float, float]:
+    """The text point whose ``lines``-line block stands on ``attach_mm``."""
+    x, y = _face(*attach_mm)
+    return (x, y + lines * _TEXT_LINE / 2.0)
+
+
+_HUB_FILLET_CENTRE = fillet(HUB_DIA / 2.0, HUB_FILLET_R, outside=True)["centre"]
+_RIM_FILLET_CENTRE = fillet(RIM_INNER_DIA / 2.0, RIM_FILLET_R, outside=False)["centre"]
+_TIE1 = _polar((0.0, 0.0), clock_to_local_deg(TIE1_CLOCK_DEG), TIE1_R)
+# TIE 2's angle is driven between its radial axis (outward at 223 deg) and the
+# horizontal inner end, where the axis enters the rim bore; its text reads the
+# same acute 43 deg in the sector opposite the sketch's, [0, 43] deg from that
+# inner point, which opens into the 180-240 window instead of out across the
+# rim and the hole's Ø.
+_TIE2_OUTWARD = clock_to_local_deg(TIE2_CLOCK_DEG) % 360.0
+_TIE2_INNER = _polar((0.0, 0.0), _TIE2_OUTWARD, RIM_INNER_DIA / 2.0)
+_TIE2_ANGLE_SECTOR = (0.0, _TIE2_OUTWARD - 180.0)
 FRONT_KEEP = {
-    "RimOuterDiaDim": (
-        FRONT_CENTER[0] - _RIM_R - 0.028,
-        FRONT_CENTER[1] + _RIM_R + 0.006,
-    ),
-    "RimInnerDiaDim": (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + _RIM_R + 0.012),
-    "BoreDiaDim": (FRONT_CENTER[0] + 0.024, FRONT_CENTER[1] + 0.014),
-    "HubFilletR": (FRONT_CENTER[0] - 0.024, FRONT_CENTER[1] + 0.014),
-    "RimFilletR": (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + 0.036),
-    "SpokeRootWidth": (FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] - 0.012),
-    "SpokeTipWidth": (FRONT_CENTER[0] + 0.040, FRONT_CENTER[1] - 0.014),
-    "Tie1Y": (FRONT_CENTER[0] - 0.008, FRONT_CENTER[1] - 0.022),
-    "Tie1HoleDia": (FRONT_CENTER[0] + 0.008, FRONT_CENTER[1] - 0.034),
-    "Tie2Angle": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] - 0.014),
+    # Near-side, one arrow each: Ø100 up-left on the OD, clear of everything;
+    # Ø88 straight up the 60-120 window to the rim bore; the bore up-left
+    # along the 120-180 window's bisector to its rim.
+    "RimOuterDiaDim": _over(_polar((0.0, 0.0), 125.0, RIM_OUTER_DIA / 2.0 + 35.0), 1),
+    "RimInnerDiaDim": _over(_polar((0.0, 0.0), 90.0, RIM_OUTER_DIA / 2.0 + 13.2), 1),
+    "BoreDiaDim": _over(_polar((0.0, 0.0), 150.0, RIM_OUTER_DIA / 2.0 + 16.0), 2),
+    # The R3 (concave, inside the 0-60 window) on its centre's 45 deg ray;
+    # the R4 (convex, from outside the rim) on its centre's -3 deg ray, past
+    # the OD and above the tip width's extension lines.
+    "HubFilletR": _over(_polar(_HUB_FILLET_CENTRE, 45.0, 14.0), 2),
+    "RimFilletR": _over(_polar(_RIM_FILLET_CENTRE, -3.0, 26.0), 2),
+    # Each spoke width beside its own end, its text down into the 300-360
+    # window: the root's line inside the hub fillets' feet, the tip's outside
+    # the rim, so neither's extension lines reach the other's line.
+    "SpokeRootWidth": _over((SPOKE_X0 + 4.5, -22.0), 2),
+    "SpokeTipWidth": _over((RIM_OUTER_DIA / 2.0 + 3.0, -22.0), 2),
+    # TIE 1's 9.85 between its own extension lines, left of the axis in the
+    # 180-240 window, clear of the bore and tie centre marks: a quarter line
+    # under mid-span, so the block stays between the lines whether its point
+    # reads as the block's middle or (inside the lines) its bottom.
+    "Tie1Y": _face(-17.0, _TIE1[1] / 2.0 - _TEXT_LINE * 1000.0 / 4.0),
+    # The tie's Ø down and right from the hole, left of the root width's line.
+    "Tie1HoleDia": _over(_polar(_TIE1, -80.0, 30.0), 2),
+    "Tie2Angle": _face(*_polar(_TIE2_INNER, sum(_TIE2_ANGLE_SECTOR) / 2.0, 10.0)),
     "Tie2HoleDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] - 0.050),
 }
+# Near-side leaders: no segment of these comes nearer the axis than half the
+# circle's radius, and each ends on its own circle (sheet metres; a reading
+# outside the band means the ink is not in sheet space).
+NEAR_SIDE_DIAMETERS = {
+    "RimOuterDiaDim": RIM_OUTER_DIA,
+    "RimInnerDiaDim": RIM_INNER_DIA,
+    "BoreDiaDim": BORE_DIA,
+}
+# The template centre-marks each hole as the view is placed, so an explicit
+# AutoInsertCenterMarks2 printed a second, identical mark (run 7: two
+# duplicate-annotation findings; sm_knife_mount #913).  Each mark keeps its
+# cross only: the extended lines ran 47.5 mm along the axes, through the
+# bore's Ø text and every window's dimension.  The face view is 1:1, so the
+# mark's model-length arm is its sheet length.
+CENTRE_MARK_ARM = 0.0025
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+_MARK_ON_HOLE = 0.0005
 # Side view: sheet right = model -Z (the pen side, where the spigot stands).
+# The view centres on the part's axial extent, the hub's back face to its
+# spigot end, so each hub face's sheet x follows from its z.
+_SIDE_MID_Z = (HUB_BACK_Z + HUB_FRONT_Z) / 2.0
+
+
+def _side_x(z_mm: float) -> float:
+    """The side view's sheet x (m) of the model plane at ``z_mm``."""
+    return RIGHT_CENTER[0] + (_SIDE_MID_Z - z_mm) * SHEET_SCALE[0] / 1000.0
+
+
+# Run 7 printed "9.85 ±0.05" (10 characters) 24.5 mm wide.
+_TEXT_CHAR = 0.00245
+# Text kept this far off any extension line it does not own, past the half
+# text height inside which the audit gates a crossing (DIM_CROSSING_TEXT_HEIGHTS).
+_TEXT_OFF_LINE = 0.004
+
+
+def _beside(face_x: float, side: int, chars: int, y: float) -> tuple[float, float]:
+    """A ``chars``-wide text centred ``side`` (-1 left, +1 right) of ``face_x``."""
+    return (face_x + side * (_TEXT_OFF_LINE + chars * _TEXT_CHAR / 2.0), y)
+
+
+# The hub's three axial sizes below the view, each text OUTSIDE its span, so
+# no extension line runs through a text (run 7: four extension-through-own-
+# text findings).  The two short ones share the near row, HubBackZ ("7.09")
+# off the back face to the left and SpigotLength ("9.00 +0.10/0") off the
+# spigot end to the right; the overall HubLength ("19.60 ±0.10") runs on the
+# far row, its text right of the spigot end under SpigotLength's.
+_HUB_NEAR_ROW = RIGHT_CENTER[1] - 0.056
+_HUB_FAR_ROW = RIGHT_CENTER[1] - 0.068
 RIGHT_KEEP = {
     "HubDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + 0.020),
     "SpigotDia": (RIGHT_CENTER[0] + 0.032, RIGHT_CENTER[1] + 0.016),
-    "HubBackZ": (RIGHT_CENTER[0] - 0.012, RIGHT_CENTER[1] - 0.060),
-    "SpigotLength": (RIGHT_CENTER[0] + 0.010, RIGHT_CENTER[1] - 0.060),
-    "HubLength": (RIGHT_CENTER[0] + 0.003, RIGHT_CENTER[1] - 0.070),
+    "HubBackZ": _beside(_side_x(HUB_BACK_Z), -1, 4, _HUB_NEAR_ROW),
+    "SpigotLength": _beside(_side_x(HUB_FRONT_Z), 1, 12, _HUB_NEAR_ROW),
+    "HubLength": _beside(_side_x(HUB_FRONT_Z), 1, 11, _HUB_FAR_ROW),
     "SpokeAxial": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] - 0.020),
     "GrooveR": (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.060),
     "GrooveBottomDia": (RIGHT_CENTER[0] + 0.040, RIGHT_CENTER[1] + 0.035),
@@ -127,6 +251,75 @@ RIGHT_HALF_RIM = RIM_AXIAL * SHEET_SCALE[0] / 2000.0
 # only band where the OD circle stands alone on that line.
 _RIM_FACE_MID_Y = (RIM_INNER_DIA / 2.0 + CAST_ROUND_R + RIM_OUTER_DIA / 2.0) / 2000.0
 _RIM_AXIS = (0.0, 0.0, 1.0)
+
+
+def _near_side_diameters(
+    adapter: Any, annotations: list[Any], *, axis: tuple[float, float]
+) -> None:
+    """One arrow on each face-view diameter's near rim, proven off the face."""
+    named = {dimension_name(adapter, annotation): annotation for annotation in annotations}
+    for name in NEAR_SIDE_DIAMETERS:
+        set_near_side_diameter(named[name], f"wheel {name}")
+    rebuild_drawing(adapter, label="wheel near-side diameters")
+    radii = {
+        name: diameter * SHEET_SCALE[0] / 2000.0
+        for name, diameter in NEAR_SIDE_DIAMETERS.items()
+    }
+    assert_leaders_clear(
+        {name: dimension_segments(named[name]) for name in NEAR_SIDE_DIAMETERS},
+        centre=axis,
+        keep_out={name: radius / 2.0 for name, radius in radii.items()},
+        lands_within={name: (0.8 * radius, 1.2 * radius) for name, radius in radii.items()},
+        label="wheel near-side diameters",
+    )
+
+
+def _trim_centre_marks(
+    adapter: Any, view: Any, holes: dict[str, tuple[float, float]]
+) -> None:
+    """Keep the template's centre marks as bare crosses, one per hole, and
+    fail on a second mark at any hole or a mark at no hole."""
+    marks = [
+        _early_bound(annotation, "IAnnotation")
+        for annotation in _early_bound(view, "IView").GetAnnotationsByType(
+            _CENTER_MARK_ANNOTATION
+        )
+        or ()
+    ]
+    for annotation in marks:
+        mark = _early_bound(annotation.GetSpecificAnnotation(), "ICenterMark")
+        mark.UseDocDisplaySettings = False
+        mark.ShowLines = False
+        mark.Size = CENTRE_MARK_ARM
+    rebuild_drawing(adapter, label="trim wheel centre marks")
+    marked = []
+    for annotation in marks:
+        mark = _early_bound(annotation.GetSpecificAnnotation(), "ICenterMark")
+        if bool(mark.UseDocDisplaySettings) or bool(mark.ShowLines):
+            raise RuntimeError("a wheel centre mark kept its extended lines")
+        data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+        lines = [
+            tuple(float(value) for value in data.GetLineAtIndex2(index))
+            for index in range(int(data.GetLineCount()))
+        ]
+        if not lines:
+            raise RuntimeError("a wheel centre mark draws no line")
+        xs = [value for line in lines for value in (line[4], line[7])]
+        ys = [value for line in lines for value in (line[5], line[8])]
+        centre = ((min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0)
+        marked.append(
+            next(
+                (
+                    name
+                    for name, hole in holes.items()
+                    if math.dist(hole, centre) <= _MARK_ON_HOLE
+                ),
+                f"no hole at {centre}",
+            )
+        )
+    if marked.count("bore") != 1 or marked.count("tie 1") > 1 or set(marked) - set(holes):
+        raise RuntimeError(f"expected one centre mark per wheel hole, found {marked}")
+    _telemetry.info(f"wheel centre marks: {sorted(marked)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -200,8 +393,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to wheel bore")
+    axis, tie1 = model_points_in_view(
+        adapter,
+        front,
+        ((0.0, 0.0, 0.0), (_TIE1[0] / 1000.0, _TIE1[1] / 1000.0, 0.0)),
+        label="wheel hole centres",
+        names=("bore", "tie 1"),
+    )
+    _near_side_diameters(adapter, annotations, axis=axis)
+    _trim_centre_marks(adapter, front, {"bore": axis, "tie 1": tie1})
 
     # The rim's axial width across the side view, up at the rim. The two OD
     # corner circles are selected as native entities: a coordinate hit-test
