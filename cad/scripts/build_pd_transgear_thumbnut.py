@@ -496,7 +496,7 @@ async def build(adapter) -> dict[str, str]:
         ("countersink axis floor", f"{csk_axis}.end", f"{chains[1][1][1]}.end", "coincident"),
     ):
         check(label, await adapter.add_sketch_constraint(first, second, relation))
-    for (label, points, seat_y, dia_name, angle_name), lines in chains:
+    for (label, _points, seat_y, dia_name, angle_name), lines in chains:
         cone, base, axis = lines
         for i in range(3):
             check(
