@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import math
 
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_crank_handle_butt_cup_spec import (

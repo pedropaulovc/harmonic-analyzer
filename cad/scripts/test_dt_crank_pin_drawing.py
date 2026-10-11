@@ -8,7 +8,7 @@ import build_dt_crank_pin as part
 import dt_crank_pin_spec
 import draw_dt_crank_pin as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gtol_spec import ConeFace
+from _gtol_cone import ConeFace
 
 
 def test_required_drawing_paths() -> None:

@@ -18,7 +18,7 @@ import math
 
 import transgear_cluster_fit as FIT
 import pd_transgear_pin_spec as PIN
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 

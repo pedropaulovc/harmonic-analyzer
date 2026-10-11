@@ -11,7 +11,7 @@ import math
 
 import _config
 
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 

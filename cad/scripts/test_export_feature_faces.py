@@ -24,8 +24,9 @@ from _export_feature_faces import (
     name_feature_faces,
     step_face_sets,
 )
-from _gtol_spec import CylinderFace, PlanarFace
-from _part_pmi import _FaceGeometry
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _gtol_face import FaceGeometry
 
 _CYLINDER = 4002  # swSurfaceTypes_e.CYLINDER_TYPE
 _PLANE = 4001  # swSurfaceTypes_e.PLANE_TYPE
@@ -54,12 +55,12 @@ _TOP_BOX = _box(-8.0, -8.0, 3.5, 8.0, 8.0, 3.5)
 _BOSS_BOX = _box(-5.0, -5.0, -3.5, 5.0, 5.0, 3.5)
 
 
-def _geometries() -> list[_FaceGeometry]:
+def _geometries() -> list[FaceGeometry]:
     return [
-        _FaceGeometry("upper", _CYLINDER, _cylinder_params(6.5), None, _UPPER_HALF),
-        _FaceGeometry("boss", _CYLINDER, _cylinder_params(10.0), None, _BOSS_BOX),
-        _FaceGeometry("lower", _CYLINDER, _cylinder_params(6.5), None, _LOWER_HALF),
-        _FaceGeometry(
+        FaceGeometry("upper", _CYLINDER, _cylinder_params(6.5), None, _UPPER_HALF),
+        FaceGeometry("boss", _CYLINDER, _cylinder_params(10.0), None, _BOSS_BOX),
+        FaceGeometry("lower", _CYLINDER, _cylinder_params(6.5), None, _LOWER_HALF),
+        FaceGeometry(
             "top", _PLANE, (0.0, 0.0, 1.0, 0.0, 0.0, 3.5 * _MM), (0.0, 0.0, 1.0),
             _TOP_BOX,
         ),

@@ -36,7 +36,7 @@ import math
 import pd_rack_pinion_spec
 import pd_transgear_pin_spec
 from _fit_deviations import deviations
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_transgear_disc_hub_geometry import SPIGOT_LENGTH, SPIGOT_LENGTH_BAND

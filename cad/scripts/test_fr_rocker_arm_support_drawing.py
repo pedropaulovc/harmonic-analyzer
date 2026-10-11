@@ -889,7 +889,7 @@ def test_seat_entry_edge_is_the_east_seats_rim_on_the_rail_top(monkeypatch) -> N
         return {"seat": face}
 
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "_resolve_faces", resolve)
+    monkeypatch.setattr(drawing, "resolve_faces", resolve)
     view = SimpleNamespace(ReferencedDocument=object())
     assert drawing._seat_entry_edge(view) is entry
     (spec,) = requested.values()

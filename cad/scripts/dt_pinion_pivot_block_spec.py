@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import _config
 from _fit_ream_slide import REAM_SLIDE
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # Nominal geometry lives in dt_pinion_pivot_block_geometry (shared with the

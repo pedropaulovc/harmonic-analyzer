@@ -67,7 +67,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _part_pmi import _resolve_faces
+from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
 from build_fr_top_frame import (
     BAR_X0,
@@ -1468,7 +1468,7 @@ def _machined_faces(view: Any) -> dict[str, Any]:
     document = _early_bound(
         _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
     )
-    return _resolve_faces(
+    return resolve_faces(
         document, {control.key: control.face for control in SURFACE_FINISHES}
     )
 

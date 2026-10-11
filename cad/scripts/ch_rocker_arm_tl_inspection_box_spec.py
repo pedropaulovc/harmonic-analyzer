@@ -33,7 +33,9 @@ from __future__ import annotations
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_c_stop_bar_spec as bar
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import ConeFace, CylinderFace, PlanarFace
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 

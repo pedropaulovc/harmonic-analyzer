@@ -28,7 +28,8 @@ from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_profile_fixture_spec as plate
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 
 BUILT_UP_PERMISSION_NOTE = "LANDS ARE A BOUGHT GAUGE PIN BONDED INTO THE REAMED BORE."
 

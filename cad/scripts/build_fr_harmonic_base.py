@@ -91,7 +91,8 @@ from _holes import (
     wizard_holes,
 )
 from _fit_deviations import deviations
-from _part_pmi import _resolve_faces, author_part_pmi
+from _gtol_face_resolve import resolve_faces
+from _part_pmi import author_part_pmi
 from fr_harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
@@ -1366,7 +1367,7 @@ async def _paint_machined_faces_black(adapter) -> None:
     """
     from solidworks_mcp.adapters.com_variant import double_array
 
-    faces = _resolve_faces(
+    faces = resolve_faces(
         adapter.currentModel,
         {control.key: control.face for control in PART_SURFACE_FINISHES},
     )

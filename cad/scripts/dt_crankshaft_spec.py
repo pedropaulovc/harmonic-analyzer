@@ -13,7 +13,8 @@ import math
 
 import _config
 from _hole_spec import HoleSpec, drill_process
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_cone_pivot_post_spec import CRANK_BORE_DIA as JOURNAL_BORE_DIA
 from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as JOURNAL_BORE_BAND

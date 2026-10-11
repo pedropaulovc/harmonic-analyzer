@@ -9,7 +9,7 @@ is imported only by the part build (which authors the PMI) and its drawing.
 
 from __future__ import annotations
 
-from _gtol_spec import PlanarFace
+from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from fr_rocker_arm_support_section_spec import HALF_Y
 

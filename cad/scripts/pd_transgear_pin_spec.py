@@ -22,7 +22,7 @@ import math
 
 import pd_transgear_arm_geometry as ARM
 import vn_transgear_retaining_ring_spec as RING
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 

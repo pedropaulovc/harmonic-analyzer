@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import ch_rocker_arm_tl_pivot_screw_spec as screw
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _printed_tolerance import printed_band_mm
 
 # AUTHOR'S CHOICE: Ø10 stock O1 drill rod with its OD left as supplied (the

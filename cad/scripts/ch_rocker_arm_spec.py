@@ -17,7 +17,7 @@ from _hole_spec import HoleSpec
 
 
 from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
-from _gtol_spec import CylinderFace
+from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 14"). These MUST match the

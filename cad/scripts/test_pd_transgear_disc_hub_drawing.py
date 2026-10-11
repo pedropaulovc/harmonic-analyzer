@@ -16,7 +16,7 @@ import pytest
 import _common
 import _config
 import _drawing_common
-import _part_pmi
+import _gtol_face
 import _printed_tolerance
 import build_pd_transgear_disc_hub as part
 import draw_pd_transgear_disc_hub as drawing
@@ -391,7 +391,7 @@ def test_face_rim_resolves_exactly_one_circle_on_the_hub_axis() -> None:
 def _surface_face(
     identity: int, parameters: tuple[float, ...], *, flipped: bool = False
 ):
-    """A model face as ``_part_pmi._face_geometry`` reads it (metres)."""
+    """A model face as ``_gtol_face_read.face_geometry`` reads it (metres)."""
     surface = SimpleNamespace(
         Identity=identity, PlaneParams=parameters, CylinderParams=parameters
     )
@@ -406,7 +406,7 @@ def _plane(z_mm: float, *, facing: float = 1.0):
     """The plane square to the hub axis at ``z_mm``, its outward normal +Z
     (or -Z)."""
     return _surface_face(
-        _part_pmi._SURFACE_PLANE,
+        _gtol_face.SURFACE_PLANE,
         (0.0, 0.0, 1.0, 0.0, 0.0, z_mm / 1000.0),
         flipped=facing < 0.0,
     )
@@ -414,7 +414,7 @@ def _plane(z_mm: float, *, facing: float = 1.0):
 
 def _cylinder(radius_mm: float):
     return _surface_face(
-        _part_pmi._SURFACE_CYLINDER, (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, radius_mm / 1000.0)
+        _gtol_face.SURFACE_CYLINDER, (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, radius_mm / 1000.0)
     )
 
 

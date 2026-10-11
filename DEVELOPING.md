@@ -601,6 +601,17 @@ Switching to these per-drawing dependencies changes existing drawing cache keys
 once. It does not reuse legacy keys; subsequent unrelated row changes stay
 isolated. A scoped drawing build need not regenerate the rest of the fleet.
 
+GD&T consumers import focused modules directly: `_gtol_identity` names PMI,
+`_gtol_symbols` defines symbols and zones, `_gtol_frame` handles frame signatures
+and XML, and `_gtol_controls` validates datum/control declarations. Face selectors
+live in `_gtol_cylinder`, `_gtol_cone`, `_gtol_planar`, `_gtol_sphere` and
+`_gtol_torus`; `_gtol_face` holds their shared protocol and geometry contract.
+COM geometry reads and face traversal live separately in `_gtol_face_read` and
+`_gtol_face_resolve`. There is no aggregate facade: the dependency graph counts
+every import, including `TYPE_CHECKING`, at file granularity. This keeps edits to
+one selector or frame representation out of unrelated spec/cache closures while
+still invalidating every consumer of the changed module.
+
 The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
 submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
 by `_common`/`_assembly` (mate/plane/feature creation), so its source is a genuine

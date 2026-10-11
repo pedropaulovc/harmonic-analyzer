@@ -34,10 +34,10 @@ from _common import (
     _visible_document_paths,
     apply_custom_properties,
 )
-from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
-from _gtol_spec import gtol_frame_signature as _gtol_frame_signature
-from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
-from _gtol_spec import translation_print_problem as _translation_print_problem
+from _gtol_symbols import GTOL_SYMBOLS as _GTOL_SYMBOLS
+from _gtol_frame import gtol_frame_signature as _gtol_frame_signature
+from _gtol_frame import gtol_frame_xml as _gtol_frame_xml
+from _gtol_frame import translation_print_problem as _translation_print_problem
 from _surface_finish import SurfaceFinishControl
 from _drawing_simplified import simplified_name
 from _drawing_layout_check import (
@@ -713,11 +713,11 @@ def _surface_finish_entity_faces(
 
 def _surface_finish_face_signatures(faces: Sequence[Any]) -> tuple[dict[str, Any], ...]:
     """Read candidate face geometry once for validation and optional diagnostics."""
-    from _part_pmi import _face_geometry
+    from _gtol_face_read import face_geometry
 
     signatures: list[dict[str, Any]] = []
     for face in faces:
-        geometry = _face_geometry(face)
+        geometry = face_geometry(face)
         if geometry is None:
             continue
         signatures.append(
@@ -740,13 +740,11 @@ def _validate_surface_finish_control_face(
     label: str,
 ) -> tuple[dict[str, Any], ...]:
     """Fail unless a selected drawing entity belongs to the controlled face."""
-    from _part_pmi import _face_matches
-
     faces = _surface_finish_entity_faces(
         selected_entity, entity_type=entity_type, label=label
     )
     signatures = _surface_finish_face_signatures(faces)
-    if any(_face_matches(item["geometry"], control.face) for item in signatures):
+    if any(control.face.matches(item["geometry"]) for item in signatures):
         return signatures
     diagnostic = tuple(
         {key: value for key, value in item.items() if key != "geometry"}
@@ -944,7 +942,7 @@ def add_feature_control_frame(
     """Attach a native feature-control frame to a drawing-view edge.
 
     ``translated`` names datum references printed with the translation
-    modifier (``_gtol_spec.gtol_frame_xml``).  ``lower_frame`` is a second,
+    modifier (``_gtol_frame.gtol_frame_xml``).  ``lower_frame`` is a second,
     stacked frame ``(characteristic, tolerance, datums)`` on the same leader
     (``IGtol.AddFrame``), printed with its own symbol -- not composite
     (``GetCompositeFrame2(1)`` must read False) -- its XML read back.
@@ -1409,7 +1407,7 @@ def assert_frame_datums_defined(views: Sequence[Any], *, label: str) -> None:
     ⌖Ø0.20|A|B on the knife mount with no B on the sheet, because the
     identifier its readback proved does not print.
     """
-    from _gtol_spec import gtol_frame_datums
+    from _gtol_frame import gtol_frame_datums
 
     defined: set[str] = set()
     referenced: dict[str, list[str]] = {}
@@ -1453,7 +1451,8 @@ def project_part_pmi(
     endpoints in model space, yielding off-sheet leaders even when setter
     readback reports the requested coordinates (reproduced 2026-07-29).
     """
-    from _gtol_spec import gtol_frame_signature, validate_part_pmi
+    from _gtol_controls import validate_part_pmi
+    from _gtol_frame import gtol_frame_signature
 
     validate_part_pmi(datums, controls)
     expected_keys = {datum.key for datum in datums} | {
@@ -4467,7 +4466,7 @@ def face_silhouettes_through(
     """Resolve each pick to the one silhouette of its face drawn through its point.
 
     ``picks`` maps a key to ``(face spec, sheet point)``: the model face a
-    silhouette must belong to (a ``_gtol_spec`` face spec, the one a
+    silhouette must belong to (a ``_gtol_face.FaceSpec``, the one a
     ``SurfaceFinishControl`` carries) and a sheet point on the line it draws.
     A cylinder shows two flank silhouettes of one face; the point picks the
     flank.  Returns the silhouette entity per key, for the ``entity=`` path of
@@ -4489,16 +4488,16 @@ def face_silhouettes_through(
     matched before any endpoint is read, and the matched ends are projected in
     one batch.  Fails loud unless each key resolves to exactly one silhouette.
     """
-    from _part_pmi import _face_geometry, _face_matches
+    from _gtol_face_read import face_geometry
 
     silhouettes = visible_view_entities(view, _VIEW_ENTITY_SILHOUETTE, label=label)
     matched: list[tuple[Any, tuple[str, ...], tuple[float, ...], tuple[float, ...]]] = []
     for silhouette in silhouettes:
         face = _com_invoke(silhouette, "ISilhouetteEdge", "GetFace")
-        geometry = _face_geometry(face) if face is not None else None
+        geometry = face_geometry(face) if face is not None else None
         if geometry is None:
             continue
-        keys = tuple(key for key, (spec, _xy) in picks.items() if _face_matches(geometry, spec))
+        keys = tuple(key for key, (spec, _xy) in picks.items() if spec.matches(geometry))
         if not keys:
             continue
         ends = []

@@ -40,7 +40,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _part_pmi import _resolve_faces
+from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
 from dt_pinion_cam_pin_spec import (
     CAP_RADIUS,
@@ -143,7 +143,7 @@ def _crown_face(view: Any) -> Any:
         _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
     )
     control = surface_finish_by_key(SURFACE_FINISHES, "crown")
-    return _resolve_faces(document, {control.key: control.face})[control.key]
+    return resolve_faces(document, {control.key: control.face})[control.key]
 
 
 def _overall_reference(adapter: Any, right: Any) -> None:

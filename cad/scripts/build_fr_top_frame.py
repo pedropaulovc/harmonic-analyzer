@@ -113,7 +113,8 @@ from _holes import (
     find_planar_face,
     wizard_holes,
 )
-from _part_pmi import _resolve_faces, author_part_pmi
+from _gtol_face_resolve import resolve_faces
+from _part_pmi import author_part_pmi
 from _named_views import name_octant_views
 from fr_top_frame_spec import (
     BORE_DIA,
@@ -752,14 +753,14 @@ def _open_underside_sketch(
 def _qualify_machined_faces(adapter) -> None:
     """Area-check every face the surface-finish spec owns.
 
-    ``_resolve_faces`` already proves each spec names exactly ONE face; the
+    ``resolve_faces`` already proves each spec names exactly ONE face; the
     area proves it named the RIGHT one, so a station typo ships a build failure
     instead of a roughness symbol on the wrong surface (build_fr_harmonic_base's
     _paint_machined_faces_black precedent). Expectations are the full analytic
     wall/annulus areas; the 5% band absorbs the cross-screw and set-screw tap
     windows that break into the bores (~1% each) and the C1 bore-top breaks.
     """
-    faces = _resolve_faces(
+    faces = resolve_faces(
         adapter.currentModel,
         {control.key: control.face for control in SURFACE_FINISHES},
     )
