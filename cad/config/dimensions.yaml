@@ -1347,11 +1347,11 @@ sections:
         - stated
         - high
       - - Rod diameter
-        - ~6 mm
+        - 'Ø6.000; last 10 mm at bracket end Ø6.000 0/−0.008, selected stock or lapped'
         - ~0.24
-        - round brass rod, photo proportion
-        - scaled
-        - low
+        - 'round brass rod, photo proportion; p.46 “Firmly affixed to the summing lever”; press-and-Loctite retention specified 2026-10-11'
+        - scaled + engineered fit
+        - low (photo nominal); high (specified fit)
       - - Lever rod length
         - 165 mm
         - '6.5'
@@ -1371,19 +1371,19 @@ sections:
         - scaled
         - low
       - - Thumb screw
-        - '~Ø10 × 5 reeded head, Ø3 × 12 shank (×2: clamp + output fixture)'
+        - 'MHA-VN-011, McMaster 91882A221 #4-40 UNC: Ø9.525 × 2.38125 knurled head, Ø6.35 × 2.38125 collar, 11.1125 shank under collar; ×2 placed (sliding lever clamp + axial output-fixture clamp)'
         - —
-        - 'p.48; M4: head reeded (24 × Ø1 grooves), cosmetic M3 thread on shank'
-        - scaled
-        - low
+        - 'ch20_images/page001_img01.jpeg front close-up and page002_img07.jpeg vertical-rod/fixture close-up; stock dimensions from cad/scripts/_mcmaster_91882a221.py'
+        - stock + photo topology
+        - high (stock); med (two clamp functions); low (photo-scaled original size)
       - - Output fixture
-        - collar ~Ø10 × 8, Ø5.2 bore, Ø3 cross hole
+        - 'C36000 3/8 in hex brass (AF9.525) × 11.0, horizontal axis; vertical Ø5.20 +0.03/0 sliding bore through corners, station 5.00 ±0.05 from free end; turned Ø9.0 × 6.7 spigot; R1.2 circumferential wire groove, root Ø7.00 ±0.05, centred on spigot so both axial lips remain ≥2.0 at print-worst; axial #4-40 UNC-2B tap from spigot face into rod bore'
         - —
-        - p.48 bottom close-up
-        - scaled
-        - low
+        - '20_Magnifying_Lever.pdf p.46 text; ch20_images/page001_img01.jpeg, page002_img04.jpeg and page002_img07.jpeg: hex body cross-bored on vertical rod, grooved round spigot, axial knurled screw and front-hanging wire'
+        - photo topology + engineered walls
+        - med (topology/function); low (photo sizes); high (specified stock/walls)
       - - Mounting bracket
-        - 'Angle bracket: existing Ø12 × 10 collar (Ø6.2 bore) and 10-wide forward arm unchanged at machine (+40, 979.7, −128.3); vertical side plate 48 wide × 12.7 tall × 3.175 thick, machine x −3..+45, y 973.35..986.05, z −76.2874..−73.1124. Back face seats flush against the summing-lever front face (SUMMING_Z − 152.4/2), not below it.'
+        - 'Angle bracket: Ø12 × 10 collar, bore Ø5.976 +0.008/0, press-fitted onto last 10 mm of Ø6.000 0/−0.008 lever end (0.008–0.024 diametral interference, 7 mm cylindrical engagement), retained with Loctite 638; alternative soft solder or braze. 10-wide forward arm at machine (+40, 979.7, −128.3); vertical side plate 48 wide × 12.7 tall × 3.175 thick, machine x −3..+45, y 973.35..986.05, z −76.2874..−73.1124. Back face seats flush against summing-lever front face (SUMMING_Z − 152.4/2), not below it.'
         - —
         - 'ch30_images/page002_img01.png, eight views front; ch20_images/page001_img01.jpeg, top-right close-up: vertical black angle side plate against the lever front face, two side-by-side slotted heads at the lever mid-plane'
         - scaled + derived
@@ -1407,7 +1407,9 @@ sections:
       984.834) after the 2026-08-02 rederive's −10.3 summing shift, along Z;
       the ~6 mm tip arc ≈ 1.6° of knife rock); the clamp
       position along the rod is the radius from THAT pivot, which is what the
-      ≤4× adjustment really is. The bracket collar is a loose Ø6.2/Ø6 guide.
+      ≤4× adjustment really is. Press the lever into the bracket collar until
+      its end is flush with the outer face; retain with Loctite 638.
+      Alternative retention is soft solder or braze.
 
       DEPTH RE-ANCHOR (2026-07-04, ch30 p.4; window re-solved 2026-08-02 with
       the new casting): the side view shows the whole output line (fixture
@@ -1415,31 +1417,28 @@ sections:
       front — the old z −85 (M6.4 low) hung the wire hook 50 behind the wheel
       plane (~8° lean, photo-refuted). Lever rod z −128.3 KEPT. The whole
       lever/clamp/rod/fixture chain rides the summing bar −10.3 (rod at
-      LEVER_ROD_Y 979.7, ridge contact 984.834): the clamp thumb screw is
-      shortened 12 → 11 under-head so its head top lands at y 998.7 — a 1.0
-      margin below the casting underside 999.7 — and the new front rail
-      (inner z −93, outer −131, band 999.7..1036.2) therefore imposes NO z
-      bound (escaping past the outer face −131 would need lever rod
-      z ≤ −136.25, infeasible vs the rim-duck floor −128.31). Surviving
-      window: front column surface −127.95 (gap 0.6) .. rim-duck −128.31 ⇒
-      z −128.3. Vertical rod z −134.8 (skew bore 6.5, top y 984.7), wire hook
-      at (−150, 915.05, −137.95) tied under the fixture collar beside the
-      rod; hub end z −142.77, yoke WIRE_END (63.324, 573.083, −142.77),
-      YOKE_PLANE_OFFSET −0.0564; bracket arm machine −124.3..−70. The side plate
-      now seats at the shifted lever front, z −76.2874..−73.1124; its former
-      −81..−76.45 band was a stale pre-MECHANISM_Z_SHIFT front-face reference.
-      Lever-wire straight
-      rest run 362.731 → 352.813 (−9.918: the hook DROPS toward the fixed
-      wheel, so the wire SHRINKS — the contract's "+10.3" was a sign slip).
-      Derived from the plumb-line photo + wire clearance solve (≥0.25
-      everywhere; a perfectly planar wire is impossible — the rim ring blocks
-      it — so the wire leans ~0.8°, ducking behind the rim into the hub's
-      back groove band). ch30 px measurement anchored on column pitch + GT
-      rescale + ch19 closeups (2026-08-02 rederive); confidence measured/med.
-      Clamp block at x −150; fixture at y 915.7 (collar 915.7..923.7); clamp
-      thumb screw modeled BACKED OUT (head tangent above the rod it pinches —
-      seated it would overlap); the fixture's screw is omitted at assembly
-      level.
+      LEVER_ROD_Y 979.7, ridge contact 984.834). The clamp thumb screw's
+      exact stock reach is derived from McMaster 91882A221; its tip is tangent
+      to the lever top. The casting underside is y 999.7, and the screw head
+      clears it without forcing the output line farther forward. The front
+      column surface −127.95 (gap 0.6) and rim-duck −128.31 constrain the
+      retained lever depth z −128.3. Vertical rod z −134.8 (skew bore 6.5,
+      top y 984.7); the fixture screw axis is y 919.7, with the hex body
+      spanning approximately 914.2..925.2. Both thumb screws are installed
+      backed out to tip/rod tangency so nominal CAD solids do not overlap.
+
+      The fixture screw points toward the bracket, and the wire winds in
+      the spigot groove then leaves its front tangent at screw-axis height.
+      Its yaw about the vertical rod is solved from the groove station and
+      groove-root radius plus wire radius and 0.25 stand-off, preserving
+      HOOK_Z −137.95 exactly (the wheel rim-duck clearance cap). Hook X,
+      yaw, wire length, hub tangent and yoke offset are derived in
+      cad/scripts/mg_output_fixture_geom.py and mg_lever_wire_geom.py; no
+      cross-hole wire tie or omitted fixture screw remains. The hub end
+      remains z −142.77 in the back groove lane. The straight rest wire
+      clears the fixture groove flanks, spigot and screw head numerically,
+      and the farm assembly interference gate checks the installed solids.
+      Wraps, tie-offs and wire compliance remain unmodeled.
 - heading: Chapter 21 — Magnifying Wheel (pp. 50–53)
   elements:
   - prose: ''
@@ -1515,13 +1514,15 @@ sections:
 
       Wires modeled (2026-07-04, re-derived rev 10): the two amplification wires are
       geometry — straight rest-pose Ø0.8 steel rods (`mg-lever-wire` MHA-MG-009:
-      fixture hook → tangent to the drum at about 2:25 seen from the front, on the
-      pen side, at the drum mid-plane z −154.91; `pn-pen-wire` MHA-PN-006: rim
-      groove 3-o'clock tangent at x 3.8 → pen-rod wire hole at y 513). The lever-wire
-      ARTICULATES (ball joint at the hook + axis-axis stand-off tangency to the drum)
-      and carries the WIRE-1 yoke coupling to the wheel; wraps/tie-offs and
-      compliance stay unmodeled; every run stands ≥0.25 off its neighbours. Wire Ø
-      photo-scaled (hair-thin in the book; 0.8 keeps it renderable — low confidence).
+      fixture's derived spigot-groove front tangent → tangent to the drum at about
+      2:25 seen from the front, on the pen side, at the drum mid-plane z −154.91;
+      hook z −137.95 is retained by mg_output_fixture_geom.py;
+      `pn-pen-wire` MHA-PN-006: rim groove 3-o'clock tangent at x 3.8 →
+      pen-rod wire hole at y 513). The lever-wire ARTICULATES (ball joint at the
+      hook + axis-axis stand-off tangency to the drum) and carries the WIRE-1
+      yoke coupling to the wheel; wraps/tie-offs and compliance stay unmodeled;
+      every run stands ≥0.25 off its neighbours. Wire Ø photo-scaled
+      (hair-thin in the book; 0.8 keeps it renderable — low confidence).
 
       ---
 - heading: Chapter 22 — Platen (pp. 54–55)

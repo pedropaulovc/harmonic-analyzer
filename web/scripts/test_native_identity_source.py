@@ -113,17 +113,17 @@ class NativeIdentitySourceTests(unittest.TestCase):
 
 class MagnifierInstallationTests(unittest.TestCase):
     # Released assembly datums, including its dependency-derived installed top.
+    # The output fixture's axis height is owned by the drawing-free geometry
+    # module (mg_output_fixture_geom.FIXTURE_AXIS_Y), not by the recipe.
     SOURCE = (
         "LEVER_ROD_Y = 979.7\n"
         "LEVER_ROD_Z = -128.3\n"
         "VROD_TOP_Y = LEVER_ROD_Y + 5.0\n"
-        "FIXTURE_Y0 = 915.7\n"
     )
     EXPECTED = {
         "LEVER_ROD_Y": 979.7,
         "LEVER_ROD_Z": -128.3,
         "VROD_TOP_Y": 984.7,
-        "FIXTURE_Y0": 915.7,
     }
 
     def parse_source(self, source):
@@ -173,7 +173,7 @@ class MagnifierInstallationTests(unittest.TestCase):
             "    VROD_TOP_Y = 0\n"
             "    VROD_TOP_Y += 1\n"
             "    LEVER_ROD_Y, spare = (0, 1)\n"
-            "    FIXTURE_Y0: float = 0\n"
+            "    LEVER_ROD_Z: float = 0\n"
             "samples = [VROD_TOP_Y for VROD_TOP_Y in (0, 1)]\n"
         )
         self.assertEqual(self.parse_source(source), self.EXPECTED)
@@ -182,8 +182,8 @@ class MagnifierInstallationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "build_magnifier_assembly.py"
             for source in (
-                "LEVER_ROD_Y = 979.7\nLEVER_ROD_Z = -128.3\nFIXTURE_Y0 = 915.7\n",
-                "LEVER_ROD_Y = 979.7\nLEVER_ROD_Z = -128.3\nVROD_TOP_Y = unsupported_geometry()\nFIXTURE_Y0 = 915.7\n",
+                "LEVER_ROD_Y = 979.7\nLEVER_ROD_Z = -128.3\n",
+                "LEVER_ROD_Y = 979.7\nLEVER_ROD_Z = -128.3\nVROD_TOP_Y = unsupported_geometry()\n",
             ):
                 path.write_text(source)
                 with self.subTest(source=source), self.assertRaisesRegex(ValueError, "magnifier installation datum"):

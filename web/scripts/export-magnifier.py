@@ -87,8 +87,8 @@ def main() -> None:
         spring = identity_map.import_module(cad, "spring_mount_geom")
         cx, cy = wire.WHEEL_X, wire.WHEEL_BAR_Y
         radius, rim = wheel_wire_pitch_radii(wire, pen)
-        vertical = identity_map.import_module(cad, "mg_magnifying_vertical_rod_spec")
-        fixture = identity_map.import_module(cad, "mg_output_fixture_spec")
+        vertical = identity_map.import_module(cad, "mg_magnifying_vertical_rod_geom")
+        fixture = identity_map.import_module(cad, "mg_output_fixture_geom")
         installation = magnifier_installation(
             identity_map.source_file(cad, "scripts/build_mg_magnifier_assembly.py")
         )
@@ -170,9 +170,10 @@ def main() -> None:
             "pn_pen_wire_geom.py",
             "build_mg_magnifier_assembly.py",
             "build_pn_pen_assembly.py",
-            "mg_magnifying_vertical_rod_spec.py",
+            "mg_magnifying_vertical_rod_geom.py",
             "build_mg_magnifying_vertical_rod.py",
-            "mg_output_fixture_spec.py",
+            "mg_output_fixture_geom.py",
+            "build_mg_output_fixture.py",
             "mg_magnifying_clamp_geom.py",
         )
         source_paths = {
@@ -221,13 +222,16 @@ def main() -> None:
                         ],
                     },
                     "coordinateControls": controls,
-                    # The exact archived assembly supplies both rod-top and
-                    # collar datums; the full collar stays on the straight land.
+                    # The exact archived assembly supplies the rod-top datum; the
+                    # drawing-free fixture owner supplies its rod-centred axis
+                    # height and hex half-extent. The full hex body stays on the
+                    # straight land, below the clamp.
                     "fixtureOffsetRangeMm": [
                         installation["VROD_TOP_Y"] - vertical.ROD_LENGTH
-                        + vertical.ROD_DIA / 2 - installation["FIXTURE_Y0"],
+                        + vertical.ROD_DIA / 2
+                        - (fixture.FIXTURE_AXIS_Y - fixture.HEX_CORNER_RADIUS),
                         installation["LEVER_ROD_Y"] - clamp.LEVER_BORE_Y
-                        - fixture.COLLAR_HEIGHT - installation["FIXTURE_Y0"],
+                        - (fixture.FIXTURE_AXIS_Y + fixture.HEX_CORNER_RADIUS),
                     ],
                     "limitations": [
                         "Installed taut no-slip guided-wrap branch; not a slip or unravelling dynamics model.",

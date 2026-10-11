@@ -97,7 +97,7 @@ export const BINDINGS: readonly Binding[] = [
  * release 39; binding it needs the refreshed GLB census, so until then a model
  * that carries it is reported unverified rather than drawn permanently fixed.
  */
-export const UNBOUND_THUMB_SCREW_ISSUE = 'web: bind magnifier fixture thumb-screw-2 to the output fixture at next GLB refresh'
+export const UNBOUND_THUMB_SCREW_ISSUE = 'web: bind magnifier fixture thumb-screw-2 to the output fixture at next GLB refresh (https://github.com/pedropaulovc/harmonic-analyzer/issues/1351)'
 const MAGNIFIER_THUMB_SCREW = new RegExp(`^${magnifier}vn-thumb-screw-\\d+$`)
 
 /** Present magnifier thumb-screw paths no binding resolves, as unverified-binding messages. */

@@ -38,8 +38,9 @@ test('a present output-fixture thumb screw with no binding is refused by name an
   const failures = unboundThumbScrewFailures([...RELEASED_PATHS, FIXTURE_SCREW])
   assert.equal(failures.length, 1)
   assert.ok(failures[0].startsWith(`${FIXTURE_SCREW}: `), failures[0])
+  assert.ok(UNBOUND_THUMB_SCREW_ISSUE.startsWith('web: bind magnifier fixture thumb-screw-2 to the output fixture at next GLB refresh'), UNBOUND_THUMB_SCREW_ISSUE)
+  assert.ok(failures[0].includes('https://github.com/pedropaulovc/harmonic-analyzer/issues/1351'), failures[0])
   assert.ok(failures[0].includes(UNBOUND_THUMB_SCREW_ISSUE), failures[0])
-  assert.equal(UNBOUND_THUMB_SCREW_ISSUE, 'web: bind magnifier fixture thumb-screw-2 to the output fixture at next GLB refresh')
   assert.ok(!BINDINGS.some(binding => binding.pattern.test(FIXTURE_SCREW)), 'no binding may silently claim the unreleased screw')
 })
 

@@ -180,7 +180,10 @@ async def build(adapter):
             rotation,
         )
         weight("mg-magnifying-vertical-rod", (m.CLAMP_X, m.VROD_TOP_Y, m.VROD_Z), rotation)
-        weight("mg-output-fixture", (m.CLAMP_X, m.FIXTURE_Y0, m.VROD_Z), m.IDENTITY)
+        weight("mg-output-fixture", m.FIXTURE_POSITION, m.FIXTURE_ROWS)
+        weight(
+            "vn-thumb-screw", m.FIXTURE_SCREW_POSITION, m.FIXTURE_SCREW_ROWS
+        )
         positive = sum(max(0, row["gravity_torque_n_mm"]) for row in rows)
         negative = sum(min(0, row["gravity_torque_n_mm"]) for row in rows)
         hook = m.HUB_WIRE_START

@@ -1,14 +1,20 @@
-r"""Create the curated machinist drawing for the output fixture collar.
+r"""Create the manufacturing drawing for the output fixture (MHA-MG-006).
 
-The SLDPRT remains authoritative.  This recipe supplies only the collar's
-views, diameter/station dimensions, and manufacturing notes;
-sheet/template and export behavior lives in ``_drawing_common``.
+The SLDPRT is authoritative: every printed dimension, its places and its
+band are model dimensions marked for the drawing
+(``mg_output_fixture_spec.DRAWING_DIMENSIONS``); this recipe places views,
+keeps each dimension where it reads, and proves the import kept the part's
+places. Sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The output fixture is a small brass collar (Ø10 x 8) that slides the trace's
-vertical placement on the Ø5 output rod: a coaxial Ø5.2 slip bore and a Ø2.26
-cross hole (#4-40 tap drill) for the clamp screw / lever-wire tie.  The collar
-is tiny, so the sheet runs 3:1; the isometric drops to 2:1.
+The side view is the ``*Top`` orientation, as in the lathe: the hex axis
+horizontal, looking straight down the reamed rod bore, the flats edge-on top
+and bottom.  It carries every axial station from the free end, the spigot
+and groove sizes and the bore's Ø.  The end view is the ``*Right``
+projection, looking at the spigot face with the flats standing vertical; it
+carries the flats, the bore's location from one flat (its origin is the tap,
+on the bore axis) and the #4-40 tap's native callout.  Hidden lines stay
+off: the tap is a standard hole its callout states.
 
 Run with SolidWorks open::
 
@@ -35,12 +41,30 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _gear_drawing_entities import visible_circle_edge
+from mg_output_fixture_geom import (
+    FREE_END_X,
+    GROOVE_X,
+    HEX_AF,
+    HEX_CORNER_RADIUS,
+    SHOULDER_X,
+    SPIGOT_FACE_X,
+    TAP_DRILL_DIA,
+)
+from mg_output_fixture_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    ROD_BORE_CALLOUT,
+    TAP_PROCESS,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["mg_output_fixture"]
@@ -55,25 +79,58 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (3.0, 1.0)  # 3:1 whole sheet (Ø10 collar)
+# A 17.7 x 11 part: 4:1 leaves room for the side view's eight dimensions.
+SHEET_SCALE = (4.0, 1.0)
+VIEW_SCALE = (4, 1)
+ISO_SCALE = (3, 1)
+_S = SHEET_SCALE[0] / SHEET_SCALE[1]
+SIDE_CENTER = (0.125, 0.180)
+END_CENTER = (0.262, SIDE_CENTER[1])
+ISO_CENTER = (0.365, 0.195)
+NOTES_XY = (0.016, 0.078)
+# The side view is centred on the part's axial extent.
+_AXIAL_MID = (FREE_END_X + SPIGOT_FACE_X) / 2.0
+_HALF_AF = HEX_AF / 2.0
 
-# Sheet layout (meters).  The side (front) view carries the cross hole + height;
-# the end (top) view above it carries the two concentric diameters; the
-# isometric (2:1) sits to the right.
-FRONT_CENTER = (0.120, 0.130)
-TOP_CENTER = (0.120, 0.210)
-ISO_CENTER = (0.340, 0.175)
 
-# Per-view survivors of the marked-dimension import.  The end (top) view carries
-# the collar OD + rod bore; the side (front) view carries the cross-hole
-# diameter and its mid-height station.  The keep union == the marked set.
-TOP_KEEP = {
-    "CollarDiaDim": (0.070, 0.238),
-    "RodBoreDiaDim": (0.185, 0.210),
+def _side_x(model_x_mm: float) -> float:
+    """Sheet X of a station along the hex axis on the side view."""
+    return SIDE_CENTER[0] + (model_x_mm - _AXIAL_MID) * _S / 1000.0
+
+
+def _side_y(sketch_v_mm: float) -> float:
+    """Sheet Y of a Top-plane sketch height on the side view (sheet up is
+    sketch +v, model -Z)."""
+    return SIDE_CENTER[1] + sketch_v_mm * _S / 1000.0
+
+
+_SIDE_TOP = _side_y(_HALF_AF)
+_SIDE_BOTTOM = _side_y(-_HALF_AF)
+# The axial stations stack over the side view, each text mid-span, from the
+# free end out; the stations' extension lines rise from the spigot's top
+# edge.  The bore's station hangs below, with the groove's root Ø clear of it
+# to the right.  The spigot's Ø stands off the face; the groove's radius
+# leader runs to the arc from beyond it, low enough to land on the cut.
+SIDE_KEEP = {
+    "HexLength": (_side_x((FREE_END_X + SHOULDER_X) / 2.0), _SIDE_TOP + 0.010),
+    "GrooveStation": (_side_x((FREE_END_X + GROOVE_X) / 2.0), _SIDE_TOP + 0.020),
+    "OverallLength": (_side_x(_AXIAL_MID), _SIDE_TOP + 0.030),
+    "RodStation": (_side_x(FREE_END_X / 2.0), _SIDE_BOTTOM - 0.010),
+    "GrooveRootDia": (_side_x(GROOVE_X), _SIDE_BOTTOM - 0.012),
+    "SpigotDia": (_side_x(SPIGOT_FACE_X) + 0.012, SIDE_CENTER[1]),
+    "GrooveRadius": (_side_x(SPIGOT_FACE_X) + 0.030, _SIDE_BOTTOM + 0.002),
+    "RodBoreDia": (_side_x(FREE_END_X) - 0.022, SIDE_CENTER[1] + 0.012),
 }
-FRONT_KEEP = {
-    "CrossHoleDiaDim": (0.185, 0.110),
+# The end view stands the flats vertical (``*Right`` looks along -X, sheet
+# right is model -Z): across them above the hex, the bore's location from one
+# of them below it.
+_END_HALF_HEIGHT = HEX_CORNER_RADIUS * _S / 1000.0
+END_KEEP = {
+    "HexAf": (END_CENTER[0], END_CENTER[1] + _END_HALF_HEIGHT + 0.010),
+    "BoreFromFlat": (END_CENTER[0], END_CENTER[1] - _END_HALF_HEIGHT - 0.010),
 }
+# Below and right of the end view, clear of the flats' dimension and the iso.
+TAP_CALLOUT_XY = (END_CENTER[0] + 0.030, END_CENTER[1] - _END_HALF_HEIGHT - 0.024)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -91,8 +148,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
-            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -100,8 +155,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
-            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -111,40 +164,66 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Output Fixture Collar Manufacturing Drawing",
+            0: "Output Fixture Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "output fixture; brass collar; rod bore; cross hole",
+            3: "output fixture; 3/8 hex brass; reamed rod bore; wire groove; #4-40 tap",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    # Explicit per-view scale: a view placed without one can silently auto-scale,
-    # which shifts every coordinate-based pick on it.
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    set_hidden_lines_removed(adapter, iso)
-    set_hidden_lines_removed(adapter, top)
-    # The side view shows the vertical rod bore as hidden lines through the body.
-    set_hidden_lines_visible(adapter, front)
 
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to the end view")
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to the cross hole")
+    side = place_view(adapter, str(SOURCE), "*Top", *SIDE_CENTER, scale=VIEW_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (side, end, iso):
+        set_hidden_lines_removed(adapter, view)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.078)
-    add_property_linked_note(adapter, "End View Note", 0.170, 0.246)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.112)
+    side_annotations = curate_view_dimensions(
+        adapter,
+        side,
+        keep=SIDE_KEEP,
+        view_label="side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    end_annotations = curate_view_dimensions(
+        adapter,
+        end,
+        keep=END_KEEP,
+        view_label="end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # Places (and so each dimension's general row) are authored on the part;
+    # the sheet only proves the import kept them.
+    assert_imported_precision(
+        adapter, [*side_annotations, *end_annotations], DRAWING_PRECISION_BY_NAME
+    )
+    set_dimension_callouts(adapter, side_annotations, {"RodBoreDia": ROD_BORE_CALLOUT})
+    if not auto_center_marks(adapter, side, holes=True, size=0.0025):
+        raise RuntimeError("failed to add the rod bore's center mark to the side view")
+    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+        raise RuntimeError("failed to add the tap's center mark to the end view")
+    # The tap drill's edge on the spigot face: the one visible circle of the
+    # Hole Wizard feature from the end.
+    add_native_hole_callout(
+        adapter,
+        end,
+        edge=visible_circle_edge(adapter, end, TAP_DRILL_DIA),
+        callout_xy=TAP_CALLOUT_XY,
+        label="#4-40 thumb-screw tap",
+        process=TAP_PROCESS,
+    )
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Output Fixture Collar Manufacturing Drawing",
+        pdf_title="Output Fixture Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks pins its own "#4-40 Tapped Hole" note once the tap
+        # carries a hole callout; the callout already states the thread.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

@@ -6,7 +6,7 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
 
 * magnifying-bracket -- the fitting that AFFIXES the lever rod to the pivoted
   summing bar, so it RIDES the lever (locked, like the clamp chain), its collar
-  carrying the rod (Ø6.2 over Ø6) concentrically at every rock angle. The
+  carrying the rod with a press fit and Loctite 638 at every rock angle. The
   lever EXTENDS FROM the pivoted summing bar and pivots WITH it about the
   knife-edge ridge line (engineerguy video 2/4 + 4/4; tip arc ~6 mm), so its
   one DOF is the rock about that Z line; the clamp + thumb screw + vertical rod
@@ -24,8 +24,8 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   Its two assembly settings, the press gauge and the endshake, are model
   dimensions of a blanked construction chain (mg_magnifier_assembly_spec)
   that the MHA-MG-000 sheet prints.
-* lever-wire -- WIRE 1's straight rest-pose run from the output fixture's cross
-  hole down to the drum tangent. It ARTICULATES like the real wire: a
+* lever-wire -- WIRE 1's straight rest-pose run from the output fixture's
+  spigot-groove front tangent down to the drum tangent. It ARTICULATES like the real wire: a
   ball joint at the hook (HookPoint on the wire coincident to the fixture's
   HookAnchorPoint) plus a 0.25 stand-off tangency to the drum,
   so the hook end follows the lever while the drum end hugs the drum (its two
@@ -41,13 +41,13 @@ Cross-subassembly fits (checked at the top level): the column-clamp arcs ride
 the O25.4 column (fr-frame.SLDASM); the pen-hanger (pn-pen.SLDASM) clamps the
 wheel-bar, and the wheel rim -> pen-rod wire couples this sub to the pen.
 
-Documented simplifications (Appendix C): the magnifying clamp's thumb screw is
-modeled backed-out (the tip is tangent to the lever rod -- a seated screw would
-overlap it); the output fixture's clamp screw is omitted (its cross hole doubles
-as the wire hook); the wires are modeled as straight rest-pose rods only
-(lever-wire here, pen-wire in pn-pen.SLDASM) -- drum/rim wraps, hooks and compliance
-are not, and the kinematic couplings stay Motion-study mates
-(cad/docs/motion-policy.md), so each run stands 0.25 off its wheel surface.
+Documented simplifications (Appendix C): both thumb screws are modeled
+backed-out with their tips tangent to the rods they clamp (seated screws would
+overlap them). The output fixture has the photographed hex body, grooved
+spigot and axial screw; the wires are straight rest-pose runs only (lever-wire
+here, pen-wire in pn-pen.SLDASM). Groove wraps, tie-offs and compliance are not
+modeled, and the kinematic couplings stay Motion-study mates
+(cad/docs/motion-policy.md).
 
 Fix-all strategy (M6.2): every structural component inserted at its exact final
 transform and fixed; the lever + bracket + wheel + wire are left free and
@@ -67,9 +67,10 @@ import sys
 
 import mg_magnifier_assembly_spec as stack_spec
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _custom_properties import apply_custom_properties
 from _dimensions import drive_dimension, set_global
+from _paths import OUT_PNG
 from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision, _named_dimension
@@ -103,6 +104,7 @@ from _assembly import (
     reset_dof_manifest,
     save_assembly_and_images,
     write_dof_manifest,
+    world_point,
 )
 from _assembly_patterns import (
     assert_pattern_targets,
@@ -118,6 +120,7 @@ from _transforms import (
     compose_rows,
     euler_from_rows,
     rot_z_rows,
+    rows_from_euler,
 )
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, SUMMING_Z
 from sm_summing_lever_spec import PLATE_L
@@ -181,7 +184,7 @@ LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 
 # Knife-edge pivot (engineerguy video 2/4 + 4/4): the lever rod EXTENDS FROM
 # the pivoted summing bar and pivots WITH it about the knife-edge ridge line
-# (along Z) -- it does NOT spin in the bracket collar (a loose Ø6.2/Ø6 guide).
+# (along Z) -- it does NOT spin in the press-fitted, bonded bracket collar.
 # The ridge is the summing sub's knife line; assert the lever part's local
 # KnifeAxis lands exactly on it, so a knife move fails loud here.
 from mg_magnifying_lever_geom import (  # noqa: E402
@@ -245,7 +248,30 @@ CLAMP_POS = (
 )
 VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -134.8 (local +x -> machine -z)
 VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the rod)
-FIXTURE_Y0 = 915.7  # collar y 915.7..923.7 on the vertical rod (rode down 10.3)
+from mg_output_fixture_geom import (  # noqa: E402
+    FIXTURE_AXIS_Y,
+    FIXTURE_YAW_DEG,
+    HOOK_LOCAL,
+    SPIGOT_FACE_X,
+    HEX_AF,
+    ROD_STATION,
+)
+from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA  # noqa: E402
+
+# Local +X runs through the spigot toward the bracket, slightly back (+Z);
+# local +Z is the machine-front groove tangent. No chirality shim is applied.
+FIXTURE_ROWS = rows_from_euler([0.0, 180.0 + FIXTURE_YAW_DEG, 0.0])
+FIXTURE_POSITION = (CLAMP_X, FIXTURE_AXIS_Y, VROD_Z)
+FIXTURE_SCREW_ROWS = compose_rows(ROT_Y_180, FIXTURE_ROWS)
+FIXTURE_SCREW_TIP_X = VROD_DIA / 2.0
+FIXTURE_SCREW_COLLAR_X = FIXTURE_SCREW_TIP_X + THUMB_SHANK_LEN
+FIXTURE_SCREW_OUTER_X = FIXTURE_SCREW_COLLAR_X + THUMB_HEAD_STACK_LEN
+FIXTURE_SCREW_STANDOFF = FIXTURE_SCREW_COLLAR_X - SPIGOT_FACE_X
+FIXTURE_SCREW_POSITION = tuple(
+    origin + FIXTURE_SCREW_OUTER_X * FIXTURE_ROWS[0][axis]
+    for axis, origin in enumerate(FIXTURE_POSITION)
+)
+assert FIXTURE_SCREW_STANDOFF > 0.0, "fixture screw collar must stand off the spigot"
 
 # --- wheel -------------------------------------------------------------------
 WHEEL_X = 53.0
@@ -305,13 +331,11 @@ for _geom in (_lever_wire, _pen_wire):
     )
 DRUM_Z = WHEEL_MID_Z + DRUM_MID_Z  # -154.91: drum centre (drum frame mid-plane)
 
-# Hook = tied through the cross hole, hanging under the collar's bottom face
-# (wire r + 0.25) on the front face of the vertical rod (Ø5 rod r 2.5 +
-# wire r + 0.25).
-_HOOK_EXPECTED = (
-    CLAMP_X,
-    FIXTURE_Y0 - (HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE),
-    VROD_Z - (2.5 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE),
+# Transform the model-owned groove front tangent, rather than assuming an
+# x-symmetric collar: its nonzero local X must be rotated exactly once.
+_HOOK_EXPECTED = tuple(
+    origin + sum(HOOK_LOCAL[i] * FIXTURE_ROWS[i][axis] for i in range(3))
+    for axis, origin in enumerate(FIXTURE_POSITION)
 )
 assert all(
     math.isclose(a, b, abs_tol=1e-9)
@@ -349,6 +373,38 @@ def _lever_wire_rows() -> list[list[float]]:
         x[0] * d[1] - x[1] * d[0],
     ]
     return [x, d, z]
+
+
+def _assert_fixture_hook_anchor(adapter, fixture: str) -> None:
+    """Prove the saved part's named point, not just a copied nominal, meets the wire."""
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    component = assembly.GetComponentByName(fixture)
+    if component is None:
+        raise RuntimeError(f"fixture component missing: {fixture}")
+    model = _early_bound(component, "IComponent2").GetModelDoc2()
+    if model is None:
+        raise RuntimeError(f"fixture part document not loaded: {fixture}")
+    feature = _early_bound(model, "IPartDoc").FeatureByName("HookAnchorPoint")
+    if feature is None:
+        raise RuntimeError("output fixture is missing HookAnchorPoint")
+    ref = _early_bound(feature, "IFeature").GetSpecificFeature2()
+    if ref is None:
+        raise RuntimeError("HookAnchorPoint is not native reference geometry")
+    point = _early_bound(ref, "IRefPoint").GetRefPoint()
+    if point is None:
+        raise RuntimeError("HookAnchorPoint has no native point")
+    local = [
+        float(value) * 1000.0
+        for value in _read_member(_early_bound(point, "IMathPoint"), "ArrayData")
+    ]
+    actual = world_point(adapter, fixture, local)
+    if not all(
+        math.isclose(a, b, abs_tol=1e-3)
+        for a, b in zip(actual, HUB_WIRE_START, strict=True)
+    ):
+        raise RuntimeError(
+            f"HookAnchorPoint {actual} != WIRE_START {HUB_WIRE_START} mm"
+        )
 
 
 # Wire articulation geometry (ball joint + hub stand-off, see build()). The
@@ -697,17 +753,35 @@ async def build(adapter) -> dict[str, str]:
     fixture = await place_component(
         adapter,
         "mg-output-fixture",
-        [CLAMP_X, FIXTURE_Y0, VROD_Z],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        list(FIXTURE_POSITION),
+        euler_from_rows(FIXTURE_ROWS),
+        FIXTURE_ROWS,
         ground=False,
     )
-    # (the fixture is x-symmetric about its origin, so it stays at IDENTITY)
     await lock_mate(
         adapter,
         named_ref(f"Front Plane@{fixture}", "PLANE"),
         named_ref(f"Front Plane@{vrod}", "PLANE"),
         label="output-fixture locked to vertical-rod",
+    )
+    assert_component_placed(adapter, fixture, list(FIXTURE_POSITION), FIXTURE_ROWS)
+    fixture_screw = await place_component(
+        adapter,
+        "vn-thumb-screw",
+        list(FIXTURE_SCREW_POSITION),
+        euler_from_rows(FIXTURE_SCREW_ROWS),
+        FIXTURE_SCREW_ROWS,
+        ground=False,
+        label="thumb-screw (output fixture)",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{fixture_screw}", "PLANE"),
+        named_ref(f"Front Plane@{fixture}", "PLANE"),
+        label="output-fixture thumb-screw locked to fixture",
+    )
+    assert_component_placed(
+        adapter, fixture_screw, list(FIXTURE_SCREW_POSITION), FIXTURE_SCREW_ROWS
     )
 
     # --- magnifying wheel ----------------------------------------------------
@@ -806,9 +880,9 @@ async def build(adapter) -> dict[str, str]:
         "vn-wheel-axle-nut", LOCKNUT_D, "wheel-axle locknut locked to the axle"
     )
     # --- amplification wire 1 (fixture -> drum) ------------------------------
-    # The straight rest-pose run: it hangs from the fixture's cross hole and
-    # grazes the brass drum's tangent (the wrap is implied -- module docstring).
-    # Part origin = the DRUM end, +Y toward the hook.
+    # The straight rest-pose run leaves the fixture's spigot-groove front
+    # tangent and grazes the brass drum's tangent; wraps are implied. Part
+    # origin = the DRUM end, +Y toward the hook.
     hw = await place_component(
         adapter,
         "mg-lever-wire",
@@ -834,6 +908,7 @@ async def build(adapter) -> dict[str, str]:
         label="lever-wire hook ball joint",
         verify=(hw, hw_o),
     )
+    _assert_fixture_hook_anchor(adapter, fixture)
     await distance_driver(
         adapter,
         component_named_ref(hw, "Axis1", "AXIS"),
@@ -932,7 +1007,45 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
+    # The whole assembly is too tall to judge the tiny groove and wire
+    # departure. Capture one farm-native front close-up in the existing render
+    # directory; the assembly cache carries that directory without extra tasks.
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    centre_station = (FIXTURE_SCREW_OUTER_X - ROD_STATION) / 2.0
+    centre = [
+        origin + centre_station * FIXTURE_ROWS[0][axis]
+        for axis, origin in enumerate(FIXTURE_POSITION)
+    ]
+    half = (FIXTURE_SCREW_OUTER_X + ROD_STATION) / 2.0 + HEX_AF / 2.0
+    detail = OUT_PNG / ASM_NAME / f"{ASM_NAME}_fixture-detail.png"
+    model.ShowNamedView2("", 1)  # swFrontView, remapped to the machine front
+    model.ViewZoomTo2(
+        X1=(centre[0] - half) / 1000.0,
+        Y1=(centre[1] - half) / 1000.0,
+        Z1=(centre[2] - half) / 1000.0,
+        X2=(centre[0] + half) / 1000.0,
+        Y2=(centre[1] + half) / 1000.0,
+        Z2=(centre[2] + half) / 1000.0,
+    )
+    model.GraphicsRedraw2()
+    try:
+        check(
+            "export_image fixture detail",
+            await adapter.export_image(
+                {
+                    "file_path": str(detail),
+                    "format_type": "png",
+                    "width": 1600,
+                    "height": 1000,
+                    "view_orientation": "current",
+                }
+            ),
+        )
+    finally:
+        adapter._zoom_to_fit(model)
+    artefacts["fixture_detail"] = str(detail)
+    return artefacts
 
 
 if __name__ == "__main__":

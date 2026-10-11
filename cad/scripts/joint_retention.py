@@ -613,7 +613,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "mg_magnifying_clamp",  # #4-40 UNC-2B tapped ScrewHole (Hole Wizard), receiver of thumb_screw
         "ms_stop_block",  # MHA-MS-002: #4-40 UNC-2B tapped through the floor (receiver of vn_thumb_screw) + 2x #2-56 UNC blind taps (receiver of vn_ms_stop_plate_screw)
         "vn_ms_stop_plate_screw",  # #2-56 x 1/4 brass fillister (McMaster 90114A124, MHA-VN-054), member: 2 into ms_stop_block through the cover plate
-        "mg_output_fixture",  # #4-40 UNC tapped cross hole (entry wall), receiver of the 2nd thumb_screw
+        "mg_output_fixture",  # #4-40 UNC axial tap from the spigot face into the rod bore (mg_output_fixture_spec.TAP_SPEC), receiver of the 2nd thumb_screw
         "vn_pedestal_hold_down_screw",  # #8-32 x 3/4 fillister (90280A197, MHA-VN-032), member: 2 arbor-pedestal seats in harmonic_base, 2 pivot-bracket seats in rocker_arm_support
         "pn_pen_frame",  # #4-40 UNC-2B tapped hole up through the bottom rail, receiver of pen_set_screw
         "pn_pen_hanger",  # #8-32 tapped hole in the strap, receiver of hanger_screw
@@ -630,7 +630,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "sm_summing_lever",  # receiver: #10-24 counter-anchor, 20x #6-32 channel anchors, two blind #2-56 magnifying-bracket seats
         "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through latch-hook taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
         "vn_swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
-        "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty, not placed in the SLDASM); 3rd up through ms_stop_block
+        "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: clamp ScrewHole and output-fixture spigot tap (both placed in mg-magnifier.SLDASM); 3rd up through ms_stop_block
         "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #2-56 fulcrum-keeper taps (top-level row)
         "pd_transgear_arm",  # MHA-PD-018: 2x #8-32 plate taps through (pd_transgear_arm_spec), receiver; the pin MHA-PD-023 is pressed in a reamed hole
         "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A199, MHA-VN-040), 1-in stock cut to fit; member: 2 into transgear_arm
@@ -681,7 +681,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_keeper_chain_link",  # snap loop link
         "vn_knife_mount_dowel",  # MHA-VN-051 1/8 dowels, two pressed into each knife mount's reamed top-seat holes, slip in the crossbar hole and slot
         "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
-        "mg_lever_wire",  # wire, tied through the fixture cross hole; no thread
+        "mg_lever_wire",  # wire, wrapped in the fixture's spigot groove; no thread
         "mg_magnifying_bracket",  # two counterbored normal #2 clearance holes in its front mounting flange; no thread
         "mg_magnifying_lever",  # plain Ø6 domed rod
         "mg_magnifying_vertical_rod",  # plain Ø5 domed rod
@@ -1774,30 +1774,30 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="mg-magnifier/fixture-thumb-screw",
         assembly="mg_magnifier",
-        # thumb_screw's one placed instance is the magnifying-clamp screw; the
-        # builder omits this second one, so the stem does not cover it.
-        member=UNMODELLED,
+        member="vn_thumb_screw",
         receiver="mg_output_fixture",
         thread="#4-40 UNC",
         quantity=1,
         installed_at="",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "hand-set operator clamp: locks the output-fixture collar at its set height on the vertical rod "
-            "(sets the trace's vertical placement); collar and rod never move relative in operation, and the "
-            "wire tension acts along the rod (Y) at the hook in front of the rod, i.e. no moment about the "
-            "radial screw axis (Z)"
+            "hand-set operator clamp: locks the output fixture's hex body at its set height on the vertical rod "
+            "(sets the trace's vertical placement); fixture and rod never move relative in operation, the "
+            "wire pull at the spigot-groove front tangent runs mostly along the rod (Y), and the fixture rides "
+            "the lever as one rigid body with the clamp chain, i.e. no operating torque about the horizontal "
+            "screw axis (fixture local X, the spigot axis)"
         ),
-        axial_capture="tip bears on the Ø5 vertical rod through the tapped entry wall of the radial cross hole (screw NOT placed in mg-magnifier.SLDASM)",
+        axial_capture="tip bears on the Ø5 vertical rod through the #4-40 tap running axially from the spigot face into the rod bore (modelled backed-out, tip tangent, collar standing off the spigot face)",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_mg_output_fixture.py docstring ('a small reeded screw (separate thumb-screw part) locks it'); "
-            "mg_output_fixture_spec.py CROSS_HOLE_SPEC + DRAWING_NOTES 3 (TAP THE ENTRY WALL ONLY #4-40 UNC); "
-            "config parts/vn-thumb-screw.yaml quantity 2; dimensions.yaml ch20 'Thumb screw ... (x2: clamp + output fixture)'; "
-            "build_mg_magnifier_assembly.py docstring ('the output fixture's clamp screw is omitted')"
+            "build_mg_magnifier_assembly.py:build ('thumb-screw (output fixture)', lock_mate 'output-fixture thumb-screw locked to fixture'; "
+            "FIXTURE_SCREW_TIP_X = rod radius, FIXTURE_SCREW_STANDOFF > 0; docstring 'both thumb screws are modeled backed-out'); "
+            "mg_output_fixture_geom.py TAP_SPEC + SPIGOT_FACE_X (axial tap from the spigot face into the rod bore); "
+            "mg_output_fixture_spec.py TAP_SPEC + DRAWING_NOTES; config parts/vn-thumb-screw.yaml quantity 2; "
+            "dimensions.yaml ch20 thumb screw x2 (sliding clamp + output fixture)"
         ),
     ),
     Joint(
@@ -2200,7 +2200,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "mg_magnifier", "build_mg_magnifier_assembly.py", "thumb-screw locked to clamp"
     ),
     "mg-magnifier/fixture-thumb-screw": Occurrence(
-        "mg_magnifier", "mg_output_fixture_spec.py", "CROSS_HOLE_SPEC"
+        "mg_magnifier", "build_mg_magnifier_assembly.py", "output-fixture thumb-screw locked to fixture"
     ),
     "mg-magnifier/wheel-bar-clamp-screws": Occurrence(
         "mg_magnifier", "build_mg_magnifier_assembly.py", "CLAMP_SCREW_X"
