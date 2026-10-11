@@ -46,8 +46,8 @@ from pd_transgear_arm_plate_geometry import (
 BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
 
 # Places each printed dimension carries (contract §12):
-# the outline (end radius, bar width, top corners, kink), the boss Ø, the
-# notch face's corner heights (it only clears the arm's edge) and the
+# the outline (end radius, both side edges from K, top corners, kinks), the
+# boss Ø, the notch face's corner heights (it only clears the arm's edge) and the
 # countersink Ø (the cut-to-fit screw's seat, CSK_DIA_BAND) are routine .X;
 # the thickness over the arm is .XX (at .X the shortest stock MHA-VN-040 no
 # longer stands past its cut and the land under the cone thins below the
@@ -134,7 +134,15 @@ ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE
 # not marked: the thickness over the arm, the hub station and the hub-to-boss
 # length already fix the boss face.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PlateOutline": {"EndR", "Width", "TopLeftY", "TopRightY", "KinkY"},
+    "PlateOutline": {
+        "EndR",
+        "EdgeLeftX",
+        "EdgeRightX",
+        "TopLeftY",
+        "TopRightY",
+        "KinkY",
+        "KinkRightY",
+    },
     "Plate": {"ThicknessOverArm"},
     "LowerOutline": {"NotchLeftY", "NotchRightY"},
     "LowerSection": {"NotchDepth"},
@@ -146,10 +154,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateOutline": {
         "EndR": OUTLINE_PLACES,
-        "Width": OUTLINE_PLACES,
+        "EdgeLeftX": OUTLINE_PLACES,
+        "EdgeRightX": OUTLINE_PLACES,
         "TopLeftY": OUTLINE_PLACES,
         "TopRightY": OUTLINE_PLACES,
         "KinkY": OUTLINE_PLACES,
+        "KinkRightY": OUTLINE_PLACES,
     },
     "Plate": {"ThicknessOverArm": THICKNESS_PLACES},
     "LowerOutline": {"NotchLeftY": NOTCH_PLACES, "NotchRightY": NOTCH_PLACES},
