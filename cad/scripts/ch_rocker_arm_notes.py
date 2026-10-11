@@ -11,12 +11,7 @@ the offline drawing test.
 from __future__ import annotations
 
 from ch_rocker_arm_spec import (
-    ARM_DEPTH,
     BOT_ARC_LEN,
-    CENTER_Y,
-    PIVOT_MID_Y,
-    R_BOTTOM,
-    R_TOP,
     STRAP_HUB_SYMMETRY,
     TIP_FACE,
     TOP_ARC_LEN,
@@ -32,11 +27,20 @@ from ch_rocker_arm_spec import (
 # cheek-over-hub air in test_rocker_bank_layout.
 HUB_COAXIALITY_DIA = 0.50
 
+# Drawing-only arc-system acceptance (Pedro, 2026-10-11). The model nominals
+# stay R800/R816 with top height 8.00. A surface-profile zone is measured along
+# the arc normal, not as a radius size band. Ⓤ is the portion OUTSIDE material:
+# top 0.5 -> +Y; bottom 0 -> +Y. At the mirror axis these preserve the model's
+# top 8.00..8.50 and derived bottom 0.00..0.50 envelopes. Template ±0.03 is
+# inspection of the shop template, not the finished-part tolerance.
+ARC_PROFILE_ZONE_MM = "0.5"
+ARC_PROFILE_OUTSIDE_MM = {"TopRadius": "0.5", "BottomRadius": "0"}
+
 # True free-text instructions only; geometry / datum structure / roughness live
 # in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
 # their native callouts (Ø6.50 dim, Ø1.99 THRU ALL) -- the notes state process,
-# fit and count, never a second copy of a sheet dimension.  16.00 depth is a
-# REF: it is fixed by the concentric R800/R816 edges.
+# fit and count, never a second copy of a sheet dimension. BASIC radii and
+# top height now feed the arc-system profile frames directly.
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_rocker_arm marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -70,17 +74,12 @@ BUILT_UP_PERMISSION_NOTE = None
 
 DRAWING_NOTES = "\n".join(
     (
-        # r743-3: the 21-line block rendered 0.76 over NOTES_CEILING; notes
-        # 1-2 say the same in two fewer lines (test_rocker_arm_drawing keeps a
-        # full line of headroom at the measured pitch).
+        # Retain the legacy sheet's other requirements; the profile nominals
+        # now live in native BASIC dimensions, not in this prose.
         "1. MIRROR-SYMMETRIC ABOUT THE PIVOT AXIS;",
         "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
         "2. ALL HOLES THRU.",
-        f"3. TOP EDGE R{R_TOP:.{DEFAULT_DRAWING_PRECISION}f}, "
-        f"BOTTOM EDGE R{R_BOTTOM:.{DEFAULT_DRAWING_PRECISION}f},",
-        "   CONCENTRIC; COMMON CENTRE ON THE",
-        f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.{DEFAULT_DRAWING_PRECISION}f} REF FROM THE PIVOT",
-        f"   AXIS (STRAP DEPTH {ARM_DEPTH:.{DEFAULT_DRAWING_PRECISION}f} REF).",
+        "3. ARCS CONCENTRIC ABOUT THE MIRROR AXIS.",
         f"4. ARC LENGTHS {TOP_ARC_LEN:.{DEFAULT_DRAWING_PRECISION}f} TOP / "
         f"{BOT_ARC_LEN:.{DEFAULT_DRAWING_PRECISION}f} BOTTOM",
         "   DEFINE THE ARC ENDPOINTS.",

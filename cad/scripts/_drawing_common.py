@@ -109,6 +109,7 @@ class DrawingOutputs:
     png: Path
 
 
+
 # The general-tolerance custom properties every part carries
 # (_part_properties.part_properties, from cad/config/title_block.yaml) and the drawing
 # template's title block reads via $PRPSHEET. finalize_drawing requires them on

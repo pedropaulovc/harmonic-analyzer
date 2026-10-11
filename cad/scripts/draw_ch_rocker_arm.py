@@ -6,9 +6,9 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The strap is a long thin curved seesaw (~292 mm tip to tip, 16 mm deep, 2.5 mm
-thick).  The print shows the profile (front), a 1:1 end view that carries the
-strap's 2.500 +/-0.025 thickness and the hub length natively, plus a 1:4
-isometric.  The sheet runs at 1:2.
+thick). The print shows the profile (front), with BASIC radii and height feeding
+two unequally disposed surface-profile frames, a 1:1 end view carrying the
+strap's thickness and hub length natively, and a 1:4 isometric. Sheet scale 1:2.
 
 Run with SolidWorks open::
 
@@ -77,6 +77,7 @@ from ch_rocker_arm_spec import (
     HUB_DIA,
     PIVOT_HOLE_DIA,
     R_TOP,
+    R_BOTTOM,
     ROD_HOLE_SPEC,
     ROD_HOLE_X,
     ROD_HOLE_Y,
@@ -87,6 +88,7 @@ from ch_rocker_arm_spec import (
     TOP_END_X,
     TOP_END_Y,
 )
+from ch_rocker_arm_notes import ARC_PROFILE_OUTSIDE_MM, ARC_PROFILE_ZONE_MM
 
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm"]
@@ -146,6 +148,15 @@ ROD_HOLE = requirement(
 # right of the end view. Beside the end view (0.315, 0.150) it read as that
 # view's label, 0.4 mm from HubLength's "+0.05" (r743-p1s-B2 render).
 ISO_CAPTION_XY = (0.325, 0.183)
+
+# The two frames control one nominal concentric arc system. Their material
+# sides differ: top outside is +Y, bottom inside is +Y. A single shared frame
+# would put one of the zones on the wrong side of its basic arc.
+ARC_PROFILE_FRAME_XY = {
+    "TopRadius": (0.025, 0.225),
+    "BottomRadius": (0.025, 0.135),
+}
+ARC_PROFILE_PICK_X_MM = {"TopRadius": -110.0, "BottomRadius": -100.0}
 
 # General notes. The linked block renders ~4.1 mm a line, so its 18 lines run
 # ~75 mm. Anchored by its top at y 0.082, the last two ran past the bottom
@@ -409,15 +420,16 @@ def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]
     return rim, (rim[0] + PIVOT_FINISH_OFFSET[0], rim[1] + PIVOT_FINISH_OFFSET[1])
 
 
-# The large concentric radii are carried in the manufacturing note: imported
-# radius dimensions retain off-sheet centre witnesses even in shortened-radius
-# mode.  Keeping them as notes avoids clipped geometry without losing values.
+# The native BASIC radii feed the arc-system profile frames. Suppress their
+# off-sheet centre witnesses and dimension-line tails, retaining the radial
+# arrow/leader (drawing-layout-tuning refusal a), rather than typing values in
+# the manufacturing notes.
 # The O6.50 text sits down-left of the pivot, left of the rod-pin X location
 # dimension (pivot to rod-pin hole, its line at y 0.138): from (0.180, 0.120),
 # straight below the bore, its leader crossed that dimension's line and ran up
 # its extension line (r743-4D render).
-# The top edge's +0.50/0 height over the pivot axis (Codex #936
-# PRRT_kwDOPHDy386mV3AO) runs up the mirror axis from the pivot centre, its
+# The top edge's BASIC height over the pivot axis runs up the mirror axis from
+# the pivot centre, feeding the profile zone that preserves the former +0.50/0;
 # text straight above the strap, left of the rod-pin frame and datum C. It
 # prints LEFT of the axis, so it rides above datum A's box (top y ~0.1905):
 # at a 10 mm rise its rows sat on datum A's 135-degree leader
@@ -426,21 +438,26 @@ def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]
 TOP_ABOVE_PIVOT_TEXT_RISE = 0.022
 FRONT_KEEP = {
     "PivotDia": (0.130, 0.148),
+    "TopRadius": (0.130, 0.218),
+    "BottomRadius": (0.090, 0.154),
     "TopAbovePivot": (
         _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[0],
         _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[1]
         + TOP_ABOVE_PIVOT_TEXT_RISE,
     ),
 }
-NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
 
 _TOP_P = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
 TOP_EDGE = requirement(
     "top_edge", kind="profile", faces=(CylinderFace(2 * rocker.R_TOP),),
-    requirements=("height_above_pivot", "radius", "arc_len"), fields={
-        "height_above_pivot": (_band(rocker.TOP_EDGE_ABOVE_PIVOT, _TOP_P, rocker.TOP_EDGE_BAND), ("TOP_EDGE_ABOVE_PIVOT", "TOP_EDGE_BAND")),
+    requirements=("height_above_pivot", "radius", "profile_zone", "arc_len"), fields={
+        "height_above_pivot": (rocker.TOP_EDGE_ABOVE_PIVOT, ("TOP_EDGE_ABOVE_PIVOT", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "height_from": ("pivot_bore", (("draw_ch_rocker_arm", "build"),)),
-        "radius": (_band(rocker.R_TOP, _P), ("R_TOP", ("ch_rocker_arm_notes", "DRAWING_NOTES"))), "radius_nominal": (rocker.R_TOP, ("R_TOP",)),
+        "radius": (rocker.R_TOP, ("R_TOP", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))), "radius_nominal": (rocker.R_TOP, ("R_TOP",)),
+        "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
+        "profile_zone": (float(ARC_PROFILE_ZONE_MM), (("ch_rocker_arm_notes", "ARC_PROFILE_ZONE_MM"),)),
+        "outside_disposition": (float(ARC_PROFILE_OUTSIDE_MM["TopRadius"]), (("ch_rocker_arm_notes", "ARC_PROFILE_OUTSIDE_MM"),)),
+        "profile_datums": (["A", "B", "C"], (("draw_ch_rocker_arm", "_add_arc_profiles"),)),
         "arc_len": (_band(rocker.TOP_ARC_LEN, _P), ("TOP_ARC_LEN", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)),
         "centre_from_pivot_ref": (rocker.CENTER_Y - rocker.PIVOT_MID_Y, ("CENTER_Y", "PIVOT_MID_Y", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
@@ -449,9 +466,13 @@ TOP_EDGE = requirement(
 )
 PROFILE_OUTER = requirement(
     "profile_outer", kind="profile", faces=(CylinderFace(2 * rocker.R_BOTTOM), _RIGHT[1], _TIPS[1]),
-    requirements=("bottom_radius", "bottom_arc_len", "mirror_symmetric"), fields={
-        "bottom_radius": (_band(rocker.R_BOTTOM, _P), ("R_BOTTOM", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
+    requirements=("bottom_radius", "profile_zone", "bottom_arc_len", "mirror_symmetric"), fields={
+        "bottom_radius": (rocker.R_BOTTOM, ("R_BOTTOM", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "bottom_radius_nominal": (rocker.R_BOTTOM, ("R_BOTTOM",)),
+        "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
+        "profile_zone": (float(ARC_PROFILE_ZONE_MM), (("ch_rocker_arm_notes", "ARC_PROFILE_ZONE_MM"),)),
+        "outside_disposition": (float(ARC_PROFILE_OUTSIDE_MM["BottomRadius"]), (("ch_rocker_arm_notes", "ARC_PROFILE_OUTSIDE_MM"),)),
+        "profile_datums": (["A", "B", "C"], (("draw_ch_rocker_arm", "_add_arc_profiles"),)),
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
         "bottom_arc_len": (_band(rocker.BOT_ARC_LEN, _P), ("BOT_ARC_LEN", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
         "mirror_symmetric": (True, (("ch_rocker_arm_notes", "DRAWING_NOTES"),)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
@@ -469,7 +490,6 @@ HUB_OD = requirement(
         "coaxial_to": ("pivot_bore", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
     }, precision={"dia": _P, "coaxiality_dia": _P},
 )
-
 # The hub length (+0.05/0, #743 PR2) under the end view, where the hub shows
 # its full length (the end view is 1:1, centred on the pivot mid-depth).
 # The strap thickness (+/-0.025, ARM_THICKNESS_BAND, Main ruling 2026-10
@@ -518,6 +538,60 @@ part_metadata(datums={
     "B": ({"feature": "strap_datum_b", "surface": "+Z broad strap face"}, (("draw_ch_rocker_arm", "build"),)),
 })
 TOP_KEEP: dict[str, tuple[float, float]] = {}
+BASIC_PROFILE_DIMENSIONS = {"TopRadius", "BottomRadius", "TopAbovePivot"}
+
+
+def _basic_profile_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Make the imported profile nominals BASIC without saving the source part."""
+    remaining = set(BASIC_PROFILE_DIMENSIONS)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        set_basic_dimension(adapter, display, label=f"arc-system {name}")
+        if name in ARC_PROFILE_OUTSIDE_MM:
+            display.ShortenedRadius = True
+            # swLeaderLineNone / swWitnessLineNone: remove the radius centre
+            # tail/witness, not the arrow and text-to-arc leader.
+            display.LeaderVisibility = 3
+            display.WitnessVisibility = 3
+            if (
+                not bool(display.ShortenedRadius)
+                or int(display.LeaderVisibility) != 3
+                or int(display.WitnessVisibility) != 3
+            ):
+                raise RuntimeError(f"{name} retained its off-sheet radius witnesses")
+        remaining.remove(name)
+    if remaining:
+        raise RuntimeError(f"arc-system BASIC dimensions missing: {sorted(remaining)}")
+
+
+def _arc_profile_point(name: str) -> tuple[float, float]:
+    """A point on each nominal arc, away from bores, datums and radius leaders."""
+    radius = {"TopRadius": R_TOP, "BottomRadius": R_BOTTOM}[name]
+    x = ARC_PROFILE_PICK_X_MM[name]
+    centre_y = _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT + R_TOP
+    return _sheet_xy(x, centre_y - math.sqrt(radius**2 - x**2))
+
+
+def _add_arc_profiles(adapter: Any, front: Any) -> None:
+    """Attach separate native frames: Ⓤ0.5 top, Ⓤ0 bottom, total zone 0.5."""
+    for name, radius in (("TopRadius", R_TOP), ("BottomRadius", R_BOTTOM)):
+        edge = visible_circle_edge(adapter, front, 2.0 * radius)
+        add_feature_control_frame(
+            adapter,
+            front,
+            edge_entity=edge,
+            leader_attach_xy=_arc_profile_point(name),
+            frame_xy=ARC_PROFILE_FRAME_XY[name],
+            characteristic="profile_surface",
+            tolerance=ARC_PROFILE_ZONE_MM,
+            outside_disposition=ARC_PROFILE_OUTSIDE_MM[name],
+            datums=("A", "B", "C"),
+            label=f"arc-system {name} profile",
+        )
+
 
 
 def _note_extent(adapter: Any, note: Any) -> tuple[float, float, float, float]:
@@ -634,9 +708,8 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    # By feature, like the end view: only PivotHoleProfile's O6.50 and
-    # TopEdgeReference's height arrive, so the note-only radii are never
-    # imported to be deleted again.
+    # Import the source radii and top height too: these are the BASIC nominal
+    # geometry of the profile zone, not independent radius/height bands.
     front_annotations = curate_view_dimensions(
         adapter,
         front,
@@ -644,6 +717,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _basic_profile_dimensions(adapter, front_annotations)
     # The hub length and the strap thickness only show in the end view; the
     # front looks down their direction. Codex #936 (PRRT_kwDOPHDy386mRk__):
     # RIGHT_KEEP was declared but never curated, so the +0.05/0 band that sets
@@ -795,6 +869,7 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="rod-pin hole position",
     )
+    _add_arc_profiles(adapter, front)
 
     notes = add_property_linked_note(
         adapter, "Manufacturing Notes", NOTES_LEFT, NOTES_CEILING

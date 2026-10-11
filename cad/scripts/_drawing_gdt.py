@@ -243,6 +243,7 @@ def add_feature_control_frame(
     entity: Any | None = None,
     leader_attach_xy: tuple[float, float] | None = None,
     translated: Sequence[str] = (),
+    outside_disposition: str | None = None,
     lower_frame: tuple[str, str, Sequence[str]] | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
@@ -252,6 +253,9 @@ def add_feature_control_frame(
     stacked frame ``(characteristic, tolerance, datums)`` on the same leader
     (``IGtol.AddFrame``), printed with its own symbol -- not composite
     (``GetCompositeFrame2(1)`` must read False) -- its XML read back.
+
+    ``outside_disposition`` applies the native circled-U profile modifier to
+    the upper frame (None: symmetric; "0": wholly inside; total: wholly outside).
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.  Only the kinds
@@ -268,6 +272,14 @@ def add_feature_control_frame(
     attached entity (GetAttachedEntityCount3 1 -> 0, types (EDGE,) -> ())
     while IGtol.IsAttached kept reading True with one non-dangling leader.
     """
+    xml = _gtol_frame_xml(
+        characteristic,
+        tolerance,
+        datums=datums,
+        diameter=diameter,
+        translated=translated,
+        outside_disposition=outside_disposition,
+    )
     draw = adapter.currentModel
     if entity_type.upper() not in _ATTACHMENT_SELECT_TYPES:
         raise ValueError(
@@ -366,10 +378,10 @@ def add_feature_control_frame(
     frame = _sw_type_info.early_bound_or_flag(
         frame, "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
     )
-    # The legacy seed preserves ordinary migration but carries no translation
-    # modifier, and projection must be applied through current-frame XML even
-    # when the frame was just converted; the current-format XML states both.
-    if not migrated or translated or projected_zone_height_mm is not None:
+    # The legacy seed carries neither translation, projection nor unequal-profile
+    # modifiers; requested modifiers must use current-format XML after migration.
+    if (not migrated or translated or projected_zone_height_mm is not None
+            or outside_disposition is not None):
         if frame.SetSymbolXml(xml) is not True:
             raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
     applied = frame.GetSymbolXml()

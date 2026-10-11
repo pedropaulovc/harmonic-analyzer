@@ -96,7 +96,8 @@ frames and no datums.
 - **Cams.** The pinion-cam eccentric-axis position, and any future cam.
 - **Channel consistency.** At most one control per channel part (rocker arm,
   channel lever, amplitude bar, connecting rod) where a coordinate ± would let
-  the 20 channels scatter.
+  the 20 channels scatter, except the rocker-arm arc-system control described
+  below.
 - **Crank mesh.** MHA-DT-005's crank bore: one diametral angularity frame to
   the cone-journal bore (datum A), clocked by the foot seat (datum B), with the
   plan angle basic. The fixed-centre 16T:64T crossed mesh loses running
@@ -142,6 +143,42 @@ frames and no datums.
   assembly checks the running mesh over the whole engaged window (no tight
   spot, shake at every tooth). Keep numerical limits in the shared functional
   source, not a generic multi-line Manufacturing Notes block.
+
+   **Rocker arm MHA-CH-006 (Pedro, 2026-10-11):** retain the rod-pin
+   position Ø0.20 to A|B|C **and** one arc-system surface-profile control,
+   represented by two frames, one for each arc. The rod-pin coordinates set
+   the connecting-rod lever length and angle: changing them changes the
+   cam-to-rocker closure and neutral pose
+   ([`channel_kinematics.py`](../scripts/channel_kinematics.py), `arc_geometry`;
+   [`ch_rocker_arm_spec.py`](../scripts/ch_rocker_arm_spec.py), `ROD_HOLE_X/Y`).
+   Independently, the R800 upper surface carries the amplitude-bar foot:
+   its form and height set the sliding-contact locus as the rocker swings,
+   closing the rocker–bar–lever chain (`solve_state` and J5 in
+   [`build_ch_channel_assembly.py`](../scripts/build_ch_channel_assembly.py)).
+   The R816 lower arc completes the nominal concentric 16 mm-deep moving
+   strap envelope ([`build_ch_rocker_arm.py`](../scripts/build_ch_rocker_arm.py),
+   opening source rationale and chapter-30 sketch reconstruction). The bottom
+   arc is not a second amplitude-bar contact surface; no separate gain-criticality
+   claim is made for it. The historic [GD&T assessment](tolerance-gdt-assessment.md),
+   §5.2, identifies the R800 form as a profile requirement; its older production
+   tolerance suggestions do not override this ruling.
+
+   A radius size band does not state the accepted form: R800 ±0.51 over a
+   292 mm chord allows only about ±0.009 mm of sagitta. BASIC R800/R816 and
+   BASIC top height 8.00 instead feed 0.5 mm surface-profile zones to the
+   existing reachable A (pivot bore), B (strap face), C (+X land) datums.
+   Top Ⓤ0.5 puts the entire zone outside material; bottom Ⓤ0 puts it inside.
+   The material sides oppose, so a single frame cannot specify both zones.
+   At the mirror-axis station the upper edge remains 8.00..8.50 above the
+   pivot and the lower edge 0.00..0.50 above the model bottom origin,
+   preserving the model's `TOP_EDGE_BAND` and derived concentric-arc placement.
+   Away from that station the zone follows the surface normal, not a rigid
+   vertical translation, and does not require identical deviations on both
+   actual surfaces. Profile of a surface, rather than of a line, controls the
+   entire narrow edge face through the strap thickness, not just selected
+   cross-sections (ASME Y14.5-2018). The shop template's ±0.03 DTI-station
+   acceptance about the 8.25-height aim is separate from the part's 0.5 zone.
+   This is a drawing-tolerance cutover; model geometry remains unchanged.
 
 A new entry needs a user ruling.
 

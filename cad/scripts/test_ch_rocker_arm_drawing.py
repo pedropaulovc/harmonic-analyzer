@@ -34,7 +34,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert arm.DRAWING_DIMENSIONS is ch_rocker_arm_notes.DRAWING_DIMENSIONS
     marked = set().union(*ch_rocker_arm_notes.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
-    assert kept | drawing.NOTE_ONLY_DIMENSIONS == marked
+    assert kept == marked
 
 
 def test_draw_view_math_matches_the_spec() -> None:
@@ -76,19 +76,18 @@ def test_sheet_runs_at_1_to_2() -> None:
 
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = ch_rocker_arm_notes.DRAWING_NOTES
-    assert "R800" in notes
-    assert "R816" in notes
+    assert "ARCS CONCENTRIC ABOUT THE MIRROR AXIS." in notes
+    assert "R800" not in notes
+    assert "R816" not in notes
     # The rod hole rides its native Ø1.99 THRU ALL callout; the notes state
     # count and process only, never a second copy of a sheet dimension.
     assert "(1X)" in notes
     assert "#47" not in notes
     assert "6. PIVOT HOLE: REAM." in notes
-    assert "16.00 REF" in notes
+    assert "16.00 REF" not in notes
     assert "2. ALL HOLES THRU." in notes
-    # User ruling 2026-09-26: the edge height over the pivot is the control
-    # (a model dimension, test_top_edge_height_is_a_banded_model_dimension);
-    # the arc centre distance is reference.
-    assert "808.00 REF FROM THE PIVOT" in notes
+    # Profile nominals print once, as native BASIC dimensions, not as prose.
+    assert "808.00 REF FROM THE PIVOT" not in notes
     assert f"INTEGRAL HUB DIA {ch_rocker_arm_spec.HUB_DIA:.2f}" in notes
     assert (
         "HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø0.50 (TURN HUB AND REAM BORE IN ONE SETUP)"
@@ -123,7 +122,6 @@ def test_native_gdt_and_finish_present() -> None:
     assert math.degrees(drawing.PIVOT_DATUM_ANGLE) % 90.0 == pytest.approx(45.0)
     assert 'label="pivot bore cylindrical datum feature"' in source
     assert source.count("shoulder=True") == 1
-    assert source.count("add_feature_control_frame(") == 1
     tree = ast.parse(source)
     frames = [
         node
@@ -131,6 +129,12 @@ def test_native_gdt_and_finish_present() -> None:
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "add_feature_control_frame"
+        and any(
+            keyword.arg == "characteristic"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "position"
+            for keyword in node.keywords
+        )
     ]
     assert len(frames) == 1
     keywords = {keyword.arg: keyword.value for keyword in frames[0].keywords}
@@ -149,6 +153,7 @@ def test_native_gdt_and_finish_present() -> None:
         == ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]
     )
     assert drawing.ROD_HOLE.fields["position_dia"][0] == float(printed_tolerance)
+    assert ast.unparse(keywords["diameter"]) == "True"
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
@@ -158,10 +163,173 @@ def test_native_gdt_and_finish_present() -> None:
     assert source.count("edge_entity=rod_hole_edge") == 1
 
 
-def test_large_radius_values_are_note_only() -> None:
-    assert drawing.NOTE_ONLY_DIMENSIONS == {"TopRadius", "BottomRadius"}
-    assert "R800" in ch_rocker_arm_notes.DRAWING_NOTES
-    assert "R816" in ch_rocker_arm_notes.DRAWING_NOTES
+def test_profile_nominals_are_kept_natively_without_note_only_duplicates() -> None:
+    names = {"TopRadius", "BottomRadius", "TopAbovePivot"}
+    assert drawing.BASIC_PROFILE_DIMENSIONS == names
+    assert names <= drawing.FRONT_KEEP.keys()
+    assert not hasattr(drawing, "NOTE_ONLY_DIMENSIONS")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_basic_profile_dimensions(adapter, front_annotations)" in source
+    assert "_add_arc_profiles(adapter, front)" in source
+
+
+class _ProfileDisplay:
+    """Model COM property writes, including silently ignored setters."""
+
+    def __init__(self, ignored: str | None = None) -> None:
+        self.ignored = ignored
+        self.writes: list[tuple[str, object]] = []
+        object.__setattr__(self, "ShortenedRadius", False)
+        object.__setattr__(self, "LeaderVisibility", 0)
+        object.__setattr__(self, "WitnessVisibility", 0)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name in {"ShortenedRadius", "LeaderVisibility", "WitnessVisibility"}:
+            self.writes.append((name, value))
+            if name == self.ignored:
+                return
+        object.__setattr__(self, name, value)
+
+
+def _profile_annotations(monkeypatch: pytest.MonkeyPatch, displays: dict) -> list:
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
+    return [
+        SimpleNamespace(name=name, GetSpecificAnnotation=lambda display=display: display)
+        for name, display in displays.items()
+    ]
+
+
+def test_basic_profile_dimensions_converts_all_three_and_shortens_only_radii(
+    bound: None, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = object()
+    displays = {
+        name: _ProfileDisplay()
+        for name in ("TopRadius", "BottomRadius", "TopAbovePivot", "PivotDia")
+    }
+    annotations = _profile_annotations(monkeypatch, displays)
+    calls = []
+    monkeypatch.setattr(
+        drawing, "set_basic_dimension",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+    drawing._basic_profile_dimensions(adapter, annotations)
+    assert calls == [
+        ((adapter, displays[name]), {"label": f"arc-system {name}"})
+        for name in ("TopRadius", "BottomRadius", "TopAbovePivot")
+    ]
+    for name in ("TopRadius", "BottomRadius"):
+        assert displays[name].writes == [
+            ("ShortenedRadius", True),
+            ("LeaderVisibility", 3),
+            ("WitnessVisibility", 3),
+        ]
+        assert displays[name].ShortenedRadius is True
+        assert displays[name].LeaderVisibility == 3
+        assert displays[name].WitnessVisibility == 3
+    assert displays["TopAbovePivot"].writes == []
+    assert displays["PivotDia"].writes == []
+
+
+@pytest.mark.parametrize("missing", ["TopRadius", "BottomRadius", "TopAbovePivot"])
+def test_basic_profile_dimensions_rejects_each_missing_nominal(
+    bound: None, monkeypatch: pytest.MonkeyPatch, missing: str,
+) -> None:
+    displays = {
+        name: _ProfileDisplay()
+        for name in ("TopRadius", "BottomRadius", "TopAbovePivot")
+        if name != missing
+    }
+    annotations = _profile_annotations(monkeypatch, displays)
+    monkeypatch.setattr(drawing, "set_basic_dimension", lambda *_args, **_kwargs: None)
+    with pytest.raises(RuntimeError, match=f"BASIC dimensions missing:.*{missing}"):
+        drawing._basic_profile_dimensions(object(), annotations)
+
+
+@pytest.mark.parametrize("radius", ["TopRadius", "BottomRadius"])
+@pytest.mark.parametrize("ignored", ["ShortenedRadius", "LeaderVisibility", "WitnessVisibility"])
+def test_basic_profile_dimensions_rejects_ignored_radius_flags(
+    bound: None, monkeypatch: pytest.MonkeyPatch, radius: str, ignored: str,
+) -> None:
+    displays = {
+        name: _ProfileDisplay(ignored if name == radius else None)
+        for name in ("TopRadius", "BottomRadius", "TopAbovePivot")
+    }
+    annotations = _profile_annotations(monkeypatch, displays)
+    monkeypatch.setattr(drawing, "set_basic_dimension", lambda *_args, **_kwargs: None)
+    with pytest.raises(RuntimeError, match=f"{radius} retained its off-sheet radius witnesses"):
+        drawing._basic_profile_dimensions(object(), annotations)
+
+
+def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, front = object(), object()
+    edges = {1600.0: object(), 1632.0: object()}
+    picks, frames = [], []
+
+    def circle_edge(actual_adapter, actual_view, diameter):
+        assert actual_adapter is adapter
+        assert actual_view is front
+        picks.append(diameter)
+        return edges[diameter]
+
+    monkeypatch.setattr(drawing, "visible_circle_edge", circle_edge)
+    monkeypatch.setattr(
+        drawing, "add_feature_control_frame",
+        lambda *args, **kwargs: frames.append((args, kwargs)),
+    )
+    drawing._add_arc_profiles(adapter, front)
+    assert picks == [1600.0, 1632.0]
+    assert len(frames) == 2
+    scale = drawing._S / 1000.0
+    for (args, kwargs), name, radius, model_x, frame_xy, outside in zip(
+        frames,
+        ("TopRadius", "BottomRadius"),
+        (800.0, 816.0),
+        (-110.0, -100.0),
+        ((0.025, 0.225), (0.025, 0.135)),
+        ("0.5", "0"),
+    ):
+        assert args == (adapter, front)
+        assert kwargs["edge_entity"] is edges[2.0 * radius]
+        assert kwargs["characteristic"] == "profile_surface"
+        assert kwargs["tolerance"] == "0.5"
+        assert kwargs["outside_disposition"] == outside
+        assert kwargs["datums"] == ("A", "B", "C")
+        assert not kwargs.get("diameter", False)
+        assert not kwargs.get("all_around", False)
+        assert "edge_xy" not in kwargs
+        assert kwargs["label"] == f"arc-system {name} profile"
+        assert kwargs["frame_xy"] == frame_xy
+        sheet_x, sheet_y = kwargs["leader_attach_xy"]
+        x = (sheet_x - drawing.FRONT_CENTER[0]) / scale
+        y = (sheet_y - drawing.FRONT_CENTER[1]) / scale + drawing._BBOX_CY
+        assert x == pytest.approx(model_x)
+        assert y < ch_rocker_arm_spec.CENTER_Y
+        assert math.hypot(x, y - ch_rocker_arm_spec.CENTER_Y) == pytest.approx(radius)
+
+
+def test_profile_zone_mirror_station_envelopes_and_template_aim() -> None:
+    """Only at the mirror station is the arc normal vertical. These limits
+    do not assert a rigid vertical offset of the curve at its ends."""
+    centre = ch_rocker_arm_spec.CENTER_Y
+    assert (ch_rocker_arm_spec.R_TOP, ch_rocker_arm_spec.R_BOTTOM) == (800.0, 816.0)
+    nominal_top = centre - ch_rocker_arm_spec.R_TOP - ch_rocker_arm_spec.PIVOT_MID_Y
+    nominal_bottom = centre - ch_rocker_arm_spec.R_BOTTOM
+    assert nominal_top == pytest.approx(8.0)
+    assert nominal_bottom == pytest.approx(0.0)
+    zone = float(ch_rocker_arm_notes.ARC_PROFILE_ZONE_MM)
+    top_outside = float(ch_rocker_arm_notes.ARC_PROFILE_OUTSIDE_MM["TopRadius"])
+    bottom_inside = zone - float(ch_rocker_arm_notes.ARC_PROFILE_OUTSIDE_MM["BottomRadius"])
+    assert zone == top_outside == bottom_inside == 0.5
+    assert (nominal_top, nominal_top + top_outside) == pytest.approx((8.0, 8.5))
+    assert (nominal_bottom, nominal_bottom + bottom_inside) == pytest.approx((0.0, 0.5))
+    template_aim = nominal_top + zone / 2.0
+    assert template_aim == pytest.approx(8.25)
+    # The template's own ±0.03 inspection band is not the part's total zone.
+    assert (template_aim - 0.03, template_aim + 0.03) == pytest.approx((8.22, 8.28))
+
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -283,11 +451,9 @@ def test_strap_thickness_text_clears_datum_b_the_frame_and_the_iso_caption() -> 
     assert y < drawing.FCF_XY[1] - 0.007 - 0.010
 
 
-def test_top_edge_height_is_a_banded_model_dimension() -> None:
-    """Codex #936 PRRT_kwDOPHDy386mV3AO, drawing-simplicity-policy.md `How the repository implements the guidelines`: the clearance-critical
-    "8.00 +0.50/0" lived only in a note. It is now the one printed dimension
-    of a hidden reference sketch, carrying the band natively; the arcs'
-    centre is derived from it, and no note repeats it."""
+def test_top_edge_model_band_is_unchanged_by_the_basic_drawing_override() -> None:
+    """The source keeps its existing height band and centre equation; the
+    drawing's imported height is BASIC and governed by surface profile."""
     from _drawing_contract import model_toleranced_dimensions
 
     upper, lower = ch_rocker_arm_spec.TOP_EDGE_BAND
@@ -305,8 +471,8 @@ def test_top_edge_height_is_a_banded_model_dimension() -> None:
     assert "ABOVE THE PIVOT" not in joined
     assert f"+{upper:.2f}/0" not in joined
     build = Path(arm.__file__).read_text(encoding="utf-8")
-    # The centre is an equation of the printed height, so the model can't
-    # hold one value while the sheet prints another.
+    # The source centre remains an equation of the model height; the drawing
+    # override changes presentation, not the source geometry or its band.
     assert '"ArmDepth" / 2 + "TopAbovePivot" + "CurveRadius"' in build
     assert ch_rocker_arm_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"] == 2
 
@@ -332,9 +498,8 @@ def test_pivot_bore_ream_band_rides_its_diameter_not_a_note() -> None:
 
 
 def test_no_rocker_note_carries_a_tolerance_band() -> None:
-    """drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): every band on MHA-CH-006 is a model tolerance. The one
-    exception is the hub coaxiality, a plain note by Main's ruling
-    (2026-09-26)."""
+    """No size/profile band is duplicated in prose. Hub coaxiality remains
+    a plain note by Main's ruling (2026-09-26)."""
     for line in ch_rocker_arm_notes.DRAWING_NOTES.splitlines():
         if "COAXIAL" in line or "WITHIN" in line:
             continue
@@ -783,10 +948,8 @@ def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:
             ).startswith('"rod-pin'):
                 if node.func.id != "set_basic_dimension":
                     uses.append((node.func.id, keywords))
-    assert picks == {
-        "rod_hole_edge": "_ROD_HOLE_DIA",
-        "pivot_bore_edge": "PIVOT_HOLE_DIA",
-    }
+    assert picks["rod_hole_edge"] == "_ROD_HOLE_DIA"
+    assert picks["pivot_bore_edge"] == "PIVOT_HOLE_DIA"
     kinds = {name for name, _ in uses}
     assert kinds == {
         "add_native_hole_callout",
@@ -883,8 +1046,8 @@ def test_general_notes_bottom_is_seated_inside_the_frame(
     )
     assert x0 == pytest.approx(drawing.NOTES_LEFT, abs=0.0005)
     assert y1 < drawing.NOTES_CEILING
-    # The old top anchor: the same block reached below the border.
-    assert 0.082 - lines * NOTE_LINE_PITCH < BORDER_BOTTOM
+    # The shorter notes need no historical line-count overflow assumption:
+    # the rendered extent, not an old insertion point, governs seating.
 
 
 # r743-3 (4ca562169, w4): the 21-line block rendered 16.06..110.76 mm, i.e.

@@ -89,6 +89,102 @@ def test_frame_signature_rejects_unsupported_range_symbol() -> None:
         )
 
 
+def test_unmodified_frame_keeps_legacy_tolerance_payload() -> None:
+    xml = gtol_frame_xml("profile_surface", "legacy tolerance text")
+    assert "<PrimaryToleranceValue>legacy tolerance text</PrimaryToleranceValue>" in xml
+    assert gtol_frame_signature(xml).outside_disposition is None
+
+
+@pytest.mark.parametrize("outside", (None, "0", "0.5"))
+def test_profile_frame_authors_native_outside_disposition(outside: str | None) -> None:
+    from xml.etree import ElementTree
+
+    xml = gtol_frame_xml(
+        "profile_surface", "0.5", datums=("A", "B", "C"),
+        outside_disposition=outside,
+    )
+    root = ElementTree.fromstring(xml)
+    assert root.findtext(
+        "OffsetZoneInfo/UnequallyDisposedProfile/OutsideDisposition"
+    ) == outside
+    assert gtol_frame_signature(xml).outside_disposition == outside
+    if outside is None:
+        assert "OffsetZoneInfo" not in xml
+        assert xml == gtol_frame_xml("profile_surface", "0.5", datums=("A", "B", "C"))
+
+
+@pytest.mark.parametrize("outside", ("0", "0.5"))
+def test_profile_signature_detects_lost_or_changed_u(outside: str) -> None:
+    plain = gtol_frame_xml("profile_surface", "0.5")
+    authored = gtol_frame_xml("profile_surface", "0.5", outside_disposition=outside)
+    changed = gtol_frame_xml(
+        "profile_surface", "0.5", outside_disposition="0.25"
+    )
+    assert gtol_frame_signature(authored) != gtol_frame_signature(plain)
+    assert gtol_frame_signature(authored) != gtol_frame_signature(changed)
+    normalized = authored.replace(
+        f"<OutsideDisposition>{outside}</OutsideDisposition>",
+        f"<OutsideDisposition>{outside}00</OutsideDisposition>"
+        if "." in outside else "<OutsideDisposition>0.000</OutsideDisposition>",
+    )
+    assert gtol_frame_signature(authored) == gtol_frame_signature(normalized)
+
+
+@pytest.mark.parametrize(
+    ("characteristic", "tolerance", "diameter", "outside"),
+    (
+        ("position", "0.5", False, "0.5"),
+        ("profile_surface", "0.5", True, "0"),
+        ("profile_surface", "0.5", False, "-0.1"),
+        ("profile_surface", "0.5", False, "0.6"),
+        ("profile_surface", "0.5", False, ""),
+        ("profile_surface", "0.5", False, "bogus"),
+        ("profile_surface", "0.5", False, "NaN"),
+        ("profile_surface", "0.5", False, "Infinity"),
+        ("profile_surface", "NaN", False, "0"),
+        ("profile_surface", "Infinity", False, "0"),
+        ("profile_surface", "bogus", False, "0"),
+    ),
+)
+def test_profile_disposition_rejects_inappropriate_or_invalid_values(
+    characteristic: str, tolerance: str, diameter: bool, outside: str
+) -> None:
+    with pytest.raises(ValueError, match="outside disposition"):
+        gtol_frame_xml(
+            characteristic, tolerance, diameter=diameter, outside_disposition=outside
+        )
+
+
+@pytest.mark.parametrize("outside", ("", "bogus", "NaN", "Infinity", "-0.1", "0.6"))
+def test_profile_signature_rejects_invalid_disposition(outside: str) -> None:
+    xml = gtol_frame_xml("profile_surface", "0.5", outside_disposition="0.5")
+    with pytest.raises(ValueError, match="outside disposition"):
+        gtol_frame_signature(xml.replace(
+            "<OutsideDisposition>0.5</OutsideDisposition>",
+            f"<OutsideDisposition>{outside}</OutsideDisposition>",
+        ))
+
+
+def test_profile_signature_rejects_duplicate_or_misplaced_disposition() -> None:
+    xml = gtol_frame_xml("profile_surface", "0.5", outside_disposition="0")
+    node = "<OutsideDisposition>0</OutsideDisposition>"
+    with pytest.raises(ValueError, match="duplicated outside disposition"):
+        gtol_frame_signature(xml.replace(node, node + node))
+    with pytest.raises(ValueError, match="outside disposition XML nesting"):
+        gtol_frame_signature(
+            gtol_frame_xml("profile_surface", "0.5").replace(
+                "</GtolFrame>", node + "</GtolFrame>"
+            )
+        )
+    with pytest.raises(ValueError, match="non-diametral profile"):
+        gtol_frame_signature(xml.replace("GTOL-SPROF", "GTOL-POSI"))
+    with pytest.raises(ValueError, match="non-diametral profile"):
+        gtol_frame_signature(xml.replace(
+            "</ToleranceRangeInfo>",
+            "<PrimaryRangeSymbol>phi</PrimaryRangeSymbol></ToleranceRangeInfo>",
+        ))
+
+
 def test_part_pmi_validation_rejects_name_collision_and_unknown_datum() -> None:
     datum = PartDatum("A", CylinderFace(5.0))
     collision = GeometricControl("datum_A", "cylindricity", "0.01", CylinderFace(5.0))

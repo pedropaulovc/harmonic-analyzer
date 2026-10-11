@@ -9,6 +9,7 @@ part tier may not import a drawing module.
 
 from __future__ import annotations
 
+
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -39,6 +40,7 @@ def gtol_frame_xml(
     diameter: bool = False,
     projected_zone_height_mm: float | None = None,
     translated: Sequence[str] = (),
+    outside_disposition: str | None = None,
 ) -> str:
     """Build the SOLIDWORKS-2022+ feature-control-frame XML payload, using the
     repository's mm annotation convention.
@@ -52,6 +54,10 @@ def gtol_frame_xml(
     ``TRANSLATION_GLYPH``).  A clocking
     datum feature of size at a basic distance from the primary takes it, so
     its simulator may slide along that distance and only orients.
+
+    ``outside_disposition`` is the profile zone's portion outside material:
+    None keeps the symmetric default; "0" is wholly inside and the total
+    tolerance is wholly outside. It authors the native circled-U modifier.
     """
     symbol = GTOL_SYMBOLS.get(characteristic)
     if symbol is None:
@@ -72,6 +78,8 @@ def gtol_frame_xml(
             f"translation modifier on {tuple(translated)!r} must name a "
             f"non-primary datum of {tuple(datums)!r}"
         )
+    if outside_disposition is not None:
+        _validate_outside_disposition(symbol, tolerance, diameter, outside_disposition)
     root = ElementTree.Element("GtolFrame")
     ElementTree.SubElement(root, "ToleranceSymbol").text = symbol
     range_info = ElementTree.SubElement(root, "ToleranceRangeInfo")
@@ -85,6 +93,10 @@ def gtol_frame_xml(
         ElementTree.SubElement(feature_info, "Projection").text = format(
             Decimal(str(projected_zone_height_mm)), "f"
         )
+    if outside_disposition is not None:
+        offset = ElementTree.SubElement(root, "OffsetZoneInfo")
+        profile = ElementTree.SubElement(offset, "UnequallyDisposedProfile")
+        ElementTree.SubElement(profile, "OutsideDisposition").text = outside_disposition
     for datum in datums:
         compartment = ElementTree.SubElement(root, "DatumCompartment")
         detail = ElementTree.SubElement(compartment, "DatumDetail")
@@ -104,6 +116,7 @@ class GtolFrameSignature:
     tolerance_zone: ToleranceZone
     projected_zone_height_mm: float | None = None
     translated: tuple[str, ...] = ()
+    outside_disposition: str | None = None
 
 
 def gtol_frame_signature(xml: str) -> GtolFrameSignature:
@@ -186,6 +199,26 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
             raise ValueError("projected zone height is present without its enabled symbol")
     if len(texts("ProjectedToleranceZone")) != len(projected_flags):
         raise ValueError("projected zone symbol must be a child of FeatureInfo")
+    dispositions = texts("OutsideDisposition")
+    if len(dispositions) > 1:
+        raise ValueError("frame XML has duplicated outside disposition")
+    outside_disposition = None
+    if dispositions:
+        # Namespaces are allowed, but the native schema's nesting is required.
+        paths = [
+            child
+            for offset in root
+            if offset.tag.rsplit("}", 1)[-1] == "OffsetZoneInfo"
+            for profile in offset
+            if profile.tag.rsplit("}", 1)[-1] == "UnequallyDisposedProfile"
+            for child in profile
+            if child.tag.rsplit("}", 1)[-1] == "OutsideDisposition"
+        ]
+        if len(paths) != 1:
+            raise ValueError("invalid outside disposition XML nesting")
+        outside_disposition = _validate_outside_disposition(
+            symbols[0], tolerances[0], bool(range_symbols), dispositions[0]
+        )
     datums, translated = _datum_references(root)
     return GtolFrameSignature(
         characteristic_symbol=symbols[0],
@@ -194,7 +227,35 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
         tolerance_zone=tolerance_zone,
         projected_zone_height_mm=projected_zone_height_mm,
         translated=translated,
+        outside_disposition=outside_disposition,
     )
+
+
+def _validate_outside_disposition(
+    symbol: str, tolerance: str, diameter: bool, outside_disposition: str
+) -> str:
+    """Validate native profile disposition and normalize its numeric readback."""
+    profile_symbols = {
+        GTOL_SYMBOLS[name]
+        for name in ("profile_surface", "profile_line")
+        if name in GTOL_SYMBOLS
+    }
+    if symbol not in profile_symbols or diameter:
+        raise ValueError("outside disposition requires a non-diametral profile tolerance")
+    try:
+        outside = Decimal(outside_disposition)
+        total = Decimal(tolerance)
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError("outside disposition and tolerance must be finite numeric values") from exc
+    if not outside.is_finite() or not total.is_finite():
+        raise ValueError("outside disposition and tolerance must be finite numeric values")
+    if not Decimal(0) <= outside <= total:
+        raise ValueError("outside disposition must be between zero and the total tolerance")
+    # Numeric readbacks such as "0.500" must still match the authored "0.5".
+    if outside == 0:
+        return "0"
+    normalized = format(outside, "f")
+    return normalized.rstrip("0").rstrip(".") if "." in normalized else normalized
 
 
 def gtol_frame_datums(xml: str) -> tuple[str, ...]:
