@@ -25,16 +25,7 @@ from _hole_spec import CLEARANCE_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
 from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
-from ch_fulcrum_keeper_spec import (
-    FOOT_TIP_X,
-    FULCRUM_KEEPER_CENTRE_Z,
-    KEEPER_FITUP_X_FROM_WEB_MM,
-    KEEPER_SEAT_FLATNESS_BUDGET_MM,
-    KEEPER_SEAT_LENGTH_MM as KEEPER_CONTACT_LENGTH_MM,
-    KEEPER_WIDTH,
-    KEEPER_Z_OFF,
-    LUG_HALF_T,
-)
+from ch_fulcrum_keeper_spec import KEEPER_SEAT_FLATNESS_BUDGET_MM
 
 # --- Machined-surface geometry ------------------------------------------------
 #
@@ -48,7 +39,7 @@ FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
 RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
 HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
-FLANGE_THICKNESS_MM = 8.0  # final top flange, including under the faced seats
+FLANGE_THICKNESS_MM = 8.0  # final top flange, including the faced right rail top
 FLANGE_THICKNESS_PLACES = 1
 BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
 BOSS_DIA = (
@@ -58,31 +49,6 @@ BORE_DIA = COLUMN_SOCKET_DIAMETER
 CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
 GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
-
-# Two faced regions on the existing top flange, not raised pads or pockets.
-# Native split lines bound the NOMINAL contact plus its edge allowance;
-# machining matches the actual keeper contacts in the single setup below.
-# The 16.5 contact length includes the lug underside as well as the foot.
-KEEPER_SEAT_EDGE_MARGIN_MM = 0.10
-KEEPER_SEAT_WIDTH_MM = KEEPER_WIDTH + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
-KEEPER_SEAT_LENGTH_MM = KEEPER_CONTACT_LENGTH_MM + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
-KEEPER_SEAT_CENTRES_XZ = tuple(
-    (
-        COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM,
-        FULCRUM_KEEPER_CENTRE_Z
-        + side * (KEEPER_Z_OFF + (FOOT_TIP_X - LUG_HALF_T) / 2.0),
-    )
-    for side in (-1.0, 1.0)
-)
-KEEPER_SEAT_BOUNDS_XZ = tuple(
-    (
-        x - KEEPER_SEAT_WIDTH_MM / 2.0,
-        x + KEEPER_SEAT_WIDTH_MM / 2.0,
-        z - KEEPER_SEAT_LENGTH_MM / 2.0,
-        z + KEEPER_SEAT_LENGTH_MM / 2.0,
-    )
-    for x, z in KEEPER_SEAT_CENTRES_XZ
-)
 
 
 # --- Knife-hanger screw counterbores and dowel slip holes (crossbar) ---------
@@ -217,10 +183,11 @@ HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# These nine faces own native finish controls. The two keeper-seat regions
-# carry SEAT_UM in the bounded facing/common-zone instruction below: existing
-# PlanarFace bounding-box selectors cannot distinguish those coplanar patches
-# from the residual rail top. The locating-seat finish is not a general grade.
+# These nine faces own native finish controls. The right (west) rail top
+# between its bosses, which seats both MHA-CH-007 keepers, carries SEAT_UM in
+# the linked facing note below: the whole strip is one face, so the note
+# names its extent instead of a split-line region. The locating-seat finish
+# is not a general grade.
 #
 # * The four tube-socket bores take the MHA-FR-003 columns on a match-fitted close
 #   hand-slip; a cast bore wall cannot hold that fit and would score the tube.
@@ -441,13 +408,6 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
     "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
-    # Keeper facing: actual contacts set size/location; split-line dimensions
-    # are references. Final local flange thickness binds the receiver-wall proof.
-    "keeper seat width": 1,
-    "keeper seat length": 1,
-    "keeper seat inner edge from socket": 1,
-    "keeper seat end from socket": 1,
-    "keeper seat flange thickness": FLANGE_THICKNESS_PLACES,
 }
 
 # Use the canonical printed-band reader, not the unrounded inch grades.
@@ -480,8 +440,12 @@ DRAWING_NOTES = (
     "RETAIN CORNER AND ORIENTATION MATCH MARKS.\n"
     "CONVEX CASTING EDGES C2 X 45 UNLESS NOTED; HOLE EDGES PER TITLE BLOCK."
 )
+# User ruling 2026-10-11: the whole right (west) rail top between the two
+# corner bosses is faced, so both keeper feet land on one flat face wherever
+# fit-up puts them; no split-line regions, no underside facing.  Its own
+# property, placed beside the keeper callout on HOLES-SOCKETS.
 DRAWING_NOTES_B = (
-    f"BOTH SEATS WITHIN ONE COMMON {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f} FLATNESS ZONE.\n"
-    f"SIZE TO ACTUAL KEEPER CONTACTS PLUS {KEEPER_SEAT_EDGE_MARGIN_MM:.2f} EACH EDGE.\n"
-    f"KEEPER LOCATING SEATS: Ra {SEAT_UM:.1f} UM."
+    "RIGHT RAIL TOP BETWEEN BOSSES\n"
+    "(MHA-CH-007 KEEPER SEATS):\n"
+    f"FLAT WITHIN {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f}, Ra {SEAT_UM:.1f} UM."
 )

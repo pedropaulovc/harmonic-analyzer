@@ -18,12 +18,12 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   The O25.5 column bores and O27.5 cap recesses stay unchanged. Four
   stock 1-3/4 in cross screws seat flush in front/rear O9 counterbores and clear
   both tube walls into the far casting wall/web through #10-32 taps.
-* Two bounded keeper-seat regions on the side-rail TOP FLANGE are faced
-  together in one setup, within the keeper-owned common 0.04 flatness zone.
-  Each covers the actual 14 x 16.5 complete contact plus 0.10 at each edge;
-  split-line footprints are nominal 14.2 x 16.7 references. The finished
-  local flange below both seats is controlled at 8.0 (.X, minimum 7.2),
-  with Ra 3.2 locating-seat finish; the nominal rail-top plane stays fixed.
+* The whole side-rail TOP FLANGE top of the keeper rail, between its two
+  corner bosses, is faced flat within the keeper-owned 0.04 zone at the
+  Ra 3.2 locating-seat finish (user ruling 2026-10-11), so both keeper feet
+  land on one face wherever fit-up puts them. The nominal rail-top plane
+  stays fixed; the B-B top flange thickness (TYP, .X, minimum 7.2) is the
+  finished flange under it.
 * Integral crossbar 22 wide at x -26..-4 spanning the window along Z,
   flush with BOTH faces at its junctions (the underside 999.7 is the
   knife-mount seat plane), with 18 x 18 plan gussets at all four rail
@@ -71,10 +71,9 @@ hanger counterbores) -> dowel slip holes -> wizard holes (side-screw
 taps, set-screw tap, keeper taps) -> internal T-root fillets (R3) ->
 external top-rim breaks (C2) -> C1 bore top lead-ins -> remaining
 external edge breaks (C2, one feature per connected chain: rail runs,
-crossbar, west window, hub rail, outer corners, boss rims) -> keeper-seat
-split lines.
+crossbar, west window, hub rail, outer corners, boss rims).
 Wizard holes come after the face cuts so every seat face is final; the
-edge breaks and zero-volume split lines follow the solid features.
+edge breaks follow the solid features.
 Analytic volume checks after every feature; boss additions and top-rim
 breaks use circle-segment formulas, the remaining edge breaks sum
 per-edge chamfer sections, while hub/counterbore/tap expectations
@@ -95,14 +94,13 @@ from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
-from _feature_tree import feature_name_by_type, name_last_feature
+from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
-    _feature_by_name,
     add_line_chain,
     anchor_point_to_origin,
     dimension_between,
@@ -132,8 +130,6 @@ from _holes import (
 from _gtol_face_resolve import resolve_faces
 from _part_pmi import author_part_pmi
 from _named_views import name_octant_views
-from _gtol_planar import PlanarFace
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from fr_top_frame_spec import (
     BORE_DIA,
     BOSS_ABOVE,
@@ -170,11 +166,6 @@ from fr_top_frame_spec import (
     HANGER_SLOT_X,
     KEEPER_TAP_CALLOUT_PRECISION,
     KEEPER_TAP_DRILL_WANDER_DEG,
-    KEEPER_SEAT_BOUNDS_XZ,
-    KEEPER_SEAT_CENTRES_XZ,
-    KEEPER_SEAT_EDGE_MARGIN_MM,
-    KEEPER_SEAT_LENGTH_MM,
-    KEEPER_SEAT_WIDTH_MM,
     PRINTED_DRILLED_HOLE_PLUS_MM,
     PRINTED_LINEAR_BAND_MM,
     HANGER_PIN_SLIP_CLEARANCE_MAX,
@@ -407,7 +398,7 @@ KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +81.746
 # and the crossbar junctions. The corner bosses supply the corner lands. The
 # per-face setback differs by rail family (the rails are 34.2/38.0 wide but
 # share one web thickness).
-FLANGE = FLANGE_THICKNESS_MM  # final top flange, also below the faced seats
+FLANGE = FLANGE_THICKNESS_MM  # final top flange, also below the faced rail top
 WEB_T = 13.0  # user ruling: retain loose bands plus realistic deep-drill wander
 RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.6 setback per side-rail face
 RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.5 setback per front/rear-rail face
@@ -797,12 +788,11 @@ KEEPER_MAX_FOOT_WIDTH = (
     + PRINTED_LINEAR_BAND_MM[KEEPER_DRAWING_PRECISION["Foot"]["Depth"]]
 )
 
-# Facing covers the ACTUAL complete contact plus its 0.10 edge allowance;
-# the split-line model rectangles are nominal references, not fixed tooling.
-KEEPER_SEAT_PRINTED_BOSS_MARGINS = tuple(
-    margin - KEEPER_SEAT_EDGE_MARGIN_MM for margin in KEEPER_FOOT_PRINTED_BOSS_MARGINS
-)
-KEEPER_SEAT_PRINTED_FLANGE_SIDE_MARGIN = (
+# The whole keeper-rail top between the bosses is faced (user ruling
+# 2026-10-11), so the ACTUAL foot, anywhere its printed fit-up band puts it,
+# must stand on that flat face: clear of the bosses (above) and of the
+# maximum printed C2 top-rim leg on either side of the rail.
+KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN = (
     (
         round(RAIL_W_SIDE, DRAWING_REFERENCE_PRECISION["side flange width"])
         - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["side flange width"]]
@@ -813,19 +803,13 @@ KEEPER_SEAT_PRINTED_FLANGE_SIDE_MARGIN = (
         + KEEPER_FITUP_LOCATION_BAND_MM
     )
     - KEEPER_MAX_FOOT_WIDTH / 2.0
-    - KEEPER_SEAT_EDGE_MARGIN_MM
+    - (
+        round(EDGE_CHAMFER, DRAWING_REFERENCE_PRECISION["top rim chamfer"])
+        + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["top rim chamfer"]]
+    )
 )
-# Only the flat portion can carry a faced contact: remove the maximum
-# printed C2 top-rim leg as well as the actual-foot edge allowance.
-KEEPER_SEAT_PRINTED_FLAT_TOP_SIDE_MARGIN = KEEPER_SEAT_PRINTED_FLANGE_SIDE_MARGIN - (
-    round(EDGE_CHAMFER, DRAWING_REFERENCE_PRECISION["top rim chamfer"])
-    + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["top rim chamfer"]]
-)
-if (
-    min(*KEEPER_SEAT_PRINTED_BOSS_MARGINS, KEEPER_SEAT_PRINTED_FLAT_TOP_SIDE_MARGIN)
-    <= 0.0
-):
-    raise AssertionError("keeper faced region escapes the flat top flange")
+if KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN <= 0.0:
+    raise AssertionError("keeper foot leaves the flat keeper-rail top")
 
 KEEPER_PRINTED_SIDE_STATION = round(
     SCREW_FROM_SIDE,
@@ -852,14 +836,14 @@ KEEPER_MIN_WEB_HALF_WIDTH = (
     round(WEB_T, DRAWING_REFERENCE_PRECISION["side rail web thickness"])
     - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["side rail web thickness"]]
 ) / 2.0
-# The controlling .X dimension on KEEPER-SEATS measures the FINAL local
-# flange under each faced contact. Cap-floor and boss-height bands cannot
-# subtract a second facing allowance from this directly printed minimum.
+# B-B prints the top flange thickness TYP: one .X FINAL dimension binds
+# every rail, the faced keeper-rail top included, so facing cannot subtract
+# a second allowance from its printed minimum, and cap-floor and boss-height
+# bands do not enter. (An untyped flange would need its own facing
+# allowance; this wall stays >= 1.5 only for one below about 0.77.)
 KEEPER_MIN_FLANGE_THICKNESS = (
-    round(FLANGE, DRAWING_REFERENCE_PRECISION["keeper seat flange thickness"])
-    - PRINTED_LINEAR_BAND_MM[
-        DRAWING_REFERENCE_PRECISION["keeper seat flange thickness"]
-    ]
+    round(FLANGE, DRAWING_REFERENCE_PRECISION["top flange thickness"])
+    - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["top flange thickness"]]
 )
 KEEPER_MIN_ROOT_RADIUS = (
     round(ROOT_FILLET_R, DRAWING_REFERENCE_PRECISION["T rail root radius"])
@@ -1461,8 +1445,8 @@ def _external_edge_breaks() -> tuple[
     rib's outer and inner bottom edges (2.1 to the Ø30 hub boss, so C2
     leaves a 0.1 land), the tapered hub V-gusset edges (they feather into
     the underside), the 2-deep set-screw pocket rim (C2 would consume the
-    whole pocket wall), and every hole, bore, counterbore, tap, slot and
-    keeper split-line edge. The vertical junctions of the bar sides with
+    whole pocket wall), and every hole, bore, counterbore, tap and slot
+    edge. The vertical junctions of the bar sides with
     the gusset hypotenuses are re-entrant (225 degrees), not edges to break.
     """
     c = EDGE_CHAMFER
@@ -1815,99 +1799,6 @@ def _qualify_machined_faces(adapter) -> None:
                 "(minus tap windows and edge breaks)"
             )
         _telemetry.info(f"{key} face qualified ({area:.0f} mm^2)")
-
-
-async def _split_keeper_seats(adapter) -> None:
-    """Bound two faced regions without changing final height or material.
-
-    Reuse the pinion-arbor's projected split-line convention: sketch mark 4,
-    exact parent face mark 1. Finished-part CAD specifies the seat plane;
-    it does not model a cast machining allowance or cut that plane lower.
-    """
-    x, z = KEEPER_SEAT_CENTRES_XZ[0]
-    target = resolve_faces(
-        adapter.currentModel,
-        {
-            "keeper_top": PlanarFace(
-                (0.0, 1.0, 0.0), HALF_H, contains_x_mm=x, contains_z_mm=z
-            )
-        },
-    )["keeper_top"]
-    dims = SketchDims()
-    check("create keeper seat profile", await adapter.create_sketch("Top"))
-    for index, (x0, x1, z0, z1) in enumerate(KEEPER_SEAT_BOUNDS_XZ):
-        points = [(x0, -z1), (x1, -z1), (x1, -z0), (x0, -z0)]
-        lines = await add_line_chain(adapter, points)
-        await define_rectilinear_chain(
-            adapter,
-            lines,
-            points,
-            label=f"keeper seat {index}",
-            dims=dims,
-            names=[
-                f"Seat{index}Width",
-                f"Seat{index}Length",
-                f"Seat{index}X",
-                f"Seat{index}Z",
-            ],
-        )
-    await ensure_fully_defined(adapter, "keeper seat profile")
-    check("exit keeper seat profile", await adapter.exit_sketch())
-    name_last_feature(adapter, "KeeperSeatProfile")
-    dims.apply(adapter, "KeeperSeatProfile")
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    model.ClearSelection2(True)
-    if (
-        model.Extension.SelectByID2(
-            "KeeperSeatProfile", "SKETCH", 0.0, 0.0, 0.0, False, 4, null_callout(), 0
-        )
-        is not True
-    ):
-        raise RuntimeError("keeper seats: failed to select the split sketch")
-    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
-    selection = _early_bound(manager.CreateSelectData(), "ISelectData")
-    selection.Mark = 1
-    if _early_bound(target, "IEntity").Select4(True, selection) is not True:
-        raise RuntimeError("keeper seats: failed to select the rail top")
-    previous = feature_name_by_type(adapter, "PLine")
-    model.InsertSplitLineProject(False, False)
-    model.ClearSelection2(True)
-    split = feature_name_by_type(adapter, "PLine")
-    if not split or split == previous:
-        raise RuntimeError("keeper seats: projected split line was not created")
-    name_last_feature(adapter, "KeeperSeatFaces")
-    await force_rebuild(adapter)
-
-
-def _qualify_keeper_seat_faces(adapter) -> None:
-    """Prove two coplanar rectangles minus their existing tap openings.
-
-    Face boxes are only coarse station filters (GetBox is approximate);
-    area rejects the residual rail face and the exact-one count proves both
-    local regions exist. No shared planar-selector or PMI changes are needed.
-    """
-    feature = _early_bound(_feature_by_name(adapter, "KeeperSeatFaces"), "IFeature")
-    expected_area = (
-        KEEPER_SEAT_WIDTH_MM * KEEPER_SEAT_LENGTH_MM
-        - math.pi * (TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0) ** 2
-    )
-    counts = [0, 0]
-    for raw in feature.GetFaces() or ():
-        face = _early_bound(raw, "IFace2")
-        box = tuple(float(value) * 1000.0 for value in face.GetBox() or ())
-        if len(box) != 6 or max(abs(box[1] - HALF_H), abs(box[4] - HALF_H)) > 0.1:
-            continue
-        area = float(face.GetArea()) * 1e6
-        if abs(area - expected_area) > 0.01 * expected_area:
-            continue
-        for index, (x, z) in enumerate(KEEPER_SEAT_CENTRES_XZ):
-            if box[0] - 0.1 <= x <= box[3] + 0.1 and box[2] - 0.1 <= z <= box[5] + 0.1:
-                counts[index] += 1
-    if counts != [1, 1]:
-        raise RuntimeError(
-            f"keeper seats: expected one {expected_area:.3f} mm^2 face per seat; got {counts}"
-        )
-    _telemetry.info(f"two keeper seat faces qualified ({expected_area:.3f} mm^2 each)")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -2948,13 +2839,6 @@ async def build(adapter) -> dict[str, str]:
             0.03 * v_chain + 0.5 * EDGE_CHAMFER**3 * shared + 10.0,
         )
 
-    # 19. Machined keeper-seat regions on the unchanged rail-top plane.
-    # Split boundaries, not a cut or raised pad: volume and all stacks stay fixed.
-    await _split_keeper_seats(adapter)
-    volume = await volume_check(
-        adapter, "keeper seat split (no material change)", volume, 0.05
-    )
-
     # Deferred drive equations: after the whole model + a rebuild exist so
     # every target resolves; the re-check proves the equations are neutral.
     await force_rebuild(adapter)
@@ -3010,7 +2894,6 @@ async def build(adapter) -> dict[str, str]:
     # single place a place count is authored (drawing-simplicity rule 2).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _qualify_machined_faces(adapter)
-    _qualify_keeper_seat_faces(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

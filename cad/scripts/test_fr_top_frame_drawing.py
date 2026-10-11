@@ -740,7 +740,7 @@ def test_keeper_receiver_full_depth_displaced_axis_proves_web_change(
     # Independently reconstruct the worst printed sizes and transferred axis.
     # The .X band stays loose; widening the web, not tightening it, buys wall.
     half_width = _printed_web_half_width(web_thickness)
-    flange_places = spec.DRAWING_REFERENCE_PRECISION["keeper seat flange thickness"]
+    flange_places = spec.DRAWING_REFERENCE_PRECISION["top flange thickness"]
     flange_depth = (
         round(spec.FLANGE_THICKNESS_MM, flange_places)
         - spec.PRINTED_LINEAR_BAND_MM[flange_places]
@@ -814,17 +814,20 @@ def _worst_thread_wall(half_width, root_radius, flange_depth, corner_x, depth, w
     return min(arc, web) - wander
 
 
-@pytest.mark.parametrize("stack", ("cap floor height", "keeper seat flange thickness"))
-def test_printed_keeper_seat_flange_minimum_keeps_the_receiver_wall(stack) -> None:
-    """Facing may lower each seat; only a directly printed FINAL flange
-    under it bounds what the receiver's T-root keeps at the worst case."""
+@pytest.mark.parametrize("stack", ("cap floor height", "typ top flange thickness"))
+def test_printed_typ_top_flange_minimum_keeps_the_receiver_wall(stack) -> None:
+    """Facing may lower the keeper-rail top; only a directly printed FINAL
+    flange that covers it bounds what the receiver's T-root keeps at the
+    worst case.  B-B prints the top flange TYP, so its .X minimum binds the
+    faced keeper rail too, with no second facing allowance."""
     band = spec.PRINTED_LINEAR_BAND_MM
-    seat_places = spec.DRAWING_REFERENCE_PRECISION["keeper seat flange thickness"]
     top_places = spec.DRAWING_REFERENCE_PRECISION["top flange thickness"]
-    assert seat_places == top_places == spec.FLANGE_THICKNESS_PLACES == 1
+    assert top_places == spec.FLANGE_THICKNESS_PLACES == 1
     assert spec.FLANGE_THICKNESS_MM == part.FLANGE == 8.0
-    if stack == "keeper seat flange thickness":
-        flange_depth = round(spec.FLANGE_THICKNESS_MM, seat_places) - band[seat_places]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"top flange thickness", "TYP TOP FLANGE"' in source
+    if stack == "typ top flange thickness":
+        flange_depth = round(spec.FLANGE_THICKNESS_MM, top_places) - band[top_places]
         assert flange_depth == pytest.approx(7.2)
         # The very minimum the part's receiver-wall guard is built on.
         assert flange_depth == pytest.approx(part.KEEPER_MIN_FLANGE_THICKNESS)
@@ -860,7 +863,7 @@ def test_printed_keeper_seat_flange_minimum_keeps_the_receiver_wall(stack) -> No
     pilot_wall = half_width - (axis_offset + displacement + pilot_radius)
     assert pilot_wall == pytest.approx(1.645596762049888)
     assert pilot_wall == pytest.approx(part.KEEPER_TAP_DRILL_WALL_MARGIN)
-    if stack == "keeper seat flange thickness":
+    if stack == "typ top flange thickness":
         assert thread_wall == pytest.approx(1.6241775880068343, abs=1e-6)
         assert thread_wall == pytest.approx(
             part.KEEPER_TAP_THREAD_WALL_MARGIN, abs=1e-6
@@ -2171,24 +2174,10 @@ def test_transfer_rows_rederive_the_keeper_envelope_and_plan_clearance() -> None
     assert math.dist(tip, hole) == pytest.approx(hole_r)
 
 
-def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None:
+def _hole_sheet_stations():
+    """HOLES-SOCKETS' six station dimensions, evaluated from the build's loop."""
     import ast
 
-    left, bottom = _plan(-drawing.PLAN_HALF_X, drawing.PLAN_HALF_Z)
-    right, top = _plan(drawing.PLAN_HALF_X, -drawing.PLAN_HALF_Z)
-    frame = drawing.SHEET_FRAME
-    assert (
-        frame[0] + drawing.INK_CLEARANCE
-        < left
-        < right
-        < frame[2] - drawing.INK_CLEARANCE
-    )
-    assert (
-        TITLE_BLOCK[3] + drawing.INK_CLEARANCE
-        < bottom
-        < top
-        < frame[3] - drawing.INK_CLEARANCE
-    )
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     loop = next(
         node
@@ -2215,19 +2204,44 @@ def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None
         hanger_x=(part.BAR_X0 + part.BAR_X1) / 2,
         keeper_drill_r=part.TAP_DRILL_MM[part.KEEPER_TAP_SPEC.size] / 2,
     )
-    stations = eval(
+    return eval(
         compile(ast.Expression(loop.iter), "<station-fields>", "eval"), environment
     )
-    assert len(stations) == 6
+
+
+def _keeper_callout_placed():
+    """RD4's (callout point, sheet box) as the build places it."""
     hole, hole_r, boss, boss_r = _keeper_geometry()
     callout, _tip = drawing.keeper_callout_placement(hole, hole_r, boss, boss_r)
     left, down, right, up = drawing.KEEPER_CALLOUT_EXTENT
-    callout_box = (
+    return callout, (
         callout[0] - left,
         callout[1] - down,
         callout[0] + right,
         callout[1] + up,
     )
+
+
+def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None:
+    left, bottom = _plan(-drawing.PLAN_HALF_X, drawing.PLAN_HALF_Z)
+    right, top = _plan(drawing.PLAN_HALF_X, -drawing.PLAN_HALF_Z)
+    frame = drawing.SHEET_FRAME
+    assert (
+        frame[0] + drawing.INK_CLEARANCE
+        < left
+        < right
+        < frame[2] - drawing.INK_CLEARANCE
+    )
+    assert (
+        TITLE_BLOCK[3] + drawing.INK_CLEARANCE
+        < bottom
+        < top
+        < frame[3] - drawing.INK_CLEARANCE
+    )
+    stations = _hole_sheet_stations()
+    assert len(stations) == 6
+    _callout, callout_box = _keeper_callout_placed()
+    left, _down, right, _up = drawing.KEEPER_CALLOUT_EXTENT
     # Estimated field allowances, not measured render ink: 2 mm per qualifier
     # character and the historical 10.2 mm value/qualifier height. Farm ink
     # validation remains authoritative for actual font metrics and witnesses.
@@ -2250,10 +2264,10 @@ def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None
     )
 
 
-# --- Round 3: two machined keeper foot seats on the west top flange --------
+# --- The faced keeper-rail top (user ruling 2026-10-11) ---------------------
 
 
-def test_keeper_seat_note_is_the_part_property_carrying_the_keeper_budget() -> None:
+def test_keeper_facing_note_is_the_part_property_carrying_the_keeper_budget() -> None:
     import ast
 
     budget = keeper.KEEPER_SEAT_FLATNESS_BUDGET_MM
@@ -2261,112 +2275,66 @@ def test_keeper_seat_note_is_the_part_property_carrying_the_keeper_budget() -> N
     # The frame imports the keeper's budget; the keeper never imports the frame.
     assert spec.KEEPER_SEAT_FLATNESS_BUDGET_MM is budget
     assert "fr_top_frame_spec" not in Path(keeper.__file__).read_text(encoding="utf-8")
-    lines = spec.DRAWING_NOTES_B.splitlines()
-    # The common zone is the requirement; how the shop holds it (one setup)
-    # is its method, which the note does not order (machinist review r13).
-    assert len(lines) == 3
-    assert lines[0] == f"BOTH SEATS WITHIN ONE COMMON {budget:.2f} FLATNESS ZONE."
-    assert "SIZE TO ACTUAL KEEPER CONTACT" in lines[1]
-    assert f"PLUS {spec.KEEPER_SEAT_EDGE_MARGIN_MM:.2f} EACH EDGE" in lines[1]
-    assert lines[2] == "KEEPER LOCATING SEATS: Ra 3.2 UM."
-    assert "SETUP" not in spec.DRAWING_NOTES_B
+    # One requirement on one face: the whole keeper-rail top between its
+    # bosses, named as the print names that rail.  No region size, no edge
+    # margin, no setup method (machinist review r13).
+    assert spec.DRAWING_NOTES_B.splitlines() == [
+        "RIGHT RAIL TOP BETWEEN BOSSES",
+        "(MHA-CH-007 KEEPER SEATS):",
+        "FLAT WITHIN 0.04, Ra 3.2 UM.",
+    ]
+    tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
+    (notes,) = [
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and [ast.unparse(target) for target in node.targets] == ["DRAWING_NOTES_B"]
+    ]
+    sourced = {
+        value.value.id
+        for value in ast.walk(notes)
+        if isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name)
+    }
+    assert sourced == {"KEEPER_SEAT_FLATNESS_BUDGET_MM", "SEAT_UM"}
+    assert SEAT_UM == 3.2 and spec.SEAT_UM is SEAT_UM
     builder = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Manufacturing Notes B": DRAWING_NOTES_B' in builder
-    # The keeper sheet links the property; its own executable strings never
-    # retype it. Historical comments about other sheets' Ra leaders are not
-    # another keeper-seat requirement.
-    sheet, _build = _keeper_sheet_tree()
+    # The sheet links the property; its executable strings never retype it
+    # (docstrings about other sheets' Ra leaders are not a requirement).
+    drawing_tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    docstrings = {
+        id(node.value)
+        for node in ast.walk(drawing_tree)
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
+    }
     strings = [
         node.value
-        for node in ast.walk(sheet)
-        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        for node in ast.walk(drawing_tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
     ]
-    assert "Manufacturing Notes B" in strings
-    for forbidden in ("FLATNESS ZONE", "IN ONE SETUP", "LOCATING SEATS", "Ra 3.2"):
-        assert not any(forbidden in value for value in strings)
-
-
-def test_keeper_seats_are_the_nominal_contacts_plus_their_edge_margin() -> None:
-    margin = spec.KEEPER_SEAT_EDGE_MARGIN_MM
-    assert margin == 0.10
-    assert keeper.KEEPER_SEAT_LENGTH_MM == pytest.approx(16.5)
-    assert keeper.KEEPER_SEAT_LENGTH_MM == pytest.approx(
-        2.0 * keeper.LUG_HALF_T + keeper.FOOT_L
+    for forbidden in ("BETWEEN BOSSES", "FLAT WITHIN", "KEEPER SEATS", "Ra 3.2"):
+        assert not any(forbidden in value for value in strings), forbidden
+    build = next(
+        node
+        for node in drawing_tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
     )
-    assert spec.KEEPER_SEAT_WIDTH_MM == pytest.approx(
-        keeper.KEEPER_WIDTH + 2.0 * margin
-    )
-    assert spec.KEEPER_SEAT_WIDTH_MM == pytest.approx(14.2)
-    assert spec.KEEPER_SEAT_LENGTH_MM == pytest.approx(
-        keeper.KEEPER_SEAT_LENGTH_MM + 2.0 * margin
-    )
-    assert spec.KEEPER_SEAT_LENGTH_MM == pytest.approx(16.7)
-    assert [value for centre in spec.KEEPER_SEAT_CENTRES_XZ for value in centre] == (
-        pytest.approx([199.9, -79.75391221957346, 199.9, 78.74608778042654])
-    )
-    drill_r = part.TAP_DRILL_MM[part.KEEPER_TAP_SPEC.size] / 2.0
-    for (x, z), (x0, x1, z0, z1), tap_z, tip_z, side in zip(
-        spec.KEEPER_SEAT_CENTRES_XZ,
-        spec.KEEPER_SEAT_BOUNDS_XZ,
-        (part.KEEPER_TAP_Z_FRONT, part.KEEPER_TAP_Z_REAR),
-        (part.KEEPER_FOOT_TIP_Z_FRONT, part.KEEPER_FOOT_TIP_Z_REAR),
-        (-1.0, 1.0),
-    ):
-        assert x == pytest.approx(part.KEEPER_TAP_X)
-        assert x == pytest.approx(part.COLUMN_X + keeper.KEEPER_FITUP_X_FROM_WEB_MM)
-        assert (x1 - x0, z1 - z0) == pytest.approx(
-            (spec.KEEPER_SEAT_WIDTH_MM, spec.KEEPER_SEAT_LENGTH_MM)
-        )
-        assert ((x0 + x1) / 2.0, (z0 + z1) / 2.0) == pytest.approx((x, z))
-        # The contact runs from the foot tip outboard to the lug's inner face
-        # inboard; each split line stands one margin outside it.
-        inner_face = keeper.FULCRUM_KEEPER_CENTRE_Z + side * (
-            keeper.KEEPER_Z_OFF - keeper.LUG_HALF_T
-        )
-        outboard, inboard = (z0, z1) if side < 0 else (z1, z0)
-        assert outboard == pytest.approx(tip_z + side * margin)
-        assert inboard == pytest.approx(inner_face - side * margin)
-        # The keeper tap opens wholly inside its seat.
-        assert x0 + drill_r < part.KEEPER_TAP_X < x1 - drill_r
-        assert z0 + drill_r < tap_z < z1 - drill_r
-        # On the flat flange top: inside both chamfered rims, off the boss.
-        assert part.INNER_X + part.EDGE_CHAMFER < x0
-        assert x1 < part.OUTER_X - part.EDGE_CHAMFER
-        boss_z = part.FRONT_COLUMN_Z if side < 0 else part.REAR_COLUMN_Z
-        nearest = (min(max(part.COLUMN_X, x0), x1), min(max(boss_z, z0), z1))
-        assert math.dist(nearest, (part.COLUMN_X, boss_z)) > part.BOSS_DIA / 2.0
+    (properties,) = _named_calls(build, "read_required_properties")
+    assert "Manufacturing Notes B" in ast.literal_eval(properties.args[1])
+    assert "Manufacturing Notes B" in ast.literal_eval(_keyword(properties, "required"))
+    linked = [
+        call
+        for call in _named_calls(drawing_tree, "add_property_linked_note")
+        if ast.literal_eval(call.args[1]) == "Manufacturing Notes B"
+    ]
+    assert len(linked) == 1
+    assert ast.unparse(linked[0].args[2]) == "*keeper_facing_note_xy(keeper_callout_xy)"
+    assert _keyword(linked[0], "char_height").id == "KEEPER_FACING_NOTE_HEIGHT"
 
 
-def test_keeper_seat_flange_thickness_is_the_final_top_flange_under_each_seat() -> None:
-    places = spec.DRAWING_REFERENCE_PRECISION
-    # One places constant: the seat's controlling dimension is the top
-    # flange's own .X, not a second tolerance stacked from the cap floors.
-    assert places["keeper seat flange thickness"] == places["top flange thickness"]
-    assert places["keeper seat flange thickness"] == spec.FLANGE_THICKNESS_PLACES == 1
-    assert spec.FLANGE_THICKNESS_MM == part.FLANGE == 8.0
-    assert part.HALF_H - part.FLANGE_BOT_Y == pytest.approx(spec.FLANGE_THICKNESS_MM)
-    flange_places = places["keeper seat flange thickness"]
-    assert f"{spec.FLANGE_THICKNESS_MM:.{flange_places}f}" == "8.0"
-    assert places["keeper seat width"] == places["keeper seat length"] == 1
-    # The cap-floor height is gone from the contract and the sheet alike.
-    assert "keeper seat height above cap floors" not in places
-    assert not hasattr(spec, "KEEPER_SEAT_HEIGHT_MM")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for retired in (
-        "KEEPER_SEAT_HEIGHT_MM",
-        "keeper seat height above cap floors",
-        "ABOVE CAP SEAT FLOOR",
-        "KEEPER_HEIGHT_",
-        "KEEPER_BORE_HALF_CHORD",
-        "KEEPER_RECESS_HALF_CHORD",
-        "KEEPER_SECTION_SOCKET_XY",
-    ):
-        assert retired not in source, retired
-
-
-def test_keeper_seats_leave_the_web_ligaments_and_boss_clearances_unchanged() -> None:
-    import ast
-
+def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> None:
     assert part.WEB_T == 13.0
     assert (part.WEB_IN_X, part.WEB_OUT_X) == pytest.approx((190.5, 203.5))
     assert (part.HALF_H, part.FLANGE, part.FLANGE_BOT_Y) == pytest.approx(
@@ -2375,58 +2343,44 @@ def test_keeper_seats_leave_the_web_ligaments_and_boss_clearances_unchanged() ->
     assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(1.6241775880068343)
     assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.645596762049888)
     assert part.KEEPER_FOOT_BOSS_MARGINS == pytest.approx((1.496, 2.504), abs=0.0005)
+    # Along the rail the faced top runs boss to boss, so the fitted foot
+    # stays on it exactly when it clears the bosses at the printed bands.
     assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.150, 0.640))
     assert part.KEEPER_FOOT_RAIL_MARGINS == pytest.approx((4.996, 6.004), abs=0.0005)
-    assert part.KEEPER_SEAT_PRINTED_BOSS_MARGINS == pytest.approx(
-        (0.05, 0.54), abs=0.0005
+    # Across it the widest printed foot, at the farthest printed fit-up
+    # offset from the web, stays inside the narrowest printed flange less
+    # the largest printed C2 top-rim leg.
+    places = spec.DRAWING_REFERENCE_PRECISION
+    band = spec.PRINTED_LINEAR_BAND_MM
+    width_places = places["side flange width"]
+    chamfer_places = places["top rim chamfer"]
+    foot_places = keeper.DRAWING_PRECISION["Foot"]["Depth"]
+    half_flange = (round(part.RAIL_W_SIDE, width_places) - band[width_places]) / 2.0
+    offset = (
+        abs(round(keeper.KEEPER_FITUP_X_FROM_WEB_MM, keeper.KEEPER_FITUP_PLACES))
+        + keeper.KEEPER_FITUP_LOCATION_BAND_MM
     )
-    assert part.KEEPER_SEAT_PRINTED_FLANGE_SIDE_MARGIN == pytest.approx(6.28, abs=0.005)
-    chamfer_places = spec.DRAWING_REFERENCE_PRECISION["top rim chamfer"]
-    max_chamfer = (
-        round(part.EDGE_CHAMFER, chamfer_places)
-        + spec.PRINTED_LINEAR_BAND_MM[chamfer_places]
+    half_foot = (round(keeper.KEEPER_WIDTH, foot_places) + band[foot_places]) / 2.0
+    max_chamfer = round(part.EDGE_CHAMFER, chamfer_places) + band[chamfer_places]
+    assert (half_flange, offset, half_foot, max_chamfer) == pytest.approx(
+        (16.7, 2.92, 7.4, 2.8)
     )
-    assert max_chamfer == pytest.approx(2.8)
-    assert part.KEEPER_SEAT_PRINTED_FLAT_TOP_SIDE_MARGIN == pytest.approx(
-        part.KEEPER_SEAT_PRINTED_FLANGE_SIDE_MARGIN - max_chamfer
-    )
-    assert part.KEEPER_SEAT_PRINTED_FLAT_TOP_SIDE_MARGIN == pytest.approx(3.48)
-    # Faced in place: the rail-top plane stays put, and the print bounds the
-    # final flange left under each seat instead of a height over cap floors.
+    margin = half_flange - offset - half_foot - max_chamfer
+    assert part.KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN == pytest.approx(margin)
+    assert margin == pytest.approx(3.58)
+    # Faced in place: the rail-top plane stays put.
     assert part.HALF_H - part.FLANGE_BOT_Y == pytest.approx(spec.FLANGE_THICKNESS_MM)
-    # The nine native socket, cap and hub finishes stand unchanged.
+    # The nine native socket, cap and hub finishes stand unchanged; the
+    # faced rail top's SEAT_UM rides on the linked note B.
     assert [c.key for c in spec.SURFACE_FINISHES] == [
         f"{kind}_{rail}_{end}"
         for rail in ("east", "west")
         for end in ("front", "rear")
         for kind in ("socket", "cap_seat")
     ] + ["hub_bore"]
-    # The seats' locating finish is SEAT_UM, carried by the part's linked
-    # note B (no native symbol can pick a split region of a shared plane).
-    assert SEAT_UM == 3.2
-    assert spec.SEAT_UM is SEAT_UM
-    assert (
-        spec.DRAWING_NOTES_B.splitlines().count(
-            f"KEEPER LOCATING SEATS: Ra {SEAT_UM:.1f} UM."
-        )
-        == 1
-    )
-    tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
-    (notes,) = [
-        node.value
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and [ast.unparse(target) for target in node.targets] == ["DRAWING_NOTES_B"]
-    ]
-    sourced = [
-        value.value.id
-        for value in ast.walk(notes)
-        if isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name)
-    ]
-    assert "SEAT_UM" in sourced
 
 
-def test_keeper_seats_get_their_own_half_size_sheet() -> None:
+def test_top_frame_drawing_is_six_sheets() -> None:
     assert drawing.SHEET_NAMES == (
         "PICTORIAL",
         "GEOMETRY",
@@ -2434,377 +2388,56 @@ def test_keeper_seats_get_their_own_half_size_sheet() -> None:
         "CROSS-TAPS",
         "HUB-SET-SCREW",
         "UNDERSIDE",
-        "KEEPER-SEATS",
     )
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
-    assert drawing.KEEPER_PLAN_SCALE == drawing.SHEET_SCALES["KEEPER-SEATS"]
-    assert drawing.KEEPER_PLAN_SCALE == drawing.SHEET_SCALES["HOLES-SOCKETS"]
-    assert drawing.KEEPER_PLAN_SCALE == (1.0, 2.0)
-    assert drawing.KEEPER_SECTION_SCALE == drawing.HUB_SECTION_SCALE == (1, 1)
+    # No split-line seat regions remain to dimension, qualify or section.
+    assert not [key for key in spec.DRAWING_REFERENCE_PRECISION if "keeper seat" in key]
+    for module in (spec, part, drawing):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        for retired in (
+            "KEEPER_SEAT_BOUNDS_XZ",
+            "KEEPER_SEAT_CENTRES_XZ",
+            "KEEPER_SEAT_EDGE_MARGIN_MM",
+            "KeeperSeatFaces",
+            "_split_keeper_seats",
+            "KEEPER-SEATS",
+            '"G-G"',
+        ):
+            assert retired not in source, (module.__name__, retired)
 
 
-# Estimated text allowances, not measured render ink: 2 mm per character as
-# the station fields, 5.1 mm rows as the transfer rows, and a dimension field
-# one row deeper than its text (its position is its text's bottom centre).
-# Notes and the caption use the conservative 3.5 mm full-em width; both are
-# anchored at their upper-left.  Farm validation measures the actual ink.
-_KEEPER_CHAR = 0.002
-_KEEPER_ROW = drawing.KEEPER_TRANSFER_ROW_PITCH
-_KEEPER_NOTE_CHAR = drawing.KEEPER_TRANSFER_CHARACTER_WIDTH
+# The facing note's rows render about 2.6 mm per character at its 3.5 mm
+# height (the C2 line on farm 30394c1da: 70 characters over 30 -> 208 mm),
+# on the transfer callout's 5.1 mm row pitch.  An estimate, not render ink:
+# farm validation measures the regenerated sheet.
+_FACING_NOTE_CHAR = 0.0026
 
 
-def _keeper_plan(x, z):
-    cx, cy = drawing.KEEPER_PLAN_CENTER
-    s = drawing.KEEPER_PLAN_VIEW_SCALE / 1000.0
-    return (cx + x * s, cy - z * s)
-
-
-def _keeper_section(z, y):
-    """G-G: +Z right and +Y up, the front seat's faced centre at its pinned point."""
-    sx, sy = drawing.KEEPER_SECTION_SEAT_XY
-    s = drawing.KEEPER_SECTION_VIEW_SCALE / 1000.0
-    seat_z = spec.KEEPER_SEAT_CENTRES_XZ[0][1]
-    return (sx + (z - seat_z) * s, sy + (y - part.HALF_H) * s)
-
-
-def _dimension_field(xy, value, qualifier):
-    rows = [value, *qualifier.splitlines()]
-    half = max(map(len, rows)) * _KEEPER_CHAR / 2.0
-    return (
-        xy[0] - half,
-        xy[1] - _KEEPER_ROW,
-        xy[0] + half,
-        xy[1] + len(rows) * _KEEPER_ROW,
+def test_keeper_facing_note_hangs_under_the_keeper_callout_clear_of_all_ink() -> None:
+    callout, callout_box = _keeper_callout_placed()
+    x, y = drawing.keeper_facing_note_xy(callout)
+    rows = spec.DRAWING_NOTES_B.splitlines()
+    note = (
+        x,
+        y - len(rows) * drawing.KEEPER_TRANSFER_ROW_PITCH,
+        x + max(map(len, rows)) * _FACING_NOTE_CHAR,
+        y,
     )
-
-
-def _note_box(xy, text):
-    rows = text.splitlines()
-    width = max(map(len, rows)) * _KEEPER_NOTE_CHAR
-    return (xy[0], xy[1] - len(rows) * _KEEPER_ROW, xy[0] + width, xy[1])
-
-
-def _keeper_cut_half_chord(diameter):
-    offset = drawing.KEEPER_SECTION_X - part.COLUMN_X
-    return math.sqrt((diameter / 2.0) ** 2 - offset**2)
-
-
-def _keeper_sheet_boxes():
-    left, bottom = _keeper_plan(-drawing.PLAN_HALF_X, drawing.PLAN_HALF_Z)
-    right, top = _keeper_plan(drawing.PLAN_HALF_X, -drawing.PLAN_HALF_Z)
-    boss_half = _keeper_cut_half_chord(part.BOSS_DIA)
-    end_z = drawing.keeper_section_cut_ends()[1][1]
-    section_low = _keeper_section(
-        part.FRONT_COLUMN_Z - boss_half, -(part.HALF_H + part.BOSS_BELOW)
-    )
-    section_high = _keeper_section(end_z, part.HALF_H + part.BOSS_ABOVE)
-    boxes = {
-        "plan": (left, bottom, right, top),
-        "G-G": (*section_low, *section_high),
-        "length text": _dimension_field(
-            drawing.KEEPER_LENGTH_TEXT_XY, "(16.7)", drawing.KEEPER_SEAT_QUALIFIER
-        ),
-        "width text": _dimension_field(
-            drawing.KEEPER_WIDTH_TEXT_XY, "(14.2)", drawing.KEEPER_SEAT_QUALIFIER
-        ),
-        "end text": _dimension_field(
-            drawing.KEEPER_END_TEXT_XY, "(24.9)", drawing.KEEPER_SOCKET_QUALIFIER
-        ),
-        "inner text": _dimension_field(
-            drawing.KEEPER_INNER_TEXT_XY, "(4.2)", drawing.KEEPER_SOCKET_QUALIFIER
-        ),
-        "flange text": _dimension_field(
-            drawing.KEEPER_FLANGE_TEXT_XY, "8.0", drawing.KEEPER_FLANGE_QUALIFIER
-        ),
-        "caption": _note_box(
-            drawing.KEEPER_SECTION_CAPTION_XY, "SECTION G-G\nSCALE 1:1"
-        ),
-        "notes B": _note_box(drawing.KEEPER_SEAT_NOTE_XY, spec.DRAWING_NOTES_B),
-    }
-    e0, e_down, e1, e_up = drawing.KEEPER_SECTION_LETTER_EXTENT
-    for end, (x, z) in zip(("start", "end"), drawing.keeper_section_cut_ends()):
-        tx, ty = _keeper_plan(x, z)
-        boxes[f"G {end} letter"] = (tx + e0, ty + e_down, tx + e1, ty + e_up)
-    return boxes
-
-
-def test_keeper_seat_sheet_fits_inside_the_border_clear_of_the_title_block() -> None:
-    boxes = _keeper_sheet_boxes()
+    ink = drawing.INK_CLEARANCE
+    # Flush with RD4's left edge, a clearance under its shoulder row.
+    assert note[0] == pytest.approx(callout_box[0])
+    assert callout_box[1] - note[3] == pytest.approx(ink + drawing.ROUND_OUT)
     frame = drawing.SHEET_FRAME
-    ink = drawing.INK_CLEARANCE
-    for name, box in boxes.items():
-        assert frame[0] + ink <= box[0] < box[2] <= frame[2] - ink, name
-        assert frame[1] + ink <= box[1] < box[3] <= frame[3] - ink, name
-        assert _box_box_gap(box, TITLE_BLOCK) >= ink, name
-    names = sorted(boxes)
-    for i, a in enumerate(names):
-        for b in names[i + 1 :]:
-            assert _box_box_gap(boxes[a], boxes[b]) >= ink, (a, b)
-
-
-def test_keeper_footprint_dimension_lines_stand_off_their_ink() -> None:
-    boxes = _keeper_sheet_boxes()
-    ink = drawing.INK_CLEARANCE
-    x0, x1, z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[1]
-    # Length: a vertical line past the plan's right edge, between the seat's
-    # two Z split lines, its witnesses running right off them.
-    line_x, line_y = drawing.KEEPER_LENGTH_LINE_XY
-    assert line_x - boxes["plan"][2] >= ink
-    assert _keeper_plan(x0, z1)[1] < line_y < _keeper_plan(x0, z0)[1]
-    length_line = ((line_x, _keeper_plan(x0, z1)[1]), (line_x, _keeper_plan(x0, z0)[1]))
-    # Width: a horizontal line inside the rail band over the near split line.
-    width_x, width_y = drawing.KEEPER_WIDTH_LINE_XY
-    assert _keeper_plan(x0, 0.0)[0] < width_x < _keeper_plan(x1, 0.0)[0]
-    assert width_y - _keeper_plan(x0, z0)[1] == pytest.approx(
-        drawing.KEEPER_DIM_LINE_GAP
-    )
-    rim_x = (part.INNER_X + part.EDGE_CHAMFER, part.OUTER_X - part.EDGE_CHAMFER)
-    assert rim_x[0] < x0 and x1 < rim_x[1]
-    width_line = (_keeper_plan(x0, z0), _keeper_plan(x1, z0))
-    width_line = tuple((x, width_y) for x, _y in width_line)
-    for name in ("length text", "width text", "G start letter", "G end letter"):
-        for line in (length_line, width_line):
-            assert _box_segment_gap(boxes[name], line) >= ink, name
-    # Each value sits right of its line, outside the plan, a gap off it.
-    assert boxes["length text"][0] - line_x >= ink
-
-
-def _keeper_dimension_lines():
-    """Every plan dimension line on the sheet, as sheet segments."""
-    x0, x1, z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[1]
-    length_x = drawing.KEEPER_LENGTH_LINE_XY[0]
-    width_y = drawing.KEEPER_WIDTH_LINE_XY[1]
-    inner_y = drawing.KEEPER_INNER_LINE_XY[1]
-    socket = _keeper_plan(part.COLUMN_X, part.REAR_COLUMN_Z)
-    seat_end_y = _keeper_plan(x0, z1)[1]
-    return {
-        "length": ((length_x, seat_end_y), (length_x, _keeper_plan(x0, z0)[1])),
-        "width": (
-            (_keeper_plan(x0, z0)[0], width_y),
-            (_keeper_plan(x1, z0)[0], width_y),
-        ),
-        "end": ((length_x, socket[1]), (length_x, seat_end_y)),
-        "inner": ((_keeper_plan(x0, z0)[0], inner_y), (socket[0], inner_y)),
-    }
-
-
-def test_keeper_seat_location_chains_off_the_rear_socket_axis() -> None:
-    x0, _x1, _z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[1]
-    # Nominal location of the split lines, reference only: the seat is sized
-    # and placed to the fitted keeper, not to fixed tooling.
-    assert part.COLUMN_X - x0 == pytest.approx(4.2)
-    assert part.REAR_COLUMN_Z - z1 == pytest.approx(24.903912, abs=1e-6)
-    places = spec.DRAWING_REFERENCE_PRECISION
-    assert places["keeper seat inner edge from socket"] == 1
-    assert places["keeper seat end from socket"] == 1
-    socket = _keeper_plan(part.COLUMN_X, part.REAR_COLUMN_Z)
-    # The end location chains in line with the length: one shared witness.
-    end_x, end_y = drawing.KEEPER_END_LINE_XY
-    assert end_x == drawing.KEEPER_LENGTH_LINE_XY[0]
-    assert socket[1] < end_y < _keeper_plan(x0, z1)[1]
-    # The inner-edge location runs just below the plan, between its witnesses.
-    boxes = _keeper_sheet_boxes()
-    inner_x, inner_y = drawing.KEEPER_INNER_LINE_XY
-    assert boxes["plan"][1] - inner_y == pytest.approx(drawing.KEEPER_DIM_LINE_GAP)
-    assert _keeper_plan(x0, 0.0)[0] < inner_x < socket[0]
-
-
-def test_keeper_plan_leaders_cross_no_foreign_ink() -> None:
-    boxes = _keeper_sheet_boxes()
-    lines = _keeper_dimension_lines()
-    ink = drawing.INK_CLEARANCE
-    leaders = {
-        "length": (drawing.KEEPER_LENGTH_LINE_XY, drawing.KEEPER_LENGTH_TEXT_XY),
-        "width": (drawing.KEEPER_WIDTH_LINE_XY, drawing.KEEPER_WIDTH_TEXT_XY),
-        "end": (drawing.KEEPER_END_LINE_XY, drawing.KEEPER_END_TEXT_XY),
-        "inner": (drawing.KEEPER_INNER_LINE_XY, drawing.KEEPER_INNER_TEXT_XY),
-    }
-    for name, leader in leaders.items():
-        own = f"{name} text"
-        for other, box in boxes.items():
-            # The width line itself stands inside the plan's rail band.
-            if other == own or (name == "width" and other == "plan"):
-                continue
-            assert _box_segment_gap(box, leader) >= ink, (name, other)
-        for other, line in lines.items():
-            if other == name or {name, other} == {"end", "length"}:
-                continue  # its own line; the chained pair share a witness end
-            assert _box_segment_gap((*line[0], *line[1]), leader) >= ink, (name, other)
-    # Every value parks right of the plan, clear of it.
-    for name in ("length", "width", "end", "inner"):
-        assert boxes[f"{name} text"][0] - boxes["plan"][2] >= ink, name
-    # Each dimension line clears every text field but its own.
-    for name, line in lines.items():
-        for other, box in boxes.items():
-            if other in ("plan", f"{name} text"):
-                continue
-            assert _box_segment_gap(box, line) >= ink, (name, other)
-
-
-def test_keeper_flange_dimension_stands_in_the_air_past_the_cut() -> None:
-    boxes = _keeper_sheet_boxes()
-    lines = _keeper_dimension_lines()
-    ink = drawing.INK_CLEARANCE
-    _x0, _x1, _z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[0]
-    end_z = drawing.keeper_section_cut_ends()[1][1]
-    end_x = _keeper_section(end_z, part.HALF_H)[0]
-    seat_y = _keeper_section(z1, part.HALF_H)[1]
-    underside_y = _keeper_section(z1, part.FLANGE_BOT_Y)[1]
-    line_x, line_y = drawing.KEEPER_FLANGE_LINE_XY
-    # One line gap past the cut's far end, so the line lies on no hatching,
-    # and level with the flange it measures.
-    assert line_x - end_x == pytest.approx(drawing.KEEPER_DIM_LINE_GAP)
-    assert line_x - boxes["G-G"][2] >= ink
-    assert underside_y < line_y < seat_y
-    assert line_y == pytest.approx((underside_y + seat_y) / 2.0)
-    line = ((line_x, underside_y), (line_x, seat_y))
-    # Witnesses run out along their own faces: the seat line's continuation
-    # over the residual top, and the underside through the cut's far end.
-    witnesses = (
-        (_keeper_section(z1, part.HALF_H), (line_x, seat_y)),
-        ((end_x, underside_y), (line_x, underside_y)),
-    )
-    # The value parks right of its line, outside the section.
-    text = boxes["flange text"]
-    assert text[0] - line_x >= ink
-    leader = (drawing.KEEPER_FLANGE_LINE_XY, drawing.KEEPER_FLANGE_TEXT_XY)
-    for other, box in boxes.items():
-        if other == "flange text":
-            continue
-        assert _box_segment_gap(box, line) >= ink, other
-        assert _box_segment_gap(box, leader) >= ink, other
-        if other != "G-G":
-            for witness in witnesses:
-                assert _box_segment_gap(box, witness) >= ink, other
-    for other, plan_line in lines.items():
-        for segment in (line, leader, *witnesses):
-            plan_box = (*plan_line[0], *plan_line[1])
-            assert _box_segment_gap(plan_box, segment) >= ink, other
-
-
-def test_keeper_section_cuts_each_seat_over_its_flat_flange_underside() -> None:
-    (x_start, z_start), (x_end, z_end) = drawing.keeper_section_cut_ends()
-    assert x_start == x_end == drawing.KEEPER_SECTION_X
-    # Midway between the west web's nominal root-fillet toe, where the
-    # underside turns flat, and the seats' outer split line.
-    root_toe = part.WEB_OUT_X + part.ROOT_FILLET_R
-    assert root_toe == pytest.approx(206.5)
-    for x0, x1, _z0, _z1 in spec.KEEPER_SEAT_BOUNDS_XZ:
-        assert x1 == pytest.approx(207.0)
-        assert x0 < root_toe < drawing.KEEPER_SECTION_X < x1
-        assert drawing.KEEPER_SECTION_X == pytest.approx((root_toe + x1) / 2.0)
-    assert drawing.KEEPER_SECTION_X == pytest.approx(206.75)
-    assert drawing.KEEPER_SECTION_X < part.OUTER_X - part.EDGE_CHAMFER
-    # Outboard of the keeper tap's drill and thread: G-G cuts no thread.
-    drill_r = part.TAP_DRILL_MM[part.KEEPER_TAP_SPEC.size] / 2.0
-    major_r = part.THREAD_MAJOR_MM[part.KEEPER_TAP_SPEC.size] / 2.0
-    assert part.KEEPER_TAP_X + max(drill_r, major_r) < drawing.KEEPER_SECTION_X
-    boss_half = _keeper_cut_half_chord(part.BOSS_DIA)
-    assert drawing.KEEPER_BOSS_HALF_CHORD == pytest.approx(boss_half)
-    assert boss_half == pytest.approx(math.sqrt(22.5**2 - 9.75**2))
-    # From beyond the front boss, past the front seat's far split line.
-    assert z_start < -drawing.PLAN_HALF_Z < part.FRONT_COLUMN_Z - boss_half
-    _x0, _x1, z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[0]
-    assert part.FRONT_COLUMN_Z + boss_half < z0 < z1 < z_end
-    assert z_end == pytest.approx(z1 + drawing.KEEPER_SECTION_RUNOUT)
-    assert z_end == pytest.approx(drawing.KEEPER_SECTION_END_Z)
-    assert z_end < spec.KEEPER_SEAT_BOUNDS_XZ[1][2]
-    # Every G-G row derives from the front seat's centre.
-    assert drawing.KEEPER_SECTION_SEAT_Z == pytest.approx(
-        spec.KEEPER_SEAT_CENTRES_XZ[0][1]
-    )
-
-
-def _keeper_line(start, end, tag):
-    from _drawing_common import ViewEdge
-
-    return ViewEdge(edge=tag, line=(start, end), circle=None, vertices=None)
-
-
-def test_keeper_split_edge_pick_needs_the_whole_boundary() -> None:
-    from _drawing_common import ViewEdges
-
-    x0, x1, z0, _z1 = spec.KEEPER_SEAT_BOUNDS_XZ[1]
-    y = part.HALF_H
-    split = ViewEdges("plan", (_keeper_line((x1, y, z0), (x0, y, z0), "split"),))
-    assert (
-        drawing._keeper_seat_split_edge(split, (x0, y, z0), (x1, y, z0), label="split")
-        == "split"
-    )
-    rim = (part.INNER_X + part.EDGE_CHAMFER, part.OUTER_X - part.EDGE_CHAMFER)
-    merged = ViewEdges("plan", (_keeper_line((rim[0], y, z0), (rim[1], y, z0), "rim"),))
-    with pytest.raises(RuntimeError, match="not the split line"):
-        drawing._keeper_seat_split_edge(
-            merged, (x0, y, z0), (x1, y, z0), label="merged"
-        )
-
-
-def test_keeper_section_seat_line_runs_split_to_split() -> None:
-    from _drawing_common import ViewEdges
-
-    x, y = drawing.KEEPER_SECTION_X, part.HALF_H
-    _x0, _x1, z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[0]
-    centre = spec.KEEPER_SEAT_CENTRES_XZ[0][1]
-    boss_z = part.FRONT_COLUMN_Z + _keeper_cut_half_chord(part.BOSS_DIA)
-    end_z = drawing.keeper_section_cut_ends()[1][1]
-    residual = _keeper_line((x, y, boss_z), (x, y, z0), "residual")
-    seat = _keeper_line((x, y, z1), (x, y, z0), "seat")
-    beyond = _keeper_line((x, y, z1), (x, y, end_z), "beyond")
-    underside = _keeper_line(
-        (x, part.FLANGE_BOT_Y, boss_z), (x, part.FLANGE_BOT_Y, end_z), "underside"
-    )
-    edge, point = drawing._keeper_seat_cut_edge(
-        ViewEdges("G-G", (residual, seat, beyond, underside)), label="seat"
-    )
-    assert edge == "seat"
-    assert point == pytest.approx((x, y, centre))
-    # A split that failed at either end merges the seat into the residual top.
-    for merged in (
-        _keeper_line((x, y, boss_z), (x, y, z1), "merged near"),
-        _keeper_line((x, y, z0), (x, y, end_z), "merged far"),
-    ):
-        with pytest.raises(RuntimeError, match="expected one seat line"):
-            drawing._keeper_seat_cut_edge(
-                ViewEdges("G-G", (residual, merged, beyond)), label="seat"
-            )
-    # A seat line broken part-way (say by a tap the plane should miss).
-    broken = (
-        _keeper_line((x, y, z0), (x, y, centre - 1.0), "broken near"),
-        _keeper_line((x, y, centre + 1.0), (x, y, z1), "broken far"),
-    )
-    with pytest.raises(RuntimeError, match="expected one seat line"):
-        drawing._keeper_seat_cut_edge(ViewEdges("G-G", broken), label="seat")
-    with pytest.raises(RuntimeError, match="expected one seat line"):
-        drawing._keeper_seat_cut_edge(ViewEdges("G-G", (underside,)), label="seat")
-
-
-def test_keeper_section_underside_line_spans_the_whole_seat() -> None:
-    from _drawing_common import ViewEdges
-
-    x, y = drawing.KEEPER_SECTION_X, part.FLANGE_BOT_Y
-    _x0, _x1, z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[0]
-    centre = spec.KEEPER_SEAT_CENTRES_XZ[0][1]
-    boss_z = part.FRONT_COLUMN_Z + _keeper_cut_half_chord(part.BOSS_DIA)
-    end_z = drawing.keeper_section_cut_ends()[1][1]
-    seat = _keeper_line((x, part.HALF_H, z0), (x, part.HALF_H, z1), "seat")
-    underside = _keeper_line((x, y, end_z), (x, y, boss_z), "underside")
-    edge, point = drawing._keeper_flange_underside_edge(
-        ViewEdges("G-G", (seat, underside)), label="underside"
-    )
-    assert edge == "underside"
-    assert point == pytest.approx((x, y, centre))
-    # A blend or break that leaves part of the seat without flat underside
-    # below it, a line at another level, or one off the plane is refused.
-    for wrong in (
-        _keeper_line((x, y, z0 + 1.0), (x, y, end_z), "short"),
-        _keeper_line((x, y, boss_z), (x, y, z1 - 1.0), "short far"),
-        _keeper_line((x, y - 0.5, boss_z), (x, y - 0.5, end_z), "low"),
-        _keeper_line((x - 0.5, y, boss_z), (x - 0.5, y, end_z), "off plane"),
-    ):
-        with pytest.raises(RuntimeError, match="expected one flange underside line"):
-            drawing._keeper_flange_underside_edge(
-                ViewEdges("G-G", (seat, wrong)), label="underside"
-            )
+    assert frame[0] + ink <= note[0] < note[2] <= frame[2] - ink
+    assert frame[1] + ink <= note[1] < note[3] <= frame[3] - ink
+    assert _box_box_gap(note, TITLE_BLOCK) >= ink
+    left, bottom = _plan(-drawing.PLAN_HALF_X, drawing.PLAN_HALF_Z)
+    right, top = _plan(drawing.PLAN_HALF_X, -drawing.PLAN_HALF_Z)
+    assert _box_box_gap(note, (left, bottom, right, top)) >= ink
+    for _p0, _p1, _expected, (sx, sy), _o, label, suffix, _r in _hole_sheet_stations():
+        half_width = len(suffix) * 0.002 / 2
+        field = (sx - half_width, sy - 0.0051, sx + half_width, sy + 0.0051)
+        assert _box_box_gap(note, field) >= ink, label
 
 
 def test_socket_bore_circle_pick_is_exact_about_the_axis() -> None:
@@ -2832,39 +2465,14 @@ def test_socket_bore_circle_pick_is_exact_about_the_axis() -> None:
         drawing._socket_bore_circle(edges, x, -z, label="front")
 
 
-def test_pin_section_profile_can_hold_its_row_as_well(monkeypatch) -> None:
-    view = _FakeView((0.3300, 0.2100))
-    monkeypatch.setattr(
-        drawing,
-        "model_point_in_view",
-        lambda _adapter, v, _xyz, *, label: (
-            v.Position[0] - 0.0043,
-            v.Position[1] + 0.0020,
-        ),
-    )
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda _adapter, *, label: None)
-    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
-    drawing._pin_section_profile(
-        None, view, (0.0, 0.0, 0.0), 0.3320, target_y=0.1800, label="G-G"
-    )
-    assert view.Position == pytest.approx((0.3363, 0.1780))
-
-
-def _keeper_sheet_tree():
+def _called_name(call):
     import ast
 
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    sheet = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "_keeper_seat_sheet"
-    )
-    build = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
-    )
-    return sheet, build
+    if isinstance(call.func, ast.Name):
+        return call.func.id
+    if isinstance(call.func, ast.Attribute):
+        return call.func.attr
+    return ""
 
 
 def _named_calls(node, name):
@@ -2881,384 +2489,3 @@ def _named_calls(node, name):
 
 def _keyword(call, name):
     return next((item.value for item in call.keywords if item.arg == name), None)
-
-
-def test_keeper_dimensions_hang_on_split_lines_and_the_flange_underside() -> None:
-    import ast
-
-    sheet, _build = _keeper_sheet_tree()
-    dimensions = {
-        ast.literal_eval(_keyword(call, "label")): call
-        for call in _named_calls(sheet, "_checked_dimension")
-    }
-    assert set(dimensions) == {
-        "keeper seat width",
-        "keeper seat length",
-        "keeper seat inner edge from socket",
-        "keeper seat end from socket",
-        "keeper seat flange thickness",
-    }
-    assigned = {}
-    for node in ast.walk(sheet):
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            names = target.elts if isinstance(target, ast.Tuple) else (target,)
-            for item in names:
-                if isinstance(item, ast.Name):
-                    assigned[item.id] = node.value
-    for label, entities_name, expected in (
-        ("keeper seat width", "width_edges", "KEEPER_SEAT_WIDTH_MM"),
-        ("keeper seat length", "length_edges", "KEEPER_SEAT_LENGTH_MM"),
-    ):
-        call = dimensions[label]
-        assert ast.literal_eval(_keyword(call, "reference")) is True, label
-        assert _keyword(call, "expected_mm").id == expected, label
-        entities = _keyword(call, "entities")
-        assert isinstance(entities, ast.Name) and entities.id == entities_name
-        picks = assigned[entities_name]
-        assert isinstance(picks, ast.Tuple) and len(picks.elts) == 2
-        assert all(
-            isinstance(pick, ast.Call) and pick.func.id == "_keeper_seat_split_edge"
-            for pick in picks.elts
-        ), label
-    # Location: the rear socket's bore circle, centred, to the same split
-    # edges the footprint hangs on -- a nominal reference, like the size.
-    socket = assigned["rear_socket_edge"]
-    assert socket.func.id == "_socket_bore_circle"
-    assert [arg.id for arg in socket.args] == [
-        "keeper_plan_edges",
-        "COLUMN_X",
-        "REAR_COLUMN_Z",
-    ]
-    for label, orientation, expected, split in (
-        (
-            "keeper seat inner edge from socket",
-            "horizontal",
-            "COLUMN_X - xmin",
-            "width_edges[0]",
-        ),
-        (
-            "keeper seat end from socket",
-            "vertical",
-            "REAR_COLUMN_Z - zmax",
-            "length_edges[1]",
-        ),
-    ):
-        call = dimensions[label]
-        assert ast.literal_eval(_keyword(call, "reference")) is True, label
-        assert ast.literal_eval(_keyword(call, "center")) is True, label
-        assert ast.literal_eval(_keyword(call, "orientation")) == orientation, label
-        assert ast.unparse(_keyword(call, "expected_mm")) == expected, label
-        assert [ast.unparse(item) for item in _keyword(call, "entities").elts] == [
-            "rear_socket_edge",
-            split,
-        ], label
-    # Those indices name the inner (x = xmin) and socket-side (z = zmax) edges.
-    width_inner = assigned["width_edges"].elts[0]
-    assert [ast.unparse(arg) for arg in width_inner.args[1:]] == [
-        "(xmin, HALF_H, zmin)",
-        "(xmin, HALF_H, zmax)",
-    ]
-    length_end = assigned["length_edges"].elts[1]
-    assert [ast.unparse(arg) for arg in length_end.args[1:]] == [
-        "(xmin, HALF_H, zmax)",
-        "(xmax, HALF_H, zmax)",
-    ]
-    assert _keyword(dimensions["keeper seat width"], "center") is None
-    # Controlling, not reference: the final flange left under the faced seat,
-    # from G-G's own flat-underside and seat cut lines.
-    flange = dimensions["keeper seat flange thickness"]
-    assert _keyword(flange, "reference") is None
-    assert _keyword(flange, "expected_mm").id == "FLANGE_THICKNESS_MM"
-    assert ast.literal_eval(_keyword(flange, "orientation")) == "vertical"
-    assert [item.id for item in _keyword(flange, "entities").elts] == [
-        "underside_edge",
-        "seat_edge",
-    ]
-    assert [ast.unparse(_keyword(flange, key)) for key in ("p0", "p1")] == [
-        "underside_point",
-        "seat_point",
-    ]
-    assert _keyword(flange, "text_xy").id == "KEEPER_FLANGE_LINE_XY"
-    assert _keyword(flange, "offset_text").id == "KEEPER_FLANGE_TEXT_XY"
-    assert _keyword(flange, "suffix").id == "KEEPER_FLANGE_QUALIFIER"
-    assert assigned["underside_edge"].func.id == "_keeper_flange_underside_edge"
-    assert assigned["underside_point"] is assigned["underside_edge"]
-    assert assigned["seat_edge"].func.id == "_keeper_seat_cut_edge"
-    assert assigned["seat_point"] is assigned["seat_edge"]
-    for name in ("underside_edge", "seat_edge"):
-        assert [ast.unparse(arg) for arg in assigned[name].args] == [
-            "seat_section_edges"
-        ], name
-    # No cap-floor pick and no construction proxy remain on the sheet.
-    assert not _named_calls(sheet, "_cut_face_edge")
-    # No native Ra here: a plane-and-box face pick would take the residual
-    # top too; the seats' SEAT_UM rides on the linked note B.
-    assert not _named_calls(sheet, "add_surface_finish")
-
-
-def test_keeper_section_is_a_native_removed_cut_of_the_plan() -> None:
-    import ast
-
-    sheet, build = _keeper_sheet_tree()
-    (section,) = _named_calls(sheet, "create_section_view")
-    assert ast.literal_eval(_keyword(section, "section_label")) == "G"
-    assert ast.literal_eval(_keyword(section, "partial")) is True
-    assert _keyword(section, "scale").id == "KEEPER_SECTION_SCALE"
-    assert _keyword(section, "view_xy").id == "KEEPER_SECTION_SEAT_XY"
-    assert _named_calls(sheet, "keeper_section_cut_ends")
-    (orient,) = _named_calls(sheet, "_orient_cut_section")
-    assert ast.literal_eval(orient.args[2]) == (0.0, 0.0, 1.0)
-    (pin,) = _named_calls(sheet, "_pin_section_profile")
-    assert ast.unparse(pin.args[2]) == (
-        "(KEEPER_SECTION_X, HALF_H, KEEPER_SECTION_SEAT_Z)"
-    )
-    assert ast.unparse(_keyword(pin, "target_y")) == "KEEPER_SECTION_SEAT_XY[1]"
-    # The plane stands outboard of the keeper tap: there is no thread to hide,
-    # and the helper refuses a view without one.
-    assert not _named_calls(sheet, "_hide_cosmetic_threads")
-    (display,) = _named_calls(sheet, "_assert_section_display")
-    assert ast.literal_eval(_keyword(display, "cut_surface_only")) is True
-    assert ast.literal_eval(_keyword(display, "removed")) is True
-    assert len(_named_calls(sheet, "set_hidden_lines_removed")) == 2
-    (note,) = _named_calls(sheet, "add_property_linked_note")
-    assert ast.literal_eval(note.args[1]) == "Manufacturing Notes B"
-    (properties,) = _named_calls(build, "read_required_properties")
-    assert "Manufacturing Notes B" in ast.literal_eval(properties.args[1])
-    assert "Manufacturing Notes B" in ast.literal_eval(_keyword(properties, "required"))
-    source = ast.unparse(build)
-    assert source.index("_keeper_seat_sheet(adapter, ddoc)") < source.index(
-        "_auto_tapped_hole_notes(adapter)"
-    )
-
-
-class _FakeSeatFace:
-    """A split face as GetBox (m, coarse) and GetArea (m^2) report it."""
-
-    def __init__(self, box_mm, area_mm2):
-        self._box = tuple(value / 1000.0 for value in box_mm)
-        self._area = area_mm2 / 1e6
-
-    def GetBox(self):
-        return self._box
-
-    def GetArea(self):
-        return self._area
-
-
-class _FakeSeatFeature:
-    def __init__(self, faces):
-        self._faces = tuple(faces)
-
-    def GetFaces(self):
-        return self._faces
-
-
-def _keeper_seat_area_mm2():
-    drill = part.TAP_DRILL_MM[part.KEEPER_TAP_SPEC.size]
-    return (
-        spec.KEEPER_SEAT_WIDTH_MM * spec.KEEPER_SEAT_LENGTH_MM
-        - math.pi * (drill / 2.0) ** 2
-    )
-
-
-def _keeper_seat_face(index):
-    x0, x1, z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[index]
-    y = part.HALF_H
-    # GetBox is only approximate: pad it as SolidWorks may.
-    return _FakeSeatFace(
-        (x0 - 0.05, y, z0 - 0.05, x1 + 0.05, y, z1 + 0.05), _keeper_seat_area_mm2()
-    )
-
-
-def _residual_rail_top():
-    """The rest of the west flange top: same plane, box spans both seats."""
-    y = part.HALF_H
-    box = (part.INNER_X, y, -drawing.PLAN_HALF_Z, part.OUTER_X, y, drawing.PLAN_HALF_Z)
-    seats = 2.0 * spec.KEEPER_SEAT_WIDTH_MM * spec.KEEPER_SEAT_LENGTH_MM
-    area = (part.OUTER_X - part.INNER_X) * 2.0 * drawing.PLAN_HALF_Z - seats
-    return _FakeSeatFace(box, area)
-
-
-def _qualify_keeper_faces(monkeypatch, faces) -> None:
-    feature = _FakeSeatFeature(faces)
-
-    def by_name(_adapter, name):
-        assert name == "KeeperSeatFaces"
-        return feature
-
-    monkeypatch.setattr(part, "_feature_by_name", by_name)
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
-    part._qualify_keeper_seat_faces(None)
-
-
-def test_keeper_seat_qualifier_takes_the_two_bounded_seats_past_the_residual_top(
-    monkeypatch,
-) -> None:
-    # The residual flange top shares the plane and its box covers both seat
-    # centres; only its area keeps it out of the count.
-    _qualify_keeper_faces(
-        monkeypatch, (_residual_rail_top(), _keeper_seat_face(0), _keeper_seat_face(1))
-    )
-
-
-@pytest.mark.parametrize(
-    ("faces", "counts"),
-    [
-        ((0, 0, 1), "[2, 1]"),
-        ((0,), "[1, 0]"),
-        ((1,), "[0, 1]"),
-        ((), "[0, 0]"),
-    ],
-    ids=["duplicate front", "missing rear", "missing front", "no split"],
-)
-def test_keeper_seat_qualifier_rejects_a_duplicate_or_missing_region(
-    monkeypatch, faces, counts
-) -> None:
-    import re
-
-    seats = [_residual_rail_top(), *(_keeper_seat_face(index) for index in faces)]
-    with pytest.raises(RuntimeError, match=re.escape(f"face per seat; got {counts}")):
-        _qualify_keeper_faces(monkeypatch, seats)
-
-
-def test_keeper_seat_qualifier_rejects_a_residual_merged_into_a_seat(
-    monkeypatch,
-) -> None:
-    # A split that failed on one station leaves that seat's area inside a
-    # residual face, which the 1% area filter refuses to count.
-    front = _keeper_seat_face(0)
-    merged = _FakeSeatFace(
-        (
-            part.INNER_X,
-            part.HALF_H,
-            0.0,
-            part.OUTER_X,
-            part.HALF_H,
-            drawing.PLAN_HALF_Z,
-        ),
-        1.02 * _keeper_seat_area_mm2(),
-    )
-    with pytest.raises(RuntimeError, match=r"got \[1, 0\]"):
-        _qualify_keeper_faces(monkeypatch, (_residual_rail_top(), front, merged))
-
-
-def _builder_tree():
-    import ast
-
-    return ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-
-
-def _called_name(call):
-    import ast
-
-    if isinstance(call.func, ast.Name):
-        return call.func.id
-    if isinstance(call.func, ast.Attribute):
-        return call.func.attr
-    return ""
-
-
-def test_keeper_seat_split_only_projects_lines_on_the_existing_rail_top() -> None:
-    import ast
-    import re
-
-    tree = _builder_tree()
-    split = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_split_keeper_seats"
-    )
-    calls = [node for node in ast.walk(split) if isinstance(node, ast.Call)]
-    names = [_called_name(call) for call in calls]
-    # Split boundaries only: no pad, cut, extrude or edge break moves stock.
-    assert not [
-        name
-        for name in names
-        if re.search(r"(?i)extru|cut|boss|pad|chamfer|fillet|offset", name)
-    ]
-    assert names.count("InsertSplitLineProject") == 1
-    (face,) = [call for call in calls if _called_name(call) == "PlanarFace"]
-    assert ast.literal_eval(face.args[0]) == (0.0, 1.0, 0.0)
-    assert face.args[1].id == "HALF_H"
-    (sketch,) = [call for call in calls if _called_name(call) == "create_sketch"]
-    assert ast.literal_eval(sketch.args[0]) == "Top"
-    (select,) = [call for call in calls if _called_name(call) == "SelectByID2"]
-    assert ast.literal_eval(select.args[0]) == "KeeperSeatProfile"
-    assert ast.literal_eval(select.args[6]) == 4
-    marks = [
-        node.value
-        for node in ast.walk(split)
-        if isinstance(node, ast.Assign)
-        and any(isinstance(t, ast.Attribute) and t.attr == "Mark" for t in node.targets)
-    ]
-    assert [ast.literal_eval(mark) for mark in marks] == [1]
-    loops = [node for node in ast.walk(split) if isinstance(node, ast.For)]
-    assert [ast.unparse(loop.iter) for loop in loops] == [
-        "enumerate(KEEPER_SEAT_BOUNDS_XZ)"
-    ]
-    named = [
-        ast.literal_eval(call.args[1])
-        for call in calls
-        if _called_name(call) == "name_last_feature"
-    ]
-    assert named == ["KeeperSeatProfile", "KeeperSeatFaces"]
-
-
-def test_keeper_seats_split_after_the_solid_and_qualify_once_before_pmi() -> None:
-    import ast
-
-    tree = _builder_tree()
-    build = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
-    )
-    statements = [ast.unparse(node) for node in build.body]
-
-    def index(text):
-        (found,) = [i for i, statement in enumerate(statements) if statement == text]
-        return found
-
-    split = index("await _split_keeper_seats(adapter)")
-    gate = split + 1
-    (gate_call,) = [
-        node
-        for node in ast.walk(build.body[gate])
-        if isinstance(node, ast.Call) and _called_name(node) == "volume_check"
-    ]
-    # The zero-volume gate: expected volume is the running volume untouched.
-    assert (
-        ast.literal_eval(gate_call.args[1]) == "keeper seat split (no material change)"
-    )
-    assert isinstance(gate_call.args[2], ast.Name) and gate_call.args[2].id == "volume"
-    assert 0.0 < ast.literal_eval(gate_call.args[3]) <= 0.05
-    # Every material feature precedes the split.
-    last_material = max(
-        i
-        for i, node in enumerate(build.body[:split])
-        for call in ast.walk(node)
-        if isinstance(call, ast.Call) and _called_name(call) == "volume_check"
-    )
-    assert statements[last_material].startswith(
-        "for feature, (picks, v_chain, shared) in EXTERNAL_EDGE_BREAKS.items():"
-    )
-    assert "f'external edge breaks {feature}'" in statements[last_material]
-    rebuilds = [
-        i for i, s in enumerate(statements) if s == "await force_rebuild(adapter)"
-    ]
-    driven = next(
-        i
-        for i, s in enumerate(statements)
-        if "'driven casting (equations neutral)'" in s
-    )
-    machined = index("_qualify_machined_faces(adapter)")
-    seats = index("_qualify_keeper_seat_faces(adapter)")
-    pmi = next(i for i, s in enumerate(statements) if s.startswith("author_part_pmi("))
-    assert gate < max(rebuilds) < driven < machined < seats < pmi
-    module_calls = [
-        _called_name(node) for node in ast.walk(tree) if isinstance(node, ast.Call)
-    ]
-    assert module_calls.count("_split_keeper_seats") == 1
-    assert module_calls.count("_qualify_keeper_seat_faces") == 1
