@@ -71,11 +71,15 @@ ISO_CENTER = (0.320, 0.095)
 
 _HALF_LEN = BAR_LENGTH * SHEET_SCALE[0] / 2000.0
 LEFT_END = FRONT_CENTER[0] - _HALF_LEN
+RIGHT_END = FRONT_CENTER[0] + _HALF_LEN
 AXLE_BORE_SHEET_X = FRONT_CENTER[0] + AXLE_BORE_X * SHEET_SCALE[0] / 1000.0
 
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.030),
-    "Side": (LEFT_END - 0.020, FRONT_CENTER[1]),
+    # The bar height off the right end, in the open sheet between the bar and
+    # the end view: off the left end its text sat on the border's zone
+    # letter and frame line.
+    "Side": (RIGHT_END + 0.020, FRONT_CENTER[1]),
     # The axle bore's station from the left end, above the bar; its reamed Ø
     # up and right of the bore, so the leader leaves the circle clear of the
     # station's extension line.
