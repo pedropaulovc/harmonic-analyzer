@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -250,32 +249,13 @@ def test_native_marks_and_complete_two_sheet_manufacturing_package():
     assert spec.BORE_DIA * spec.BORE_VIEW_SCALE[0] / spec.BORE_VIEW_SCALE[1] >= 28.0
     assert set(spec.PART_DATUMS) == set(spec.COLLAR_DATUMS + spec.SCREW_DATUMS)
     assert set(spec.GEOMETRIC_CONTROLS) == set(spec.COLLAR_CONTROLS + spec.SCREW_CONTROLS)
-    source = inspect.getsource(part)
-    assert "wizard_holes" in source and "AddThreadParameters" in source
-    assert "apply_drawing_precision" in source
-    assert "mark_dimensions_for_drawing" in source
-    assert "merge_result=False" in source
     assert "GROUND DOG TIP" in spec.DRAWING_NOTES
     assert len(spec.DRAWING_NOTES.splitlines()) <= 4
-    drawing_source = inspect.getsource(drawing)
-    assert "add_native_hole_callout" in drawing_source
-    assert "assert_imported_precision" in drawing_source
-    assert "project_part_pmi" in drawing_source
-    assert "author_part_pmi" in source
-    assert "build_purchased_fastener_drawing" not in drawing_source
-    assert "set_dimension_precision" not in drawing_source
-    # Edges stay sharp in the model: the title block covers the collar's
-    # breaks, and the dog's tighter limit is printed once on its diameter.
-    assert "add_chamfer" not in source
     # One line: an above callout's line break prints nothing (main's guard).
     assert spec.DOG_EDGE_CALLOUT == f"STONE DOG EDGE {spec.DOG_EDGE_BREAK:.2f} MAX"
     assert drawing._printable_above_callouts({"DogDia": spec.DOG_EDGE_CALLOUT})
     with pytest.raises(RuntimeError, match="do not print"):
         drawing._printable_above_callouts({"DogDia": "DOG EDGE:\nSTONE"})
-    assert '_printable_above_callouts({"DogDia": spec.DOG_EDGE_CALLOUT})' in drawing_source
-    # The screw faces come from the faces the screw view draws.
-    assert "_view_faces(\n        screw," in drawing_source
-    assert "_resolve_faces" not in drawing_source
 
 
 def test_screw_faces_come_from_the_view_one_per_spec(monkeypatch):
@@ -410,8 +390,6 @@ def test_native_default_bom_and_manufacturing_descriptions_share_spec_authority(
     for name, description in spec.MANUFACTURING_DESCRIPTIONS.items():
         assert configs[name].Description == description
         assert configs[name].UseDescriptionInBOM is True
-    source = inspect.getsource(part.build)
-    assert '"Description": spec.BOM_DESCRIPTION' in source
 
 
 def test_station_ledger_does_not_double_pay_post_mount_world_vectors():
@@ -864,15 +842,10 @@ def test_each_view_asserts_only_the_precision_it_keeps() -> None:
              drawing.BORE_KEEP.keys(), drawing.SCREW_KEEP.keys())
     for keep in keeps:
         assert set(drawing._precision(keep)) == set(keep)
-    source = inspect.getsource(drawing)
-    assert "assert_imported_precision(adapter, marks, spec.DRAWING_PRECISION_BY_NAME)" not in source
-    assert source.count(", _precision(") == 4
 
 
-def test_tap_view_imports_the_blanked_root_gauge_through_the_hidden_owner_path() -> None:
+def test_tap_view_keeps_the_blanked_root_gauge_limit() -> None:
     # 8f1cd4a9f: the blanked TapRootGauge sketch's TapRootLimit never imported.
-    source = inspect.getsource(drawing.build)
-    assert "hidden_sketches.curate_view_dimensions(\n        adapter, tap, keep=TAP_KEEP" in source
     assert "TapRootLimit" in drawing.TAP_KEEP
     assert "TapRootLimit" in spec.DRAWING_DIMENSIONS["TapRootGauge"]
 

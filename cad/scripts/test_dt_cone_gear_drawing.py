@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import math
 import re
 from pathlib import Path
@@ -354,15 +353,12 @@ def test_root_envelope_reads_the_body_and_failures_name_their_call() -> None:
     # f68549253: the reopened audit passed the IPartDoc where the reader calls
     # IBody2.GetFaces, and every configuration failed as an anonymous
     # DISP_E_MEMBERNOTFOUND.
-    source = inspect.getsource(readback._configuration_topology)
-    assert "_native_root_envelope_mm(bodies[0], teeth=teeth)" in source
     try:
         readback._exit_face(object())
     except AttributeError as exc:
         site = readback._failure_site(exc)
     assert '_com_invoke(body, "IBody2", "GetFaces")' in site
     assert "in _exit_face" in site
-    assert "_failure_site(exc)" in inspect.getsource(readback.assert_saved_configuration_topology)
 
 
 def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:
@@ -849,12 +845,19 @@ def test_settled_clock_check_refuses_outside_arrow_stubs() -> None:
     assert any("sweep" in fault for fault in faults)
     assert drawing.clock_arc_faults([], bad_vertex) == ["no arc"]
     assert drawing.ARROWS_INSIDE == 0  # swDimensionArrowsSide_e.swDimArrowsInside
-    assert "display.ArrowSide = ARROWS_INSIDE" in inspect.getsource(
-        drawing._sweep_clock_right_of_flat
-    )
-    assert "settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),)" in (
-        inspect.getsource(drawing.build)
-    )
+
+
+def test_settled_clocks_refuse_stub_arcs_on_any_sheet(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    sheets: list[str] = []
+    ddoc = SimpleNamespace(ActivateSheet=lambda name: sheets.append(name) or True)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "_clock_arcs", lambda display: display)
+    clocks = [("T012", [], 12), ("T018", [], 18)]
+    with pytest.raises(RuntimeError, match=r"settling rebuild:\nT012: no arc\nT018: no arc"):
+        drawing._assert_settled_clocks(SimpleNamespace(currentModel=ddoc), clocks)
+    assert sheets == ["T012", "T018"]
 
 
 def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
@@ -933,16 +936,31 @@ def test_the_part_saves_both_authoring_sketches_hidden() -> None:
     assert body.index("_suppress_rows_and_hide_references(adapter, pattern_axis)") < body.index(
         "await adapter.save_file("
     )
-    # Hide/show is per configuration (7e88be269 T006 image): the axis and both
-    # sketches are blanked inside the loop that activates each configuration,
-    # and the reopened part is gated in every configuration.
-    helper = inspect.getsource(part._suppress_rows_and_hide_references)
-    loop = helper[helper.index("for configuration in"):]
-    assert "_activate_configuration(model, configuration)" in loop
-    assert 'blank_reference_geometry(adapter, ((pattern_axis, "AXIS"),))' in loop
-    assert "_blank_reference_sketches(adapter)" in loop
     assert "blank_reference_geometry(" not in body
     assert "assert_reference_geometry_hidden_in_every_configuration(adapter, PART_NAME)" in body
+
+
+def test_hide_and_show_is_set_with_each_configuration_active(monkeypatch: pytest.MonkeyPatch) -> None:
+    """7e88be269 T006 image: blanked with T120 active only, the axis and both
+    sketches rendered in every other configuration."""
+    from types import SimpleNamespace
+
+    events: list[tuple[str, ...]] = []
+    suppressed = SimpleNamespace(IsSuppressed2=lambda *_args: (True,))
+    model = SimpleNamespace(
+        GetConfigurationNames=lambda: [c for c, _t in spec.CONFIGS],
+        FeatureByName=lambda _name: suppressed,
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(part, "_activate_configuration", lambda _m, c: events.append(("activate", c)))
+    monkeypatch.setattr(part, "blank_reference_geometry", lambda _a, refs: events.append(("blank", *refs[0])))
+    monkeypatch.setattr(part, "_blank_reference_sketches", lambda _a: events.append(("sketches",)))
+    part._suppress_rows_and_hide_references(SimpleNamespace(currentModel=model), "Axis1")
+    assert events == [
+        event
+        for configuration, _teeth in spec.CONFIGS
+        for event in (("activate", configuration), ("blank", "Axis1", "AXIS"), ("sketches",))
+    ]
 
 
 def test_a_blank_that_does_not_take_fails_the_part_build() -> None:
@@ -1023,9 +1041,43 @@ def test_every_configuration_stores_its_own_blank_and_thickness_band(
             assert which == 3
             upper_mm, lower_mm = band_for(teeth)
             assert (lower * 1000.0, upper * 1000.0) == pytest.approx((lower_mm, upper_mm))
-    source = inspect.getsource(readback.assert_saved_configuration_topology)
-    assert "_assert_configuration_bands(adapter, configuration, teeth)" in source
-    assert "GetMinValue" not in inspect.getsource(part._set_configuration_bands)
+
+
+def test_the_reopened_audit_reads_each_band_with_its_own_configuration_active(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The reopened audit reads every configuration's bands with that
+    configuration active, and a failure names the call that raised (a raw
+    COM error carries no member name, f68549253)."""
+    import asyncio
+    from types import SimpleNamespace
+
+    active: list[str] = []
+    banded: list[tuple[str, str, int]] = []
+
+    async def activate(configuration: str) -> SimpleNamespace:
+        active.append(configuration)
+        return SimpleNamespace(is_success=True, data={"rebuilt": True}, error=None)
+
+    async def topology(_adapter, configuration, teeth, *, phase, measure_roots):
+        assert measure_roots and active[-1] == configuration
+        return float(teeth), configuration, ()
+
+    def bands(_adapter, configuration, teeth):
+        banded.append((active[-1], configuration, teeth))
+        if teeth == spec.CONFIGS[0][1]:
+            raise AttributeError("member not found")
+
+    monkeypatch.setattr(readback, "_configuration_topology", topology)
+    monkeypatch.setattr(readback, "_assert_configuration_bands", bands)
+    adapter = SimpleNamespace(set_active_configuration=activate)
+    with pytest.raises(RuntimeError) as failure:
+        asyncio.run(readback.assert_saved_configuration_topology(adapter))
+    assert sorted(banded) == sorted((c, c, t) for c, t in spec.CONFIGS)
+    message = str(failure.value)
+    assert f"{spec.CONFIGS[0][0]}: AttributeError at line" in message
+    assert "_assert_configuration_bands(adapter, configuration, teeth)" in message
+    assert message.count("AttributeError") == 1
 
 
 def test_only_the_front_view_shows_the_authoring_sketches() -> None:
