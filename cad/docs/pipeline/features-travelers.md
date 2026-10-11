@@ -2,13 +2,15 @@
 
 ## Independent producers
 
-`package:features` is a scoped COM leaf for `ch_rocker_arm`, `ch_pivot_shaft`,
-`dt_cone_pivot_post` and every spec-driven shop fixture in
-`export_features.SPEC_DRIVEN_PARTS` (`export_features.SUPPORTED_PARTS` is the
-whole list). Its native dependency closure is those parts, not assemblies or
-drawings. The three machine parts have legacy committed process plans; they are
-not enrolled travelers yet. Fixture bundles expose drawing requirements too.
-It writes only self-contained bundles:
+`features:<stem>` is one scoped COM leaf per part whose `draw_<stem>.py`
+declares requirement features. `export_features.SUPPORTED_PARTS` is derived by
+an import-free AST scan of those draw scripts; adding a declaration enrolls the
+part without editing a central exporter list. `package:features` is a seat-free
+aggregator depending on every `features:<stem>` leaf, not a COM export action.
+Each leaf's native dependency is its own part, not assemblies or drawing
+artefacts. The three machine parts have legacy committed process plans; they
+are not enrolled travelers yet. Fixture bundles expose drawing requirements too.
+Each leaf writes only its own self-contained bundle:
 
 ```text
 cad/out/features/<underscore-stem>/
@@ -22,7 +24,7 @@ The STEP plus `features.toml` is the consumer artefact; there are no feature
 receipts or preservation certificates. `export_features.py` is SolidWorks-free.
 
 The ordinary full `export` remains independent: it owns `cad/out/step/`, the
-other existing neutral outputs and `release-neutral.json`. The scoped leaf does
+other existing neutral outputs and `release-neutral.json`. The scoped leaves do
 not touch those paths, STL/PNG outputs, colors or source-digest ledgers. There is
 no ordering or preservation relationship between the producers.
 
@@ -32,17 +34,51 @@ never through a local SolidWorks session or finite build timer.
 
 ## Drawing authority
 
-Every sourced value carries `file:line` citations for Python and
+Each part owns module-level `requirement(name, *, kind, faces, requirements,
+fields, precision=...)` calls in its draw script, next to the code that prints
+the corresponding callout, dimension, FCF or note. The shared API in
+`_feature_requirements.py` registers each declaration and returns it for drawing
+code to consume. `faces` contains the existing geometry selectors;
+`requirements` preserves the ordered acceptance-field names, including explicit
+unknowns. Each `fields` entry is `(value, sources)`: a string source names a
+symbol in `<stem>_spec`, while `(module, NAME)` cites a symbol in another module.
+Part-level fields, geometry frames and drawing datums use colocated
+`part_metadata` declarations with the same `(value, sources)` pairs; explicit
+`model_sources` and `precision_sources` cite the shared frame and displayed
+precision facts. Multiple metadata declarations merge without replacing prior
+facts.
+There is one declaration convention for machine parts and shop fixtures;
+specs remain the source of geometry and native dimension values. Importing a
+draw module to load its declarations neither connects to SolidWorks nor runs
+its guarded `__main__` entrypoint.
+
+Drawing-owned numeric acceptance bands belong to `_printed_limits.py`, not the
+declaration API: draw scripts import `limits` and `drilled_limits` directly from
+it. Native geometry safeguards instead derive their bounds directly from the
+unchanged `_printed_tolerance.printed_deviations` helper, retaining the same
+12-place rounding. Keeping the drawing numeric API separate avoids re-keying
+native recipes when only feature requirements change. `_feature_requirements.py`
+neither reads title-block configuration nor belongs in native part or assembly
+source closures; `_printed_limits.py` also stays out of every native closure.
+
+Every sourced value carries `file:start-end` citations for Python and
 `file:dotted.key.path` citations for YAML, for example
-`cad/config/title_block.yaml:linear_2pl.display`. YAML paths resolve to scalar
-values in the named file, not a synthetic merged registry; material-family
-citations name both the part's family selection and the family's actual values.
+`cad/config/title_block.yaml:linear_2pl.display`. Python spans are resolved from
+the current AST: a field cites its requirement call site and every named
+spec/notes symbol it reads. Cross-script citations use symbol names, never
+hand-maintained line ranges; missing symbols fail export. YAML paths resolve to
+scalar values in the named file, not a synthetic merged registry;
+material-family citations name both the part's family selection and the
+family's actual values.
 Printed general-tolerance and note-only bands are acceptance limits, not the
 underlying inch grade. Exact
 model nominal coordinates are separate; BASIC and REF dimensions do not acquire
 invented general-tolerance bands. Explicit native tolerance bands retain the
 exact authored nominal where native display rounding has not been proved.
 Precision alone does not justify a private rounding convention.
+The rocker's zero-place `land_angle_deg` band is centred on
+`round(land_angle_nominal_deg, 0)` plus/minus the printed title-block angular
+tolerance; the separate nominal remains the unrounded geometry value.
 
 Turned-feature `z_mm` intervals describe nominal geometry along the feature's
 source-frame Z axis, not an acceptance band. Shaft grooves overlay the journal
@@ -65,9 +101,9 @@ the +X radial tip land; those domains are disjoint from the remaining faces.
 `construction` reads the notes used by the actual drawing and cites their
 declaration; `built_up_permitted` requires an explicit permission note included
 there. A process plan cannot approve its own assembled substitute. Offline
-citation checks load YAML to resolve every emitted key path, including dynamic
-part-registry and material-family citations. Python citations identify source
-line ranges but are not anchor-checked.
+citation checks resolve every emitted YAML key path, including dynamic
+part-registry and material-family citations, and require Python spans to match
+current AST declarations or call sites in existing source files.
 
 ## Face identity and native hygiene
 
@@ -102,12 +138,18 @@ Release staging copies the verified scoped STEP and manifest under `features/`,
 separately from the existing full neutral inventory. Each face reference remains
 bound only to the adjacent STEP whose digest the manifest records.
 
-Both export leaves use the existing exporter/import-closure and `_config_deps`
-cache keying. Exporter source changes therefore re-key both `package:features`
-and `export` as expected. YAML comment-only edits do not change parsed dependencies;
-key-path citations remain valid without forcing a rebuild for shifted lines.
-There is no raw-YAML feature-task override; conservative dependency fallbacks
-may over-rebuild, including after an edit irrelevant to a requirement.
+Each `features:<stem>` cache key includes only that part's draw-module closure,
+symbol-citation module closures, registry/config dependencies, release revision
+and native part artefact identity/execution token, plus shared exporter/helper
+sources. A draw-only edit re-keys that part's features leaf, not the other
+features leaves or its native part/assembly builds. Full `export` intentionally
+uses the union of feature inputs; a shared exporter edit can re-key all features
+leaves and full `export`. The seat-free `package:features` aggregator has no
+all-parts COM source key. YAML comment-only edits do not change parsed
+dependencies; key-path citations remain valid without forcing a rebuild for
+shifted lines. There is no raw-YAML feature-task override; conservative
+dependency fallbacks may over-rebuild, including after an edit irrelevant to a
+requirement.
 
 ## Plan and fixture binding
 

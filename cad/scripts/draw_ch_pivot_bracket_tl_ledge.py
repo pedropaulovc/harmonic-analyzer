@@ -41,6 +41,11 @@ from _hole_spec import drill_process
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import ch_pivot_bracket_tl_ledge_spec as part_spec
+from _feature_requirements import requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_pivot_bracket_tl_ledge_spec import (
     CLEARANCE_SPEC,
     DRAWING_DIMENSIONS,
@@ -97,7 +102,54 @@ FRONT_KEEP = {
     "Height": (0.058, FRONT_CENTER[1]),
     "Hole1Y": (0.075, _sheet_y(HOLE_Y / 2.0)),
 }
+
+
+requirement("foot_rest",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), part_spec.LEDGE_HEIGHT),),
+    requirements=("height", "width"),
+    fields={
+        "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": part_spec.LEDGE_HEIGHT}, ("LEDGE_HEIGHT",)),
+        "height": (
+            limits(part_spec.LEDGE_HEIGHT, part_spec.SIZE_PLACES),
+            ("LEDGE_HEIGHT", "SIZE_PLACES", ("ch_pivot_bracket_sides", "FOOT_LEN")),
+        ),
+        "height_nominal": (
+            part_spec.LEDGE_HEIGHT,
+            ("LEDGE_HEIGHT", ("ch_pivot_bracket_sides", "FOOT_LEN")),
+        ),
+        "height_from": ("block_face", ("__frame__",)),
+        "width": (limits(part_spec.LEDGE_WIDTH, part_spec.SIZE_PLACES), ("LEDGE_WIDTH", ("ch_pivot_bracket_spec", "FOOT_W"))),
+    },
+    precision={"height": part_spec.SIZE_PLACES, "width": part_spec.SIZE_PLACES},
+)
+
+requirement("block_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=(),
+    fields={
+        "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+    },
+)
+
 RIGHT_KEEP = {"Thick": (RIGHT_CENTER[0], 0.226)}
+
+
+requirement("upright_seat",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("thickness",),
+    fields={
+        "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "thickness": (limits(part_spec.LEDGE_THICK, part_spec.SIZE_PLACES), ("LEDGE_THICK",)),
+    },
+    precision={"thickness": part_spec.SIZE_PLACES},
+)
+
 # Both holes stand on the one Y station the part prints (Hole1Y).
 DIMENSION_PREFIXES = {"Hole1Y": "2X "}
 # Centred text (~63 mm at 4:1) in the gap between the face's right edge
@@ -105,6 +157,38 @@ DIMENSION_PREFIXES = {"Hole1Y": "2X "}
 # the outline ran through DRILL (PR #1317 machinist review).
 HOLE_CALLOUT_XY = (0.230, 0.200)
 HOLE_CALLOUT_PROCESS = drill_process(CLEARANCE_SPEC)
+
+
+for _side, _x in (("left", part_spec.HOLE_X[0]), ("right", part_spec.HOLE_X[1])):
+    requirement(f"screw_hole_{_side}",
+        kind="hole",
+        faces=(CylinderFace(part_spec.HOLE_DIA, contains_x_mm=_x),),
+        requirements=("dia", "station", "height"),
+        fields={
+            "at": ([_x, part_spec.HOLE_Y, part_spec.LEDGE_THICK], ("HOLE_X", "HOLE_Y", "LEDGE_THICK")),
+            "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
+            "drill": (part_spec.CLEARANCE_SPEC.size, ("CLEARANCE_SPEC",)),
+            # The callout prints the #5 size to two places (5.22); the band
+            # and nominal are that printed value.
+            "dia": (
+                limits(round(part_spec.HOLE_DIA, 2), 2, (part_spec.drilled_oversize_mm(), 0.0)),
+                ("HOLE_DIA", ("ch_pivot_bracket_tl_angle_plate_spec", "SCREW_CLEARANCE")),
+            ),
+            "nominal_dia": (round(part_spec.HOLE_DIA, 2), ("HOLE_DIA",)),
+            "thru": (True, ("CLEARANCE_SPEC",)),
+            # model X from the left end; model Y from the block face
+            "station": (limits(_x, part_spec.HOLE_X_PLACES), ("HOLE_X", "HOLE_X_PLACES")),
+            "station_nominal": (_x, ("HOLE_X",)),
+            "height": (
+                limits(part_spec.HOLE_Y, part_spec.HOLE_Y_PLACES),
+                ("HOLE_Y", "HOLE_Y_PLACES", ("ch_pivot_bracket_tl_angle_plate_spec", "SCREW_Y")),
+            ),
+            "height_nominal": (part_spec.HOLE_Y, ("HOLE_Y",)),
+            "height_from": ("block_face", ("__frame__",)),
+        },
+        precision={"dia": 2, "station": part_spec.HOLE_X_PLACES, "height": part_spec.HOLE_Y_PLACES},
+    )
+
 
 
 def _set_dimension_prefixes(

@@ -12,11 +12,25 @@ import draw_ch_rocker_arm_tl_filing_button as button_drawing
 import draw_ch_rocker_arm_tl_filing_stud as stud_drawing
 import export_features
 import pytest
-from _feature_requirements import limits
+from _feature_requirements import requirements_for
+from _printed_limits import limits
 from prechips.model import TOLERANCE_REQUIREMENTS
 
 BUTTON = "ch_rocker_arm_tl_filing_button"
 STUD = "ch_rocker_arm_tl_filing_stud"
+
+
+def test_drawing_declarations_own_the_exported_requirements() -> None:
+    for drawing in (button_drawing, stud_drawing):
+        declared = requirements_for(drawing)
+        features = export_features.requirement_manifest(drawing.PART_STEM)["features"]
+        selectors = export_features.feature_selectors(drawing.PART_STEM)
+        assert declared
+        assert set(declared) == set(features) == set(selectors)
+        for name, declaration in declared.items():
+            assert declaration.kind == features[name]["kind"]
+            assert list(declaration.requirements) == features[name]["requirements"]
+            assert tuple(selectors[name]) == declaration.faces
 
 
 def _features(stem: str) -> dict:

@@ -388,10 +388,15 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
         )
         return path
 
+    def bundle_paths(stem: str, out: Path) -> tuple[Path, Path]:
+        directory = out / "features" / stem
+        return directory / "features.toml", directory / f"{stem.replace('_', '-')}.STEP"
+
     monkeypatch.setitem(sys.modules, "export_features", SimpleNamespace(
         SUPPORTED_PARTS=("ch_rocker_arm",),
         feature_selectors=lambda _stem: _SELECTORS,
         write_manifest=write_manifest,
+        bundle_paths=bundle_paths,
     ))
 
     class _Adapter:
@@ -424,7 +429,7 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
     monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ())
     monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _asms: {})
     monkeypatch.setattr(export_models, "_exporter_digest", lambda: "exporter-v1")
-    monkeypatch.setattr(export_models, "release_revision", lambda: "v41")
+    monkeypatch.setattr(export_models._config, "release_revision", lambda: "v41")
     monkeypatch.setattr(
         export_models, "enforce_preferences",
         lambda _adapter, spec: seen["preferences"].append(spec),

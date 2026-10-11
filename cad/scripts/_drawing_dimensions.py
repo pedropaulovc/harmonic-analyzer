@@ -9,12 +9,47 @@ from __future__ import annotations
 from typing import Any, Iterable, Literal
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.solidworks.drawing import TOL_BASIC, dimension_name
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import TOL_BASIC, dimension_name, view_name
 
 from _com import _early_bound
 from _drawing_common import rebuild_drawing
 from _drawing_scan import _span_scan_attrs
 import _telemetry
+
+
+def move_model_dimension(
+    adapter: Any,
+    annotation: Any,
+    target: Any,
+    text_xy: tuple[float, float],
+    *,
+    source_view: Any,
+) -> Any:
+    """Move a native model dimension and verify its new drawing-view owner."""
+    name = dimension_name(adapter, annotation)
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, source_view)):
+        raise RuntimeError(f"{name}: failed to activate source dimension view")
+    draw.ClearSelection2(True)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name or not draw.Extension.SelectByID2(
+        selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
+    drawing.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    matches = [
+        _early_bound(item, "IAnnotation")
+        for item in (_early_bound(target, "IView").GetAnnotations() or ())
+        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"{name}: native dimension did not move into target view")
+    return matches[0]
 
 
 _DIMENSION_TEXT_CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow

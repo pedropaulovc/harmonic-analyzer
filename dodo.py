@@ -17,6 +17,8 @@ Task groups (the prefix says whether SolidWorks is required):
   part:<stem>        build one part            (COM -- needs SolidWorks)
   assembly:<stem>    build/refresh one assembly (COM)
   drawing:<stem>     build one manufacturing drawing (COM)
+  features:<stem>    isolated STEP/requirements bundle (COM)
+  package:features   aggregate every feature bundle (NO SolidWorks)
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   prechips:<stem>    strict manufacturing traveler (NO SolidWorks; FreeCAD)
@@ -632,7 +634,7 @@ def _stage_name(label: str) -> str:
         return "preflight"
     if label == "gallery":
         return "gallery"
-    if label.startswith(("export", "package:features")):
+    if label.startswith(("export", "features:")):
         return "export"
     return "harmonic-analyzer"
 
@@ -1861,6 +1863,8 @@ def _fit_groups_env(task: str) -> str | None:
         deps = _recipe_files(stem)
     elif family == "drawing" and stem in DRAWINGS_BY_NAME:
         deps = _drawing_file_deps(stem)
+    elif family == "features":
+        deps = _feature_export_file_deps(stem)
     elif family in ("part", "assembly", "drawing"):
         raise ValueError(f"{task!r} names no {family} task; its fit groups are unknown")
     else:
@@ -2039,37 +2043,59 @@ def _export_file_deps() -> list[str]:
     return [*_export_requirement_deps(), *_cad_identity_deps()]
 
 
-def _export_requirement_deps() -> list[str]:
-    """Source/config closure for the exporter and its named-face requirements."""
-    from export_features import SUPPORTED_PARTS, source_paths
+def _feature_requirement_deps(stem: str) -> list[str]:
+    """One part's declaration/citation closure and generic exporter inputs.
 
+    Discovery identifies supported stems but never contributes another part's
+    draw/spec files to this leaf. Config reads include dynamically loaded
+    citation sources, not just imports the generic driver can see.
+    """
+    from export_features import source_paths
+
+    sources = {
+        EXPORT_PY.resolve(),
+        *(Path(path).resolve() for path in module_deps_of(EXPORT_PY)),
+        *(path.resolve() for path in source_paths(stem)),
+    }
     return sorted({
-        str(EXPORT_PY),
-        *module_deps_of(EXPORT_PY),
-        *(path for stem in SUPPORTED_PARTS
-          for path in _config_deps(SCRIPTS_DIR / "export_features.py", stem, "part")),
-        *(str(path.resolve()) for path in source_paths()),
+        *(str(path) for path in sources),
+        *(dep for path in sources if path.suffix == ".py"
+          for dep in _config_deps(path, stem, "part")),
     })
 
 
-def _feature_export_file_deps() -> list[str]:
+def _export_requirement_deps() -> list[str]:
+    """Full export/check consumers intentionally read all part declarations."""
+    from export_features import SUPPORTED_PARTS
+
+    return sorted({
+        path for stem in SUPPORTED_PARTS for path in _feature_requirement_deps(stem)
+    })
+
+
+def _feature_export_file_deps(stem: str) -> list[str]:
+    """One bundle's recipe plus release revision and exact native identity."""
+    return sorted({
+        *_feature_requirement_deps(stem),
+        str(RELEASE_VERSION_FILE),
+        _submodule_dep(),
+        _sldprt(stem),
+        _part_execution_token(stem),
+    })
+
+
+def _feature_export_outputs(stem: str) -> list[Path]:
+    from export_features import bundle_paths
+
+    return [path.resolve() for path in bundle_paths(stem, CAD_OUT)]
+
+
+def _feature_bundle_outputs() -> list[Path]:
+    """The complete bundle inventory for seat-free aggregate consumers."""
     from export_features import SUPPORTED_PARTS
 
     return [
-        *_export_requirement_deps(),
-        str(RELEASE_VERSION_FILE),
-        *(path for stem in SUPPORTED_PARTS
-          for path in (_sldprt(stem), _part_execution_token(stem))),
-    ]
-
-
-def _feature_export_outputs() -> list[Path]:
-    from export_features import SUPPORTED_PARTS, bundle_paths
-
-    return [
-        path.resolve()
-        for stem in SUPPORTED_PARTS
-        for path in bundle_paths(stem, CAD_OUT)
+        path for stem in SUPPORTED_PARTS for path in _feature_export_outputs(stem)
     ]
 
 
@@ -3671,9 +3697,9 @@ def task_check():
             "file_dep": [
                 str((SCRIPTS_DIR / "features_bound.py").resolve()),
                 *(_export_requirement_deps()),
-                *(str(path) for path in _feature_export_outputs()),
+                *(str(path) for path in _feature_bundle_outputs()),
                 *(str((CAD_OUT / "step" / path.name).resolve())
-                  for path in _feature_export_outputs() if path.suffix == ".STEP"),
+                  for path in _feature_bundle_outputs() if path.suffix == ".STEP"),
             ],
             "task_dep": ["package:features", "export"],
             "cmd": [sys.executable, str(SCRIPTS_DIR / "features_bound.py"),
@@ -3954,11 +3980,33 @@ def task_preflight():
     }
 
 
-def task_package():
-    """COM packages with distinct, cache-keyed leaf payloads.
+def task_features():
+    """One cache-keyed COM leaf for each part's isolated requirement bundle."""
+    from export_features import SUPPORTED_PARTS
 
-    ``package:features`` exports isolated STEP/requirements bundles for three
-    native parts. It never writes the full export's paths or ledgers.
+    for stem in SUPPORTED_PARTS:
+        deps = _feature_export_file_deps(stem)
+        outputs = _feature_export_outputs(stem)
+        yield {
+            "name": stem,
+            "file_dep": deps,
+            "targets": [str(path) for path in outputs],
+            "actions": [(_cached_com_action, [
+                f"features:{stem}",
+                [sys.executable, str(EXPORT_PY), "--features", stem],
+                deps, outputs, f"features-{stem.replace('_', '-')}",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
+
+
+def task_package():
+    """Feature aggregation and cache-keyed native release packaging.
+
+    ``package:features`` is action-free and seat-free. Its explicit task edges
+    include every ``features:<stem>`` leaf in the packaged farm graph; file edges
+    require each leaf's complete adjacent STEP/manifest bundle.
 
     ``package:release`` is the COM half of a release: SolidWorks Pack-and-Go of
     the top assembly and of every native drawing, merged and de-duplicated into
@@ -3971,17 +4019,11 @@ def task_package():
     """
     from export_features import SUPPORTED_PARTS
 
-    feature_deps = _feature_export_file_deps()
     yield {
         "name": "features",
-        "file_dep": feature_deps,
-        "targets": [str(path) for path in _feature_export_outputs()],
-        "uptodate": [False],
-        "actions": [(_cached_com_action, [
-            "package:features",
-            [sys.executable, str(EXPORT_PY), "--features", *SUPPORTED_PARTS],
-            feature_deps, _feature_export_outputs(), "package-features",
-        ])],
+        "task_dep": [f"features:{stem}" for stem in SUPPORTED_PARTS],
+        "file_dep": [str(path) for path in _feature_bundle_outputs()],
+        "actions": [],
         "verbosity": 2,
     }
 
@@ -4131,7 +4173,10 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
     rows.append(("verify:kinematics", _kinematics_file_deps()))
     rows.append(("preflight", _preflight_file_deps()))
     rows.append(("export", _export_file_deps()))
-    rows.append(("package:features", _feature_export_file_deps()))
+    from export_features import SUPPORTED_PARTS
+
+    for stem in SUPPORTED_PARTS:
+        rows.append((f"features:{stem}", _feature_export_file_deps(stem)))
     rows.append(("package:release", _package_file_deps()))
     return rows
 

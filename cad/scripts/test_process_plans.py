@@ -31,11 +31,9 @@ def synthetic(tmp_path, monkeypatch):
     for name in plans.SHOP_FILES:
         (shop / name).write_text("version = 1\n", encoding="utf-8")
     out = tmp_path / "out"
-    bundle = out / "features" / STEM
-    bundle.mkdir(parents=True)
-    step = bundle / "ch-rocker-arm.STEP"
+    manifest, step = plans.bundle_paths(STEM, out)
+    step.parent.mkdir(parents=True)
     step.write_bytes(b"synthetic STEP bytes\n")
-    manifest = bundle / "features.toml"
     manifest.write_text(
         'part = "ch-rocker-arm"\n'
         f'step = "{step.name}"\nstep_sha256 = "{hashlib.sha256(step.read_bytes()).hexdigest()}"\n'
@@ -77,6 +75,25 @@ def test_bind_list_splices_and_preserves_unrelated_bytes(synthetic):
     assert b"# path comment\r\n" in result
     assert b"# keep spacing\r\n" in result
     assert source.read_bytes() == raw
+
+
+def test_bind_plan_reads_only_its_own_bundle_not_an_aggregate_manifest(synthetic):
+    source, out, manifest, _ = synthetic
+    source.write_text(
+        'part = "ch-rocker-arm"\nfeatures = "old"\nfaces = ["HAF_BORE__P01"]\n'
+        'drawing = { revision = "v41" }\n',
+        encoding="utf-8",
+    )
+    unrelated, unrelated_step = plans.bundle_paths("ch_pivot_shaft", out)
+    unrelated.parent.mkdir(parents=True)
+    unrelated.write_bytes(b"not TOML; another leaf is incomplete\n")
+    unrelated_step.write_bytes(b"unrelated STEP\n")
+    before = (unrelated.read_bytes(), unrelated_step.read_bytes())
+    bound = plans.bind_plan(STEM, out)
+    plan = tomllib.loads(bound.read_text(encoding="utf-8"))
+    assert (bound.parent / plan["features"]).resolve() == manifest.resolve()
+    assert plan["faces"] == list(REFS)
+    assert (unrelated.read_bytes(), unrelated_step.read_bytes()) == before
 
 
 @pytest.mark.parametrize("value", ['"HAF_BORE__P01"', "'HAF_BORE__P01'"])
@@ -413,7 +430,7 @@ def test_completeness_rejects_every_incomplete_artifact(synthetic, failure):
 def test_manifest_override_and_staging_prove_staged_digest(synthetic, tmp_path):
     out, manifest, bound, _ = _complete(synthetic)
     stage = tmp_path / "stage"
-    staged_manifest = stage / "features" / STEM / "features.toml"
+    staged_manifest, _staged_step = plans.bundle_paths(STEM, stage)
     staged_manifest.parent.mkdir(parents=True)
     staged_manifest.write_bytes(manifest.read_bytes())
     step_name = tomllib.loads(manifest.read_text())["step"]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 import sys
 import tomllib
@@ -60,8 +61,8 @@ def bound_output(tmp_path: Path, *, pivot_bore_faces: int = 2) -> Path:
     out = tmp_path / "cad" / "out"
     for stem in export_features.SUPPORTED_PARTS:
         labels = _labels(stem, pivot_bore_faces=pivot_bore_faces)
-        name = f"{stem.replace('_', '-')}.STEP"
-        step = out / "features" / stem / name
+        _manifest, step = export_features.bundle_paths(stem, out)
+        name = step.name
         step.parent.mkdir(parents=True)
         step.write_bytes(_step(name, labels, stamp="2026-10-01T22:03:24", first=10, stride=1))
         full = out / "step" / name
@@ -107,6 +108,20 @@ def test_independent_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path) -
         assert {path.name for path in (stage / "features" / stem).iterdir()} == {
             f"{stem.replace('_', '-')}.STEP", "features.toml",
         }
+
+
+@pytest.mark.parametrize("member", [0, 1], ids=["manifest", "step"])
+def test_unproduced_feature_leaf_never_stages_a_partial_package(tmp_path: Path, member: int) -> None:
+    out = bound_output(tmp_path)
+    stem = export_features.SUPPORTED_PARTS[-1]
+    missing = export_features.bundle_paths(stem, out)[member]
+    missing.unlink()
+    before = _tree(out)
+    stage = tmp_path / "stage"
+    with pytest.raises(features_bound.FeaturesBoundError, match=re.escape(str(missing))):
+        features_bound.stage_bound_features(out, stage)
+    assert not stage.exists()
+    assert _tree(out) == before
 
 
 @pytest.mark.parametrize(("mismatch", "diagnostic"), [

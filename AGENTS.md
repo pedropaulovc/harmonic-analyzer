@@ -337,7 +337,8 @@ such build:
 | `part:<stem>`, `assembly:<stem>`, `drawing:<stem>` | yes | yes | yes |
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `preflight`, `export`, `package:release` | yes | yes | yes |
-| `package:features` (isolated STEP/requirements bundles) | yes | yes | yes |
+| `features:<stem>` (one isolated STEP/requirements bundle) | yes | yes | yes |
+| `package:features` | no (aggregator) | no | — (its leaves are) |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
@@ -347,10 +348,16 @@ such build:
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
 
-`package:features` builds only `ch_rocker_arm`, `ch_pivot_shaft`,
-`dt_cone_pivot_post` and the shop fixtures in `export_features.SPEC_DRIVEN_PARTS`
-(`SUPPORTED_PARTS` is the whole list) and writes
-`cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`. The manifest's
+`features:<stem>` exports each part whose `draw_<stem>.py` has module-level
+`_feature_requirements.requirement(...)` declarations beside its printed drawing
+requirements. `export_features.SUPPORTED_PARTS` is derived by import-free AST
+discovery, not a maintained part list. Each leaf is keyed on that part's own
+draw/citation/config closure and native part identity; a draw-only declaration
+edit does not re-key other features leaves or native part/assembly builds.
+`package:features` is a seat-free aggregator over all those COM leaves. Each
+leaf writes `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`; Python
+citations resolve current declaration/call-site AST spans, while YAML citations
+resolve scalar key paths. Missing cited symbols fail loudly. The manifest's
 `step_sha256` binds the raw adjacent STEP; this self-contained bundle is the
 consumer artefact. Full `export` is independent; neither producer overwrites
 the other's paths. The release-only `check:features_bound` compares the two

@@ -11,7 +11,20 @@ import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_tl_angle_plate_spec as spec
 import draw_ch_pivot_bracket_tl_angle_plate as drawing
 import export_features
-from _feature_requirements import limits
+from _feature_requirements import requirements_for
+from _printed_limits import limits
+
+
+def test_drawing_declarations_own_the_exported_requirements() -> None:
+    declared = requirements_for(drawing)
+    features = export_features.requirement_manifest(drawing.PART_STEM)["features"]
+    selectors = export_features.feature_selectors(drawing.PART_STEM)
+    assert declared
+    assert set(declared) == set(features) == set(selectors)
+    for name, declaration in declared.items():
+        assert declaration.kind == features[name]["kind"]
+        assert list(declaration.requirements) == features[name]["requirements"]
+        assert tuple(selectors[name]) == declaration.faces
 
 
 def _features() -> dict:

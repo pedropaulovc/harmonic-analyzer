@@ -31,11 +31,8 @@ import math
 
 import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_spec as bracket
-from _feature_requirements import ExportFeature, limits
-from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm
+from _printed_tolerance import drilled_oversize_mm, printed_deviations
 
 # Bought plate envelope (inventory: 4 x 5 x 3-1/2 in machined cast-iron plate).
 PLATE_LENGTH = 127.0  # 5 in, along X
@@ -68,13 +65,15 @@ _LEDGE_HEIGHT_FLOOR = (
     - (sides.FOOT_LEN - bracket.FOOT_LEN_BAND)
     - BLOCK_HEIGHT
 )
-_LEDGE_BAND = _LEDGE_HEIGHT_FLOOR - limits(_LEDGE_HEIGHT_FLOOR, 1)[0]
+_LEDGE_BAND = _LEDGE_HEIGHT_FLOOR - round(
+    _LEDGE_HEIGHT_FLOOR + printed_deviations(_LEDGE_HEIGHT_FLOOR, 1)[0], 12
+)
 _LEDGE_HEIGHT = math.ceil(round((_LEDGE_HEIGHT_FLOOR + _LEDGE_BAND) * 10.0, 6)) / 10.0
 LEDGE_TOP_Y = round(BLOCK_HEIGHT + _LEDGE_HEIGHT, 6)  # 77.7
 PART_PROUD = LEDGE_TOP_Y + sides.FOOT_LEN - PLATE_HEIGHT  # 5.24
 PART_PROUD_WORST = (
     BLOCK_HEIGHT
-    + limits(_LEDGE_HEIGHT, 1)[0]
+    + round(_LEDGE_HEIGHT + printed_deviations(_LEDGE_HEIGHT, 1)[0], 12)
     + sides.FOOT_LEN
     - bracket.FOOT_LEN_BAND
     - (PLATE_HEIGHT + PLATE_HEIGHT_ALLOWANCE)
@@ -188,12 +187,11 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 
 
 def _station(value: float) -> list[float]:
-    return limits(value, STATION_PLACES)
+    return [round(value + deviation, 12) for deviation in printed_deviations(value, STATION_PLACES)]
 
 
 # Hole stations: ``station`` is the model X from the plate's left end, ``height``
 # the model Y from the table face (the base underside) -- each one dimension.
-_INTO_PLATE = ([0.0, 0.0, -1.0], ("__frame__",))
 _TAP_DRILL = blind_cut_dia_mm(TAP_SPEC)
 _STUD_DRILL = blind_cut_dia_mm(STUD_SPEC)
 _DRILLED = (drilled_oversize_mm(), 0.0)
@@ -209,7 +207,7 @@ STUD_TOP_WALL_MIN = (
     PLATE_HEIGHT
     - PLATE_HEIGHT_ALLOWANCE
     - _station(STUD_Y)[1]
-    - limits(STUD_DIA_PRINTED, STUD_DIA_PLACES, _DRILLED)[1] / 2.0
+    - round(STUD_DIA_PRINTED + _DRILLED[0], 12) / 2.0
 )
 if STUD_TOP_WALL_MIN < 2.0:
     raise AssertionError(
@@ -236,88 +234,4 @@ if BRIDGE_HEAD_GAP < BRIDGE_HEAD_GAP_MIN:
     raise AssertionError(
         f"the bridge bar clears the ledge screw heads by {BRIDGE_HEAD_GAP:.2f}"
         " at worst case, under the 0.3 daylight margin"
-    )
-EXPORT_FEATURES: dict[str, ExportFeature] = {
-    "seat_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
-        requirements=(),
-        fields={
-            "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-            # Where the bracket's seat face lies on it: the foot's width about
-            # the centre, from the ledge top to the plate's top edge.
-            "bounds": (
-                {
-                    "x": [CENTRE_X - bracket.FOOT_W / 2.0, CENTRE_X + bracket.FOOT_W / 2.0],
-                    "y": [LEDGE_TOP_Y, PLATE_HEIGHT],
-                },
-                (
-                    "CENTRE_X",
-                    "LEDGE_TOP_Y",
-                    "PLATE_HEIGHT",
-                    ("ch_pivot_bracket_spec", "FOOT_W"),
-                    ("ch_pivot_bracket_sides", "FOOT_LEN"),
-                ),
-            ),
-        },
-    ),
-    "table_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
-        requirements=(),
-        fields={
-            "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
-        },
-    ),
-}
-# Each tap's printed stations are reference (the spot note governs), so they
-# export as nominals with no band. The tap is THRU: its one drilled cylinder
-# carries the thread, the spot note and the printed drill band together.
-for _side, _x in (("left", TAP_X[0]), ("right", TAP_X[1])):
-    EXPORT_FEATURES[f"ledge_tap_{_side}"] = ExportFeature(
-        kind="hole",
-        faces=(CylinderFace(_TAP_DRILL, contains_x_mm=_x),),
-        requirements=("thread", "note", "dia"),
-        fields={
-            "at": ([_x, SCREW_Y, 0.0], ("TAP_X", "SCREW_Y")),
-            "axis": _INTO_PLATE,
-            "thread": (f"{SCREW_THREAD} UNC-{TAP_SPEC.thread_class}", ("TAP_SPEC", "SCREW_THREAD")),
-            "tap_drill_mm": (_TAP_DRILL, ("TAP_SPEC",)),
-            "dia": (
-                limits(TAP_DRILL_PRINTED, TAP_DRILL_PLACES, _DRILLED),
-                ("TAP_SPEC", "TAP_DRILL_PRINTED", "TAP_DRILL_PLACES"),
-            ),
-            "nominal_dia": (TAP_DRILL_PRINTED, ("TAP_DRILL_PRINTED",)),
-            "thru": (True, ("TAP_SPEC",)),
-            "station_nominal": (_x, ("TAP_X",)),
-            "height_nominal": (SCREW_Y, ("SCREW_Y",)),
-            "height_from": ("table_face", ("__frame__",)),
-            "note": (TAP_SPOT_NOTE, ("TAP_SPOT_NOTE", "LEDGE_CLEARANCE_SPEC")),
-        },
-        precision={"dia": TAP_DRILL_PLACES},
-    )
-for _side, _x in (("left", STUD_X[0]), ("right", STUD_X[1])):
-    EXPORT_FEATURES[f"stud_hole_{_side}"] = ExportFeature(
-        kind="hole",
-        faces=(CylinderFace(_STUD_DRILL, contains_x_mm=_x),),
-        requirements=("dia", "station", "height"),
-        fields={
-            "at": ([_x, STUD_Y, 0.0], ("STUD_X", "STUD_Y")),
-            "axis": _INTO_PLATE,
-            "drill": (STUD_SPEC.size, ("STUD_SPEC",)),
-            "dia": (
-                limits(STUD_DIA_PRINTED, STUD_DIA_PLACES, _DRILLED),
-                ("STUD_SPEC", "STUD_DIA_PRINTED", "STUD_DIA_PLACES"),
-            ),
-            "nominal_dia": (STUD_DIA_PRINTED, ("STUD_DIA_PRINTED",)),
-            "thru": (True, ("STUD_SPEC",)),
-            "station": (_station(_x), ("STUD_X", "STATION_PLACES")),
-            "station_nominal": (_x, ("STUD_X",)),
-            "height": (_station(STUD_Y), ("STUD_Y", "STATION_PLACES")),
-            "height_nominal": (STUD_Y, ("STUD_Y",)),
-            "height_from": ("table_face", ("__frame__",)),
-        },
-        precision={"dia": STUD_DIA_PLACES, "station": STATION_PLACES, "height": STATION_PLACES},
     )

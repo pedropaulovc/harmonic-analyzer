@@ -21,7 +21,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_reference_dimension
+from _drawing_dimensions import (
+    assert_imported_precision,
+    move_model_dimension,
+    set_reference_dimension,
+)
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -30,6 +34,11 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+import ch_rocker_arm_tl_filing_button_spec as part_spec
+from _feature_requirements import requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_filing_button_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -37,7 +46,7 @@ from ch_rocker_arm_tl_filing_button_spec import (
     REFERENCE_DIMENSIONS,
     SURFACE_FINISHES,
 )
-from draw_dt_cone_pivot_post_tl_cap_jaw_button import _move_dimension
+
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_filing_button"]
 PART_STEM = SPEC.artifact_stem
@@ -67,9 +76,75 @@ FACE_KEEP = {
     "BoreDia": (0.115, 0.240),
 }
 EDGE_XY = {"DiscDia": (0.165, 0.180)}
+
+
+_AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
+
+
+requirement("rim",
+    kind="boss",
+    faces=(CylinderFace(part_spec.OD),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": _AXIS,
+        "dia": (
+            limits(part_spec.OD, part_spec.OD_PLACES),
+            ("OD", "OD_PLACES", ("ch_rocker_arm_spec", "HUB_DIA")),
+        ),
+        "dia_nominal": (part_spec.OD, ("OD", ("ch_rocker_arm_spec", "HUB_DIA"))),
+    },
+    precision={"dia": part_spec.OD_PLACES},
+)
+
+requirement("bore",
+    kind="hole",
+    faces=(CylinderFace(part_spec.BORE_DIA),),
+    requirements=("note", "thru", "finish_ra"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": _AXIS,
+        "dia_nominal": (part_spec.BORE_DIA, ("BORE_DIA",)),
+        "thru": (True, ("BORE_DIA",)),
+        "note": (part_spec.BORE_FIT_NOTE, ("BORE_FIT_NOTE",)),
+        "finish_ra": (part_spec.MACHINED_UM, ("SURFACE_FINISHES",)),
+    },
+    precision={"finish_ra": 1},
+)
+
 EDGE_KEEP = {
     "DiscThick": (0.200, 0.235),
 }
+
+
+requirement("hub_seat_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("thickness",),
+    fields={
+        "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "thickness": (limits(part_spec.THICKNESS, part_spec.THICKNESS_PLACES), ("THICKNESS",)),
+        "thickness_nominal": (part_spec.THICKNESS, ("THICKNESS",)),
+    },
+    precision={"thickness": part_spec.THICKNESS_PLACES},
+)
+
+requirement("outer_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.THICKNESS),),
+    requirements=("thickness",),
+    fields={
+        "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part_spec.THICKNESS},
+            ("THICKNESS",),
+        ),
+        "thickness": (limits(part_spec.THICKNESS, part_spec.THICKNESS_PLACES), ("THICKNESS",)),
+    },
+    precision={"thickness": part_spec.THICKNESS_PLACES},
+)
+
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -120,7 +195,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         name = dimension_name(adapter, annotation)
         if name in EDGE_XY:
-            annotation = _move_dimension(
+            annotation = move_model_dimension(
                 adapter, annotation, edge, EDGE_XY[name], source_view=face
             )
         annotations.append(annotation)

@@ -66,6 +66,177 @@ def test_detector_does_not_treat_unbanded_f_strings_as_tolerances(value: str) ->
     assert drawing_specification_violations(f"LABEL = {value}\n") == ()
 
 
+@pytest.mark.parametrize(
+    ("imports", "call", "keyword", "is_requirement"),
+    (
+        ("from _feature_requirements import requirement", "requirement", "fields", True),
+        (
+            "from _feature_requirements import requirement as declare",
+            "BORE = declare",
+            "fields",
+            True,
+        ),
+        (
+            "import _feature_requirements as features",
+            "BORE: object = features.requirement",
+            "fields",
+            True,
+        ),
+        ("from _feature_requirements import part_metadata", "part_metadata", "fields", False),
+        (
+            "from _feature_requirements import part_metadata as declare",
+            "METADATA = declare",
+            "frames",
+            False,
+        ),
+        (
+            "import _feature_requirements as features",
+            "METADATA: object = features.part_metadata",
+            "datums",
+            False,
+        ),
+    ),
+)
+def test_detector_allows_spec_sourced_inline_declaration_data(
+    imports: str, call: str, keyword: str, is_requirement: bool
+) -> None:
+    note = (
+        'f"ISO 4762; {LOW:+.2f}/{part_spec.UPPER:+.2f}; '
+        'Ra {part_spec.FINISH:g}; engagement {part_spec.MINIMUM:.1f} min"'
+    )
+    value = note if keyword == "fields" else '{"label": ' + note + "}"
+    arguments = (
+        '"bore", kind="hole", faces=(CylinderFace(part_spec.DIA),), '
+        'requirements=("note",), '
+        if is_requirement
+        else ""
+    )
+    source = (
+        f"{imports}\n"
+        "from _gtol_cylinder import CylinderFace\n"
+        "from sample_spec import MINIMUM as LOW\n"
+        "import sample_spec as part_spec\n"
+        f'{call}({arguments}{keyword}={{"note": '
+        f'({value}, ("MINIMUM", ("other_spec", "UPPER")))}})\n'
+    )
+    assert drawing_specification_violations(source) == ()
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        '"3.0 MIN"',
+        'f"{LOCAL_MINIMUM:.1f} min"',
+        'f"{part_spec.MINIMUM:.1f} min / 9.0 max"',
+        'f"{part_spec.MINIMUM:.1f} min / {LOCAL_MINIMUM:.1f} max"',
+        'f"Ra 1.6; engagement {part_spec.MINIMUM:.1f} min"',
+        'f"+0.00/-{part_spec.MINIMUM:.2f}"',
+    ),
+)
+def test_declaration_sources_do_not_mask_local_manufacturing_values(value: str) -> None:
+    source = (
+        "from _feature_requirements import requirement\n"
+        "from _gtol_cylinder import CylinderFace\n"
+        "import sample_spec as part_spec\n"
+        "LOCAL_MINIMUM = 3.0\n"
+        'requirement("bore", kind="hole", faces=(CylinderFace(part_spec.DIA),), '
+        f'requirements=("note",), fields={{"note": ({value}, ("MINIMUM",))}})\n'
+    )
+    assert _rules(source) == ["drawing-spec-string"]
+
+
+@pytest.mark.parametrize(
+    ("imports", "scope", "keyword", "sources"),
+    (
+        ("", "", "fields", '("MINIMUM",)'),
+        ("from other_api import requirement", "", "fields", '("MINIMUM",)'),
+        (
+            "def unused():\n    from _feature_requirements import requirement",
+            "",
+            "fields",
+            '("MINIMUM",)',
+        ),
+        (
+            "from _feature_requirements import requirement",
+            "def build():\n    ",
+            "fields",
+            '("MINIMUM",)',
+        ),
+        (
+            "from _feature_requirements import requirement",
+            "class Drawing:\n    ",
+            "fields",
+            '("MINIMUM",)',
+        ),
+        ("from _feature_requirements import requirement", "", "fields", "()"),
+        ("from _feature_requirements import requirement", "", "fields", "(3,)"),
+        (
+            "from _feature_requirements import requirement",
+            "",
+            "precision",
+            '("MINIMUM",)',
+        ),
+    ),
+)
+def test_declaration_boundary_requires_module_level_api_and_sourced_data(
+    imports: str, scope: str, keyword: str, sources: str
+) -> None:
+    source = (
+        f"{imports}\n"
+        "from _gtol_cylinder import CylinderFace\n"
+        "import sample_spec as part_spec\n"
+        f'{scope}requirement("bore", kind="hole", '
+        "faces=(CylinderFace(part_spec.DIA),), "
+        f'requirements=("note",), {keyword}={{"note": '
+        f'(f"{{part_spec.MINIMUM:.1f}} min", {sources})}})\n'
+    )
+    assert _rules(source) == ["drawing-spec-string"]
+
+
+def test_declarations_do_not_exempt_outside_strings_or_native_drawing_code() -> None:
+    source = """
+from _feature_requirements import requirement, part_metadata
+from _drawing_common import add_attached_note
+from _gtol_cylinder import CylinderFace
+import sample_spec as part_spec
+
+DECLARED_NOTE = f"{part_spec.MINIMUM:.1f} min"
+CALLOUT = "3.0 MIN"
+requirement(
+    "bore", kind="hole", faces=(CylinderFace(part_spec.DIA),),
+    requirements=("note",), fields={"note": (DECLARED_NOTE, ("MINIMUM",))},
+)
+
+async def build(adapter):
+    add_attached_note(
+        adapter, view, text=f"{part_spec.MINIMUM:.1f} min",
+        note_xy=(0.1, 0.2), label="native note",
+    )
+    model_dimension.SetToleranceType(2)
+
+part_metadata(
+    fields={
+        "note": (
+            add_attached_note(
+                adapter, view, text=f"{part_spec.MINIMUM:.1f} min",
+                note_xy=(0.1, 0.2), label="native call inside declaration",
+            ),
+            ("MINIMUM",),
+        ),
+        "mutation": (model_dimension.SetToleranceType(2), ("MINIMUM",)),
+    },
+)
+"""
+    assert _rules(source) == [
+        "drawing-spec-string",
+        "drawing-spec-string",
+        "drawing-spec-string",
+        "drawing-tolerance-mutation",
+        "drawing-spec-string",
+        "drawing-tolerance-mutation",
+    ]
+
+
 def test_detector_rejects_literal_and_local_surface_finish_grades() -> None:
     source = """
 from _drawing_finish import add_surface_finish as finish

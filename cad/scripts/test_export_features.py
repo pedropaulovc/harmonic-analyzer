@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 import hashlib
+import importlib
+import importlib.util
 import math
+import sys
 import tomllib
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,14 +19,65 @@ from prechips.model import Features
 
 import export_features as exporter
 import _config
+import ch_pivot_shaft_spec as shaft
+import ch_rocker_arm_notes as rocker_notes
+import ch_rocker_arm_spec as rocker
+import dt_cone_pivot_post_spec as cone
+import rocker_bank_layout as bank
 from _export_feature_faces import FeatureFaceError, face_name
+from _feature_requirements import discover_parts, requirements_for
 from _gtol_face import FaceGeometry
 
 
-def _step(tmp_path: Path, stem: str) -> Path:
+def _requirement_calls(tree: ast.Module) -> list[ast.Call]:
+    calls: list[ast.Call] = []
+
+    def visit(node: ast.AST) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            return
+        if isinstance(node, ast.Call) and (
+            isinstance(node.func, ast.Name) and node.func.id == "requirement"
+            or isinstance(node.func, ast.Attribute) and node.func.attr == "requirement"
+        ):
+            calls.append(node)
+        for child in ast.iter_child_nodes(node):
+            visit(child)
+
+    visit(tree)
+    return calls
+
+
+def _fresh_draw(monkeypatch, stem: str):
+    import _session
+    from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
+
+    def refuse(*_args, **_kwargs):
+        pytest.fail("drawing import attempted a SolidWorks session or output write")
+
+    monkeypatch.setattr(_session, "run_build", refuse)
+    monkeypatch.setattr(PyWin32Adapter, "__init__", refuse)
+    monkeypatch.setattr(PyWin32Adapter, "connect", refuse)
+    monkeypatch.setattr(Path, "write_bytes", refuse)
+    monkeypatch.setattr(Path, "write_text", refuse)
+    name = f"draw_{stem}"
+    path = exporter.REPO / "cad" / "scripts" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, name, module)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _step_labels(stem: str) -> list[str]:
     labels = [face_name(feature, 1) for feature in exporter.feature_selectors(stem)]
     if stem == "ch_rocker_arm":
         labels.insert(0, face_name("pivot_bore", 1))
+    return labels
+
+
+def _step(tmp_path: Path, stem: str) -> Path:
+    labels = _step_labels(stem)
     rows = ["ISO-10303-21;", "HEADER;", "ENDSEC;", "DATA;"]
     rows += [f"#{index} = ADVANCED_FACE('{label}',(#1),#2,.T.);" for index, label in enumerate(labels, start=10)]
     rows += ["ENDSEC;", "END-ISO-10303-21;"]
@@ -49,6 +104,112 @@ def _owners(stem: str, geometry: FaceGeometry) -> list[str]:
     ]
 
 
+def test_supported_parts_are_derived_from_draw_requirement_calls() -> None:
+    scripts = exporter.REPO / "cad" / "scripts"
+    draws = tuple(scripts.glob("draw_*.py"))
+    assert draws, "no draw scripts scanned"
+    declared = {
+        path.stem.removeprefix("draw_")
+        for path in draws
+        if _requirement_calls(ast.parse(path.read_text(encoding="utf-8")))
+    }
+    assert declared, "no module-level requirement declarations found"
+    assert set(exporter.SUPPORTED_PARTS) == declared
+    assert discover_parts(scripts) == tuple(sorted(declared))
+
+
+def test_adding_a_draw_declaration_is_discovered_without_importing(tmp_path: Path) -> None:
+    path = tmp_path / "draw_synthetic_part.py"
+    original = (
+        "from _feature_requirements import requirement\n"
+        "from _gtol_cylinder import CylinderFace\n"
+        "raise RuntimeError('discovery must not import this drawing')\n"
+        "TEXT = \"requirement('not_a_declaration')\"\n"
+        "def drawing_helper():\n"
+        "    requirement('not_module_level', kind='hole', faces=(CylinderFace(5.0),),\n"
+        "                requirements=('dia',), fields={'dia': ([4.9, 5.1], ('BORE_DIA',))})\n"
+    )
+    path.write_text(original, encoding="utf-8")
+    assert discover_parts(tmp_path) == ()
+    path.write_text(
+        original
+        + "BORE = requirement('bore', kind='hole', faces=(CylinderFace(5.0),),\n"
+        + "                   requirements=('dia',), fields={'dia': ([4.9, 5.1], ('BORE_DIA',))})\n",
+        encoding="utf-8",
+    )
+    assert discover_parts(tmp_path) == ("synthetic_part",)
+    assert "draw_synthetic_part" not in sys.modules
+
+
+@pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
+def test_draw_declarations_supply_requirements_selectors_and_field_sources(stem: str) -> None:
+    draw = importlib.import_module(f"draw_{stem}")
+    declarations = requirements_for(draw)
+    features = exporter.requirement_manifest(stem)["features"]
+    selectors = exporter.feature_selectors(stem)
+    assert declarations, f"{draw.__name__} declares no requirements"
+    assert set(declarations) == set(features) == set(selectors)
+    path = Path(draw.__file__).resolve()
+    calls = _requirement_calls(ast.parse(path.read_text(encoding="utf-8")))
+    assert calls, f"{path.name} has no module-level requirement calls"
+    relative = path.relative_to(exporter.REPO).as_posix()
+    call_citations = {
+        f"harmonic-analyzer/{relative}:{call.lineno}-{call.end_lineno}"
+        for call in calls
+    }
+    spec = importlib.import_module(f"{stem}_spec")
+    for name, declared in declarations.items():
+        feature = features[name]
+        assert declared.name == name
+        assert feature["kind"] == declared.kind
+        assert feature["requirements"] == list(declared.requirements)
+        assert selectors[name] == declared.faces
+        assert declared.path == path
+        call_citation = f"harmonic-analyzer/{relative}:{declared.call_span[0]}-{declared.call_span[1]}"
+        assert call_citation in call_citations, (stem, name, call_citation)
+        for field, (value, sources) in declared.fields.items():
+            assert feature[field] == (list(value) if isinstance(value, tuple) else value), (stem, name, field)
+            citations = set(feature["cite"][field])
+            assert call_citation in citations, (stem, name, field, citations)
+            for source in sources:
+                module, symbol = (
+                    (importlib.import_module(source[0]), source[1])
+                    if isinstance(source, tuple) else (spec, source)
+                )
+                assert set(exporter._cite(module, symbol)) <= citations, (stem, name, field, source)
+
+
+@pytest.mark.parametrize("source", ["MISSING_TEST_DIMENSION", ("ch_rocker_arm_spec", "MISSING_TEST_DIMENSION")])
+def test_missing_citation_symbol_fails_instead_of_exporting_unsourced_requirements(monkeypatch, source) -> None:
+    draw = importlib.import_module("draw_ch_rocker_arm")
+    declared = requirements_for(draw)["rod_hole"]
+    value, sources = declared.fields["dia"]
+    monkeypatch.setitem(declared.fields, "dia", (value, (*sources, source)))
+    with pytest.raises(ValueError, match="MISSING_TEST_DIMENSION"):
+        exporter.requirement_manifest("ch_rocker_arm")
+
+
+@pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
+def test_draw_import_registers_declarations_without_starting_solidworks(monkeypatch, stem: str) -> None:
+    module = _fresh_draw(monkeypatch, stem)
+    assert requirements_for(module), f"{module.__name__}: import did not register declarations"
+    assert callable(module.build)
+
+
+def test_rocker_land_angle_band_centres_the_printed_zero_place_nominal(monkeypatch) -> None:
+    nominal = 89.6
+    monkeypatch.setattr(math, "degrees", lambda _value: nominal)
+    _fresh_draw(monkeypatch, "ch_rocker_arm")
+    features = exporter.requirement_manifest("ch_rocker_arm")["features"]
+    tolerance = float(exporter._config.title_block("angular")["value_deg"])
+    printed = round(nominal, 0)
+    for name in ("tip_land_pos_x", "tip_land_neg_x"):
+        assert features[name]["land_angle_nominal_deg"] == nominal
+        assert features[name]["precision"]["land_angle_deg"] == 0
+        assert features[name]["land_angle_deg"] == [printed - tolerance, printed + tolerance]
+        assert features[name]["land_angle_deg"] != [nominal - tolerance, nominal + tolerance]
+
+
 def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> None:
     manifest = exporter.requirement_manifest("ch-rocker-arm")
     features = manifest["features"]
@@ -63,11 +224,11 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
         assert features[name]["land_angle_deg"] == [89.0, 91.0]
         assert features[name]["precision"]["land_angle_deg"] == 0
         citations = features[name]["cite"]["land_angle_deg"]
-        assert exporter.SOURCE_MAP["angular"][0] in citations
+        assert "harmonic-analyzer/cad/config/title_block.yaml:angular.value_deg" in citations
         assert not any("linear_" in citation for citation in citations)
-        assert set(exporter._cite(exporter.rocker, "TIP_FACE", "TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "R_TOP", "CENTER_Y")) <= set(citations)
+        assert set(exporter._cite(rocker, "TIP_FACE", "TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "R_TOP", "CENTER_Y")) <= set(citations)
     assert manifest["material"]["thickness"] == 2.5
-    assert exporter._cite(exporter.rocker, "ARM_THICKNESS")[0] in manifest["material"]["cite"]
+    assert exporter._cite(rocker, "ARM_THICKNESS")[0] in manifest["material"]["cite"]
     # The strap's native 2.500 +/-0.025 (Main ruling 2026-10, option b).
     for name in ("strap_datum_b", "strap_faces"):
         assert features[name]["thickness"] == [2.475, 2.525]
@@ -94,12 +255,11 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
 
 
 def test_shaft_flats_are_coplanar_faces_named_by_their_stations() -> None:
-    shaft = exporter.shaft
     features = exporter.requirement_manifest("ch_pivot_shaft")["features"]
     selectors = exporter.feature_selectors("ch_pivot_shaft")
     flat_y = shaft.FLAT_AF - shaft.SHAFT_DIA / 2
     half_chord = shaft.flat_chord(shaft.FLAT_DEPTH) / 2
-    for side, station in zip(("south", "north"), exporter.bank.PIVOT_SHAFT_FLAT_STATIONS):
+    for side, station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS):
         name = f"{side}_flat"
         assert features[name]["kind"] == "face"
         assert features[name]["station_nominal"] == station
@@ -115,7 +275,6 @@ def test_shaft_flats_are_coplanar_faces_named_by_their_stations() -> None:
 
 def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_positive_tip() -> None:
     manifest = exporter.requirement_manifest("ch_rocker_arm")
-    rocker = exporter.rocker
     assert manifest["datums"]["A"]["feature"] == "pivot_bore"
     assert manifest["datums"]["B"]["feature"] == "strap_datum_b"
     assert manifest["datums"]["C"]["feature"] == "tip_land_pos_x"
@@ -138,7 +297,6 @@ def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_positive_
 
 
 def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
-    cone = exporter.cone
     manifest = exporter.requirement_manifest("dt_cone_pivot_post")
     features = manifest["features"]
     crank = features["crank_bore"]
@@ -192,10 +350,10 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
         cone.DRAWING_PRECISION_BY_NAME["MountWestX"]
     )
     selectors = exporter.feature_selectors("dt_cone_pivot_post")
-    for datum in exporter.cone.PART_DATUMS:
+    for datum in cone.PART_DATUMS:
         assert selectors[manifest["datums"][datum.letter]["feature"]] == (datum.face,)
     # A same-diameter face away from the drawing journal must not become A.
-    diameter = exporter.cone.BORE_DIA / 1000
+    diameter = cone.BORE_DIA / 1000
     remote = FaceGeometry(
         None,
         4002,
@@ -226,7 +384,7 @@ def test_shaft_axial_extents_tile_the_turned_axis() -> None:
     for below, above in zip(order, order[1:]):
         assert spans[below][1] == pytest.approx(spans[above][0]), (below, above)
     # The O.D. runs the whole cylinder; its named patch lies inside it.
-    assert spans["pivot_bearing"] == pytest.approx([-exporter.bank.PIVOT_SHAFT_LENGTH, 0.0])
+    assert spans["pivot_bearing"] == pytest.approx([-bank.PIVOT_SHAFT_LENGTH, 0.0])
     low, high = spans["pivot_bearing"]
     assert low < selectors["pivot_bearing"][0].contains_z_mm < high
     # Domes run from the end circle of the O.D. to the sphere's apex.
@@ -263,8 +421,8 @@ def test_cone_axial_extents_map_through_source_frames_onto_authored_faces() -> N
 
     foot, body_top = ends("body")
     head_base, head_top = ends("head")
-    assert head_base == pytest.approx([0.0, exporter.cone.HEAD_BASE_Y, 0.0])
-    assert head_top == pytest.approx([0.0, exporter.cone.BLOCK_HEIGHT, 0.0])
+    assert head_base == pytest.approx([0.0, cone.HEAD_BASE_Y, 0.0])
+    assert head_top == pytest.approx([0.0, cone.BLOCK_HEIGHT, 0.0])
     assert foot == pytest.approx([0.0, 0.0, 0.0]) and _on_plane(foot, selectors["foot_seat"][0])
     assert body_top == pytest.approx(head_base)
     assert _on_plane(head_top, selectors["head"][1])
@@ -280,7 +438,6 @@ def test_cone_axial_extents_map_through_source_frames_onto_authored_faces() -> N
 def test_turned_profile_resolves_only_spans_coaxial_with_its_setup() -> None:
     from prechips.rules.turned_profile import _axial_span
 
-    cone = exporter.cone
     manifest = exporter.requirement_manifest("dt_cone_pivot_post")
     features, frames = manifest["features"], manifest["frames"]
     # A spindle on the post axis facing the head top: setup +Z runs model -Y.
@@ -319,12 +476,22 @@ def test_raw_step_face_sets_and_values_satisfy_installed_consumer_schema(tmp_pat
     manifest = _load(path)
     loaded = Features.model_validate(manifest)
     if stem == "ch_rocker_arm":
-        assert loaded.features["pivot_bore"].faces == [
-            "#10/ADVANCED_FACE[1]/HAF_PIVOT_BORE__P01",
-            "#11/ADVANCED_FACE[2]/HAF_PIVOT_BORE__P01",
-        ]
-        assert loaded.features[loaded.datums["B"].feature].faces == ["#15/ADVANCED_FACE[6]/HAF_STRAP_DATUM_B__P01"]
-        assert loaded.features[loaded.datums["C"].feature].faces == ["#18/ADVANCED_FACE[9]/HAF_TIP_LAND_POS_X__P01"]
+        labels = _step_labels(stem)
+
+        def expected_faces(label: str) -> list[str]:
+            return [
+                f"#{ordinal + 9}/ADVANCED_FACE[{ordinal}]/{label}"
+                for ordinal, emitted_label in enumerate(labels, start=1)
+                if emitted_label == label
+            ]
+
+        pivot_faces = expected_faces("HAF_PIVOT_BORE__P01")
+        assert len(pivot_faces) == 2
+        assert loaded.features["pivot_bore"].faces == pivot_faces
+        for datum, label in (("B", "HAF_STRAP_DATUM_B__P01"), ("C", "HAF_TIP_LAND_POS_X__P01")):
+            datum_faces = expected_faces(label)
+            assert len(datum_faces) == 1
+            assert loaded.features[loaded.datums[datum].feature].faces == datum_faces
     assert loaded.step == step.name
     assert loaded.step_sha256 == hashlib.sha256(content).hexdigest()
     assert loaded.drawing.revision == "v40"
@@ -352,7 +519,7 @@ def test_writer_uses_supplied_revision_and_replaces_adjacent_manifest(tmp_path: 
     manifest = _load(path)
     assert manifest["drawing"]["revision"] == "v41"
     assert manifest["step_sha256"] == hashlib.sha256(step.read_bytes()).hexdigest() != old_digest
-    assert exporter.SOURCE_MAP["drawing_revision"][0] in manifest["drawing"]["cite"]
+    assert "harmonic-analyzer/cad/config/release.yaml:next_revision" in manifest["drawing"]["cite"]
 
 
 def test_missing_label_fails_before_installing_requirements(tmp_path: Path) -> None:
@@ -368,13 +535,13 @@ def test_unsupported_part_is_rejected_without_a_bundle(tmp_path: Path) -> None:
         exporter.write_manifest("unrelated_part", tmp_path / "missing.STEP", revision="v40")
 
 
-@pytest.mark.parametrize("stem,module", [("ch_rocker_arm", exporter.rocker_notes), ("ch_pivot_shaft", exporter.shaft), ("dt_cone_pivot_post", exporter.cone)])
+@pytest.mark.parametrize("stem,module", [("ch_rocker_arm", rocker_notes), ("ch_pivot_shaft", shaft), ("dt_cone_pivot_post", cone)])
 def test_construction_uses_the_actual_drawing_notes_and_explicit_permission(monkeypatch, stem, module) -> None:
     original = exporter.requirement_manifest(stem)
     assert original["construction"] == "one_piece"
     assert original["notes"]["manufacturing"] == module.DRAWING_NOTES.splitlines()
     citation = original["cite"]["construction"]
-    assert citation == exporter._cite(module, "DRAWING_NOTES")
+    assert set(exporter._cite(module, "DRAWING_NOTES")) <= set(citation)
     permission = "BUILT-UP CONSTRUCTION IS PERMITTED."
     monkeypatch.setattr(module, "BUILT_UP_PERMISSION_NOTE", permission, raising=False)
     with pytest.raises(ValueError, match="explicit text in DRAWING_NOTES"):
@@ -386,7 +553,8 @@ def test_construction_uses_the_actual_drawing_notes_and_explicit_permission(monk
     assert manifest["cite"]["construction"] == citation
 
 
-def test_emitted_yaml_citations_resolve_to_scalar_requirement_sources() -> None:
+@pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
+def test_all_emitted_citations_resolve_current_python_ast_and_yaml_scalar_sources(stem: str) -> None:
     def strings(value):
         if isinstance(value, str):
             yield value
@@ -396,22 +564,47 @@ def test_emitted_yaml_citations_resolve_to_scalar_requirement_sources() -> None:
         elif isinstance(value, list):
             for child in value:
                 yield from strings(child)
-    for stem in exporter.SUPPORTED_PARTS:
-        citations = set(strings(exporter.requirement_manifest(stem)))
-        yaml_citations = {
-            citation for citation in citations
-            if citation.startswith("harmonic-analyzer/") and ".yaml" in citation
-        }
-        dashed = stem.replace("_", "-")
-        assert f"harmonic-analyzer/cad/config/parts/{dashed}.yaml:{dashed}.number" in yaml_citations
-        for reference in yaml_citations:
-            filename, separator, key_path = reference.removeprefix("harmonic-analyzer/").partition(":")
-            assert separator and key_path, reference
-            value = yaml.safe_load((exporter.REPO / filename).read_text(encoding="utf-8"))
-            for key in key_path.split("."):
+
+    citations = {
+        citation for citation in strings(exporter.requirement_manifest(stem))
+        if citation.startswith("harmonic-analyzer/")
+    }
+    assert citations, f"{stem}: no citations emitted"
+    dashed = stem.replace("_", "-")
+    assert f"harmonic-analyzer/cad/config/parts/{dashed}.yaml:{dashed}.number" in citations
+    assert any(".py:" in citation for citation in citations), f"{stem}: no Python sources cited"
+    source_text = {}
+    python_spans = {}
+    yaml_documents = {}
+    for reference in citations:
+        filename, separator, location = reference.removeprefix("harmonic-analyzer/").partition(":")
+        assert separator and location, reference
+        path = exporter.REPO / filename
+        assert path.is_file(), f"{reference}: missing source file"
+        if path not in source_text:
+            source_text[path] = path.read_text(encoding="utf-8")
+        if path.suffix == ".yaml":
+            if path not in yaml_documents:
+                yaml_documents[path] = yaml.safe_load(source_text[path])
+            value = yaml_documents[path]
+            for key in location.split("."):
                 assert isinstance(value, dict) and key in value, f"{reference}: missing key {key!r}"
                 value = value[key]
             assert value is not None and not isinstance(value, (dict, list)), f"{reference}: not a scalar value"
+        elif path.suffix == ".py":
+            low, dash, high = location.partition("-")
+            assert low.isdecimal() and dash and high.isdecimal(), f"{reference}: invalid AST span"
+            span = int(low), int(high)
+            assert 1 <= span[0] <= span[1] <= len(source_text[path].splitlines()), reference
+            if path not in python_spans:
+                python_spans[path] = {
+                    (node.lineno, node.end_lineno)
+                    for node in ast.walk(ast.parse(source_text[path]))
+                    if hasattr(node, "lineno") and hasattr(node, "end_lineno")
+                }
+            assert span in python_spans[path], f"{reference}: not a current AST declaration/call span"
+        else:
+            pytest.fail(f"{reference}: unsupported citation source")
 
 
 class _GearProfileAdapter:

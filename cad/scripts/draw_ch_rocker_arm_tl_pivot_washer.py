@@ -33,6 +33,11 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import ch_rocker_arm_tl_pivot_washer_spec as part_spec
+from _feature_requirements import requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_pivot_washer_spec import (
     BORE_CALLOUT,
     DRAWING_DIMENSIONS,
@@ -61,9 +66,59 @@ FACE_KEEP = {
     # drawn through the centre.
     "BoreDia": (0.075, 0.145),
 }
+
+
+requirement("bore",
+    kind="hole",
+    faces=(CylinderFace(part_spec.BORE_DIA),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "dia": (
+            limits(part_spec.BORE_DIA, part_spec.PLACES, part_spec.BORE_BAND),
+            ("BORE_DIA", "BORE_BAND", ("ch_rocker_arm_tl_pivot_screw_spec", "SHOULDER_DIA")),
+        ),
+        "thru": (True, ("BORE_DIA",)),
+    },
+    precision={"dia": part_spec.PLACES},
+)
+
 EDGE_KEEP = {
     "Thick": (0.175, 0.105),
 }
+
+
+requirement("hub_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("thickness", "dia"),
+    fields={
+        "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "thickness": (limits(part_spec.THICK, part_spec.THICK_PLACES), ("THICK", "THICK_PLACES")),
+        "dia": (
+            limits(part_spec.OUTER_DIA, part_spec.OUTER_PLACES, part_spec.OUTER_BAND),
+            ("OUTER_DIA", "OUTER_BAND", ("ch_rocker_arm_spec", "HUB_DIA")),
+        ),
+        "process": ("face", ("DRAWING_NOTES",)),
+    },
+    precision={"thickness": part_spec.THICK_PLACES, "dia": part_spec.OUTER_PLACES},
+)
+
+requirement("head_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.THICK),),
+    requirements=("thickness",),
+    fields={
+        "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": part_spec.THICK}, ("THICK",)),
+        "thickness": (limits(part_spec.THICK, part_spec.THICK_PLACES), ("THICK", "THICK_PLACES")),
+        "process": ("face", ("DRAWING_NOTES",)),
+    },
+    precision={"thickness": part_spec.THICK_PLACES},
+)
+
 
 
 async def build(adapter: Any) -> dict[str, str]:

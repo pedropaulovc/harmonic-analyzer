@@ -6,7 +6,6 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     delete_view,
     dimension_name,
@@ -16,7 +15,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
-from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -26,18 +24,28 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    move_model_dimension,
+    set_dimension_callouts,
+)
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import dt_cone_pivot_post_tl_cap_jaw_button_spec as part_spec
+from _feature_requirements import requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from dt_cone_pivot_post_tl_cap_jaw_button_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     SPIGOT_CALLOUT,
 )
+
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_pivot_post_tl_cap_jaw_button"]
 PART_STEM = SPEC.artifact_stem
@@ -62,6 +70,39 @@ PROFILE_KEEP = {
     "FaceThick": (0.136, 0.222),
     "OverallLength": (0.140, 0.238),
 }
+
+
+_AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
+
+
+requirement("spigot_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.OVERALL_LENGTH),),
+    requirements=("length",),
+    fields={
+        "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "x", "value": part_spec.OVERALL_LENGTH},
+            ("OVERALL_LENGTH",),
+        ),
+        "length": (limits(part_spec.OVERALL_LENGTH, 1), ("OVERALL_LENGTH",)),
+        "length_nominal": (part_spec.OVERALL_LENGTH, ("OVERALL_LENGTH",)),
+    },
+    precision={"length": 1},
+)
+
+requirement("jaw_face",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
+    requirements=("thickness",),
+    fields={
+        "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("__frame__",)),
+        "thickness": (limits(part_spec.FACE_THICK, 1), ("FACE_THICK",)),
+    },
+    precision={"thickness": 1},
+)
+
 DONOR_KEEP = {
     "FaceDia": (0.055, 0.230),
     "SpigotDia": (0.055, 0.120),
@@ -72,38 +113,41 @@ PROFILE_DIAMETER_XY = {
 }
 
 
-def _move_dimension(
-    adapter: Any,
-    annotation: Any,
-    target: Any,
-    text_xy: tuple[float, float],
-    *,
-    source_view: Any,
-) -> Any:
-    """Move a native model dimension and verify its new drawing-view owner."""
-    name = dimension_name(adapter, annotation)
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, source_view)):
-        raise RuntimeError(f"{name}: failed to activate source dimension view")
-    draw.ClearSelection2(True)
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    selection_name = str(display.GetNameForSelection() or "")
-    if not selection_name or not draw.Extension.SelectByID2(
-        selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
-    drawing.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    matches = [
-        _early_bound(item, "IAnnotation")
-        for item in (_early_bound(target, "IView").GetAnnotations() or ())
-        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"{name}: native dimension did not move into target view")
-    return matches[0]
+requirement("spigot",
+    kind="boss",
+    faces=(CylinderFace(part_spec.SPIGOT_DIA),),
+    requirements=("dia", "note"),
+    fields={
+        "at": ([part_spec.FACE_THICK, 0.0, 0.0], ("FACE_THICK",)),
+        "axis": _AXIS,
+        "dia": (
+            limits(part_spec.SPIGOT_DIA, 2, part_spec.SPIGOT_BAND),
+            ("SPIGOT_DIA", "SPIGOT_BAND", ("dt_cone_pivot_post_spec", "BORE_DIA"),
+             ("dt_cone_pivot_post_spec", "RUNNING_BORE_BAND")),
+        ),
+        "dia_nominal": (part_spec.SPIGOT_DIA, ("SPIGOT_DIA",)),
+        "note": (part_spec.SPIGOT_CALLOUT, ("SPIGOT_CALLOUT", "POST_NUMBER")),
+    },
+    precision={"dia": 2},
+)
+
+requirement("cap_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.FACE_THICK),),
+    requirements=("thickness", "dia"),
+    fields={
+        "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "x", "value": part_spec.FACE_THICK}, ("FACE_THICK",)),
+        "thickness": (limits(part_spec.FACE_THICK, 1), ("FACE_THICK",)),
+        "thickness_nominal": (part_spec.FACE_THICK, ("FACE_THICK",)),
+        "dia": (
+            limits(part_spec.FACE_DIA, part_spec.FACE_PLACES),
+            ("FACE_DIA", ("dt_cone_pivot_post_spec", "CONE_BOSS_DIA")),
+        ),
+        "dia_nominal": (part_spec.FACE_DIA, ("FACE_DIA",)),
+    },
+    precision={"thickness": 1, "dia": part_spec.FACE_PLACES},
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -158,7 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     diameters = [
-        _move_dimension(
+        move_model_dimension(
             adapter,
             annotation,
             profile,

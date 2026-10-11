@@ -9,9 +9,22 @@ import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_c_stop_bar_spec as spec
 import draw_ch_rocker_arm_tl_c_stop_bar as drawing
 import export_features
+from _feature_requirements import requirements_for
 from _hole_spec import THREAD_MAJOR_MM
 
 STEM = "ch_rocker_arm_tl_c_stop_bar"
+
+
+def test_drawing_declarations_own_the_exported_requirements() -> None:
+    declared = requirements_for(drawing)
+    features = export_features.requirement_manifest(drawing.PART_STEM)["features"]
+    selectors = export_features.feature_selectors(drawing.PART_STEM)
+    assert declared
+    assert set(declared) == set(features) == set(selectors)
+    for name, declaration in declared.items():
+        assert declaration.kind == features[name]["kind"]
+        assert list(declaration.requirements) == features[name]["requirements"]
+        assert tuple(selectors[name]) == declaration.faces
 
 
 def _features() -> dict:

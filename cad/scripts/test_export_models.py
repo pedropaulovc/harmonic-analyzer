@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import hashlib
 import json
 import re
 import struct
 import os
 import sys
+import tomllib
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -1029,3 +1031,71 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
 
     with pytest.raises(FileNotFoundError, match="is missing but dt-cone-gear--t102"):
         export_models.assert_gallery_inputs_current(manifest)
+
+
+@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "ch_rocker_arm_tl_vise_stop"])
+def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
+    tmp_path: Path, monkeypatch, stem: str,
+) -> None:
+    import export_features
+    from _export_feature_faces import face_name
+
+    native = tmp_path / "sldprt" / f"{stem.replace('_', '-')}.SLDPRT"
+    native.parent.mkdir()
+    native.write_bytes(b"unchanged native part")
+    unrelated = tmp_path / "features" / "ch_rocker_arm" / "features.toml"
+    unrelated.parent.mkdir(parents=True)
+    unrelated.write_bytes(b"another leaf's independent manifest")
+    ledger = tmp_path / "stl" / "export-src.json"
+    ledger.parent.mkdir()
+    ledger.write_bytes(b"full export ledger stays untouched")
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    opened = []
+    closed = []
+
+    class Adapter:
+        currentModel = None
+        swApp = SimpleNamespace(CloseAllDocuments=lambda unsaved: closed.append(unsaved))
+
+        async def open_model(self, path):
+            opened.append(Path(path))
+            self.currentModel = Path(path)
+            return SimpleNamespace(is_success=True, data=None)
+
+        def _attempt(self, call, default=None):
+            return call()
+
+    def save_step(_doc, selected, step):
+        assert selected == stem
+        rows = [
+            f"#{index} = ADVANCED_FACE ( '{face_name(feature, 1)}', ( #100 ), #101, .T. ) ;"
+            for index, feature in enumerate(export_features.feature_selectors(selected), 1)
+        ]
+        step.write_text(
+            "ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n"
+            + "\n".join(rows) + "\nENDSEC;\nEND-ISO-10303-21;\n",
+            encoding="ascii",
+        )
+
+    monkeypatch.setattr(export_models, "OUT_SLDPRT", native.parent)
+    monkeypatch.setattr(export_models, "OUT_FEATURES", tmp_path / "features")
+    monkeypatch.setattr(export_models, "enforce_preferences", lambda *_args: None)
+    monkeypatch.setattr(export_models, "_save_feature_step", save_step)
+    monkeypatch.setattr(export_models._config, "release_revision", lambda: "v38")
+    monkeypatch.setattr(
+        export_models, "run_build", lambda build: (asyncio.run(build(Adapter())), 0)[1],
+    )
+    monkeypatch.setattr(sys, "argv", ["export_models.py", "--features", stem.replace("_", "-")])
+
+    assert export_models.main() == 0
+    manifest, step = export_features.bundle_paths(stem, tmp_path)
+    content = tomllib.loads(manifest.read_text(encoding="utf-8"))
+    assert content["step"] == step.name
+    assert content["step_sha256"] == hashlib.sha256(step.read_bytes()).hexdigest()
+    assert content["drawing"]["revision"] == "v38"
+    assert set(content["features"]) == set(export_features.feature_selectors(stem))
+    assert opened == [native]
+    assert closed == [True]
+    after = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    assert {path: after[path] for path in before} == before
+    assert set(after) - set(before) == {manifest, step}

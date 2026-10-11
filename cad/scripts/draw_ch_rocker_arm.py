@@ -27,6 +27,15 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 
+import _config
+import _surface_finish
+import ch_rocker_arm_notes as rocker_notes
+import ch_rocker_arm_spec as rocker
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import drilled_limits as _drilled_band
+from _printed_limits import limits as _band
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -98,6 +107,19 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
 # the top-arc tip (TOP_END_Y).
 _PIVOT_MID_Y = 8.0  # pivot bore centre = ArmDepth / 2
 _ROD_HOLE_DIA = blind_cut_dia_mm(ROD_HOLE_SPEC)
+
+_P = rocker_notes.DEFAULT_DRAWING_PRECISION
+_AXIS = ((0.0, 0.0, 1.0), ("__frame__",))
+_CENTRE = ([0.0, rocker.PIVOT_MID_Y, 0.0], ("PIVOT_MID_Y",))
+
+part_metadata(
+    fields={
+        "precision": (_P, (("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION"),)),
+        "material.thickness": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
+    },
+    model_sources=("ARM_THICKNESS", "HUB_LENGTH"),
+    precision_sources=(("ch_rocker_arm_notes", "DRAWING_PRECISION"), ("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION")),
+)
 _BBOX_CY = TOP_END_Y / 2.0
 
 FRONT_CENTER = (0.180, 0.175)
@@ -105,6 +127,20 @@ RIGHT_CENTER = (0.300, 0.165)
 ISO_CENTER = (0.345, 0.205)
 # The rod-pin position frame's top-left corner; it draws 7 mm tall.
 FCF_XY = (0.300, 0.195)
+
+ROD_HOLE = requirement(
+    "rod_hole", kind="hole", faces=(CylinderFace(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)),),
+    requirements=("at", "dia", "thru", "position_dia"), fields={
+        "at": ([rocker.ROD_HOLE_X, rocker.ROD_HOLE_Y, 0.0], ("ROD_HOLE_X", "ROD_HOLE_Y")),
+        "axis": _AXIS, "drill": (rocker.ROD_HOLE_SPEC.size, ("ROD_HOLE_SPEC",)),
+        "dia": (_drilled_band(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), _P), ("ROD_HOLE_SPEC", ("_hole_spec", "NUMBER_DRILL_MM"), ("_drawing_hole_callout", "add_native_hole_callout"))),
+        "nominal_dia": (blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), ("ROD_HOLE_SPEC", ("_hole_spec", "NUMBER_DRILL_MM"))),
+        "thru": (rocker.ROD_HOLE_SPEC.end == "through_all", ("ROD_HOLE_SPEC",)),
+        "position_dia": (float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]), ("GEOMETRIC_TOLERANCES_MM",)),
+        "position_datums": (["A", "B", "C"], ("GEOMETRIC_TOLERANCES_MM", ("_drawing_gdt", "add_feature_control_frame"))),
+        "dimension_type": ("basic", ("ROD_HOLE_X", "ROD_HOLE_Y")),
+    }, precision={"at": "unknown", "dia": _P, "position_dia": _P},
+)
 # The iso caption's top-left, under the iso's right half: below the FCF and
 # right of the end view. Beside the end view (0.315, 0.150) it read as that
 # view's label, 0.4 mm from HubLength's "+0.05" (r743-p1s-B2 render).
@@ -128,6 +164,47 @@ NOTES_MIN_LINE_PITCH = 0.0025
 # outward along the end radius -- where datum C (clocking) attaches.
 _TIP_FACE_MID_X = TOP_END_X + (TIP_FACE / 2.0) * (TOP_END_X / R_TOP)
 _TIP_FACE_MID_Y = TOP_END_Y - (TIP_FACE / 2.0) * math.cos(TOP_ARC_LEN / 2.0 / R_TOP)
+
+
+def _plane_between(
+    start: tuple[float, float], end: tuple[float, float],
+) -> PlanarFace:
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    normal = (-dy / length, dx / length, 0.0)
+    return PlanarFace(normal, normal[0] * start[0] + normal[1] * start[1])
+
+
+def _rocker_points() -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
+    top = (rocker.TOP_END_X, rocker.TOP_END_Y)
+    bottom = (rocker.BOT_END_X, rocker.CENTER_Y - math.sqrt(rocker.R_BOTTOM**2 - rocker.BOT_END_X**2))
+    tip = (rocker.ROD_TIP_X, rocker.TOP_END_Y + rocker.TIP_FACE * (rocker.TOP_END_Y - rocker.CENTER_Y) / rocker.R_TOP)
+    return top, tip, bottom
+
+
+_TOP, _TIP, _BOTTOM = _rocker_points()
+_RIGHT = (_plane_between(_TOP, _TIP), _plane_between(_TIP, _BOTTOM))
+_TIPS = tuple(PlanarFace((-face.normal[0], face.normal[1], 0.0), face.offset_mm) for face in _RIGHT)
+_LAND_ANGLE = math.degrees(math.acos(
+    sum((_TIP[i] - _TOP[i]) * _RIGHT[0].normal[i] for i in (0, 1)) / rocker.TIP_FACE
+))
+_ANGULAR = float(_config.title_block("angular")["value_deg"])
+
+for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x", -1, _TIPS[0])):
+    requirement(
+        _name, kind="face", faces=(_face,), requirements=("tip_land", "land_angle_deg"), fields={
+            "tip_land": (_band(rocker.TIP_FACE, _P), ("TIP_FACE",)),
+            "land_angle_deg": ([round(_LAND_ANGLE, 0) - _ANGULAR, round(_LAND_ANGLE, 0) + _ANGULAR], ("TIP_FACE", "TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "R_TOP", "CENTER_Y")),
+            "land_angle_nominal_deg": (_LAND_ANGLE, ("TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "TIP_FACE", "R_TOP", "CENTER_Y")),
+            "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
+            "top_edge_feature": ("top_edge", ("R_TOP",)),
+            **({"datum": ("C", ("TIP_FACE",))} if _sign == 1 else {}),
+        }, precision={"tip_land": _P, "land_angle_deg": 0},
+    )
+
+part_metadata(datums={
+    "C": ({"feature": "tip_land_pos_x", "surface": "rod-side (+X) radial tip land"}, ("TIP_FACE",)),
+})
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -172,6 +249,26 @@ PIVOT_PICK_ZOOM_HALF = 2.0 * PIVOT_HUB_SHEET_R
 # rim first, then a point further from the hub rim. Each result is recorded,
 # and a pick that never resolves to the bore fails the build.
 PIVOT_PICK_FRACTIONS = (1.0, 0.6)
+
+PIVOT_BORE = requirement(
+    "pivot_bore", kind="hole", faces=(CylinderFace(rocker.PIVOT_HOLE_DIA),),
+    requirements=("dia", "thru", "finish_ra", "process"), fields={
+        "at": _CENTRE, "axis": _AXIS,
+        "dia": (_band(rocker.PIVOT_HOLE_DIA, _P, rocker.PIVOT_HOLE_BAND), ("PIVOT_HOLE_DIA", "PIVOT_HOLE_BAND")),
+        "nominal_dia": (rocker.PIVOT_HOLE_DIA, ("PIVOT_HOLE_DIA",)),
+        "thru": (True, ("PIVOT_HOLE_DIA",)),
+        "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
+        "process": ("ream", ("PIVOT_HOLE_BAND",)), "datum": ("A", ("PIVOT_HOLE_DIA",)),
+    }, precision={"dia": _P, "finish_ra": 1},
+)
+
+part_metadata(
+    frames={
+        name: ({"origin": [0.0, rocker.PIVOT_MID_Y, sign * rocker.HUB_LENGTH / 2], "x": [1.0, 0.0, 0.0], "y": [0.0, float(sign), 0.0], "z": [0.0, 0.0, float(sign)], "binding": "unknown"}, ("PIVOT_MID_Y", "HUB_LENGTH"))
+        for name, sign in (("A", 1), ("B", -1))
+    },
+    datums={"A": ({"feature": "pivot_bore", "surface": "pivot bore cylinder"}, ("PIVOT_HOLE_DIA",))},
+)
 
 
 def _pivot_datum_request(centre: tuple[float, float]) -> tuple[float, float]:
@@ -277,6 +374,43 @@ FRONT_KEEP = {
     ),
 }
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
+
+_TOP_P = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
+TOP_EDGE = requirement(
+    "top_edge", kind="profile", faces=(CylinderFace(2 * rocker.R_TOP),),
+    requirements=("height_above_pivot", "radius", "arc_len"), fields={
+        "height_above_pivot": (_band(rocker.TOP_EDGE_ABOVE_PIVOT, _TOP_P, rocker.TOP_EDGE_BAND), ("TOP_EDGE_ABOVE_PIVOT", "TOP_EDGE_BAND")),
+        "height_from": ("pivot_bore", ("PIVOT_MID_Y",)),
+        "radius": (_band(rocker.R_TOP, _P), ("R_TOP",)), "radius_nominal": (rocker.R_TOP, ("R_TOP",)),
+        "arc_len": (_band(rocker.TOP_ARC_LEN, _P), ("TOP_ARC_LEN",)),
+        "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)),
+        "centre_from_pivot_ref": (rocker.CENTER_Y - rocker.PIVOT_MID_Y, ("CENTER_Y", "PIVOT_MID_Y")),
+        "end": (list(_TOP), ("TOP_END_X", "TOP_END_Y")),
+    }, precision={"height_above_pivot": _TOP_P, "radius": _P, "arc_len": _P},
+)
+PROFILE_OUTER = requirement(
+    "profile_outer", kind="profile", faces=(CylinderFace(2 * rocker.R_BOTTOM), _RIGHT[1], _TIPS[1]),
+    requirements=("bottom_radius", "bottom_arc_len", "mirror_symmetric"), fields={
+        "bottom_radius": (_band(rocker.R_BOTTOM, _P), ("R_BOTTOM",)),
+        "bottom_radius_nominal": (rocker.R_BOTTOM, ("R_BOTTOM",)),
+        "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", ("R_TOP",)),
+        "bottom_arc_len": (_band(rocker.BOT_ARC_LEN, _P), ("BOT_ARC_LEN",)),
+        "mirror_symmetric": (True, ("R_BOTTOM",)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
+        "bottom_end": (list(_BOTTOM), ("BOT_END_X", "R_BOTTOM", "CENTER_Y")),
+        "radial_tip_end": (list(_TIP), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
+    }, precision={"bottom_radius": _P, "bottom_arc_len": _P},
+)
+HUB_OD = requirement(
+    "hub_od", kind="boss", faces=(CylinderFace(rocker.HUB_DIA),),
+    requirements=("dia", "coaxiality_dia"), fields={
+        "at": _CENTRE, "axis": _AXIS,
+        "dia": (_band(rocker.HUB_DIA, _P), ("HUB_DIA",)),
+        "dia_nominal": (rocker.HUB_DIA, ("HUB_DIA",)),
+        "coaxiality_dia": (rocker_notes.HUB_COAXIALITY_DIA, (("ch_rocker_arm_notes", "HUB_COAXIALITY_DIA"),)),
+        "coaxial_to": ("pivot_bore", ("HUB_DIA",)),
+    }, precision={"dia": _P, "coaxiality_dia": _P},
+)
+
 # The hub length (+0.05/0, #743 PR2) under the end view, where the hub shows
 # its full length (the end view is 1:1, centred on the pivot mid-depth).
 # The strap thickness (+/-0.025, ARM_THICKNESS_BAND, Main ruling 2026-10
@@ -289,6 +423,41 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "HubLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - (_PIVOT_MID_Y + 12.0) / 1000.0),
     "StrapThickness": STRAP_THICKNESS_TEXT_XY,
 }
+
+_HUB_P = rocker_notes.DRAWING_PRECISION["Hub"]["HubLength"]
+_STRAP_P = rocker_notes.DRAWING_PRECISION["Strap"]["StrapThickness"]
+_STRAP_BAND = (_band(rocker.ARM_THICKNESS, _STRAP_P, rocker.ARM_THICKNESS_BAND), ("ARM_THICKNESS", "ARM_THICKNESS_BAND"))
+HUB_FACES = requirement(
+    "hub_faces", kind="face",
+    faces=tuple(PlanarFace((0, 0, sign), rocker.HUB_LENGTH / 2) for sign in (-1, 1)),
+    requirements=("length",), fields={
+        "length": (_band(rocker.HUB_LENGTH, _HUB_P, rocker.HUB_LENGTH_BAND), ("HUB_LENGTH", "HUB_LENGTH_BAND")),
+        "length_nominal": (rocker.HUB_LENGTH, ("HUB_LENGTH",)),
+        "upper_z": (rocker.HUB_LENGTH / 2, ("HUB_LENGTH",)),
+        "lower_z": (-rocker.HUB_LENGTH / 2, ("HUB_LENGTH",)),
+    }, precision={"length": _HUB_P},
+)
+STRAP_FACES = requirement(
+    "strap_faces", kind="face", faces=(PlanarFace((0, 0, -1), rocker.ARM_THICKNESS / 2),),
+    requirements=("thickness",), fields={
+        "thickness": _STRAP_BAND,
+        "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
+        "upper_z": (rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
+        "lower_z": (-rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
+    }, precision={"thickness": _STRAP_P},
+)
+STRAP_DATUM_B = requirement(
+    "strap_datum_b", kind="face", faces=(PlanarFace((0, 0, 1), rocker.ARM_THICKNESS / 2),),
+    requirements=("thickness",), fields={
+        "thickness": _STRAP_BAND,
+        "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
+        "plane": ({"frame": "model", "axis": "z", "value": rocker.ARM_THICKNESS / 2}, ("ARM_THICKNESS",)),
+        "datum": ("B", ("ARM_THICKNESS",)),
+    }, precision={"thickness": _STRAP_P},
+)
+part_metadata(datums={
+    "B": ({"feature": "strap_datum_b", "surface": "+Z broad strap face"}, ("ARM_THICKNESS",)),
+})
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 
 

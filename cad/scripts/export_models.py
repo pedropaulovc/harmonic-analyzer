@@ -44,8 +44,8 @@ export above can run on a SolidWorks farm worker that has no renderer:
     uv run python cad\\scripts\\export_models.py --comparisons
 
 ``--features <stem> ...`` is the separate feature-bundle producer
-(the doit ``package:features`` leaf). For each supported part it writes ONLY
-``cad/out/features/<stem>/<dashed>.STEP`` (the same named, default-configuration
+(the doit ``features:<stem>`` leaves, aggregated by ``package:features``).
+For each supported part it writes ONLY ``cad/out/features/<stem>/<dashed>.STEP`` (the same named, default-configuration
 ``SaveAs3`` export the full run writes to ``cad/out/step``) and an adjacent
 ``features.toml`` bound to those raw STEP bytes by ``export_features.write_manifest``.
 It never touches the global STEP/STL/PNG, colour, source-digest or release-neutral files:
@@ -86,7 +86,7 @@ from _preferences import (
 )  # noqa: E402
 from _session import run_build  # noqa: E402
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
-from _config import release_revision  # noqa: E402
+import _config  # noqa: E402
 from _export_feature_faces import FeatureFaceError, name_feature_faces, step_face_sets  # noqa: E402
 
 import _telemetry  # noqa: E402
@@ -100,7 +100,6 @@ OUT_SLDASM = CAD_ROOT / "out" / "sldasm"
 OUT_PNG = CAD_ROOT / "out" / "png"
 # ``--features`` owns features/<underscore-stem>/{<dashed>.STEP, features.toml}.
 OUT_FEATURES = CAD_ROOT / "out" / "features"
-FEATURES_MANIFEST = "features.toml"
 COLORS = OUT_STL / "colors.json"
 # Per-output source-recipe digests: ``mesh|dashed-assembly -> digest`` recorded at
 # export time so a re-export fires iff the SOURCE's recipe changed. Keyed on doit's
@@ -1474,7 +1473,7 @@ def export_feature_bundles(stems: list[str]) -> int:
     closes unsaved, and must leave its native byte-identical before the manifest
     reads and binds the just-written STEP. No global export output is touched.
     """
-    from export_features import write_manifest  # noqa: PLC0415
+    from export_features import bundle_paths, write_manifest  # noqa: PLC0415
 
     natives = {stem: OUT_SLDPRT / f"{stem.replace('_', '-')}.SLDPRT" for stem in stems}
     missing = sorted(path.name for path in natives.values() if not path.is_file())
@@ -1486,18 +1485,17 @@ def export_feature_bundles(stems: list[str]) -> int:
         done: dict[str, str] = {}
         for stem in stems:
             native = natives[stem]
-            bundle = OUT_FEATURES / stem
-            step = bundle / f"{stem.replace('_', '-')}.STEP"
+            manifest, step = bundle_paths(stem, OUT_FEATURES.parent)
             with _telemetry.span("export.feature_bundle", part=stem):
-                bundle.mkdir(parents=True, exist_ok=True)
-                (bundle / FEATURES_MANIFEST).unlink(missing_ok=True)
+                step.parent.mkdir(parents=True, exist_ok=True)
+                manifest.unlink(missing_ok=True)
                 native_sha = _file_sha256(native)
                 check(f"open {native.name}", await adapter.open_model(str(native)))
                 _save_feature_step(adapter.currentModel, stem, step)
                 log(f"saved {step.name} ({step.stat().st_size / 1e6:.1f} MB)")
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
                 _require_native_unchanged(native, native_sha)
-                write_manifest(stem, step, revision=release_revision())
+                write_manifest(stem, step, revision=_config.release_revision())
             done[stem] = "exported"
         return done
 

@@ -730,6 +730,93 @@ def _leaves_primary_precision(node: ast.Call) -> bool:
     )
 
 
+def _sourced_declaration_strings(tree: ast.Module) -> frozenset[ast.expr]:
+    """Locate inline data strings in module-level feature declarations.
+
+    ``requirement`` and ``part_metadata`` register cited manifest data beside
+    the drawing code; they do not print annotations or mutate model tolerances.
+    Recognize only the imported APIs and their explicit ``(value, sources)``
+    data pairs. Citation resolution remains the exporter's responsibility.
+    Do not follow aliases or calls inside a value: their strings still belong
+    to ordinary drawing code, even when its result is passed to a declaration.
+    """
+    apis = frozenset({"requirement", "part_metadata"})
+    direct: dict[str, str] = {}
+    modules: set[str] = set()
+    for statement in tree.body:
+        if isinstance(statement, ast.ImportFrom) and _module_is(
+            statement.module, "_feature_requirements"
+        ):
+            direct.update(
+                (alias.asname or alias.name, alias.name)
+                for alias in statement.names
+                if alias.name in apis
+            )
+        elif isinstance(statement, ast.Import):
+            modules.update(
+                alias.asname or alias.name.split(".")[-1]
+                for alias in statement.names
+                if _module_is(alias.name, "_feature_requirements")
+            )
+
+    def is_source(node: ast.expr) -> bool:
+        if isinstance(node, ast.Constant):
+            return isinstance(node.value, str) and bool(node.value)
+        return (
+            isinstance(node, ast.Tuple)
+            and len(node.elts) == 2
+            and all(
+                isinstance(item, ast.Constant)
+                and isinstance(item.value, str)
+                and bool(item.value)
+                for item in node.elts
+            )
+        )
+
+    def data_strings(value: ast.expr) -> Iterable[ast.expr]:
+        if isinstance(value, ast.JoinedStr) or (
+            isinstance(value, ast.Constant) and isinstance(value.value, str)
+        ):
+            yield value
+        elif isinstance(value, (ast.Dict, ast.List, ast.Tuple)):
+            children = value.values if isinstance(value, ast.Dict) else value.elts
+            for child in children:
+                yield from data_strings(child)
+
+    strings: set[ast.expr] = set()
+    for statement in tree.body:
+        if not isinstance(statement, (ast.Expr, ast.Assign, ast.AnnAssign)):
+            continue
+        call = statement.value
+        if not isinstance(call, ast.Call):
+            continue
+        function = call.func
+        api = direct.get(function.id) if isinstance(function, ast.Name) else None
+        if (
+            isinstance(function, ast.Attribute)
+            and isinstance(function.value, ast.Name)
+            and function.value.id in modules
+        ):
+            api = function.attr
+        if api not in apis:
+            continue
+        keywords = {"fields"} if api == "requirement" else {"fields", "frames", "datums"}
+        for keyword in call.keywords:
+            if keyword.arg not in keywords or not isinstance(keyword.value, ast.Dict):
+                continue
+            for pair in keyword.value.values:
+                if not isinstance(pair, ast.Tuple) or len(pair.elts) != 2:
+                    continue
+                value, sources = pair.elts
+                if (
+                    isinstance(sources, ast.Tuple)
+                    and sources.elts
+                    and all(is_source(source) for source in sources.elts)
+                ):
+                    strings.update(data_strings(value))
+    return frozenset(strings)
+
+
 def drawing_specification_violations(
     source: str, *, filename: str = "<string>"
 ) -> tuple[DrawingSpecificationViolation, ...]:
@@ -739,6 +826,11 @@ def drawing_specification_violations(
     scales, leader elbows, and table positions belong to the sheet.  The gate
     targets values that are rendered as tolerances/finish requirements or that
     mutate a drawing dimension's tolerance object.
+
+    Cited feature-declaration data is not a COM print operation. Within its
+    inline sourced-value pairs, spec-derived f-string fragments are permitted;
+    literal manufacturing numbers and local interpolations are still rejected.
+    All drawing/native calls remain checked, including calls in declarations.
     """
     tree = ast.parse(source, filename=filename)
     parent = {
@@ -746,6 +838,7 @@ def drawing_specification_violations(
     }
     docstrings = _docstring_nodes(tree)
     assignments = _simple_assignments(tree)
+    declaration_strings = _sourced_declaration_strings(tree)
     catalog_direct, catalog_modules = _surface_finish_imports(tree)
     part_spec_direct, part_spec_modules = _part_spec_imports(tree)
     reference_precision_names = _reference_precision_names(tree)
@@ -803,12 +896,38 @@ def drawing_specification_violations(
             )
             if (ra and not catalog_ra) or limits or bilateral or unilateral:
                 match = ra or limits or bilateral or unilateral
-                assert match is not None
-                add(
-                    node,
-                    "drawing-spec-string",
-                    repr(match.group(0).replace("\x00", "{...}")),
-                )
+                if node in declaration_strings and formatted and all(
+                    _part_spec_sourced(
+                        expression,
+                        direct=part_spec_direct,
+                        modules=part_spec_modules,
+                        assignments=assignments,
+                    )
+                    for expression in formatted
+                ):
+                    # Only interpolated spec values cross the data boundary.
+                    # Check every fragment so a sourced MIN cannot mask a
+                    # frozen MAX later in the same declaration string.
+                    match = next(
+                        (
+                            fragment
+                            for pattern in (
+                                _RA_FRAGMENT,
+                                _LIMIT_FRAGMENT,
+                                _BILATERAL_FRAGMENT,
+                                _UNILATERAL_FRAGMENT,
+                            )
+                            for fragment in pattern.finditer(rendered)
+                            if any(character.isdigit() for character in fragment.group(0))
+                        ),
+                        None,
+                    )
+                if match is not None:
+                    add(
+                        node,
+                        "drawing-spec-string",
+                        repr(match.group(0).replace("\x00", "{...}")),
+                    )
 
         if isinstance(node, ast.Call):
             if _call_is(node, "add_surface_finish", surface_direct, surface_modules):

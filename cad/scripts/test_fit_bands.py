@@ -292,19 +292,19 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed for the symmetric rod-pin coordinate tolerance and position budget"
     ),
     ("ch_rocker_arm_tl_profile_fixture_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for drilled-hole inspection limits"
+        "indexed by _printed_limits.limits for drilled-hole inspection limits"
     ),
     ("ch_rocker_arm_tl_vise_stop_spec", "SCREW_LENGTH_BAND"): (
         "indexed for the ISO 4762 screw's minimum engagement and maximum protrusion"
     ),
     ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for the stud-drill inspection limits"
+        "indexed by _printed_limits.limits for the stud-drill inspection limits"
     ),
     ("ch_rocker_arm_tl_c_stop_bar_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for screw-hole inspection limits"
+        "indexed by _printed_limits.limits for screw-hole inspection limits"
     ),
     ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for tap-drill inspection limits"
+        "indexed by _printed_limits.limits for tap-drill inspection limits"
     ),
     ("ch_rocker_arm_tl_filing_button_spec", "BORE_BAND"): (
         "matched-fit design intent, indexed by filing_stud_spec for bore clearance"

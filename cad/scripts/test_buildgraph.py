@@ -1756,10 +1756,16 @@ def test_config_files_subset_of_known_tokens():
     """Every real script resolves to known tokens (concrete files that exist, or
     the machine/* | tolerances/* | parts/* | title_block | ** dynamic tokens). The set can only
     NARROW the old whole-config dep, never invent a missing-file dependency."""
-    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**"}
-    for stem in part_stems():
-        for tok in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"):
-            assert tok in globs or (bg.CONFIG_DIR / tok).is_file(), f"{stem}: {tok}"
+    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
+    scripts = [
+        *bg.part_scripts(),
+        *(script_for(stem) for stem in ASSEMBLY_ORDER),
+        *SCRIPTS_DIR.glob("draw_*.py"),
+        SCRIPTS_DIR / "export_features.py",
+    ]
+    for script in scripts:
+        for tok in config_files_of(script):
+            assert tok in globs or (bg.CONFIG_DIR / tok).is_file(), f"{script.name}: {tok}"
 
 
 def test_config_files_conservative_on_unknown_use():
@@ -2635,3 +2641,63 @@ def test_interference_contracts_do_not_depend_on_magnifier_fit_or_pose() -> None
 def test_reads_title_block_geometry_covers_root_and_closure(script, expected):
     assert bg.reads_title_block_geometry(SCRIPTS_DIR / script) is expected
 
+
+def test_feature_declarations_stay_out_of_all_native_build_closures():
+    """Manifest-only edits must never cascade through native part/assembly recipes."""
+    forbidden = {"_feature_requirements", "_printed_limits", "export_features"}
+    for script in [*bg.part_scripts(), *(script_for(stem) for stem in ASSEMBLY_ORDER)]:
+        closure = {Path(path).stem for path in module_deps_of(script)}
+        assert not closure & forbidden, (script.name, closure & forbidden)
+        assert not any(name.startswith("draw_") for name in closure), script.name
+
+
+def test_generic_feature_driver_closure_contains_no_discovered_part_draw_or_spec():
+    """Import-free discovery cannot become an all-part recipe dependency."""
+    import export_features
+
+    closure = {Path(path).name for path in module_deps_of(SCRIPTS_DIR / "export_features.py")}
+    assert "_feature_requirements.py" in closure
+    for stem in export_features.SUPPORTED_PARTS:
+        assert f"draw_{stem}.py" not in closure
+        assert f"{stem}_spec.py" not in closure
+
+
+def test_features_source_closures_preserve_draw_and_spec_config_reads():
+    import export_features
+
+    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
+    for stem in export_features.SUPPORTED_PARTS:
+        sources = {path.resolve() for path in export_features.source_paths(stem)}
+        drawing = (SCRIPTS_DIR / f"draw_{stem}.py").resolve()
+        spec = (SCRIPTS_DIR / f"{stem}_spec.py").resolve()
+        assert {drawing, spec} <= sources, stem
+        assert {Path(path).resolve() for path in module_deps_of(drawing)} <= sources, stem
+        assert {
+            path.name for path in sources if path.name.startswith("draw_")
+        } == {drawing.name}, stem
+        for source in sources:
+            if source.suffix == ".py":
+                for token in config_files_of(source):
+                    assert token in globs or (bg.CONFIG_DIR / token).is_file(), (stem, source, token)
+
+
+def test_requirement_declarations_do_not_read_title_block_geometry():
+    script = SCRIPTS_DIR / "_feature_requirements.py"
+    assert script.stem not in bg.TITLE_BLOCK_GEOMETRY_MODULES
+    assert not bg.reads_title_block_geometry(script)
+    assert "title_block" not in config_files_of(script)
+
+
+@pytest.mark.parametrize("module", ["_printed_limits", "_printed_tolerance"])
+def test_numeric_tolerance_title_block_readers_are_classified(module):
+    script = SCRIPTS_DIR / f"{module}.py"
+    assert script.stem in bg.TITLE_BLOCK_GEOMETRY_MODULES
+    assert bg.reads_title_block_geometry(script)
+    assert "title_block" in config_files_of(script)
+
+
+def test_feature_exporter_revision_call_keeps_config_analysis_classifiable():
+    """A bare from-_config import must not widen every features leaf to '**'."""
+    exporter = SCRIPTS_DIR / "export_models.py"
+    assert bg._config_tokens_in_source(exporter) == frozenset({"release.yaml"})
+    assert "**" not in config_files_of(exporter)

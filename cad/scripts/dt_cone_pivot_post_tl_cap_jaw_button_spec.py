@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import _config
 import dt_cone_pivot_post_spec as post
-from _feature_requirements import ExportFeature, limits
-from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
+from _printed_tolerance import printed_deviations
 
 # Face (the jaw-to-cap spacer) and spigot (the centring stub). Both axial
 # sizes print from the faced jaw face: the shoulder and the overall length.
@@ -46,11 +44,14 @@ SPIGOT_CALLOUT = f"ENTERS {POST_NUMBER}\nCONE PIVOT POST\nJOURNAL BORE BY HAND"
 # the post's print accepts; at its smallest and shifted the other way it still
 # covers the bore edge, so the shoulder always lands on the annulus.
 FACE_PLACES = 1
-_FACE_MIN, _FACE_MAX = limits(FACE_DIA, FACE_PLACES)
+_FACE_MIN, _FACE_MAX = [round(FACE_DIA + deviation, 12) for deviation in printed_deviations(FACE_DIA, FACE_PLACES)]
 _FLOAT_MAX = (post.BORE_DIA + post.RUNNING_BORE_BAND[0]) - (SPIGOT_DIA + SPIGOT_BAND[1])
-CONE_BOSS_MIN = limits(
-    post.CONE_BOSS_DIA, post.DRAWING_PRECISION["ConeBossProfile"]["ConeBossDia"]
-)[0]
+CONE_BOSS_MIN = round(
+    post.CONE_BOSS_DIA + printed_deviations(
+        post.CONE_BOSS_DIA, post.DRAWING_PRECISION["ConeBossProfile"]["ConeBossDia"]
+    )[0],
+    12,
+)
 if _FACE_MAX / 2.0 + _FLOAT_MAX / 2.0 >= CONE_BOSS_MIN / 2.0:
     raise AssertionError("cap jaw-button face can overhang the cone boss cap")
 if _FACE_MIN / 2.0 - _FLOAT_MAX / 2.0 <= (post.BORE_DIA + post.RUNNING_BORE_BAND[0]) / 2.0:
@@ -79,66 +80,3 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
 
-_AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
-EXPORT_FEATURES: dict[str, ExportFeature] = {
-    "spigot": ExportFeature(
-        kind="boss",
-        faces=(CylinderFace(SPIGOT_DIA),),
-        requirements=("dia", "note"),
-        fields={
-            "at": ([FACE_THICK, 0.0, 0.0], ("FACE_THICK",)),
-            "axis": _AXIS,
-            "dia": (
-                limits(SPIGOT_DIA, 2, SPIGOT_BAND),
-                ("SPIGOT_DIA", "SPIGOT_BAND", ("dt_cone_pivot_post_spec", "BORE_DIA"),
-                 ("dt_cone_pivot_post_spec", "RUNNING_BORE_BAND")),
-            ),
-            "dia_nominal": (SPIGOT_DIA, ("SPIGOT_DIA",)),
-            "note": (SPIGOT_CALLOUT, ("SPIGOT_CALLOUT", "POST_NUMBER")),
-        },
-        precision={"dia": 2},
-    ),
-    "spigot_end": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((1.0, 0.0, 0.0), OVERALL_LENGTH),),
-        requirements=("length",),
-        fields={
-            "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
-            "plane": (
-                {"frame": "model", "axis": "x", "value": OVERALL_LENGTH},
-                ("OVERALL_LENGTH",),
-            ),
-            "length": (limits(OVERALL_LENGTH, 1), ("OVERALL_LENGTH",)),
-            "length_nominal": (OVERALL_LENGTH, ("OVERALL_LENGTH",)),
-        },
-        precision={"length": 1},
-    ),
-    "cap_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((1.0, 0.0, 0.0), FACE_THICK),),
-        requirements=("thickness", "dia"),
-        fields={
-            "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "x", "value": FACE_THICK}, ("FACE_THICK",)),
-            "thickness": (limits(FACE_THICK, 1), ("FACE_THICK",)),
-            "thickness_nominal": (FACE_THICK, ("FACE_THICK",)),
-            "dia": (
-                limits(FACE_DIA, FACE_PLACES),
-                ("FACE_DIA", ("dt_cone_pivot_post_spec", "CONE_BOSS_DIA")),
-            ),
-            "dia_nominal": (FACE_DIA, ("FACE_DIA",)),
-        },
-        precision={"thickness": 1, "dia": FACE_PLACES},
-    ),
-    "jaw_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((-1.0, 0.0, 0.0), 0.0),),
-        requirements=("thickness",),
-        fields={
-            "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("__frame__",)),
-            "thickness": (limits(FACE_THICK, 1), ("FACE_THICK",)),
-        },
-        precision={"thickness": 1},
-    ),
-}

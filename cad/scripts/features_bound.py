@@ -71,10 +71,7 @@ def _face_labels(faces: dict[str, list[str]]) -> FaceLabels:
 def _validated_files(out: Path) -> tuple[tuple[Path, bytes], ...]:
     pending: list[tuple[Path, bytes]] = []
     for stem in export_features.SUPPORTED_PARTS:
-        dashed = stem.replace("_", "-")
-        directory = out / "features" / stem
-        step_path = directory / f"{dashed}.STEP"
-        manifest_path = directory / "features.toml"
+        manifest_path, step_path = export_features.bundle_paths(stem, out)
         full_path = out / "step" / step_path.name
         step_bytes = _read(step_path)
         manifest_bytes = _read(manifest_path)

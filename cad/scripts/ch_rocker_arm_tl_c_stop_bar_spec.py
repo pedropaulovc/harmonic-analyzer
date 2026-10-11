@@ -24,9 +24,6 @@ from __future__ import annotations
 import math
 
 import ch_rocker_arm_spec as rocker
-from _feature_requirements import ExportFeature, limits
-from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
@@ -133,98 +130,3 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = "NO NICKS, BURRS OR STAMPING ON THE TOP FACE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
-_Z = [0.0, 0.0, 1.0]
-EXPORT_FEATURES: dict[str, ExportFeature] = {
-    "c_stop_top": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 1.0, 0.0), BAR_HEIGHT),),
-        requirements=("height", "length", "width"),
-        fields={
-            "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": BAR_HEIGHT}, ("BAR_HEIGHT",)),
-            "height": (
-                limits(BAR_HEIGHT, 3, BAR_HEIGHT_BAND),
-                ("BAR_HEIGHT", "BAR_HEIGHT_BAND"),
-            ),
-            "height_nominal": (BAR_HEIGHT, ("BAR_HEIGHT",)),
-            "length_nominal": (BAR_LENGTH, ("BAR_LENGTH",)),
-            "width_nominal": (BAR_WIDTH, ("BAR_WIDTH",)),
-            "length": (
-                limits(BAR_LENGTH, 1),
-                ("BAR_LENGTH", "C_LAND_X0", ("ch_rocker_arm_spec", "TIP_FACE")),
-            ),
-            "width": (
-                limits(BAR_WIDTH, 1),
-                ("BAR_WIDTH", ("ch_rocker_arm_spec", "ARM_THICKNESS")),
-            ),
-        },
-        precision={"height": 3, "length": 1, "width": 1},
-    ),
-    "base_seat": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
-        requirements=("height",),
-        fields={
-            "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
-            "height": (
-                limits(BAR_HEIGHT, 3, BAR_HEIGHT_BAND),
-                ("BAR_HEIGHT", "BAR_HEIGHT_BAND"),
-            ),
-        },
-        precision={"height": 3},
-    ),
-    "box_face_seat": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
-        requirements=("width",),
-        fields={
-            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-            "width": (limits(BAR_WIDTH, 1), ("BAR_WIDTH",)),
-        },
-        precision={"width": 1},
-    ),
-    **{
-        f"screw_hole_{side}": ExportFeature(
-            kind="hole",
-            faces=(CylinderFace(CLEARANCE_DIA, contains_x_mm=x),),
-            requirements=("station", "height", "dia", "thru"),
-            fields={
-                "at": ([x, SCREW_Y, BAR_WIDTH], ("SCREW_X", "SCREW_Y", "BAR_WIDTH")),
-                "axis": (_Z, ("__frame__",)),
-                "station": (limits(x, 2, SCREW_POSITION_BAND), ("SCREW_X", "SCREW_POSITION_BAND")),
-                "station_nominal": (x, ("SCREW_X",)),
-                "height": (limits(SCREW_Y, 2, SCREW_POSITION_BAND), ("SCREW_Y", "SCREW_POSITION_BAND")),
-                "height_nominal": (SCREW_Y, ("SCREW_Y",)),
-                "dia_nominal": (CLEARANCE_DIA, ("CLEARANCE_DIA",)),
-                "dia": (
-                    limits(CLEARANCE_DIA, 2, DRILLED_BAND),
-                    ("CLEARANCE_DIA", "DRILLED_BAND", "SCREW_HOLE_SPEC"),
-                ),
-                "thru": (True, ("SCREW_HOLE_SPEC",)),
-            },
-            precision={"station": 2, "height": 2, "dia": 2},
-        )
-        for side, x in zip(("left", "right"), SCREW_X, strict=True)
-    },
-    **{
-        f"screw_hole_{side}_counterbore": ExportFeature(
-            kind="counterbore",
-            faces=(
-                CylinderFace(CBORE_DIA, contains_x_mm=x),
-                PlanarFace((0.0, 0.0, 1.0), BAR_WIDTH - CBORE_DEPTH, contains_x_mm=x),
-            ),
-            requirements=("dia", "depth"),
-            fields={
-                "parent": (f"screw_hole_{side}", ("SCREW_HOLE_SPEC",)),
-                "dia": (limits(CBORE_DIA, 2), ("CBORE_DIA", "SCREW_HOLE_SPEC")),
-                "dia_nominal": (CBORE_DIA, ("CBORE_DIA",)),
-                "depth": (limits(CBORE_DEPTH, 2), ("CBORE_DEPTH", "SCREW_HOLE_SPEC")),
-                "depth_ref": (CBORE_DEPTH, ("CBORE_DEPTH",)),
-            },
-            precision={"dia": 2, "depth": 2},
-        )
-        for side, x in zip(("left", "right"), SCREW_X, strict=True)
-    },
-}

@@ -14,6 +14,13 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+import _surface_finish
+import ch_pivot_shaft_spec as shaft
+import rocker_bank_layout as bank
+from _feature_requirements import requirement
+from _printed_limits import limits as _band
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
 from _check import check
 from _com import _early_bound, _read_member
 from _drawing_centerline import add_view_centerline
@@ -106,6 +113,24 @@ def _left_of_witness(witness_x: float, callout: str) -> float:
 # the south flat is the same cut (FlatProfile), placed by its own station.
 FLATS_CALLOUT = "2X"
 
+_P = shaft.DRAWING_PRECISION_BY_NAME
+for _side, _station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, strict=True):
+    _dimension = f"{_side.capitalize()}FlatStation"
+    requirement(
+        f"{_side}_flat", kind="face",
+        faces=(PlanarFace((0, 1, 0), shaft.FLAT_AF - shaft.SHAFT_DIA / 2, contains_z_mm=-_station),),
+        requirements=("height", "length", "station"), fields={
+            "height": (_band(shaft.FLAT_AF, _P["FlatAF"]), ("FLAT_AF",)),
+            "height_nominal": (shaft.FLAT_AF, ("FLAT_AF",)),
+            "height_from": ("pivot_bearing", ("FLAT_AF",)),
+            "length": (_band(shaft.FLAT_LENGTH, _P["FlatLength"]), ("FLAT_LENGTH",)),
+            "length_nominal": (shaft.FLAT_LENGTH, ("FLAT_LENGTH",)),
+            "station": (_band(_station, _P[_dimension]), ("NORTH_FLAT_STATION", ("rocker_bank_layout", "PIVOT_SHAFT_FLAT_STATIONS"))),
+            "station_nominal": (_station, ("NORTH_FLAT_STATION", ("rocker_bank_layout", "PIVOT_SHAFT_FLAT_STATIONS"))),
+            "plane": ({"frame": "model", "axis": "y", "value": shaft.FLAT_AF - shaft.SHAFT_DIA / 2}, ("FLAT_AF", "SHAFT_DIA")),
+        }, precision={"height": _P["FlatAF"], "length": _P["FlatLength"], "station": _P[_dimension]},
+    )
+
 PROFILE_KEEP = {
     # Under the bar, centred: the REF span the cut-to-fit callout governs.
     "ShaftLength": (PROFILE_CENTER[0], 0.158),
@@ -114,6 +139,21 @@ PROFILE_KEEP = {
     # The south flat's station from the north end, across the whole bar.
     "SouthFlatStation": (PROFILE_CENTER[0], 0.242),
 }
+
+PIVOT_BEARING = requirement(
+    "pivot_bearing", kind="shaft", faces=(shaft.SURFACE_FINISHES[0].face,),
+    requirements=("dia", "finish_ra"), fields={
+        "at": ([0.0, 0.0, shaft.BODY_PROBE_Z_MM], ("BODY_PROBE_Z_MM",)),
+        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "dia": (_band(shaft.SHAFT_DIA, _P["ShaftDia"], shaft.SHAFT_DIA_BAND), ("SHAFT_DIA", "SHAFT_DIA_BAND")),
+        "dia_nominal": (shaft.SHAFT_DIA, ("SHAFT_DIA",)),
+        "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
+        "length_ref": (bank.PIVOT_SHAFT_LENGTH, ("LENGTH_CALLOUT", ("rocker_bank_layout", "PIVOT_SHAFT_LENGTH"))),
+        "note": (shaft.LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
+        # Nominal turned-axis extent, not the cut-to-fit length requirement.
+        "z_mm": ([round(-bank.PIVOT_SHAFT_LENGTH, 12), 0.0], (("rocker_bank_layout", "PIVOT_SHAFT_LENGTH"),)),
+    }, precision={"dia": _P["ShaftDia"], "finish_ra": 1},
+)
 
 # DETAIL A: the north flat (5.0 x 0.5 deep), its station and the dome are
 # 1.5-5 mm features. At 1:1 their dimensions crammed the north end, text on
@@ -176,6 +216,27 @@ DETAIL_KEEP = {
         DETAIL_CENTER[1] + 0.022,
     ),
 }
+
+for _name, _z, _centre in (
+    ("north_dome", 0.0, shaft.DOME_HEIGHT - shaft.DOME_SPHERE_RADIUS),
+    ("south_dome", -bank.PIVOT_SHAFT_LENGTH, -bank.PIVOT_SHAFT_LENGTH + shaft.DOME_SPHERE_RADIUS - shaft.DOME_HEIGHT),
+):
+    requirement(
+        _name, kind="dome", faces=(SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, _centre)),),
+        requirements=("height",), fields={
+            "height": (_band(shaft.DOME_HEIGHT, _P["DomeHeight"]), ("DOME_HEIGHT",)),
+            "height_nominal": (shaft.DOME_HEIGHT, ("DOME_HEIGHT",)),
+            "sphere_radius": (shaft.DOME_SPHERE_RADIUS, ("DOME_SPHERE_RADIUS",)),
+            "base_radius": (shaft.SHAFT_DIA / 2, ("SHAFT_DIA",)),
+            "base_z": (_z, ("__frame__",) if _name == "north_dome" else (("rocker_bank_layout", "PIVOT_SHAFT_LENGTH"),)),
+            "note": (shaft.DOME_CALLOUT, ("DOME_CALLOUT",)),
+            "z_mm": (
+                [0.0, round(shaft.DOME_HEIGHT, 12)] if _name == "north_dome"
+                else [round(_z - shaft.DOME_HEIGHT, 12), round(_z, 12)],
+                ("DOME_HEIGHT", ("rocker_bank_layout", "PIVOT_SHAFT_LENGTH")),
+            ),
+        }, precision={"height": _P["DomeHeight"]},
+    )
 # Ra on the running face: the body the 20 hubs rock on and the two ears
 # journal. A revolved flank is a drawing SILHOUETTE, not a model edge, so the
 # pick names that entity type; the straight leader keeps off the geometry.

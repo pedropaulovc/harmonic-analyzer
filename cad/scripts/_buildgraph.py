@@ -2077,6 +2077,11 @@ def config_files_of(script: Path) -> frozenset[str]:
     they read. Returns ``frozenset({"**"})`` if any source uses ``_config``
     unclassifiably or fails to parse -- so doit over-rebuilds rather than ever
     skipping a real change.
+
+    Runtime-loaded requirement declarations are deliberately not discovered here:
+    features:<stem> callers enumerate only source_paths(stem) and analyze each
+    Python source's closure. Following every discovered drawing from the generic
+    exporter would make one declaration edit invalidate every feature leaf.
     """
     sources = [_resolved(script), *(Path(p) for p in module_deps_of(script))]
     tokens: set[str] = set()
@@ -2314,6 +2319,7 @@ def stamps_title_block_properties(script: Path) -> bool:
 # a stamper or a drawing script is listed here (test_dodo_recipe pins it).
 TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
+        "_printed_limits",
         "_printed_tolerance",
         "vn_boss_hook_spec",
         "build_dt_drive_train_assembly",
