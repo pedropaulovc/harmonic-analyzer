@@ -14,8 +14,9 @@ at its tightest phase), with symmetric half-range terms combined by RSS:
 
 * running runout: the cone and the drum each ``TOOTH_RUNOUT_TIR_MM`` about
   their bores, so the centre swings +/- TIR about its mean;
-* T120 set phase, feeler leaf step, T120 tip and drum root as cut: the T120
-  setting error, through the swing (x r);
+* T120 set phase, feeler leaf step, and the T120 tip and drum root at their
+  printed limits (tip bands and the drum's cutter plunge): the T120 setting
+  error, through the swing (x r);
 * pivot translation (x (1 - r)): the platform's reamed pivot bore on the
   stock shoulder, the base seat's position to the pedestal seats, the #10-24
   thread centring and the arbor's running float in the pedestal bores. The
@@ -37,11 +38,12 @@ import dt_arbor_pedestal_spec as pedestal
 import dt_cone_gear_spec as cone
 import dt_cone_swing_platform_pivot_spec as platform
 import dt_cylinder_gear_shaft_spec as arbor
+import dt_cylinder_gear_spec as drum
 import vn_cone_pivot_screw_spec as pivot_screw
 from cone_pitch import SEAT_PITCH
 from dt_cone_pivot_post_installation import GEAR_AXIS_SHIFT
 from dt_cylinder_gear_spec import BORE_DIAMETRAL_CLEARANCE_MM as DRUM_SEAT_CLEARANCE
-from dt_cylinder_gear_spec import ROOT_ENVELOPE_DIA_MM, TEETH as DRUM_TEETH
+from dt_cylinder_gear_spec import TEETH as DRUM_TEETH
 from fr_harmonic_base_spec import PIVOT_SEAT_POSITION_BAND_MM
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
@@ -68,11 +70,6 @@ PIVOT_TRANSLATION_MM = math.sqrt(
 )
 CONE_SEAT_FLOAT_MM = GEAR_SEAT_CLEARANCE[1] / 2.0
 DRUM_SEAT_FLOAT_MM = DRUM_SEAT_CLEARANCE[1] / 2.0
-T120_SET_MM = math.sqrt(
-    (TOOTH_RUNOUT_TIR_MM / 2.0) ** 2 + SET_FEELER_READING_MM**2
-    + ((cone.blank_dia_band(120)[0] - cone.blank_dia_band(120)[1]) / 2.0) ** 2
-    + ((ROOT_ENVELOPE_DIA_MM[1] - ROOT_ENVELOPE_DIA_MM[0]) / 4.0) ** 2
-)
 
 
 def pivot_distance_mm(teeth: int) -> float:
@@ -122,9 +119,38 @@ def cone_centre(teeth: int) -> ConeCentre:
     return ConeCentre(teeth, r, tuple(terms))
 
 
+def _printed_radius_limits_mm(corners, attribute_min: str, attribute_max: str) -> tuple[float, float]:
+    return (
+        min(getattr(profile, attribute_min) for profile in corners),
+        max(getattr(profile, attribute_max) for profile in corners),
+    )
+
+
+# The T120 set is a feeler between the T120 tip and the drum root as both are
+# cut, so the setting reads off their printed limits (cutter plunge and tip
+# bands, all four corners each), referred to their midpoints. Booking only the
+# nominal root shape left out the drum's 0.05 plunge and its tip band (code
+# review of #1272).
+T120_TIP_RADIUS_LIMITS_MM = _printed_radius_limits_mm(
+    cone.manufacturing_corner_profiles(120), "blank_radius_mm", "blank_radius_mm",
+)
+DRUM_ROOT_RADIUS_LIMITS_MM = _printed_radius_limits_mm(
+    drum.manufacturing_corner_profiles(), "root_radius_min_mm", "root_radius_max_mm",
+)
+T120_SET_MM = math.sqrt(
+    (TOOTH_RUNOUT_TIR_MM / 2.0) ** 2 + SET_FEELER_READING_MM**2
+    + ((T120_TIP_RADIUS_LIMITS_MM[1] - T120_TIP_RADIUS_LIMITS_MM[0]) / 2.0) ** 2
+    + ((DRUM_ROOT_RADIUS_LIMITS_MM[1] - DRUM_ROOT_RADIUS_LIMITS_MM[0]) / 2.0) ** 2
+)
+
+
 def feeler_gap_mm(teeth: int) -> float:
-    """The radial set reading at a cone: its printed tip to the drum's mid
-    root, with the swing at the set centre (the T120 feeler, and the shim at
-    T012 and T120 while the pedestals are snug-loose)."""
+    """The radial set reading at a cone: its tip to the drum's root, both at
+    the middle of their printed limits, with the swing at the set centre (the
+    T120 feeler, and the shim at T012 and T120 while the pedestals are
+    snug-loose)."""
+    tip = _printed_radius_limits_mm(
+        cone.manufacturing_corner_profiles(teeth), "blank_radius_mm", "blank_radius_mm",
+    )
     return (standard_centre_mm(teeth) + SET_ABOVE_STANDARD_MM
-            - cone.outside_dia_mm(teeth) / 2.0 - sum(ROOT_ENVELOPE_DIA_MM) / 4.0)
+            - sum(tip) / 2.0 - sum(DRUM_ROOT_RADIUS_LIMITS_MM) / 2.0)
