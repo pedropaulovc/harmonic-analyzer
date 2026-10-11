@@ -35,6 +35,39 @@ def test_reducer_centre_sits_inside_its_derived_window() -> None:
     assert "contact ratio" in " ".join(mesh.reducer_mesh(35.183).failures())
 
 
+@pytest.mark.parametrize("field", [
+    "contact_ratio_min", "backlash_low", "backlash_high",
+    "root_clearance_min_mm", "root_clearance_floor_mm", "interference_margin_min_mm",
+])
+def test_an_undefined_mesh_number_fails_closed(field: str) -> None:
+    good = mesh.reducer_mesh()
+    values = {
+        "label": good.label,
+        "contact_ratio_min": good.contact_ratio_min,
+        "backlash_mm": good.backlash_mm,
+        "root_clearance_min_mm": good.root_clearance_min_mm,
+        "root_clearance_floor_mm": good.root_clearance_floor_mm,
+        "interference_margin_min_mm": good.interference_margin_min_mm,
+    }
+    if field.startswith("backlash"):
+        low, high = good.backlash_mm
+        values["backlash_mm"] = (math.nan, high) if field.endswith("low") else (low, math.nan)
+    else:
+        values[field] = math.nan
+    with pytest.raises(ValueError, match="not a finite number"):
+        mesh.MeshCheck(**values).require()
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf])
+def test_mesh_entry_points_reject_non_finite_inputs(bad: float) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        mesh.feed_rack_mesh((bad, bad))
+    with pytest.raises(ValueError, match="finite"):
+        mesh.feed_rack_mesh(extra_opening_mm=bad)
+    with pytest.raises(ValueError, match="finite"):
+        mesh.reducer_mesh(bad)
+
+
 def test_reducer_formulas_reduce_to_the_standard_mesh() -> None:
     # At the standard centre the operating angle is the cutting angle, so
     # standard-thickness teeth (half the circular pitch) have zero backlash.

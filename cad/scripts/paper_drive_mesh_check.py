@@ -57,7 +57,22 @@ class MeshCheck:
     interference_margin_min_mm: float
 
     def failures(self) -> list[str]:
-        problems = []
+        # Every gate below is an ordered comparison, which NaN passes; an
+        # undefined number is a failure, never a pass.
+        values = {
+            "contact ratio": self.contact_ratio_min,
+            "tight backlash": self.backlash_mm[0],
+            "loose backlash": self.backlash_mm[1],
+            "root clearance": self.root_clearance_min_mm,
+            "root clearance floor": self.root_clearance_floor_mm,
+            "interference margin": self.interference_margin_min_mm,
+        }
+        problems = [
+            f"{name} is not a finite number ({value!r})"
+            for name, value in values.items() if not math.isfinite(value)
+        ]
+        if problems:
+            return problems
         if self.contact_ratio_min < CONTACT_RATIO_FLOOR:
             problems.append(
                 f"contact ratio {self.contact_ratio_min:.3f} < {CONTACT_RATIO_FLOOR}"
@@ -131,6 +146,8 @@ def feed_rack_mesh(
     pin's drop when it is set with travel left).
     """
     low, high = backlash_band_mm
+    if not all(math.isfinite(value) for value in (low, high, extra_opening_mm)):
+        raise ValueError("feed rack mesh inputs must be finite")
     radius = feed.PITCH_DIA / 2.0
     pitch = math.pi * feed.MODULE_MM * math.cos(_FEED_PA)
     interference_depth = radius * math.sin(_FEED_PA) ** 2
@@ -223,6 +240,8 @@ def reducer_mesh(centre_distance_mm: float = disc.CENTRE_DISTANCE) -> MeshCheck:
     root clearance and the interference points at the tight centre with the
     largest tips.
     """
+    if not math.isfinite(centre_distance_mm):
+        raise ValueError("reducer centre distance must be finite")
     pinions = knob.manufactured_profiles()
     discs = disc.manufactured_profiles()
     shift = reducer_runout_shift_mm()
