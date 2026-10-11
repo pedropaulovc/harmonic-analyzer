@@ -474,6 +474,12 @@ flutes = 2
 point_angle = { value = 118, measured = { by = "example (plausible, not measured)", date = "2026-10-05", instrument = "drill point gauge" } }
 flute_len_mm = { value = 49.2, measured = { by = "example (plausible, not measured)", date = "2026-10-05", instrument = "calipers" } }
 oal_mm = { value = 73.0, measured = { by = "example (plausible, not measured)", date = "2026-10-05", instrument = "calipers" } }
+# Chain-drill speed and feed (rocker S3:30). prechips#185: a chain_drill rough_profile is looked
+# up as an end-mill "profile" row, so the drilling data rides on the member as its chart (read
+# before any cutting-data row). feed_mm_min = rpm x 2 flutes x chip load = rpm x feed per rev.
+chart = "LMS Cutting Speeds, Drilling & Reaming table, row Plain carbon steels (1006...1018...1026): drilling 60-100 ft/min, low end 60 used (https://littlemachineshop.com/pages/cutting-speeds); UF MAE Design Lab Speeds and Feeds, table Recommended Feed Rates for 2 Flute HSS & Carbide Drills, row 1/8 to 1/4 in: 0.002-0.004 in/rev (https://web.mae.ufl.edu/designlab/Advanced%20Manufacturing/Speeds%20and%20Feeds/Speeds%20and%20Feeds.htm); AUTHOR'S CHOICE 0.001 in/rev = 0.0254 mm/rev, half the low end, because each chain hole leaves only a 0.75 mm web to the previous one and a light feed keeps the point from walking into it; / 2 flutes = 0.0127 mm/tooth"
+sfm = 60.0
+chip_load_mm_per_tooth = 0.0127
 
 [tools.drill-index-115.members."#29".projection_mm]
 "drill-chuck-r8" = { value = 52.4, measured = { by = "example (plausible, not measured)", date = "2026-10-05", instrument = "steel rule, chuck nose to drill point" } }
@@ -507,6 +513,10 @@ flutes = 2
 point_angle = { value = 118, measured = { by = "example (plausible, not measured)", date = "2026-10-05", instrument = "drill point gauge" } }
 flute_len_mm = { value = 40.5, measured = { by = "example (plausible, not measured)", date = "2026-10-05", instrument = "calipers" } }
 oal_mm = { value = 63.5, measured = { by = "example (plausible, not measured)", date = "2026-10-05", instrument = "calipers" } }
+# Chain-drill speed and feed (rocker S3:20), as for #29 above (prechips#185).
+chart = "LMS Cutting Speeds, Drilling & Reaming table, row Plain carbon steels (1006...1018...1026): drilling 60-100 ft/min, low end 60 used (https://littlemachineshop.com/pages/cutting-speeds); UF MAE Design Lab Speeds and Feeds, table Recommended Feed Rates for 2 Flute HSS & Carbide Drills, row Under 1/8 in: up to 0.002 in/rev (https://web.mae.ufl.edu/designlab/Advanced%20Manufacturing/Speeds%20and%20Feeds/Speeds%20and%20Feeds.htm); AUTHOR'S CHOICE 0.001 in/rev = 0.0254 mm/rev, half the table's limit, for the 1.33 mm web to the previous chain hole; / 2 flutes = 0.0127 mm/tooth"
+sfm = 60.0
+chip_load_mm_per_tooth = 0.0127
 
 [tools.drill-index-115.members."#33".projection_mm]
 "drill-chuck-r8" = { value = 42.9, measured = { by = "example (plausible, not measured)", date = "2026-10-05", instrument = "steel rule, chuck nose to drill point" } }
