@@ -2424,9 +2424,12 @@ def test_keeper_facing_note_hangs_under_the_keeper_callout_clear_of_all_ink() ->
         y,
     )
     ink = drawing.INK_CLEARANCE
-    # Flush with RD4's left edge, a clearance under its shoulder row.
+    # Flush with RD4's left edge, a clearance under the native leader
+    # shoulder, which sits below the estimated box: all leader ink is above.
     assert note[0] == pytest.approx(callout_box[0])
-    assert callout_box[1] - note[3] == pytest.approx(ink + drawing.ROUND_OUT)
+    shoulder = callout[1] - drawing.KEEPER_CALLOUT_SHOULDER_DROP
+    assert shoulder <= callout_box[1]
+    assert shoulder - note[3] == pytest.approx(ink + drawing.ROUND_OUT)
     frame = drawing.SHEET_FRAME
     assert frame[0] + ink <= note[0] < note[2] <= frame[2] - ink
     assert frame[1] + ink <= note[1] < note[3] <= frame[3] - ink

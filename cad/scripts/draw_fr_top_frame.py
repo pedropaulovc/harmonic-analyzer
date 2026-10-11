@@ -330,6 +330,12 @@ KEEPER_CALLOUT_EXTENT = (
 # about 2.6 mm per character on a 5.1 mm row (farm 30394c1da: its
 # 70-character line spans 30 -> 208 mm).
 KEEPER_FACING_NOTE_HEIGHT = 0.0035
+# Native SolidWorks centres the four-row RD4 block on its callout point and
+# lands the leader on an underline below the bottom row, 11.15 mm under that
+# point (HOLES-SOCKETS, farm 9e13b1b78 and b51258927: rows 91.7 -> 112.0 mm
+# about a 101.85 mm point, leader shoulder at 90.7 mm), not on the estimated
+# extent's bottom.  Rounded outward; the facing note hangs under it.
+KEEPER_CALLOUT_SHOULDER_DROP = 0.0112
 
 
 def _keeper_leader_angle(
@@ -1487,12 +1493,16 @@ def keeper_callout_placement(
 
 def keeper_facing_note_xy(callout: Point) -> Point:
     """Top-left of the keeper-rail facing note, in sheet m: under RD4 at
-    ``callout``, flush with its left edge, an ink clearance below the row
-    its shoulder underlines, so the faced rail top and the taps it seats
-    read together.  The leader leaves that shoulder up-left, away from it.
+    ``callout``, flush with its estimated left edge, an ink clearance below
+    the native leader shoulder that underlines its bottom row, so the faced
+    rail top and the taps it seats read together.  The leader leaves that
+    shoulder up-left, away from it.
     """
-    left, down, _right, _up = KEEPER_CALLOUT_EXTENT
-    return (callout[0] - left, callout[1] - down - INK_CLEARANCE - ROUND_OUT)
+    left = KEEPER_CALLOUT_EXTENT[0]
+    return (
+        callout[0] - left,
+        callout[1] - KEEPER_CALLOUT_SHOULDER_DROP - INK_CLEARANCE - ROUND_OUT,
+    )
 
 
 def cap_seat_finish_placement(tip: Point, entry: Point) -> Point:
