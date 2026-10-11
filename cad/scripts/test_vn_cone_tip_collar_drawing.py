@@ -120,6 +120,12 @@ def test_full_thread_counts_male_and_female_incomplete_ends():
     assert spec.SET_SCREW_HOLE.depth_mm == spec.TAP_DRILL_DEPTH
     assert spec.SET_SCREW_HOLE.overrides_mm["ThreadDepth"] == spec.TAP_FULL_DEPTH
     assert spec.TAP_DRILL_DEPTH > spec.TAP_FULL_DEPTH
+    # Shallowest drill still runs one pitch past the deepest full thread,
+    # both at the title block's .XX (machinist review: 7.09 vs 7.31).
+    shallowest_drill = spec.TAP_DRILL_DEPTH - spec.ROUTINE_BAND_MM
+    deepest_thread = spec.TAP_FULL_DEPTH + spec.ROUTINE_BAND_MM
+    assert shallowest_drill - deepest_thread >= spec.SET_SCREW_PITCH
+    assert spec.WORST_WALLS_MM["blind drill to opposite OD"] >= spec.WALL_TARGET_MM
     bore_max = spec.BORE_FINISHED_DIA_LIMITS_MM[1]
     land_min = lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0]
     float_max = (bore_max - land_min) / 2.0
@@ -714,12 +720,27 @@ def test_native_cylinder_positive_control_uses_actual_property_and_finite_axis(m
 
 
 def test_manufacturing_bore_datum_uses_the_real_in_band_native_radius():
-    source = inspect.getsource(drawing)
-    assert '(spec.BORE_MODEL_DIA_MM / 2.0, 1.0, 0.0), "collar bore datum"' in source
-    assert '(spec.BORE_DIA / 2.0, 1.0, 0.0), "collar bore datum"' not in source
-    builder = inspect.getsource(part.build)
-    assert '"InstalledShaftAxis"' in builder
-    assert "-spec.INSTALLED_BORE_AXIS_OFFSET_MM" in builder
+    # A attaches on the bore's native surface, at the in-band model diameter.
+    x, _, z = drawing.DATUM_A_MODEL_MM
+    assert math.hypot(x, z) == pytest.approx(spec.BORE_MODEL_DIA_MM / 2.0)
+    low, high = spec.BORE_FINISHED_DIA_LIMITS_MM
+    assert low <= spec.BORE_MODEL_DIA_MM <= high
+    # Machinist review of the stack build: on the 4:1 end view the tag read
+    # as pointing at the bore centre. On the 40:1 bore view the leader lands
+    # on the bore surface and the tag stands level with it, outside the crop.
+    numerator, denominator = spec.BORE_VIEW_SCALE
+    surface = spec.BORE_MODEL_DIA_MM / 2.0 * numerator / denominator / 1000.0
+    view = object()
+    for side in (-1.0, 1.0):
+        edge = (drawing.BORE_CENTER[0] + side * surface, drawing.BORE_CENTER[1])
+        placement = drawing.datum_a_placement(view, edge)
+        assert placement.view is view
+        assert placement.attachment_xy == edge
+        assert placement.position[1] == edge[1]
+        reach = abs(placement.position[0] - drawing.BORE_CENTER[0])
+        assert reach == pytest.approx(surface + drawing.DATUM_A_LEADER_M)
+        assert reach > drawing.bore_crop_radius_m()
+        assert 0.0 < placement.position[0] < 0.420
 
 
 def test_custom_body_is_smallest_printed_od_retaining_existing_wall_target():
