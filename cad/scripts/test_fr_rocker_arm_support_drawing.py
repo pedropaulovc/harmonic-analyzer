@@ -486,11 +486,11 @@ def test_bracket_seats_sit_under_the_bracket_holes() -> None:
     assert seats.SEAT_SPEC.depth_mm == seats.SEAT_DRILL_DEPTH == 18.0
     assert seats.SEAT_SPEC.overrides_mm == {"ThreadDepth": seats.SEAT_THREAD_DEPTH}
     assert seats.SEAT_THREAD_DEPTH == 14.7
-    assert len(seats.SEAT_MACHINE_XZ) == len(sides.CONFIGURATIONS) == 2
+    assert len(seats.SEAT_MACHINE_XZ) == len(sides.SIDES) == 2
     assert [z for _, z in seats.SEAT_MACHINE_XZ] == pytest.approx(
         [
-            sides.MOUNT_Z[name] + sides.OUTBOARD_SIGN[name] * sides.HOLE_Z[name]
-            for name in sides.CONFIGURATIONS
+            sides.MOUNT_Z[name] + sides.OUTBOARD_SIGN[name] * sides.HOLE_Z
+            for name in sides.SIDES
         ]
     )
     assert {x for x, _ in seats.SEAT_MACHINE_XZ} == {placement.SUPPORT_WORLD_X}

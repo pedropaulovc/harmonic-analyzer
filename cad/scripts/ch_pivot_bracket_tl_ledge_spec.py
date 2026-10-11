@@ -18,8 +18,7 @@ its back face (the face that seats on the upright). +X along the ledge, +Y up,
 It is the angle plate's model frame translated by
 (PLATE_LENGTH/2 - LEDGE_WIDTH/2, BLOCK_HEIGHT, 0), so the inventory's fixture
 frame (bracket plan setup frame TC) is
-TC = (x - LEDGE_WIDTH/2, -z, y + BLOCK_HEIGHT - (PLATE_HEIGHT + PART_PROUD[c]))
-for bracket configuration c (both stand on this one ledge).
+TC = (x - LEDGE_WIDTH/2, -z, y + BLOCK_HEIGHT - (PLATE_HEIGHT + PART_PROUD)).
 """
 
 from __future__ import annotations
@@ -38,7 +37,7 @@ from _printed_tolerance import drilled_oversize_mm
 # general tolerance; its ends stay clear of the bridge's stud nuts.
 LEDGE_WIDTH = 22.6
 LEDGE_THICK = bracket.FOOT_H  # 6.0
-# 26.9, under the shorter S foot at the stack's worst case (angle-plate spec)
+# 26.9, under the bracket's foot at the stack's worst case (angle-plate spec)
 LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)
 SIZE_PLACES = 1
 if LEDGE_WIDTH < bracket.FOOT_W:

@@ -12,9 +12,10 @@ bottoming-tapped seat in the support's top face, transferred from the set
 bracket at assembly (the south bracket is blade-set off the preload spring's
 washer, so its seat cannot be cast or pre-drilled).
 
-The brackets' feet run outboard to the support's end faces (user-approved
-sketch, 2026-10-09), so each seat lies over the window's side edge: the post
-outboard, the central web and its R6.35 pocket-corner fillet inboard. Under
+The brackets' feet run outboard toward the support's end faces (user-approved
+sketch, 2026-10-09; the one MHA-CH-008 ends flush with the south end face and
+short of the north one, #1341), so each seat lies over the window's side edge:
+the post outboard, the central web and its R6.35 pocket-corner fillet inboard. Under
 the top rail (the source casting's 6.35, no longer deepened as #743 had it)
 the seat runs down the web column, which the cavity (|x| < 63.5) never
 reaches, so the drill point has cast iron under it to the window bottom. What
@@ -44,7 +45,7 @@ from _hole_spec import (
     THREAD_MAJOR_MM,
     HoleSpec,
 )
-from ch_pivot_bracket_sides import CONFIGURATIONS, HOLE_MACHINE_Z
+from ch_pivot_bracket_sides import HOLE_MACHINE_Z, SIDES
 from fr_rocker_arm_support_section_spec import HALF_Y
 from fr_rocker_arm_support_spec import SUPPORT_WORLD_X, SUPPORT_WORLD_Z
 
@@ -87,9 +88,7 @@ WEB_PLACES = 2
 # Machine (x, z) of the two seats, south bracket first: each under its
 # bracket's one hold-down hole, on the support's centreline (the brackets sit
 # on it, and each hole is on the bracket's x = 0).
-SEAT_MACHINE_XZ = tuple(
-    (SUPPORT_WORLD_X, HOLE_MACHINE_Z[name]) for name in CONFIGURATIONS
-)
+SEAT_MACHINE_XZ = tuple((SUPPORT_WORLD_X, HOLE_MACHINE_Z[name]) for name in SIDES)
 # The support is turned +90 deg about machine Y: local X -> machine -Z and
 # local Z -> machine +X, so a seat on its centreline is local (X, Z) =
 # (SUPPORT_WORLD_Z - z, 0).
@@ -108,7 +107,7 @@ WEB_WALL_MIN = WEB - LINEAR_2PL / 2.0 - SCREW_MAJOR_DIA / 2.0
 END_WALL_MIN = tuple(
     (HALF_Y - abs(x)) - SCREW_MAJOR_DIA / 2.0 - _bracket.STATION_BAND - LINEAR_1PL / 2.0
     for x in SEAT_LOCAL_X
-)  # S 2.11, N 2.44
+)  # S 2.11, N 3.72
 
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError(
