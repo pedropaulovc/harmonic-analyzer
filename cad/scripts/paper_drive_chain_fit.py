@@ -36,7 +36,7 @@ def source_nominal_chain_centres_mm() -> tuple[Point, Point]:
     Default engaged P1 nominal has parallel world-Z axes. Manufacturing
     tilt and arbitrary P1 states need their own 3D proof, not this nominal one.
     """
-    from dt_cone_support_pose import crank_axis_nominal_xy_mm
+    from dt_cone_swing_platform_crank_axis import crank_axis_nominal_xy_mm
     from paper_drive_geom import KNOB_SHAFT_XY
     return KNOB_SHAFT_XY, crank_axis_nominal_xy_mm(sprocket.CHAIN_MID_Z)
 
