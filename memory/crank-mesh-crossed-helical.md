@@ -7,6 +7,8 @@ metadata:
 
 > Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
+> Gear standard update (2026-10): the pair is now normal 24DP PA20 cut with stock 24DP cutters, and the 64T helix equals the 13.0011° cone incline ([gear-standard.md](../cad/docs/gear-standard.md)). The 12.5182° angle, SIN_I, centre and seed-window figures below are the 2026-07 old-profile values and certify nothing about the stock-form pair; the crossed-helical reasoning still holds.
+
 
 The crank-pinion (16T) : crank-drive-gear (64T) mesh crosses axes: the 64T
 rides the cone shaft (inclined 12.5182° in plan, SIN_I 0.21675010133293013)
@@ -56,8 +58,10 @@ the LIVE assembly constants (never mirrored), pins PINION_TOOTH_Z /
 PINION_SEED_DEG / Y_CRANK against build_dt_drive_train_assembly, and PASS/FAILs
 on a full crank-pitch phase sweep. The tooth-in-gap seed window shifts ~−1.5°
 at tighter slacks (helix twist at the engaged band), so the seed formula must
-be re-checked with the study whenever the slack changes. Helix/backlash knobs:
-gear_train.crank_drive_backlash_mm / crank_drive_helix_slices; fit class
+be re-checked with the study whenever the slack changes. Helix/backlash knobs
+(2026-07, old profile): gear_train.crank_drive_backlash_mm / crank_drive_helix_slices.
+Current: the 0.15 thinning knob is retired; 64T thickness is
+tolerances.crank_mesh.gear64_tooth_thickness_deviations_mm [+0.100, −0.050], fit class
 tolerances.crank_mesh.c2c_slack_mm. See [[ch30-gt-re-anchor]],
 [[load-bearing-claims-need-a-repro]].
 

@@ -7,6 +7,8 @@ metadata:
 
 > Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
+> Historical (2026-07-07 state). The DP38/DP30 PA14.5 gearing below was superseded in 2026-10 by 48DP reducer / 32DP feed, PA20; see [[paper-drive-real-train]] and [gear-standard.md](../cad/docs/gear-standard.md).
+
 
 # Paper-drive rework — reference findings + design (2026-07-07)
 

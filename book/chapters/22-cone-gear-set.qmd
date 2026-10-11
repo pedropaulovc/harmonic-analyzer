@@ -18,7 +18,7 @@ Twenty spur gears from six to a hundred and twenty teeth on one shaft, turning o
 | `dt-cone-gear` ×20 (T006–T120) | TODO | TODO | TODO |
 | `dt-cone-gear-shaft` | TODO | TODO | TODO |
 | `dt-cone-tip-block` | TODO | TODO | TODO |
-| `vn-cone-tip-collar` (MHA-VN-016) | 1 | black-oxide 1215 steel | 1/16 in bore set-screw shaft collar, McMaster 9414T1 (`vn_cone_tip_collar_spec.py`: `BORE_DIA`, `SKU`) |
+| `vn-cone-tip-collar` (MHA-VN-016) | 1 | TODO (from `vn_cone_tip_collar_spec.py`) | custom stepped collar turned from bar, locked by a #2-56 × 5/16 in set screw, McMaster 94355A213 (`vn_cone_tip_collar_spec.py`) |
 | `vn-cone-tip-adjuster` | TODO | TODO | TODO |
 | `vn-cone-tip-pinch-screw` | TODO | TODO | TODO |
 | `vn-cone-tip-block-screw` (MHA-VN-030) | 1 | black-oxide alloy steel | #4-40 × 3/8 socket head cap screw, McMaster 91251A108 (`vn_cone_tip_block_screw_spec.py`: `THREAD`, `SHANK_LEN`) |
@@ -27,7 +27,7 @@ Twenty spur gears from six to a hundred and twenty teeth on one shaft, turning o
 
 ## What will fight you
 
-The T006 gear is ~4.08 mm outside diameter on a Ø0.79 mm bore — a **0.49 mm wall** at the tooth root, the single hardest feature in the machine. T012/T018/T024 are 0.83/0.78/0.71 mm. The original used a harder yellow metal for the tip gears. Enlarging them is **not** a free change: at fixed tooth count it changes the diametral pitch and breaks the shared DP-49.82 mesh with the cylinder gears.
+The T006 gear is 4.31 mm (0.17 in) outside diameter on a Ø0.794 mm (1/32 in) bore. That leaves at least 0.64 mm (0.025 in) of web between the gap floor and the bore: the single hardest feature in the machine. The terminal journal was cut to 1/32 in to keep that web above 0.62 mm with 48DP 20° teeth (`cad/docs/gear-standard.md`). T012 shares the same 1/32 in terminal and keeps about 2.0 mm; T018 and T024 keep about 2.4 mm (0.09 in). The original used a harder yellow metal for the tip gears. Enlarging them is not a free change: at a fixed tooth count it changes the diametral pitch and breaks the shared 48DP mesh with the cylinder gears.
 
 ## Making each part
 
@@ -43,8 +43,9 @@ TODO
 **Sources for this chapter**
 
 - `cad/scripts/build_*.py` (geometry — the source of truth)
-- `cad/scripts/vn_cone_tip_collar_spec.py`, `cad/scripts/vn_cone_tip_block_screw_spec.py` (stock collar and hold-down screw sizes)
+- `cad/scripts/vn_cone_tip_collar_spec.py`, `cad/scripts/vn_cone_tip_block_screw_spec.py` (collar and hold-down screw sizes)
 - `cad/config/parts/*.yaml` (material, appearance, registry)
-- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing, cutter plan)
+- `cad/docs/gear-standard.md` (tooth standard, and the dimensions it changed)
 - `logbook/entries/` (what actually happened)
 

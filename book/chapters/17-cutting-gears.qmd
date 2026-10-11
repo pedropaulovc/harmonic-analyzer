@@ -5,7 +5,7 @@ status: stub
 
 # Cutting the gears {#sec-gear-cutting}
 
-With a cutter you made and a dividing head you trust, gear cutting is just careful repetition. Start at the easy end.
+With the right cutter and a dividing head you trust, gear cutting is just careful repetition. Start at the easy end.
 
 ::: {.callout-note appearance="simple"}
 **TODO** — stub. Nothing here has been written yet.

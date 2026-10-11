@@ -45,8 +45,8 @@ like "hold ±0.02 mm across five consecutive parts", instead of "feel confident
 turning".
 
 The gear modules are the long pole and there is no point pretending otherwise.
-Off-the-shelf cutters for this machine's diametral pitch do not exist, so M10
-includes making the cutters, and it is scheduled with the most slack.
+Stock cutters cover every gear except the six-tooth cone, so M10 includes
+making that one cutter, and it is scheduled with the most slack.
 
 ## References on hand
 
@@ -54,7 +54,7 @@ All in [`references/`](../references/), which is a git submodule:
 
 - `machining-for-hobbyists-getting-started/`, the beginner spine, a chapter per topic
 - `machinerys-handbook/`, the lookup, with a local search index
-- `gears-and-gear-cutting/`, whose ch. 12 is the Eureka form-cutter method
+- `gears-and-gear-cutting/`, whose ch. 12 forms cutters with a button tool (the Eureka device there only relieves them)
 - `jet-bd-920n-operators-manual.pdf`, the lathe
 - `magxact-mx100m-mill-dro-manual/` and `el400-operation-manual/`, the DROs
 

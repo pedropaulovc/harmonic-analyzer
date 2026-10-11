@@ -37,7 +37,7 @@ TODO
 
 ::: {.callout-tip}
 ## Now make
-`ch-pivot-shaft` (Ø6.35 × 203.2, L/D 32:1), then the `dt-cone-gear-shaft` — five steps ending in a Ø0.79 × 34 mm journal.
+`ch-pivot-shaft` (Ø6.35 × 203.2, L/D 32:1), then the `dt-cone-gear-shaft` — five steps ending in a Ø0.79 × 33.6 mm (1/32 in) terminal land.
 :::
 
 ---
