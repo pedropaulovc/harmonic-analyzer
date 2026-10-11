@@ -341,7 +341,7 @@ such build:
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
-| `check:traveler_ch_rocker_arm`, `check:traveler_ch_pivot_shaft`, `check:traveler_dt_cone_pivot_post` | **no** | no (parallel; needs exported manifest + STEP) | no |
+| `prechips:<stem>` (enrolled process travelers) | **no** (FreeCAD 1.1) | no (parallel; needs scoped manifest + STEP) | no (submitter-only) |
 | `check:features_bound` | **no** | no (release only; compares scoped/full STEP face labels and patch counts) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
@@ -357,11 +357,15 @@ the other's paths. The release-only `check:features_bound` compares the two
 sessions' face-label sets and patch counts per label, requires two rocker
 pivot-bore patches and reports both digests. It does not require byte equality:
 SolidWorks timestamps headers and renumbers entities. Release staging copies the
-verified scoped bundles under `features/`. The three build/release
-traveler checks use pinned prechips and `cad/process/`: exit 3 (bad input) fails;
-exit 2 (machining blockers) logs every `✗` as **warn** and passes; exit 4
-(required unknown) and 0 pass. This is not machining approval. See [feature
-exports and travelers](cad/docs/pipeline/features-travelers.md).
+verified scoped bundles under `features/`. Each enrolled `prechips:<stem>` task
+uses pinned prechips 0.1 and `cad/process/` with a strict **exit 0 only** policy:
+bad input, machining blockers and required unknowns all fail without a stamp.
+Build and release include every stem in `_process_plans.TRAVELER_STEMS`.
+Enrollment is currently empty: the tracked legacy plans remain as provenance,
+not runnable 0.1 plans or machining approval. A part enrolls only after a migrated
+plan reaches exit 0 on real exported geometry. Releases ship verified travelers
+under `travelers/<stem>/` and list them in the notes. See [feature exports and
+travelers](cad/docs/pipeline/features-travelers.md).
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
@@ -381,12 +385,14 @@ exports and travelers](cad/docs/pipeline/features-travelers.md).
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
   Its COM half is the separate `package:release` leaf. The release action and
   publisher run on the submitter, precompute README images before the tag, and
-  install them with the `next_revision` bump only after publication succeeds.
+  install them with the `next_revision` and enrolled plan revision bumps only
+  after publication succeeds.
 - The release follow-up PR is exempt from the three merge gates ONLY if its
-  entire diff is the `cad/config/release.yaml` `next_revision` bump plus the
-  generated README image files. It may merge immediately. Code, prose, docs,
-  README markup/layout or any other change stays in an ordinary PR and MUST pass
-  every gate.
+  entire diff is the `cad/config/release.yaml` `next_revision` bump, the matching
+  `[drawing].revision` literal lines in enrolled `cad/process/<stem>/plan.toml`
+  files, and generated README image files. It may merge immediately. Other plan
+  or shop changes, code, prose, docs, README markup/layout or any other change
+  stays in an ordinary PR and MUST pass every gate.
 - For a supervised farm release, launch only
   `-Targets "build,export,package:release,preflight"` through
   `scripts/farm-run.ps1` (`build` supplies drawing and check gates). On recorded
@@ -397,9 +403,11 @@ exports and travelers](cad/docs/pipeline/features-travelers.md).
   redispatch. See
   [`DEVELOPING.md`](DEVELOPING.md#supervised-farm-releases).
 - The tracked `cad/config/release.yaml` value is the Revision on every
-  `.SLDPRT`, `.SLDASM`, and linked drawing title block. The publisher advances
-  `next_revision` after a successful publish; the release agent MUST merge that
-  generated-only follow-up before the next release.
+  `.SLDPRT`, `.SLDASM`, and linked drawing title block. Every enrolled process
+  plan's tracked `[drawing].revision` literal must match it. The publisher stages
+  all revision updates before publishing and advances them together afterward;
+  the release agent MUST merge that generated-only follow-up before the next
+  release. `--no-publish` leaves all tracked revisions and images byte-identical.
 
 ### Release notes
 

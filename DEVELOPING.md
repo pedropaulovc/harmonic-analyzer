@@ -10,6 +10,25 @@ goes to the farm)? Read
 — it is the decision tree, the seat/cache invariants and the evidence trail for
 an ad-hoc COM operation, and it links back here for cache detail.
 
+## Process traveler prerequisites
+
+`prechips:<stem>` tasks run on the submitter, including when SolidWorks leaves
+run on the farm. They need **FreeCAD 1.1** there; the Python dependency
+`prechips==0.1` does not install the FreeCAD executable. prechips discovers the
+Windows FreeCAD 1.1 installation or a command on `PATH`; set `FREECAD_CMD` when
+it lives elsewhere:
+
+```powershell
+$env:FREECAD_CMD = "$env:LOCALAPPDATA\Programs\FreeCAD 1.1\bin\freecadcmd.exe"
+uv run --frozen python -c "import prechips.kernel as k; print(k.discover_kernel())"
+```
+
+An unavailable kernel is a failure, not a geometry pass: required-unknown
+findings exit 4 and the strict task accepts only exit 0. Enrollment is currently
+empty, so ordinary builds do not run the stale tracked plans. Before enrolling
+a migrated part, follow the binding and validation loop in
+[`cad/process/README.md`](cad/process/README.md).
+
 ## Local pytest timing
 
 Run the CAD and pipeline suite serially for comparable timings:
@@ -545,9 +564,9 @@ failure names its other likely causes instead.
 
 Never launch the `release` target through `farm-run.ps1`: it runs in a
 disposable snapshot, and cleanup would discard the publisher's post-release
-tracked image and `release.yaml` updates. Launch with
-`-Targets "build,export,package:release,preflight"` (`build` supplies drawing
-and check gates). Once successful, restore the complete `cad/out` from the
+tracked image, `release.yaml` and enrolled process-plan revision updates. Launch
+with `-Targets "build,export,package:release,preflight"` (`build` supplies drawing,
+check and enrolled traveler gates). Once successful, restore the complete `cad/out` from the
 recorded `.done` `outputs` path (normally `<LogDirectory>\<run-id>.out`) into
 the owning worktree. Then run `uv run --frozen python -m doit -s gallery`
 followed by `uv run --frozen python -m doit -s release -- vNN` there. This keeps
