@@ -576,7 +576,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_cone_tip_adjuster",  # #10-32 cup-tip set screw (94025A164), member into cone_tip_block
         "dt_cone_tip_block",  # #4-40 blind foot tap + #10-32 through adjuster tap + #4-40 far-jaw pinch tap, receiver
         "vn_cone_tip_block_screw",  # #4-40 SHCS (91251A108), member into cone_tip_block foot
-        "vn_cone_tip_collar",  # custom collar + reworked #2-56 94355A213 screw on the shaft D-flat
+        "vn_cone_tip_collar",  # custom collar + stock #2-56 94355A213 flat-point screw on the shaft D-flat
         "vn_cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_adjuster
         "dt_crank_arm",  # #4-40 through-taps, receiver of crank_handle_pivot_screw and fillister_screw (MHA-VN-006)
         "dt_crank_handle_pivot_screw",  # #4-40 made shoulder screw (MHA-DT-032), member into crank_arm
@@ -954,13 +954,13 @@ JOINTS: tuple[Joint, ...] = (
             "load the screw across its axis"
         ),
         axial_capture=(
-            "94355A213 stock set screw's native ground dog seated wholly on the shaft's Sec4 D-flat; "
+            "94355A213 stock flat-point set screw, as supplied, landed on the shaft's Sec4 D-flat; "
             "custom collar set one COLLAR_FEELER off T006; receiver carries >=1.5D full thread"
         ),
         lock=Lock.NONE,
         evidence=(
             "build_dt_drive_train_assembly.py tip_collar placement + 'tip collar set screw on the "
-            "D-flat' parallel mate; vn_cone_tip_collar_spec DOG_SIDE_MARGIN_MM, "
+            "D-flat' parallel mate; vn_cone_tip_collar_spec SCREW_LANDING_MARGIN_MM, "
             "WORST_FULL_ENGAGEMENT_MM and WORST_WALLS_MM; cone_stack_end_play "
             "(collar and block never touch); CONE_CRANK_STEPS 'LOCK ITS SET SCREW ON THE FLAT'"
         ),

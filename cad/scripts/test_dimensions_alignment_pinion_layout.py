@@ -312,12 +312,12 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
     for fragment in (
         f"McMaster {tip_collar.SET_SCREW_SKU}",
         f"body OD{tip_collar.OUTER_DIA:.{body_places}f} ±{tip_collar.ROUTINE_BAND_MM:.2f} mm",
-        f"width {tip_collar.WIDTH:.1f} at the routine ±{tip_collar.WIDTH_BAND_MM:.2f} band",
-        f"south nose length {tip_collar.NOSE_LENGTH:.1f}",
-        f"BASIC tap station {tip_collar.TAP_STATION:.1f}",
+        f"width {tip_collar.WIDTH:.3f} at the title-block ±{tip_collar.WIDTH_BAND_MM:.2f} band",
+        f"south nose length {tip_collar.NOSE_LENGTH:.3f}",
+        f"tap station {tip_collar.TAP_STATION:.3f}",
         f"Ø{tip_collar.NOSE_DIA:.2f} nose",
-        "ground positive dog governed by the shared retention reader",
-        "model-owned tap-position and dog-runout controls",
+        "fitted as supplied",
+        "SCREW_LANDING_MARGIN_MM",
         "not a frozen purchased-collar diameter or native/full-P1 acceptance",
     ):
         assert fragment in collar_row[1], fragment

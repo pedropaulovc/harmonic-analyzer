@@ -1,4 +1,4 @@
-"""Finite saved-body BACK-arc clamp and manufactured shadow-aware P1 air.
+"""Finite saved-body manufactured shadow-aware P1 air for the tip collar.
 
 Only checked temporary copies are transformed/clipped; saved geometry and
 operational mates are never actuated. Source envelopes include every collar
@@ -16,7 +16,7 @@ from _com import _early_bound
 from solidworks_mcp.adapters.com_variant import double_array
 
 GEAR_COMPONENT = "dt-cylinder-gear-20"
-NATIVE_RESOLUTION_MM = air.collar.NATIVE_CONTACT_RESOLUTION_MM
+NATIVE_RESOLUTION_MM = 1e-5  # metrology roundoff, not a printed fit grade.
 
 
 def _solid(raw: Any, label: str) -> Any:
@@ -164,105 +164,13 @@ def _closest(face, point, label):
     return tuple(float(value)*1000.0 for value in result[:3])
 
 
-def _planes(body, label):
-    for face in _faces(body):
-        surface = _early_bound(face.GetSurface(), "ISurface")
-        if surface is None:
-            raise RuntimeError(f"{label}: native surface is missing")
-        if surface.IsPlane() is not True:
-            continue
-        params = tuple(float(value) for value in surface.PlaneParams)
-        if len(params) != 6 or not all(math.isfinite(value) for value in params):
-            raise RuntimeError(f"{label}: invalid actual plane parameters")
-        normal = params[:3]
-        if abs(sum(v*v for v in normal)-1.0) > 1e-8:
-            raise RuntimeError(f"{label}: native plane normal is not unit")
-        point = tuple(v*1000.0 for v in params[3:])
-        yield face, normal, sum(a*b for a, b in zip(normal, point, strict=True))
-
-
-def _installed_clamp(utility, ring, screw, collar_transform, shaft_body, shaft_transform):
-    """Native part-local → root → actual shaft → +Y shaft-frame control."""
-    inverse = _early_bound(shaft_transform.Inverse(), "IMathTransform")
-    _array(inverse, "collar clamp actual shaft inverse")
-    swizzle = _transform(utility, (1.0, 0.0, 0.0, 0.0, 0.0, -1.0,
-                                  0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                                  1.0, 0.0, 0.0, 0.0), "collar clamp shaft frame")
-    ring = _copy(ring, "finite loaded collar", collar_transform, inverse, swizzle)
-    screw = _copy(screw, "finite loaded screw", collar_transform, inverse, swizzle)
-    journal = _copy(shaft_body, "finite loaded shaft", swizzle)
-    r = air.collar.BORE_DIA/2.0
-    bores = _cylinders(ring, air.collar.BORE_MODEL_DIA_MM/2.0, (0.0, 1.0, 0.0), "actual collar bore")
-    rounds = _cylinders(journal, r, (0.0, 1.0, 0.0), "actual terminal round BACK arc")
-    south = air.shaft.FRONT_STUB + air.SOUTH_STATION_MM
-    witnesses = []
-    for station in (south+air.collar.EDGE_BREAK+2.0*NATIVE_RESOLUTION_MM,
-                    south+air.collar.WIDTH-air.collar.EDGE_BREAK-2.0*NATIVE_RESOLUTION_MM):
-        requested = (-r, station, 0.0)
-        shaft_point = min((_closest(face, requested, "shaft finite BACK arc") for face, *_ in rounds),
-                          key=lambda value: math.dist(value, requested))
-        candidate = min(((math.dist(point := _closest(face, shaft_point, "bore finite BACK arc"), shaft_point),
-                          point, origin, axis, radius) for face, origin, axis, radius in bores),
-                        key=lambda value: value[0])
-        witnesses.append(air.collar.BackArcWitness(shaft_point, candidate[1], candidate[2], candidate[3], r, candidate[4]))
-    dogs = _cylinders(screw, air.collar.DOG_DIA/2.0, (1.0, 0.0, 0.0), "actual complete ground dog")
-    dog_face, dog_origin, dog_axis, dog_radius = dogs[0]
-    tips = []
-    for face, normal, plane in _planes(screw, "actual ground dog tip"):
-        cosine = sum(a*b for a, b in zip(normal, dog_axis, strict=True))
-        if abs(abs(cosine)-1.0) > 1e-8:
-            continue
-        t = (plane-sum(a*b for a, b in zip(normal, dog_origin, strict=True)))/cosine
-        centre = tuple(dog_origin[k]+t*dog_axis[k] for k in range(3))
-        if math.dist(_closest(face, centre, "finite dog centre"), centre) > NATIVE_RESOLUTION_MM:
-            continue  # Socket annulus is not the ground dog face.
-        edge = _closest(face, (centre[0], centre[1]+10.0, centre[2]), "finite dog face radius")
-        radius = math.dist(edge, centre)
-        if dog_radius-air.collar.DOG_EDGE_BREAK-NATIVE_RESOLUTION_MM <= radius <= dog_radius+NATIVE_RESOLUTION_MM:
-            tips.append((face, centre))
-    if len(tips) != 1:
-        raise RuntimeError("collar clamp: actual ground dog tip cannot be identified uniquely")
-    _tip_face, dog_centre = tips[0]
-    positive = _extreme(screw, dog_axis, "dog toward retained stock")
-    negative = _extreme(screw, tuple(-v for v in dog_axis), "dog opposite retained stock")
-    forward = sum((positive[k]-dog_centre[k])*dog_axis[k] for k in range(3))
-    backward = sum((dog_centre[k]-negative[k])*dog_axis[k] for k in range(3))
-    force = dog_axis if forward > backward else tuple(-v for v in dog_axis)
-    flats = []
-    expected_offset = air.collar.TERMINAL_FLAT_AF_MM-r
-    for face, normal, plane in _planes(journal, "actual terminal flat"):
-        if abs(abs(normal[0])-1.0) > 1e-8:
-            continue
-        offset = plane/normal[0]
-        if abs(offset-expected_offset) > NATIVE_RESOLUTION_MM:
-            continue
-        point = _closest(face, dog_centre, "finite terminal flat contact")
-        if math.dist(point, dog_centre) <= NATIVE_RESOLUTION_MM:
-            flats.append((face, offset))
-    if len(flats) != 1:
-        raise RuntimeError("collar clamp: dog tip is not on the actual finite terminal flat")
-    face, offset = flats[0]
-    start = _closest(face, (offset, -1000.0, dog_centre[2]), "terminal flat south end")[1]
-    end = _closest(face, (offset, 1000.0, dog_centre[2]), "terminal flat north end")[1]
-    record = air.collar.validate_installed_clamp_pose(
-        back_arc_witnesses=tuple(witnesses), dog_tip_centre_mm=dog_centre,
-        dog_axis_to_socket=force, dog_radius_mm=dog_radius,
-        flat_offset_mm=offset, flat_half_chord_mm=math.sqrt(r*r-offset*offset),
-        flat_axial_limits_mm=(start, end),
-    )
-    record["actual_dog_tip_mm"] = dog_centre
-    record["actual_dog_axis_to_socket"] = force
-    _telemetry.info(f"Finite saved-body signed collar BACK-arc/whole-DOG law: {record}")
-    return record
-
-
 def measure(adapter: Any, *, collar_component: str, shaft_component: str):
     """Read the saved solids against the printed-tolerance collar air stack."""
     proof = air.full_sweep_proof()
     assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     collar, collar_bodies, collar_transform = _component(assembly, collar_component, 2)
-    _shaft, shaft_bodies, shaft_transform = _component(assembly, shaft_component, 1)
+    _component(assembly, shaft_component, 1)
     gear, gear_bodies, gear_transform = _component(assembly, GEAR_COMPONENT, 1)
     pose = _array(collar_transform, "installed collar")
     axis = (math.sin(math.radians(cone_line.INCLINE_DEG)), 0.0, math.cos(math.radians(cone_line.INCLINE_DEG)))
@@ -289,7 +197,6 @@ def measure(adapter: Any, *, collar_component: str, shaft_component: str):
         (rings if abs(y_min) <= NATIVE_RESOLUTION_MM else screws).append(body)
     if len(rings) != 1 or len(screws) != 1:
         raise RuntimeError("collar air: part-local actual ring/screw cannot be identified")
-    loaded = _installed_clamp(utility, rings[0], screws[0], collar_transform, shaft_bodies[0], shaft_transform)
     ring_north = _extreme(rings[0], (0.0, 1.0, 0.0), "whole ring partition control")[1]
     if abs(ring_north-air.collar.WIDTH) > NATIVE_RESOLUTION_MM:
         raise RuntimeError("collar air: native ring material escapes the complete local-Y partition")
@@ -356,7 +263,7 @@ def measure(adapter: Any, *, collar_component: str, shaft_component: str):
                 minimum, governing = worst, {**row, "measured_mm":measured, "loaded_nominal_shift_mm":loaded_shift,
                                             "native_relief_discount_mm":relief, "worst_mm":worst}
         record = {"closest_distance_mm":distance, "closest_points_mm":points,
-                  "loaded_clamp":loaded, "minimum_booked_air_mm":minimum,
+                  "minimum_booked_air_mm":minimum,
                   "governing":governing, "interval_material_pair_certificates":len(proof)}
         sp.set_attribute("tip_collar_j19.closest_mm", distance)
         sp.set_attribute("tip_collar_j19.booked_min_mm", minimum)
