@@ -125,7 +125,7 @@ SOURCE_MAP = {
         (("RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0", 'datum="B"'),),
     ),
     "right_view_frame": (
-        "harmonic-analyzer/cad/scripts/draw_ch_pivot_shaft.py:59-61",
+        "harmonic-analyzer/cad/scripts/draw_ch_pivot_shaft.py:63-64",
         (('"*Right"', "Model -Z runs to the sheet's right"),),
     ),
     "rocker_datum_c": (
