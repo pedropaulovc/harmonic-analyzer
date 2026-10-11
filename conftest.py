@@ -31,39 +31,22 @@ _READ_ONLY_PROGRAMS = frozenset({"tasklist", "tasklist.exe"})
 # HARMONIC_SW_AUTOSTART says. dodo's COM tasks launch exactly this shape,
 # `python cad/scripts/build_<stem>.py`; on 2026-10-11 such a child (from orphaned
 # `doit -n` workers) started sldworks.exe on the licence w15 shares.
-_COM_SCRIPT = re.compile(
-    r"[\\/]cad[\\/]scripts[\\/]"
-    r"(?:(?:build|draw)_[^\\/]+|verify|export_models|package_native"
-    r"|release_seat_documents)\.py$",
+# Fail closed: a command line that names one anywhere (any argument, or inside a
+# `-c`/`/c`/`-Command` string) is refused, whatever runs it, unless its program
+# is a known reader below.
+_COM_SCRIPT_NAME = re.compile(
+    r"(?<![\w.-])"
+    r"(?:(?:build|draw)_[^\\/\s\"'&|;<>()^]*|verify|export_models|package_native"
+    r"|release_seat_documents)\.py(?!\w)",
     re.IGNORECASE,
 )
-# Only a script in COMMAND position runs: the program itself, the first
-# non-option argument of a Python interpreter, the command `uv run` starts, a
-# script `powershell -File` runs, or a command a shell starts (`cmd /c`,
-# `powershell -Command`, or after `&`, `|`, `;`). `git hash-object`,
-# `uv run ruff check` and `python -m py_compile` only read the file.
-_PYTHONS = re.compile(r"(?:pythonw?[\d.]*|py)(?:\.exe)?", re.IGNORECASE)
-_UVS = re.compile(r"uvx?(?:\.exe)?", re.IGNORECASE)
-_SHELLS = re.compile(r"(?:cmd|powershell|pwsh)(?:\.exe)?", re.IGNORECASE)
-# `uv run` options whose value is the next word (not the command).
-_UV_RUN_VALUE_OPTIONS = frozenset(
-    {
-        "--with",
-        "--with-editable",
-        "--with-requirements",
-        "--project",
-        "--directory",
-        "--python",
-        "-p",
-        "--group",
-        "--extra",
-        "--package",
-        "--env-file",
-        "--index",
-    }
-)
-_SHELL_COMMAND_FLAGS = frozenset({"/c", "/k", "-c", "-command"})
-_SHELL_SEPARATOR = re.compile(r"(&&|\|\||[&|;()])")
+# Programs that only read a script they name, judged by their first word (or,
+# for Python, its `-m` module). A shell operator voids the exemption: the
+# command could chain a second program.
+_SCRIPT_READERS = frozenset({"git", "ruff", "certutil"})
+_SCRIPT_READER_MODULES = frozenset({"py_compile"})
+_PYTHONS = re.compile(r"(?:pythonw?[\d.]*|py)", re.IGNORECASE)
+_SHELL_OPERATORS = re.compile(r"[&|;<>\n]")
 # ctypes symbols that start a process or open a document (a part opens SolidWorks).
 _NATIVE_LAUNCHERS = frozenset(
     {
@@ -133,101 +116,61 @@ def _text(part):
     )
 
 
-def _split_command(text):
-    """Words of a command string, with each shell separator as its own word."""
-    try:
-        pieces = shlex.split(text, posix=False)
-    except ValueError:  # an unbalanced quote: CreateProcess still runs it
-        pieces = text.split()
-    words = []
-    for piece in pieces:
-        if piece[:1] in "\"'":
-            words.append(piece.strip("\"'"))
-        else:
-            words.extend(w for w in _SHELL_SEPARATOR.split(piece) if w)
-    return words
-
-
-def _executed_words(args, executable=None):
-    """The words of ``args`` that the process tree would execute as programs."""
+def _texts(args):
+    """Each argument of an argv list, or a command string whole."""
     if isinstance(args, (list, tuple)):
-        words = [_text(part) for part in args]
+        return [_text(part) for part in args]
+    return [_text(args)]
+
+
+def _reads_only(args, executable=None):
+    """Whether the program is a known reader of the scripts it names."""
+    texts = _texts(args)
+    if any(_SHELL_OPERATORS.search(text) for text in texts):
+        return False
+    if isinstance(args, (list, tuple)):
+        words = texts
     else:
-        words = _split_command(_text(args))
-    if executable is not None and words:
-        words[0] = _text(executable)
-    executed = []
-    program = None  # None: the next word is in command position
-    skip_value = run_seen = False
-    for index, word in enumerate(words):
-        if _SHELL_SEPARATOR.fullmatch(word):
-            program = None
-            continue
-        if skip_value:
-            skip_value = False
-            continue
-        if program is None:
-            if word.startswith("-"):  # an option before the command (`uv run -q`)
-                skip_value = run_seen and word in _UV_RUN_VALUE_OPTIONS
-                continue
-            name = PureWindowsPath(word).name
-            if _PYTHONS.fullmatch(name):
-                program = "python"
-            elif _UVS.fullmatch(name):
-                program, run_seen = "uv", False
-            elif _SHELLS.fullmatch(name):
-                program = "shell"
-            else:
-                executed.append(word)
-                program = "other"
-        elif program == "python":
-            # The first non-option word is the script (or the -m module or -c
-            # code); the words after it are the script's own arguments.
-            if word in ("-X", "-W"):
-                skip_value = True
-            elif not word.startswith("-"):
-                executed.append(word)
-                program = "other"
-        elif program == "uv":
-            if word == "run" and not run_seen:
-                run_seen, program = True, None
-        elif program == "shell":
-            flag = word.lower()
-            if flag in _SHELL_COMMAND_FLAGS:
-                program = "shell-command"
-            elif flag == "-file":
-                program = "shell-file"
-        elif program == "shell-command":
-            # The rest is the shell's command line: one argument or loose words.
-            rest = [w for part in words[index:] for w in _split_command(part)]
-            executed.extend(_executed_words(rest))
-            break
-        elif program == "shell-file":
-            executed.append(word)
-            program = "other"
-    return executed
+        try:
+            words = shlex.split(texts[0], posix=False)
+        except ValueError:  # an unbalanced quote
+            return False
+    words = [word.strip("\"'") for word in words]
+    if not words:
+        return False
+    program = _text(executable) if executable is not None else words[0]
+    name = PureWindowsPath(program.strip("\"'")).name.lower().removesuffix(".exe")
+    if name in _SCRIPT_READERS:
+        return True
+    return (
+        bool(_PYTHONS.fullmatch(name))
+        and len(words) > 2
+        and words[1] == "-m"
+        and words[2] in _SCRIPT_READER_MODULES
+    )
 
 
-def _com_script(args, executable=None, cwd=None):
-    """The COM build script ``args`` would run, resolved against ``cwd``, if any."""
-    base = _text(cwd) if cwd else os.getcwd()
-    for word in _executed_words(args, executable):
-        path = os.path.normpath(os.path.join(base, word))
-        if _COM_SCRIPT.search(path):
-            return path
+def _com_script(args, executable=None):
+    """The COM script name ``args`` mentions, unless a known reader runs it."""
+    texts = _texts(args)
+    if executable is not None:
+        texts.append(_text(executable))
+    for text in texts:
+        match = _COM_SCRIPT_NAME.search(text)
+        if match:
+            return None if _reads_only(args, executable) else match.group(0)
     return None
 
 
-def _acts_on_host(args, executable=None, cwd=None):
-    return _launches_solidworks(args, executable) or _com_script(args, executable, cwd)
+def _acts_on_host(args, executable=None):
+    return _launches_solidworks(args, executable) or _com_script(args, executable)
 
 
 def _refuse_create_process(module_name, original):
-    # ``_winapi`` and ``win32process`` share CreateProcess' positional layout:
-    # (application, command line, ..., current directory at index 7, ...).
+    # ``_winapi`` and ``win32process`` share CreateProcess' leading positions:
+    # (application, command line, ...).
     def guarded_create_process(application, command_line, *rest, **kwargs):
-        cwd = rest[5] if len(rest) > 5 else None
-        if _acts_on_host(command_line or "", application, cwd):
+        if _acts_on_host(command_line or "", application):
             _refuse(f"{module_name}.CreateProcess", command_line or application)
         return original(application, command_line, *rest, **kwargs)
 
@@ -258,7 +201,7 @@ def _install_launch_guard():
     original_init = subprocess.Popen.__init__
 
     def guarded_init(self, args, *rest, **kwargs):
-        if _acts_on_host(args, kwargs.get("executable"), kwargs.get("cwd")):
+        if _acts_on_host(args, kwargs.get("executable")):
             _refuse("subprocess.Popen", args)
         original_init(self, args, *rest, **kwargs)
 

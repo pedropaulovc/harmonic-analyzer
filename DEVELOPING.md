@@ -35,11 +35,13 @@ remain part of the suite wall time. Telemetry appends to that worktree's ignored
 `cad/out/reports/telemetry`, and the root conftest isolates the buildgraph facts
 cache in a temporary directory. Keep `NOSW_GUARD` enabled and leave
 `HARMONIC_BUILDGRAPH_CACHE` unset. With the guard on, a test fails if it starts
-SolidWorks, binds `SldWorks.Application`, launches a COM script under
-`cad/scripts` (`build_*`, `draw_*`, `verify`, `export_models`, `package_native`,
-`release_seat_documents`), or reaches dodo's `_exec_com` with its real
-subprocess runner. Fake the runner instead. The vendored `SolidworksMCP-python`
-tests are excluded because they can take the farm's SolidWorks licence.
+SolidWorks, binds `SldWorks.Application`, starts a child whose command line
+names a COM script (`build_*.py`, `draw_*.py`, `verify.py`, `export_models.py`,
+`package_native.py`, `release_seat_documents.py`) unless the program is a known
+reader (`git`, `ruff`, `certutil`, `python -m py_compile`), or reaches dodo's
+`_exec_com` with its real subprocess runner. Fake the runner instead. The
+vendored `SolidworksMCP-python` tests are excluded because they can take the
+farm's SolidWorks licence.
 
 Reuse source facts only within an unchanged-source scan, or immutable baseline
 bytes for private mutation fixtures. Keep each case's writable checkout, task

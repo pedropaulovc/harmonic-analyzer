@@ -244,7 +244,7 @@ def test_com_build_script_in_os_system_is_refused(solidworks_launch_refusals):
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is not on PATH")
 def test_a_program_that_only_reads_a_build_script_passes(solidworks_launch_refusals):
-    """git hashes the file; only an interpreter or shell runs it."""
+    """git hashes the file: a known reader may name a COM script."""
     result = subprocess.run(
         ["git", "hash-object", "--stdin", "--path", str(MISSING_BUILD)],
         input=b"probe\n",
@@ -264,6 +264,7 @@ def _root_conftest(request):
 
 
 _BUILD = str(MISSING_BUILD)
+_SPACED = "C:\\never exists\\cad\\scripts\\build_tripwire_probe_never_exists.py"
 
 
 @pytest.mark.parametrize(
@@ -273,15 +274,28 @@ _BUILD = str(MISSING_BUILD)
         (["python", _BUILD], None),
         (["python", "-X", "utf8", "-u", _BUILD], None),
         (["worker", _BUILD], sys.executable),
+        (["git", _BUILD], sys.executable),  # the executable, not argv[0], runs
+        (["probe"], _BUILD),
+        (["python", "-m", "runpy", _BUILD], None),
         (subprocess.list2cmdline(["echo", "probe"]) + " & python " + _BUILD, None),
+        ("git hash-object x & python " + _BUILD, None),  # a chained second program
         (["cmd", "/c", subprocess.list2cmdline(["python", _BUILD, "--x"])], None),
         (["cmd", "/c", "python", _BUILD], None),
+        (["cmd", "/c", f'"python" "{_SPACED}"'], None),
+        (["cmd", "/c", "python", _SPACED], None),
+        (f'cmd /c python "{_SPACED}"', None),
         (["uv", "run", "--with", "x", "python", _BUILD], None),
+        (["uv", "run", "-w", "probe", "python", _BUILD], None),
+        (["uv", "run", "--directory", "cad/scripts", "python", "build_x.py"], None),
         (["uv", "run", _BUILD], None),
+        (["uv", "run", "ruff", "check", _BUILD], None),  # uv, not ruff, is first
         (["pwsh", "-NoProfile", "-File", _BUILD], None),
+        (["pwsh", "-Command", f"& python '{_SPACED}'"], None),
+        (["python", "-c", "import runpy; runpy.run_path('verify.py')"], None),
+        (["python", "other.py", "--then", "VERIFY.PY"], None),
     ],
 )
-def test_a_build_script_in_command_position_counts(request, args, executable):
+def test_a_command_naming_a_com_script_counts(request, args, executable):
     assert _root_conftest(request)._com_script(args, executable)
 
 
@@ -289,14 +303,16 @@ def test_a_build_script_in_command_position_counts(request, args, executable):
     "args",
     [
         ["git", "hash-object", "--path", _BUILD],
+        "git hash-object --path " + _BUILD,
+        ["C:\\Program Files\\Git\\cmd\\git.exe", "show", f"HEAD:{_BUILD}"],
         ["certutil", "-hashfile", _BUILD, "SHA256"],
-        ["uv", "run", "ruff", "check", _BUILD],
+        ["ruff", "check", _BUILD],
         ["python", "-m", "py_compile", _BUILD],
-        ["python", "-c", "print(1)", _BUILD],
-        ["python", "other.py", _BUILD],
+        ["python", "-m", "pytest", "cad/scripts/test_build_probe.py"],
+        ["python", "rebuild_x.py", "verify.pyc"],
     ],
 )
-def test_a_build_script_only_read_does_not_count(request, args):
+def test_a_known_reader_or_no_com_script_does_not_count(request, args):
     assert _root_conftest(request)._com_script(args) is None
 
 
