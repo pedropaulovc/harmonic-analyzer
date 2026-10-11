@@ -31,6 +31,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM
 from _printed_tolerance import printed_band_mm
+from cone_stack_end_play import COLLAR_FEELER
 from cone_shaft_land_bands import (
     RUNNING_DIA_BAND,
     TERMINAL_DIA_MM,
@@ -436,8 +437,10 @@ DRAWING_NOTES = "\n".join((
     "GROUND DOG TIP; BREAK TIP EDGE ONLY AS DIMENSIONED.",
     "DATUM D: RETAINED STOCK THREAD AXIS.",
 ))
+# The leaf is the end-play setting (cone_stack_end_play), named on this sheet
+# so the fitter need not look it up (machinist review of the stack build).
 INSTALLATION_NOTES = "\n".join((
-    "SET ASSEMBLY FEELER OFF T006 THRUST FACE.",
+    f"SET WITH A {COLLAR_FEELER:.2f} FEELER OFF T006 THRUST FACE.",
     "SEAT BOTH ENDS ON JOURNAL ROUND BACK ARC.",
     "SNUG DOG ON D-FLAT, THEN REMOVE LEAF.",
     "DO NOT SWING OR RUN WITH COLLAR LOOSE.",

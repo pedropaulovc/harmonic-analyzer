@@ -854,3 +854,17 @@ def test_tap_view_imports_the_blanked_root_gauge_through_the_hidden_owner_path()
     assert "hidden_sketches.curate_view_dimensions(\n        adapter, tap, keep=TAP_KEEP" in source
     assert "TapRootLimit" in drawing.TAP_KEEP
     assert "TapRootLimit" in spec.DRAWING_DIMENSIONS["TapRootGauge"]
+
+
+def test_datum_d_tags_the_thread_and_the_feeler_is_named() -> None:
+    """Machinist review of the stack build: datum D (the thread axis) sat at
+    the shoulder end and read as the shoulder face, and the collar's setting
+    feeler had no thickness on the sheet."""
+    from cone_stack_end_play import COLLAR_FEELER
+
+    thread_right_x = drawing.DOG_LEFT_X + spec.SET_SCREW_LENGTH * drawing.SCREW_SCALE / 1000.0
+    thread_top_y = drawing.SCREW_CENTER[1] + spec.SET_SCREW_MAJOR_DIA * drawing.SCREW_SCALE / 2000.0
+    x, y = drawing.DATUM_D_XY
+    assert drawing.THREAD_LEFT_X + 0.010 < x < thread_right_x - 0.010
+    assert y > thread_top_y + 0.005
+    assert f"SET WITH A {COLLAR_FEELER:.2f} FEELER OFF T006 THRUST FACE." in spec.INSTALLATION_NOTES
