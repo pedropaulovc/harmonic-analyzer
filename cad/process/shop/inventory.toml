@@ -1891,6 +1891,53 @@ range_mm = [1.0, 7.5]
 resolution_mm = 0.1
 note = 'Illustrative metric leaf radius gauge, including R7.0; compare the upper ear crown against the 7 mm leaf under backlight. Capability provenance: measured = { by = "example (plausible, not measured)", date = "2026-10-05", instrument = "optical comparator against a calibrated radius master" }. Range/resolution are plain scalars under the gauge schema, not measured LengthMeasurement fields.'
 
+# --- ch_rocker_arm (trial T4) additions ---
+# Outline template for MHA-CH-006: the arm's finished outline (R800 top edge, R816
+# bottom, tapers, tip lands) cut from 1/8 in steel sheet with a Ø6.5 pivot hole, laid on
+# the part to scribe the outline and held against it to check the filed edges. Not yet
+# made or bought: verify = true until it is in the shop and checked on the surface plate.
+[gauges.arm-outline-template]
+name = "arm outline template (MHA-CH-006)"
+kind = "profile_gauge"
+range_mm = [799.0, 817.0]
+verify = true
+purchase = "one laser-cut 1/8 in (3.2 mm) mild-steel template of the MHA-CH-006 outline from the drawing's DXF, Ø6.5 pivot hole, with a 40 x 25 mm tab off the top edge at X0 for the bench vise"
+source = "candidate vendor: SendCutSend laser cutting, https://sendcutsend.com/materials/a36-steel/ (1/8 in mild steel); price not quoted (needs an online DXF quote)"
+note = "range_mm covers the drawing radii R800 (top edge, 799.49-800.51) and R816 (bottom, 815.49-816.51) from features.toml; the template's own accuracy must be checked before use"
+
+# The PM-30MV's own table as a holding surface for work clamped straight to it with the
+# clamping-kit straps (thin plate that the PM-6 jaws would stand above). prechips has no
+# "on the machine table" hold, so the table is declared as a fixture. Local frame: table
+# top Z0 (the setup's work seat by definition), X along the table, origin at the table
+# centre. Length and width are the maker's published table size, not shop measurements;
+# the 50 mm depth is drawing depth only. No `height` is recorded: the work sits on the
+# table itself, but prechips' envelope screen asks for a measured fixture height.
+[fixtures.pm30mv-table]
+name = "PM-30MV table (strap clamps straight to the table)"
+kind = "machine_table"
+fits = "PM-30MV"
+source = "https://www.precisionmatthews.com/products/pm-30mv (Table: X-axis table length 33 in, Y-axis table width 8.25 in, T-slot 9/16 in / 14 mm), read 2026-10-11"
+solids = [
+  { name = "table", supply = "existing", shape = "box", at_mm = [-419.1, -104.775, -50.0], size_mm = [838.2, 209.55, 50.0], locates = "work underside", note = "33 x 8.25 in from the maker's spec page (source above); 50 mm thickness is drawing depth only." },
+]
+
+# Per-blank shim stack for MHA-CH-006 S4. Turned over onto the raw blank ends, the S3-faced
+# strap face (datum B) hangs (measured raw thickness M - 5.219) above the table, nominal
+# 2.719, over a 312 mm span. Four stacks under the arm's strap band carry it while S4 faces
+# the other side. Each stack: one 3/32 in ground flat (2.381) plus steel shim to
+# M - 5.219 - 2.381 (nominal 0.338), checked with the 0-1 in micrometer before it goes in.
+# Not in the shop yet (shop gap): verify = true until the flat stock and shim are bought.
+[fixtures.strap-shim-stack]
+name = "strap shim stack (3/32 in ground flat + shim), MHA-CH-006 S4"
+kind = "custom"
+shop_made = true
+verify = true
+purchase = "O1 precision ground flat stock 3/32 x 3/4 x 18 in (cut into 20 mm pieces, one per stack) and a 0.001-0.031 in steel shim stock assortment"
+source = "candidates: Abrams Industries O1 3/32 x 3/4 x 18 reg, $12.05 (https://us.abrams-industries.com/buy/precision-ground-flat-stock); Precision Brand 15-piece 0.001-0.031 in steel shim sheet assortment 6 x 12 in, MSC 86798816, $136.56 web price (https://www.mscdirect.com/product/details/86798816); prices read 2026-10-11"
+solids = [
+  { name = "stack", shape = "box", supply = "bought", shim = true, at_mm = [-10.0, -6.0, 0.0], size_mm = [20.0, 12.0, 2.71875], locates = "S3-faced strap face (datum B)", note = "3/32 in ground flat + shim to the measured gap M - 5.219; 2.71875 is the nominal for a 7.9375 blank" },
+]
+
 # --- pivot-bracket additions ---
 
 
