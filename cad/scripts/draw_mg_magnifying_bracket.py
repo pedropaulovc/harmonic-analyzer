@@ -69,6 +69,9 @@ TOP_CENTER = (0.115, 0.180)
 FRONT_CENTER = (0.115, 0.110)
 # Supplemental entry view, not part of the aligned front/top/right group.
 BACK_CENTER = (0.245, 0.095)
+RIGHT_CENTER = (0.240, 0.180)
+ISO_CENTER = (0.340, 0.130)
+
 # The four plan dimensions ride the TOP view (both extruded rectangles lie on the
 # part's Top plane), as does the collar's mid-plane extrude length (along X).
 # Arm/flange dim names are disambiguated in the build (ArmWidth/ArmDepth vs
