@@ -1050,13 +1050,15 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
     ordered_actions = (
         "TAP THE DISC CENTRAL",
         "SPOT-DRILL THE DISC",
-        "LOCK SCREWS",
+        "SCREWS.",
         f"RECHECK ALL {disc.TEETH} SPACES",
         "THEN MATCH-MARK DISC AND HUB",
     )
     locations = [transferred.index(action) for action in ordered_actions]
     assert locations == sorted(locations)
     assert "OD RUNOUT" not in transferred
+    # joint_retention: pd-paper-drive/disc-screws is a static clamp, Lock.NONE.
+    assert "LOCK" not in transferred
 
 
 def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
