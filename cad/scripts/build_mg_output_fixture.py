@@ -16,10 +16,11 @@ spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
   the spigot face, revolved about local X (inside the hex it adds nothing:
   its Ø is under the flats).  It carries every axial station from the free
   end (``RodStation``, ``HexLength``, ``OverallLength``) and ``SpigotDia``.
-* ``GrooveProfile``: the full-radius groove, one Top-plane circle revolved
-  as a cut.  Its centreline starts on the free end, so ``GrooveStation``
-  runs from there; ``GrooveRadius`` sizes it and ``GrooveRootDia`` is the
-  doubled distance from the axis to the circle's NEAREST point.
+* ``GrooveProfile``: the full-radius groove, a Top-plane circle drawn as two
+  semicircles meeting at the root, revolved as a cut.  Its centreline starts
+  on the free end, so ``GrooveStation`` runs from there; ``GrooveRadius``
+  sizes it and ``GrooveRootDia`` is the diametric dimension from the axis to
+  the root point.
 * ``RodBoreProfile``: the reamed Ø5.20 cross bore along local Y.
 * ``AxialTap``: one Hole Wizard #4-40 tap from the spigot face, up to the
   rod bore (the thumb screw's receiver).
@@ -39,7 +40,7 @@ from typing import Any
 import _telemetry
 from _appearance import apply_material
 from _check import check
-from _com import _early_bound, _read_member
+from _com import _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _drawing_marks import (
     add_diametric_linear_dimension,
@@ -111,7 +112,6 @@ BORE_CUT_DEPTH = 2.0 * HEX_CORNER_RADIUS + 2.0
 # The cross-section's corner offset from the axis, for the hex sketch's
 # equation (the corner radius is the flats over sqrt(3)).
 _CORNER_PER_AF = 1.0 / math.sqrt(3.0)
-_ARC_END_MIN = 2  # swArcEndCondition_e.swArcEndConditionMin (nearest point)
 _SAVED_DRAWING_PROPERTIES = ("Manufacturing Notes",)
 
 # --- Analytic volumes (mm^3) -----------------------------------------------------
@@ -440,19 +440,34 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
     """The groove circle on the Top plane, stationed from the free end.
 
     The revolve axis runs from the free end to the bore axis, so its start is
-    the free end on the axis.  The root Ø is a diametric dimension from that
-    axis to the circle's NEAREST point (``IDimension::SetArcEndCondition``);
-    it is driven to the root at once, before the cut, so the cut never sees
-    the circle wherever the condition change left it."""
+    the free end on the axis.  The circle is two semicircles meeting at the
+    root and at the crown, both plumb over the centre (the build_dt_crank_arm
+    end-cap recipe), so the root is a sketch point: ``GrooveRootDia`` is a
+    diametric dimension from the axis to it.  A diametric dimension to a
+    circle measures its single distance, not the doubled Ø, so it cannot
+    carry the root.  The axis stays the sketch's only centreline (the
+    revolve's implicit axis)."""
     groove = SketchDims()
+    root_v = GROOVE_CENTRE_R - GROOVE_RADIUS  # sketch v of the root
+    crown_v = GROOVE_CENTRE_R + GROOVE_RADIUS
     check("create_sketch groove", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "groove axis", await adapter.add_centerline(FREE_END_X, 0.0, 0.0, 0.0)
     )
-    circle = check(
-        "groove circle",
-        await adapter.add_circle(GROOVE_X, GROOVE_CENTRE_R, GROOVE_RADIUS),
+    # add_arc sweeps CCW p1 -> p2: crown -> root bulges to the free end,
+    # root -> crown to the spigot face; the shared ends merge at creation.
+    toward_free_end = check(
+        "groove arc toward the free end",
+        await adapter.add_arc(
+            GROOVE_X, GROOVE_CENTRE_R, GROOVE_X, crown_v, GROOVE_X, root_v
+        ),
+    )
+    toward_face = check(
+        "groove arc toward the spigot face",
+        await adapter.add_arc(
+            GROOVE_X, GROOVE_CENTRE_R, GROOVE_X, root_v, GROOVE_X, crown_v
+        ),
     )
     set_sketch_direct_db(adapter, False)
     await anchor_point_to_origin(adapter, f"{axis}.end", 0.0, 0.0, "groove axis at the bore")
@@ -460,10 +475,21 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
         adapter, f"{axis}.start", FREE_END_X, 0.0, "groove axis from the free end"
     )
     groove.record("GrooveDatum", '"RodStation"')
+    # Crown and root plumb over the first arc's centre make it a semicircle;
+    # the root plumb over the second's makes that one concentric.
+    for point, centre in (
+        (f"{toward_free_end}.start", f"{toward_free_end}.center"),
+        (f"{toward_free_end}.end", f"{toward_free_end}.center"),
+        (f"{toward_face}.start", f"{toward_face}.center"),
+    ):
+        check(
+            f"groove {point} plumb over its centre",
+            await adapter.add_sketch_constraint(point, centre, "vertical_points"),
+        )
     await dimension_between(
         adapter,
         f"{axis}.start",
-        f"{circle}.center",
+        f"{toward_free_end}.center",
         "horizontal_distance",
         GROOVE_STATION,
         "groove from the free end",
@@ -471,44 +497,21 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
     groove.record("GrooveStation", '"GrooveStation"')
     check(
         "groove radius",
-        await adapter.add_sketch_dimension(circle, None, "radial", GROOVE_RADIUS),
+        await adapter.add_sketch_dimension(toward_face, None, "radial", GROOVE_RADIUS),
     )
     groove.record("GrooveRadius", '"GrooveRadius"')
-    root = await add_diametric_linear_dimension(
-        adapter, axis, circle, (GROOVE_X, -GROOVE_CENTRE_R), "GrooveRootDia"
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        f"{toward_face}.start",
+        (GROOVE_X, -GROOVE_CENTRE_R),
+        "GrooveRootDia",
     )
-    _measure_to_nearest_point(root, "GrooveRootDia")
-    # Driven below, before the cut, not with the deferred jobs.
-    groove.record("GrooveRootDia")
+    groove.record("GrooveRootDia", '"GrooveRootDia"')
     await ensure_fully_defined(adapter, "groove profile")
     check("exit_sketch groove", await adapter.exit_sketch())
     name_last_feature(adapter, "GrooveProfile")
-    jobs = groove.apply(adapter, "GrooveProfile")
-    await drive_dimension(adapter, "GrooveRootDia@GrooveProfile", '"GrooveRootDia"')
-    await force_rebuild(adapter)
-    return jobs
-
-
-def _measure_to_nearest_point(display: Any, label: str) -> None:
-    """Move a dimension's circular endpoint from the circle's centre to its
-    nearest point, and prove the change held."""
-    display = _early_bound(display, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension(), "IDimension")
-    moved = False
-    for index in (1, 2):
-        if int(dimension.GetArcEndCondition(index)) == 0:
-            continue  # this end is the axis, not the circle
-        result = int(dimension.SetArcEndCondition(index, _ARC_END_MIN))
-        if result != 0:
-            raise RuntimeError(
-                f"{label}: SetArcEndCondition({index}, nearest) returned {result}"
-            )
-        if int(dimension.GetArcEndCondition(index)) != _ARC_END_MIN:
-            raise RuntimeError(f"{label}: endpoint {index} did not keep the nearest point")
-        moved = True
-    if not moved:
-        raise RuntimeError(f"{label}: neither endpoint is on the groove circle")
-    _telemetry.success(f"{label}: measured to the circle's nearest point")
+    return groove.apply(adapter, "GrooveProfile")
 
 
 async def _centroid_x_check(adapter: Any, label: str, expected_x: float) -> None:

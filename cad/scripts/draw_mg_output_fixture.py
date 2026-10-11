@@ -110,7 +110,8 @@ _SIDE_BOTTOM = _side_y(-_HALF_AF)
 # free end out; the stations' extension lines rise from the spigot's top
 # edge.  The bore's station hangs below, with the groove's root Ø clear of it
 # to the right.  The spigot's Ø stands off the face; the groove's radius
-# leader runs to the arc from beyond it, low enough to land on the cut.
+# (its sketch sits on the upper side, sketch +v) reads beyond the face,
+# just over the spigot's top edge.
 SIDE_KEEP = {
     "HexLength": (_side_x((FREE_END_X + SHOULDER_X) / 2.0), _SIDE_TOP + 0.010),
     "GrooveStation": (_side_x((FREE_END_X + GROOVE_X) / 2.0), _SIDE_TOP + 0.020),
@@ -118,7 +119,7 @@ SIDE_KEEP = {
     "RodStation": (_side_x(FREE_END_X / 2.0), _SIDE_BOTTOM - 0.010),
     "GrooveRootDia": (_side_x(GROOVE_X), _SIDE_BOTTOM - 0.012),
     "SpigotDia": (_side_x(SPIGOT_FACE_X) + 0.012, SIDE_CENTER[1]),
-    "GrooveRadius": (_side_x(SPIGOT_FACE_X) + 0.030, _SIDE_BOTTOM + 0.002),
+    "GrooveRadius": (_side_x(SPIGOT_FACE_X) + 0.012, _SIDE_TOP + 0.004),
     "RodBoreDia": (_side_x(FREE_END_X) - 0.022, SIDE_CENTER[1] + 0.012),
 }
 # The end view stands the flats vertical (``*Right`` looks along -X, sheet
