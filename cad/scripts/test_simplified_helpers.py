@@ -9,7 +9,7 @@ import pytest
 
 import _assembly
 import _simplified_part
-from _drawing_common import (
+from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
     ViewRole,

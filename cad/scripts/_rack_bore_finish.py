@@ -6,7 +6,8 @@ import math
 from typing import Any
 
 from _com import _early_bound
-from _drawing_common import _validate_surface_finish_control_face, model_point_in_view
+from _drawing_finish import _validate_surface_finish_control_face
+from _drawing_projection import model_point_in_view
 from _surface_finish import surface_finish_by_key
 from pd_rack_pinion_spec import BORE_DIA, FACE_WIDTH, SURFACE_FINISHES
 

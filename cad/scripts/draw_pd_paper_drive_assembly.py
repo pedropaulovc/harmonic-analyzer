@@ -50,15 +50,11 @@ from _check import check
 from _com import _com_invoke, _early_bound
 from _session import run_build
 from _pd_paper_drive_explode import exploded_view_name
-from _drawing_common import (
-    SIMPLIFIED_VIEW_CONFIGURATION,
+from _drawing_balloon_display import rendered_balloon_circle
+from _drawing_balloons import (
     isolate_drawing_view_components,
-    set_view_exploded_state,
     BalloonAnchor,
     BalloonLanding,
-    DrawingOutputs,
-    ViewRole,
-    _SW_SHADED_EDGES,
     _VIEW_ENTITY_EDGE,
     _AnchorChoice,
     _anchor_model_points,
@@ -68,18 +64,26 @@ from _drawing_common import (
     _view_component_leaves,
     _view_explode_offsets,
     add_component_bom_balloons,
-    apply_view_configuration,
     assert_balloon_landings,
-    assert_full_detail_view,
-    create_blank_drawing_sheets,
+)
+from _drawing_common import (
+    DrawingOutputs,
+    _SW_SHADED_EDGES,
     finalize_drawing,
-    insert_bom_table,
-    model_points_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    rendered_balloon_circle,
     set_high_quality_shaded_with_edges,
+)
+from _drawing_projection import model_points_in_view
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_tables import insert_bom_table
+from _drawing_view_configuration import (
+    SIMPLIFIED_VIEW_CONFIGURATION,
+    set_view_exploded_state,
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
     view_configuration,
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings

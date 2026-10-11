@@ -14,15 +14,15 @@ from _com import _early_bound
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_precision,
-    set_hidden_lines_visible,
-    stamp_drawing_summary,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_visible
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_dimension_precision
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _stock_trim_drawing import TrimSheet
 from vn_boss_hook_spec import (

@@ -13,17 +13,16 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    stamp_drawing_summary,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
 from ch_rocker_thrust_washer_spec import (
     DRAWING_DIMENSIONS,

@@ -174,10 +174,36 @@ def test_the_overall_reference_picks_both_end_faces_as_drawn_edges(
     """Run 20261001T142942518Z: the rear-face pick asked for a SILHOUETTE
     where only the face's edge-on circle (a model EDGE) is drawn, and the
     sheet stopped.  Both picks land on end-face edges and measure 5.9."""
+    import _drawing_balloons
     import _drawing_common
+    import _drawing_dimension_import
+    import _drawing_edge_dimensions
+    import _drawing_gdt
+    import _drawing_layout_collect
+    import _drawing_leader_notes
+    import _drawing_sections
+    import _drawing_selection
+    import _drawing_selection_probe
+    import _drawing_sheets
+    import _drawing_tables
 
+    monkeypatch.setattr(_drawing_balloons, "view_name", lambda _a, _v: "Drawing View2")
     monkeypatch.setattr(_drawing_common, "view_name", lambda _a, _v: "Drawing View2")
-    monkeypatch.setattr(_drawing_common, "null_callout", lambda: None)
+    monkeypatch.setattr(_drawing_dimension_import, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_edge_dimensions, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_gdt, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_layout_collect, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_leader_notes, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_sections, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_selection, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_selection_probe, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_tables, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_balloons, "null_callout", lambda: None)
+    monkeypatch.setattr(_drawing_dimension_import, "null_callout", lambda: None)
+    monkeypatch.setattr(_drawing_edge_dimensions, "null_callout", lambda: None)
+    monkeypatch.setattr(_drawing_selection, "null_callout", lambda: None)
+    monkeypatch.setattr(_drawing_sheets, "null_callout", lambda: None)
+    monkeypatch.setattr(_drawing_tables, "null_callout", lambda: None)
     references: list[str] = []
     monkeypatch.setattr(
         drawing,

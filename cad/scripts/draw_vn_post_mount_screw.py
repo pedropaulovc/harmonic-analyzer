@@ -48,21 +48,23 @@ import _telemetry
 from _check import check
 from _com import _early_bound
 from _session import run_build
-import _drawing_common
+import _drawing_dimension_import
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    assert_imported_precision,
     finalize_drawing,
     new_project_drawing,
-    dimension_name,
-    model_point_in_view,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimension,
-    stamp_drawing_summary,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import Box, estimate_text_box
 from _stock_trim_drawing import TrimSheet
@@ -318,7 +320,7 @@ def _curate_tip_view(adapter: Any, view: Any) -> list[Any]:
     cutter's CutEndDeburrProfile is selected (source 1), never the entire
     model.  The cropped model view's entire-model import delivered it in
     b6552f13b; the targeted form is the one the Front already uses."""
-    return _drawing_common.curate_view_dimensions(
+    return _drawing_dimension_import.curate_view_dimensions(
         adapter,
         view,
         keep=DETAIL_KEEP,

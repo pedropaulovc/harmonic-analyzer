@@ -31,22 +31,22 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_edge_dimension,
-    add_feature_control_frame,
-    add_native_hole_callout,
-    add_property_linked_note,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
     set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    stamp_drawing_summary,
 )
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from sh_column_clamp_front_spec import (
     ARC_DEPTH,

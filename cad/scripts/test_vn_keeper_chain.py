@@ -82,7 +82,7 @@ def test_link_volume_matches_its_shape() -> None:
 def test_chain_edges_fit_the_balloon_walk() -> None:
     # Its beads draw only silhouettes, so the drawings balloon the chain from
     # its rod/bead circles, two per link; the walk samples at most this many.
-    from _drawing_common import _VISIBLE_EDGES_PER_INSTANCE
+    from _drawing_balloons import _VISIBLE_EDGES_PER_INSTANCE
 
     assert 2 * (chain.BEAD_COUNT - 1) <= _VISIBLE_EDGES_PER_INSTANCE
 

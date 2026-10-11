@@ -29,12 +29,9 @@ else:
 from _check import check  # noqa: E402
 from _com import _early_bound  # noqa: E402
 from _session import run_build  # noqa: E402
-from _drawing_common import (  # noqa: E402
-    _drawing_component_children,
-    _drawing_component_stems,
-    _edge_endpoint_key,
-    set_high_quality_shaded_with_edges,
-)
+from _drawing_balloons import _drawing_component_children, _drawing_component_stems  # noqa: E402
+from _drawing_common import set_high_quality_shaded_with_edges  # noqa: E402
+from _drawing_edges import _edge_endpoint_key  # noqa: E402
 from solidworks_mcp.adapters import sw_type_info  # noqa: E402
 from solidworks_mcp.adapters.solidworks.drawing import new_drawing, place_view  # noqa: E402
 

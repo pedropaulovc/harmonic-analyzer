@@ -124,7 +124,8 @@ def main():
     else:
         import _script_paths  # noqa: F401
     from _com import _early_bound, _read_member
-    import _drawing_common as common
+    import _drawing_dimension_import
+    import solidworks_mcp.adapters.solidworks.drawing
     from _drawing_precision import _named_dimension
     import draw_pd_rack_pinion as recipe
     from diagnostics._owned_native_session import run_owned_diagnostic
@@ -148,7 +149,7 @@ def main():
             "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "adapter": subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "probe_sha256": digest(__file__), "recipe_sha256": digest(recipe.__file__),
-            "helper_sha256": digest(common.__file__),
+            "helper_sha256": digest(solidworks_mcp.adapters.solidworks.drawing.__file__),
             "pid": int(app.GetProcessID()), "revision": str(app.RevisionNumber()),
             "started_utc": datetime.now(timezone.utc).isoformat(),
             "scope": "partial diagnostic, no datum or manufacturing acceptance",
@@ -194,7 +195,7 @@ def main():
                 row["drawing_dimensions"] = [
                     display_state(_early_bound(ann, "IAnnotation").GetSpecificAnnotation())
                     for ann in known_draw_annotations
-                    if common.dimension_name(adapter, ann) == "BoreDia"
+                    if solidworks_mcp.adapters.solidworks.drawing.dimension_name(adapter, ann) == "BoreDia"
                 ]
                 row["source_dirty_after_readback"] = bool(source_model.GetSaveFlag())
                 row["dimension_observation_phase"] = annotation_phase
@@ -280,8 +281,8 @@ def main():
                 patches.enter_context(patch.object(recipe, "add_native_axis_datum", boundary))
                 for owner, name in (
                     (recipe, "place_view"), (recipe, "set_hidden_lines_removed"),
-                    (recipe, "auto_center_marks"), (common, "insert_marked_dimensions"),
-                    (common, "delete_unnamed_imports"), (common, "curate_dimensions"),
+                    (recipe, "auto_center_marks"), (_drawing_dimension_import, "insert_marked_dimensions"),
+                    (_drawing_dimension_import, "delete_unnamed_imports"), (_drawing_dimension_import, "curate_dimensions"),
                 ):
                     patches.enter_context(patch.object(owner, name, wrap(
                         name, getattr(owner, name), remember=name in ("insert_marked_dimensions", "delete_unnamed_imports", "curate_dimensions")

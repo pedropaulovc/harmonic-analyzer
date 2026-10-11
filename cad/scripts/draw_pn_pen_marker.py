@@ -24,17 +24,16 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
-    add_property_linked_note,
-    add_surface_finish,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
-    stamp_drawing_summary,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pn_pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H, SURFACE_FINISHES
@@ -104,7 +103,7 @@ def _add_picked_dimension(
 ) -> Any:
     """Dimension across explicit typed picks (EDGE/VERTEX) at sheet points.
 
-    ``_drawing_common.add_edge_dimension`` only picks edges; the revolve's tip
+    ``_drawing_edge_dimensions.add_edge_dimension`` only picks edges; the revolve's tip
     apex is a VERTEX, so the overall length needs a mixed-type pick.
     """
     draw = adapter.currentModel

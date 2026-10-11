@@ -9,7 +9,28 @@ from typing import Any
 
 import pytest
 
+import _drawing_attachment
+import _drawing_balloons
+import _drawing_centerline
 import _drawing_common
+import _drawing_view_display
+import _drawing_dimension_import
+import _drawing_dimensions
+import _drawing_edge_dimensions
+import _drawing_edges
+import _drawing_finish
+import _drawing_gdt
+import _drawing_hole_callout
+import _drawing_layout_collect
+import _drawing_leader_notes
+import _drawing_notes
+import _drawing_sections
+import _drawing_selection
+import _drawing_selection_probe
+import _drawing_sheets
+import _drawing_tables
+import _drawing_view_configuration
+import solidworks_mcp.adapters
 import _gtol_face_resolve
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
@@ -59,12 +80,32 @@ def test_surface_finish_accepts_controlled_face_for_every_entity_path(
         id(controlled_face): _geometry(controlled_face, 10.0),
         id(other_face): _geometry(other_face, 6.0),
     }
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         "_gtol_face_read.face_geometry", lambda face: geometries[id(face)]
     )
 
-    signatures = _drawing_common._validate_surface_finish_control_face(
+    signatures = _drawing_finish._validate_surface_finish_control_face(
         selected, entity_type=entity_type, control=_control(), label="bearing finish"
     )
 
@@ -78,7 +119,27 @@ def test_surface_finish_rejects_entity_without_controlled_face(
     wrong_face = object()
     entity = _Entity(faces=(wrong_face,), face=wrong_face)
     selected = wrong_face if entity_type == "FACE" else entity
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         "_gtol_face_read.face_geometry", lambda face: _geometry(face, 6.0)
     )
@@ -87,7 +148,7 @@ def test_surface_finish_rejects_entity_without_controlled_face(
         RuntimeError,
         match="selected .* does not touch controlled surface-finish face",
     ):
-        _drawing_common._validate_surface_finish_control_face(
+        _drawing_finish._validate_surface_finish_control_face(
             selected,
             entity_type=entity_type,
             control=_control(),
@@ -97,7 +158,7 @@ def test_surface_finish_rejects_entity_without_controlled_face(
 
 def test_surface_finish_rejects_unverifiable_entity_type() -> None:
     with pytest.raises(ValueError, match="expected EDGE, SILHOUETTE, or FACE"):
-        _drawing_common._surface_finish_entity_faces(
+        _drawing_finish._surface_finish_entity_faces(
             object(), entity_type="VERTEX", label="bearing finish"
         )
 
@@ -108,7 +169,17 @@ def test_add_surface_finish_validates_part_control_without_audit_opt_in(
     selected = object()
     monkeypatch.delenv("HARMONIC_SURFACE_AUDIT", raising=False)
     monkeypatch.setattr(
-        _drawing_common,
+        _drawing_finish,
+        "_select_annotation_entity",
+        lambda *_args, **_kwargs: selected,
+    )
+    monkeypatch.setattr(
+        _drawing_gdt,
+        "_select_annotation_entity",
+        lambda *_args, **_kwargs: selected,
+    )
+    monkeypatch.setattr(
+        _drawing_selection,
         "_select_annotation_entity",
         lambda *_args, **_kwargs: selected,
     )
@@ -127,12 +198,12 @@ def test_add_surface_finish_validates_part_control_without_audit_opt_in(
         raise RuntimeError("wrong controlled face")
 
     monkeypatch.setattr(
-        _drawing_common, "_validate_surface_finish_control_face", reject
+        _drawing_finish, "_validate_surface_finish_control_face", reject
     )
     finish = _control()
 
     with pytest.raises(RuntimeError, match="wrong controlled face"):
-        _drawing_common.add_surface_finish(
+        _drawing_finish.add_surface_finish(
             object(),
             object(),
             edge_xy=(0.1, 0.1),
@@ -200,11 +271,31 @@ class _Adapter:
 
 @pytest.fixture(autouse=True)
 def _plain_early_binding(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
 
 
 def _guard(annotation: _Annotation, entity: Any, entity_type: str) -> None:
-    _drawing_common._assert_attached_to(
+    _drawing_attachment._assert_attached_to(
         _Adapter(), annotation, entity, entity_type=entity_type,
         what="surface-finish symbol", label="bore",
     )
@@ -300,7 +391,7 @@ def test_feature_control_frame_refuses_a_dimension_attachment() -> None:
         currentModel = None
 
     with pytest.raises(ValueError, match="cannot attach to a DIMENSION"):
-        _drawing_common.add_feature_control_frame(
+        _drawing_gdt.add_feature_control_frame(
             _Adapter(), None, edge_xy=(0.0, 0.0), frame_xy=(0.0, 0.0),
             characteristic="runout", tolerance="0.01", label="runout",
             entity_type="DIMENSION",
@@ -480,13 +571,54 @@ def _frame_datum(
         annotation.prints = printer(inserted[-1].label, annotation.position)
         annotation.position = (0.0, annotation.position[1])
 
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
+    monkeypatch.setattr(_drawing_balloons, "view_name", lambda *_: "Drawing View3")
     monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_dimension_import, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_edge_dimensions, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_gdt, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_layout_collect, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_leader_notes, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_sections, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_selection, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_selection_probe, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_tables, "view_name", lambda *_: "Drawing View3")
+    monkeypatch.setattr(_drawing_balloons, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_centerline, "rebuild_drawing", rebuild)
     monkeypatch.setattr(_drawing_common, "rebuild_drawing", rebuild)
-    tag = _drawing_common.add_frame_datum_feature(
+    monkeypatch.setattr(_drawing_dimension_import, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_finish, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_gdt, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_hole_callout, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_leader_notes, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_sections, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_tables, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_view_configuration, "rebuild_drawing", rebuild)
+    tag = _drawing_gdt.add_frame_datum_feature(
         type("_Adapter", (), {"currentModel": _Draw()})(), view, frame, datum="B",
         symbol_xy=_DATUM_B_XY, label="dowel hole pattern datum B",
     )
@@ -650,12 +782,28 @@ def _translated_frame(
             pass
 
     monkeypatch.setattr(
-        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
-    monkeypatch.setattr(_drawing_common, "_select_annotation_entity", lambda *_, **__: "rim")
+    monkeypatch.setattr(_drawing_finish, "_select_annotation_entity", lambda *_, **__: "rim")
+    monkeypatch.setattr(_drawing_gdt, "_select_annotation_entity", lambda *_, **__: "rim")
+    monkeypatch.setattr(_drawing_selection, "_select_annotation_entity", lambda *_, **__: "rim")
+    monkeypatch.setattr(_drawing_balloons, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_centerline, "rebuild_drawing", lambda *_, **__: None)
     monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda *_, **__: None)
-    monkeypatch.setattr(_drawing_common, "_assert_attached_to", lambda *_, **__: None)
-    _drawing_common.add_feature_control_frame(
+    monkeypatch.setattr(_drawing_dimension_import, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_finish, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_gdt, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_hole_callout, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_leader_notes, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_sections, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_tables, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_view_configuration, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_attachment, "_assert_attached_to", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_finish, "_assert_attached_to", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_gdt, "_assert_attached_to", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_leader_notes, "_assert_attached_to", lambda *_, **__: None)
+    _drawing_gdt.add_feature_control_frame(
         type("_Adapter", (), {"currentModel": _Draw()})(), None,
         edge_xy=(0.1, 0.2), frame_xy=(0.078, 0.218), characteristic="position",
         tolerance="0.05", datums=("C", "B"), translated=("B",),
@@ -777,14 +925,34 @@ def _stacked_frame(
             pass
 
     monkeypatch.setattr(
-        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
     monkeypatch.setattr(
-        _drawing_common, "_select_annotation_entity", lambda *_, **__: "rim"
+        _drawing_finish, "_select_annotation_entity", lambda *_, **__: "rim"
     )
+    monkeypatch.setattr(
+        _drawing_gdt, "_select_annotation_entity", lambda *_, **__: "rim"
+    )
+    monkeypatch.setattr(
+        _drawing_selection, "_select_annotation_entity", lambda *_, **__: "rim"
+    )
+    monkeypatch.setattr(_drawing_balloons, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_centerline, "rebuild_drawing", lambda *_, **__: None)
     monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda *_, **__: None)
-    monkeypatch.setattr(_drawing_common, "_assert_attached_to", lambda *_, **__: None)
-    _drawing_common.add_feature_control_frame(
+    monkeypatch.setattr(_drawing_dimension_import, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_finish, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_gdt, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_hole_callout, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_leader_notes, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_sections, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_tables, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_view_configuration, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_attachment, "_assert_attached_to", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_finish, "_assert_attached_to", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_gdt, "_assert_attached_to", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_leader_notes, "_assert_attached_to", lambda *_, **__: None)
+    _drawing_gdt.add_feature_control_frame(
         type("_Adapter", (), {"currentModel": _Draw()})(),
         None,
         edge_xy=(0.1, 0.2),
@@ -852,9 +1020,29 @@ def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
     # Farm run 20261009T171439353Z: the knife mount printed the tap and bore
     # frames to A|B with no B on the sheet (only the frame's unprinted datum
     # identifier named it).
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
     front = _View(("A",), (_FrameGtol("DetailItem355", ("A", "B")),))
     top = _View((), (_FrameGtol("DetailItem356", ("A",)), _FrameGtol("DetailItem358", ("A", "B"))))
@@ -873,9 +1061,9 @@ def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
         match=r"reference datum\(s\) no tag prints: B by \['DetailItem355', 'DetailItem358'\], "
         r"C by \['DetailItem357'\]; tags print \['A'\]",
     ):
-        _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
+        _drawing_gdt.assert_frame_datums_defined((front, top), label="knife mount")
     top.tags = [_DatumTag("B"), _DatumTag("C")]
-    _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
+    _drawing_gdt.assert_frame_datums_defined((front, top), label="knife mount")
 
 
 @pytest.mark.parametrize(
@@ -891,7 +1079,7 @@ def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
 def test_leader_landing_tolerance_is_one_millimetre(offset_m: float, accepted: bool) -> None:
     requested = (0.2055, 0.1175)
     points = (0.136, 0.106, 0.0, requested[0] + offset_m, requested[1], 0.0)
-    check = lambda: _drawing_common._assert_leader_lands(  # noqa: E731
+    check = lambda: _drawing_attachment._assert_leader_lands(  # noqa: E731
         _Annotation((object(),), (1,), leader_points=points), requested,
         what="surface-finish symbol", label="bore",
     )

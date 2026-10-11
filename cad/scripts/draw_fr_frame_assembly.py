@@ -21,39 +21,41 @@ import _telemetry
 from _check import check
 from _com import _early_bound
 from _session import run_build
-from _drawing_common import (
-    ASSEMBLY_VIEW_CONFIGURATION,
-    SIMPLIFIED_VIEW_CONFIGURATION,
-    DrawingOutputs,
-    ViewRole,
+from _drawing_balloon_display import rendered_balloon_circle
+from _drawing_balloons import (
     BalloonLanding,
     _BALLOON_LANDING_TOLERANCE_M,
     _balloon_item_number,
-    _edge_endpoint_key,
     _spread_balloons,
-    _zoomed_on,
     add_component_bom_balloons,
-    apply_view_configuration,
     assert_balloon_landings,
-    assert_full_detail_view,
-    create_section_view,
-    finalize_drawing,
-    insert_bom_table,
-    model_point_in_view,
-    model_points_in_view,
     position_bom_balloon,
-    rendered_balloon_circle,
     drawing_viewport_pixel_size,
+)
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_arc_endpoints_to_center,
-    set_reference_dimension,
-    set_hidden_lines_visible,
     set_high_quality_shaded_with_edges,
-    set_view_exploded_state,
-    sheet_drawable_region,
-    visible_component_entities,
 )
+from _drawing_view_display import set_hidden_lines_visible
+from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
+from _drawing_edges import _edge_endpoint_key
+from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_scan import _zoomed_on
+from _drawing_sections import create_section_view
+from _drawing_sheet_region import sheet_drawable_region
+from _drawing_tables import insert_bom_table
+from _drawing_view_configuration import (
+    ASSEMBLY_VIEW_CONFIGURATION,
+    SIMPLIFIED_VIEW_CONFIGURATION,
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
+    set_view_exploded_state,
+)
+from solidworks_mcp.adapters.solidworks.drawing import visible_component_entities
 from _simplified_names import simplified_name
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS

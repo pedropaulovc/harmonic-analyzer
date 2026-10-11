@@ -7,7 +7,7 @@ from dataclasses import replace
 
 import pytest
 
-import _drawing_common
+import _drawing_hole_callout
 import build_fr_harmonic_base as part
 import dt_cone_swing_platform_geometry as platform
 import dt_cone_pivot_post_installation
@@ -1219,7 +1219,7 @@ def test_base_callout_prefix_is_the_shared_helpers(
 
     native = "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>"
     process = getattr(sheet, process_name)
-    assert _drawing_common.compose_hole_callout_prefix(process, native) == (
+    assert _drawing_hole_callout.compose_hole_callout_prefix(process, native) == (
         expected_process_rows + native
     )
 

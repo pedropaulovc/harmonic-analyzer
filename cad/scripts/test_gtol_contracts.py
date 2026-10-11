@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from _drawing_common import PmiDrawingPlacement
+from _drawing_gdt import PmiDrawingPlacement
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_controls import GeometricControl, PartDatum, validate_part_pmi

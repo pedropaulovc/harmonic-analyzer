@@ -86,7 +86,10 @@ def main():
     else:
         import _script_paths  # noqa: F401
     from _com import _early_bound
-    import _drawing_common as common
+    import _drawing_common
+    import _drawing_gdt
+    import _drawing_selection
+    from solidworks_mcp.adapters.solidworks.drawing import dimension_name
     from _drawing_registry import DrawingLayout
     from _gear_drawing_entities import visible_circle_edge
     from diagnostics._owned_native_session import run_owned_diagnostic
@@ -112,7 +115,7 @@ def main():
             "adapter": subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "probe_sha256": digest(__file__),
             "recipe_sha256": digest(recipe.__file__),
-            "helper_sha256": digest(common.__file__),
+            "helper_sha256": digest(_drawing_gdt.__file__),
             "pid": int(app.GetProcessID()), "revision": str(app.RevisionNumber()),
             "started_utc": datetime.now(timezone.utc).isoformat(),
             "status": "running", "scope": "partial diagnostic sheet, not acceptance",
@@ -166,7 +169,7 @@ def main():
                 name = "RodDia" if args.part == "dt_pinion_lift_rod" else "BoreDia"
                 annotations = [_early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()]
                 dimensions = [annotation for annotation in annotations if int(annotation.GetType()) == 4]
-                names = [common.dimension_name(adapter, annotation) for annotation in dimensions]
+                names = [dimension_name(adapter, annotation) for annotation in dimensions]
                 report["dimension_names"] = names
                 matches = [annotation for annotation, actual in zip(dimensions, names) if actual == name]
                 if len(matches) != 1:
@@ -196,7 +199,7 @@ def main():
                         if not dimension.Select3(False, null_callout()):
                             raise RuntimeError("failed native-control dimension selection")
                     else:
-                        common._select_annotation_entity(
+                        _drawing_selection._select_annotation_entity(
                             adapter, view, edge_xy=kwargs.get("edge_xy"),
                             edge_entity=None, entity=kwargs.get("entity"),
                             entity_type="EDGE", label=kwargs["label"],
@@ -248,7 +251,7 @@ def main():
                     if type(code) is not int or code != 0 or not path.is_file():
                         raise RuntimeError(f"diagnostic SaveAs3 rejected: {suffix}: {code!r}")
                     report["exports"][suffix]["sha256"] = digest(path)
-                common.render_pdf_png(
+                _drawing_common.render_pdf_png(
                     output / "partial.pdf",
                     output / "partial.png",
                     layout=DrawingLayout.LANDSCAPE,

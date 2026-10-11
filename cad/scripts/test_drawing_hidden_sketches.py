@@ -17,7 +17,8 @@ from pathlib import Path
 
 import pytest
 
-import _drawing_common
+import _drawing_dimension_import
+import solidworks_mcp.adapters.solidworks.drawing
 import _drawing_hidden_sketches as hidden_sketches
 from test_targeted_model_items import (
     FakeAdapter,
@@ -37,7 +38,7 @@ def _no_com_curate(monkeypatch) -> None:
     def curate(adapter, annotations, *, delete=(), reposition=None):
         survivors = []
         for a in annotations:
-            name = _drawing_common.dimension_name(adapter, a)
+            name = solidworks_mcp.adapters.solidworks.drawing.dimension_name(adapter, a)
             if name in delete:
                 continue
             if reposition and name in reposition:
@@ -45,7 +46,8 @@ def _no_com_curate(monkeypatch) -> None:
             survivors.append(a)
         return survivors
 
-    monkeypatch.setattr(_drawing_common, "curate_dimensions", curate)
+    monkeypatch.setattr(_drawing_dimension_import, "curate_dimensions", curate)
+    monkeypatch.setattr(solidworks_mcp.adapters.solidworks.drawing, "curate_dimensions", curate)
 
 
 class FakeSketchFeature:
@@ -167,7 +169,7 @@ def test_a_part_hidden_sketch_is_shown_in_the_view_and_left_shown() -> None:
     measured that a per-view re-blank hides the dimensions it delivered."""
     adapter, drawing, view = _hidden_seat()
     curated = _curate(adapter, view, ("ArcCentreX", "Length"))
-    assert sorted(_drawing_common.dimension_name(adapter, a) for a in curated) == [
+    assert sorted(solidworks_mcp.adapters.solidworks.drawing.dimension_name(adapter, a) for a in curated) == [
         "ArcCentreX",
         "Length",
     ]
@@ -206,7 +208,7 @@ def test_a_shown_sketch_must_own_a_kept_dimension(monkeypatch) -> None:
     is stray geometry.  The owner inversion makes that impossible today, so a
     future edit that selects a non-owner is simulated."""
     monkeypatch.setattr(
-        _drawing_common,
+        _drawing_dimension_import,
         "_features_owning",
         lambda spec, keep, view_label: ("ArcReference", "Column"),
     )

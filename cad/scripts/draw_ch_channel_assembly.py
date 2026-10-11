@@ -26,12 +26,14 @@ from _com import _early_bound
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    ViewRole,
-    apply_view_configuration,
-    assert_full_detail_view,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+)
+from _drawing_view_configuration import (
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT

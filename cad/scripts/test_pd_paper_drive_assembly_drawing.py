@@ -9,7 +9,7 @@ import pytest
 import _assembly
 import _chain as chain
 import _config
-import _drawing_common
+import _drawing_balloons
 import build_pd_paper_drive_assembly as assembly
 import draw_pd_paper_drive_assembly as drawing
 import dt_drive_train_steps
@@ -273,7 +273,7 @@ def test_the_collar_leader_lands_on_its_rear_rim_beside_the_lower_end() -> None:
     assert landing[1] - minus_end[1] == pytest.approx((radius + y) / 2.0 / 1000.0)
     largest_scale = max(num / den for num, den in drawing.INNER_SCALE_LADDER)
     end_gap_m = (radius + y) * largest_scale / 1000.0
-    assert end_gap_m < _drawing_common._BALLOON_LANDING_TOLERANCE_M / 2.0
+    assert end_gap_m < _drawing_balloons._BALLOON_LANDING_TOLERANCE_M / 2.0
     # Below the axis is away from the feed sleeve: its stud stands above the knob.
     assert assembly.STUD_XY[1] > assembly.KNOB_SHAFT_XY[1]
 
@@ -342,10 +342,10 @@ def _ring_centres(
     ry = (outline[3] - outline[1]) / 2.0 + drawing.BALLOON_MARGIN
     thetas = [math.atan2(y - cy, x - cx) for _item, (x, y) in INNER_RING_180658]
     order = sorted(range(len(thetas)), key=thetas.__getitem__)
-    gap = _drawing_common._min_angular_gap(
-        min(rx, ry), BALLOON_RADIUS, clearance=_drawing_common._BALLOON_CLEARANCE_M
+    gap = _drawing_balloons._min_angular_gap(
+        min(rx, ry), BALLOON_RADIUS, clearance=_drawing_balloons._BALLOON_CLEARANCE_M
     )
-    angles = _drawing_common._push_apart_on_ring(
+    angles = _drawing_balloons._push_apart_on_ring(
         [thetas[index] for index in order], min_gap=gap
     )
     centres = [(0.0, 0.0)] * len(thetas)

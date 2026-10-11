@@ -15,7 +15,7 @@ vocabulary.
 .. warning::
 
    **The number is unit-bearing and the symbol text is FROZEN.**
-   ``_drawing_common.add_surface_finish`` writes ``Ra <value>`` into the symbol
+   ``_drawing_finish.add_surface_finish`` writes ``Ra <value>`` into the symbol
    via ``SetText``; SolidWorks never re-renders it when the document's unit
    system changes.  These values are **micrometres** (the ISO/metric
    convention).  Under inch (ips) display the machinist convention is

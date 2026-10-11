@@ -38,41 +38,40 @@ from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_common import (
     DrawingOutputs,
-    FaceLabel,
-    add_datum_feature,
-    add_feature_control_frame,
-    PictorialView,
-    place_pictorial_sheet,
-    add_native_hole_callout,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    rebuild_drawing,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
     assert_imported_precision,
-    add_edge_dimension,
-    add_surface_finish,
-    dimension_name,
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
     set_reference_dimension,
     set_basic_dimension,
-    add_property_linked_note,
-    create_section_view,
-    create_blank_drawing_sheets,
-    curate_view_dimensions,
-    finalize_drawing,
-    model_point_in_view,
     offset_dimension_text,
-    _select_view_entity,
-    _zoomed_on,
-    new_project_drawing,
-    read_required_properties,
     set_dimension_callouts,
-    set_hole_callout_precision,
-    view_name,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    ViewEdges,
-    rebuild_drawing,
-    scan_view_edges,
-    stamp_drawing_summary,
 )
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edges import ViewEdges, scan_view_edges
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
+from _drawing_scan import _zoomed_on
+from _drawing_sections import create_section_view
+from _drawing_selection import _select_view_entity
+from _drawing_sheets import (
+    FaceLabel,
+    PictorialView,
+    place_pictorial_sheet,
+    create_blank_drawing_sheets,
+)
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gtol_face_resolve import resolve_faces
 from _surface_finish import surface_finish_by_key
@@ -309,7 +308,7 @@ ARROW_HALF_WIDTH = 0.000381
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
-# through _drawing_common.compose_hole_callout_prefix.
+# through _drawing_hole_callout.compose_hole_callout_prefix.
 TRANSFER_KEEPER_CALLOUT = "TRANSFER FROM MHA-CH-007\nAT ASSEMBLY;\n"
 # Historical RD4 envelope measured on b49e1, NOT a measurement of the new
 # transfer callout. Expand its width for a conservative 3.5 mm per prefix

@@ -43,31 +43,34 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_edge_dimension,
-    add_feature_control_frame,
-    add_frame_datum_feature,
-    add_native_hole_callout,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_frame_datums_defined,
-    assert_imported_precision,
-    create_section_view,
-    curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
-    offset_dimension_text,
     read_required_properties,
     rebuild_drawing,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
     set_arc_endpoints_to_center,
     set_basic_dimension,
     set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hole_callout_precision,
-    stamp_drawing_summary,
-    view_name,
 )
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import (
+    add_datum_feature,
+    add_feature_control_frame,
+    add_frame_datum_feature,
+    assert_frame_datums_defined,
+)
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
+from _drawing_sections import create_section_view
+from solidworks_mcp.adapters.solidworks.drawing import view_name
 from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key

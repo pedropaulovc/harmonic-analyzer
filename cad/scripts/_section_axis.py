@@ -14,7 +14,8 @@ from typing import Any
 
 import _telemetry
 from _com import _early_bound
-from _drawing_common import rebuild_drawing, view_name
+from _drawing_common import rebuild_drawing
+from solidworks_mcp.adapters.solidworks.drawing import view_name
 
 
 @_telemetry.traced("drawing.section_axis", label_param="label")

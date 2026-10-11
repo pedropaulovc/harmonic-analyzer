@@ -48,24 +48,22 @@ from _drawing_annotation_extent import (
 )
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
-    add_property_linked_note,
-    add_surface_finish,
-    create_section_view,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
-    model_points_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimension,
-    stamp_drawing_summary,
-    view_name,
-    visible_view_entities,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_points_in_view
+from _drawing_sections import create_section_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 from _drawing_leaders import (
     Segment,
     dimension_segments,

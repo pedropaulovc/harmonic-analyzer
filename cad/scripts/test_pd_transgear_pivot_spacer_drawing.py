@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import _config
-import _drawing_common
+import _drawing_edges
 import _gtol_face
 import build_pd_transgear_pivot_spacer as part
 import draw_pd_transgear_pivot_spacer as drawing
@@ -308,7 +308,7 @@ def test_both_frames_stand_inside_the_sheet_clear_of_every_annotation() -> None:
 
 
 def _circle(radius: float, z: float, *, axis_z: float = 1.0):
-    return _drawing_common.ViewEdge(
+    return _drawing_edges.ViewEdge(
         edge=object(),
         line=None,
         circle=(0.0, 0.0, z, 0.0, 0.0, axis_z, radius),
@@ -332,12 +332,12 @@ def test_each_frame_finds_the_od_rim_of_its_own_face() -> None:
             _circle(bore_r, z),
             _circle(bore_r, other_z),
         )
-        edges = _drawing_common.ViewEdges(label="profile", edges=(*neighbours, rim))
+        edges = _drawing_edges.ViewEdges(label="profile", edges=(*neighbours, rim))
         assert drawing.face_rim(edges, mark) is rim
-        lone = _drawing_common.ViewEdges(label="profile", edges=neighbours)
+        lone = _drawing_edges.ViewEdges(label="profile", edges=neighbours)
         with pytest.raises(RuntimeError, match=r"matched 0 of 3 circles: r 4\.3000"):
             drawing.face_rim(lone, mark)
-        split = _drawing_common.ViewEdges(
+        split = _drawing_edges.ViewEdges(
             label="profile", edges=(rim, _circle(od_r, z))
         )
         with pytest.raises(RuntimeError, match="matched 2 of 2"):
@@ -376,7 +376,7 @@ def _od_cylinder():
 
 def _rim_between(*faces):
     edge = SimpleNamespace(GetTwoAdjacentFaces2=lambda: faces)
-    return _drawing_common.ViewEdge(edge=edge, line=None, circle=None, vertices=None)
+    return _drawing_edges.ViewEdge(edge=edge, line=None, circle=None, vertices=None)
 
 
 @pytest.mark.parametrize("plane_first", [False, True])

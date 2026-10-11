@@ -14,17 +14,15 @@ from _custom_properties import apply_custom_properties
 from _drawing_common import (
     TITLE_BLOCK_TOLERANCE_PROPERTIES,
     DrawingOutputs,
-    add_property_linked_note,
     assert_asme_b_sheet,
     finalize_drawing,
     new_project_drawing,
-    property_link,
     read_required_properties,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    sheet_drawable_region,
-    stamp_drawing_summary,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_notes import add_property_linked_note, property_link
+from _drawing_sheet_region import sheet_drawable_region
 from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _fastener_catalog import fastener
 from solidworks_mcp.adapters.com_variant import double_array

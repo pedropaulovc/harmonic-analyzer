@@ -31,22 +31,24 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
-    add_native_hole_callout,
-    add_property_linked_note,
-    assert_imported_precision,
-    create_section_view,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimensions import (
+    assert_imported_precision,
     set_arc_endpoints_to_max,
     set_dimension_callouts,
-    set_hidden_lines_removed,
     set_reference_dimension,
-    stamp_drawing_summary,
-    visible_view_entities,
 )
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edges import visible_view_entities
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
+from _drawing_sections import create_section_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from pd_transgear_arm_geometry import (

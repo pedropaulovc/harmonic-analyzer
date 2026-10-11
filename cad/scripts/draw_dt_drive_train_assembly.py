@@ -37,30 +37,36 @@ from ch_channel_assembly_steps import step_ref as channel_step_ref
 from _check import check
 from _com import _early_bound
 from _session import run_build
-from _drawing_common import (
-    SIMPLIFIED_VIEW_CONFIGURATION,
+from _drawing_balloons import (
     BalloonLanding,
-    DrawingOutputs,
-    ViewRole,
-    _SW_SHADED_EDGES,
-    _leader_segments_of,
     _spread_balloons,
     add_component_bom_balloons,
-    apply_view_configuration,
     assert_balloon_landings,
-    assert_full_detail_view,
     balloon_item_resolved,
-    check_drawing_layout,
-    collect_layout_elements,
-    create_blank_drawing_sheets,
+)
+from _drawing_common import (
+    DrawingOutputs,
+    _SW_SHADED_EDGES,
     finalize_drawing,
-    insert_bom_table,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_hidden_lines_removed,
     set_high_quality_shaded_with_edges,
+)
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_layout_collect import (
+    _leader_segments_of,
+    check_drawing_layout,
+    collect_layout_elements,
+)
+from _drawing_projection import model_point_in_view
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_tables import insert_bom_table
+from _drawing_view_configuration import (
+    SIMPLIFIED_VIEW_CONFIGURATION,
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
     set_view_exploded_state,
     view_configuration,
 )

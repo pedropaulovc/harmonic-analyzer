@@ -16,7 +16,7 @@ opt-in: only the sheets that import it re-key, whereas an edit to
 
 A leadered dimension's text block sits on its shoulder, a horizontal line of
 ``IDisplayDimension::GetDisplayData`` (sheet space; see
-``_drawing_common._display_dimension_leader_segments``).  The shoulder runs
+``_drawing_layout_collect._display_dimension_leader_segments``).  The shoulder runs
 under the full text width, and the text is centred on the annotation's
 ``GetPosition``.  The block is therefore the shoulder's x-span, from the
 shoulder up to the mirror of the shoulder about that centre.  The other display
@@ -31,13 +31,10 @@ from typing import Any
 
 import _telemetry
 from _com import _early_bound
-from _drawing_common import (
-    _ANNOT_DIM,
-    _GDT_TYPES,
-    _gdt_element,
-    rebuild_drawing,
-    sheet_drawable_region,
-)
+from _drawing_common import rebuild_drawing
+from _drawing_gdt_layout import _GDT_TYPES, _gdt_element
+from _drawing_layout_collect import _ANNOT_DIM
+from _drawing_sheet_region import sheet_drawable_region
 from _drawing_layout_check import DrawableRegion, LeaderSegment, _segment_crosses_box
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 

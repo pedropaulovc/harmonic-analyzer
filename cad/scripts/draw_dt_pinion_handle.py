@@ -12,22 +12,23 @@ from _check import check
 from _com import _early_bound
 from _paths import CAD_ROOT
 from _session import run_build
+from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_view_centerline,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimensions,
-    stamp_drawing_summary,
-    view_name,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimensions,
+)
+from _drawing_notes import add_property_linked_note
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 from _drawing_registry import DRAWINGS_BY_NAME
 from dt_pinion_handle_spec import DRAWING_PRECISION_BY_NAME
 from solidworks_mcp.adapters.pywin32_adapter import null_callout

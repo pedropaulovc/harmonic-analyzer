@@ -26,17 +26,16 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    assert_imported_precision,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    stamp_drawing_summary,
-    view_name,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
+from solidworks_mcp.adapters.solidworks.drawing import view_name
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
 from dt_drive_train_steps import step_ref

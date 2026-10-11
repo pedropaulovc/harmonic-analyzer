@@ -32,23 +32,26 @@ from _check import check
 from _com import _early_bound
 from _paths import CAD_ROOT
 from _session import run_build
+from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
-    add_native_hole_callout,
-    add_property_linked_note,
-    add_surface_finish,
-    add_view_centerline,
-    assert_imported_precision,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_dimensions import (
+    assert_imported_precision,
     set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_reference_dimension,
-    stamp_drawing_summary,
+)
+from _drawing_finish import add_surface_finish
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_attached_note
+from _drawing_notes import add_property_linked_note
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
     view_name,
     visible_component_entities,
 )

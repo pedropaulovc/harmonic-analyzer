@@ -38,27 +38,27 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_leaders import ARROW_TEXT_CLEARANCE
 from _drawing_common import (
-    _INSERT_DIMS_MARKED,
     DrawingOutputs,
-    add_note,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    check_drawing_layout,
-    create_blank_drawing_sheets,
-    curate_dimensions,
-    delete_unnamed_imports,
-    dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    stamp_drawing_summary,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import _INSERT_DIMS_MARKED, delete_unnamed_imports
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_layout_collect import check_drawing_layout
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
+from _drawing_sheets import create_blank_drawing_sheets
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    curate_dimensions,
+    dimension_name,
     view_name,
-    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_audit import arc_segments

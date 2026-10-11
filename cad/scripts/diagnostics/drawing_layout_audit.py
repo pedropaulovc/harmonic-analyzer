@@ -55,7 +55,7 @@ Two deliberate non-uses, both documented:
   ``GetFirstDisplayDimension6`` "obsoletes IView::GetFirstDisplayDimension5 by
   supporting inactive sheets" (``types/IView/GetFirstDisplayDimension6.md``).
   ``IView::GetAnnotations`` covers dimensions, notes and GD&T in one pass and is
-  already the project's convention (``_drawing_common._iter_view_annotations``).
+  already the project's convention (``_drawing_layout_collect._iter_view_annotations``).
 
 WHAT IT REPORTS
 ---------------
@@ -177,7 +177,7 @@ _SW_OPEN_READ_ONLY = 2
 # swAnnotationOwner_e.swAnnotationOwner_DrawingSheet -- excludes the sheet
 # format's own frame / zone labels / title-block notes, which are template ink
 # and not the author's to move (same test as
-# ``_drawing_common.collect_layout_elements``).
+# ``_drawing_layout_collect.collect_layout_elements``).
 _OWNER_DRAWING_SHEET = 1
 
 
@@ -336,7 +336,7 @@ def _display_text_boxes(
     of this display data" (``types/IDisplayData/GetTextPositionAtIndex.md``).
     On drawing annotations that origin is the sheet origin -- the sibling line
     primitives come back in sheet space (measured on this project's hole
-    callouts: ``_drawing_common._display_dimension_leader_segments``), and a
+    callouts: ``_drawing_layout_collect._display_dimension_leader_segments``), and a
     text offset expressed against a different origin than the lines it labels
     would make the two unusable together.  The audit asserts the consequence
     rather than the claim: a text box that lands outside the sheet is dropped
@@ -492,7 +492,7 @@ def _note_box(adapter: Any, annotation: Any) -> Box | None:
 def _table_geometry(adapter: Any, table: Any) -> AnnotationGeometry | None:
     """Box a table from its anchor plus its column widths and row heights.
 
-    Same route as ``_drawing_common._table_element``: the project's tables are
+    Same route as ``_drawing_layout_collect._table_element``: the project's tables are
     inserted top-left anchored, so ``IAnnotation::GetPosition`` on the table's
     underlying annotation is the top-left corner and the box grows right and
     DOWN.  A horizontally split table still reports the source table's total
@@ -654,7 +654,7 @@ def _keep_outs(width: float, height: float) -> tuple[tuple[str, Box], ...]:
     """The title-block keep-out for whichever checked-in template this sheet is.
 
     Matched by sheet size against ``_drawing_registry.DRAWING_TEMPLATES`` -- the
-    same template data ``_drawing_common.collect_layout_elements`` reserves --
+    same template data ``_drawing_layout_collect.collect_layout_elements`` reserves --
     so a sheet from a foreign template simply gets no keep-out instead of a
     fabricated one.
     """

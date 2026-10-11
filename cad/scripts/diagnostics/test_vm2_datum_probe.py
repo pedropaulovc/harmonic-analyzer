@@ -163,6 +163,9 @@ def harness(tmp_path, monkeypatch):
     modules = {
         "_com": SimpleNamespace(_early_bound=lambda value, _kind: value),
         "_drawing_common": common,
+        "_drawing_gdt": SimpleNamespace(__file__=__file__),
+        "_drawing_selection": SimpleNamespace(),
+        "solidworks_mcp.adapters.solidworks.drawing": common,
         "_gear_drawing_entities": SimpleNamespace(visible_circle_edge=lambda *_args: edge),
         "_telemetry": SimpleNamespace(span=lambda *_args, **_kwargs: nullcontext()),
         "diagnostics._owned_native_session": SimpleNamespace(
@@ -175,6 +178,9 @@ def harness(tmp_path, monkeypatch):
         monkeypatch.setitem(sys.modules, name, value)
 
     def load(stem):
+        # File-loaded entrypoints need the same script-directory path as a
+        # standalone invocation, without relying on another test importing it.
+        monkeypatch.syspath_prepend(str(Path(__file__).parent))
         spec = importlib.util.spec_from_file_location(stem, Path(__file__).with_name(f"{stem}.py"))
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

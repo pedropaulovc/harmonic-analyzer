@@ -35,34 +35,35 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_leader_note,
-    add_native_hole_callout,
-    add_surface_finish,
-    create_blank_drawing_sheets,
-    create_section_view,
-    create_view_theoretical_datum,
-    assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
-    dimension_name,
-    insert_hole_table,
-    import_cosmetic_threads,
-    model_point_in_view,
-    model_points_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimensions import (
+    assert_imported_precision,
     set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hole_callout_precision,
     set_reference_dimension,
-    stamp_drawing_summary,
-    visible_view_entities,
+)
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_leader_notes import add_leader_note
+from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_tables import create_view_theoretical_datum, insert_hole_table
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
     view_name,
     visible_component_entities,
 )
 
-from _drawing_common import _iter_tables, _iter_view_annotations, sheet_drawable_region
+from _drawing_layout_collect import _iter_tables, _iter_view_annotations
+from _drawing_sheet_region import sheet_drawable_region
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
@@ -761,7 +762,7 @@ TRANSFER_PEDESTAL_HOLES = tuple(
 # line: side by side, two "AT ASSEMBLY; 8-32 UNC - 2B" lines ran into each
 # other (hb-notes-2 eye pass). The spring callout keeps the semicolon joining
 # the locating instruction to its "4-40 UNC - 2B" line. The trailing line
-# break reaches the sheet through _drawing_common.compose_hole_callout_prefix.
+# break reaches the sheet through _drawing_hole_callout.compose_hole_callout_prefix.
 TRANSFER_BLOCK_CALLOUT = f"TRANSFER FROM MHA-DT-018\n{TRANSFER_AFTER_RIG_SET}\n"
 TRANSFER_SPRING_CALLOUT = f"TRANSFER FROM MHA-DT-024\n{TRANSFER_AFTER_RIG_SET}"
 TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"

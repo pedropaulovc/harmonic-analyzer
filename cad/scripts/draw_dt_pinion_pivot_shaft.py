@@ -26,18 +26,17 @@ from _session import run_build
 from _drawing_annotation_extent import gdt_box, place_callout_clear
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
-    add_property_linked_note,
-    add_surface_finish,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    stamp_drawing_summary,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_dimension_callouts
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from dt_drive_train_steps import step_ref

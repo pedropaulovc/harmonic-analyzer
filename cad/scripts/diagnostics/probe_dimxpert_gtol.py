@@ -17,7 +17,7 @@ Q3  ``InsertGtol(<type>)`` returns an ``IDimXpertAnnotation``.
 Q4  The empty Gtol it creates (documented default: 0.02 for Tolerance 1) can be
     FILLED.  Two candidate paths, both tried with read-back:
       * ``IGtolFrame::SetSymbolXml`` -- the current-format path already live and
-        read-back-verified in ``_drawing_common.add_feature_control_frame``; and
+        read-back-verified in ``_drawing_gdt.add_feature_control_frame``; and
       * ``IGtol::SetFrameSymbols2`` / ``SetFrameValues2`` + ``ConvertFormat`` --
         the path ``InsertGtol``'s own Remarks prescribe, whose docs carry
         "valid only if this Gtol was created in a version of SOLIDWORKS earlier
@@ -115,7 +115,8 @@ else:
     import _script_paths  # noqa: F401
 from _com import _early_bound, _read_member  # noqa: E402
 from _paths import CAD_ROOT  # noqa: E402
-from _drawing_common import _GTOL_SYMBOLS, _gtol_frame_xml  # noqa: E402
+from _gtol_frame import gtol_frame_xml as _gtol_frame_xml  # noqa: E402
+from _gtol_symbols import GTOL_SYMBOLS as _GTOL_SYMBOLS  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import (  # noqa: E402
     PyWin32Adapter,
     null_callout,

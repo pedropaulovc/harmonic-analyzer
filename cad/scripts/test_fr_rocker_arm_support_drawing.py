@@ -9,7 +9,29 @@ from unittest.mock import Mock
 
 import pytest
 import _config
+import _drawing_attachment
+import _drawing_balloons
+import _drawing_centerline
 import _drawing_common
+import _drawing_view_display
+import _drawing_dimension_import
+import _drawing_dimensions
+import _drawing_edge_dimensions
+import _drawing_edges
+import _drawing_finish
+import _drawing_gdt
+import _drawing_hole_callout
+import _drawing_layout_collect
+import _drawing_leader_notes
+import _drawing_notes
+import _drawing_projection
+import _drawing_sections
+import _drawing_selection
+import _drawing_selection_probe
+import _drawing_sheets
+import _drawing_tables
+import _drawing_view_configuration
+import solidworks_mcp.adapters
 
 import draw_fr_rocker_arm_support as drawing
 import build_fr_rocker_arm_support as support
@@ -310,11 +332,42 @@ def _section_doubles(
         swApp=SimpleNamespace(GetMathUtility=lambda: math_utility),
         _get_attr_or_call=lambda obj, name: _member(obj, name),
     )
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda obj, _: obj)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_balloons, "view_name", lambda *_: "Front")
     monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_common, "double_array", tuple)
+    monkeypatch.setattr(_drawing_dimension_import, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_edge_dimensions, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_gdt, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_layout_collect, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_leader_notes, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_sections, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_selection, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_selection_probe, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_tables, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_projection, "double_array", tuple)
+    monkeypatch.setattr(_drawing_sections, "double_array", tuple)
     monkeypatch.setattr(
-        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
     return SimpleNamespace(
         adapter=adapter,
@@ -345,7 +398,7 @@ def test_section_cut_uses_parent_sketch_coordinates(
     not be silently reset by a drawing recipe.
     """
     doubles = _section_doubles(monkeypatch, scale, add_to_db=seat_add_to_db)
-    result = _drawing_common.create_section_view(
+    result = _drawing_sections.create_section_view(
         doubles.adapter,
         doubles.parent,
         line_start=doubles.start,
@@ -384,7 +437,7 @@ def test_section_cut_restores_the_seat_when_the_line_fails(
     boom = RuntimeError("CreateLine exploded")
     doubles = _section_doubles(monkeypatch, 1.0, add_to_db=seat_add_to_db, raises=boom)
     with pytest.raises(RuntimeError, match="CreateLine exploded"):
-        _drawing_common.create_section_view(
+        _drawing_sections.create_section_view(
             doubles.adapter,
             doubles.parent,
             line_start=doubles.start,
@@ -414,7 +467,7 @@ def test_section_cut_refuses_a_cutting_line_inference_moved(monkeypatch, moved) 
         monkeypatch, 1.0, snap=(0.0, 0.000674, 0.0), snap_at=moved
     )
     with pytest.raises(RuntimeError, match=rf"{moved} point sits 0\.674 mm"):
-        _drawing_common.create_section_view(
+        _drawing_sections.create_section_view(
             doubles.adapter,
             doubles.parent,
             line_start=doubles.start,

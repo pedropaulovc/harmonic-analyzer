@@ -28,7 +28,8 @@ else:
     import _script_paths  # noqa: F401
 from _check import check  # noqa: E402 -- diagnostic path bootstrap
 from _com import _early_bound  # noqa: E402 -- diagnostic path bootstrap
-from _drawing_common import add_native_hole_callout, new_project_drawing, render_pdf_png
+from _drawing_common import new_project_drawing, render_pdf_png  # noqa: E402 -- diagnostic path bootstrap
+from _drawing_hole_callout import add_native_hole_callout  # noqa: E402 -- diagnostic path bootstrap
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from draw_fr_harmonic_base import _cross_tap_edge
 from diagnostics._owned_native_session import run_owned_diagnostic

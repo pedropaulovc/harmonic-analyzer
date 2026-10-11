@@ -36,26 +36,28 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    _zoomed_on,
-    add_native_hole_callout,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    create_section_view,
-    check_drawing_layout,
-    curate_view_dimensions,
     finalize_drawing,
     rebuild_drawing,
     new_project_drawing,
-    model_point_in_view,
     read_required_properties,
-    set_hidden_lines_removed,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
     set_dimension_callouts,
     set_reference_dimension,
-    stamp_drawing_summary,
-    visible_component_entities,
-    visible_view_entities,
 )
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_layout_collect import check_drawing_layout
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
+from _drawing_scan import _zoomed_on
+from _drawing_sections import create_section_view
+from solidworks_mcp.adapters.solidworks.drawing import visible_component_entities
 from _drawing_registry import DRAWINGS_BY_NAME
 import build_dt_cone_swing_platform as _part
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info

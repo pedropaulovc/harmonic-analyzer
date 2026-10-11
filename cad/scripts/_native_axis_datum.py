@@ -11,7 +11,7 @@ import math
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
-import _drawing_common as drawing
+import _drawing_selection
 import _telemetry
 from _com import _early_bound
 
@@ -170,7 +170,7 @@ def add_native_axis_datum(
     _validate_source_edge(app, view, entity, source_path, radius_m=radius_m, label=label)
     if view.GetDatumTags():
         raise RuntimeError(f"{label}: native axis view already has datum tags")
-    selected = drawing._select_annotation_entity(
+    selected = _drawing_selection._select_annotation_entity(
         adapter, view, edge_xy=None, edge_entity=None, entity=entity,
         entity_type="EDGE", label=label,
     )

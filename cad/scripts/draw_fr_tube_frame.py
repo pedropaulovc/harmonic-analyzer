@@ -29,22 +29,22 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
-    property_link,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    set_reference_dimension,
-    stamp_drawing_summary,
-    visible_view_entities,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edges import visible_view_entities
+from _drawing_notes import add_property_linked_note, property_link
+from _drawing_projection import model_point_in_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (

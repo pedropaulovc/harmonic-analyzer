@@ -14,7 +14,7 @@ from typing import Any
 
 import _telemetry
 from _com import _early_bound
-from _drawing_common import visible_view_entities
+from _drawing_edges import visible_view_entities
 
 
 def _span_attrs(**attributes: float) -> None:
@@ -85,7 +85,7 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     ``GetVisibleEntities2`` documents no ordering, and a part with coaxial or
     mirrored circles of one radius (every through-bore has two, one per face)
     would otherwise return a different edge run to run. See
-    :func:`_drawing_common._spread_balloons` for what that non-determinism cost.
+    :func:`_drawing_balloons._spread_balloons` for what that non-determinism cost.
     The centre comes out of ``CircleParams`` this loop already reads, so the
     guarantee is free.
     """

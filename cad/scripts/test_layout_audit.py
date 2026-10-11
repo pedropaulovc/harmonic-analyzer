@@ -4547,12 +4547,12 @@ def test_a_leadered_notes_zero_length_attach_stub_is_no_finding():
 def test_every_auto_center_marks_call_records_its_counts(monkeypatch):
     """#913 (2): _drawing_common registers the submodule's observer, and each
     call lands as a center_marks.auto_insert span event."""
-    import _drawing_common
+    import _drawing_center_mark_observer
     import _telemetry
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
     from solidworks_mcp.adapters.solidworks import drawing as sw_drawing
 
-    assert sw_drawing.CENTER_MARK_OBSERVER is _drawing_common._record_center_marks
+    assert sw_drawing.CENTER_MARK_OBSERVER is _drawing_center_mark_observer._record_center_marks
     events = []
     monkeypatch.setattr(_telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
     marks = ["template-mark"]
@@ -4585,12 +4585,12 @@ def test_every_auto_center_marks_call_records_its_counts(monkeypatch):
 def test_a_refused_center_mark_count_is_sent_as_a_primitive(monkeypatch):
     """OTel drops None attribute values: a count whose read raised goes out as
     -1 and is named in read_failed; the view is its name string."""
-    import _drawing_common
+    import _drawing_center_mark_observer
     import _telemetry
 
     events = []
     monkeypatch.setattr(_telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
-    _drawing_common._record_center_marks(
+    _drawing_center_mark_observer._record_center_marks(
         {"view": "Drawing View2", "before": None, "after": 3, "holes": True, "slots": False, "ok": True}
     )
     [(name, attrs)] = events

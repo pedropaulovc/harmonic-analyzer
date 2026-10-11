@@ -38,33 +38,34 @@ from _com import _early_bound
 from _paths import CAD_ROOT
 from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
+from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
-    add_attached_note,
-    add_native_hole_callout,
-    add_property_linked_note,
-    add_surface_finish,
-    add_view_centerline,
-    assert_imported_precision,
-    curate_view_dimensions,
-    create_section_view,
-    dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
-    offset_dimension_text,
-    project_part_pmi,
     read_required_properties,
     rebuild_drawing,
+    set_high_quality_shaded_with_edges,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
     set_basic_dimensions,
     set_dimension_callouts,
-    set_hidden_lines_removed,
     set_reference_dimension,
-    set_high_quality_shaded_with_edges,
-    stamp_drawing_summary,
-    visible_view_entities,
 )
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_attached_note
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
+from _drawing_sections import create_section_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )

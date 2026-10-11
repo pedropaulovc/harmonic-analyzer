@@ -15,20 +15,22 @@ from _session import run_build
 from _drawing_annotation_extent import place_callout_clear, require_clear
 from _drawing_common import (
     DrawingOutputs,
-    add_surface_finish,
-    add_native_hole_callout,
-    assert_imported_precision,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+)
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed
+from _drawing_dimensions import (
+    assert_imported_precision,
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
     set_dimension_callouts,
-    set_hidden_lines_removed,
     set_reference_dimension,
-    stamp_drawing_summary,
-    visible_view_entities,
 )
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_hole_callout import add_native_hole_callout
 from _drawing_hidden_sketches import curate_view_dimensions
 from _surface_finish import surface_finish_by_key
 from _drawing_registry import DRAWINGS_BY_NAME

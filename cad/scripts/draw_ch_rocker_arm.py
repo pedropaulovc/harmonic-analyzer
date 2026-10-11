@@ -33,25 +33,23 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    _select_view_entity,
-    _zoomed_on,
-    add_datum_feature,
-    add_edge_dimension,
-    add_feature_control_frame,
-    add_native_hole_callout,
-    add_property_linked_note,
-    add_surface_finish,
-    check_drawing_layout,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_basic_dimension,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    sheet_drawable_region,
-    stamp_drawing_summary,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_dimensions import set_basic_dimension
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_layout_collect import check_drawing_layout
+from _drawing_notes import add_property_linked_note
+from _drawing_scan import _zoomed_on
+from _drawing_selection import _select_view_entity
+from _drawing_sheet_region import sheet_drawable_region
 
 # The part saves TopEdgeReference hidden (#880): this form shows it in the
 # view that imports its dimension.

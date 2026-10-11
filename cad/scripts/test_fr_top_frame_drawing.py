@@ -1984,11 +1984,11 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
 
 def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
     import ast
-    import _drawing_common
+    import _drawing_hole_callout
 
     native = "<hw-threaddesc>\n<hw-threaddepth>\n<hw-tapdrldia> <hw-tapdrldepth>"
     assert (
-        _drawing_common.compose_hole_callout_prefix(
+        _drawing_hole_callout.compose_hole_callout_prefix(
             drawing.TRANSFER_KEEPER_CALLOUT,
             native,
         )
@@ -2013,7 +2013,7 @@ def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
         keyword.value for keyword in callouts[0].keywords if keyword.arg == "process"
     )
     assert isinstance(process, ast.Name) and process.id == "TRANSFER_KEEPER_CALLOUT"
-    helper_tree = ast.parse(Path(_drawing_common.__file__).read_text(encoding="utf-8"))
+    helper_tree = ast.parse(Path(_drawing_hole_callout.__file__).read_text(encoding="utf-8"))
     helper = next(
         node
         for node in helper_tree.body
@@ -2716,13 +2716,13 @@ def test_keeper_section_cuts_each_seat_over_its_flat_flange_underside() -> None:
 
 
 def _keeper_line(start, end, tag):
-    from _drawing_common import ViewEdge
+    from _drawing_edges import ViewEdge
 
     return ViewEdge(edge=tag, line=(start, end), circle=None, vertices=None)
 
 
 def test_keeper_split_edge_pick_needs_the_whole_boundary() -> None:
-    from _drawing_common import ViewEdges
+    from _drawing_edges import ViewEdges
 
     x0, x1, z0, _z1 = spec.KEEPER_SEAT_BOUNDS_XZ[1]
     y = part.HALF_H
@@ -2740,7 +2740,7 @@ def test_keeper_split_edge_pick_needs_the_whole_boundary() -> None:
 
 
 def test_keeper_section_seat_line_runs_split_to_split() -> None:
-    from _drawing_common import ViewEdges
+    from _drawing_edges import ViewEdges
 
     x, y = drawing.KEEPER_SECTION_X, part.HALF_H
     _x0, _x1, z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[0]
@@ -2779,7 +2779,7 @@ def test_keeper_section_seat_line_runs_split_to_split() -> None:
 
 
 def test_keeper_section_underside_line_spans_the_whole_seat() -> None:
-    from _drawing_common import ViewEdges
+    from _drawing_edges import ViewEdges
 
     x, y = drawing.KEEPER_SECTION_X, part.FLANGE_BOT_Y
     _x0, _x1, z0, z1 = spec.KEEPER_SEAT_BOUNDS_XZ[0]
@@ -2808,7 +2808,7 @@ def test_keeper_section_underside_line_spans_the_whole_seat() -> None:
 
 
 def test_socket_bore_circle_pick_is_exact_about_the_axis() -> None:
-    from _drawing_common import ViewEdge, ViewEdges
+    from _drawing_edges import ViewEdge, ViewEdges
 
     def circle(x, y, z, radius, tag, axis=(0.0, 1.0, 0.0)):
         return ViewEdge(

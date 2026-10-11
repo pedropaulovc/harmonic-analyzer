@@ -20,24 +20,25 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_dimension_measures,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
-    offset_dimension_text,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_visible,
-    set_reference_dimensions,
-    stamp_drawing_summary,
-    view_name,
-    visible_view_entities,
 )
+from _drawing_summary import stamp_drawing_summary
+from _drawing_view_display import set_hidden_lines_visible
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+    set_reference_dimensions,
+)
+from _drawing_edge_dimensions import assert_dimension_measures
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_read import face_geometry

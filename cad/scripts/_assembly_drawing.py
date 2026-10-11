@@ -9,12 +9,14 @@ import _telemetry
 from _check import check
 from _drawing_common import (
     DrawingOutputs,
-    ViewRole,
-    apply_view_configuration,
-    assert_full_detail_view,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+)
+from _drawing_view_configuration import (
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
 )
 from _drawing_registry import DrawingLayout
 from solidworks_mcp.adapters.solidworks.drawing import place_view

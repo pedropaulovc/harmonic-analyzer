@@ -18,7 +18,36 @@ from types import SimpleNamespace
 
 import pytest
 
-import _drawing_common as drawing_common
+import _config
+import _drawing_attachment
+import _drawing_balloon_display
+import _drawing_balloons
+import _drawing_centerline
+import _drawing_common
+import _drawing_view_display
+import _drawing_dimension_import
+import _drawing_dimensions
+import _drawing_edge_dimensions
+import _drawing_edges
+import _drawing_finish
+import _drawing_gdt
+import _drawing_gdt_layout
+import _drawing_hole_callout
+import _drawing_layout_audit
+import _drawing_layout_collect
+import _drawing_leader_notes
+import _drawing_notes
+import _drawing_projection
+import _drawing_scan
+import _drawing_sections
+import _drawing_selection
+import _drawing_selection_probe
+import _drawing_sheets
+import _drawing_tables
+import _drawing_view_configuration
+import _layout_audit
+import _telemetry
+import solidworks_mcp.adapters
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
@@ -114,7 +143,7 @@ def test_high_quality_shaded_with_edges_uses_documented_com_shape():
     view = _display_view()
     view.SetDisplayMode4 = lambda *args: calls.append(args) or True
 
-    drawing_common.set_high_quality_shaded_with_edges(
+    _drawing_common.set_high_quality_shaded_with_edges(
         _FakeAdapter(None), view, label="Sheet1 Isometric"
     )
 
@@ -128,7 +157,7 @@ def test_high_quality_shaded_with_edges_accepts_a_no_op_setter_on_a_correct_view
     view = _display_view()
     view.SetDisplayMode4 = lambda *_args: False
 
-    drawing_common.set_high_quality_shaded_with_edges(
+    _drawing_common.set_high_quality_shaded_with_edges(
         _FakeAdapter(None), view, label="Sheet1 Isometric"
     )
 
@@ -138,7 +167,7 @@ def test_high_quality_shaded_with_edges_rejects_silent_write_failure():
     view.SetDisplayMode4 = lambda *_args: False
 
     with pytest.raises(RuntimeError, match="not precise Shaded With Edges"):
-        drawing_common.set_high_quality_shaded_with_edges(
+        _drawing_common.set_high_quality_shaded_with_edges(
             _FakeAdapter(None), view, label="Sheet1 Isometric"
         )
 
@@ -152,13 +181,13 @@ def test_high_quality_shaded_with_edges_surfaces_a_com_exception():
     view.SetDisplayMode4 = boom
 
     with pytest.raises(RuntimeError, match="SetDisplayMode4 raised"):
-        drawing_common.set_high_quality_shaded_with_edges(
+        _drawing_common.set_high_quality_shaded_with_edges(
             _FakeAdapter(None), view, label="Sheet1 Isometric"
         )
 
 
 def test_hidden_lines_visible_forces_a_verified_hlr_transition(monkeypatch):
-    mode = {"value": drawing_common._SW_HLV}
+    mode = {"value": _drawing_view_display._SW_HLV}
     calls = []
 
     def set_mode(_use_parent, value, _faceted, _edges, _threads):
@@ -170,25 +199,65 @@ def test_hidden_lines_visible_forces_a_verified_hlr_transition(monkeypatch):
         SetDisplayMode4=set_mode,
         GetDisplayMode2=lambda: mode["value"],
     )
-    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
 
-    drawing_common.set_hidden_lines_visible(_FakeAdapter(None), view)
+    _drawing_view_display.set_hidden_lines_visible(_FakeAdapter(None), view)
 
-    assert calls == [drawing_common._SW_HLR, drawing_common._SW_HLV]
+    assert calls == [_drawing_view_display._SW_HLR, _drawing_view_display._SW_HLV]
 
 
 def test_hidden_lines_visible_rejects_a_stale_hlv_transition(monkeypatch):
     calls = []
     view = SimpleNamespace(
         SetDisplayMode4=lambda _parent, value, *_rest: calls.append(value) or False,
-        GetDisplayMode2=lambda: drawing_common._SW_HLV,
+        GetDisplayMode2=lambda: _drawing_view_display._SW_HLV,
     )
-    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
 
     with pytest.raises(RuntimeError, match="transition drawing view through HLR"):
-        drawing_common.set_hidden_lines_visible(_FakeAdapter(None), view)
+        _drawing_view_display.set_hidden_lines_visible(_FakeAdapter(None), view)
 
-    assert calls == [drawing_common._SW_HLR]
+    assert calls == [_drawing_view_display._SW_HLR]
 
 
 @pytest.mark.parametrize(
@@ -204,7 +273,7 @@ def test_high_quality_shaded_with_edges_rejects_bad_readback(defect, value):
     view = _display_view(**{defect: value})
 
     with pytest.raises(RuntimeError, match="not precise Shaded With Edges"):
-        drawing_common.set_high_quality_shaded_with_edges(
+        _drawing_common.set_high_quality_shaded_with_edges(
             _FakeAdapter(None), view, label="Sheet1 Isometric"
         )
 
@@ -212,7 +281,7 @@ def test_high_quality_shaded_with_edges_rejects_bad_readback(defect, value):
 def test_high_quality_shaded_with_edges_ignores_transient_facet_flag():
     # A fresh view reads faceted=True until its first full compute (the export);
     # the pre-export setter must not fail on it.
-    drawing_common.set_high_quality_shaded_with_edges(
+    _drawing_common.set_high_quality_shaded_with_edges(
         _FakeAdapter(None), _display_view(faceted=True), label="Sheet1 Isometric"
     )
 
@@ -222,12 +291,68 @@ def _sheet_views(monkeypatch, views_by_sheet):
     ddoc = SimpleNamespace(
         ActivateSheet=lambda name: active.update(sheet=name) or name in views_by_sheet
     )
-    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: ddoc)
     monkeypatch.setattr(
-        drawing_common, "iter_views", lambda _adapter: iter(views_by_sheet[active["sheet"]])
+        _drawing_common, "iter_views", lambda _adapter: iter(views_by_sheet[active["sheet"]])
     )
     monkeypatch.setattr(
-        drawing_common, "view_name", lambda _adapter, view: view.GetName2()
+        _drawing_layout_collect, "iter_views", lambda _adapter: iter(views_by_sheet[active["sheet"]])
+    )
+    monkeypatch.setattr(
+        _drawing_sheets, "iter_views", lambda _adapter: iter(views_by_sheet[active["sheet"]])
+    )
+    monkeypatch.setattr(
+        _drawing_balloons, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_common, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_dimension_import, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_edge_dimensions, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_gdt, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_layout_collect, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_leader_notes, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_sections, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_selection, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_selection_probe, "view_name", lambda _adapter, view: view.GetName2()
+    )
+    monkeypatch.setattr(
+        _drawing_tables, "view_name", lambda _adapter, view: view.GetName2()
     )
 
 
@@ -248,7 +373,7 @@ def test_post_export_precision_proof_checks_every_isometric(monkeypatch):
         },
     )
 
-    checked = drawing_common.assert_precise_isometric_views(
+    checked = _drawing_common.assert_precise_isometric_views(
         _FakeAdapter(None), ("Sheet1", "Sheet2")
     )
 
@@ -263,7 +388,7 @@ def test_post_export_precision_proof_rejects_faceted_isometric(monkeypatch, face
     )
 
     with pytest.raises(RuntimeError, match="'Iso2': exported isometric is not precision"):
-        drawing_common.assert_precise_isometric_views(
+        _drawing_common.assert_precise_isometric_views(
             _FakeAdapter(None), ("Sheet1", "Sheet2")
         )
 
@@ -278,7 +403,7 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
     def _unexpected_flag(*_args, **_kwargs):
         raise AssertionError("layout collection must not call flagged()")
 
-    monkeypatch.setattr(drawing_common._sw_type_info, "flagged", _unexpected_flag)
+    monkeypatch.setattr(solidworks_mcp.adapters.sw_type_info, "flagged", _unexpected_flag)
 
     note = SimpleNamespace(GetExtent=[0.01, 0.09, 0.0, 0.04, 0.10, 0.0])
     note_annotation = SimpleNamespace(
@@ -323,7 +448,7 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
     )
     model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
 
-    elements, leaders, region = drawing_common.collect_layout_elements(
+    elements, leaders, region = _drawing_layout_collect.collect_layout_elements(
         _FakeAdapter(model), layout=DrawingLayout.LANDSCAPE
     )
 
@@ -345,7 +470,7 @@ def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
         return SimpleNamespace(
             GetLeaderCount=0,
             GetSpecificAnnotation=note,
-            GetType=drawing_common._ANNOT_NOTE,
+            GetType=_drawing_layout_collect._ANNOT_NOTE,
             GetName=name,
             OwnerType=owner_type,
         )
@@ -355,7 +480,7 @@ def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
     sheet_gdt = SimpleNamespace(
         GetLeaderCount=0,
         GetSpecificAnnotation=SimpleNamespace(GetPosition=[-0.02, 0.0, 0.0]),
-        GetType=drawing_common._ANNOT_GTOL,
+        GetType=_drawing_gdt_layout._ANNOT_GTOL,
         GetName="template-gdt",
         GetPosition=[-0.02, 0.0, 0.0],
         OwnerType=1,
@@ -377,7 +502,7 @@ def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
     )
     model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
 
-    elements, leaders, _region = drawing_common.collect_layout_elements(
+    elements, leaders, _region = _drawing_layout_collect.collect_layout_elements(
         _FakeAdapter(model), layout=DrawingLayout.LANDSCAPE
     )
 
@@ -415,7 +540,7 @@ def test_portrait_collector_uses_mapped_keepout_and_physical_size():
     )
     model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
 
-    elements, leaders, region = drawing_common.collect_layout_elements(
+    elements, leaders, region = _drawing_layout_collect.collect_layout_elements(
         _FakeAdapter(model), layout=DrawingLayout.PORTRAIT
     )
 
@@ -448,7 +573,7 @@ def test_split_table_box_uses_only_the_rendered_row_range():
         GetRowHeight=lambda _index: 0.008,
     )
 
-    element = drawing_common._table_element(
+    element = _drawing_layout_collect._table_element(
         _FakeAdapter(SimpleNamespace()), table, "split-bom"
     )
 
@@ -470,7 +595,7 @@ def test_later_split_table_piece_includes_the_repeated_header_height():
         GetRowHeight=lambda index: 0.010 if index == 0 else 0.008,
     )
 
-    element = drawing_common._table_element(
+    element = _drawing_layout_collect._table_element(
         _FakeAdapter(SimpleNamespace()), table, "split-bom-2"
     )
 
@@ -883,7 +1008,7 @@ def _datum_tag(x, y, lines, label="A", *, primitives=()):
     )
     return SimpleNamespace(
         GetPosition=[x, y, 0.0],
-        GetType=lambda: drawing_common._ANNOT_DATUM,
+        GetType=lambda: _drawing_gdt_layout._ANNOT_DATUM,
         GetName=lambda: label,
         GetLeaderCount=lambda: 0,  # the whole point: it registers none
         GetSpecificAnnotation=lambda: spec,
@@ -909,7 +1034,7 @@ def test_datum_tag_leader_is_collected_even_though_it_registers_none():
     leader = [((ax, 0.1562), (ax, ay))]
     ann = _datum_tag(ax, ay, box + leader)
 
-    segs = drawing_common._datum_leader_segments(
+    segs = _drawing_layout_collect._datum_leader_segments(
         _FakeAdapter(None), ann, label="A", owner="Front"
     )
 
@@ -940,7 +1065,7 @@ def _hole_callout(lines, *, is_callout=True):
         GetDisplayData=lambda: data,
     )
     return SimpleNamespace(
-        GetType=lambda: drawing_common._ANNOT_DIM,
+        GetType=lambda: _drawing_layout_collect._ANNOT_DIM,
         GetName=lambda: "RD3",
         GetLeaderCount=lambda: 0,  # the whole point: registers none
         GetSpecificAnnotation=lambda: display,
@@ -962,7 +1087,7 @@ def test_hole_callout_leader_reads_the_true_bent_geometry():
     ]
     ann = _hole_callout(lines)
 
-    segs = drawing_common._display_dimension_leader_segments(
+    segs = _drawing_layout_collect._display_dimension_leader_segments(
         _FakeAdapter(None), ann, label="RD3", owner="Front"
     )
 
@@ -983,7 +1108,7 @@ def test_collector_boxes_no_dimension_but_keeps_hole_callout_leaders(monkeypatch
     dimension text from display data now, so the element audit carries NO
     dimension box -- only the hole callout's leader ink for crossing checks."""
     monkeypatch.setattr(
-        drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_a, **_k: obj
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda obj, *_a, **_k: obj
     )
     lines = [
         ((0.0707, 0.20571), (0.08389, 0.2192)),
@@ -1009,7 +1134,7 @@ def test_collector_boxes_no_dimension_but_keeps_hole_callout_leaders(monkeypatch
     )
     model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
 
-    elements, leaders, _region = drawing_common.collect_layout_elements(
+    elements, leaders, _region = _drawing_layout_collect.collect_layout_elements(
         _FakeAdapter(model), layout=DrawingLayout.LANDSCAPE
     )
 
@@ -1022,7 +1147,7 @@ def test_plain_dimension_contributes_no_leader():
     at the end of a free leader -- so it must yield NO leader segment (else every
     linear/radius dimension would spray phantom leaders across the audit)."""
     ann = _hole_callout([((0.0, 0.0), (0.1, 0.1))], is_callout=False)
-    segs = drawing_common._display_dimension_leader_segments(
+    segs = _drawing_layout_collect._display_dimension_leader_segments(
         _FakeAdapter(None), ann, label="Length", owner="Front"
     )
     assert segs == []
@@ -1044,7 +1169,7 @@ def test_datum_leader_across_a_foreign_view_now_flags():
     ]
     leader = [((0.1435, 0.25), (0.1435, 0.057))]
     ann = _datum_tag(0.1435, 0.057, box + leader)
-    segs = drawing_common._datum_leader_segments(
+    segs = _drawing_layout_collect._datum_leader_segments(
         _FakeAdapter(None), ann, label="A", owner="Front"
     )
 
@@ -1059,9 +1184,9 @@ def test_closed_rectangle_ignores_a_tag_with_no_box():
     checks, not fewer. Silently returning [] would restore the blind spot.
     """
     lines = [((0.10, 0.10), (0.15, 0.18))]  # a lone diagonal, no box
-    assert drawing_common._closed_rectangle(lines) == set()
+    assert _drawing_layout_collect._closed_rectangle(lines) == set()
     ann = _datum_tag(0.10, 0.10, lines)
-    segs = drawing_common._datum_leader_segments(
+    segs = _drawing_layout_collect._datum_leader_segments(
         _FakeAdapter(None), ann, label="A", owner="Front"
     )
     assert len(segs) == 1
@@ -1140,7 +1265,7 @@ def _gdt(x, y, kind, label):
     annotation = SimpleNamespace(
         GetPosition=[x, y, 0.0], GetType=lambda k=kind: k, GetName=lambda n=label: n
     )
-    return drawing_common._gdt_element(_FakeAdapter(None), annotation, label, kind)
+    return _drawing_gdt_layout._gdt_element(_FakeAdapter(None), annotation, label, kind)
 
 
 def test_surface_finish_box_matches_the_measured_symbol_anatomy():
@@ -1150,12 +1275,12 @@ def test_surface_finish_box_matches_the_measured_symbol_anatomy():
     is the wrong SHAPE here, not merely the wrong size.
     """
     ax, ay = 0.100, 0.200
-    element = _gdt(ax, ay, drawing_common._ANNOT_SFSYM, "Ra")
+    element = _gdt(ax, ay, _drawing_gdt_layout._ANNOT_SFSYM, "Ra")
 
-    assert element.xmin == ax - drawing_common._SF_BOX_LEFT_M
-    assert element.xmax == ax + drawing_common._SF_BOX_RIGHT_M
+    assert element.xmin == ax - _drawing_gdt_layout._SF_BOX_LEFT_M
+    assert element.xmax == ax + _drawing_gdt_layout._SF_BOX_RIGHT_M
     assert element.ymin == ay  # the vertex IS the bottom edge
-    assert element.ymax == ay + drawing_common._SF_BOX_UP_M
+    assert element.ymax == ay + _drawing_gdt_layout._SF_BOX_UP_M
     # The body is far wider than tall and sits entirely above its anchor.
     assert element.xmax - element.xmin > 2 * (element.ymax - element.ymin)
 
@@ -1185,7 +1310,7 @@ def _gdt_with_geometry(
     )
     if primitives is None:
         annotation.GetDisplayData = lambda: _display_data(lines, triangles, texts)
-    return drawing_common._gdt_element(_FakeAdapter(None), annotation, label, kind)
+    return _drawing_gdt_layout._gdt_element(_FakeAdapter(None), annotation, label, kind)
 
 
 def test_control_frame_is_measured_from_its_rendered_lines():
@@ -1210,7 +1335,7 @@ def test_control_frame_is_measured_from_its_rendered_lines():
         ((0.1137, 0.0865), (0.1049, 0.1268)),
     ]  # diagonal
     el = _gdt_with_geometry(
-        ax, ay, drawing_common._ANNOT_GTOL, "pos", lines=frame + leader
+        ax, ay, _drawing_gdt_layout._ANNOT_GTOL, "pos", lines=frame + leader
     )
 
     # The FRAME hangs down-right of the anchor (its top-left corner), so the
@@ -1240,7 +1365,7 @@ def test_datum_tag_box_spans_its_leader_and_triangle():
     leader = [((ax, 0.1562), (ax, ay))]
     tri = [((0.2086, 0.1537), (0.2114, 0.1537), (0.2100, 0.1562))]
     el = _gdt_with_geometry(
-        ax, ay, drawing_common._ANNOT_DATUM, "A", lines=box + leader, triangles=tri
+        ax, ay, _drawing_gdt_layout._ANNOT_DATUM, "A", lines=box + leader, triangles=tri
     )
 
     assert el.ymin == pytest.approx(0.1366)  # box bottom
@@ -1281,7 +1406,7 @@ _MHA062_DATUM_A_PRIMITIVES = [
 def _recorded_events(monkeypatch):
     events = []
     monkeypatch.setattr(
-        drawing_common._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+        _telemetry, "event", lambda name, **attrs: events.append((name, attrs))
     )
     return events
 
@@ -1294,12 +1419,12 @@ def test_a_leadered_frames_igtol_primitives_never_box_it(monkeypatch):
     nominal square at its position, and says so in a trace event."""
     events = _recorded_events(monkeypatch)
     el = _gdt_with_geometry(
-        0.065, 0.232, drawing_common._ANNOT_GTOL, "cylindricity",
+        0.065, 0.232, _drawing_gdt_layout._ANNOT_GTOL, "cylindricity",
         primitives=_MHA062_CYLINDRICITY_PRIMITIVES,
     )
     placeholder = (0.062808, 0.208112, 0.069883, 0.215112)
     assert (el.xmin, el.ymin, el.xmax, el.ymax) != pytest.approx(placeholder)
-    half = drawing_common._NOMINAL_GDT_HALF_M
+    half = _drawing_gdt_layout._NOMINAL_GDT_HALF_M
     assert (el.xmin, el.ymax) == pytest.approx((0.065 - half, 0.232 + half))
     assert [(name, attrs["symbol"]) for name, attrs in events] == [("gdt_box.fallback", "cylindricity")]
 
@@ -1309,7 +1434,7 @@ def test_a_datum_tags_primitive_jog_is_not_a_leader():
     the sheet never prints; it would be crossing-checked as one. With no
     display data there is no leader to read."""
     ann = _datum_tag(0.055, 0.229, [], primitives=_MHA062_DATUM_A_PRIMITIVES)
-    segs = drawing_common._datum_leader_segments(
+    segs = _drawing_layout_collect._datum_leader_segments(
         _FakeAdapter(None), ann, label="A", owner="Drawing View1"
     )
     assert not [s for s in segs if 0.0486 < min(s.x0, s.x1) < 0.0487]
@@ -1358,7 +1483,7 @@ def test_a_frame_is_boxed_from_its_display_data():
     top-left at GetPosition) plus its leader down to (114.63, 140.63)."""
     texts = [(t, (x * MM, y * MM), h * MM) for t, (x, y), h in _KNIFE_FCF_TEXTS]
     el = _gdt_with_geometry(
-        0.147, 0.16863, drawing_common._ANNOT_GTOL, "position",
+        0.147, 0.16863, _drawing_gdt_layout._ANNOT_GTOL, "position",
         lines=_m(_KNIFE_FCF_LINES), texts=texts,
     )
     assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx(
@@ -1370,17 +1495,17 @@ def test_a_frame_attached_to_a_dimension_is_boxed_from_its_display_data():
     """Main's review: the dimension-attached fallback is a DATUM rule. A frame
     hung under a dimension reads its display data like any other; the nominal
     square is wrong for an FCF by construction."""
-    dimension = drawing_common._SEL_DIMENSION
+    dimension = _drawing_gdt_layout._SEL_DIMENSION
     frame = _gdt_with_geometry(
-        0.147, 0.16863, drawing_common._ANNOT_GTOL, "position",
+        0.147, 0.16863, _drawing_gdt_layout._ANNOT_GTOL, "position",
         lines=_m(_KNIFE_FCF_LINES), attached_to=(dimension,),
     )
     assert (frame.xmin, frame.xmax) == pytest.approx((0.11463, 0.17641))
     datum = _gdt_with_geometry(
-        0.115, 0.18737, drawing_common._ANNOT_DATUM, "A",
+        0.115, 0.18737, _drawing_gdt_layout._ANNOT_DATUM, "A",
         lines=_m(_KNIFE_DATUM_LINES), attached_to=(dimension,),
     )
-    half = drawing_common._NOMINAL_GDT_HALF_M
+    half = _drawing_gdt_layout._NOMINAL_GDT_HALF_M
     assert (datum.xmin, datum.xmax) == pytest.approx((0.115 - half, 0.115 + half))
 
 
@@ -1390,12 +1515,12 @@ def test_a_datum_tag_is_boxed_and_led_from_its_display_data():
     is set aside."""
     tri = [((0.1164, 0.16937), (0.1136, 0.16937), (0.1150, 0.17182))]
     el = _gdt_with_geometry(
-        0.115, 0.18737, drawing_common._ANNOT_DATUM, "A",
+        0.115, 0.18737, _drawing_gdt_layout._ANNOT_DATUM, "A",
         lines=_m(_KNIFE_DATUM_LINES), triangles=tri,
         texts=[("A", (0.11327, 0.18809), 0.0035)],
     )
     assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.1115, 0.16937, 0.1185, 0.19437))
-    segs = drawing_common._datum_leader_segments(
+    segs = _drawing_layout_collect._datum_leader_segments(
         _FakeAdapter(None), _datum_tag(0.115, 0.18737, _m(_KNIFE_DATUM_LINES)), label="A", owner="Drawing View1"
     )
     assert [(s.x0, s.y0, s.x1, s.y1) for s in segs] == [pytest.approx((0.115, 0.16937, 0.115, 0.18737))]
@@ -1438,7 +1563,7 @@ def test_mha062_cylindricity_frame_is_boxed_where_it_prints():
         ("0.01", (0.074822, 0.225722), 0.0035, 0.009051),
     ]
     el = _gdt_with_geometry(
-        0.065, 0.232, drawing_common._ANNOT_GTOL, "cylindricity",
+        0.065, 0.232, _drawing_gdt_layout._ANNOT_GTOL, "cylindricity",
         lines=_MHA062_CYLINDRICITY, texts=texts,
     )
     assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.05865, 0.214826, 0.085295, 0.232))
@@ -1453,13 +1578,13 @@ def test_mha062_crown_frame_carries_its_below_frame_text_at_its_own_width(monkey
         ("0.05", (0.254822, 0.221722), 0.0035, 0.009051),
         ("BOTH CROWNS", (0.245, 0.215444), 0.0035, 0.034140),
     ]
-    display = drawing_common.annotation_display(
+    display = _drawing_layout_audit.annotation_display(
         _FakeAdapter(None), SimpleNamespace(GetDisplayData=lambda: _display_data(_MHA062_CROWN, (), texts))
     )[0]
-    box = drawing_common.display_box({**display, "lines": []})  # the text alone
+    box = _layout_audit.display_box({**display, "lines": []})  # the text alone
     assert (box.xmin, box.xmax) == pytest.approx((0.245, 0.27914))
     el = _gdt_with_geometry(
-        0.245, 0.228, drawing_common._ANNOT_GTOL, "crown", lines=_MHA062_CROWN, texts=texts
+        0.245, 0.228, _drawing_gdt_layout._ANNOT_GTOL, "crown", lines=_MHA062_CROWN, texts=texts
     )
     assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.245, 0.206399, 0.28745, 0.228))
     assert not [name for name, _attrs in events if name == "gdt_box.text_estimated"]
@@ -1468,14 +1593,14 @@ def test_mha062_crown_frame_carries_its_below_frame_text_at_its_own_width(monkey
 def test_a_run_without_a_reported_width_is_estimated_and_logged(monkeypatch):
     events = _recorded_events(monkeypatch)
     _gdt_with_geometry(
-        0.245, 0.228, drawing_common._ANNOT_GTOL, "crown", lines=_MHA062_CROWN,
+        0.245, 0.228, _drawing_gdt_layout._ANNOT_GTOL, "crown", lines=_MHA062_CROWN,
         texts=[("BOTH CROWNS", (0.245, 0.215444), 0.0035)],
     )
     assert [(name, attrs) for name, attrs in events] == [
         ("gdt_box.text_estimated", {"symbol": "crown", "runs": 1})
     ]
     # A refused width is not a lost read: the layout audit must not gate on it.
-    display, refused = drawing_common.annotation_display(
+    display, refused = _drawing_layout_audit.annotation_display(
         _FakeAdapter(None),
         SimpleNamespace(GetDisplayData=lambda: _display_data(texts=[("BOTH CROWNS", (0.245, 0.215444), 0.0035)])),
     )
@@ -1486,12 +1611,12 @@ def test_mha062_datum_a_is_boxed_and_led_where_it_prints():
     """Rendered: box centred on its leader at x 0.055, 0.0514..0.0585 x
     0.2293..0.2360, no jog. The display data says exactly that."""
     el = _gdt_with_geometry(
-        0.055, 0.229, drawing_common._ANNOT_DATUM, "A", lines=_MHA062_DATUM_A,
+        0.055, 0.229, _drawing_gdt_layout._ANNOT_DATUM, "A", lines=_MHA062_DATUM_A,
         triangles=[((0.0564, 0.2177), (0.0536, 0.2177), (0.055, 0.22015))],
         texts=[("A", (0.053274, 0.229722), 0.0035, 0.003451)],
     )
     assert (el.xmin, el.ymin, el.xmax, el.ymax) == pytest.approx((0.0515, 0.2177, 0.0585, 0.236))
-    segs = drawing_common._datum_leader_segments(
+    segs = _drawing_layout_collect._datum_leader_segments(
         _FakeAdapter(None), _datum_tag(0.055, 0.229, _MHA062_DATUM_A), label="A", owner="Drawing View1"
     )
     assert [(s.x0, s.y0, s.x1, s.y1) for s in segs] == [pytest.approx((0.055, 0.2177, 0.055, 0.229))]
@@ -1503,8 +1628,8 @@ def test_unmeasurable_gdt_falls_back_to_the_nominal_square():
     A dropped symbol is worse than a coarse one: it leaves the audit silent on a
     symbol placed clear off the sheet.
     """
-    half = drawing_common._NOMINAL_GDT_HALF_M
-    for kind in (drawing_common._ANNOT_DATUM, drawing_common._ANNOT_GTOL):
+    half = _drawing_gdt_layout._NOMINAL_GDT_HALF_M
+    for kind in (_drawing_gdt_layout._ANNOT_DATUM, _drawing_gdt_layout._ANNOT_GTOL):
         element = _gdt(0.100, 0.200, kind, "tag")
         assert (element.xmin, element.ymin) == (0.100 - half, 0.200 - half)
         assert (element.xmax, element.ymax) == (0.100 + half, 0.200 + half)
@@ -1517,13 +1642,13 @@ def test_surface_finish_over_the_top_border_is_now_caught():
     +/-8 mm box topped out at 0.263 and reported clean, while the real body
     reached ay+0.018 = 0.273 and printed over the border.
     """
-    ra = _gdt(0.030, 0.255, drawing_common._ANNOT_SFSYM, "Ra")
+    ra = _gdt(0.030, 0.255, _drawing_gdt_layout._ANNOT_SFSYM, "Ra")
     overflows = find_overflows([ra], ZONE_REGION)
     assert overflows, "the Ra body crosses the top zone bound and must be flagged"
     assert "top" in format_findings([], overflows).lower()
 
     # The old symmetric box is the negative control: it does NOT reach the bound.
-    half = drawing_common._NOMINAL_GDT_HALF_M
+    half = _drawing_gdt_layout._NOMINAL_GDT_HALF_M
     old = _el(
         "Ra",
         0.030 - half,
@@ -1541,7 +1666,7 @@ def test_surface_finish_over_the_top_border_is_now_caught():
 def test_surface_finish_clear_of_the_border_still_passes():
     """Positive control: draw-D's verified-safe bounds must audit clean."""
     for ax, ay in ((0.045, 0.1045), (0.133, 0.1992)):
-        ra = _gdt(ax, ay, drawing_common._ANNOT_SFSYM, "Ra")
+        ra = _gdt(ax, ay, _drawing_gdt_layout._ANNOT_SFSYM, "Ra")
         assert not find_overflows([ra], ZONE_REGION)
 
 
@@ -1652,12 +1777,12 @@ def _stub_layout(monkeypatch, leader_crossings):
     seg = LeaderSegment("a", "gdt", 0.0, 0.0, 0.1, 0.1, owner="Front")
     found = [LeaderCrossing(seg, seg, 0.05, 0.05) for _ in range(leader_crossings)]
     monkeypatch.setattr(
-        drawing_common,
+        _drawing_layout_collect,
         "collect_layout_elements",
         lambda _adapter, *, layout: ([], [], WHOLE_SHEET),
     )
     monkeypatch.setattr(
-        drawing_common,
+        _drawing_layout_collect,
         "audit_layout",
         lambda *_a, **_k: ([], [], found),
     )
@@ -1665,7 +1790,7 @@ def _stub_layout(monkeypatch, leader_crossings):
 
 def test_a_clean_sheet_passes(monkeypatch):
     _stub_layout(monkeypatch, 0)
-    drawing_common.check_drawing_layout(
+    _drawing_layout_collect.check_drawing_layout(
         None, layout=DrawingLayout.LANDSCAPE, stem="pn-pen-assembly"
     )
 
@@ -1678,7 +1803,7 @@ def test_no_sheet_is_exempt_from_a_leader_crossing(monkeypatch, stem):
     sheet -- named, unnamed, or formerly-grandfathered -- may reintroduce one."""
     _stub_layout(monkeypatch, 1)
     with pytest.raises(RuntimeError):
-        drawing_common.check_drawing_layout(
+        _drawing_layout_collect.check_drawing_layout(
             None, layout=DrawingLayout.LANDSCAPE, stem=stem
         )
 
@@ -1686,7 +1811,7 @@ def test_no_sheet_is_exempt_from_a_leader_crossing(monkeypatch, stem):
 def test_the_grandfather_machinery_is_gone():
     """A tripwire on the retirement: re-adding an allowlist must be a deliberate
     act that trips a test, not a quiet way to make a red build green."""
-    assert not hasattr(drawing_common, "_KNOWN_LEADER_CROSSINGS")
+    assert not hasattr(_drawing_layout_collect, "_KNOWN_LEADER_CROSSINGS")
 
 
 # --- the shared-terminus exemption must not swallow real crossings -----------
@@ -1736,18 +1861,18 @@ def test_the_ratchet_never_excuses_a_leader_across_a_VIEW():
     class _Stub:
         pass
 
-    import _drawing_common as dc
+    import _drawing_layout_collect
 
-    real_collect, real_audit = dc.collect_layout_elements, dc.audit_layout
-    dc.collect_layout_elements = lambda _a, *, layout: ([], [], WHOLE_SHEET)
-    dc.audit_layout = lambda *_a, **_k: ([], [], mixed)
+    real_collect, real_audit = _drawing_layout_collect.collect_layout_elements, _drawing_layout_collect.audit_layout
+    _drawing_layout_collect.collect_layout_elements = lambda _a, *, layout: ([], [], WHOLE_SHEET)
+    _drawing_layout_collect.audit_layout = lambda *_a, **_k: ([], [], mixed)
     try:
         with pytest.raises(RuntimeError):
-            dc.check_drawing_layout(
+            _drawing_layout_collect.check_drawing_layout(
                 None, layout=DrawingLayout.LANDSCAPE, stem="pn-pen-assembly"
             )
     finally:
-        dc.collect_layout_elements, dc.audit_layout = real_collect, real_audit
+        _drawing_layout_collect.collect_layout_elements, _drawing_layout_collect.audit_layout = real_collect, real_audit
 
 
 # --- balloon ring separation (SolidWorks-free) -------------------------------
@@ -1764,14 +1889,14 @@ def test_push_apart_never_reorders_the_balloons():
     attachment angles it was probed with, and it returned them reordered.
     """
     angles = [-1.865, -1.661, -1.629, -1.407, -1.152, 1.684, 1.805, 1.838]
-    out = drawing_common._push_apart_on_ring(angles, min_gap=0.4211)
+    out = _drawing_balloons._push_apart_on_ring(angles, min_gap=0.4211)
     assert out == sorted(out), f"push-apart reordered the balloons: {out}"
 
 
 def test_push_apart_actually_separates_to_the_gap():
     angles = [-1.865, -1.661, -1.629, -1.407, -1.152, 1.684, 1.805, 1.838]
     gap = 0.4211
-    out = drawing_common._push_apart_on_ring(angles, min_gap=gap)
+    out = _drawing_balloons._push_apart_on_ring(angles, min_gap=gap)
     for a, b in zip(out, out[1:]):
         assert b - a >= gap - 1e-9, f"gap {b - a} < {gap}"
     # and the wrap-around pair, which the linear chain cannot see
@@ -1804,7 +1929,7 @@ def test_push_apart_keeps_a_seam_straddling_cluster_at_the_seam():
     """
     angles = [-3.10, 3.10]
     gap = 0.4
-    out = drawing_common._push_apart_on_ring(angles, min_gap=gap)
+    out = _drawing_balloons._push_apart_on_ring(angles, min_gap=gap)
     # Separated to the gap, measured cyclically (the pair spans the seam).
     cyclic = [(b - a) % (2.0 * _math.pi) for a, b in zip(out, out[1:])]
     cyclic.append((out[0] - out[-1]) % (2.0 * _math.pi))
@@ -1823,7 +1948,7 @@ def test_push_apart_never_reorders_across_the_seam():
     must not shuffle indices when it rotates the run off the seam.
     """
     angles = sorted([-3.0, -2.8, -2.6, 2.7, 2.9, 3.05])
-    out = drawing_common._push_apart_on_ring(angles, min_gap=0.35)
+    out = _drawing_balloons._push_apart_on_ring(angles, min_gap=0.35)
     assert _cyclic_order_preserved(angles, out), f"seam run reordered: {out}"
     cyclic = [(b - a) % (2.0 * _math.pi) for a, b in zip(sorted(out), sorted(out)[1:])]
     cyclic.append((min(out) + 2.0 * _math.pi) - max(out))
@@ -1833,7 +1958,7 @@ def test_push_apart_never_reorders_across_the_seam():
 def test_push_apart_leaves_already_separated_angles_alone():
     """Minimum movement: balloons that already clear must not be herded."""
     angles = [0.0, 1.0, 2.0, 3.0]
-    out = drawing_common._push_apart_on_ring(angles, min_gap=0.5)
+    out = _drawing_balloons._push_apart_on_ring(angles, min_gap=0.5)
     assert out == pytest.approx(angles)
 
 
@@ -1841,7 +1966,7 @@ def test_push_apart_falls_back_to_even_spacing_when_it_cannot_fit():
     # 20 balloons x 0.5 rad = 10 rad > 2*pi: packing tighter than their own
     # circles would trade crossings for overlaps, the trade radial already lost.
     angles = [i * 0.01 for i in range(20)]
-    out = drawing_common._push_apart_on_ring(angles, min_gap=0.5)
+    out = _drawing_balloons._push_apart_on_ring(angles, min_gap=0.5)
     spacing = [round(b - a, 6) for a, b in zip(out, out[1:])]
     assert len(set(spacing)) == 1, "fallback must space evenly"
 
@@ -1852,7 +1977,7 @@ def test_min_angular_gap_clears_the_audits_SQUARE_not_just_the_circle():
     set against the model that grades it, or placement and audit disagree --
     measured as 9 overlaps when this used 2*r."""
     ring, balloon = 0.05, 0.00472
-    gap = drawing_common._min_angular_gap(ring, balloon, clearance=0.0)
+    gap = _drawing_balloons._min_angular_gap(ring, balloon, clearance=0.0)
     assert gap * ring == pytest.approx(2.0 * _math.sqrt(2.0) * balloon, rel=1e-9)
 
 
@@ -1883,7 +2008,7 @@ class _FakeEdge:
 
 def test_edge_key_reads_the_endpoints_after_generating_the_curve():
     edge = _FakeEdge((1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 1.0, 0, 0, 0))
-    key = drawing_common._edge_endpoint_key(_FakeAdapter(None), edge)
+    key = _drawing_edges._edge_endpoint_key(_FakeAdapter(None), edge)
     assert key == (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
     # GetCurveParams2 reads what GetCurve generated; SolidWorks keeps no curve
     # of its own, so skipping the call returns stale or empty parameters.
@@ -1897,9 +2022,9 @@ def test_edge_key_is_none_when_the_geometry_cannot_be_read():
         def GetCurveParams2(self):
             raise RuntimeError("no curve data")
 
-    assert drawing_common._edge_endpoint_key(_FakeAdapter(None), _Mute(())) is None
+    assert _drawing_edges._edge_endpoint_key(_FakeAdapter(None), _Mute(())) is None
     assert (
-        drawing_common._edge_endpoint_key(_FakeAdapter(None), _FakeEdge((1.0, 2.0)))
+        _drawing_edges._edge_endpoint_key(_FakeAdapter(None), _FakeEdge((1.0, 2.0)))
         is None
     )
 
@@ -1995,7 +2120,27 @@ class _MovingBalloon(_FakeNote):
 
 
 def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(monkeypatch):
-    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
     note = _MovingBalloon()
     model = SimpleNamespace(
         GetCurrentSheet=lambda: SimpleNamespace(GetMagneticLinesCount=lambda: 0),
@@ -2007,11 +2152,11 @@ def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(m
     )
     adapter = _FakeAdapter(model)
     target = (0.10, 0.18)
-    drawing_common.position_bom_balloon(
+    _drawing_balloons.position_bom_balloon(
         adapter, [note], item_number="2", position_xy=target, label="stale native cache"
     )
     assert note.placed == pytest.approx(target)
-    box = drawing_common._note_element(adapter, note, "B2")
+    box = _drawing_layout_collect._note_element(adapter, note, "B2")
     assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(
         (0.095, 0.175, 0.105, 0.185)
     )
@@ -2019,7 +2164,27 @@ def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(m
 
 @pytest.mark.parametrize("pixels_per_metre,accepted", ((1000.0, True), (2000.0, False)))
 def test_balloon_placement_acceptance_tracks_current_viewport_resolution(monkeypatch, pixels_per_metre, accepted):
-    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_balloons, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_centerline, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edges, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_finish, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_hole_callout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_leader_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_selection_probe, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_sheets, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tables, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_view_configuration, "_early_bound", lambda value, _kind: value)
     note = _MovingBalloon(pixel_error_m=0.00075)
     model = SimpleNamespace(
         GetCurrentSheet=lambda: SimpleNamespace(GetMagneticLinesCount=lambda: 0),
@@ -2030,7 +2195,7 @@ def test_balloon_placement_acceptance_tracks_current_viewport_resolution(monkeyp
         )),
     )
     def place():
-        drawing_common.position_bom_balloon(
+        _drawing_balloons.position_bom_balloon(
             _FakeAdapter(model), [note], item_number="2",
             position_xy=(0.10, 0.18), label="quantized native preview",
         )
@@ -2055,13 +2220,13 @@ def test_rendered_balloon_circle_rejects_unusable_ink(geometry):
         GetArcCount=lambda: count, GetArcAtIndex2=lambda _index: arc
     )
     with pytest.raises(RuntimeError):
-        drawing_common.rendered_balloon_circle(note, label="invalid native circle")
+        _drawing_balloon_display.rendered_balloon_circle(note, label="invalid native circle")
 
 
 def _ring_positions(notes):
     view = SimpleNamespace(GetOutline=lambda: (0.10, 0.10, 0.20, 0.20))
     adapter = _FakeAdapter(SimpleNamespace(EditRebuild3=lambda: None))
-    drawing_common._spread_balloons(adapter, view, list(notes))
+    _drawing_balloons._spread_balloons(adapter, view, list(notes))
     return [note.placed for note in notes]
 
 
@@ -2155,14 +2320,14 @@ def _instances(*names, hidden=(), bodies=None):
 def _leaves(children):
     root = _FakeDrawingComponent("dt-drive-train-8", children=children)
     view = SimpleNamespace(RootDrawingComponent2=lambda _resolve: root)
-    return drawing_common._view_component_leaves(_FakeAdapter(None), view, label="t")
+    return _drawing_balloons._view_component_leaves(_FakeAdapter(None), view, label="t")
 
 
-_ANCHOR = drawing_common.BalloonAnchor(point_mm=(1.0, 2.0, 3.0))
+_ANCHOR = _drawing_balloons.BalloonAnchor(point_mm=(1.0, 2.0, 3.0))
 
 
 def _chosen(children, stem="dt-cone-gear", anchor=_ANCHOR):
-    return drawing_common._shown_instances(_leaves(children), stem, anchor, label="t")[0].path
+    return _drawing_balloons._shown_instances(_leaves(children), stem, anchor, label="t")[0].path
 
 
 def test_anchor_instance_is_the_lowest_natural_name_in_any_walk_order():
@@ -2184,7 +2349,7 @@ def test_anchor_instance_skips_a_hidden_instance_and_a_hidden_parent():
 
 
 def test_pinned_anchor_instance_must_be_shown():
-    pinned = drawing_common.BalloonAnchor(point_mm=(0.0, 0.0, 0.0), instance="dt-cone-gear-4")
+    pinned = _drawing_balloons.BalloonAnchor(point_mm=(0.0, 0.0, 0.0), instance="dt-cone-gear-4")
     assert _chosen(_instances("dt-cone-gear-1", "dt-cone-gear-4"), anchor=pinned) == "dt-cone-gear-4"
     with pytest.raises(RuntimeError):
         _chosen(_instances("dt-cone-gear-1", "dt-cone-gear-4", hidden={"dt-cone-gear-4"}), anchor=pinned)
@@ -2455,16 +2620,29 @@ def _balloon(monkeypatch, sheet, view, anchors, items=(("dt-cone-gear", "1"),)):
         return [(round(p[0], 9), round(p[1], 9)) for p in points]
 
     events = []
-    monkeypatch.setattr(drawing_common, "model_points_in_view", project)
-    monkeypatch.setattr(drawing_common, "_spread_balloons", lambda *a, **k: None)
-    monkeypatch.setattr(drawing_common, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_balloons, "model_points_in_view", project)
+    monkeypatch.setattr(_drawing_edges, "model_points_in_view", project)
+    monkeypatch.setattr(_drawing_projection, "model_points_in_view", project)
+    monkeypatch.setattr(_drawing_balloons, "_spread_balloons", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_balloons, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_centerline, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_dimension_import, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_finish, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_gdt, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_hole_callout, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_leader_notes, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_sections, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_tables, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(_drawing_view_configuration, "rebuild_drawing", lambda *a, **k: None)
     monkeypatch.setattr(
-        drawing_common, "_balloon_item_number", lambda _adapter, note, label: note.item
+        _drawing_balloons, "_balloon_item_number", lambda _adapter, note, label: note.item
     )
     monkeypatch.setattr(
-        drawing_common._telemetry, "event", lambda name, **kw: events.append((name, kw))
+        _telemetry, "event", lambda name, **kw: events.append((name, kw))
     )
-    landings = drawing_common.add_component_bom_balloons(
+    landings = _drawing_balloons.add_component_bom_balloons(
         _FakeAdapter(sheet), view, items=items, anchors=anchors, label="t"
     )
     sheet.landings = landings
@@ -2519,7 +2697,7 @@ def test_a_family_without_a_frozen_anchor_fails_before_any_balloon(monkeypatch):
     view = _exploded_view(_instances("dt-cone-gear-1", "dt-crank-pinion-1"), [])
     anchors = {
         "dt-cone-gear": _ANCHOR,
-        "dt-crank-pinion": drawing_common.BalloonAnchor(point_mm=(4.0, 5.0, 6.0)),
+        "dt-crank-pinion": _drawing_balloons.BalloonAnchor(point_mm=(4.0, 5.0, 6.0)),
     }
 
     def ready_sheet():
@@ -2562,7 +2740,7 @@ def _pair_of_subassemblies(**view_kwargs):
     return _instances("sub-1/dt-cone-gear-1", "sub-2/dt-cone-gear-1", **view_kwargs)
 
 
-_SUB_2 = drawing_common.BalloonAnchor(point_mm=(1.0, 2.0, 3.0), instance="sub-2/dt-cone-gear-1")
+_SUB_2 = _drawing_balloons.BalloonAnchor(point_mm=(1.0, 2.0, 3.0), instance="sub-2/dt-cone-gear-1")
 
 
 def test_anchor_instance_is_the_full_path_not_its_last_segment():
@@ -2620,7 +2798,7 @@ def test_a_non_active_explode_member_naming_no_instance_of_its_configuration_fai
     with pytest.raises(
         RuntimeError, match=r"moves 'sub-2', which .* names no instance of 'Default Simplified'"
     ):
-        drawing_common._view_explode_offsets(_FakeAdapter(None), view, label="t")
+        _drawing_balloons._view_explode_offsets(_FakeAdapter(None), view, label="t")
 
 
 @pytest.mark.parametrize(
@@ -2635,7 +2813,7 @@ def test_an_exploded_view_whose_configuration_reads_no_steps_is_refused(referenc
     view = _exploded_view(_pair_of_subassemblies(), _SUBASSEMBLY_EXPLODE, referenced=referenced)
     view.ReferencedDocument.configuration.GetNumberOfExplodeSteps = lambda: 0
     with pytest.raises(RuntimeError, match=why):
-        drawing_common._view_explode_offsets(_FakeAdapter(None), view, label="t")
+        _drawing_balloons._view_explode_offsets(_FakeAdapter(None), view, label="t")
 
 
 @pytest.mark.parametrize(
@@ -2655,7 +2833,7 @@ def test_balloon_must_attach_to_exactly_one_edge_of_the_exact_instance(monkeypat
         _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _SUB_2})
 
 
-_WALK = drawing_common.BalloonAnchor()
+_WALK = _drawing_balloons.BalloonAnchor()
 
 # An L-shaped outline's corners.
 _L_POINTS = ((0.0, 0.0, 0.0), (0.004, 0.0, 0.0), (0.004, 0.006, 0.0), (0.0, 0.006, 0.0))
@@ -2764,7 +2942,7 @@ def test_zoomed_on_restores_fit_and_raises_the_first_failure(fault, raised):
     fails too, the failure raised is still the first one, noting the second."""
     window = _ZoomWindow(fault)
     with pytest.raises(RuntimeError, match=raised) as failure:
-        with drawing_common._zoomed_on(SimpleNamespace(currentModel=window), (0.1, 0.2), 0.012):
+        with _drawing_scan._zoomed_on(SimpleNamespace(currentModel=window), (0.1, 0.2), 0.012):
             raise RuntimeError("the pick failed")
     notes = getattr(failure.value, "__notes__", [])
     if fault == "body-then-restore":
@@ -2850,14 +3028,14 @@ def test_a_later_rebuild_that_moves_a_landed_leader_fails_the_final_proof(monkey
     view, sheet = _walked_to(hit, landing)
     _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
     adapter = _FakeAdapter(sheet)
-    drawing_common.assert_balloon_landings(adapter, sheet.landings)
+    _drawing_balloons.assert_balloon_landings(adapter, sheet.landings)
     sheet.balloons[0].end = landing
     with pytest.raises(
         RuntimeError,
         match=r"1 balloon\(s\) changed after the final rebuild: .*cone-gear balloon leader "
         r"attachment moved",
     ):
-        drawing_common.assert_balloon_landings(adapter, sheet.landings)
+        _drawing_balloons.assert_balloon_landings(adapter, sheet.landings)
 
 
 def _ring_point(t, centre=(0.1, 0.1), radius=0.00495):
@@ -2938,7 +3116,7 @@ def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge
 
 @pytest.mark.parametrize(
     "listed",
-    [0, drawing_common._VISIBLE_EDGES_PER_INSTANCE + 1],
+    [0, _drawing_balloons._VISIBLE_EDGES_PER_INSTANCE + 1],
     ids=["none-listed", "over-the-cap"],
 )
 def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypatch, listed):
@@ -2993,7 +3171,7 @@ def test_bom_items_order_numerically_not_lexically():
     """ "10" must not sort between "1" and "2" -- a lexical key would reorder a
     ring whose items ran into double digits, which every assembly sheet does."""
     keys = [
-        drawing_common._balloon_item_key(_FakeAdapter(None), _FakeNote(0, 0, item=t))
+        _drawing_balloons._balloon_item_key(_FakeAdapter(None), _FakeNote(0, 0, item=t))
         for t in ("10", "2", "3")
     ]
     assert [key[0] for key in sorted(keys)] == [2, 3, 10]
@@ -3007,7 +3185,7 @@ def test_an_unreadable_balloon_item_sorts_last_instead_of_failing():
         def GetBomBalloonText(self, _upper):
             raise RuntimeError("no text")
 
-    key = drawing_common._balloon_item_key(_FakeAdapter(None), _Mute(0, 0))
+    key = _drawing_balloons._balloon_item_key(_FakeAdapter(None), _Mute(0, 0))
     assert key == (sys.maxsize, "")
 
 
@@ -3016,8 +3194,8 @@ def test_a_balloon_whose_item_reads_empty_does_not_tie_every_key():
     blank = _FakeNote(0.17, 0.17, item="")
     real = _FakeNote(0.17, 0.17, item="7")
     adapter = _FakeAdapter(None)
-    assert drawing_common._balloon_item_key(adapter, blank) == (sys.maxsize, "")
-    assert drawing_common._balloon_item_key(adapter, real) == (7, "7")
+    assert _drawing_balloons._balloon_item_key(adapter, blank) == (sys.maxsize, "")
+    assert _drawing_balloons._balloon_item_key(adapter, real) == (7, "7")
 
 
 def test_drawing_revision_must_match_current_release():
@@ -3028,14 +3206,14 @@ def test_drawing_revision_must_match_current_release():
         def GetCustomInfoValue(self, _configuration, name):
             return self.revision if name == "Revision" else "present"
 
-    expected = drawing_common._config.release_revision()
-    drawing_common.read_required_properties(
+    expected = _config.release_revision()
+    _drawing_common.read_required_properties(
         Model(expected),
         ("Revision",),
         required=("Revision",),
     )
     with pytest.raises(RuntimeError, match=r"Revision .* current release"):
-        drawing_common.read_required_properties(
+        _drawing_common.read_required_properties(
             Model("v1"),
             ("Revision",),
             required=("Revision",),
