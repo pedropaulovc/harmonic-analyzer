@@ -101,9 +101,6 @@ BASIC_REDUCER_DIMENSIONS = (
     ("StationReference", "PlateTapStation1"),
     ("StationReference", "PlateTapStation2"),
 )
-BASIC_REDUCER_DIMENSIONS += (
-    ("StationReference", "ReducerDeltaX"), ("StationReference", "ReducerDeltaY"),
-)
 BASIC_REDUCER_DIMENSIONS += tuple(
     ("LocatorProfile", name) for name in ("LocatorX1", "LocatorY1", "LocatorX2", "LocatorY2")
 )
@@ -274,7 +271,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PivotBoreProfile": {"PivotBoreDia"},
     "PinBoreProfile": {"PinBoreDia"},
     "SpotFaceProfile": {"SpotFaceDia", "FloorDepth"},
-    "StationReference": {"PinStation", "PlateTapStation1", "PlateTapStation2", "ReducerDeltaX", "ReducerDeltaY"},
+    "StationReference": {"PinStation", "PlateTapStation1", "PlateTapStation2"},
     "PinHoleProfile": {"PinHoleDia", "PinHoleZ"},
     "PinHole": {"PinHoleDepth"},
     "LocatorProfile": {"LocatorX1", "LocatorY1", "LocatorY2", "LocatorDia1"},
@@ -293,16 +290,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "SpotFaceDia": SPOT_FACE_DIA_PLACES,
         "FloorDepth": SPOT_FACE_FLOOR_PLACES,
     },
-    # The reducer offsets print at the stations' .XXX: each BASIC rounds by
-    # <= 0.0005, so the 35.101 centre distance they compose moves <= 0.0007
-    # (backlash 2 tan 20 x 0.0007 = 0.0005), under 2 % of the feed stud's
-    # Ø0.050 position zone.  Six places asked for nothing the mesh needs.
     "StationReference": {
         "PinStation": STATION_PLACES,
         "PlateTapStation1": STATION_PLACES,
         "PlateTapStation2": STATION_PLACES,
-        "ReducerDeltaX": STATION_PLACES,
-        "ReducerDeltaY": STATION_PLACES,
     },
     "PinHoleProfile": {
         "PinHoleDia": PIN_HOLE_DIA_PLACES,

@@ -202,9 +202,6 @@ FRONT_KEEP = {
     "LocatorY1": (_LOCATOR_X - 0.0075, _front_y(LOCATOR_SITES_MM[0][1]) - 0.006),
     "LocatorY2": (_LOCATOR_X + 0.00725, _front_y(LOCATOR_SITES_MM[1][1]) + 0.006),
     "LocatorDia1": (0.245, _front_y(PIVOT_END_R) + 0.021),
-    # Right of section B's lower label; ReducerDeltaY inside the left border.
-    "ReducerDeltaX": (_front_x(PIN_STATION) - 0.020, _UNDER_FRONT - 0.005),
-    "ReducerDeltaY": (0.032, FRONT_CENTER[1] - 0.029),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper
