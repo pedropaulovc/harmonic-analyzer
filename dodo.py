@@ -1368,7 +1368,7 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
-_VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
+_VERIFY_NAMES = ("soundness", "kinematics", "pn_pen_shadow_render")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
