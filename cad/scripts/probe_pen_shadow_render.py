@@ -47,6 +47,7 @@ async def probe(adapter: Any) -> dict[str, str]:
         for name in (
             "swDisplayShadowsInShadedMode",
             "swDisplayAmbientOcclusionShadows",
+            "swDisplayRealViewGraphics",
         )
     }
     initial = {name: bool(sw.GetUserPreferenceToggle(value)) for name, value in prefs.items()}
@@ -129,13 +130,18 @@ async def probe(adapter: Any) -> dict[str, str]:
             raise RuntimeError("Scene floor shadow readback remained enabled")
         model.ShowNamedView2("", enum("swIsometricView"))
         adapter._zoom_to_fit(model)
-        for shadows, filename in ((False, "both-off.png"),):
+        for realview, filename in (
+            (initial["swDisplayRealViewGraphics"], "both-off.png"),
+            (False, "both-off-realview-off.png"),
+        ):
             sw.SetUserPreferenceToggle(prefs["swDisplayAmbientOcclusionShadows"], False)
-            sw.SetUserPreferenceToggle(prefs["swDisplayShadowsInShadedMode"], shadows)
+            sw.SetUserPreferenceToggle(prefs["swDisplayShadowsInShadedMode"], False)
+            sw.SetUserPreferenceToggle(prefs["swDisplayRealViewGraphics"], realview)
             observed = {name: bool(sw.GetUserPreferenceToggle(value)) for name, value in prefs.items()}
             if observed != {
-                "swDisplayShadowsInShadedMode": shadows,
+                "swDisplayShadowsInShadedMode": False,
                 "swDisplayAmbientOcclusionShadows": False,
+                "swDisplayRealViewGraphics": realview,
             }:
                 raise RuntimeError(f"Render preference readback mismatch: {observed}")
             scene_before = {

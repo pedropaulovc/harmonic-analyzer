@@ -2897,6 +2897,7 @@ def task_verify():
     probe_dir = CAD_OUT / "png" / "pn-pen-shadow-probe"
     probe_outputs = [
         probe_dir / "both-off.png",
+        probe_dir / "both-off-realview-off.png",
         REPORTS / "pn-pen-shadow-render.json",
     ]
     probe_deps = [
