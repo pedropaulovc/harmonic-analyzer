@@ -26,9 +26,18 @@ def _readings() -> tuple[registration.RegistrationReading, ...]:
     )
 
 
+def _setup(across_mm: float, along_mm: float) -> tuple[float, float]:
+    """A setup error with these components across and along S-K."""
+    ux, uy = registration.S_TO_K_UNIT
+    return (along_mm * ux - across_mm * uy, along_mm * uy + across_mm * ux)
+
+
+_SETUP = _setup(0.018, 0.002)
+
+
 def _receive(**changes) -> tuple[float, float]:
     inputs = dict(
-        setup_error_xy_mm=(0.018, 0.012), readings=_readings(),
+        setup_error_xy_mm=_SETUP, readings=_readings(),
         required_load_cases=("pull", "push", "rock"), measurement_uncertainty_mm=0.001,
         own_datum_patterns_accepted=(True, True), free_hand_assembly=True,
     )
@@ -139,10 +148,27 @@ def test_measured_receiver_pays_full_two_pose_travel_and_uncertainty() -> None:
     assert registration.LOCATOR_COORDINATE_TRAVEL_MAX_MM <= 0.100 / math.sqrt(2.0)
 
 
+def test_setup_must_hold_the_drawn_centre_distance_window_along_s_k() -> None:
+    import pd_rack_pinion_spec as disc
+    tol = disc.CENTRE_DISTANCE_SET_TOL
+    uncertainty = 0.001
+    s_to_k = (arm.KNOB_BORE_STATION - arm.PIN_STATION, arm.KNOB_BORE_OFFSET)
+    assert math.hypot(*s_to_k) == pytest.approx(disc.CENTRE_DISTANCE)
+    # Inside the position circle but off the centre-distance window: refused.
+    off_window = _setup(0.0, tol - uncertainty + 0.001)
+    assert math.hypot(*off_window) + uncertainty <= registration.REDUCER_AXIS_SETUP_RADIUS_MM
+    for sign in (1.0, -1.0):
+        with pytest.raises(ValueError, match="centre distance"):
+            _receive(setup_error_xy_mm=_setup(0.0, sign * (tol - uncertainty + 0.001)))
+        _receive(setup_error_xy_mm=_setup(0.0, sign * (tol - uncertainty)))
+    # The same error across S-K is only a clocking error: accepted.
+    _receive(setup_error_xy_mm=_setup(tol, 0.0))
+
+
 def test_actual_joint_receiver_requires_critical_setting_and_every_signed_loaded_site() -> None:
     import transgear_hanger_joints as joints
     inputs = dict(
-        setup_error_xy_mm=(0.018, 0.012), registration_readings=_readings(),
+        setup_error_xy_mm=_SETUP, registration_readings=_readings(),
         required_load_cases=("pull", "push", "rock"), measurement_uncertainty_mm=0.001,
         own_datum_patterns_accepted=(True, True), free_hand_assembly=True,
     )
@@ -186,15 +212,17 @@ def test_every_projected_caller_uses_canonical_real_saved_file_reader_after_expo
 def test_receiver_charges_full_delta_uncertainty_without_unneeded_one_micron_instrument_grade() -> None:
     """Synthetic readings only: two .002 instrument errors cost .004."""
     readings = tuple(replace(row, seat_normal_changes_mm=(0.0, 0.0, 0.0)) for row in _readings())
+    # A .004 uncertainty spends the whole +/-.004 S-K window, so only a
+    # dead-on setup reading is accepted with it.
     widths = _receive(
-        setup_error_xy_mm=(0.015, 0.010), readings=readings,
+        setup_error_xy_mm=(0.0, 0.0), readings=readings,
         measurement_uncertainty_mm=0.004,
     )
     assert widths == pytest.approx((0.068, 0.060))
     assert registration.ARM_SEAT_NORMAL_UNCERTAINTY_MAX_MM == registration.ARM_PLATE_LOADED_NORMAL_CHANGE_MAX_MM
     with pytest.raises(ValueError, match="observation is invalid or exceeds the grade"):
         _receive(
-            setup_error_xy_mm=(0.015, 0.010), measurement_uncertainty_mm=0.004,
+            setup_error_xy_mm=(0.0, 0.0), measurement_uncertainty_mm=0.004,
             readings=tuple(replace(row, seat_normal_changes_mm=(0.0011, 0.0, 0.0)) for row in _readings()),
         )
 

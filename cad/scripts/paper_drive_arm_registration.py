@@ -29,6 +29,15 @@ ARM_LOCATOR_SITES_MM = ARM.LOCATOR_SITES_MM
 PLATE_LOCATOR_SITES_MM = PLATE.LOCATOR_SITES_MM
 LOCATOR_PAIR_BASELINE_MM = ARM.LOCATOR_PAIR_BASELINE_MM
 REDUCER_AXIS_SETUP_RADIUS_MM = reducer_position_diameter_mm() / 2.0
+# The drawn matched setting: K held CENTRE_DISTANCE +/- this from S along
+# S-K (the reducer mesh's window, printed on the arm and plate sheets).
+REDUCER_CENTRE_DISTANCE_SET_TOL_MM = ARM.DISC.CENTRE_DISTANCE_SET_TOL
+# Unit vector S -> K in the arm frame (x along the arm, y across), the
+# frame of every K reading below.
+_S_TO_K = (ARM.KNOB_BORE_STATION - ARM.PIN_STATION, ARM.KNOB_BORE_OFFSET)
+S_TO_K_UNIT = (
+    _S_TO_K[0] / math.hypot(*_S_TO_K), _S_TO_K[1] / math.hypot(*_S_TO_K)
+)
 LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM = 2.0 * reducer_position_diameter_mm()
 LOCATOR_COORDINATE_TRAVEL_MAX_MM = math.floor(
     LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / math.sqrt(2.0) * 1e4
@@ -137,6 +146,11 @@ def require_matched_registration(
 ) -> tuple[float, float]:
     """Receive the measured complete push/rock/load extrema, charging uncertainty.
 
+    ``setup_error_xy_mm`` and every ``gear_plane_k_xy_mm`` are K's measured
+    gear-plane position less its nominal, in the arm frame (x along the arm,
+    y across). Setup must lie in the drawn position circle AND in the drawn
+    S-K centre-distance window along S-K.
+
     Required load cases must come from the caller's physical operating-load
     envelope. This receiver checks observations; it does not fabricate or
     certify that the caller's finite load list encloses a continuous domain.
@@ -148,6 +162,9 @@ def require_matched_registration(
     if (len(setup_error_xy_mm) != 2 or not all(map(math.isfinite, setup_error_xy_mm))
             or math.hypot(*setup_error_xy_mm) + measurement_uncertainty_mm > REDUCER_AXIS_SETUP_RADIUS_MM):
         raise ValueError("actual S-K gear-plane setup fails the drawn position circle")
+    along = setup_error_xy_mm[0] * S_TO_K_UNIT[0] + setup_error_xy_mm[1] * S_TO_K_UNIT[1]
+    if abs(along) + measurement_uncertainty_mm > REDUCER_CENTRE_DISTANCE_SET_TOL_MM:
+        raise ValueError("actual S-K centre distance is outside the drawn setting window")
     if (not required_load_cases or len(set(required_load_cases)) != len(required_load_cases)
             or not math.isfinite(measurement_uncertainty_mm)
             or not 0.0 < measurement_uncertainty_mm <= ARM_SEAT_NORMAL_UNCERTAINTY_MAX_MM
