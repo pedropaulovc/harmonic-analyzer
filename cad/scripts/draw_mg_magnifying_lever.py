@@ -78,13 +78,15 @@ FRONT_KEEP = {
     "DomeRadius": (RIGHT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.028),
 }
 # The press zone's two reference dims, at the rod's east (dome-tip) end: the
-# zone length above the rod, left of the dome-radius leader; the banded
-# diameter below-right of the tip, between the far-dome-centre dimension's
-# extension line and the end view.
+# zone length above the rod, pushed left of the dome-radius leader (the 10 mm
+# span cannot hold its own text, so SolidWorks sets the text outside the
+# extension lines; v41 landed "FROM TIP" under the R3 leader at -0.006); the
+# banded diameter below-right of the tip, between the far-dome-centre
+# dimension's extension line and the end view.
 _ROD_TIP_X = FRONT_CENTER[0] + ROD_LENGTH * SHEET_SCALE[0] / 2000.0
 _PRESS_ZONE_MID_X = _ROD_TIP_X - PRESS_ZONE_LENGTH * SHEET_SCALE[0] / 2000.0
 PRESS_ZONE_KEEP = {
-    "PressZoneLen": (_PRESS_ZONE_MID_X - 0.006, FRONT_CENTER[1] + 0.013),
+    "PressZoneLen": (_PRESS_ZONE_MID_X - 0.026, FRONT_CENTER[1] + 0.013),
     "PressZoneDia": (_ROD_TIP_X + 0.018, FRONT_CENTER[1] - 0.018),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}

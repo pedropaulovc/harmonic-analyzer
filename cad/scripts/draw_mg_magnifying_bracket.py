@@ -92,9 +92,13 @@ FRONT_KEEP = {"FlangeHeight": (0.148, 0.110)}
 # The collar's end-on circles: the annulus sketch lies on the part's Right
 # plane, so its two diameters import here.  The collar centre sits right of the
 # view centre by half the arm's reach (the arm runs +Z, to the sheet's left).
+# The OD reads above-right of the collar; the bore's two-line press-seat callout
+# goes below the ARM, left of the collar, in the clear band between the arm and
+# the top view's 17.70 station: v41 had it below-right, where its second line
+# sat on the back view's hole callout ("DRILL / COUNTERBORE ...").
 RIGHT_KEEP = {
     "CollarOd": (RIGHT_CENTER[0] + 0.044, RIGHT_CENTER[1] + 0.016),
-    "CollarBore": (RIGHT_CENTER[0] + 0.044, RIGHT_CENTER[1] - 0.016),
+    "CollarBore": (RIGHT_CENTER[0] - 0.014, RIGHT_CENTER[1] - 0.030),
 }
 # Blind-review round 1: the four plan values read unattached at a glance --
 # label each with the feature it controls.

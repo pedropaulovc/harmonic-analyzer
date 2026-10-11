@@ -62,6 +62,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_prefix,
 )
 from mg_lever_press_fit_geom import (
     PRESS_ZONE_DIA,
@@ -299,6 +300,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "PressZone", "PressZoneDia", *deviations(PRESS_ZONE_DIA_BAND)
     )
+    # A diametric linear dimension on a side-view sketch prints no Ø by itself
+    # (build_dt_pinion_arbor's journals; the v41 sheet read "6.000 0/-0.008").
+    set_dimension_prefix(adapter, "PressZone", "PressZoneDia", "<MOD-DIAM>")
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

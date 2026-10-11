@@ -94,6 +94,8 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name_last_feature(adapter, "PressZone")' in source
     assert '"PressZone", "PressZoneDia", *deviations(PRESS_ZONE_DIA_BAND)' in source
+    # Point-form diametric dims print no Ø of their own (v41 sheet).
+    assert 'set_dimension_prefix(adapter, "PressZone", "PressZoneDia", "<MOD-DIAM>")' in source
     assert 'blank_reference_sketches(adapter, ("PressZone",))' in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     assert "segment.ConstructionGeometry = True" in source
@@ -128,6 +130,7 @@ def test_final_forced_volume_guard_follows_annotations_before_publication() -> N
     assert publish.value.value.func.id == "save_part_and_images"
     for mutation in (
         "set_dimension_bilateral_tolerance",
+        "set_dimension_prefix",
         "apply_drawing_precision",
         "clear_dimensions_for_drawing",
         "mark_dimensions_for_drawing",
