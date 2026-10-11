@@ -17,6 +17,24 @@ the untranslated involute with the rack and the tip both moved inward by the
 radial part of that translation, s*cos(pi/N). The reducer pinion and the
 disc are cut at standard depth, so they take the ordinary external-gear
 formulas at the operating pressure angle.
+
+The reducer's contact ratio has two tiers (user decision 2026-10-11): CR at
+least 1.2 at the nominal centre, and at least 1.1 at the loose runout
+extreme (the centre opened by the two tooth-space runouts). AGMA guidance
+treats a contact ratio at or above about 1.1 as continuous action -- more
+than one tooth pair in contact at handover -- which is enough for this slow,
+hand-driven reducer; 1.2 remains the nominal design floor.
+
+Finite-profile bound (not a gate). These formulas take the ideal 120T
+involute. The disc is cut by the stock #2 (55T) cutter translated 17.20 to
+17.22 mm, whose flank against that ideal involute (same pitch thickness)
+over the active profile is at most 1.05 um fuller just below the pitch
+circle and relieved toward the tip, by 18.8 to 24.3 um at the tip over the
+printed corners; the 12T pinion deviates by at most -2.9..+3.4 um. Hence:
+backlash loses at most about 4 um (normal) to the extra material; the ideal
+interference check is conservative, since relief only removes metal at
+unchanged tip radii; and the contact ratios are computed on the ideal
+involute, so the relieved disc tip carries little load at handover.
 """
 
 from __future__ import annotations
@@ -32,6 +50,9 @@ import pd_transgear_knob_shaft_spec as knob
 MM_PER_IN = 25.4
 # AGMA's recommended minimum transverse contact ratio for spur gears.
 CONTACT_RATIO_FLOOR = 1.2
+# The reducer's loose runout extreme: continuous action for a slow,
+# hand-driven reducer (user decision 2026-10-11; see the module docstring).
+RUNOUT_CONTACT_RATIO_FLOOR = 1.1
 # The rack mesh's existing physical gate (pd_paper_drive_assembly_steps).
 RACK_ROOT_CLEARANCE_FLOOR_MM = 0.25
 # AGMA fine-pitch standard clearance, 0.200/P + 0.002 in, at the reducer's
@@ -55,12 +76,38 @@ class MeshCheck:
     root_clearance_min_mm: float
     root_clearance_floor_mm: float
     interference_margin_min_mm: float
+    # CR at the loose runout extreme; None where contact_ratio_min is
+    # already taken there (the rack mesh).
+    runout_contact_ratio_min: float | None = None
 
     def failures(self) -> list[str]:
-        problems = []
+        # Every gate below is an ordered comparison, which NaN passes; an
+        # undefined number is a failure, never a pass.
+        values = {
+            "contact ratio": self.contact_ratio_min,
+            "tight backlash": self.backlash_mm[0],
+            "loose backlash": self.backlash_mm[1],
+            "root clearance": self.root_clearance_min_mm,
+            "root clearance floor": self.root_clearance_floor_mm,
+            "interference margin": self.interference_margin_min_mm,
+        }
+        if self.runout_contact_ratio_min is not None:
+            values["runout contact ratio"] = self.runout_contact_ratio_min
+        problems = [
+            f"{name} is not a finite number ({value!r})"
+            for name, value in values.items() if not math.isfinite(value)
+        ]
+        if problems:
+            return problems
         if self.contact_ratio_min < CONTACT_RATIO_FLOOR:
             problems.append(
                 f"contact ratio {self.contact_ratio_min:.3f} < {CONTACT_RATIO_FLOOR}"
+            )
+        if (self.runout_contact_ratio_min is not None
+                and self.runout_contact_ratio_min < RUNOUT_CONTACT_RATIO_FLOOR):
+            problems.append(
+                f"runout-extreme contact ratio {self.runout_contact_ratio_min:.3f} < "
+                f"{RUNOUT_CONTACT_RATIO_FLOOR}"
             )
         if self.backlash_mm[0] <= 0.0:
             problems.append(f"backlash {self.backlash_mm[0]:.4f} mm at the tight extreme")
@@ -85,8 +132,12 @@ class MeshCheck:
     @property
     def summary(self) -> str:
         low, high = self.backlash_mm
+        runout = (
+            "" if self.runout_contact_ratio_min is None
+            else f" ({self.runout_contact_ratio_min:.3f} at the runout extreme)"
+        )
         return (
-            f"{self.label}: CR {self.contact_ratio_min:.3f} min, backlash "
+            f"{self.label}: CR {self.contact_ratio_min:.3f} min{runout}, backlash "
             f"{low:.3f}..{high:.3f}, root clearance {self.root_clearance_min_mm:.3f}, "
             f"interference margin {self.interference_margin_min_mm:.3f}"
         )
@@ -131,6 +182,8 @@ def feed_rack_mesh(
     pin's drop when it is set with travel left).
     """
     low, high = backlash_band_mm
+    if not all(math.isfinite(value) for value in (low, high, extra_opening_mm)):
+        raise ValueError("feed rack mesh inputs must be finite")
     radius = feed.PITCH_DIA / 2.0
     pitch = math.pi * feed.MODULE_MM * math.cos(_FEED_PA)
     interference_depth = radius * math.sin(_FEED_PA) ** 2
@@ -218,11 +271,13 @@ def reducer_runout_shift_mm() -> float:
 def reducer_mesh(centre_distance_mm: float = disc.CENTRE_DISTANCE) -> MeshCheck:
     """The reducer at its assembled centre over every printed corner.
 
-    Contact ratio at the nominal centre and minimum tips; backlash at the
-    runout-shifted centres with the thickest and thinnest printed teeth;
+    Contact ratio at the minimum tips, at the nominal centre and at the
+    loose runout extreme (two tiers); backlash at the runout-shifted centres with the thickest and thinnest printed teeth;
     root clearance and the interference points at the tight centre with the
     largest tips.
     """
+    if not math.isfinite(centre_distance_mm):
+        raise ValueError("reducer centre distance must be finite")
     pinions = knob.manufactured_profiles()
     discs = disc.manufactured_profiles()
     shift = reducer_runout_shift_mm()
@@ -258,4 +313,5 @@ def reducer_mesh(centre_distance_mm: float = disc.CENTRE_DISTANCE) -> MeshCheck:
         clearance,
         REDUCER_ROOT_CLEARANCE_FLOOR_MM,
         margin,
+        reducer_contact_ratio(loose, pinion_tip_min, disc_tip_min),
     )

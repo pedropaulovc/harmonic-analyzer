@@ -74,8 +74,7 @@ def crank_gear_platform_budget() -> dict[str, float]:
     plate plane and cannot reduce distance to this infinite-plane bound.
     The retained title-row-sized and relative-crank-FCF deductions are EXTRA
     conservative air reserves, not tolerances on the BASIC cone incline or
-    independent whole-post pose. Actual global pose is constrained by both
-    supports (dt_cone_support_pose). Boss length and collar width spend their
+    independent whole-post pose. Boss length and collar width spend their
     actual general grades; north float and the far 64T face maximize overhang.
     """
     post = dt_cone_pivot_post_spec

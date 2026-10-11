@@ -232,7 +232,8 @@ CENTRE_DISTANCE = 35.101
 # bore is held CENTRE_DISTANCE +/- this from the pin bore when the pair is
 # match-drilled, and must still be there with the plate screwed down.
 CENTRE_DISTANCE_WINDOW = (35.097, 35.105)
-CENTRE_DISTANCE_SET_TOL = (CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE_WINDOW[0]) / 2.0
+# Rounded to the micron so a reading of exactly the tolerance compares equal.
+CENTRE_DISTANCE_SET_TOL = round((CENTRE_DISTANCE_WINDOW[1] - CENTRE_DISTANCE_WINDOW[0]) / 2.0, 6)
 if abs(sum(CENTRE_DISTANCE_WINDOW) / 2.0 - CENTRE_DISTANCE) > 1e-9:
     raise AssertionError("CENTRE_DISTANCE is the midpoint of its window")
 STANDARD_CENTRE_DISTANCE = (TEETH + MESH_PINION_TEETH) * MODULE_MM / 2.0
