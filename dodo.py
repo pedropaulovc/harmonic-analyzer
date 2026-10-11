@@ -3181,6 +3181,8 @@ def task_check():
         # Supplier pose facts must stay independent of native replica recipes.
         SCRIPTS_DIR / "test_vn_cone_pose_specs.py",
         SCRIPTS_DIR / "test_fit_bands.py",
+        # Fixture pose, hook transform and conservative swept-wire clearance.
+        SCRIPTS_DIR / "test_mg_fixture_installation.py",
         SCRIPTS_DIR / "test_printed_text_rulings.py",
         # ... and the #857 re-merge: its leader-geometry and replica-driver pins.
         SCRIPTS_DIR / "test_drawing_leaders.py",

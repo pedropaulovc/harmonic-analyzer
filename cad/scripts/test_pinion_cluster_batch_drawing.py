@@ -746,6 +746,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
     }
+    # The new magnifier joints are also checked across the top assembly.
+    # Qualify the independent leaf oracles instead of duplicating their budgets.
+    for pair in (
+        frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")),
+        frozenset(("mg-magnifying-lever-1", "mg-magnifying-bracket-1")),
+    ):
+        qualified = frozenset(f"mg-magnifier-1/{part}" for part in pair)
+        threaded_by_assembly["ha-harmonic-analyzer"][qualified] = (
+            threaded_by_assembly["mg-magnifier"][pair]
+        )
     # U27 (Main, 2026-09-23): the follower studs slip line-to-line into
     # their H7 seats and are bonded, so the drive train allows them NO
     # overlap -- the former press allowance is gone.

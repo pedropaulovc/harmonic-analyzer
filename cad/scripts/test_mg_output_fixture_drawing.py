@@ -73,7 +73,8 @@ def test_geometry_import_closure_carries_no_sheet_or_registry() -> None:
     local = {name for name in seen if (SCRIPTS / f"{name}.py").is_file()}
     for name in local:
         assert not name.startswith(("_drawing", "_config", "draw_", "build_")), name
-        assert not name.endswith("_spec"), name
+        # Private modelling contracts such as _hole_spec are not part sheets.
+        assert not (name.endswith("_spec") and not name.startswith("_")), name
     assert not {"win32com", "pythoncom", "solidworks_mcp"} & seen
 
 
