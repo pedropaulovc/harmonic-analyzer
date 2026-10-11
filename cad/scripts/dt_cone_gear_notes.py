@@ -32,7 +32,7 @@ def root_to_bore_web_min_mm(teeth: int) -> float:
 def cutter_description(teeth: int) -> str:
     template = spec.stock_form_profile(teeth).template
     if template.cutter_number is None:
-        return f"{template.name}; CUSTOM TEMPLATE {template.reference_teeth}T; NOT STOCK"
+        return f"{template.name}, TEMPLATE ON LAST SHEET (REF); NOT STOCK"
     minimum, maximum = template.teeth_range
     upper = "UP" if maximum is None else str(maximum)
     return f"#{template.cutter_number} {minimum}-{upper}T; TEMPLATE {template.reference_teeth}T"
@@ -40,7 +40,7 @@ def cutter_description(teeth: int) -> str:
 
 def _tooth_form(template) -> str:
     if template.relief is not None:
-        return "FINITE INVOLUTE; TROCHOID RELIEF BELOW TIF"
+        return f"FINITE INVOLUTE; RELIEF BELOW R{template.relief_junction_radius_mm:.3f}"
     if template.root_radius_mm < template.base_radius_mm:
         return "FINITE INVOLUTE; RADIAL BELOW BASE"
     return "FINITE INVOLUTE; ABOVE-BASE ROOT ARC"
@@ -73,6 +73,13 @@ def gear_data(teeth: int) -> str:
         ("ROOT RADIAL MIN/MAX (mm, REF)", f"{profile.root_radius_min_mm:.3f} / {profile.root_radius_max_mm:.3f}"),
         ("WEB MIN (mm, REF)", f"{web:.2f}"),
     )
+    if teeth == 6:
+        # The custom form is reference only; the cut gear is accepted here.
+        low, high = spec.custom_six_over_pins_limits_mm()
+        rows += ((
+            f"OVER 2 PINS \u00d8{spec.CUSTOM_SIX_PIN_DIA_MM:.2f}, OPPOSITE GAPS (mm)",
+            f"{low:.3f} TO {high:.3f}",
+        ),)
     return "\n".join(("GEAR DATA", *(f"{label}:  {value}" for label, value in rows)))
 
 

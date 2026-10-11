@@ -253,7 +253,7 @@ def cutter_detail_window_mm() -> tuple[float, float, float]:
 
 
 def cutter_grind_data() -> str:
-    """What the toolmaker grinds DT6-FORM1 to and checks it against.
+    """What the toolmaker grinds DT6-FORM1 to, for reference.
 
     The sheet once printed the part's "Cutter Profile" property: parametric
     equations with 17-digit floats, which no shop grinds to (eye pass of
@@ -261,8 +261,9 @@ def cutter_grind_data() -> str:
     gives the form's outline sizes at 3 places, read from the same profile
     the native cut uses. T006 cuts at T=0 on a spur (helix 0) gear, so its
     installed gap IS the ground form, and the widths are chords across that
-    gap. The comparator magnification is this sheet's own scale, so the
-    sheet's gap view serves as the overlay chart.
+    gap. The form is reference only: the shop has no optical comparator
+    (machinist review of the stack build), so the cut T006 is accepted over
+    pins on its own sheet (dt_cone_gear_spec.custom_six_over_pins_limits_mm).
     """
     profile = stock_form_profile(6)
     template = profile.template
@@ -275,7 +276,6 @@ def cutter_grind_data() -> str:
         profile.angular_pitch_rad - profile.pitch_tooth_thickness_mm / pitch_radius
     ) / 2.0
     blank_radius = profile.blank_radius_mm
-    numerator, denominator = SHEET_SCALES[CUTTER_DETAIL_SHEET]
     rows = (
         ("FORM DEPTH (PLUNGE FROM BLANK OD)", f"{profile.plunge_mm:.3f}"),
         ("TIP ARC (FORMS GEAR ROOT)", f"R{template.root_radius_mm:.3f}"),
@@ -287,12 +287,12 @@ def cutter_grind_data() -> str:
             f"WIDTH AT BLANK OD {2.0 * blank_radius:.3f} (CHORD)",
             f"{2.0 * blank_radius * math.sin(profile.tip_half_angle_rad):.3f}",
         ),
-        ("TIF (RELIEF TO INVOLUTE)", f"R{template.relief_junction_radius_mm:.3f} REF"),
+        ("RELIEF MEETS INVOLUTE AT", f"R{template.relief_junction_radius_mm:.3f}"),
     )
     return "\n".join((
-        f"{template.name} GROUND FORM TOOL, mm",
+        f"{template.name} GROUND FORM TOOL (REF), mm",
         *(f"{label}:  {value}" for label, value in rows),
-        f"GRIND TO TEMPLATE; CHECK ON OPTICAL COMPARATOR AT {numerator:g}:{denominator:g}",
+        "ACCEPT THE CUT T006 OVER PINS PER SHEET T006",
     ))
 
 
