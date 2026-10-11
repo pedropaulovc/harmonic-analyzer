@@ -319,9 +319,15 @@ def test_profile_zone_mirror_station_envelopes_and_template_aim() -> None:
     nominal_bottom = centre - ch_rocker_arm_spec.R_BOTTOM
     assert nominal_top == pytest.approx(8.0)
     assert nominal_bottom == pytest.approx(0.0)
-    zone = float(ch_rocker_arm_notes.ARC_PROFILE_ZONE_MM)
-    top_outside = float(ch_rocker_arm_notes.ARC_PROFILE_OUTSIDE_MM["TopRadius"])
-    bottom_inside = zone - float(ch_rocker_arm_notes.ARC_PROFILE_OUTSIDE_MM["BottomRadius"])
+    assert drawing.TOP_EDGE_BAND is ch_rocker_arm_spec.TOP_EDGE_BAND
+    assert drawing.ARC_PROFILE_ZONE_MM == f"{ch_rocker_arm_spec.TOP_EDGE_BAND[0]:g}"
+    assert drawing.ARC_PROFILE_OUTSIDE_MM == {
+        "TopRadius": drawing.ARC_PROFILE_ZONE_MM,
+        "BottomRadius": f"{ch_rocker_arm_spec.TOP_EDGE_BAND[1]:g}",
+    }
+    zone = float(drawing.ARC_PROFILE_ZONE_MM)
+    top_outside = float(drawing.ARC_PROFILE_OUTSIDE_MM["TopRadius"])
+    bottom_inside = zone - float(drawing.ARC_PROFILE_OUTSIDE_MM["BottomRadius"])
     assert zone == top_outside == bottom_inside == 0.5
     assert (nominal_top, nominal_top + top_outside) == pytest.approx((8.0, 8.5))
     assert (nominal_bottom, nominal_bottom + bottom_inside) == pytest.approx((0.0, 0.5))

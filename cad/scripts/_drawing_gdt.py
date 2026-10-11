@@ -272,15 +272,6 @@ def add_feature_control_frame(
     attached entity (GetAttachedEntityCount3 1 -> 0, types (EDGE,) -> ())
     while IGtol.IsAttached kept reading True with one non-dangling leader.
     """
-    xml = _gtol_frame_xml(
-        characteristic,
-        tolerance,
-        datums=datums,
-        diameter=diameter,
-        translated=translated,
-        outside_disposition=outside_disposition,
-    )
-    draw = adapter.currentModel
     if entity_type.upper() not in _ATTACHMENT_SELECT_TYPES:
         raise ValueError(
             f"feature-control frame cannot attach to a {entity_type} ({label})"
@@ -292,7 +283,9 @@ def add_feature_control_frame(
         diameter=diameter,
         projected_zone_height_mm=projected_zone_height_mm,
         translated=translated,
+        outside_disposition=outside_disposition,
     )
+    draw = adapter.currentModel
     expected_signature = _gtol_frame_signature(xml)
     edge = _select_annotation_entity(
         adapter,

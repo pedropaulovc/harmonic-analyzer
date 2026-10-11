@@ -85,10 +85,10 @@ from ch_rocker_arm_spec import (
     TIP_FACE,
     TOP_ARC_LEN,
     TOP_EDGE_ABOVE_PIVOT,
+    TOP_EDGE_BAND,
     TOP_END_X,
     TOP_END_Y,
 )
-from ch_rocker_arm_notes import ARC_PROFILE_OUTSIDE_MM, ARC_PROFILE_ZONE_MM
 
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm"]
@@ -148,6 +148,15 @@ ROD_HOLE = requirement(
 # right of the end view. Beside the end view (0.315, 0.150) it read as that
 # view's label, 0.4 mm from HubLength's "+0.05" (r743-p1s-B2 render).
 ISO_CAPTION_XY = (0.325, 0.183)
+
+# Re-express the part-owned one-sided height envelope as a normal profile zone:
+# no second numeric tolerance lives in the drawing prose. The zero lower limit
+# is pinned by the rocker contract; it is Ⓤ0 on the lower (inside-material) arc.
+ARC_PROFILE_ZONE_MM = f"{TOP_EDGE_BAND[0]:g}"
+ARC_PROFILE_OUTSIDE_MM = {
+    "TopRadius": ARC_PROFILE_ZONE_MM,
+    "BottomRadius": f"{TOP_EDGE_BAND[1]:g}",
+}
 
 # The two frames control one nominal concentric arc system. Their material
 # sides differ: top outside is +Y, bottom inside is +Y. A single shared frame

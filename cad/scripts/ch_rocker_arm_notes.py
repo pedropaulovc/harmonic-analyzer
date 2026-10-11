@@ -27,14 +27,6 @@ from ch_rocker_arm_spec import (
 # cheek-over-hub air in test_rocker_bank_layout.
 HUB_COAXIALITY_DIA = 0.50
 
-# Drawing-only arc-system acceptance (Pedro, 2026-10-11). The model nominals
-# stay R800/R816 with top height 8.00. A surface-profile zone is measured along
-# the arc normal, not as a radius size band. Ⓤ is the portion OUTSIDE material:
-# top 0.5 -> +Y; bottom 0 -> +Y. At the mirror axis these preserve the model's
-# top 8.00..8.50 and derived bottom 0.00..0.50 envelopes. Template ±0.03 is
-# inspection of the shop template, not the finished-part tolerance.
-ARC_PROFILE_ZONE_MM = "0.5"
-ARC_PROFILE_OUTSIDE_MM = {"TopRadius": "0.5", "BottomRadius": "0"}
 
 # True free-text instructions only; geometry / datum structure / roughness live
 # in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
