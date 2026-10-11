@@ -599,17 +599,6 @@ def require_rack_form_admission_mm(
     )
 
 
-RACK_FLANK_INSPECTION_PROPERTY = "Rack Flank Inspection"
-
-
-def rack_flank_inspection_callout_text() -> str:
-    """The flank requirement the drawing carries (policy option (c))."""
-    from paper_drive_geom import feed_rack_form_admission_controls
-
-    controls = feed_rack_form_admission_controls()
-    return f"FLANKS {PA_DEG:g} DEG +/-{controls['working_side_angle_deviation_deg']:g}"
-
-
 GAP_AREA = (half_width(ROOT_Y) + half_width(BAR_HEIGHT)) * (BAR_HEIGHT - ROOT_Y)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -618,8 +607,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "EndStockProfile": {"RackDepth", "RackHeight", "RackInset", "SeamHeight"},
     "OverallHeightReference": {"OverallHeight"},
 }
+# The cut length and the backer's two sizes serve no fit, so they print one
+# place under the general .X band; the operating window and the cut-end
+# section maxima are paid at those bands. The rack's inset on the backer and
+# the purchased stock's reference sizes keep two places.
+_ONE_PLACE = frozenset({"Length", "BackerDepth", "SeamHeight"})
 DRAWING_PRECISION = {
-    feature: {name: 2 for name in names}
+    feature: {name: 1 if name in _ONE_PLACE else 2 for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME = {
@@ -649,10 +643,8 @@ PURCHASED_RACK_NOTE = (
     f"PURCHASED RACK: {PURCHASED_RACK_SUPPLIER} {PURCHASED_RACK_SKU}; "
     f"{PURCHASED_RACK_LENGTH_IN:g} IN"
 )
-GEAR_DATA = (
-    f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA; "
-    f"{PURCHASED_RACK_MATERIAL.upper()}"
-)
+# The material is the title block's; the note does not repeat it.
+GEAR_DATA = f"{PURCHASED_RACK_NOTE}; {DP:g} DP, {PA_DEG:g}\N{DEGREE SIGN} PA"
 # A purchased rack is received by its two stock sizes; its pitch accuracy is
 # the catalogue part's, checked only by the running mesh at assembly.
 INCOMING_RACK_INSPECTION_NOTE = (

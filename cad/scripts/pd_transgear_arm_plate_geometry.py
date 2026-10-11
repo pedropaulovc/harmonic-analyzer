@@ -130,7 +130,7 @@ FRONT_FACE_Z = -NOTCH_DEPTH
 # --- Screw holes: 2 x 82° countersinks for the #8 clamp heads ----------------
 # Clearance, drilled +0.10/0. Accommodate the published ASME maximum
 # under-head fillet: basic shank radius + 15% basic diameter, with room for
-# the independent projected axes. Matched dowels alone locate.
+# the projected axes. Matched dowels alone locate.
 SCREW_HOLE_DIA = 5.8
 CSK_DIA = 7.9248  # 0.312 in, the head's Ø at the top of the bevel
 CSK_ANGLE_DEG = 82.0
@@ -172,8 +172,9 @@ CSK_DIA_BAND = printed_band_mm(CSK_DIA_PLACES)
 # The notch face's corner heights print .X: the face only clears the arm's
 # lower edge (transgear_hanger_joints.NOTCH_REFERENCE_AIR_WORST_MM).
 NOTCH_BAND = BAND_X
-# Both projected zones are independent at EVERY height. The minimum pilot
-# disk has relative centre offset <= two radii; no hidden coaxial credit.
+# Each cone is coaxial with its hole (sheet note 3), so its axis lies in the
+# hole's projected zone. The floor still pays two independent zone radii at
+# EVERY height, which bounds that with no coaxial credit.
 # Pay the cone rim's vertical lever and its shallowest global generatrix.
 _CSK_AXIS_TILT_MAX_RAD = math.atan(REDUCER_POSITION_DIAMETER / CLAMP_PLATE_PROJECTED_HEIGHT_MM)
 _CSK_DEPTH_MAX = (

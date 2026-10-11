@@ -121,20 +121,20 @@ def test_native_controls_reference_actual_bores_and_project_past_real_chain_plan
         assert datum_z - height < registration.gear_plane_machine_z_mm() < datum_z
 
 
-def test_clamp_axes_have_real_projected_zones_and_independent_actual_cone_faces() -> None:
-    from _gtol_cone import ConeFace
+def test_clamp_axes_have_real_projected_zones_and_each_countersink_rides_its_hole() -> None:
     from _gtol_cylinder import CylinderFace
     arm_controls = {control.key: control for control in arm_spec.GEOMETRIC_CONTROLS}
     plate_controls = {control.key: control for control in plate_spec.GEOMETRIC_CONTROLS}
-    for index, (x, _y) in enumerate(plate.SCREW_HOLES, 1):
+    # The cones are coaxial with their holes (sheet note 3): no frame of their own.
+    assert not any("countersink" in key for key in plate_controls)
+    for index, (x, y) in enumerate(plate.SCREW_HOLES, 1):
         tap = arm_controls[f"plate_tap_{index}_position"]
         hole = plate_controls[f"plate_hole_{index}_position"]
-        cone = plate_controls[f"plate_countersink_{index}_position"]
         assert tap.projected_zone_height_mm == arm.CLAMP_TAP_PROJECTED_HEIGHT_MM
-        assert hole.projected_zone_height_mm == cone.projected_zone_height_mm == plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
-        assert isinstance(hole.face, CylinderFace) and isinstance(cone.face, ConeFace)
-        assert cone.face.contains_x_mm == x and cone.face.half_angle_degrees == plate.CSK_ANGLE_DEG / 2.0
-        for control in (tap, hole, cone):
+        assert hole.projected_zone_height_mm == plate.CLAMP_PLATE_PROJECTED_HEIGHT_MM
+        assert isinstance(hole.face, CylinderFace)
+        assert (hole.face.contains_x_mm, hole.face.contains_y_mm) == (x, y)
+        for control in (tap, hole):
             assert control.datums == ("A", "B", "C")
             assert control.tolerance == "0.050" and control.tolerance_zone == "diametral"
 

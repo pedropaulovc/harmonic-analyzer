@@ -340,6 +340,9 @@ _SECTION_LABEL_MODEL = 2.1
 _CAPTION_CLEAR_MODEL = 6.0
 _INNER_BORDER_X = 0.4191  # ASME B landscape inner border, right
 _GAP = 0.004  # sheet m between neighbouring texts
+# The locator callout's leader leaves its text block's lower right, this far
+# (model mm) from the kept text point (measured on the r3 sheet).
+_LOCATOR_LEADER_START_MODEL = (7.0, -5.5)
 
 
 def _half_width_model(text: str) -> float:
@@ -370,6 +373,19 @@ def test_the_thrust_face_finishes_clear_their_face_and_the_diameters() -> None:
         text_near -= _half_width_model(text)
         assert near > 0.0, key
         assert text_near > far, key
+
+
+def test_each_thrust_face_finish_lands_on_its_own_face_annulus() -> None:
+    """Each leader meets its face between the bore and the face's diameter,
+    with the symbol level with that point, so it reads as the face's."""
+    for key, face_z, face_dia in (
+        ("hub_face", geometry.HUB_FACE_Z, geometry.HUB_DIA),
+        ("boss_face", geometry.BOSS_FACE_Z, geometry.BOSS_DIA),
+    ):
+        pick, symbol = drawing.FACE_FINISHES[key]
+        assert pick[2] == face_z, key
+        assert geometry.BORE_DIA / 2.0 + 0.5 < abs(pick[1]) < face_dia / 2.0 - 0.5, key
+        assert symbol[1] == pick[1], key
 
 
 def test_the_hole_height_text_stands_between_the_edge_and_the_corner_height() -> None:
@@ -434,9 +450,34 @@ def test_the_first_plan_row_clears_the_cutting_line_arrow() -> None:
         + _SECTION_LABEL_MODEL
     )
     nearest_row = min(
-        drawing.PLAN_KEEP[name][1] for name in ("ScrewHoleX1", "ScrewHoleX2", "Width")
+        drawing.PLAN_KEEP[name][1] for name in ("ScrewHoleX1", "ScrewHoleX2", "LocatorX1")
     )
     assert nearest_row - _TEXT_BELOW_KEEP_MODEL - arrow_top >= 1.0
+
+
+def test_the_reamed_hole_leader_crosses_no_plan_dimension_line() -> None:
+    """The locator callout's leader runs from its text to locator 1 without
+    crossing a location or size dimension line standing above the plan."""
+    spans = {
+        "ScrewHoleX1": (geometry.SCREW_HOLES[0][0], 0.0),
+        "ScrewHoleX2": (geometry.SCREW_HOLES[1][0], 0.0),
+        "LocatorX1": (geometry.LOCATOR_SITES_MM[0][0], 0.0),
+        "Width": (geometry.EDGE_MINUS_X, geometry.EDGE_PLUS_X),
+    }
+    text_x, text_y, _ = drawing.PLAN_KEEP["LocatorDia1"]
+    start_x = text_x + _LOCATOR_LEADER_START_MODEL[0]
+    start_y = text_y + _LOCATOR_LEADER_START_MODEL[1]
+    site_x, site_y = geometry.LOCATOR_SITES_MM[0]
+    checked = 0
+    for name, (x0, x1) in spans.items():
+        if name not in drawing.PLAN_KEEP:
+            continue
+        row = drawing.PLAN_KEEP[name][1]
+        assert site_y < row < start_y, name
+        leader_x = start_x + (site_x - start_x) * (start_y - row) / (start_y - site_y)
+        assert not min(x0, x1) <= leader_x <= max(x0, x1), name
+        checked += 1
+    assert checked
 
 
 def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
@@ -488,10 +529,12 @@ def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
     assert projected
     for control in projected:
         assert f"{control.projected_zone_height_mm:.1f}" in plate_notes
-    assert "LEFT VIEW: REAR FACE, CARRIES THE" in plate_notes
+    assert "LEFT VIEW: REAR FACE;" in plate_notes
+    assert f"CSK COAXIAL WITH ITS \u00d8{geometry.SCREW_HOLE_DIA:.1f} HOLE." in plate_notes
     assert "CENTRE VIEW: MOUNTING FACE A." in plate_notes
-    for feature in ("HOLE BORES (CENTRE VIEW)", "CSK CONES (LEFT VIEW)", "KNOB BORE"):
+    for feature in ("HOLE BORES (CENTRE VIEW)", "KNOB BORE"):
         assert feature in plate_notes
+    assert "CSK CONES" not in plate_notes
     # The countersinks are cut from the rear face, which *Front (the left
     # view) looks at; *Back (the centre view) looks at face A.
     assert geometry.REAR_FACE_Z > 0.0

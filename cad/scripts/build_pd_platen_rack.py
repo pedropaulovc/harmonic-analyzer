@@ -94,11 +94,9 @@ from pd_platen_rack_spec import (
     PURCHASED_RACK_NOTE,
     RACK_HEIGHT,
     RACK_THICKNESS,
-    RACK_FLANK_INSPECTION_PROPERTY,
     RACK_Z0,
     ROOT_Y,
     half_width,
-    rack_flank_inspection_callout_text,
 )
 
 PART_NAME = "pd-platen-rack"
@@ -368,7 +366,6 @@ async def build(adapter) -> dict[str, str]:
             "Gear Data": GEAR_DATA,
             "Purchased Rack": PURCHASED_RACK_NOTE,
             "Incoming Rack Inspection": INCOMING_RACK_INSPECTION_NOTE,
-            RACK_FLANK_INSPECTION_PROPERTY: rack_flank_inspection_callout_text(),
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Enlarged End View Note": ENLARGED_END_VIEW_NOTE,

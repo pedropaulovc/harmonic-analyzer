@@ -62,12 +62,13 @@ from pd_transgear_arm_plate_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     BORE_DIA,
+    BOSS_DIA,
     BOSS_FACE_Z,
-    CSK_DIA,
     EDGE_MINUS_X,
     EDGE_PLUS_X,
     END_R,
     FRONT_FACE_Z,
+    HUB_DIA,
     HUB_FACE_Z,
     KINK,
     NOTCH_LEFT,
@@ -161,15 +162,15 @@ SECTION_LINE_MODEL = (
 # stand outboard of each side, the hole height's wide toleranced text wholly
 # between the edge and the top-corner height's dimension line.
 # Rows 4 apart (8 mm on the sheet: 4.4 mm air between 3.6 mm texts) keep the
-# width's witness lines under the locator diameter's shoulder: at 5 apart
-# they rose to 246.2 mm, through its shoulder at 245.5 mm (farm run
-# 20261009T224545531Z, shoulder-crosses-line), and that four-line callout
-# cannot rise further inside the top border.
+# locator's witness lines under the locator diameter's shoulder (at 5 apart
+# a top row rose through it: farm run 20261009T224545531Z,
+# shoulder-crosses-line). The width stands under the centre view instead:
+# across the top it was the one dimension line the reamed-hole leader had
+# to cross (machinist review of the r3 sheets).
 PLAN_ROWS = tuple(_SECTION_TOP + 8.0 + 4.0 * row for row in range(3))
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ScrewHoleX2": (SCREW_HOLES[1][0] / 2.0, PLAN_ROWS[0], _Z_PLAN),
     "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, PLAN_ROWS[1], _Z_PLAN),
-    "Width": ((EDGE_MINUS_X + EDGE_PLUS_X) / 2.0, PLAN_ROWS[2], _Z_PLAN),
     "KinkY": (EDGE_MINUS_X - 5.0, KINK[1] / 2.0, _Z_PLAN),
     "TopLeftY": (EDGE_MINUS_X - 11.0, TOP_LEFT[1] / 2.0, _Z_PLAN),
     "ScrewHoleY": (EDGE_PLUS_X + 9.5, SCREW_HOLES[0][1] / 2.0, _Z_PLAN),
@@ -178,14 +179,16 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
     "ScrewHoleDia": (EDGE_MINUS_X - 8.0, _TOP + 8.0, _Z_PLAN),
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 8.0, _Z_PLAN),
-    "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2] + 5.0, _Z_PLAN),
-    # High enough that its callout lines clear the screw-hole callout, and
-    # its right end clears countersink 1's frame leader; three short lines
-    # keep its left edge inside the border.
+    "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2], _Z_PLAN),
+    # High enough that its callout lines clear the screw-hole callout; three
+    # short lines keep its left edge inside the border. Its leader runs down
+    # to locator 1 left of every location dimension line.
     "LocatorDia1": (EDGE_MINUS_X - 7.0, _TOP + 23.75, _Z_PLAN),
 }
-# Back view (the mounting face): the notch face's corner heights, outboard.
+# Back view (the mounting face): the notch face's corner heights, outboard,
+# and the plate width below the end round, clear of every leader.
 BACK_KEEP: dict[str, tuple[float, float, float]] = {
+    "Width": ((EDGE_MINUS_X + EDGE_PLUS_X) / 2.0, _BOTTOM - 7.0, 0.0),
     "NotchLeftY": (EDGE_MINUS_X - 4.0, NOTCH_LEFT[1] / 2.0, FRONT_FACE_Z),
     "NotchRightY": (EDGE_PLUS_X + 4.0, NOTCH_RIGHT[1] / 2.0, FRONT_FACE_Z),
     "LocatorY1": (EDGE_MINUS_X - 8.0, LOCATOR_SITES_MM[0][1] / 2.0, 0.0),
@@ -223,39 +226,43 @@ FINISH_CHAR_HEIGHT = 0.0025
 # Position frames, sheet metres. A frame's xy is its top-left corner; it is
 # about 59 mm wide with a projected zone (44 mm without), and its leader
 # leaves the end nearer the feature through a 6.3 mm shoulder (measured on
-# run 20261009T214031408Z). The frames stand in three rows above the views
-# and each leader drops beside, never through, the plan's stacked
-# X-dimension text (sheet x 0.069..0.097): countersink 1's left of it,
-# countersink 2's right of it. The back view mirrors X, so its hole frames
-# sit outboard of their own holes (no crossing) and the two through-bore
-# locator leaders drop between the hole leaders.
+# run 20261009T214031408Z). The frames stand in three rows above the back
+# view, which mirrors X, so its hole frames sit outboard of their own holes
+# (no crossing) and the two through-bore locator leaders drop between the
+# hole leaders. The plan carries no frame: each countersink is coaxial with
+# its hole (note 3).
 FRAME_ROWS = (0.262, 0.250, 0.238)
 FRAME_XY = {
-    "plate_countersink_1_position": (0.071, FRAME_ROWS[0]),
-    "plate_countersink_2_position": (0.1143, FRAME_ROWS[1]),
     "plate_hole_1_position": (0.228, FRAME_ROWS[2]),
     "plate_hole_2_position": (0.1174, FRAME_ROWS[2]),
     "plate_locator_1_position": (0.2098, FRAME_ROWS[0]),
     "plate_locator_2_position": (0.2183, FRAME_ROWS[1]),
 }
 # The thrust faces' finish symbols, on section A-A where each face is
-# edge-on: the pick lands on the face's line inside the bore (the bore's
-# far-half end edge, which bounds the face) and the symbol stands beyond the
-# face, inside the diameters' extension lines.  A symbol reaches about 1
-# left and 7.5 right of its point (model mm at 2:1, the Ra text running
-# right): the hub's stands far enough out that its text clears the hub face.
-# Model points, mm.
+# edge-on: the pick lands on the face's own cut edge, midway across the
+# annulus between the bore and the face's diameter (not at the bore mouth,
+# where it read as a note on the diameter beside it), and the symbol stands
+# level with it beyond the face, inside the diameters' extension lines.  A
+# symbol reaches about 1 left and 7.5 right of its point (model mm at 2:1,
+# the Ra text running right): the hub's stands far enough out that its text
+# clears the hub face. Model points, mm.
 FINISH_SYMBOL_REACH = (1.0, 7.5)
-_THRUST_PICK_Y = -BORE_DIA / 4.0
 _ModelPoint = tuple[float, float, float]
+
+
+def _annulus_mid_y(face_dia: float) -> float:
+    """Below the axis, midway across a thrust face's annulus."""
+    return -(BORE_DIA + face_dia) / 4.0
+
+
 FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint]] = {
     "hub_face": (
-        (0.0, _THRUST_PICK_Y, HUB_FACE_Z),
-        (0.0, _THRUST_PICK_Y, HUB_FACE_Z - 9.5),
+        (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z),
+        (0.0, _annulus_mid_y(HUB_DIA), HUB_FACE_Z - 9.5),
     ),
     "boss_face": (
-        (0.0, _THRUST_PICK_Y, BOSS_FACE_Z),
-        (0.0, _THRUST_PICK_Y, BOSS_FACE_Z + 4.0),
+        (0.0, _annulus_mid_y(BOSS_DIA), BOSS_FACE_Z),
+        (0.0, _annulus_mid_y(BOSS_DIA), BOSS_FACE_Z + 4.0),
     ),
 }
 
@@ -368,11 +375,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     # These are the same native feature datums and circular zones authored
-    # on the part, not +/- positions retyped on a drawing. *Front sees +Z:
-    # countersink mouths are on RearFace. The drill mouths and the through
-    # locator bores' rims on the Front sketch (z = 0) are visible in *Back;
-    # the plan's drill mouth hides behind the cone, whose same-radius throat
-    # is at RearFace - CSK_DEPTH.
+    # on the part, not +/- positions retyped on a drawing. The drill mouths
+    # and the through locator bores' rims on the Front sketch (z = 0) are
+    # visible in *Back; the plan (*Front) carries datum C's clock edge.
     plan_edges = scan_view_edges(plan, label="plate rear-face locating PMI")
     back_edges = scan_view_edges(back, label="plate mounting-face drill PMI")
     placements = {
@@ -410,15 +415,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 ).edge,
             )
             for index, (x, y) in enumerate(SCREW_HOLES, 1)
-        },
-        **{
-            f"plate_countersink_{index}_position": PmiDrawingPlacement(
-                plan, FRAME_XY[f"plate_countersink_{index}_position"],
-                edge_entity=plan_edges.circle_at(
-                    (x, y, REAR_FACE_Z), CSK_DIA / 2.0,
-                    axis=(0.0, 0.0, 1.0), label=f"plate countersink {index} projected position",
-                ).edge,
-            ) for index, (x, y) in enumerate(SCREW_HOLES, 1)
         },
         # Below the end radius's text and right of the bore finish symbol.
         "knob_projected_axis": PmiDrawingPlacement(

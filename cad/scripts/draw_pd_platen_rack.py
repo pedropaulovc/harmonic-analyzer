@@ -19,15 +19,12 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_callout,
     add_property_linked_note,
     assert_dimension_measures,
     assert_imported_precision,
     dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
-    property_link,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -39,12 +36,6 @@ from pd_platen_rack_spec import (
     DRAWING_NOMINALS_MM,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_DIMENSIONS,
-    FIRST_GAP_X,
-    PITCH_LINE_Y,
-    RACK_FLANK_INSPECTION_PROPERTY,
-    RACK_THICKNESS,
-    RACK_Z0,
-    half_width,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -77,11 +68,6 @@ END_KEEP = {
 }
 INCOMING_INSPECTION_XY = (0.020, 0.263)
 GEAR_DATA_XY = (0.020, 0.254)
-# One-line requirement (option (c)) ending at x ~48, left of the first gap
-# flank at x ~55: SolidWorks takes the leader from the nearer, right end,
-# so it runs down-right clear of its own text and left of the Length
-# dimension line's start.
-FLANK_INSPECTION_XY = (0.016, 0.214)
 # Under the isometric's label (y ~0.077, run 9 touched its first line), left
 # of the title block (x 0.216) and above the border.
 NOTES_XY = (0.020, 0.064)
@@ -134,59 +120,11 @@ def _assert_native_dimensions(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"rack sheet is missing sizes {sorted(missing)}")
 
 
-def _add_rack_flank_callout(adapter: Any, view: Any) -> Any:
-    """Link the flank inspection to a real finite nominal SeedGap flank.
-
-    CAD phase locates graphics ONLY. It supplies neither the physical
-    inspection datum nor manufactured end-phase acceptance.
-    """
-    edge_xy = model_point_in_view(
-        adapter, view,
-        ((FIRST_GAP_X + half_width(PITCH_LINE_Y)) / 1000.0,
-         PITCH_LINE_Y / 1000.0, (RACK_Z0 + RACK_THICKNESS) / 1000.0),
-        label="rack finite nominal flank inspection leader",
-    )
-    note = _early_bound(add_property_linked_callout(
-        adapter, view, property_name=RACK_FLANK_INSPECTION_PROPERTY,
-        edge_xy=edge_xy, note_xy=FLANK_INSPECTION_XY,
-    ), "INote")
-    raw_annotation = note.GetAnnotation()
-    if raw_annotation is None:
-        raise RuntimeError("rack flank inspection has no native annotation")
-    annotation = _early_bound(raw_annotation, "IAnnotation")
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError("rack flank inspection has no native text format")
-    # Same native font path as add_property_linked_note; no helper fork.
-    text_format.CharHeight = 0.0025
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError("rack flank inspection text height did not persist")
-    return note
-
-
-def _assert_rack_flank_callout(note: Any, source_text: str) -> None:
-    """Retain model-linked ink and an actual non-dangling EDGE/leader."""
-    if note.PropertyLinkedText != property_link(RACK_FLANK_INSPECTION_PROPERTY):
-        raise RuntimeError("rack flank inspection lost its source property link")
-    resolved = note.GetText()
-    if type(resolved) is not str or resolved.replace("\r\n", "\n") != source_text.replace("\r\n", "\n"):
-        raise RuntimeError("rack flank inspection differs from the saved source property")
-    raw_annotation = note.GetAnnotation()
-    if raw_annotation is None:
-        raise RuntimeError("rack flank inspection lost its native annotation")
-    annotation = _early_bound(raw_annotation, "IAnnotation")
-    attached_types = annotation.GetAttachedEntityTypes()
-    if (attached_types is None or tuple(attached_types) != (1,)
-            or int(annotation.GetAttachedEntityCount3()) != 1
-            or int(annotation.GetLeaderCount()) != 1 or bool(annotation.IsDangling())):
-        raise RuntimeError("rack flank inspection lost its real edge/leader association")
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
     check("open platen rack source", await adapter.open_model(str(SOURCE)))
-    properties = read_required_properties(
+    read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -198,7 +136,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Incoming Rack Inspection",
             "Manufacturing Notes",
-            RACK_FLANK_INSPECTION_PROPERTY,
             "Isometric View Note",
             "Enlarged End View Note",
         ),
@@ -210,7 +147,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Incoming Rack Inspection",
             "Manufacturing Notes",
-            RACK_FLANK_INSPECTION_PROPERTY,
             "Isometric View Note",
             "Enlarged End View Note",
         ),
@@ -265,7 +201,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ("Isometric View Note", ISO_NOTE_XY),
     ):
         add_property_linked_note(adapter, property_name, *position, char_height=0.0025)
-    flank_callout = _add_rack_flank_callout(adapter, front)
     for view in (front, top, end):
         set_hidden_lines_removed(adapter, view)
     return await finalize_drawing(
@@ -274,10 +209,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Platen Rack and Backer Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        settled_checks=(
-            lambda: _assert_native_dimensions(adapter, annotations),
-            lambda: _assert_rack_flank_callout(flank_callout, properties[RACK_FLANK_INSPECTION_PROPERTY]),
-        ),
+        settled_checks=(lambda: _assert_native_dimensions(adapter, annotations),),
     )
 
 
