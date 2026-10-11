@@ -34,7 +34,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import dt_cone_pivot_post_tl_soft_jaw_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -135,7 +135,7 @@ def _bolt_features(side: str, x: float, name: str) -> dict[str, dict]:
             ),
             'requirements': ("dia", "depth"),
             'fields': {
-                "parent": (hole, ("BOLT_HOLE_SPEC",)),
+                "parent": (hole, ("BOLT_HOLE_SPEC", ("draw_dt_cone_pivot_post_tl_soft_jaw", "build"))),
                 "dia": (limits(part_spec.CBORE_DIA, 2), ("CBORE_DIA", "JAW_SCREW_HEAD_DIA")),
                 "nominal_dia": (part_spec.CBORE_DIA, ("CBORE_DIA",)),
                 "depth": (limits(part_spec.CBORE_DEPTH, 2), ("CBORE_DEPTH", "JAW_SCREW_HEAD_HEIGHT")),
@@ -147,6 +147,8 @@ def _bolt_features(side: str, x: float, name: str) -> dict[str, dict]:
 
 
 # The bottom edge stands on the vise bed beside the parallels.
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_drawing_hole_callout", "add_native_hole_callout")))
+
 requirement("bed_face",
     kind="face",
     faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),

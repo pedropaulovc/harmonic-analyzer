@@ -17,7 +17,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _surface_finish
 import ch_pivot_shaft_spec as shaft
 import rocker_bank_layout as bank
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits as _band
 from _gtol_planar import PlanarFace
 from _gtol_sphere import SphereFace
@@ -114,6 +114,7 @@ def _left_of_witness(witness_x: float, callout: str) -> float:
 FLATS_CALLOUT = "2X"
 
 _P = shaft.DRAWING_PRECISION_BY_NAME
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
 for _side, _station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, strict=True):
     _dimension = f"{_side.capitalize()}FlatStation"
     requirement(
@@ -122,7 +123,7 @@ for _side, _station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, s
         requirements=("height", "length", "station"), fields={
             "height": (_band(shaft.FLAT_AF, _P["FlatAF"]), ("FLAT_AF",)),
             "height_nominal": (shaft.FLAT_AF, ("FLAT_AF",)),
-            "height_from": ("pivot_bearing", ("FLAT_AF",)),
+            "height_from": ("pivot_bearing", (("draw_ch_pivot_shaft", "build"),)),
             "length": (_band(shaft.FLAT_LENGTH, _P["FlatLength"]), ("FLAT_LENGTH",)),
             "length_nominal": (shaft.FLAT_LENGTH, ("FLAT_LENGTH",)),
             "station": (_band(_station, _P[_dimension]), ("NORTH_FLAT_STATION", ("rocker_bank_layout", "PIVOT_SHAFT_FLAT_STATIONS"))),

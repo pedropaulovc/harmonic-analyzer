@@ -55,7 +55,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_profile_fixture_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
@@ -160,7 +160,7 @@ _PAD_PLANE_SOURCES = (
     ("ch_rocker_arm_spec", "HUB_LENGTH"),
     ("ch_rocker_arm_spec", "ARM_THICKNESS"),
 )
-_FROM_BORE = ("locating_bore", ("LOCATING_BORE_DIA",))
+_FROM_BORE = ("locating_bore", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),))
 
 
 def _plan_location(
@@ -279,7 +279,7 @@ def _hold_down(index: int, x: float, y: float) -> dict[str, dict]:
                 ),
                 "dia_nominal": (part_spec.HOLD_DOWN_CLEARANCE_DIA, ("HOLD_DOWN_CLEARANCE_DIA",)),
                 "thru": (True, spec),
-                "hole_spec": ("1/2 SHCS COUNTERBORE", spec),
+                "hole_spec": ("1/2 SHCS COUNTERBORE", ("HOLD_DOWN_HOLE_SPEC", ("draw_ch_rocker_arm_tl_profile_fixture", "build"))),
             },
             'precision': {"station": part_spec.HOLD_DOWN_X_PLACES, "height": part_spec.HOLD_DOWN_Y_PLACES, "dia": 2},
         },
@@ -288,7 +288,7 @@ def _hold_down(index: int, x: float, y: float) -> dict[str, dict]:
             'faces': (CylinderFace(part_spec.HOLD_DOWN_CBORE_DIA, contains_x_mm=x, contains_y_mm=y),),
             'requirements': ("dia", "depth"),
             'fields': {
-                "parent": (name, spec),
+                "parent": (name, ("HOLD_DOWN_HOLE_SPEC", ("draw_ch_rocker_arm_tl_profile_fixture", "build"))),
                 "dia": (limits(part_spec.HOLD_DOWN_CBORE_DIA, 2), ("HOLD_DOWN_CBORE_DIA", *spec)),
                 "dia_nominal": (part_spec.HOLD_DOWN_CBORE_DIA, ("HOLD_DOWN_CBORE_DIA",)),
                 "depth": (limits(part_spec.HOLD_DOWN_CBORE_DEPTH, 2), ("HOLD_DOWN_CBORE_DEPTH", *spec)),
@@ -350,7 +350,7 @@ def _tap_drill(
         'faces': tuple(ConeFace(part_spec._DRILL_POINT_HALF_ANGLE_DEG, contains_x_mm=x) for x in stations),
         'requirements': ("depth",),
         'fields': {
-            **({} if parent is None else {"parent": (parent, (spec_name,))}),
+            **({} if parent is None else {"parent": (parent, (spec_name, ("draw_ch_rocker_arm_tl_profile_fixture", "build")))}),
             "depth": (limits(spec.depth_mm, 2), (spec_name,)),
             "depth_ref": (spec.depth_mm, (spec_name,)),
             "thru": (False, (spec_name,)),
@@ -358,6 +358,13 @@ def _tap_drill(
         'precision': {"depth": 2},
     }
 
+
+part_metadata(precision_sources=(
+    "DRAWING_PRECISION_BY_NAME", "SCHEDULE_PLACES", "PART_LENGTH_PLACES",
+    "PAD_POCKET_LENGTH_PLACES", "HOLD_DOWN_X_PLACES", "HOLD_DOWN_Y_PLACES",
+    "CLAMP_STUD_PLACES", "STAND_BORE_PLACES",
+    ("_drawing_hole_callout", "add_native_hole_callout"),
+))
 
 requirement("rod_pin_hole",
     kind="hole",
@@ -391,7 +398,7 @@ requirement("rod_pin_hole",
             ("ROD_PIN_HOLE_XY", "ROD_PIN_XY_BAND", "PARENT_BAND_SHARE"),
         ),
         "height_nominal": (part_spec.ROD_PIN_HOLE_XY[1], ("ROD_PIN_HOLE_XY",)),
-        "height_from": ("locating_bore", ("ROD_PIN_HOLE_XY",)),
+        "height_from": ("locating_bore", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),)),
         "axis": _DOWN,
         "dia": (
             limits(part_spec.ROD_PIN_HOLE_DIA, 3, part_spec.ROD_PIN_HOLE_BAND),
@@ -460,7 +467,7 @@ requirement("stand_top",
                 ("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION"),
             ),
         ),
-        "height_from": ("pad_tops", ("STAND_DROP",)),
+        "height_from": ("pad_tops", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),)),
         "height_nominal": (part_spec.STAND_DROP, ("STAND_DROP",)),
         "dia": (limits(part_spec.STAND_OD, part_spec.SCHEDULE_PLACES), ("STAND_OD",)),
         "dia_nominal": (part_spec.STAND_OD, ("STAND_OD",)),
@@ -517,7 +524,7 @@ requirement("pad_tops",
             limits(part_spec.PLATE_DROP, 3),
             ("PLATE_DROP", "PAD_TOP_Z", "PLATE_TOP_Z"),
         ),
-        "height_from": ("plate_top", ("PLATE_DROP",)),
+        "height_from": ("plate_top", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),)),
         "height_nominal": (part_spec.PLATE_DROP, ("PLATE_DROP",)),
     },
     precision={"height": 3},
@@ -537,7 +544,7 @@ requirement("rail_rest_tops",
             limits(part_spec.REST_TOP_HEIGHT, 2),
             ("REST_TOP_HEIGHT", "REST_HEIGHT", "REST_POCKET_DEPTH"),
         ),
-        "height_from": ("plate_top", ("REST_TOP_HEIGHT",)),
+        "height_from": ("plate_top", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),)),
         "height_nominal": (part_spec.REST_TOP_HEIGHT, ("REST_TOP_HEIGHT",)),
     },
     precision={"height": 2},

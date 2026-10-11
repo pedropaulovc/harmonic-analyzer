@@ -30,7 +30,7 @@ from _section_axis import create_section_axis_centerline, position_section_capti
 from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_diamond_pin_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -84,6 +84,8 @@ AXIAL_XY = {
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
 _ROD = ("ch_rocker_arm_spec", "ROD_HOLE_SPEC")
 
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", "DRAWING_REFERENCE_PRECISION"))
 
 requirement("neck_face",
     kind="face",

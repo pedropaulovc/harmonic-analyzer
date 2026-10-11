@@ -35,7 +35,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import ch_rocker_arm_tl_filing_button_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -81,6 +81,8 @@ EDGE_XY = {"DiscDia": (0.165, 0.180)}
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
 
 
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
+
 requirement("rim",
     kind="boss",
     faces=(CylinderFace(part_spec.OD),),
@@ -105,7 +107,7 @@ requirement("bore",
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
         "axis": _AXIS,
         "dia_nominal": (part_spec.BORE_DIA, ("BORE_DIA",)),
-        "thru": (True, ("BORE_DIA",)),
+        "thru": (True, (("draw_ch_rocker_arm_tl_filing_button", "build"),)),
         "note": (part_spec.BORE_FIT_NOTE, ("BORE_FIT_NOTE",)),
         "finish_ra": (part_spec.MACHINED_UM, ("SURFACE_FINISHES",)),
     },

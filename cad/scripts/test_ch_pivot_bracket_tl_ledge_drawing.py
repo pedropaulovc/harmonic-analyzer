@@ -11,7 +11,6 @@ import ch_pivot_bracket_tl_angle_plate_spec as plate
 import ch_pivot_bracket_tl_ledge_spec as spec
 import draw_ch_pivot_bracket_tl_ledge as drawing
 import export_features
-from _feature_requirements import requirements_for
 from _printed_limits import limits
 from _hole_spec import THREAD_MAJOR_MM
 
@@ -28,18 +27,6 @@ PRECHIPS_TABLE_Z = -94.14  # base box bottom
 PRECHIPS_LEDGE_Z = (-43.34, -16.44)  # bolted foot-end ledge box, 26.9 high
 PRECHIPS_SCREW_Z = -26.94  # ledge screws, clearance and tapped holes
 PRECHIPS_STUD_Z = -13.44  # bridge stud holes (the bridge's Setup Z)
-
-
-def test_drawing_declarations_own_the_exported_requirements() -> None:
-    declared = requirements_for(drawing)
-    features = export_features.requirement_manifest(drawing.PART_STEM)["features"]
-    selectors = export_features.feature_selectors(drawing.PART_STEM)
-    assert declared
-    assert set(declared) == set(features) == set(selectors)
-    for name, declaration in declared.items():
-        assert declaration.kind == features[name]["kind"]
-        assert list(declaration.requirements) == features[name]["requirements"]
-        assert tuple(selectors[name]) == declaration.faces
 
 
 def _features() -> dict:

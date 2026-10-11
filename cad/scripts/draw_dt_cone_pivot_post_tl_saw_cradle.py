@@ -46,7 +46,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import dt_cone_pivot_post_tl_saw_cradle_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -142,7 +142,7 @@ FRONT_KEEP = {
 
 _POST = "dt_cone_pivot_post_spec"
 _X_AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
-_FROM_SIDE = ("side_face", ("__frame__",))
+_FROM_SIDE = ("side_face", (("draw_dt_cone_pivot_post_tl_saw_cradle", "build"),))
 
 
 def _seat(x_span: tuple[float, float], name: str) -> dict:
@@ -170,8 +170,8 @@ def _seat(x_span: tuple[float, float], name: str) -> dict:
             # from the base side face (model Z0).
             "station": (limits(part_spec.SEAT_Z, 1), ("SEAT_Z",)),
             "station_nominal": (part_spec.SEAT_Z, ("SEAT_Z",)),
-            "thru": (True, (name,)),
-            "process": ("bore", ("DRAWING_NOTES",)),
+            "thru": (True, (("draw_dt_cone_pivot_post_tl_saw_cradle", "build"),)),
+            "process": ("bore", (("draw_dt_cone_pivot_post_tl_saw_cradle", "build"),)),
         },
         'precision': {"dia": part_spec.SEAT_PLACES, "height": 1, "station": 1},
     }
@@ -239,6 +239,8 @@ def _z_face(z: float, outward: float, name: str) -> dict:
     }
 
 
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_drawing_hole_callout", "add_native_hole_callout")))
+
 requirement("cap_pad",
     kind="face",
     faces=(PlanarFace((0.0, 1.0, 0.0), part_spec.PAD_HT),),
@@ -279,7 +281,7 @@ requirement("base_top",
         "plane": ({"frame": "model", "axis": "y", "value": part_spec.BASE_HT}, ("BASE_HT",)),
         "height": (limits(part_spec.BASE_HT, 1), ("BASE_HT",)),
         "height_nominal": (part_spec.BASE_HT, ("BASE_HT",)),
-        "height_from": ("underside", ("__frame__",)),
+        "height_from": ("underside", (("draw_dt_cone_pivot_post_tl_saw_cradle", "build"),)),
     },
     precision={"height": 1},
 )

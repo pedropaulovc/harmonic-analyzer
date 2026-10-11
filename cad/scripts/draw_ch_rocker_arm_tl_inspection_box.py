@@ -38,7 +38,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_inspection_box_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
@@ -94,13 +94,15 @@ def _window(
             "station": (limits(station, 1), (sources[2],)),
             "station_nominal": (station, (sources[2],)),
             "lower_z": (limits(floor_y, 1), (sources[3],)),
-            "height_from": ("base", ("__frame__",)),
-            "note": (note, ("__frame__",)),
-            "thru": (True, ("__frame__",)),
+            "height_from": ("base", (("draw_ch_rocker_arm_tl_inspection_box", "build"),)),
+            "note": (note, (("draw_ch_rocker_arm_tl_inspection_box", "DIMENSION_CALLOUTS"), ("draw_ch_rocker_arm_tl_inspection_box", "build"))),
+            "thru": (True, (("draw_ch_rocker_arm_tl_inspection_box", "DIMENSION_CALLOUTS"),)),
         },
         'precision': {"width": 1, "height": 1, "station": 1, "lower_z": 1},
     }
 
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_drawing_hole_callout", "add_native_hole_callout")))
 
 # Bought reference faces: located, not reworked, so no printed band.
 requirement("datum_b_face",
@@ -218,7 +220,7 @@ for side, x in zip(("left", "right"), part_spec.TAP_X, strict=True):
         faces=(ConeFace(part_spec.DRILL_POINT_HALF_ANGLE, contains_x_mm=x),),
         requirements=("dia", "depth"),
         fields={
-            "parent": (f"bar_tap_{side}", ("TAP_SPEC",)),
+            "parent": (f"bar_tap_{side}", ("TAP_SPEC", ("draw_ch_rocker_arm_tl_inspection_box", "build"))),
             # The title-block drilled band qualifies the printed Ø3.45.
             "dia": (
                 limits(round(part_spec.TAP_DRILL_DIA, 2), 2, part_spec.DRILLED_BAND),

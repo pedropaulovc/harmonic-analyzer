@@ -238,6 +238,7 @@ _CRANK_END_SOURCES = ("CRANK_BOSS_START_Z", "CRANK_BOSS_NORTH_FACE", "HEAD_DIA",
 part_metadata(
     fields={"volume_mm3": (cone.HARVESTED_VOLUME_MM3, ("HARVESTED_VOLUME_MM3",))},
     frames=_cone_source_frames(), model_sources=("BLOCK_HEIGHT",),
+    precision_sources=("DRAWING_PRECISION_BY_NAME", "GEOMETRIC_CONTROLS", ("_surface_finish", "ra")),
 )
 
 
@@ -274,21 +275,21 @@ FRONT_KEEP = {
 BODY = requirement(
     "body", faces=(CylinderFace(cone.BLOCK_DIA),),
     **_size_requirement("boss", {"dia": ("BLOCK_DIA", "MainBodyDia"), "height": ("BLOCK_HEIGHT", "MainBodyHt")}, {
-        "frame": ("body_axis", _HEAD_SOURCES),
+        "frame": ("body_axis", (*_HEAD_SOURCES, ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
         "z_mm": ([0.0, round(cone.HEAD_BASE_Y, 12)], _HEAD_SOURCES),
     }),
 )
 HEAD = requirement(
     "head", faces=(CylinderFace(cone.HEAD_DIA), PlanarFace((0, 1, 0), cone.BLOCK_HEIGHT)),
     **_size_requirement("boss", {"dia": ("HEAD_DIA", "HeadDia"), "height": ("HEAD_HEIGHT", "HeadHt")}, {
-        "frame": ("body_axis", _HEAD_SOURCES),
+        "frame": ("body_axis", (*_HEAD_SOURCES, ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
         "z_mm": ([round(cone.HEAD_BASE_Y, 12), round(cone.BLOCK_HEIGHT, 12)], _HEAD_SOURCES),
     }),
 )
 CRANK_BOSS = requirement(
     "crank_boss", faces=(CylinderFace(cone.CRANK_BOSS_DIA),),
     **_size_requirement("boss", {"dia": ("CRANK_BOSS_DIA", "CrankBossDia")}, {
-        "frame": ("crank_axis", ("CRANK_BORE_HEIGHT",)),
+        "frame": ("crank_axis", ("CRANK_BORE_HEIGHT", ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
         "z_mm": ([round(cone.CRANK_BOSS_START_Z, 12), round(cone.CRANK_BOSS_END_Z, 12)], _CRANK_END_SOURCES),
     }),
 )
@@ -298,10 +299,10 @@ CRANK_BORE = requirement(
         "at": ([0.0, cone.CRANK_BORE_HEIGHT, 0.0], ("CRANK_BORE_HEIGHT",)),
         "axis": ([0.0, 0.0, 1.0], ("INCLINE_DEG",)),
         "dia": (_band(cone.CRANK_BORE_DIA, _P["CrankBoreDia"], cone.RUNNING_BORE_BAND), ("CRANK_BORE_DIA", "RUNNING_BORE_BAND")),
-        "nominal_dia": (cone.CRANK_BORE_DIA, ("CRANK_BORE_DIA",)), "thru": (True, ("CRANK_BORE_DIA",)),
+        "nominal_dia": (cone.CRANK_BORE_DIA, ("CRANK_BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_CALLOUTS"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
         "separation": (_band(cone.CRANK_ABOVE_CONE, _P["CrankAboveCone"], cone.CRANK_ABOVE_CONE_BAND), ("CRANK_ABOVE_CONE", "CRANK_ABOVE_CONE_BAND")),
-        "height_from": ("journal_bore", ("CRANK_ABOVE_CONE",)),
+        "height_from": ("journal_bore", (("draw_dt_cone_pivot_post", "build"),)),
         "height_nominal": (cone.CRANK_BORE_HEIGHT, ("CRANK_BORE_HEIGHT",)),
         "angularity_dia": (float(cone.GEOMETRIC_CONTROLS[0].tolerance), ("CRANK_BORE_ANGULARITY_MM", "GEOMETRIC_CONTROLS")),
         "angularity_datums": (list(cone.GEOMETRIC_CONTROLS[0].datums), ("GEOMETRIC_CONTROLS",)),
@@ -348,7 +349,7 @@ for _side, _x, _dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", con
         requirements=("dia", "thru", "station"), fields={
             "at": ([_x, cone.BLOCK_HEIGHT, 0.0], ("ATTACHMENT_X", "BLOCK_HEIGHT")), "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
             "dia": (_drilled_band(cone.ATTACHMENT_THRU_DIA, _P[_dim]), ("ATTACHMENT_THRU_DIA", ("_drawing_hole_callout", "add_native_hole_callout"))),
-            "nominal_dia": (cone.ATTACHMENT_THRU_DIA, ("ATTACHMENT_THRU_DIA",)), "thru": (True, ("ATTACHMENT_THRU_DIA",)),
+            "nominal_dia": (cone.ATTACHMENT_THRU_DIA, ("ATTACHMENT_THRU_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "build"),)),
             "station": (_band(_x, _P[_dim]), ("ATTACHMENT_X",)), "station_nominal": (_x, ("ATTACHMENT_X",)),
         }, precision={"dia": _P[_dim], "station": _P[_dim]},
     )
@@ -358,7 +359,7 @@ for _side, _x, _dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", con
             PlanarFace((0, 1, 0), cone.BLOCK_HEIGHT - cone.ATTACHMENT_CBORE_DEPTH, contains_x_mm=_x),
         ),
         requirements=("dia", "depth"), fields={
-            "parent": (_name, ("ATTACHMENT_THRU_DIA",)),
+            "parent": (_name, (("draw_dt_cone_pivot_post", "build"),)),
             "dia": (_band(cone.ATTACHMENT_CBORE_DIA, _P[_dim]), ("ATTACHMENT_CBORE_DIA",)), "nominal_dia": (cone.ATTACHMENT_CBORE_DIA, ("ATTACHMENT_CBORE_DIA",)),
             "depth": (_band(cone.ATTACHMENT_CBORE_DEPTH, _P[_dim]), ("ATTACHMENT_CBORE_DEPTH",)), "depth_ref": (cone.ATTACHMENT_CBORE_DEPTH, ("ATTACHMENT_CBORE_DEPTH",)),
         }, precision={"dia": _P[_dim], "depth": _P[_dim]},
@@ -380,7 +381,7 @@ JOURNAL_KEEP = {
 CONE_BOSS = requirement(
     "cone_boss", faces=(CylinderFace(cone.CONE_BOSS_DIA),),
     **_size_requirement("boss", {"dia": ("CONE_BOSS_DIA", "ConeBossDia")}, {
-        "frame": ("cone_axis", ("BORE_HEIGHT", "INCLINE_DEG", "SURFACE_FINISHES")),
+        "frame": ("cone_axis", ("BORE_HEIGHT", "INCLINE_DEG", "SURFACE_FINISHES", ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
         "z_mm": ([round(-cone.CONE_BOSS_LENGTH / 2, 12), round(cone.CONE_BOSS_LENGTH / 2, 12)], ("CONE_BOSS_LENGTH", "BLOCK_DIA")),
     }),
 )
@@ -390,7 +391,7 @@ JOURNAL_BORE = requirement(
         "at": ([0.0, cone.BORE_HEIGHT, 0.0], ("BORE_HEIGHT",)),
         "axis": ([-_NORMAL[0], 0.0, -_NORMAL[2]], ("INCLINE_DEG",)),
         "dia": (_band(cone.BORE_DIA, _P["JournalBoreDia"], cone.RUNNING_BORE_BAND), ("BORE_DIA", "RUNNING_BORE_BAND")),
-        "nominal_dia": (cone.BORE_DIA, ("BORE_DIA",)), "thru": (True, ("BORE_DIA",)),
+        "nominal_dia": (cone.BORE_DIA, ("BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_CALLOUTS"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
         "height": (_band(cone.BORE_HEIGHT, _P["JournalAxisY"], (cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, -cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM)), ("BORE_HEIGHT", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM")),
         "height_from": ("foot_seat", ("BORE_HEIGHT",)), "datum": ("A", ("PART_DATUMS",)),

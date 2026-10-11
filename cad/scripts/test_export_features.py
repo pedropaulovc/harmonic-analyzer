@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import ast
+import builtins
+from dataclasses import replace
 import hashlib
 import importlib
 import importlib.util
@@ -11,7 +13,7 @@ import math
 import sys
 import tomllib
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 import yaml
@@ -25,26 +27,8 @@ import ch_rocker_arm_spec as rocker
 import dt_cone_pivot_post_spec as cone
 import rocker_bank_layout as bank
 from _export_feature_faces import FeatureFaceError, face_name
-from _feature_requirements import discover_parts, requirements_for
+from _feature_requirements import declaration_calls, discover_parts, metadata_for, requirements_for, source_tree
 from _gtol_face import FaceGeometry
-
-
-def _requirement_calls(tree: ast.Module) -> list[ast.Call]:
-    calls: list[ast.Call] = []
-
-    def visit(node: ast.AST) -> None:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
-            return
-        if isinstance(node, ast.Call) and (
-            isinstance(node.func, ast.Name) and node.func.id == "requirement"
-            or isinstance(node.func, ast.Attribute) and node.func.attr == "requirement"
-        ):
-            calls.append(node)
-        for child in ast.iter_child_nodes(node):
-            visit(child)
-
-    visit(tree)
-    return calls
 
 
 def _fresh_draw(monkeypatch, stem: str):
@@ -104,20 +88,6 @@ def _owners(stem: str, geometry: FaceGeometry) -> list[str]:
     ]
 
 
-def test_supported_parts_are_derived_from_draw_requirement_calls() -> None:
-    scripts = exporter.REPO / "cad" / "scripts"
-    draws = tuple(scripts.glob("draw_*.py"))
-    assert draws, "no draw scripts scanned"
-    declared = {
-        path.stem.removeprefix("draw_")
-        for path in draws
-        if _requirement_calls(ast.parse(path.read_text(encoding="utf-8")))
-    }
-    assert declared, "no module-level requirement declarations found"
-    assert set(exporter.SUPPORTED_PARTS) == declared
-    assert discover_parts(scripts) == tuple(sorted(declared))
-
-
 def test_adding_a_draw_declaration_is_discovered_without_importing(tmp_path: Path) -> None:
     path = tmp_path / "draw_synthetic_part.py"
     original = (
@@ -141,16 +111,135 @@ def test_adding_a_draw_declaration_is_discovered_without_importing(tmp_path: Pat
     assert "draw_synthetic_part" not in sys.modules
 
 
+@pytest.mark.parametrize("source", [
+    "requirement('unbound')",
+    "import unrelated\nunrelated.requirement('wrong_module')",
+    "from unrelated import requirement\nrequirement('wrong_import')",
+    "from _feature_requirements import part_metadata as requirement\nrequirement('wrong_api')",
+    "from _feature_requirements import requirement\nrequirement = lambda *args: None\nrequirement('rebound')",
+    "from _feature_requirements import requirement\nif condition:\n    requirement = None\nrequirement('possibly_rebound')",
+    "while condition:\n    from _feature_requirements import requirement\nrequirement('unbound_after_loop')",
+    "try:\n    from _feature_requirements import requirement\nexcept ImportError:\n    requirement('unbound_in_handler')",
+    "match candidate:\n    case 1:\n        from _feature_requirements import requirement\n    case 2:\n        requirement('unbound_in_other_case')",
+    "from _feature_requirements import requirement\nmatch candidate:\n    case {'key': requirement}:\n        requirement('shadowed_by_pattern')",
+])
+def test_wrong_or_unbound_api_does_not_discover_a_part(tmp_path: Path, source: str) -> None:
+    (tmp_path / "draw_not_enrolled.py").write_text(source, encoding="utf-8")
+    assert discover_parts(tmp_path) == ()
+
+
+@pytest.mark.parametrize("source", [
+    "from _feature_requirements import requirement as declare\nfor item in things:\n    declare(item)",
+    "import _feature_requirements as features\nwith context:\n    features.requirement('bound')",
+    "if condition:\n    from _feature_requirements import requirement\n    requirement('bound_in_branch')",
+])
+def test_import_bound_api_in_module_control_flow_discovers_a_part(tmp_path: Path, source: str) -> None:
+    (tmp_path / "draw_enrolled.py").write_text(source, encoding="utf-8")
+    assert discover_parts(tmp_path) == ("enrolled",)
+
+
+def test_source_paths_never_import_draw_spec_or_citation_modules(monkeypatch) -> None:
+    import _buildgraph
+
+    original_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name.startswith("draw_") or name.endswith(("_spec", "_notes")):
+            pytest.fail(f"source_paths imported a declaration input: {name}")
+        return original_import(name, *args, **kwargs)
+
+    def refuse_import_module(name, *_args, **_kwargs):
+        pytest.fail(f"source_paths dynamically imported {name}")
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    monkeypatch.setattr(importlib, "import_module", refuse_import_module)
+    for stem in exporter.SUPPORTED_PARTS:
+        paths = exporter.source_paths(stem)
+        assert paths and all(path.is_file() for path in paths), stem
+        assert any(path.name == f"draw_{stem}.py" for path in paths), stem
+
+
+def test_source_paths_cover_unimported_runtime_tuple_sources_and_their_closure(tmp_path: Path, monkeypatch) -> None:
+    import _buildgraph
+
+    scripts = tmp_path / "cad" / "scripts"
+    scripts.mkdir(parents=True)
+    files = {
+        "export_features.py": "",
+        "draw_synthetic.py": (
+            "from _feature_requirements import requirement, part_metadata\n"
+            "raise RuntimeError('source discovery must not execute this')\n"
+            "_AUTHORITY = ('unimported_authority', 'PRINTED_NOTE')\n"
+            "def _fields():\n"
+            "    return {'note': ('printed', (_AUTHORITY,))}\n"
+            "requirement('synthetic', fields=_fields())\n"
+            "part_metadata(precision_sources=(('unimported_precision', 'PLACES'),))\n"
+        ),
+        "synthetic_spec.py": "raise RuntimeError('must not import the spec')\n",
+        "synthetic_notes.py": "raise RuntimeError('must not import the notes')\n",
+        "unimported_authority.py": "import authority_dependency\nPRINTED_NOTE = 'printed'\n",
+        "unimported_precision.py": "PLACES = 2\n",
+        "authority_dependency.py": "raise RuntimeError('must not import the cited closure')\n",
+    }
+    for name, content in files.items():
+        (scripts / name).write_text(content, encoding="utf-8")
+    monkeypatch.setattr(exporter, "__file__", str(scripts / "export_features.py"))
+    monkeypatch.setattr(exporter, "CONFIG_DIR", tmp_path / "cad" / "config")
+    monkeypatch.setattr(exporter, "SUPPORTED_PARTS", ("synthetic",))
+    with monkeypatch.context() as graph:
+        graph.setattr(_buildgraph, "SCRIPTS_DIR", scripts)
+        _buildgraph.clear_import_caches()
+        try:
+            paths = set(exporter.source_paths("synthetic"))
+            assert {scripts / name for name in files} <= paths
+            for name in ("draw_synthetic", "synthetic_spec", "synthetic_notes", "unimported_authority", "unimported_precision", "authority_dependency"):
+                assert name not in sys.modules
+            (scripts / "unimported_precision.py").unlink()
+            with pytest.raises(ValueError, match="missing citation source module: unimported_precision"):
+                exporter.source_paths("synthetic")
+        finally:
+            _buildgraph.clear_import_caches()
+
+
+def test_source_tree_cache_reads_current_contents_even_at_the_same_path(tmp_path: Path) -> None:
+    path = tmp_path / "source.py"
+    path.write_text("FIRST = 1\n", encoding="utf-8", newline="\n")
+    first = source_tree(path)
+    assert source_tree(path) is first
+    path.write_text("OTHER = 2\n", encoding="utf-8", newline="\n")
+    second = source_tree(path)
+    assert second is not first
+    assert second.body[0].targets[0].id == "OTHER"
+    path.write_bytes(b"OTHER = 2\r\n")
+    assert source_tree(path) is not second
+
+
+def test_assignment_subscript_and_attribute_targets_cannot_hijack_symbol_citations(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "authority.py"
+    path.write_text(
+        "KEY = 'printed authority'\nTABLE = {}\nTABLE[KEY] = 'not the authority'\n"
+        "TABLE.KEY = 'not a declaration'\nFIRST, [SECOND, THIRD] = values\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(exporter, "REPO", tmp_path)
+    module = ModuleType("authority")
+    module.__file__ = str(path)
+    tree = source_tree(path)
+    expected = f"harmonic-analyzer/authority.py:{tree.body[0].lineno}-{tree.body[0].end_lineno}"
+    assert exporter._cite(module, "KEY") == [expected]
+    assert {"FIRST", "SECOND", "THIRD"} <= exporter._declarations(module).keys()
+    path.write_text("\n" + path.read_text(encoding="utf-8"), encoding="utf-8")
+    updated = source_tree(path).body[0]
+    assert exporter._cite(module, "KEY") == [f"harmonic-analyzer/authority.py:{updated.lineno}-{updated.end_lineno}"]
+
+
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
-def test_draw_declarations_supply_requirements_selectors_and_field_sources(stem: str) -> None:
+def test_draw_declarations_cite_current_calls_and_declared_sources(stem: str) -> None:
     draw = importlib.import_module(f"draw_{stem}")
     declarations = requirements_for(draw)
     features = exporter.requirement_manifest(stem)["features"]
-    selectors = exporter.feature_selectors(stem)
-    assert declarations, f"{draw.__name__} declares no requirements"
-    assert set(declarations) == set(features) == set(selectors)
     path = Path(draw.__file__).resolve()
-    calls = _requirement_calls(ast.parse(path.read_text(encoding="utf-8")))
+    calls = declaration_calls(source_tree(path), "requirement")
     assert calls, f"{path.name} has no module-level requirement calls"
     relative = path.relative_to(exporter.REPO).as_posix()
     call_citations = {
@@ -160,10 +249,6 @@ def test_draw_declarations_supply_requirements_selectors_and_field_sources(stem:
     spec = importlib.import_module(f"{stem}_spec")
     for name, declared in declarations.items():
         feature = features[name]
-        assert declared.name == name
-        assert feature["kind"] == declared.kind
-        assert feature["requirements"] == list(declared.requirements)
-        assert selectors[name] == declared.faces
         assert declared.path == path
         call_citation = f"harmonic-analyzer/{relative}:{declared.call_span[0]}-{declared.call_span[1]}"
         assert call_citation in call_citations, (stem, name, call_citation)
@@ -177,6 +262,19 @@ def test_draw_declarations_supply_requirements_selectors_and_field_sources(stem:
                     if isinstance(source, tuple) else (spec, source)
                 )
                 assert set(exporter._cite(module, symbol)) <= citations, (stem, name, field, source)
+        if declared.precision:
+            precision_sources = [
+                source for metadata in metadata_for(draw)
+                for source in metadata.precision_sources
+            ]
+            assert precision_sources, (stem, name, "no printed precision authority")
+            for source in precision_sources:
+                module, symbol = (
+                    (importlib.import_module(source[0]), source[1])
+                    if isinstance(source, tuple) else (spec, source)
+                )
+                assert symbol != "__frame__", (stem, name, source)
+                assert set(exporter._cite(module, symbol)) <= set(feature["cite"]["precision"]), (stem, name, source)
 
 
 @pytest.mark.parametrize("source", ["MISSING_TEST_DIMENSION", ("ch_rocker_arm_spec", "MISSING_TEST_DIMENSION")])
@@ -187,6 +285,50 @@ def test_missing_citation_symbol_fails_instead_of_exporting_unsourced_requiremen
     monkeypatch.setitem(declared.fields, "dia", (value, (*sources, source)))
     with pytest.raises(ValueError, match="MISSING_TEST_DIMENSION"):
         exporter.requirement_manifest("ch_rocker_arm")
+
+
+@pytest.mark.parametrize("sources", [(), ("__frame__",)])
+def test_feature_precision_without_explicit_printed_sources_fails(monkeypatch, sources) -> None:
+    draw = importlib.import_module("draw_ch_rocker_arm")
+    monkeypatch.setattr(
+        draw, "_FEATURE_METADATA",
+        [replace(metadata, precision_sources=sources) for metadata in metadata_for(draw)],
+    )
+    with pytest.raises(ValueError, match="precision_sources"):
+        exporter.requirement_manifest("ch_rocker_arm")
+
+
+def _assert_rocker_literal_print_authority() -> None:
+    features = exporter.requirement_manifest("ch_rocker_arm")["features"]
+    pivot = features["pivot_bore"]
+    assert f"PIVOT HOLE: {pivot['process'].upper()}." in rocker_notes.DRAWING_NOTES, "pivot process drifted from its printed note"
+    assert pivot["thru"] and "ALL HOLES THRU." in rocker_notes.DRAWING_NOTES, "hole end drifted from its printed note"
+    assert features["profile_outer"]["mirror_symmetric"] and "MIRROR-SYMMETRIC" in rocker_notes.DRAWING_NOTES, "profile symmetry drifted from its printed note"
+    printed_notes = set(exporter._cite(rocker_notes, "DRAWING_NOTES"))
+    for feature, field in ((pivot, "process"), (pivot, "thru"), (features["profile_outer"], "mirror_symmetric")):
+        assert printed_notes <= set(feature["cite"][field])
+
+
+def test_rocker_literal_requirements_match_the_printed_notes() -> None:
+    _assert_rocker_literal_print_authority()
+
+
+def test_changed_printed_process_is_detected_instead_of_accepting_stale_literal(monkeypatch) -> None:
+    original = rocker_notes.DRAWING_NOTES
+    changed = original.replace("PIVOT HOLE: REAM.", "PIVOT HOLE: HONE.")
+    assert changed != original
+    monkeypatch.setattr(rocker_notes, "DRAWING_NOTES", changed)
+    with pytest.raises(AssertionError, match="pivot process drifted"):
+        _assert_rocker_literal_print_authority()
+
+
+def test_ground_finish_keeps_its_declared_authority_without_a_seat_grade_citation() -> None:
+    import ch_rocker_arm_tl_pivot_screw_spec as screw
+
+    shoulder = exporter.requirement_manifest("ch_rocker_arm_tl_pivot_screw")["features"]["shoulder"]
+    assert shoulder["finish_ra"] == exporter._surface_finish.GROUND_UM
+    assert set(exporter._cite(screw, "SURFACE_FINISHES")) <= set(shoulder["cite"]["finish_ra"])
+    assert not set(exporter._cite(exporter._surface_finish, "SEAT_UM")) & set(shoulder["cite"]["finish_ra"])
 
 
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)

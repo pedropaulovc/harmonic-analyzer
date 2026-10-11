@@ -39,7 +39,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import ch_rocker_arm_tl_filing_stud_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -101,8 +101,10 @@ PROFILE_KEEP = {
 
 
 _AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
-_FROM_TIP = ("tip_face", ("THREAD_END",))
+_FROM_TIP = ("tip_face", (("draw_ch_rocker_arm_tl_filing_stud", "build"),))
 
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
 
 requirement("tip_face",
     kind="face",

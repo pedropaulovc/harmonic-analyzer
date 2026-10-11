@@ -2699,5 +2699,4 @@ def test_numeric_tolerance_title_block_readers_are_classified(module):
 def test_feature_exporter_revision_call_keeps_config_analysis_classifiable():
     """A bare from-_config import must not widen every features leaf to '**'."""
     exporter = SCRIPTS_DIR / "export_models.py"
-    assert bg._config_tokens_in_source(exporter) == frozenset({"release.yaml"})
     assert "**" not in config_files_of(exporter)

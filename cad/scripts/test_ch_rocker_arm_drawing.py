@@ -105,6 +105,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
 
 
 def test_native_gdt_and_finish_present() -> None:
+    """Native print arguments retain the part-owned limit and A-B-C frame."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
     # face; the rod-pin position frame references all three.
@@ -114,7 +115,31 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'label="pivot bore cylindrical datum feature"' in source
     assert source.count("shoulder=True") == 1
     assert source.count("add_feature_control_frame(") == 1
-    assert 'datums=("A", "B", "C")' in source
+    tree = ast.parse(source)
+    frames = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "add_feature_control_frame"
+    ]
+    assert len(frames) == 1
+    keywords = {keyword.arg: keyword.value for keyword in frames[0].keywords}
+    # Evaluate the actual native print-call arguments without invoking COM.
+    printed_datums = eval(
+        compile(ast.Expression(keywords["datums"]), drawing.__file__, "eval"),
+        vars(drawing),
+    )
+    assert printed_datums == ("A", "B", "C")
+    printed_tolerance = eval(
+        compile(ast.Expression(keywords["tolerance"]), drawing.__file__, "eval"),
+        vars(drawing),
+    )
+    assert (
+        printed_tolerance
+        == ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]
+    )
+    assert drawing.ROD_HOLE.fields["position_dia"][0] == float(printed_tolerance)
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source

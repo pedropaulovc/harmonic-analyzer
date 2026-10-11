@@ -1,6 +1,6 @@
 # Drawing requirements, STEP face sets and process travelers
 
-## Independent producers
+## Scoped producers and full-export consumers
 
 `features:<stem>` is one scoped COM leaf per part whose `draw_<stem>.py`
 declares requirement features. `export_features.SUPPORTED_PARTS` is derived by
@@ -23,10 +23,12 @@ raw bytes, verified when the manifest is generated directly from that STEP.
 The STEP plus `features.toml` is the consumer artefact; there are no feature
 receipts or preservation certificates. `export_features.py` is SolidWorks-free.
 
-The ordinary full `export` remains independent: it owns `cad/out/step/`, the
-other existing neutral outputs and `release-neutral.json`. The scoped leaves do
-not touch those paths, STL/PNG outputs, colors or source-digest ledgers. There is
-no ordering or preservation relationship between the producers.
+The ordinary full `export` owns `cad/out/step/`, the other existing neutral
+outputs and `release-neutral.json`. For enrolled feature parts it validates and
+consumes the scoped feature bundles, copying their exact STEP bytes into the
+full neutral inventory instead of loading draw declarations or re-deriving
+manifests. It waits for `package:features`; the scoped leaves never overwrite
+full-export paths, STL/PNG outputs, colors or source-digest ledgers.
 
 Run COM leaves through the
 [supervised farm launcher](../../../DEVELOPING.md#supervised-farm-launches),
@@ -37,8 +39,13 @@ never through a local SolidWorks session or finite build timer.
 Each part owns module-level `requirement(name, *, kind, faces, requirements,
 fields, precision=...)` calls in its draw script, next to the code that prints
 the corresponding callout, dimension, FCF or note. The shared API in
-`_feature_requirements.py` registers each declaration and returns it for drawing
-code to consume. `faces` contains the existing geometry selectors;
+`_feature_requirements.py` registers each declaration and returns a `Requirement`
+descriptor for registry inspection or explicit drawing-code consumption, not
+automatic print-path wiring. The rocker explicitly reads its Pivot/Strap datum
+and rod FCF tolerance/datum fields and checks four imported native precisions
+against descriptor values. Other return values may remain inspection-only;
+colocation alone is not a printed-callout drift check.
+`faces` contains the existing geometry selectors;
 `requirements` preserves the ordered acceptance-field names, including explicit
 unknowns. Each `fields` entry is `(value, sources)`: a string source names a
 symbol in `<stem>_spec`, while `(module, NAME)` cites a symbol in another module.
@@ -47,6 +54,17 @@ Part-level fields, geometry frames and drawing datums use colocated
 `model_sources` and `precision_sources` cite the shared frame and displayed
 precision facts. Multiple metadata declarations merge without replacing prior
 facts.
+Feature-level `precision` remains a raw value map, but requires nonempty
+`part_metadata.precision_sources` naming the actual printed precision authority;
+export fails if it is absent. A spec module docstring is not a precision source.
+Literal process, through-hole and note requirements cite `DRAWING_NOTES` when
+the notes are the printed authority; datum and callout literals cite the drawing
+function that prints them. Citing a nearby numeric spec symbol does not establish
+authority for an unrelated literal. Meaningful drift checks compare against the
+printed authority, not registry/manifest/selector equality.
+Inherited process values such as lap/face retain their route-docstring or
+native-facing authority where no printed instruction exists; such citations
+do not claim that the sheet prints those process requirements.
 There is one declaration convention for machine parts and shop fixtures;
 specs remain the source of geometry and native dimension values. Importing a
 draw module to load its declarations neither connects to SolidWorks nor runs
@@ -107,9 +125,10 @@ current AST declarations or call sites in existing source files.
 
 ## Face identity and native hygiene
 
-Both export paths use the same AP214 preference/default-configuration/naming
-path. `swStepExportFaceEdgeProps` exposes deterministic transient native entity
-names. Existing `_part_pmi` geometry matchers resolve each feature to every
+Scoped feature exports and full exports of other parts use the same AP214
+preference/default-configuration/naming path. `swStepExportFaceEdgeProps`
+exposes deterministic transient native entity names.
+Existing `_part_pmi` geometry matchers resolve each feature to every
 matching native patch. Zero matches, cross-feature claims, failed name/read-back
 or missing/unknown exported labels fail loudly. A periodic native face can yield
 multiple `ADVANCED_FACE` patches with the same label; all belong to its feature
@@ -119,37 +138,44 @@ only with that exact STEP digest. The STEP is never rewritten.
 Names are never saved into the native part. A before/after native SHA guard runs
 after closing the export document. Offline parser tests cover split patches and
 ambiguous/lost labels. The rocker pivot bore must carry two labelled STEP patches;
-one surviving half is a failure even if both producers make the same mistake.
+one surviving half is a failure even if the full inventory copies that mistake.
 
 ## Release binding gate
 
 `check:features_bound` is SolidWorks-free and required by `release`, not `build`.
-It waits for both producers, validates the manifest with the pinned prechips
-`Features` schema, verifies its adjacent scoped STEP digest, and requires every
-feature's recorded face set to equal the references parsed from that STEP.
-A mismatch fails with the feature name before any bundle is staged. It then
-compares each feature's face labels and patch count per label between scoped and
-full STEPs. Both raw digests are reported. Headers, entity
-numbers and file order are not semantic identity: SolidWorks timestamps headers
-and renumbers entities on re-export. This is the independent-session re-export
-regression, not a byte-equality certificate.
+It waits for scoped bundles and the full neutral inventory, validates the
+manifest with the pinned prechips `Features` schema, verifies its adjacent
+scoped STEP digest, and requires every feature's recorded face set to equal
+the references parsed from that STEP. A mismatch fails with the feature name
+before any bundle is staged. The gate requires byte-identical scoped and full
+STEPs, reports both raw digests, and retains the split rocker pivot-bore patch
+check. Full export now copies the scoped STEP bytes: this checks authoritative
+bundle binding and copied neutral inventory, not an independent-session COM
+re-export.
 
 Release staging copies the verified scoped STEP and manifest under `features/`,
 separately from the existing full neutral inventory. Each face reference remains
 bound only to the adjacent STEP whose digest the manifest records.
 
-Each `features:<stem>` cache key includes only that part's draw-module closure,
-symbol-citation module closures, registry/config dependencies, release revision
-and native part artefact identity/execution token, plus shared exporter/helper
-sources. A draw-only edit re-keys that part's features leaf, not the other
-features leaves or its native part/assembly builds. Full `export` intentionally
-uses the union of feature inputs; a shared exporter edit can re-key all features
-leaves and full `export`. The seat-free `package:features` aggregator has no
-all-parts COM source key. YAML comment-only edits do not change parsed
-dependencies; key-path citations remain valid without forcing a rebuild for
-shifted lines. There is no raw-YAML feature-task override; conservative
-dependency fallbacks may over-rebuild, including after an edit irrelevant to a
-requirement.
+Each `features:<stem>` cache key includes the **entire** closure of its own
+draw module, symbol-citation module closures, registry/config dependencies,
+release revision and native part artefact identity/execution token, plus shared
+exporter/helper sources. Declaration discovery and source-path construction
+parse Python statically without importing draw modules; declaration values are
+validated when exporting.
+A draw-only edit re-keys that part's features leaf, not the other features
+leaves or its native part/assembly builds. This is file-granular coupling, not
+declaration-only coupling: edits to shared drawing helpers, `_drawing_common`,
+layout-audit helpers or `_pdf_ink` re-key all 18 enrolled feature leaves.
+Full `export` consumes bundle outputs rather than the draw closures directly;
+changed bundle bytes can therefore re-key it downstream. Feature leaves use
+`uptodate: [False]`, like full export, so each invocation reaches the cache probe
+even when local targets exist; target existence alone does not certify a bundle.
+The seat-free `package:features` aggregator has no all-parts COM source key.
+YAML comment-only edits do not change parsed dependencies; key-path citations
+remain valid without forcing a rebuild for shifted lines. There is no raw-YAML
+feature-task override; conservative dependency fallbacks may over-rebuild,
+including after an edit irrelevant to a requirement.
 
 ## Plan and fixture binding
 
@@ -198,7 +224,7 @@ uv run --frozen python -m doit prechips:<stem>
 ```
 
 Every enrolled traveler is required by both `build` and `release`. Its task
-depends on `package:features`, its scoped bundle and tracked plan, the shop
+depends only on its own `features:<stem>` leaf, its scoped bundle and tracked plan, the shop
 files, CAD-tagged fixture spec modules, the locked consumer and executed wrapper
 closure. It runs locally on the submitter without a SolidWorks seat, including
 under the farm executor, and needs FreeCAD 1.1 (see

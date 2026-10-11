@@ -49,7 +49,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import ch_pivot_bracket_tl_angle_plate_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -145,6 +145,8 @@ SIDE_KEEP = {
 _INTO_PLATE = ([0.0, 0.0, -1.0], ("__frame__",))
 
 
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", "TAP_DRILL_PLACES", "STUD_DIA_PLACES"))
+
 requirement("seat_face",
     kind="face",
     faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
@@ -211,8 +213,8 @@ for _side, _x in (("left", part_spec.TAP_X[0]), ("right", part_spec.TAP_X[1])):
             "thru": (True, ("TAP_SPEC",)),
             "station_nominal": (_x, ("TAP_X",)),
             "height_nominal": (part_spec.SCREW_Y, ("SCREW_Y",)),
-            "height_from": ("table_face", ("__frame__",)),
-            "note": (part_spec.TAP_SPOT_NOTE, ("TAP_SPOT_NOTE", "LEDGE_CLEARANCE_SPEC")),
+            "height_from": ("table_face", (("draw_ch_pivot_bracket_tl_angle_plate", "build"),)),
+            "note": (part_spec.TAP_SPOT_NOTE, ("DRAWING_NOTES", "TAP_SPOT_NOTE", "LEDGE_CLEARANCE_SPEC")),
         },
         precision={"dia": part_spec.TAP_DRILL_PLACES},
     )
@@ -236,7 +238,7 @@ for _side, _x in (("left", part_spec.STUD_X[0]), ("right", part_spec.STUD_X[1]))
             "station_nominal": (_x, ("STUD_X",)),
             "height": (part_spec._station(part_spec.STUD_Y), ("STUD_Y", "STATION_PLACES")),
             "height_nominal": (part_spec.STUD_Y, ("STUD_Y",)),
-            "height_from": ("table_face", ("__frame__",)),
+            "height_from": ("table_face", (("draw_ch_pivot_bracket_tl_angle_plate", "build"),)),
         },
         precision={"dia": part_spec.STUD_DIA_PLACES, "station": part_spec.STATION_PLACES, "height": part_spec.STATION_PLACES},
     )

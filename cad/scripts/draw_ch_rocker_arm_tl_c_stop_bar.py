@@ -31,7 +31,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_c_stop_bar_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -75,6 +75,8 @@ RIGHT_KEEP = {"BarWidth": (0.230, 0.135)}
 
 _Z = [0.0, 0.0, 1.0]
 
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_drawing_hole_callout", "add_native_hole_callout")))
 
 requirement("c_stop_top",
     kind="face",
@@ -172,7 +174,7 @@ for side, x in zip(("left", "right"), part_spec.SCREW_X, strict=True):
         ),
         requirements=("dia", "depth"),
         fields={
-            "parent": (f"screw_hole_{side}", ("SCREW_HOLE_SPEC",)),
+            "parent": (f"screw_hole_{side}", ("SCREW_HOLE_SPEC", ("draw_ch_rocker_arm_tl_c_stop_bar", "build"))),
             "dia": (limits(part_spec.CBORE_DIA, 2), ("CBORE_DIA", "SCREW_HOLE_SPEC")),
             "dia_nominal": (part_spec.CBORE_DIA, ("CBORE_DIA",)),
             "depth": (limits(part_spec.CBORE_DEPTH, 2), ("CBORE_DEPTH", "SCREW_HOLE_SPEC")),

@@ -39,7 +39,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import dt_cone_pivot_post_tl_bond_cradle_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -128,7 +128,7 @@ _POST = "dt_cone_pivot_post_spec"
 _UP = ([0.0, 0.0, 1.0], ("__frame__",))
 _POST_AXIS = ([0.0, 1.0, 0.0], ("__frame__",))
 _HEIGHT_FROM = "body_seat"
-_FROM_BASE_TOP = ("base_top", ("BASE_TOP_Z",))
+_FROM_BASE_TOP = ("base_top", (("draw_dt_cone_pivot_post_tl_bond_cradle", "build"),))
 
 
 def _width(nominal: float, printed: str, sources: tuple[str, ...]) -> dict:
@@ -208,7 +208,7 @@ def _crank_pin(x: float) -> dict:
                 ),
             ),
             "height_nominal": (part_spec.CRANK_PIN_FROM_AXIS, ("CRANK_PIN_FROM_AXIS",)),
-            "height_from": (_HEIGHT_FROM, ("CRANK_PIN_FROM_AXIS", "SEAT_AXIS_HEIGHT")),
+            "height_from": (_HEIGHT_FROM, (("draw_dt_cone_pivot_post_tl_bond_cradle", "build"),)),
             "station": (
                 limits(part_spec.CRANK_PIN_Y, part_spec.DRAWING_PRECISION_BY_NAME["CrankPinY"]),
                 ("CRANK_PIN_Y", (_POST, "CRANK_BORE_HEIGHT")),
@@ -264,7 +264,7 @@ def _cone_pin(name: str) -> dict:
                 ),
             ),
             "height_nominal": (part_spec.CONE_PIN_FROM_AXIS, ("CONE_PIN_FROM_AXIS",)),
-            "height_from": (_HEIGHT_FROM, ("CONE_PIN_FROM_AXIS", "SEAT_AXIS_HEIGHT")),
+            "height_from": (_HEIGHT_FROM, (("draw_dt_cone_pivot_post_tl_bond_cradle", "build"),)),
             "station": (
                 limits(part_spec.CONE_PIN_Y, part_spec.DRAWING_PRECISION_BY_NAME["ConePinY"]),
                 ("CONE_PIN_Y", (_POST, "BORE_HEIGHT")),
@@ -293,6 +293,8 @@ def _cone_pin(name: str) -> dict:
         },
     }
 
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
 
 # The face every transverse location prints from.
 requirement("base_west_side",

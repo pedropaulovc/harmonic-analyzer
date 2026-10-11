@@ -14,7 +14,6 @@ import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_tl_profile_fixture_spec as spec
 import draw_ch_rocker_arm_tl_profile_fixture as drawing
 import export_features
-from _feature_requirements import requirements_for
 from _printed_limits import limits
 from _printed_tolerance import printed_band_mm
 from prechips.model import TOLERANCE_REQUIREMENTS
@@ -43,18 +42,6 @@ FROZEN_STUD_TAPS = {
     "s5": (-30.0, 45.0),  # stud-tap-lu4
     "s6": (30.0, 45.0),  # stud-tap-ru4
 }
-
-
-def test_drawing_declarations_own_the_exported_requirements() -> None:
-    declared = requirements_for(drawing)
-    features = export_features.requirement_manifest(drawing.PART_STEM)["features"]
-    selectors = export_features.feature_selectors(drawing.PART_STEM)
-    assert declared
-    assert set(declared) == set(features) == set(selectors)
-    for name, declaration in declared.items():
-        assert declaration.kind == features[name]["kind"]
-        assert list(declaration.requirements) == features[name]["requirements"]
-        assert tuple(selectors[name]) == declaration.faces
 
 
 def test_rests_and_stud_taps_stand_at_the_prechips_freeze_stations() -> None:

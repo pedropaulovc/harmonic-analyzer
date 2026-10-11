@@ -12,8 +12,9 @@ importing drawings or connecting to SolidWorks.
 ``part_metadata`` uses the same sourced-value pairs for part-level ``fields``
 (``precision``, ``material.thickness``, ``volume_mm3``), named ``frames`` and
 ``datums``. Multiple colocated calls merge without overwriting prior facts.
-``model_sources`` supplements the shared model frame; ``precision_sources``
-names the drawing's precision declarations for each feature precision field.
+``model_sources`` supplements the shared model frame. Every feature precision
+dict requires nonempty ``precision_sources`` naming its actual printed maps,
+callout helpers or formatter; a module docstring is not precision authority.
 
 Numeric ``limits`` and ``drilled_limits`` belong to ``_printed_limits`` and
 drawings import them directly. Both modules stay out of native part and assembly
@@ -45,7 +46,6 @@ class Requirement:
     requirements: tuple[str, ...]
     fields: dict[str, tuple[Any, tuple[Source, ...]]]
     precision: dict[str, int | str]
-    module: str
     path: Path
     call_span: tuple[int, int]
 
@@ -76,32 +76,182 @@ def _require_sources(fields: dict[str, tuple[Any, tuple[Source, ...]]]) -> None:
 
 
 @lru_cache(maxsize=256)
-def _declaration_calls(text: str, api: str) -> tuple[ast.Call, ...]:
-    tree = ast.parse(text)
-    names = {api}
-    modules = {"_feature_requirements"}
-    for node in tree.body:
-        if isinstance(node, ast.ImportFrom) and node.module == "_feature_requirements":
-            names.update(alias.asname or alias.name for alias in node.names if alias.name == api)
-        elif isinstance(node, ast.Import):
-            modules.update(alias.asname or alias.name for alias in node.names if alias.name == "_feature_requirements")
-    calls = []
+def _source_tree(path: Path, text: str) -> ast.Module:
+    return ast.parse(text, filename=str(path))
 
-    def visit(node: ast.AST) -> None:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
-            return
-        if isinstance(node, ast.Call):
+
+def source_tree(path: Path) -> ast.Module:
+    """Parse current source, caching only an exact resolved-path/content pair."""
+    path = Path(path).resolve()
+    with path.open(encoding="utf-8", newline="") as source:
+        return _source_tree(path, source.read())
+
+
+@lru_cache(maxsize=512)
+def declaration_calls(tree: ast.Module, api: str) -> tuple[ast.Call, ...]:
+    """Find import-bound API calls in executable module code, without execution."""
+    bindings: dict[str, str] = {}
+    calls: list[ast.Call] = []
+
+    class Visitor(ast.NodeVisitor):
+        def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+            for alias in node.names:
+                name = alias.asname or alias.name
+                bindings.pop(name, None)
+                if node.module == "_feature_requirements" and node.level == 0 and alias.name == api:
+                    bindings[name] = api
+
+        def visit_Import(self, node: ast.Import) -> None:
+            for alias in node.names:
+                name = alias.asname or alias.name.split(".")[0]
+                bindings.pop(name, None)
+                if alias.name == "_feature_requirements":
+                    bindings[name] = "module"
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            bindings.pop(node.name, None)
+
+        visit_AsyncFunctionDef = visit_FunctionDef
+        visit_ClassDef = visit_FunctionDef
+
+        def visit_Lambda(self, node: ast.Lambda) -> None:
+            pass
+
+        def visit_Name(self, node: ast.Name) -> None:
+            if isinstance(node.ctx, (ast.Store, ast.Del)):
+                bindings.pop(node.id, None)
+
+        def visit_Assign(self, node: ast.Assign) -> None:
+            self.visit(node.value)
+            for target in node.targets:
+                self.visit(target)
+
+        def visit_AugAssign(self, node: ast.AugAssign) -> None:
+            self.visit(node.value)
+            self.visit(node.target)
+
+        def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+            if node.value is not None:
+                self.visit(node.value)
+                self.visit(node.target)
+
+        def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+            self.visit(node.value)
+            self.visit(node.target)
+
+        def visit_If(self, node: ast.If) -> None:
+            self.visit(node.test)
+            before = dict(bindings)
+            for statement in node.body:
+                self.visit(statement)
+            body = dict(bindings)
+            bindings.clear()
+            bindings.update(before)
+            for statement in node.orelse:
+                self.visit(statement)
+            merged = {name: owner for name, owner in body.items() if bindings.get(name) == owner}
+            bindings.clear()
+            bindings.update(merged)
+
+        def visit_For(self, node: ast.For) -> None:
+            self.visit(node.iter)
+            before = dict(bindings)
+            self.visit(node.target)
+            for statement in node.body:
+                self.visit(statement)
+            merged = {name: owner for name, owner in before.items() if bindings.get(name) == owner}
+            bindings.clear()
+            bindings.update(merged)
+            for statement in node.orelse:
+                self.visit(statement)
+
+        visit_AsyncFor = visit_For
+
+        def visit_While(self, node: ast.While) -> None:
+            self.visit(node.test)
+            before = dict(bindings)
+            for statement in node.body:
+                self.visit(statement)
+            merged = {name: owner for name, owner in before.items() if bindings.get(name) == owner}
+            bindings.clear()
+            bindings.update(merged)
+            for statement in node.orelse:
+                self.visit(statement)
+
+        def visit_Try(self, node: ast.Try) -> None:
+            before = dict(bindings)
+            for statement in (*node.body, *node.orelse):
+                self.visit(statement)
+            branches = [dict(bindings)]
+            for handler in node.handlers:
+                bindings.clear()
+                bindings.update(before)
+                if handler.type is not None:
+                    self.visit(handler.type)
+                if handler.name is not None:
+                    bindings.pop(handler.name, None)
+                for statement in handler.body:
+                    self.visit(statement)
+                if handler.name is not None:
+                    bindings.pop(handler.name, None)
+                branches.append(dict(bindings))
+            merged = {
+                name: owner for name, owner in branches[0].items()
+                if all(branch.get(name) == owner for branch in branches[1:])
+            }
+            bindings.clear()
+            bindings.update(merged)
+            for statement in node.finalbody:
+                self.visit(statement)
+
+        visit_TryStar = visit_Try
+
+        def visit_Match(self, node: ast.Match) -> None:
+            self.visit(node.subject)
+            before = dict(bindings)
+            branches = [before]
+            for case in node.cases:
+                bindings.clear()
+                bindings.update(before)
+                self.visit(case.pattern)
+                if case.guard is not None:
+                    self.visit(case.guard)
+                for statement in case.body:
+                    self.visit(statement)
+                branches.append(dict(bindings))
+            merged = {
+                name: owner for name, owner in before.items()
+                if all(branch.get(name) == owner for branch in branches[1:])
+            }
+            bindings.clear()
+            bindings.update(merged)
+
+        def visit_MatchAs(self, node: ast.MatchAs) -> None:
+            if node.name is not None:
+                bindings.pop(node.name, None)
+            if node.pattern is not None:
+                self.visit(node.pattern)
+
+        def visit_MatchStar(self, node: ast.MatchStar) -> None:
+            if node.name is not None:
+                bindings.pop(node.name, None)
+
+        def visit_MatchMapping(self, node: ast.MatchMapping) -> None:
+            if node.rest is not None:
+                bindings.pop(node.rest, None)
+            self.generic_visit(node)
+
+        def visit_Call(self, node: ast.Call) -> None:
             function = node.func
             if (
-                isinstance(function, ast.Name) and function.id in names
+                isinstance(function, ast.Name) and bindings.get(function.id) == api
                 or isinstance(function, ast.Attribute) and function.attr == api
-                and isinstance(function.value, ast.Name) and function.value.id in modules
+                and isinstance(function.value, ast.Name) and bindings.get(function.value.id) == "module"
             ):
                 calls.append(node)
-        for child in ast.iter_child_nodes(node):
-            visit(child)
+            self.generic_visit(node)
 
-    visit(tree)
+    Visitor().visit(tree)
     return tuple(calls)
 
 
@@ -110,7 +260,7 @@ def discover_parts(scripts: Path) -> tuple[str, ...]:
     return tuple(
         path.stem.removeprefix("draw_")
         for path in sorted(Path(scripts).glob("draw_*.py"))
-        if _declaration_calls(path.read_text(encoding="utf-8"), "requirement")
+        if declaration_calls(source_tree(path), "requirement")
     )
 
 
@@ -121,7 +271,7 @@ def _call_site(frame: Any, api: str) -> tuple[Path, tuple[int, int]]:
     if not path.stem.startswith("draw_"):
         raise ValueError(f"{api} must be declared in a draw_<stem> module")
     calls = [
-        call for call in _declaration_calls(path.read_text(encoding="utf-8"), api)
+        call for call in declaration_calls(source_tree(path), api)
         if call.lineno <= frame.f_lineno <= call.end_lineno
     ]
     if len(calls) != 1:
@@ -134,13 +284,18 @@ def requirement(
     requirements: tuple[str, ...], fields: dict[str, tuple[Any, tuple[Source, ...]]],
     precision: dict[str, int | str] | None = None,
 ) -> Requirement:
-    """Register and return one requirement at its drawing-owned call site."""
+    """Register a requirement; return a registry descriptor for optional inspection.
+
+    Registration does not make drawing print paths consume this descriptor.
+    Those paths retain their printed spec/notes authority unless explicitly read
+    from the returned fields or precision.
+    """
     frame = inspect.currentframe().f_back
     try:
         path, span = _call_site(frame, "requirement")
         declared = Requirement(
             name, kind, tuple(faces), tuple(requirements), fields,
-            dict(precision or {}), frame.f_globals["__name__"], path, span,
+            dict(precision or {}), path, span,
         )
         registry = frame.f_globals.setdefault("_FEATURE_REQUIREMENTS", {})
         if name in registry:

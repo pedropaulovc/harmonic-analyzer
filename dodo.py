@@ -1476,15 +1476,15 @@ def _digest_files(files: list[str]) -> str:
 # COM -- stay off it.
 #
 # THREE tiers (the over-rebuild fix): DRAWING tasks fold the WHOLE tree
-# (``_submodule_dep`` -> ``_submodule_digest``); ASSEMBLY recipes fold the tree MINUS
-# drawing.py (``_submodule_assembly_dep`` -> ``_submodule_assembly_digest``); PART
+# (``_submodule_dep`` -> ``_submodule_digest``); ASSEMBLY, export and features recipes
+# fold the tree MINUS drawing.py (``_submodule_assembly_dep``); PART
 # recipes fold the tree MINUS {assembly.py, motion.py, drawing.py}
 # (``_submodule_part_dep`` -> ``_submodule_part_digest``). So a bump touching only
 # assembly.py/motion.py rebuilds the 8 assemblies but leaves all ~100 parts cached, and
 # a bump touching only drawing.py rebuilds just the (few) drawing tasks. Every exclusion
-# is SAFE because the excluded module is never CALLED by that tier's build scripts --
-# enforced loud by ``check:partiso`` (test_part_isolation.py); see the exclusion sets
-# below.
+# is SAFE because the excluded module is never CALLED by that tier's runtime.
+# Native build exclusions are enforced by ``check:partiso``; see the exclusion
+# sets below and the feature-producer rationale in the drawing.py entry.
 _SUBMODULE_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule.digest"
 _SUBMODULE_ASSEMBLY_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-assembly.digest"
 _SUBMODULE_PART_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-part.digest"
@@ -1501,8 +1501,8 @@ _SUBMODULE_PART_DEP_PATH: str | None = None
 # fails loud if a build script ever imports a module its tier excludes:
 #
 #   * DRAWING tasks fold the WHOLE tree (``_submodule_digest``).
-#   * ASSEMBLY recipes fold the tree MINUS ``drawing.py`` (``_submodule_assembly_digest``)
-#     -- see ``_ASSEMBLY_DIGEST_EXCLUDE_FILES``.
+#   * ASSEMBLY/export/features recipes fold the tree MINUS ``drawing.py``
+#     (``_submodule_assembly_digest``) -- see ``_ASSEMBLY_DIGEST_EXCLUDE_FILES``.
 #   * PART recipes fold the tree MINUS {assembly.py, motion.py, drawing.py}
 #     (``_submodule_part_digest``) -- see ``_PART_DIGEST_EXCLUDE_FILES``.
 #
@@ -1521,6 +1521,10 @@ _SUBMODULE_PART_DEP_PATH: str | None = None
 #     claim ("excluded from every part *and* assembly cache key"). Drawing tasks keep
 #     folding it via the full ``_submodule_dep`` (task_drawing), so their recipe still
 #     tracks it.
+#     Features import draw modules for their declarations and so LOAD drawing.py,
+#     but do not use its constants or call its helpers. Its module-level setup
+#     defines drawing-only state; _drawing_common sets only CENTER_MARK_OBSERVER,
+#     consulted by auto_center_marks, never by IPartDoc face naming or SaveAs3.
 #
 # CONSERVATIVE elsewhere: everything NOT named here (base, com_variant, sketch, feature,
 # sw_type_info, pywin32_adapter, factory, AND the MCP-server surface tools/agents/ui/
@@ -1669,12 +1673,11 @@ def _submodule_dep() -> str:
 
 
 def _submodule_assembly_dep() -> str:
-    """Path to the synthetic file_dep tracking the ASSEMBLY-relevant submodule slice
-    (whole tree MINUS drawing.py) for ASSEMBLY recipes (``_recipe_files`` /
-    ``_assembly_file_deps``): a separate sidecar whose CONTENT is
+    """Synthetic file_dep for the assembly/neutral-export/features submodule slice
+    (whole tree MINUS drawing.py): a separate sidecar whose CONTENT is
     ``_submodule_assembly_digest()``. Distinct from ``_submodule_dep`` so a drawing.py
-    edit flips the drawing-task sidecar but leaves this one (and the ~8 assemblies)
-    untouched. Memoized to one write-check per process."""
+    edit flips the drawing-task sidecar but leaves these COM consumers untouched.
+    Memoized to one write-check per process."""
     global _SUBMODULE_ASSEMBLY_DEP_PATH
     if _SUBMODULE_ASSEMBLY_DEP_PATH is None:
         _SUBMODULE_ASSEMBLY_DEP_PATH = _write_digest_sidecar(
@@ -2039,8 +2042,12 @@ def _preflight_file_deps() -> list[str]:
 
 
 def _export_file_deps() -> list[str]:
-    """Exporter source/config closure plus every model's exact identity."""
-    return [*_export_requirement_deps(), *_cad_identity_deps()]
+    """Exporter runtime, complete produced feature bundles, and native identities."""
+    return sorted({
+        *_export_requirement_deps(),
+        *(str(path) for path in _feature_bundle_outputs()),
+        *_cad_identity_deps(),
+    })
 
 
 def _feature_requirement_deps(stem: str) -> list[str]:
@@ -2065,11 +2072,10 @@ def _feature_requirement_deps(stem: str) -> list[str]:
 
 
 def _export_requirement_deps() -> list[str]:
-    """Full export/check consumers intentionally read all part declarations."""
-    from export_features import SUPPORTED_PARTS
-
+    """Generic export runtime/config only; declarations belong to feature leaves."""
     return sorted({
-        path for stem in SUPPORTED_PARTS for path in _feature_requirement_deps(stem)
+        *_executed_closure([str(EXPORT_PY)]),
+        _submodule_assembly_dep(),
     })
 
 
@@ -2078,7 +2084,7 @@ def _feature_export_file_deps(stem: str) -> list[str]:
     return sorted({
         *_feature_requirement_deps(stem),
         str(RELEASE_VERSION_FILE),
-        _submodule_dep(),
+        _submodule_assembly_dep(),
         _sldprt(stem),
         _part_execution_token(stem),
     })
@@ -3696,7 +3702,6 @@ def task_check():
         "features_bound": {
             "file_dep": [
                 str((SCRIPTS_DIR / "features_bound.py").resolve()),
-                *(_export_requirement_deps()),
                 *(str(path) for path in _feature_bundle_outputs()),
                 *(str((CAD_OUT / "step" / path.name).resolve())
                   for path in _feature_bundle_outputs() if path.suffix == ".STEP"),
@@ -3835,7 +3840,7 @@ def task_prechips():
                 str((SCRIPTS_DIR / "_telemetry.py").resolve()),
                 *_executed_closure(cmd),
             }),
-            "task_dep": ["package:features"] if diagnostic is None else [],
+            "task_dep": [f"features:{stem}"] if diagnostic is None else [],
             "targets": [
                 stamp, str(directory / "plan.toml"),
                 str(directory / "report.json"), str(directory / "traveler.html"),
@@ -3873,9 +3878,9 @@ def task_export():
             str((CAD_OUT / "boxes" / "ha-harmonic-analyzer.json").resolve()),
             str((REPORTS / "release-neutral.json").resolve()),
         ],
-        # Neutral release formats require soundness and kinematics, independent
-        # of the separately produced requirements bundles.
-        "task_dep": ["verify:soundness", "verify:kinematics"],
+        # Named STEP copies require the complete produced feature inventory;
+        # native neutral formats also require soundness and kinematics.
+        "task_dep": ["verify:soundness", "verify:kinematics", "package:features"],
         "uptodate": [False],
         # --record-digests: this runs AFTER every part/assembly is (re)built (its
         # file_dep) and the verify gates, so the natives are current and their
@@ -3991,6 +3996,8 @@ def task_features():
             "name": stem,
             "file_dep": deps,
             "targets": [str(path) for path in outputs],
+            # Always probe the cache so existing but tampered/partial bundles repair.
+            "uptodate": [False],
             "actions": [(_cached_com_action, [
                 f"features:{stem}",
                 [sys.executable, str(EXPORT_PY), "--features", stem],

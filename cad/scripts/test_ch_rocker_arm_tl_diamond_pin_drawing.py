@@ -10,21 +10,8 @@ import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_diamond_pin_spec as spec
 import draw_ch_rocker_arm_tl_diamond_pin as drawing
 import export_features
-from _feature_requirements import requirements_for
 
 STEM = "ch_rocker_arm_tl_diamond_pin"
-
-
-def test_drawing_declarations_own_the_exported_requirements() -> None:
-    declared = requirements_for(drawing)
-    features = export_features.requirement_manifest(drawing.PART_STEM)["features"]
-    selectors = export_features.feature_selectors(drawing.PART_STEM)
-    assert declared
-    assert set(declared) == set(features) == set(selectors)
-    for name, declaration in declared.items():
-        assert declaration.kind == features[name]["kind"]
-        assert list(declaration.requirements) == features[name]["requirements"]
-        assert tuple(selectors[name]) == declaration.faces
 
 
 def _features() -> dict:

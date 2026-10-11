@@ -2080,8 +2080,9 @@ def config_files_of(script: Path) -> frozenset[str]:
 
     Runtime-loaded requirement declarations are deliberately not discovered here:
     features:<stem> callers enumerate only source_paths(stem) and analyze each
-    Python source's closure. Following every discovered drawing from the generic
-    exporter would make one declaration edit invalidate every feature leaf.
+    Python source's closure. Full export reads produced bundles instead of these
+    declarations. Following every discovered drawing from the generic exporter
+    would make one declaration edit invalidate every feature leaf.
     """
     sources = [_resolved(script), *(Path(p) for p in module_deps_of(script))]
     tokens: set[str] = set()

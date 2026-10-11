@@ -34,7 +34,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_pivot_washer_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -68,6 +68,8 @@ FACE_KEEP = {
 }
 
 
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
+
 requirement("bore",
     kind="hole",
     faces=(CylinderFace(part_spec.BORE_DIA),),
@@ -79,7 +81,7 @@ requirement("bore",
             limits(part_spec.BORE_DIA, part_spec.PLACES, part_spec.BORE_BAND),
             ("BORE_DIA", "BORE_BAND", ("ch_rocker_arm_tl_pivot_screw_spec", "SHOULDER_DIA")),
         ),
-        "thru": (True, ("BORE_DIA",)),
+        "thru": (True, (("draw_ch_rocker_arm_tl_pivot_washer", "build"),)),
     },
     precision={"dia": part_spec.PLACES},
 )
@@ -101,7 +103,7 @@ requirement("hub_face",
             limits(part_spec.OUTER_DIA, part_spec.OUTER_PLACES, part_spec.OUTER_BAND),
             ("OUTER_DIA", "OUTER_BAND", ("ch_rocker_arm_spec", "HUB_DIA")),
         ),
-        "process": ("face", ("DRAWING_NOTES",)),
+        "process": ("face", (("draw_ch_rocker_arm_tl_pivot_washer", "build"),)),
     },
     precision={"thickness": part_spec.THICK_PLACES, "dia": part_spec.OUTER_PLACES},
 )
@@ -114,7 +116,7 @@ requirement("head_face",
         "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
         "plane": ({"frame": "model", "axis": "z", "value": part_spec.THICK}, ("THICK",)),
         "thickness": (limits(part_spec.THICK, part_spec.THICK_PLACES), ("THICK", "THICK_PLACES")),
-        "process": ("face", ("DRAWING_NOTES",)),
+        "process": ("face", (("draw_ch_rocker_arm_tl_pivot_washer", "build"),)),
     },
     precision={"thickness": part_spec.THICK_PLACES},
 )

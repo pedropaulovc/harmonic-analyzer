@@ -1112,6 +1112,25 @@ Switching to these per-drawing dependencies changes existing drawing cache keys
 once. It does not reuse legacy keys; subsequent unrelated row changes stay
 isolated. A scoped drawing build need not regenerate the rest of the fleet.
 
+Feature declarations remain colocated in `draw_<stem>.py`. Static AST discovery
+and source-path construction do not import those modules while loading the task
+graph, but each `features:<stem>` source key includes its **entire own draw-module
+closure**, not just declaration expressions. An own-draw edit re-keys only that
+feature leaf; shared `_drawing_common`, layout-audit, `_pdf_ink` and drawing-helper
+edits re-key all 18 enrolled feature leaves, not native part/assembly recipes.
+Full `export` waits for scoped bundles, validates them and copies their exact
+STEP bytes; its recipe consumes bundle outputs rather than draw closures
+directly. An enrolled `prechips:<stem>` depends only on its own feature leaf.
+Feature leaves retain `uptodate: [False]`, so every invocation reaches the cache
+probe even if local manifest and STEP targets exist. `cache_status` reports
+individual `features:<stem>` keys, not an aggregate `package:features` COM key.
+See [drawing requirements and travelers](cad/docs/pipeline/features-travelers.md)
+for sourced precision, printed-literal authority and explicit descriptor consumption.
+The declaration migration's spec edits cause a one-time native part/assembly
+re-key; moving the unchanged dimension mover into `_drawing_common` causes a
+one-time shared drawing re-key. Account for these in the release farm build,
+separately from the ongoing feature-leaf coupling above.
+
 GD&T consumers import focused modules directly: `_gtol_identity` names PMI,
 `_gtol_symbols` defines symbols and zones, `_gtol_frame` handles frame signatures
 and XML, and `_gtol_controls` validates datum/control declarations. Face selectors
@@ -1155,16 +1174,18 @@ The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
 submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
 by `_session`/`_com`/`_assembly` (session access, COM binding, mate/plane/feature creation), so its source is a genuine
 build input, yet it is an installed package, not a repo-local `_*.py` helper, so
-`module_deps_of` never walked it (issue #144). `dodo._submodule_dep()` folds a
-content-hash of the submodule's `src/solidworks_mcp` tree (repo-relative-tagged,
-so cross-machine-stable) in as **one synthetic dep** — a small gitignored
-`cad/out/reports/.solidworks-mcp-submodule.digest` sidecar whose content is that
-hash — added only in the COM dep builders (`_part_file_deps` / `_recipe_files`), so
-a submodule bump (committed pin **or** a dirty local edit) busts every COM key and
-forces a rebuild, while the SolidWorks-free `check:*` tasks stay off it. Guarded by
-`check:recipe` (`test_dodo_recipe.py`). *Migration:* this shifts every COM cache
-key once — the build self-heals over one run (a rebuild re-stamps the ledger and
-republishes), or run `doit reset-dep`.
+`module_deps_of` never walked it (issue #144). The submodule digest helpers fold
+repo-relative-tagged source content into gitignored synthetic dependencies under
+`cad/out/reports/`. Parts exclude `assembly.py`, `motion.py` and `drawing.py`;
+assemblies exclude `drawing.py`; drawing tasks include the whole tree. A pin
+bump or dirty local edit changes only the tiers that include the affected source,
+while SolidWorks-free `check:*` tasks stay off these digests. See
+[the three-tier source rules](AGENTS.md#three-tier-submodule-digest-part-vs-assembly-vs-drawing).
+`check:recipe` (`test_dodo_recipe.py`) guards the dependency construction.
+Scoped `features:<stem>` and full neutral export use the assembly tier (whole
+submodule minus `drawing.py`): face naming and `SaveAs3` do not call drawing-doc
+helpers. This excludes only submodule drawing code, not the feature source
+key's entire main-repo draw-module closure.
 
 Private/experimental work is cached too, with no namespacing: a unique input set
 yields a unique key, so an experiment is stored under its own key and never
@@ -1179,8 +1200,8 @@ without reconstructing build history from terminal scrollback (none can fail a
 build):
 
 - **`doit cache_status`** — the one-command answer to *"why did this miss?"*. For
-  every cacheable COM task (part, assembly, drawing, gate, `export`,
-  `package:release`) it prints `HIT`/`MISS` (a backend presence probe — a
+  every cacheable COM task (part, assembly, drawing, gate, `features:<stem>`,
+  `export`, `package:release`) it prints `HIT`/`MISS` (a backend presence probe — a
   HEAD,
   not a download) + the 12-char key, and for a miss the full `(digest, relpath)`
   list that produced the key. Compare two seats' output and the moved digest is the

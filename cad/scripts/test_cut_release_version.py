@@ -637,9 +637,11 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
                 }
                 adjacent = archive.read(f"{directory}/{manifest['step']}")
                 full = archive.read(f"step/{manifest['step']}")
-                # Independent exports: different raw bytes, the same face labels.
-                assert full == (out / "step" / manifest["step"]).read_bytes() != adjacent
-                assert hashlib.sha256(adjacent).hexdigest() == manifest["step_sha256"]
+                # Full export consumes the validated producer's exact raw STEP.
+                assert full == adjacent == (out / "step" / manifest["step"]).read_bytes()
+                digest = hashlib.sha256(adjacent).hexdigest()
+                assert digest == manifest["step_sha256"] == sums[f"step/{manifest['step']}"]
+                assert digest == sums[f"{directory}/{manifest['step']}"]
                 assert manifest["drawing"]["revision"] == "v38"
     assert set(facts["features"]) == set(expected)
     assert facts["travelers"] == []

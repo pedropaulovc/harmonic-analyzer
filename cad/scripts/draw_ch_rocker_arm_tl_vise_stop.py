@@ -44,7 +44,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import ch_rocker_arm_tl_vise_stop_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -154,14 +154,16 @@ def _sized_face(
             field: (limits(size, 1), (size_name,)),
             f"{field}_nominal": (size, (size_name,)),
             **(
-                {"height_from": (reference, ("__frame__",))}
+                {"height_from": (reference, (("draw_ch_rocker_arm_tl_vise_stop", "build"),))}
                 if field == "height"
-                else {"note": (f"{field} from {reference}", (size_name,))}
+                else {"note": (f"{field} from {reference}", (size_name, ("draw_ch_rocker_arm_tl_vise_stop", "build")))}
             ),
         },
         'precision': {field: 1},
     }
 
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 
 requirement("seat_face",
     kind="face",
@@ -175,7 +177,7 @@ requirement("seat_face",
         "note": (
             "clamped to the tapped face of a Kanetec MB-PM magnetic base "
             "(40 x 40 x 40, M6 x 6 tap) by one M6 x 16 SHCS",
-            ("BASE_SKU", "BASE_SIZE", "BASE_TAP_DEPTH", "SCREW_THREAD", "SCREW_LENGTH"),
+            ("SCREW_HOLE_CALLOUT", "BASE_SKU", "BASE_SIZE", "BASE_TAP_DEPTH", "SCREW_THREAD", "SCREW_LENGTH"),
         ),
     },
     precision={"length": 1},
@@ -193,7 +195,7 @@ requirement("finger_front",
         ),
         "length": (limits(part_spec.FINGER_FRONT, 1), ("FINGER_FRONT",)),
         "length_nominal": (part_spec.FINGER_FRONT, ("FINGER_FRONT",)),
-        "note": ("length from seat_face", ("FINGER_FRONT", "SEAT_X")),
+        "note": ("length from seat_face", (("draw_ch_rocker_arm_tl_vise_stop", "build"),)),
     },
     precision={"length": 1},
 )
@@ -214,7 +216,7 @@ requirement("screw_seat",
         "length_nominal": (part_spec.SCREW_GRIP, ("SCREW_GRIP",)),
         "note": (
             "lug face under the M6 SHCS head; length is the grip from the seat face",
-            ("SCREW_GRIP", "SEAT_X"),
+            ("SCREW_GRIP", "SEAT_X", ("draw_ch_rocker_arm_tl_vise_stop", "build")),
         ),
     },
     precision={"length": 3},
@@ -294,7 +296,7 @@ requirement("nose_hole",
         "axis": _PLUS_X,
         "dia": (limits(part_spec.NOSE_HOLE_DIA, 2, part_spec.DRILLED_BAND), ("NOSE_HOLE_DIA", "DRILLED_BAND")),
         "dia_nominal": (part_spec.NOSE_HOLE_DIA, ("NOSE_HOLE_DIA",)),
-        "thru": (True, ("DRAWING_DIMENSIONS",)),
+        "thru": (True, (("draw_ch_rocker_arm_tl_vise_stop", "CALLOUTS_BELOW"),)),
         # Printed NoseFromRear / NoseHeight, from the rear and bottom faces
         # (the schema's only reference field is height_from; the note
         # names the station's).
@@ -302,8 +304,8 @@ requirement("nose_hole",
         "station_nominal": (part_spec.NOSE_FROM_REAR, ("NOSE_FROM_REAR",)),
         "height": (limits(part_spec.NOSE_HEIGHT, 1), ("NOSE_HEIGHT",)),
         "height_nominal": (part_spec.NOSE_HEIGHT, ("NOSE_HEIGHT",)),
-        "height_from": ("bottom_face", ("__frame__",)),
-        "process": ("drill", ("DRILLED_BAND",)),
+        "height_from": ("bottom_face", (("draw_ch_rocker_arm_tl_vise_stop", "build"),)),
+        "process": ("drill", (("draw_ch_rocker_arm_tl_vise_stop", "CALLOUTS_BELOW"),)),
         # The stop contact: the fixed pin's end, on the blank's raw left
         # end (nominal; X zero is edge-found on the part afterwards).
         "end": (
@@ -314,7 +316,7 @@ requirement("nose_hole",
         "note": (
             "bought hardened 6 x 8 dowel pin fixed immovable, flush with the back face; "
             "its end is the blank-end stop; station from rear_face, height from bottom_face",
-            ("NOSE_PIN_DIA", "NOSE_PIN_LENGTH", "BOND_GAP_MAX"),
+            ("DRAWING_NOTES", "NOSE_PIN_CALLOUT", "NOSE_PIN_DIA", "NOSE_PIN_LENGTH", "BOND_GAP_MAX", ("draw_ch_rocker_arm_tl_vise_stop", "build")),
         ),
     },
     precision={"dia": 2, "station": 1, "height": 1},
@@ -329,14 +331,14 @@ requirement("screw_hole",
         "axis": ([-1.0, 0.0, 0.0], ("__frame__",)),
         "dia": (limits(part_spec.SCREW_HOLE_DIA, 2, part_spec.DRILLED_BAND), ("SCREW_HOLE_DIA", "DRILLED_BAND")),
         "dia_nominal": (part_spec.SCREW_HOLE_DIA, ("SCREW_HOLE_DIA",)),
-        "thru": (True, ("DRAWING_DIMENSIONS",)),
+        "thru": (True, ("SCREW_HOLE_CALLOUT",)),
         # Printed ScrewFromRear / ScrewHeight, from the rear and bottom faces.
         "station": (limits(part_spec.SCREW_FROM_REAR, 1), ("SCREW_FROM_REAR",)),
         "station_nominal": (part_spec.SCREW_FROM_REAR, ("SCREW_FROM_REAR",)),
         "height": (limits(part_spec.SCREW_HEIGHT, 1), ("SCREW_HEIGHT",)),
         "height_nominal": (part_spec.SCREW_HEIGHT, ("SCREW_HEIGHT",)),
-        "height_from": ("bottom_face", ("__frame__",)),
-        "process": ("drill", ("DRILLED_BAND",)),
+        "height_from": ("bottom_face", (("draw_ch_rocker_arm_tl_vise_stop", "build"),)),
+        "process": ("drill", ("SCREW_HOLE_CALLOUT",)),
         "note": (
             f"drilled clearance through the lug for one M6 x {part_spec.SCREW_LENGTH:g} SHCS (ISO 4762) "
             f"into the M6 x {part_spec.BASE_TAP_DEPTH:g} deep tap of a Kanetec MB-PM base; head on "
@@ -346,12 +348,17 @@ requirement("screw_hole",
             "clear of the tap bottom; hand-seating load only; station from rear_face, "
             "height from bottom_face",
             (
+                "SCREW_HOLE_CALLOUT",
                 "SCREW_THREAD",
                 "SCREW_LENGTH",
                 "SCREW_LENGTH_BAND",
                 "BASE_SKU",
                 "BASE_TAP_DEPTH",
                 "SCREW_GRIP",
+                "LINEAR_3PL",
+                "SCREW_ENGAGEMENT_PRINTED",
+                "SCREW_ENGAGEMENT_PRINTED_D",
+                "SCREW_TIP_CLEARANCE_PRINTED",
                 "SCREW_ENGAGEMENT_MIN",
                 "SCREW_TIP_CLEARANCE_MIN",
             ),

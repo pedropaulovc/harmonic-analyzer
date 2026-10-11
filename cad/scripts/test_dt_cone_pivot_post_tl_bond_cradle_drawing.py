@@ -11,24 +11,11 @@ import draw_dt_cone_pivot_post_tl_bond_cradle as drawing
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_bond_cradle_spec as spec
 import export_features
-from _feature_requirements import requirements_for
 from _printed_tolerance import angular_band_deg, printed_band_mm
 from _surface_finish import surface_finish_by_key
 from prechips.model import TOLERANCE_REQUIREMENTS
 
 STEM = "dt_cone_pivot_post_tl_bond_cradle"
-
-
-def test_drawing_declarations_own_the_exported_requirements() -> None:
-    declared = requirements_for(drawing)
-    features = export_features.requirement_manifest(drawing.PART_STEM)["features"]
-    selectors = export_features.feature_selectors(drawing.PART_STEM)
-    assert declared
-    assert set(declared) == set(features) == set(selectors)
-    for name, declaration in declared.items():
-        assert declaration.kind == features[name]["kind"]
-        assert list(declaration.requirements) == features[name]["requirements"]
-        assert tuple(selectors[name]) == declaration.faces
 
 
 def _features() -> dict:

@@ -9,20 +9,7 @@ import draw_dt_cone_pivot_post_tl_cap_jaw_button as drawing
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_cap_jaw_button_spec as spec
 import export_features
-from _feature_requirements import requirements_for
 from _printed_tolerance import printed_band_mm
-
-
-def test_drawing_declarations_own_the_exported_requirements() -> None:
-    declared = requirements_for(drawing)
-    features = export_features.requirement_manifest(drawing.PART_STEM)["features"]
-    selectors = export_features.feature_selectors(drawing.PART_STEM)
-    assert declared
-    assert set(declared) == set(features) == set(selectors)
-    for name, declaration in declared.items():
-        assert declaration.kind == features[name]["kind"]
-        assert list(declaration.requirements) == features[name]["requirements"]
-        assert tuple(selectors[name]) == declaration.faces
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:

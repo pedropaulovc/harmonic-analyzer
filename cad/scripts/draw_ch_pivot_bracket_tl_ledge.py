@@ -42,7 +42,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import ch_pivot_bracket_tl_ledge_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -104,6 +104,8 @@ FRONT_KEEP = {
 }
 
 
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_drawing_hole_callout", "add_native_hole_callout")))
+
 requirement("foot_rest",
     kind="face",
     faces=(PlanarFace((0.0, 1.0, 0.0), part_spec.LEDGE_HEIGHT),),
@@ -119,7 +121,7 @@ requirement("foot_rest",
             part_spec.LEDGE_HEIGHT,
             ("LEDGE_HEIGHT", ("ch_pivot_bracket_sides", "FOOT_LEN")),
         ),
-        "height_from": ("block_face", ("__frame__",)),
+        "height_from": ("block_face", (("draw_ch_pivot_bracket_tl_ledge", "build"),)),
         "width": (limits(part_spec.LEDGE_WIDTH, part_spec.SIZE_PLACES), ("LEDGE_WIDTH", ("ch_pivot_bracket_spec", "FOOT_W"))),
     },
     precision={"height": part_spec.SIZE_PLACES, "width": part_spec.SIZE_PLACES},
@@ -184,7 +186,7 @@ for _side, _x in (("left", part_spec.HOLE_X[0]), ("right", part_spec.HOLE_X[1]))
                 ("HOLE_Y", "HOLE_Y_PLACES", ("ch_pivot_bracket_tl_angle_plate_spec", "SCREW_Y")),
             ),
             "height_nominal": (part_spec.HOLE_Y, ("HOLE_Y",)),
-            "height_from": ("block_face", ("__frame__",)),
+            "height_from": ("block_face", (("draw_ch_pivot_bracket_tl_ledge", "build"),)),
         },
         precision={"dia": 2, "station": part_spec.HOLE_X_PLACES, "height": part_spec.HOLE_Y_PLACES},
     )

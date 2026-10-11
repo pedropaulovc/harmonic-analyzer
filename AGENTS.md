@@ -343,7 +343,7 @@ such build:
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `prechips:<stem>` (enrolled process travelers) | **no** (FreeCAD 1.1) | no (parallel; needs scoped manifest + STEP) | no (submitter-only) |
-| `check:features_bound` | **no** | no (release only; compares scoped/full STEP face labels and patch counts) | no |
+| `check:features_bound` | **no** | no (release only; validates scoped face refs and identical full STEP copy) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
@@ -351,21 +351,32 @@ such build:
 `features:<stem>` exports each part whose `draw_<stem>.py` has module-level
 `_feature_requirements.requirement(...)` declarations beside its printed drawing
 requirements. `export_features.SUPPORTED_PARTS` is derived by import-free AST
-discovery, not a maintained part list. Each leaf is keyed on that part's own
-draw/citation/config closure and native part identity; a draw-only declaration
-edit does not re-key other features leaves or native part/assembly builds.
+discovery, not a maintained part list. Source-path construction is also static:
+neither operation imports draw modules during graph loading. Each leaf includes its own **entire draw-module
+closure**, cited-module/config inputs and native part identity. A draw-only edit
+does not re-key other feature leaves or native part/assembly builds; shared
+`_drawing_common`, layout-audit, `_pdf_ink` or drawing-helper edits re-key all 18
+feature leaves. `Requirement` returns are registry descriptors for inspection
+or explicit consumption, not automatic print-path wiring: the rocker consumes
+datum/rod-FCF fields and checks four imported native precisions against them.
+Feature precision requires explicit `part_metadata.precision_sources`; printed
+literals cite their actual notes or drawing function authority, not unrelated
+numeric symbols. Retained non-printed process values cite their route or native
+authority without claiming new sheet text.
 `package:features` is a seat-free aggregator over all those COM leaves. Each
-leaf writes `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`; Python
-citations resolve current declaration/call-site AST spans, while YAML citations
+leaf writes `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}` and uses
+`uptodate: [False]` to reach the cache probe even with existing local targets.
+Python citations resolve current declaration/call-site AST spans; YAML citations
 resolve scalar key paths. Missing cited symbols fail loudly. The manifest's
 `step_sha256` binds the raw adjacent STEP; this self-contained bundle is the
-consumer artefact. Full `export` is independent; neither producer overwrites
-the other's paths. The release-only `check:features_bound` compares the two
-sessions' face-label sets and patch counts per label, requires two rocker
-pivot-bore patches and reports both digests. It does not require byte equality:
-SolidWorks timestamps headers and renumbers entities. Release staging copies the
+consumer artefact. Full `export` waits for the bundles and copies their exact
+STEP bytes into its separate neutral inventory; it consumes bundle outputs,
+not draw closures directly. The release-only `check:features_bound` validates
+scoped recorded face refs, requires two rocker pivot-bore patches and identical
+scoped/full STEP bytes, and reports both digests. Release staging copies the
 verified scoped bundles under `features/`. Each enrolled `prechips:<stem>` task
-uses pinned prechips 0.1 and `cad/process/` with a strict **exit 0 only** policy:
+depends only on its own `features:<stem>` leaf, not `package:features`, and uses
+pinned prechips 0.1 and `cad/process/` with a strict **exit 0 only** policy:
 bad input, machining blockers and required unknowns all fail without a stamp.
 Build and release include every stem in `_process_plans.TRAVELER_STEMS`.
 Enrollment is currently empty: the tracked legacy plans remain as provenance,
@@ -931,14 +942,17 @@ the modules that tier's build scripts never call:
 
 - **drawing tasks fold the WHOLE tree** (`_submodule_digest` — the only tier with
   `drawing.py`);
-- **assemblies fold the tree MINUS `drawing.py`** (`_submodule_assembly_digest` — see
-  `_ASSEMBLY_DIGEST_EXCLUDE_FILES`);
+- **assemblies, `features:<stem>` and full `export` fold the tree MINUS `drawing.py`**
+  (`_submodule_assembly_digest` — see `_ASSEMBLY_DIGEST_EXCLUDE_FILES`);
 - **parts fold the tree MINUS `{assembly.py, motion.py, drawing.py}`**
   (`_submodule_part_digest` — see `_PART_DIGEST_EXCLUDE_FILES`).
 
-Net: a bump touching only `assembly.py`/`motion.py` rebuilds the ~8 assemblies but
-leaves all ~100 parts cached; a bump touching only `drawing.py` rebuilds just the (few)
-drawing tasks, not the parts or assemblies. The three sidecars are distinct files
+Net: a bump touching only `assembly.py`/`motion.py` changes assembly/export-tier
+keys but leaves all ~100 part keys cached; a bump touching only submodule
+`drawing.py` changes drawing-task keys, not part, assembly or export keys.
+This does not narrow the feature leaves' main-repo draw-module closures:
+shared local drawing-helper edits still re-key all feature leaves.
+The three sidecars are distinct files
 (`.solidworks-mcp-submodule.digest` / `-assembly.digest` / `-part.digest`).
 
 Each exclusion is SAFE because the dropped module is never **CALLED** by that tier's
@@ -951,6 +965,9 @@ build scripts:
   module-level `IDrawingDoc` helpers), so nothing in a part OR assembly build graph
   imports it; only a `draw_*` drawing script does. Hence it drops from both the part and
   assembly digests (matching `drawing.py`'s own docstring).
+  Feature naming and `SaveAs3` export do not call `IDrawingDoc` helpers, so scoped
+  feature and full neutral exports use the assembly tier too, even though static
+  feature source keys conservatively include main-repo draw-module closures.
 
 `check:partiso` (`test_part_isolation.py`) ENFORCES both directions loud: it derives its
 forbidden sets straight from `dodo._PART_DIGEST_EXCLUDE_FILES` /

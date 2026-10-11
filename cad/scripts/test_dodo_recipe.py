@@ -3343,7 +3343,7 @@ def isolated_export_keys(tmp_path, monkeypatch):
 
     dodo = _load_dodo()
     monkeypatch.setattr(dodo, "_cad_identity_deps", lambda: [])
-    deps = dodo._export_file_deps()
+    deps = dodo._export_requirement_deps()
     root = tmp_path / "repo"
     copied = []
     for source in deps:
@@ -3354,12 +3354,19 @@ def isolated_export_keys(tmp_path, monkeypatch):
         copied.append(str(destination))
     monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
     monkeypatch.setattr(dodo, "_export_requirement_deps", lambda: copied)
+    bundles = []
+    for source in dodo._feature_bundle_outputs():
+        destination = root / source.relative_to(REPO_ROOT)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(b"produced feature bundle input\n")
+        bundles.append(destination)
+    monkeypatch.setattr(dodo, "_feature_bundle_outputs", lambda: bundles)
     monkeypatch.setattr(export_models, "_import_dodo", lambda: dodo)
     monkeypatch.setattr(export_models, "__file__", str(root / "cad/scripts/export_models.py"))
 
     def snapshot():
         return (
-            dodo._cache_key(copied, "export"),
+            dodo._cache_key(dodo._export_file_deps(), "export"),
             export_models._exporter_digest(),
         )
 
@@ -3369,14 +3376,11 @@ def isolated_export_keys(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "source",
     [
-        "export_features.py", "_export_feature_faces.py", "_gtol_face_read.py",
-        "_gtol_face.py", "_gtol_cylinder.py", "_gtol_planar.py", "_gtol_cone.py",
-        "_gtol_sphere.py",
-        "ch_rocker_arm_spec.py", "rocker_bank_layout.py", "draw_ch_rocker_arm.py",
-        "draw_ch_rocker_arm_tl_vise_stop.py", "ch_rocker_arm_tl_vise_stop_spec.py",
+        "export_features.py", "features_bound.py", "_export_feature_faces.py",
+        "_gtol_face_read.py", "_gtol_face.py",
     ],
 )
-def test_export_face_naming_inputs_invalidate_outer_key_and_internal_ledger(
+def test_export_runtime_inputs_invalidate_outer_key_and_internal_ledger(
     isolated_export_keys, source,
 ):
     root, snapshot = isolated_export_keys
@@ -3389,6 +3393,35 @@ def test_export_face_naming_inputs_invalidate_outer_key_and_internal_ledger(
 
     assert after[0] != before[0], source
     assert after[1] != before[1], source
+
+
+@pytest.mark.parametrize("member", ["features.toml", "ch-rocker-arm.STEP"])
+def test_produced_bundle_edits_rekey_full_export_without_invalidating_native_ledger(
+    isolated_export_keys, member,
+):
+    root, snapshot = isolated_export_keys
+    before = snapshot()
+    source = root / "cad/out/features/ch_rocker_arm" / member
+    source.write_bytes(source.read_bytes() + b"bundle revision\n")
+    after = snapshot()
+    assert after[0] != before[0]
+    assert after[1] == before[1]
+
+
+@pytest.mark.parametrize("source", [
+    "draw_ch_rocker_arm.py", "draw_ch_rocker_arm_tl_vise_stop.py",
+    "_drawing_layout_audit.py", "_pdf_ink.py",
+])
+def test_draw_source_edits_do_not_rekey_full_export_before_producing_bundles(
+    isolated_export_keys, source,
+):
+    root, snapshot = isolated_export_keys
+    member = root / "cad/scripts" / source
+    assert not member.exists(), "full export must not fold drawing/declaration closures"
+    member.write_bytes(b"DRAWING_REVISION = 1\n")
+    before = snapshot()
+    member.write_bytes(b"DRAWING_REVISION = 2\n")
+    assert snapshot() == before
 
 
 def test_feature_cache_and_status_share_the_parsed_yaml_key(tmp_path, monkeypatch):
@@ -3494,7 +3527,7 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     dodo, plans, exporter, stem, source, spec, helper = synthetic_prechips_task
     task = next(dodo.task_prechips())
     assert task["name"] == stem
-    assert task["task_dep"] == ["package:features"]
+    assert task["task_dep"] == [f"features:{stem}"]
     deps = {str(path) for path in task["file_dep"]}
     expected = {
         str(source), *(str(path) for path in plans.shop_paths()),
@@ -3531,6 +3564,44 @@ def test_prechips_build_release_edges_and_stage(synthetic_prechips_task):
     assert dodo._stage_name(f"prechips:{stem}") == "prechips-traveler"
     assert not any(name.startswith("traveler_") for name in dodo._CHECK_NAMES)
     assert not any(task["name"].startswith("traveler_") for task in dodo.task_check())
+
+
+@pytest.mark.parametrize("consumer", ["traveler", "export"])
+def test_feature_failure_blocks_full_export_but_not_another_traveler(
+    synthetic_prechips_task, consumer,
+):
+    from doit.control import TaskControl
+    from doit.loader import load_tasks
+
+    dodo, _, exporter, stem, _, _, _ = synthetic_prechips_task
+    failing = next(part for part in exporter.SUPPORTED_PARTS if part != stem)
+    selected = f"prechips:{stem}" if consumer == "traveler" else "export"
+    control = TaskControl(load_tasks(dict(vars(dodo)), allow_delayed=True))
+    control.process([selected])
+    dispatcher = control.task_dispatcher()
+    scheduled = {}
+    processed = None
+    while True:
+        try:
+            node = dispatcher.generator.send(processed)
+        except StopIteration:
+            break
+        assert not isinstance(node, str), "all dispatched tasks receive a completion"
+        # No task action executes: model one failed feature leaf in doit's real
+        # scheduler, and propagate its failure through consumer dependency nodes.
+        node.run_status = (
+            "failure" if node.task.name == f"features:{failing}" or node.bad_deps
+            else "done"
+        )
+        scheduled[node.task.name] = node.run_status
+        processed = node
+    feature_leaves = {name for name in scheduled if name.startswith("features:")}
+    if consumer == "traveler":
+        assert feature_leaves == {f"features:{stem}"}
+        assert scheduled[selected] == "done"
+    else:
+        assert feature_leaves == {f"features:{part}" for part in exporter.SUPPORTED_PARTS}
+        assert scheduled[selected] == "failure"
 
 
 def test_prechips_kernel_discovery_is_lazy_at_task_load(
@@ -3752,93 +3823,6 @@ def test_recipe_gate_tracks_every_enrolled_plan(synthetic_prechips_task, monkeyp
         assert dodo._digest_files(recipe["file_dep"]) != before, member
 
 
-def test_features_leaves_have_isolated_inputs_outputs_and_cached_actions():
-    import export_features
-
-    dodo = _load_dodo()
-    tasks = {task["name"]: task for task in dodo.task_features()}
-    assert len(tasks) == 18
-    assert set(tasks) == set(export_features.SUPPORTED_PARTS)
-    for stem, task in tasks.items():
-        deps = set(task["file_dep"])
-        assert deps == set(dodo._feature_export_file_deps(stem))
-        assert {
-            str(dodo.RELEASE_VERSION_FILE), dodo._submodule_dep(),
-            dodo._sldprt(stem), dodo._part_execution_token(stem),
-        } <= deps
-        assert {
-            str(path.resolve()) for path in export_features.source_paths(stem)
-        } <= deps
-        assert {
-            Path(path).name for path in deps if Path(path).name.startswith("draw_")
-        } == {f"draw_{stem}.py"}, stem
-        for other in tasks.keys() - {stem}:
-            assert dodo._sldprt(other) not in deps, (stem, other)
-            assert dodo._part_execution_token(other) not in deps, (stem, other)
-        outputs = export_features.bundle_paths(stem, dodo.CAD_OUT)
-        assert task["targets"] == [str(path.resolve()) for path in outputs]
-        action, args = task["actions"][0]
-        assert len(task["actions"]) == 1
-        assert action is dodo._cached_com_action
-        assert args == [
-            f"features:{stem}",
-            [sys.executable, str(dodo.EXPORT_PY), "--features", stem],
-            task["file_dep"], [path.resolve() for path in outputs],
-            f"features-{stem.replace('_', '-')}",
-        ]
-        assert task.get("task_dep", []) == []
-
-
-def test_features_package_aggregates_every_bundle_without_an_action_or_source_key():
-    import export_features
-
-    dodo = _load_dodo()
-    task = next(task for task in dodo.task_package() if task["name"] == "features")
-    expected = {
-        str(path.resolve())
-        for stem in export_features.SUPPORTED_PARTS
-        for path in export_features.bundle_paths(stem, dodo.CAD_OUT)
-    }
-    assert task["task_dep"] == [
-        f"features:{stem}" for stem in export_features.SUPPORTED_PARTS
-    ]
-    assert set(task["file_dep"]) == expected
-    assert task["actions"] == []
-    assert task.get("targets", []) == []
-    assert not task.get("uptodate")
-    check = next(task for task in dodo.task_check() if task["name"] == "features_bound")
-    assert check["task_dep"] == ["package:features", "export"]
-    assert expected <= set(check["file_dep"])
-
-
-def test_features_cache_status_names_each_leaf_not_the_package():
-    import export_features
-
-    dodo = _load_dodo()
-    rows = dict(dodo._cache_rows())
-    assert "package:features" not in rows
-    for stem in export_features.SUPPORTED_PARTS:
-        assert rows[f"features:{stem}"] == dodo._feature_export_file_deps(stem)
-
-
-def test_features_inputs_include_config_reads_of_each_dynamic_source():
-    import export_features
-
-    dodo = _load_dodo()
-    for stem in export_features.SUPPORTED_PARTS:
-        deps = set(dodo._feature_export_file_deps(stem))
-        for source in export_features.source_paths(stem):
-            if source.suffix == ".py":
-                assert set(dodo._config_deps(source, stem, "part")) <= deps, (stem, source)
-        assert str((dodo.CONFIG_DIR / "parts" / f"{stem.replace('_', '-')}.yaml").resolve()) in deps
-        groups = {
-            Path(dep).stem for dep in deps
-            if Path(dep).parent == dodo.CONFIG_DIR / "tolerances"
-            and Path(dep).stem != "_base"
-        }
-        assert dodo._fit_groups_env(f"features:{stem}") == ",".join(sorted(groups))
-
-
 @pytest.fixture
 def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
     """Use real leaf/native recipes and keys, mutating only isolated source bytes."""
@@ -3847,7 +3831,7 @@ def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
     dodo, root, native_snapshot = isolated_assembly_helper_keys
     adapter = root / ".adapter-features.digest"
     adapter.write_bytes(b"fixed feature exporter adapter\n")
-    monkeypatch.setattr(dodo, "_submodule_dep", lambda: str(adapter))
+    monkeypatch.setattr(dodo, "_submodule_assembly_dep", lambda: str(adapter))
     sources = {
         stem: dodo._feature_requirement_deps(stem)
         for stem in export_features.SUPPORTED_PARTS

@@ -53,7 +53,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import ch_rocker_arm_tl_pivot_screw_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -134,6 +134,8 @@ _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
 _ROCKER = "ch_rocker_arm_spec"
 
 
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
+
 requirement("shoulder",
     kind="boss",
     faces=(part_spec.SURFACE_FINISHES[0].face,),
@@ -144,7 +146,7 @@ requirement("shoulder",
         "dia_nominal": (part_spec.SHOULDER_DIA, ("SHOULDER_DIA",)),
         "length": (limits(part_spec.SHOULDER_LENGTH, part_spec.AXIAL_PLACES), ("SHOULDER_LENGTH", "AXIAL_PLACES")),
         "finish_ra": (part_spec.GROUND_UM, ("SURFACE_FINISHES",)),
-        "process": ("lap", ("SURFACE_FINISHES",)),
+        "process": ("lap", ("__frame__", "SURFACE_FINISHES", ("draw_ch_rocker_arm_tl_pivot_screw", "build"))),
         "note": (" ".join(part_spec.SHOULDER_FIT_CALLOUT.splitlines()), ("SHOULDER_FIT_CALLOUT",)),
     },
     precision={"length": part_spec.AXIAL_PLACES, "finish_ra": 1},
@@ -160,7 +162,7 @@ requirement("head",
         "dia_nominal": (part_spec.HEAD_DIA, ("HEAD_DIA",)),
         "length": (limits(part_spec.HEAD_LENGTH, 1), ("HEAD_LENGTH",)),
         "finish_ra": (part_spec.MACHINED_UM, ("SURFACE_FINISHES",)),
-        "process": ("lap", ("SURFACE_FINISHES",)),
+        "process": ("lap", ("__frame__", "SURFACE_FINISHES", ("draw_ch_rocker_arm_tl_pivot_screw", "build"))),
         "coaxial_to": ("shoulder", ("DRAWING_NOTES",)),
         "note": (" ".join(part_spec.HEAD_FIT_CALLOUT.splitlines()), ("HEAD_FIT_CALLOUT",)),
     },
@@ -188,8 +190,8 @@ requirement("tip",
         "plane": ({"frame": "model", "axis": "z", "value": part_spec.TIP_Z}, ("TIP_Z",)),
         # The printed chamfer callout is the acceptance: 45 degrees, down
         # to the thread root; its (0.65) size is reference.
-        "note": (part_spec.TIP_CHAMFER_NOTE, ("CHAMFER_CALLOUT", "TIP_CHAMFER")),
-        "height_from": ("underhead", ("UNDER_HEAD_LENGTH",)),
+        "note": (part_spec.TIP_CHAMFER_NOTE, ("TIP_CHAMFER_NOTE", "CHAMFER_CALLOUT", "TIP_CHAMFER")),
+        "height_from": ("underhead", ("DRAWING_NOTES", ("draw_ch_rocker_arm_tl_pivot_screw", "build"))),
         "station_nominal": (part_spec.UNDER_HEAD_LENGTH, ("UNDER_HEAD_LENGTH",)),
         "station": (
             limits(part_spec.UNDER_HEAD_LENGTH, part_spec.AXIAL_PLACES),

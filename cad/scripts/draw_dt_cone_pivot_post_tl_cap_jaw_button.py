@@ -36,7 +36,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 import dt_cone_pivot_post_tl_cap_jaw_button_spec as part_spec
-from _feature_requirements import requirement
+from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -74,6 +74,8 @@ PROFILE_KEEP = {
 
 _AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
 
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 
 requirement("spigot_end",
     kind="face",

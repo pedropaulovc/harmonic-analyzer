@@ -16,6 +16,7 @@ import ast
 import hashlib
 import importlib
 import importlib.util
+from functools import lru_cache
 import json
 import math
 from pathlib import Path
@@ -25,7 +26,7 @@ from typing import Any
 import _config
 import _part_properties
 import _surface_finish
-from _feature_requirements import _declaration_calls, discover_parts, metadata_for, requirements_for
+from _feature_requirements import declaration_calls, discover_parts, metadata_for, requirements_for, source_tree
 from _gtol_face import FaceSpec
 from _printed_tolerance import printed_band_mm
 
@@ -60,19 +61,28 @@ def _notes_module(stem: str) -> ModuleType:
 
 
 def _declarations(module: ModuleType) -> dict[str, str]:
-    """Resolve current AST declarations, never stale, hand-entered line spans."""
+    """Resolve cached, current AST declarations rather than hand-entered spans."""
     path = Path(module.__file__).resolve()
+    return _source_declarations(path, source_tree(path))
+
+
+def _target_names(target: ast.AST) -> tuple[str, ...]:
+    if isinstance(target, ast.Name):
+        return (target.id,)
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return tuple(name for item in target.elts for name in _target_names(item))
+    return ()
+
+
+@lru_cache(maxsize=256)
+def _source_declarations(path: Path, tree: ast.Module) -> dict[str, str]:
     relative = path.relative_to(REPO).as_posix()
-    tree = ast.parse(path.read_text(encoding="utf-8"))
     result = {}
     if tree.body and isinstance(tree.body[0], ast.Expr) and isinstance(tree.body[0].value, ast.Constant) and isinstance(tree.body[0].value.value, str):
         result["__frame__"] = f"harmonic-analyzer/{relative}:{tree.body[0].lineno}-{tree.body[0].end_lineno}"
     for node in tree.body:
         if isinstance(node, ast.Assign):
-            names = [
-                item.id for target in node.targets for item in ast.walk(target)
-                if isinstance(item, ast.Name)
-            ]
+            names = [name for target in node.targets for name in _target_names(target)]
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             names = [node.target.id]
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -100,10 +110,18 @@ def _spec_cite(module: ModuleType, sources: tuple[str | tuple[str, str], ...]) -
     return list(dict.fromkeys(citations))
 
 
+@lru_cache(maxsize=256)
+def _call_spans(tree: ast.Module) -> frozenset[tuple[int, int]]:
+    return frozenset(
+        (call.lineno, call.end_lineno)
+        for api in ("requirement", "part_metadata")
+        for call in declaration_calls(tree, api)
+    )
+
+
 def _call_cite(path: Path, span: tuple[int, int]) -> list[str]:
-    text = path.read_text(encoding="utf-8")
-    calls = (*_declaration_calls(text, "requirement"), *_declaration_calls(text, "part_metadata"))
-    if not any((call.lineno, call.end_lineno) == span for call in calls):
+    tree = source_tree(path)
+    if span not in _call_spans(tree):
         raise ValueError(f"missing declaration call at {path}:{span[0]}-{span[1]}")
     return [f"harmonic-analyzer/{path.relative_to(REPO).as_posix()}:{span[0]}-{span[1]}"]
 
@@ -120,23 +138,70 @@ def _title_cite(*keys: str) -> list[str]:
     return citations
 
 
+def _source_module_path(name: str, scripts: Path) -> Path:
+    if not name or any(not component.isidentifier() for component in name.split(".")):
+        raise ValueError(f"invalid citation source module: {name!r}")
+    base = scripts.joinpath(*name.split("."))
+    for path in (base.with_suffix(".py"), base / "__init__.py"):
+        if path.is_file():
+            return path.resolve()
+    raise ValueError(f"missing citation source module: {name}")
+
+
+def _source_modules(tree: ast.Module) -> set[str]:
+    """Collect explicit (module, NAME) roots, including helper/runtime sources."""
+    assignments = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                for name in _target_names(target):
+                    assignments[name] = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
+            assignments[node.target.id] = node.value
+
+    def resolve(node: ast.AST, seen: frozenset[str] = frozenset()) -> ast.AST:
+        if isinstance(node, ast.Name) and node.id in assignments and node.id not in seen:
+            return resolve(assignments[node.id], seen | {node.id})
+        return node
+
+    modules = set()
+
+    def add_sources(node: ast.AST) -> None:
+        node = resolve(node)
+        if not isinstance(node, (ast.Tuple, ast.List)):
+            return
+        for source in node.elts:
+            if isinstance(source, ast.Starred):
+                add_sources(source.value)
+                continue
+            source = resolve(source)
+            if isinstance(source, ast.Tuple) and len(source.elts) == 2:
+                owner, symbol = (resolve(item) for item in source.elts)
+                if all(isinstance(item, ast.Constant) and isinstance(item.value, str) for item in (owner, symbol)):
+                    modules.add(owner.value)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Tuple) and len(node.elts) == 2:
+            # Also covers sourced values returned by declaration helpers.
+            add_sources(node.elts[1])
+        elif isinstance(node, ast.keyword) and node.arg in {"model_sources", "precision_sources"}:
+            add_sources(node.value)
+    return modules
+
+
 def source_paths(stem: str) -> tuple[Path, ...]:
-    """Only this drawing, its citation closures, registry row and shared sources."""
+    """Statically cover this draw and its source closures; never import them."""
     from _buildgraph import module_deps_of
 
     stem = _stem(stem)
-    drawing = _drawing_module(stem)
-    spec = _spec_module(stem)
-    modules = {drawing, spec, _notes_module(stem)}
-    for declared in requirements_for(drawing).values():
-        for _value, sources in declared.fields.values():
-            modules.update(importlib.import_module(source[0]) for source in sources if isinstance(source, tuple))
-    for metadata in metadata_for(drawing):
-        sources = [*metadata.model_sources, *metadata.precision_sources]
-        for values in (metadata.fields, metadata.frames, metadata.datums):
-            sources.extend(source for _value, names in values.values() for source in names)
-        modules.update(importlib.import_module(source[0]) for source in sources if isinstance(source, tuple))
-    roots = {Path(__file__).resolve(), *(Path(module.__file__).resolve() for module in modules)}
+    scripts = Path(__file__).resolve().parent
+    drawing = _source_module_path(f"draw_{stem}", scripts)
+    spec = _source_module_path(f"{stem}_spec", scripts)
+    notes = scripts / f"{stem}_notes.py"
+    roots = {Path(__file__).resolve(), drawing, spec}
+    if notes.is_file():
+        roots.add(notes.resolve())
+    roots.update(_source_module_path(name, scripts) for name in _source_modules(source_tree(drawing)))
     paths = set(roots)
     for path in roots:
         paths.update(Path(dependency).resolve() for dependency in module_deps_of(path))
@@ -154,15 +219,14 @@ def _finish_precision() -> int:
     return len(_surface_finish.ra(_surface_finish.MACHINED_UM).partition(".")[2])
 
 
-def _drawing_features(stem: str, drawing: ModuleType) -> dict[str, dict[str, Any]]:
+def _drawing_features(
+    stem: str, declarations: dict[str, Any], calls: dict[str, list[str]],
+    precision_cite: list[str],
+) -> dict[str, dict[str, Any]]:
     module = _spec_module(stem)
-    precision_name = next(
-        (name for name in ("DRAWING_PRECISION", "DRAWING_PRECISION_BY_NAME") if name in _declarations(module)),
-        "__frame__",
-    )
     result = {}
-    for name, declared in requirements_for(drawing).items():
-        call = _call_cite(declared.path, declared.call_span)
+    for name, declared in declarations.items():
+        call = calls[name]
         feature = {"kind": declared.kind, "frame": "model", "requirements": list(declared.requirements)}
         citations = {}
         for key, (value, sources) in declared.fields.items():
@@ -170,7 +234,9 @@ def _drawing_features(stem: str, drawing: ModuleType) -> dict[str, dict[str, Any
             citations[key] = list(dict.fromkeys([*call, *_spec_cite(module, sources)]))
         if declared.precision:
             feature["precision"] = dict(declared.precision)
-            citations["precision"] = [*call, *_cite(module, precision_name)]
+            if not precision_cite:
+                raise ValueError(f"draw_{stem}: feature precision needs nonempty metadata precision_sources")
+            citations["precision"] = list(dict.fromkeys([*call, *precision_cite]))
         feature["cite"] = citations
         result[name] = feature
     return result
@@ -191,21 +257,32 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
     dashed = stem.replace("_", "-")
     module = _spec_module(stem)
     drawing = _drawing_module(stem)
-    features = _drawing_features(stem, drawing)
-    metadata = metadata_for(drawing)
+    declarations = requirements_for(drawing)
+    call_cites = {}
+
+    def call_cite(declared: Any) -> list[str]:
+        site = declared.path, declared.call_span
+        if site not in call_cites:
+            call_cites[site] = _call_cite(*site)
+        return call_cites[site]
+
+    calls = {name: call_cite(declared) for name, declared in declarations.items()}
+    metadata = [(declared, call_cite(declared)) for declared in metadata_for(drawing)]
     facts = {}
     fact_citations = {}
     precision_cite = []
-    frame_cite = _cite(module, "__frame__")
-    for declared in metadata:
-        call = _call_cite(declared.path, declared.call_span)
+    frame_cite = [*_cite(module, "__frame__"), *_cite(drawing, "build")]
+    for declared, call in metadata:
         for key, (value, sources) in declared.fields.items():
             facts[key] = value
             fact_citations[key] = [*call, *_spec_cite(module, sources)]
         if declared.model_sources:
             frame_cite += [*call, *_spec_cite(module, declared.model_sources)]
         if declared.precision_sources:
+            if any((source[1] if isinstance(source, tuple) else source) == "__frame__" for source in declared.precision_sources):
+                raise ValueError(f"draw_{stem}: precision_sources must cite printed precision, not a module docstring")
             precision_cite += [*call, *_spec_cite(module, declared.precision_sources)]
+    features = _drawing_features(stem, declarations, calls, precision_cite)
     notes_module = _notes_module(stem)
     construction, construction_cite = _construction(notes_module)
     row = _config.parts(dashed)
@@ -242,9 +319,8 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
             ("edge_break_r", "edge_break.radius_mm"), ("chamfer_max", "edge_break.chamfer_max_mm"),
         )
     }
-    declarations = requirements_for(drawing)
     for name, feature in features.items():
-        call = _call_cite(declarations[name].path, declarations[name].call_span)
+        call = calls[name]
         for key in feature.get("precision", {}) if isinstance(feature.get("precision"), dict) else ():
             if precision_cite:
                 feature["cite"][f"precision.{key}"] = list(dict.fromkeys([*call, *precision_cite]))
@@ -252,10 +328,6 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
                 tolerance = "angular.value_deg" if key.endswith("_deg") else f"linear_{feature['precision'][key]}pl.display"
                 feature["cite"][key] += _title_cite(tolerance, "drilled_hole.plus_mm", "drilled_hole.minus_mm")
         if "finish_ra" in feature:
-            feature["cite"]["finish_ra"] += _cite(
-                _surface_finish,
-                "MACHINED_UM" if feature["finish_ra"] == _surface_finish.MACHINED_UM else "SEAT_UM",
-            )
             if isinstance(feature.get("precision"), dict):
                 feature["precision"]["finish_ra"] = _finish_precision()
                 feature["cite"]["precision.finish_ra"] = [*call, *_cite(_surface_finish, "ra")]
@@ -270,8 +342,7 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
             feature["cite"]["z_mm"] = list(dict.fromkeys([*feature["cite"]["z_mm"], *frame_cite]))
     frames: dict[str, Any] = {"model": {"origin": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 1.0, 0.0], "z": [0.0, 0.0, 1.0], "cite": frame_cite}, "setup": UNKNOWN}
     datums: dict[str, Any] = {}
-    for declared in metadata:
-        call = _call_cite(declared.path, declared.call_span)
+    for declared, call in metadata:
         for values, target in ((declared.frames, frames), (declared.datums, datums)):
             for name, (value, sources) in values.items():
                 target[name] = {**value, "cite": [*call, *_spec_cite(module, sources)]}
@@ -335,10 +406,7 @@ def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     step = Path(step)
     content = step.read_bytes()
     manifest = requirement_manifest(stem)
-    selectors = feature_selectors(stem)
-    if selectors.keys() != manifest["features"].keys():
-        raise ValueError(f"feature selector/requirement domains differ: {stem}")
-    faces = step_face_sets(content.decode("latin-1"), selectors.keys())
+    faces = step_face_sets(content.decode("latin-1"), manifest["features"].keys())
     step_cite = f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"
     for name, feature in manifest["features"].items():
         feature["faces"] = faces[name]

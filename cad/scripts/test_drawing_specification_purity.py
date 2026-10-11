@@ -12,8 +12,11 @@ from _drawing_contract import (
 )
 
 
-def _rules(source: str) -> list[str]:
-    return [item.rule for item in drawing_specification_violations(source)]
+def _rules(source: str, *, filename: str = "<string>") -> list[str]:
+    return [
+        item.rule
+        for item in drawing_specification_violations(source, filename=filename)
+    ]
 
 
 @pytest.mark.parametrize(
@@ -117,9 +120,200 @@ def test_detector_allows_spec_sourced_inline_declaration_data(
         "from sample_spec import MINIMUM as LOW\n"
         "import sample_spec as part_spec\n"
         f'{call}({arguments}{keyword}={{"note": '
-        f'({value}, ("MINIMUM", ("other_spec", "UPPER")))}})\n'
+        f'({value}, ("MINIMUM", ("sample_spec", "UPPER"), "FINISH"))}})\n'
     )
-    assert drawing_specification_violations(source) == ()
+    assert drawing_specification_violations(source, filename="draw_sample.py") == ()
+
+
+@pytest.mark.parametrize(
+    ("imports", "expression", "sources"),
+    (
+        ("from sample_spec import MINIMUM", "MINIMUM", '("MINIMUM",)'),
+        (
+            "from sample_spec import MINIMUM as LOW",
+            "LOW",
+            '(("sample_spec", "MINIMUM"),)',
+        ),
+        ("import sample_spec", "sample_spec.MINIMUM", '("MINIMUM",)'),
+        (
+            "import sample_spec as own",
+            "own.MINIMUM",
+            '(("sample_spec", "MINIMUM"),)',
+        ),
+    ),
+)
+def test_declaration_strings_resolve_actual_own_spec_import_bindings(
+    imports: str, expression: str, sources: str
+) -> None:
+    source = (
+        "from _feature_requirements import part_metadata\n"
+        f"{imports}\n"
+        'part_metadata(fields={"note": '
+        f'(f"{{{expression}:.1f}} min", {sources})}})\n'
+    )
+    assert drawing_specification_violations(source, filename="draw_sample.py") == ()
+
+
+@pytest.mark.parametrize("api", ("requirement", "part_metadata"))
+@pytest.mark.parametrize(
+    ("scope", "closing"),
+    (
+        ("if enabled:\n    ", ""),
+        ("if enabled:\n    pass\nelse:\n    ", ""),
+        ("for item in items:\n    ", ""),
+        ("while enabled:\n    ", ""),
+        ("with context():\n    ", ""),
+        ("try:\n    ", "\nexcept Exception:\n    pass"),
+        ("match choice:\n    case 'selected':\n        ", ""),
+    ),
+)
+def test_declaration_strings_in_executable_module_control_flow(
+    api: str, scope: str, closing: str
+) -> None:
+    arguments = (
+        '"bore", kind="hole", faces=(), requirements=("note",), '
+        if api == "requirement"
+        else ""
+    )
+    source = (
+        f"from _feature_requirements import {api} as declare\n"
+        "import sample_spec as own\n"
+        f'{scope}declare({arguments}fields={{"note": '
+        '(f"{own.MINIMUM:.1f} min", ("MINIMUM",))})'
+        f"{closing}\n"
+    )
+    assert drawing_specification_violations(source, filename="draw_sample.py") == ()
+
+
+@pytest.mark.parametrize(
+    ("imports", "value", "sources"),
+    (
+        ("import sample_spec as own", 'f"{own.MINIMUM:.1f} min"', '("UPPER",)'),
+        (
+            "import sample_spec as own",
+            'f"{own.MINIMUM:.1f} min"',
+            '(("other_spec", "MINIMUM"),)',
+        ),
+        (
+            "from sample_spec import MINIMUM as LOW",
+            'f"{LOW:.1f} min"',
+            '("LOW",)',
+        ),
+        (
+            "import sample_spec as own",
+            'f"{own.MINIMUM:.1f} min / {own.UPPER:.1f} max"',
+            '("MINIMUM",)',
+        ),
+        (
+            "import sample_spec as own\nfrom sample_spec import PLACES",
+            'f"{own.MINIMUM:.{PLACES}f} min"',
+            '("MINIMUM",)',
+        ),
+        (
+            "import other_spec as own",
+            'f"{own.MINIMUM:.1f} min"',
+            '(("other_spec", "MINIMUM"),)',
+        ),
+        (
+            "from other_spec import MINIMUM",
+            'f"{MINIMUM:.1f} min"',
+            '(("other_spec", "MINIMUM"),)',
+        ),
+        (
+            "import other_spec as own",
+            'f"{own.MINIMUM:.1f} min"',
+            '("MINIMUM",)',
+        ),
+        (
+            "import not_sample_spec as own",
+            'f"{own.MINIMUM:.1f} min"',
+            '("MINIMUM",)',
+        ),
+        (
+            "import foreign.sample_spec as own",
+            'f"{own.MINIMUM:.1f} min"',
+            '("MINIMUM",)',
+        ),
+        (
+            "from foreign.sample_spec import MINIMUM",
+            'f"{MINIMUM:.1f} min"',
+            '("MINIMUM",)',
+        ),
+        (
+            "from sample_spec import MINIMUM",
+            'f"{unrelated.MINIMUM:.1f} min"',
+            '("MINIMUM",)',
+        ),
+        (
+            "def unused():\n    import sample_spec as own",
+            'f"{own.MINIMUM:.1f} min"',
+            '("MINIMUM",)',
+        ),
+        (
+            "import sample_spec as own\nown = unrelated",
+            'f"{own.MINIMUM:.1f} min"',
+            '("MINIMUM",)',
+        ),
+        (
+            "from sample_spec import MINIMUM\nfrom other_spec import MINIMUM",
+            'f"{MINIMUM:.1f} min"',
+            '("MINIMUM",)',
+        ),
+    ),
+)
+def test_declaration_strings_reject_mismatched_cites_and_foreign_spec_bindings(
+    imports: str, value: str, sources: str
+) -> None:
+    source = (
+        "from _feature_requirements import part_metadata\n"
+        f"{imports}\n"
+        f'part_metadata(fields={{"note": ({value}, {sources})}})\n'
+    )
+    assert _rules(source, filename="draw_sample.py") == ["drawing-spec-string"]
+
+
+@pytest.mark.parametrize("filename", ("<string>", "sample.py", "draw_other.py"))
+def test_declaration_exemption_requires_the_draws_own_filename(filename: str) -> None:
+    source = """
+from _feature_requirements import part_metadata
+import sample_spec as own
+part_metadata(fields={"note": (f"{own.MINIMUM:.1f} min", ("MINIMUM",))})
+"""
+    assert _rules(source, filename=filename) == ["drawing-spec-string"]
+
+
+def test_declaration_sources_are_not_shared_between_data_pairs() -> None:
+    source = """
+from _feature_requirements import part_metadata
+import sample_spec as own
+part_metadata(fields={
+    "first": (f"{own.MINIMUM:.1f} min", ("UPPER",)),
+    "second": (f"{own.UPPER:.1f} max", ("MINIMUM",)),
+})
+"""
+    assert _rules(source, filename="draw_sample.py") == [
+        "drawing-spec-string",
+        "drawing-spec-string",
+    ]
+
+
+@pytest.mark.parametrize(
+    "imports",
+    (
+        "import other_api as declarations",
+        "import _feature_requirements as declarations\ndeclarations = other_api",
+    ),
+)
+def test_declaration_exemption_does_not_match_unrelated_api_attributes(
+    imports: str,
+) -> None:
+    source = (
+        f"{imports}\n"
+        "import sample_spec as own\n"
+        'declarations.part_metadata(fields={"note": '
+        '(f"{own.MINIMUM:.1f} min", ("MINIMUM",))})\n'
+    )
+    assert _rules(source, filename="draw_sample.py") == ["drawing-spec-string"]
 
 
 @pytest.mark.parametrize(
@@ -142,7 +336,7 @@ def test_declaration_sources_do_not_mask_local_manufacturing_values(value: str) 
         'requirement("bore", kind="hole", faces=(CylinderFace(part_spec.DIA),), '
         f'requirements=("note",), fields={{"note": ({value}, ("MINIMUM",))}})\n'
     )
-    assert _rules(source) == ["drawing-spec-string"]
+    assert _rules(source, filename="draw_sample.py") == ["drawing-spec-string"]
 
 
 @pytest.mark.parametrize(
@@ -168,8 +362,28 @@ def test_declaration_sources_do_not_mask_local_manufacturing_values(value: str) 
             "fields",
             '("MINIMUM",)',
         ),
+        (
+            "from _feature_requirements import requirement",
+            "unused = lambda: ",
+            "fields",
+            '("MINIMUM",)',
+        ),
         ("from _feature_requirements import requirement", "", "fields", "()"),
         ("from _feature_requirements import requirement", "", "fields", "(3,)"),
+        ("from _feature_requirements import requirement", "", "fields", '["MINIMUM"]'),
+        ("from _feature_requirements import requirement", "", "fields", '"MINIMUM"'),
+        (
+            "from _feature_requirements import requirement",
+            "",
+            "fields",
+            '(("sample_spec", ""),)',
+        ),
+        (
+            "from _feature_requirements import requirement",
+            "",
+            "fields",
+            '(("sample_spec", "MINIMUM", "extra"),)',
+        ),
         (
             "from _feature_requirements import requirement",
             "",
@@ -190,7 +404,7 @@ def test_declaration_boundary_requires_module_level_api_and_sourced_data(
         f'requirements=("note",), {keyword}={{"note": '
         f'(f"{{part_spec.MINIMUM:.1f}} min", {sources})}})\n'
     )
-    assert _rules(source) == ["drawing-spec-string"]
+    assert _rules(source, filename="draw_sample.py") == ["drawing-spec-string"]
 
 
 def test_declarations_do_not_exempt_outside_strings_or_native_drawing_code() -> None:
@@ -227,7 +441,7 @@ part_metadata(
     },
 )
 """
-    assert _rules(source) == [
+    assert _rules(source, filename="draw_sample.py") == [
         "drawing-spec-string",
         "drawing-spec-string",
         "drawing-spec-string",
