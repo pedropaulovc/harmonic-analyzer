@@ -116,18 +116,12 @@ async def probe(adapter: Any) -> dict[str, str]:
             "FloorReflections": initial_reflections,
             "FloorShadows": bool(scene.FloorShadows),
         }
-        # FloorReflections is valid only while FloorShadows is true. Establish
-        # that prerequisite briefly, then disable both in the open model only.
+        # Direct reflection setter + global cast-shadow preference off were
+        # proven by the native d43da58d7 capture; do not mutate FloorShadows.
         # Never call scene.Modify(): it saves the scene, unlike this probe.
-        scene.FloorShadows = True
-        if not bool(scene.FloorShadows):
-            raise RuntimeError("Could not establish reflection setter prerequisite")
         scene.FloorReflections = False
         if bool(scene.FloorReflections):
             raise RuntimeError("Scene floor reflection readback remained enabled")
-        scene.FloorShadows = False
-        if bool(scene.FloorShadows):
-            raise RuntimeError("Scene floor shadow readback remained enabled")
         model.ShowNamedView2("", enum("swIsometricView"))
         adapter._zoom_to_fit(model)
         for realview, filename in (
@@ -148,8 +142,8 @@ async def probe(adapter: Any) -> dict[str, str]:
                 "FloorReflections": bool(scene.FloorReflections),
                 "FloorShadows": bool(scene.FloorShadows),
             }
-            if scene_before["FloorShadows"]:
-                raise RuntimeError(f"Floor shadows enabled before capture: {scene_before}")
+            if scene_before["FloorReflections"]:
+                raise RuntimeError(f"Floor reflections enabled before capture: {scene_before}")
             model.GraphicsRedraw2()
             image = output_dir / filename
             image.unlink(missing_ok=True)
@@ -177,8 +171,6 @@ async def probe(adapter: Any) -> dict[str, str]:
                 "preferences_before_capture": observed,
                 "scene_before_capture": scene_before,
                 "scene_after_capture": scene_after,
-                "floor_reflections_effectively_enabled": False,
-                "reflection_readback_valid": False,
                 "observed_preferences": after,
                 "bytes": image.stat().st_size,
             })
@@ -187,23 +179,15 @@ async def probe(adapter: Any) -> dict[str, str]:
         restoration_errors = []
         if scene is not None and initial_reflections is not None:
             try:
-                scene.FloorShadows = True
                 scene.FloorReflections = initial_reflections
-                if bool(scene.FloorReflections) != initial_reflections:
-                    raise RuntimeError("Failed to restore scene FloorReflections")
+                metadata["restored_scene"] = {
+                    "FloorReflections": bool(scene.FloorReflections),
+                    "FloorShadows": bool(scene.FloorShadows),
+                }
+                if metadata["restored_scene"] != metadata["initial_scene"]:
+                    raise RuntimeError("Failed to restore original scene properties")
             except Exception as exc:
                 restoration_errors.append(f"scene.FloorReflections: {exc}")
-            finally:
-                try:
-                    scene.FloorShadows = metadata["initial_scene"]["FloorShadows"]
-                    metadata["restored_scene"] = {
-                        "FloorReflections": bool(scene.FloorReflections),
-                        "FloorShadows": bool(scene.FloorShadows),
-                    }
-                    if metadata["restored_scene"] != metadata["initial_scene"]:
-                        raise RuntimeError("Failed to restore original scene properties")
-                except Exception as exc:
-                    restoration_errors.append(f"scene.FloorShadows: {exc}")
         for name, value in prefs.items():
             try:
                 sw.SetUserPreferenceToggle(value, initial[name])
