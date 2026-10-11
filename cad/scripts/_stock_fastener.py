@@ -8,18 +8,14 @@ from typing import Any
 
 import _telemetry
 from _fastener_catalog import fastener
-from _common import (
-    _com_invoke,
-    _early_bound,
-    apply_color,
-    apply_custom_properties,
-    apply_material,
-    check,
-    force_rebuild,
-    name_last_feature,
-    report_mass_properties,
-    save_part_and_images,
-)
+from _appearance import apply_color, apply_material
+from _check import check
+from _com import _com_invoke, _early_bound
+from _custom_properties import apply_custom_properties
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
 from _stock_recipe import RecipeAuthor, recipe_declaration
 from _visibility import FeatureWalk
 

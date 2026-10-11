@@ -27,7 +27,13 @@ import dodo
 import _telemetry
 import vn_counter_spring_spec
 import vn_counter_spring_stock_geom as stock
-from _common import _early_bound, _read_member, check, run_build
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check
+from _com import _early_bound, _read_member
+from _session import run_build
 
 ROOT = Path(__file__).resolve().parents[3]
 

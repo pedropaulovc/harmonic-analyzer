@@ -23,7 +23,7 @@ This module is the one place the eight octant views are defined:
   values, not the diagonal (a transposed matrix shares its diagonal).
 
 **Opt-in per part build, on purpose.** Calling this from
-``_common.save_part_and_images`` would fold it into every part's recipe
+``_part_save.save_part_and_images`` would fold it into every part's recipe
 closure and rebuild the whole fleet for a view most prints never place. A
 part whose drawing wants an octant view imports this module and calls
 :func:`name_octant_views` itself; that part rebuilds, nothing else does.
@@ -43,7 +43,7 @@ import math
 from typing import Any
 
 import _telemetry
-from _common import _early_bound
+from _com import _early_bound
 from solidworks_mcp.adapters.com_variant import double_array
 
 Axis = tuple[float, float, float]

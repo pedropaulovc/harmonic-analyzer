@@ -19,7 +19,8 @@ from __future__ import annotations
 
 import sys
 
-from _common import POLISHED_STEEL, run_build
+from _appearance import POLISHED_STEEL
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from diagnostics.diag_build_98296A026 import build_98296A026

@@ -38,10 +38,7 @@ import sys
 
 import _telemetry
 
-from _common import (
-    check,
-    log,
-)
+from _check import check, log
 from _assembly import (
     coincident_mate,
     component_named_ref,

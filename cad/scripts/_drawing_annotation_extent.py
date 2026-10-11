@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import _telemetry
-from _common import _early_bound
+from _com import _early_bound
 from _drawing_common import (
     _ANNOT_DIM,
     _GDT_TYPES,

@@ -23,11 +23,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     bodies,
@@ -66,7 +68,7 @@ SS_CUT_CY = SS_HALF + SS_PITCH + 7.0 * SS_PITCH / 16.0  # 7P/16 past the raised 
 
 
 async def build_94025A150(adapter, truth=None):
-    from _common import add_line_chain
+    from _sketch import add_line_chain
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     # --- revolve profile (vendor Sketch2 mapped (r, y) = (y_v, -x_v)) -----

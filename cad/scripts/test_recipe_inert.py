@@ -1,8 +1,8 @@
 """``check:inert``: a recipe-inert module can never change a saved artefact.
 
 ``_buildgraph.RECIPE_INERT_MODULES`` are left out of every part/assembly/drawing
-recipe, so editing one re-keys nothing (perf F2.6: 8 of 16 recent ``_common.py``
-commits, each of which re-keyed all 227 leaves, touched only this kind of code).
+recipe, so editing one re-keys nothing (perf F2.6: 8 of 16 recent shared-helper
+monolith commits, each re-keying all 227 leaves, touched only this kind of code).
 That is sound only while the modules stay observation-only. These rules make
 the claim checkable instead of argued, and fail loud when a change breaks it:
 
@@ -42,12 +42,12 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     # Connect-time provenance and the startup gate (it only reads, then either
     # returns or ends the process before any document opens), and the post-save
     # teardown.
-    ("_common.py", "run_build"): frozenset(
+    ("_session.py", "run_build"): frozenset(
         {"note_seats_before_connect", "record_seat_provenance", "teardown_seat"}
     ),
     # PRE-save, by necessity: the camera moves right after this, and the snapshot
     # records the view the sketches were authored under. Rule 3 proves it reads only.
-    ("_common.py", "save_part_and_images"): frozenset({"record_authoring_context"}),
+    ("_part_save.py", "save_part_and_images"): frozenset({"record_authoring_context"}),
     # Release packaging's own teardown, after Pack-and-Go.
     ("package_native.py", "_release_seat"): frozenset({"release_seat_working_directory"}),
     # A failed drive-train package audit: the evidence PDF's directory, read
@@ -58,7 +58,7 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     ("draw_dt_cone_pivot_post.py", "_export_failure_pdf"): frozenset({"OUT_FAILURES"}),
     # A refused rebuild: reads the What's Wrong table, then raises through
     # capture_com_failure.  Nothing after it runs.
-    ("_common.py", "force_rebuild"): frozenset({"capture_rebuild_failure"}),
+    ("_rebuild.py", "force_rebuild"): frozenset({"capture_rebuild_failure"}),
     # An empty source-property read: reads the property managers and the seat's
     # age, then raises the reader's own failure.  Nothing after it runs.
     ("_drawing_common.py", "read_required_properties"): frozenset(
@@ -113,16 +113,13 @@ LOCAL_ATTRIBUTE_STORES = {"cb", "argtypes", "restype"}
 
 # Rule 4: the tracked names an inert module may read, per tracked module.
 READS: dict[str, frozenset[str]] = {
-    "_common": frozenset(
+    "_paths": frozenset({"CAD_ROOT"}),
+    "_com": frozenset({"_read_member", "_early_bound", "_scalar"}),
+    "_preferences": frozenset({"_preference_id"}),
+    "_rebuild": frozenset({"_FEATURE_ERROR", "active_configuration_name"}),
+    "_session": frozenset(
         {
-            "CAD_ROOT",
-            "_read_member",
-            "_early_bound",
-            "_preference_id",
             "_attributes_of",
-            "_scalar",
-            "_FEATURE_ERROR",
-            "active_configuration_name",
             # Teardown only (rule 3 pins teardown_seat's callers).
             "discard_open_documents",
             "_resident_output_documents",
@@ -372,16 +369,18 @@ def test_the_rules_catch_what_they_claim(tmp_path, monkeypatch):
     """Negative controls: each rule fails on a module that breaks it."""
     fake = tmp_path / "_fake_inert.py"
     fake.write_text(
-        "import _common\n"
+        "import _part_save\n"
         "def stamp(model):\n"
         "    model.Extension.CustomPropertyManager('').Add3('Generator', 30, 'x', 2)\n"
         "def resize(dimension):\n"
         "    dimension.SystemValue = 0.002\n"
         "def peek(adapter):\n"
-        "    return _common.save_part_and_images\n",
+        "    return _part_save.save_part_and_images\n",
         encoding="utf-8",
     )
     monkeypatch.setitem(INERT, "_fake_inert", fake)
+    # A real save module the fake may import but never read.
+    monkeypatch.setitem(READS, "_part_save", frozenset())
     with pytest.raises(AssertionError, match="Add3"):
         test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
     with pytest.raises(AssertionError, match="SystemValue"):

@@ -17,7 +17,9 @@ from typing import Any
 import _config
 import _telemetry
 import ch_channel_assembly_steps as steps
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     ViewRole,

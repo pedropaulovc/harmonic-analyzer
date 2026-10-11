@@ -36,11 +36,13 @@ from _stock_recipe import stock_recipe  # noqa: E402
 
 import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     assert_profile_closed,
@@ -102,8 +104,9 @@ def flare_profile() -> tuple[Segment, ...]:
 
 @stock_recipe("99607A213", threaded=True)
 async def build_99607A213(adapter, truth=None):
-    from _common import (add_line_chain, _early_bound, _feature_by_name,
-                         _read_member)
+    from _com import _early_bound, _read_member
+    from _feature_tree import _feature_by_name
+    from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import (mass_properties, no_sketch_inference,
                                    split_at_plane)
     from solidworks_mcp.adapters.base import (CircularPatternParameters,

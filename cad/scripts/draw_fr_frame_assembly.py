@@ -18,7 +18,9 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 import _telemetry
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,

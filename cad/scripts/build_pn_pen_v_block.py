@@ -25,26 +25,22 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _check import check
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
-    apply_material,
-    check,
-    define_circle,
-    define_polygon_chain,
-    define_rectilinear_chain,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain, define_rectilinear_chain
+from _sketch_circle import define_circle
 
 import _telemetry
 from _drawing_marks import (
@@ -73,7 +69,7 @@ from pn_pen_v_block_spec import (
 )
 
 PART_NAME = "pn-pen-v-block"
-MATERIAL = "Brass"  # see _common.apply_material docstring
+MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
 THROUGH_CUT_DEPTH = 80.0  # mid-plane total; > any extent crossed
 

@@ -70,20 +70,15 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    REFERENCES_DIR,
-    apply_material,
-    bbox_extent_check,
-    check,
-    drive_dimension,
-    force_rebuild,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    volume_check,
-)
+from _appearance import apply_material
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _paths import REFERENCES_DIR
+from _rebuild import force_rebuild
+from _session import run_build
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
 from fr_nameplate_spec import (
     PLATE_HEIGHT,
@@ -95,7 +90,7 @@ from fr_nameplate_spec import (
 import _telemetry
 
 PART_NAME = "fr-nameplate"
-MATERIAL = "Brass"  # bright cast/engraved brass plate (see _common.apply_material)
+MATERIAL = "Brass"  # bright cast/engraved brass plate (see _appearance.apply_material)
 
 # Plate dimensions/stations live in the pure-data contract used by base and frame.
 CORNER_R = 4.020278591487471  # mm; measured circular fit, not an outline driver

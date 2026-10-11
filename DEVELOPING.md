@@ -628,7 +628,7 @@ not the socket-head or dowel COM recipe.
 
 The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
 submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
-by `_common`/`_assembly` (mate/plane/feature creation), so its source is a genuine
+by `_session`/`_com`/`_assembly` (session access, COM binding, mate/plane/feature creation), so its source is a genuine
 build input, yet it is an installed package, not a repo-local `_*.py` helper, so
 `module_deps_of` never walked it (issue #144). `dodo._submodule_dep()` folds a
 content-hash of the submodule's `src/solidworks_mcp` tree (repo-relative-tagged,

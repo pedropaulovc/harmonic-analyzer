@@ -61,7 +61,7 @@ from typing import Any
 
 import _drawing_common as _dc
 import _telemetry
-from _common import _early_bound, _read_member
+from _com import _early_bound, _read_member
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
 # swVisibilityState_e

@@ -137,7 +137,7 @@ SOURCE_MAP = {
         (),
     ),
     "drawing_properties": (
-        "harmonic-analyzer/cad/scripts/_common.py:1751-1765",
+        "harmonic-analyzer/cad/scripts/_part_properties.py:16-30",
         (("def part_properties", '"Revision": _config.release_revision()'),),
     ),
     "linear_1pl": (

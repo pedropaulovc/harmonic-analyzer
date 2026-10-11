@@ -22,7 +22,7 @@ So closure here is always AUTHORED, by writing exact coordinates straight to
 the sketch database under ``ISketchManager.AddToDB = True``.  A DB write is
 not drawing: the inference engine never sees it, and two segment ends written
 at bit-identical coordinates are coalesced into ONE sketch point at creation.
-That is the mechanism ``_common.add_line_chain`` has always relied on -- it
+That is the mechanism ``_sketch.add_line_chain`` has always relied on -- it
 authors zero closure relations and its loops close on every seat.  Arcs are
 authored centre-based (:func:`minor_arc`) so the only quantity SolidWorks may
 re-fit is an endpoint, and the endpoint each segment passes is the same double

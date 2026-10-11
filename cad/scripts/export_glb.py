@@ -16,7 +16,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from _common import _early_bound, check, log, run_build
+from _check import check, log
+from _com import _early_bound
+from _session import run_build
 from export_models import OUT_GLTF, OUT_SLDASM, _save_as
 
 import _telemetry

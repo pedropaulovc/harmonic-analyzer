@@ -63,25 +63,23 @@ import sys
 import _config
 import _telemetry
 import pd_transgear_removable_spec as spec
-from _common import (
-    IN,
-    OUT_PNG,
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties
+from _paths import IN, OUT_PNG
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
-    apply_material,
-    check,
-    define_circle,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
     set_sketch_direct_db,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     _named_dimension,
     add_diametric_linear_dimension,
@@ -98,11 +96,11 @@ from _grouped_bom_properties import apply_grouped_bom_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_removable_notes import DRAWING_NOTES, GEAR_DATA
 
-# ``set_global`` is imported from _common under a distinct name: the gap-math
+# ``set_global`` is imported from _dimensions under a distinct name: the gap-math
 # globals below use involute_gear's stricter 4-arg ``set_global`` (asserts the
 # round-tripped value to test the equation-parser dialect), while the plain
-# mm length knobs use _common's 3-arg upsert.
-from _common import set_global as set_global_mm
+# mm length knobs use _dimensions's 3-arg upsert.
+from _dimensions import set_global as set_global_mm
 from involute_gear import (
     pattern_count_dimension,
     read_dimension,

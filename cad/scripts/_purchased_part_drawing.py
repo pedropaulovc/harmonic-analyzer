@@ -13,7 +13,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from _common import _early_bound, check
+from _check import check
+from _com import _early_bound
 from _drawing_common import read_required_properties
 from _drawing_registry import DrawingSpec
 from _purchased_fastener_drawing import _PROPERTIES, _VIEW_CELLS, _build_reference_sheet

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import sys
 
-from _common import run_build
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part

@@ -10,7 +10,19 @@ from pathlib import Path
 
 import pytest
 
-import _common
+import _appearance
+import _com
+import _custom_properties
+import _dimensions
+import _extrude
+import _feature_tree
+import _part_checks
+import _part_properties
+import _part_save
+import _rebuild
+import _session
+import _sketch
+import _sketch_rectangle
 import _config
 import _telemetry
 import build_vn_cone_tip_block_screw as part
@@ -155,15 +167,60 @@ def _record(monkeypatch, author) -> list[tuple]:
     monkeypatch.setattr(socket_head, "insert_helix", logger("insert_helix"))
     monkeypatch.setattr(socket_head, "offset_plane", logger("offset_plane"))
     monkeypatch.setattr(socket_head, "thread_sweep_cut", logger("thread_sweep_cut"))
-    monkeypatch.setattr(_common, "add_line_chain", async_logger("add_line_chain"))
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "add_line_chain", async_logger("add_line_chain"))
+    monkeypatch.setattr(_sketch_rectangle, "add_line_chain", async_logger("add_line_chain"))
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(
-        _common,
+        _dimensions,
         "_feature_by_name",
         lambda _adapter, name: adapter.obj(f"feature {name}"),
     )
     monkeypatch.setattr(
-        _common, "_read_member", lambda obj, name: getattr(obj, name)
+        _feature_tree,
+        "_feature_by_name",
+        lambda _adapter, name: adapter.obj(f"feature {name}"),
+    )
+    monkeypatch.setattr(
+        _sketch,
+        "_feature_by_name",
+        lambda _adapter, name: adapter.obj(f"feature {name}"),
+    )
+    monkeypatch.setattr(
+        _com, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _custom_properties, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _extrude, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _feature_tree, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _part_properties, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _rebuild, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _session, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _sketch, "_read_member", lambda obj, name: getattr(obj, name)
+    )
+    monkeypatch.setattr(
+        _sketch_rectangle, "_read_member", lambda obj, name: getattr(obj, name)
     )
     monkeypatch.setattr(diag_mcmaster_lib, "no_sketch_inference", no_inference)
     monkeypatch.setattr(

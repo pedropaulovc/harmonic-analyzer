@@ -70,8 +70,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (  # noqa: E402
-    CAD_ROOT,
+from _check import check, log  # noqa: E402
+from _com import _early_bound, _read_member  # noqa: E402
+from _part_save import set_isometric_view  # noqa: E402
+from _paths import CAD_ROOT  # noqa: E402
+from _preferences import (
     PREF_STL_QUALITY,
     PREF_STL_UNITS,
     TOGGLE_STL_BINARY,
@@ -79,14 +82,9 @@ from _common import (  # noqa: E402
     TOGGLE_STL_ONE_FILE,
     TOGGLE_STL_SHOW_INFO,
     PreferenceSpec,
-    _early_bound,
-    _read_member,
-    check,
     enforce_preferences,
-    log,
-    run_build,
-    set_isometric_view,
-)
+)  # noqa: E402
+from _session import run_build  # noqa: E402
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
 from _config import release_revision  # noqa: E402
 from _export_feature_faces import FeatureFaceError, name_feature_faces, step_face_sets  # noqa: E402
@@ -132,7 +130,7 @@ GALLERY_PY = COMPARISONS_DIR / "tools" / "gallery.py"
 GALLERY_STAMP = CAD_ROOT / "out" / "reports" / "comparison-gallery.json"
 
 # swconst ids (extracted from the installed swconst.tlb, R2026x). The STL ids
-# live in _common (shared with the part-build STL export); STEP is export-only.
+# live in _preferences (shared with the part-build STL export); STEP is export-only.
 PREF_STEP_AP = 75            # int: swStepAP -> 214 (carries colours)
 # Face names are the prechips face-set contract (_export_feature_faces). The
 # STEP writer carries IPartDoc::SetEntityName names into the ADVANCED_FACE
@@ -147,7 +145,7 @@ TOGGLE_STEP_SPLIT_PERIODIC = 396   # swStepExportSplitPeriodic
 TOGGLE_STEP_FACE_EDGE_PROPS = 397  # swStepExportFaceEdgeProps
 
 # Workbench-friendly equivalents of the SolidWorks material appearances
-# actually used by the build scripts (see _common.apply_material).
+# actually used by the build scripts (see _appearance.apply_material).
 MATERIAL_RGB = {
     "plain carbon steel": (0.55, 0.56, 0.57),
     "brass": (0.72, 0.60, 0.30),
@@ -160,7 +158,7 @@ DEFAULT_RGB = (0.55, 0.55, 0.55)
 
 # Declared baseline for every neutral export this module writes: a fine BINARY
 # STL in millimetres at the model origin (byte-identical to the part build's own
-# STL, which _common.export_part_stl enforces from the same ids) and STEP AP214
+# STL, which _part_save.export_part_stl enforces from the same ids) and STEP AP214
 # so the .step carries colours, face names and split periodic faces. Both the
 # full export and the ``--features`` bundles enforce this one spec, so their
 # named STEPs come from identical writer settings. SHOW_INFO -> False because
@@ -174,7 +172,7 @@ DEFAULT_RGB = (0.55, 0.55, 0.55)
 # by construction) stranded the mutated values on a seat that lives on -- and the
 # next run captured the stranded value as "the original" and restored it forever.
 # Nothing downstream wants any other value, so the state is asserted at the start
-# of the export and deliberately left in place. See _common.enforce_preferences.
+# of the export and deliberately left in place. See _preferences.enforce_preferences.
 EXPORT_PREFERENCES = PreferenceSpec(
     label="neutral-export",
     integers={PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0},

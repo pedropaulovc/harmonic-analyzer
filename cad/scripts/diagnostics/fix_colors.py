@@ -11,15 +11,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from _common import (  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _appearance import (
     PANEL_BLACK,
     POLISHED_STEEL,
     SPRING_BLACK,
     STAINED_OAK,
     apply_color,
-    check,
-    run_build,
-)
+)  # noqa: E402
+from _check import check  # noqa: E402
+from _session import run_build  # noqa: E402
 
 import _telemetry  # noqa: E402
 

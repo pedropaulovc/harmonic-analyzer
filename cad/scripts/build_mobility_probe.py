@@ -39,15 +39,10 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from _common import (
-    OUT_SLDASM,
-    UNDER_CONSTRAINED,
-    _flag_only,
-    _read_member,
-    check,
-    log,
-    run_build,
-)
+from _check import check, log
+from _com import UNDER_CONSTRAINED, _flag_only, _read_member
+from _paths import OUT_SLDASM
+from _session import run_build
 from build_motion_study import (
     ANGLE,
     DISTANCE,

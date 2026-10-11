@@ -148,14 +148,11 @@ import sys
 
 import _config
 import _telemetry
-from _common import (
-    _early_bound,
-    apply_custom_properties,
-    check,
-    force_rebuild,
-    log,
-    run_build,
-)
+from _check import check, log
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _rebuild import force_rebuild
+from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _printed_tolerance import printed_deviations
 from _transforms import ROT_X_NEG90, ROT_Y_180, compose_rows, euler_from_rows

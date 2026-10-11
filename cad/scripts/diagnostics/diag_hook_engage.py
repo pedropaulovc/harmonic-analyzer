@@ -14,7 +14,13 @@ from __future__ import annotations
 
 import sys
 
-from _common import OUT_PNG, OUT_SLDASM, check, log, run_build
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check, log
+from _paths import OUT_PNG, OUT_SLDASM
+from _session import run_build
 from _assembly import _flag, _read_member
 
 

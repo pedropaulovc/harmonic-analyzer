@@ -51,6 +51,6 @@ async def build_catalog(adapter) -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    from _common import run_build
+    from _session import run_build
 
     sys.exit(run_build(build_catalog))

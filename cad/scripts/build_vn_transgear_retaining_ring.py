@@ -18,7 +18,8 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import PANEL_BLACK, run_build
+from _appearance import PANEL_BLACK
+from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_97431A260 import build_97431A260

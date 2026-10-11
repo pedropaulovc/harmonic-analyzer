@@ -427,8 +427,9 @@ so `PublishSTEP242File` carrying PMI must be **gated behind the same runtime MBD
 (§11) — not offered as a guaranteed fallback. (Geometry-only STEP export via the normal Save-As path
 is always available; it just won't carry the tolerances.)
 
-Home it next to the existing per-part stamping: an `apply_pmi(part, features)` in `_common.py`
-alongside `apply_custom_properties` / `apply_material`, driven by the new `critical_features` rows.
+Home it in a focused PMI helper: an `apply_pmi(part, features)` driven by the new
+`critical_features` rows, alongside the existing per-part stamping in
+`_custom_properties.apply_custom_properties` / `_appearance.apply_material`.
 
 Concretely:
 

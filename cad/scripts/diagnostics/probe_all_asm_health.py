@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import (
-    OUT_SLDASM,
-    _flag,
-    _read_member,
-    log,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log
+from _com import _flag, _read_member
+from _paths import OUT_SLDASM
 from _assembly import whats_wrong
 
 ORDER = ["fr-frame", "ch-channel", "dt-drive-train", "output", "ha-harmonic-analyzer"]

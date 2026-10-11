@@ -22,7 +22,7 @@ def ownership(monkeypatch):
     real_import = builtins.__import__
 
     def guarded_import(name, *args, **kwargs):
-        if name in {"_common", "dodo", "diagnostics._owned_native_session"}:
+        if name in {"_com", "dodo", "diagnostics._owned_native_session"}:
             imports.append(name)
             raise AssertionError(f"CLI reached native execution import: {name}")
         return real_import(name, *args, **kwargs)

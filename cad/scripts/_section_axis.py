@@ -13,7 +13,7 @@ import math
 from typing import Any
 
 import _telemetry
-from _common import _early_bound
+from _com import _early_bound
 from _drawing_common import rebuild_drawing, view_name
 
 

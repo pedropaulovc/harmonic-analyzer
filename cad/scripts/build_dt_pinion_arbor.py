@@ -12,32 +12,25 @@ import math
 import sys
 
 import _telemetry
-from _common import (
-    POLISHED_STEEL,
+from _appearance import POLISHED_STEEL, apply_color, apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _extrude import extrude_at_offset
+from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    _feature_by_name,
     anchor_point_to_origin,
-    apply_color,
-    apply_material,
     blank_reference_sketches,
-    check,
-    define_circle,
-    drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
-    feature_name_by_type,
-    force_rebuild,
-    name_bore_axis,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     add_diametric_linear_dimension,
     apply_drawing_precision,

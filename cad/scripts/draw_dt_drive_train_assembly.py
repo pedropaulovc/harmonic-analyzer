@@ -34,7 +34,9 @@ import pinion_rig_fitup as FITUP
 import pinion_rig_tip_gap as TIP_GAP
 from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY, RODS_PINNED_REF
 from ch_channel_assembly_steps import step_ref as channel_step_ref
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     BalloonLanding,

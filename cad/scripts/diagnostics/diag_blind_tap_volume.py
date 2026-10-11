@@ -11,7 +11,13 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cad" / "scripts"))
 
 import dodo  # noqa: E402
-from _common import _early_bound, check, run_build  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _com import _early_bound  # noqa: E402
+from _session import run_build  # noqa: E402
 from _holes import DRILL_POINT_H, HoleSpec, wizard_holes  # noqa: E402
 
 DIA = 4.0386

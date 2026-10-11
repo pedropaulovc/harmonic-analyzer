@@ -13,7 +13,16 @@ from types import SimpleNamespace
 
 import pytest
 
-import _common
+import _appearance
+import _bore_axis
+import _check
+import _part_properties
+import _part_save
+import _rebuild
+import _sketch
+import _sketch_chains
+import _sketch_circle
+import _sketch_rectangle
 import _config
 import _drawing_common
 import _gtol_face
@@ -871,9 +880,17 @@ def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> N
     monkeypatch.setattr(part, "define_circle", define_circle)
     monkeypatch.setattr(part, "add_line_chain", add_line_chain)
     monkeypatch.setattr(part, "add_diametric_linear_dimension", add_diametric)
-    monkeypatch.setattr(_common.SketchDims, "record", record)
-    monkeypatch.setattr(_common.SketchDims, "apply", apply)
-    monkeypatch.setattr(_common, "check", lambda _label, result: result)
+    monkeypatch.setattr(_sketch.SketchDims, "record", record)
+    monkeypatch.setattr(_sketch.SketchDims, "apply", apply)
+    monkeypatch.setattr(_appearance, "check", lambda _label, result: result)
+    monkeypatch.setattr(_bore_axis, "check", lambda _label, result: result)
+    monkeypatch.setattr(_check, "check", lambda _label, result: result)
+    monkeypatch.setattr(_part_save, "check", lambda _label, result: result)
+    monkeypatch.setattr(_rebuild, "check", lambda _label, result: result)
+    monkeypatch.setattr(_sketch, "check", lambda _label, result: result)
+    monkeypatch.setattr(_sketch_chains, "check", lambda _label, result: result)
+    monkeypatch.setattr(_sketch_circle, "check", lambda _label, result: result)
+    monkeypatch.setattr(_sketch_rectangle, "check", lambda _label, result: result)
     monkeypatch.setattr(part, "check", lambda _label, result: result)
     monkeypatch.setattr(part, "name_dimensions", names)
     monkeypatch.setattr(part, "name_bore_axis", lambda *a, **k: _async("Axis1"))
@@ -1019,7 +1036,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
             if k.arg == "required"
         )
     )
-    carried = dict(_common.part_properties(part.PART_NAME))
+    carried = dict(_part_properties.part_properties(part.PART_NAME))
     stamp = _calls(part.__file__)["apply_drawing_properties"]
     extra = ast.literal_eval(
         ast.unparse(stamp.args[2]).replace("DRAWING_NOTES", repr(spec.DRAWING_NOTES))

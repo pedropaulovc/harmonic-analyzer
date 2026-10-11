@@ -11,7 +11,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import run_build
+from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_spring_drawing
 

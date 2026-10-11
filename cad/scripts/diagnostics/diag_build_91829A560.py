@@ -64,18 +64,18 @@ from _shoulder_screw_geometry import (  # noqa: E402
 )
 
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    CAD_ROOT,
-    REFERENCES_DIR,
-    _early_bound,
-    _read_member,
-    add_line_chain,
-    check,
-    define_centered_rectangle,
-    define_circle,
-    run_build,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _com import _early_bound, _read_member  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
+from _paths import CAD_ROOT, REFERENCES_DIR  # noqa: E402
+from _session import run_build  # noqa: E402
+from _sketch import add_line_chain  # noqa: E402
+from _sketch_circle import define_circle  # noqa: E402
+from _sketch_rectangle import define_centered_rectangle  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
 
 OUT_DIR = CAD_ROOT / "out" / "reference"
@@ -190,7 +190,8 @@ async def build_91829A560(adapter, truth=None):
     from win32com.client import VARIANT
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
-    from _common import extrude_at_offset, name_last_feature
+    from _extrude import extrude_at_offset
+    from _feature_tree import name_last_feature
 
     model = adapter.currentModel
 

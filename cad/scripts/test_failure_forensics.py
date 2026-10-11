@@ -59,7 +59,19 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import _common  # noqa: E402
+import _appearance  # noqa: E402
+import _com  # noqa: E402
+import _custom_properties  # noqa: E402
+import _dimensions  # noqa: E402
+import _feature_tree  # noqa: E402
+import _part_checks  # noqa: E402
+import _part_properties  # noqa: E402
+import _part_save  # noqa: E402
+import _preferences  # noqa: E402
+import _rebuild  # noqa: E402
+import _session  # noqa: E402
+import _sketch  # noqa: E402
+import _sketch_rectangle  # noqa: E402
 import _sketch_closure  # noqa: E402
 import _seat_forensics  # noqa: E402
 import _telemetry  # noqa: E402
@@ -966,7 +978,17 @@ def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
     import _drawing_common
 
     spans, logs = capture_telemetry
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 21.8)
     _seat_forensics.record_seat_provenance(_Adapter(sw=_StartingSeat([True], pid=15124)))
     part = _SourcePart({"Number": "MHA-DT-023"}, loading_reads=0)
@@ -1021,7 +1043,17 @@ def test_an_unreadable_load_flag_earns_no_re_read(monkeypatch):
     the failure raises after the one read, with the flag recorded as unknown."""
     import _drawing_common
 
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     part = _SourcePart({name: "x" for name in _TITLE_BLOCK}, loading_reads=0, empty_reads=1)
     monkeypatch.setattr(part, "IsOpenedViewOnly", lambda: None)  # no boolean answer
 
@@ -1289,7 +1321,7 @@ def test_add_to_db_left_on_by_a_dead_leaf_is_reported(capture_telemetry):
     spans, logs = capture_telemetry
     adapter = _Adapter(sw=_Seat(), sketch_manager=_SketchManager(add_to_db=True))
 
-    _common.set_sketch_direct_db(adapter, True)
+    _sketch.set_sketch_direct_db(adapter, True)
 
     warnings = [
         str(r.log_record.body)
@@ -1305,7 +1337,7 @@ def test_a_healthy_add_to_db_transition_does_not_warn(capture_telemetry):
     spans, logs = capture_telemetry
     adapter = _Adapter(sw=_Seat(), sketch_manager=_SketchManager(add_to_db=False))
 
-    _common.set_sketch_direct_db(adapter, True)
+    _sketch.set_sketch_direct_db(adapter, True)
 
     assert adapter.currentSketchManager.AddToDB is True
     assert not [
@@ -1330,7 +1362,7 @@ class _PreferenceSeat:
             self.values[pref] = value
 
 
-_INFERENCE_SPEC = _common.PreferenceSpec(
+_INFERENCE_SPEC = _preferences.PreferenceSpec(
     label="test-sketch-inference",
     toggles={"swSketchInference": False},
     baseline_toggles={"swSketchInference": True},
@@ -1349,9 +1381,9 @@ def test_enforce_writes_the_declaration_and_reports_the_drift(capture_telemetry)
     seat = _PreferenceSeat({_SW_SKETCH_INFERENCE: False})
     adapter = _Adapter(sw=seat)
 
-    drift = _common.enforce_preferences(
+    drift = _preferences.enforce_preferences(
         adapter,
-        _common.PreferenceSpec(
+        _preferences.PreferenceSpec(
             label="test-enforce", toggles={"swSketchInference": True}
         ),
     )
@@ -1372,9 +1404,9 @@ def test_enforce_on_a_clean_seat_is_silent(capture_telemetry):
     adapter = _preference_adapter({_SW_SKETCH_INFERENCE: True})
 
     assert (
-        _common.enforce_preferences(
+        _preferences.enforce_preferences(
             adapter,
-            _common.PreferenceSpec(
+            _preferences.PreferenceSpec(
                 label="test-clean", toggles={"swSketchInference": True}
             ),
         )
@@ -1390,7 +1422,7 @@ def test_override_restores_the_declared_baseline_not_the_observed_value():
     must come out at the declared baseline (on), not back at the poisoned value
     it was observed to hold."""
     seat = _PreferenceSeat({_SW_SKETCH_INFERENCE: False})
-    with _common.preference_override(_Adapter(sw=seat), _INFERENCE_SPEC):
+    with _preferences.preference_override(_Adapter(sw=seat), _INFERENCE_SPEC):
         assert seat.values[_SW_SKETCH_INFERENCE] is False
     assert seat.values[_SW_SKETCH_INFERENCE] is True
 
@@ -1401,8 +1433,8 @@ def test_nested_override_does_not_restore_mid_flight():
     override."""
     seat = _PreferenceSeat({_SW_SKETCH_INFERENCE: True})
     adapter = _Adapter(sw=seat)
-    with _common.preference_override(adapter, _INFERENCE_SPEC):
-        with _common.preference_override(adapter, _INFERENCE_SPEC):
+    with _preferences.preference_override(adapter, _INFERENCE_SPEC):
+        with _preferences.preference_override(adapter, _INFERENCE_SPEC):
             assert seat.values[_SW_SKETCH_INFERENCE] is False
         # Inner exit restored nothing: the outer block still needs it off.
         assert seat.values[_SW_SKETCH_INFERENCE] is False
@@ -1423,12 +1455,12 @@ def test_override_depth_unwinds_even_when_the_restore_write_throws():
 
     exploding = _ExplodingSeat({_SW_SKETCH_INFERENCE: True})
     with contextlib.suppress(OSError):
-        with _common.preference_override(_Adapter(sw=exploding), _INFERENCE_SPEC):
+        with _preferences.preference_override(_Adapter(sw=exploding), _INFERENCE_SPEC):
             pass
-    assert _common._override_depth[_INFERENCE_SPEC.label] == 0
+    assert _preferences._override_depth[_INFERENCE_SPEC.label] == 0
 
     # Proof it is not latched: the next block still applies and restores.
-    with _common.preference_override(_Adapter(sw=seat), _INFERENCE_SPEC):
+    with _preferences.preference_override(_Adapter(sw=seat), _INFERENCE_SPEC):
         assert seat.values[_SW_SKETCH_INFERENCE] is False
     assert seat.values[_SW_SKETCH_INFERENCE] is True
 
@@ -1442,7 +1474,7 @@ def test_a_refused_preference_write_warns_instead_of_failing_the_build(
     spans, logs = capture_telemetry
     seat = _PreferenceSeat({_SW_SKETCH_INFERENCE: True}, refuse={_SW_SKETCH_INFERENCE})
 
-    with _common.preference_override(_Adapter(sw=seat), _INFERENCE_SPEC):
+    with _preferences.preference_override(_Adapter(sw=seat), _INFERENCE_SPEC):
         pass
 
     warnings = [
@@ -1541,7 +1573,9 @@ def test_the_census_names_the_sketch_from_its_feature(monkeypatch):
             return sketch
 
     adapter = _Adapter(sw=_Seat(), model=object())
-    monkeypatch.setattr(_common, "_feature_by_name", lambda _a, _n: _Feature())
+    monkeypatch.setattr(_dimensions, "_feature_by_name", lambda _a, _n: _Feature())
+    monkeypatch.setattr(_feature_tree, "_feature_by_name", lambda _a, _n: _Feature())
+    monkeypatch.setattr(_sketch, "_feature_by_name", lambda _a, _n: _Feature())
 
     state = _sketch_closure._sketch_state(adapter, "LogoProfile")
 
@@ -1839,7 +1873,7 @@ def test_a_failure_that_captured_nothing_says_so(dodo_failures, capture_telemetr
     """Most failures capture nothing, and silence read as "forensics broke".
 
     ``capture_com_failure`` fires at COM-failure sites, so an ordinary recipe
-    rejection (``_common.check`` raising on a sketch relation the seat refused)
+    rejection (``_check.check`` raising on a sketch relation the seat refused)
     leaves ``failures/`` empty. Emitting no line at all made that
     indistinguishable from a capture path that never ran, and the submitter's
     message still advertised a ``failures/*`` download -- which fetched zero
@@ -2003,7 +2037,7 @@ class _Drawing(_Model):
 
 class _DrawingAdapter(_Adapter):
     def _get_attr_or_call(self, obj: Any, name: str) -> Any:
-        return _common._read_member(obj, name)
+        return _com._read_member(obj, name)
 
 
 def _refuse_rod_pin_callout(tmp_path: Path) -> None:
@@ -2198,14 +2232,24 @@ def test_a_refused_rebuild_names_its_features_captures_and_raises(
     capture (session messages included) lands before the unchanged raise."""
     import asyncio
 
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     spans, logs = capture_telemetry
     adapter = _RebuildAdapter(tmp_path, "Error in rebuild_model: Failed to rebuild model")
 
     with pytest.raises(
         RuntimeError, match=r"^rebuild failed: Error in rebuild_model: Failed to rebuild model$"
     ):
-        asyncio.run(_common.force_rebuild(adapter))
+        asyncio.run(_rebuild.force_rebuild(adapter))
 
     (rebuild,) = [s for s in spans.get_finished_spans() if s.name == "feature.rebuild"]
     (event,) = [e for e in rebuild.events if e.name == "rebuild.failed"]
@@ -2245,14 +2289,24 @@ def test_a_warning_only_table_names_no_failing_feature(
 ):
     import asyncio
 
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     spans, _logs = capture_telemetry
     adapter = _RebuildAdapter(
         tmp_path, "Error in rebuild_model: Failed to rebuild model", rows=(("EdgeBreak3", 4, True),)
     )
 
     with pytest.raises(RuntimeError, match=r"^rebuild failed: "):
-        asyncio.run(_common.force_rebuild(adapter))
+        asyncio.run(_rebuild.force_rebuild(adapter))
 
     (rebuild,) = [s for s in spans.get_finished_spans() if s.name == "feature.rebuild"]
     (event,) = [e for e in rebuild.events if e.name == "rebuild.failed"]
@@ -2265,9 +2319,19 @@ def test_a_warning_only_table_names_no_failing_feature(
 def test_a_clean_rebuild_captures_nothing(tmp_path, monkeypatch, capture_telemetry):
     import asyncio
 
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     spans, _logs = capture_telemetry
-    asyncio.run(_common.force_rebuild(_RebuildAdapter(tmp_path, None)))
+    asyncio.run(_rebuild.force_rebuild(_RebuildAdapter(tmp_path, None)))
 
     (rebuild,) = [s for s in spans.get_finished_spans() if s.name == "feature.rebuild"]
     assert not [e for e in rebuild.events if e.name == "rebuild.failed"]

@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import _telemetry
-from _common import _early_bound
+from _com import _early_bound
 from _hole_spec import (
     CLEARANCE_MM as CLEARANCE_MM,
     DRILL_POINT_H,
@@ -544,7 +544,8 @@ def wizard_holes(
 
     placement_drive_jobs: list[tuple[str, str]] = []
     if placement_dims is not None:
-        from _common import SketchDims, check
+        from _check import check
+        from _sketch import SketchDims
         from solidworks_mcp.adapters.solidworks.sketch import (
             _add_sketch_constraint_impl,
             _add_sketch_dimension_impl,
@@ -896,7 +897,7 @@ def wizard_hole_on_cylinder(
         str(sub.Name), "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
     ):
         raise RuntimeError(f"hole wizard {label}: cannot edit {sub.Name}")
-    from _common import check
+    from _check import check
     from solidworks_mcp.adapters.solidworks.sketch import (
         _add_sketch_constraint_impl,
     )

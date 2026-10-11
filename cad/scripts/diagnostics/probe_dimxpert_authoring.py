@@ -100,7 +100,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
-from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound, _read_member  # noqa: E402
+from _paths import CAD_ROOT  # noqa: E402
 from probe_dimxpert_gtol import (  # noqa: E402
     _FAILED_CHECKS,
     SELECTOR_PLANE,

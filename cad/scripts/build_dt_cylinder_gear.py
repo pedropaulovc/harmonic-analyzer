@@ -74,30 +74,25 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import (
-    IN,
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _com import _flag, _read_member
+from _dimensions import dump_dimensions, drive_dimension, name_dimensions, set_global
+from _feature_tree import _feature_by_name, name_last_feature
+from _part_checks import report_mass_properties
+from _paths import IN
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _flag,
-    _feature_by_name,
-    _read_member,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    define_circle,
     dimension_between,
-    dump_dimensions,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    name_dimensions,
-    report_mass_properties,
-    run_build,
-    set_global,
     set_sketch_direct_db,
 )
+from _sketch_circle import define_circle
 from _drawing_marks import (
     add_angular_reference_dimension,
     apply_drawing_precision,

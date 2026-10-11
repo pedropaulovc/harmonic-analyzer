@@ -31,24 +31,21 @@ from __future__ import annotations
 
 import sys
 
-from _common import (
+from _appearance import apply_material
+from _bore_axis import name_bore_axis
+from _check import check
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
     add_line_chain,
-    apply_material,
-    check,
-    define_polygon_chain,
-    define_rectilinear_chain,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    set_global,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_polygon_chain, define_rectilinear_chain
 from _simplified_part import save_simplified_part
 from _platen_rack_geometry import (
     BAR_HEIGHT,

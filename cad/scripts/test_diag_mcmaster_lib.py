@@ -156,7 +156,7 @@ class _WeldedSeat:
 
     That is every real seat: an exact-coordinate endpoint written straight to
     the sketch DB is coalesced there at creation, which is why
-    ``_common.add_line_chain`` closes its loops while authoring no closure
+    ``_sketch.add_line_chain`` closes its loops while authoring no closure
     relation at all.
 
     So ``add_sketch_constraint`` here answers a ``merge`` the way SW 2026

@@ -1,7 +1,7 @@
 """Static scan: or_flag fallback names must be declared on their interface.
 
 ``early_bound_or_flag(obj, "IFace", *fallback_names)`` (and the
-``_common._early_bound`` shim) only applies its fallback ``_FlagAsMethod``
+``_com._early_bound`` shim) only applies its fallback ``_FlagAsMethod``
 names when the checked-in makepy wrapper is UNAVAILABLE. When the wrapper
 loads (the normal case), a fallback name that is NOT declared on the named
 interface routes through the early-bound wrapper's lazily-built — and

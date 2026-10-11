@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import (
-    _flag,
-    _read_member,
-    log,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import log
+from _com import _flag, _read_member
 from _assembly import (
     assert_model_healthy,
     whats_wrong,

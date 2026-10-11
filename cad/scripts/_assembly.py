@@ -17,29 +17,15 @@ from typing import Any
 import _config
 import _telemetry
 from _assembly_contract import AssemblyContract, assembly_contract
-from _common import (
-    DEFAULT_VIEWS,
-    FULLY_CONSTRAINED,
-    OUT_PNG,
-    OUT_SLDASM,
-    OUT_SLDPRT,
-    UNDER_CONSTRAINED,
-    _CHAIN_LINK_PREFIXES,
-    _FEATURE_ERROR,
-    _MATE_TOL_MM,
-    _SUMMARY_TITLE,
-    _git_commit_year,
-    _git_sha,
-    _early_bound,
-    _read_member,
-    apply_custom_properties,
-    apply_summary_info,
-    active_configuration_name,
-    check,
-    log,
-    set_isometric_view,
-    whats_wrong,
-)
+from _bore_axis import _MATE_TOL_MM
+from _check import check, log
+from _com import FULLY_CONSTRAINED, UNDER_CONSTRAINED, _early_bound, _read_member
+from _custom_properties import apply_custom_properties
+from _part_properties import _SUMMARY_TITLE, apply_summary_info
+from _part_save import set_isometric_view
+from _source_identity import _git_commit_year, _git_sha
+from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDASM, OUT_SLDPRT, _CHAIN_LINK_PREFIXES
+from _rebuild import _FEATURE_ERROR, active_configuration_name, whats_wrong
 from _simplified_identity import components_identity
 from _simplified_names import (
     SIMPLIFIED_COMMENT,
@@ -134,7 +120,7 @@ def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bo
 # A chain link touching one of these is intended MESH, not a fault: the chain
 # rides the pitch circle so the links overlap the teeth in the shared z-plane
 # (a coplanar single-plane stand-in). Whitelisted like link<->link contact in
-# check_no_interference. Defined here (not in _common) so it stays off every
+# check_no_interference. Defined here (not in _session) so it stays off every
 # part's recipe digest -- only the assemblies that read it rebuild on a change.
 _CHAIN_SPROCKET_PREFIXES = ("pd-transgear-removable",)
 # Only the sprockets the roller chain actually WRAPS mesh it: the T12 crank wheel

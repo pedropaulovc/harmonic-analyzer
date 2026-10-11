@@ -34,7 +34,13 @@ from _chain import (
     WRAP_R_B,
 )
 import _telemetry
-from _common import anchor_point_to_origin, check, run_build, set_sketch_direct_db
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check
+from _session import run_build
+from _sketch import anchor_point_to_origin, set_sketch_direct_db
 
 
 async def _state(adapter: Any) -> str:

@@ -1,6 +1,6 @@
 r"""Diagnostic: instrument the transgear-removable pin-hole dim failure in situ.
 
-Replays the full build with ``_common.dimension_between`` patched to dump
+Replays the full build with ``_sketch.dimension_between`` patched to dump
 sketch state, over-defining relations, and fallback attempts the moment a
 bore+pins centre dim fails (the ``vertical_distance pin hole PinPos`` /
 ``PinNeg`` dims of the drive-pin holes on local +/-Y; minimal repro attempts
@@ -15,11 +15,18 @@ from __future__ import annotations
 
 import sys
 
-import _common
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+import _session
+import _sketch
+import _sketch_chains
+import _sketch_rectangle
 import _telemetry
 import build_pd_transgear_removable as btr
 
-_orig = _common.dimension_between
+_orig = _sketch.dimension_between
 
 
 async def _patched(adapter, ref1, ref2, kind, value, label):
@@ -45,7 +52,9 @@ async def _patched(adapter, ref1, ref2, kind, value, label):
         raise
 
 
-_common.dimension_between = _patched
+# Every module that binds the helper by name, so no caller bypasses the dump.
+for _module in (_sketch, _sketch_chains, _sketch_rectangle):
+    _module.dimension_between = _patched
 
 if __name__ == "__main__":
-    sys.exit(_common.run_build(btr.build))
+    sys.exit(_session.run_build(btr.build))

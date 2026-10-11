@@ -31,7 +31,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import dodo
-from _common import _early_bound, check, run_build
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check
+from _com import _early_bound
+from _session import run_build
 import _telemetry
 import build_mg_magnifier_assembly as m
 import vn_counter_spring_spec

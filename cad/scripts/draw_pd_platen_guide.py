@@ -24,7 +24,10 @@ from pd_platen_guide_spec import (
 
 import _telemetry
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _paths import CAD_ROOT
+from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,

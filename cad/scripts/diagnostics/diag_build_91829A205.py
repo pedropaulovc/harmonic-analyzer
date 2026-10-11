@@ -61,15 +61,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _stock_recipe import stock_recipe  # noqa: E402
 
 import _telemetry  # noqa: E402
-from _common import (  # noqa: E402
-    add_line_chain,
-    check,
-    define_centered_rectangle,
-    define_circle,
-    extrude_at_offset,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _extrude import extrude_at_offset  # noqa: E402
+from _feature_tree import name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
+from _sketch import add_line_chain  # noqa: E402
+from _sketch_circle import define_circle  # noqa: E402
+from _sketch_rectangle import define_centered_rectangle  # noqa: E402
 from _shoulder_screw_geometry import (  # noqa: E402
     _slot_strip_area,
     _slotted_rim_chamfer_volume,

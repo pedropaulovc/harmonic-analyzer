@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import _common
+import _sketch
 
 import build_dt_pinion_lever as lever
 import draw_dt_pinion_lever as drawing
@@ -208,7 +208,7 @@ def test_station_reference_sketches_are_saved_hidden() -> None:
     source = Path(lever.__file__).read_text(encoding="utf-8")
     assert set(re.findall(r'"(\w+Reference)"', source)) == set(expected)
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
-    # One shared helper in _common (restricted review), no local copy.
+    # One shared helper in _sketch (restricted review), no local copy.
     assert "def _blank_reference_sketches" not in source
     assert source.count(blank) == 1
     assert source.index(blank) < source.rindex(
@@ -218,9 +218,9 @@ def test_station_reference_sketches_are_saved_hidden() -> None:
 
 def test_station_reference_blank_reads_every_sketch_back_hidden(monkeypatch) -> None:
     sketches = dt_pinion_lever_spec.REFERENCE_SKETCHES
-    assert _run_blank(monkeypatch, _common, sketches, blanks=True) == list(sketches)
+    assert _run_blank(monkeypatch, _sketch, sketches, blanks=True) == list(sketches)
     with pytest.raises(RuntimeError, match="GripStationReference still visible"):
-        _run_blank(monkeypatch, _common, sketches, blanks=False)
+        _run_blank(monkeypatch, _sketch, sketches, blanks=False)
 
 
 def test_hub_detail_is_created_and_dimensioned_while_the_part_shows_them() -> None:

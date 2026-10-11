@@ -403,7 +403,11 @@ def _box_mm(owner, member: str, what: str) -> list[float]:
     to read a box would compare equal and the probe would report a match it
     never made.
     """
-    from _common import _read_member
+    if __package__:
+        from . import _script_paths  # noqa: F401
+    else:
+        import _script_paths  # noqa: F401
+    from _com import _read_member
 
     box = [round(float(v) * 1000.0, 9) for v in (_read_member(owner, member) or ())]
     if len(box) != 6:
@@ -412,7 +416,7 @@ def _box_mm(owner, member: str, what: str) -> list[float]:
 
 
 def _face_geometry(face, what: str) -> dict:
-    from _common import _read_member
+    from _com import _read_member
 
     surface = _read_member(face, "GetSurface")
     return {
@@ -424,7 +428,8 @@ def _face_geometry(face, what: str) -> dict:
 
 async def capture_census(adapter, part_path: Path) -> dict:
     """Read one saved part's face census.  Opens the document; changes nothing."""
-    from _common import _early_bound, _read_member, check
+    from _check import check
+    from _com import _early_bound, _read_member
 
     check(f"open {part_path.name}", await adapter.open_model(str(part_path)))
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -473,7 +478,8 @@ async def resolve_census(adapter, census: dict, part_path: Path) -> list[dict]:
     came back.  ``diff_resolution`` turns the rows into verdicts; keeping the
     rows means the evidence survives the run.
     """
-    from _common import _early_bound, _read_member, check
+    from _check import check
+    from _com import _early_bound, _read_member
 
     check(f"open {part_path.name}", await adapter.open_model(str(part_path)))
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -518,7 +524,7 @@ async def resolve_census(adapter, census: dict, part_path: Path) -> list[dict]:
 def _seat(label: str, work) -> int:
     """Run ``work(adapter)`` under the single-seat lock and the build watchdog."""
     import dodo
-    from _common import discard_open_documents, run_build
+    from _session import discard_open_documents, run_build
 
     async def build(adapter):
         try:

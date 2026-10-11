@@ -76,15 +76,15 @@ def _com_method_flagging_neutralized():
     attempt `_FlagAsMethod` on objects that have none.
 
     Measured today the gate never reaches it (0 calls across the 14 tests):
-    `_common._early_bound` passes a test double straight through before it
-    touches `sw_type_info`, and `_common._flag` -- the caller the removed stub
+    `_com._early_bound` passes a test double straight through before it
+    touches `sw_type_info`, and `_com._flag` -- the caller the removed stub
     was written for -- no longer has call sites. This stays as the standing
     isolation invariant the stub module used to provide, so a gate that starts
     flagging methods cannot pull real COM type info into a seatless gate.
 
     Scoped, not assigned at import: `check:recipe` runs every offline test
     file in ONE pytest process, so a module-level assignment would leak into
-    a later test that legitimately reaches `_common._flag` and silently skip
+    a later test that legitimately reaches `_com._flag` and silently skip
     real COM method flagging there (CodeRabbit, PR #771).
     """
     from solidworks_mcp.adapters import sw_type_info

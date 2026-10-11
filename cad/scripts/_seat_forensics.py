@@ -7,8 +7,8 @@ re-keys nothing. That is sound only because nothing here can change a saved
 artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
 
 - Tracked code reaches this module only through pinned call sites: connect-time
-  provenance and the post-save teardown in ``_common.run_build``, the pre-save
-  authoring snapshot in ``_common.save_part_and_images`` (read-only: it has to
+  provenance and the post-save teardown in ``_session.run_build``, the pre-save
+  authoring snapshot in ``_part_save.save_part_and_images`` (read-only: it has to
   run before the camera moves), the pre-save display record in
   ``_drawing_common.new_project_drawing`` (read-only), ``package_native``'s
   teardown, the missing-property capture behind
@@ -19,9 +19,9 @@ artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
   is settled: ``SaveAs3``/``SaveBMP`` of a failing document (only under the
   always-raising ``capture_com_failure``) and ``SetCurrentWorkingDirectory``
   (only at teardown).
-- This module reads ``_common`` and ``_sketch_closure`` through pinned names
-  only, as module attributes (``_common`` imports this module, so a
-  ``from _common import`` here would be a cycle).
+- This module reads ``_com``, ``_paths``, ``_preferences``, ``_rebuild``,
+  ``_session`` and ``_sketch_closure`` through pinned module attributes only,
+  keeping reads cycle-safe when these modules import the forensic hooks.
 
 A change that makes any of this untrue (a verdict a build raises on, a write
 into the model before its save) belongs in a tracked module instead: the
@@ -55,7 +55,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
 
-import _common
+import _com
+import _paths
+import _preferences
+import _rebuild
+import _session
 import _sketch_closure
 import _telemetry
 import _watchdog
@@ -92,7 +96,7 @@ def _seat_park_directory() -> Path:
     helper in its environment.
     """
 
-    checkout = _normal_path(_common.CAD_ROOT.parent)
+    checkout = _normal_path(_paths.CAD_ROOT.parent)
     disposable = [checkout]
     work_root = os.environ.get("FARM_WORK_ROOT")
     if work_root:
@@ -101,7 +105,7 @@ def _seat_park_directory() -> Path:
     candidates = [Path(tempfile.gettempdir())]
     if windows:
         candidates.append(Path(windows) / "Temp")
-    candidates.append(Path(_normal_path(_common.CAD_ROOT).anchor))
+    candidates.append(Path(_normal_path(_paths.CAD_ROOT).anchor))
     for candidate in candidates:
         if not candidate.is_dir():
             continue
@@ -372,7 +376,7 @@ def _seat_working_directory(adapter: Any) -> dict[str, Any]:
     if sw is None:
         return {}
     value = adapter._attempt(
-        lambda: _common._read_member(sw, "GetCurrentWorkingDirectory"), default=None
+        lambda: _com._read_member(sw, "GetCurrentWorkingDirectory"), default=None
     )
     return {"seat_working_directory": str(value)} if value else {}
 
@@ -690,12 +694,12 @@ def _property_manager_state(
     configuration active). The ``[out]`` values ride the return tuple (early
     binding, see ``_early_bound``).
     """
-    extension = _common._read_member(model, "Extension")
-    manager = _common._early_bound(
+    extension = _com._read_member(model, "Extension")
+    manager = _com._early_bound(
         extension.CustomPropertyManager(configuration), "ICustomPropertyManager"
     )
-    state: dict[str, Any] = {"count": int(_common._read_member(manager, "Count") or 0)}
-    state["names"] = [str(name) for name in (_common._read_member(manager, "GetNames") or ())]
+    state: dict[str, Any] = {"count": int(_com._read_member(manager, "Count") or 0)}
+    state["names"] = [str(name) for name in (_com._read_member(manager, "GetNames") or ())]
     reads: dict[str, Any] = {}
     for name in names:
         try:
@@ -742,11 +746,11 @@ def capture_missing_properties(
         "load": dict(load),
     }
     probes: dict[str, Callable[[], Any]] = {
-        "path": lambda: str(_common._read_member(model, "GetPathName") or ""),
-        "title": lambda: str(_common._read_member(model, "GetTitle") or ""),
-        "doc_type": lambda: int(_common._read_member(model, "GetType") or 0),
-        "read_only": lambda: bool(_common._read_member(model, "IsOpenedReadOnly")),
-        "configuration": lambda: _common.active_configuration_name(None, model),
+        "path": lambda: str(_com._read_member(model, "GetPathName") or ""),
+        "title": lambda: str(_com._read_member(model, "GetTitle") or ""),
+        "doc_type": lambda: int(_com._read_member(model, "GetType") or 0),
+        "read_only": lambda: bool(_com._read_member(model, "IsOpenedReadOnly")),
+        "configuration": lambda: _rebuild.active_configuration_name(None, model),
     }
     for key, probe in probes.items():
         try:
@@ -786,7 +790,7 @@ def capture_missing_properties(
             configuration=str(report.get("configuration")),
             api=report["api"],
             missing=json.dumps(list(missing)),
-            **_common._attributes_of(seat),
+            **_session._attributes_of(seat),
         )
     raise RuntimeError(message)
 
@@ -903,7 +907,7 @@ def sketch_authoring_preferences(adapter: Any) -> dict[str, Any]:
     for names, accessor, cast in readers:
         read = getattr(sw, accessor, None)
         for name in names:
-            pref = _common._preference_id(adapter, name)
+            pref = _preferences._preference_id(adapter, name)
             if pref is None or read is None:
                 snapshot[name] = "unresolved"
                 continue
@@ -926,13 +930,13 @@ def _document_scope_preferences(
     the system snapshot logs a misleading number.
     """
     model = adapter.currentModel
-    extension = _common._read_member(model, "Extension") if model is not None else None
+    extension = _com._read_member(model, "Extension") if model is not None else None
     if extension is None:
         return {"scope": "document", "document": None}
     scoped: dict[str, Any] = {"scope": "document"}
     read = getattr(extension, "GetUserPreferenceToggle", None)
     for name in DOCUMENT_SCOPE_TOGGLE_NAMES:
-        pref = _common._preference_id(adapter, name)
+        pref = _preferences._preference_id(adapter, name)
         if pref is None or read is None:
             scoped[name] = "unresolved"
             continue
@@ -965,7 +969,7 @@ def sketch_manager_state(adapter: Any) -> dict[str, Any]:
         return {"sketch_manager": None}
     state: dict[str, Any] = {"scope": "session"}
     for name in ("AddToDB", "AutoInference", "AutoSolve", "DisplayWhenAdded"):
-        value = adapter._attempt(lambda n=name: _common._read_member(manager, n), default=None)
+        value = adapter._attempt(lambda n=name: _com._read_member(manager, n), default=None)
         state[name] = bool(value) if isinstance(value, (bool, int)) else "unreadable"
     return state
 
@@ -1046,11 +1050,11 @@ def _frame_geometry(adapter: Any) -> dict[str, Any]:
     the field names match theirs so both halves join on one query.
     """
     sw = adapter.swApp
-    frame = adapter._attempt(lambda: _common._read_member(sw, "Frame"), default=None)
+    frame = adapter._attempt(lambda: _com._read_member(sw, "Frame"), default=None)
     # ``IFrame::GetHWndx64`` (dispid 16, VT_I8) is the handle; ``GetHWnd``
     # (dispid 11, VT_I4) is the 32-bit form and truncates on win64.
     hwnd = (
-        adapter._attempt(lambda: int(_common._early_bound(frame, "IFrame").GetHWndx64()), default=None)
+        adapter._attempt(lambda: int(_com._early_bound(frame, "IFrame").GetHWndx64()), default=None)
         if frame is not None
         else None
     )
@@ -1096,7 +1100,7 @@ def _projected_px_per_mm(adapter: Any, view: Any) -> dict[str, Any]:
     ``[out]`` params ride the return tuple (early binding; see
     :func:`_early_bound`).
     """
-    typed = _common._early_bound(view, "IModelView")
+    typed = _com._early_bound(view, "IModelView")
     project = getattr(typed, "ProjectModelPoint", None)
     if project is None:
         return {}
@@ -1160,13 +1164,13 @@ def display_geometry(adapter: Any) -> dict[str, Any]:
     geometry["session_has_display"] = geometry["screen_px"] != "0x0"
     model = adapter.currentModel
     view = (
-        adapter._attempt(lambda: _common._read_member(model, "ActiveView"), default=None)
+        adapter._attempt(lambda: _com._read_member(model, "ActiveView"), default=None)
         if model is not None
         else None
     )
     if view is None:
         return geometry
-    scale = adapter._attempt(lambda: float(_common._read_member(view, "Scale2")), default=None)
+    scale = adapter._attempt(lambda: float(_com._read_member(view, "Scale2")), default=None)
     if scale is not None:
         geometry["view_scale2"] = scale
     geometry.update(_model_view_window(adapter, view))
@@ -1188,7 +1192,7 @@ def _model_view_window(adapter: Any, view: Any) -> dict[str, Any]:
     """
     window: dict[str, Any] = {}
     box = adapter._attempt(
-        lambda: list(_common._early_bound(view, "IModelView").GetVisibleBox() or []), default=None
+        lambda: list(_com._early_bound(view, "IModelView").GetVisibleBox() or []), default=None
     )
     if box and len(box) == 4:
         left, top, right, bottom = (int(value) for value in box)
@@ -1200,7 +1204,7 @@ def _model_view_window(adapter: Any, view: Any) -> dict[str, Any]:
         ("FrameHeight", "view_frame_height_px"),
         ("FrameState", "view_frame_state"),
     ):
-        value = adapter._attempt(lambda m=member: _common._read_member(view, m), default=None)
+        value = adapter._attempt(lambda m=member: _com._read_member(view, m), default=None)
         if isinstance(value, (int, float)):
             window[key] = int(value)
     return window
@@ -1300,7 +1304,7 @@ def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
         _telemetry.event(
             "seat.authoring_context",
             label=label,
-            **_common._attributes_of(display),
+            **_session._attributes_of(display),
         )
         _telemetry.info(summary, label=label, authoring=json.dumps(context, default=str))
     return context
@@ -1351,8 +1355,8 @@ def record_drawing_display(adapter: Any, label: str) -> None:
         _telemetry.event(
             "seat.drawing_display",
             label=label,
-            **_common._attributes_of(display),
-            **_common._attributes_of(seat),
+            **_session._attributes_of(display),
+            **_session._attributes_of(seat),
         )
         _telemetry.info(
             f"drawing display {label}: {_display_summary(display, seat)}",
@@ -1398,15 +1402,15 @@ def capture_pick_miss(
             entity_type=entity_type,
             sheet_x=float(sheet_xy[0]),
             sheet_y=float(sheet_xy[1]),
-            **_common._attributes_of(display),
-            **_common._attributes_of(seat),
+            **_session._attributes_of(display),
+            **_session._attributes_of(seat),
         )
         _telemetry.warn(
             f"[forensics] {message}: view={view!r} {_display_summary(display, seat)}",
             capture=json.dumps(report, default=str, sort_keys=True),
             view=view,
             entity_type=entity_type,
-            **_common._attributes_of(seat),
+            **_session._attributes_of(seat),
         )
     raise RuntimeError(message)
 
@@ -1448,7 +1452,7 @@ def _capture_step(report: dict[str, Any], name: str, probe: Callable[[], Any]) -
     report[name] = value
     attributes = value if isinstance(value, dict) else {"value": value}
     with contextlib.suppress(Exception):
-        _telemetry.event(f"com.failure.{name}", **_common._attributes_of(attributes))
+        _telemetry.event(f"com.failure.{name}", **_session._attributes_of(attributes))
 
 
 def _seat_error_state(adapter: Any) -> dict[str, Any]:
@@ -1466,7 +1470,7 @@ def _seat_error_state(adapter: Any) -> dict[str, Any]:
     state: dict[str, Any] = {}
     sw = adapter.swApp
     messages = adapter._attempt(
-        lambda: _common._early_bound(sw, "ISldWorks").GetErrorMessages(), default=None
+        lambda: _com._early_bound(sw, "ISldWorks").GetErrorMessages(), default=None
     )
     if isinstance(messages, (list, tuple)) and len(messages) >= 2:
         state["error_messages"] = [str(text) for text in (messages[1] or [])]
@@ -1479,24 +1483,24 @@ def _whats_wrong_table(adapter: Any) -> dict[str, Any]:
     is not cleared by the read, so it may be read more than once."""
     table: dict[str, Any] = {}
     model = adapter.currentModel
-    extension = _common._read_member(model, "Extension") if model is not None else None
+    extension = _com._read_member(model, "Extension") if model is not None else None
     if extension is None:
         return table
     table["whats_wrong_count"] = adapter._attempt(
-        lambda: int(_common._early_bound(extension, "IModelDocExtension").GetWhatsWrongCount()),
+        lambda: int(_com._early_bound(extension, "IModelDocExtension").GetWhatsWrongCount()),
         default=None,
     )
     faults = adapter._attempt(
-        lambda: _common._early_bound(extension, "IModelDocExtension").GetWhatsWrong(),
+        lambda: _com._early_bound(extension, "IModelDocExtension").GetWhatsWrong(),
         default=None,
     )
     if isinstance(faults, (list, tuple)) and len(faults) >= 4:
         _retval, features, codes, warnings = faults[:4]
         table["whats_wrong"] = [
             {
-                "feature": str(_common._read_member(feature, "Name")),
+                "feature": str(_com._read_member(feature, "Name")),
                 "code": int(code or 0),
-                "error": _common._FEATURE_ERROR.get(int(code or 0), "unknown"),
+                "error": _rebuild._FEATURE_ERROR.get(int(code or 0), "unknown"),
                 "warning": bool(warning),
             }
             for feature, code, warning in zip(
@@ -1516,15 +1520,15 @@ def _document_state(adapter: Any) -> dict[str, Any]:
     if model is None:
         return {"active_document": None}
     active_sketch = adapter._attempt(
-        lambda: _common._read_member(model, "GetActiveSketch2"), default=None
+        lambda: _com._read_member(model, "GetActiveSketch2"), default=None
     )
     probes: dict[str, Callable[[], Any]] = {
-        "title": lambda: str(_common._read_member(model, "GetTitle") or ""),
-        "path": lambda: str(_common._read_member(model, "GetPathName") or ""),
-        "doc_type": lambda: int(_common._read_member(model, "GetType") or 0),
-        "feature_count": lambda: int(_common._read_member(model, "GetFeatureCount") or 0),
-        "needs_save": lambda: bool(_common._read_member(model, "GetSaveFlag")),
-        "configuration": lambda: _common.active_configuration_name(adapter, model),
+        "title": lambda: str(_com._read_member(model, "GetTitle") or ""),
+        "path": lambda: str(_com._read_member(model, "GetPathName") or ""),
+        "doc_type": lambda: int(_com._read_member(model, "GetType") or 0),
+        "feature_count": lambda: int(_com._read_member(model, "GetFeatureCount") or 0),
+        "needs_save": lambda: bool(_com._read_member(model, "GetSaveFlag")),
+        "configuration": lambda: _rebuild.active_configuration_name(adapter, model),
     }
     state: dict[str, Any] = {
         key: adapter._attempt(probe, default=None) for key, probe in probes.items()
@@ -1546,9 +1550,9 @@ def _save_failure_document(adapter: Any, out_dir: Path, slug: str) -> dict[str, 
     model = adapter.currentModel
     if model is None:
         return {"document_copy": None}
-    suffix = Path(str(_common._read_member(model, "GetPathName") or "")).suffix
+    suffix = Path(str(_com._read_member(model, "GetPathName") or "")).suffix
     if not suffix:
-        doc_type = _common._read_member(model, "GetType")
+        doc_type = _com._read_member(model, "GetType")
         suffix = _DOC_SUFFIX.get(
             doc_type if isinstance(doc_type, int) else 0, ".SLDPRT"
         )
@@ -1565,7 +1569,7 @@ def _save_failure_document(adapter: Any, out_dir: Path, slug: str) -> dict[str, 
     return {
         "document_copy": str(target) if saved else None,
         "document_copy_bytes": target.stat().st_size if saved else None,
-        "save_rc": _common._scalar(rc),
+        "save_rc": _com._scalar(rc),
     }
 
 
@@ -1670,7 +1674,7 @@ def capture_com_failure(
     out_dir = OUT_FAILURES / slug / stamp.strftime("%Y%m%dT%H%M%SZ")
     # Caller context, with any key the telemetry helpers own renamed rather than
     # dropped (see _attributes_of).
-    extra = _common._attributes_of(context)
+    extra = _session._attributes_of(context)
     report: dict[str, Any] = {
         "label": label,
         "message": message,
@@ -1757,7 +1761,7 @@ def capture_rebuild_failure(adapter: Any, message: str) -> NoReturn:
         )
     title = "document"
     with contextlib.suppress(Exception):
-        title = str(_common._read_member(adapter.currentModel, "GetTitle") or title)
+        title = str(_com._read_member(adapter.currentModel, "GetTitle") or title)
     capture_com_failure(
         adapter,
         f"rebuild {title}",
@@ -1787,8 +1791,8 @@ async def teardown_seat(adapter: Any) -> None:
     connect re-checks loud.
     """
     try:
-        _common.discard_open_documents(adapter)
-        holding = _common._resident_output_documents(adapter)
+        _session.discard_open_documents(adapter)
+        holding = _session._resident_output_documents(adapter)
         if holding:
             _telemetry.warn(
                 f"{len(holding)} cad/out document(s) still resident "

@@ -38,7 +38,14 @@ def spring_pin_volume(size: tuple[float, float], wall_t: float) -> float:
 
 
 async def build_spring_pin(adapter, size: tuple[float, float], wall_t: float) -> None:
-    from _common import check, define_circle, name_last_feature, volume_check
+    if __package__:
+        from . import _script_paths  # noqa: F401
+    else:
+        import _script_paths  # noqa: F401
+    from _check import check  # noqa: E402 -- diagnostic path bootstrap
+    from _feature_tree import name_last_feature  # noqa: E402 -- diagnostic path bootstrap
+    from _part_checks import volume_check  # noqa: E402 -- diagnostic path bootstrap
+    from _sketch_circle import define_circle  # noqa: E402 -- diagnostic path bootstrap
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     dia, length = size

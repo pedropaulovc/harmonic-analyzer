@@ -247,7 +247,7 @@ def name_feature_faces(doc: Any, stem: str) -> dict[str, list[str]]:
     ``SetEntityName`` refuses it and overwriting would break that reference.
     """
     import _telemetry  # noqa: PLC0415
-    from _common import _bind, _com_invoke, _early_bound  # noqa: PLC0415
+    from _com import _bind, _com_invoke, _early_bound  # noqa: PLC0415
     from _gtol_face_read import face_geometry  # noqa: PLC0415
     from export_features import feature_selectors  # noqa: PLC0415
 

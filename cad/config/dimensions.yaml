@@ -1021,7 +1021,7 @@ sections:
       - - Spring end hooks
         - bent-wire loops, both ends, extend axially
         - —
-        - 'p.41 inset; M4: modelled as axial lead (2× wire dia) + 270° loop at coil mean radius, both springs (`_common.add_spring_end_hooks`)'
+        - 'p.41 inset; M4: modelled as axial lead (2× wire dia) + 270° loop at coil mean radius, both springs (`_features.add_spring_end_hooks`)'
         - stated
         - high (feature), loop geometry estimated (low)
       - - Lever count

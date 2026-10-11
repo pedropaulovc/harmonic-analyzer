@@ -100,14 +100,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
 import vn_counter_spring_stock_geom as geom  # noqa: E402
-from _common import (  # noqa: E402
-    _early_bound,
-    _feature_by_name,
-    _last_feature,
-    check,
-    name_last_feature,
-    volume_check,
-)
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _check import check  # noqa: E402
+from _com import _early_bound  # noqa: E402
+from _feature_tree import _feature_by_name, _last_feature, name_last_feature  # noqa: E402
+from _part_checks import volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     SW_BODY_ADD,
     bodies,

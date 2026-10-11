@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 import _telemetry
-from _common import _bind, _com_invoke, _early_bound
+from _com import _bind, _com_invoke, _early_bound
 from _gtol_face import FaceSpec
 from _gtol_face_read import face_geometry
 

@@ -40,24 +40,20 @@ import sys
 from typing import Any, Callable
 
 import _telemetry
-from _common import (
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound, _read_member
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _feature_tree import _feature_by_name, name_last_feature
+from _part_checks import report_mass_properties
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
     SketchDims,
-    _early_bound,
-    _feature_by_name,
-    _read_member,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    check,
     dimension_between,
-    drive_dimension,
     ensure_fully_defined,
-    force_rebuild,
-    name_dimensions,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    set_global,
     set_sketch_direct_db,
 )
 from _drawing_marks import (

@@ -29,7 +29,11 @@ from typing import Any, Literal
 
 import _telemetry
 from _assembly import configured_interference_manager
-from _common import _early_bound, _read_member
+if __package__:
+    from . import _script_paths  # noqa: F401
+else:
+    import _script_paths  # noqa: F401
+from _com import _early_bound, _read_member
 from _cwm import put_component_pose
 from _native_spring_contact import native_component_interference
 

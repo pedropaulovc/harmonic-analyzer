@@ -94,7 +94,14 @@ def _dowel_com_map(size: tuple[float, float]):
 async def build_dowel(
     adapter, part_no: str, size: tuple[float, float], ends: DowelEnds | None = None
 ) -> None:
-    from _common import add_line_chain, check, name_last_feature, volume_check
+    if __package__:
+        from . import _script_paths  # noqa: F401
+    else:
+        import _script_paths  # noqa: F401
+    from _check import check  # noqa: E402 -- diagnostic path bootstrap
+    from _feature_tree import name_last_feature  # noqa: E402 -- diagnostic path bootstrap
+    from _part_checks import volume_check  # noqa: E402 -- diagnostic path bootstrap
+    from _sketch import add_line_chain  # noqa: E402 -- diagnostic path bootstrap
     from solidworks_mcp.adapters.base import RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference
 
@@ -152,7 +159,7 @@ async def build_catalog(
 ) -> dict[str, str]:
     """Catalog-only run: build the recipe and save it, no vendor truth."""
     import _telemetry
-    from _common import check
+    from _check import check  # noqa: E402 -- diagnostic path bootstrap
     from diagnostics.diag_mcmaster_lib import (
         OUT_DIR,
         assert_seat_sketch_baseline,

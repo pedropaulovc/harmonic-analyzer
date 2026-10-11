@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import _common
+import _sketch
 
 import _drawing_marks
 import _fit_deviations
@@ -930,17 +930,17 @@ def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
     }
     assert authored == expected
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
-    # One shared helper in _common (restricted review), no local copy.
+    # One shared helper in _sketch (restricted review), no local copy.
     assert "def _blank_reference_sketches" not in source
     assert source.count(blank) == 1
     assert source.index(blank) < source.rindex("save_part_and_images(adapter, PART_NAME)")
 
 
 def test_reference_sketch_blank_reads_every_sketch_back_hidden(monkeypatch) -> None:
-    blanked = _run_blank(monkeypatch, _common, spec.REFERENCE_SKETCHES, blanks=True)
+    blanked = _run_blank(monkeypatch, _sketch, spec.REFERENCE_SKETCHES, blanks=True)
     assert blanked == list(spec.REFERENCE_SKETCHES)
     with pytest.raises(RuntimeError, match="FrontJournalReference still visible"):
-        _run_blank(monkeypatch, _common, spec.REFERENCE_SKETCHES, blanks=False)
+        _run_blank(monkeypatch, _sketch, spec.REFERENCE_SKETCHES, blanks=False)
 
 
 def test_profile_imports_the_hidden_reference_dimensions_per_view() -> None:

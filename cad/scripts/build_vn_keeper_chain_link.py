@@ -26,25 +26,24 @@ import sys
 
 import _config
 import _telemetry
-from _common import (
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _feature_tree import name_last_feature
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _session import run_build
+from _sketch import (
     SketchDims,
-    apply_custom_properties,
-    _early_bound,
     anchor_point_to_origin,
-    apply_material,
-    check,
-    define_centered_rectangle,
     add_line_chain,
-    define_circle,
-    define_rectilinear_chain,
     ensure_fully_defined,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
     set_sketch_direct_db,
-    volume_check,
 )
+from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
+from _sketch_rectangle import define_centered_rectangle
 from _drawing_marks import apply_drawing_properties
 from _saved_part_guard import require_saved_drawing_properties
 from vn_keeper_chain_spec import (

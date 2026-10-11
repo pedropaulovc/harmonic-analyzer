@@ -25,15 +25,10 @@ from typing import Any, Callable, Iterable, Iterator, Literal, Mapping, Sequence
 import _config
 import _telemetry
 import _seat_forensics
-from _common import (
-    _bind,
-    _build_id,
-    _com_invoke,
-    _early_bound,
-    _read_member,
-    _visible_document_paths,
-    apply_custom_properties,
-)
+from _com import _bind, _com_invoke, _early_bound, _read_member
+from _custom_properties import apply_custom_properties
+from _source_identity import _build_id
+from _session import _visible_document_paths
 from _gtol_symbols import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_frame import gtol_frame_signature as _gtol_frame_signature
 from _gtol_frame import gtol_frame_xml as _gtol_frame_xml
@@ -1935,7 +1930,7 @@ def create_section_view(
 def _projection_frame(adapter: Any, view: Any) -> tuple[Any, Any]:
     """The math utility and the view's CURRENT model-to-sheet transform, raw.
 
-    Raw dispatches (``_common._com_invoke``): the generated wrapper would read
+    Raw dispatches (``_com._com_invoke``): the generated wrapper would read
     type info and ``QueryInterface`` every object these calls return, which
     is most of what one projection used to cost (p50 71 ms, n=22,839 in 30 d)
     for five round trips of real work.  SolidWorks still does the product, so
@@ -2346,7 +2341,7 @@ def set_hole_callout_precision(
 
 
 # The general-tolerance custom properties every part carries
-# (_common.part_properties, from cad/config/title_block.yaml) and the drawing
+# (_part_properties.part_properties, from cad/config/title_block.yaml) and the drawing
 # template's title block reads via $PRPSHEET. finalize_drawing requires them on
 # the linked model so a stale part can't ship blank tolerance cells.
 TITLE_BLOCK_TOLERANCE_PROPERTIES = (
@@ -2373,7 +2368,7 @@ TITLE_BLOCK_REVISION_PROPERTY = "Revision"
 # The copyright line's year ($PRPSHEET:{COPYRIGHT_YEAR}); required like the
 # tolerance rows so a stale source model cannot print "(c)  Pedro ...".
 TITLE_BLOCK_COPYRIGHT_PROPERTY = "COPYRIGHT_YEAR"
-# Stamped on the drawing document itself at finalize (see _common._build_id).
+# Stamped on the drawing document itself at finalize (see _source_identity._build_id).
 DRAWING_BUILD_ID_PROPERTY = "BUILD_ID"
 
 
@@ -3525,7 +3520,7 @@ def _feature_by_dimension_name(
 ) -> dict[str, str]:
     """Invert a part spec's ``DRAWING_DIMENSIONS`` to ``{dimension: feature}``.
 
-    ``_common.name_dimensions`` names a dimension per OWNING feature, so the
+    ``_dimensions.name_dimensions`` names a dimension per OWNING feature, so the
     inverse is total and unambiguous by construction.  A name claimed by two
     features is a spec bug, not a runtime condition — it would make the
     targeted import silently depend on feature order — so it raises here.

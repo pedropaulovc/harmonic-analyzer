@@ -12,7 +12,8 @@ import time
 from typing import Any
 
 import _telemetry
-from _common import _early_bound, _read_member, check
+from _check import check
+from _com import _early_bound, _read_member
 from _cone_gear_geometry import bore_area_mm2, cone_facts, cone_gap_area_in_disc
 from dt_cone_gear_spec import (
     BORE_DIA_BAND,
@@ -292,7 +293,7 @@ async def assert_saved_configuration_topology(
     20260921T231022Z-leaf-part-cone_gear/task.log lines 480-505.
 
     This validates the rebuilt saved model, not its cold caches; the part's
-    reopen proves those first (``_common.assert_saved_configurations_regenerate``).
+    reopen proves those first (``_rebuild.assert_saved_configurations_regenerate``).
     A failed
     activation/rebuild or any post-rebuild error, body, face, volume, or
     monotonicity mismatch remains fatal.
