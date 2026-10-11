@@ -33,6 +33,30 @@ from diagnostics.diag_mcmaster_thumb import THUMB_SPECS
 SCRIPTS = Path(__file__).resolve().parent
 BUILDER = SCRIPTS / "build_ms_measuring_stick_assembly.py"
 
+def test_builder_owns_setting_dimension_and_drawing_only_imports() -> None:
+    tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
+    helper = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
+                  and node.name == "_author_clamped_setting")
+    calls = [node for node in ast.walk(helper) if isinstance(node, ast.Call)]
+    names = {getattr(node.func, "id", "") for node in calls}
+    assert {"set_global", "drive_dimension", "set_dimension_symmetric_tolerance",
+            "apply_drawing_precision", "mark_dimensions_for_drawing", "blank_sketch"} <= names
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
+                 and node.name == "build")
+    assert any(isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_author_clamped_setting"
+               for node in ast.walk(build))
+    assert spec.SETTING_CHORD[0] == (spec.STICK_X_MIN, spec.STICK_TOP_Y)
+    assert spec.SETTING_CHORD[1] == (spec.BLOCK_ORIGIN[0], spec.STICK_TOP_Y)
+    assert spec.SETTING_CHORD[1][0] - spec.SETTING_CHORD[0][0] == pytest.approx(spec.SETTING_NEAR_FACE_MM)
+    assert spec.DRAWING_PRECISION == {
+        spec.SETTING_FEATURE: {spec.SETTING_DIMENSION: spec.SETTING_PRECISION}
+    }
+    drawing_tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    for node in ast.walk(drawing_tree):
+        if isinstance(node, ast.Call):
+            assert getattr(node.func, "attr", "") not in {"SetValues", "SetValues2"}
+
+
 
 def _matmul(a, b):
     return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
@@ -96,7 +120,7 @@ def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
     assert spec.STICK_MARK_X == pytest.approx(84.9)
     assert spec.STICK_ORIGIN[0] == pytest.approx(-74.4)
     assert spec.STICK_X_MIN == pytest.approx(-74.4)
-    assert spec.REFERENCE_STOP_FACE == pytest.approx(74.4)
+    assert spec.SETTING_NEAR_FACE_MM == pytest.approx(74.4)
     assert spec.STICK_X_MAX == pytest.approx(125.6)
     assert spec.STICK_X_MIN < 0.0 and spec.STICK_X_MAX > stop.BLOCK_LENGTH
 
@@ -251,9 +275,9 @@ def test_fitter_package_covers_rule_9() -> None:
     assert drawing.ASSEMBLY_STEPS.count("\n") >= len(spec.ASSEMBLY_STEPS)
     for instruction in (spec.ASSEMBLY_STEPS[-1], spec.CLAMPED_SETUP_NOTE):
         assert spec.SETTING_CRITERION in instruction
-        assert "NEAR FACE" not in instruction
-        assert "LOCATION REFERENCE" not in instruction
-    assert "NEAR FACE REF ONLY" in spec.STOP_POSITION_CALLOUT
+        assert "NEAR BLOCK FACE" in instruction
+        assert "FROM LEFT STICK END" in instruction
+    assert spec.SETTING_CRITERION in spec.STOP_POSITION_CALLOUT
     assert drawing.EXPLODED_CAPTION == spec.EXPLODED_CAPTION == (
         "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
     )
@@ -278,6 +302,9 @@ def test_bom_prints_registry_identity_and_vendor_sku_only() -> None:
         "sku",
         "quantity",
     }
+    assert drawing.BOM_COLUMN_WIDTHS["part"] > 0.026
+    assert drawing.BOM_COLUMN_WIDTHS["sku"] > 0.024
+    assert drawing.BOM_COLUMN_WIDTHS["description"] < 0.080
     template = drawing.DRAWING_TEMPLATES[drawing.SHEET_LAYOUTS[drawing.SHEET_NAMES[1]]]
     left, right = 0.0127, template.width_m - 0.0127
     assert left <= drawing.BOM_ANCHOR[0]
@@ -558,19 +585,19 @@ def test_mixed_sheets_copy_real_templates_and_close_donors(monkeypatch, defect) 
 def test_reference_dimensions_follow_the_spec() -> None:
     assert spec.REFERENCE_OVERALL_LENGTH == pytest.approx(stick.BODY_LENGTH)
     # The stop's near face sits half a block short of the STOP_MARK division.
-    assert spec.REFERENCE_STOP_FACE == pytest.approx(
+    assert spec.SETTING_NEAR_FACE_MM == pytest.approx(
         stick.SCALE_START_X
         + stop.STOP_MARK * stick.DIVISION_SPACING
         - stop.BLOCK_LENGTH / 2.0
     )
     assert stop.THUMB_AXIS_X == pytest.approx(stop.BLOCK_LENGTH / 2.0)
-    assert {label for label, _value, _callout in drawing.REFERENCE_DIMENSIONS} == {
+    assert {label for label, _value, _callout in drawing.ASSEMBLY_DIMENSIONS} == {
         "overall length",
         "stop position",
     }
-    values = {label: value for label, value, _callout in drawing.REFERENCE_DIMENSIONS}
+    values = {label: value for label, value, _callout in drawing.ASSEMBLY_DIMENSIONS}
     assert values["overall length"] == spec.REFERENCE_OVERALL_LENGTH
-    assert values["stop position"] == spec.REFERENCE_STOP_FACE
+    assert values["stop position"] == spec.SETTING_NEAR_FACE_MM
     assert f"{stop.STOP_MARK:.1f}" in spec.STOP_POSITION_CALLOUT
     assert isinstance(spec.DRAWING_REFERENCE_PRECISION, int)
     assert spec.DRAWING_REFERENCE_PRECISION >= 1
@@ -584,16 +611,20 @@ def test_reference_dimensions_follow_the_spec() -> None:
 
 
 @pytest.mark.parametrize(
-    "mark,tolerance,drill_depth,thread_depth",
-    ((2.5, 0.15, 8.2, 6.5), (1.5, 0.08, 7.6, 6.1)),
+    "mark,tolerance,drill_depth,thread_depth,zero",
+    ((2.5, 0.15, 8.2, 6.5, 57.0), (1.5, 0.08, 7.6, 6.1, 56.0)),
 )
 def test_fitter_text_tracks_mutated_setting_and_depth_specs(
-    monkeypatch, mark, tolerance, drill_depth, thread_depth
+    monkeypatch, mark, tolerance, drill_depth, thread_depth, zero
 ) -> None:
     """Evaluate real spec expressions with changed shop values, not COM mocks."""
     monkeypatch.setattr(stop, "STOP_MARK", mark)
+    monkeypatch.setattr(stick, "SCALE_START_X", zero)
     monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DEPTH", drill_depth)
     monkeypatch.setattr(stop, "PLATE_TAP_THREAD_DEPTH", thread_depth)
+    monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DIA", 1.85)
+    monkeypatch.setattr(stop, "PLATE_CLEARANCE_DIA", 2.5)
+    monkeypatch.setattr(stop, "PLATE_HOLE_POSITION_TOLERANCE_MM", 0.12)
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     assignments = [
         node for node in tree.body
@@ -616,7 +647,7 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     assert changed.STICK_ORIGIN[0] + changed.STICK_MARK_X == pytest.approx(
         stop.THUMB_AXIS_X
     )
-    assert changed.REFERENCE_STOP_FACE == pytest.approx(
+    assert changed.SETTING_NEAR_FACE_MM == pytest.approx(
         changed.STICK_MARK_X - stop.THUMB_AXIS_X
     )
     assert changed.SETTING_TOLERANCE_MM == tolerance
@@ -625,10 +656,16 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
         changed.CLAMPED_SETUP_NOTE,
         changed.ASSEMBLY_STEPS[-1],
     ):
-        assert f"{mark:.1f} MARK ON BLOCK CENTRE" in text
-        assert "THUMBSCREW AXIS" in text
-        assert f"±{tolerance:.2f} mm ALONG STICK" in text
+        assert changed.SETTING_CRITERION in text
+        assert f"{changed.SETTING_NEAR_FACE_MM:.1f} ±{tolerance:.2f} mm" in text
+        assert "FROM LEFT STICK END" in text
+    assert f"{mark:.1f} GRADUATION ON THUMBSCREW AXIS (REF)" in changed.STOP_POSITION_CALLOUT
+    assert "PLATE IS MASTER" in changed.ASSEMBLY_STEPS[0]
+    assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[0]
     pilot = changed.ASSEMBLY_STEPS[0]
+    assert "±0.12 mm LOCATIONS" in pilot
+    assert "DIA 1.85 THROUGH INTO BLOCK" in pilot
+    assert "OPEN ITS HOLES TO DIA 2.5" in pilot
     assert f"{drill_depth:.1f} mm CYLINDRICAL DEPTH INTO BLOCK" in pilot
     assert "DEPTH EXCLUDES PLATE" in pilot
     assert "BOTTOMING-TAP" in pilot
@@ -669,7 +706,7 @@ def _assert_fitter_text_spacing(fitter) -> None:
 
 def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
     assert spec.SETTING_TOLERANCE_MM == pytest.approx(0.10)
-    assert f"±{spec.SETTING_TOLERANCE_MM:.2f} mm ALONG STICK" in spec.SETTING_CRITERION
+    assert f"±{spec.SETTING_TOLERANCE_MM:.2f} mm" in spec.SETTING_CRITERION
     _assert_fitter_text_spacing(spec)
 
 
@@ -723,6 +760,16 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             self.dimension_type = dimension_types[len(displays)]
             self.value_reads = 0
 
+            self.Tolerance = SimpleNamespace(
+                Type=0,
+                SetValues=self.set_tolerance,
+                GetMinValue=lambda: self.minimum,
+                GetMaxValue=lambda: self.maximum,
+            )
+
+        def set_tolerance(self, minimum, maximum):
+            self.minimum, self.maximum = minimum, maximum
+            return True
         @property
         def Type2(self):
             if self.dimension_type == "refused":
@@ -749,8 +796,12 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             return self.text.get(index, "")
 
         def SetPrecision3(self, precision, *rest):
-            assert rest == (-1, -1, -1)
+            assert rest == (-1, spec.SETTING_TOLERANCE_PRECISION if len(displays) == 2 else -1, -1)
             self.precision = precision
+            self.tolerance_precision = rest[1]
+
+        def GetPrimaryTolPrecision2(self):
+            return self.tolerance_precision
 
         def GetPrimaryPrecision2(self):
             return self.precision
@@ -852,6 +903,23 @@ def test_reference_dimensions_select_owned_visible_end_edges(
 
     monkeypatch.setattr(drawing_common, "_project_through", project)
     monkeypatch.setattr(drawing, "_assert_dimension_ink_on_sheet", lambda *a, **kw: None)
+    monkeypatch.setattr(drawing, "_model_item_paths", lambda *a: ())
+    monkeypatch.setattr(drawing, "_show_view_sketches", lambda *a, **kw: None)
+
+    def import_setting(*args, **kwargs):
+        assert kwargs["dimensions_by_feature"] == spec.DRAWING_DIMENSIONS
+        assert set(kwargs["keep"]) == {spec.SETTING_DIMENSION}
+        display = Display(spec.SETTING_NEAR_FACE_MM / 1000.0)
+        displays.append(display)
+        if display.dimension_type in (2, 11):
+            display.text.update({1: "", 2: ""})
+            display.precision = spec.SETTING_PRECISION
+            display.tolerance_precision = spec.SETTING_TOLERANCE_PRECISION
+            display.Tolerance.Type = 4
+            display.set_tolerance(-spec.SETTING_TOLERANCE_MM / 1000, spec.SETTING_TOLERANCE_MM / 1000)
+        return [SimpleNamespace(GetSpecificAnnotation=lambda: display)]
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", import_setting)
     if defect is not None:
         if defect == "absent component":
             front.GetVisibleComponents = lambda: (block_component,)
@@ -876,7 +944,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             stick_component.edges = (*stick_component.edges, duplicate_edge)
             message = "expected one exact visible line.*found 2"
         with pytest.raises(RuntimeError, match=message):
-            drawing._add_reference_dimensions(adapter, front)
+            drawing._add_assembly_dimensions(adapter, front)
         assert selections == []
         assert displays == []
         return
@@ -887,7 +955,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
     if invalid_index is not None:
         # Values deliberately match the requested lengths even for angular
         # dimensions: a value-only guard cannot detect this defect.
-        label = drawing.REFERENCE_DIMENSIONS[invalid_index][0]
+        label = drawing.ASSEMBLY_DIMENSIONS[invalid_index][0]
         kind = dimension_types[invalid_index]
         message = (
             "native dimension type getter refused"
@@ -895,28 +963,41 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             else f"measuring-stick {label}: expected a linear dimension, got type {kind}"
         )
         with pytest.raises(RuntimeError, match=message):
-            drawing._add_reference_dimensions(adapter, front)
+            drawing._add_assembly_dimensions(adapter, front)
         assert len(displays) == invalid_index + 1
         assert displays[-1].value_reads == 0
         assert displays[-1].text == {}
         assert not hasattr(displays[-1], "precision")
         return
-    drawing._add_reference_dimensions(adapter, front)
+    settled = drawing._add_assembly_dimensions(adapter, front)
     assert [(edge, append) for edge, append, view in selections] == [
-        (start, False), (end, True), (start, False), (near, True)
+        (start, False), (end, True)
     ]
     assert [display.value * 1000.0 for display in displays] == pytest.approx(
-        [200.0, spec.REFERENCE_STOP_FACE]
+        [200.0, spec.SETTING_NEAR_FACE_MM]
     )
-    for display, (_, _, callout) in zip(displays, drawing.REFERENCE_DIMENSIONS):
+    for index, (display, (_, _, callout)) in enumerate(zip(displays, drawing.ASSEMBLY_DIMENSIONS)):
         assert display.value_reads == 1
-        assert display.text[1] == "("
-        assert display.text[2] == ")"
-        assert {1, 2} <= set(display.readbacks)
-        assert display.precision == spec.DRAWING_REFERENCE_PRECISION
+        assert display.text[1] == ("(" if index == 0 else "")
+        assert display.text[2] == (")" if index == 0 else "")
+        if index == 0:
+            assert {1, 2} <= set(display.readbacks)
+        assert display.precision == (spec.DRAWING_REFERENCE_PRECISION if index == 0 else spec.SETTING_PRECISION)
+        if index == 1:
+            assert display.Tolerance.Type == 4
+            assert display.minimum == pytest.approx(-spec.SETTING_TOLERANCE_MM / 1000)
+            assert display.maximum == pytest.approx(spec.SETTING_TOLERANCE_MM / 1000)
         if callout:
             assert display.text[4] == callout
             assert 4 in display.readbacks
+    settled()
+    displays[1].maximum *= 2.0
+    with pytest.raises(RuntimeError, match="settled assembly setting band"):
+        settled()
+    displays[1].maximum /= 2.0
+    displays[1].text[1] = "("
+    with pytest.raises(RuntimeError, match="settled assembly setting band"):
+        settled()
 
 
 def _iso_hull(box) -> list[tuple[float, float]]:

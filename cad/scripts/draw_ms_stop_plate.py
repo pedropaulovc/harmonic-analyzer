@@ -7,7 +7,7 @@ The shared millimetre hole-mouth coordinates convert to COM metres before
 projection into the cover-side *Back view.
 The two native, model-owned drill steps point to the same concentric hole
 pair from the right, clear of the overall and hole-location extension lines.
-Chamfer quantity and angle prefixes preserve the imported native values.
+Separate native chamfer size and angle retain their model-owned precision.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ RIGHT_CENTER = (0.310, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.090)
 FRONT_KEEP = {
     "PlateLength": (0.175, 0.235), "PlateHeight": (0.105, 0.170),
-    "RoofChamferSize": (0.257, 0.229), "RoofChamferAngle": (0.273, 0.229),
+    "RoofChamferSize": (0.247, 0.225), "RoofChamferAngle": (0.227, 0.205),
     "PlateLeftFromEnd": (0.175, 0.115),
     "PlateRightFromEnd": (0.175, 0.095),
     "PlateFromHeadFace": (0.115, 0.148),
@@ -51,9 +51,9 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"PlateThickness": (0.310, 0.225)}
 DIMENSION_CALLOUTS = {
     "PilotDrillDiameter": (
-        "PILOT; MATCH-DRILL WITH\n"
-        f"MS-STOP-BLOCK ({_config.parts('ms-stop-block')['number']})\n"
-        "CLAMPED IN PLACE"
+        "LAYOUT ON THIS PLATE; PILOT\n"
+        f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}\n"
+        "CLAMPED WITH " + part.MATCH_DRILL_DATUM_ALIGNMENT.replace(" AND ", " AND\n")
     ),
 }
 
@@ -79,8 +79,8 @@ def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
 
 
 def _style_plate_chamfer(adapter: Any, annotations: list[Any]) -> None:
-    """Compose 2X size X angle from two live, model-precision dimensions."""
-    remaining = {"RoofChamferSize": "2X ", "RoofChamferAngle": "X "}
+    """Keep two separate native dimensions, never a pseudo combined callout."""
+    remaining = {"RoofChamferSize": "2X ", "RoofChamferAngle": ""}
     for annotation in annotations:
         prefix = remaining.pop(dimension_name(adapter, annotation), None)
         if prefix is None:

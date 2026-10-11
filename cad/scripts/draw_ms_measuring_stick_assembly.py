@@ -1,7 +1,7 @@
 r"""Create the three-sheet measuring-stick fitter package (MHA-MS-000).
 
 Sheet 1 shows the stick clamped at its stop mark (front and top at full size)
-with the overall and stop-position REFERENCE dimensions, a section through
+with a reference overall and controlled near-face setting dimension, a section through
 the thumbscrew axis, and the clamp setup note; sheet 2 the
 builder-owned ``MS_EXPLODED`` presentation with the BOM (numbers, descriptions,
 vendor SKU, quantity) and a balloon on every component, both plate screws
@@ -24,7 +24,9 @@ import _telemetry
 import ms_measuring_stick_assembly_spec as spec
 import ms_stick_spec as stick
 import ms_stop_spec as stop
-from _common import _early_bound, check, run_build
+from _check import check
+from _com import _early_bound
+from _session import run_build
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -32,6 +34,8 @@ from _drawing_common import (
     DrawingOutputs,
     ViewRole,
     _edge_endpoint_key,
+    _model_item_paths,
+    curate_view_dimensions,
     add_component_bom_balloons,
     add_edge_dimension,
     apply_view_configuration,
@@ -51,7 +55,8 @@ from _drawing_common import (
     visible_component_entities,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from _drawing_simplified import simplified_name
+from _drawing_hidden_sketches import _show_view_sketches
+from _simplified_names import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -100,7 +105,7 @@ TITLE_BLOCK = (
 
 # Sheet 1: the 200-long stick at full size, top view above the front
 # (third-angle), and the clamp section beside them, magnified so the window,
-# roof and thumbscrew tip read. The references and the centre-index criterion
+# roof and thumbscrew tip read. The overall reference and near-face acceptance
 # run in the gap between front and top; the setup note repeats that criterion.
 FRONT_CENTER = (0.135, 0.190)
 TOP_CENTER = (0.135, 0.248)
@@ -136,9 +141,9 @@ BALLOON_MARGIN = 0.012
 SECOND_SCREW_BALLOON_MARGIN = 0.024
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.026,
-    "description": 0.080,
-    "sku": 0.024,
+    "part": 0.032,
+    "description": 0.066,
+    "sku": 0.032,
     "quantity": 0.012,
 }
 BOM_SKU_TITLE = "VENDOR SKU"
@@ -203,10 +208,10 @@ SECOND_SCREW_BALLOON_ANCHORS = {
 }
 
 
-# Reference dimensions on the front view: (label, expected mm, callout below).
-REFERENCE_DIMENSIONS = (
+# Geometry-owned measurements: overall reference and controlled assembly setting.
+ASSEMBLY_DIMENSIONS = (
     ("overall length", spec.REFERENCE_OVERALL_LENGTH, ""),
-    ("stop position", spec.REFERENCE_STOP_FACE, spec.STOP_POSITION_CALLOUT),
+    ("stop position", spec.SETTING_NEAR_FACE_MM, spec.STOP_POSITION_CALLOUT),
 )
 
 EXPLODED_VIEW_NAMES = {
@@ -587,12 +592,12 @@ def _reference_end_edge(
     return matches[0]
 
 
-def _add_reference_dimensions(adapter: Any, front: Any) -> None:
-    """Overall length and the stop position as parenthesized REFERENCE
-    dimensions across the front view's edges: both stick ends, and the
-    stop's near (X=0) face. Each native type is proved linear before its
-    measured value is checked against the spec and bracketed; places come
-    from the spec too."""
+def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
+    """Measure real component edges; tolerance only the assembly setting.
+
+    The assembly poses own the nominal. The saved drawing dimension owns the
+    assembly acceptance band, not an alternate component manufacturing size.
+    """
     # Mid-height on each stick end; below the window floor on the block's
     # near end edge, clear of the stick. Front views drop Z.
     stick_mid_y = (spec.STICK_TOP_Y + spec.STICK_BOTTOM_Y) / 2.0
@@ -642,21 +647,31 @@ def _add_reference_dimensions(adapter: Any, front: Any) -> None:
             ((stick_start[0] + stop_face[0]) / 2.0, STOP_POSITION_TEXT_Y),
         ),
     }
-    for label, expected_mm, callout in REFERENCE_DIMENSIONS:
+    authored = []
+    for label, expected_mm, callout in ASSEMBLY_DIMENSIONS:
         p0, p1, text_xy = picks[label]
-        display = _early_bound(
-            add_edge_dimension(
-                adapter,
-                front,
-                p0=p0,
-                p1=p1,
-                text_xy=text_xy,
-                label=f"measuring-stick {label} reference",
-                orientation="horizontal",
-                entities=entities[label],
-            ),
-            "IDisplayDimension",
-        )
+        if label == "overall length":
+            display = _early_bound(
+                add_edge_dimension(
+                    adapter, front, p0=p0, p1=p1, text_xy=text_xy,
+                    label=f"measuring-stick {label}", orientation="horizontal",
+                    entities=entities[label],
+                ),
+                "IDisplayDimension",
+            )
+        else:
+            draw = _early_bound(adapter.currentModel, "IDrawingDoc")
+            _show_view_sketches(
+                draw, (spec.SETTING_FEATURE,),
+                paths=_model_item_paths(adapter, front), label="clamped setting",
+            )
+            annotations = curate_view_dimensions(
+                adapter, front, keep={spec.SETTING_DIMENSION: text_xy},
+                view_label="clamped setting", dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+            )
+            if len(annotations) != 1:
+                raise RuntimeError("clamped setting must import one native dimension")
+            display = _early_bound(annotations[0].GetSpecificAnnotation(), "IDisplayDimension")
         dimension_type = int(display.Type2)
         if dimension_type not in (_LINEAR_DIMENSION, _HORIZONTAL_LINEAR_DIMENSION):
             raise RuntimeError(
@@ -670,26 +685,59 @@ def _add_reference_dimensions(adapter: Any, front: Any) -> None:
                 f"measuring-stick {label} measured {measured_mm:g}, "
                 f"expected {expected_mm:g} mm"
             )
-        display = _early_bound(
-            set_reference_dimension(
-                adapter, display.GetAnnotation(), label=f"measuring-stick {label}"
-            ),
-            "IDisplayDimension",
-        )
-        display.SetPrecision3(spec.DRAWING_REFERENCE_PRECISION, -1, -1, -1)
-        if int(display.GetPrimaryPrecision2()) != spec.DRAWING_REFERENCE_PRECISION:
+        if label == "overall length":
+            display = _early_bound(
+                set_reference_dimension(
+                    adapter, display.GetAnnotation(), label=f"measuring-stick {label}"
+                ),
+                "IDisplayDimension",
+            )
+            precision = spec.DRAWING_REFERENCE_PRECISION
+        else:
+            precision = spec.SETTING_PRECISION
+        if label == "overall length":
+            display.SetPrecision3(precision, -1, -1, -1)
+        if int(display.GetPrimaryPrecision2()) != precision:
             raise RuntimeError(f"measuring-stick {label} precision did not persist")
+        if label == "stop position" and int(display.GetPrimaryTolPrecision2()) != spec.SETTING_TOLERANCE_PRECISION:
+            raise RuntimeError("assembly setting tolerance precision did not persist")
         if callout:
             display.SetText(4, callout)  # swDimensionTextCalloutBelow
             if str(display.GetText(4) or "") != callout:
                 raise RuntimeError(f"measuring-stick {label} callout did not persist")
         _assert_dimension_ink_on_sheet(display, label=f"measuring-stick {label}")
+        authored.append((label, display, expected_mm))
+
+    def settled() -> None:
+        for label, saved_display, nominal_mm in authored:
+            saved_dimension = _early_bound(saved_display.GetDimension2(0), "IDimension")
+            if int(saved_display.Type2) not in (_LINEAR_DIMENSION, _HORIZONTAL_LINEAR_DIMENSION):
+                raise RuntimeError(f"{label}: settled dimension is not linear")
+            if abs(abs(float(saved_dimension.SystemValue) * 1000.0) - nominal_mm) > 1e-4:
+                raise RuntimeError(f"{label}: settled nominal changed")
+            prefix, suffix = (str(saved_display.GetText(i) or "") for i in (1, 2))
+            saved_tolerance = _early_bound(saved_dimension.Tolerance, "IDimensionTolerance")
+            if label == "overall length":
+                if (prefix, suffix) != ("(", ")") or int(saved_tolerance.Type) != 0:
+                    raise RuntimeError("overall is not pure reference")
+            else:
+                band_m = spec.SETTING_TOLERANCE_MM / 1000.0
+                if (
+                    (prefix, suffix) != ("", "")
+                    or int(saved_tolerance.Type) != 4
+                    or abs(float(saved_tolerance.GetMinValue()) + band_m) > 1e-9
+                    or int(saved_display.GetPrimaryTolPrecision2()) != spec.SETTING_TOLERANCE_PRECISION
+                    or abs(float(saved_tolerance.GetMaxValue()) - band_m) > 1e-9
+                ):
+                    raise RuntimeError("settled assembly setting band/reference state changed")
+
+    return settled
 
 
-def _place_clamped_sheet(adapter: Any) -> None:
-    """Front and top at full size with the overall and stop-position
-    references, section A-A through the thumbscrew axis (the stick against
-    the roof, the tip on its underside), and the clamp setup note."""
+def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
+    """Front and top with reference overall and controlled near-face setting,
+    section A-A through the thumbscrew axis (the stick against the roof,
+    the tip on its underside), and the clamp setup note."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
@@ -718,10 +766,11 @@ def _place_clamped_sheet(adapter: Any) -> None:
     set_hidden_lines_removed(adapter, section)
     apply_view_configuration(adapter, section, label="thumbscrew clamp section")
     _assert_view_on_sheet(section, label="thumbscrew clamp section")
-    _add_reference_dimensions(adapter, front)
+    settled = _add_assembly_dimensions(adapter, front)
     _add_note_block(
         adapter, SHEET_NAMES[0], SETUP_NOTE, SETUP_NOTE_XY, label="clamped-setup note"
     )
+    return settled
 
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
@@ -912,9 +961,14 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         scale = SHEET_SCALES[sheet_name]
         if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
             raise RuntimeError(f"failed to set measuring-stick sheet scale: {sheet_name}")
-    _place_clamped_sheet(adapter)
-    settled = _place_exploded_sheet(adapter)
+    clamped_settled = _place_clamped_sheet(adapter)
+    exploded_settled = _place_exploded_sheet(adapter)
     _place_steps_sheet(adapter)
+
+    def settled() -> None:
+        clamped_settled()
+        exploded_settled()
+
     return settled
 
 

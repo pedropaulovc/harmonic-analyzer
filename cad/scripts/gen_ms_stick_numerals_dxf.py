@@ -3,9 +3,10 @@ r"""Generate the measuring stick's engraved numerals DXF (tracked asset).
 Writes ``cad/references/ms-stick-numerals.dxf``: the 0..10 scale
 numerals of the ruled measuring stick as closed loops at their FINAL model
 millimetre coordinates, ready for ``build_ms_stick`` to import onto the
-Front plane and cut ``TICK_DEPTH`` deep (the nameplate precedent: the Makers
-seat ignores the importer's scale/position, so placement is baked into the
-file and the build imports at scale 1, position (0, 0)).
+Front plane for the separate shallow numeral engraving. Depth and V-bit
+requirements belong to ``ms_stick_spec``, not to these unchanged surface
+outlines. Placement is baked into the file because the Makers seat ignores
+the importer's scale/position; the build imports at scale 1, position (0, 0).
 
 Deterministic: same constants -> same bytes (no timestamps; fixed-precision
 coordinates; matplotlib's bundled DejaVu Sans pinned by file). Re-run after

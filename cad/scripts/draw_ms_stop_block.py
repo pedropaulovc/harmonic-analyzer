@@ -28,7 +28,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs, add_native_hole_callout, add_property_linked_callout,
     add_property_linked_note,
-    finalize_drawing, model_point_in_view,
+    dimension_name, finalize_drawing, model_point_in_view,
     new_project_drawing, read_required_properties, rebuild_drawing, set_dimension_callouts,
     set_hidden_lines_removed, stamp_drawing_summary,
 )
@@ -69,8 +69,9 @@ DIMENSION_CALLOUTS = {"RoofChamferSize": "2 CORNERS", "WindowWidth": "OPEN REBAT
 # variable definitions, not the resolved text that would freeze drill/depths.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 COVER_HOLE_PROCESS = (
-    "2X MATCH-DRILL WITH MS-STOP-PLATE\n"
-    f"{_config.parts('ms-stop-plate')['number']} CLAMPED\n"
+    f"2X MATCH-DRILL FROM {part.MATCH_DRILL_MASTER}\n"
+    f"{_config.parts('ms-stop-plate')['number']}; CLAMP WITH\n"
+    f"{part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
 )
 
 
@@ -103,6 +104,30 @@ def _orient_bottom_view(adapter: Any, view: Any) -> None:
         raise RuntimeError(
             f"stop block underside rotation did not take: {applied!r} rad, expected pi"
         )
+
+
+def _assert_plate_location_references(adapter: Any, annotations: list[Any]) -> None:
+    """Read back the source-owned parentheses and absence of receiver bands."""
+    remaining = set(part.PLATE_LOCATION_DIMENSIONS)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        remaining.remove(name)
+        display = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        if (
+            int(tolerance.Type) != 0
+            or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
+            or not bool(display.ShowDimensionValue)
+        ):
+            raise RuntimeError(f"{name}: imported plate-master reference lost its source display")
+    if remaining:
+        raise RuntimeError(f"missing plate-master reference dimensions: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -174,11 +199,10 @@ async def build(adapter: Any) -> dict[str, str]:
         part.BLOCK_DRAWING_PRECISION_BY_NAME,
         bands={
             **{name: part.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
-            **{name: (-part.PLATE_HOLE_POSITION_TOLERANCE_MM, part.PLATE_HOLE_POSITION_TOLERANCE_MM)
-               for name in part.PLATE_LOCATION_DIMENSIONS},
         },
         angular=frozenset({"RoofChamferAngle"}),
     )
+    _assert_plate_location_references(adapter, annotations)
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)

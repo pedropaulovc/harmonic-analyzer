@@ -6,6 +6,9 @@ Model dimensions own the manufacturing values, bands and decimal places.
 The release supplies the engraved native/STEP model and its ruled-face/detail
 drawings, not the generated build-input DXF. Name its pinned outline font on the
 print while retaining the native model as the exact numeral-outline authority.
+The 2026-10-11 user Option A numeral ruling changes only their cut envelope:
+0.10 +/-0.05 deep, with 15-degree inward walls for a 30-degree included V bit.
+Surface glyph outlines/placement and the square-bottom graduations stay fixed.
 """
 
 from __future__ import annotations
@@ -36,6 +39,10 @@ NUMERAL_HEIGHT_MM = 2.0
 NUMERAL_GAP_MM = 0.6
 NUMERAL_ROTATION_DEG = 90
 NUMERAL_AREA_MM2 = 13.108
+NUMERAL_DEPTH = 0.10
+NUMERAL_DEPTH_TOLERANCE_MM = 0.05
+NUMERAL_V_BIT_INCLUDED_ANGLE_DEG = 30.0
+NUMERAL_DRAFT_ANGLE_DEG = NUMERAL_V_BIT_INCLUDED_ANGLE_DEG / 2.0
 NUMERALS_BBOX = (57.300, 1.393, 197.700, 4.400)
 
 # Width and thickness govern the running clearance in the 8.4 x 3.4 stop
@@ -72,6 +79,7 @@ DRAWING_DIMENSIONS = {
     "Body": {"BodyThickness"},
     "Tick0Profile": {"Tick0Width"},
     "Tick0Cut": {"TickDepth"},
+    "Numerals": {"NumeralDepth"},
     **{feature: {row[0]} for feature, row in REFERENCE_DIMENSIONS.items()},
 }
 DRAWING_PRECISION = {
@@ -87,6 +95,7 @@ DRAWING_TOLERANCES = {
     "BodyThickness": BODY_FIT_TOLERANCE_MM,
     "Tick0Width": GRADUATION_WIDTH_TOLERANCE_MM,
     "TickDepth": GRADUATION_DEPTH_TOLERANCE_MM,
+    "NumeralDepth": NUMERAL_DEPTH_TOLERANCE_MM,
     "ScaleStartX": GRADUATION_POSITION_TOLERANCE_MM,
     "FullTickLength": GRADUATION_LENGTH_TOLERANCE_MM,
     "MinorTickLength": GRADUATION_LENGTH_TOLERANCE_MM,
@@ -99,7 +108,11 @@ DRAWING_TOLERANCES = {
 }
 # gen_ms_stick_numerals_dxf uses _dxf_text's pinned DejaVuSans.ttf closed loops,
 # not a single-stroke font or a constant-width graduation cutter path.
-DRAWING_NOTES = "NUMERALS: DEJAVU SANS OUTLINES\nNUMERAL OUTLINES: ms-stick.SLDPRT"
+DRAWING_NOTES = "NUMERALS: DEJAVU SANS OUTLINES\nNUMERAL OUTLINES: ms-stick.SLDPRT (REFERENCE)"
+NUMERAL_TOOL_NOTE = (
+    f"NUMERALS: {NUMERAL_V_BIT_INCLUDED_ANGLE_DEG:g}° INCLUDED V ENGRAVING BIT;\n"
+    "ENAMEL-FILLED"
+)
 NUMERAL_PLACEMENT_NOTE = (
     "NUMERALS 0-9 RIGHT OF FULL TICKS;\n"
     "10 LEFT OF FINAL FULL TICK.\n"
@@ -114,6 +127,7 @@ DRAWING_VALUES_BY_NAME = {
     "BodyThickness": BODY_THICKNESS,
     "Tick0Width": TICK_WIDTH,
     "TickDepth": TICK_DEPTH,
+    "NumeralDepth": NUMERAL_DEPTH,
     **{
         row[0]: abs(row[2][0] - row[1][0]) + abs(row[2][1] - row[1][1])
         for row in REFERENCE_DIMENSIONS.values()

@@ -334,12 +334,18 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     for name in (
         "read_required_properties", "stamp_drawing_summary",
         "set_hidden_lines_removed", "set_dimension_callouts",
-        "assert_manufacturing_dimensions", "add_property_linked_note",
+        "add_property_linked_note",
     ):
         monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
+    native_contracts = []
+    monkeypatch.setattr(
+        drawing, "assert_manufacturing_dimensions",
+        lambda *args, **kwargs: native_contracts.append(kwargs),
+    )
     monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *a, **kw: [])
     if drawing is block_drawing:
         monkeypatch.setattr(drawing, "_remove_general_thread_class", lambda *a: None)
+        monkeypatch.setattr(drawing, "_assert_plate_location_references", lambda *a: None)
     else:
         monkeypatch.setattr(drawing, "_style_pilot_diameter", lambda *a: None)
         monkeypatch.setattr(drawing, "_style_plate_chamfer", lambda *a: None)
@@ -365,6 +371,18 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         )
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
+    assert len(native_contracts) == 1
+    bands = native_contracts[0]["bands"]
+    if drawing is block_drawing:
+        assert not set(bands) & spec.PLATE_LOCATION_DIMENSIONS
+        assert bands == {
+            name: spec.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")
+        }
+    else:
+        assert {name: bands[name] for name in spec.PLATE_LOCATION_DIMENSIONS} == {
+            name: (-spec.PLATE_HOLE_POSITION_TOLERANCE_MM, spec.PLATE_HOLE_POSITION_TOLERANCE_MM)
+            for name in spec.PLATE_LOCATION_DIMENSIONS
+        }
     # The displayed cover face is *Back: +X goes left, +Y goes up. Its
     # third-angle right view is unrotated *Left (+Z right, +Y up); its
     # third-angle underside must retain -X and send +Z down, not up.
@@ -479,6 +497,93 @@ def test_match_drilling_does_not_eliminate_absolute_end_ligament_limits() -> Non
         spec.PLATE_HOLE_XS[1] + printed_band_mm(2)
         + spec.PLATE_SCREW_MAJOR_DIA / 2.0
     ) < 1.5
+    assert spec.MATCH_DRILL_MASTER == "MS-STOP-PLATE"
+    assert spec.MATCH_DRILL_DATUM_ALIGNMENT == "LEFT END AND THUMBSCREW-SIDE EDGES ALIGNED"
+
+
+@pytest.mark.parametrize("master_band", [0.0, 0.1, 0.2, 0.51])
+def test_reference_receiver_end_web_tracks_perturbed_plate_master_band(master_band) -> None:
+    # These are absolute plate-master errors transferred from the same X=0
+    # edge, not independent or floating block reference-dimension bands.
+    expected = spec.BLOCK_LENGTH - spec.BLOCK_PRINTED_BANDS_MM["BlockLength"] - (
+        spec.PLATE_HOLE_XS[1] + master_band + spec.PLATE_SCREW_MAJOR_DIA / 2.0
+    )
+    actual = spec.transferred_tap_end_web_min(master_band)
+    assert actual == pytest.approx(expected)
+    assert actual == pytest.approx(
+        spec.PLATE_TAP_END_WEB_MIN + spec.PLATE_HOLE_POSITION_TOLERANCE_MM - master_band
+    )
+    assert (actual >= 1.5) is (master_band <= spec.PLATE_HOLE_POSITION_TOLERANCE_MM)
+
+
+@pytest.mark.parametrize("refusal", [None, "prefix", "suffix", "tolerance", "value"])
+def test_block_model_authors_native_reference_labels_without_independent_band(monkeypatch, refusal) -> None:
+    class Tolerance:
+        def __init__(self):
+            self.value = 2
+
+        @property
+        def Type(self):  # noqa: N802 - native property
+            return self.value
+
+        @Type.setter
+        def Type(self, value):
+            if refusal != "tolerance":
+                self.value = value
+
+    class Display:
+        def __init__(self):
+            self.text = {1: "", 2: ""}
+            self.ShowDimensionValue = refusal != "value"
+            self.dimension = SimpleNamespace(Tolerance=Tolerance())
+
+        def SetText(self, which, text):  # noqa: N802 - void native method
+            if refusal != {1: "prefix", 2: "suffix"}[which]:
+                self.text[which] = text
+
+        def GetText(self, which):  # noqa: N802 - string native method
+            return self.text[which]
+
+        def GetDimension2(self, index):  # noqa: N802 - native dimension accessor
+            assert index == 0
+            return self.dimension
+
+    displays = {name: Display() for name in spec.PLATE_LOCATION_DIMENSIONS}
+
+    def named(_adapter, feature, name):
+        assert feature == "PlateLocationReference"
+        return displays[name], displays[name].dimension
+
+    monkeypatch.setattr(block, "_named_dimension", named)
+    if refusal:
+        with pytest.raises(RuntimeError, match="reference-only display did not persist"):
+            block._author_plate_location_references(object())
+    else:
+        block._author_plate_location_references(object())
+        for display in displays.values():
+            assert display.text == {1: "(", 2: ")"}
+            assert display.dimension.Tolerance.Type == 0
+        monkeypatch.setattr(block_drawing, "dimension_name", lambda _adapter, item: item.name)
+        annotations = [
+            SimpleNamespace(name=name, GetSpecificAnnotation=lambda display=display: display)
+            for name, display in displays.items()
+        ]
+        block_drawing._assert_plate_location_references(object(), annotations)
+        for display in displays.values():
+            display.text[2] = ""
+            with pytest.raises(RuntimeError, match="reference lost its source display"):
+                block_drawing._assert_plate_location_references(object(), annotations)
+            display.text[2] = ")"
+
+
+def test_receiver_model_has_no_independent_location_tolerance_authoring() -> None:
+    tree = ast.parse(Path(block.__file__).read_text(encoding="utf-8"))
+    calls = {
+        node.func.id for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "set_dimension_symmetric_tolerance" not in calls
+    assert "_author_plate_location_references" in calls
 
 
 class _StopDisplay:
@@ -567,7 +672,7 @@ def test_plate_chamfer_keeps_native_size_and_angle_with_quantity_prefixes(monkey
     else:
         plate_drawing._style_plate_chamfer(object(), annotations)
         assert natives["RoofChamferSize"].prefix == "2X "
-        assert natives["RoofChamferAngle"].prefix == "X "
+        assert natives["RoofChamferAngle"].prefix == ""
     assert spec.PLATE_DRAWING_PRECISION["RoofChamfers"] == {
         "RoofChamferSize": 1, "RoofChamferAngle": 0,
     }
@@ -593,13 +698,16 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     assert "MS-STOP-PLATE" in block_drawing.COVER_HOLE_PROCESS
     assert _config.parts("ms-stop-plate")["number"] in block_drawing.COVER_HOLE_PROCESS
     assert "BOTTOMING TAP" not in block_drawing.COVER_HOLE_PROCESS
+    assert f"MATCH-DRILL FROM {spec.MATCH_DRILL_MASTER}" in block_drawing.COVER_HOLE_PROCESS
+    assert spec.MATCH_DRILL_DATUM_ALIGNMENT in block_drawing.COVER_HOLE_PROCESS
     pilot = plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]
     assert "MS-STOP-BLOCK" in pilot
     assert _config.parts("ms-stop-block")["number"] in pilot
     assert pilot.splitlines() == [
-        "PILOT; MATCH-DRILL WITH",
-        f"MS-STOP-BLOCK ({_config.parts('ms-stop-block')['number']})",
-        "CLAMPED IN PLACE",
+        "LAYOUT ON THIS PLATE; PILOT",
+        f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}",
+        "CLAMPED WITH LEFT END AND",
+        "THUMBSCREW-SIDE EDGES ALIGNED",
     ]
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
         spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
@@ -959,7 +1067,7 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
         monkeypatch.setattr(block, name, no_op)
     for name in (
         "name_last_feature", "name_dimensions", "wizard_holes", "author_hole_precision",
-        "set_dimension_symmetric_tolerance", "clear_dimensions_for_drawing",
+        "_author_plate_location_references", "clear_dimensions_for_drawing",
     ):
         monkeypatch.setattr(block, name, lambda *a, **kw: None)
     monkeypatch.setattr(block, "set_dimension_bilateral_tolerance",

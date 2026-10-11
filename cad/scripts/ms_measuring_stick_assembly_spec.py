@@ -128,23 +128,38 @@ EXPLODE_STEPS = (
 
 # --- Fitter package text ------------------------------------------------------
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
-# Assembly setting acceptance, not a component manufacturing dimension: index
-# the selected graduation to the block centre/THUMB_AXIS_X, never its near face.
+# Assembly acceptance measured between real faces; no component size is changed.
 SETTING_TOLERANCE_MM = 0.10
+SETTING_NEAR_FACE_MM = BLOCK_ORIGIN[0] - STICK_X_MIN
+SETTING_PRECISION = 1
+SETTING_TOLERANCE_PRECISION = 2
+SETTING_FEATURE = "ClampedSetting"
+SETTING_DIMENSION = "NearFaceFromStickEnd"
+DRAWING_DIMENSIONS = {SETTING_FEATURE: {SETTING_DIMENSION}}
+DRAWING_PRECISION = {SETTING_FEATURE: {SETTING_DIMENSION: SETTING_PRECISION}}
+SETTING_CHORD = (
+    (STICK_X_MIN, STICK_TOP_Y),
+    (BLOCK_ORIGIN[0], STICK_TOP_Y),
+)
 SETTING_CRITERION = (
-    f"{stop.STOP_MARK:.1f} MARK ON BLOCK CENTRE "
-    f"(THUMBSCREW AXIS), ±{SETTING_TOLERANCE_MM:.2f} mm ALONG STICK"
+    f"NEAR BLOCK FACE {SETTING_NEAR_FACE_MM:.1f} ±{SETTING_TOLERANCE_MM:.2f} mm "
+    "FROM LEFT STICK END"
+)
+SETTING_REFERENCE_DESCRIPTION = (
+    f"{stop.STOP_MARK:.1f} GRADUATION ON THUMBSCREW AXIS (REF)"
 )
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order; the explode above runs steps 2-5 backwards. Each line
 # names the parts as the BOM's DESCRIPTION column does. The block and its
 # cover are a match-drilled pair (step 1): neither is interchangeable.
 ASSEMBLY_STEPS = (
-    "1. MATCH-DRILL THE PAIR: CLAMP THE STOP COVER PLATE ON THE STOP BLOCK, "
-    f"OUTLINES ALIGNED; PILOT BOTH SCREW HOLES DIA {stop.PLATE_TAP_DRILL_DIA:.2f} "
-    f"THROUGH PLATE TO {stop.PLATE_TAP_DRILL_DEPTH:.1f} mm CYLINDRICAL DEPTH "
-    "INTO BLOCK IN ONE PASS (DEPTH EXCLUDES PLATE). REMOVE THE PLATE; OPEN ITS "
-    f"HOLES TO DIA {stop.PLATE_CLEARANCE_DIA:.1f}; BOTTOMING-TAP THE BLOCK HOLES "
+    "1. PLATE IS MASTER: LAYOUT BOTH HOLES ON THE STOP COVER PLATE AT ITS OWN "
+    f"±{stop.PLATE_HOLE_POSITION_TOLERANCE_MM:.2f} mm LOCATIONS. CLAMP PLATE "
+    f"AND BLOCK WITH {stop.MATCH_DRILL_DATUM_ALIGNMENT}; PILOT FROM PLATE "
+    f"DIA {stop.PLATE_TAP_DRILL_DIA:.2f} THROUGH INTO BLOCK TO "
+    f"{stop.PLATE_TAP_DRILL_DEPTH:.1f} mm CYLINDRICAL DEPTH INTO BLOCK "
+    "(DEPTH EXCLUDES PLATE). REMOVE PLATE; OPEN ITS HOLES TO "
+    f"DIA {stop.PLATE_CLEARANCE_DIA:.1f}; BOTTOMING-TAP BLOCK "
     f"{plate_screw.THREAD} TO {stop.PLATE_TAP_THREAD_DEPTH:.1f} mm FULL THREAD "
     "DEPTH INTO BLOCK. MARK BLOCK AND PLATE AS A PAIR.",
     f"2. START THE {thumb.THREAD} KNURLED THUMBSCREW UP INTO THE STOP BLOCK FROM "
@@ -166,16 +181,9 @@ CLAMPED_SETUP_NOTE = (
     "GRADUATED FACE AGAINST THE ROOF; THUMBSCREW TIP ON THE STICK UNDERSIDE."
 )
 
-# --- Reference dimensions (sheet 1, front view) -------------------------------
-# Parenthesized REFERENCE values only: the stick and stop drawings own every
-# size and its tolerance. OVERALL is the stick end to end; the near (X=0)
-# face reference is the mark less half the block, NOT a second setting target.
-# Only SETTING_CRITERION above defines the assembly setting acceptance.
+# Overall is pure reference; the near-face value is assembly acceptance only.
 REFERENCE_OVERALL_LENGTH = STICK_X_MAX - STICK_X_MIN
-REFERENCE_STOP_FACE = BLOCK_ORIGIN[0] - STICK_X_MIN
-STOP_POSITION_CALLOUT = "NEAR FACE REF ONLY\n" + SETTING_CRITERION.replace(
-    " (THUMBSCREW AXIS), ", "\n(THUMBSCREW AXIS)\n"
-)
+STOP_POSITION_CALLOUT = SETTING_CRITERION + "\n" + SETTING_REFERENCE_DESCRIPTION
 DRAWING_REFERENCE_PRECISION = 1
 
 assert STICK_SIDE_CLEARANCE > 0.0, STICK_SIDE_CLEARANCE

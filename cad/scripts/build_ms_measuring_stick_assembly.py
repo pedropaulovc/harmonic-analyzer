@@ -43,9 +43,22 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _assembly_patterns import ensure_global_pattern_axis
-from _common import _early_bound, apply_custom_properties, check, run_build
-from _drawing_marks import DRAWN_BY
-from _drawing_simplified import simplified_name
+from _check import check
+from _com import _early_bound
+from _custom_properties import apply_custom_properties
+from _session import run_build
+from _drawing_marks import (
+    DRAWN_BY, apply_drawing_precision, mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
+    _named_dimension, _set_tolerance_precision,
+)
+from _dimensions import drive_dimension, set_global
+from _feature_tree import name_last_feature
+from _sketch import (
+    SketchDims, anchor_point_to_origin, blank_sketch, dimension_between,
+    ensure_fully_defined, set_sketch_direct_db,
+)
+from _simplified_names import simplified_name
 from _interference_contracts import allowed_interference_pairs
 from _transforms import euler_from_rows
 
@@ -290,6 +303,51 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
     )
 
 
+async def _author_clamped_setting(adapter: Any) -> None:
+    """No solid/pose edits: a source-owned chord between physical face stations."""
+    (left_x, roof_y), (face_x, _) = spec.SETTING_CHORD
+    for name, value in (
+        ("SettingStickLeft", left_x),
+        ("SettingBlockFace", face_x),
+        ("SettingRoof", roof_y),
+    ):
+        await set_global(adapter, name, f"{value}mm")
+    dims = SketchDims()
+    check("create clamped setting sketch", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    line = check("setting chord", await adapter.add_line(left_x, roof_y, face_x, roof_y))
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("clamped setting chord is not construction")
+    check("setting horizontal", await adapter.add_sketch_constraint(line, None, "horizontal"))
+    await anchor_point_to_origin(adapter, f"{line}.start", left_x, roof_y, "setting left end")
+    dims.record("SettingLeftX", '-"SettingStickLeft"')
+    dims.record("SettingRoofY", '"SettingRoof"')
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "horizontal_distance",
+        spec.SETTING_NEAR_FACE_MM, "near face from left stick end",
+    )
+    dims.record(spec.SETTING_DIMENSION, '"SettingBlockFace" - "SettingStickLeft"')
+    await ensure_fully_defined(adapter, "clamped setting")
+    check("exit clamped setting sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, spec.SETTING_FEATURE)
+    for name, expression in dims.apply(adapter, spec.SETTING_FEATURE):
+        await drive_dimension(adapter, name, expression)
+    set_dimension_symmetric_tolerance(
+        adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM
+    )
+    display, _ = _named_dimension(adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION)
+    _set_tolerance_precision(
+        display, (-spec.SETTING_TOLERANCE_MM, spec.SETTING_TOLERANCE_MM),
+        label="clamped setting", places=spec.SETTING_TOLERANCE_PRECISION,
+    )
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    mark_dimensions_for_drawing(adapter, spec.SETTING_FEATURE, {spec.SETTING_DIMENSION})
+    blank_sketch(adapter, spec.SETTING_FEATURE)
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -317,6 +375,7 @@ async def build(adapter) -> dict[str, str]:
         f"plate screws {spec.PLATE_SCREW_TAP_RESERVE:.2f} short of the tapped depth"
     )
 
+    await _author_clamped_setting(adapter)
     assert_components_fully_defined(adapter)
     # Only the two thread engagements may overlap; the bar's roof contact,
     # the tip contact and the cover's seat are faces, not volume.

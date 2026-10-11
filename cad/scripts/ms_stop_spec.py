@@ -115,9 +115,11 @@ PLATE_DRAWING_DIMENSIONS = {
     "PlateLocationReference": {"PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace"},
     "PilotDrillReference": {"PilotDrillDiameter"},
 }
-# Functional clamp-joint bands; the axes locate a MATCH-DRILLED pair, not two
-# independently interchangeable patterns. Pilot both parts in one clamped
-# pass, then open the plate clearance and bottoming-tap the block.
+# The PLATE is the match-drill master. Its three absolute location bands
+# transfer to the block only when X=0/Y=0 datum edges are aligned; the block's
+# nominal locations are reference-only, never an independent pattern.
+MATCH_DRILL_MASTER = "MS-STOP-PLATE"
+MATCH_DRILL_DATUM_ALIGNMENT = "LEFT END AND THUMBSCREW-SIDE EDGES ALIGNED"
 PLATE_THICKNESS_TOLERANCE_MM = 0.1
 PLATE_HOLE_POSITION_TOLERANCE_MM = 0.1
 PLATE_LOCATION_DIMENSIONS = frozenset({
@@ -205,12 +207,25 @@ WINDOW_FLOOR_MIN = BLOCK_HEIGHT - BLOCK_PRINTED_BANDS_MM["BlockHeight"] - (
     ROOF_THICKNESS + BLOCK_PRINTED_BANDS_MM["RoofThickness"]
     + WINDOW_HEIGHT + WINDOW_SIZE_TOLERANCE_MM[1]
 )
+# Reference labels do not make the transferred axes float: retain the plate
+# master's absolute +/-0.10 in both the receiver and cover worst-case proofs.
 PLATE_TAP_WINDOW_WEB_MIN = WINDOW_FLOOR_MIN - (
     PLATE_HOLE_Y + PLATE_HOLE_POSITION_TOLERANCE_MM + PLATE_SCREW_MAJOR_DIA / 2.0
 )
-PLATE_TAP_END_WEB_MIN = BLOCK_LENGTH - BLOCK_PRINTED_BANDS_MM["BlockLength"] - (
-    PLATE_HOLE_XS[1] + PLATE_HOLE_POSITION_TOLERANCE_MM + PLATE_SCREW_MAJOR_DIA / 2.0
-)
+
+
+def transferred_tap_end_web_min(master_position_band_mm: float) -> float:
+    """Receiver end web after transfer from the edge-aligned plate master."""
+    radius = PLATE_SCREW_MAJOR_DIA / 2.0
+    return min(
+        PLATE_HOLE_XS[0] - master_position_band_mm - radius,
+        BLOCK_LENGTH - BLOCK_PRINTED_BANDS_MM["BlockLength"] - (
+            PLATE_HOLE_XS[1] + master_position_band_mm + radius
+        ),
+    )
+
+
+PLATE_TAP_END_WEB_MIN = transferred_tap_end_web_min(PLATE_HOLE_POSITION_TOLERANCE_MM)
 WINDOW_BACK_WALL_MIN = BLOCK_DEPTH - BLOCK_PRINTED_BANDS_MM["BlockDepth"] - (
     WINDOW_WIDTH + WINDOW_SIZE_TOLERANCE_MM[1]
 )

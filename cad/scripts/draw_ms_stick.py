@@ -3,9 +3,11 @@ r"""Four-sheet manufacturing package for the unchanged graduated brass stick.
 BAR gives the envelope and left-origin scale station. GRADUATIONS enlarges
 the full/minor pitch; TICK LENGTHS gives groove width and each length a local
 detail without cross-strip extension lines. ENGRAVING separates numeral
-dimensions from the open-edge Top detail for the square-bottom groove depth;
-the numeral detail and its dimensions leave air at the left border, with its
-placement note below the detail title and scale.
+dimensions from the open-edge Top detail for the square-bottom groove depth.
+The numeral detail and its dimensions leave air at the left border, with its
+placement note below the detail title and scale. The independently dimensioned
+shallow numeral cut has its actual removed G-G stroke profile on ENGRAVING;
+the Top parent imports its own NumeralDepth.
 Native probes import TickDepth in Top but not in a removed cut-only section.
 All sizes, bands and places come from the part; scale is never shrunk to fit.
 Part-spec coordinates are millimetres; model-point projection takes metres.
@@ -24,7 +26,8 @@ import ms_stick_spec as part
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs, add_note, add_property_linked_note,
-    create_blank_drawing_sheets, finalize_drawing, model_point_in_view, new_project_drawing,
+    create_blank_drawing_sheets, create_section_view, finalize_drawing,
+    model_point_in_view, new_project_drawing,
     read_required_properties, set_dimension_callouts, set_hidden_lines_removed,
     rebuild_drawing, stamp_drawing_summary, view_name, property_link,
 )
@@ -58,6 +61,11 @@ NUMERAL_CENTER = (0.165, 0.135)
 # The fence includes the real full-tick endpoint and both numeral gap anchors.
 NUMERAL_RADIUS_MM = 7.0
 NUMERAL_NOTE_XY = (0.045, 0.068)
+NUMERAL_PROFILE_PARENT_CENTER = (0.230, 0.245)
+NUMERAL_PROFILE_CENTER = (0.270, 0.125)
+# The 0.10 mm cut must read as a profile, not a sub-millimetre printed nick.
+NUMERAL_PROFILE_SCALE = (20.0, 1.0)
+NUMERAL_TOOL_NOTE_XY = (0.225, 0.195)
 FRONT_KEEP = {
     "BodyLength": (0.155, 0.205), "BodyWidth": (0.275, 0.175),
     "ScaleStartX": (0.180, 0.150),
@@ -74,7 +82,7 @@ LENGTH_DETAILS = (
      {"FullTickLength": (0.075, 0.180), "Tick0Width": (0.075, 0.215)}, 4.0),
     ("D", (0.215, 0.245), (0.220, 0.155),
      (part.SCALE_START_X + part.MINOR_SPACING, part.BODY_WIDTH - part.MINOR_TICK_LENGTH / 2.0),
-     {"MinorTickLength": (0.190, 0.180)}, 1.1),
+     {"MinorTickLength": (0.190, 0.180)}, 2.2),
     ("E", (0.330, 0.245), (0.335, 0.155),
      (part.SCALE_START_X + part.DIVISION_SPACING / 2.0, part.BODY_WIDTH - part.HALF_TICK_LENGTH / 2.0),
      {"HalfTickLength": (0.300, 0.185)}, 4.0),
@@ -85,10 +93,11 @@ NUMERAL_KEEP = {
     "NumeralYGap": (0.100, 0.155),
 }
 DEPTH_KEEP = {"TickDepth": (0.330, 0.180)}
+NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.350, 0.245)}
 DIMENSION_CALLOUTS = {
     "ScaleStartX": "SCALE ZERO CENTRELINE",
     "Tick0Width": "ALL GRADUATIONS",
-    "TickDepth": "ALL ENGRAVING\nSQUARE-BOTTOM GROOVES",
+    "TickDepth": "GRADUATIONS ONLY\nSQUARE-BOTTOM GROOVES",
     "FullTickLength": "FULL TICKS",
     "MinorTickLength": "MINOR TICKS",
     "HalfTickLength": "HALF-DIVISION TICK",
@@ -97,6 +106,7 @@ DIMENSION_CALLOUTS = {
     "NumeralHeight": "NUMERAL HEIGHT",
     "NumeralXGap": "NUMERAL TO TICK EDGE",
     "NumeralYGap": "NUMERAL TO FULL-TICK END",
+    "NumeralDepth": "NUMERALS ONLY; DEEP",
 }
 
 
@@ -161,6 +171,63 @@ def _engraving_detail(
     return detail
 
 
+def _numeral_profile(adapter: Any, parent: Any) -> Any:
+    """Actual removed section across both strokes of the zero's closed outline."""
+    left = part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
+    # At mid-height of the zero's advance, this cuts both stroke walls and floor.
+    # The span stays within the numeral band, excluding every graduation.
+    y = part.BODY_WIDTH - part.TICK_LENGTH - part.NUMERAL_GAP_MM - 0.8
+    endpoints = tuple(
+        model_point_in_view(
+            adapter, parent, (x / 1000.0, y / 1000.0, 0.0),
+            label="numeral stroke section endpoint",
+        )
+        for x in (left - 0.2, left + part.NUMERAL_HEIGHT_MM + 0.3)
+    )
+    section = create_section_view(
+        adapter, parent, line_start=endpoints[0], line_end=endpoints[1],
+        view_xy=NUMERAL_PROFILE_CENTER, section_label="G", scale=NUMERAL_PROFILE_SCALE,
+        partial=True, label="numeral V-envelope G-G",
+    )
+    section = _early_bound(section, "IView")
+    section.UseParentScale = False
+    section.ScaleRatio = double_array(list(NUMERAL_PROFILE_SCALE))
+    definition = _early_bound(section.GetSection(), "IDrSection")
+    definition.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="numeral G-G cut surface")
+    if not bool(definition.GetDisplayOnlySurfaceCut()) or not bool(definition.GetPartialSection()):
+        raise RuntimeError("numeral G-G must be a removed, cut-surface-only section")
+    set_hidden_lines_removed(adapter, section)
+    if bool(section.UseParentScale) or tuple(float(value) for value in section.ScaleRatio) != NUMERAL_PROFILE_SCALE:
+        raise RuntimeError("numeral G-G must retain its independent 20:1 scale")
+    model_center = (
+        (left + part.NUMERAL_HEIGHT_MM / 2.0 + 0.05) / 1000.0,
+        y / 1000.0, part.BODY_THICKNESS / 2000.0,
+    )
+    actual = model_point_in_view(adapter, section, model_center, label="numeral G-G profile centre")
+    if math.dist(actual, NUMERAL_PROFILE_CENTER) > 1e-8:
+        position = tuple(float(value) for value in section.Position)
+        target = [position[index] + NUMERAL_PROFILE_CENTER[index] - actual[index] for index in range(2)]
+        if not section.SetViewPosition(double_array(target), False):
+            raise RuntimeError("numeral G-G profile could not be centred")
+        rebuild_drawing(adapter, label="centre numeral G-G profile")
+        actual = model_point_in_view(adapter, section, model_center, label="numeral G-G placed centre")
+        if math.dist(actual, NUMERAL_PROFILE_CENTER) > 1e-6:
+            raise RuntimeError(f"numeral G-G profile centre drifted: {actual}")
+    return section
+
+
+def _assert_numeral_depth_owner(annotation: Any) -> None:
+    """The imported depth must attach to Numerals, never to a graduation."""
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    if str(dimension.FullName).split("@")[:2] != ["NumeralDepth", "Numerals"]:
+        raise RuntimeError(f"numeral depth imported from wrong feature: {dimension.FullName}")
+    if abs(float(dimension.SystemValue) * 1000.0 - part.NUMERAL_DEPTH) > 1e-6:
+        raise RuntimeError("numeral depth import does not read its independent shallow cut")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source measuring stick missing: {SOURCE}")
@@ -168,7 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
     source_model = adapter.currentModel
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
                   "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
-                  "Numeral Placement Note")
+                  "Numeral Placement Note", "Numeral Tool Note")
     read_required_properties(source_model, properties, required=properties)
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout)
@@ -256,9 +323,23 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, numeral, keep=NUMERAL_KEEP, view_label="numeral detail",
             dimensions_by_feature=part.DRAWING_DIMENSIONS)
     add_property_linked_note(adapter, "Numeral Placement Note", *NUMERAL_NOTE_XY)
+    profile_parent = place_view(
+        adapter, str(SOURCE), "*Back", *NUMERAL_PROFILE_PARENT_CENTER, scale=(1.0, 2.0))
+    _rotate_ruled_face(adapter, profile_parent)
+    set_hidden_lines_removed(adapter, profile_parent)
+    _numeral_profile(adapter, profile_parent)
+    add_property_linked_note(adapter, "Numeral Tool Note", *NUMERAL_TOOL_NOTE_XY)
     depth_parent = place_view(
         adapter, str(SOURCE), "*Top", *DEPTH_PARENT_CENTER, scale=(1.0, 2.0))
     set_hidden_lines_removed(adapter, depth_parent)
+    numeral_depth_annotations = curate_view_dimensions(
+        adapter, depth_parent, keep=NUMERAL_DEPTH_KEEP, view_label="native numeral depth",
+        dimensions_by_feature=part.DRAWING_DIMENSIONS,
+    )
+    if len(numeral_depth_annotations) != 1:
+        raise RuntimeError("expected one own model-linked numeral depth")
+    _assert_numeral_depth_owner(numeral_depth_annotations[0])
+    annotations += numeral_depth_annotations
     depth = _engraving_detail(
         adapter, depth_parent,
         model_center=(part.SCALE_START_X / 1000.0, part.BODY_WIDTH / 1000.0,
