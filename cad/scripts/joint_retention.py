@@ -765,7 +765,7 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="MHA-FR-000 STEP 6",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="retains the top_frame casting on a tube_frame column; casting and columns are stationary relative to each other and no rotating/rocking member turns about the horizontal screw axis (clearance through both tube walls)",
-        axial_capture="narrow fillister head seated on the Ø9 boss spotface; thread engages near and far wall of the top_frame interrupted #10-32 bottoming tap (SideTaps)",
+        axial_capture="narrow fillister head seated flush in the Ø9 boss counterbore; thread engages near and far wall of the top_frame interrupted #10-32 bottoming tap (SideTaps)",
         lock=Lock.NONE,
         evidence="build_fr_frame_assembly.py:build (upper cross screws, TOP_SCREW_Y/TOP_SCREW_SEAT_Z); build_fr_top_frame.py:SIDE_TAP_SPEC, step 13 SideTaps; draw_fr_frame_assembly.py ASSEMBLY_STEPS 5, 6, ASSEMBLY_CHECKS 2",
     ),
