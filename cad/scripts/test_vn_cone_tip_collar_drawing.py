@@ -120,6 +120,12 @@ def test_full_thread_counts_male_and_female_incomplete_ends():
     assert spec.SET_SCREW_HOLE.depth_mm == spec.TAP_DRILL_DEPTH
     assert spec.SET_SCREW_HOLE.overrides_mm["ThreadDepth"] == spec.TAP_FULL_DEPTH
     assert spec.TAP_DRILL_DEPTH > spec.TAP_FULL_DEPTH
+    # Shallowest drill still runs one pitch past the deepest full thread,
+    # both at the title block's .XX (machinist review: 7.09 vs 7.31).
+    shallowest_drill = spec.TAP_DRILL_DEPTH - spec.ROUTINE_BAND_MM
+    deepest_thread = spec.TAP_FULL_DEPTH + spec.ROUTINE_BAND_MM
+    assert shallowest_drill - deepest_thread >= spec.SET_SCREW_PITCH
+    assert spec.WORST_WALLS_MM["blind drill to opposite OD"] >= spec.WALL_TARGET_MM
     bore_max = spec.BORE_FINISHED_DIA_LIMITS_MM[1]
     land_min = lands.TERMINAL_FINISHED_DIA_LIMITS_MM[0]
     float_max = (bore_max - land_min) / 2.0
