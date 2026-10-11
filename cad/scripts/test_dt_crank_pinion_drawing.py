@@ -439,7 +439,7 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     assert "NORMAL = TRANSVERSE" in notes.GEAR_DATA
     assert f"#{spec.CUTTER_NUMBER}" in data["FORM CUTTER"]
     assert f"{profile.template.reference_teeth}T REFERENCE" in data["FORM CUTTER"]
-    assert "FINITE STOCK" in data["TOOTH FORM"]
+    assert data["TOOTH FORM"].strip() == "SPUR INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER"
     span_row = next(line for line in notes.GEAR_DATA.splitlines() if "BASE TANGENT SPAN" in line)
     assert "ACCEPT ON THIS PART" in span_row and "REF" not in span_row
     lower, upper = spec.BASE_TANGENT_SPAN_LIMITS_MM

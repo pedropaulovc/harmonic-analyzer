@@ -51,10 +51,10 @@ def test_gear_data_block_preserves_the_actual_finite_stock_profile() -> None:
         f"ROOT ENVELOPE DIAMETER (mm, REF):  "
         f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
         f"CUTTER PLUNGE (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
-        f"FORM CUTTER (REF):  #{spec.CUTTER_NUMBER}, "
+        f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
         f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
         f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
-        f"TOOTH FORM:  {spec.TOOTH_FORM}",
+        "TOOTH FORM:  SPUR INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER",
     ):
         assert field in data, field
     assert "CHORD" not in data

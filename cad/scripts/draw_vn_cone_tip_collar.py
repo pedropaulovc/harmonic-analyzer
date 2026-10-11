@@ -115,7 +115,14 @@ SCREW_KEEP = {
     "DogDia": (DOG_LEFT_X - 0.012, SCREW_CENTER[1] + 0.013),
     "DogLength": (DOG_LEFT_X - 0.020, SCREW_CENTER[1] - 0.040),
 }
-DATUM_D_XY = (THREAD_LEFT_X + 0.003, SCREW_CENTER[1] + 0.003)
+# Datum D is the thread axis, so its symbol stands over the thread's
+# mid-length, clear above its silhouette. At THREAD_LEFT_X + 3 mm the face
+# tag dropped onto the shoulder end and read as the shoulder face (machinist
+# review of the stack build).
+DATUM_D_XY = (
+    THREAD_LEFT_X + (spec.SET_SCREW_LENGTH - spec.DOG_LENGTH) * SCREW_SCALE / 2000.0,
+    SCREW_CENTER[1] + spec.SET_SCREW_MAJOR_DIA * SCREW_SCALE / 2000.0 + 0.010,
+)
 DOG_RUNOUT_XY = (DOG_LEFT_X - 0.040, SCREW_CENTER[1] - 0.027)
 
 

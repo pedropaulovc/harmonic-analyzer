@@ -239,6 +239,56 @@ def tooth_thickness_mm(teeth: int) -> float:
     return stock_form_profile(teeth).pitch_tooth_thickness_mm
 
 
+# T006 acceptance on the bench (machinist review of the stack build: the
+# DT6-FORM1 form cannot be checked without an optical comparator). The cut
+# gear is measured over two Ø1.20 pins (drill blanks) in opposite gaps with
+# an ordinary micrometer. At this size each pin bears on the working involute
+# well above the relief junction (R ~1.64-1.67 vs 1.53) and stands ~0.4 proud
+# of the tips, so the reading follows the tooth thickness alone.
+CUSTOM_SIX_PIN_DIA_MM = 1.20
+_OVER_PINS_SAMPLES = 2000
+
+
+def _over_pins_mm(profile: StockFormProfile, pin_dia_mm: float) -> tuple[float, float]:
+    """Measurement over two pins in opposite gaps and the flank contact radius.
+
+    The pin centre sits on the gap bisector (+X) where its distance to the
+    sampled ACTUAL flanks equals its radius; even tooth counts put the other
+    pin diametrically opposite, so M = 2 (R + r).
+    """
+    points = [
+        segment.point(index / _OVER_PINS_SAMPLES)
+        for segment in profile.gap_segments()
+        if segment.kind == "flank"
+        for index in range(_OVER_PINS_SAMPLES + 1)
+    ]
+    radius = pin_dia_mm / 2.0
+    low, high = 0.0, profile.blank_radius_mm + radius
+    for _ in range(50):
+        middle = (low + high) / 2.0
+        if min(math.hypot(x - middle, y) for x, y in points) > radius:
+            high = middle
+        else:
+            low = middle
+    x, y = min(points, key=lambda point: math.hypot(point[0] - high, point[1]))
+    return 2.0 * (high + radius), math.hypot(x, y)
+
+
+@lru_cache(maxsize=None)
+def custom_six_over_pins_limits_mm() -> tuple[float, float]:
+    """T006 over-pins acceptance at its two thickness limits, rounded inward."""
+    profiles = manufacturing_corner_profiles(6)
+    readings = []
+    for profile in profiles:
+        over_pins, contact = _over_pins_mm(profile, CUSTOM_SIX_PIN_DIA_MM)
+        if not profile.template.relief_junction_radius_mm < contact < profile.blank_radius_mm:
+            raise ValueError("T006: over-pins contact leaves the working involute")
+        if over_pins <= outside_dia_mm(6):
+            raise ValueError("T006: pins do not stand clear of the tips")
+        readings.append(over_pins)
+    return math.ceil(min(readings) * 1e3) / 1e3, math.floor(max(readings) * 1e3) / 1e3
+
+
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # Face width (user ruling 2026-09-28): the cone set is a solid stack.  Every
 # gear is one seat pitch thick, so each bears on its neighbour and the stack

@@ -22,6 +22,10 @@ from dataclasses import dataclass, field
 _STOCK_RANGES = ((8, 12, 13), (7, 14, 16), (6, 17, 20), (5, 21, 25),
                  (4, 26, 34), (3, 35, 54), (2, 55, 134), (1, 135, None))
 _EPS = 2.220446049250313e-16
+# Sheet wording for every gear cut with a stock form cutter: the cutter row
+# names the cutter and the span row is the acceptance, so the form needs no
+# description beyond this (machinist review, dt_alignment_pinion).
+TOOTH_FORM_NOTE = "SPUR INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER"
 
 
 def _positive(value: float, name: str) -> None:

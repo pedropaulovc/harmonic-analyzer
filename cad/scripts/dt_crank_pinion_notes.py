@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import dt_crank_drive_gear_notes as mate_notes
 import dt_crank_pinion_spec as spec
+from stock_form_cutter import TOOTH_FORM_NOTE
 
 
 # The spur's normal and transverse sections coincide. Its physical tooth
@@ -44,11 +45,7 @@ GEAR_DATA = mate_notes.gear_data_note(
             "TOOTH CUTTING SETUP, ACCEPT AT SETUP",
             f"{spec.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
         ),
-        (
-            "TOOTH FORM",
-            f"FULL-DEPTH NORMAL-{spec.DIAMETRAL_PITCH:g}DP PA{spec.PRESSURE_ANGLE_DEG:g} "
-            f"FINITE STOCK #{spec.CUTTER_NUMBER}/{spec.CUTTER_TEMPLATE.reference_teeth}T; STANDARD ROOT",
-        ),
+        ("TOOTH FORM", TOOTH_FORM_NOTE),
         ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-007, 64T RIGHT-HAND HELICAL"),
     ]
 )

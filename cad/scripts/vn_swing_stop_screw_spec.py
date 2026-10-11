@@ -86,13 +86,15 @@ EMBED_LEN = SHANK_LEN
 PROUD_LEN = SHANK_LEN - EMBED_LEN
 CONTACT_DIA = HEAD_DIA
 TIP_CHAMFER = 0.7 * THREAD_PITCH
-# Installed-joint acceptance, inspected on the real stock/receiver. This is
-# the design's existing >=1D floor rounded UP to a practical 0.01 mm minimum,
-# not a supplier tolerance on the screw length, tip or thread runout.
-MIN_USEFUL_ENGAGEMENT_MM = ceil(SHANK_DIA * 100.0) / 100.0
+# Installed-joint acceptance, inspected on the real stock/receiver: the
+# shop's 1.5D full-thread rule rounded UP to 0.01 mm (machinist review of the
+# stack build: the old 1D floor printed 2.85 against 4.27 needed). The fully
+# seated 3/8 screw in its 9.8-deep thread already gives ~7 mm full form, so
+# no geometry changes; this is not a supplier tolerance on length or tip.
+MIN_USEFUL_ENGAGEMENT_MM = ceil(1.5 * SHANK_DIA * 100.0) / 100.0
 MIN_USEFUL_ENGAGEMENT_SOURCE = (
     "Functional installation inspection: full-form stop thread engagement "
-    "at least 1D, rounded upward to 0.01 mm; head fully seated"
+    "at least 1.5D, rounded upward to 0.01 mm; head fully seated"
 )
 MIN_USEFUL_ENGAGEMENT_TEXT = f"{MIN_USEFUL_ENGAGEMENT_MM:.2f} MIN"
 PLATE_THICKNESS_ALLOWANCE = 25.4 * float(_config.title_block("linear_2pl")["value_in"])
