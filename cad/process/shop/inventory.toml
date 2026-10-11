@@ -1895,31 +1895,39 @@ note = 'Illustrative metric leaf radius gauge, including R7.0; compare the upper
 # Outline template for MHA-CH-006: the arm's finished outline (R800 top edge, R816
 # bottom, tapers, tip lands) with a Ø6.5 pivot hole, laid on the part to scribe the outline
 # and held against it to check the filed edges. Shop-made (Pedro 2026-10-11), not bought:
-# the ch_amplitude_bar is made first and used as a trammel to scribe R800/R816 on blued
-# plate, which is then cut and filed to the lines. Make-route: rocker-template-route.md
-# (trial T4 note). It becomes the TL CAD part ch_rocker_arm_tl_outline_template; prechips
-# has no field for that reference, so the name is in `name`/`note`. verify = true until it
-# is made and checked against the R800/R816 bands.
+# a dedicated trammel bar (not the amplitude bar; Pedro 2026-10-11) with clamp-on pivot and
+# scriber blocks scribes R800/R816 on blued O1 plate, which is then cut and filed to the
+# lines. Make-route: local://rocker-template-route.md (trial T4 note). It becomes the TL CAD
+# part ch_rocker_arm_tl_outline_template; prechips has no field for that reference, so the
+# name is in `name`/`note`. Accepted on PROFILE (Pedro 2026-10-11): DTI stations within
+# +/-0.03 of the nominal arcs about the pivot; the trammel setting is the proof of R.
+# verify = false is an ASSUMED placeholder pending Pedro's measurement (authorized
+# 2026-10-11, see local://rocker-measurement-checklist.md B3): the template is assumed made
+# and accepted as above; set verify = true again until it really is.
 [gauges.arm-outline-template]
 name = "arm outline template (MHA-CH-006), shop-made: ch_rocker_arm_tl_outline_template"
 kind = "profile_gauge"
-range_mm = [799.0, 817.0]
+range_mm = [8.0, 817.0]
+resolution_mm = 0.05
 shop_made = true
-verify = true
-note = "Shop-made template (CAD part ch_rocker_arm_tl_outline_template; make-route rocker-template-route.md: amplitude-bar trammel scribes R800/R816 on layout-blued plate, cut outside the lines, file to them). range_mm covers the drawing radii R800 (top edge, 799.49-800.51) and R816 (bottom, 815.49-816.51) from features.toml; the template's own radii must be checked against those bands before use"
+verify = false
+note = "Shop-made template (CAD part ch_rocker_arm_tl_outline_template; make-route rocker-template-route.md: dedicated trammel bar scribes R800/R816 on layout-blued O1 plate, cut outside the lines, file to them). Top edge aimed 8.25 above the pivot. Accepted on profile: DTI within +/-0.03 of nominal about the pivot at 15 stations. range_mm spans every outline dimension it is laid against, from the top edge 8.0-8.5 above the pivot to R816 (arc lengths 266-293 between); resolution_mm 0.05 is AUTHOR'S CHOICE from that +/-0.03 acceptance and a backlit light-gap reading (a 0.02 gap shows), not a calibration. verify=false: ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B3)"
 
 # The PM-30MV's own table as a holding surface for work clamped straight to it with the
 # clamping-kit straps (thin plate that the PM-6 jaws would stand above). prechips has no
 # "on the machine table" hold, so the table is declared as a fixture. Local frame: table
 # top Z0 (the setup's work seat by definition), X along the table, origin at the table
 # centre. Length and width are the maker's published table size, not shop measurements;
-# the 50 mm depth is drawing depth only. No `height` is recorded: the work sits on the
-# table itself, but prechips' envelope screen asks for a measured fixture height.
+# the 50 mm depth is drawing depth only. height_mm 0: the work seats on the table top itself
+# (Z0 by definition); recorded as an ASSUMED placeholder pending Pedro's measurement
+# (authorized 2026-10-11, see local://rocker-measurement-checklist.md A2) because the
+# envelope screen asks for a measured fixture height (prechips#174).
 [fixtures.pm30mv-table]
 name = "PM-30MV table (strap clamps straight to the table)"
 kind = "machine_table"
 fits = "PM-30MV"
 source = "https://www.precisionmatthews.com/products/pm-30mv (Table: X-axis table length 33 in, Y-axis table width 8.25 in, T-slot 9/16 in / 14 mm), read 2026-10-11"
+height_mm = { value = 0.0, measured = { by = "ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist A2); basis: the work seats on the table top, Z0 by definition", date = "2026-10-11", instrument = "none (definition), to confirm with a steel rule" } }
 solids = [
   { name = "table", supply = "existing", shape = "box", at_mm = [-419.1, -104.775, -50.0], size_mm = [838.2, 209.55, 50.0], locates = "work underside", note = "33 x 8.25 in from the maker's spec page (source above); 50 mm thickness is drawing depth only." },
 ]
@@ -1938,7 +1946,7 @@ shop_made = true
 purchase = "O1 precision ground flat stock 3/32 x 3/4 x 18 in (cut into 20 mm pieces, one per stack) and a 0.001-0.031 in steel shim stock assortment (purchase approved by Pedro 2026-10-11)"
 source = "Abrams Industries O1 3/32 x 3/4 x 18 reg, $12.05 (https://us.abrams-industries.com/buy/precision-ground-flat-stock); Precision Brand 15-piece 0.001-0.031 in steel shim sheet assortment 6 x 12 in, MSC 86798816, $136.56 web price (https://www.mscdirect.com/product/details/86798816); prices read 2026-10-11"
 solids = [
-  { name = "stack", shape = "box", supply = "bought", shim = true, at_mm = [-10.0, -6.0, 0.0], size_mm = [20.0, 12.0, 2.71875], locates = "S3-faced strap face (datum B)", note = "3/32 in ground flat + shim to the measured gap M - 5.219; 2.71875 is the nominal for a 7.9375 blank" },
+  { name = "stack", shape = "box", supply = "bought", shim = true, at_mm = [-10.0, -6.0, 0.0], size_mm = [20.0, 12.0, 2.71875], locates = "work underside (S1 raw lower face; S4 S3-faced strap face, datum B)", bears = "face", note = "3/32 in ground flat + shim to the measured gap M - 5.219; 2.71875 is the nominal for a 7.9375 blank (ASSUMED placeholder, checklist A1)" },
 ]
 
 # Hub filing buttons for MHA-CH-006 (Pedro 2026-10-11: the rotary table cannot swing the
@@ -1961,19 +1969,21 @@ solids = [
 # button rim never touches them. Tail Ø6.49 x 30: 25 in the vise jaws, 5 bare below the head.
 # Make: buttons from O1 7/16 in drill rod, turned to OD 10.20 and reamed 6.5 on the lathe,
 # torch-hardened, oil-quenched, tempered, then OD polished to 10.15-10.25 on a 6.49
-# mandrel. Stud from the same rod, left annealed. The shop has no hardening capability
-# (shop gap): MAP-gas torch kit and quench oil, or send the buttons out for heat treatment.
-# verify = true until made and measured.
+# mandrel (canola-oil quench). Stud from the same rod, left annealed.
+# Hardening (Pedro 2026-10-11): torch kit and canola quench bought (tools.map-torch-kit,
+# consumables.quench-oil-canola). verify = false is an ASSUMED placeholder pending Pedro's
+# measurement (authorized 2026-10-11, see local://rocker-measurement-checklist.md B1): the
+# kit is assumed made and measured inside the limits below; set verify = true until it is.
 [fixtures.hub-filing-buttons]
 name = "hub filing buttons and stud, MHA-CH-006 (TL parts)"
 kind = "filing_buttons"
 shop_made = true
-verify = true
+verify = false
 button_dia_limits_mm = [10.15, 10.25]
 button_bore_limits_mm = [6.5, 6.53]
 pin_dia_limits_mm = [6.47, 6.495]
 button_runout_mm = 0.02
-source = "materials: Abrams Industries O1 drill rod 7/16 in x 36 in, $17.97 (https://us.abrams-industries.com/steel/tool-steel/o1/dr-36, read 2026-10-11); M5 DIN 934 hex nut (hardware, price not found); hardening shop gap: Bernzomatic Max Heat torch kit with MAP-Pro cylinder, $64.99 (https://www.landmsupply.com/bernzomatic-max-heat-torch-kit-w-map-pro-cylinder, read 2026-10-11), plus quench oil (price not found)"
+source = "materials: Abrams Industries O1 drill rod 7/16 in x 36 in, $17.97 (https://us.abrams-industries.com/steel/tool-steel/o1/dr-36, read 2026-10-11); M5 DIN 934 hex nut (hardware, price not found); hardening: tools.map-torch-kit + consumables.quench-oil-canola (purchase approved by Pedro 2026-10-11)"
 note = "Shop-made (TL CAD parts to follow). Buttons O1, hardened and tempered; stud O1 annealed. Check each button OD with the 0-1 in micrometer, each bore and the stud with pin gauges, OD runout on the stud in V-blocks with the DTI."
 solids = [
   { name = "upper button", shape = "cylinder", at_mm = [0.0, 0.0, 0.0], axis = [0.0, 0.0, 1.0], dia_mm = 10.2, length_mm = 4.0, label = "hub buttons", locates = "upper hub face (P02) and the file's stop for the upper hub OD", note = "O1 drill rod, hardened, tempered, OD polished" },
@@ -1993,12 +2003,14 @@ solids = [
 # raw underside), so one clamp on the 7.06 thick hub holds the arm and the 2.5 strap is
 # never clamped (shop thin-wall floor 3.0). Everything else overhangs for saw and file.
 # Local frame: Z0 = end-block tops (the raw blank underside), X along the blank, Y as the
-# rocker's frame `top` (pivot axis X0 Y0). AUTHOR'S CHOICE dimensions; not yet made.
+# rocker's frame `top` (pivot axis X0 Y0). AUTHOR'S CHOICE dimensions. verify = false is an
+# ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see
+# local://rocker-measurement-checklist.md B2): assumed made from offcuts as drawn.
 [fixtures.rocker-filing-stand]
 name = "rocker filing stand (end blocks + hub pedestal), MHA-CH-006 S5"
 kind = "custom"
 shop_made = true
-verify = true
+verify = false
 note = "Shop-made from steel offcuts (material not yet chosen: shop gap); end blocks 20 x 38.1 x 30, pedestal Ø9.5 x 30.44 (its top 0.4405 above the end blocks), all set on the fitting bench and clamped to it; check the pedestal top against the end blocks with the height gauge before use"
 solids = [
   { name = "bench top", shape = "box", supply = "existing", at_mm = [-250.0, -80.0, -60.0], size_mm = [500.0, 160.0, 30.0], note = "fitting bench top, drawn for clearance" },
@@ -2006,6 +2018,147 @@ solids = [
   { name = "right end block", shape = "box", at_mm = [148.0, -12.4, -30.0], size_mm = [20.0, 38.1, 30.0], label = "end blocks", locates = "raw blank underside, right end", note = "steel offcut, faced to 30.00 on the mill" },
   { name = "hub pedestal", shape = "cylinder", at_mm = [0.0, 0.0, -30.0], axis = [0.0, 0.0, 1.0], dia_mm = 9.5, length_mm = 30.4405, locates = "lower hub face (P01)", note = "steel round, faced to 30.44 so its top stands 0.4405 above the end blocks (raw thickness M less the hub length; re-face for the measured M)" },
 ]
+
+# Riser blocks for MHA-CH-006 S1-S4. With the example spindle-to-table minimum (2.4 in,
+# 60.96) the 3/8 in end mill in its collet cannot reach a 7.94 bar lying on the PM-30MV
+# table (run15: short by 9.5 to 11.7 mm), so the bar is lifted 18.50 on six blocks clamped
+# to the table. Local frame: Z0 = block tops, X along the bar, Y as the rocker's frame `top`
+# (pivot axis X0 Y0, bar centre line Y6.65); the down setups turn the frame 180° about Z.
+# Blocks sit under the raw blank ends (X 142-178), under X 102-138 and X 30-75 either side:
+# under every S1/S4 strap-shim-stack position (X +-158/+-60 and +-120/+-45), clear of the
+# Ø6.5 pivot at X0, and 1.7 below the #47 rod-hole breakthrough at X133 in S1.
+# AUTHOR'S CHOICE dimensions; made from the approved 1018 3/4 x 1-1/2 bar (buy >= 18 in: six
+# blocks 36/36/45 long plus the two 50 long trammel blocks), all six faced in one vise
+# setting to 18.50, equal within 0.01 (0-1 in micrometer). height_mm and verify = false are
+# ASSUMED placeholders pending Pedro's measurement (authorized 2026-10-11, see
+# local://rocker-measurement-checklist.md B4): assumed made and measured as drawn.
+[fixtures.rocker-riser-blocks]
+name = "rocker riser blocks (six, 18.50 high), MHA-CH-006 S1-S4"
+kind = "custom"
+fits = "PM-30MV"
+shop_made = true
+verify = false
+height_mm = { value = 18.5, measured = { by = "ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B4); basis: author's design height, faced as a set", date = "2026-10-11", instrument = "0-1 in micrometer (to do)" } }
+# The headroom rule reads a non-vise fixture's `bed_height` and its `length`/`width` (travel),
+# while the envelope rule reads `height`: both are stated, the same 18.50 (prechips issue).
+bed_height_mm = { value = 18.5, measured = { by = "ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B4); basis: author's design height, faced as a set", date = "2026-10-11", instrument = "0-1 in micrometer (to do)" } }
+length_mm = { value = 356.0, measured = { by = "ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B4); basis: block layout X -178 to +178", date = "2026-10-11", instrument = "steel rule (to do)" } }
+width_mm = { value = 38.1, measured = { by = "ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B4); basis: 1-1/2 in bar width", date = "2026-10-11", instrument = "calipers (to do)" } }
+note = "Shop-made from the approved 1018 CR 3/4 x 1-1/2 bar: six blocks lying flat (38.1 across the bar), faced together to 18.50, equal within 0.01; each clamped to the table with a T-slot strap or set against the work strap's own clamp. The blank (S2, S3) or the strap shim stacks (S1, S4) stand on them."
+solids = [
+  { name = "table", supply = "existing", shape = "box", at_mm = [-419.1, -97.975, -68.5], size_mm = [838.2, 209.55, 50.0], note = "PM-30MV table 33 x 8.25 in (maker spec), drawing depth 50; centred under the bar" },
+  { name = "left end riser", shape = "box", at_mm = [-178.0, -12.4, -18.5], size_mm = [36.0, 38.1, 18.5], label = "riser blocks", locates = "raw blank underside (or its strap shim stack), left end", note = "1018 CR 3/4 x 1-1/2, faced to 18.50" },
+  { name = "left outer riser", shape = "box", at_mm = [-138.0, -12.4, -18.5], size_mm = [36.0, 38.1, 18.5], label = "riser blocks", locates = "work underside or its strap shim stack", note = "1018 CR 3/4 x 1-1/2, faced to 18.50" },
+  { name = "left inner riser", shape = "box", at_mm = [-75.0, -12.4, -18.5], size_mm = [45.0, 38.1, 18.5], label = "riser blocks", locates = "work underside or its strap shim stack", note = "1018 CR 3/4 x 1-1/2, faced to 18.50" },
+  { name = "right inner riser", shape = "box", at_mm = [30.0, -12.4, -18.5], size_mm = [45.0, 38.1, 18.5], label = "riser blocks", locates = "work underside or its strap shim stack", note = "1018 CR 3/4 x 1-1/2, faced to 18.50" },
+  { name = "right outer riser", shape = "box", at_mm = [102.0, -12.4, -18.5], size_mm = [36.0, 38.1, 18.5], label = "riser blocks", locates = "work underside or its strap shim stack", note = "1018 CR 3/4 x 1-1/2, faced to 18.50" },
+  { name = "right end riser", shape = "box", at_mm = [142.0, -12.4, -18.5], size_mm = [36.0, 38.1, 18.5], label = "riser blocks", locates = "raw blank underside (or its strap shim stack), right end", note = "1018 CR 3/4 x 1-1/2, faced to 18.50" },
+]
+
+# Template make-route kit for MHA-CH-006 (local://rocker-template-route.md). Approved by
+# Pedro 2026-10-11 unless marked PROPOSED; none is used by an op in the plan, so no rule
+# reads them. Prices read 2026-10-11; "search listing" prices are not confirmed on the
+# vendor page. The owned flat bench (about 1.0 x 0.65 m, Pedro 2026-10-11) carries the
+# MDF scribing board.
+
+# Dedicated trammel (Pedro 2026-10-11: not the amplitude bar). Bar used uncut and undrilled;
+# clamp-on pivot block (point 25 from the bar end) and scriber block (scribers at 825 and
+# 841, 16.000 +/-0.01 apart), both from the approved 1018 3/4 x 1-1/2 bar, slot 6.45
+# +0.05/0, 10-24 set screws and a 10-24 SHCS split clamp; points from the 1/4 in O1 rod,
+# hardened (tools.map-torch-kit, consumables.quench-oil-canola). Set on the setting bar.
+[tools.rocker-trammel]
+name = "rocker template trammel (1/4 sq 1018 bar, clamp-on pivot and scriber blocks)"
+kind = "trammel"
+shop_made = true
+verify = true
+source = "bar: Online Metals 1018 CF 1/4 sq x 36 in, part 7088, $4.60 (https://www.onlinemetals.com/en/buy/carbon-steel/0-25-carbon-steel-square-bar-1018-cold-finish/pid/7088); blocks: All Metals 1018 CR 3/4 x 1-1/2, $10.20 sale, cut length not shown (https://allmetalsinc.com/products/steel-cold-rolled-flat-bar-3-4-x-1-1-2-grade-1018); points: Abrams O1 drill rod 1/4 x 36, $11.12 search listing (https://us.abrams-industries.com/steel/tool-steel/o1/dr-36); all purchases approved by Pedro 2026-10-11"
+note = "Shop-made, not yet made (verify = true). Pivot pin 25 from the pivot-end face; R800 scriber at 825, R816 scriber at 841. Proven on the setting bar (H0/H800/H816) before and after scribing."
+
+[gauges.rocker-trammel-setting-bar]
+name = "trammel setting bar (1018 1/4 x 1 x 36, holes H0/H800/H816 drilled on the DRO)"
+kind = "setting_bar"
+shop_made = true
+verify = true
+source = "Online Metals 1018 CF 1/4 x 1 x 36 in, part 7465, $12.83 (https://www.onlinemetals.com/en/buy/carbon-steel/0-25-x-1-carbon-steel-rectangle-bar-1018-cold-finish/pid/7465); purchase approved by Pedro 2026-10-11"
+note = "Holes at 0, 800.00 and 816.00 set by the X DRO in three shifts of the bar; good to about +/-0.05 only if the DRO scale is right (checklist A4). Not yet made (verify = true)."
+
+[fixtures.trammel-board-mdf]
+name = "MDF scribing board 3/4 in, 2 x 4 ft, cut to 1000 x 610 on the owned bench"
+kind = "custom"
+purchase = "ProWood 3/4 in x 2 ft x 4 ft MDF project panel (purchase approved by Pedro 2026-10-11)"
+source = "Home Depot 109098, $32.98 derived from a listing promotion (Instacart listing $34.69) (https://www.homedepot.com/p/ProWood-3-4-in-x-2-ft-x-4-ft-Medium-Density-Fiberboard-Project-Panel-109098/202093815)"
+note = "Carries the trammel pivot and the blued template plate while R800/R816 are scribed."
+
+[gauges.template-plate-o1]
+name = "O1 ground flat 1/8 x 2-1/2 x 18 in (arm-outline-template blank)"
+kind = "material"
+purchase = "O1 precision ground flat stock 1/8 x 2-1/2 x 18 in (purchase approved by Pedro 2026-10-11)"
+source = "Abrams Industries, $27.45 search listing, page returned 403 (https://us.abrams-industries.com/steel/tool-steel/o1/gfs-reg-18/o1-1-8-x-2-1-2-x-18-reg)"
+
+# Hardening (Pedro 2026-10-11: approved). Torch-harden O1 (about 1475 F, non-magnetic plus
+# a soak) and quench in warm canola oil. Canola basis: Larrin Thomas, Knife Steel Nerds,
+# "Which quenching oil is best for knives?" (2021-07-19): on 1/4 in specimens "O1 with its
+# very high hardenability there was no difference between Parks 50 and canola"
+# (https://knifesteelnerds.com/2021/07/19/which-quenching-oil-is-best-for-knives/); O1
+# austenitize temperature: https://knifesteelnerds.com/2019/08/26/o1-steel-history-properties-and-how-to-heat-treat/
+# Caveat: Torus CNC recommends a medium-speed oil for O1, without test data.
+[tools.map-torch-kit]
+name = "Bernzomatic Max Heat torch kit with MAP-Pro cylinder"
+kind = "torch"
+purchase = "Bernzomatic Max Heat torch kit with MAP-Pro cylinder (purchase approved by Pedro 2026-10-11)"
+source = "L&M Supply, $64.99 (https://www.landmsupply.com/bernzomatic-max-heat-torch-kit-w-map-pro-cylinder), read 2026-10-11"
+note = "Hardens the O1 hub-filing buttons, trammel points and template; temper in the kitchen oven."
+
+[consumables.quench-oil-canola]
+name = "canola oil (O1 quench), about 1 qt in a steel can with a lid"
+products = ["grocery canola oil, any brand; price not found. Basis: Knife Steel Nerds 2021-07-19, O1 showed no difference between Parks 50 and canola"]
+
+# Layout and bench tools (approved by Pedro 2026-10-11).
+[consumables.layout-fluid-dykem-80400]
+name = "Dykem Steel Blue layout fluid 80400 (8 oz brush-in-cap)"
+products = ["Dykem 80400, Durable Supply $13.33 (https://durablesupply.com/dystbllafl.html); purchase approved by Pedro 2026-10-11"]
+
+[tools.scriber-starrett-70a]
+name = "Starrett 70A pocket scriber"
+kind = "scriber"
+purchase = "Starrett 70A pocket scriber (purchase approved by Pedro 2026-10-11)"
+source = "Global Test Supply, $23.50 search listing (https://www.globaltestsupply.com/product/starrett-70a-pocket-scriber)"
+
+[tools.centre-punch-starrett-18a]
+name = "Starrett 18A automatic centre punch"
+kind = "centre_punch"
+purchase = "Starrett 18A automatic centre punch (purchase approved by Pedro 2026-10-11)"
+source = "Manson Tool, $53.70 (https://www.mansontool.com/PROD/18A.html)"
+
+[tools.bandsaw-blade-g5114]
+name = "Grizzly G5114 64-1/2 x 1/2 x 0.025 in 14/18 TPI bi-metal blade"
+kind = "bandsaw_blade_spare"
+purchase = "Grizzly G5114 SuperCut 64-1/2 x 1/2 x .025 in 14/18 TPI variable-pitch bi-metal blade (purchase approved by Pedro 2026-10-11)"
+source = "Grizzly, $31.95 (https://www.grizzly.com/products/supercut-64-1-2-x-1-2-x-.025-x-14-18-tpi-vp-bi-metal-bandsaw-blade/g5114)"
+note = "For the 1/8 in template plate and thin stock; not yet a plan blade (no kerf recorded)."
+
+[tools.hacksaw-starrett-k145]
+name = "Starrett K145 hacksaw frame with 12 in bi-metal blades (24 and 32 TPI)"
+kind = "hacksaw"
+purchase = "Starrett K145 frame; 5 x Starrett 12 in 24 TPI bi-metal blades; Starrett KBS1232-10 12 in 32 TPI bi-metal 10-pack (purchase approved by Pedro 2026-10-11)"
+source = "frame: DGI Supply STR67818, $57.89 (https://www.dgisupply.com/product/STR67818); 24 TPI: LittleMachineShop 1851, $1.95 each (https://littlemachineshop.com/products/hacksaw-blades-12-bi-metal-individual-sizes-starrett); 32 TPI: GreatGages KBS1232-10, $24.00 per 10 (https://www.greatgages.com/products/kbs1232-10-starrett-hack-saw-blade-12-32tpi-10-pack)"
+note = "Parts the S5 taper/land tabs (7.9 thick: 24 TPI) and the 1/8 template plate (32 TPI)."
+
+[tools.file-nicholson-10-second-cut]
+name = "Nicholson 10 in mill second-cut file (08673)"
+kind = "file"
+purchase = "Nicholson 10 in mill second-cut file, 08673 (purchase approved by Pedro 2026-10-11)"
+source = "KBC Tools 1-552-08673, $18.38 (https://www.kbctools.com/itemdetail/1-552-08673)"
+
+# PROPOSED, not approved (Pedro 2026-10-11: not owned). Feeler gauges are dropped: the
+# template is accepted by DTI null and the light-gap check needs none.
+[tools.tap-10-24-spiral-point]
+name = "10-24 HSS spiral-point tap (PROPOSED purchase) with 10-24 screws"
+kind = "tap"
+present = false
+purchase = "PROPOSED, awaiting Pedro: Tap America T/A57097 10-24 HSS 2-flute spiral-point tap; Bolt Depot 8474 10-24 x 3/8 cup-point set screws (6); Bolt Depot 5008 10-24 x 3/4 SHCS (100)"
+source = "DrillsandCutters.com $6.24 (https://drillsandcutters.com/10-24-hss-2-flute-spiral-point-tap-tap-america/); Bolt Depot 8474 $0.10 each search listing (https://boltdepot.com/Product-Details?product=8474); Bolt Depot 5008 $7.89/100 search listing (https://boltdepot.com/Product-Details?product=5008)"
+note = "Taps the trammel block set-screw and clamp holes (#25 tap drill)."
 
 # --- pivot-bracket additions ---
 

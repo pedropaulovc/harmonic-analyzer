@@ -99,25 +99,39 @@ deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "stock"
 
 [setups.stock_state]
+# The top stays the raw upper face (the blank ends are never faced): no feature names it.
+top_feature = "unknown"
 top_z = 7.9375
 bottom_z = 0.0
 
+# Hole entries and through thickness (docs/rules-operations.md blind_depth). The pivot bore
+# enters the raw top, which op 10 faces to 7.497 over the hub (its box covers the bore);
+# the rod hole enters the raw top at X133. Both run through to the raw underside (Z0).
+# ASSUMED placeholder (checklist A1): the raw thickness is the nominal 7.9375.
+[setups.stock_state.entry_z]
+pivot_bore = 7.9375
+rod_hole = 7.9375
+
+[setups.stock_state.local_thickness]
+pivot_bore = 7.497                # upper hub face (after op 10) to the raw underside
+rod_hole = 7.9375                 # raw bar at the arm tip
+
 [setups.hold]
-fixture = "pm30mv-table"
+fixture = "rocker-riser-blocks"
 pose = { origin_mm = [0.0, 0.0, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
   { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
   { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "none", note = "under the left blank end, below its clamp", pose = { origin_mm = [-158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "none", note = "under the bar at X-60", pose = { origin_mm = [-60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "none", note = "under the bar at X+60", pose = { origin_mm = [60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "none", note = "under the right blank end, below its clamp", pose = { origin_mm = [158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the left blank end, below its clamp; seats the work at Z0 (prechips#184: locate, not none)", pose = { origin_mm = [-158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X-60", pose = { origin_mm = [-60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X+60", pose = { origin_mm = [60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the right blank end, below its clamp", pose = { origin_mm = [158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "AUTHOR'S CHOICE: the raw blank on the four strap shim stacks (any equal height; the S4 set at nominal 2.719), so the letter D drill, the reamer and the #47 drill break through into air above the table; then one strap clamp across each raw blank end (X 160-168 either side), over its stack"
+clamp = "AUTHOR'S CHOICE: the six riser blocks clamped to the table along the bar line (they lift the work 18.50 so the 3/8 in end mill reaches it inside the spindle-to-table minimum); the raw blank on the four strap shim stacks set on the blocks (any equal height; the S4 set at nominal 2.719), so the letter D drill, the reamer and the #47 drill break through into air above the blocks; then one strap clamp across each raw blank end (X 160-168 either side), over its stack and end block"
 
 [setups.zero.x]
 edge = "left sawn blank end, finder tip at Z +4"
@@ -135,13 +149,13 @@ check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-method = "measure_then_set"
-gauge = "micrometers/0-1in"
-measure = "raw bar thickness (as rolled, both faces raw) at the blank end, with the 0-1 in micrometer before clamping; the top then stands that far above the work's underside (Z0, on the shim stacks)"
-measure_before_hold = true
+# ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see
+# local://rocker-measurement-checklist.md A1): raw bar thickness = 7.9375 (nominal 5/16 in,
+# Online Metals pid 12035), so the raw top stands at stock_state.top_z. Mike the bar before
+# clamping; if it is not 7.94 +/-0.02, put M back (measure_then_set, offset 0) or re-author top_z.
+method = "paper"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
-offset_mm = 0.0
 paper_mm = 0.05
 check_jog_mm = 1.0
 retouch_after = []
@@ -229,7 +243,7 @@ do = "spot"
 feature = "pivot_bore"
 tool = "center-drills-lms-4859/2"
 holder = "drill-chuck-r8"
-to_z = 6.0
+depth_mm = 1.5                    # tip at Z 5.997 below the faced hub, as the 6.0 stop before
 approach_mm = 3.0
 
 [[setups.ops]]
@@ -238,7 +252,7 @@ do = "drill"
 feature = "pivot_bore"
 tool = "drill-index-115/D"
 holder = "drill-chuck-r8"
-to_z = -2.5
+exit_mm = 0.6                     # author's choice: full Ø 0.6 past the raw underside, point clear of the shim-stack air gap
 approach_mm = 3.0
 
 [[setups.ops]]
@@ -247,7 +261,7 @@ do = "ream"
 feature = "pivot_bore"
 tool = "reamers-metric/6.5mm"
 holder = "drill-chuck-r8"
-to_z = -1.5
+exit_mm = 1.0                     # author's choice: reamer lead and 1.0 past the raw underside
 approach_mm = 3.0
 
 [[setups.ops]]
@@ -256,7 +270,7 @@ do = "spot"
 feature = "rod_hole"
 tool = "center-drills-lms-4859/2"
 holder = "drill-chuck-r8"
-to_z = 7.2
+depth_mm = 0.74                   # tip at Z 7.2 below the raw top, as before
 approach_mm = 3.0
 
 [[setups.ops]]
@@ -265,7 +279,7 @@ do = "drill"
 feature = "rod_hole"
 tool = "drill-index-115/#47"
 holder = "drill-chuck-r8"
-to_z = -1.0
+exit_mm = 0.4                     # author's choice: tip about 1.0 below the raw underside, 1.7 above the right outer riser block
 approach_mm = 3.0
 
 # ---------------------------------------------------------------------------------------
@@ -282,12 +296,13 @@ deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "S1"
 
 [setups.stock_state]
+top_feature = "unknown"
 top_z = 7.9375
 bottom_z = 0.0
 
 [setups.hold]
-fixture = "pm30mv-table"
-pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+fixture = "rocker-riser-blocks"
+pose = { origin_mm = [0.0, 0.0, 0.0], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
   { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
   { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
@@ -296,7 +311,7 @@ clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "one strap clamp across each raw blank end (X 160-168 either side), straight onto the mill table"
+clamp = "the bar on the six riser blocks (turned 180° about Z for the down frame); one strap clamp across each raw blank end (X 160-168 either side), over its end block"
 
 [setups.zero]
 transfer = { from = "S1", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", runout_limit_mm = 0.02 }
@@ -305,6 +320,7 @@ transfer = { from = "S1", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", 
 edge = "pivot_bore"
 method = "indicate"
 gauge = "dti"
+tool = "dti"
 from = "indicated"
 edge_mm = 0.0
 check_jog_mm = 10.0
@@ -313,19 +329,17 @@ check_jog_mm = 10.0
 edge = "pivot_bore"
 method = "indicate"
 gauge = "dti"
+tool = "dti"
 from = "indicated"
 edge_mm = 0.0
 check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-method = "measure_then_set"
-gauge = "micrometers/0-1in"
-measure = "raw bar thickness (as rolled, both faces raw) at the blank end, with the 0-1 in micrometer before clamping; the top then stands that far above the table"
-measure_before_hold = true
+# ASSUMED placeholder (checklist A1): raw thickness 7.9375 nominal; see S1 zero.z.
+method = "paper"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
-offset_mm = 0.0
 paper_mm = 0.05
 check_jog_mm = 1.0
 retouch_after = []
@@ -376,11 +390,12 @@ deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "S2"
 
 [setups.stock_state]
+top_feature = "unknown"
 top_z = 7.9375
 bottom_z = 0.0
 
 [setups.hold]
-fixture = "pm30mv-table"
+fixture = "rocker-riser-blocks"
 pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
   { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
@@ -390,7 +405,7 @@ clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "one strap clamp across each raw blank end (X 160-168 either side), straight onto the mill table"
+clamp = "the bar on the six riser blocks; one strap clamp across each raw blank end (X 160-168 either side), over its end block"
 
 [setups.zero]
 transfer = { from = "S2", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", runout_limit_mm = 0.02 }
@@ -399,6 +414,7 @@ transfer = { from = "S2", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", 
 edge = "pivot_bore"
 method = "indicate"
 gauge = "dti"
+tool = "dti"
 from = "indicated"
 edge_mm = 0.0
 check_jog_mm = 10.0
@@ -407,19 +423,17 @@ check_jog_mm = 10.0
 edge = "pivot_bore"
 method = "indicate"
 gauge = "dti"
+tool = "dti"
 from = "indicated"
 edge_mm = 0.0
 check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-method = "measure_then_set"
-gauge = "micrometers/0-1in"
-measure = "raw bar thickness (as rolled, both faces raw) at the blank end, with the 0-1 in micrometer before clamping; the top then stands that far above the table"
-measure_before_hold = true
+# ASSUMED placeholder (checklist A1): raw thickness 7.9375 nominal; see S1 zero.z.
+method = "paper"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
-offset_mm = 0.0
 paper_mm = 0.05
 check_jog_mm = 1.0
 retouch_after = []
@@ -500,25 +514,26 @@ deburr_cite = "features.toml general_tolerances edge_break R0.25"
 stock_in = "S3"
 
 [setups.stock_state]
+top_feature = "unknown"
 top_z = 7.9375
 bottom_z = 0.0
 
 [setups.hold]
-fixture = "pm30mv-table"
-pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+fixture = "rocker-riser-blocks"
+pose = { origin_mm = [0.0, 0.0, 0.0], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
   { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
   { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "none", note = "under the strap at X-120", pose = { origin_mm = [-120.0, -8.96, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "none", note = "under the strap at X-45", pose = { origin_mm = [-45.0, -1.26, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "none", note = "under the strap at X+45", pose = { origin_mm = [45.0, -1.26, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "none", note = "under the strap at X+120", pose = { origin_mm = [120.0, -8.96, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X-120; seats datum B (prechips#184: locate, not none)", pose = { origin_mm = [-120.0, -8.96, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X-45", pose = { origin_mm = [-45.0, -1.26, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X+45", pose = { origin_mm = [45.0, -1.26, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X+120", pose = { origin_mm = [120.0, -8.96, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "AUTHOR'S CHOICE: build the four strap shim stacks first (3/32 in ground flat + shim to the measured raw thickness M - 5.219, nominal 2.719, checked with the 0-1 in micrometer) under the S3-faced strap face so the 312 mm span cannot spring under the cutter; then one strap clamp across each raw blank end (X 160-168 either side), straight onto the mill table"
+clamp = "AUTHOR'S CHOICE: the six riser blocks clamped to the table (turned 180° about Z for the down frame); build the four strap shim stacks on them first (3/32 in ground flat + shim to the measured raw thickness M - 5.219, nominal 2.719, checked with the 0-1 in micrometer) under the S3-faced strap face so the 312 mm span cannot spring under the cutter; the raw blank ends rest on the end blocks; then one strap clamp across each raw blank end (X 160-168 either side)"
 
 [setups.zero]
 transfer = { from = "S3", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", runout_limit_mm = 0.02 }
@@ -527,6 +542,7 @@ transfer = { from = "S3", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", 
 edge = "pivot_bore"
 method = "indicate"
 gauge = "dti"
+tool = "dti"
 from = "indicated"
 edge_mm = 0.0
 check_jog_mm = 10.0
@@ -535,19 +551,17 @@ check_jog_mm = 10.0
 edge = "pivot_bore"
 method = "indicate"
 gauge = "dti"
+tool = "dti"
 from = "indicated"
 edge_mm = 0.0
 check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-method = "measure_then_set"
-gauge = "micrometers/0-1in"
-measure = "raw bar thickness (as rolled, both faces raw) at the blank end, with the 0-1 in micrometer before clamping; the top then stands that far above the table"
-measure_before_hold = true
+# ASSUMED placeholder (checklist A1): raw thickness 7.9375 nominal; see S1 zero.z.
+method = "paper"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
-offset_mm = 0.0
 paper_mm = 0.05
 check_jog_mm = 1.0
 retouch_after = []
