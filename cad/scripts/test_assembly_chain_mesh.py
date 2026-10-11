@@ -518,11 +518,12 @@ def test_link_contacts_and_allowed_pairs_keep_their_aggregate_behavior(
     assert adapter.currentModel.manager.releases == 1
 
 
-def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch) -> None:
+def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch, tmp_path) -> None:
     """PD run 10: verify_soundness:pd_paper_drive read 34 link-on-sprocket mesh
     contacts as interference because verify.py's soundness gates never passed
     the mounts the assembly builds pass (541011de0)."""
-    import inspect
+    import asyncio
+    from types import SimpleNamespace
 
     import verify
 
@@ -534,6 +535,7 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch) -> None:
     class _Report:
         def __init__(self) -> None:
             self.gates: dict[str, object] = {}
+            self.failed: list[tuple[str, str]] = []
 
         def gate(self, label, fn) -> None:
             self.gates[label] = fn
@@ -550,6 +552,21 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch) -> None:
         report.gates[f"{name}:interference-free"]()
         assert seen.pop("mounts") == expected
     # The static suite's own copy of the gate passes the same mounts.
-    assert "chain_mounts=_soundness_chain_mounts(name)" in inspect.getsource(
-        verify._verify_static_one
+    monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
+    monkeypatch.setattr(verify, "_assert_fresh", lambda _name, _report: True)
+    monkeypatch.setattr(verify, "active_configuration_name", lambda _adapter: verify.REST)
+
+    async def ok(*_args):
+        return SimpleNamespace(is_success=True, data=[verify.REST])
+
+    adapter = SimpleNamespace(
+        _attempt=lambda _fn, default=None: default,
+        swApp=None, currentModel=None,
+        open_model=ok, list_configurations=ok,
     )
+    for name, expected in (("pd-paper-drive", mounted_wheels()), ("ch-channel", None)):
+        (tmp_path / f"{name}.SLDASM").touch()
+        report = _Report()
+        asyncio.run(verify._verify_static_one(adapter, name, report))
+        report.gates[f"{name}:interference-free"]()
+        assert seen.pop("mounts") == expected

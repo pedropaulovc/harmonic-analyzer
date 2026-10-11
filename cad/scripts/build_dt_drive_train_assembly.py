@@ -1261,7 +1261,6 @@ from dt_cone_pivot_post_spec import (  # noqa: E402
 import crank_boss_rim  # noqa: E402
 import gear64_post_measure  # noqa: E402
 import _native_tip_collar_air as native_tip_collar_air  # noqa: E402
-import dt_tip_collar_air as tip_collar_air  # noqa: E402
 from dt_cone_pivot_post_spec import CRANK_BORE_HEIGHT as POST_CRANK_Y  # noqa: E402
 from dt_cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
@@ -6977,11 +6976,10 @@ async def build(adapter) -> dict[str, str]:
             solved_adapter, post_origin=tuple(_PPOST), gear_offset=GEAR64_POST_OFFSET
         )
         # Same final solved/saved model: finite signed BACK-arc seating and
-        # all20 native material shadows over the manufactured closed P1 range.
-        installed_axis, bank_thrust = tip_collar_air.installation_acceptances()
+        # all20 native material shadows over the manufactured closed P1 range,
+        # against the printed-tolerance air stack (dt_tip_collar_air).
         native_tip_collar_air.measure(
             solved_adapter, collar_component=tip_collar, shaft_component=cone_shaft,
-            installed=installed_axis, bank_thrust=bank_thrust,
         )
 
     # Title-block identity for the assembly drawing (draw_dt_drive_train_assembly.py):

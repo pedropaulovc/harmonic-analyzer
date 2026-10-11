@@ -256,9 +256,9 @@ def _installed_clamp(utility, ring, screw, collar_transform, shaft_body, shaft_t
     return record
 
 
-def measure(adapter: Any, *, collar_component: str, shaft_component: str, installed, bank_thrust):
-    """Read actual saved solids and refuse missing installed/source authorities."""
-    proof = air.full_sweep_proof(installed=installed, bank_thrust=bank_thrust)
+def measure(adapter: Any, *, collar_component: str, shaft_component: str):
+    """Read the saved solids against the printed-tolerance collar air stack."""
+    proof = air.full_sweep_proof()
     assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     collar, collar_bodies, collar_transform = _component(assembly, collar_component, 2)

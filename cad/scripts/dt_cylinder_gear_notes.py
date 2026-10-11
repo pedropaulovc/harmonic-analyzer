@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import _config
 import dt_cylinder_gear_spec as spec
 from stock_form_cutter import TOOTH_FORM_NOTE
+
+# The cone mesh stack (cone_set_stack) books this runout on every cone and
+# on the drum.
+TOOTH_RUNOUT_TIR_MM = float(_config.fit("cone_drum_oblique_mesh", "tooth_cutting_runout_tir_mm"))
 
 BORE_FIT_CALLOUT = (
     "FINISH BORE THRU; ALL 20 GEARS\n"
@@ -35,6 +40,7 @@ GEAR_DATA = "\n".join(
         f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
         f"PITCH TOOTH THICKNESS (mm, REF):  {spec.PITCH_TOOTH_THICKNESS_MM:.3f}",
         f"TOOTH FORM:  {TOOTH_FORM_NOTE}",
+        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
     )
 )
 DRAWING_NOTES = "\n".join(
