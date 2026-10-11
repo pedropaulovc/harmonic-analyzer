@@ -396,6 +396,7 @@ def test_custom_six_sheet_defines_the_tool_edge_point_by_point() -> None:
     assert "INSPECT THE TOOL BY TEMPLATE TO THIS TABLE;" in lines
     assert "FORM DEPTH (PLUNGE FROM BLANK OD):  1.055" in lines
     assert "TIP: CONCAVE ARC R1.100 ABOUT GEAR AXIS" in lines
+    assert "TIP ARC TO R1.531: STRAIGHT LINES ROW TO ROW" in lines
     assert "ABOVE R1.531: INVOLUTE, BASE R1.492" in lines
     # Wide only, by half the T006 thinning band (0/-0.04 on thickness).
     assert spec.CUSTOM_SIX_FORM_TOLERANCE_MM == pytest.approx(0.02)
@@ -403,14 +404,47 @@ def test_custom_six_sheet_defines_the_tool_edge_point_by_point() -> None:
     points = spec.custom_six_form_points_mm()
     rows = [line for line in lines if line.startswith("R") and "   X" in line]
     assert rows == [f"R{r:.3f}   X{x:.3f}   Y{y:.3f}" for r, x, y in points]
-    assert points[0] == (template.root_radius_mm, 0.0, 0.0)
-    # The tip corner sits on the root circle; the last row is the blank OD.
-    r, x, y = points[1]
-    assert math.hypot(x, y + template.root_radius_mm) == pytest.approx(template.root_radius_mm)
+    root = template.root_radius_mm
+    junction = template.relief_junction_radius_mm
+    assert points[0] == (root, 0.0, 0.0)
     assert points[-1][0] == profile.blank_radius_mm
+    # Rows print at 3 places; the relief's end rows round to the nearest.
+    resolution = 0.0005 * math.sqrt(2.0)
+
+    def model_xy(radius: float) -> tuple[float, float]:
+        angle = spec.custom_six_gap_half_angle_rad(radius)
+        return radius * math.sin(angle), radius * math.cos(angle) - root
+
+    # The tip arc ends where the relief leaves the root circle; the straight
+    # lines end at the junction row, and every row above it is on the involute.
+    split = next(i for i, (r, _, _) in enumerate(points) if abs(r - junction) < resolution)
+    relief, involute = points[1:split + 1], points[split + 1:]
+    assert math.dist(relief[0][1:], model_xy(root)) < resolution
+    assert math.dist(relief[-1][1:], model_xy(junction)) < resolution
+    assert all(r >= root - resolution for r, _, _ in relief)
+    for radius, x, y in involute:
+        assert junction < radius and (x, y) == pytest.approx(model_xy(radius), abs=1e-12)
+    # The straight lines never cut inside the model relief (a line point sits
+    # at no smaller polar angle than the relief at its radius), and stand at
+    # most 0.006 off it (the rounding of their ends aside).
+    curve = [model_xy(root + (junction - root) * i / 2000) for i in range(2001)]
+    inside, offset = 0.0, 0.0
+    for (_, x0, y0), (_, x1, y1) in zip(relief, relief[1:]):
+        for index in range(21):
+            x = x0 + (x1 - x0) * index / 20
+            y = y0 + (y1 - y0) * index / 20
+            radius = math.hypot(x, y + root)
+            distance = min(math.dist((x, y), point) for point in curve)
+            offset = max(offset, distance)
+            if root < radius < junction and math.atan2(x, y + root) < (
+                spec.custom_six_gap_half_angle_rad(radius)
+            ):
+                inside = max(inside, distance)
+    assert inside < 0.0005
+    assert offset < 0.006
     # Closed-form cross-checks against the native profile: the pitch and
     # blank-OD rows are the tool's pitch thickness and the profile's tip chord.
-    by_radius = {round(r, 6): x for r, x, _ in points}
+    by_radius = {round(r, 6): x for r, x, _ in involute}
     pitch_half_gap = math.asin(by_radius[round(profile.pitch_radius_mm, 6)] / profile.pitch_radius_mm)
     thickness = profile.pitch_radius_mm * (profile.angular_pitch_rad - 2.0 * pitch_half_gap)
     assert thickness == pytest.approx(profile.pitch_tooth_thickness_mm, abs=1e-6)
@@ -418,20 +452,9 @@ def test_custom_six_sheet_defines_the_tool_edge_point_by_point() -> None:
         profile.blank_radius_mm * math.sin(profile.tip_half_angle_rad), abs=1e-9
     )
     # Relief and involute meet at the junction row.
-    junction = template.relief_junction_radius_mm
     assert template.relief_half_angle_rad(junction) == pytest.approx(
         spec.custom_six_gap_half_angle_rad(junction + 1e-9), abs=1e-6
     )
-    # A straight line between neighbours stays within 0.006 of the edge.
-    for (r0, x0, y0), (r1, x1, y1) in zip(points[1:], points[2:]):
-        length = math.hypot(x1 - x0, y1 - y0)
-        for index in range(1, 20):
-            radius = r0 + (r1 - r0) * index / 20
-            angle = spec.custom_six_gap_half_angle_rad(radius)
-            px = radius * math.sin(angle)
-            py = radius * math.cos(angle) - template.root_radius_mm
-            off = abs((px - x0) * (y1 - y0) - (py - y0) * (x1 - x0)) / length
-            assert off < 0.006, (r0, r1, off)
     assert "(t)" not in data and "sin" not in data and "SOURCE" not in data
     # Every decimal prints at 3 places.
     for number in re.findall(r"\d+\.\d+", data):
