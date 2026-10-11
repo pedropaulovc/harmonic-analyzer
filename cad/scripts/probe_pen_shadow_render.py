@@ -1,4 +1,4 @@
-"""Throwaway route-B native pen render A/B; never saves the source model."""
+"""Throwaway native pen render with cast shadows and floor reflections off."""
 
 from __future__ import annotations
 
@@ -83,10 +83,12 @@ async def probe(adapter: Any) -> dict[str, str]:
         "enum_typelib_identity": [str(item) for item in typelib.GetLibAttr()],
         "preference_ids": prefs,
         "initial_preferences": initial,
-        "camera": "isometric, zoom-to-fit once; current view for both captures",
+        "camera": "isometric, zoom-to-fit once; current view for capture",
         "captures": [],
     }
     artefacts: dict[str, str] = {}
+    scene = None
+    initial_reflections = None
     try:
         opened = sw.OpenDoc6(
             str(assembly.resolve()),
@@ -102,9 +104,25 @@ async def probe(adapter: Any) -> dict[str, str]:
         if model is None or errors:
             raise RuntimeError(f"Read-only assembly open failed: errors={errors}, warnings={warnings}")
         adapter.currentModel = model
+        configuration = _early_bound(model.GetActiveConfiguration(), "IConfiguration")
+        if configuration is None:
+            raise RuntimeError("Assembly has no active configuration")
+        scene = _early_bound(configuration.GetScene(), "ISwScene")
+        if scene is None:
+            raise RuntimeError("Assembly configuration has no scene")
+        initial_reflections = bool(scene.FloorReflections)
+        metadata["initial_scene"] = {
+            "FloorReflections": initial_reflections,
+            "FloorShadows": bool(scene.FloorShadows),
+        }
+        # Documented direct setter changes the open model's in-memory scene.
+        # Never call scene.Modify(): it saves the scene, unlike this probe.
+        scene.FloorReflections = False
+        if bool(scene.FloorReflections):
+            raise RuntimeError("Scene floor reflection readback remained enabled")
         model.ShowNamedView2("", enum("swIsometricView"))
         adapter._zoom_to_fit(model)
-        for shadows, filename in ((True, "shadows-on.png"), (False, "shadows-off.png")):
+        for shadows, filename in ((False, "both-off.png"),):
             sw.SetUserPreferenceToggle(prefs["swDisplayAmbientOcclusionShadows"], False)
             sw.SetUserPreferenceToggle(prefs["swDisplayShadowsInShadedMode"], shadows)
             observed = {name: bool(sw.GetUserPreferenceToggle(value)) for name, value in prefs.items()}
@@ -113,6 +131,12 @@ async def probe(adapter: Any) -> dict[str, str]:
                 "swDisplayAmbientOcclusionShadows": False,
             }:
                 raise RuntimeError(f"Render preference readback mismatch: {observed}")
+            scene_before = {
+                "FloorReflections": bool(scene.FloorReflections),
+                "FloorShadows": bool(scene.FloorShadows),
+            }
+            if scene_before["FloorReflections"]:
+                raise RuntimeError(f"Floor reflections enabled before capture: {scene_before}")
             model.GraphicsRedraw2()
             image = output_dir / filename
             image.unlink(missing_ok=True)
@@ -129,14 +153,34 @@ async def probe(adapter: Any) -> dict[str, str]:
             after = {name: bool(sw.GetUserPreferenceToggle(value)) for name, value in prefs.items()}
             if after != observed:
                 raise RuntimeError(f"Capture changed preferences: before={observed}, after={after}")
+            scene_after = {
+                "FloorReflections": bool(scene.FloorReflections),
+                "FloorShadows": bool(scene.FloorShadows),
+            }
+            if scene_after != scene_before:
+                raise RuntimeError(f"Capture changed scene: before={scene_before}, after={scene_after}")
             metadata["captures"].append({
                 "path": image.relative_to(CAD_ROOT.parent).as_posix(),
+                "preferences_before_capture": observed,
+                "scene_before_capture": scene_before,
+                "scene_after_capture": scene_after,
                 "observed_preferences": after,
                 "bytes": image.stat().st_size,
             })
             artefacts[filename] = str(image)
     finally:
         restoration_errors = []
+        if scene is not None and initial_reflections is not None:
+            try:
+                scene.FloorReflections = initial_reflections
+                metadata["restored_scene"] = {
+                    "FloorReflections": bool(scene.FloorReflections),
+                    "FloorShadows": bool(scene.FloorShadows),
+                }
+                if metadata["restored_scene"] != metadata["initial_scene"]:
+                    raise RuntimeError("Failed to restore original scene properties")
+            except Exception as exc:
+                restoration_errors.append(f"scene.FloorReflections: {exc}")
         for name, value in prefs.items():
             try:
                 sw.SetUserPreferenceToggle(value, initial[name])
