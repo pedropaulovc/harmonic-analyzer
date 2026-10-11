@@ -48,6 +48,7 @@ from _drawing_leaders import (
     set_near_side_diameter,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import Box, estimate_text_box
 from mg_magnifying_wheel_geom import HUB_BACK_Z, HUB_FRONT_Z, SPOKE_X0
 from mg_magnifying_wheel_spec import (
     BORE_DIA,
@@ -84,7 +85,9 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 FRONT_CENTER = (0.125, 0.150)
 RIGHT_CENTER = (0.255, 0.150)
-ISO_CENTER = (0.350, 0.150)
+# The isometric stands right of the side view's Ø14.5 text, ISO_CLEAR off it.
+ISO_CENTER = (0.367, 0.150)
+ISO_CLEAR = 0.005
 
 _RIM_R = RIM_OUTER_DIA * SHEET_SCALE[0] / 2000.0
 
@@ -109,6 +112,10 @@ DRAWING_PRECISION_BY_NAME = {
 # 2.8 mm under its point, the two-line SpokeRootWidth one 5.6 mm), and its
 # text runs away from the feature it measures.
 _TEXT_LINE = 0.0056
+# A leadered Ø callout's shoulder starts this far (mm) left of its point, and
+# its stacked tolerance tops out this far over it (run 8 readback).
+_CALLOUT_SHOULDER_LEFT = 15.3
+_CALLOUT_ABOVE = 6.3
 
 
 def _face(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -167,10 +174,26 @@ FRONT_KEEP = {
     # under mid-span, so the block stays between the lines whether its point
     # reads as the block's middle or (inside the lines) its bottom.
     "Tie1Y": _face(-17.0, _TIE1[1] / 2.0 - _TEXT_LINE * 1000.0 / 4.0),
-    # The tie's Ø down and right from the hole, left of the root width's line.
-    "Tie1HoleDia": _over(_polar(_TIE1, -80.0, 30.0), 2),
+    # The two tie Ø callouts hang off the face, the block's leader from its
+    # shoulder's near end (the shoulder runs 7.3 mm under the point).  Run 8
+    # put TIE 1's block across its own sloped leader in the 240-300 window:
+    # now below the wheel, its top 3.2 mm under the OD, the shoulder starting
+    # 2 mm right of the hole, so the leader drops near-vertically clear of
+    # the text.
+    "Tie1HoleDia": _face(
+        _TIE1[0] + 2.0 + _CALLOUT_SHOULDER_LEFT,
+        -RIM_OUTER_DIA / 2.0 - 3.2 - _CALLOUT_ABOVE,
+    ),
     "Tie2Angle": _face(*_polar(_TIE2_INNER, sum(_TIE2_ANGLE_SECTOR) / 2.0, 10.0)),
-    "Tie2HoleDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] - 0.050),
+    # TIE 2's Ø is a linear width across the radial hole: its extension lines
+    # run out along the hole's axis to the dimension line's foot, ~1 mm past
+    # the text's projection onto the axis.  Run 8 hung the block ON that foot,
+    # so both lines ran through it: now 18 mm to the axis's upper side, past
+    # the OD, the block's projection 66 mm out along the axis, and a one-line
+    # "TIE 2" (the hole's run, groove to rim bore, is in the notes).
+    "Tie2HoleDia": _face(
+        *_polar(_polar((0.0, 0.0), _TIE2_OUTWARD, 66.0), _TIE2_OUTWARD - 90.0, 18.0)
+    ),
 }
 # Near-side leaders: no segment of these comes nearer the axis than half the
 # circle's radius, and each ends on its own circle (sheet metres; a reading
@@ -212,25 +235,59 @@ def _beside(face_x: float, side: int, chars: int, y: float) -> tuple[float, floa
     return (face_x + side * (_TEXT_OFF_LINE + chars * _TEXT_CHAR / 2.0), y)
 
 
-# The hub's three axial sizes below the view, each text OUTSIDE its span, so
-# no extension line runs through a text (run 7: four extension-through-own-
-# text findings).  The two short ones share the near row, HubBackZ ("7.09")
-# off the back face to the left and SpigotLength ("9.00 +0.10/0") off the
-# spigot end to the right; the overall HubLength ("19.60 ±0.10") runs on the
-# far row, its text right of the spigot end under SpigotLength's.
-_HUB_NEAR_ROW = RIGHT_CENTER[1] - 0.056
-_HUB_FAR_ROW = RIGHT_CENTER[1] - 0.068
+# Side-view text points (run 8 readback): a size whose text stands between
+# its extension lines prints it centred on the point, breaking its line round
+# it; one whose text stands outside hangs it off the line's end, centred on
+# the point (axial) or running from the point away from the view (diameters).
+# A one-line text's point stands _ONE_LINE_UP over its dimension line, a
+# stacked tolerance's _STACK_UP; the line runs 6.3 mm past the extension line
+# away from its text.
+_ONE_LINE_UP = 0.0028
+_STACK_UP = 0.0045
+# Run 8 printed "Ø25.00 +0.1/-0.1" 30.1 mm wide.
+_DIA_TEXT_HALF = 0.0151
+# Run 8 stacked all three diameters right of the view, where the Ø14.5 printed
+# over the isometric and the Ø97.6's line ran through it, and the axial sizes
+# below the hub, where the 4.0's line crossed three hub extension lines.
+#
+# Left of the view, the Ø25 and the Ø97.6 print BETWEEN their extension
+# lines: the Ø25 centred on the hub, its line _TEXT_OFF_LINE plus half its
+# text left of the back face; the Ø97.6 up between the hub and the rim bore,
+# its line as far again left of the Ø25's, so neither line nor text reaches
+# the other's, and the hub's extension lines stop short of the Ø97.6's line.
+_HUB_DIA_X = _side_x(HUB_BACK_Z) - _TEXT_OFF_LINE - _DIA_TEXT_HALF
+_GROOVE_DIA_X = _HUB_DIA_X - _DIA_TEXT_HALF - _TEXT_OFF_LINE
+# Above the hub, two rows left of the back face, the spokes' 4.0 under the
+# rim's 8.00 (added below): both lines run from the part leftward to their
+# text, above the hub's extension lines and under the rim bore.
+_SPOKE_ROW = RIGHT_CENTER[1] + HUB_DIA / 2000.0 + 0.0055
+_RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
+# The hub's three axial sizes below the rim, one row each, each text OUTSIDE
+# its span so no extension line runs through a text (run 7: four
+# extension-through-own-text findings): HubBackZ ("7.09") left of the back
+# face; SpigotLength ("9.00 +0.10/0") right of the spigot end; the overall
+# HubLength ("19.60 ±0.10") left of the back face under HubBackZ, clear of
+# "SIDE VIEW SCALE 1:1" under it (run 8 printed it right, 3.4 mm off it).
+_HUB_ROWS = tuple(RIGHT_CENTER[1] - _RIM_R - 0.007 * row for row in (1, 2, 3))
 RIGHT_KEEP = {
-    "HubDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + 0.020),
-    "SpigotDia": (RIGHT_CENTER[0] + 0.032, RIGHT_CENTER[1] + 0.016),
-    "HubBackZ": _beside(_side_x(HUB_BACK_Z), -1, 4, _HUB_NEAR_ROW),
-    "SpigotLength": _beside(_side_x(HUB_FRONT_Z), 1, 12, _HUB_NEAR_ROW),
-    "HubLength": _beside(_side_x(HUB_FRONT_Z), 1, 11, _HUB_FAR_ROW),
-    "SpokeAxial": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] - 0.020),
-    "GrooveR": (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] + 0.060),
-    "GrooveBottomDia": (RIGHT_CENTER[0] + 0.040, RIGHT_CENTER[1] + 0.035),
-    # The rim-bore round, top left, between the groove and the hub.
-    "CastRoundR": (RIGHT_CENTER[0] - 0.028, RIGHT_CENTER[1] + 0.038),
+    "HubDia": (_HUB_DIA_X, RIGHT_CENTER[1]),
+    "GrooveBottomDia": (_GROOVE_DIA_X, RIGHT_CENTER[1] + 0.035),
+    # Right of the view only the spigot's Ø, its text from 7.2 mm past the
+    # spigot end, above the spigot: ISO_CLEAR off the isometric, proven at
+    # build (_assert_text_off_iso).
+    "SpigotDia": (_side_x(HUB_FRONT_Z) + 0.0072, RIGHT_CENTER[1] + 0.016),
+    "SpokeAxial": _beside(_side_x(HUB_BACK_Z), -1, 3, _SPOKE_ROW + _ONE_LINE_UP),
+    "HubBackZ": _beside(_side_x(HUB_BACK_Z), -1, 4, _HUB_ROWS[0] + _ONE_LINE_UP),
+    "SpigotLength": _beside(_side_x(HUB_FRONT_Z), 1, 12, _HUB_ROWS[1] + _STACK_UP),
+    "HubLength": _beside(_side_x(HUB_BACK_Z), -1, 11, _HUB_ROWS[2] + _STACK_UP),
+    # The groove's R up right, its leader down-left onto the groove clear of
+    # the rim's front corner, so the Ø97.6's extension line, which leaves the
+    # groove bottom leftward, runs nowhere near its arrow.
+    "GrooveR": (RIGHT_CENTER[0] + 0.020, RIGHT_CENTER[1] + 0.060),
+    # The rim-bore round's callout right, between the spigot's Ø and the
+    # groove's R, its shoulder 10 mm under the rim bore: the Ø97.6 holds the
+    # left (run 8 hung it there).
+    "CastRoundR": (RIGHT_CENTER[0] + 0.0292, RIGHT_CENTER[1] + 0.0413),
 }
 DIMENSION_CALLOUTS = {
     "BoreDiaDim": "THRU - REAM",
@@ -240,7 +297,7 @@ DIMENSION_CALLOUTS = {
     "RimFilletR": "12X",
     "CastRoundR": "2X RIM BORE EDGES",
     "Tie1HoleDia": "THRU - TIE 1",
-    "Tie2HoleDia": "TIE 2, GROOVE TO RIM BORE",
+    "Tie2HoleDia": "TIE 2",
 }
 
 RIGHT_HALF_RIM = RIM_AXIAL * SHEET_SCALE[0] / 2000.0
@@ -320,6 +377,47 @@ def _trim_centre_marks(
     if marked.count("bore") != 1 or marked.count("tie 1") > 1 or set(marked) - set(holes):
         raise RuntimeError(f"expected one centre mark per wheel hole, found {marked}")
     _telemetry.info(f"wheel centre marks: {sorted(marked)}")
+
+
+def _assert_text_off_iso(adapter: Any, annotations: list[Any], iso: Any) -> None:
+    """Fail when any dimension's text block comes within ISO_CLEAR of the
+    isometric's outline (run 8 printed the side view's Ø14.5 over the iso
+    wheel).  Every text item a dimension draws (value, stacked tolerance,
+    callout lines) is boxed by the layout audit's estimator, as
+    draw_dt_cone_gear_shaft does: no API returns a text's width."""
+    iso_box = Box(*(float(value) for value in _early_bound(iso, "IView").GetOutline()))
+    nearest = math.inf
+    crowding = []
+    for annotation in annotations:
+        annotation = _early_bound(annotation, "IAnnotation")
+        label = dimension_name(adapter, annotation) or "unnamed dimension"
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        data = _early_bound(display.GetDisplayData(), "IDisplayData")
+        for index in range(int(data.GetTextCount())):
+            anchor = [float(value) for value in data.GetTextPositionAtIndex(index)]
+            reference = int(data.GetTextRefPositionAtIndex(index))
+            box = estimate_text_box(
+                str(data.GetTextAtIndex(index) or ""),
+                anchor=(anchor[0], anchor[1]),
+                height=float(data.GetTextHeightAtIndex(index)),
+                reference=reference if 0 <= reference <= 5 else 0,
+                angle=float(data.GetTextAngleAtIndex(index)),
+            )
+            if box is None:
+                continue
+            gap = box.gap(iso_box)
+            nearest = min(nearest, gap)
+            if gap < ISO_CLEAR:
+                crowding.append(f"{label} {box.format_mm()}")
+    if crowding:
+        raise RuntimeError(
+            f"dimension text within {ISO_CLEAR * 1000:.0f} mm of the isometric "
+            f"{iso_box.format_mm()}: {crowding}"
+        )
+    _telemetry.info(
+        f"wheel dimension text clears the isometric {iso_box.format_mm()} by "
+        f"{nearest * 1000:.1f} mm"
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -403,11 +501,12 @@ async def build(adapter: Any) -> dict[str, str]:
     _near_side_diameters(adapter, annotations, axis=axis)
     _trim_centre_marks(adapter, front, {"bore": axis, "tie 1": tie1})
 
-    # The rim's axial width across the side view, up at the rim. The two OD
-    # corner circles are selected as native entities: a coordinate hit-test
-    # at the corner where each edge-on circle ends on the OD silhouette found
-    # no edge on farm run 4 (85a5d462d), and the side view's asymmetric hub
-    # (HUB_FRONT_Z..HUB_BACK_Z) means its origin need not sit on RIGHT_CENTER.
+    # The rim's axial width across the side view, its text left of the rim's
+    # back face on its own row (above). The two OD corner circles are
+    # selected as native entities: a coordinate hit-test at the corner where
+    # each edge-on circle ends on the OD silhouette found no edge on farm run
+    # 4 (85a5d462d), and the side view's asymmetric hub (HUB_FRONT_Z..
+    # HUB_BACK_Z) means its origin need not sit on RIGHT_CENTER.
     right_edges = scan_view_edges(right, label="wheel right rim corners")
     rim_corners = tuple(
         right_edges.circle_at(
@@ -423,7 +522,9 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         p0=(RIGHT_CENTER[0] - RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_FACE_MID_Y),
         p1=(RIGHT_CENTER[0] + RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_FACE_MID_Y),
-        text_xy=(RIGHT_CENTER[0] + 0.028, RIGHT_CENTER[1] + _RIM_R),
+        text_xy=_beside(
+            _side_x(RIM_AXIAL / 2.0), -1, 4, _RIM_WIDTH_ROW + _ONE_LINE_UP
+        ),
         label="rim axial width",
         orientation="horizontal",
         entities=rim_corners,
@@ -435,12 +536,20 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rim axial width",
         entities=rim_corners,
     )
+    rebuild_drawing(adapter, label="wheel dimension layout")
+    _assert_text_off_iso(
+        adapter,
+        [*annotations, _early_bound(rim_width, "IDisplayDimension").GetAnnotation()],
+        iso,
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
     add_property_linked_note(
         adapter, "Section View Note", RIGHT_CENTER[0] - 0.022, 0.075
     )
-    add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.085)
+    add_property_linked_note(
+        adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085
+    )
 
     return await finalize_drawing(
         adapter,

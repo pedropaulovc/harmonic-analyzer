@@ -179,7 +179,6 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == config["material_specification"]
     # Paint never reaches a fitted or wire-bearing surface (policy rule 1).
     assert config["finish"] == (
-        "BLACK ENAMEL; MASK BORE, SPIGOT, FACED HUB ENDS AND TURNED RIM WITH "
-        "ITS GROOVE; OIL BARE MACHINED SURFACES"
+        "BLACK ENAMEL; MASK BORE, SPIGOT, HUB ENDS, RIM AND GROOVE; OIL BARE SURFACES"
     )
     assert int(config["quantity"]) == 1
