@@ -833,6 +833,17 @@ def test_crank_axis_follows_the_actual_train() -> None:
     assert drawing.SHEET_SCALES == {drawing.SHEET_NAMES[0]: drawing.SHEET_SCALE}
 
 
+def test_nominal_crank_axis_follows_the_post_station_and_the_swing() -> None:
+    at_chain = crank_axis.crank_axis_nominal_xy_mm(-155.7)
+    assert at_chain == pytest.approx((cone_line.X_CRANK, cone_line.Y_CRANK))
+    swung = crank_axis.crank_axis_nominal_xy_mm(-155.7, 3.0)
+    farther = crank_axis.crank_axis_nominal_xy_mm(-175.7, 3.0)
+    assert farther[0] - swung[0] == pytest.approx(-20.0 * math.tan(math.radians(3.0)))
+    assert farther[1] == swung[1]
+    with pytest.raises(ValueError, match="parallel"):
+        crank_axis.crank_axis_nominal_xy_mm(-155.7, 90.0)
+
+
 def test_unrelieved_plate_budget_spends_all_booked_sources() -> None:
     import dt_cone_pivot_post_spec as post
 
