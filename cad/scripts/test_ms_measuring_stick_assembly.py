@@ -33,18 +33,86 @@ from diagnostics.diag_mcmaster_thumb import THUMB_SPECS
 SCRIPTS = Path(__file__).resolve().parent
 BUILDER = SCRIPTS / "build_ms_measuring_stick_assembly.py"
 
-def test_builder_owns_setting_dimension_and_drawing_only_imports() -> None:
-    tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
-    helper = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
-                  and node.name == "_author_clamped_setting")
-    calls = [node for node in ast.walk(helper) if isinstance(node, ast.Call)]
-    names = {getattr(node.func, "id", "") for node in calls}
-    assert {"set_global", "drive_dimension", "set_dimension_symmetric_tolerance",
-            "apply_drawing_precision", "mark_dimensions_for_drawing", "blank_sketch"} <= names
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
-                 and node.name == "build")
-    assert any(isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_author_clamped_setting"
-               for node in ast.walk(build))
+def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
+    """Run the builder's setting helper against fakes: every async authoring
+    step must actually execute (an un-awaited coroutine silently drops the
+    globals and equations), and the mm suffix is load-bearing in the equation
+    manager, which reads bare numbers in document units."""
+    import asyncio
+
+    import build_ms_measuring_stick_assembly as builder
+
+    ok = lambda data=None: SimpleNamespace(is_success=True, data=data, error=None)  # noqa: E731
+    globals_authored: dict[str, str] = {}
+    equations: dict[str, str] = {}
+    toleranced: list[tuple] = []
+
+    class Adapter:
+        _sketch_entities = {"chord": object()}
+
+        async def create_sketch(self, plane):
+            return ok()
+
+        async def add_line(self, *args):
+            return ok("chord")
+
+        async def add_sketch_constraint(self, *args):
+            return ok()
+
+        async def exit_sketch(self):
+            return ok()
+
+    class Dims:
+        def __init__(self):
+            self.rows = []
+
+        def record(self, name, drive=None):
+            self.rows.append((name, drive))
+
+        def apply(self, adapter, feature):
+            return [(f"{name}@{feature}", drive) for name, drive in self.rows if drive]
+
+    async def set_global(adapter, name, expression):
+        globals_authored[name] = expression
+
+    async def drive_dimension(adapter, name, expression):
+        equations[name] = expression
+
+    async def noop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(builder, "set_global", set_global)
+    monkeypatch.setattr(builder, "drive_dimension", drive_dimension)
+    monkeypatch.setattr(builder, "SketchDims", Dims)
+    for name in ("anchor_point_to_origin", "dimension_between", "ensure_fully_defined"):
+        monkeypatch.setattr(builder, name, noop)
+    for name in ("set_sketch_direct_db", "name_last_feature", "_set_tolerance_precision",
+                 "apply_drawing_precision", "mark_dimensions_for_drawing", "blank_sketch"):
+        monkeypatch.setattr(builder, name, lambda *a, **kw: None)
+    monkeypatch.setattr(builder, "_early_bound",
+                        lambda entity, iface: SimpleNamespace(ConstructionGeometry=False))
+    monkeypatch.setattr(builder, "_named_dimension", lambda *a: (object(), None))
+    monkeypatch.setattr(builder, "set_dimension_symmetric_tolerance",
+                        lambda adapter, feature, name, tol: toleranced.append((feature, name, tol)))
+
+    asyncio.run(builder._author_clamped_setting(Adapter()))
+
+    (left_x, roof_y), (face_x, _) = spec.SETTING_CHORD
+    assert globals_authored == {
+        "SettingStickLeft": f"{left_x}mm",
+        "SettingBlockFace": f"{face_x}mm",
+        "SettingRoof": f"{roof_y}mm",
+    }
+    feature = spec.SETTING_FEATURE
+    assert equations == {
+        f"SettingLeftX@{feature}": '-"SettingStickLeft"',
+        f"SettingRoofY@{feature}": '"SettingRoof"',
+        f"{spec.SETTING_DIMENSION}@{feature}": '"SettingBlockFace" - "SettingStickLeft"',
+    }
+    assert toleranced == [(feature, spec.SETTING_DIMENSION, spec.SETTING_TOLERANCE_MM)]
+
+
+def test_setting_chord_spans_the_near_face_reference() -> None:
     assert spec.SETTING_CHORD[0] == (spec.STICK_X_MIN, spec.STICK_TOP_Y)
     assert spec.SETTING_CHORD[1] == (spec.BLOCK_ORIGIN[0], spec.STICK_TOP_Y)
     assert spec.SETTING_CHORD[1][0] - spec.SETTING_CHORD[0][0] == pytest.approx(spec.SETTING_NEAR_FACE_MM)
