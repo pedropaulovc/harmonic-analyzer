@@ -560,17 +560,21 @@ def _basic_profile_dimensions(adapter: Any, annotations: list[Any]) -> None:
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         set_basic_dimension(adapter, display, label=f"arc-system {name}")
         if name in ARC_PROFILE_OUTSIDE_MM:
-            display.ShortenedRadius = True
-            # swLeaderLineNone / swWitnessLineNone: remove the radius centre
-            # tail/witness, not the arrow and text-to-arc leader.
-            display.LeaderVisibility = 3
-            display.WitnessVisibility = 3
+            # Outside arrows with no solid/extended centre leader stop at the
+            # arc (the pinion-arbor and arbor-pedestal radius patterns). A
+            # shortened radius alone still printed an off-sheet jog on this
+            # drawing and crossed the upper profile frame's leader.
+            display.ShortenedRadius = False
+            display.ArcExtensionLineOrOppositeSide = False
+            display.ArrowSide = 1  # swDimArrowsOutside
+            display.SolidLeader = False
             if (
-                not bool(display.ShortenedRadius)
-                or int(display.LeaderVisibility) != 3
-                or int(display.WitnessVisibility) != 3
+                bool(display.ShortenedRadius)
+                or bool(display.ArcExtensionLineOrOppositeSide)
+                or int(display.ArrowSide) != 1
+                or bool(display.SolidLeader)
             ):
-                raise RuntimeError(f"{name} retained its off-sheet radius witnesses")
+                raise RuntimeError(f"{name} retained its centre-directed radius leader")
         remaining.remove(name)
     if remaining:
         raise RuntimeError(f"arc-system BASIC dimensions missing: {sorted(remaining)}")

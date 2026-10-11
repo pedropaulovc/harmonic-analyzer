@@ -76,7 +76,8 @@ def test_sheet_runs_at_1_to_2() -> None:
 
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = ch_rocker_arm_notes.DRAWING_NOTES
-    assert "ARCS CONCENTRIC ABOUT THE MIRROR AXIS." in notes
+    # Concentricity applies to nominal arcs, not independent profile deviations.
+    assert "3. NOMINAL ARCS CONCENTRIC ON MIRROR AXIS." in notes
     assert "R800" not in notes
     assert "R816" not in notes
     # The rod hole rides its native Ø1.99 THRU ALL callout; the notes state
@@ -179,12 +180,13 @@ class _ProfileDisplay:
     def __init__(self, ignored: str | None = None) -> None:
         self.ignored = ignored
         self.writes: list[tuple[str, object]] = []
-        object.__setattr__(self, "ShortenedRadius", False)
-        object.__setattr__(self, "LeaderVisibility", 0)
-        object.__setattr__(self, "WitnessVisibility", 0)
+        object.__setattr__(self, "ShortenedRadius", True)
+        object.__setattr__(self, "ArcExtensionLineOrOppositeSide", True)
+        object.__setattr__(self, "ArrowSide", 0)
+        object.__setattr__(self, "SolidLeader", True)
 
     def __setattr__(self, name: str, value: object) -> None:
-        if name in {"ShortenedRadius", "LeaderVisibility", "WitnessVisibility"}:
+        if name in {"ShortenedRadius", "ArcExtensionLineOrOppositeSide", "ArrowSide", "SolidLeader"}:
             self.writes.append((name, value))
             if name == self.ignored:
                 return
@@ -199,7 +201,7 @@ def _profile_annotations(monkeypatch: pytest.MonkeyPatch, displays: dict) -> lis
     ]
 
 
-def test_basic_profile_dimensions_converts_all_three_and_shortens_only_radii(
+def test_basic_profile_dimensions_converts_all_three_and_trims_only_radius_leaders(
     bound: None, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = object()
@@ -220,13 +222,15 @@ def test_basic_profile_dimensions_converts_all_three_and_shortens_only_radii(
     ]
     for name in ("TopRadius", "BottomRadius"):
         assert displays[name].writes == [
-            ("ShortenedRadius", True),
-            ("LeaderVisibility", 3),
-            ("WitnessVisibility", 3),
+            ("ShortenedRadius", False),
+            ("ArcExtensionLineOrOppositeSide", False),
+            ("ArrowSide", 1),
+            ("SolidLeader", False),
         ]
-        assert displays[name].ShortenedRadius is True
-        assert displays[name].LeaderVisibility == 3
-        assert displays[name].WitnessVisibility == 3
+        assert displays[name].ShortenedRadius is False
+        assert displays[name].ArcExtensionLineOrOppositeSide is False
+        assert displays[name].ArrowSide == 1
+        assert displays[name].SolidLeader is False
     assert displays["TopAbovePivot"].writes == []
     assert displays["PivotDia"].writes == []
 
@@ -247,7 +251,9 @@ def test_basic_profile_dimensions_rejects_each_missing_nominal(
 
 
 @pytest.mark.parametrize("radius", ["TopRadius", "BottomRadius"])
-@pytest.mark.parametrize("ignored", ["ShortenedRadius", "LeaderVisibility", "WitnessVisibility"])
+@pytest.mark.parametrize("ignored", [
+    "ShortenedRadius", "ArcExtensionLineOrOppositeSide", "ArrowSide", "SolidLeader",
+])
 def test_basic_profile_dimensions_rejects_ignored_radius_flags(
     bound: None, monkeypatch: pytest.MonkeyPatch, radius: str, ignored: str,
 ) -> None:
@@ -257,7 +263,7 @@ def test_basic_profile_dimensions_rejects_ignored_radius_flags(
     }
     annotations = _profile_annotations(monkeypatch, displays)
     monkeypatch.setattr(drawing, "set_basic_dimension", lambda *_args, **_kwargs: None)
-    with pytest.raises(RuntimeError, match=f"{radius} retained its off-sheet radius witnesses"):
+    with pytest.raises(RuntimeError, match=f"{radius} retained its centre-directed radius leader"):
         drawing._basic_profile_dimensions(object(), annotations)
 
 
