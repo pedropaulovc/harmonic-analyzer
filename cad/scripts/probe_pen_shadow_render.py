@@ -32,7 +32,7 @@ async def probe(adapter: Any) -> dict[str, str]:
         if typelib.GetTypeInfoType(index) != pythoncom.TKIND_ENUM:
             continue
         info = typelib.GetTypeInfo(index)
-        for variable in range(info.GetTypeAttr()[9]):
+        for variable in range(info.GetTypeAttr().cVars):
             descriptor = info.GetVarDesc(variable)
             named_constants[info.GetNames(descriptor[0])[0]] = int(descriptor[1])
 
