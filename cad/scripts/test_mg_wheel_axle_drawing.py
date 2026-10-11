@@ -116,8 +116,9 @@ def test_thread_callout_and_notes() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     notes = spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
-    assert "19.50 +/-0.05" in notes
-    assert "FROM FRONT FACE (BACK END ~FLUSH)" in notes
+    flat = " ".join(notes.splitlines())
+    assert "UNTIL THE SHANK STEP STANDS 19.50 +/-0.05 FROM THE BAR FRONT FACE" in flat
+    assert "(BACK END ~FLUSH)" in notes
     assert "DEBURR" not in notes
     assert "X.XX" not in notes
 
