@@ -515,8 +515,13 @@ def stage_comparisons(stage: Path) -> dict[str, Any]:
 
 
 def preflight(version: str, allow_dirty: bool) -> None:
-    """Fail fast before staging or creating anything."""
+    """Fail fast on configured/plan/manifest revision drift before staging."""
     require_configured_revision(version)
+    for stem in _process_plans.TRAVELER_STEMS:
+        try:
+            _process_plans.check_plan_revision(stem, CAD_ROOT / "out", revision=version)
+        except _process_plans.PlanBindError as exc:
+            raise SystemExit(f"!!  traveler plan {stem}: {exc}") from exc
     if _git("tag", "--list", version):
         raise SystemExit(f"!!  tag {version} already exists -- pick another version")
 

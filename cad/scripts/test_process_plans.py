@@ -39,6 +39,7 @@ def synthetic(tmp_path, monkeypatch):
     manifest.write_text(
         'part = "ch-rocker-arm"\n'
         f'step = "{step.name}"\nstep_sha256 = "{hashlib.sha256(step.read_bytes()).hexdigest()}"\n'
+        'drawing = { revision = "v41" }\n'
         "[features.bore]\nfaces = " + json.dumps(REFS) + "\n",
         encoding="utf-8",
     )
@@ -61,6 +62,7 @@ def test_bind_list_splices_and_preserves_unrelated_bytes(synthetic):
         'note = "prose HAF_BORE__P01 remains literal"\r\n'
         "literal = 'prose HAF_BORE__P01 remains literal'\r\n"
         'faces = ["before", "HAF_BORE__P01", "after"] # keep spacing\r\n'
+        'drawing = { revision = "v41" }\r\n'
     ).encode()
     source.write_bytes(raw)
     bound = plans.bind_plan(STEM, out)
@@ -80,7 +82,10 @@ def test_bind_list_splices_and_preserves_unrelated_bytes(synthetic):
 @pytest.mark.parametrize("value", ['"HAF_BORE__P01"', "'HAF_BORE__P01'"])
 def test_scalar_multiface_names_source_line(synthetic, value):
     source, out, _, _ = synthetic
-    source.write_text(f'part = "ch-rocker-arm"\nfeatures = "old"\nface = {value}\n')
+    source.write_text(
+        f'part = "ch-rocker-arm"\nfeatures = "old"\nface = {value}\n'
+        'drawing = { revision = "v41" }\n'
+    )
     with pytest.raises(plans.PlanBindError, match=r"(?i)line\s*3|:3\b"):
         plans.bind_plan(STEM, out)
 
@@ -92,6 +97,7 @@ def test_unknown_or_wrongly_owned_label_rejected(synthetic, label):
         manifest.write_text(manifest.read_text().replace(LABEL, label))
     source.write_text(
         f'part = "ch-rocker-arm"\nfeatures = "old"\nfaces = ["{label}"]\n'
+        'drawing = { revision = "v41" }\n'
     )
     with pytest.raises(plans.PlanBindError, match=r"line 3:"):
         plans.bind_plan(STEM, out)
@@ -104,6 +110,7 @@ def test_single_face_scalar_and_literal_quotes(synthetic):
     )
     source.write_text(
         "part = 'ch-rocker-arm'\nfeatures = 'old'\nface = 'HAF_BORE__P01'\n"
+        'drawing = { revision = "v41" }\n'
     )
     bound = plans.bind_plan(STEM, out)
     assert tomllib.loads(bound.read_text())["face"] == REFS[0]
@@ -118,6 +125,7 @@ def test_multiline_prose_ending_in_quotes_is_preserved(synthetic, quote, extra):
         'part = "ch-rocker-arm"\nfeatures = "old"\n'
         + prose
         + '\nfaces = ["HAF_BORE__P01"]\n'
+        + 'drawing = { revision = "v41" }\n'
     ).encode()
     source.write_bytes(raw)
     bound = plans.bind_plan(STEM, out)
@@ -197,13 +205,28 @@ def _complete(synthetic):
     source, out, manifest, _ = synthetic
     source.write_text(
         'part = "ch-rocker-arm"\n'
-        'features = "old"\n[[setups]]\nid = "lathe"\n'
+        'features = "old"\ndrawing = { revision = "v41" }\n[[setups]]\nid = "lathe"\n'
         "[[setups.ops]]\nop = 7\n[setups.ops.inspection_views]\nbore = {}\n"
         '[[setups]]\nid = "mill"\nops = []\n'
     )
     bound = plans.bind_plan(STEM, out)
     directory = bound.parent
-    inputs = {}
+    inventory, policy, cutting = plans.bind_shop(out)
+    paths = {
+        "plan": bound,
+        "features": manifest,
+        "inventory": inventory,
+        "shop_policy": policy,
+        "cutting_data": cutting,
+        "step": manifest.parent / "ch-rocker-arm.STEP",
+    }
+    inputs = {
+        kind: {
+            "path": str(path),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+        for kind, path in paths.items()
+    }
     for key, name in (
         ("lathe", "setup-S1.png"),
         ("lathe:7:bore", "setup-S1-op7-bore.png"),
@@ -250,9 +273,6 @@ def test_required_outputs_uses_installed_inspection_names(synthetic, monkeypatch
         return ("installed-api-sentinel.png",)
 
     monkeypatch.setattr(prechips.report, "inspection_sketch_names", names)
-    # Accommodate a direct import without weakening the requirement to call the API.
-    if hasattr(plans, "inspection_sketch_names"):
-        monkeypatch.setattr(plans, "inspection_sketch_names", names)
     assert bound.parent / "installed-api-sentinel.png" in plans.required_outputs(bound)
     assert seen == [plan]
 
@@ -367,3 +387,123 @@ def test_shop_spec_module_dependencies_are_deduplicated(synthetic, monkeypatch):
 def test_empty_enrollment_stages_no_travelers(tmp_path, monkeypatch):
     monkeypatch.setattr(plans, "TRAVELER_STEMS", ())
     assert plans.stage_travelers(tmp_path / "absent-out", tmp_path / "stage") == []
+
+
+@pytest.mark.parametrize("rebind", [False, True])
+def test_changed_tracked_plan_cannot_reuse_successful_traveler(
+    synthetic, tmp_path, rebind
+):
+    out, manifest, _bound, _report = _complete(synthetic)
+    source = plans.plan_path(STEM)
+    source.write_bytes(
+        source.read_bytes().replace(
+            b'features = "old"', b'features = "old" # new authored plan'
+        )
+    )
+    if rebind:
+        plans.bind_plan(STEM, out)
+    with pytest.raises(plans.TravelerIncomplete, match="plan"):
+        plans.verify_traveler(STEM, out)
+    assert not plans.traveler_complete(STEM, out)
+    stage = tmp_path / "stage"
+    staged_manifest = stage / "features" / STEM / "features.toml"
+    staged_manifest.parent.mkdir(parents=True)
+    staged_manifest.write_bytes(manifest.read_bytes())
+    (staged_manifest.parent / "ch-rocker-arm.STEP").write_bytes(
+        (manifest.parent / "ch-rocker-arm.STEP").read_bytes()
+    )
+    with pytest.raises(plans.TravelerIncomplete, match="plan"):
+        plans.stage_travelers(out, stage)
+
+
+def test_changed_manifest_with_identical_step_cannot_reuse_traveler(synthetic):
+    out, manifest, _bound, report = _complete(synthetic)
+    step_digest = report["step_sha256"]
+    manifest.write_bytes(manifest.read_bytes() + b"width = [1.0, 2.0]\n")
+    assert tomllib.loads(manifest.read_text())["step_sha256"] == step_digest
+    with pytest.raises(plans.TravelerIncomplete, match="features input"):
+        plans.verify_traveler(STEM, out)
+
+
+@pytest.mark.parametrize(
+    "kind", ["plan", "features", "inventory", "shop_policy", "cutting_data", "step"]
+)
+def test_missing_or_stale_input_hash_cannot_certify_traveler(synthetic, kind):
+    out, _manifest, bound, report = _complete(synthetic)
+    report["inputs"][kind]["sha256"] = "0" * 64
+    _write_report(bound.parent, report)
+    with pytest.raises(plans.TravelerIncomplete, match=f"{kind} input"):
+        plans.verify_traveler(STEM, out)
+
+
+def test_changed_tracked_shop_cannot_reuse_bound_shop_or_traveler(synthetic):
+    out, _manifest, _bound, _report = _complete(synthetic)
+    (plans.PROCESS_ROOT / "shop" / "shop-policy.toml").write_bytes(b"version = 2\n")
+    with pytest.raises(plans.TravelerIncomplete, match="current shop inputs"):
+        plans.verify_traveler(STEM, out)
+
+
+@pytest.mark.parametrize("configured", [None, "v42"])
+def test_revision_validation_names_authored_revision_line(synthetic, configured):
+    source, out, _manifest, _shop = synthetic
+    authored = "v42" if configured is None else "v41"
+    source.write_text(
+        'part = "ch-rocker-arm"\nfeatures = "old"\n[drawing]\n'
+        f'revision = "{authored}"\n'
+    )
+    with pytest.raises(plans.PlanBindError, match="line 4:.*drawing.revision"):
+        plans.check_plan_revision(STEM, out, revision=configured)
+    if configured is None:
+        with pytest.raises(plans.PlanBindError, match="line 4:.*drawing.revision"):
+            plans.bind_plan(STEM, out)
+
+
+def test_inline_table_scalar_in_array_is_not_spliced_as_list(synthetic):
+    source, out, _manifest, _shop = synthetic
+    source.write_text(
+        'part = "ch-rocker-arm"\nfeatures = "old"\n'
+        'items = [{ face = "HAF_BORE__P01" }]\n'
+        'drawing = { revision = "v41" }\n'
+    )
+    with pytest.raises(plans.PlanBindError, match="line 3:.*cannot bind a scalar"):
+        plans.bind_plan(STEM, out)
+    source.write_text(
+        source.read_text().replace(
+            'face = "HAF_BORE__P01"', 'faces = ["HAF_BORE__P01"]'
+        )
+    )
+    bound = plans.bind_plan(STEM, out)
+    assert tomllib.loads(bound.read_text())["items"][0]["faces"] == list(REFS)
+
+
+def test_staging_ships_only_verified_snapshots_and_shared_shop(
+    synthetic, tmp_path, monkeypatch
+):
+    out, manifest, bound, _report = _complete(synthetic)
+    original_png = (bound.parent / "setup-S1.png").read_bytes()
+    (bound.parent / ".report.killed.tmp").write_bytes(b"stray temporary")
+    (bound.parent / ".check").mkdir()
+    (bound.parent / ".check" / "report.json").write_bytes(b"scratch report")
+    stage = tmp_path / "stage"
+    staged_manifest = stage / "features" / STEM / "features.toml"
+    staged_manifest.parent.mkdir(parents=True)
+    staged_manifest.write_bytes(manifest.read_bytes())
+    (staged_manifest.parent / "ch-rocker-arm.STEP").write_bytes(
+        (manifest.parent / "ch-rocker-arm.STEP").read_bytes()
+    )
+    original_verify = plans._verified_traveler_bytes
+
+    def verify_then_change(*args, **kwargs):
+        snapshots = original_verify(*args, **kwargs)
+        (bound.parent / "setup-S1.png").write_bytes(b"changed after validation")
+        return snapshots
+
+    monkeypatch.setattr(plans, "_verified_traveler_bytes", verify_then_change)
+    copied = plans.stage_travelers(out, stage)
+    assert (copied[0] / "setup-S1.png").read_bytes() == original_png
+    assert not (copied[0] / ".report.killed.tmp").exists()
+    assert not (copied[0] / ".check").exists()
+    for name in plans.SHOP_FILES:
+        assert (stage / "travelers" / "_shop" / name).read_bytes() == (
+            out / "travelers" / "_shop" / name
+        ).read_bytes()

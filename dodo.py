@@ -3005,6 +3005,8 @@ def task_check():
     ``check:nameplate`` / ``check:recipe`` wrap the pure-python unit tests via
     pytest. None takes the COM seat lock, so they fan out under ``-n``.
     """
+    import _process_plans
+
     config_py = str((SCRIPTS_DIR / "_config.py").resolve())
     # The tolerance audit (check:config) scans every build_*.py for PART_NAME, so a
     # part script added/renamed without touching the config YAML must still
@@ -3299,6 +3301,11 @@ def task_check():
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
+            # The enrolled revision contract reads plans rather than importing them.
+            *(
+                str(_process_plans.plan_path(stem).resolve())
+                for stem in _process_plans.TRAVELER_STEMS
+            ),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(
@@ -3709,6 +3716,44 @@ def task_check():
         }
 
 
+class _PrechipsKernelTracker:
+    """Compare the lazy FreeCAD identity with the last successful traveler run."""
+
+    def __init__(self):
+        self.identity: dict[str, str] | None = None
+
+    def _calc(self) -> dict[str, str] | None:
+        from prechips.kernel import discover_kernel
+
+        try:
+            command = discover_kernel()
+            if command is None:
+                return None
+            path = str(Path(command).resolve())
+            with _telemetry.span("prechips.kernel_identity", path=path):
+                version = subprocess.check_output(
+                    [path, "--version"],
+                    text=True,
+                    stderr=subprocess.STDOUT,
+                    timeout=10,
+                    env=_telemetry.inject_env(),
+                ).strip()
+        except (OSError, UnicodeError, subprocess.SubprocessError):
+            return None
+        return {"path": path, "version": version} if version else None
+
+    def __call__(self, task, values) -> bool:
+        self.identity = self._calc()
+        task.value_savers.append(lambda: {"_prechips_kernel": self.identity})
+        return self.identity is not None and values.get("_prechips_kernel") == self.identity
+
+
+def _fail_prechips_inventory(label: str, inventory: str, diagnostic: str) -> None:
+    """Fail only the selected traveler, using the diagnostic captured at task load."""
+    with _telemetry.span("task", label=label, service=_stage_name(label)):
+        raise RuntimeError(f"{label}: {inventory}: {diagnostic}")
+
+
 def task_prechips():
     """Strict, SolidWorks-free travelers for enrolled parts (requires FreeCAD)."""
     import _process_plans
@@ -3723,13 +3768,34 @@ def task_prechips():
             sys.executable, str(SCRIPTS_DIR / "prechips_traveler.py"),
             stem, "--out", str(CAD_OUT),
         ]
-        specs = [SCRIPTS_DIR / f"{module}.py" for module in _process_plans.shop_spec_modules()]
+        diagnostic = None
+        try:
+            specs = [
+                SCRIPTS_DIR / f"{module}.py"
+                for module in _process_plans.shop_spec_modules()
+            ]
+        except _process_plans.PlanBindError as exc:
+            specs = []
+            diagnostic = str(exc)
+        actions = [(_run_stamped, [cmd, label, stamp, label])]
+        uptodate = [
+            (_process_plans.traveler_complete, [stem, CAD_OUT]),
+            _PrechipsKernelTracker(),
+        ]
+        if diagnostic is not None:
+            actions = [(
+                _fail_prechips_inventory,
+                [label, str(_process_plans.shop_paths()[0].resolve()), diagnostic],
+            )]
+            uptodate = [False]
+        # A captured shop error must fail without first exporting scoped geometry.
+        bundles = bundle_paths(stem, CAD_OUT) if diagnostic is None else ()
         yield {
             "name": stem,
             "file_dep": sorted({
                 str(_process_plans.plan_path(stem).resolve()),
                 *(str(path.resolve()) for path in _process_plans.shop_paths()),
-                *(str(path.resolve()) for path in bundle_paths(stem, CAD_OUT)),
+                *(str(path.resolve()) for path in bundles),
                 *(path for spec in specs for path in _executed_closure([str(spec)])),
                 str((REPO_ROOT / "pyproject.toml").resolve()),
                 str((REPO_ROOT / "uv.lock").resolve()),
@@ -3737,13 +3803,13 @@ def task_prechips():
                 str((SCRIPTS_DIR / "_telemetry.py").resolve()),
                 *_executed_closure(cmd),
             }),
-            "task_dep": ["package:features"],
+            "task_dep": ["package:features"] if diagnostic is None else [],
             "targets": [
                 stamp, str(directory / "plan.toml"),
                 str(directory / "report.json"), str(directory / "traveler.html"),
             ],
-            "uptodate": [(_process_plans.traveler_complete, [stem, CAD_OUT])],
-            "actions": [(_run_stamped, [cmd, label, stamp, label])],
+            "uptodate": uptodate,
+            "actions": actions,
             "clean": True,
             "verbosity": 2,
         }

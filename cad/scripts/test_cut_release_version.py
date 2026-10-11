@@ -103,6 +103,62 @@ def test_release_requires_configured_cad_revision(
         cut_release.require_configured_revision("v23")
 
 
+@pytest.mark.parametrize("no_publish", [False, True])
+@pytest.mark.parametrize(
+    "detail",
+    [
+        "plan drawing.revision 'v21' does not match feature manifest drawing.revision 'v22'",
+        "plan drawing.revision 'v21' does not match configured revision 'v22'",
+    ],
+)
+def test_release_revision_mismatch_fails_before_staging_or_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    no_publish: bool, detail: str,
+) -> None:
+    """Preflight preserves the binder's diagnostic, including during dry runs."""
+    stems = ("ch_rocker_arm", "ch_pivot_shaft")
+    calls: list[tuple[str, Path, str]] = []
+    cad = tmp_path / "cad"
+    monkeypatch.setattr(cut_release, "CAD_ROOT", cad)
+    monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", stems)
+
+    def check_plan_revision(stem: str, out: Path, *, revision: str) -> None:
+        # The core helper's own tests exercise real synthetic plan/manifest bytes.
+        # Here its error proves release ordering and forwarding of both inputs.
+        calls.append((stem, out, revision))
+        if stem == stems[-1]:
+            raise cut_release._process_plans.PlanBindError(detail, line=9)
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("revision mismatch reached release side effects")
+
+    monkeypatch.setattr(
+        cut_release._process_plans, "check_plan_revision", check_plan_revision,
+    )
+    monkeypatch.setattr(
+        cut_release, "_start_release_log",
+        lambda _version: (tmp_path / "release.log", lambda: None),
+    )
+    for name in (
+        "_git", "_gh", "previous_tag", "bundle", "publish",
+        "prepare_configured_revision_advance", "report_no_publish",
+    ):
+        monkeypatch.setattr(cut_release, name, forbidden)
+    monkeypatch.setattr(trim_renders, "regenerate_readme_images", forbidden)
+    argv = ["cut_release.py", "v22"]
+    if no_publish:
+        argv.append("--no-publish")
+    monkeypatch.setattr(sys, "argv", argv)
+
+    with pytest.raises(SystemExit) as failure:
+        cut_release.main()
+
+    assert str(failure.value) == f"!!  traveler plan {stems[-1]}: line 9: {detail}"
+    assert calls == [(stem, cad / "out", "v22") for stem in stems]
+
+
 @pytest.fixture
 def enrolled_revision_plans(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -712,6 +768,12 @@ def prepared_readme_release(
     monkeypatch.setattr(cut_release, "SCENE_JSON", scene)
     monkeypatch.setattr(cut_release, "LOGS_DIR", tmp_path / "logs")
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    # These image/publication tests have no feature manifests; revision validation
+    # is exercised separately by the preflight regression above.
+    monkeypatch.setattr(
+        cut_release._process_plans, "check_plan_revision",
+        lambda _stem, _out, *, revision: None,
+    )
     monkeypatch.setattr(trim_renders, "DOCS_IMAGES", images)
     monkeypatch.setattr(cut_release, "bundle", lambda *_args: (zip_path, facts))
     monkeypatch.setattr(cut_release, "_git", lambda *_args, **_kwargs: "")

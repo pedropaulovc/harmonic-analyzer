@@ -24,6 +24,8 @@ tokens with that manifest's exact refs. A label covering multiple patches
 expands inside a list; it cannot be used as a single-face scalar. Unknown labels,
 wrong-part labels and ambiguous scalar bindings fail with a source line. A label
 mentioned inside longer prose is not replaced. Other tracked bytes are preserved.
+Binding also rejects a plan drawing revision that differs from the scoped
+manifest; release preflight requires both to match the configured next revision.
 Do not add `[paths]` to a tracked plan: the wrapper supplies the three shared
 shop inputs as CLI flags. Binding never edits the tracked plan.
 
@@ -75,10 +77,15 @@ uv run --frozen python cad/scripts/prechips_traveler.py "<stem>"
 uv run --frozen python -m doit "prechips:<stem>"
 ```
 
-`--check` binds the inputs and invokes prechips' check command; it does not
-produce or validate HTML/PNG traveler completeness. The default wrapper invokes
-the full traveler command and verifies its outputs after exit 0. Both preserve
-nonzero consumer exits: 2 (machining blockers), 3 (bad input), 4 (required
+`--check` binds the plan to `cad/out/travelers/<stem>/.check/plan.toml`, binds
+shop inputs under `.check/_shop/`, and sends all check output to `.check/`.
+It reads the current scoped feature bundle but never rewrites the full bound
+plan, shared bound shop, report, HTML or PNGs, even when authoring inputs change.
+Check mode does not produce or validate HTML/PNG traveler completeness.
+The default wrapper removes the previous `report.json` **before binding**, then
+invokes the full traveler command and verifies its outputs after exit 0; a failed
+bind or consumer run cannot retain an old success certificate. Both modes
+preserve nonzero consumer exits: 2 (machining blockers), 3 (bad input), 4 (required
 unknowns) and unexpected failures are failures, not advisory passes. Do not run
 this loop on the unchanged stale legacy plans.
 
@@ -88,12 +95,18 @@ Every enrolled stem is required by both `build` and `release`. Its outputs are
 `cad/out/travelers/<stem>/plan.toml`, `report.json`, `traveler.html`, setup images
 and operation inspection images, with the task stamp at
 `cad/out/reports/prechips-<stem>.ok`. Completeness is derived from the plan and
-checked against render hashes, `expected_exit == 0` and the scoped STEP digest.
-Deleting or rewriting an image invalidates the task even if its stamp remains.
+checked against render hashes, `expected_exit == 0` and report input digests for
+the bound plan, scoped manifest and STEP, inventory, shop policy and cutting data.
+Verification also regenerates the tracked plan and shop bindings in memory and
+requires byte equality with the bound files. A changed source plan, feature
+manifest, shop input or render invalidates the traveler even if its stamp remains.
 
-Releases verify against the staged feature manifest and copy each traveler to
-`travelers/<stem>/` alongside `features/<stem>/`; the bound plan's relative
-feature path continues to resolve there. Release notes list the travelers.
+Releases verify against the staged feature manifest and stage only the validated
+byte snapshots of the bound plan and required report/HTML/PNGs to
+`travelers/<stem>/`, plus the shared bound inputs under `travelers/_shop/`.
+Scratch outputs, lock files and stray temporary files are not shipped.
+The staged `features/<stem>/` bundle and the bound plan's relative feature path
+continue to resolve together. Release notes list the travelers.
 After successful publication the publisher advances `release.yaml` and every
 enrolled plan's single `[drawing].revision` line together with the generated
 README images. The generated-only follow-up exemption covers only those revision

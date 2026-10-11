@@ -121,6 +121,8 @@ with several patches expands inside a list; a multi-face scalar, unknown label
 or label owned by another part fails with its source line. Prose containing a
 label is not rewritten, and other bytes stay unchanged. Plans carry no
 `[paths]`: the wrapper supplies the shop paths as CLI flags.
+Binding requires the plan's drawing revision to equal the scoped manifest's
+revision; release preflight also compares it with the configured next revision.
 
 A shop-made fixture's inventory entry uses `cad = "<fixture-stem>"` and no
 hand-authored `solids`. Its TL spec exports `PRECHIPS_SOLIDS`, derived from the
@@ -162,30 +164,49 @@ this task family.
 | other nonzero | fail, no stamp | consumer failure |
 
 Outputs live under `cad/out/travelers/<stem>/`: the bound plan, `report.json`,
-printable `traveler.html`, setup PNGs and operation inspection PNGs. Completeness
-is derived from the plan: one `setup-S<ordinal>.png` per setup plus every name
-from `prechips.report.inspection_sketch_names(plan)`. The report must record
-matching SHA-256 hashes for every render under `inputs["render:…"]`, declare
-`expected_exit == 0`, and match the feature manifest's `step_sha256`.
+printable `traveler.html`, setup PNGs and operation inspection PNGs. The full
+wrapper deletes the old report before binding so a binding error or consumer
+failure cannot leave an old success certificate beside new inputs.
+Completeness is derived from the plan: one `setup-S<ordinal>.png` per setup plus
+every name from `prechips.report.inspection_sketch_names(plan)`. The report must
+record matching SHA-256 hashes for every render under `inputs["render:…"]`,
+declare `expected_exit == 0`, and match the manifest's `step_sha256`.
+Its input digests must also match the bound plan, scoped feature manifest and
+STEP, inventory, shop policy and cutting data. Verification regenerates the
+tracked plan and shop bindings in memory and requires byte equality with the
+bound files; a report cannot certify a different tracked source generation.
 `verify_traveler` is used after execution, by the task's `uptodate` check and
-during release staging. Missing or changed images force a rerun rather than
+during release staging. Changed inputs or renders force a rerun rather than
 allowing a stale `cad/out/reports/prechips-<stem>.ok` stamp to pass.
 
+The authoring wrapper's `--check` mode writes a separate bound plan,
+`.check/_shop/` inputs and consumer outputs under
+`cad/out/travelers/<stem>/.check/`. It references the current scoped feature
+bundle without modifying it. All check-mode output rewrites and render cleanup
+stay in scratch: the full bound plan, shared shop and traveler outputs remain
+untouched even after source edits. Check mode does not verify full completeness.
+
 The `_run_stamped` → `_exec` path injects `TRACEPARENT` and service
-`prechips-traveler`; the wrapper continues the task span and captures prechips
-telemetry in the pipeline. A strict pass is not permission to machine: shop
-measurements, physical setup verification and machining approval remain human
-responsibilities.
+`prechips-traveler`; the wrapper continues the task trace with
+`pipeline.prechips_traveler`, `prechips.bind` and `prechips.verify` spans and
+captures prechips telemetry unchanged. The pipeline helper accounts for process
+startup. Binding, completeness and nonzero consumer failures mark the pipeline
+span as failed. A strict pass is not permission to machine: shop measurements,
+physical setup verification and machining approval remain human responsibilities.
 
 ## Release travelers and revisions
 
 After staging the verified `features/` bundles, `cut_release.py` calls
-`_process_plans.stage_travelers(out, stage)`. Each enrolled traveler is verified
-against the **staged** feature manifest, then its directory is copied to
-`travelers/<stem>/` in the release ZIP. `facts["travelers"]` records the staged
-paths, release notes list them, and the final provenance manifest hashes their
-files. Any incomplete report, changed render or mismatched STEP digest fails
-before the ZIP is sealed. Empty enrollment stages and lists no travelers.
+`_process_plans.stage_travelers(out, stage)` under `release.travelers_stage`.
+Each enrolled traveler is verified against the **staged** feature manifest,
+then only the validated byte snapshots of its bound plan and required outputs
+are written to `travelers/<stem>/` in the release ZIP. The validated shared shop
+inputs are staged under `travelers/_shop/` too. Check scratch, lock files and
+stray temporary files are excluded; staging does not re-read an entire directory
+after verification. `facts["travelers"]` records the staged paths, release notes
+list them, and the final provenance manifest hashes their files. Any incomplete
+report, changed render/input, source binding drift or mismatched STEP digest
+fails before the ZIP is sealed. Empty enrollment stages and lists no travelers.
 
 Each enrolled plan's tracked `[drawing].revision` literal equals
 `cad/config/release.yaml:next_revision`. The publisher prepares source/temporary
