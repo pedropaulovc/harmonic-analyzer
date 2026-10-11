@@ -73,7 +73,7 @@ def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None
         "ShaftLength": 1,
         "DomeHeight": 1,
         "Radius": 1,
-        "FlatLength": 1,
+        "FlatLength": 2,
         "FlatAF": 3,
         "NorthFlatStation": 2,
         "SouthFlatStation": 2,

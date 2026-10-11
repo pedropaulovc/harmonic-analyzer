@@ -182,7 +182,10 @@ if abs(PIVOT_SHAFT_FLAT_STATIONS[1] - _shaft.NORTH_FLAT_STATION) > 1e-9:
 # flush by straightedge, and at the south ear the stack's acceptance excess,
 # the spring blade's set error and both washers' stock bands (the north one
 # moves the datum ear with the shaft's flush end, the south one the blade-set
-# ear), which move the south ear along the shaft.
+# ear), which move the south ear along the shaft. Both flats are stationed
+# from the north end, set on the north ear's OUTBOARD face, while the south
+# ear is set from the north ear's INBOARD face (through the stack), so the
+# north ear's thickness band also moves the south flat off its ear.
 SHAFT_FLUSH_SET_BAND = 0.25
 _WASHER_DEV = (
     _washer.STOCK_THICKNESS_RANGE[0] - _washer.THICKNESS,
@@ -193,7 +196,9 @@ SOUTH_EAR_SET_RANGE = (
     ROCKER_SPRING_SET_BAND - 2.0 * _WASHER_DEV[0],
 )
 FLAT_OFFSET_MAX = (
-    SHAFT_FLUSH_SET_BAND + max(abs(v) for v in SOUTH_EAR_SET_RANGE),
+    SHAFT_FLUSH_SET_BAND
+    + _bracket.EAR_T_BAND
+    + max(abs(v) for v in SOUTH_EAR_SET_RANGE),
     SHAFT_FLUSH_SET_BAND,
 )  # (south, north)
 # How far a flat may run from its ear's mid-plane before a hub's bore rides
