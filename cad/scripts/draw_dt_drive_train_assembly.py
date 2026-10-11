@@ -954,9 +954,10 @@ CHECKS = _note_text(
         "   TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. EASE THE MHA-DT-002",
         "   SCREWS (MHA-VN-032) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS, TIP TO",
         f"   MHA-DT-012 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
-        f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-VN-032.",
-        f"   SWING IN UNTIL A {set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT;",
-        "   HOLD IT THERE AND TIGHTEN MHA-VN-013. DO NOT LOOSEN MHA-DT-002 AFTER",
+        f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-VN-032. SWING OUT AND",
+        "   REMOVE THE SHIMS. SWING IN UNTIL A "
+        f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT; HOLD",
+        "   IT THERE AND TIGHTEN MHA-VN-013. DO NOT LOOSEN MHA-DT-002 AFTER",
         "   THIS SET; IF YOU DO, REDO BOTH STEPS.",
         # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
         # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).

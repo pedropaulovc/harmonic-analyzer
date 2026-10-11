@@ -1,11 +1,11 @@
 r"""Shared recipe for the McMaster 91790A* 18-8 stainless steel slotted 82 deg
 oval head screws (catalog-only: no vendor model is downloaded or committed).
 
-Live-page facts for https://www.mcmaster.com/91790A199/, read2026-10-09:
-18-8 stainless, slotted oval head, standard profile, nominal82deg,
-headØ.312in, headheight.152in, ovaltop.052in, #8-32 UNC class2A,
+Live-page facts for https://www.mcmaster.com/91790A199/, read 2026-10-09:
+18-8 stainless, slotted oval head, standard profile, nominal 82 deg,
+head Ø.312 in, head height .152 in, oval top .052 in, #8-32 UNC class 2A,
 fully threaded, ASME B18.6.3, 1in stock. Length is measured from the
-TOP OF THE BEVEL, not crown or underhead. H/C/O in ASME2013 Table7
+TOP OF THE BEVEL, not crown or underhead. H/C/O in ASME 2013 Table 7
 are reference dimensions; native construction is not a tolerance limit.
 
 The page gives no slot dimensions, tip-chamfer or crown-radius figure, nor
@@ -84,7 +84,7 @@ from vn_transgear_arm_plate_screw_spec import (  # noqa: E402
 OVAL_SIZES = {
     # part: (major dia, length from the top of the bevel, head dia at the top
     #        of the bevel, crown height, head angle deg, pitch)
-    # #8-32 x1in, fully threaded, quantity2; installed part cuts to the same fit.
+    # #8-32 x 1 in, fully threaded, quantity 2; installed part cuts to the same fit.
     "91790A199": (
         THREAD_MAJOR,
         STOCK_LENGTH,

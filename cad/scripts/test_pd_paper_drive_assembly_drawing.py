@@ -1039,7 +1039,10 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
     assert (
         f"MANDREL IN THE {drawing._N['pd-transgear-feed-pinion']} BORE" in transferred
     )
-    assert f"WITH THE {drawing._N['pd-rack-pinion']} PIN IN EACH TOOTH SPACE" in transferred
+    assert (
+        f"WITH A \u00d8{disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} GAUGE PIN IN EACH "
+        f"{drawing._N['pd-rack-pinion']} TOOTH SPACE IN TURN"
+    ) in transferred
     tir = drawing.quality.toothspace_runout_tir_mm()
     assert f"TILL THE DIAL READS {tir:.2f} TIR MAX" in transferred
     for method in ("CERTIFIED", "RUNNING-BORE", "INDICATOR STATION", "INSPECTION"):

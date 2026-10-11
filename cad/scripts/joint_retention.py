@@ -221,12 +221,15 @@ RULINGS: dict[str, Ruling] = {
         joint="pd-paper-drive/thumbnut-on-knob-shaft",
         granted=(
             "user, 2026-10-03, joint-specific rule-9 ruling on the machinist review of "
-            "6c385465d: no lock on the MHA-PD-013 thumbnut. The T24 floats 0.05-0.15 under the "
+            "6c385465d: no lock on the MHA-PD-013 thumbnut; re-granted 2026-10-11 for "
+            "#8-32 after the inch change. The T24 floats 0.05-0.15 under the "
             "flange and turns against it only by its drive-pin backlash, ±0.9° per reversal "
             "((Ø2.5 +0.10 hole - Ø2.381 pin) / 2 on the R7 circle). Any drag it passes is "
             "μ F r_m = 0.15 × 1 N × 5.68 = 0.85 N·mm [INFERENCE: chain axial pull ≤1 N], "
-            "against ~360 N·mm to back off a hand-tight nut [INFERENCE: ~400 N preload, μ "
-            "0.15 on the 1/4-20 flank and the pilot seat], over 100x. Every positive lock "
+            "against ~330 N·mm to back off a hand-tight nut [INFERENCE: ~400 N preload, μ "
+            "0.15 on the #8-32 flank (d2 3.65, P 0.794) and on the pilot seat at the 10-03 "
+            "mean radius 4.24; F (0.5 d2 μ / cos 30° - P / 2π + μ r)], over 300x. "
+            "Every positive lock "
             "tried broke a wall or the chain's envelope: a 98335A049 hairpin across the "
             "flange sweeps r ~23 inside the chain band (plates' inner edge r 21.2)"
         ),
@@ -617,7 +620,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
         "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #8-32 fulcrum-keeper taps (top-level row)
         "pd_transgear_arm",  # MHA-PD-018: 2x #8-32 plate taps through (pd_transgear_arm_spec), receiver; the pin MHA-PD-023 is pressed in a reamed hole
-        "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster91790A199, MHA-VN-040), 1-in stock cut to fit; member:2 into transgear_arm
+        "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A199, MHA-VN-040), 1-in stock cut to fit; member: 2 into transgear_arm
         "vn_transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-VN-039), cut to fit; member: 3 through the hub flange into rack_pinion
         "pd_transgear_knob_shaft",  # MHA-PD-008: #8-32 UNC die-cut front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-VN-048)
         "vn_transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 91829A205, MHA-VN-041), member into the support_bar's blind pivot tap

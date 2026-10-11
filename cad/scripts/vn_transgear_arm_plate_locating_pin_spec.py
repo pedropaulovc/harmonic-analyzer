@@ -1,8 +1,8 @@
 """MHA-VN-054: live-sourced McMaster 93600A189 arm/plate locating dowel.
 
 316 stainless steel, passivated, ISO 2338-m6, both ends chamfered. The
-supplier specifies diameter2.002..2.008 and nominal length6mm.
-ISO2338:1997 Table1 gives length5.75..6.25; endc≈0.35 is only
+supplier specifies diameter 2.002..2.008 and nominal length 6 mm.
+ISO 2338:1997 Table 1 gives length 5.75..6.25; end c≈0.35 is only
 a reference, NOT a maximum or a full-cylinder guarantee. The purchased
 native reference remains a nominal cylinder, with no invented end form.
 
@@ -21,7 +21,7 @@ ASSEMBLY_QUANTITY = 2
 DIA = 2.0
 DIA_LIMITS = (2.002, 2.008)
 LENGTH = 6.0
-# Published ISO2338:1997 Table1, not an incoming acceptance band.
+# Published ISO 2338:1997 Table 1, not an incoming acceptance band.
 # https://cdn.standards.iteh.ai/samples/20001/5b26cece48c448b782c0de1eccb5b16c/ISO-2338-1997.pdf
 LENGTH_LIMITS_MM = (5.75, 6.25)
 END_FORM_REFERENCE_MM = 0.35  # c≈, explicitly NOT a maximum
@@ -57,7 +57,7 @@ ARM_BOTTOM_AIR_MIN_MM = (
 
 PURCHASED_STOCK_NOTE = "\n".join((
     f"McMASTER {SKU} / 316 SS / PASSIVATED",
-    "2 x 6 NOMINAL; ISO2338-m6, BOTH ENDS CHAMFERED",
+    "2 x 6 NOMINAL; ISO 2338-m6, BOTH ENDS CHAMFERED",
     "TWO MATCHED LOCATORS / PRESS ARM; SLIP PLATE",
     "SCREWS CLAMP ONLY; DO NOT BOTTOM IN ARM",
 ))

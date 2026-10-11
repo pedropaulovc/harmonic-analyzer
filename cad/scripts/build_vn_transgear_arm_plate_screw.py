@@ -1,8 +1,8 @@
-r"""Purchased transgear arm-plate screws: McMaster91790A199, 18-8 stainless,
+r"""Purchased transgear arm-plate screws: McMaster 91790A199, 18-8 stainless,
 cut to fit.
 
-8-32 x1in slotted82deg oval head, fully threaded, length measured from
-the top of the bevel, verified live2026-10-09 at mcmaster.com/91790A199
+8-32 x 1 in slotted 82 deg oval head, fully threaded, length measured from
+the top of the bevel, verified live 2026-10-09 at mcmaster.com/91790A199
 (``vn_transgear_arm_plate_screw_spec``).  Two hold the arm plate
 (MHA-PD-019) on the arm (MHA-PD-018): each bevel seats in one of the plate's
 82 deg countersinks and the shank runs through the plate's clearance

@@ -2,7 +2,8 @@ r"""Reproduce the v2 cone pivot post and integrated crank pedestal.
 
 The v2 casting supplies the retained diameters, cone-axis, foot and mounting
 datums.  Its original 86 mm height came from the ch30 eight-view; this
-normal-24DP crank variant grows the actual body to 90 mm and keeps the 26.6 mm
+normal-24DP crank variant grows the actual body to ``BLOCK_HEIGHT``
+(dt_cone_pivot_post_spec, from dt_post_mount_stack) and keeps the 26.6 mm
 head so the raised crank boss remains inside the host outline.  The body,
 head and boss proportions otherwise retain the harvested feature geometry.
 

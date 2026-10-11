@@ -1,12 +1,12 @@
-r"""Live-sourced McMaster91790A199 dimensions in mm, without native execution.
+r"""Live-sourced McMaster 91790A199 dimensions in mm, without native execution.
 
-MHA-VN-040 (quantity2): standard OVAL slotted18-8, #8-32 UNC-2A,
-fully threaded1in stock, nominal82degree, ASME B18.6.3, flat tip.
-Populated primary page observed2026-10-09T07:17:13.553Z:
+MHA-VN-040 (quantity 2): standard OVAL slotted 18-8, #8-32 UNC-2A,
+fully threaded 1 in stock, nominal 82 degree, ASME B18.6.3, flat tip.
+Populated primary page observed 2026-10-09T07:17:13.553Z:
 https://www.mcmaster.com/91790A199/ . Length is from BEVEL TOP,
-not crown or underhead. Catalog head diameter.312in, total head.152in,
-crown.052in are nominal, not supplier tolerance bands. The derived
-82degree cone/spherical crown recipe is not a vendor3D model or a
+not crown or underhead. Catalog head diameter .312 in, total head .152 in,
+crown .052 in are nominal, not supplier tolerance bands. The derived
+82 degree cone/spherical crown recipe is not a vendor 3D model or a
 profile guarantee. The installed oval/slotted head look is unchanged.
 
 Stock is bench-fitted and cut OFF MECHANISM before the guide-lock sweep.
@@ -34,7 +34,7 @@ ASSEMBLY_QUANTITY = 2
 THREAD_MAJOR = 0.164 * IN
 THREAD_MAJOR_MIN = 0.1571 * IN  # UNC-2A minimum major (ASME B1.1)
 THREAD_MAJOR_MAX_MM = 0.1631 * IN  # UNC-2A maximum; GO gage mouth datum
-# ASME B1.1 UNC-2A, Machining Doctor thread table tid15. Internal 2B
+# ASME B1.1 UNC-2A, Machining Doctor thread table tid 15. Internal 2B
 # counterpart lives with the actual ARM tap; pitch clearance is NOT zero.
 THREAD_PITCH_DIA_LIMITS_MM = tuple(value * IN for value in (0.1399, 0.1428))
 PITCH = IN / 32.0
@@ -43,7 +43,7 @@ HEAD_H = 0.152 * IN  # total, crown included
 CROWN_H = 0.052 * IN
 BEVEL_H = HEAD_H - CROWN_H
 HEAD_ANGLE_DEG = 82.0
-# ASME B18.6.3-2013 Table7 (printed p19), §§2.1.5,2.1.6,3.2–3.7:
+# ASME B18.6.3-2013 Table 7 (printed p. 19), §§2.1.5, 2.1.6, 3.2–3.7:
 # https://www.finesz.com/pic/ASMEB18.6.3-2013.pdf
 # H=.100, C=.052 and total O=.152 are REF, not dimensional maxima.
 # The mandatory protrusion F above standard gaging diameter G IS limited.
@@ -56,7 +56,7 @@ HEAD_RADIUS_FROM_SHANK_AXIS_MAX_MM = HEAD_DIA_MAX_MM / 2.0 + HEAD_AXIS_ECCENTRIC
 UNDER_HEAD_FILLET_RADIUS_MAX_MM = 0.15 * THREAD_MAJOR
 UNTHREADED_UNDER_HEAD_MAX_MM = 2.0 * PITCH
 POINT_CHAMFER_LENGTH_MAX_MM = 2.0 * PITCH
-# §3.5 permits the non-thread body down to the Class2A minimum pitch OD.
+# §3.5 permits the non-thread body down to the Class 2A minimum pitch OD.
 # Bound ALL crown/cone/fillet metal; no REF crown or side-height cap.
 HEAD_WHOLE_METAL_HEIGHT_MAX_MM = (
     HEAD_PROTRUSION_MAX_MM
@@ -73,9 +73,9 @@ HEAD_TOP_TO_THREAD_GAGE_MAX_MM = (
     / math.tan(HEAD_BEARING_HALF_ANGLE_MIN_RAD)
 )
 STOCK_LENGTH = 1.0 * IN  # primary nominal FROM BEVEL TOP
-# §3.4 applies -.03in to oval overall Lo. No positive .052 REF crown credit.
+# §3.4 applies -.03 in to oval overall Lo. No positive .052 REF crown credit.
 STOCK_OVERALL_LENGTH_MIN_MM = STOCK_LENGTH - 0.03 * IN
-# §3.7: .006in/in straightness. Whole-metal height bounds the uncredited
+# §3.7: .006 in/in straightness. Whole-metal height bounds the uncredited
 # crown in the maximum stock lever; no nominal crown tolerance is assumed.
 STOCK_BODY_STRAIGHTNESS_MAX_MM = 0.006 * (STOCK_LENGTH + HEAD_WHOLE_METAL_HEIGHT_MAX_MM)
 HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM = (
