@@ -451,6 +451,7 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
     land_angle = math.degrees(math.acos(
         sum((tip[i] - top[i]) * tangent[i] for i in (0, 1)) / rocker.TIP_FACE
     ))
+    angular = float(_config.title_block("angular")["value_deg"])
     result = {
         "pivot_bore": _feature(rocker, "hole", ["dia", "thru", "finish_ra", "process"], {
             "at": centre, "axis": axis,
@@ -519,11 +520,11 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
     for name, sign in (("tip_land_pos_x", 1), ("tip_land_neg_x", -1)):
         result[name] = _feature(rocker, "face", ["tip_land", "land_angle_deg"], {
             "tip_land": (_band(rocker.TIP_FACE, p), ("TIP_FACE",)),
-            "land_angle_deg": (UNKNOWN, ("TIP_FACE",)),
+            "land_angle_deg": ([land_angle - angular, land_angle + angular], ("TIP_FACE", "TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "R_TOP", "CENTER_Y")),
             "land_angle_nominal_deg": (land_angle, ("TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "TIP_FACE", "R_TOP", "CENTER_Y")),
             "radial_tip_end": ([sign * tip[0], tip[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
             "top_edge_feature": ("top_edge", ("R_TOP",)),
-        }, precision={"tip_land": p, "land_angle_deg": UNKNOWN})
+        }, precision={"tip_land": p, "land_angle_deg": 0})
     result["tip_land_pos_x"]["datum"] = "C"
     result["tip_land_pos_x"]["cite"]["datum"] = _source_cite("rocker_datum_c")
     notes_cite = _cite(rocker_notes, "DRAWING_NOTES")
@@ -754,7 +755,8 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
                     rocker_notes, "DRAWING_PRECISION", "DEFAULT_DRAWING_PRECISION",
                 )
             if key in feature["cite"] and isinstance(feature.get(key), list) and len(feature[key]) == 2:
-                feature["cite"][key] += _source_cite(f"linear_{feature['precision'][key]}pl", "angular", "drilled_hole_plus", "drilled_hole_minus")
+                tolerance = "angular" if key.endswith("_deg") else f"linear_{feature['precision'][key]}pl"
+                feature["cite"][key] += _source_cite(tolerance, "drilled_hole_plus", "drilled_hole_minus")
         if "finish_ra" in feature:
             feature["cite"]["finish_ra"] += _cite(
                 _surface_finish,
@@ -793,10 +795,10 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
     volume = {"volume_mm3": cone.HARVESTED_VOLUME_MM3, "volume_cite": _cite(cone, "HARVESTED_VOLUME_MM3")} if stem == "dt_cone_pivot_post" else {}
     return {
         "part": dashed, "units": "mm", "precision": rocker_notes.DEFAULT_DRAWING_PRECISION if stem == "ch_rocker_arm" else UNKNOWN,
-        "step": f"{dashed}.STEP", "step_sha256": UNKNOWN, "construction": construction, **volume, "cite_root": "harmonic-analyzer",
+        "step": bundle_paths(stem)[1].name, "step_sha256": UNKNOWN, "construction": construction, **volume, "cite_root": "harmonic-analyzer",
         "cite": {"construction": construction_cite, "units": frame_cite, "precision": _cite(rocker_notes, "DEFAULT_DRAWING_PRECISION") if stem == "ch_rocker_arm" else frame_cite, "frames": frame_cite},
         "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), *_source_cite("drawing_revision", "drawing_properties")]},
-        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": UNKNOWN, "cite": registry_cite("material_specification", "material", "finish")},
+        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": rocker.ARM_THICKNESS if stem == "ch_rocker_arm" else UNKNOWN, "cite": [*registry_cite("material_specification", "material", "finish"), *(_cite(rocker, "ARM_THICKNESS") if stem == "ch_rocker_arm" else [])]},
         "notes": {"manufacturing": notes.splitlines(), "process": row.get("process", UNKNOWN), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": [*registry_cite("process"), *_source_cite("edge_break_display_r", "edge_break_display_chamfer"), *_cite(notes_module, "DRAWING_NOTES")]},
         "general_tolerances": general, "frames": frames, "datums": datums, "features": features,
     }
@@ -833,6 +835,13 @@ def _toml(data: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def bundle_paths(stem: str, out: Path = OUT) -> tuple[Path, Path]:
+    """Return the requirements manifest and scoped STEP in their shared bundle."""
+    stem = _stem(stem)
+    directory = Path(out) / "features" / stem
+    return directory / "features.toml", directory / f"{stem.replace('_', '-')}.STEP"
+
+
 def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     """Bind all labelled STEP faces and write the adjacent requirements TOML."""
     from prechips.model import Features
@@ -856,7 +865,7 @@ def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     manifest["cite"]["step_sha256"] = [step_cite]
     manifest["drawing"]["revision"] = revision
     Features.model_validate(manifest)
-    path = step.with_name("features.toml")
+    path = step.with_name(bundle_paths(stem)[0].name)
     partial = path.with_suffix(".toml.partial")
     partial.write_text(_toml(manifest), encoding="utf-8", newline="\n")
     partial.replace(path)

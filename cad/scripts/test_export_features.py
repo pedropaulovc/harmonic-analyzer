@@ -60,6 +60,14 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert features["hub_faces"]["length_nominal"] == 7.0565
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         assert features[name]["tip_land"] == [5.08, 6.10]
+        assert features[name]["land_angle_deg"] == [89.0, 91.0]
+        assert features[name]["precision"]["land_angle_deg"] == 0
+        citations = features[name]["cite"]["land_angle_deg"]
+        assert exporter.SOURCE_MAP["angular"][0] in citations
+        assert not any("linear_" in citation for citation in citations)
+        assert set(exporter._cite(exporter.rocker, "TIP_FACE", "TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "R_TOP", "CENTER_Y")) <= set(citations)
+    assert manifest["material"]["thickness"] == 2.5
+    assert exporter._cite(exporter.rocker, "ARM_THICKNESS")[0] in manifest["material"]["cite"]
     # The strap's native 2.500 +/-0.025 (Main ruling 2026-10, option b).
     for name in ("strap_datum_b", "strap_faces"):
         assert features[name]["thickness"] == [2.475, 2.525]
@@ -74,7 +82,6 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
 def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -> None:
     features = exporter.requirement_manifest("ch_rocker_arm")["features"]
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
-        assert features[name]["land_angle_deg"] == "unknown"
         assert features[name]["requirements"] == ["tip_land", "land_angle_deg"]
     assert features["profile_outer"]["requirements"] == ["bottom_radius", "bottom_arc_len", "mirror_symmetric"]
     assert "depth_ref" not in features["profile_outer"]["requirements"]
@@ -282,6 +289,25 @@ def test_turned_profile_resolves_only_spans_coaxial_with_its_setup() -> None:
     assert _axial_span(features["body"], spindle, frames, 1.0) == pytest.approx((cone.HEAD_HEIGHT, cone.BLOCK_HEIGHT))
     assert _axial_span(features["crank_boss"], spindle, frames, 1.0) is None
     assert _axial_span(features["cone_boss"], spindle, frames, 1.0) is None
+
+
+@pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
+def test_bundle_paths_use_canonical_stems_and_existing_filenames(tmp_path: Path, stem: str) -> None:
+    expected = (
+        tmp_path / "features" / stem / "features.toml",
+        tmp_path / "features" / stem / f"{stem.replace('_', '-')}.STEP",
+    )
+    assert exporter.bundle_paths(stem, out=tmp_path) == expected
+    assert exporter.bundle_paths(stem.replace("_", "-"), out=tmp_path) == expected
+    manifest, step = exporter.bundle_paths(stem)
+    assert manifest.parent == exporter.OUT / "features" / stem
+    assert manifest.name == "features.toml"
+    assert step.name == exporter.requirement_manifest(stem)["step"]
+
+
+def test_bundle_paths_reject_unsupported_parts(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="unsupported"):
+        exporter.bundle_paths("unrelated_part", out=tmp_path)
 
 
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
