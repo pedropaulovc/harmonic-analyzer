@@ -17,4 +17,3 @@ pd-platen-rack:
   process: "fabricated from purchased SDP/SI A 1B12-Y324 rack stock, cut to 269.64 mm and soft-soldered to the existing 7.2375 x 6 mm brass backer; backer soft-soldered to the platen"
   installation_notes: |-
     CUT TO 269.6 MM; SOFT-SOLDER TO BACKER; SET MESH AT ASSEMBLY.
-    CHECK FLANKS 20 DEG +/-2.

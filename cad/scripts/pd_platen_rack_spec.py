@@ -599,17 +599,6 @@ def require_rack_form_admission_mm(
     )
 
 
-RACK_FLANK_INSPECTION_PROPERTY = "Rack Flank Inspection"
-
-
-def rack_flank_inspection_callout_text() -> str:
-    """The flank requirement the drawing carries (policy option (c))."""
-    from paper_drive_geom import feed_rack_form_admission_controls
-
-    controls = feed_rack_form_admission_controls()
-    return f"FLANKS {PA_DEG:g} DEG +/-{controls['working_side_angle_deviation_deg']:g}"
-
-
 GAP_AREA = (half_width(ROOT_Y) + half_width(BAR_HEIGHT)) * (BAR_HEIGHT - ROOT_Y)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

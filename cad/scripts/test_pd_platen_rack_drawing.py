@@ -230,17 +230,17 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     assert "SET MESH AT ASSEMBLY" in installation
     for method in ("WIRE", "SECANT", "INDICATOR", " U +/-"):
         assert method not in installation
-    # Policy option (c): the sheet carries the flank requirement only; the
-    # assembly's rack step carries no measuring method.
-    callout = spec.rack_flank_inspection_callout_text()
-    assert callout == f"FLANKS {spec.PA_DEG:g} DEG +/-{quality.rack_working_side_angle_deviation_deg():g}"
+    # The purchased rack's flanks are as purchased: neither the sheet nor the
+    # installation note adds a flank requirement, and the assembly's rack step
+    # carries no measuring method.
+    assert "FLANK" not in installation
     assembly = importlib.import_module("draw_pd_paper_drive_assembly")
     steps_module = importlib.import_module("pd_paper_drive_assembly_steps")
     soldered = assembly._step_text(
         operating_domain=steps_module.feed_rack_operating_domain()
     )["rack-soldered"]
     for method in ("WIRE", "SECANT", "INDICATOR", "U +/-"):
-        assert method not in callout and method not in soldered
+        assert method not in soldered
 
 
 def test_incoming_rack_note_is_the_two_stock_sizes() -> None:
@@ -721,26 +721,6 @@ def test_supported_process_basis_still_requires_all_explicit_envelopes(
 def test_raw_pins_cloud_or_roll_scalar_is_not_a_material_envelope_certificate(unsupported):
     with pytest.raises(ValueError, match="whole-point-envelope inspection receipt"):
         spec.require_rack_form_admission_mm(receipt=unsupported, required_gap_stations=(0, 1, 2))
-
-
-def test_feature_local_flank_ink_uses_one_canonical_shop_resolution_source():
-    text = spec.rack_flank_inspection_callout_text()
-    assert text == f"FLANKS {spec.PA_DEG:g} DEG +/-{quality.rack_working_side_angle_deviation_deg():g}"
-    for qualifier in (
-        quality.stock_form_receiving_status_text(),
-        "WHOLE MATERIAL", "X-INTERCEPT", "BOUNDARY", "ROOT INTRUSION",
-        "RECEIVED NORMALS", "MODEL", "VENDOR ACCURACY", "PROOF",
-    ):
-        assert qualifier not in text
-        assert qualifier not in _config.parts(builder.PART_NAME)["installation_notes"]
-    assert len(text.splitlines()) == 1
-    assert len(text) <= 70
-    assert builder.RACK_FLANK_INSPECTION_PROPERTY == drawing.RACK_FLANK_INSPECTION_PROPERTY
-    assert builder.rack_flank_inspection_callout_text is spec.rack_flank_inspection_callout_text
-    source = inspect.getsource(drawing)
-    assert "add_property_linked_callout(" in source
-    assert "model_point_in_view(" in source
-    assert "_assert_rack_flank_callout(" in source
 
 
 @pytest.fixture
