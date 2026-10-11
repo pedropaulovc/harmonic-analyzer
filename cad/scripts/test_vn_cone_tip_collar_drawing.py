@@ -495,17 +495,21 @@ def test_collar_air_shares_the_assembly_post_face_and_tip_tap_bands():
     )) == pytest.approx(bdt.TIP_TAP_LATERAL_BAND_MM)
 
 
-def test_collar_air_books_the_shaft_tip_across_the_backed_off_cup():
-    from cone_shaft_land_bands import TERMINAL_FINISHED_DIA_LIMITS_MM, TERMINAL_FLAT_OFFSET_MIN_MM
-    from cone_stack_end_play import SHAFT_END_PLAY
+def test_collar_air_bounds_the_released_tip_by_the_post_journal_not_the_vendor_cup():
+    post, shaft = air.post, air.shaft
 
-    capture = air.TIP_END_TERMS_MM["shaft tip in the backed-off cup"]
-    assert "shaft tip in the backed-off cup" in air.IN_SERVICE_CLEARANCES
-    r, o, e = TERMINAL_FINISHED_DIA_LIMITS_MM[1] / 2.0, TERMINAL_FLAT_OFFSET_MIN_MM, SHAFT_END_PLAY[1]
-    # Toward the round the 45 deg wall gives exactly the end play; toward the
-    # D-flat the corners meet the wall circle r + e, which gives more.
-    assert capture > e
-    assert r * r + 2.0 * o * capture + capture * capture == pytest.approx((r + e) ** 2)
+    name = "shaft swing in the post journal off the cup"
+    release = air.TIP_END_TERMS_MM[name]
+    assert name in air.IN_SERVICE_CLEARANCES
+    c = max(shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)
+    engaged = (post.CONE_BOSS_LENGTH - printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
+               - 2.0 * shaft.THRUST_EDGE_BREAK_MAX)
+    span = shaft.T006_TIP_STATION - air.cone_line.POST_STATION
+    # Seated at one side of the journal, released to the other.
+    assert release == pytest.approx(2.0 * c * span / engaged)
+    # B18.6.2 bounds no cup depth or wall angle: the nominal 90 deg vendor cup
+    # over the 0.25 end play would have booked less.
+    assert release > 0.5
 
 
 
