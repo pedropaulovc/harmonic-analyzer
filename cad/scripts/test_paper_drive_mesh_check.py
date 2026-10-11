@@ -37,8 +37,52 @@ def test_reducer_centre_window_is_bounded_by_the_two_gates() -> None:
     assert mesh.reducer_mesh(disc.CENTRE_DISTANCE).failures() == []
 
 
+def _min_tips() -> tuple[float, float]:
+    return (
+        min(p.blank_radius_mm for p in knob.manufactured_profiles()),
+        min(p.blank_radius_mm for p in disc.manufactured_profiles()),
+    )
+
+
+def test_reducer_contact_ratio_has_a_nominal_and_a_runout_tier() -> None:
+    # Nominal tier at the centre, runout tier with the centre opened by both
+    # tooth-space runouts; both at the minimum printed tips.
+    check = mesh.reducer_mesh()
+    loose = disc.CENTRE_DISTANCE + mesh.reducer_runout_shift_mm()
+    assert check.contact_ratio_min == pytest.approx(
+        mesh.reducer_contact_ratio(disc.CENTRE_DISTANCE, *_min_tips())
+    )
+    assert check.runout_contact_ratio_min == pytest.approx(
+        mesh.reducer_contact_ratio(loose, *_min_tips())
+    )
+    assert check.contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
+    assert check.runout_contact_ratio_min >= mesh.RUNOUT_CONTACT_RATIO_FLOOR
+    assert check.runout_contact_ratio_min < check.contact_ratio_min
+    assert mesh.RUNOUT_CONTACT_RATIO_FLOOR < mesh.CONTACT_RATIO_FLOOR
+
+
+def test_runout_tier_fails_on_its_own() -> None:
+    # A larger runout that leaves the nominal tier intact must still fail
+    # once the loose extreme drops below its floor.
+    tips = _min_tips()
+    shift = mesh.reducer_runout_shift_mm()
+    while mesh.reducer_contact_ratio(disc.CENTRE_DISTANCE + shift, *tips) >= mesh.RUNOUT_CONTACT_RATIO_FLOOR:
+        shift += 0.001
+    good = mesh.reducer_mesh()
+    bad = mesh.MeshCheck(
+        good.label, good.contact_ratio_min, good.backlash_mm, good.root_clearance_min_mm,
+        good.root_clearance_floor_mm, good.interference_margin_min_mm,
+        mesh.reducer_contact_ratio(disc.CENTRE_DISTANCE + shift, *tips),
+    )
+    assert bad.contact_ratio_min >= mesh.CONTACT_RATIO_FLOOR
+    problems = bad.failures()
+    assert len(problems) == 1 and problems[0].startswith("runout-extreme contact ratio")
+    # The rack mesh takes its contact ratio at its own loose end: no tier.
+    assert mesh.feed_rack_mesh().runout_contact_ratio_min is None
+
+
 @pytest.mark.parametrize("field", [
-    "contact_ratio_min", "backlash_low", "backlash_high",
+    "contact_ratio_min", "runout_contact_ratio_min", "backlash_low", "backlash_high",
     "root_clearance_min_mm", "root_clearance_floor_mm", "interference_margin_min_mm",
 ])
 def test_an_undefined_mesh_number_fails_closed(field: str) -> None:
@@ -50,6 +94,7 @@ def test_an_undefined_mesh_number_fails_closed(field: str) -> None:
         "root_clearance_min_mm": good.root_clearance_min_mm,
         "root_clearance_floor_mm": good.root_clearance_floor_mm,
         "interference_margin_min_mm": good.interference_margin_min_mm,
+        "runout_contact_ratio_min": good.runout_contact_ratio_min,
     }
     if field.startswith("backlash"):
         low, high = good.backlash_mm
