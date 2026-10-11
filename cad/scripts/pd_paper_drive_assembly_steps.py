@@ -62,7 +62,8 @@ SEQUENCE: tuple[str, ...] = (
     # R9-68: the plain pin pressed into the arm's reamed hole, head on the
     # arm's rear face (pd_transgear_pin_spec).
     "pin-pressed",
-    # The critical gear-plane S-K pose is held in the matched jig before the
+    # The plate's knob bore is held at its drawn place from the arm's pin
+    # bore in the matched jig before the
     # two locating holes receive their separate final press/slip reams.
     "arm-plate-located",
     "arm-plate-fitted",
@@ -147,7 +148,7 @@ def matched_locator_notes(mate_number: str) -> str:
         (
             f"1. LOCATING HOLES MATCH-DRILLED WITH {mate_number};",
             f"   {step_ref('arm-plate-located')}.",
-            "2. ASSEMBLED S-K POSE AND SEAT ACCEPTANCE:",
+            "2. PLATE SEAT ACCEPTANCE:",
             f"   {step_ref('arm-plate-fitted')}.",
         )
     )

@@ -296,7 +296,10 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    assert "TOGETHER IN THE S-K JIG PER THEIR DRAWINGS" in located
+    assert (
+        "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
+        f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE, PER THEIR DRAWINGS"
+    ) in located
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
@@ -1469,9 +1472,11 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
 
 def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:
     body = _step_body("loaded-rack-geometry-checked")
-    assert body.startswith("HANGER LATCHED, KNOB HELD.")
-    assert "WITH PAPER LOADED, RUN THE PLATEN THROUGH THE WHOLE ENGAGED WINDOW" in body
-    assert "NO TIGHT SPOT, SHAKE AT EVERY TOOTH" in body
+    assert body.startswith("HANGER LATCHED, PAPER LOADED. TRAVEL: TURN THE KNOB")
+    travel, backlash = body.split(" BACKLASH: ")
+    assert "RUN THE PLATEN THROUGH THE WHOLE ENGAGED WINDOW: NO TIGHT SPOT" in travel
+    assert "KNOB HELD" not in travel
+    assert backlash.startswith("KNOB HELD, ROCK THE PLATEN ALONG THE RACK")
     for method in ("UNCERTAINTY", "RE-ZERO", "DATUM", "REJECT"):
         assert method not in body
     assert steps.step_number("hook-pin-hole-match-drilled") < steps.step_number(
@@ -1486,8 +1491,9 @@ def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
     assert steps.KNOB_HELD_BACK_TEXT in body
     clock = drawing.quality.reducer_setup_clock_deviation_mm()
     assert (
-        f"TURN THE DISC SO A {knob_shaft.TEETH}T GAP FACES S AND A {disc.TEETH}T "
-        f"TOOTH FACES K, WITHIN {clock:.2f} AT THE PITCH CIRCLE"
+        "TURN THE DISC SO, ON THE LINE THROUGH THE KNOB AND CLUSTER AXES, A "
+        f"{disc.TEETH}T TOOTH STANDS CENTRED IN A {knob_shaft.TEETH}T GAP, "
+        f"WITHIN {clock:.2f} AT THE PITCH CIRCLE"
     ) in body
     assert body.endswith("TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH.")
     for method in ("UNCERTAINTY", "RE-ZERO", "RE-CLOCK", "ABSOLUTE", "REJECT"):

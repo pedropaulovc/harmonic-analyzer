@@ -1752,7 +1752,7 @@ sections:
         - process allowance
         - high
       - - Matched reducer absolute setup clock
-        - 'With the disc cluster on its feed running bore and the hanger latched, turn the disc so an integral 12T gap faces S and a 120T tooth faces K, judged on their flanks, within 0.05 at each pitch circle (MHA-PD-000 fit-up pose step). Set once. Separate from all-space index, tooth-space TIR and tooth thickness.'
+        - 'With the disc cluster on its feed running bore and the hanger latched, turn the disc so, on the line through the knob and cluster axes, a 120T tooth stands centred in an integral 12T gap, judged on their flanks, within 0.05 at each pitch circle (MHA-PD-000 fit-up pose step). Set once. Separate from all-space index, tooth-space TIR and tooth thickness.'
         - —
         - '`fits.stock_form_quality.reducer_setup_clock_deviation_mm` through `_gear_quality.reducer_setup_clock_deviation_mm`; `draw_pd_paper_drive_assembly` fit-up pose step'
         - specified assembly setting
