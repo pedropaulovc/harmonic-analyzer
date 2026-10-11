@@ -187,7 +187,7 @@ def _numeral_profile(adapter: Any, parent: Any) -> Any:
     section = create_section_view(
         adapter, parent, line_start=endpoints[0], line_end=endpoints[1],
         view_xy=NUMERAL_PROFILE_CENTER, section_label="G", scale=NUMERAL_PROFILE_SCALE,
-        partial=True, label="numeral V-envelope G-G",
+        partial=True, label="numeral depth G-G",
     )
     section = _early_bound(section, "IView")
     section.UseParentScale = False

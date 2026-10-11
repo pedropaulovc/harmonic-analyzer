@@ -712,7 +712,6 @@ def test_numeral_depth_and_tool_contract_are_independent_of_graduations() -> Non
     assert spec.NUMERAL_DEPTH == 0.10
     assert spec.NUMERAL_DEPTH_TOLERANCE_MM == 0.05
     assert spec.NUMERAL_V_BIT_INCLUDED_ANGLE_DEG == 30.0
-    assert spec.NUMERAL_DRAFT_ANGLE_DEG == 15.0
     assert spec.DRAWING_DIMENSIONS["Numerals"] == {"NumeralDepth"}
     assert spec.DRAWING_PRECISION["Numerals"] == {"NumeralDepth": 2}
     assert spec.DRAWING_VALUES_BY_NAME["NumeralDepth"] == spec.NUMERAL_DEPTH
@@ -727,28 +726,7 @@ def test_numeral_depth_and_tool_contract_are_independent_of_graduations() -> Non
     assert "0.10" not in spec.NUMERAL_TOOL_NOTE
 
 
-def test_numeral_envelope_volume_integrates_sloped_walls_and_counters() -> None:
-    width, height, depth = 0.27, 2.0, spec.NUMERAL_DEPTH
-    rectangle = [(0.0, 0.0), (width, 0.0), (width, height), (0.0, height)]
-    slope = math.tan(math.radians(spec.NUMERAL_DRAFT_ANGLE_DEG))
-    expected = (
-        width * height * depth - (width + height) * slope * depth**2
-        + 4.0 * slope**2 * depth**3 / 3.0
-    )
-    assert builder.numeral_envelope_volume([rectangle], depth, 15.0) == pytest.approx(expected)
-    assert builder.numeral_envelope_volume([rectangle], depth, 0.0) == pytest.approx(width * height * depth)
-    counter = [(0.1, 0.2), (0.1, 0.4), (0.17, 0.4), (0.17, 0.2)]
-    # Counter grows with z, so its subtracted volume uses the opposite slope.
-    counter_volume = (
-        0.07 * 0.2 * depth + (0.07 + 0.2) * slope * depth**2
-        + 4.0 * slope**2 * depth**3 / 3.0
-    )
-    assert builder.numeral_envelope_volume([rectangle, counter], depth, 15.0) == pytest.approx(
-        expected - counter_volume,
-    )
-
-
-def test_unchanged_dxf_owns_surface_outlines_and_shallow_envelope_volume(monkeypatch) -> None:
+def test_unchanged_dxf_owns_surface_outlines(monkeypatch) -> None:
     import _dxf_text as dxf
     import gen_ms_stick_numerals_dxf as generator
 
@@ -762,77 +740,37 @@ def test_unchanged_dxf_owns_surface_outlines_and_shallow_envelope_volume(monkeyp
     )
     assert artwork == generator.render()
     rings = [ring for ring, closed in dxf.read_lwpolylines(artwork.decode("ascii")) if closed]
-    volume = builder.numeral_envelope_volume(rings, spec.NUMERAL_DEPTH, spec.NUMERAL_DRAFT_ANGLE_DEG)
-    shallow_prism = dxf.net_area(rings) * spec.NUMERAL_DEPTH
-    assert 0.0 < volume < shallow_prism
-    assert shallow_prism - volume > 0.05 * volume
-    assert volume < spec.NUMERAL_AREA_MM2 * spec.TICK_DEPTH / 4.0
+    assert dxf.net_area(rings) == pytest.approx(spec.NUMERAL_AREA_MM2, rel=1e-3)
     monkeypatch.setattr(spec, "NUMERAL_DEPTH", 0.15)
-    monkeypatch.setattr(spec, "NUMERAL_DRAFT_ANGLE_DEG", 20.0)
     assert generator.render() == artwork
 
 
-def test_native_numeral_cut_enables_inward_draft_and_drives_own_depth(monkeypatch) -> None:
-    calls, names = [], []
-    definition = SimpleNamespace(
-        GetDepth=lambda forward: spec.NUMERAL_DEPTH / 1000.0,
-        GetDraftAngle=lambda forward: math.radians(spec.NUMERAL_DRAFT_ANGLE_DEG),
-        GetDraftWhileExtruding=lambda forward: True,
-        GetDraftOutward=lambda forward: False,
-    )
-    feature = SimpleNamespace(GetDefinition=lambda: definition, Select2=lambda append, mark: True)
+def test_numeral_cut_uses_its_own_depth_and_drives_it(monkeypatch) -> None:
+    depths, names = [], []
+    definition = SimpleNamespace(GetDepth=lambda forward: spec.NUMERAL_DEPTH / 1000.0)
+    feature = SimpleNamespace(GetDefinition=lambda: definition)
 
-    def cut(*args):
-        calls.append(args)
-        return feature
+    class Adapter:
+        async def create_cut_extrude(self, params):
+            depths.append(params.depth)
+            return SimpleNamespace(is_success=True, data=None, error=None)
 
-    model = SimpleNamespace(
-        FeatureManager=SimpleNamespace(FeatureCut4=cut), ClearSelection2=lambda value: None,
-    )
-    adapter = SimpleNamespace(currentModel=model)
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(builder, "_feature_by_name", lambda actual, name: feature)
     monkeypatch.setattr(builder, "name_last_feature", lambda actual, name: name)
     monkeypatch.setattr(builder, "name_dimensions", lambda actual, feature, values: names.append((feature, values)))
     monkeypatch.setattr(builder, "dump_dimensions", lambda actual, feature: [
-        {"index": 0, "full_name": "D1@Numerals@ms-stick", "value_mm": 1000.0 * math.radians(15.0)},
-        {"index": 1, "full_name": "D2@Numerals@ms-stick", "value_mm": spec.NUMERAL_DEPTH},
+        {"index": 0, "full_name": "D1@Numerals@ms-stick", "value_mm": spec.NUMERAL_DEPTH},
     ])
     jobs = []
-    builder._cut_numerals(adapter, jobs)
-    assert len(calls) == 1 and len(calls[0]) == 27
-    assert calls[0][:7] == (True, False, False, 0, 0, spec.NUMERAL_DEPTH / 1000.0, 0.0)
-    assert calls[0][7:11] == (True, False, True, False)
-    assert calls[0][11] == pytest.approx(math.radians(15.0))
-    assert names == [("Numerals", [None, "NumeralDepth"])]
+    asyncio.run(builder._cut_numerals(Adapter(), jobs))
+    assert depths == [spec.NUMERAL_DEPTH]
+    assert names == [("Numerals", ["NumeralDepth"])]
     assert jobs == [("NumeralDepth@Numerals", '"NumeralDepth"')]
-    tree = ast.parse(Path(builder.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
-    own_globals = [
-        node for node in ast.walk(build)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-        and node.func.id == "set_global" and len(node.args) > 1
-        and isinstance(node.args[1], ast.Constant) and node.args[1].value == "NumeralDepth"
-    ]
-    assert len(own_globals) == 1
-    # No disabled-draft adapter path is permitted for the numeral feature.
-    source = ast.get_source_segment(Path(builder.__file__).read_text(encoding="utf-8"), build)
-    assert "depth=TICK_DEPTH" not in source
 
 
-@pytest.mark.parametrize("edits", [
-    {"GetDepth": lambda forward: 0.0005},
-    {"GetDraftWhileExtruding": lambda forward: False},
-    {"GetDraftOutward": lambda forward: True},
-    {"GetDraftAngle": lambda forward: 0.0},
-])
-def test_native_numeral_readback_refuses_old_depth_or_wrong_draft(monkeypatch, edits) -> None:
-    definition = SimpleNamespace(**({
-        "GetDepth": lambda forward: 0.0001,
-        "GetDraftWhileExtruding": lambda forward: True,
-        "GetDraftOutward": lambda forward: False,
-        "GetDraftAngle": lambda forward: math.radians(15.0),
-    } | edits))
+def test_native_numeral_readback_refuses_old_depth(monkeypatch) -> None:
+    definition = SimpleNamespace(GetDepth=lambda forward: spec.TICK_DEPTH / 1000.0)
     feature = SimpleNamespace(GetDefinition=lambda: definition)
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(builder, "_feature_by_name", lambda actual, name: feature)

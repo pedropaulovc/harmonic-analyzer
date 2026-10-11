@@ -7,7 +7,8 @@ The release supplies the engraved native/STEP model and its ruled-face/detail
 drawings, not the generated build-input DXF. Name its pinned outline font on the
 print while retaining the native model as the exact numeral-outline authority.
 The 2026-10-11 user Option A numeral ruling changes only their cut envelope:
-0.10 +/-0.05 deep, with 15-degree inward walls for a 30-degree included V bit.
+0.10 +/-0.05 deep, cut with a 30-degree included V bit (a print note; the model
+carries the depth as straight walls).
 Surface glyph outlines/placement and the square-bottom graduations stay fixed.
 """
 
@@ -42,7 +43,6 @@ NUMERAL_AREA_MM2 = 13.108
 NUMERAL_DEPTH = 0.10
 NUMERAL_DEPTH_TOLERANCE_MM = 0.05
 NUMERAL_V_BIT_INCLUDED_ANGLE_DEG = 30.0
-NUMERAL_DRAFT_ANGLE_DEG = NUMERAL_V_BIT_INCLUDED_ANGLE_DEG / 2.0
 NUMERALS_BBOX = (57.300, 1.393, 197.700, 4.400)
 
 # Width and thickness govern the running clearance in the 8.4 x 3.4 stop
