@@ -8,7 +8,9 @@ the drawing and the offline lockstep test.
 
 from __future__ import annotations
 
-from mg_magnifying_wheel_geom import DRUM_PRESS, SPIGOT_BAND, SPIGOT_DIA
+from _gtol_cylinder import CylinderFace
+from _surface_finish import SEAT_UM, SurfaceFinishControl
+from mg_magnifying_wheel_geom import SPIGOT_BAND, SPIGOT_DIA
 from mg_wheel_drum_geom import (  # noqa: F401 (re-export)
     DRUM_BORE,
     DRUM_BORE_BAND,
@@ -29,12 +31,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Drum": {"DrumLen": 2},
 }
 
-# The fit the bore makes, stated on the sheet (the geom refuses a minimum
-# interference that is not positive).
-_SPIGOT = (SPIGOT_DIA + SPIGOT_BAND[1], SPIGOT_DIA + SPIGOT_BAND[0])
-DRAWING_NOTES = "\n".join(
-    (
-        f"PRESS ON MG-MAGNIFYING-WHEEL SPIGOT Ø{_SPIGOT[0]:.3f}-{_SPIGOT[1]:.3f}",
-        f"(INTERFERENCE {DRUM_PRESS[0]:.3f}-{DRUM_PRESS[1]:.3f}), HARD AGAINST THE BOSS.",
-    )
+# The spigot the bore is pressed on, printed on the bore's own callout
+# (policy rule 6); the geom refuses a minimum interference that is not
+# positive.
+SPIGOT_LIMITS = (SPIGOT_DIA + SPIGOT_BAND[1], SPIGOT_DIA + SPIGOT_BAND[0])
+# Rule 6: the notes say only what no callout can.
+DRAWING_NOTES = "HARD AGAINST THE WHEEL BOSS."
+# Rule 5: the bore is a static locating press seat on the wheel's spigot.
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
+    SurfaceFinishControl("mg_drum_bore", SEAT_UM, CylinderFace(DRUM_BORE)),
 )

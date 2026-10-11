@@ -15,6 +15,7 @@ import mg_magnifying_wheel_geom as wheel_geom
 import mg_wheel_drum_spec as spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import SEAT_UM
 
 
 def test_required_drawing_paths() -> None:
@@ -71,12 +72,14 @@ def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
     )
 
 
-def test_notes_are_short_and_state_the_press_fit() -> None:
+def test_press_fit_rides_the_bore_callout_and_notes_are_short() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
     assert all(len(line) <= 80 for line in lines)
-    flat = " ".join(lines)
-    assert "SPIGOT Ø14.523-14.534 (INTERFERENCE 0.005-0.034)" in flat
+    assert "PRESS" not in spec.DRAWING_NOTES
+    assert drawing.DIMENSION_CALLOUTS["DrumBore"].endswith(
+        "SPIGOT <MOD-DIAM>14.523-14.534"
+    )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
@@ -132,11 +135,9 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     assert missing == []
 
 
-def test_no_gdt_or_finish_symbols() -> None:
+def test_bore_carries_the_seat_finish_and_no_gdt() -> None:
     names = set(_calls(drawing.__file__))
-    assert not names & {
-        "add_datum_feature",
-        "add_feature_control_frame",
-        "add_surface_finish",
-    }
-    assert "author_part_pmi" not in _calls(part.__file__)
+    assert not names & {"add_datum_feature", "add_feature_control_frame"}
+    assert [(c.key, c.roughness_um) for c in spec.SURFACE_FINISHES] == [
+        ("mg_drum_bore", SEAT_UM)
+    ]

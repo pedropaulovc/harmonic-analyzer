@@ -18,10 +18,12 @@ from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_surface_finish,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -29,12 +31,18 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
+from _surface_finish import surface_finish_by_key
 from draw_dt_cone_pivot_post_tl_cap_jaw_button import _move_dimension
-from mg_wheel_drum_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, DRUM_LEN
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
+from mg_wheel_drum_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    DRUM_BORE,
+    DRUM_LEN,
+    SPIGOT_LIMITS,
+    SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_drum"]
@@ -75,9 +83,25 @@ RIGHT_KEEP = {
 }
 OD_ON_SIDE = (RIGHT_CENTER[0] + DRUM_LEN / 2.0 * _S + 0.030, RIGHT_CENTER[1])
 NOTES_XY = (0.020, 0.085)
+# The press fit prints on the bore's own callout, the spigot's limits read
+# from the wheel's spec (policy rule 6).
 DIMENSION_CALLOUTS = {
-    "DrumBore": "THRU - REAM",
+    "DrumBore": (
+        "REAM THRU\nPRESS ON MG-MAGNIFYING-WHEEL\n"
+        f"SPIGOT <MOD-DIAM>{SPIGOT_LIMITS[0]:.3f}-{SPIGOT_LIMITS[1]:.3f}"
+    ),
 }
+# The bore's seat finish (policy rule 5) lands on the bore up-left, clear of
+# the Ø line that runs up-right to its callout and through the centre to the
+# lower-left rim; the symbol stands outside the O.D. on the same bearing
+# (sheet metres from the landing).  Model x and y are the face view's.
+_FINISH_LANDING_MODEL = (
+    -DRUM_BORE / 2000.0 * 0.5**0.5,
+    DRUM_BORE / 2000.0 * 0.5**0.5,
+    0.0,
+)
+_FINISH_SYMBOL_OFFSET = (-0.012, 0.012)
+FINISH_CHAR_HEIGHT = 0.0025
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -142,7 +166,9 @@ async def build(adapter: Any) -> dict[str, str]:
     od_donors = [a for a in front_annotations if dimension_name(adapter, a) == "DrumOd"]
     if len(od_donors) != 1:
         raise RuntimeError("expected one drum O.D. donor dimension")
-    moved_od = _move_dimension(adapter, od_donors[0], right, OD_ON_SIDE, source_view=front)
+    moved_od = _move_dimension(
+        adapter, od_donors[0], right, OD_ON_SIDE, source_view=front
+    )
     annotations = [
         *(a for a in front_annotations if dimension_name(adapter, a) != "DrumOd"),
         *right_annotations,
@@ -152,8 +178,25 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to the drum face view")
+    # The template centre-marks the bore as the view is placed; run 11's
+    # explicit AutoInsertCenterMarks2 printed a second, identical mark (the
+    # layout audit's duplicate-annotation finding).
+    landing = model_point_in_view(
+        adapter, front, _FINISH_LANDING_MODEL, label="drum bore finish landing"
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_entity=visible_circle_edge(adapter, front, DRUM_BORE),
+        symbol_xy=(
+            landing[0] + _FINISH_SYMBOL_OFFSET[0],
+            landing[1] + _FINISH_SYMBOL_OFFSET[1],
+        ),
+        control=surface_finish_by_key(SURFACE_FINISHES, "mg_drum_bore"),
+        label="drum bore finish",
+        leader_attach_xy=landing,
+        char_height=FINISH_CHAR_HEIGHT,
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
