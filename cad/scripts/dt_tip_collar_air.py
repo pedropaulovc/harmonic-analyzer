@@ -25,10 +25,26 @@ fastener/thread class, read from the spec the drawing prints it from:
 * the bank: the back strap and washer datum chain and G19's cock in its
   running fit.
 
-Vertical (Y) errors move the collar across Z, not along it. The whole sweep
-is worst-case arithmetic when that closes everywhere; otherwise the RSS of
-the same terms everywhere, as cone_set_stack combines the set-at-assembly
-frame. Either way the build fails if the governing air closes.
+Vertical (Y) errors move the collar across Z, not along it.
+
+Each physical source enters the stack once, with its full projected effect:
+a plan move of a shaft support shifts the collar across the shaft by its
+share of the span AND tilts the collar's faces with the shaft line, and a
+post mounting error that also moves the post along the shaft adds that too.
+The projections of one error are summed into that one source, never combined
+as separate scatter.  The sources are then of two kinds:
+
+* clearances (IN_SERVICE_CLEARANCES): fastener and running clearances, thread
+  centring, the cup screw in its thread, the collar's float and cock and
+  G19's cock in its bore.  The parts can take them all up together, so they
+  add arithmetically;
+* printed manufacturing and set tolerances: independent of each other, so
+  they combine as a root sum of squares.
+
+The whole sweep is worst-case arithmetic over every source when that closes
+everywhere; otherwise the clearances arithmetic plus the RSS of the
+tolerances, everywhere.  Either way the build fails if the governing air
+closes.
 """
 from __future__ import annotations
 
@@ -185,6 +201,20 @@ SWING_TERMS_MM = {
     "base pivot seat to the pedestal seats": cone_set_stack.PIVOT_SEAT_POSITION_MM,
     "pivot thread centring": cone_set_stack.PIVOT_THREAD_CENTRING_MM,
 }
+# The sources booked arithmetically: clearances the parts take up together
+# in service or at fit-up, not independent manufacturing scatter.  Every
+# other source is a printed tolerance and joins the RSS.
+IN_SERVICE_CLEARANCES = frozenset({
+    "post screw clearance",
+    "post running journal fit",
+    "tip hold-down screw clearance",
+    "tip cup in its thread",
+    "platform pivot bore on the shoulder",
+    "pivot thread centring",
+    "collar float on the journal",
+    "collar cock on the journal",
+    "G19 cock in its running fit",
+})
 
 
 def _dot(a, b):
@@ -270,7 +300,12 @@ def _pivot_reach_mm(tier: CollarTier, angle_deg: float) -> float:
 
 
 def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) -> dict[str, float]:
-    """Worst-case closing of the world-Z air, one entry per printed source."""
+    """Worst-case closing of the world-Z air, one entry per physical source.
+
+    A source with several projections (a post mounting error moves the post
+    along the shaft, moves the line across it and tilts the collar's faces)
+    enters once, as the sum of all of them.
+    """
     origin, axis = collar_pose_frame(angle_deg)
     along = abs(axis[2])
     across = math.sqrt(max(0.0, 1.0 - along**2))
@@ -280,12 +315,12 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     # The shaft line runs from the post journal to the cup: a plan move of
     # either end across the shaft moves each collar station by its share of
     # the span, and tilts the collar's faces with the line.
-    post_move = sum(POST_END_TERMS_MM.values())
-    tip_move = sum(TIP_END_TERMS_MM.values())
     share = max((end - cone_line.POST_STATION) / _SUPPORT_SPAN for end in ends)
-    terms["post end across the shaft"] = (1.0 - share) * post_move * across
-    terms["tip end across the shaft"] = share * tip_move * across
-    terms["collar faces tilted with the shaft line"] = radius * (post_move + tip_move) / _SUPPORT_SPAN
+    tilt = radius / _SUPPORT_SPAN
+    for name, value in POST_END_TERMS_MM.items():
+        terms[name] = terms.get(name, 0.0) + value * ((1.0 - share) * across + tilt)
+    for name, value in TIP_END_TERMS_MM.items():
+        terms[name] = terms.get(name, 0.0) + value * (share * across + tilt)
     terms.update(SWING_TERMS_MM)
     # The T120 feeler sets the swing angle to T120_SET_MM at T120; the
     # collar turns with it about the pivot.
@@ -319,6 +354,8 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     ) + max(abs(v) for v in drum.OVERALL_THICKNESS_BAND) * math.sin(running_cock / 2.0)
     if not all(math.isfinite(value) and value >= 0.0 for value in terms.values()):
         raise ValueError(f"collar air has an invalid closing term: {terms}")
+    if not IN_SERVICE_CLEARANCES <= terms.keys():
+        raise ValueError(f"collar air lost a clearance source: {IN_SERVICE_CLEARANCES - terms.keys()}")
     return terms
 
 
@@ -332,17 +369,27 @@ class AirStack:
     arc_mm: float  # the swing between this interval's midpoint and its ends
 
     @property
+    def clearances(self) -> dict[str, float]:
+        return {k: v for k, v in self.terms.items() if k in IN_SERVICE_CLEARANCES}
+
+    @property
+    def tolerance_rss_mm(self) -> float:
+        return math.hypot(*(v for k, v in self.terms.items() if k not in IN_SERVICE_CLEARANCES))
+
+    @property
     def arithmetic_mm(self) -> float:
         return self.nominal_mm - sum(self.terms.values()) - self.arc_mm
 
     @property
-    def rss_mm(self) -> float:
-        return self.nominal_mm - math.hypot(*self.terms.values()) - self.arc_mm
+    def statistical_mm(self) -> float:
+        return (self.nominal_mm - sum(self.clearances.values())
+                - self.tolerance_rss_mm - self.arc_mm)
 
     def closure_mm(self, method: str) -> dict[str, float]:
         if method == "arithmetic":
             return {**self.terms, "continuous p1 interval arc": self.arc_mm}
-        return {"RSS of the booked terms": math.hypot(*self.terms.values()),
+        return {**self.clearances,
+                "RSS of the printed tolerances": self.tolerance_rss_mm,
                 "continuous p1 interval arc": self.arc_mm}
 
 
@@ -351,8 +398,9 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
 
     Each row is one interval's midpoint; the arc term bounds the poses
     between midpoints. The whole sweep is worst-case arithmetic when that
-    closes everywhere; otherwise the RSS of the same terms, everywhere.
-    Raises if the governing air closes anywhere.
+    closes everywhere; otherwise "statistical" everywhere: the clearances
+    arithmetic plus the RSS of the printed tolerances.  Raises if the
+    governing air closes anywhere.
     """
     if type(intervals) is not int or intervals < 1:
         raise ValueError("collar swing proof requires at least one closed interval")
@@ -368,21 +416,21 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
                     tier.name, fixed.name, angle, projection_nominal_mm(tier, Z, fixed, angle),
                     closure_terms_mm(tier, fixed, angle), _pivot_reach_mm(tier, angle) * half_rad,
                 )))
-    method = "arithmetic" if all(s.arithmetic_mm > 0.0 for _, s in stacks) else "rss"
+    method = "arithmetic" if all(s.arithmetic_mm > 0.0 for _, s in stacks) else "statistical"
     rows = []
     for index, s in stacks:
-        air = s.arithmetic_mm if method == "arithmetic" else s.rss_mm
+        air = s.arithmetic_mm if method == "arithmetic" else s.statistical_mm
         if not math.isfinite(air) or air <= 0.0:
             raise ValueError(
                 f"MHA-VN-016 collar can reach G19 at P1 {s.angle_deg:.3f} deg: {s.tier}/"
                 f"{s.drum_tier} nominal {s.nominal_mm:.3f}, arithmetic "
-                f"{s.arithmetic_mm:.3f}, RSS {s.rss_mm:.3f}: {s.terms}"
+                f"{s.arithmetic_mm:.3f}, statistical {s.statistical_mm:.3f}: {s.terms}"
             )
         rows.append({
             "tier": s.tier, "drum_tier": s.drum_tier, "angle_deg": s.angle_deg,
             "angle_interval_deg": (lower + index * width, lower + (index + 1) * width),
             "normal": Z, "nominal_mm": s.nominal_mm, "method": method,
-            "arithmetic_mm": s.arithmetic_mm, "rss_mm": s.rss_mm,
+            "arithmetic_mm": s.arithmetic_mm, "statistical_mm": s.statistical_mm,
             "closure_mm": s.closure_mm(method), "air_mm": air,
         })
     return rows

@@ -495,27 +495,38 @@ def test_collar_air_shares_the_assembly_post_face_and_tip_tap_bands():
     )) == pytest.approx(bdt.TIP_TAP_LATERAL_BAND_MM)
 
 
-def test_collar_air_books_only_printed_sources():
+def test_collar_air_books_each_printed_source_once():
     terms = air.closure_terms_mm(air.TIERS[0], air.DRUM_TIERS[0], 0.0)
     assert set(terms) == {
-        *air.AXIAL_TERMS_MM, *air.SWING_TERMS_MM,
-        "post end across the shaft", "tip end across the shaft",
-        "collar faces tilted with the shaft line", "T120 set of the swing",
+        *air.AXIAL_TERMS_MM, *air.POST_END_TERMS_MM, *air.TIP_END_TERMS_MM,
+        *air.SWING_TERMS_MM, "T120 set of the swing",
         "collar tier axial limit", "collar tier radial limit",
         "collar float on the journal", "collar cock on the journal",
         *(f"bank {name}" for name in air.bank.DATUM_CHAIN_STACK),
         "drum tier limits", "G19 cock in its running fit",
     }
     assert all(value >= 0.0 for value in terms.values())
+    assert air.IN_SERVICE_CLEARANCES <= set(terms)
+    # One post mounting error enters once: along the shaft, plus across it,
+    # plus the face tilt it gives the shaft line.
+    along = abs(air.collar_pose_frame(0.0)[1][2])
+    for name in ("post platform tap station", "post screw clearance", "post counterbore pattern"):
+        assert terms[name] > air.AXIAL_TERMS_MM[name] * along
 
 
-def test_collar_air_falls_back_to_rss_only_when_arithmetic_refuses(monkeypatch):
+def test_collar_air_adds_clearances_and_rss_only_the_tolerances(monkeypatch):
     rows = air.full_sweep_proof(intervals=20)
-    assert {row["method"] for row in rows} == {"rss"}
+    assert {row["method"] for row in rows} == {"statistical"}
     assert min(row["arithmetic_mm"] for row in rows) <= 0.0
     assert min(row["air_mm"] for row in rows) > 0.0
     for row in rows:
-        assert row["air_mm"] == pytest.approx(row["nominal_mm"] - sum(row["closure_mm"].values()))
+        closure = row["closure_mm"]
+        assert row["air_mm"] == pytest.approx(row["nominal_mm"] - sum(closure.values()))
+        assert set(closure) == {*air.IN_SERVICE_CLEARANCES, "RSS of the printed tolerances",
+                                "continuous p1 interval arc"}
+    stack = air.AirStack("t", "d", 0.0, 10.0, {"tip cup in its thread": 1.0, "a": 3.0, "b": 4.0}, 0.5)
+    assert stack.statistical_mm == pytest.approx(10.0 - 1.0 - 5.0 - 0.5)
+    assert stack.arithmetic_mm == pytest.approx(10.0 - 8.0 - 0.5)
     monkeypatch.setattr(air, "closure_terms_mm", lambda *_args: {"small": 0.01})
     rows = air.full_sweep_proof(intervals=20)
     assert {row["method"] for row in rows} == {"arithmetic"}
