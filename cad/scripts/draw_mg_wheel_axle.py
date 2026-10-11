@@ -33,6 +33,7 @@ from mg_wheel_axle_spec import (
     STEP_Y,
     THREAD_CALLOUT,
     THREAD_END_Y,
+    THREAD_MAJOR,
     TIP_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view, view_outline
@@ -92,9 +93,13 @@ DRAWING_PRECISION_BY_NAME = {
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
-# The thread callout's leader lands on the thread's end edge (where the dome
-# starts); the note stands up and right so the leader leans back onto it.
-THREAD_PICK = (THREAD_END_X, SIDE_CENTER[1] + 0.003)
+# The thread callout's leader lands on the thread's major-diameter silhouette
+# midway along the threaded length; the note stands up and right so the
+# leader leans back onto it, clear of the dome.
+THREAD_PICK = (
+    (STEP_X + THREAD_END_X) / 2.0,
+    SIDE_CENTER[1] + THREAD_MAJOR / 2.0 * _S / 1000.0,
+)
 THREAD_NOTE_XY = (THREAD_END_X + 0.012, SIDE_CENTER[1] + 0.042)
 # A point on the shank face, clear of the Ø dimension line.
 CENTERLINE_PICK = (BACK_X + 0.020, SIDE_CENTER[1] + 0.003)
@@ -207,6 +212,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=spt(*THREAD_PICK),
         note_xy=spt(*THREAD_NOTE_XY),
         label="wheel axle thread callout",
+        entity_type="SILHOUETTE",
     )
 
     # x=0.020: a note is left-aligned on its anchor, so the ink starts here,

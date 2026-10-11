@@ -13,6 +13,7 @@ assembly's d = 0); the pin runs y = BACK_Y (back end) .. TIP_Y.
 
 from __future__ import annotations
 
+import mg_wheel_bar_geom as _bar
 from _hole_spec import THREAD_MAJOR_MM
 
 MM_PER_IN = 25.4
@@ -76,10 +77,19 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
 }
 
+# The bar's reamed bore the pin presses into, its limits printed to three
+# places (mg_wheel_group.BAR_PRESS proves the interference at both corners).
+_BAR_BORE = (
+    _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1],
+    _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0],
+)
+_BAR_BORE_IN = f"{_bar.AXLE_BORE_DIA / MM_PER_IN:.4f}".lstrip("0")
 DRAWING_NOTES = "\n".join(
     (
-        "PRESS INTO MG-WHEEL-BAR UNTIL THE SHANK STEP STANDS",
-        f"{PRESS_GAUGE:.2f} +/-{PRESS_GAUGE_TOL:.2f} FROM THE BAR FRONT FACE (BACK END ~FLUSH);",
-        "RED LOCTITE 271 OPTIONAL.",
+        f"PRESS INTO MG-WHEEL-BAR Ø{_BAR_BORE[0]:.3f}-{_BAR_BORE[1]:.3f} "
+        f"REAMED BORE (Ø{_BAR_BORE_IN})",
+        f"UNTIL THE SHANK STEP STANDS {PRESS_GAUGE:.2f} +/-{PRESS_GAUGE_TOL:.2f} "
+        "FROM THE BAR FRONT FACE",
+        "(BACK END ~FLUSH); RED LOCTITE 271 OPTIONAL.",
     )
 )
