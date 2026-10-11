@@ -8,6 +8,7 @@ the drawing and the offline lockstep test.
 
 from __future__ import annotations
 
+from mg_magnifying_wheel_geom import DRUM_PRESS, SPIGOT_BAND, SPIGOT_DIA
 from mg_wheel_drum_geom import (  # noqa: F401 (re-export)
     DRUM_BORE,
     DRUM_BORE_BAND,
@@ -28,4 +29,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Drum": {"DrumLen": 2},
 }
 
-DRAWING_NOTES = "PRESS ON THE MG-MAGNIFYING-WHEEL SPIGOT, HARD AGAINST THE BOSS."
+# The fit the bore makes, stated on the sheet (the geom refuses a minimum
+# interference that is not positive).
+_SPIGOT = (SPIGOT_DIA + SPIGOT_BAND[1], SPIGOT_DIA + SPIGOT_BAND[0])
+DRAWING_NOTES = "\n".join(
+    (
+        f"PRESS ON MG-MAGNIFYING-WHEEL SPIGOT Ø{_SPIGOT[0]:.3f}-{_SPIGOT[1]:.3f}",
+        f"(INTERFERENCE {DRUM_PRESS[0]:.3f}-{DRUM_PRESS[1]:.3f}), HARD AGAINST THE BOSS.",
+    )
+)

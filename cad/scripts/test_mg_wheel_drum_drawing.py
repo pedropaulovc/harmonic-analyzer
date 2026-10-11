@@ -71,10 +71,12 @@ def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
     )
 
 
-def test_notes_are_short_and_dimension_free() -> None:
+def test_notes_are_short_and_state_the_press_fit() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
-    assert not any(ch.isdigit() for ch in spec.DRAWING_NOTES)
+    assert all(len(line) <= 80 for line in lines)
+    flat = " ".join(lines)
+    assert "SPIGOT Ø14.523-14.534 (INTERFERENCE 0.005-0.034)" in flat
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 

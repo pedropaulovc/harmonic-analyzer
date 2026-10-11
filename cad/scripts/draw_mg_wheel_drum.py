@@ -20,6 +20,7 @@ from _drawing_common import (
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -28,7 +29,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from mg_wheel_drum_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION
+from draw_dt_cone_pivot_post_tl_cap_jaw_button import _move_dimension
+from mg_wheel_drum_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, DRUM_LEN
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -53,6 +55,7 @@ VIEW_SCALE = (2, 1)
 FRONT_CENTER = (0.110, 0.180)
 RIGHT_CENTER = (0.200, 0.180)
 ISO_CENTER = (0.320, 0.180)
+_S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 
 DRAWING_PRECISION_BY_NAME = {
     name: digits
@@ -60,13 +63,18 @@ DRAWING_PRECISION_BY_NAME = {
     for name, digits in names.items()
 }
 
+# Both diameters import on the face view, where every diameter line runs
+# through the centre: two would cross there. The bore keeps the face view;
+# the O.D. is a donor there and moves onto the side view, right of the ring.
 FRONT_KEEP = {
-    "DrumOd": (0.060, 0.230),
+    "DrumOd": (0.060, 0.130),
     "DrumBore": (0.150, 0.230),
 }
 RIGHT_KEEP = {
     "DrumLen": (0.200, 0.215),
 }
+OD_ON_SIDE = (RIGHT_CENTER[0] + DRUM_LEN / 2.0 * _S + 0.030, RIGHT_CENTER[1])
+NOTES_XY = (0.020, 0.085)
 DIMENSION_CALLOUTS = {
     "DrumBore": "THRU - REAM",
 }
@@ -117,21 +125,28 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
+    front_annotations = curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    right_annotations = curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    od_donors = [a for a in front_annotations if dimension_name(adapter, a) == "DrumOd"]
+    if len(od_donors) != 1:
+        raise RuntimeError("expected one drum O.D. donor dimension")
+    moved_od = _move_dimension(adapter, od_donors[0], right, OD_ON_SIDE, source_view=front)
     annotations = [
-        *curate_view_dimensions(
-            adapter,
-            front,
-            keep=FRONT_KEEP,
-            view_label="front",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
-        *curate_view_dimensions(
-            adapter,
-            right,
-            keep=RIGHT_KEEP,
-            view_label="right",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
+        *(a for a in front_annotations if dimension_name(adapter, a) != "DrumOd"),
+        *right_annotations,
+        moved_od,
     ]
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
@@ -140,7 +155,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the drum face view")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,
