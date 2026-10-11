@@ -6,6 +6,8 @@ import ast
 import math
 from pathlib import Path
 
+import pytest
+
 import _config
 import build_mg_wheel_drum as part
 import draw_mg_wheel_drum as drawing
@@ -52,9 +54,9 @@ def test_every_size_carries_its_band_on_the_model() -> None:
 
 
 def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
-    # H7 bore on the p6 spigot: never a clearance at any band corner.
+    # H7 bore on the r6 spigot: interference at every band corner.
     assert spec.DRUM_BORE == wheel_geom.SPIGOT_DIA
-    assert spec.DRUM_BORE_BAND[0] <= wheel_geom.SPIGOT_BAND[1]
+    assert wheel_geom.DRUM_PRESS == pytest.approx((0.005, 0.034))
     # Nominally flush; the drum's minus-only length against the spigot's
     # plus-only length keeps its face at or under the spigot face.
     assert spec.DRUM_LEN == wheel_geom.SPIGOT_LEN

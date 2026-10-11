@@ -20,7 +20,13 @@ from __future__ import annotations
 
 import math
 
-from mg_wheel_drum_geom import DRUM_BORE, DRUM_LEN, DRUM_LEN_BAND, DRUM_WIRE_R
+from mg_wheel_drum_geom import (
+    DRUM_BORE,
+    DRUM_BORE_BAND,
+    DRUM_LEN,
+    DRUM_LEN_BAND,
+    DRUM_WIRE_R,
+)
 
 # --- rim (DIMENSIONS.md ch21: Ø100 annotated) ----------------------------------
 RIM_OUTER_DIA = 100.0
@@ -52,7 +58,9 @@ BORE_DIA = round(0.1890 * 25.4, 6)  # 4.8006, reamed: runs on the 3/16 pin
 # Printed bands, (upper, lower) deviations.
 HUB_DIA_BAND = (0.10, -0.10)
 HUB_LEN_BAND = (0.10, -0.10)
-SPIGOT_BAND = (0.029, 0.018)  # p6: press fit under the drum's H7 bore
+# r6: press fit under the drum's H7 bore. p6 (+0.029/+0.018) met H7's top at
+# its bottom, so the worst pair was line-to-line; r6 grips at every corner.
+SPIGOT_BAND = (0.034, 0.023)
 # Spigot length plus-only against the drum's minus-only length: the drum,
 # pressed to the boss, never stands proud of the spigot face, so the front
 # washer bears on the spigot (the iron), never on the drum.
@@ -64,6 +72,13 @@ DRUM_RECESS = (
 )  # 0.0 .. 0.2: the drum face below the spigot face
 if DRUM_RECESS[0] < 0.0:
     raise AssertionError(f"the drum can stand proud of the spigot: {DRUM_RECESS}")
+# Diametral interference of the drum on the spigot, (min, max).
+DRUM_PRESS = (
+    SPIGOT_DIA + SPIGOT_BAND[1] - (DRUM_BORE + DRUM_BORE_BAND[0]),
+    SPIGOT_DIA + SPIGOT_BAND[0] - (DRUM_BORE + DRUM_BORE_BAND[1]),
+)  # 0.005 .. 0.034
+if DRUM_PRESS[0] <= 0.0:
+    raise AssertionError(f"the drum is not a press fit on the spigot: {DRUM_PRESS}")
 
 # --- spokes ------------------------------------------------------------------------
 SPOKE_COUNT = 6  # counted on the p.51 full-page photo; 0 and 180 deg on the bar

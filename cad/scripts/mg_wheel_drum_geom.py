@@ -17,9 +17,10 @@ from __future__ import annotations
 DRUM_OD = 18.9
 DRUM_BORE = 14.5
 DRUM_LEN = 9.0
-# Printed bands, (upper, lower) deviations. The bore is H7 on the wheel's p6
-# spigot (mg_magnifying_wheel_geom.SPIGOT_BAND): a press fit. The length is
-# minus-only against the spigot's plus-only length (DRUM_RECESS there).
+# Printed bands, (upper, lower) deviations. The bore is H7 on the wheel's r6
+# spigot (mg_magnifying_wheel_geom.SPIGOT_BAND, DRUM_PRESS): a press fit. The
+# length is minus-only against the spigot's plus-only length (DRUM_RECESS
+# there).
 DRUM_OD_BAND = (0.10, -0.10)
 DRUM_BORE_BAND = (0.018, 0.0)
 DRUM_LEN_BAND = (0.0, -0.10)
