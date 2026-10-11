@@ -10,8 +10,8 @@ This file finds every band consumer by reading the scripts' source, resolves eac
 argument in the imported module (the value ``build()`` would see), and applies
 the same checks ``build()`` would:
 
-* ``deviations(band)`` takes ``(upper, lower)``; the helper must accept it and
-  return lower < upper.
+* ``deviations(band)`` and ``_feature_requirements.limits(model, places, band)``
+  take ``(upper, lower)``; the helper must accept it and return lower < upper.
 * ``set_dimension_bilateral_tolerance(..., *BAND)`` splats ``(lower, upper)``
   straight into the setter, which refuses lower >= upper.
 
@@ -42,7 +42,7 @@ import _gear_fit_limits
 SCRIPTS = Path(__file__).resolve().parent
 
 # Helpers that take an (upper, lower) band, and the positional index of the band.
-_BAND_HELPERS = {"deviations": 0}
+_BAND_HELPERS = {"deviations": 0, "limits": 2}
 _SETTER = "set_dimension_bilateral_tolerance"
 
 # A consumer whose argument is a name local to build() (so it cannot be read off
