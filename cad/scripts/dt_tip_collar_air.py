@@ -23,7 +23,9 @@ fastener/thread class, read from the spec the drawing prints it from:
   cup, so the journal bounds it; it also tilts the collar's faces).
 * the swing: the reamed pivot on the stock shoulder, the base pivot seat to
   the pedestal seats, the pivot thread and the T120 set (cone_set_stack);
-* the collar on the shaft: its nose size, its float and cock on the journal;
+* the collar on the shaft: its nose and body sizes, its float and cock on
+  the journal, and the stock set screw's tap station, centring and angle,
+  length, the D-flat it seats on and its rock in the thread;
 * the bank: the back strap and washer datum chain and G19's cock in its
   running fit.
 
@@ -38,10 +40,14 @@ as separate scatter.  The sources are then of two kinds:
 
 * clearances (IN_SERVICE_CLEARANCES): fastener and running clearances, thread
   centring, the cup screw in its thread, the shaft's release swing in the
-  post journal, the collar's float and cock and G19's cock in its bore.  The
-  parts can take them all up together, so they add arithmetically;
-* printed manufacturing and set tolerances: independent of each other, so
-  they combine as a root sum of squares.
+  post journal, the collar's float and cock, the set screw's thread rock and
+  G19's cock in its bore.  The parts can take them all up together, so they
+  add arithmetically;
+* printed manufacturing and set tolerances (INDEPENDENT_TOLERANCES):
+  independent of each other, so they combine as a root sum of squares.
+
+Every source is in exactly one of the two sets; an unclassified source is
+refused, never defaulted to the RSS.
 
 The whole sweep is worst-case arithmetic over every source when that closes
 everywhere; otherwise the clearances arithmetic plus the RSS of the
@@ -84,6 +90,10 @@ class CollarTier:
     south_lower_mm: float
     north_upper_mm: float
     radius_upper_mm: float
+    # The tier's south and radial limits split by physical source:
+    # name -> (axial loss, radial gain), summing to -south_lower_mm and
+    # radius_upper_mm.
+    limits: dict[str, tuple[float, float]]
 
 
 @dataclass(frozen=True)
@@ -101,27 +111,63 @@ SOUTH_STATION_MM = shaft.TIP_COLLAR_START_STATION
 PARTITION_STATION_MM = collar.NOSE_LENGTH - collar.SHOULDER_ROOT_RADIUS
 _MIN_STOCK_Y = collar.TAP_STATION - collar.SET_SCREW_MAJOR_DIA / 2.0
 _STOCK_R = math.hypot(collar.SET_SCREW_END_RADIUS, collar.SET_SCREW_MAJOR_DIA / 2.0)
-_MAX_STOCK_Y_LOSS = (
-    collar.TAP_STATION_BAND_MM
-    + (collar.SET_SCREW_LENGTH + collar.SET_SCREW_LENGTH_BAND_MM)
-    * math.sin(collar.SET_SCREW_MAX_AXIS_ANGLE_RAD)
+
+
+def _stock_extent(station=0.0, centring=0.0, tap_angle=0.0, length=0.0, flat=0.0,
+                  rock=0.0, float_=0.0) -> tuple[float, float]:
+    """The stock screw's south loss and radial gain over its nominal seat."""
+    reach = collar.SET_SCREW_LENGTH + length
+    lean = reach * math.sin(tap_angle + rock)
+    return station + lean, math.hypot(
+        collar.SET_SCREW_SEAT_RADIUS + flat + float_ + reach,
+        collar.SET_SCREW_MAJOR_DIA / 2.0 + centring + lean,
+    ) - _STOCK_R
+
+
+# The screw tier's limits, source by source.  The printed tolerances (the
+# tap's station, centring and angle, the screw's length band, the D-flat's
+# depth and land at their printed limits) come first; the in-service
+# clearances (the 3A/2B thread rock, the collar's float on its journal) take
+# the last increments, which are the largest, so the arithmetic group never
+# gets less than its share.  The increments sum exactly to the composite.
+_SCREW_SOURCES = (
+    ("set screw tap station", "station", collar.TAP_STATION_BAND_MM),
+    ("set screw tap centring", "centring", collar.TAP_LATERAL_BAND_MM),
+    ("set screw tap angle", "tap_angle", collar.TAP_ANGLE_RAD),
+    ("set screw length", "length", collar.SET_SCREW_LENGTH_BAND_MM),
+    ("terminal flat depth", "flat", collar._FLAT_MAX - collar.SET_SCREW_SEAT_RADIUS),
+    ("set screw rock in its thread", "rock",
+     collar.SET_SCREW_MAX_AXIS_ANGLE_RAD - collar.TAP_ANGLE_RAD),
+    ("collar float on the journal", "float_", collar._FLOAT_MAX),
 )
-_MAX_STOCK_R = math.hypot(
-    collar._POINT_PLANE_MAX + collar.SET_SCREW_LENGTH + collar.SET_SCREW_LENGTH_BAND_MM,
-    collar.SET_SCREW_MAJOR_DIA / 2.0 + collar.TAP_LATERAL_BAND_MM
-    + (collar.SET_SCREW_LENGTH + collar.SET_SCREW_LENGTH_BAND_MM)
-    * math.sin(collar.SET_SCREW_MAX_AXIS_ANGLE_RAD),
-)
+
+
+def _screw_limits() -> dict[str, tuple[float, float]]:
+    limits, args, before = {}, {}, (0.0, 0.0)
+    for name, arg, value in _SCREW_SOURCES:
+        args[arg] = value
+        after = _stock_extent(**args)
+        limits[name] = (after[0] - before[0], after[1] - before[1])
+        before = after
+    return limits
+
+
+_SCREW_LIMITS = _screw_limits()
+_MAX_STOCK_Y_LOSS = sum(axial for axial, _ in _SCREW_LIMITS.values())
+_MAX_STOCK_R_GAIN = sum(radial for _, radial in _SCREW_LIMITS.values())
 TIERS = (
     CollarTier("nose", 0.0, PARTITION_STATION_MM, collar.NOSE_DIA / 2.0,
                0.0, collar.AXIAL_BAND_MM + collar.SHOULDER_ROOT_RADIUS,
-               collar.ROUTINE_BAND_MM / 2.0),
+               collar.ROUTINE_BAND_MM / 2.0,
+               {"collar nose diameter": (0.0, collar.ROUTINE_BAND_MM / 2.0)}),
     CollarTier("body", PARTITION_STATION_MM, collar.WIDTH, collar.OUTER_DIA / 2.0,
-               -collar.AXIAL_BAND_MM, collar.WIDTH_BAND_MM, collar.ROUTINE_BAND_MM / 2.0),
+               -collar.AXIAL_BAND_MM, collar.WIDTH_BAND_MM, collar.ROUTINE_BAND_MM / 2.0,
+               {"collar nose length": (collar.AXIAL_BAND_MM, 0.0),
+                "collar outside diameter": (0.0, collar.ROUTINE_BAND_MM / 2.0)}),
     CollarTier("screw", _MIN_STOCK_Y,
                collar.TAP_STATION + collar.SET_SCREW_MAJOR_DIA / 2.0,
-               _STOCK_R, -_MAX_STOCK_Y_LOSS, _MAX_STOCK_Y_LOSS,
-               max(0.0, _MAX_STOCK_R - _STOCK_R)),
+               _STOCK_R, -_MAX_STOCK_Y_LOSS, _MAX_STOCK_Y_LOSS, _MAX_STOCK_R_GAIN,
+               _SCREW_LIMITS),
 )
 DRUM_TIERS = (
     DrumTier("tooth_face", -drum.FACE_WIDTH, 0.0, drum.OUTSIDE_DIA / 2.0,
@@ -224,9 +270,9 @@ SWING_TERMS_MM = {
     "base pivot seat to the pedestal seats": cone_set_stack.PIVOT_SEAT_POSITION_MM,
     "pivot thread centring": cone_set_stack.PIVOT_THREAD_CENTRING_MM,
 }
-# The sources booked arithmetically: clearances the parts take up together
-# in service or at fit-up, not independent manufacturing scatter.  Every
-# other source is a printed tolerance and joins the RSS.
+# Every source is classified explicitly; an unclassified one is refused.
+# In-service clearances the parts take up together in service or at fit-up
+# add arithmetically.
 IN_SERVICE_CLEARANCES = frozenset({
     "post screw clearance",
     "post running journal fit",
@@ -237,8 +283,41 @@ IN_SERVICE_CLEARANCES = frozenset({
     "pivot thread centring",
     "collar float on the journal",
     "collar cock on the journal",
+    "set screw rock in its thread",
     "G19 cock in its running fit",
 })
+# Independent printed manufacturing and set tolerances join the RSS.
+INDEPENDENT_TOLERANCES = frozenset({
+    "post platform tap station",
+    "post counterbore pattern",
+    "post cone boss length",
+    "shaft thrust collar width",
+    "gear stack terminal north face",
+    "collar feeler set",
+    "tip platform hold-down station",
+    "tip block foot tap station",
+    "tip passage centre",
+    "tip block square on its one screw",
+    "base pivot seat to the pedestal seats",
+    "T120 set of the swing",
+    "collar nose diameter",
+    "collar nose length",
+    "collar outside diameter",
+    "set screw tap station",
+    "set screw tap centring",
+    "set screw tap angle",
+    "set screw length",
+    "terminal flat depth",
+    *(f"bank {name}" for name in bank.DATUM_CHAIN_STACK),
+    "drum tier limits",
+})
+if IN_SERVICE_CLEARANCES & INDEPENDENT_TOLERANCES:
+    raise AssertionError("a collar air source cannot be both a clearance and a tolerance")
+# Sources only some collar tiers carry.
+_TIER_ONLY_SOURCES = (
+    frozenset(name for tier in TIERS for name in tier.limits)
+    - frozenset({"collar float on the journal"})
+)
 
 
 def _dot(a, b):
@@ -350,9 +429,8 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     # collar turns with it about the pivot.
     set_angle = cone_set_stack.T120_SET_MM / cone_set_stack.pivot_distance_mm(120)
     terms["T120 set of the swing"] = _pivot_reach_mm(tier, angle_deg) * set_angle
-    # The collar on its journal: nose size, float and cock (vn_cone_tip_collar).
-    terms["collar tier axial limit"] = -tier.south_lower_mm * along
-    terms["collar tier radial limit"] = tier.radius_upper_mm * across
+    # The collar on its journal: float and cock (vn_cone_tip_collar), then
+    # the tier's own limits, each into its physical source.
     cock = TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
     bore_upper_r = collar.BORE_FINISHED_DIA_LIMITS_MM[1] / 2.0
     terms["collar float on the journal"] = (
@@ -362,6 +440,8 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
         max(abs(e - SOUTH_STATION_MM) for e in ends) * (1.0 - math.cos(cock))
         + radius * math.sin(cock)
     )
+    for name, (axial, radial) in tier.limits.items():
+        terms[name] = terms.get(name, 0.0) + axial * along + radial * across
     # The bank: its datum chain, then G19's cock within its running fit.
     terms.update({f"bank {name}": value for name, value in bank.DATUM_CHAIN_STACK.items()})
     manufactured = _tilted_fixed_support(fixed, Z, 0.0)
@@ -378,8 +458,12 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     ) + max(abs(v) for v in drum.OVERALL_THICKNESS_BAND) * math.sin(running_cock / 2.0)
     if not all(math.isfinite(value) and value >= 0.0 for value in terms.values()):
         raise ValueError(f"collar air has an invalid closing term: {terms}")
-    if not IN_SERVICE_CLEARANCES <= terms.keys():
-        raise ValueError(f"collar air lost a clearance source: {IN_SERVICE_CLEARANCES - terms.keys()}")
+    unclassified = terms.keys() - IN_SERVICE_CLEARANCES - INDEPENDENT_TOLERANCES
+    if unclassified:
+        raise ValueError(f"collar air has an unclassified source: {sorted(unclassified)}")
+    missing = (IN_SERVICE_CLEARANCES | INDEPENDENT_TOLERANCES) - _TIER_ONLY_SOURCES - terms.keys()
+    if missing:
+        raise ValueError(f"collar air lost a source: {sorted(missing)}")
     return terms
 
 
@@ -392,13 +476,18 @@ class AirStack:
     terms: dict[str, float]
     arc_mm: float  # the swing between this interval's midpoint and its ends
 
+    def __post_init__(self):
+        unclassified = self.terms.keys() - IN_SERVICE_CLEARANCES - INDEPENDENT_TOLERANCES
+        if unclassified:
+            raise ValueError(f"collar air has an unclassified source: {sorted(unclassified)}")
+
     @property
     def clearances(self) -> dict[str, float]:
         return {k: v for k, v in self.terms.items() if k in IN_SERVICE_CLEARANCES}
 
     @property
     def tolerance_rss_mm(self) -> float:
-        return math.hypot(*(v for k, v in self.terms.items() if k not in IN_SERVICE_CLEARANCES))
+        return math.hypot(*(v for k, v in self.terms.items() if k in INDEPENDENT_TOLERANCES))
 
     @property
     def arithmetic_mm(self) -> float:
