@@ -103,6 +103,10 @@ physical-drain obligations. Protocol 6 requires paired producer/pool/worker
 deployment to an idle, physically drained fleet; protocol-5 coordinator state
 is not replayed into the new protocol-6 singleton.
 
+Old-protocol native logs are unsupported by the new launcher. Finish or cancel
+their runs with matched old tools **before** that coordinated idle-fleet
+cutover; the protocol-6 launcher provides no runtime legacy support.
+
 The preflight stamps only the committed local `HEAD`; it does not fetch or
 update a shared `origin/*` ref and does not publish source files. Each worker
 fetches that exact SHA with depth one from the fixed approved repository,

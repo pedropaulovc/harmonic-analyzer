@@ -830,14 +830,14 @@ function Add-RunRequests {
     foreach ($file in @(Get-ChildItem -LiteralPath $Directory -Filter '*.json' -File | Sort-Object -Property Name)) {
         $request = Read-RunRecord -Path $file.FullName
         if ($file.Name -eq 'build.json') {
-            if ($Parsed['build_id'] -and $Parsed['build_id'] -ne $request['build_id']) {
+            if ($Parsed['build_id'] -and $Parsed['build_id'] -cne $request['build_id']) {
                 throw 'durable build identity disagrees with registration log'
             }
             $Parsed['build_id'] = $request['build_id']
             continue
         }
         $identity = Get-WorkflowIdentity -WorkflowId $request['workflow_id']
-        if ($request['build_id'] -ne $identity['build_id'] -or $request['task'] -ne $identity['task']) {
+        if ($request['build_id'] -cne $identity['build_id'] -or $request['task'] -cne $identity['task']) {
             throw 'durable leaf request disagrees with workflow identity'
         }
         $task = $request['task']
@@ -876,7 +876,7 @@ function Get-RunStatus {
     $log = Read-RunLog -Path $record['log']
     Add-RunRequests -Parsed $log -Directory $record['requests']
     if ($log['build_id']) {
-        if ($record['build_id'] -and $record['build_id'] -ne $log['build_id']) {
+        if ($record['build_id'] -and $record['build_id'] -cne $log['build_id']) {
             throw 'durable build identity disagrees with run record'
         }
         if (-not $record['build_id']) {
@@ -898,7 +898,7 @@ function Get-RunStatus {
         }
     }
     foreach ($leaf in $log['leaves'].Values) {
-        if ($leaf['workflow_id'] -and (-not $record['build_id'] -or $leaf['build_id'] -ne $record['build_id'])) {
+        if ($leaf['workflow_id'] -and (-not $record['build_id'] -or $leaf['build_id'] -cne $record['build_id'])) {
             throw 'native workflow identity disagrees with registered build'
         }
     }
@@ -1468,13 +1468,18 @@ function Invoke-RunCancel {
         [Parameter(Mandatory)][int]$BindingWaitSeconds
     )
 
-    $snapshot = Get-RunStatus -RecordPath $RecordPath
-    $status = $snapshot.status
-    $record = $snapshot.record
-    $runId = $status['run_id']
+    # Local attribution comes from the trusted run record, not native IDs.
+    # Stop dispatch even when remote identity parsing below must fail closed.
+    $record = Read-RunRecord -Path $RecordPath
+    $runId = $record['run_id']
+    $alive = Test-LauncherAlive -Record $record
+    $done = $null
+    if (Test-Path -LiteralPath $record['done'] -PathType Leaf) {
+        $done = Read-RunRecord -Path $record['done']
+    }
+    $launcherWas = if ($null -ne $done) { $done['state'] } elseif ($alive) { 'running' } else { 'launcher-died' }
     $errors = [System.Collections.Generic.List[string]]::new()
     $killed = [System.Collections.Generic.List[int]]::new()
-    $launcherWas = $status['state']
     $runStartedAt = ConvertTo-UtcTimestamp -Value $record['started_at']
     if ($launcherWas -in @('running', 'launcher-died')) {
         Stop-RunProcesses -Record $record -Killed $killed -Errors $errors
@@ -1493,7 +1498,8 @@ function Invoke-RunCancel {
         Write-RunEvent -RunId $runId -Text "already finished: $($finished['state']); reconciling its leaves"
     }
 
-    # Re-read: the log is final now that nothing writes it.
+    # Parse strict remote identities only after local dispatch has stopped.
+    # A failure throws before any remote command or output/snapshot cleanup.
     $finalSnapshot = Get-RunStatus -RecordPath $RecordPath
     $record = $finalSnapshot.record
     $unsettled = @($finalSnapshot.status['leaves'] | Where-Object { $_['workflow_id'] } | ForEach-Object { $_['workflow_id'] })
@@ -1532,7 +1538,7 @@ function Invoke-RunCancel {
             $reservationLine = $reservation.output | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1
             $leafStatus = $reservationLine | ConvertFrom-Json -AsHashtable
             $key = $leafStatus['key']
-            if ($null -eq $key -or $key['build_id'] -ne $buildId -or $key['workflow_id'] -ne $WorkflowId) {
+            if ($null -eq $key -or $key['build_id'] -cne $buildId -or $key['workflow_id'] -cne $WorkflowId) {
                 throw "invalid coordinator reservation for $WorkflowId"
             }
             $reservationState = $leafStatus['state']
@@ -1560,7 +1566,7 @@ function Invoke-RunCancel {
             }
             $binding = $leafStatus['binding']
             if ($null -ne $binding) {
-                if ($binding['build_id'] -ne $buildId -or $binding['workflow_id'] -ne $WorkflowId -or -not $binding['run_id']) {
+                if ($binding['build_id'] -cne $buildId -or $binding['workflow_id'] -cne $WorkflowId -or -not $binding['run_id']) {
                     throw "invalid coordinator binding for $WorkflowId"
                 }
                 $bindingRun = $binding['run_id']

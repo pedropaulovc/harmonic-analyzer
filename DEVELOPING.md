@@ -146,6 +146,13 @@ accepted reservation to an exact workflow run. Builds can reuse cache artifacts,
 but never attach to another build's execution. The display label identifies
 the build that owns the execution.
 
+Old-protocol native logs are unsupported by the protocol-6 launcher, including
+status inspection and remote cancellation. Finish or cancel those runs with
+their matched old tools **before** the coordinated cutover to an idle,
+physically drained fleet; there is no runtime legacy fallback. Cancellation
+still stops safely attributed local processes before rejecting invalid remote
+identities (exit 2), without remote commands or output/snapshot cleanup.
+
 Targets are *selections*, not variables, and they arrive as one string. `pwsh
 -File` binds a single token per parameter, so a repeated `-Targets` or a
 space-separated list is rejected before the script runs: pass
