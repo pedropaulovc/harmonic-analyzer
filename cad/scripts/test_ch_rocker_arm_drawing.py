@@ -345,7 +345,7 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         ("TopRadius", "BottomRadius"),
         (800.0, 816.0),
         (-110.0, -100.0),
-        ((0.114, 0.228), (0.112, 0.122)),
+        ((0.114, 0.228), (0.040, 0.105)),
         ("0.5", "0"),
     ):
         assert args == (adapter, front)
@@ -365,6 +365,18 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         assert x == pytest.approx(model_x)
         assert y < ch_rocker_arm_spec.CENTER_Y
         assert math.hypot(x, y - ch_rocker_arm_spec.CENTER_Y) == pytest.approx(radius)
+
+
+def test_lower_profile_leader_clears_native_ream_callout_corridor() -> None:
+    # R6 native ink: the REAM pivot row spans x104.0..156.1 at y144.4..148.0.
+    # The native frame leader starts 6.4mm left and 3.5mm below its placement.
+    frame = drawing.ARC_PROFILE_FRAME_XY["BottomRadius"]
+    start = (frame[0] - 0.0064, frame[1] - 0.0035)
+    end = drawing._arc_profile_point("BottomRadius")
+    for y in (0.1444, 0.1480):
+        fraction = (y - start[1]) / (end[1] - start[1])
+        x = start[0] + fraction * (end[0] - start[0])
+        assert x < 0.1040 - 0.0017
 
 
 def test_profile_zone_mirror_station_envelopes_and_template_aim() -> None:
