@@ -59,6 +59,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import hashlib
 import math
 import sys
 
@@ -76,6 +77,7 @@ from _assembly import (
     coincident_mate,
     component_origin,
     distance_driver,
+    dof_manifest_path,
     lock_mate,
     named_ref,
     parallel_mate,
@@ -503,8 +505,22 @@ async def build(adapter) -> dict[str, str]:
     # without building or saving any part. Preserve the normal published assembly.
     discard_open_documents(adapter)
     adapter.currentModel = None
-    with independent_pn_capture():
-        artefacts.update(await _build_pen(adapter))
+    normal_dof_path = dof_manifest_path(ASM_NAME)
+    with normal_dof_path.open("rb") as source:
+        normal_dof_before = hashlib.file_digest(source, "sha256").hexdigest()
+    try:
+        with independent_pn_capture():
+            artefacts.update(await _build_pen(adapter))
+    finally:
+        # The independent builder rewrites this normal output too. Never silently
+        # publish a changed or missing manifest beside the untouched normal model.
+        with normal_dof_path.open("rb") as source:
+            normal_dof_after = hashlib.file_digest(source, "sha256").hexdigest()
+        if normal_dof_after != normal_dof_before:
+            raise RuntimeError(
+                f"independent pn construction changed {normal_dof_path}: "
+                f"{normal_dof_before} -> {normal_dof_after}"
+            )
     # Compare only after both constructions and their first reconciles complete.
     artefacts.update(await probe_assembly_display_data(adapter, artefacts["assembly"]))
     return artefacts

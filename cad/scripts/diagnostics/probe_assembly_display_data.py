@@ -313,7 +313,7 @@ OUTPUT_FILENAMES = (
 _STREAM_MARKER = bytes.fromhex("140006000800")
 _STRING_MARKER = b"\xff\xfe\xff"
 _MAX_DISPLAY_BYTES = 64 * 1024 * 1024
-_INDEPENDENT_PN_CAPTURE = ContextVar("independent_pn_display_capture", default=False)
+_PN_CAPTURE_MODE: ContextVar[str] = ContextVar("pn_display_capture_mode", default="normal")
 
 
 def _digest(path: Path) -> str:
@@ -486,15 +486,15 @@ def _set_marks(model: Any, ldr_names: tuple[str, ...]) -> None:
 @contextmanager
 def independent_pn_capture():
     """Select only the second pn construction's diagnostic save path."""
-    token = _INDEPENDENT_PN_CAPTURE.set(True)
+    token = _PN_CAPTURE_MODE.set("independent")
     try:
         yield
     finally:
-        _INDEPENDENT_PN_CAPTURE.reset(token)
+        _PN_CAPTURE_MODE.reset(token)
 
 
-def independent_pn_capture_requested() -> bool:
-    return _INDEPENDENT_PN_CAPTURE.get()
+def pn_capture_mode() -> str:
+    return _PN_CAPTURE_MODE.get()
 
 
 def _protected_records(protected: dict[Path, str]) -> list[dict[str, Any]]:
@@ -528,10 +528,14 @@ def _require_preserved(records: list[dict[str, Any]]) -> None:
 def _untitled_pn_state(adapter: Any) -> tuple[Any, dict[str, Any]]:
     model = _model(adapter)
     if model.GetPathName():
-        raise RuntimeError("pre-copy pn display probe requires the untitled build source")
+        raise RuntimeError(
+            "pre-copy pn display probe requires the untitled build source"
+        )
     state = _state(model)
     if set(state["configurations"]) != {"Default", "Default Simplified"}:
-        raise RuntimeError("pre-copy pn display probe requires both native configurations")
+        raise RuntimeError(
+            "pre-copy pn display probe requires both native configurations"
+        )
     if state["active_configuration"] != "Default":
         raise RuntimeError("pre-copy pn display probe requires active Default")
     return model, state
@@ -544,9 +548,7 @@ def _display_observation(path: Path) -> dict[str, Any]:
         return {"parser_error": repr(error), "parser": "exploratory, not a gate"}
 
 
-def _capture_copy11(
-    model: Any, path: Path, row: dict[str, Any]
-) -> None:
+def _capture_copy11(model: Any, path: Path, row: dict[str, Any]) -> None:
     path.unlink(missing_ok=True)
     row["save_api"] = ReferenceSave.COPY.value
     row["save_options"] = 11
@@ -703,7 +705,9 @@ async def capture_independent_pn_first_reconcile(
         destination = paths[INDEPENDENT_STAGES[1]]
         shutil.copy2(source, destination)
         if _digest(destination) != row["sha256"]:
-            raise RuntimeError("independent pn first reconcile did not start from source bytes")
+            raise RuntimeError(
+                "independent pn first reconcile did not start from source bytes"
+            )
         check(
             "display matrix inspect independent reconcile input",
             await adapter.open_model(str(destination)),
@@ -723,7 +727,9 @@ async def capture_independent_pn_first_reconcile(
         discard_open_documents(adapter)
         adapter.currentModel = None
         await reconcile_saved_rebuild_state(
-            adapter, INDEPENDENT_STAGES[1], destination,
+            adapter,
+            INDEPENDENT_STAGES[1],
+            destination,
             diagnostic_save=row["native_reconcile_save"],
         )
         row.update(
@@ -861,7 +867,9 @@ async def probe_assembly_display_data(
             if path == normal_path and history is source_histories[0]:
                 continue
             if _digest(path) != evidence["before_sha256"]:
-                raise RuntimeError(f"display matrix pre-copy protected input changed: {path}")
+                raise RuntimeError(
+                    f"display matrix pre-copy protected input changed: {path}"
+                )
             protected[path] = evidence["before_sha256"]
     for filename in SOURCE_HISTORY_FILENAMES:
         path = directory / filename
@@ -942,7 +950,10 @@ async def probe_assembly_display_data(
             discard()
             early_outputs = {
                 *SOURCE_HISTORY_FILENAMES,
-                *(paths[stage].name for stage in (*EXTRA_COPY_STAGES, *INDEPENDENT_STAGES)),
+                *(
+                    paths[stage].name
+                    for stage in (*EXTRA_COPY_STAGES, *INDEPENDENT_STAGES)
+                ),
             }
             for filename in OUTPUT_FILENAMES:
                 if filename not in early_outputs:
@@ -971,7 +982,9 @@ async def probe_assembly_display_data(
                     stage = saved_row["stage"]
                     row = dict(saved_row)
                     if _digest(paths[stage]) != row["sha256"]:
-                        raise RuntimeError(f"display matrix early snapshot changed: {stage}")
+                        raise RuntimeError(
+                            f"display matrix early snapshot changed: {stage}"
+                        )
                     report["stages"].append(row)
                     check(
                         f"display matrix open early snapshot {stage}",
@@ -1312,7 +1325,10 @@ async def probe_assembly_display_data(
                             marks = {
                                 ReferenceOperation.CLEAR_MARKS: (),
                                 ReferenceOperation.MARK_DEFAULT: ("Default",),
-                                ReferenceOperation.MARK_BOTH: ("Default", "Default Simplified"),
+                                ReferenceOperation.MARK_BOTH: (
+                                    "Default",
+                                    "Default Simplified",
+                                ),
                             }[operation]
                             _set_marks(model, marks)
                             evidence["requested_ldr_marks"] = marks
@@ -1331,7 +1347,9 @@ async def probe_assembly_display_data(
                             model = None
                             discard()
                             await reconcile_saved_rebuild_state(
-                                adapter, stage, paths[stage],
+                                adapter,
+                                stage,
+                                paths[stage],
                                 diagnostic_save=row["native_reconcile_save"],
                             )
                             model = _model(adapter)
@@ -1460,6 +1478,10 @@ async def probe_assembly_display_data(
 
     return {f"display_{stage}": str(paths[stage]) for stage in STAGES} | {
         "display_matrix": str(manifest),
-        "display_extra_copy_source_history": str(directory / SOURCE_HISTORY_FILENAMES[0]),
-        "display_independent_source_history": str(directory / SOURCE_HISTORY_FILENAMES[1]),
+        "display_extra_copy_source_history": str(
+            directory / SOURCE_HISTORY_FILENAMES[0]
+        ),
+        "display_independent_source_history": str(
+            directory / SOURCE_HISTORY_FILENAMES[1]
+        ),
     }

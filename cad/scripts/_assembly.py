@@ -2503,19 +2503,19 @@ async def save_assembly_and_images(
     assert_reference_geometry_hidden(adapter, asm_name)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
-    independent_display_probe = False
+    display_capture_mode = "normal"
     if asm_name == "pn-pen":
         from diagnostics.probe_assembly_display_data import (
             capture_independent_pn_first_reconcile,
-            independent_pn_capture_requested,
+            pn_capture_mode,
         )
 
-        independent_display_probe = independent_pn_capture_requested()
+        display_capture_mode = pn_capture_mode()
     sidecar = _massprops_sidecar(asm_name)
     # A full build replaces the assembly bytes. Strictly retire proof for the
     # previous bytes before replacement; an unlink failure aborts the save.
     # The temporary independent pn capture must leave the normal proof intact.
-    if not independent_display_probe:
+    if display_capture_mode != "independent":
         _invalidate_massprops_proof(sidecar)
         if dof_manifest:
             dof_manifest_path(asm_name).unlink(missing_ok=True)
@@ -2531,7 +2531,7 @@ async def save_assembly_and_images(
     # save (_run_solved_gates leaves the model clean or raises).
     if rebuild_if_needed_before_save(adapter, asm_name) and solved_gates is not None:
         _run_solved_gates(adapter, asm_name, solved_gates, trigger="save_rebuild")
-    if independent_display_probe:
+    if display_capture_mode == "independent":
         # Diagnostic-only second construction: first Copy11 targets its separate
         # marked artifact; no normal save/render/fingerprint tail runs here.
         return await capture_independent_pn_first_reconcile(adapter, asm_path)
