@@ -66,6 +66,10 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
         "LOCKNUT ON FULL THREAD"
         in stack.DIMENSION_CALLOUTS[stack.PRESS_GAUGE_DIMENSION]
     )
+    # The endshake is set by one nut and held by the other.
+    endshake = stack.DIMENSION_CALLOUTS[stack.ENDSHAKE_DIMENSION]
+    assert "SET BY THE FIRST NUT" in endshake
+    assert "LOCKED BY THE SECOND" in endshake
     for text in stack.DIMENSION_CALLOUTS.values():
         assert not re.search(r"\d", text), text
     # One detail imports each setting.
@@ -80,26 +84,80 @@ def _circle_box(detail) -> tuple[float, float, float, float]:
 
 
 @pytest.mark.parametrize("detail", [drawing.PRESSED, drawing.ENDSHAKE])
-def test_each_detail_sits_in_the_free_field_with_its_label(detail) -> None:
-    left, bottom, right, top = _circle_box(detail)
+def test_each_detail_sits_in_the_free_field_with_its_label_under_its_ink(
+    detail,
+) -> None:
+    left, _bottom, right, top = _circle_box(detail)
     assert left > ISO_RIGHT
     assert right < SHEET_RIGHT
     assert top < SHEET_TOP
     label_x, label_top = detail.label_xy
-    assert label_top < bottom
-    # Two label lines, about 4 mm each, clear the title block.
-    assert label_top - 0.008 > TITLE_BLOCK_TOP
+    ink_bottom = detail.sheet_xy(detail.centre_d, -detail.ink_drop_mm)[1]
+    # Just under the detail's lowest printed edge, not under its unprinted
+    # crop circle.
+    assert 0.002 <= ink_bottom - label_top <= 0.005
+    # Two label lines, about 4.5 mm each, clear the title block.
+    assert label_top - 0.009 > TITLE_BLOCK_TOP
     assert left <= label_x
     assert detail.label_text.splitlines()[1] == (
         f"SCALE {detail.scale[0]} : {detail.scale[1]}"
     )
 
 
-def test_the_details_do_not_overlap() -> None:
-    upper = _circle_box(drawing.PRESSED)
-    lower = _circle_box(drawing.ENDSHAKE)
-    label_bottom = drawing.PRESSED.label_xy[1] - 0.008
-    assert lower[3] < label_bottom < upper[1]
+def test_each_detail_s_lowest_ink_is_its_geometry() -> None:
+    import mg_magnifying_wheel_spec as wheel
+    import vn_wheel_axle_front_washer_spec as washer
+    import vn_wheel_axle_nut_spec as nut
+    from mg_wheel_bar_geom import BAR_SIDE
+
+    # The bar's underside: the axle runs mid-height through the bar.
+    assert drawing.PRESSED.ink_drop_mm == pytest.approx(BAR_SIDE / 2.0)
+    # The circle's chord at the spigot face: the spigot fills it there, and
+    # the nuts and washer beside it stand higher.
+    detail = drawing.ENDSHAKE
+    offset = detail.centre_d - stack.HUB_FRONT_D
+    assert detail.ink_drop_mm == pytest.approx(
+        math.sqrt(detail.radius_mm**2 - offset**2)
+    )
+    assert detail.ink_drop_mm < wheel.SPIGOT_DIA / 2.0
+    assert max(nut.ACROSS_CORNERS, washer.OD) / 2.0 < detail.ink_drop_mm
+
+
+def test_the_details_and_labels_do_not_overlap() -> None:
+    upper_label_bottom = drawing.PRESSED.label_xy[1] - 0.009
+    assert _circle_box(drawing.ENDSHAKE)[3] < upper_label_bottom
+
+
+def test_an_above_callout_with_a_line_break_is_refused(monkeypatch) -> None:
+    assert drawing.CALLOUT_LOCATION[stack.PRESS_GAUGE_DIMENSION] == "above"
+    assert drawing._printable_callouts() == stack.DIMENSION_CALLOUTS
+    monkeypatch.setitem(
+        stack.DIMENSION_CALLOUTS, stack.PRESS_GAUGE_DIMENSION, "PRESS GAUGE\nLOCKNUT"
+    )
+    with pytest.raises(RuntimeError, match="line break do not print"):
+        drawing._printable_callouts()
+
+
+class _Display:
+    def __init__(self, parts: dict[int, str]) -> None:
+        self.parts = parts
+
+    def GetText(self, part: int) -> str:
+        return self.parts.get(part, "")
+
+
+def test_each_callout_reads_back_from_its_own_compartment() -> None:
+    callouts = stack.DIMENSION_CALLOUTS
+    gauge, endshake = stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION
+    good = [
+        (gauge, _Display({3: callouts[gauge]})),
+        (endshake, _Display({4: callouts[endshake].replace("\n", "\r\n")})),
+    ]
+    drawing._assert_callouts(good, callouts)
+    # The gauge's text in the below compartment is not its callout.
+    wrong = [(gauge, _Display({4: callouts[gauge]})), good[1]]
+    with pytest.raises(RuntimeError, match="above callout reads ''"):
+        drawing._assert_callouts(wrong, callouts)
 
 
 def test_each_detail_frames_both_ends_of_its_dimension() -> None:

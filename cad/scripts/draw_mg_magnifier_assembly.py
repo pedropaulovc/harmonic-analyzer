@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import math
 import sys
 from typing import Any, Callable
 
@@ -56,6 +57,7 @@ from _drawing_view_configuration import (
 from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
 from mg_wheel_axle_spec import TIP_Y
+from mg_wheel_bar_geom import BORE_ROW_HEIGHT
 
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifier_assembly"]
@@ -78,9 +80,9 @@ ISO_CENTER = (0.225, 0.140)
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
-# A detail's label note: its top-left corner this far under the crop circle
-# and left of the circle's centre.
-LABEL_DROP = 0.007
+# A detail's label note: its top-left corner this far under the detail's
+# lowest ink and left of the circle's centre.
+LABEL_GAP = 0.004
 LABEL_INSET = 0.016
 
 
@@ -91,7 +93,9 @@ class StackDetail:
     On the Right view, sheet x runs with machine -z (away from the bar) and
     sheet y with machine y. ``centre_d`` is the circle's centre as a stack
     station d (from the bar front face, on the axle line); ``centre`` is where
-    that point lands on the sheet.
+    that point lands on the sheet. ``ink_drop_mm`` is how far below the axle
+    the detail's lowest printed edge stands, in model mm; the crop circle
+    itself does not print.
     """
 
     title: str
@@ -100,6 +104,7 @@ class StackDetail:
     radius_mm: float
     centre: tuple[float, float]
     stems: frozenset[str]
+    ink_drop_mm: float
 
     @property
     def mm(self) -> float:
@@ -133,13 +138,15 @@ class StackDetail:
     def label_xy(self) -> tuple[float, float]:
         return (
             self.centre[0] - LABEL_INSET,
-            self.centre[1] - self.crop_radius - LABEL_DROP,
+            self.centre[1] - self.ink_drop_mm * self.mm - LABEL_GAP,
         )
 
 
 # The free field right of the isometric, above the title block. The gauge
-# detail spans the bar's front face to past the step; the endshake detail
-# spans the spigot face to the axle's tip.
+# detail spans the bar's front face to past the step; its lowest edge is the
+# bar's underside, the bore row height below the axle. The endshake detail
+# spans the spigot face to the axle's tip; the hub and drum fill the circle
+# up to the spigot face, so its lowest edge is the circle's chord there.
 PRESSED = StackDetail(
     "AXLE AS PRESSED",
     (2, 1),
@@ -147,12 +154,15 @@ PRESSED = StackDetail(
     16.0,
     (0.330, 0.200),
     frozenset({"mg-wheel-bar", "mg-wheel-axle"}),
+    BORE_ROW_HEIGHT,
 )
+_ENDSHAKE_CENTRE_D = (stack.HUB_FRONT_D + TIP_Y) / 2.0
+_ENDSHAKE_RADIUS = 7.0
 ENDSHAKE = StackDetail(
     "WHEEL ENDSHAKE",
     (4, 1),
-    (stack.HUB_FRONT_D + TIP_Y) / 2.0,
-    7.0,
+    _ENDSHAKE_CENTRE_D,
+    _ENDSHAKE_RADIUS,
     (0.330, 0.112),
     frozenset(
         {
@@ -165,6 +175,7 @@ ENDSHAKE = StackDetail(
             "vn-wheel-axle-nut",
         }
     ),
+    math.sqrt(_ENDSHAKE_RADIUS**2 - (_ENDSHAKE_CENTRE_D - stack.HUB_FRONT_D) ** 2),
 )
 # The gauge's dimension line runs above the bar, inside the circle, its
 # callout above the value; the endshake's text stands right of the stack,
@@ -184,6 +195,38 @@ CALLOUT_LOCATION = {
     stack.PRESS_GAUGE_DIMENSION: "above",
     stack.ENDSHAKE_DIMENSION: "below",
 }
+# swDimensionTextParts_e: the compartment each location writes and reads.
+CALLOUT_TEXT_PART = {"above": 3, "below": 4}
+
+
+def _printable_callouts() -> dict[str, str]:
+    """The callouts, refused if an above one holds a line break.
+
+    SolidWorks keeps a line break in the above compartment, and GetText reads
+    it back, yet prints none of that callout: the gauge's two-line callout in
+    run 20261012T185729782Z, like the thumbnut's and the cone-gear shaft's
+    before it. Below-callout line breaks print.
+    """
+    broken = sorted(
+        name
+        for name, location in CALLOUT_LOCATION.items()
+        if location == "above" and "\n" in stack.DIMENSION_CALLOUTS[name]
+    )
+    if broken:
+        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
+    return {name: stack.DIMENSION_CALLOUTS[name] for name in CALLOUT_LOCATION}
+
+
+def _assert_callouts(displays: list[tuple[str, Any]], callouts: dict[str, str]) -> None:
+    """Each setting's callout reads back from its own compartment."""
+    for name, display in displays:
+        part = CALLOUT_TEXT_PART[CALLOUT_LOCATION[name]]
+        text = str(display.GetText(part) or "")
+        if text.replace("\r\n", "\n") != callouts[name]:
+            raise RuntimeError(
+                f"{name}: {CALLOUT_LOCATION[name]} callout reads {text!r}, "
+                f"not {callouts[name]!r}"
+            )
 
 
 def _activate(adapter: Any, view: Any, *, label: str) -> str:
@@ -295,18 +338,17 @@ def _dimensioned_detail(
 
 
 def _stack_dimensions(adapter: Any) -> Callable[[], None]:
-    """Both settings, with their callouts, places and bands read back; the
-    returned check re-reads the bands once the drawing has settled."""
+    """Both settings, with their callouts, places and bands read back once
+    both details are cropped; the returned check re-reads the bands and the
+    callouts once the drawing has settled."""
+    callouts = _printable_callouts()
     annotations = [
         *_dimensioned_detail(adapter, PRESSED, PRESSED_KEEP),
         *_dimensioned_detail(adapter, ENDSHAKE, ENDSHAKE_KEEP),
     ]
     for name, location in CALLOUT_LOCATION.items():
         set_dimension_callouts(
-            adapter,
-            annotations,
-            {name: stack.DIMENSION_CALLOUTS[name]},
-            location=location,
+            adapter, annotations, {name: callouts[name]}, location=location
         )
     precision = {
         name: places
@@ -326,6 +368,7 @@ def _stack_dimensions(adapter: Any) -> Callable[[], None]:
     ]
     if sorted(name for name, _ in displays) != sorted(stack.DIMENSION_TOLERANCES):
         raise RuntimeError(f"stack details imported {sorted(n for n, _ in displays)}")
+    _assert_callouts(displays, callouts)
 
     def settled() -> None:
         for name, display in displays:
@@ -339,6 +382,7 @@ def _stack_dimensions(adapter: Any) -> Callable[[], None]:
                 or int(display.GetPrimaryTolPrecision2()) != stack.TOLERANCE_PRECISION
             ):
                 raise RuntimeError(f"{name}: settled band changed")
+        _assert_callouts(displays, callouts)
 
     return settled
 

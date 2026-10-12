@@ -49,8 +49,17 @@ DIMENSION_TOLERANCES = {
     PRESS_GAUGE_DIMENSION: PRESS_GAUGE_TOL,
     ENDSHAKE_DIMENSION: ENDSHAKE_TOL,
 }
-# Each callout states what its band protects.
+# Each callout states what its band protects. The gauge's prints above its
+# value, on one line: SolidWorks keeps a line break in that compartment but
+# prints none of the callout (run 20261012T185729782Z). The endshake's
+# prints below, where line breaks print.
 DIMENSION_CALLOUTS = {
-    PRESS_GAUGE_DIMENSION: "PRESS GAUGE\nLOCKNUT ON FULL THREAD",
-    ENDSHAKE_DIMENSION: "WHEEL FREE, NO RATTLE;\nSET BY THE FIRST NUT",
+    PRESS_GAUGE_DIMENSION: "PRESS GAUGE: LOCKNUT ON FULL THREAD",
+    ENDSHAKE_DIMENSION: "\n".join(
+        (
+            "WHEEL FREE, NO RATTLE;",
+            "SET BY THE FIRST NUT,",
+            "LOCKED BY THE SECOND",
+        )
+    ),
 }
