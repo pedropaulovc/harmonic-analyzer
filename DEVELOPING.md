@@ -674,10 +674,11 @@ protocol-6 run:
 Before recovery, stop any record-attributed local producer/orphans and close
 its producer lease so no new reservations can appear. The supervised
 `-Cancel -RunId <run-id> -Why …` path does this and reconciles recorded native
-reservations through the coordinator's exact-run bindings. It preserves
-outputs and removes the snapshot only when reconciliation succeeds. An
-unresolved identity, binding or physical attempt blocks cleanup and relaunch;
-diagnose it rather than treating the launcher exit as remote cancellation.
+reservations through the coordinator's exact-run bindings. Its success proves
+local stop, producer close and exact-run reconciliation, **not physical drain**.
+It can write `.done` and remove the local snapshot while remote attempt fences
+persist. Invalid identities or unresolved bindings can block that cleanup;
+unconfirmed physical attempts always block relaunch, not necessarily cleanup.
 
 Account for **every recorded native reservation**, not one representative and
 not only the `unsettled_workflows` subset. Use the run's `build_id` and each
@@ -685,17 +686,22 @@ workflow ID from `leaves` and the durable request records. Resolve the
 reservation before querying its execution:
 
 ```powershell
+# After stopping the record-attributed local producer, close its lease:
+uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py close-build "<build-id>" --reason cancelled
 uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py leaf-status --build-id "<build-id>" --workflow-id "<workflow-id>" --json
 # Only after leaf-status supplies the immutable binding.run_id:
 uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py status --run-id "<bound-run-id>" "<workflow-id>" --json
+# Optional progress monitor; watch has no --run-id option:
+uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py watch "<workflow-id>"
 ```
 
 Follow each exact bound execution under a supervised monitor until terminal,
-then confirm with the coordinator that its physical attempts and reservation
-are settled. A terminal workflow alone does not prove physical drain. A
-coordinator-confirmed `drained` reservation, or its authoritative
-`missing_closed` result with no binding or unconfirmed attempts, settles that
-reservation. Any unknown binding, recovery-required state, unconfirmed physical
+then query `leaf-status` again for coordinator-confirmed physical settlement.
+Neither terminal workflow status nor a successful `-Cancel` proves drain.
+For **every recorded reservation**, require `state: "drained"` or the
+authoritative `state: "missing_closed"`, with **empty `unconfirmed_attempts`**
+in either case (`missing_closed` also has no binding). Any unknown binding,
+recovery-required state, unconfirmed physical
 attempt, unreadable record, or authentication/network/CLI failure remains
 unresolved. `NOT_FOUND` is **never** proof of absence or drain, whether the log
 says requested or attached; there is no relaunch exception for that result.
@@ -716,11 +722,21 @@ Unchanged inputs permit cache restores; a miss executes under the new build's
 identity, not an old workflow's binding.
 
 A dead launcher's outputs may still be in `<snapshot>\cad\out`, named by
-`status.outputs`. Preserve required artifacts before cleanup. Do not remove
-that snapshot while any reservation is unresolved; successful `-Cancel`
-performs the recorded cleanup. Old-protocol native logs are unsupported by
-this launcher: finish or cancel those runs with matching old tools **before**
-the coordinated, idle and physically drained protocol-6 cutover.
+`status.outputs`. Preserve required artifacts before local cleanup. A successful
+`-Cancel` can perform the recorded cleanup before remote fences clear, so keep
+checking coordinator settlement before relaunch. If manual cleanup is needed,
+especially after an invalid remote identity makes `-Cancel` exit 2 without
+automatic cleanup, first confirm **all** recorded reservations settled as
+above and copy any required `cad\out` artifacts. Then, from another checkout:
+
+```powershell
+git worktree remove --force <snapshot>
+git worktree prune
+```
+
+Old-protocol native logs are unsupported by this launcher: finish or cancel
+those runs with matching old tools **before** the coordinated, idle and
+physically drained protocol-6 cutover.
 
 ## Remote build-artifact cache
 

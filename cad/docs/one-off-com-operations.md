@@ -308,10 +308,13 @@ cancelling an exact bound run, never merely the workflow ID. Cancellation or
 Temporal closure does not free occupied capacity: the exact worker attempts must
 acknowledge native execution and cleanup physically drained. Unknown attempts
 remain fenced until independently verified operator drain evidence is supplied.
-Recovering an interrupted run therefore means accounting for *every* recorded
-reservation, not one representative leaf. Relaunch only after their exact bound
-runs and physical attempts are coordinator-confirmed settled; a terminal
-workflow alone, an unknown binding or `NOT_FOUND` does not prove drain.
+Successful launcher cancellation proves local stop, producer close and exact-run
+reconciliation, not physical drain; its `.done` and local snapshot cleanup can
+precede release of remote attempt fences. Recovering an interrupted run means
+accounting for *every* recorded reservation. Before relaunch, `leaf-status` must
+report `drained` or authoritative `missing_closed` with empty
+`unconfirmed_attempts` for each one. Terminal status alone, an unknown binding or
+`NOT_FOUND` does not prove drain.
 Every new invocation creates a fresh build ID and distinct native executions:
 it can restore published cache artifacts, but cannot rejoin old running work.
 Retain the commit, targets, leaf budget and cache environment from the supervised
