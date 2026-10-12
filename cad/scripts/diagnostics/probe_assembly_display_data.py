@@ -239,6 +239,7 @@ async def probe_assembly_display_data(
     from _assembly import place_component
     from _check import check
     from _com import _early_bound
+    from _rebuild import active_configuration_name
     from _session import discard_open_documents
     from _telemetry import info, span
     from _transforms import IDENTITY
@@ -422,9 +423,9 @@ async def probe_assembly_display_data(
                         row["configuration_switches"] = []
                         for name in ("Default Simplified", "Default"):
                             if (
-                                not model.ShowConfiguration2(name)
-                                or not model.EditRebuild3()
-                            ):
+                                active_configuration_name(adapter, model) != name
+                                and not model.ShowConfiguration2(name)
+                            ) or not model.EditRebuild3():
                                 raise RuntimeError(
                                     f"display matrix {stage}: switch/rebuild refused {name}"
                                 )
