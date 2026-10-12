@@ -2620,7 +2620,6 @@ async def save_assembly_and_images(
     # on-disk parts and a fresh open would report NeedsRebuild2 != 0. Runs after
     # the copy source is discarded so the reopen loads clean children from disk.
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
-    assert_saved_display_data(asm_path)
     if asm_name in ("ch-channel", "sm-summing"):
         if native_contact_check is None:
             raise ValueError(f"{asm_name} assembly requires native_contact_check")
@@ -2690,7 +2689,9 @@ def _mark_assembly_display_data(adapter: Any, model: Any, asm_name: str) -> None
     configurations. It stores a save request, not a geometry change; do not
     activate configurations or rebuild while marking them.
     """
-    with _telemetry.span("assembly.mark_all_configuration_display_data", asm=asm_name) as sp:
+    with _telemetry.span(
+        "assembly.mark_all_configuration_display_data", asm=asm_name
+    ) as sp:
         sp.set_attribute("outcome", _DisplayDataMarkOutcome.FAILED.value)
         model = _early_bound(model, "IModelDoc2")
         names = [str(name) for name in (model.GetConfigurationNames() or ())]
@@ -2703,15 +2704,23 @@ def _mark_assembly_display_data(adapter: Any, model: Any, asm_name: str) -> None
             sp.set_attribute("outcome", _DisplayDataMarkOutcome.NOT_APPLICABLE.value)
             return
         for name in names:
-            configuration = _early_bound(model.GetConfigurationByName(name), "IConfiguration")
+            configuration = _early_bound(
+                model.GetConfigurationByName(name), "IConfiguration"
+            )
             if configuration is None:
-                raise RuntimeError(f"{asm_name}: display-data configuration {name!r} is unavailable")
+                raise RuntimeError(
+                    f"{asm_name}: display-data configuration {name!r} is unavailable"
+                )
             if configuration.LargeDesignReviewMark is not True:
                 configuration.LargeDesignReviewMark = True
                 if configuration.LargeDesignReviewMark is not True:
-                    raise RuntimeError(f"{asm_name}: {name!r} display-data mark did not set")
+                    raise RuntimeError(
+                        f"{asm_name}: {name!r} display-data mark did not set"
+                    )
         if active_configuration_name(adapter, model) != rest:
-            raise RuntimeError(f"{asm_name}: display-data marking changed active configuration {rest!r}")
+            raise RuntimeError(
+                f"{asm_name}: display-data marking changed active configuration {rest!r}"
+            )
         sp.set_attribute("outcome", _DisplayDataMarkOutcome.MARKED.value)
 
 
@@ -3562,7 +3571,6 @@ async def refresh_assembly(
     # re-saved -- a no-op reload leaves the reconciled artifact byte-stable.
     if saved:
         await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
-    assert_saved_display_data(asm_path)
 
     if asm_name in ("ch-channel", "sm-summing"):
         if native_contact_check is None:

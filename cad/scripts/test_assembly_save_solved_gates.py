@@ -334,6 +334,7 @@ def test_incomplete_or_unsupported_saved_bytes_prevent_manifest_publication(
         (_assembly.OUT_SLDASM / f"{ASM}.SLDASM").write_bytes(saved_native_bytes(flag))
 
     monkeypatch.setattr(_assembly, "_save_new_assembly_as_copy", save_invalid)
+    monkeypatch.setattr(_assembly, "reconcile_saved_rebuild_state", _native_reconcile)
     with pytest.raises(RuntimeError, match="display"):
         _save(adapter, _free_dof_gate)
     assert not _assembly.dof_manifest_path(ASM).exists()
