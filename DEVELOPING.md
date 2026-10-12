@@ -140,10 +140,11 @@ Launcher stdout JSON and its logs use UTF-8, including detached Windows launches
 
 Every new leaf execution has coordinator-authored Temporal memo `display_name`,
 separate from optional launcher metadata `farm_run`. Neither label enters the
-workflow ID or cache key. Protocol 5 binds each accepted reservation to an exact
-workflow run; an existing run with foreign ownership is refused, not silently
-attached to another build. The queued/running display label identifies the
-creator, not a later requesting session.
+workflow ID or cache key. Protocol 6 gives each build its own workflow ID,
+`leaf:<build_id>:<task>:<cache key or commit[:16]>:<timeout_s>s`, and binds each
+accepted reservation to an exact workflow run. Builds can reuse cache artifacts,
+but never attach to another build's execution. The display label identifies
+the build that owns the execution.
 
 Targets are *selections*, not variables, and they arrive as one string. `pwsh
 -File` binds a single token per parameter, so a repeated `-Targets` or a
@@ -177,29 +178,50 @@ exactly four leaves running 88% of a cold build and one worker idle throughout
 `--continue` collects later failures instead of stopping at the first; any failed
 task still leaves the run nonzero.
 
-### FIFO build ownership
+### FIFO capacity reservations
 
 After successful preflight, the parent build creates a fresh timestamp-and-GUID
 `build_id`, ignoring any inherited `HARMONIC_FARM_BUILD_ID`, and registers with
-the singleton `BuildFifo` coordinator. Builds wait in strict registration FIFO
-order. A waiting producer executes no doit actions; once active, its leaves
-still run in parallel according to `-n`. Ownership stays open through local
-actions and dependency gaps: an empty leaf queue does not let another build
-overtake it.
+the protocol-6 singleton `solidworks-build-fifo-6` coordinator. After registration
+is acknowledged with an open, valid producer lease, its doit scheduler starts
+immediately, even with zero reserved capacity or ownership reported as waiting.
+Local/cache work and dependency preparation can progress in every build; native-ready
+leaves submit reservations even when that build currently has no worker allocation.
+The coordinator, not a producer-side exclusive gate, controls native admission.
+
+Capacity is reserved in registration FIFO order using actual usable workers.
+Unused reserved workers transfer to the next open build after 180 seconds idle;
+each further transfer starts a fresh 180-second interval. Assignment or physical
+release starts the idle clock; producer heartbeats do not reset it. Admissions
+consume the newest idle worker first, preserving older surplus transfer clocks.
+The oldest open unfinished producer retains a one-worker floor through DAG gaps.
+For five usable workers and wholly idle builds A/B/C, reservations start A=5,
+become A=1/B=4 after 180 seconds, then A=1/C=4 after another 180 seconds.
+Occupied workers are never preempted. If the head's worker disappears while
+surviving workers are occupied by younger builds, its floor remains explicitly
+unsatisfied until physical release; zero usable capacity is also explicit.
+Closing or expiry releases idle reservations, not occupied/drain obligations.
+
+`build-status <build_id>` exposes `reserved_capacity` and `occupied_capacity`;
+`fifo-status` exposes an active-build list, `head_build_id`, `usable_capacity`,
+`occupied_capacity`,
+`reserved_idle_capacity`, `capacity_observed_at` and any `capacity_error`.
+Reserved idle capacity is not permission for another build to steal that worker.
 
 The supported runtime is Python 3.12–3.14 (`pyproject.toml` and `uv.lock`);
 `.python-version` selects 3.14 for development rather than narrowing that
-contract. Queued ownership uses finite one-second event waits so Windows
-Python 3.12/3.13 can deliver Ctrl-C. Cancellation joins the parent renewal thread,
-closes the named build even if registration's reply was still uncertain, and
-restores the inherited build-ID environment without entering the scheduler.
+contract. Cancellation joins the parent renewal thread, closes the named build
+even if registration's reply was still uncertain, and restores the inherited
+build-ID environment. A producer whose registration was not acknowledged never
+enters the scheduler.
 
 Only the parent renews ownership, every 15 seconds on an independent background
 thread, while waiting and while active. Spawned action processes inherit
 `HARMONIC_FARM_BUILD_ID` but do not renew the lease. The coordinator's 120-second
-producer lease expires after a killed or disconnected parent. Transient heartbeat
-and waiting-status RPC failures are retried only while the last acknowledged
-lease remains valid; an uncertain heartbeat reuses its sequence and update ID.
+producer lease expires after a killed or disconnected parent. This 120-second
+lease is distinct from the 180-second idle-capacity transfer timer. Transient
+heartbeat RPC failures are retried only while the last acknowledged lease remains
+valid; an uncertain heartbeat reuses its sequence and update ID.
 Queries and duplicate replies do not extend that deadline. Expiry or an explicit
 coordinator refusal fails the producer closed, with no reopening or late renewal.
 Normal completion closes ownership as `finished`, task failure as `failed`,
@@ -213,12 +235,13 @@ reservation to the coordinator. The coordinator owns leaf startup and exact-run
 binding. Accepted reservations remain outstanding even when startup or its
 response is uncertain; absence of a workflow is not evidence of no accepted
 work. Closing or expiry blocks new admissions but does not discard accepted
-reservations. The next build waits until those reservations settle and every
-worker attempt has acknowledged actual native execution and cleanup completion.
+reservations. A worker occupied by accepted work cannot be reassigned until those
+reservations settle and every attempt acknowledges actual native execution and
+cleanup completion. Other builds can still use their own reserved workers.
 Temporal workflow closure, timeout, cancellation and producer lease expiry do
-not prove physical drain. Unknown or unconfirmed attempts block the FIFO
-fail-closed until physical-drain evidence is supplied through the pool operator
-surface.
+not prove physical drain. Unknown or unconfirmed attempts keep the affected
+capacity fenced fail-closed until physical-drain evidence is supplied through
+the pool operator surface.
 `leaf-status` exposes failed startup, grant or history observation as
 `state: "recovery_required"` with typed `error_code` and `error` fields. The
 producer fails the affected action rather than polling forever or attaching to
@@ -261,11 +284,14 @@ recreated as an empty singleton: that would forget accepted work and drain
 obligations. Recovery requires physical-drain evidence and a reviewed,
 snapshot-aware recovery or history reset, not another producer launch.
 
-Protocol 5 is a clean cutover, not a rolling upgrade over protocol 4 histories.
-Migration requires an idle fleet, no outstanding reservations or unconfirmed
-attempts, and compatible producer, coordinator and worker code together.
-Do not deploy from this implementation worktree; future live-history migration
-requires a separately reviewed replay/migration plan.
+Protocol 6 is a clean cutover, not a rolling upgrade over protocol 5 histories.
+The protocol-5 coordinator state is not replayed as protocol 6; the new singleton
+is `solidworks-build-fifo-6`. Paired producer, pool coordinator and worker deployment
+requires an idle fleet with all old physical work drained, no outstanding
+reservations and no unconfirmed attempts. The matching pool commit is a required
+external paired dependency, not a compatibility shim or implicit source pin.
+Do not deploy from this implementation worktree; live-history migration requires
+a separately reviewed replay/migration plan.
 
 
 ### The build snapshot
@@ -478,25 +504,26 @@ from stale identity data. Corrupt or conflicting metadata may still make
   10 rounds, else an error). Each process is stopped through a handle whose
   start time matches the scan's, so a PID reused after the scan is never
   killed, and a stopped process still running 60 s later is an error, since it
-  may still be dispatching. For protocol 5 it then closes producer ownership
+  may still be dispatching. For protocol 6 it then closes producer ownership
   with `farm.py close-build <build_id> --reason cancelled`, blocking new
   admissions while retaining accepted reservations. It reconciles each request
   with `farm.py leaf-status --build-id <id> --workflow-id <wf> --json`.
   Reserved work is polled for at most `-BindingWaitSeconds` (30 by default;
   0 performs one query). A still-pending accepted reservation is `unresolved`,
-  not absent; the request and snapshot remain for a later `-Cancel`, and FIFO
-  ownership remains fenced. A typed `recovery_required` or `error_code` response
+  not absent; the request and snapshot remain for a later `-Cancel`, and the
+  reservation's physical-drain obligation remains fenced. A typed `recovery_required` or `error_code` response
   stops reconciliation immediately and calls for operator recovery.
   Status and cancellation of a bound leaf use `--run-id <run>` so a later
   execution with the same canonical workflow ID cannot be cancelled by mistake.
 
-  Creator memo and sibling protections remain: a leaf another submitter created
-  is `kept-foreign`; a leaf a live sibling run in the same `-LogDirectory`
-  still waits on is `kept-shared` (a `launcher-died` sibling counts while its
-  build outlives it). `HARMONIC_FARM_RUN` is metadata supplied to the coordinator,
-  which writes creator memo when it starts the reserved leaf. Siblings are
-  checked immediately before each cancellation. A sibling outside that log
-  directory is not visible to this launcher.
+  Protocol-6 cancellation trusts the validated coordinator binding for the
+  owning build and cancels only that exact run; `farm_run` is launcher metadata,
+  not an additional ownership or shared-execution gate. Historical records
+  without `build_id` retain creator-memo and sibling protections: a foreign
+  creator is `kept-foreign`, and a live sibling in the same `-LogDirectory`
+  waiting on a historical shared ID is `kept-shared`. Historical siblings are
+  checked immediately before cancellation; those outside the log directory
+  are not visible to this launcher.
 
   The typed `missing_closed` coordinator reply is `settled-untracked`: producer
   ownership is fenced closed and no retained reservation remains to reconcile.
@@ -509,9 +536,9 @@ from stale identity data. Corrupt or conflicting metadata may still make
   1 without writing `.done` or cleaning the snapshot. Retry the same command; do
   not erase the request or infer drain from error text.
   A successful remote cancellation still does not prove native worker cleanup:
-  FIFO handoff waits for the worker's physical-drain acknowledgement.
+  capacity reassignment waits for the worker's physical-drain acknowledgement.
   Historical runs without `build_id` retain the legacy settle query after
-  `-SettleSeconds` (30) and may report `not-found`; this is not a protocol 5
+  `-SettleSeconds` (30) and may report `not-found`; this is not a protocol-6
   reservation outcome.
   If any leaf cannot be accounted for (`farm.py` failed on
   authentication, network or CLI), `-Cancel` exits 1 and changes nothing

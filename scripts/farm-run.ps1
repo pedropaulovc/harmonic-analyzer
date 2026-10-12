@@ -108,8 +108,8 @@ param(
     [ValidateRange(0, 600)]
     [int]$SettleSeconds = 30,
 
-    # Protocol 5: bound reconciliation may need operator recovery. A timeout
-    # leaves the reservation unresolved; it never releases FIFO ownership.
+    # Protocol 6: bound reconciliation may need operator recovery. A timeout
+    # leaves the reservation unresolved; it never proves physical drain.
     [Parameter(ParameterSetName = 'Cancel')]
     [ValidateRange(0, 600)]
     [int]$BindingWaitSeconds = 30,
@@ -718,10 +718,17 @@ function Read-SharedText {
 }
 
 function Get-WorkflowTask {
-    param([Parameter(Mandatory)][string]$WorkflowId)
+    param(
+        [Parameter(Mandatory)][string]$WorkflowId,
+        [string]$BuildId
+    )
 
-    # _farm.workflow_id: leaf:<task>:<cache key or commit prefix>:<budget>s
-    $match = [System.Text.RegularExpressions.Regex]::Match($WorkflowId, '\Aleaf:(.+):[^:]+:\d+s\z')
+    # Protocol 6: leaf:<build id>:<task>:<cache key or commit prefix>:<budget>s.
+    # Only historical records without a build identity use the old shared ID.
+    $prefix = if ($BuildId) { "leaf:$BuildId`:" } else { 'leaf:' }
+    $match = [System.Text.RegularExpressions.Regex]::Match(
+        $WorkflowId, '\A' + [regex]::Escape($prefix) + '(.+):[^:]+:\d+s\z'
+    )
     if ($match.Success) {
         return $match.Groups[1].Value
     }
@@ -729,7 +736,10 @@ function Get-WorkflowTask {
 }
 
 function Read-RunLog {
-    param([Parameter(Mandatory)][string]$Path)
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [string]$BuildId
+    )
 
     # The log lines that mark a leaf's life, as build.py/_farm/_artifact_cache
     # print them at --verbosity info:
@@ -740,7 +750,7 @@ function Read-RunLog {
     #   TaskError - taskid:<task>                   (doit, then a traceback whose
     #                                                last exception line says why)
     $parsed = [ordered]@{
-        build_id = $null
+        build_id = $BuildId
         leaves = [ordered]@{}
         hits = 0
         task_errors = [System.Collections.Generic.List[string]]::new()
@@ -771,7 +781,7 @@ function Read-RunLog {
         if ($workflow.Success) {
             $verb = $workflow.Groups[1].Value
             $workflowId = $workflow.Groups[2].Value
-            $task = Get-WorkflowTask -WorkflowId $workflowId
+            $task = Get-WorkflowTask -WorkflowId $workflowId -BuildId $parsed['build_id']
             $parsed['leaves'][$task] = [ordered]@{
                 task = $task
                 state = $verb
@@ -871,7 +881,14 @@ function Get-RunStatus {
         $done = Read-RunRecord -Path $record['done']
     }
     $state = if ($null -ne $done) { $done['state'] } elseif ($alive) { 'running' } else { 'launcher-died' }
-    $log = Read-RunLog -Path $record['log']
+    $buildId = $record['build_id']
+    if (-not $buildId -and $record['requests']) {
+        $buildRecordPath = Join-Path $record['requests'] 'build.json'
+        if (Test-Path -LiteralPath $buildRecordPath -PathType Leaf) {
+            $buildId = (Read-RunRecord -Path $buildRecordPath)['build_id']
+        }
+    }
+    $log = Read-RunLog -Path $record['log'] -BuildId $buildId
     Add-RunRequests -Parsed $log -Directory $record['requests']
     if ($log['build_id']) {
         if ($record['build_id'] -and $record['build_id'] -ne $log['build_id']) {
@@ -1612,7 +1629,7 @@ function Invoke-RunCancel {
                 $remaining = $BindingWaitSeconds - $bindingWait.Elapsed.TotalSeconds
                 if ($remaining -le 0) {
                     $outcome['outcome'] = 'unresolved'
-                    $outcome['detail'] = "accepted reservation still pending after $BindingWaitSeconds s; FIFO ownership remains fenced"
+                    $outcome['detail'] = "accepted reservation still pending after $BindingWaitSeconds s; physical drain remains unresolved"
                     $outcome['event'] = "unresolved reservation $WorkflowId`: binding wait exhausted"
                     $errors.Add("reservation $WorkflowId has no exact binding after $BindingWaitSeconds s; retry -Cancel or use operator recovery")
                     return $outcome
@@ -1651,29 +1668,27 @@ function Invoke-RunCancel {
             $outcome['event'] = "already closed $WorkflowId`: $($described['status'])"
             return $outcome
         }
-        # The farm has no creator identity (every submitter on a host shares
-        # user@host), and an attach looks like a creation. Only the start that
-        # creates a workflow writes its memo, and _farm._dispatch stamps this
-        # run's ID there, so the memo alone says this run created the leaf.
-        if (-not $described.ContainsKey('farm_run')) {
+        # Historical shared-ID records use creator memo as their ownership
+        # evidence. Protocol 6 uses the coordinator's exact-run binding.
+        if (-not $buildId -and -not $described.ContainsKey('farm_run')) {
             $outcome['outcome'] = 'kept-foreign'
             $outcome['detail'] = 'farm.py status reports no farm_run (solidworks-pool before pedropaulovc/solidworks-pool#165); cannot tell who created it'
             $outcome['event'] = "kept $WorkflowId`: $($outcome['detail'])"
             return $outcome
         }
-        if ($described['farm_run'] -ne $runId) {
+        if (-not $buildId -and $described['farm_run'] -ne $runId) {
             $creator = if ($null -eq $described['farm_run']) { 'a submitter outside farm-run.ps1' } else { "run $($described['farm_run'])" }
             $outcome['outcome'] = 'kept-foreign'
             $outcome['detail'] = "created by $creator; this run attached"
             $outcome['event'] = "kept $WorkflowId`: $($outcome['detail'])"
             return $outcome
         }
-        # Workflows are shared by ID (USE_EXISTING): a live sibling run that
-        # is waiting on the same leaf keeps it. Asked only now, right before
-        # cancelling, so a sibling that finished or attached while this loop
-        # queried the farm is seen; what remains is the one farm.py round trip
-        # this cancel takes.
-        $waiter = (Get-SiblingWaits -Directory $Directory -RecordPath $RecordPath)[$WorkflowId]
+        # Historical workflows were shared by ID (USE_EXISTING). Recheck the
+        # sibling immediately before cancelling; protocol 6 instead trusts
+        # the coordinator's validated build-scoped exact-run binding.
+        $waiter = if (-not $buildId) {
+            (Get-SiblingWaits -Directory $Directory -RecordPath $RecordPath)[$WorkflowId]
+        } else { $null }
         if ($null -ne $waiter) {
             $outcome['outcome'] = 'kept-shared'
             $outcome['detail'] = "run $waiter is still waiting on it"

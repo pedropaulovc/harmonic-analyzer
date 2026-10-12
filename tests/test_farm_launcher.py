@@ -294,6 +294,8 @@ if lines:
     # Build output as build.py prints it: farm dispatch, cache hits, doit errors.
     printed = Path(lines).read_text(encoding="utf-8")
     requested = re.findall(r"Farm workflow requested: (\\S+)", printed)
+    registered = re.search(r"Farm build registered: (\\S+)", printed)
+    build_id = registered.group(1) if registered else None
     # UV_STUB_UNLOGGED: workflows dispatched whose lines never reach the log,
     # as when -Cancel stops the launcher before it copies them.
     unlogged = [w for w in os.environ.get("UV_STUB_UNLOGGED", "").split(",") if w]
@@ -303,12 +305,16 @@ if lines:
         # _farm._dispatch names the workflow in the run's request directory...
         requests = os.environ.get("HARMONIC_FARM_REQUESTS")
         if requests:
-            task = ":".join(workflow.split(":")[1:3])
+            fields = workflow.split(":")
+            task = ":".join(fields[2:-2] if build_id else fields[1:-2])
             name = hashlib.sha256(workflow.encode("utf-8")).hexdigest()[:32]
             (Path(requests) / f"{name}.json").write_text(
-                json.dumps({"task": task, "workflow_id": workflow}), encoding="utf-8"
+                json.dumps({
+                    "task": task, "workflow_id": workflow,
+                    **({"build_id": build_id} if build_id else {}),
+                }), encoding="utf-8"
             )
-        # ...then start_workflow(USE_EXISTING, memo=...): only a creation writes it.
+        # Historical starts write creator memo; build-scoped records retain metadata.
         if workflow in workflows and not workflows[workflow].get("_old"):
             workflows[workflow].setdefault("farm_run", os.environ.get("HARMONIC_FARM_RUN"))
     farm_state.write_text(json.dumps(workflows), encoding="utf-8")
@@ -1410,6 +1416,7 @@ def test_log_directory_must_be_outside_the_worktree(tmp_path: Path) -> None:
 
 # --- Tracking a recorded run: -Status, -Watch, -Cancel, -List ------------------
 
+# Historical launcher records intentionally retain shared, pre-build-scoped IDs.
 LEAF_PEN = "leaf:part:pen_rod:" + "a" * 64 + ":5400s"
 LEAF_CONE = "leaf:part:cone_gear:" + "b" * 64 + ":5400s"
 LEAF_NUT = "leaf:part:wheel_axle_nut:" + "c" * 64 + ":5400s"
@@ -1514,6 +1521,49 @@ def _start_held(
 
 def _stub_pid(fixture: dict[str, object]) -> int:
     return int(_record(Path(fixture["invocation"]))["pid"])
+
+@pytest.mark.parametrize("identity_source", ["log", "durable"])
+@pytest.mark.parametrize(
+    ("task", "key"), [("part:wheel_axle_nut", "c" * 64), ("check:assembly:train", "d" * 16)]
+)
+def test_status_extracts_task_from_build_scoped_workflow_id(
+    tmp_path: Path, identity_source: str, task: str, key: str,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    build_id = "20261011T120000Z-fixture-build"
+    workflow = f"leaf:{build_id}:{task}:{key}:5400s"
+    leaf_lines = (
+        f"Farm workflow requested: {workflow}\n"
+        f"Farm workflow attached: {workflow}\n"
+        f"[cache] HIT   {task} ({key[:12]}) -> output\n"
+    )
+    process, release, running = _start_held(
+        tmp_path, fixture, f"Farm build registered: {build_id}\n{leaf_lines}", "scoped"
+    )
+    try:
+        if identity_source == "durable":
+            (Path(running["requests"]) / "build.json").write_text(
+                json.dumps({"build_id": build_id, "farm_run": running["run_id"]}),
+                encoding="utf-8",
+            )
+            # A lost registration line must not turn the build prefix into a task.
+            Path(running["log"]).write_text(leaf_lines, encoding="utf-8")
+        status = _run_launcher(
+            fixture, _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            fixture["environment"],
+        )
+        assert status.returncode == 0, status.stderr
+        report = json.loads(status.stdout)
+        assert report["build_id"] == build_id
+        assert [(leaf["task"], leaf["workflow_id"], leaf["state"]) for leaf in report["leaves"]] == [
+            (task, workflow, "succeeded")
+        ]
+        assert report["counts"]["hits"] == 0
+        assert report["counts"]["succeeded"] == 1
+        assert report["in_flight_workflows"] == []
+    finally:
+        release.touch()
+        process.communicate(timeout=HANG_GUARD_S)
 
 
 def test_status_and_watch_follow_a_live_run_to_its_outcome(tmp_path: Path) -> None:
@@ -2597,11 +2647,13 @@ def test_fifo_cancel_closes_group_and_reconciles_exact_reservation(
     tmp_path: Path, reservation: str,
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
+    build_id = "fixture-build"
+    LEAF_NUT = f"leaf:{build_id}:part:wheel_axle_nut:" + "c" * 64 + ":5400s"
     process, release, running = _start_held(
-        tmp_path, fixture, f"Farm workflow requested: {LEAF_NUT}\n",
+        tmp_path, fixture,
+        f"Farm build registered: {build_id}\nFarm workflow requested: {LEAF_NUT}\n",
         "fifo",
     )
-    build_id = "fixture-build"
     try:
         requests = Path(running["requests"])
         (requests / "build.json").write_text(
@@ -2659,14 +2711,10 @@ def test_fifo_cancel_closes_group_and_reconciles_exact_reservation(
         assert state[LEAF_NUT]["status"] == "RUNNING"
         assert done["cancel"]["workflows"][0]["workflow_id"] == LEAF_NUT
         assert "run_id" not in done["cancel"]["workflows"][0]
-    elif reservation == "foreign":
-        assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
-        assert state[LEAF_NUT]["status"] == "RUNNING"
-        assert not Path(fixture["farm_cancels"]).exists()
-        assert "kept-foreign" in cancel.stdout
     else:
         assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
-        assert "pending reservation" in cancel.stdout
+        if reservation == "delayed":
+            assert "pending reservation" in cancel.stdout
         assert state[LEAF_NUT]["status"] == "CANCELED"
         call = json.loads(Path(fixture["farm_cancels"]).read_text(encoding="utf-8"))
         assert call["argv"][call["argv"].index("--run-id") + 1] == "exact-leaf-run"
@@ -2679,7 +2727,7 @@ def test_fifo_cancel_closes_durable_group_without_any_leaf_or_registration_log(
     tmp_path: Path,
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
-    process, release, running = _start_held(tmp_path, fixture, "waiting for FIFO\n", "group")
+    process, release, running = _start_held(tmp_path, fixture, "preparing dependencies\n", "group")
     try:
         (Path(running["requests"]) / "build.json").write_text(
             json.dumps({"build_id": "waiting-build", "farm_run": running["run_id"]}),
@@ -2688,7 +2736,7 @@ def test_fifo_cancel_closes_durable_group_without_any_leaf_or_registration_log(
         cancel = _run_launcher(
             fixture,
             _tracking(fixture, "-Cancel", "-RunId", running["run_id"],
-                      "-Why", "producer waiting", "-SettleSeconds", "0"),
+                      "-Why", "producer preparing", "-SettleSeconds", "0"),
             fixture["environment"],
         )
         process.communicate(timeout=HANG_GUARD_S)
@@ -2712,10 +2760,13 @@ def test_fifo_cancel_pending_or_failed_reconciliation_is_bounded_and_retryable(
     tmp_path: Path, reservation: str,
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
-    process, release, running = _start_held(
-        tmp_path, fixture, f"Farm workflow requested: {LEAF_NUT}\n", "recovery"
-    )
     build_id = "recovery-build"
+    LEAF_NUT = f"leaf:{build_id}:part:wheel_axle_nut:" + "c" * 64 + ":5400s"
+    process, release, running = _start_held(
+        tmp_path, fixture,
+        f"Farm build registered: {build_id}\nFarm workflow requested: {LEAF_NUT}\n",
+        "recovery",
+    )
     requests = Path(running["requests"])
     build_record = json.dumps({"build_id": build_id, "farm_run": running["run_id"]})
     request_record = json.dumps({
@@ -2809,6 +2860,7 @@ def test_fifo_cancel_unknown_or_pruned_reservation_settles_only_with_closed_fenc
         tmp_path, fixture, "recorded request without retained binding\n", "untracked"
     )
     build_id = "untracked-build"
+    LEAF_NUT = f"leaf:{build_id}:part:wheel_axle_nut:" + "c" * 64 + ":5400s"
     requests = Path(running["requests"])
     try:
         (requests / "build.json").write_text(
@@ -2822,7 +2874,7 @@ def test_fifo_cancel_unknown_or_pruned_reservation_settles_only_with_closed_fenc
         }), encoding="utf-8")
         state_path = Path(fixture["farm_state"])
         state = {
-            # The canonical workflow belongs to another run, not this request.
+            # An execution exists, but no retained coordinator binding authorizes it.
             LEAF_NUT: {
                 "status": "RUNNING", "run_id": "foreign-leaf-run",
                 "farm_run": "another-producer",
@@ -2881,10 +2933,13 @@ def test_fifo_cancel_operator_confirmed_unbound_drain_is_settled(
     tmp_path: Path,
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
-    process, release, running = _start_held(
-        tmp_path, fixture, f"Farm workflow requested: {LEAF_NUT}\n", "drained"
-    )
     build_id = "drained-build"
+    LEAF_NUT = f"leaf:{build_id}:part:wheel_axle_nut:" + "c" * 64 + ":5400s"
+    process, release, running = _start_held(
+        tmp_path, fixture,
+        f"Farm build registered: {build_id}\nFarm workflow requested: {LEAF_NUT}\n",
+        "drained",
+    )
     try:
         (Path(running["requests"]) / "build.json").write_text(
             json.dumps({"build_id": build_id, "farm_run": running["run_id"]}),

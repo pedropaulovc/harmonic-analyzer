@@ -76,11 +76,30 @@ preflight (`_farm_preflight`) refuses to start unless:
   those local files;
 - the remote cache is `ro` or `rw` (`_artifact_cache.enabled()`) — the farm
   hands results back **through the cache**, so `off` cannot work;
-- `farm.py agents --json` reports farm protocol 4 and no known worker reports
+- `farm.py agents --json` reports farm protocol 6 and no known worker reports
   an incompatible or unreadable protocol.
 
 A preflight failure prints `farm: <reason>` and exits 2, also before any action
 runs.
+
+After preflight, protocol 6 registers a fresh build with
+`solidworks-build-fifo-6` and starts the scheduler as soon as registration is
+acknowledged with an open, valid producer lease. There is no exclusive-ownership
+or capacity wait before local/cache work; native-ready leaves can be submitted
+at zero allocation and wait for coordinator admission. Usable workers are
+reserved in registration FIFO order. Unused surplus transfers to the next open
+build after 180 seconds idle, with a new timer at each transfer; the oldest open
+unfinished producer retains a one-worker floor through dependency gaps.
+Heartbeats do not reset idle timers, and occupied workers are never preempted.
+Lost capacity can leave that floor explicitly unsatisfied until a worker is
+physically released.
+
+The parent independently renews its 120-second producer lease every 15 seconds.
+That lease and the 180-second idle-capacity timer are different clocks. Closure
+or lease expiry releases idle reservations but preserves accepted work and
+physical-drain obligations. Protocol 6 requires paired producer/pool/worker
+deployment to an idle, physically drained fleet; protocol-5 coordinator state
+is not replayed into the new protocol-6 singleton.
 
 The preflight stamps only the committed local `HEAD`; it does not fetch or
 update a shared `origin/*` ref and does not publish source files. Each worker
@@ -249,16 +268,18 @@ holds nothing from a supervised run.
 
 **Farm half.** The failure message `_farm_build` raises already names worker,
 category, exit code and log blob. The workflow id is
-`leaf:<task>:<64-hex cache key>:<clamped timeout>s`
-(`_farm.workflow_id`; for a keyless `check:` leaf the key slot is the first 16
-characters of the requested commit). Protocol 5 also records the owning
-`build_id`, distinct from a supervised launch's `farm_run`. Resolve the
-coordinator reservation before inspecting an execution. From the pool checkout:
+`leaf:<build_id>:<task>:<64-hex cache key>:<timeout_s>s`
+(`_farm.workflow_id(build_id, task, cache_key, commit, timeout_s)`; for a keyless
+`check:` leaf the key slot is the first 16 characters of the requested commit).
+Protocol 6 scopes executions to the owning `build_id`, distinct from a supervised
+launch's `farm_run`: equal task/cache/budget inputs in another build reuse artifacts,
+not the workflow execution. Resolve the coordinator reservation before inspecting
+an execution. From the pool checkout:
 
 ```powershell
-uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py leaf-status --build-id "<build-id>" --workflow-id "leaf:part:dt_cone_gear:<64hex>:900s" --json
-uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py status --run-id "<bound-run-id>" "leaf:part:dt_cone_gear:<64hex>:900s"
-uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py logs "leaf:part:dt_cone_gear:<64hex>:900s"
+uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py leaf-status --build-id "<build-id>" --workflow-id "leaf:<build-id>:part:dt_cone_gear:<64hex>:900s" --json
+uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py status --run-id "<bound-run-id>" "leaf:<build-id>:part:dt_cone_gear:<64hex>:900s"
+uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py logs "leaf:<build-id>:part:dt_cone_gear:<64hex>:900s"
 ```
 
 The submitter logs each ID twice, with `build_id`: `Farm workflow requested:
@@ -275,7 +296,10 @@ Stopping a local submitter cancels no remote leaf. Its parent lease expires
 after 120 seconds without renewal; this blocks new admissions but does not
 discard accepted reservations or prove physical drain. Explicit cancellation
 closes the owning build and reconciles every requested reservation before
-cancelling an exact bound run, never merely the reusable workflow ID.
+cancelling an exact bound run, never merely the workflow ID. Cancellation or
+Temporal closure does not free occupied capacity: the exact worker attempts must
+acknowledge native execution and cleanup physically drained. Unknown attempts
+remain fenced until independently verified operator drain evidence is supplied.
 Recovering an interrupted run therefore means accounting for *every* request,
 not one representative leaf. A new invocation creates a fresh build ID; retain
 the commit, targets, leaf budget and cache environment — for a supervised
