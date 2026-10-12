@@ -38,6 +38,13 @@ radial through tap (`cad/scripts/vn_cone_tip_collar_spec.py`). The stack floats
 the tip block; the cup screw alone sets the shaft's end play. The 16T pinion
 face is 11.6 mm (`cad/scripts/dt_crank_pinion_spec.py`).
 
+When fitting the post, follow MHA-DT-000 step 3: hold MHA-DT-005 pushed toward
+the tip block MHA-DT-021 along the shaft throughout. Turn the post on its screws
+until the tip centres in the cup, tighten both MHA-VN-031 screws and recheck.
+This takes up the post's along-shaft screw clearance away from the cylinder bank.
+Do not assume the backed-off cup captures the tip: the collar air stack bounds
+the released shaft swing by the post journal (`cad/scripts/dt_tip_collar_air.py`).
+
 ::: {.callout-tip}
 ## Now make
 Gauge a shaft-land D-flat and its mating gear bore before assembling the stack.

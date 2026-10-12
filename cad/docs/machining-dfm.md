@@ -43,15 +43,23 @@ geometry is casting-shaped, not milling-shaped.
      gear stack south on the shaft's thrust collar, set the original 0.45 ±0.10 feeler off the
      T006 thrust face, seat both collar bore ends on the round back of the terminal, snug the
      stock flat point on the D-flat, then remove the feeler.
-     Never run or swing a loose collar. Installation notes are in
-     `vn_cone_tip_collar_spec.INSTALLATION_NOTES`; `dt_tip_collar_air.py` owns the
+     Never run or swing a loose collar.
+     During the post fit-up (MHA-DT-000 step 3), hold MHA-DT-005 pushed toward
+     MHA-DT-021 along the shaft throughout: turn the post on its screws until the
+     tip centres in the cup, tighten both MHA-VN-031 screws and recheck. This takes
+     up the post's along-shaft screw clearance away from G19.
+     Installation notes are in `vn_cone_tip_collar_spec.INSTALLATION_NOTES`;
+     `dt_tip_collar_air.py` owns the
      air stack over the whole swing. Use worst-case arithmetic over every source if it
      clears everywhere; otherwise use the statistical method everywhere: nominal air
      minus the arithmetic sum of `IN_SERVICE_CLEARANCES`, minus the RSS of independent
      printed manufacturing and set tolerances, minus the swing-interval arc allowance.
-     Fastener and running clearances, thread centring, cup freedom, collar float and
-     cock, and G19 cock can all be taken up together; never put them in the RSS.
-     The current calculated least nose air is 0.0749 mm (`dt_tip_collar_air.require_air()`),
+     Fastener and running clearances, thread centring, the cup screw in its thread,
+     shaft swing in the post journal off the cup, collar float and cock, set-screw
+     thread rock, and G19 cock can all be taken up together; never put them in the RSS.
+     ASME B18.6.2 limits only the cup diameter, not its depth or wall angle, so the
+     released shaft swing is bounded by the post journal, not by assumed cup capture.
+     The current calculated least nose air is 0.4681 mm (`dt_tip_collar_air.require_air()`),
      not a measured clearance.
 
 - **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
