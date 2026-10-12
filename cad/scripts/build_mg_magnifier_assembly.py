@@ -21,6 +21,9 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   revolute), front washer, nut and locknut (stations: mg_wheel_group). The
   brass wheel-drum is pressed on the wheel's front spigot and rides it. The
   wheel rim drives the pen rod via WIRE 2 (pn-pen.SLDASM).
+  Its two assembly settings, the press gauge and the endshake, are model
+  dimensions of a blanked construction chain (mg_magnifier_assembly_spec)
+  that the MHA-MG-000 sheet prints.
 * lever-wire -- WIRE 1's straight rest-pose run from the output fixture's cross
   hole down to the drum tangent. It ARTICULATES like the real wire: a
   ball joint at the hook (HookPoint on the wire coincident to the fixture's
@@ -62,10 +65,27 @@ from __future__ import annotations
 import math
 import sys
 
+import mg_magnifier_assembly_spec as stack_spec
 from _check import check
+from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _dimensions import drive_dimension, set_global
 from _session import run_build
-from _drawing_marks import DRAWN_BY
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision, _named_dimension
+from _drawing_tolerances import (
+    set_dimension_symmetric_tolerance,
+    _set_tolerance_precision,
+)
+from _feature_tree import name_last_feature
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _assembly import (
     activate_assembly_contract,
     angle_driver,
@@ -254,6 +274,11 @@ from mg_wheel_group import (  # noqa: E402
 assert math.isclose(BAR_FRONT_Z, _group.BAR_FRONT_Z, abs_tol=1e-9), (
     "wheel-bar front face drifted from mg_wheel_group.BAR_FRONT_Z"
 )
+assert (stack_spec.AXLE_X, stack_spec.AXLE_Y, stack_spec.BAR_FRONT_Z) == (
+    WHEEL_X,
+    WHEEL_BAR_Y,
+    BAR_FRONT_Z,
+), "mg_magnifier_assembly_spec's axle line drifted from the placed axle"
 # --- amplification wire 1 (fixture -> drum) ----------------------------------
 # Endpoints + length live in build_mg_lever_wire.py (the part's length IS the run);
 # re-derive the anchors from THIS script's layout and fail loud on drift, so a
@@ -348,6 +373,94 @@ def _lever_wire_rows() -> list[list[float]]:
 _HW_ROWS = _lever_wire_rows()
 _STANDOFF_R = DRUM_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE  # 10.1
 _WIRE_SPIN_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[2][0]))))
+
+
+async def _author_axle_stack_reference(adapter) -> None:
+    """The press gauge and the endshake as model dimensions: no solid or pose
+    edits, one construction chain on the axle centreline through the bar front
+    face, the shank step, the wheel's spigot face and the front washer
+    (mg_magnifier_assembly_spec), dimensioned from globals, banded,
+    marked for the drawing and blanked (the ms ClampedSetting pattern).
+    On the Right plane, sketch x is machine -z and sketch y is machine y."""
+    spec = stack_spec
+    for name, value in (
+        ("AxleBarFrontFace", -spec.BAR_FRONT_Z),
+        ("AxleAxisY", spec.AXLE_Y),
+        ("AxlePressGauge", spec.PRESS_GAUGE),
+        ("HubFrontStation", spec.HUB_FRONT_D),
+        ("WheelEndshake", spec.ENDSHAKE),
+    ):
+        await set_global(adapter, name, f"{value}mm")
+    xs = [-spec.BAR_FRONT_Z + d for d in spec.CHAIN_D]
+    y = spec.AXLE_Y
+    dims = SketchDims()
+    check("create axle stack sketch", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    legs = [
+        check(f"axle stack leg {index}", await adapter.add_line(x0, y, x1, y))
+        for index, (x0, x1) in enumerate(zip(xs, xs[1:]))
+    ]
+    set_sketch_direct_db(adapter, False)
+    for index, leg in enumerate(legs):
+        segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"axle stack leg {index} is not construction")
+        check(
+            f"axle stack leg {index} horizontal",
+            await adapter.add_sketch_constraint(leg, None, "horizontal"),
+        )
+    for index, (leg, after) in enumerate(zip(legs, legs[1:])):
+        check(
+            f"axle stack leg {index} chained",
+            await adapter.add_sketch_constraint(
+                f"{leg}.end", f"{after}.start", "coincident"
+            ),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{legs[0]}.start", xs[0], y, "bar front face"
+    )
+    dims.record("StackFaceX", '"AxleBarFrontFace"')
+    dims.record("StackAxisY", '"AxleAxisY"')
+    for leg, length, (name, drive) in zip(
+        legs,
+        (x1 - x0 for x0, x1 in zip(xs, xs[1:])),
+        (
+            (spec.PRESS_GAUGE_DIMENSION, '"AxlePressGauge"'),
+            ("StepToHubFront", '"HubFrontStation" - "AxlePressGauge"'),
+            (spec.ENDSHAKE_DIMENSION, '"WheelEndshake"'),
+        ),
+        strict=True,
+    ):
+        await dimension_between(
+            adapter, f"{leg}.start", f"{leg}.end", "horizontal_distance", length, name
+        )
+        dims.record(name, drive)
+    await ensure_fully_defined(adapter, "axle stack")
+    check("exit axle stack sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, spec.FEATURE)
+    for name, expression in dims.apply(adapter, spec.FEATURE):
+        await drive_dimension(adapter, name, expression)
+    for name, band in spec.DIMENSION_TOLERANCES.items():
+        set_dimension_symmetric_tolerance(adapter, spec.FEATURE, name, band)
+        display, _ = _named_dimension(adapter, spec.FEATURE, name)
+        _set_tolerance_precision(
+            display,
+            (-band, band),
+            label=f"axle stack {name}",
+            places=spec.TOLERANCE_PRECISION,
+        )
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    mark_dimensions_for_drawing(adapter, spec.FEATURE, set(spec.DIMENSION_TOLERANCES))
+    # Blanked so no view of this assembly or of the top assembly renders the
+    # chain; the MHA-MG-000 detail shows it in that view only.
+    blank_sketch(adapter, spec.FEATURE)
+    feature = _early_bound(
+        _early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(spec.FEATURE),
+        "IFeature",
+    )
+    if int(feature.Visible) != 1:  # swVisibilityStateHide
+        raise RuntimeError(f"{spec.FEATURE} still visible after BlankSketch")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -802,6 +915,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
+    await _author_axle_stack_reference(adapter)
     # Title-block identity for the assembly drawing (draw_mg_magnifier_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;
