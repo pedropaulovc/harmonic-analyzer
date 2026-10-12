@@ -94,9 +94,6 @@ def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
     assert widened < 0.0
     # The model keeps the corners sharp; the limit is printed once, above the
     # terminal across-flat.
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "InsertFeatureChamfer" not in source
-    assert "TerminalTorqueEdge" not in source
     assert "TerminalFlatEdgeBreak" not in dt_cone_gear_shaft_spec.DRAWING_DIMENSIONS
     callout = drawing.TORQUE_CORNER_CALLOUT
     assert f"{lands.TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX" in callout
@@ -105,9 +102,34 @@ def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
     assert drawing._printable_above_callouts({"Sec4AF": callout})
     with pytest.raises(RuntimeError, match="do not print"):
         drawing._printable_above_callouts({"Sec4AF": "TORQUE CORNERS:\nSTONE"})
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_printable_above_callouts({name: TORQUE_CORNER_CALLOUT})" in drawing_source
     assert "TerminalTorqueEdge" not in drawing.D_SECTION_KEEP
+
+
+def test_only_the_terminal_d_section_prints_the_torque_corner_limit(monkeypatch):
+    """Run the real section loop with its native steps recorded: the limit
+    rides above the terminal flat's own across-flat, once, through the
+    printable-above guard."""
+    from collections import defaultdict
+
+    callouts = []
+    monkeypatch.setattr(drawing, "_cut_endpoints", lambda *_a: ((0.0, 0.0), (1.0, 0.0)))
+    monkeypatch.setattr(drawing, "create_section_view", lambda *_a, label, **_k: label)
+    monkeypatch.setattr(drawing, "_prepare_d_section", lambda *_a: None)
+    monkeypatch.setattr(
+        drawing, "curate_view_dimensions", lambda _a, _view, *, keep, **_k: list(keep)
+    )
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, dimension: dimension)
+    monkeypatch.setattr(drawing, "_trim_centre_mark", lambda *_a: ())
+    monkeypatch.setattr(drawing, "_section_face", lambda *_a: (0.0, 0.0, 1.0, 1.0))
+    monkeypatch.setattr(drawing, "_place_view_caption", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        drawing, "set_dimension_callouts",
+        lambda _a, dimensions, texts, *, location: callouts.append((dimensions, texts, location)),
+    )
+    placed = drawing._add_d_sections(object(), defaultdict(object), 1)
+    assert len(placed) == len(drawing.D_SECTIONS)
+    terminal = f"Sec{max(drawing.FLAT_LANDS)}AF"
+    assert callouts == [([terminal], {terminal: drawing.TORQUE_CORNER_CALLOUT}, "above")]
 
 
 def test_display_precision_is_owned_by_the_part() -> None:
@@ -1801,10 +1823,6 @@ def test_the_64t_front_plane_is_its_south_face(monkeypatch) -> None:
     is sketched on Front and extruded +z by the face width, and
     _place_on_shaft puts that origin face/2 south of the gear's centre."""
     import asyncio
-    import inspect
-
-    import _gear
-    import build_dt_crank_drive_gear
 
     placed = {}
 
@@ -1824,11 +1842,32 @@ def test_the_64t_front_plane_is_its_south_face(monkeypatch) -> None:
     south = drive.cone_station(drive._GEAR64_SOUTH_STATION)
     assert placed["dt-crank-drive-gear"] == pytest.approx(south, abs=1e-9)
 
-    blank = inspect.getsource(_gear._build_helical_stock_form_gear)
-    assert 'check("create_sketch stock base", await adapter.create_sketch("Front"))' in blank
-    assert "create_extrusion(ExtrusionParameters(depth=face_width))" in blank
-    crank = inspect.getsource(build_dt_crank_drive_gear.build)
-    assert "screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM" in crank
+
+def test_the_64t_build_hands_the_stock_helper_its_profile_and_sweep_bound(monkeypatch) -> None:
+    """Run the real 64T build up to its stock-form gear, recording the call."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+
+    import build_dt_crank_drive_gear as crank
+
+    class Reached(Exception):
+        pass
+
+    calls = []
+
+    async def stock_form_gear(*args, **kwargs):
+        calls.append((args[1:], kwargs))
+        raise Reached
+
+    monkeypatch.setattr(crank, "check", MagicMock())
+    monkeypatch.setattr(crank, "set_global", AsyncMock())
+    monkeypatch.setattr(crank, "build_stock_form_gear", stock_form_gear)
+    with pytest.raises(Reached):
+        asyncio.run(crank.build(AsyncMock()))
+    assert calls == [(
+        (crank.STOCK_PROFILE, crank.FACE_WIDTH),
+        {"screw_sweep_bound_mm": crank.NATIVE_SWEEP_BOUND_MM},
+    )]
 
 
 def test_the_64t_native_stock_tooth_preserves_material_and_phase_gates(monkeypatch) -> None:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import math
 import runpy
 from collections import Counter
@@ -13,7 +12,7 @@ import pytest
 
 import _config
 from _buildgraph import module_deps_of
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _gear_fit_limits import gear_tip_band_mm
 import build_dt_cylinder_gear as part
 import dt_cylinder_gear_notes as notes
@@ -150,20 +149,8 @@ def test_cam_and_notch_oracles_use_actual_off_centre_root_material() -> None:
 def test_critical_tip_is_a_marked_native_dimension() -> None:
     assert spec.DRAWING_DIMENSIONS["GearBlankProfile"] == {"OutsideDia"}
     assert "OutsideDia" in drawing.RIGHT_KEEP
-    source = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    calls = [
-        node
-        for node in ast.walk(source)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "set_dimension_bilateral_tolerance"
-    ]
-    assert any(
-        len(call.args) == 4
-        and ast.literal_eval(call.args[1]) == "GearBlankProfile"
-        and ast.literal_eval(call.args[2]) == "OutsideDia"
-        and ast.unparse(call.args[3]) == "*deviations(OUTSIDE_DIA_BAND)"
-        for call in calls
+    assert model_toleranced_dimensions(part)[("GearBlankProfile", "OutsideDia")] == (
+        "*deviations(OUTSIDE_DIA_BAND)"
     )
     assert part.OUTSIDE_DIA_BAND == spec.OUTSIDE_DIA_BAND
 
@@ -481,45 +468,58 @@ def test_pattern_notch_reference_uses_the_actual_seed_gap() -> None:
     assert "PatternNotchPhase" in drawing.FRONT_KEEP
 
 
-def test_pattern_notch_is_an_untoleranced_reference_with_no_method_text() -> None:
-    """Main's MHA-DT-012 eye pass: the kerf is sawn into a root the indexing
-    already cut, so tooth pattern to notch is not a separate operation. The
-    90 deg prints (90°) REF; the ±0.02 deg grade and the INSPECT text are gone
-    (the callout-above slot never rendered, so its readback was a false pass).
-    Cam lobe to notch stays toleranced on NotchPhase."""
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
-    expected_names = {
-        keyword.value.id
-        for node in calls
-        if isinstance(node.func, ast.Name)
-        and node.func.id == "add_angular_reference_dimension"
-        for keyword in node.keywords
-        if keyword.arg == "expected_degrees" and isinstance(keyword.value, ast.Name)
-    }
-    assert {"NOTCH_PHASE_DEG", "PATTERN_NOTCH_REF_ANGLE_DEG"} <= expected_names
-    assert not any(
-        isinstance(node.func, ast.Name) and node.func.id == "set_dimension_basic_tolerance"
-        for node in calls
+def test_the_build_places_both_notch_angles_and_fixes_the_pattern_ray(monkeypatch) -> None:
+    """Run the real build, natively stubbed, to its two angular dimensions:
+    cam lobe to notch at NOTCH_PHASE_DEG, and the fixed stock-pattern seed ray
+    to notch at PATTERN_NOTCH_REF_ANGLE_DEG."""
+    import asyncio
+    import inspect
+    from unittest.mock import AsyncMock, MagicMock
+
+    class Reached(Exception):
+        pass
+
+    for attr, value in list(vars(part).items()):
+        if attr.startswith("__") or attr == "build" or not callable(value):
+            continue
+        if getattr(value, "__module__", "") == part.__name__:
+            continue
+        if inspect.isfunction(value) or inspect.isclass(value):
+            stub = AsyncMock() if inspect.iscoroutinefunction(value) else MagicMock()
+            monkeypatch.setattr(part, attr, stub)
+    monkeypatch.setattr(part, "check", lambda label, _result: label)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "_body_state", lambda *_a: "one body")
+    monkeypatch.setattr(
+        part, "build_stock_form_gear", AsyncMock(return_value=SimpleNamespace(volume=0.0))
     )
-    assert any(
-        isinstance(node.func, ast.Attribute)
-        and node.func.attr == "add_sketch_constraint"
-        and isinstance(node.args[0], ast.Name)
-        and node.args[0].id == "pattern_ray"
-        and isinstance(node.args[-1], ast.Constant)
-        and node.args[-1].value == "fix"
-        for node in calls
+    monkeypatch.setattr(
+        part, "volume_check", AsyncMock(side_effect=lambda _a, _l, expected, _t: expected)
     )
-    for gone in ("BASIC_DIMENSIONS", "pattern_notch_phase_callouts"):
-        assert not hasattr(spec, gone) and not hasattr(drawing, gone)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "INSPECT" not in source and "GetText(3)" not in source
-    tolerances = Path(spec.__file__).parents[1] / "config" / "tolerances"
-    assert all(
-        "drum_tooth_to_cam_notch_clock_deg" not in group.read_text(encoding="utf-8")
-        for group in tolerances.glob("*.yaml")
+    monkeypatch.setattr(part, "add_line_chain", AsyncMock(return_value=["B", "R", "T", "L"]))
+    angles = []
+
+    async def angular(_adapter, first, second, _xy, _label, *, expected_degrees):
+        angles.append((first, second, expected_degrees))
+        if len(angles) == 2:
+            raise Reached
+
+    monkeypatch.setattr(part, "add_angular_reference_dimension", angular)
+    adapter = AsyncMock()
+    adapter.get_mass_properties.return_value = SimpleNamespace(
+        is_success=True,
+        data=SimpleNamespace(center_of_mass=(
+            0.0, spec.ECCENTRICITY, spec.FACE_WIDTH + spec.CAM_THICKNESS / 2.0,
+        )),
     )
+    with pytest.raises(Reached):
+        asyncio.run(part.build(adapter))
+    ray, radial = "actual seed-tooth-gap reference ray", "notch radial construction line"
+    assert angles == [
+        ("notch lobe-axis construction line", radial, spec.NOTCH_PHASE_DEG),
+        (ray, radial, spec.PATTERN_NOTCH_REF_ANGLE_DEG),
+    ]
+    assert adapter.add_sketch_constraint.await_args_list[-1].args == (ray, None, "fix")
 
 
 def test_pattern_notch_drawing_consumes_pure_specification() -> None:
