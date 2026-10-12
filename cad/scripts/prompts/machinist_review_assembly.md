@@ -27,6 +27,14 @@ HOW TO REVIEW
    external interfaces or leaves to final assembly. For each, decide whether
    operating loads reach it and where its lock and locking step are shown
    (rule 23).
+5. Walk rule 22 item by item and record each gap: assembled views where every
+   part is identifiable; an exploded view that reads; a parts list with
+   balloons for every visible part; steps that fit every part the package
+   shows and install no part it does not contain; every check with an
+   acceptance criterion the step can meet; setup states; every consumable
+   named (lubricant, locker, solder).
+6. Before you report a crossing, an overprint or a contradiction, zoom into
+   that region of the image and confirm it.
 
 JUDGING ENGAGEMENT AND STACKS
 Installed engagement is proven upstream by the source model. Check it where
@@ -72,13 +80,13 @@ view or item for every finding, and say the fix):
   restating the title block.
 - clarity: what makes you stop and re-read. Content touching or outside the
   border (rule 13); text inside the silhouette without cause, or crossing
-  balloons or leaders (rule 14); broken ASME alignment, an unbalanced view
-  group, the wrong orientation or a crowded sheet (rule 15; say which view,
-  BOM or step list should move to its own sheet); views too small to identify
-  parts; a missing or noncompliant isometric (rule 8); a step order that is
-  hard to follow; an exploded view that does not read; an otherwise
-  identifiable matched-fit mate missing its name or number (rule 4). A
-  contradiction is never clarity; it is a blocker.
+  balloons or leaders (rule 14); broken ASME alignment, a view group bunched
+  against one edge, the wrong orientation or a crowded sheet (rule 15; say
+  which view, BOM or step list should move to its own sheet); views too small
+  to identify parts; a missing or noncompliant isometric (rule 8); a step
+  order that is hard to follow; an exploded view that does not read; an
+  otherwise identifiable matched-fit mate missing its name or number
+  (rule 4). A contradiction is never clarity; it is a blocker.
 - minor: taste and polish; any shortfall the package states as a plain fact
   (rule 20), each quoted with its stated value; engagement not verifiable
   from the package.

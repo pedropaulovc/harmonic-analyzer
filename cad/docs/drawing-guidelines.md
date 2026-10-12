@@ -75,12 +75,18 @@ HOLES row.
 
 - Three places mean "hold it", two mean "routine", one means "near enough".
   Three places on a drilled hole is a defect, and so are two places on a reamed
-  bearing bore with no band.
+  bearing bore with no band. Two places is the ordinary spelling of a drilled
+  hole (`Ø5.95 DRILL THRU`), a tap or tap-drill depth and a routine location;
+  it is never over-specification by itself.
 - Noncritical overall sizes generally need one place (`.X`). Chamfers, edge
-  radii and clearance holes never need extra places.
-- A dimension that carries its own band (`Ø9.55 +0.03/0`) is toleranced by
-  that band. Its decimal places are only the number's spelling, so never ask
-  it to grow a place to match the band.
+  breaks and clearance holes never need extra places.
+- A dimension that carries its own band (`Ø9.55 +0.03/0`, or stacked limits
+  such as `15.65` over `0.0/-0.5`) is toleranced by that band. Its decimal
+  places are only the number's spelling: never ask it to grow or drop a place,
+  and never round it, which moves its limits.
+- A three-place size with no band and no stated function is
+  over-specification under this rule. It becomes a rule 4 matter only when the
+  sheet or package gives it a function.
 - A tighter band goes on the dimension itself, never in a note and never as a
   geometric frame.
 
@@ -93,15 +99,18 @@ centre distance. A pass-through hole, a clearance bore, an outside profile or
 a chamfer gets the loosest title-block band that serves it.
 
 - **Every tight band names its mate.** A tight band is an explicit band
-  narrower than the title-block band for its decimal places, or any
-  three-place size. The reason for it is the mating part, so the callout, or
-  a flagged note attached to it (rule 7), names the mate ("SLIDING FIT ON
-  SHAFT, ITEM 4", or the mate's name and drawing or part number) and the fit
-  it needs: running, sliding, press or locating. A gear centre distance names
-  the mesh; a width that sets a stack names the stack. The shop can then make
-  the hole to the shaft instead of chasing a number. A tight band whose mate
-  appears nowhere in the package is a blocker. Either name the mate or loosen
-  the band.
+  narrower than the title-block band for its decimal places, a three-place
+  size given a function, or any REAM callout (REAM marks a fit bore even when
+  its band matches DRILLED HOLES). The reason for it is the mating part, so
+  the callout, or a flagged note attached to it (rule 7), names the mate
+  ("SLIDING FIT ON SHAFT, ITEM 4", or the mate's name and drawing or part
+  number) and the fit it needs: running, sliding, press or locating. A gear
+  centre distance names the mesh; a width that sets a stack names the stack.
+  The shop can then make the hole to the shaft instead of chasing a number.
+  A tight band whose mate appears nowhere in the package is a blocker: either
+  name the mate or loosen the band. A mate named somewhere in the package (a
+  general note, a gear data block, another sheet) but not at the callout it
+  serves is a clarity defect, not a blocker.
 - **Matched or selectively fitted pairs.** For a one-off pair, the callout
   identifies the mate by name and assigned drawing or part number, and states
   the required clearance, interference or an unambiguous functional
@@ -143,10 +152,13 @@ a pattern or feature that must match its mate or stay consistent across the
 repeated channel parts, and a few gear-mesh and disc alignments whose running
 clearance depends on it.
 
-- Everything else carries no frames and no datums. Perpendicularity on a
-  shoulder, flatness on a clamp face or runout on a collar of a hand-cranked
-  mechanism is over-specification. Running fits are a size band on the
-  diameter plus, at most, a roughness symbol (rule 6).
+- A position frame on a hole pattern that must match a mating pattern, or on
+  a feature repeated identically across the channel parts, is in that short
+  list; it is not over-specification. Everything else carries no frames and
+  no datums. Perpendicularity on a shoulder, flatness on a clamp face or
+  runout on a collar of a hand-cranked mechanism is over-specification.
+  Running fits are a size band on the diameter plus, at most, a roughness
+  symbol (rule 6).
 - Where a frame is justified it is complete: datum feature symbols on real,
   reachable surfaces and basic dimensions for whatever it locates. A frame with
   a missing datum, a datum no one could set up on, or a located feature with no
@@ -171,20 +183,29 @@ deliberately:
 | knife edge or pivot-screw shoulder that must be ground | Ra 0.8 µm |
 | one static mating seat that locates the part on its neighbour (a foot on a base, a bolted register) | Ra 3.2 µm |
 
-Gear seats, clamp faces, register faces that do not locate, and every other
-face carry no symbol. A symbol on a face that neither runs nor locates is
-over-specification.
+Gear seats, pinned or pressed bores, clamp faces, register faces that do not
+locate, and every other face carry no symbol. A banded or reamed bore is not a
+running bore by itself: a gear's D-bore or seat bore does not run. A symbol on
+a face that neither runs nor locates is over-specification. Judge function
+from the whole package: a thrust washer face, a thrust shoulder, or a face a
+note says slides or bears does run.
 
 ### Rule 7 — Notes: few, flagged, never a method
 
 At most four short lines of part-specific facts the views cannot carry: drill
-versus ream, stock allowance (`16 STOCK OK`), `CENTRES OK`, match-drill at
-assembly, a loose-supplied set screw, a gear data block.
+versus ream, stock allowance (`16 STOCK OK`, `SUPPLY 4.30 MIN THICK`),
+`CENTRES OK`, match-drill at assembly, a matched-fit statement with its mate
+and acceptance, a loose-supplied set screw, a stated shortfall (rule 20), a
+gear data block. A gear data block may carry REF values (module, transverse
+DP, contact ratio), addendum modification and a backlash acceptance; those
+are gear data, not narration.
 
 - A note never restates the title block, never carries a dimension or a
   tolerance that belongs on a feature, never explains what a datum letter is,
   and never narrates design intent. Other part numbers appear only to identify
-  a mate.
+  a mate, and identifying a mate is always allowed.
+- The title block's Finish field (`AS DRAWN`, `DRAWN WIRE`, `BORE AS REAMED`)
+  is a finish statement under rule 2, not a note line and not a method.
 - **Flag it where it applies.** A requirement that matters (a matched fit, a
   match-drill, a "do not cut" face) goes on the feature callout or the assembly
   step with a leader to the feature, not buried in a general note block.
@@ -290,9 +311,10 @@ never cosmetic polish.
   Convenience is not a reason. Interior text never masks geometry, hides a
   feature or component, or crosses a line.
 - No leader crosses another leader, a view it does not annotate, or a
-  dimension line, and no text sits on a line. A radius and a diameter
-  dimension line that meet at their shared centre are drawn that way by
-  convention; that is not a crossing.
+  dimension line, and no text sits on or is struck by a line. That list is
+  complete: a leader crossing an extension line or the outline of the feature
+  it annotates, a radius or diameter line drawn through its centre, and
+  extension lines crossing each other are conventional and not defects.
 
 ### Rule 15 — Balance the sheet; add a sheet before cramming
 
@@ -301,7 +323,9 @@ never cosmetic polish.
   them for composition.
 - The view group, tables and steps look intentional and balanced in the
   usable region, not bunched against one edge beside a large empty field.
-  Correctness comes before balance.
+  That is the whole test: a sparse sheet whose views are spread across the
+  usable region, or a full-width view group in the template's normal
+  position, is balanced. Correctness comes before balance.
 - Choose landscape or portrait by the useful scale of the views and the room
   the dimensions, BOM and steps need. A sparse sheet with undersized views is
   in the wrong orientation when rotating the same content would make it
@@ -365,6 +389,9 @@ hold it at the worst case or a stated fit-up adjustment covers the whole
 worst-case range: a slot, shim, feeler-set gap, cut-to-fit length or
 match-drilled hole, named in the assembly step. A stack that silently depends
 on tight part bands is a defect; the fix is an adjustment, not a tighter part.
+A part that states a supply size and a set-at-assembly size for the same
+feature (`SUPPLY 3.40 MIN`, `2.90 SET AT ASSEMBLY 2.75–2.95`) is describing
+this adjustment, not contradicting itself.
 
 ### Rule 20 — State a known shortfall as a plain fact
 
@@ -446,7 +473,8 @@ thread, or a staked or peened end.
 
 Part tolerances, materials and finishes belong on the part drawings; repeating
 them on an assembly is clutter. Torque values may be given once in a general
-note rather than per screw.
+note rather than per screw. This rule governs assembly sheets only; a part
+sheet's notes are judged by rule 7.
 
 ## Every package
 
@@ -454,7 +482,8 @@ note rather than per screw.
 
 A package is reviewed as a whole. A dimension supplied on another sheet is not
 missing, but any contradiction is a blocker, because the builder cannot tell
-which statement to obey. That includes:
+which statement to obey. A contradiction is two statements that cannot both be
+obeyed. That includes:
 
 - two views that cannot both be true of one part, such as a projection that
   disagrees with its neighbour;
@@ -465,6 +494,13 @@ which statement to obey. That includes:
 - on an assembly, item numbers, quantities or descriptions that disagree
   across BOMs and balloons, and setup or assembly steps that disagree across
   sheet boundaries.
+
+Statements that can both be obeyed are not a contradiction: a tighter local
+band inside the title-block band, a material picked from the title block's
+listed alternatives, the same size spelled with different places (`Ø12.0` and
+`Ø12.00`), a supply size and a set-at-assembly size (rule 19), or a view-scale
+label differing from the title-block scale on a DO NOT SCALE sheet. Judge
+those under rules 2, 3 or 7 at their own severity.
 
 ## Sources and departures
 
