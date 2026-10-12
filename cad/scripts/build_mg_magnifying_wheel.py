@@ -1,7 +1,7 @@
 r"""Reproduction script: magnifying wheel (book ch. 21, pp. 50-53).
 
 A gray cast-iron spider: a turned Ø100 rim on six tapered cast spokes and a
-turned Ø25 hub boss. The boss carries an integral Ø14.5 spigot on its front
+turned Ø25 hub boss. The boss carries an integral Ø14.0 spigot on its front
 (pen) side, on which the MHA-MG-010 brass drum is pressed. The lever wire wraps
 the drum, the pen wire runs in the rim's U-groove: the wire-centre radii
 49.2 / 9.85 give the wheel's 5x magnification. TIE 1 (lever wire) is an axial
@@ -443,7 +443,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Hub: ONE stepped half-profile on the Right plane (sketch x -> model -Z):
-    # the Ø25 boss from its back face to the step, then the Ø14.5 spigot to its
+    # the Ø25 boss from its back face to the step, then the Ø14.0 spigot to its
     # front face, revolved about the axis line.
     hub_sd = SketchDims()
     back_x, step_x, front_x = -HUB_BACK_Z, -HUB_STEP_Z, -HUB_FRONT_Z

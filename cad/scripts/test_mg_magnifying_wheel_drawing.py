@@ -157,7 +157,7 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     # The two fits print on their own diameters, limits read from the mates.
     assert "PRESS FIT" not in notes and "RUNS ON" not in notes
     assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"].endswith("<MOD-DIAM>4.758-4.768")
-    assert "<MOD-DIAM>14.500-14.518" in drawing.DIMENSION_CALLOUTS["SpigotDia"]
+    assert "<MOD-DIAM>14.000-14.018" in drawing.DIMENSION_CALLOUTS["SpigotDia"]
     assert "DO NOT" not in notes and "RELEASE" not in notes
     assert "GRAY-IRON" not in notes and "BLACK" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes

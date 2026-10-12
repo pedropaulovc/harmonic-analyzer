@@ -25,7 +25,6 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
-from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
@@ -38,7 +37,8 @@ from mg_wheel_drum_spec import (
     DRAWING_PRECISION,
     DRUM_BORE,
     DRUM_LEN,
-    SPIGOT_LIMITS,
+    PRESS_CALLOUT,
+    RECESS_CALLOUT,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
@@ -56,12 +56,14 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø18.9 x 9 ring: 2:1 keeps the press-fit bore's three places legible.
-SHEET_SCALE = (2.0, 1.0)
-VIEW_SCALE = (2, 1)
-FRONT_CENTER = (0.110, 0.180)
-RIGHT_CENTER = (0.200, 0.180)
-ISO_CENTER = (0.320, 0.180)
+# A Ø18.9 x 9 ring at 3:1: the face view, the side view and the isometric
+# sit on one row midway between the top border and the title block (top at
+# about 65 mm), with no general note left to anchor (policy rule 6).
+SHEET_SCALE = (3.0, 1.0)
+VIEW_SCALE = (3, 1)
+FRONT_CENTER = (0.100, 0.155)
+RIGHT_CENTER = (0.230, 0.155)
+ISO_CENTER = (0.345, 0.155)
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 
 DRAWING_PRECISION_BY_NAME = {
@@ -73,22 +75,21 @@ DRAWING_PRECISION_BY_NAME = {
 # Both diameters import on the face view, where every diameter line runs
 # through the centre: two would cross there. The bore keeps the face view;
 # the O.D. is a donor there and moves onto the side view, right of the ring.
+# The bore's four-line callout stands up and right of the face view; the
+# length's two-line callout hangs under the side view, above the title
+# block, so the two text blocks never share a row.
 FRONT_KEEP = {
-    "DrumOd": (0.060, 0.130),
-    "DrumBore": (0.150, 0.230),
+    "DrumOd": (0.060, 0.090),
+    "DrumBore": (0.150, 0.228),
 }
 RIGHT_KEEP = {
-    "DrumLen": (0.200, 0.215),
+    "DrumLen": (RIGHT_CENTER[0], 0.112),
 }
 OD_ON_SIDE = (RIGHT_CENTER[0] + DRUM_LEN / 2.0 * _S + 0.030, RIGHT_CENTER[1])
-NOTES_XY = (0.020, 0.085)
-# The press fit prints on the bore's own callout, the spigot's limits read
-# from the wheel's spec (policy rule 6).
+# Each band's need prints on its own callout (policy rule 6).
 DIMENSION_CALLOUTS = {
-    "DrumBore": (
-        "REAM THRU\nPRESS ON MG-MAGNIFYING-WHEEL\n"
-        f"SPIGOT <MOD-DIAM>{SPIGOT_LIMITS[0]:.3f}-{SPIGOT_LIMITS[1]:.3f}"
-    ),
+    "DrumBore": f"REAM THRU\n{PRESS_CALLOUT}",
+    "DrumLen": RECESS_CALLOUT,
 }
 # The bore's seat finish (policy rule 5) lands on the bore up-left, clear of
 # the Ø line that runs up-right to its callout and through the centre to the
@@ -117,15 +118,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-        ),
+        required=("Number", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
@@ -196,8 +190,6 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=landing,
         char_height=FINISH_CHAR_HEIGHT,
     )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

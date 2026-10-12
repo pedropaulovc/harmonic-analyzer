@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the magnifying wheel.
 
 A Ø100 cast-iron spider: six tapered spokes, a grooved rim, a Ø25 boss with
-the Ø14.5 drum spigot, a reamed axle bore and two wire-tie holes.  The wheel
+the Ø14.0 drum spigot, a reamed axle bore and two wire-tie holes.  The wheel
 axis is local +Z, so the FRONT view is the face (rim, spokes, fillets, bore,
 ties) and SECTION A-A, cut on the axis through the model's Right plane, is
 the hub profile, the groove and the axial widths in solid lines (policy rule
@@ -112,7 +112,7 @@ FRONT_CENTER = (0.125, 0.150)
 # drive gear), and it needs the room between the hub's axial rows and the
 # title block.
 SECTION_CENTER = (0.255, 0.165)
-# The isometric stands right of the section's Ø14.5 text, ISO_CLEAR off it.
+# The isometric stands right of the section's Ø14.0 text, ISO_CLEAR off it.
 ISO_CENTER = (0.367, 0.150)
 ISO_CLEAR = 0.005
 
@@ -471,7 +471,7 @@ BORE_FINISH_SYMBOL = _face(
 _BORE_FINISH_POINT = (*_polar((0.0, 0.0), _BORE_FINISH_BEARING, BORE_DIA / 2.0), 0.0)
 # The spigot's finish lands mid-length on the spigot's upper cut line (the
 # cylinder's edge where the A-A plane cuts it, model +Y), its symbol up and
-# right of the landing, above the Ø14.5's upper extension line and under the
+# right of the landing, above the Ø14.0's upper extension line and under the
 # rim-bore round's shoulder (sheet metres).
 _SPIGOT_FINISH_POINT = (0.0, SPIGOT_DIA / 2.0, (HUB_STEP_Z + HUB_FRONT_Z) / 2.0)
 _SPIGOT_FINISH_OFFSET = (0.012, 0.014)

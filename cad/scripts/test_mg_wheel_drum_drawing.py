@@ -12,6 +12,7 @@ import _config
 import build_mg_wheel_drum as part
 import draw_mg_wheel_drum as drawing
 import mg_magnifying_wheel_geom as wheel_geom
+import mg_wheel_drum_geom
 import mg_wheel_drum_spec as spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -46,12 +47,14 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_every_size_carries_its_band_on_the_model() -> None:
+    # The O.D. has no fit: it takes the title block's .XX row.
     assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "DrumOd"): "*deviations(DRUM_OD_BAND)",
         ("RingProfile", "DrumBore"): "*deviations(DRUM_BORE_BAND)",
         ("Drum", "DrumLen"): "*deviations(DRUM_LEN_BAND)",
     }
-    assert spec.DRAWING_PRECISION["RingProfile"]["DrumBore"] == 3
+    assert spec.DRAWING_PRECISION["RingProfile"] == {"DrumOd": 2, "DrumBore": 3}
+    # Rule 12 at the worst printed corner: the .XX O.D. on the H7 bore.
+    assert mg_wheel_drum_geom.WALL_WORST == pytest.approx(2.186)
 
 
 def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
@@ -72,16 +75,20 @@ def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
     )
 
 
-def test_press_fit_rides_the_bore_callout_and_notes_are_short() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert 1 <= len(lines) <= 4
-    assert all(len(line) <= 80 for line in lines)
-    assert "PRESS" not in spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["DrumBore"].endswith(
-        "SPIGOT <MOD-DIAM>14.523-14.534"
-    )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+def test_each_band_states_its_need_on_its_callout() -> None:
+    # Rule 6: the seating stop rides the press-fit callout; no general note.
+    assert not hasattr(spec, "DRAWING_NOTES")
+    bore = drawing.DIMENSION_CALLOUTS["DrumBore"].splitlines()
+    assert bore == [
+        "REAM THRU",
+        "PRESS ON MG-MAGNIFYING-WHEEL",
+        "SPIGOT, HARD AGAINST BOSS",
+        "0.005-0.034 INTERFERENCE",
+    ]
+    assert drawing.DIMENSION_CALLOUTS["DrumLen"].splitlines() == [
+        "FRONT FACE 0.00-0.20 BELOW",
+        "WHEEL SPIGOT FACE",
+    ]
 
 
 def test_registry_row() -> None:
@@ -115,11 +122,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     carried = dict(_part_properties.part_properties(part.PART_NAME))
     build_calls = _calls(part.__file__)
     stamp = build_calls["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args] == [
-        "adapter",
-        "PART_NAME",
-        "{'Manufacturing Notes': DRAWING_NOTES}",
-    ]
+    assert [ast.unparse(a) for a in stamp.args] == ["adapter", "PART_NAME"]
     assert stamp.lineno < build_calls["save_part_and_images"].lineno
     stamped: dict[str, str] = {}
     monkeypatch.setattr(
@@ -127,9 +130,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
         "apply_custom_properties",
         lambda _adapter, props: stamped.update(props),
     )
-    _drawing_marks.apply_drawing_properties(
-        None, part.PART_NAME, {"Manufacturing Notes": spec.DRAWING_NOTES}
-    )
+    _drawing_marks.apply_drawing_properties(None, part.PART_NAME)
     carried.update(stamped)
     missing = [name for name in required if not str(carried.get(name) or "").strip()]
     assert missing == []

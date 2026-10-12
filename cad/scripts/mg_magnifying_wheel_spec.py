@@ -203,7 +203,7 @@ WALLS = {
     "tie1_to_bore": TIE1_BORE_WALL,  # 6.870
     "tie2_to_rim_fillet": TIE2_SPOKE_WALL,  # 2.706
     "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.095
-    "spigot_to_bore": SPIGOT_WALL,  # 4.856
+    "spigot_to_bore": SPIGOT_WALL,  # 4.606
     "groove_floor": GROOVE_FLOOR_WALL,  # 4.350
 }
 for _name, _wall in WALLS.items():

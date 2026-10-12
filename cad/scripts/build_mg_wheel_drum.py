@@ -1,7 +1,7 @@
 r"""Reproduction script: magnifying-wheel drum (MHA-MG-010; 1 used).
 
 The brass ring the lever wire wraps (book ch. 21, p.53 shows the wheel's brass
-hub drum): pressed on the wheel's Ø14.5 spigot up to the boss, its front face
+hub drum): pressed on the wheel's Ø14.0 spigot up to the boss, its front face
 never proud of the spigot's (``mg_magnifying_wheel_geom.DRUM_RECESS``). Its
 wire-centre radius sets the wheel's magnification (``mg_wheel_drum_geom``).
 
@@ -41,14 +41,12 @@ from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from mg_wheel_drum_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     DRUM_BORE,
     DRUM_BORE_BAND,
     DRUM_LEN,
     DRUM_LEN_BAND,
     DRUM_OD,
-    DRUM_OD_BAND,
     SURFACE_FINISHES,
 )
 
@@ -126,9 +124,8 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "RingProfile", "DrumOd", *deviations(DRUM_OD_BAND)
-    )
+    # The O.D. takes the title block's .XX row (DRAWING_PRECISION); the bore
+    # and the length carry their fit bands.
     set_dimension_bilateral_tolerance(
         adapter, "RingProfile", "DrumBore", *deviations(DRUM_BORE_BAND)
     )
@@ -140,7 +137,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 
