@@ -34,6 +34,7 @@ DISPLAY_NAME = "FIFO lifecycle test"
 INHERITED_BUILD_ID = "20261010T190000.000000Z-" + "a" * 32
 FARM_RUN = "launcher-run-is-not-the-build-id"
 WAIT_S = 5
+SIGINT_STARTUP_GUARD_S = 60
 
 
 def _deadline(seconds=60):
@@ -475,6 +476,10 @@ def test_windows_sigint_closes_accepted_build_and_restores_environment(
             return FakeClient()
 
         _farm._connect_client = connect
+        # Imports and all live-farm guards are ready before the parent starts
+        # the separate, unchanged SIGINT-and-close behavior deadline.
+        print("ready", flush=True)
+        assert sys.stdin.readline() == "start\\n"
         entered = False
         interrupted = False
         try:
@@ -495,7 +500,7 @@ def test_windows_sigint_closes_accepted_build_and_restores_environment(
         }))
         """
     )
-    child = subprocess.run(
+    child = subprocess.Popen(
         [
             sys.executable,
             "-I",
@@ -505,12 +510,51 @@ def test_windows_sigint_closes_accepted_build_and_restores_environment(
             registration,
         ],
         cwd=tmp_path,
-        capture_output=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        check=True,
-        timeout=WAIT_S + 5,
     )
-    outcome = json.loads(child.stdout)
+    startup_ready = threading.Event()
+    startup_lines = []
+    startup_errors = []
+
+    def read_startup():
+        try:
+            startup_lines.append(child.stdout.readline())
+        except BaseException as exc:
+            startup_errors.append(exc)
+        finally:
+            startup_ready.set()
+
+    reader = threading.Thread(target=read_startup, name="sigint-probe-startup", daemon=True)
+    reader.start()
+    try:
+        if not startup_ready.wait(SIGINT_STARTUP_GUARD_S):
+            child.kill()
+            reader.join(timeout=WAIT_S + 5)
+            stdout, stderr = child.communicate(timeout=WAIT_S + 5)
+            raise AssertionError(
+                f"SIGINT probe imports/guards exceeded {SIGINT_STARTUP_GUARD_S}s "
+                f"startup guard: stdout={stdout!r} stderr={stderr!r}"
+            )
+        reader.join()
+        if startup_errors:
+            raise startup_errors[0]
+        assert startup_lines == ["ready\n"], startup_lines
+        # Starting the behavior only after readiness preserves the 10s budget;
+        # slow cold imports cannot spend that signal/close safety window.
+        stdout, stderr = child.communicate(input="start\n", timeout=WAIT_S + 5)
+        assert child.returncode == 0, (stdout, stderr)
+    finally:
+        # Only this captured synthetic child is stopped; no console broadcast,
+        # parent interrupt or native worker process is involved.
+        if child.poll() is None:
+            child.kill()
+        reader.join(timeout=WAIT_S + 5)
+        child.communicate(timeout=WAIT_S + 5)
+        assert not reader.is_alive(), "SIGINT startup pipe reader leaked"
+    outcome = json.loads(stdout)
     assert outcome["interrupted"]
     assert outcome["entered"] is (registration == "zero-capacity-scheduler")
     assert not outcome["thread_alive"], "cancelled producer left a renewal thread"
