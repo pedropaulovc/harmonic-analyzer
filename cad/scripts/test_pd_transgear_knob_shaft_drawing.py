@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import importlib
 import inspect
 import math
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -22,8 +25,10 @@ from _drawing_contract import (
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_notes import property_link
 from paper_drive_stock_inspection import span_contact_points_mm, toothspace_gauge_contact_mm
 from stock_form_cutter import CutterTemplate, StockFormProfile, translation_for_tangent_span
+from _test_stubbed_build import offline_adapter, stub_seat
 
 
 F_MACHINE_Z = -148.1
@@ -318,6 +323,124 @@ def test_shared_callout_takes_the_one_formed_edge_through_the_contact() -> None:
         ink.flank_at_contact([flank, twin], contact)
     with pytest.raises(RuntimeError, match="matched 0 of 0 drawn edges; nearest: none"):
         ink.flank_at_contact([], contact)
+
+
+class _DrawnEdge:
+    """A view edge as COM answers it: closest point (m) and curve kind."""
+
+    def __init__(self, closest_mm, *, straight: bool = False) -> None:
+        self.closest_m = tuple(value / 1000.0 for value in closest_mm)
+        self.curve = SimpleNamespace(IsLine=lambda: straight, IsCircle=lambda: False)
+
+    def GetClosestPointOn(self, *_point):
+        return self.closest_m
+
+    def GetCurve(self):
+        return self.curve
+
+
+_LANDING = (0.120, 0.080)
+
+
+def _callout_seat(monkeypatch: pytest.MonkeyPatch, *, landed=_LANDING, attached=(1,)):
+    """Run the shared callout on a recording sheet; return its parts and the contact (mm)."""
+    import paper_drive_stock_drawing as ink
+
+    kwargs = dict(
+        profile=spec.STOCK_PROFILE,
+        actual_pin_diameter_mm=spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM,
+        rotate_rad=0.3,
+        axial_station_mm=spec.FACE_WIDTH,
+        property_name=spec.TOOTH_SPACE_CALLOUT_PROPERTY,
+        note_xy=(0.150, 0.100),
+    )
+    contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, kwargs["actual_pin_diameter_mm"])
+    x, y = ink._rotate(contact.flank_point_mm, kwargs["rotate_rad"])
+    edges = {
+        "neighbour": _DrawnEdge((x + 0.2, y, spec.FACE_WIDTH)),
+        "root line": _DrawnEdge((x, y, spec.FACE_WIDTH), straight=True),
+        "flank": _DrawnEdge((x, y + 0.004, spec.FACE_WIDTH)),
+        "far face": _DrawnEdge((x, y, 0.0)),
+    }
+    seat = MagicMock()
+    draw = seat.adapter.currentModel
+    draw.SelectionManager.SetSelectionPoint2.return_value = True
+    annotation = draw.InsertNote.return_value.GetAnnotation.return_value
+    annotation.SetLeader3.return_value = 0
+    annotation.SetPosition2.return_value = True
+    annotation.GetAttachedEntityCount3.return_value = len(attached)
+    annotation.GetAttachedEntityTypes.return_value = attached
+    annotation.GetLeaderCount.return_value = 1
+    annotation.IsDangling.return_value = False
+    annotation.GetLeaderPointsAtIndex.return_value = (0.15, 0.10, 0.0, *landed, 0.0)
+    monkeypatch.setattr(ink, "visible_view_entities", lambda _view, _kind, label: list(edges.values()))
+    monkeypatch.setattr(
+        ink, "_com_invoke", lambda obj, _interface, method, *args: getattr(obj, method)(*args)
+    )
+    monkeypatch.setattr(ink, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(ink, "model_point_in_view", seat.model_point_in_view)
+    seat.model_point_in_view.return_value = _LANDING
+    monkeypatch.setattr(ink, "_select_view_entity", seat._select_view_entity)
+    monkeypatch.setattr(ink, "rebuild_drawing", seat.rebuild_drawing)
+    return ink, seat, edges, kwargs, (x, y)
+
+
+def test_shared_callout_attaches_one_leader_to_the_flank_at_the_gauge_contact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ink, seat, edges, kwargs, (x, y) = _callout_seat(monkeypatch)
+    view = object()
+    note = ink.add_toothspace_callout(seat.adapter, view, **kwargs)
+
+    draw = seat.adapter.currentModel
+    assert note is draw.InsertNote.return_value
+    # The contact is projected at the inspected end face, in metres.
+    projected = seat.model_point_in_view.call_args
+    assert projected.args[1] is view
+    assert projected.args[2] == pytest.approx((x / 1e3, y / 1e3, spec.FACE_WIDTH / 1e3))
+    # The formed flank through it is selected by entity, the landing is that
+    # selection's point, and the note linked to the part's control rides it.
+    selected = seat._select_view_entity.call_args
+    assert selected.args[1:3] == (view, "EDGE") and selected.kwargs["entity"] is edges["flank"]
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    order = [
+        names.index("_select_view_entity"),
+        names.index("adapter.currentModel.SelectionManager.SetSelectionPoint2"),
+        names.index("adapter.currentModel.InsertNote"),
+        names.index("rebuild_drawing"),
+        names.index("adapter.currentModel.ClearSelection2"),
+    ]
+    assert order == sorted(order)
+    draw.SelectionManager.SetSelectionPoint2.assert_called_once_with(1, -1, *_LANDING, 0.0)
+    draw.InsertNote.assert_called_once_with(property_link(spec.TOOTH_SPACE_CALLOUT_PROPERTY))
+    annotation = note.GetAnnotation.return_value
+    annotation.SetPosition2.assert_called_once_with(*kwargs["note_xy"], 0.0)
+
+
+@pytest.mark.parametrize(
+    ("readback", "message"),
+    [
+        ({"landed": (_LANDING[0] + 0.002, _LANDING[1])}, "leader attachment moved"),
+        ({"attached": (1, 1)}, "exactly one EDGE attachment"),
+        ({"attached": (2,)}, "exactly one EDGE attachment"),
+    ],
+)
+def test_shared_callout_fails_on_a_wrong_attachment_or_a_moved_landing(
+    monkeypatch: pytest.MonkeyPatch, readback: dict, message: str
+) -> None:
+    ink, seat, _edges, kwargs, _contact = _callout_seat(monkeypatch, **readback)
+    with pytest.raises(RuntimeError, match=message):
+        ink.add_toothspace_callout(seat.adapter, object(), **kwargs)
+
+
+def test_shared_callout_refuses_a_landing_the_sheet_did_not_take(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ink, seat, _edges, kwargs, _contact = _callout_seat(monkeypatch)
+    seat.adapter.currentModel.SelectionManager.SetSelectionPoint2.return_value = False
+    with pytest.raises(RuntimeError, match="failed to set the flank landing"):
+        ink.add_toothspace_callout(seat.adapter, object(), **kwargs)
+    seat.adapter.currentModel.InsertNote.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -778,3 +901,179 @@ def test_neck_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> 
     with pytest.raises(RuntimeError, match=r"lost \['FrontReliefDia'\] to its crop"):
         drawing._dimension_then_crop_detail(object(), view)
     assert events[0][1]["lost"] == "FrontReliefDia"
+
+
+# The stock-gear part builds, run offline with their seat stubbed
+# (_test_stubbed_build): what each authors, in what order, checked on the
+# recorded calls of the real functions.
+
+
+@pytest.mark.parametrize(
+    ("module_name", "volume_check", "pattern"),
+    [
+        ("build_pd_transgear_knob_shaft", "_native_volume_check", "pattern_stock_feature"),
+        ("build_pd_transgear_feed_pinion", "check_one_solid_body_volume", "pattern_about_z"),
+    ],
+)
+def test_straight_stock_pass_bosses_the_blank_then_cuts_one_patterned_gap(
+    monkeypatch: pytest.MonkeyPatch, module_name: str, volume_check: str, pattern: str
+) -> None:
+    module = importlib.import_module(module_name)
+    seat = stub_seat(monkeypatch, module, keep=("_straight_stock_gaps",))
+    seat.placed_ground_curve.side_effect = (
+        lambda _adapter, _segment, _phase: f"Curve{seat.placed_ground_curve.call_count}"
+    )
+    seat.name_last_feature.side_effect = lambda _adapter, name: name
+    adapter = offline_adapter()
+    seat.attach_mock(adapter, "adapter")
+    asyncio.run(module._straight_stock_gaps(adapter, []))
+
+    watched = {
+        "ensure_fully_defined", "adapter.exit_sketch", "adapter.create_extrusion",
+        "adapter.create_cut_extrude", volume_check, "placed_ground_curve", pattern,
+    }
+    order = [name for name, _args, _kwargs in seat.mock_calls if name in watched]
+    order = [name for k, name in enumerate(order) if k == 0 or name != order[k - 1]]
+    assert order == [
+        "ensure_fully_defined", "adapter.exit_sketch", "adapter.create_extrusion",
+        volume_check,
+        "placed_ground_curve", "ensure_fully_defined", "adapter.exit_sketch",
+        "adapter.create_cut_extrude", volume_check,
+        pattern, volume_check,
+    ]
+    # The gap is the stock profile's native segments in cut order, each
+    # FIXed as created, at clearance past the blank.
+    profile = module.STOCK_PROFILE
+    segments = [placed.args[1] for placed in seat.placed_ground_curve.call_args_list]
+    assert segments == list(
+        profile.cut_order_native_segments(clearance_radius_mm=profile.blank_radius_mm + 1.0)
+    )
+    curves = [f"Curve{k}" for k in range(1, len(segments) + 1)]
+    assert seat.ensure_fully_defined.call_args_list[1].kwargs["fix_entities"] == curves
+    # A blind boss of the face width, then a blind cut of the full depth,
+    # both from the sketch plane (F): one direction, solid, merged, each
+    # result checked.
+    boss = adapter.create_extrusion.await_args.args[0]
+    cut = adapter.create_cut_extrude.await_args.args[0]
+    assert (boss.depth, cut.depth) == (module.FACE_WIDTH, module.FULL_DEPTH)
+    for feature in (boss, cut):
+        assert feature.end_condition == "Blind"
+        assert feature.start_offset == 0.0
+        assert not (feature.reverse_direction or feature.both_directions or feature.thin_feature)
+        assert feature.merge_result
+    checked = [id(call.args[1]) for call in seat.check.call_args_list]
+    assert id(adapter.create_extrusion.return_value) in checked
+    assert id(adapter.create_cut_extrude.return_value) in checked
+    # One pattern of the cut gap seed, one instance per tooth.
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    cut_at = names.index("adapter.create_cut_extrude")
+    seed = next(
+        args[1] for name, args, _kwargs in seat.mock_calls[cut_at:]
+        if name == "name_last_feature"
+    )
+    (patterned,) = getattr(seat, pattern).call_args_list
+    assert patterned.args[1] == seed
+    assert patterned.args[2] == module.TEETH
+
+
+def test_neck_corners_are_equal_tangent_quarter_arcs_with_a_radial_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(monkeypatch, part, keep=("_stud_profile",))
+    arcs: list[tuple[str, tuple[float, ...]]] = []
+
+    def native_arc(_adapter, _label, *points):
+        arcs.append((f"Arc{len(arcs) + 1}", points))
+        return arcs[-1][0]
+
+    seat._native_arc.side_effect = native_arc
+    adapter = offline_adapter()
+    asyncio.run(part._stud_profile(adapter))
+
+    radius = part.FRONT_CORNER_RADIUS
+    assert len(arcs) == 2
+    for _name, (cx, cy, sx, sy, ex, ey) in arcs:
+        assert math.dist((cx, cy), (sx, sy)) == pytest.approx(radius)
+        assert math.dist((cx, cy), (ex, ey)) == pytest.approx(radius)
+        assert math.dist((sx, sy), (ex, ey)) == pytest.approx(radius * math.sqrt(2.0))
+        assert min(sy, ey) == pytest.approx(part._R_NECK)
+    front, core = (name for name, _points in arcs)
+    constraints = [call.args for call in adapter.add_sketch_constraint.await_args_list]
+    for arc in (front, core):
+        assert sum(1 for c in constraints if arc in c[:2] and c[2] == "tangent") == 2
+    assert (front, core, "equal") in constraints
+    dimensions = [call.args for call in adapter.add_sketch_dimension.await_args_list]
+    assert (front, None, "radial", radius) in dimensions
+
+
+def test_cutter_end_is_authored_after_the_turned_profiles_within_its_volume_bounds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(
+        monkeypatch, part,
+        spy=("_stud_profile", "_journal_profile", "_revolve_profile", "_stock_cutter_endcut"),
+    )
+    seat._straight_stock_gaps.return_value = part.ToothedDisc(
+        1000.0, ("StraightToothGap", "StraightToothPattern")
+    )
+    seat._cut_core_flat.side_effect = lambda _adapter, _jobs, volume: volume
+    seat._native_volume_check.side_effect = (
+        lambda _adapter, _label, lower, upper, _allowance: (lower + upper) / 2.0
+    )
+    seat._native_arc.side_effect = lambda _adapter, label, *_points: label
+    endcut = SimpleNamespace(plane="ToolEndPlane", cut="ToolEndCut")
+    seat.author_cutter_endcut.return_value = endcut
+    adapter = offline_adapter()
+    seat.attach_mock(adapter, "adapter")
+    asyncio.run(part.build(adapter))
+
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    authored = names.index("author_cutter_endcut")
+    assert names.index("_stud_profile") < authored
+    assert names.index("_journal_profile") < authored
+    assert seat.author_cutter_endcut.await_args.args[1:] == (
+        part.STOCK_PROFILE, part.CUTTER_DIA, part.FULL_DEPTH
+    )
+    # The seed removes one tooth's end and the pattern TEETH of them, each
+    # within the spec's resolved removal bounds of the volume before it.
+    lower, upper = spec.endcut_volume_bounds_mm3()
+    before = seat._stock_cutter_endcut.call_args.args[1]
+    checks = [
+        args[2:4] for name, args, _kwargs in seat.mock_calls[authored:]
+        if name == "_native_volume_check"
+    ]
+    assert checks[0] == pytest.approx((before - upper, before - lower))
+    assert checks[1] == pytest.approx(
+        (before - part.TEETH * upper, before - part.TEETH * lower)
+    )
+    (patterned,) = [
+        args for name, args, _kwargs in seat.mock_calls[authored:]
+        if name == "pattern_stock_feature"
+    ]
+    assert patterned[1:3] == (endcut.cut, part.TEETH)
+    # Each turned profile is revolved a full turn as its sketch closes, the
+    # body named for the profile handed over.
+    revolves = []
+    for name, args, _kwargs in seat.mock_calls:
+        if name == "_revolve_profile":
+            revolves.append(("handoff", args[1:]))
+        elif name == "adapter.create_revolve":
+            revolves.append(("revolve", args[0].angle))
+        elif name == "name_last_feature" and args[1] in (
+            "StudProfile", "Stud", "JournalProfile", "Journal"
+        ):
+            revolves.append(("named", args[1]))
+    assert revolves == [
+        ("named", "StudProfile"), ("handoff", ("stud", "Stud")),
+        ("revolve", 360.0), ("named", "Stud"),
+        ("named", "JournalProfile"), ("handoff", ("journal", "Journal")),
+        ("revolve", 360.0), ("named", "Journal"),
+    ]
+    # The last native volume check is the complete part against the spec's
+    # finished-shaft bounds, after the drive equations' final rebuild.
+    volume_checks = [k for k, name in enumerate(names) if name == "_native_volume_check"]
+    last_rebuild = len(names) - 1 - names[::-1].index("force_rebuild")
+    assert volume_checks[-1] > last_rebuild
+    assert seat.mock_calls[volume_checks[-1]].args[2:4] == pytest.approx(
+        spec.expected_volume_bounds_mm3()
+    )

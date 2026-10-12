@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import importlib
 import math
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -12,6 +15,7 @@ import _rack_bore_finish as finish_helper
 import build_pd_rack_pinion as part
 import draw_pd_rack_pinion as drawing
 import pd_rack_pinion_spec as spec
+import pd_transgear_feed_pinion_spec as feed_spec
 import pd_transgear_disc_hub_geometry as hub_geometry
 import vn_transgear_disc_screw_spec as disc_screw
 from _drawing_contract import (
@@ -23,6 +27,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import estimate_text_box
 from _printed_tolerance import printed_band_mm
 from paper_drive_stock_inspection import span_contact_points_mm
+from _test_stubbed_build import offline_adapter, stub_seat
 
 
 def test_required_drawing_paths() -> None:
@@ -957,3 +962,71 @@ def test_finish_straight_leader_with_native_readback_point_is_valid(finish_inser
     state = finish_insertion
     state.points = (0.278, 0.113, 0.0015, 0.222499999953, 0.175, 0.0015)
     assert state.run() is state.finish
+
+
+@pytest.mark.parametrize(
+    ("module_name", "spec_name", "orientation", "centre", "station", "pin", "gap_phase"),
+    [
+        # The disc's teeth run its full face width; the front face shows them.
+        # build_pd_rack_pinion cuts its gaps with build_stock_form_gear's
+        # default bisector phase, half a pitch (pi / N).
+        (
+            "draw_pd_rack_pinion", "pd_rack_pinion_spec", "*Front", "FRONT_CENTER",
+            "FACE_WIDTH", "TOOTH_SPACE_GAUGE_PIN_DIA_MM", math.pi / spec.TEETH,
+        ),
+        # Run 11: the sleeve's end view looks at the step face, whose run-out
+        # gaps are partial depth; the straight pass is full depth at the rear.
+        # build_pd_transgear_feed_pinion places its gaps at the inspection phase.
+        (
+            "draw_pd_transgear_feed_pinion", "pd_transgear_feed_pinion_spec",
+            "*Back", "REAR_CENTER", "TOOTH_SPACE_INSPECTION_END_MM",
+            "TOOTHSPACE_GAUGE_DIA_MM", feed_spec.TOOTH_SPACE_INSPECTION_PHASE_RAD,
+        ),
+    ],
+)
+def test_sheet_calls_out_the_tooth_space_on_its_full_depth_face_view(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, module_name: str, spec_name: str,
+    orientation: str, centre: str, station: str, pin: str, gap_phase: float,
+) -> None:
+    module = importlib.import_module(module_name)
+    owner = importlib.import_module(spec_name)
+    source = tmp_path / "source.SLDPRT"
+    source.write_bytes(b"")
+    monkeypatch.setattr(module, "SOURCE", source)
+    seat = stub_seat(monkeypatch, module)
+    if hasattr(module, "_set_tap_callout_text"):
+        monkeypatch.setattr(module, "_set_tap_callout_text", MagicMock())
+    if hasattr(module, "SHEET_INNER_BORDER"):  # the sleeve reads its notes' extents back
+        left, bottom, right, top = module.SHEET_INNER_BORDER
+        seat._early_bound.return_value.GetExtent.return_value = (
+            left + 0.01, bottom + 0.01, 0.0, right - 0.01, top - 0.01, 0.0
+        )
+    seat.new_project_drawing.return_value = (MagicMock(), MagicMock())
+    seat.place_view.side_effect = lambda _adapter, path, view, x, y, scale: SimpleNamespace(
+        path=path, orientation=view, centre=(x, y)
+    )
+    asyncio.run(module.build(offline_adapter()))
+
+    (callout,) = seat.add_toothspace_callout.call_args_list
+    view = callout.args[1]
+    assert (view.path, view.orientation, view.centre) == (
+        str(source), orientation, getattr(module, centre)
+    )
+    assert callout.kwargs["axial_station_mm"] == getattr(owner, station)
+    assert callout.kwargs["profile"] is owner.STOCK_PROFILE
+    assert callout.kwargs["property_name"] == owner.TOOTH_SPACE_CALLOUT_PROPERTY
+    # The part's certified gauge pin, seated in the sheet's chosen gap of the
+    # part as cut: the gap bisector at the part's phase, a whole number of
+    # pitches round, and the note where the sheet's layout put it.
+    assert callout.kwargs["actual_pin_diameter_mm"] == getattr(owner, pin)
+    pitch = 2.0 * math.pi / owner.TEETH
+    assert 0 <= module.TOOTH_SPACE_GAP_INDEX < owner.TEETH
+    assert callout.kwargs["rotate_rad"] == pytest.approx(
+        gap_phase + module.TOOTH_SPACE_GAP_INDEX * pitch, abs=1e-12
+    )
+    assert callout.kwargs["note_xy"] == module.TOOTH_SPACE_CALLOUT_XY
+    # The callout links the part's own control, checked against the spec first.
+    (required,) = seat.require_source_control.call_args_list
+    assert required.args[1] == owner.TOOTH_SPACE_CALLOUT
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    assert names.index("require_source_control") < names.index("add_toothspace_callout")
