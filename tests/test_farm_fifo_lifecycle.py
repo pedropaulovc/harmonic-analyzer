@@ -1204,6 +1204,9 @@ class _LeafControl:
         assert identity == self.request.submitter
         return _LeafClient(self)
 
+    async def describe(self, **options):
+        return SimpleNamespace(workflow_type=_farm.WORKFLOW_BUILD_FIFO)
+
     async def execute_update(self, name, arg, **options):
         assert name == "submit_leaf"
         assert arg == _farm.SubmitLeaf(self.request, FARM_RUN)
