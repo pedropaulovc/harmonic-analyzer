@@ -659,66 +659,68 @@ cache-miss followed by a restored artifact, and the artifact plus its
 
 ### Recovering a run across a handoff
 
-`-Status` the recorded run id (or `-Watch` it, which ends in the same object):
+Use `-Status -RunId <run-id>` or `-Watch -RunId <run-id>` on the recorded
+protocol-6 run:
 
-1. **`running`.** The launcher is alive. Keep watching with `-Watch`. Do not
-   start a second submitter for the same work.
-2. **`succeeded`, `failed` or `cancelled`.** That is the outcome. `succeeded`
-   with exit 0 is a finished run; `failed` is a finished failure to diagnose
-   from `task_errors` and the log.
-3. **`launcher-died`** (watch exit 21). The launcher is gone and wrote no
-   `.done`, so the local outcome is *unknown*. It is not a cancellation, and it
-   is not permission to relaunch. The remote work is very likely still running:
-   `_farm.run_leaf` shares workflows by ID (`USE_EXISTING`), so killing the
-   submitter never cancelled anything — and `launcher.orphaned_processes`
-   lists a build child that may still be dispatching.
+1. **`running`.** Keep watching. Do not start another submitter for this work.
+2. **`succeeded`, `failed` or `cancelled`.** This is the local launcher's
+   outcome. Diagnose failures from `task_errors` and the log. A failed or
+   cancelled submitter can still have accepted remote reservations to settle.
+3. **`launcher-died`** (watch exit 21). The launcher wrote no `.done`, so its
+   local outcome is unknown. Accepted remote work is not cancelled by losing
+   the submitter, and `launcher.orphaned_processes` may name local children
+   that can still dispatch. This is not permission to relaunch.
 
-In case 3, either abandon the run with `-Cancel -Why …` (it stops the orphans,
-cancels the leaves no live sibling needs, keeps the outputs and removes the
-snapshot), or finish it. To finish it, query every workflow in
-`unsettled_workflows` — every leaf with a workflow id and no result, not
-one representative — from the pool checkout:
+Before recovery, stop any record-attributed local producer/orphans and close
+its producer lease so no new reservations can appear. The supervised
+`-Cancel -RunId <run-id> -Why …` path does this and reconciles recorded native
+reservations through the coordinator's exact-run bindings. It preserves
+outputs and removes the snapshot only when reconciliation succeeds. An
+unresolved identity, binding or physical attempt blocks cleanup and relaunch;
+diagnose it rather than treating the launcher exit as remote cancellation.
+
+Account for **every recorded native reservation**, not one representative and
+not only the `unsettled_workflows` subset. Use the run's `build_id` and each
+workflow ID from `leaves` and the durable request records. Resolve the
+reservation before querying its execution:
 
 ```powershell
-uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py status "<workflow-id>" --json
-uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py watch  "<workflow-id>"
+uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py leaf-status --build-id "<build-id>" --workflow-id "<workflow-id>" --json
+# Only after leaf-status supplies the immutable binding.run_id:
+uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py status --run-id "<bound-run-id>" "<workflow-id>" --json
 ```
 
-Follow a RUNNING workflow under a supervised monitor until it is terminal, then
-finish the bookkeeping from the *run record*, never from the caller's worktree:
-the snapshot contract lets that worktree move on mid-run, so its HEAD says
-nothing about what was launched. The recorded identity is `commit`, `targets`,
-`leaf_timeout_minutes` and `cache_environment`. Launch `scripts/farm-run.ps1`
-again with exactly those — `-Worktree` pointed at a clean checkout whose HEAD
-is `commit` (the kept snapshot itself, or a fresh
-`git worktree add --detach <path> <commit>`), `-Targets` and `-LeafTimeout`
-from the record, and `HARMONIC_CACHE_ACCOUNT`/`CONTAINER`/`SALT` set (or unset)
-to match `cache_environment`. Supply `-DisplayName` with the recovering session's
-owner and reason; historical records may have no label. This metadata does not
-change identity, and a rejoined workflow still retains its creator's label.
-Same commit, cache environment and budget give
-the same keys and workflow IDs, so every finished leaf restores from the cache
-and a running one is rejoined rather than duplicated. The leaf budget is part
-of the workflow ID, so changing it during recovery creates a different
-workflow instead of rejoining the one already running. Never cancel a shared
-workflow automatically.
+Follow each exact bound execution under a supervised monitor until terminal,
+then confirm with the coordinator that its physical attempts and reservation
+are settled. A terminal workflow alone does not prove physical drain. A
+coordinator-confirmed `drained` reservation, or its authoritative
+`missing_closed` result with no binding or unconfirmed attempts, settles that
+reservation. Any unknown binding, recovery-required state, unconfirmed physical
+attempt, unreadable record, or authentication/network/CLI failure remains
+unresolved. `NOT_FOUND` is **never** proof of absence or drain, whether the log
+says requested or attached; there is no relaunch exception for that result.
 
-A launcher that died before its `.done` never ran its cleanup, so its snapshot
-is still registered and its outputs are still in `<snapshot>\cad\out` (the
-status `outputs`). `-Cancel` does that cleanup. If you finished the run by
-relaunching instead, copy what you need out of that `cad\out`, then remove the
-snapshot from any checkout of the repository:
-`git worktree remove --force <snapshot>` followed by `git worktree prune`. A
-snapshot is only ever the recorded commit; removing it loses nothing else.
+Only after all recorded reservations are settled may you launch again.
+Every relaunch registers a **new build ID** and therefore creates distinct
+native workflow executions, even with the same commit, task, cache key and
+timeout. It reuses published cache artifacts, **not running executions**.
+There is no cross-build rejoin or sibling-sharing guarantee.
 
-Relaunching the recorded invocation is allowed in exactly one case: an
-authenticated `NOT_FOUND` for an ID that was *requested* but never *attached*.
-That pair of log lines exists precisely for the window between server acceptance
-and the submitter's acknowledgement. Everything else stays unresolved and blocks
-an automatic relaunch: `NOT_FOUND` for an attached ID, a missing or unreadable
-identifier, a checkout at any commit other than the recorded one or a different
-cache environment, or a `status` call that failed on authentication, network or
-CLI error. An auth or network failure is never a `NOT_FOUND`.
+Recover inputs from the *run record*, not the caller's current worktree: its
+recorded `commit`, `targets`, `leaf_timeout_minutes` and `cache_environment`
+describe what was launched. Point `-Worktree` at a clean checkout of that
+commit (the retained snapshot or a fresh checkout), use the recorded targets
+and leaf budget, and set or unset `HARMONIC_CACHE_ACCOUNT`/`CONTAINER`/`SALT`
+to match. Supply `-DisplayName` for the recovering session's owner and reason.
+Unchanged inputs permit cache restores; a miss executes under the new build's
+identity, not an old workflow's binding.
+
+A dead launcher's outputs may still be in `<snapshot>\cad\out`, named by
+`status.outputs`. Preserve required artifacts before cleanup. Do not remove
+that snapshot while any reservation is unresolved; successful `-Cancel`
+performs the recorded cleanup. Old-protocol native logs are unsupported by
+this launcher: finish or cancel those runs with matching old tools **before**
+the coordinated, idle and physically drained protocol-6 cutover.
 
 ## Remote build-artifact cache
 

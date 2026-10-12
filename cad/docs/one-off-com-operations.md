@@ -308,12 +308,16 @@ cancelling an exact bound run, never merely the workflow ID. Cancellation or
 Temporal closure does not free occupied capacity: the exact worker attempts must
 acknowledge native execution and cleanup physically drained. Unknown attempts
 remain fenced until independently verified operator drain evidence is supplied.
-Recovering an interrupted run therefore means accounting for *every* request,
-not one representative leaf. A new invocation creates a fresh build ID; retain
-the commit, targets, leaf budget and cache environment — for a supervised
-launch, those in its run record, not the caller's current worktree. The budget
-remains part of the canonical workflow ID. The full procedure is in
-[supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
+Recovering an interrupted run therefore means accounting for *every* recorded
+reservation, not one representative leaf. Relaunch only after their exact bound
+runs and physical attempts are coordinator-confirmed settled; a terminal
+workflow alone, an unknown binding or `NOT_FOUND` does not prove drain.
+Every new invocation creates a fresh build ID and distinct native executions:
+it can restore published cache artifacts, but cannot rejoin old running work.
+Retain the commit, targets, leaf budget and cache environment from the supervised
+run record, not the caller's current worktree. The budget remains part of the
+canonical workflow ID. Follow
+[the handoff recovery procedure](../../DEVELOPING.md#recovering-a-run-across-a-handoff).
 
 **A failure OUTSIDE the recipe has no leaf log.** `farm.py logs` needs
 `log_blob`, and the worker only publishes one once it has actually run the
