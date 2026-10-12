@@ -32,7 +32,7 @@ HANGER_SCREW_LOCAL_X = HANGER_SCREW_MACHINE_X - HANGER_ORIGIN_X
 
 # Wheel-axle bore: reamed .1865 through, on the mid-height line at the wheel
 # station; the 3/16 mg-wheel-axle presses in to a gauge from the front face
-# (mg_wheel_axle_spec), its back end about flush with the back face.
+# (mg_wheel_axle_spec), its back end near the back face.
 WHEEL_X = 53.0  # magnifying-wheel centre, machine x
 AXLE_BORE_X = WHEEL_X - WHEEL_BAR_X0  # -56
 AXLE_BORE_DIA = round(0.1865 * 25.4, 6)  # 4.7371
@@ -43,7 +43,8 @@ AXLE_BORE_POSITION_TOL = 0.10
 # minus-only, because its top limit sets the TIE 1 tail clearance
 # (mg_wheel_group) and its bottom the axle-bore wall below.
 BAR_SIDE_BAND = (0.0, -0.5)
-# Printed depth band: the pin's back end sits within it of the back face.
+# Printed depth band: with the axle's press gauge and .X shank it places the
+# axle's back end on the back face (mg_wheel_axle_spec.BACK_END_PROUD_MAX).
 BAR_DEPTH_BAND = (0.10, -0.10)
 AXLE_BORE_MIN_WALL = 2.0  # drawing-simplicity rule 12 target, worst case
 # Worst wall above or below the bore: the bar at its thinnest, the bore at its
@@ -67,7 +68,8 @@ CLAMP_HOLE_DIA = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
 # The station is dimensioned directly from the finished end, so the overall
 # length tolerance does not enter this stack.
 PEN_HANGER_MIN_END_WALL = 2.0
-# The hanger station prints .XX: the title block's row holds the end wall.
+# The hanger station prints .XX: the title block's row holds the end wall
+# (2.154 worst); at .X it would be 1.864, under the 2.0 target.
 PEN_HANGER_STATION_PLACES = 2
 PEN_HANGER_STATION_TOL = printed_band_mm(PEN_HANGER_STATION_PLACES)
 

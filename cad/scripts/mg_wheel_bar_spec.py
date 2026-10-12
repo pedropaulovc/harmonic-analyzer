@@ -36,8 +36,8 @@ _LEFT_END = -BAR_LENGTH / 2.0
 AXLE_BORE_STATION = AXLE_BORE_X - _LEFT_END  # 61.0
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The bar depth is the extrude's named depth, banded because the
-# wheel axle's back end lands within it of the back face (mg_wheel_group).
+# print shows.  The bar depth is the extrude's named depth, banded because it
+# places the wheel axle's back end on the back face (mg_wheel_axle_spec).
 # The reamed axle bore is a sketch-cut whose diameter (with its reamer band)
 # and station from the left end are model dimensions; the three screw bores
 # are native Hole Wizard clearance holes, quoted in the notes, never fake
@@ -58,6 +58,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # The small clearance-hole circles are not dependable associative-callout
 # picks at 1:1, so their stations ride the notes (computed from the geom
 # constants, never duplicated as literals) + the front-view centre marks.
+# The hanger station keeps .XX: at .X (+/-0.8) the end wall falls to 1.86
+# (mg_wheel_bar_geom.require_hanger_end_wall), so its line states the wall
+# the band holds (policy rule 2).
 DRAWING_NOTES = "\n".join(
     (
         "ALL BORES THRU ON THE MID-HEIGHT CENTRELINE "
@@ -66,9 +69,10 @@ DRAWING_NOTES = "\n".join(
         f"Ø{CLAMP_HOLE_DIA:.2f} DRILL THRU FOR COLUMN-CLAMP SCREWS (MHA-SH-002).",
         f"1X {PEN_HANGER_HOLE_SPEC.size} {PEN_HANGER_HOLE_SPEC.fit.upper()} "
         f"CLEARANCE Ø{PEN_HANGER_HOLE_DIA:.2f} DRILL THRU FOR THE PEN-HANGER SCREW.",
-        "HOLE STATIONS FROM THE LEFT END: HANGER "
-        f"{SCREW_HOLE_X - _LEFT_END:.{PEN_HANGER_STATION_PLACES}f}; CLAMPS "
-        f"{CLAMP_HOLE_X[0] - _LEFT_END:.1f} AND {CLAMP_HOLE_X[1] - _LEFT_END:.1f}.",
+        "HOLE STATIONS FROM THE LEFT END: CLAMPS "
+        f"{CLAMP_HOLE_X[0] - _LEFT_END:.1f}, {CLAMP_HOLE_X[1] - _LEFT_END:.1f}; "
+        f"HANGER {SCREW_HOLE_X - _LEFT_END:.{PEN_HANGER_STATION_PLACES}f} FOR "
+        f"{PEN_HANGER_MIN_END_WALL:.1f} WALL.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
