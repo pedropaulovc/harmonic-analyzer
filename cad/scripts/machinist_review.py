@@ -26,8 +26,8 @@ defect as much as a missing dimension.
 
 Claude disables built-in tools and user/project customizations. Codex uses an
 isolated home with hardlinked (never copied) auth, a direct-tool model catalogue,
-and a fresh neutral attempt directory. Its audited
-auth-link behavior is version-specific and fails closed after a CLI upgrade.
+and a fresh neutral attempt directory. The auth link is checked before and after
+every invocation and repaired if a CLI save split it (``relink_codex_auth``).
 Only the private ``sheets`` MCP server is configured. Attempt directories hold
 schema/configuration/output files, never sheet PNGs. Claude's event stream and
 Codex's authoritative rollout reject unauthorized tools or injected context,
@@ -71,6 +71,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -99,6 +100,8 @@ SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-review"
 # Auth is linked here, never copied into an attempt or retained report.
 CODEX_HOME = Path(tempfile.gettempdir()) / "machinist-review-codex-home"
+# Parallel reviews share CODEX_HOME; one thread repairs its auth link at a time.
+_CODEX_AUTH_LOCK = threading.Lock()
 
 DEFAULT_MODELS = {
     "claude": "claude-fable-5-1",
@@ -438,18 +441,65 @@ def build_codex_command(
     return command
 
 
+def _codex_source_home() -> Path:
+    return Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
+
+
+def relink_codex_auth(codex_home: Path) -> str | None:
+    """Keep the isolated home's ``auth.json`` a hardlink of the user's login.
+
+    A ChatGPT login rotates its refresh token on every refresh and revokes the
+    old one. Codex 0.159.1 saves ``auth.json`` in place, so a refresh during a
+    review lands in the user's own file through the link. A CLI that saves by
+    write-then-rename instead splits the link: the isolated copy then holds the
+    newest token and the user's file a revoked one. This repairs that whatever
+    the CLI version: a newer, different isolated copy is atomically copied back
+    over the user's file, then the link is remade. Returns a warning when the
+    link had been split, ``None`` otherwise.
+    """
+    source_auth = _codex_source_home() / "auth.json"
+    linked = codex_home / "auth.json"
+    with _CODEX_AUTH_LOCK:
+        if not source_auth.is_file():
+            raise FileNotFoundError(f"original Codex file login not found: {source_auth}")
+        if not linked.exists():
+            linked.hardlink_to(source_auth)
+            return None
+        if linked.samefile(source_auth):
+            return None
+        warning = f"isolated Codex auth link was split; relinked to {source_auth}"
+        if (
+            linked.stat().st_mtime_ns > source_auth.stat().st_mtime_ns
+            and linked.read_bytes() != source_auth.read_bytes()
+        ):
+            staged = source_auth.with_name(f"auth.json.{uuid.uuid4().hex}.tmp")
+            shutil.copy2(linked, staged)
+            os.replace(staged, source_auth)
+            warning = (
+                f"isolated Codex auth link was split by a refresh; copied the "
+                f"refreshed login back to {source_auth} and relinked"
+            )
+        linked.unlink()
+        linked.hardlink_to(source_auth)
+        return warning
+
+
+def _warn_auth(warning: str | None) -> None:
+    if warning:
+        print(f"!! {warning}", file=sys.stderr)
+
+
 def prepare_codex_environment(
     *, codex_home: Path, attempt_dir: Path, model: str, codex: str = "codex"
 ) -> dict[str, str]:
     """Link shared auth into an instruction-free home; retain direct model metadata.
 
-    Codex 0.159.1 loads global AGENTS.md independently of project_doc_max_bytes.
-    Its FileAuthStorage.save opens auth.json with truncate/write/create, then
-    writes and flushes IN PLACE, so a hardlink shares refreshed tokens with the
-    original login. Never copy auth.json or place this home in retained artifacts.
-    A CLI upgrade needs a storage-contract audit before using this hardlink.
+    Codex 0.159.1 loads global AGENTS.md independently of project_doc_max_bytes,
+    so the reviewer runs from its own home. That home shares the user's login
+    through a hardlink (never a copy), kept whole by ``relink_codex_auth``
+    before and after every Codex invocation.
     """
-    source_home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
+    source_home = _codex_source_home()
     if (
         not codex_home.is_absolute()
         or not attempt_dir.is_absolute()
@@ -458,25 +508,10 @@ def prepare_codex_environment(
         or attempt_dir.resolve().is_relative_to(codex_home.resolve())
     ):
         raise ValueError("isolated CODEX_HOME must be absolute and separate from attempt artifacts")
-    version = subprocess.run(
-        [codex, "--version"], cwd=attempt_dir, capture_output=True,
-        text=True, encoding="utf-8", timeout=60,
-    )
-    if version.returncode or version.stdout.strip() != "codex-cli 0.159.1":
-        raise RuntimeError("Codex auth linking requires audited codex-cli 0.159.1 in-place storage")
-    source_auth = source_home / "auth.json"
-    if not source_auth.is_file():
-        raise FileNotFoundError(f"original Codex file login not found: {source_auth}")
     codex_home.mkdir(parents=True, exist_ok=True)
     if any((codex_home / name).exists() for name in ("AGENTS.md", "AGENTS.override.md", "config.toml")):
         raise RuntimeError("isolated CODEX_HOME contains user instructions or configuration")
-    linked_auth = codex_home / "auth.json"
-    try:
-        linked_auth.hardlink_to(source_auth)
-    except FileExistsError:
-        pass
-    if not linked_auth.samefile(source_auth):
-        raise RuntimeError("isolated Codex auth is not linked to the original login")
+    _warn_auth(relink_codex_auth(codex_home))
     env = {**os.environ, "CODEX_HOME": str(codex_home)}
     catalog_result = subprocess.run(
         [codex, "debug", "models"], cwd=attempt_dir, env=env,
@@ -496,8 +531,7 @@ def prepare_codex_environment(
     (attempt_dir / "codex-models.json").write_text(
         json.dumps({"models": [descriptor]}, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    if not linked_auth.samefile(source_auth):
-        raise RuntimeError("Codex model discovery replaced the shared authentication link")
+    _warn_auth(relink_codex_auth(codex_home))
     return env
 
 
@@ -1573,6 +1607,8 @@ def review_package(
             verdict = None
         finally:
             capture_rollout()
+            if reviewer == "codex" and attempt_record["command"] is not None:
+                _warn_auth(relink_codex_auth(CODEX_HOME))
             if attempt_record["command"] is None:
                 # A planned Claude UUID is not a persisted, resumable session.
                 session_id = None

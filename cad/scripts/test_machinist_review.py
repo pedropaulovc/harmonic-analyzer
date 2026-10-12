@@ -539,13 +539,17 @@ def _codex_reply(
 
 _REAL_CODEX_HOME = mr.CODEX_HOME
 _REAL_PREPARE_CODEX_ENVIRONMENT = mr.prepare_codex_environment
+_REAL_RELINK_CODEX_AUTH = mr.relink_codex_auth
 
 
 @pytest.fixture(autouse=True)
 def isolated_codex(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """Keep tests off the real isolated home; never run ``codex debug models``."""
-    state = SimpleNamespace(home=tmp_path / "codex-isolated-home", prepared=[])
+    state = SimpleNamespace(home=tmp_path / "codex-isolated-home", prepared=[], relinked=[])
     monkeypatch.setattr(mr, "CODEX_HOME", state.home)
+    # Never resolve the operator's own login, even if a test reaches the real relink.
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-main-home"))
+    monkeypatch.setattr(mr, "relink_codex_auth", lambda home: state.relinked.append(Path(home)))
 
     def fake_prepare(
         *, codex_home: Path, attempt_dir: Path, model: str, codex: str
@@ -690,6 +694,7 @@ def test_codex_home_is_isolated_outside_repository_and_reports() -> None:
 def test_prepare_codex_environment_links_auth_and_pins_direct_tool_mode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(mr, "relink_codex_auth", _REAL_RELINK_CODEX_AUTH)
     main_home = tmp_path / "main-home"
     main_home.mkdir()
     auth = main_home / "auth.json"
@@ -709,8 +714,6 @@ def test_prepare_codex_environment_links_auth_and_pins_direct_tool_mode(
 
     def fake_run(command: list[str], **kwargs: Any):
         calls.append(command[1:])
-        if command[1:] == ["--version"]:
-            return mr.subprocess.CompletedProcess(command, 0, stdout="codex-cli 0.159.1\n", stderr="")
         assert command[1:] == ["debug", "models"]
         # The catalog is fetched as the isolated home, already holding the link.
         assert kwargs["env"]["CODEX_HOME"] == str(home)
@@ -739,25 +742,23 @@ def test_prepare_codex_environment_links_auth_and_pins_direct_tool_mode(
             for path in attempt_dir.rglob("*")
             if path.is_file()
         )
-    assert calls == [["--version"], ["debug", "models"]] * 2
+    assert calls == [["debug", "models"]] * 2
 
 
-@pytest.mark.parametrize("failure", ["cli_version", "unknown_model", "missing_auth"])
+@pytest.mark.parametrize("failure", ["unknown_model", "missing_auth"])
 def test_prepare_codex_environment_refuses_unverified_setups(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
 ) -> None:
+    monkeypatch.setattr(mr, "relink_codex_auth", _REAL_RELINK_CODEX_AUTH)
     main_home = tmp_path / "main-home"
     main_home.mkdir()
     if failure != "missing_auth":
         (main_home / "auth.json").write_text("{}", encoding="utf-8")
     monkeypatch.setenv("CODEX_HOME", str(main_home))
-    version = "codex-cli 0.160.0" if failure == "cli_version" else "codex-cli 0.159.1"
     slug = "gpt-6-luna" if failure == "unknown_model" else "gpt-6-astra"
 
     def fake_run(command: list[str], **_kwargs: Any):
-        stdout = version if command[1:] == ["--version"] else json.dumps(
-            {"models": [{"slug": slug, "tool_mode": "code_mode_only"}]}
-        )
+        stdout = json.dumps({"models": [{"slug": slug, "tool_mode": "code_mode_only"}]})
         return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
     monkeypatch.setattr(mr.subprocess, "run", fake_run)
@@ -772,6 +773,52 @@ def test_prepare_codex_environment_refuses_unverified_setups(
             codex="codex-test",
         )
     assert not (attempt_dir / "codex-models.json").exists()
+
+
+def _split_auth_link(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    """A login whose isolated link a write-then-rename save has split."""
+    main_home = tmp_path / "main-home"
+    main_home.mkdir()
+    main_auth = main_home / "auth.json"
+    main_auth.write_text('{"refresh_token": "old"}', encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(main_home))
+    home = tmp_path / "isolated-home"
+    home.mkdir()
+    linked = home / "auth.json"
+    linked.hardlink_to(main_auth)
+    staged = home / "auth.json.tmp"
+    staged.write_text('{"refresh_token": "rotated"}', encoding="utf-8")
+    os.replace(staged, linked)
+    assert not linked.samefile(main_auth)
+    return main_auth, linked
+
+
+def test_relink_codex_auth_returns_a_refreshed_login_to_the_user(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main_auth, linked = _split_auth_link(tmp_path, monkeypatch)
+    os.utime(main_auth, ns=(1, 1))  # the user's file predates the refresh
+
+    warning = _REAL_RELINK_CODEX_AUTH(linked.parent)
+
+    assert warning is not None and "copied the refreshed login back" in warning
+    assert main_auth.read_text(encoding="utf-8") == '{"refresh_token": "rotated"}'
+    assert linked.samefile(main_auth)
+    assert not list(main_auth.parent.glob("auth.json.*.tmp"))
+    assert _REAL_RELINK_CODEX_AUTH(linked.parent) is None  # whole again
+
+
+def test_relink_codex_auth_never_overwrites_a_newer_user_login(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main_auth, linked = _split_auth_link(tmp_path, monkeypatch)
+    os.utime(linked, ns=(1, 1))  # the user logged in again after the split
+
+    warning = _REAL_RELINK_CODEX_AUTH(linked.parent)
+
+    assert warning is not None and "copied" not in warning
+    assert main_auth.read_text(encoding="utf-8") == '{"refresh_token": "old"}'
+    assert linked.samefile(main_auth)
 
 
 def test_prompts_share_the_static_load_prompt_prefix_for_every_package() -> None:

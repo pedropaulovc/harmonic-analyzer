@@ -447,6 +447,7 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(mr.shutil, "which", lambda executable: executable)
     monkeypatch.setattr(mr.subprocess, "run", fake_run)
     monkeypatch.setattr(mr, "prepare_codex_environment", prepare_codex_environment)
+    monkeypatch.setattr(mr, "relink_codex_auth", lambda home: None)
     monkeypatch.setattr(mr, "load_codex_rollout", load_codex_rollout)
     monkeypatch.setattr(evaluation, "runtime_versions", runtime_versions)
     return state
