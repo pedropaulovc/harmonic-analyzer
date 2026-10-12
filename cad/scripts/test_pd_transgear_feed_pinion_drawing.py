@@ -68,7 +68,7 @@ def test_bands_come_from_named_spec_constants() -> None:
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
     }
     # A band tighter than its printed row needs a functional reason (rule 12):
-    # stations' ±0.05, the contact-critical tip class, boss h6 and flat
+    # stations' ±0.05, the tip class, boss h6 and flat
     # 0/-0.015 bands have functional reasons tighter than their printed rows.
     assert spec.STATION_TOL < printed_band_mm(spec.STATION_PLACES)
     by_name = spec.DRAWING_PRECISION_BY_NAME
@@ -595,6 +595,18 @@ def test_finish_leader_climbs_clear_of_its_own_text() -> None:
     assert ink_left > drawing.SHEET_INNER_BORDER[0]
 
 
+def test_finish_leader_stays_above_the_span_extension_lines() -> None:
+    """Stack6 review: the finish leader, landing at -135°, crossed the
+    two-tooth span's upper extension line. That line runs along the lower-left
+    diagonal, 2.7 mm above-left of the bore centre (stack6 render). Both
+    leader ends must stand farther above-left of that diagonal."""
+    cx, cy = drawing.FRONT_CENTER
+    sx, sy = drawing.FINISH_SYMBOL
+    for x, y in ((sx + _FINISH_SHOULDER_DX, sy), drawing.FINISH_ATTACH):
+        # Signed distance above-left of the 45° line through the centre.
+        assert ((y - cy) - (x - cx)) / math.sqrt(2.0) > 0.0027 + 0.001
+
+
 def test_bore_fit_leader_passes_clear_of_the_finish() -> None:
     """Run 20261002T153039266Z's bore fit leader ran through the finish's "Ra
     1.6" (leader-through-text).  The note stands above its landing, so its
@@ -615,7 +627,7 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
     assert "MESH_PINION_TEETH" not in source
     assert "PROFILE_SHIFT" not in source
     assert spec.TEETH == spec.CUTTER_TEMPLATE.reference_teeth == 12
-    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("contact_critical")
+    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("standard")
     assert part.STOCK_PROFILE is spec.STOCK_PROFILE
     assert (part.TEETH, part.DP, part.PRESSURE_ANGLE_DEG) == (
         spec.TEETH, spec.DIAMETRAL_PITCH, spec.PRESSURE_ANGLE_DEG

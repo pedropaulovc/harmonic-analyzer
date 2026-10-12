@@ -25,7 +25,6 @@ from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
-    add_leader_note,
     add_native_hole_callout,
     add_property_linked_note,
     assert_imported_precision,
@@ -114,8 +113,9 @@ PARALLELISM_EDGE = (REAR_FACE_X, RIGHT_CENTER[1] - HALF_OD * 0.45)
 PARALLELISM_FRAME = (REAR_FACE_X + 0.012, RIGHT_CENTER[1] - HALF_OD * 0.45 - 0.012)
 
 FRONT_KEEP = {
-    # Approach from upper-left, clear of native datum A below-left.
-    "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] + 0.038),
+    # Approach from upper-left, clear of native datum A below-left; far
+    # enough out that the fit lines under the value stay off the rim.
+    "BoreDia": (FRONT_CENTER[0] - 0.080, FRONT_CENTER[1] + 0.053),
     "OutsideDia": (FRONT_CENTER[0] + 0.060, FRONT_CENTER[1] + 0.035),
     "ToothSpan": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.050),
     "RootEnvelope": (FRONT_CENTER[0] + 0.050, FRONT_CENTER[1] - 0.028),
@@ -124,16 +124,10 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_OD - 0.012),
 }
-DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
-# The bore's fit note stands at the left margin under the gear data block;
-# its leader lands on the bore's 180° point, between the bore dimension's
-# upper-left leader and datum A below-left.
-_BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
-BORE_FIT_NOTE = (0.018, 0.200)
-BORE_FIT_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(180.0)),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(180.0)),
-)
+# The bore's fit stands under its size, on the bore dimension's own leader:
+# a separate fit-note leader converged on the small bore with the size,
+# datum, diameter and finish leaders (machinist review, stack6: clarity).
+DIMENSION_CALLOUTS = {"BoreDia": f"{BORE_CALLOUT}\n{BORE_FIT_CALLOUT}"}
 # Lower-left of the face view, off the rim: the leader rises to the lower-left
 # tap, below datum A and clear of the bore.  The pick is on that tap's drill
 # circle at 225° about its centre, off the centre-mark lines.  The face view is
@@ -267,15 +261,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *right_annotations], DRAWING_PRECISION_BY_NAME
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    add_leader_note(
-        adapter,
-        BORE_FIT_CALLOUT,
-        text_xy=BORE_FIT_NOTE,
-        attach_xy=BORE_FIT_ATTACH,
-        label="disc bore fit",
-        view=front,
-        height=0.0022,
-    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to disc bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
@@ -291,9 +276,8 @@ async def build(adapter: Any) -> dict[str, str]:
         shoulder=True,
         stability_tolerance_m=0.0001,
     )
-    # Part datum A above remains the 13.1 pilot. The feature-local inspection
-    # property explicitly names the ASSEMBLED feed pinion's running bore;
-    # no fake local axis carrier or tooth-tip runout frame substitutes for it.
+    # The tooth-space control reads datum A above, the 13.1 pilot, at the
+    # cutting setup; the assembled control is MHA-PD-000's transfer step.
     add_toothspace_callout(
         adapter,
         front,

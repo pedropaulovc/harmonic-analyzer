@@ -692,7 +692,7 @@ async def build(adapter) -> dict[str, str]:
     # Bands (pd_transgear_feed_pinion_spec): the flat's end wall and the overall
     # length ±0.05 (R9-5), the reamed bore, the boss's h6 under the disc's
     # and hub's H7 bores, the flat's (0, -0.015) under the hub's flat, the
-    # contact-critical tip class, the root as a physical MIN floor; the cutter's full-depth station
+    # standard tip class, the root as a physical MIN floor; the cutter's full-depth station
     # at its .XXX band and its run-out as a MAX limit (R9-67).  The tooth
     # length, which only places the step, holds the title block's .XXX.
     set_dimension_symmetric_tolerance(adapter, "FlatProfile", "FlatEnd", STATION_TOL)

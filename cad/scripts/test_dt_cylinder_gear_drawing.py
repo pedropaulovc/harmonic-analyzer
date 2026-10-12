@@ -79,7 +79,7 @@ def test_tooth_system_and_reference_cutter_are_spec_owned() -> None:
     assert spec.MAX_CUT_DEPTH_MM > spec.WHOLE_DEPTH
     assert spec.OUTSIDE_DIA <= spec.MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM
     assert spec.OUTSIDE_DIA + 0.01 > spec.MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM
-    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("contact_critical")
+    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("standard")
     assert spec.WHOLE_DEPTH_BAND == (0.05, 0.0)
     assert spec.CUTTER_NUMBER == 2
     assert spec.CUTTER_TEETH_RANGE == (55, 134)
@@ -229,7 +229,7 @@ def test_tip_limits_follow_printed_nominal_and_shared_grade(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     nominal = round(spec.OUTSIDE_DIA, spec.DRAWING_PRECISION_BY_NAME["OutsideDia"])
-    upper, lower = gear_tip_band_mm("contact_critical")
+    upper, lower = gear_tip_band_mm("standard")
     assert spec.outside_dia_limits_mm() == pytest.approx(
         (nominal + lower, nominal + upper), abs=1e-12
     )
@@ -239,7 +239,7 @@ def test_tip_limits_follow_printed_nominal_and_shared_grade(
     changed_band = [0.0, -0.01]
 
     def fit_value(*keys: str):
-        if keys == ("gear_tip", "contact_critical_band_mm"):
+        if keys == ("gear_tip", "standard_band_mm"):
             return changed_band
         return original_fit(*keys)
 

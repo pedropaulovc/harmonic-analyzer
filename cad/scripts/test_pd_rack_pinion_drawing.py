@@ -359,13 +359,15 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert drawing.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert inspection.splitlines()[0] == (
-        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO "
-        "MHA-PD-010 BORE, ASSEMBLED"
+        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A, "
+        "ACCEPT AT CUTTING SETUP"
     )
     assert len(inspection.splitlines()) == 2
     assert "INDEX" not in inspection
     assert max(map(len, inspection.splitlines())) <= 70
-    assert "TO A" not in inspection  # local part A is only the 13.1 pilot
+    # The part sheet names only its own datum; the assembled axis is the
+    # assembly's transfer step (test_pd_paper_drive_assembly_drawing).
+    assert "MHA-" not in inspection and "ASSEMBLED" not in inspection
     # The sheet states the requirement; the method and history stay off it.
     assert not any(word in inspection + spec.GEAR_DATA for word in ("CERTIFIED", "PREMISE"))
     assert not any(word in inspection for word in ("TRANSFER", "LOCK", "MATCH-MARK"))
@@ -417,20 +419,24 @@ def test_native_blank_subfeature_is_a_method_and_names_are_properties(monkeypatc
     assert (blank.Name, profile.Name) == ("GearBlank", "GearBlankProfile")
 
 
-def test_expanded_gear_data_stays_above_the_bore_fit_note() -> None:
-    # The existing fleet note line spacing, measured on the arbor-pedestal
-    # print; the data block uses its explicitly authored cap height.
+def test_the_bore_callout_with_its_fit_clears_the_gear_data_and_the_rim() -> None:
+    """The fit lines hang under the bore size on its own leader, so they must
+    clear the gear data block to the left and the toothed rim to the right."""
+    note = dict(advance_ratio=109.7 / (42 * 3.5), line_spacing=16.8 * 25.4 / 72.0 / 3.5)
     data = estimate_text_box(
-        spec.GEAR_DATA,
-        anchor=drawing.GEAR_DATA_XY,
-        height=drawing.GEAR_DATA_CHAR_HEIGHT,
-        advance_ratio=109.7 / (42 * 3.5),
-        line_spacing=16.8 * 25.4 / 72.0 / 3.5,
+        spec.GEAR_DATA, anchor=drawing.GEAR_DATA_XY,
+        height=drawing.GEAR_DATA_CHAR_HEIGHT, **note,
     )
-    assert data is not None
-    assert data.ymin > drawing.BORE_FIT_NOTE[1] + 0.002
-    assert data.xmin >= 0.0127 and data.xmax < drawing.FRONT_KEEP["BoreDia"][0] - 0.002
-    assert data.ymax <= 0.2667
+    size = f"\N{DIAMETER SIGN}{spec.BORE_DIA:.3f} +0.018"
+    callout = estimate_text_box(
+        "\n".join((size, drawing.DIMENSION_CALLOUTS["BoreDia"])),
+        anchor=drawing.FRONT_KEEP["BoreDia"], height=0.0035, reference=5, **note,
+    )
+    assert data is not None and callout is not None
+    assert data.xmin >= 0.0127 and data.ymax <= 0.2667
+    assert data.xmax < callout.xmin - 0.002
+    corner = (callout.xmax, callout.ymin)  # the corner nearest the rim
+    assert math.dist(corner, drawing.FRONT_CENTER) > drawing.HALF_OD + 0.005
 
 
 def test_tooth_space_control_fits_the_upper_right_note_lane() -> None:
@@ -559,7 +565,6 @@ def test_tap_leader_lands_on_the_lower_left_tap_and_crosses_no_bore_leader() -> 
     finish_attach = (centre[0] + bore_r, centre[1])
     for other in (
         (dim_xy, far),
-        (drawing.BORE_FIT_NOTE, drawing.BORE_FIT_ATTACH),
         (drawing.BORE_FINISH_POSITION, finish_attach),
     ):
         assert not _segments_cross(*leader, *other)
@@ -597,7 +602,9 @@ def test_model_and_drawing_consume_the_spec_geometry() -> None:
         spec.STANDARD_CENTRE_DISTANCE + spec.CENTRE_EXTENSION
     )
     assert part.BORE_DIAMETER == spec.BORE_DIA == hub_geometry.SPIGOT_DIA
-    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": spec.BORE_CALLOUT}
+    assert drawing.DIMENSION_CALLOUTS == {
+        "BoreDia": f"{spec.BORE_CALLOUT}\n{spec.BORE_FIT_CALLOUT}"
+    }
 
 
 def test_part_config_properties() -> None:

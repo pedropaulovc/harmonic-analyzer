@@ -280,12 +280,12 @@ def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
         assert "SLIDE" not in line and "BY HAND" not in line, line
 
 
-def test_critical_tip_bands_keep_nominal_stock_root_air() -> None:
+def test_shared_tip_band_keeps_nominal_stock_root_air() -> None:
     """Retain the >0.20 air guard with both ACTUAL printed tip/root envelopes."""
     import dt_cylinder_gear_spec as gear
 
     assert spec.OUTSIDE_DIA_BAND == gear.OUTSIDE_DIA_BAND
-    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("contact_critical")
+    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("standard")
     pinion_lower, pinion_upper = spec.outside_dia_limits_mm()
     gear_lower, gear_upper = gear.outside_dia_limits_mm()
     engaged_c2c = spec.ENGAGED_CENTER_DISTANCE_MM
@@ -351,7 +351,7 @@ def test_tip_grade_configuration_reaches_the_part_spec(
     changed_band = [0.0, -0.01]
 
     def fit_value(*keys: str):
-        if keys == ("gear_tip", "contact_critical_band_mm"):
+        if keys == ("gear_tip", "standard_band_mm"):
             return changed_band
         return original_fit(*keys)
 

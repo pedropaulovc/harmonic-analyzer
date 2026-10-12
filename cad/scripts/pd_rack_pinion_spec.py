@@ -393,7 +393,6 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 
 
 KNOB_NUMBER = "MHA-PD-008"
-FEED_PINION_NUMBER = "MHA-PD-010"
 # What a machinist needs to cut and check the teeth; design parameters stay
 # in this module (Main ruling 2026-10-10).
 GEAR_DATA = gear_data_note(
@@ -420,14 +419,20 @@ DRAWING_NOTES = BORE_FRONT_CHAMFER_NOTE
 
 # Spacing is held by the dividing head and is not inspected; one pin in
 # every space on a radial indicator catches eccentricity and gross slips.
-# The axis is the feed pinion's running bore with the disc fitted on the
-# cluster (MHA-PD-000's disc-transfer step), named by its part number so it
-# cannot be read as this disc's own pilot datum A.
+# The disc's own control is to its pilot datum A, accepted at the tooth
+# cutting setup (the drive-train gears' convention). The mesh stack books
+# 0.05 TIR about the assembled running axis. MHA-PD-000's disc-transfer step
+# reaches it by tapping the disc central on the feed pinion's bore, and
+# accepts it there. That tap can only move the disc within the spigot
+# clearance, and the clearance may be zero. So a disc whose teeth run out
+# more than the assembled budget about its own pilot cannot be centred to
+# it. The part therefore takes the same 0.05: the loosest limit that cannot
+# send a disc to assembly that the transfer step must reject.
 TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
 TOOTH_SPACE_CALLOUT = "\n".join(
     (
-        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO "
-        f"{FEED_PINION_NUMBER} BORE, ASSEMBLED",
+        f"TOOTH SPACE RUNOUT {TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A, "
+        "ACCEPT AT CUTTING SETUP",
         f"\u00d8{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} PIN, ALL {TEETH} SPACES",
     )
 )
@@ -436,8 +441,7 @@ TOOTH_SPACE_CALLOUT = "\n".join(
 # Manufacturing GD&T limits consumed by the part's drawing projection.  The
 # hub's flange clamps the front face (datum B), so the rear face, toward the
 # platen, is held parallel to it (the paper-drive assembly's platen air reads
-# it). Tooth-space runout is controlled on the assembled cluster's actual
-# running bore, NOT on this disc's separate 13.1 pilot datum A.
+# it). Tooth-space runout is to the pilot datum A (TOOTH_SPACE_CALLOUT).
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "disc rear face parallelism to front": "0.05",
 }

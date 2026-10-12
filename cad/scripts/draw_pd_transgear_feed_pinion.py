@@ -235,12 +235,17 @@ SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 6 * _ROW_PITCH)
 # "Ra 1.6" printed 13.5-37.4 mm right of and 10.8-17.2 mm above the point,
 # over the teeth and across the bore fit leader's landing at 135 degrees.  At
 # 2.5 mm the symbol's ink tops out 9 mm below that landing and its text ends
-# 7 mm left of the tip circle.
+# 7 mm left of the tip circle.  The leader lands on the bore's 180° point,
+# not at -135°: the two-tooth span's extension lines run along that lower-left
+# diagonal, and its upper line passes 2.7 mm above-left of the bore centre
+# (machinist review, stack6: the finish leader crossed it).  The symbol
+# stands 10 mm below the centre, so the shallower leader still passes right
+# of its own text.
 FINISH_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-135.0)),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-135.0)),
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(180.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(180.0)),
 )
-FINISH_SYMBOL = (FRONT_CENTER[0] - HALF_OD - 0.022, FRONT_CENTER[1] - 0.012)
+FINISH_SYMBOL = (FRONT_CENTER[0] - HALF_OD - 0.022, FRONT_CENTER[1] - 0.010)
 FINISH_CHAR_HEIGHT = 0.0025
 
 # The step face (the disc hub's seat) shows edge-on in the section where the
