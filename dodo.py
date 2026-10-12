@@ -3267,6 +3267,8 @@ def task_check():
     }
     recipe_test_deps = sorted(
         {
+            # Pytest discovers shared fixtures outside the import closure.
+            str((REPO_ROOT / "conftest.py").resolve()),
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
