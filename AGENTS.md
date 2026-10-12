@@ -409,11 +409,13 @@ Run the humanizer skill on the authored prose, preserving numbers, part IDs,
 units, quoted drawing callouts and links.
 
 After successful publication (including a requested draft release), fetch the
-generated body with `gh release view vNN --json body`. Append it verbatim after
-one `## Bundle` heading beneath the authored descriptions. Preserve its counts,
-size, changed-parts list, heading levels, diff images, asset URLs, provenance
-and logs. For an existing release, preserve that appendix rather than regenerate
-it. Write the complete notes to a host-visible file and install them immediately
+generated Markdown body with `gh release view vNN --json body --jq .body`.
+Append that Markdown verbatim after one `## Bundle` heading beneath the authored
+descriptions. Preserve its counts, size, changed-parts list, heading levels,
+diff images, asset URLs, provenance and logs. When correcting a release that
+already has authored notes, preserve everything below its existing `## Bundle`
+heading verbatim and replace only the authored prose. Write the complete notes
+to a host-visible file and install them immediately
 with `gh release edit vNN --notes-file <file>`. Read back the body, verify the
 authored descriptions and unchanged appendix, and confirm the tag pins the
 intended source commit before reporting completion.
