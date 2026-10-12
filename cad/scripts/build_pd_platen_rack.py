@@ -62,9 +62,8 @@ from _sketch import (
     SketchDims,
 )
 from _sketch_chains import define_polygon_chain, define_rectilinear_chain
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
-    _named_dimension,
-    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,

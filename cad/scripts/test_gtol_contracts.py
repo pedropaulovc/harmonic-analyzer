@@ -6,15 +6,13 @@ from xml.etree import ElementTree
 
 import pytest
 
-import _drawing_common
+import _drawing_gdt
+from _drawing_gdt import PmiDrawingPlacement
 import _part_pmi
-from _drawing_common import PmiDrawingPlacement
 from _gtol_cone import ConeFace
-from _gtol_cylinder import CylinderFace
 from _gtol_controls import GeometricControl, PartDatum, validate_part_pmi
-from _gtol_planar import PlanarFace
-from _gtol_sphere import SphereFace
-from _gtol_torus import TorusFace
+from _gtol_cylinder import CylinderFace
+from _gtol_face import FaceGeometry
 from _gtol_frame import (
     TRANSLATION_GLYPH,
     gtol_frame_datums,
@@ -22,7 +20,9 @@ from _gtol_frame import (
     gtol_frame_xml,
     translation_print_problem,
 )
-from _gtol_face import FaceGeometry
+from _gtol_planar import PlanarFace
+from _gtol_sphere import SphereFace
+from _gtol_torus import TorusFace
 
 
 
@@ -525,20 +525,20 @@ def projected_native(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     )
     monkeypatch.setattr(_part_pmi, "_select_face", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(_part_pmi, "_verify_attachment", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        _drawing_common._sw_type_info,
+        _drawing_gdt._sw_type_info,
         "early_bound_or_flag",
         lambda value, *_args: value,
     )
     monkeypatch.setattr(
-        _drawing_common, "_select_annotation_entity", lambda *_args, **_kwargs: object()
+        _drawing_gdt, "_select_annotation_entity", lambda *_args, **_kwargs: object()
     )
     monkeypatch.setattr(
-        _drawing_common, "_assert_attached_to", lambda *_args, **_kwargs: None
+        _drawing_gdt, "_assert_attached_to", lambda *_args, **_kwargs: None
     )
     monkeypatch.setattr(
-        _drawing_common, "rebuild_drawing", lambda *_args, **_kwargs: state.on_rebuild()
+        _drawing_gdt, "rebuild_drawing", lambda *_args, **_kwargs: state.on_rebuild()
     )
     return state
 
@@ -550,7 +550,7 @@ def _author_native(state: SimpleNamespace, path: str, height: float | None = 31.
         return _part_pmi.author_part_pmi(state.adapter, controls=(control,))
     state.adapter.currentModel.GetType = lambda: 3
     if path == "projection":
-        return _drawing_common.project_part_pmi(
+        return _drawing_gdt.project_part_pmi(
             state.adapter,
             placements={
                 control.key: PmiDrawingPlacement(
@@ -562,7 +562,7 @@ def _author_native(state: SimpleNamespace, path: str, height: float | None = 31.
             label="projected axis",
         )
     assert path == "drawing"
-    return _drawing_common.add_feature_control_frame(
+    return _drawing_gdt.add_feature_control_frame(
         state.adapter,
         state.view,
         edge_xy=(0.0, 0.0),
@@ -725,13 +725,13 @@ def test_direct_projected_height_validates_before_native_insertion(
         pytest.fail("invalid projected height reached native selection or insertion")
 
     monkeypatch.setattr(
-        _drawing_common, "_select_annotation_entity", unexpected_native_call
+        _drawing_gdt, "_select_annotation_entity", unexpected_native_call
     )
     monkeypatch.setattr(
         projected_native.adapter.currentModel, "InsertGtol", unexpected_native_call
     )
     with pytest.raises(ValueError, match="finite and positive"):
-        _drawing_common.add_feature_control_frame(
+        _drawing_gdt.add_feature_control_frame(
             projected_native.adapter,
             projected_native.view,
             edge_xy=(0.0, 0.0),
@@ -752,7 +752,7 @@ def test_spec_projection_own_bstr_guard_is_discriminating(
     state.frame.readback = state.frame.GetSymbolXml if readback == "method" else readback
     # Isolate the receiver's getter guard from the direct helper's guard.
     monkeypatch.setattr(
-        _drawing_common, "add_feature_control_frame", lambda *_args, **_kwargs: state.gtol
+        _drawing_gdt, "add_feature_control_frame", lambda *_args, **_kwargs: state.gtol
     )
     with pytest.raises(RuntimeError, match="not a string"):
         _author_native(state, "projection")
@@ -816,7 +816,7 @@ def test_ordinary_native_writers_skip_projected_capture_and_unit_getters(
         pytest.fail("ordinary frame reached projected native evidence capture")
 
     monkeypatch.setattr(_part_pmi, "capture_projected_gtol", unexpected_capture)
-    monkeypatch.setattr(_drawing_common, "capture_projected_gtol", unexpected_capture)
+    monkeypatch.setattr(_drawing_gdt, "capture_projected_gtol", unexpected_capture)
     monkeypatch.setattr(
         projected_native.adapter.currentModel, "GetUserUnit", unexpected_capture
     )

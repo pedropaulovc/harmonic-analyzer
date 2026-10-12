@@ -15,7 +15,7 @@ import _telemetry
 from _check import check
 from _com import _com_invoke, _early_bound, _read_member
 from _cone_gear_geometry import R_CLEAR_MM, bore_area_mm2
-from _drawing_marks import _named_dimension
+from _drawing_precision import _named_dimension
 from _fit_deviations import deviations
 from dt_cone_gear_spec import (
     BORE_DIA_BAND,

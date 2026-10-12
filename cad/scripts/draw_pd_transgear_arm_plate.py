@@ -30,33 +30,37 @@ import argparse
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    place_view,
+)
+
 import _config
-import _drawing_hidden_sketches as hidden_sketches
-import _telemetry
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    create_section_view,
     finalize_drawing,
-    model_point_in_view,
-    project_part_pmi,
-    scan_view_edges,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_edges import scan_view_edges
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
+import _drawing_hidden_sketches as hidden_sketches
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _native_projected_zone import require_saved_projected_gtols
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _native_projected_zone import require_saved_projected_gtols
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from pd_paper_drive_assembly_steps import matched_locator_notes
 from pd_transgear_arm_plate_geometry import (
     LOCATOR_SITES_MM,
@@ -94,11 +98,6 @@ from pd_transgear_arm_plate_spec import (
     ISO_VIEW_SCALE,
     SCREW_HOLE_CALLOUT,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    place_view,
 )
 
 

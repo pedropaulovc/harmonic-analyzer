@@ -3452,7 +3452,7 @@ def _datum_seated_on_frame(source: AnnotationGeometry, target: AnnotationGeometr
     pattern datum by the symbol on the frame under its nX callout), so the
     frame's text is the triangle's feature, not a neighbour it crowds.  The
     knife mount's datum B on its dowel-pair frame (MHA-SM-002,
-    _drawing_common.add_frame_datum_feature) seats its triangle's base on the
+    _drawing_gdt.add_frame_datum_feature) seats its triangle's base on the
     frame's bottom border, 1.66 mm under the frame's 0.13.
 
     The whole triangle must stay outside the frame's box: seated on a border

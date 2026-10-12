@@ -26,80 +26,14 @@ their owning specs and actual critical gear/seat/load inspections remain require
 from __future__ import annotations
 
 import argparse
-import math
-import sys
-import textwrap
 from collections import Counter
 from dataclasses import dataclass
+import math
 from pathlib import Path
+import sys
+import textwrap
 from typing import Any, Callable, Iterable, Sequence
 
-import _chain as chain
-import _config
-import _gear_quality as quality
-import _telemetry
-import pd_latch_hook_geometry as hook_geometry
-import pd_paper_drive_assembly_steps as steps
-import pd_paper_drive_explode_spec as explode
-import pd_platen_guide_spec as platen_guide
-import pd_platen_spec as platen
-import pd_rack_pinion_spec as disc
-import pd_transgear_arm_geometry as arm_geometry
-import vn_transgear_arm_plate_screw_spec as plate_screw
-import vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
-import transgear_cluster_fit as cluster_fit
-import pd_transgear_disc_hub_geometry as hub_geometry
-import pd_transgear_disc_hub_spec as hub
-import vn_transgear_disc_screw_spec as disc_screw
-import pd_transgear_drive_collar_spec as collar
-import transgear_hanger_joints as joints
-import vn_transgear_knob_cup_pin_spec as cup_pin
-import pd_transgear_knob_cup_spec as knob_cup
-import vn_transgear_knob_drive_pin_spec as drive_pin
-import pd_transgear_feed_pinion_spec as feed_pinion
-import pd_transgear_knob_shaft_spec as knob_shaft
-import vn_transgear_pivot_screw_spec as pivot_screw
-import vn_transgear_pivot_spring_spec as spring
-import pd_transgear_removable_spec as sprocket
-from paper_drive_rack_travel import RackOperatingDomain, OPERATING_DIRECTION_TEXT
-from _check import check
-from _com import _com_invoke, _early_bound
-from _session import run_build
-from _pd_paper_drive_explode import exploded_view_name
-from _drawing_common import (
-    SIMPLIFIED_VIEW_CONFIGURATION,
-    isolate_drawing_view_components,
-    set_view_exploded_state,
-    BalloonAnchor,
-    BalloonLanding,
-    DrawingOutputs,
-    ViewRole,
-    _SW_SHADED_EDGES,
-    _VIEW_ENTITY_EDGE,
-    _AnchorChoice,
-    _anchor_model_points,
-    _create_component_bom_balloon,
-    _shown_instances,
-    _spread_balloons,
-    _view_component_leaves,
-    _view_explode_offsets,
-    add_component_bom_balloons,
-    apply_view_configuration,
-    assert_balloon_landings,
-    assert_full_detail_view,
-    create_blank_drawing_sheets,
-    finalize_drawing,
-    insert_bom_table,
-    model_points_in_view,
-    new_project_drawing,
-    read_required_properties,
-    rebuild_drawing,
-    rendered_balloon_circle,
-    set_high_quality_shaded_with_edges,
-    view_configuration,
-)
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES, DrawingLayout
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -107,6 +41,77 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     raw_visible_entities,
     view_name,
 )
+
+import _chain as chain
+from _check import check
+from _com import _com_invoke, _early_bound
+import _config
+from _drawing_balloon_display import rendered_balloon_circle
+from _drawing_balloons import (
+    _VIEW_ENTITY_EDGE,
+    BalloonAnchor,
+    BalloonLanding,
+    _anchor_model_points,
+    _AnchorChoice,
+    _create_component_bom_balloon,
+    _shown_instances,
+    _spread_balloons,
+    _view_component_leaves,
+    _view_explode_offsets,
+    add_component_bom_balloons,
+    assert_balloon_landings,
+    isolate_drawing_view_components,
+)
+from _drawing_common import (
+    _SW_SHADED_EDGES,
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    rebuild_drawing,
+    set_high_quality_shaded_with_edges,
+)
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _drawing_projection import model_points_in_view
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_tables import insert_bom_table
+from _drawing_view_configuration import (
+    SIMPLIFIED_VIEW_CONFIGURATION,
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
+    set_view_exploded_state,
+    view_configuration,
+)
+from _pd_paper_drive_explode import exploded_view_name
+from _session import run_build
+import _telemetry
+import pd_latch_hook_geometry as hook_geometry
+import pd_paper_drive_assembly_steps as steps
+import pd_paper_drive_explode_spec as explode
+import pd_platen_guide_spec as platen_guide
+import pd_platen_spec as platen
+import pd_transgear_arm_geometry as arm_geometry
+import pd_transgear_disc_hub_geometry as hub_geometry
+import pd_transgear_disc_hub_spec as hub
+import pd_transgear_drive_collar_spec as collar
+import pd_transgear_knob_cup_spec as knob_cup
+import pd_transgear_knob_shaft_spec as knob_shaft
+import pd_transgear_removable_spec as sprocket
+import transgear_cluster_fit as cluster_fit
+import transgear_hanger_joints as joints
+import vn_transgear_arm_plate_screw_spec as plate_screw
+import vn_transgear_disc_screw_spec as disc_screw
+import vn_transgear_knob_cup_pin_spec as cup_pin
+import vn_transgear_knob_drive_pin_spec as drive_pin
+import vn_transgear_pivot_screw_spec as pivot_screw
+import vn_transgear_pivot_spring_spec as spring
+import _gear_quality as quality
+import pd_rack_pinion_spec as disc
+import pd_transgear_feed_pinion_spec as feed_pinion
+import vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
+from paper_drive_rack_travel import OPERATING_DIRECTION_TEXT, RackOperatingDomain
 
 
 SPEC = DRAWINGS_BY_NAME["pd_paper_drive_assembly"]

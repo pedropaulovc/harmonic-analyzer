@@ -22,18 +22,25 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable, Mapping, Sequence
+from enum import Enum
 import math
 import sys
-from enum import Enum
 from typing import Any, NamedTuple
 
-from collections.abc import Iterable, Mapping, Sequence
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    delete_view,
+    dimension_name,
+    iter_views,
+    place_view,
+    view_name,
+)
 
-import _telemetry
 from _check import check
 from _com import _early_bound, _read_member
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_annotation_extent import (
     CLEAR_GAP_M,
     PLACE_SETTLE_M,
@@ -48,24 +55,17 @@ from _drawing_annotation_extent import (
 )
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
-    add_property_linked_note,
-    add_surface_finish,
-    create_section_view,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
-    model_points_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
-    view_name,
-    visible_view_entities,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
 from _drawing_leaders import (
     Segment,
     dimension_segments,
@@ -74,9 +74,16 @@ from _drawing_leaders import (
     leader_segments,
     set_near_side_diameter,
 )
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import estimate_text_box
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_cone_gear_shaft_spec import (
     COLLAR_DIA,
     COLLAR_END_STATION,
@@ -91,14 +98,6 @@ from dt_cone_gear_shaft_spec import (
     SHAFT_LENGTH,
     SURFACE_FINISHES,
     TORQUE_CORNER_CALLOUT,
-)
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import (
-    delete_view,
-    iter_views,
-    place_view,
 )
 
 

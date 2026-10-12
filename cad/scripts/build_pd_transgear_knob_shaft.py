@@ -45,17 +45,11 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _drawing_marks import (
-    _named_dimension,
-    add_diametric_linear_dimension,
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
-    set_dimension_prefix,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_dimension_insert import add_diametric_linear_dimension
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_prefix import set_dimension_prefix
 from _simplified_part import save_simplified_part
 from _sketch_circle import define_circle
 from _fit_deviations import deviations
@@ -681,7 +675,6 @@ def _apply_neck_and_flat_limits(adapter: Any) -> None:
         adapter, "CoreFlatProfile", "FlatToolRadius", CORE_FLAT_TOOL_END_RADIUS,
         CORE_FLAT_TOOL_END_RADIUS_BAND, CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE,
     )
-    set_dimension_prefix(adapter, "CoreFlatProfile", "FlatEnd", "TOOL END FROM 12T FRONT FACE ")
 
 
 async def _journal_profile(adapter: Any) -> list[tuple[str, str]]:

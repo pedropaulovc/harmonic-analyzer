@@ -2,8 +2,9 @@ r"""Create the curated machinist drawing for the gooseneck counter-spring post.
 
 The SLDPRT remains authoritative.  This recipe supplies only the post's
 elevation + isometric views, the bend-radius / arm-run dimensions, and the
-manufacturing notes; every shared sheet/template, import, curation, and export
-behavior lives in ``_drawing_common``.
+manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The post is a polished chrome Ø16 x 2-wall tube with a tall vertical leg,
 an R51 quarter bend and a horizontal arm. Its flush brazed Ø12 x 8 end plug
@@ -22,25 +23,26 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import place_view
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from sm_gooseneck_spring_joint import TAP_DRILL_DIA, TAP_SPEC
-from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["sm_gooseneck"]

@@ -204,7 +204,7 @@ def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:
 
 
 def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
-    """MHA-VN-054 presses into the arm's blind reams over its insertion
+    """MHA-VN-056 presses into the arm's blind reams over its insertion
     (length less proud), short of the floor, and slips in the plate."""
     import vn_transgear_arm_plate_locating_pin_spec as dowel
 

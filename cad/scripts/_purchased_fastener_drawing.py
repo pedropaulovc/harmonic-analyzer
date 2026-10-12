@@ -6,27 +6,6 @@ import math
 from pathlib import Path
 from typing import Any, Literal
 
-import _config
-import _telemetry
-from _check import check
-from _com import _early_bound
-from _custom_properties import apply_custom_properties
-from _drawing_common import (
-    TITLE_BLOCK_TOLERANCE_PROPERTIES,
-    DrawingOutputs,
-    add_property_linked_note,
-    assert_asme_b_sheet,
-    finalize_drawing,
-    new_project_drawing,
-    property_link,
-    read_required_properties,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    sheet_drawable_region,
-    stamp_drawing_summary,
-)
-from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
-from _fastener_catalog import fastener
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -34,6 +13,26 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     view_name,
 )
+
+from _check import check
+from _com import _early_bound
+import _config
+from _custom_properties import apply_custom_properties
+from _drawing_common import (
+    TITLE_BLOCK_TOLERANCE_PROPERTIES,
+    DrawingOutputs,
+    assert_asme_b_sheet,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    stamp_drawing_summary,
+)
+from _drawing_notes import add_property_linked_note, property_link
+from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
+from _drawing_sheet_region import sheet_drawable_region
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _fastener_catalog import fastener
+import _telemetry
 
 # Project-used scales, largest first. All four views share the largest scale
 # fitting their actual native outlines; no catalogue dimension/axis heuristics.

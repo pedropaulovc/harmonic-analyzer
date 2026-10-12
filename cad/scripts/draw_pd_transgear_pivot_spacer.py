@@ -19,51 +19,49 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import math
 import sys
-from dataclasses import dataclass
 from typing import Any
 
-import _telemetry
-from _check import check
-from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
-from _drawing_common import (
-    DrawingOutputs,
-    ViewEdge,
-    ViewEdges,
-    add_feature_control_frame,
-    add_property_linked_note,
-    add_surface_finish,
-    add_view_centerline,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
-    finalize_drawing,
-    model_points_in_view,
-    new_project_drawing,
-    read_required_properties,
-    rebuild_drawing,
-    scan_view_edges,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    stamp_drawing_summary,
-    view_name,
-)
-from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
-from _gtol_planar import PlanarFace
-from _native_axis_datum import add_native_axis_datum
-from _layout_geometry import audit_sheet, format_findings
-from _gtol_face_read import face_geometry
-from _surface_finish import surface_finish_by_key
-from diagnostics.drawing_layout_audit import collect_document
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
+    view_name,
 )
+
+from _check import check
+from _com import _early_bound
+from _drawing_centerline import add_view_centerline
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    rebuild_drawing,
+    stamp_drawing_summary,
+)
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_feature_control_frame
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_points_in_view
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _gear_drawing_entities import visible_circle_edge
+from _gtol_face_read import face_geometry
+from _gtol_planar import PlanarFace
+from _layout_geometry import audit_sheet, format_findings
+from _native_axis_datum import add_native_axis_datum
+from _paths import CAD_ROOT
+from _session import run_build
+from _surface_finish import surface_finish_by_key
+import _telemetry
+from diagnostics.drawing_layout_audit import collect_document
 from pd_transgear_pivot_spacer_spec import (
     BORE_CALLOUT,
     BORE_DATUM,

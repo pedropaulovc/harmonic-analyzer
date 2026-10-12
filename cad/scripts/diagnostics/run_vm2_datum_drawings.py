@@ -12,6 +12,7 @@ import time
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cad/scripts"))
 
+from _buildgraph import module_deps_of  # noqa: E402
 from _drawing_registry import DRAWINGS_BY_NAME  # noqa: E402
 
 SPECS = tuple(DRAWINGS_BY_NAME[name] for name in ("dt_pinion_lift_rod", "pd_rack_pinion"))
@@ -38,9 +39,14 @@ def main():
     sources = [ROOT / f"cad/out/sldprt/{spec.artifact_stem}.SLDPRT" for spec in SPECS]
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     adapter = subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    scripts = [ROOT / f"cad/scripts/{name}" for name in (
-        "draw_dt_pinion_lift_rod.py", "draw_pd_rack_pinion.py", "_native_axis_datum.py",
-        "_rack_bore_finish.py", "_drawing_common.py")]
+    recipes = [spec.script for spec in SPECS]
+    # Match the project implementation closure of each normal drawing recipe,
+    # not just the former shared owner of datum/finish/callout helpers.
+    scripts = [Path(path) for path in sorted({
+        path
+        for recipe in recipes
+        for path in (str(recipe), *module_deps_of(recipe))
+    })]
     report = {"kind": "vm2-normal-datum-drawing-tasks", "head": head, "adapter": adapter,
               "command": command, "cwd": str(ROOT), "status": "running",
               "started_utc": datetime.now(timezone.utc).isoformat(),

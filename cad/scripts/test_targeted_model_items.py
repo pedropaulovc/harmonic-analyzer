@@ -17,8 +17,10 @@ appended to that selection (measured in
 from __future__ import annotations
 
 import pytest
+import solidworks_mcp.adapters.solidworks.drawing
 
-import _drawing_common as drawing_common
+import _drawing_dimension_import
+import _telemetry
 import fr_harmonic_base_spec
 import fr_tube_frame_spec
 
@@ -31,7 +33,7 @@ class RefusingAdapter:
 
 
 def test_only_the_features_owning_the_kept_names_are_imported() -> None:
-    features = drawing_common._features_owning(
+    features = _drawing_dimension_import._features_owning(
         fr_tube_frame_spec.DRAWING_DIMENSIONS,
         {"Length", "TopChamfer"},
         view_label="length",
@@ -41,7 +43,7 @@ def test_only_the_features_owning_the_kept_names_are_imported() -> None:
 
 def test_one_feature_is_selected_once_for_all_of_its_kept_names() -> None:
     """Three kept names on one sketch must not become three selections."""
-    assert drawing_common._features_owning(
+    assert _drawing_dimension_import._features_owning(
         fr_tube_frame_spec.DRAWING_DIMENSIONS,
         {"LowerHoleY", "UpperHoleY", "CrossHoleDia"},
         view_label="length",
@@ -50,7 +52,9 @@ def test_one_feature_is_selected_once_for_all_of_its_kept_names() -> None:
 
 def test_every_marked_dimension_of_a_real_spec_resolves_to_its_feature() -> None:
     for spec in (fr_tube_frame_spec, fr_harmonic_base_spec):
-        owner = drawing_common._feature_by_dimension_name(spec.DRAWING_DIMENSIONS)
+        owner = _drawing_dimension_import._feature_by_dimension_name(
+            spec.DRAWING_DIMENSIONS
+        )
         for feature, names in spec.DRAWING_DIMENSIONS.items():
             for name in names:
                 assert owner[name] == feature
@@ -58,7 +62,7 @@ def test_every_marked_dimension_of_a_real_spec_resolves_to_its_feature() -> None
 
 def test_a_kept_name_no_feature_declares_fails_before_com() -> None:
     with pytest.raises(RuntimeError) as error:
-        drawing_common._features_owning(
+        _drawing_dimension_import._features_owning(
             fr_tube_frame_spec.DRAWING_DIMENSIONS, {"Length", "Bogus"}, view_label="end"
         )
     assert "end view keeps dimensions no feature declares: ['Bogus']" in str(
@@ -69,14 +73,14 @@ def test_a_kept_name_no_feature_declares_fails_before_com() -> None:
 
 def test_a_dimension_two_features_claim_is_a_spec_bug() -> None:
     with pytest.raises(ValueError, match="claimed by features"):
-        drawing_common._feature_by_dimension_name(
+        _drawing_dimension_import._feature_by_dimension_name(
             {"Profile": {"Bore"}, "Cut": {"Bore"}}
         )
 
 
 def test_a_view_that_keeps_nothing_imports_nothing() -> None:
     assert (
-        drawing_common.curate_view_dimensions(
+        _drawing_dimension_import.curate_view_dimensions(
             RefusingAdapter(),
             object(),
             keep={},
@@ -214,7 +218,7 @@ def _seat(view="Drawing View1", component="fr-tube-frame-1"):
 
 def test_the_view_is_selected_before_the_features_are_appended() -> None:
     adapter, drawing, view = _seat()
-    named = drawing_common.insert_feature_dimensions(
+    named = _drawing_dimension_import.insert_feature_dimensions(
         adapter, view, ("AnnulusProfile", "Column")
     )
     assert [name for name, _ in named] == ["OuterDia", "Length", "TopChamfer"]
@@ -229,7 +233,7 @@ def test_the_view_is_selected_before_the_features_are_appended() -> None:
 def test_a_body_feature_owner_is_retried_after_the_sketch_type() -> None:
     """An owner can be a sketch or a body feature; an empty Type resolves neither."""
     adapter, drawing, view = _seat()
-    drawing_common.insert_feature_dimensions(adapter, view, ("Column",))
+    _drawing_dimension_import.insert_feature_dimensions(adapter, view, ("Column",))
     attempted = [
         (name, type_name)
         for kind, name, type_name, _ in (
@@ -246,7 +250,7 @@ def test_a_body_feature_owner_is_retried_after_the_sketch_type() -> None:
 def test_a_feature_of_neither_kind_fails_loudly() -> None:
     adapter, drawing, view = _seat()
     with pytest.raises(RuntimeError, match="as a SKETCH or a BODYFEATURE"):
-        drawing_common.insert_feature_dimensions(adapter, view, ("Missing",))
+        _drawing_dimension_import.insert_feature_dimensions(adapter, view, ("Missing",))
 
 
 def test_a_derived_view_is_qualified_by_its_base_view() -> None:
@@ -261,7 +265,7 @@ def test_a_derived_view_is_qualified_by_its_base_view() -> None:
     adapter, drawing, base = _seat(view="Drawing View7", component="fr-top-frame-7")
     section = FakeView("Section View A-A", "fr-top-frame-7", base=base)
     drawing.kinds["Section View A-A"] = "DRAWINGVIEW"
-    named = drawing_common.insert_feature_dimensions(
+    named = _drawing_dimension_import.insert_feature_dimensions(
         adapter, section, ("AnnulusProfile",)
     )
     assert [name for name, _ in named] == ["OuterDia"]
@@ -282,7 +286,9 @@ def test_a_derived_view_is_qualified_by_its_base_view() -> None:
 def test_the_component_qualifier_is_read_back_per_view() -> None:
     """The middle qualifier is the view's own root component, never the part stem."""
     adapter, drawing, view = _seat(view="Drawing View2", component="fr-tube-frame-2")
-    drawing_common.insert_feature_dimensions(adapter, view, ("AnnulusProfile",))
+    _drawing_dimension_import.insert_feature_dimensions(
+        adapter, view, ("AnnulusProfile",)
+    )
     assert view.child_context == [False]
     assert (
         "select",
@@ -316,7 +322,7 @@ def test_kept_dimensions_are_placed_again_only_after_a_delete_or_a_drift(
     placement.  A kept dimension that reads back on its point skips it."""
     calls = []
     monkeypatch.setattr(
-        drawing_common,
+        _drawing_dimension_import,
         "insert_feature_dimensions",
         lambda adapter, view, features: [
             (name, FakeAnnotation(name)) for name in imported
@@ -328,7 +334,7 @@ def test_kept_dimensions_are_placed_again_only_after_a_delete_or_a_drift(
         calls.append((tuple(delete), tuple(sorted(reposition or {}))))
         survivors = []
         for a in annotations:
-            name = drawing_common.dimension_name(adapter, a)
+            name = solidworks_mcp.adapters.solidworks.drawing.dimension_name(adapter, a)
             if name in delete:
                 continue
             x, y = (reposition or {})[name]
@@ -337,11 +343,9 @@ def test_kept_dimensions_are_placed_again_only_after_a_delete_or_a_drift(
         return survivors
 
     recorded: dict[str, object] = {}
-    monkeypatch.setattr(drawing_common, "curate_dimensions", curate)
-    monkeypatch.setattr(
-        drawing_common._telemetry, "annotate", lambda **attrs: recorded.update(attrs)
-    )
-    curated = drawing_common.curate_view_dimensions(
+    monkeypatch.setattr(_drawing_dimension_import, "curate_dimensions", curate)
+    monkeypatch.setattr(_telemetry, "annotate", lambda **attrs: recorded.update(attrs))
+    curated = _drawing_dimension_import.curate_view_dimensions(
         FakeAdapter(None),
         object(),
         keep={"Length": (0.1, 0.1)},

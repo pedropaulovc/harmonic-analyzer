@@ -26,7 +26,7 @@ from _gear_quality import (
     toothspace_runout_tir_mm,
 )
 from _printed_tolerance import printed_band_mm
-from _drawing_marks import _tolerance_places
+from _drawing_tolerances import _tolerance_places
 from paper_drive_stock_inspection import (
     span_contact_points_mm,
     toothspace_gauge_contact_mm,

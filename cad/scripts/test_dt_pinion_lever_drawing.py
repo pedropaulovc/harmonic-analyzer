@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 from types import SimpleNamespace
@@ -229,9 +230,21 @@ def test_hub_detail_is_created_and_dimensioned_while_the_part_shows_them() -> No
     # the detail is created and curated inside part_sketches_shown.
     source = Path(drawing.__file__).read_text(encoding="utf-8").replace("\r\n", "\n")
     assert "from _drawing_hidden_sketches import" in source
-    common = source[source.index("from _drawing_common import (") :]
-    common = common[: common.index(")")]
-    assert "curate_view_dimensions" not in common
+    imports = [
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.ImportFrom)
+    ]
+    assert any(
+        node.module == "_drawing_hidden_sketches"
+        and any(alias.name == "curate_view_dimensions" for alias in node.names)
+        for node in imports
+    )
+    assert not any(
+        node.module != "_drawing_hidden_sketches"
+        and any(alias.name == "curate_view_dimensions" for alias in node.names)
+        for node in imports
+    )
     assert drawing.REFERENCE_SKETCHES is dt_pinion_lever_spec.REFERENCE_SKETCHES
     opened = source.index("await adapter.open_model(str(SOURCE))")
     captured = source.index("source_model = adapter.currentModel")

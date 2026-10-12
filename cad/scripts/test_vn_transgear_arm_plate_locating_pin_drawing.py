@@ -1,4 +1,4 @@
-"""Offline source contracts for MHA-VN-054; no native or load-family certificate."""
+"""Offline source contracts for MHA-VN-056; no native or load-family certificate."""
 from __future__ import annotations
 
 import asyncio
@@ -25,7 +25,7 @@ def test_live_sourced_identity_is_registered_end_to_end() -> None:
     assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,)
     assert stock.material == spec.MATERIAL == "AISI 304"
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
-    assert row["number"] == spec.PART_NUMBER == "MHA-VN-054"
+    assert row["number"] == spec.PART_NUMBER == "MHA-VN-056"
     assert row["quantity"] == spec.ASSEMBLY_QUANTITY == 2
     assert row["installation_notes"] == spec.PURCHASED_STOCK_NOTE
     lines = row["installation_notes"].splitlines()

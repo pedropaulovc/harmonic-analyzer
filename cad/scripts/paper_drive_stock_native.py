@@ -24,7 +24,8 @@ from _sketch import (
     SketchDims,
 )
 from _sketch_circle import define_circle
-from _drawing_marks import _named_dimension, set_dimension_prefix
+from _drawing_precision import _named_dimension
+from _drawing_prefix import set_dimension_prefix
 from _gear import equation_curve
 from _visibility import blank_reference_geometry
 from paper_drive_stock_inspection import span_contact_points_mm

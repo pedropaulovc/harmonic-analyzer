@@ -1201,22 +1201,22 @@ def test_readout_term_counts_the_normalising_read(report):
 
 def test_stick_division_is_the_configured_scale_the_builder_engraves():
     """Configured divisions and tick count preserve the engraved end margin."""
-    import ha_measuring_stick_geom
+    import ms_stick_geom
 
     configured = float(eb._config.machine("amplitude", "stick_division_spacing_mm"))
-    assert ha_measuring_stick_geom.DIVISION_SPACING == configured
-    assert ha_measuring_stick_geom.DIVISION_COUNT == int(
+    assert ms_stick_geom.DIVISION_SPACING == configured
+    assert ms_stick_geom.DIVISION_COUNT == int(
         eb._config.machine("amplitude", "stick_division_count")
     )
-    assert ha_measuring_stick_geom.MINOR_SPACING == configured / int(
+    assert ms_stick_geom.MINOR_SPACING == configured / int(
         eb._config.machine("amplitude", "stick_minor_per_division")
     )
     assert eb.STICK_DIVISION_MM == configured
     # the engraved span follows the configured COUNT, so the last tick keeps
     # its end margin instead of running off a longer/shorter scale
-    import build_ha_measuring_stick as stick
+    import ms_stick_spec as stick
 
-    assert stick.SCALE_SPAN == (ha_measuring_stick_geom.DIVISION_COUNT - 1) * configured
+    assert stick.SCALE_SPAN == (ms_stick_geom.DIVISION_COUNT - 1) * configured
     assert stick.SCALE_START_X == (
         stick.BODY_LENGTH - stick.SCALE_SPAN - stick.SCALE_END_MARGIN
     )

@@ -258,7 +258,7 @@ def _farm_command(command_class, display_name: str | None = None):
                 if display_name is not None:
                     os.environ["HARMONIC_FARM_DISPLAY_NAME"] = label
                 _farm_preflight()
-                # No ownership or build ID exists until every preflight passes.
+                # No producer registration or build ID exists until preflight passes.
             except BaseException as problem:
                 self.dep_manager.close()
                 if isinstance(problem, FarmPreflightError):
@@ -266,14 +266,14 @@ def _farm_command(command_class, display_name: str | None = None):
                     return 2
                 raise
             try:
-                with _farm.producer_build(label) as ownership:
+                with _farm.producer_build(label) as producer:
                     print(
                         "farm: every SolidWorks task runs on the farm (parts, "
                         "assemblies, drawings, verify:*, preflight, export, "
                         "package:release)"
                     )
                     result = command_class._execute(self, *args, **kwargs)
-                    ownership.finish(result == 0)
+                    producer.finish(result == 0)
                     return result
             except _farm.BuildOwnershipError as problem:
                 self.dep_manager.close()

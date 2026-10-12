@@ -34,6 +34,7 @@ import sys
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -42,21 +43,20 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
-    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
+from _drawing_dimension_insert import add_diametric_linear_dimension
+from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
-    add_diametric_linear_dimension,
-    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from ch_pivot_shaft_spec import (
