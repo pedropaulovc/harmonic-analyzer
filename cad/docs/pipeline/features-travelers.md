@@ -175,6 +175,11 @@ release revision and native part artefact identity/execution token, plus shared
 exporter/helper sources. Declaration discovery and source-path construction
 parse Python statically without importing draw modules; declaration values are
 validated when exporting.
+Feature subprocesses restrict `fit(...)` reads to the tolerance groups folded
+into their own cache keys via `HARMONIC_FIT_GROUPS`. Undeclared group reads raise
+`KeyError` rather than producing cacheable success; when no groups are declared,
+the empty guard refuses every group. The action-free `package:features`
+aggregator remains unrestricted.
 A draw-only edit re-keys that part's features leaf, not the other features
 leaves or its native part/assembly builds. This is file-granular coupling, not
 declaration-only coupling: edits to shared drawing helpers, `_drawing_common`,

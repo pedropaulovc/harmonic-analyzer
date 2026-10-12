@@ -1866,8 +1866,8 @@ def _fit_groups_env(task: str) -> str | None:
         deps = _recipe_files(stem)
     elif family == "drawing" and stem in DRAWINGS_BY_NAME:
         deps = _drawing_file_deps(stem)
-    elif family == "features":
-        deps = _feature_export_file_deps(stem)
+    elif task.startswith("package:features:"):
+        deps = _feature_export_file_deps(task.removeprefix("package:features:"))
     elif family in ("part", "assembly", "drawing"):
         raise ValueError(f"{task!r} names no {family} task; its fit groups are unknown")
     else:
