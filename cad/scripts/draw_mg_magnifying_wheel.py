@@ -199,6 +199,17 @@ _TIE2_ANGLE_SECTOR = (180.0, _TIE2_OUTWARD)
 # (run 11 readback: the R3.0's at 142.9 for a point at 149.1).
 _RADIUS_SHOULDER_LEFT = 6.2
 _HUB_FILLET_SHOULDER = _polar((0.0, 0.0), 30.0, RIM_OUTER_DIA / 2.0 + 10.0)
+# A near-side Ø's leader runs radially from its circle to its shoulder's near
+# end, 10.0 mm left of its text point and 2.8 mm under it; the Ø88's shoulder
+# is 18.5 mm long (run 12c readback: 136.57 to 155.07 for a text point at
+# 146.62).  Run 12c's Ø88 left the rim bore at 79 deg and crossed the A-A
+# line's top arrow; the 60-120 window has no landing whose radial leader
+# clears that arrow and its letter, so the Ø88 lands in the 0-60 window at
+# 19 deg, its near end 14 mm past the OD: the block stands between the R4's
+# (top 16.5 mm above the axis) and the R3's shoulder (30 mm), right of the
+# wheel and left of A-A's Ø25.
+_DIA_SHOULDER_LEFT = 10.0
+_RIM_INNER_SHOULDER = _polar((0.0, 0.0), 19.0, RIM_OUTER_DIA / 2.0 + 14.0)
 # The bore's block: its "RUNS ON MG-WHEEL-AXLE" line is the face's widest
 # text (21 characters at run 7's 2.45 mm each); the block stands left of the
 # wheel on a shoulder 30 mm above the axis, its right end 7 mm off the OD.
@@ -211,11 +222,13 @@ _BORE_BLOCK_X = (
 )
 FRONT_KEEP = {
     # Near-side, one arrow each: Ø100 up-left on the OD, over the bore's
-    # block; Ø88 up the 60-120 window at 70 deg, clear of the A-A line's top
-    # arrow; the bore up-left through the 120-180 window to its block's
+    # block; Ø88 right through the 0-60 window at 19 deg, clear of the A-A
+    # line; the bore up-left through the 120-180 window to its block's
     # shoulder (stacked Ø plus three callout lines).
     "RimOuterDiaDim": _over(_polar((0.0, 0.0), 125.0, RIM_OUTER_DIA / 2.0 + 40.0), 1),
-    "RimInnerDiaDim": _over(_polar((0.0, 0.0), 70.0, RIM_OUTER_DIA / 2.0 + 13.2), 1),
+    "RimInnerDiaDim": _over(
+        (_RIM_INNER_SHOULDER[0] + _DIA_SHOULDER_LEFT, _RIM_INNER_SHOULDER[1]), 1
+    ),
     "BoreDiaDim": _over((_BORE_BLOCK_X, _BORE_SHOULDER_Y), 5),
     # The R3 (concave, inside the 0-60 window) leadered out along the window
     # to a shoulder past the OD at 30 deg; the R4 (convex, from outside the
