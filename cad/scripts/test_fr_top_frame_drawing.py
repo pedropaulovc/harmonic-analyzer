@@ -1297,6 +1297,50 @@ def test_b_outer_arrow_keeps_off_the_window_width() -> None:
     assert tail[0] + _SECTION_ARROW_LENGTH <= _WINDOW_WIDTH_TEXT[0] / 1000.0 - drawing.INK_CLEARANCE
 
 
+# Sheet-2 ink about the two short plan widths, measured on the ca7edf4d
+# render (sheet m): each width's left arrow tail, the plan's top edge, the
+# 359.8 line, its left extension, the 153.9 line and the front view's top.
+_CROSSBAR_FLANGE_ARROW_TAIL_X = 0.13275
+_GUSSET_RUN_ARROW_TAIL_X = 0.14009
+_PLAN_TOP_Y = 0.21216
+_WIN_WIDTH_LINE_Y = 0.22772
+_WIN_WIDTH_LEFT_EXTENSION_X = 0.08502
+_WINDOW_WIDTH_LINE_Y = 0.11522
+_FRONT_VIEW_TOP_Y = 0.09666
+
+
+@pytest.mark.parametrize(
+    ("xy", "lines", "left", "below", "above", "right"),
+    (
+        (
+            drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY, ("22.0", "CROSSBAR FLANGE"),
+            drawing.SHEET_FRAME[0], _FRONT_VIEW_TOP_Y, _WINDOW_WIDTH_LINE_Y,
+            _CROSSBAR_FLANGE_ARROW_TAIL_X,
+        ),
+        (
+            drawing.GUSSET_RUN_TEXT_OFFSET_XY, ("18.0", "4X 45 DEG GUSSET"),
+            _WIN_WIDTH_LEFT_EXTENSION_X, _PLAN_TOP_Y, _WIN_WIDTH_LINE_Y,
+            _GUSSET_RUN_ARROW_TAIL_X,
+        ),
+    ),
+    ids=("crossbar-flange-22.0", "gusset-run-18.0"),
+)
+def test_short_plan_width_text_parks_clear_of_its_extension_lines(
+    xy, lines, left, below, above, right
+) -> None:
+    """ca7edf4d review: both widths are shorter on paper than their text, so
+    centred text stood across their extension lines.  Parked left on a
+    leader, each text block (2.9 mm a glyph, 4.6 mm a row, both rounded up
+    from that render) keeps an ink clearance to every neighbour."""
+    half_w = 0.0029 * max(len(line) for line in lines) / 2.0
+    half_h = 0.0046 * len(lines) / 2.0
+    ink = drawing.INK_CLEARANCE
+    assert xy[0] + half_w + ink <= right
+    assert xy[0] - half_w - ink >= left
+    assert xy[1] - half_h - ink >= below
+    assert xy[1] + half_h + ink <= above
+
+
 def test_section_cuts_cross_the_same_stock() -> None:
     """The moved ends keep what each removed section shows: B cuts the
     rail's plain T between the junction land and the corner boss, E runs

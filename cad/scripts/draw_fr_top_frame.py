@@ -828,6 +828,15 @@ GEOMETRY_CALLOUTS = {
     "GussetRunE": "4X 45 DEG GUSSET",
     "RingHeight": "RAIL HEIGHT",
 }
+# Two plan widths are shorter on paper than their own text (at 1:3 the 22.0
+# crossbar flange is 7.3 mm, the 18.0 gusset run 6.0), so text centred on
+# them stood across their extension lines (codex review of ca7edf4d, sheet
+# 2).  Each parks its text left of its line on a leader: the 22.0's between
+# the 153.9 window line (y 115.2) and the front view (96.7); the 18.0's
+# between the plan's top edge (212.2) and the 359.8 line (227.7), right of
+# that line's left extension (x 85.0).  Ink measured on the ca7edf4d render.
+CROSSBAR_FLANGE_TEXT_OFFSET_XY = (0.1085, 0.1080)
+GUSSET_RUN_TEXT_OFFSET_XY = (0.1145, 0.2205)
 
 # The boss/socket diameters leave the socket they qualify in opposite
 # directions so neither leader crosses the other's text.  The hole STATIONS
@@ -2080,6 +2089,9 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     geometry_callouts.update(GEOMETRY_CALLOUTS)
     set_dimension_callouts(adapter, geometry_annotations, geometry_callouts)
+    offset_dimension_text(
+        adapter, geometry_top_dimensions, {"GussetRunE": GUSSET_RUN_TEXT_OFFSET_XY}
+    )
     # Every imported dimension's places are the part's; the whole print's
     # imports are collected here and read back once, before export.
     imported_annotations = [*geometry_annotations]
@@ -2146,7 +2158,8 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=(BAR_X1, HALF_H-EDGE_CHAMFER, 0.0),
         text_xy=(GEOMETRY_TOP_CENTER[0], 0.1095), label="crossbar flange width",
         expected_mm=BAR_X1-BAR_X0, orientation="horizontal", exact_linear=True,
-        suffix="CROSSBAR FLANGE", edges=geometry_top_edges,
+        suffix="CROSSBAR FLANGE", offset_text=CROSSBAR_FLANGE_TEXT_OFFSET_XY,
+        edges=geometry_top_edges,
     )
     # B-B is a REMOVED section: the cutting line crosses the +Z rail alone
     # (the -Z rail is its mirror), so the section shows the one T profile the
