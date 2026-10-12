@@ -11,19 +11,22 @@ drawing prints (part sheets, the title block, the assembly steps) or a stock
 fastener/thread class, read from the spec the drawing prints it from:
 
 * along the shaft: the post's mounting (as build_dt_drive_train_assembly's
-  POST_BOSS_FACE_AXIAL_BAND_MM books it), the shaft's thrust collar, the
-  gear stack's terminal north face and the collar's feeler set;
+  POST_BOSS_FACE_AXIAL_BAND_MM books it, less the screw clearance the
+  pushed post takes up), the shaft's thrust collar, the gear stack's
+  terminal north face and the collar's feeler set;
 * across the shaft, at the post end: the post's tapped-hole station, its
   screws' clearance, its counterbore pattern and its running fit;
 * across the shaft, at the tip end: the hold-down tap (as
   TIP_TAP_LATERAL_BAND_MM), the adjuster passage centre, the block's square
   on its one screw at the title block's angular band, the cup screw's float
-  and cock in its thread, and the shaft tip's radial freedom in the cup once
-  the cup is backed off for SHAFT_END_PLAY (the shaft swings on its post
-  journal to take it, so it also tilts the collar's faces).
+  and cock in its thread, and the shaft's swing in the post journal once the
+  cup is backed off for SHAFT_END_PLAY (no standard holds the tip in the
+  cup, so the journal bounds it; it also tilts the collar's faces).
 * the swing: the reamed pivot on the stock shoulder, the base pivot seat to
   the pedestal seats, the pivot thread and the T120 set (cone_set_stack);
-* the collar on the shaft: its nose size, its float and cock on the journal;
+* the collar on the shaft: its nose and body sizes, its float and cock on
+  the journal, and the stock set screw's tap station, centring and angle,
+  length, the D-flat it seats on and its rock in the thread;
 * the bank: the back strap and washer datum chain and G19's cock in its
   running fit.
 
@@ -37,11 +40,15 @@ The projections of one error are summed into that one source, never combined
 as separate scatter.  The sources are then of two kinds:
 
 * clearances (IN_SERVICE_CLEARANCES): fastener and running clearances, thread
-  centring, the cup screw in its thread, the shaft tip in the backed-off cup,
-  the collar's float and cock and G19's cock in its bore.  The parts can take
-  them all up together, so they add arithmetically;
-* printed manufacturing and set tolerances: independent of each other, so
-  they combine as a root sum of squares.
+  centring, the cup screw in its thread, the shaft's release swing in the
+  post journal, the collar's float and cock, the set screw's thread rock and
+  G19's cock in its bore.  The parts can take them all up together, so they
+  add arithmetically;
+* printed manufacturing and set tolerances (INDEPENDENT_TOLERANCES):
+  independent of each other, so they combine as a root sum of squares.
+
+Every source is in exactly one of the two sets; an unclassified source is
+refused, never defaulted to the RSS.
 
 The whole sweep is worst-case arithmetic over every source when that closes
 everywhere; otherwise the clearances arithmetic plus the RSS of the
@@ -68,12 +75,8 @@ import vn_cone_tip_collar_spec as collar
 import _mcmaster_94025a164 as adjuster
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
-from cone_stack_end_play import COLLAR_FEELER_BAND, SHAFT_END_PLAY
-from cone_shaft_land_bands import (
-    TERMINAL_FINISHED_DIA_LIMITS_MM,
-    TERMINAL_FLAT_OFFSET_MIN_MM,
-    TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD,
-)
+from cone_stack_end_play import COLLAR_FEELER_BAND
+from cone_shaft_land_bands import TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
 from dt_cone_swing_platform_geometry import manufactured_p1_stop_enclosure
 
 Vector = tuple[float, float, float]
@@ -88,6 +91,10 @@ class CollarTier:
     south_lower_mm: float
     north_upper_mm: float
     radius_upper_mm: float
+    # The tier's south and radial limits split by physical source:
+    # name -> (axial loss, radial gain), summing to -south_lower_mm and
+    # radius_upper_mm.
+    limits: dict[str, tuple[float, float]]
 
 
 @dataclass(frozen=True)
@@ -105,27 +112,63 @@ SOUTH_STATION_MM = shaft.TIP_COLLAR_START_STATION
 PARTITION_STATION_MM = collar.NOSE_LENGTH - collar.SHOULDER_ROOT_RADIUS
 _MIN_STOCK_Y = collar.TAP_STATION - collar.SET_SCREW_MAJOR_DIA / 2.0
 _STOCK_R = math.hypot(collar.SET_SCREW_END_RADIUS, collar.SET_SCREW_MAJOR_DIA / 2.0)
-_MAX_STOCK_Y_LOSS = (
-    collar.TAP_STATION_BAND_MM
-    + (collar.SET_SCREW_LENGTH + collar.SET_SCREW_LENGTH_BAND_MM)
-    * math.sin(collar.SET_SCREW_MAX_AXIS_ANGLE_RAD)
+
+
+def _stock_extent(station=0.0, centring=0.0, tap_angle=0.0, length=0.0, flat=0.0,
+                  rock=0.0, float_=0.0) -> tuple[float, float]:
+    """The stock screw's south loss and radial gain over its nominal seat."""
+    reach = collar.SET_SCREW_LENGTH + length
+    lean = reach * math.sin(tap_angle + rock)
+    return station + lean, math.hypot(
+        collar.SET_SCREW_SEAT_RADIUS + flat + float_ + reach,
+        collar.SET_SCREW_MAJOR_DIA / 2.0 + centring + lean,
+    ) - _STOCK_R
+
+
+# The screw tier's limits, source by source.  The printed tolerances (the
+# tap's station, centring and angle, the screw's length band, the D-flat's
+# depth and land at their printed limits) come first; the in-service
+# clearances (the 3A/2B thread rock, the collar's float on its journal) take
+# the last increments, which are the largest, so the arithmetic group never
+# gets less than its share.  The increments sum exactly to the composite.
+_SCREW_SOURCES = (
+    ("set screw tap station", "station", collar.TAP_STATION_BAND_MM),
+    ("set screw tap centring", "centring", collar.TAP_LATERAL_BAND_MM),
+    ("set screw tap angle", "tap_angle", collar.TAP_ANGLE_RAD),
+    ("set screw length", "length", collar.SET_SCREW_LENGTH_BAND_MM),
+    ("terminal flat depth", "flat", collar._FLAT_MAX - collar.SET_SCREW_SEAT_RADIUS),
+    ("set screw rock in its thread", "rock",
+     collar.SET_SCREW_MAX_AXIS_ANGLE_RAD - collar.TAP_ANGLE_RAD),
+    ("collar float on the journal", "float_", collar._FLOAT_MAX),
 )
-_MAX_STOCK_R = math.hypot(
-    collar._POINT_PLANE_MAX + collar.SET_SCREW_LENGTH + collar.SET_SCREW_LENGTH_BAND_MM,
-    collar.SET_SCREW_MAJOR_DIA / 2.0 + collar.TAP_LATERAL_BAND_MM
-    + (collar.SET_SCREW_LENGTH + collar.SET_SCREW_LENGTH_BAND_MM)
-    * math.sin(collar.SET_SCREW_MAX_AXIS_ANGLE_RAD),
-)
+
+
+def _screw_limits() -> dict[str, tuple[float, float]]:
+    limits, args, before = {}, {}, (0.0, 0.0)
+    for name, arg, value in _SCREW_SOURCES:
+        args[arg] = value
+        after = _stock_extent(**args)
+        limits[name] = (after[0] - before[0], after[1] - before[1])
+        before = after
+    return limits
+
+
+_SCREW_LIMITS = _screw_limits()
+_MAX_STOCK_Y_LOSS = sum(axial for axial, _ in _SCREW_LIMITS.values())
+_MAX_STOCK_R_GAIN = sum(radial for _, radial in _SCREW_LIMITS.values())
 TIERS = (
     CollarTier("nose", 0.0, PARTITION_STATION_MM, collar.NOSE_DIA / 2.0,
                0.0, collar.AXIAL_BAND_MM + collar.SHOULDER_ROOT_RADIUS,
-               collar.ROUTINE_BAND_MM / 2.0),
+               collar.ROUTINE_BAND_MM / 2.0,
+               {"collar nose diameter": (0.0, collar.ROUTINE_BAND_MM / 2.0)}),
     CollarTier("body", PARTITION_STATION_MM, collar.WIDTH, collar.OUTER_DIA / 2.0,
-               -collar.AXIAL_BAND_MM, collar.WIDTH_BAND_MM, collar.ROUTINE_BAND_MM / 2.0),
+               -collar.AXIAL_BAND_MM, collar.WIDTH_BAND_MM, collar.ROUTINE_BAND_MM / 2.0,
+               {"collar nose length": (collar.AXIAL_BAND_MM, 0.0),
+                "collar outside diameter": (0.0, collar.ROUTINE_BAND_MM / 2.0)}),
     CollarTier("screw", _MIN_STOCK_Y,
                collar.TAP_STATION + collar.SET_SCREW_MAJOR_DIA / 2.0,
-               _STOCK_R, -_MAX_STOCK_Y_LOSS, _MAX_STOCK_Y_LOSS,
-               max(0.0, _MAX_STOCK_R - _STOCK_R)),
+               _STOCK_R, -_MAX_STOCK_Y_LOSS, _MAX_STOCK_Y_LOSS, _MAX_STOCK_R_GAIN,
+               _SCREW_LIMITS),
 )
 DRUM_TIERS = (
     DrumTier("tooth_face", -drum.FACE_WIDTH, 0.0, drum.OUTSIDE_DIA / 2.0,
@@ -176,28 +219,45 @@ _CUP_REACH = math.hypot(
     abs(shaft.T006_TIP_STATION - cone_line.TIP_BLOCK_STATION) + _BLOCK_DEPTH_MAX / 2.0,
 )
 # Step 3 seats the tip in the cup, then backs the cup off for SHAFT_END_PLAY.
-# At the far end of that stroke the 45 deg cup wall stands SHAFT_END_PLAY *
-# tan(45) clear of the seated tip, and the shaft, swinging on its post
-# journal, can carry the tip that far across the cup.  The terminal's D-flat
-# runs out through the tip, so toward the flat the D's two corners, not its
-# round, meet the wall: a Ø2r D with its flat o off the axis, moved d toward
-# the flat, reaches the wall circle r + e when r^2 + 2*o*d + d^2 = (r + e)^2.
-# The largest terminal and the shallowest flat (printed limits) give the most
-# room; any edge break only lets the tip seat deeper on its break, which
-# gives less.  The shaft turns, so the flat can face any way: the larger of
-# the two directions is booked.
-_TERMINAL_R_MAX = TERMINAL_FINISHED_DIA_LIMITS_MM[1] / 2.0
-_CUP_WALL_R = _TERMINAL_R_MAX + SHAFT_END_PLAY[1] * (adjuster.CUP_DIA / 2.0) / adjuster.CUP_DEPTH
-_TIP_CAPTURE = max(
-    _CUP_WALL_R - _TERMINAL_R_MAX,
-    math.sqrt(TERMINAL_FLAT_OFFSET_MIN_MM**2 + _CUP_WALL_R**2 - _TERMINAL_R_MAX**2)
-    - TERMINAL_FLAT_OFFSET_MIN_MM,
+# The 94025A164 is a slotted headless cup-point set screw: ASME B18.6.2's
+# slotted headless set screw table limits only its cup point diameter C
+# (#10: 0.102 MAX / 0.088 MIN in).  It controls neither the cup's depth nor
+# its wall angle, and McMaster publishes neither (their model's 90 deg cup is
+# a nominal depiction, _mcmaster_94025a164), so nothing certifies that the
+# tip stays captured once the cup backs off.  The complete bound is the post
+# journal: the tip is free to go wherever the journal lets the shaft swing.
+# A shaft in a bore of engaged length Lj with diametral clearance c reaches
+# c * L / Lj off the bore axis at L from the bore's centre (POST_STATION,
+# the boss faces are symmetric about the post axis); from the seated position
+# to the released one the tip can cross that whole range, 2 * c * L / Lj.
+# Lj is the boss length at its printed minimum less the two printed rim
+# breaks; the shaft's journal overruns both rims and its collar root is sharp.
+_JOURNAL_ENGAGED_MIN = (
+    post.CONE_BOSS_LENGTH
+    - printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
+    - 2.0 * shaft.THRUST_EDGE_BREAK_MAX
 )
+_TIP_RELEASE = 2.0 * (2.0 * _JOURNAL_FLOAT) * _SUPPORT_SPAN / _JOURNAL_ENGAGED_MIN
+
+# MHA-DT-000 step 3 (user decision 2026-10-12) holds the post pushed toward
+# the tip block while it is turned and its screws are tightened.  The screws
+# sit at +/-ATTACHMENT_X: turning the post by theta moves them +/-theta*X
+# in their holes, and the post's remaining translation is the lens where
+# both screws stay inside their clearance.  That lens is symmetric about the
+# centred pose (whatever the turn), so the pushed post stands at or north of
+# centre along the shaft at every turn the tip needs: its clearance can only
+# carry the collar away from G19, and its along-shaft share is booked 0.
+# Held pushed through the turn, the post still reaches every tip position
+# TIP_LATERAL_CAPACITY_MM allows, because the lens shrinks to the centred
+# pose at the full turn.  The push holds only the post's position along the
+# shaft; where it lands across the shaft depends on the turn, so the
+# across-shaft and face-tilt shares (POST_END_TERMS_MM) stay booked in full.
+POST_SCREW_CLEARANCE_TAKEN_UP_MM = _POST_FLOAT
 
 # Along the shaft, from the post's mounting to the collar's south face.
 AXIAL_TERMS_MM = {
     "post platform tap station": plate.POST_MOUNT_STATION_TOL_MM,
-    "post screw clearance": _POST_FLOAT,
+    "post screw clearance": _POST_FLOAT - POST_SCREW_CLEARANCE_TAKEN_UP_MM,
     "post counterbore pattern": _MOUNT_X_BAND * _SIN_I,
     "post cone boss length": printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0,
     "shaft thrust collar width": shaft.printed_band("CollarWidth"),
@@ -218,7 +278,7 @@ TIP_END_TERMS_MM = {
     "tip passage centre": printed_band_mm(tip.PASSAGE_CENTER_PLACES),
     "tip block square on its one screw": _CUP_REACH * math.sin(_ANGULAR_RAD),
     "tip cup in its thread": _THREAD_FLOAT + _BLOCK_DEPTH_MAX * (2.0 * _THREAD_FLOAT / _MIN_EMBED),
-    "shaft tip in the backed-off cup": _TIP_CAPTURE,
+    "shaft swing in the post journal off the cup": _TIP_RELEASE,
 }
 # The swing's frame (cone_set_stack's set-at-assembly terms).
 SWING_TERMS_MM = {
@@ -226,21 +286,54 @@ SWING_TERMS_MM = {
     "base pivot seat to the pedestal seats": cone_set_stack.PIVOT_SEAT_POSITION_MM,
     "pivot thread centring": cone_set_stack.PIVOT_THREAD_CENTRING_MM,
 }
-# The sources booked arithmetically: clearances the parts take up together
-# in service or at fit-up, not independent manufacturing scatter.  Every
-# other source is a printed tolerance and joins the RSS.
+# Every source is classified explicitly; an unclassified one is refused.
+# In-service clearances the parts take up together in service or at fit-up
+# add arithmetically.
 IN_SERVICE_CLEARANCES = frozenset({
     "post screw clearance",
     "post running journal fit",
     "tip hold-down screw clearance",
     "tip cup in its thread",
-    "shaft tip in the backed-off cup",
+    "shaft swing in the post journal off the cup",
     "platform pivot bore on the shoulder",
     "pivot thread centring",
     "collar float on the journal",
     "collar cock on the journal",
+    "set screw rock in its thread",
     "G19 cock in its running fit",
 })
+# Independent printed manufacturing and set tolerances join the RSS.
+INDEPENDENT_TOLERANCES = frozenset({
+    "post platform tap station",
+    "post counterbore pattern",
+    "post cone boss length",
+    "shaft thrust collar width",
+    "gear stack terminal north face",
+    "collar feeler set",
+    "tip platform hold-down station",
+    "tip block foot tap station",
+    "tip passage centre",
+    "tip block square on its one screw",
+    "base pivot seat to the pedestal seats",
+    "T120 set of the swing",
+    "collar nose diameter",
+    "collar nose length",
+    "collar outside diameter",
+    "set screw tap station",
+    "set screw tap centring",
+    "set screw tap angle",
+    "set screw length",
+    "terminal flat depth",
+    *(f"bank {name}" for name in bank.DATUM_CHAIN_STACK),
+    "drum tier limits",
+})
+if IN_SERVICE_CLEARANCES & INDEPENDENT_TOLERANCES:
+    raise AssertionError("a collar air source cannot be both a clearance and a tolerance")
+# Sources only some collar tiers carry.
+_TIER_ONLY_SOURCES = (
+    frozenset(name for tier in TIERS for name in tier.limits)
+    - frozenset({"collar float on the journal"})
+)
 
 
 def _dot(a, b):
@@ -352,9 +445,8 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     # collar turns with it about the pivot.
     set_angle = cone_set_stack.T120_SET_MM / cone_set_stack.pivot_distance_mm(120)
     terms["T120 set of the swing"] = _pivot_reach_mm(tier, angle_deg) * set_angle
-    # The collar on its journal: nose size, float and cock (vn_cone_tip_collar).
-    terms["collar tier axial limit"] = -tier.south_lower_mm * along
-    terms["collar tier radial limit"] = tier.radius_upper_mm * across
+    # The collar on its journal: float and cock (vn_cone_tip_collar), then
+    # the tier's own limits, each into its physical source.
     cock = TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
     bore_upper_r = collar.BORE_FINISHED_DIA_LIMITS_MM[1] / 2.0
     terms["collar float on the journal"] = (
@@ -364,6 +456,8 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
         max(abs(e - SOUTH_STATION_MM) for e in ends) * (1.0 - math.cos(cock))
         + radius * math.sin(cock)
     )
+    for name, (axial, radial) in tier.limits.items():
+        terms[name] = terms.get(name, 0.0) + axial * along + radial * across
     # The bank: its datum chain, then G19's cock within its running fit.
     terms.update({f"bank {name}": value for name, value in bank.DATUM_CHAIN_STACK.items()})
     manufactured = _tilted_fixed_support(fixed, Z, 0.0)
@@ -380,8 +474,12 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     ) + max(abs(v) for v in drum.OVERALL_THICKNESS_BAND) * math.sin(running_cock / 2.0)
     if not all(math.isfinite(value) and value >= 0.0 for value in terms.values()):
         raise ValueError(f"collar air has an invalid closing term: {terms}")
-    if not IN_SERVICE_CLEARANCES <= terms.keys():
-        raise ValueError(f"collar air lost a clearance source: {IN_SERVICE_CLEARANCES - terms.keys()}")
+    unclassified = terms.keys() - IN_SERVICE_CLEARANCES - INDEPENDENT_TOLERANCES
+    if unclassified:
+        raise ValueError(f"collar air has an unclassified source: {sorted(unclassified)}")
+    missing = (IN_SERVICE_CLEARANCES | INDEPENDENT_TOLERANCES) - _TIER_ONLY_SOURCES - terms.keys()
+    if missing:
+        raise ValueError(f"collar air lost a source: {sorted(missing)}")
     return terms
 
 
@@ -394,13 +492,18 @@ class AirStack:
     terms: dict[str, float]
     arc_mm: float  # the swing between this interval's midpoint and its ends
 
+    def __post_init__(self):
+        unclassified = self.terms.keys() - IN_SERVICE_CLEARANCES - INDEPENDENT_TOLERANCES
+        if unclassified:
+            raise ValueError(f"collar air has an unclassified source: {sorted(unclassified)}")
+
     @property
     def clearances(self) -> dict[str, float]:
         return {k: v for k, v in self.terms.items() if k in IN_SERVICE_CLEARANCES}
 
     @property
     def tolerance_rss_mm(self) -> float:
-        return math.hypot(*(v for k, v in self.terms.items() if k not in IN_SERVICE_CLEARANCES))
+        return math.hypot(*(v for k, v in self.terms.items() if k in INDEPENDENT_TOLERANCES))
 
     @property
     def arithmetic_mm(self) -> float:
