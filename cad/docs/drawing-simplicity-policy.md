@@ -377,8 +377,13 @@ tagged emitter for every row, printing the shortfall it names.
 `uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or
 `--all`) renders the verdict a blind senior machinist gives each drawing package
 under the calibrated prompt in `cad/scripts/prompts/`. **The reviewer MUST be a
-different model family from whoever authored or last edited the drawing
-script.** An agent running on a Claude model (Fable, Opus, Sonnet) reviews with
+different model family from whoever authored the PR's render-affecting
+change** — the drawing script or spec edit, or, for a sheet changed only
+indirectly, the geometry/config/helper edit that moved its render. Earlier
+editors of an untouched drawing script do not pick the family. When both
+families authored render-affecting commits in the PR, no cross-family reviewer
+exists: use the last-resort rule below (Astra or Fable at high reasoning).
+An agent running on a Claude model (Fable, Opus, Sonnet) reviews with
 `--reviewer codex`; an agent running on a Codex/GPT model reviews with
 `--reviewer claude`. A same-family review shares the author's blind spots and
 does not count as the gate, even when it returns `SHIP`. If the cross-family
