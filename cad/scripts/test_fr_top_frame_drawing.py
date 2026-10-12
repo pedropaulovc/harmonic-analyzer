@@ -2269,8 +2269,15 @@ def test_slot_width_leader_passes_left_of_the_land_dimension() -> None:
     assert _segment_gap(leader, Segment(land[0] - 0.00635, 0.145, land[1] + 0.00635, 0.145)) >= ink
     for x in land:
         assert _segment_gap(leader, Segment(x, 0.14397, x, 0.16383)) >= ink
-    # UNDERSIDE LOCATOR printed [60.4, 111.5]..[146.1, 120.0] mm.
-    assert segment_box_distance(leader, Box(0.0604, 0.1115, 0.1461, 0.1200)) >= ink
+    # UNDERSIDE LOCATOR: its one 33-glyph row printed 85.7 mm wide, 2.6 mm a
+    # glyph; rows 4.6 mm apart and 3.6 tall below the note's top-left point.
+    rows = drawing.HUB_BOTTOM_NOTE.splitlines()
+    nx, ny = drawing.HUB_BOTTOM_NOTE_XY
+    note = Box(
+        nx, ny - 0.0046 * (len(rows) - 1) - 0.0036,
+        nx + 0.0026 * max(len(row) for row in rows), ny,
+    )
+    assert segment_box_distance(leader, note) >= ink
     # The width's line stays left of the slot and the crossbar's outer face.
     assert drawing.HANGER_SLOT_WIDTH_TEXT_XY[0] < centre[0] + part.BAR_X0 * m_per_mm - ink
 
@@ -2458,8 +2465,10 @@ def test_slot_basic_note_completes_both_stations_frames() -> None:
     assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(
         spec.HANGER_PIN_X_TOL + float(zone) / 2.0
     )
+    # The 7.100 names the round holes it locates and, codex review of
+    # 07527cf4, their transverse station: the screw axis's own Z.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'suffix="2X ROUND HOLE\\nFROM SCREW AXIS"' in source
+    assert 'suffix="2X ROUND HOLE FROM\\nSCREW AXIS, SAME Z"' in source
     # Rule 6, and rule 8 against the a3735691 sheet-6 ink (metres): F-F's
     # 7.100 block top 0.1133, the 72.0 block's underline 0.13663, detail C's
     # fence (r 0.076 about its centre) at its nearest over the note's rows.

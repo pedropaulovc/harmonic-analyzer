@@ -64,6 +64,7 @@ from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -493,7 +494,11 @@ HUB_LEFT_NOTE_XY = (0.093, 0.0455)
 # smallest features on the casting.
 HUB_BOTTOM_CENTER = (0.110, 0.200)
 HUB_BOTTOM_SCALE = (1, 3)
-HUB_BOTTOM_NOTE_XY = (0.060, 0.120)
+# Three rows, at the band's left edge: the 07527cf4 codex review read the
+# one 85.7 mm row, wedged between the slot width's block and F-F's 14.200,
+# as crowding the section dimensions.
+HUB_BOTTOM_NOTE_XY = (0.040, 0.118)
+HUB_BOTTOM_NOTE = "UNDERSIDE LOCATOR\nBAR/GUSSET BOTTOMS\nAT SEATS SHARP"
 HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
 HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
@@ -564,23 +569,27 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 # extension lines and the underside edge).  Right: the depth the hole and
 # slot share.  Above, between the owned axes: the hole's 7.100 station from
 # the screw axis, its text on a jog to the right, clear of the locator's land
-# text; a row higher, so the two dimension lines never share the hole's
-# extension line at one height, the slot's BASIC 14.200 from the round hole
-# (the slot position frames' true location), its text on a jog to the left,
-# between the counterbore floor's text and the locator's label.  Under the
-# slot, a row below the hole's size so their arrows cannot meet: its length,
-# the text on a jog between the caption and the hole's callout.  The caption
-# takes the empty lower-left corner of the band.
+# text and the boss's Ø30.0; its rows state the hole stands at the screw's
+# own Z (codex review of 07527cf4: the round holes, datums B and C, had no
+# transverse location).  A row higher, so the two dimension lines never
+# share the hole's extension line at one height, the slot's BASIC 14.200
+# from the round hole (the slot position frames' true location), its box on
+# a short jog up-left, right of the locator's label.  Under the slot, a row
+# below the hole's size so their arrows cannot meet: its length, the text on
+# a jog left of its line, so the leader leaves the underline's right end
+# clear of its own rows (the 07527cf4 render ran it up through "2X"), between
+# the caption and the slot's extension lines.  The caption takes the empty
+# lower-left corner of the band.
 HANGER_FLOOR_TEXT_XY = _hanger_section_xy(
     BAR_X0 - HANGER_SECTION_GUSSET_REACH - 8.0, -HALF_H + HANGER_GRIP / 2.0
 )
 HANGER_FLOOR_OFFSET_XY = (0.058, 0.076)
 PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
-PIN_STATION_OFFSET_XY = (0.160, 0.106)
+PIN_STATION_OFFSET_XY = (0.157, 0.106)
 SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 14.0)
-SLOT_STATION_OFFSET_XY = (0.066, 0.104)
+SLOT_STATION_OFFSET_XY = (0.104, 0.1115)
 SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
-SLOT_LENGTH_OFFSET_XY = (0.118, 0.026)
+SLOT_LENGTH_OFFSET_XY = (0.0895, 0.024)
 # The callout block is 65 x 19 mm on that render (3.5 mm text).  Centred
 # here it spans sheet x 0.140..0.205 and y 0.025..0.044: its left edge is
 # 5.7 mm right of the size's outer arrow tail (0.1343), its top 6 mm under
@@ -598,7 +607,7 @@ HANGER_SECTION_CALLOUTS = {
     "HangerPinHoleDia": HANGER_PIN_HOLE_CALLOUT,
     "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
 }
-HANGER_SECTION_CAPTION_XY = (0.070, 0.040)
+HANGER_SECTION_CAPTION_XY = (0.055, 0.040)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
 # centre): datum B is the front round dowel hole, its tag low in the window
 # right of the crossbar; datum C the rear one, its tag above the rear rail so
@@ -1538,7 +1547,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         expected_mm=HANGER_PIN_X, orientation="horizontal",
         entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
         entities=(axes[0], axes[1]),
-        suffix="2X ROUND HOLE\nFROM SCREW AXIS",
+        suffix="2X ROUND HOLE FROM\nSCREW AXIS, SAME Z",
         offset_text=PIN_STATION_OFFSET_XY,
     )
     # The slot's true location for its position frame: BASIC from the round
@@ -2880,6 +2889,16 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter, hub_left_dimensions, {"SetBossWidth": SET_BOSS_WIDTH_TEXT_XY},
     )
+    # One arrow on the spot's rim, no line on through the tap centre: the
+    # 07527cf4 codex review read the diametric pair, meeting the tap
+    # callout's leader at the centre, as leaders converging on the boss.
+    spot_dia = [
+        annotation for annotation in hub_left_dimensions
+        if dimension_name(adapter, annotation) == "SetSpotDia"
+    ]
+    if len(spot_dia) != 1:
+        raise RuntimeError(f"expected one SetSpotDia dimension, found {len(spot_dia)}")
+    set_near_side_diameter(spot_dia[0], "set-screw spot face diameter")
     _add_view_centerlines(
         adapter, hub_top,
         (
@@ -3073,10 +3092,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # itself and says nothing a reader can already read off the title block
     # beyond the knife seats' exception to the C2 note: the bar-side and
     # gusset-hypotenuse bottoms under both seats keep the title-block break.
-    if add_note(
-        adapter, "UNDERSIDE LOCATOR\nBAR/GUSSET BOTTOMS AT SEATS SHARP",
-        *HUB_BOTTOM_NOTE_XY,
-    ) is None:
+    if add_note(adapter, HUB_BOTTOM_NOTE, *HUB_BOTTOM_NOTE_XY) is None:
         raise RuntimeError("failed to label underside locator")
     if add_note(adapter, SLOT_BASIC_NOTE, *SLOT_BASIC_NOTE_XY) is None:
         raise RuntimeError("failed to state the dowel slots' basic location")
