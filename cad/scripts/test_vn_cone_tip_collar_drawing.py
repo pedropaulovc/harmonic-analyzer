@@ -516,17 +516,16 @@ def test_collar_air_gains_the_pushed_posts_axial_clearance(monkeypatch):
 
 
 def test_collar_air_bounds_the_released_tip_by_the_post_journal_not_the_vendor_cup():
-    post, shaft = air.post, air.shaft
+    shaft = air.shaft
 
     name = "shaft swing in the post journal off the cup"
     release = air.TIP_END_TERMS_MM[name]
     assert name in air.IN_SERVICE_CLEARANCES
     c = max(shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)
-    engaged = (post.CONE_BOSS_LENGTH - printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
-               - 2.0 * shaft.THRUST_EDGE_BREAK_MAX)
     span = shaft.T006_TIP_STATION - air.cone_line.POST_STATION
-    # Seated at one side of the journal, released to the other.
-    assert release == pytest.approx(2.0 * c * span / engaged)
+    # Seated at one side of the journal, released to the other, over the
+    # shaft spec's guaranteed support across the end-play stroke.
+    assert release == pytest.approx(2.0 * c * span / shaft.JOURNAL_SUPPORT_SPAN_MIN_MM)
     # B18.6.2 bounds no cup depth or wall angle: the nominal 90 deg vendor cup
     # over the 0.25 end play would have booked less.
     assert release > 0.5

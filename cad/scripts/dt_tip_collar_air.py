@@ -226,18 +226,17 @@ _CUP_REACH = math.hypot(
 # a nominal depiction, _mcmaster_94025a164), so nothing certifies that the
 # tip stays captured once the cup backs off.  The complete bound is the post
 # journal: the tip is free to go wherever the journal lets the shaft swing.
-# A shaft in a bore of engaged length Lj with diametral clearance c reaches
-# c * L / Lj off the bore axis at L from the bore's centre (POST_STATION,
-# the boss faces are symmetric about the post axis); from the seated position
-# to the released one the tip can cross that whole range, 2 * c * L / Lj.
-# Lj is the boss length at its printed minimum less the two printed rim
-# breaks; the shaft's journal overruns both rims and its collar root is sharp.
-_JOURNAL_ENGAGED_MIN = (
-    post.CONE_BOSS_LENGTH
-    - printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
-    - 2.0 * shaft.THRUST_EDGE_BREAK_MAX
+# A shaft in a bore of supported length Lj with diametral clearance c reaches
+# c * L / Lj off the bore axis at L from the bore's centre; from the seated
+# position to the released one the tip can cross that whole range,
+# 2 * c * L / Lj.  Lj is the shaft spec's guaranteed cylindrical support over
+# the whole end-play stroke (JOURNAL_SUPPORT_SPAN_MIN_MM).  L is taken from
+# the post centre (POST_STATION, the boss faces are symmetric about the post
+# axis); a support withdrawn by the end play centres north of it, nearer the
+# tip, so this L is the longer lever.
+_TIP_RELEASE = (
+    2.0 * (2.0 * _JOURNAL_FLOAT) * _SUPPORT_SPAN / shaft.JOURNAL_SUPPORT_SPAN_MIN_MM
 )
-_TIP_RELEASE = 2.0 * (2.0 * _JOURNAL_FLOAT) * _SUPPORT_SPAN / _JOURNAL_ENGAGED_MIN
 
 # MHA-DT-000 step 3 (user decision 2026-10-12) holds the post pushed toward
 # the tip block while it is turned and its screws are tightened.  The screws
