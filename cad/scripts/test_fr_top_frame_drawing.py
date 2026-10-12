@@ -2302,17 +2302,21 @@ def test_slot_frames_stand_above_the_plan_clear_of_every_line() -> None:
 
 def test_slot_width_leader_passes_left_of_the_land_dimension() -> None:
     # Machinist review of 11783475: the 3.240's leader crossed 70.0
-    # FULL-THICKNESS LAND.  The leader runs from the width's line midpoint
-    # to its block's underline right end, (+22.44, -12.89) mm off the offset
-    # point as the 40d9d030e render printed it.
+    # FULL-THICKNESS LAND; codex review of fe1a7611: it still met the 72.0
+    # line's left arrow tail.  The fe1a7611 render's leader runs from the
+    # width's lower arrow tail (6.35 mm under the width's line midpoint, less
+    # half the 1.09 mm line spacing) to its block's underline right end,
+    # (+26.0, -12.89) mm off the offset point.
     from _layout_geometry import Box, Segment, segment_box_distance
 
     ink = drawing.INK_CLEARANCE
     centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
     tx, ty = drawing.HANGER_SLOT_WIDTH_OFFSET_XY
-    leader = Segment(*drawing.HANGER_SLOT_WIDTH_TEXT_XY, tx + 0.02244, ty - 0.01289)
+    wx, wy = drawing.HANGER_SLOT_WIDTH_TEXT_XY
+    leader = Segment(wx, wy - 0.00055 - 0.00635, tx + 0.0260, ty - 0.01289)
     land = [centre[0] + x * m_per_mm for x in (part.LAND_X0, part.LAND_X1)]
-    assert _segment_gap(leader, Segment(land[0] - 0.00635, 0.145, land[1] + 0.00635, 0.145)) >= ink
+    land_line = Segment(land[0] - 0.00635, 0.14499, land[1] + 0.00635, 0.14499)
+    assert _segment_gap(leader, land_line) >= 2.0 * ink
     for x in land:
         assert _segment_gap(leader, Segment(x, 0.14397, x, 0.16383)) >= ink
     # UNDERSIDE LOCATOR: its one 33-glyph row printed 85.7 mm wide, 2.6 mm a

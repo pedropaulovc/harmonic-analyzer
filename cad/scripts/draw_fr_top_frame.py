@@ -701,9 +701,12 @@ HANGER_SLOT_WIDTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[0] + (BAR_X0 - 40.0) * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1] + STUD_Z_FRONT * _HUB_BOTTOM_M_PER_MM,
 )
-# The block left of the land's dimension line: the leader from the width's
-# line at x 88 mm passes 3.2 mm left of that line's left end (x 87.0 mm).
-HANGER_SLOT_WIDTH_OFFSET_XY = (0.058, 0.137)
+# The block left of the land's dimension line.  On the fe1a7611 render the
+# leader ran from the width's lower arrow tail (x 87.67, y 165.10 mm) to the
+# underline's right end (offset x + 26.0, y 124.11) and passed 0.8 mm from
+# the land line's left arrow tail (x 86.64, y 144.99) at its height (codex
+# review of fe1a7611): 8 mm further left it passes 4.7 mm clear.
+HANGER_SLOT_WIDTH_OFFSET_XY = (0.050, 0.137)
 # The crossbar pockets' length stands outside the plan, so nothing inside
 # the frame reads as part of it: its dimension line at model x -256, 12.2
 # left of the Ø45 barrels, 7.0 left of detail C's fence (r 38 about the
