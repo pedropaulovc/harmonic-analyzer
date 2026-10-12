@@ -7,6 +7,7 @@ import math
 import re
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -381,7 +382,240 @@ _APP = SimpleNamespace(IsSame=lambda a, b: 1 if a is b else 0)
 
 @pytest.fixture
 def bound(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bypass native wrapping for offline logic only, not native-binding proof."""
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+
+
+class _PrecisionAdapter:
+    @staticmethod
+    def _attempt(operation, default=None):
+        try:
+            return operation()
+        except Exception:
+            return default
+
+    def _get_attr_or_call(self, obj, name):
+        member = self._attempt(lambda: getattr(obj, name))
+        return self._attempt(member) if callable(member) else member
+
+
+class _PrecisionDisplay:
+    def __init__(self, primary, name="PivotDia") -> None:
+        self.primary = primary
+        self.dimension = SimpleNamespace(Name=name)
+
+    def GetDimension(self):
+        return self.dimension
+
+    def GetPrimaryPrecision2(self):
+        return self.primary
+
+
+class _PrecisionAnnotation:
+    def __init__(self, display) -> None:
+        self.display = display
+
+    def GetSpecificAnnotation(self):
+        return self.display
+
+
+class _PrecisionExtension:
+    def __init__(self, precision) -> None:
+        self.precision = precision
+        self.calls: list[tuple[int, int]] = []
+
+    def GetUserPreferenceInteger(self, preference: int, option: int):
+        self.calls.append((preference, option))
+        return self.precision
+
+
+def _pivot_precision_case(primary, document_precision=2, name="PivotDia"):
+    """Method-shaped scalar getters model the typelib, not a live COM binding."""
+    display = _PrecisionDisplay(primary, name)
+    annotation = _PrecisionAnnotation(display)
+    extension = _PrecisionExtension(document_precision)
+    model = SimpleNamespace(Extension=extension)
+    return _PrecisionAdapter(), model, annotation, extension
+
+
+@pytest.mark.parametrize("primary", [2, -2], ids=["explicit", "inherited"])
+def test_pivot_precision_matching_two_places_passes(bound: None, primary) -> None:
+    adapter, model, annotation, extension = _pivot_precision_case(primary)
+    drawing._assert_pivot_precision(adapter, model, [annotation])
+    assert extension.calls == ([(24, 204)] if primary == -2 else [])
+
+
+@pytest.mark.parametrize("primary", [3, -2], ids=["explicit", "inherited"])
+def test_pivot_precision_three_places_fails(bound: None, primary) -> None:
+    adapter, model, annotation, extension = _pivot_precision_case(primary, 3)
+    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*effective 3"):
+        drawing._assert_pivot_precision(adapter, model, [annotation])
+    assert extension.calls == ([(24, 204)] if primary == -2 else [])
+
+
+@pytest.mark.parametrize(
+    ("primary", "document_precision", "calls"),
+    [
+        (None, 2, []),
+        (-2, None, [(24, 204)]),
+        (-2, -2, [(24, 204)]),
+    ],
+    ids=["raw-missing", "document-missing", "document-still-sentinel"],
+)
+def test_pivot_precision_missing_readback_fails(
+    bound: None, primary, document_precision, calls
+) -> None:
+    adapter, model, annotation, extension = _pivot_precision_case(
+        primary, document_precision
+    )
+    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+        drawing._assert_pivot_precision(adapter, model, [annotation])
+    assert extension.calls == calls
+
+
+@pytest.mark.parametrize("inherited", [False, True], ids=["raw", "document"])
+@pytest.mark.parametrize(
+    "unreadable",
+    [True, 2.0, "2", Mock(), _PrecisionDisplay(2).GetPrimaryPrecision2],
+    ids=["bool", "float", "string", "mock", "bound-method"],
+)
+def test_pivot_precision_never_coerces_unreadable_values(
+    bound: None, inherited: bool, unreadable
+) -> None:
+    adapter, model, annotation, extension = _pivot_precision_case(
+        -2 if inherited else unreadable, unreadable
+    )
+    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+        drawing._assert_pivot_precision(adapter, model, [annotation])
+    assert extension.calls == ([(24, 204)] if inherited else [])
+
+
+@pytest.mark.parametrize("empty", [True, False], ids=["empty", "other-dimension"])
+def test_pivot_precision_missing_dimension_fails(bound: None, empty: bool) -> None:
+    adapter, model, annotation, extension = _pivot_precision_case(
+        2, name="TopAbovePivot"
+    )
+    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*missing dimension"):
+        drawing._assert_pivot_precision(adapter, model, [] if empty else [annotation])
+    assert extension.calls == []
+
+
+@pytest.mark.parametrize(
+    "stage", ["annotation", "dimension", "primary", "document"]
+)
+def test_pivot_precision_getter_exceptions_fail_closed(
+    bound: None, monkeypatch: pytest.MonkeyPatch, stage: str
+) -> None:
+    adapter, model, annotation, extension = _pivot_precision_case(-2)
+
+    def fail(*_args):
+        raise RuntimeError("native getter failed")
+
+    target, member = {
+        "annotation": (annotation, "GetSpecificAnnotation"),
+        "dimension": (annotation.display, "GetDimension"),
+        "primary": (annotation.display, "GetPrimaryPrecision2"),
+        "document": (extension, "GetUserPreferenceInteger"),
+    }[stage]
+    monkeypatch.setattr(target, member, fail)
+    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+        drawing._assert_pivot_precision(adapter, model, [annotation])
+
+
+@pytest.mark.parametrize("stage", ["display", "dimension", "name", "extension"])
+def test_pivot_precision_unavailable_native_state_fails_closed(
+    bound: None, stage: str
+) -> None:
+    adapter, model, annotation, extension = _pivot_precision_case(-2)
+    if stage == "display":
+        annotation.display = None
+    elif stage == "dimension":
+        annotation.display.dimension = None
+    elif stage == "name":
+        annotation.display.dimension.Name = None
+    else:
+        model.Extension = None
+    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+        drawing._assert_pivot_precision(adapter, model, [annotation])
+    assert extension.calls == []
+
+
+@pytest.mark.parametrize(
+    "interface", ["IAnnotation", "IDisplayDimension", "IModelDoc2", "IModelDocExtension"]
+)
+def test_pivot_precision_binding_failures_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, interface: str
+) -> None:
+    adapter, model, annotation, _extension = _pivot_precision_case(-2)
+
+    def bind(obj, requested):
+        if requested == interface:
+            raise RuntimeError("native binding unavailable")
+        return obj
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*unreadable"):
+        drawing._assert_pivot_precision(adapter, model, [annotation])
+
+
+def test_build_uses_effective_pivot_precision_and_strict_part_precision() -> None:
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    helper = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_assert_pivot_precision"
+    )
+    expected = next(
+        node.value for node in helper.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "expected"
+                for target in node.targets)
+    )
+    metadata = ast.parse("PIVOT_BORE.precision['dia']", mode="eval").body
+    assert ast.dump(expected) == ast.dump(metadata)
+    calls = {
+        name: [
+            node for node in ast.walk(build)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id == name
+        ]
+        for name in (
+            "new_project_drawing", "_assert_pivot_precision", "assert_imported_precision"
+        )
+    }
+    assert all(len(matches) == 1 for matches in calls.values())
+    pivot_call = calls["_assert_pivot_precision"][0]
+    assert [ast.unparse(arg) for arg in pivot_call.args] == [
+        "adapter", "drawing_model", "imported_annotations"
+    ]
+    combined = next(
+        node.value for node in build.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "imported_annotations"
+                for target in node.targets)
+    )
+    assert ast.dump(combined) == ast.dump(
+        ast.parse("[*front_annotations, *right_annotations]", mode="eval").body
+    )
+    strict_call = calls["assert_imported_precision"][0]
+    assert ast.dump(strict_call.args[1]) == ast.dump(pivot_call.args[2])
+    assert isinstance(strict_call.args[2], ast.Dict)
+    assert {
+        ast.literal_eval(key): ast.unparse(value)
+        for key, value in zip(strict_call.args[2].keys, strict_call.args[2].values)
+    } == {
+        "TopAbovePivot": "TOP_EDGE.precision['height_above_pivot']",
+        "HubLength": "HUB_FACES.precision['length']",
+        "StrapThickness": "STRAP_DATUM_B.precision['thickness']",
+    }
+    decimals = next(
+        keyword.value for keyword in calls["new_project_drawing"][0].keywords
+        if keyword.arg == "decimals"
+    )
+    assert ast.dump(decimals) == ast.dump(metadata)
 
 
 def test_datum_a_attached_to_the_bore_passes(bound: None) -> None:

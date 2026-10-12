@@ -44,7 +44,16 @@ the corresponding callout, dimension, FCF or note. The shared API in
 descriptor for registry inspection or explicit drawing-code consumption, not
 automatic print-path wiring. The rocker explicitly reads its Pivot/Strap datum
 and rod FCF tolerance/datum fields and checks four imported native precisions
-against descriptor values. Other return values may remain inspection-only;
+against descriptor values. Its local `PivotDia` guard accepts explicit primary
+precision or resolves `swPrecisionFollowsDocumentSetting` (`-2`) through the
+drawing's `IModelDocExtension.GetUserPreferenceInteger(swDetailingLinearDimPrecision,
+swDetailingDiameterDimension)`. The effective value must match
+`PIVOT_BORE.precision["dia"]`; missing or unreadable values fail closed. Passing
+that metadata as the drawing's units-decimal setting is not proof of its
+document detailing precision: the guard reads that preference back. The other
+three dimensions (`TopAbovePivot`, `HubLength`, `StrapThickness`) retain the
+strict explicit part-owned precision assertion; none of these guards rewrites
+the imported dimension. Other return values may remain inspection-only;
 colocation alone is not a printed-callout drift check.
 `faces` contains the existing geometry selectors;
 `requirements` preserves the ordered acceptance-field names, including explicit

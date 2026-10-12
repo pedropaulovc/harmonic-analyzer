@@ -24,6 +24,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -87,6 +88,7 @@ from ch_rocker_arm_spec import (
     TOP_END_X,
     TOP_END_Y,
 )
+
 
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm"]
@@ -270,6 +272,64 @@ part_metadata(
     },
     datums={"A": ({"feature": "pivot_bore", "surface": "pivot bore cylinder"}, (("draw_ch_rocker_arm", "build"),))},
 )
+
+
+def _assert_pivot_precision(
+    adapter: Any, drawing_model: Any, annotations: list[Any]
+) -> None:
+    """Read PivotDia's effective primary precision without rewriting its import."""
+    expected = PIVOT_BORE.precision["dia"]
+    for annotation in annotations:
+        annotation = adapter._attempt(
+            lambda a=annotation: _early_bound(a, "IAnnotation")
+        )
+        name = adapter._attempt(lambda a=annotation: dimension_name(adapter, a))
+        if type(name) is not str or not name:
+            raise RuntimeError(
+                f"PivotDia precision: expected {expected}; unreadable dimension name"
+            )
+        if name != "PivotDia":
+            continue
+        display = adapter._attempt(
+            lambda a=annotation: _early_bound(
+                a.GetSpecificAnnotation(), "IDisplayDimension"
+            )
+        )
+        primary = adapter._attempt(lambda d=display: d.GetPrimaryPrecision2())
+        if type(primary) is not int:
+            raise RuntimeError(
+                f"PivotDia precision: expected {expected}; "
+                f"unreadable primary precision {primary!r}"
+            )
+        effective = primary
+        # swDimensionPrecisionSettings_e.swPrecisionFollowsDocumentSetting = -2.
+        if primary == -2:
+            extension = adapter._attempt(
+                lambda: _early_bound(
+                    _early_bound(drawing_model, "IModelDoc2").Extension,
+                    "IModelDocExtension",
+                )
+            )
+            # swconst R2026x: swDetailingLinearDimPrecision = 24;
+            # swDetailingDiameterDimension = 204. Units decimals are not this getter.
+            effective = adapter._attempt(
+                lambda: extension.GetUserPreferenceInteger(24, 204)
+            )
+        if type(effective) is not int or effective < 0:
+            raise RuntimeError(
+                f"PivotDia precision: expected {expected}; "
+                f"unreadable effective precision {effective!r} (primary {primary})"
+            )
+        if effective != expected:
+            raise RuntimeError(
+                f"PivotDia precision: expected {expected}; "
+                f"effective {effective} decimal places (primary {primary})"
+            )
+        return
+    raise RuntimeError(
+        f"PivotDia precision: expected {expected}; missing dimension, "
+        "effective precision unreadable"
+    )
 
 
 def _pivot_datum_request(centre: tuple[float, float]) -> tuple[float, float]:
@@ -551,7 +611,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
+        decimals=PIVOT_BORE.precision["dia"],
     )
     stamp_drawing_summary(
         adapter,
@@ -598,8 +659,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    assert_imported_precision(adapter, [*front_annotations, *right_annotations], {
-        "PivotDia": PIVOT_BORE.precision["dia"],
+    imported_annotations = [*front_annotations, *right_annotations]
+    _assert_pivot_precision(adapter, drawing_model, imported_annotations)
+    assert_imported_precision(adapter, imported_annotations, {
         "TopAbovePivot": TOP_EDGE.precision["height_above_pivot"],
         "HubLength": HUB_FACES.precision["length"],
         "StrapThickness": STRAP_DATUM_B.precision["thickness"],
