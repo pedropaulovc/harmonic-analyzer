@@ -501,6 +501,49 @@ def test_same_width_outside_allocation_fault_reduces_air_but_still_clears() -> N
     assert fault >= pin.CROTCH_CLEARANCE_MIN
 
 
+@pytest.mark.parametrize(
+    "required_clearance",
+    (0.0, pin.CROTCH_CLEARANCE_MIN),
+    ids=("physical-nonstrike-bound", "required-clearance"),
+)
+def test_outside_fault_fit_predicate_rejects_a_raised_source_floor(
+    monkeypatch: pytest.MonkeyPatch, required_clearance: float
+) -> None:
+    """Recompute the source-driven sweep on both sides of each real predicate.
+
+    Zero tests the conservative physical nonstrike bound; CROTCH_CLEARANCE_MIN
+    tests the required running air. Losing the former guarantee is not proof
+    of an exact geometric strike: the bound encloses the position discs in a
+    square. The 0.05 mm perturbation is test sensitivity, not a printed band.
+    """
+    top, _bottom = _printed_profile_limits()
+    zone = float(arm_drawing.ARC_PROFILE_ZONE_MM)
+    outside_fault = _profile_normal_limits(zone, zone)
+    fault_clearance = _profile_crotch_clearance(top, outside_fault)
+    assert fault_clearance >= required_clearance
+    excess = fault_clearance - required_clearance
+    sensitivity = 0.05
+    original_floor = rod.FORK_CROTCH_Y
+
+    # Raise the actual source floor, rather than subtracting a shift from the
+    # previously computed result. Both calls must reread slot depth and sweep
+    # all profile/fork corners with the modified geometry.
+    monkeypatch.setattr(rod, "FORK_CROTCH_Y", original_floor + excess - sensitivity)
+    passing_clearance = _profile_crotch_clearance(top, outside_fault)
+    assert passing_clearance == pytest.approx(
+        required_clearance + sensitivity, abs=1e-9
+    )
+    assert passing_clearance >= required_clearance
+
+    monkeypatch.setattr(rod, "FORK_CROTCH_Y", original_floor + excess + sensitivity)
+    with pytest.raises(AssertionError):
+        assert _profile_crotch_clearance(top, outside_fault) >= required_clearance
+    failing_clearance = _profile_crotch_clearance(top, outside_fault)
+    assert failing_clearance == pytest.approx(
+        required_clearance - sensitivity, abs=1e-9
+    )
+
+
 def _arm_bottom_silhouette(
     r_top: float, r_bottom: float, top_above_pivot: float
 ) -> np.ndarray:
