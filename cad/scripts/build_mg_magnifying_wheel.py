@@ -94,7 +94,6 @@ from mg_magnifying_wheel_geom import (
     TIE1_CLOCK_DEG,
     TIE1_R,
     TIE2_CLOCK_DEG,
-    TIE_HOLE_BAND,
     TIE_HOLE_DIA,
     TIE_POSITION_TOL,
     clock_to_local_deg,
@@ -862,12 +861,8 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "GrooveProfile", "GrooveBottomDia", *deviations(GROOVE_BOTTOM_BAND)
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "Tie1Profile", "Tie1HoleDia", *deviations(TIE_HOLE_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "Tie2Profile", "Tie2HoleDia", *deviations(TIE_HOLE_BAND)
-    )
+    # The tie holes are drilled: the title block's DRILLED HOLES row governs
+    # their size.  TIE 1's location keeps its band; its note says why.
     set_dimension_symmetric_tolerance(adapter, "Tie1Profile", "Tie1Y", TIE_POSITION_TOL)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

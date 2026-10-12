@@ -100,8 +100,9 @@ RIM_FILLET_R = 4.0
 CAST_ROUND_R = 0.80
 
 # --- wire ties ---------------------------------------------------------------------
+# Both ties are drilled: the title block's DRILLED HOLES row governs their
+# size (mg_magnifying_wheel_spec takes its plus in every wall).
 TIE_HOLE_DIA = 1.0
-TIE_HOLE_BAND = (0.05, 0.0)
 TIE_POSITION_TOL = 0.05
 # TIE 1 (lever wire): straight axial hole through the Ø25 boss on the drum's
 # wire-centre radius, 6 o'clock from the front at rest.

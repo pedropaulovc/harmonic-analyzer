@@ -79,21 +79,23 @@ def test_tight_bands_sit_on_the_model_dimensions() -> None:
         ("HubProfile", "SpigotLength"): "*deviations(SPIGOT_LEN_BAND)",
         ("GrooveProfile", "GrooveR"): "*deviations(GROOVE_R_BAND)",
         ("GrooveProfile", "GrooveBottomDia"): "*deviations(GROOVE_BOTTOM_BAND)",
-        ("Tie1Profile", "Tie1HoleDia"): "*deviations(TIE_HOLE_BAND)",
-        ("Tie2Profile", "Tie2HoleDia"): "*deviations(TIE_HOLE_BAND)",
         ("Tie1Profile", "Tie1Y"): "TIE_POSITION_TOL",
     }
 
 
 def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     spec = mg_magnifying_wheel_spec
-    assert min(spec.WALLS.values()) >= spec.MIN_WALL == 2.0
-    assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.706, abs=1e-3)
-    assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.088, abs=1e-3)
+    # TIE 1's boss wall sits on the 2.0 target with the ties drilled to the
+    # title block's +0.10/0.
+    assert min(spec.WALLS.values()) >= spec.MIN_WALL - 1e-9
+    assert spec.MIN_WALL == 2.0
+    assert spec.WALLS["tie1_to_hub_od"] == pytest.approx(2.0, abs=1e-9)
+    assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.681, abs=1e-3)
+    assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.063, abs=1e-3)
     # TIE 2 breaks into the bore at mid-width: its ligament ends at the
     # rim-bore rounds, R0.8 MAX (no model band), on a rim 8.0 wide at .X
     # (7.2 at least).
-    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.225, abs=1e-3)
+    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.200, abs=1e-3)
     assert geom.CAST_ROUND_R == 0.80
     assert not hasattr(geom, "CAST_ROUND_BAND")
     assert spec.DRAWING_REFERENCE_PRECISION == {

@@ -20,7 +20,7 @@ import itertools
 import math
 
 from _gtol_cylinder import CylinderFace
-from _printed_tolerance import angular_band_deg, printed_band_mm
+from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 import mg_lever_wire_geom as _lever
 from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
@@ -49,7 +49,6 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     TIE1_CLOCK_DEG,
     TIE1_R,
     TIE2_CLOCK_DEG,
-    TIE_HOLE_BAND,
     TIE_HOLE_DIA,
     TIE_POSITION_TOL,
     clock_to_local_deg,
@@ -120,11 +119,15 @@ ROUND_TEXT_SUFFIX = " MAX"
 # clocking is a 0 deg relation no dimension can show: the seed spoke lies on
 # local +X, so two spokes lie on the face view's horizontal centerline, the
 # one TIE 2's angle is measured from, and TIE 1 on the vertical one falls
-# midway between two (both asserted below).
+# midway between two (both asserted below).  TIE 1's 9.85 keeps a tight
+# band for the boss wall (TIE1_HUB_WALL); the need rides TIE 1's note, as
+# no callout line fits between that dimension's extension lines 9.85 apart.
+MIN_WALL = 2.0  # drawing-simplicity rule 12 target
 DRAWING_NOTES = "\n".join(
     (
         f"{SPOKE_COUNT} TAPERED SPOKES EQUALLY SPACED, TWO ON THE HORIZONTAL CENTERLINE.",
-        "TIE 1: LEVER-WIRE TIE HOLE THROUGH THE BOSS.",
+        f"TIE 1: LEVER-WIRE TIE HOLE THRU BOSS; {TIE1_R:.2f} BAND HOLDS "
+        f"{MIN_WALL:.1f} BOSS WALL.",
         "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
     )
 )
@@ -138,7 +141,6 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 # --- walls and the groove seat at the worst PRINTED band (rule 12) -----------------
-MIN_WALL = 2.0  # drawing-simplicity rule 12 target
 _PLACES = {
     name: places
     for names in DRAWING_PRECISION.values()
@@ -164,12 +166,15 @@ _RIM_AXIAL_MIN = RIM_AXIAL - printed_band_mm(
 # R0.8 MAX: the R's single limit is its nominal.
 _CAST_ROUND_MAX = CAST_ROUND_R
 _HUB_DIA = (HUB_DIA + HUB_DIA_BAND[1], HUB_DIA + HUB_DIA_BAND[0])
-_TIE_R_MAX = (TIE_HOLE_DIA + TIE_HOLE_BAND[0]) / 2.0 + TIE_POSITION_TOL
+# The ties are drilled to the title block's DRILLED HOLES row (+0.10/0).
+_TIE_R_MAX = (TIE_HOLE_DIA + drilled_oversize_mm()) / 2.0 + TIE_POSITION_TOL
 _SPOKE_PITCH = 360.0 / SPOKE_COUNT
 if clock_to_local_deg(0.0) % _SPOKE_PITCH or TIE1_CLOCK_DEG % 180.0 != 90.0:
     raise AssertionError("the spokes no longer lie on the horizontal centerline")
 
-# TIE 1 to the boss OD (12.45 - 9.85 - 0.575 = 2.025).
+# TIE 1 to the boss OD (12.45 - 9.85 - 0.60 = 2.00, on the target).  At the
+# title block's .XX (+/-0.51) the wall would be 1.54 and at .X (+/-0.8)
+# 1.25, so TIE 1's 9.85 keeps its +/-0.05 (its need is in the notes).
 TIE1_HUB_WALL = _HUB_DIA[0] / 2.0 - TIE1_R - _TIE_R_MAX
 # TIE 1 to the nearest hub-fillet foot: the hole sits midway between two
 # spokes, at +30 deg from the seed (+X) spoke in its frame.
@@ -215,7 +220,7 @@ TIE2_SPOKE_WALL = (
 )
 # TIE 2 to the rim's side faces: it breaks into the bore at mid-width, where
 # the faces end at the rim-bore rounds' tangent line (R0.8 MAX: 3.6 - 0.8 -
-# 0.575 = 2.225).
+# 0.60 = 2.20).
 TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - _CAST_ROUND_MAX - _TIE_R_MAX
 # Spigot to bore at the smallest finished spigot and the largest finished
 # bore, and the groove floor to the rim ID.
@@ -223,16 +228,16 @@ SPIGOT_WALL = (SPIGOT_DIA_MIN - WHEEL_BORE_MAX) / 2.0
 GROOVE_FLOOR_WALL = (GROOVE_BOTTOM_DIA + GROOVE_BOTTOM_BAND[1] - _RIM_ID[1]) / 2.0
 
 WALLS = {
-    "tie1_to_hub_od": TIE1_HUB_WALL,  # 2.025
-    "tie1_to_hub_fillet": TIE1_FILLET_WALL,  # 2.088
-    "tie1_to_bore": TIE1_BORE_WALL,  # 6.865
-    "tie2_to_rim_fillet": TIE2_SPOKE_WALL,  # 2.706
-    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.225
+    "tie1_to_hub_od": TIE1_HUB_WALL,  # 2.000
+    "tie1_to_hub_fillet": TIE1_FILLET_WALL,  # 2.063
+    "tie1_to_bore": TIE1_BORE_WALL,  # 6.840
+    "tie2_to_rim_fillet": TIE2_SPOKE_WALL,  # 2.681
+    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.200
     "spigot_to_bore": SPIGOT_WALL,  # 4.592
     "groove_floor": GROOVE_FLOOR_WALL,  # 4.350
 }
 for _name, _wall in WALLS.items():
-    if _wall < MIN_WALL:
+    if _wall < MIN_WALL - 1e-9:
         raise AssertionError(f"wheel wall {_name} {_wall:.3f} < {MIN_WALL}")
 
 # The web and rim locate off the spigot face at .X (HubFrontZ).  Moved the
