@@ -112,6 +112,9 @@ CLAMP_SECTION_CENTER = (0.340, 0.165)
 CLAMP_SECTION_SCALE = (4.0, 1.0)
 CLAMP_SECTION_LABEL = "A"
 STOP_POSITION_TEXT_Y = 0.220
+# Fraction of the setting span from the stick end: left of centre, so the
+# callout clears the section-A label standing over the block's near face.
+STOP_POSITION_TEXT_FRACTION = 0.42
 OVERALL_LENGTH_TEXT_Y = 0.237
 SETUP_NOTE_XY = (0.030, 0.160)
 SETUP_NOTE_WIDTH = 52  # characters; default-format note text
@@ -643,7 +646,11 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
         "stop position": (
             stick_start,
             stop_face,
-            ((stick_start[0] + stop_face[0]) / 2.0, STOP_POSITION_TEXT_Y),
+            (
+                stick_start[0]
+                + STOP_POSITION_TEXT_FRACTION * (stop_face[0] - stick_start[0]),
+                STOP_POSITION_TEXT_Y,
+            ),
         ),
     }
     authored = []

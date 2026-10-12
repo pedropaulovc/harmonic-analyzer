@@ -431,8 +431,8 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     else:
         # The native pilot's construction circle is at X=3.5, the same
         # right-sheet hole selected for the opened clearance callout.
-        assert callout_positions["two cover clearance holes"] == (0.265, 0.155)
-        assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.265, 0.190)
+        assert callout_positions["two cover clearance holes"] == (0.265, 0.150)
+        assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.265, 0.182)
         assert callout_positions["two cover clearance holes"][0] > front_map.apply(
             (0.0, center[1], center[2])
         )[0]
@@ -714,7 +714,7 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     assert _config.parts("ms-stop-plate")["number"] in block_drawing.COVER_HOLE_PROCESS
     assert "BOTTOMING TAP" not in block_drawing.COVER_HOLE_PROCESS
     assert f"MATCH-DRILL FROM {spec.MATCH_DRILL_MASTER}" in block_drawing.COVER_HOLE_PROCESS
-    assert spec.MATCH_DRILL_DATUM_ALIGNMENT in block_drawing.COVER_HOLE_PROCESS
+    assert spec.MATCH_DRILL_DATUM_ALIGNMENT in block_drawing.COVER_HOLE_PROCESS.replace("\n", " ")
     pilot = plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]
     assert "MS-STOP-BLOCK" in pilot
     assert _config.parts("ms-stop-block")["number"] in pilot

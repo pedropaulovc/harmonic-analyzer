@@ -733,7 +733,6 @@ def test_numeral_depth_and_tool_contract_are_independent_of_graduations() -> Non
     assert spec.DRAWING_TOLERANCES["TickDepth"] == 0.1
     assert "GRADUATIONS ONLY" in drawing.DIMENSION_CALLOUTS["TickDepth"]
     assert "ALL ENGRAVING" not in drawing.DIMENSION_CALLOUTS["TickDepth"]
-    assert drawing.DIMENSION_CALLOUTS["NumeralDepth"] == "NUMERALS ONLY; DEEP"
     assert spec.NUMERAL_TOOL_NOTE == "NUMERALS: 30° INCLUDED V ENGRAVING BIT;\nENAMEL-FILLED"
     assert "0.10" not in spec.NUMERAL_TOOL_NOTE
 

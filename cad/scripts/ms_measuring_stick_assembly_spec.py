@@ -17,6 +17,8 @@ assembly-frame image of the part's local axis ``i``. No SolidWorks imports.
 
 from __future__ import annotations
 
+import textwrap
+
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
@@ -183,7 +185,13 @@ CLAMPED_SETUP_NOTE = (
 
 # Overall is pure reference; the near-face value is assembly acceptance only.
 REFERENCE_OVERALL_LENGTH = STICK_X_MAX - STICK_X_MIN
-STOP_POSITION_CALLOUT = SETTING_CRITERION + "\n" + SETTING_REFERENCE_DESCRIPTION
+# The dimension itself states the near-face criterion and the setup note
+# repeats it in words; the callout carries only the graduation reference,
+# wrapped narrow enough to sit between the dimension's extension lines.
+STOP_POSITION_CALLOUT_WIDTH = 21  # characters
+STOP_POSITION_CALLOUT = "\n".join(
+    textwrap.wrap(SETTING_REFERENCE_DESCRIPTION, width=STOP_POSITION_CALLOUT_WIDTH)
+)
 DRAWING_REFERENCE_PRECISION = 1
 
 assert STICK_SIDE_CLEARANCE > 0.0, STICK_SIDE_CLEARANCE

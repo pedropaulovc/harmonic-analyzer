@@ -74,7 +74,9 @@ FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 COVER_HOLE_PROCESS = (
     f"2X MATCH-DRILL FROM {part.MATCH_DRILL_MASTER}\n"
     f"{_config.parts('ms-stop-plate')['number']}; CLAMP WITH\n"
-    f"{part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
+    # Two short lines: one 55-character line ran through the left border.
+    + part.MATCH_DRILL_DATUM_ALIGNMENT.replace(" AND ", " AND\n")
+    + "\n"
 )
 
 

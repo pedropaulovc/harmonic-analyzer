@@ -344,7 +344,6 @@ def test_fitter_package_covers_rule_9() -> None:
         assert spec.SETTING_CRITERION in instruction
         assert "NEAR BLOCK FACE" in instruction
         assert "FROM LEFT STICK END" in instruction
-    assert spec.SETTING_CRITERION in spec.STOP_POSITION_CALLOUT
     assert drawing.EXPLODED_CAPTION == spec.EXPLODED_CAPTION == (
         "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
     )
@@ -719,14 +718,15 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     )
     assert changed.SETTING_TOLERANCE_MM == tolerance
     for text in (
-        changed.STOP_POSITION_CALLOUT,
         changed.CLAMPED_SETUP_NOTE,
         changed.ASSEMBLY_STEPS[-1],
     ):
         assert changed.SETTING_CRITERION in text
         assert f"{changed.SETTING_NEAR_FACE_MM:.1f} ±{tolerance:.2f} mm" in text
         assert "FROM LEFT STICK END" in text
-    assert f"{mark:.1f} GRADUATION ON THUMBSCREW AXIS (REF)" in changed.STOP_POSITION_CALLOUT
+    assert changed.STOP_POSITION_CALLOUT.replace("\n", " ") == (
+        f"{mark:.1f} GRADUATION ON THUMBSCREW AXIS (REF)"
+    )
     assert "PLATE IS MASTER" in changed.ASSEMBLY_STEPS[0]
     assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[0]
     pilot = changed.ASSEMBLY_STEPS[0]
@@ -760,7 +760,20 @@ def _assert_fitter_text_spacing(fitter) -> None:
         > drawing.CHECKS_XY[1] + line_pitch
     )
     assert drawing.SETUP_NOTE_XY[1] - len(setup.splitlines()) * line_pitch > 0.090
-    # The four-line callout stays above the front silhouette; the overall
+    # The stacked callout fits between the setting's extension lines and
+    # ends left of the section-A label (r7 sheet: a 49-character criterion
+    # line crossed both). Default note glyphs measure ~2.5 mm wide.
+    char_width = 0.0026
+    section_label_clearance = 0.009  # label's left edge to the near block face
+    span = fitter.SETTING_NEAR_FACE_MM / 1000.0
+    half_width = (
+        max(len(line) for line in fitter.STOP_POSITION_CALLOUT.splitlines())
+        * char_width / 2.0
+    )
+    centre = drawing.STOP_POSITION_TEXT_FRACTION * span
+    assert centre - half_width > 0.0
+    assert centre + half_width < span - section_label_clearance
+    # The stacked callout stays above the front silhouette; the overall
     # reference remains above it and below the top view.
     assert (
         drawing.STOP_POSITION_TEXT_Y

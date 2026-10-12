@@ -114,7 +114,7 @@ DIMENSION_CALLOUTS = {
     "NumeralHeight": "NUMERAL HEIGHT",
     "NumeralXGap": "NUMERAL TO TICK EDGE",
     "NumeralYGap": "NUMERAL TO FULL-TICK END",
-    "NumeralDepth": "NUMERALS ONLY; DEEP",
+    "NumeralDepth": "NUMERAL DEPTH",
 }
 
 

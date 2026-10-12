@@ -41,7 +41,8 @@ OUTPUTS = DrawingOutputs(slddrw=SPEC.outputs["slddrw"], pdf=SPEC.outputs["pdf"],
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 FRONT_CENTER = (0.175, 0.170)
-RIGHT_CENTER = (0.310, FRONT_CENTER[1])
+# Far enough right that the four-line pilot callout ends clear of this view.
+RIGHT_CENTER = (0.345, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.090)
 FRONT_KEEP = {
     "PlateLength": (0.175, 0.235), "PlateHeight": (0.105, 0.170),
@@ -49,9 +50,10 @@ FRONT_KEEP = {
     "PlateLeftFromEnd": (0.175, 0.115),
     "PlateRightFromEnd": (0.175, 0.095),
     "PlateFromHeadFace": (0.115, 0.148),
-    "PilotDrillDiameter": (0.265, 0.190),
+    # Below the chamfer-size witness line, above the clearance callout.
+    "PilotDrillDiameter": (0.265, 0.182),
 }
-RIGHT_KEEP = {"PlateThickness": (0.310, 0.225)}
+RIGHT_KEEP = {"PlateThickness": (RIGHT_CENTER[0], 0.225)}
 DIMENSION_CALLOUTS = {
     "PilotDrillDiameter": (
         "LAYOUT ON THIS PLATE; PILOT\n"
@@ -138,7 +140,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # imported pilot. Two adjacent native callouts avoid an unverified note
     # dimension-link format while keeping both 2X quantities and sizes live.
     # Both leaders stay right of the overall-height and hole-location lanes.
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.265, 0.155),
+    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.265, 0.150),
                            label="two cover clearance holes", process="THEN OPEN")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")
