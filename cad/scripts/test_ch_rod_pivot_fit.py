@@ -98,8 +98,11 @@ def test_worst_case_joint_budget() -> None:
     assert b["tine_bearing_land_min"] == b["tine_min"]
     assert b["tine_bearing_land_min"] >= pin.RULE12_WALL_FLOOR
     assert b["crown_wall_min"] >= pin.RULE12_WALL_TARGET
-    # This crotch value retains the spec's legacy radius-band envelope.
-    assert b["crotch_clearance_min"] == pytest.approx(1.2029, abs=1e-4)
+    # Base 2ff1897d5: 1.2097559454 mm with RELATIVE_SWING_DEG=(-8.61, 1.01).
+    # Main's raised-drive-axis closure changes ch_rod_pivot_pin_spec's swing
+    # to (-8.67, 1.07): -0.0068964928 mm. This PR changes no legacy radius
+    # budget input (delta 0); the independent profile-zone proof is below.
+    assert b["crotch_clearance_min"] == pytest.approx(1.2028594525413179, abs=1e-9)
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
     assert b["bridge_min"] == pytest.approx(2.234, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET
