@@ -15,13 +15,15 @@ west-rail fulcrum-keeper taps.
 
 from __future__ import annotations
 
+from math import sqrt
+
 import _config
 import vn_knife_hanger_stud_spec as HANGER_SCREW
 import vn_knife_mount_dowel_spec as KNIFE_DOWEL
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _hole_spec import CLEARANCE_MM, HoleSpec
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
 from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
@@ -49,6 +51,31 @@ BORE_DIA = COLUMN_SOCKET_DIAMETER
 CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
 GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
+
+# --- Gooseneck set-screw boss (east-rail hub) ---------------------------------
+#
+# User ruling 2026-10-12 (option (a), no jam nut): the MHA-VN-023 square-head
+# cup-point set screw that pinches the O16 post enters the hub through a cast
+# boss on the hub pad's outer face -- square-sided and blended into the rail
+# under the top flange, as the ch19 img04 hub shows it -- spot-faced square
+# to the tap. The spot face starts the thread square on a machined face (the
+# head stands proud of it: the cup point bites the post first); it prints .X
+# from the bore axis the screw pinches across.
+HUB_SET_SPOT_FROM_AXIS = 21.0  # .X
+HUB_SET_SPOT_PLACES = 1
+HUB_SET_BOSS_FROM_AXIS = 22.0  # cast face: 1.0 stock over the spot face
+HUB_SET_SPOT_DIA = 12.0  # clears the 1/4 square head's 8.98 diagonal
+HUB_SET_BOSS_W = 18.0  # along the rail, centred on the tap: spot + 2 x (C2 + 1.0)
+SET_SCREW_THREAD = "1/4-20"
+SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_THREAD]  # 6.350
+SET_SCREW_PITCH = 25.4 / 20.0
+SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # rule 12: >= 1.5D of full thread
+
+
+def _sag(radius: float) -> float:
+    """A circle's sag across the set screw's major diameter."""
+    return radius - sqrt(radius**2 - (SET_SCREW_MAJOR_DIA / 2.0) ** 2)
+
 
 
 # --- Knife-hanger screw counterbores and dowel slip holes (crossbar) ---------
@@ -180,13 +207,41 @@ HANGER_PIN_DEPTH_CALLOUT = "4X"
 HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT\nREAMED WIDTH\nSLIP FIT MHA-VN-051"
 HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
 
+# Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
+# terms): the thread is full only where its major circle lies wholly in metal,
+# so the bore's sag across the hole is lost, and so is the one-pitch entry
+# chamfer; the flat spot face loses none. The spot face sits at the near end
+# of its .X band, the bore at the larger of its printed .XX band and the title
+# block's drilled row.
+_GOOSENECK_BORE_RADIUS_MAX = (GOOSENECK_BORE_DIA + max(_XX, DRILL_OVERSIZE)) / 2.0
+SET_SCREW_THREAD_TERMS = {
+    "spot face from bore axis at its minimum": HUB_SET_SPOT_FROM_AXIS - _X,
+    "bore radius at its maximum": -_GOOSENECK_BORE_RADIUS_MAX,
+    "bore sag across the thread": -_sag(_GOOSENECK_BORE_RADIUS_MAX),
+    "one-pitch entry chamfer": -SET_SCREW_PITCH,
+}
+SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_THREAD_TERMS.values())  # 9.58
+SET_SCREW_FULL_THREAD_NOMINAL = (
+    HUB_SET_SPOT_FROM_AXIS
+    - GOOSENECK_BORE_DIA / 2.0
+    - _sag(GOOSENECK_BORE_DIA / 2.0)
+    - SET_SCREW_PITCH
+)  # 10.61
+SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.51D
+if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
+    raise AssertionError(
+        f"hub set screw keeps {SET_SCREW_ENGAGEMENT_D:.2f}D of full thread "
+        f"at the printed worst case (< {SET_SCREW_MIN_ENGAGEMENT_D}D)"
+    )
+
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# These nine faces own native finish controls. The right (west) rail top
-# between its bosses, which seats both MHA-CH-007 keepers, carries SEAT_UM in
-# the linked facing note below: the whole strip is one face, so the note
-# names its extent instead of a split-line region. The locating-seat finish
+# These ten faces own native finish controls. The right (west) rail top
+# between its bosses, which seats both MHA-CH-007 keepers, and the underside
+# plane between the bosses, which seats both MHA-SM-002 knife mounts, carry
+# SEAT_UM in the linked facing notes below: each is one plane, so its note
+# names the extent instead of a split-line region. The locating-seat finish
 # is not a general grade.
 #
 # * The four tube-socket bores take the MHA-FR-003 columns on a match-fitted close
@@ -196,10 +251,12 @@ HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
 #   not cosmetic.
 # * The gooseneck bore guides the O16 counter-spring post through the hub and
 #   is pinched by the set screw against it.
+# * The set-screw boss's spot face is the machined face the set tap starts
+#   square from, so the cup point bears on the post along the tap axis.
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
 # commercial machine finish is what the fit needs. The part authors one native
-# symbol per one of these nine controlled faces; each sheet states it ONCE, and the
+# symbol per one of these ten controlled faces; each sheet states it ONCE, and the
 # target text names the family so a single symbol cannot be misread as one
 # instance (harmonic-base FLANGE_PERIMETER_TARGET precedent).
 SOCKET_BORE_TARGET = "TUBE SOCKET BORES, 4X"
@@ -233,6 +290,11 @@ SURFACE_FINISHES = tuple(
         SEAT_UM,
         CylinderFace(GOOSENECK_BORE_DIA, contains_x_mm=GOOSENECK_X),
     ),
+    SurfaceFinishControl(
+        "hub_set_spot_face",
+        SEAT_UM,
+        PlanarFace((-1.0, 0.0, 0.0), HUB_SET_SPOT_FROM_AXIS - GOOSENECK_X),
+    ),
 )
 
 
@@ -264,7 +326,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HubBossProfile": {"HubDia"},
     "HubBoss": {"HubBossExtent"},
     "RibProfile": {"RibWidth"},
-    "SetPocketProfile": {"PocketRun", "PocketRise"},
+    "SetBossProfile": {"SetBossWidth"},
+    "SetSpotProfile": {"SetSpotDia"},
     "GooseneckTap": {"SetTapZ"},
     "GooseneckProfile": {"GnDia", "GnX", "GnZ"},
     # The hanger-counterbore and keeper-tap placement dims (StudFrontX ...,
@@ -309,7 +372,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {"GussetRunE": 1},
     "HubBossProfile": {"HubDia": 1},
     "RibProfile": {"RibWidth": 1},
-    "SetPocketProfile": {"PocketRise": 1},
+    "SetBossProfile": {"SetBossWidth": 1},
+    "SetSpotProfile": {"SetSpotDia": 1},
     "GooseneckProfile": {"GnDia": 2},
     "CapRecessProfile": {"CapRecessDia": 2},
     "CapRecesses": {"CapRecessDepth": 2},
@@ -390,14 +454,16 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "opposed counterbore floor separation": 1,
     "cross screw axis from boss top": 1,
     "counterbore floor from socket axis": 1,
-    # Sheet 4, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
-    # cropped set-pocket section D-D.
+    # Sheet 5, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
+    # cropped set-screw boss section D-D (spot face, boss face, thread run).
     "hub from left front socket": 1,
     "set screw axis from rail top": 1,
     "hub boss underside drop": 1,
     "hub gusset feather span": 1,
     "hub gusset ramp angle": 1,
-    "set-pocket depth from outer rail face": 1,
+    "set-screw spot face from bore axis": HUB_SET_SPOT_PLACES,
+    "set-screw thread length": 1,
+    "set-screw boss face from bore axis": 1,
     # Sheet 6, UNDERSIDE: the junction lands and the knife-hanger section F-F
     # -- the counterbore floor (the screw's grip) above the crossbar underside,
     # the dowel slip hole's station from the screw axis, the slot's BASIC
@@ -431,10 +497,10 @@ KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 # proved without a chamfer).  The edges too short, too close to a feature or
 # under a knife seat for C2 (build_fr_top_frame._external_edge_breaks) are
 # the "UNLESS NOTED": section E-E's note names the crossbar flange underside,
-# the hub side view's note the hub rib bottoms, V-gussets and set-screw
-# pocket rim, the underside locator's the bar and gusset bottoms at the knife
-# seats; they keep the title block break.  Rule 6 caps this block at four
-# lines of at most 70 characters.
+# the hub side view's note the hub rib bottoms and V-gussets, the underside
+# locator's the bar and gusset bottoms at the knife seats; they keep the
+# title block break.  Rule 6 caps this block at four lines of at most 70
+# characters.
 DRAWING_NOTES = (
     "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-FR-003 TUBE.\n"
     "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
@@ -443,13 +509,28 @@ DRAWING_NOTES = (
 )
 # User ruling 2026-10-11: the whole right (west) rail top between the two
 # corner bosses is faced, so both keeper feet land on one flat face wherever
-# fit-up puts them; no split-line regions, no underside facing.  Its own
-# property, placed beside the keeper callout on HOLES-SOCKETS.  The last row
-# states why the flatness is held: the two keepers' lug bores carry one
-# fulcrum shaft in a running fit (blind machinist review, farm 0fbfc4d75).
+# fit-up puts them; no split-line regions.  Its own property, placed beside
+# the keeper callout on HOLES-SOCKETS.  The last row states why the flatness
+# is held: the two keepers' lug bores carry one fulcrum shaft in a running fit
+# (blind machinist review, farm 0fbfc4d75).
 DRAWING_NOTES_B = (
     "RIGHT RAIL TOP BETWEEN BOSSES\n"
     "(MHA-CH-007 KEEPER SEATS):\n"
     f"FLAT WITHIN {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f}, Ra {SEAT_UM:.1f} UM,\n"
     "SO BOTH KEEPER BORES ALIGN."
+)
+# User ruling 2026-10-12 (reading (i)): every face on the 999.7 underside
+# plane between the bosses is faced at the seat finish -- the rail web
+# bottoms, the junction lands and plan gussets, and the crossbar's full-depth
+# ends that seat both MHA-SM-002 knife mounts.  The 4X corner-boss bottoms
+# (6.3 below the plane) and the hub boss and its V-gussets (8.0 below) stay
+# off it.  No flatness zone (both knife seats lie on the one faced plane; no
+# stack spends a form budget on it) and no geometry change: the model's
+# underside is the finished plane.  Its own property, on the UNDERSIDE sheet
+# beside the enlarged detail of the hub boss and gussets it excludes.
+DRAWING_NOTES_C = (
+    "UNDERSIDE PLANE BETWEEN BOSSES\n"
+    "(MHA-SM-002 KNIFE-MOUNT SEATS):\n"
+    f"Ra {SEAT_UM:.1f} UM; BOSS BOTTOMS AND\n"
+    "HUB GUSSETS EXCLUDED."
 )

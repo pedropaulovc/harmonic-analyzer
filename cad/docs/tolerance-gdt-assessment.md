@@ -216,7 +216,7 @@ means, so it is called out per row.
 
 | Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
-| **Flatness** | knife-mount seat face; pedestal + base mating faces; top-frame integral-crossbar underside (stud seat; the former top-crossbar is merged into the top-frame casting) | ≤0.02–0.05 mm | surface-grind or single-setup face; dial-indicator sweep on 3 jacks, or CMM |
+| **Flatness** | knife-mount seat face; pedestal + base mating faces | ≤0.02–0.05 mm | surface-grind or single-setup face; dial-indicator sweep on 3 jacks, or CMM |
 | **Straightness** (axis, Ø zone) | `ch-pivot-shaft`, `ch-fulcrum-shaft`, `dt-cone-gear-shaft` tip, `dt-crank-pin` axes | ≤0.02–0.05 mm over length | between-centres turn + steady; indicate on Vee-blocks. Rule #1 (below) already bounds it at MMC |
 | **Circularity / Cylindricity** | gear + cam blanks, running journals, bearing bores | folds into runout, below | 4-jaw indicate true; rotate-and-probe, polar plot |
 
@@ -225,7 +225,7 @@ means, so it is called out per row.
 | Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
 | **Perpendicularity** | pivot-bore axis ⟂ mount face (`ch-rocker-arm`, `sm-summing-lever`, `sm-knife-mount`, pedestals); **knife edge ⟂ motion plane** | ≤0.02–0.05 mm | bore the hole **in the setup that faces the mount**; indicate off a square |
-| **Parallelism** | the two `sm-knife-mount` seats coplanar / equal-height; amplitude-bar slide face to base | parallel, ≤0.05 mm | shim to a common height at assembly; indicate |
+| **Parallelism** | amplitude-bar slide face to base (the two `sm-knife-mount` seats need none: both clamp to the one `fr-top-frame` underside plane, faced Ra 3.2 by note with no form frame, user ruling 2026-10-12) | parallel, ≤0.05 mm | indicate |
 | **Angularity** | *available* for the oblique cone↔cylinder mesh seat, but that mesh is adjustable / loose (§2) — **not required** | — | sine bar, if ever toleranced |
 
 **Location** (feature-of-size position from a datum reference frame)
@@ -452,7 +452,7 @@ geometric:            # keyed by GD&T characteristic (§5.2); each = tolerance z
   flatness:         { tol_mm: 0.05, applies_to: "knife-mount seat, pedestal/base mating faces", how: "single-setup face/grind; indicate on 3 jacks or CMM" }
   straightness:     { tol_mm: 0.05, applies_to: "pivot/fulcrum/cone-gear-shaft + crank-pin axes", how: "between-centres + steady; Rule #1 already bounds it at MMC" }
   perpendicularity: { tol_mm: 0.05, applies_to: "pivot-bore axis to mount face; knife edge to motion plane", how: "bore in the setup that faces the mount" }
-  parallelism:      { tol_mm: 0.05, applies_to: "the two knife-mount seats; amplitude-bar slide", how: "shim coplanar/equal-height at assembly" }
+  parallelism:      { tol_mm: 0.05, applies_to: "amplitude-bar slide", how: "indicate" }
   position:         { tol_mm: 0.15, modifier: MMC, applies_to: "support foot holes, 20 spring holes @7.0565, channel bores, bolt patterns", how: "drill from a common jig; basic dims locate the true position" }
   profile_surface:  { tol_mm: 0.1, applies_to: "rocker R800 concave form, cam eccentric profile, gear-tooth flanks", how: "form-cut/CNC; CMM scan vs the nominal curve" }
   runout:           { tir_mm: [0.025, 0.05], types: [circular, total], applies_to: "gear bore->pitch, cam->bore, journals, wheel", how: "mandrel / bore-and-cut one setup; dial gauge" }

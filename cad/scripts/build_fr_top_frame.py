@@ -25,7 +25,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   stays fixed; the B-B top flange thickness (TYP, .X, minimum 7.2) is the
   finished flange under it.
 * Integral crossbar 22 wide at x -26..-4 spanning the window along Z,
-  flush with BOTH faces at its junctions (the underside 999.7 is the
+  flush with BOTH faces at its junctions (the faced underside 999.7 is the
   knife-mount seat plane), with 18 x 18 plan gussets at all four rail
   junctions and, at z 3.088 -/+ 87.06, a #6 SHCS counterbore + dowel slip
   hole per knife mount: the MHA-VN-024 screw drops through the counterbore
@@ -34,11 +34,24 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   knife-mount seats) the bar is a T like the rails: the 22-wide, 8-tall
   top flange over a 13.0 web centred on the knife line through the
   underside, with R3 roots.
+* Every face on the underside plane 999.7 between the bosses -- rail web
+  bottoms, junction lands, plan gussets and the crossbar's full-depth ends
+  under both knife mounts -- is faced at the Ra 3.2 seat finish (user
+  ruling 2026-10-12, one linked manufacturing note); the corner-boss
+  bottoms 6.3 below it and the hub boss and V-gussets 8.0 below stay off
+  it. 999.7 is the FINISHED plane: the cut comes out of casting allowance,
+  so the model, its bands and every stack read from it unchanged. It is
+  faced before the counterbores and dowel holes are cut: their depths are
+  judged from it, and a later cut would shorten the 30.0 grip and the 12.0
+  slip depth one for one against the 0.01 #6 tip clearance and the 0.596
+  dowel slip margin.
 * Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 28 wide,
   O17 clearance bore for the O16 counter-spring post, underside boss
-  O30 x 8 with twin V-gussets (ch30 p004), a 16 x 16 x 2 cast pocket and
-  a 1/4-20 tap through the rib to the bore for the square-head set screw
-  (book p.45: "a square-head screw pinches the post in its socket").
+  O30 x 8 with twin V-gussets (ch30 p004), a square-sided cast boss under
+  the top flange on the rib's outer face (ch19 img04; user ruling
+  2026-10-12), spot-faced 21.0 from the bore axis, and a 1/4-20 tap from
+  the spot face to the bore for the square-head set screw (book p.45: "a
+  square-head screw pinches the post in its socket").
 * Webbed faces (T-rail section): an 8-tall full-thickness top flange, then
   the web thins to 13.0 centred on each rail and STAYS thin through the
   bottom edge. The former photo-read 12.7 web is thickened for the keeper
@@ -61,11 +74,11 @@ Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
 (x, y) -> (X, -Z) handedness; sketches on Right-plane offsets map
 (x, y) -> (Z, Y) (build_fr_rocker_arm_support precedent; NEGATIVE-offset
-planes mirror sketch x -- see the gusset/pocket sites). Build order
+planes mirror sketch x -- see the gusset/boss sites). Build order
 (ADDITIVE T-section -- the web/flange rings are extruded, not pocketed):
 web ring -> crossbar junction lands -> top-flange ring -> hub rib
 restore -> crossbar+gussets -> crossbar T pockets -> corner bosses
-(up/down pair) -> hub boss + V-gussets -> set-screw pocket ->
+(up/down pair) -> hub boss + V-gussets -> set-screw boss + spot face ->
 counterbores -> column bores -> gooseneck bore -> wizard holes (#6 SHCS
 hanger counterbores) -> dowel slip holes -> wizard holes (side-screw
 taps, set-screw tap, keeper taps) -> internal T-root fillets (R3) ->
@@ -139,6 +152,7 @@ from fr_top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_NOTES_B,
+    DRAWING_NOTES_C,
     DRAWING_PRECISION,
     DRILL_OVERSIZE,
     DRAWING_REFERENCE_PRECISION,
@@ -147,6 +161,10 @@ from fr_top_frame_spec import (
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
     HALF_H,
+    HUB_SET_BOSS_FROM_AXIS,
+    HUB_SET_BOSS_W,
+    HUB_SET_SPOT_DIA,
+    HUB_SET_SPOT_FROM_AXIS,
     HANGER_CBORE_DEPTH,
     HANGER_CBORE_DIA,
     HANGER_CLEARANCE_DIA,
@@ -170,6 +188,7 @@ from fr_top_frame_spec import (
     PRINTED_LINEAR_BAND_MM,
     HANGER_PIN_SLIP_CLEARANCE_MAX,
     REAR_COLUMN_Z,
+    SET_SCREW_THREAD,
     RING_HEIGHT,
     SURFACE_FINISHES,
 )
@@ -352,10 +371,12 @@ HUB_BOSS_DROP = 8.0  # boss bottom local -26.25
 HUB_GUSSET_T = 7.0  # V-gusset thickness along X (x -200.5..-193.5)
 HUB_GUSSET_HALF_IN = 8.0  # full-depth span |z - 3.088| <= 8
 HUB_GUSSET_HALF_OUT = 30.0  # feathers to the underside at |z - 3.088| = 30
-SET_POCKET = 16.0  # cast pocket (square) around the set-screw tap
-SET_POCKET_DEPTH = 2.0
+# Set-screw boss (fr_top_frame_spec): its cast face and its spot face, as
+# model X on the east side.
+SET_BOSS_FACE_X = GOOSENECK_X - HUB_SET_BOSS_FROM_AXIS  # -219.0
+SET_SPOT_FACE_X = GOOSENECK_X - HUB_SET_SPOT_FROM_AXIS  # -218.0
 # The tap opens into the gooseneck bore; it has no blind thread-depth limit.
-SET_TAP_SPEC = HoleSpec("tapped", "1/4-20", end="through_next")
+SET_TAP_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
 
 # --- Cross screws (frame -> tube-frame columns -> far casting wall) ----------
 # Flush counterbores: the Ø9 cut starts 0.4 outside the boss crown and stops
@@ -510,7 +531,7 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 
 
 # Knife-mount top seats (rule 12, print-worst): each block's footprint on
-# the crossbar underside, (x, z), is the convex hull of its corners over
+# the faced crossbar underside, (x, z), is the convex hull of its corners over
 # every printed extreme -- its round dowel hole at the hanger's .X x and z
 # stations from the sockets, the .XXX dowel-hole offset from the hanger
 # axis and half the dowel slip; the block's +X face 5.65 (.XX) off its round
@@ -1148,10 +1169,10 @@ def _side_tap_removal() -> float:
 
 
 def _set_tap_removal() -> float:
-    """Material removed by the 1/4-20 tap through to the gooseneck bore."""
-    r_h = TAP_DRILL_MM["1/4-20"] / 2.0
+    """Material removed by the 1/4-20 tap from the spot face to the bore."""
+    r_h = TAP_DRILL_MM[SET_SCREW_THREAD] / 2.0
     r_v = GOOSENECK_BORE_DIA / 2.0
-    floor_x = OUTER_X - SET_POCKET_DEPTH  # 212.1 (magnitudes, east side)
+    floor_x = -SET_SPOT_FACE_X  # 218.0 (magnitudes, east side)
     step = 0.005
     vol = 0.0
     d = -r_h
@@ -1276,9 +1297,10 @@ def _bore_chamfer_removal() -> float:
 def _casting_occupies(x: float, y: float, z: float) -> bool:
     """Whether the solid casting, as the C2 breaks find it, holds (x, y, z).
 
-    The rail T-ring, hub rib, junction lands, crossbar with its gussets and T
-    pockets, corner bosses and hub boss -- exact around every C2 pick (bores,
-    holes, V-gussets and the earlier top breaks lie clear of them).
+    The rail T-ring, hub rib with its set-screw boss (spot face out),
+    junction lands, crossbar with its gussets and T pockets, corner bosses
+    and hub boss -- exact around every C2 pick (bores, holes, V-gussets and
+    the earlier top breaks lie clear of them).
     """
     ax, az = abs(x), abs(z)
     in_ring_height = -HALF_H <= y <= HALF_H
@@ -1295,6 +1317,16 @@ def _casting_occupies(x: float, y: float, z: float) -> bool:
         if (
             -OUTER_X <= x <= -INNER_X
             and GOOSENECK_Z - HUB_RIB_W / 2.0 <= z <= GOOSENECK_Z + HUB_RIB_W / 2.0
+        ):
+            return True
+        if (
+            SET_BOSS_FACE_X <= x <= -OUTER_X
+            and y <= FLANGE_BOT_Y
+            and abs(z - GOOSENECK_Z) <= HUB_SET_BOSS_W / 2.0
+            and not (
+                x < SET_SPOT_FACE_X
+                and math.hypot(y, z - GOOSENECK_Z) < HUB_SET_SPOT_DIA / 2.0
+            )
         ):
             return True
         if BAR_X0 <= x <= BAR_X1 and az <= INNER_Z:
@@ -1444,9 +1476,8 @@ def _external_edge_breaks() -> tuple[
     (both knife-mount seats sit over them at the printed bands), the hub
     rib's outer and inner bottom edges (2.1 to the Ø30 hub boss, so C2
     leaves a 0.1 land), the tapered hub V-gusset edges (they feather into
-    the underside), the 2-deep set-screw pocket rim (C2 would consume the
-    whole pocket wall), and every hole, bore, counterbore, tap and slot
-    edge. The vertical junctions of the bar sides with
+    the underside), and every hole, bore, counterbore, spot-face, tap and
+    slot edge. The vertical junctions of the bar sides with
     the gusset hypotenuses are re-entrant (225 degrees), not edges to break.
     """
     c = EDGE_CHAMFER
@@ -1618,6 +1649,19 @@ def _external_edge_breaks() -> tuple[
         along_z(LAND_X0, y_bottom, sz * INNER_Z, sz * WEB_IN_Z)
         along_x(sz * INNER_Z, y_bottom, LAND_X0, BAR_X0 - GUSSET)
         along_x(sz * WEB_IN_Z, y_bottom, -(COLUMN_X - web_cut), LAND_X0)
+    start("HubSetBossBreaks")
+    # The set-screw boss proud of the rib's outer face: the four edges of its
+    # cast face and its four runs back to the rib, meeting at the face's
+    # corners. The breaks leave the O12 spot face a 1.0 land across the
+    # boss and 2.25 under the flange.
+    boss_lo = GOOSENECK_Z - HUB_SET_BOSS_W / 2.0
+    boss_hi = GOOSENECK_Z + HUB_SET_BOSS_W / 2.0
+    for z_side in (boss_lo, boss_hi):
+        along_y(SET_BOSS_FACE_X, z_side, y_bottom, y_under)
+    for y_side in (y_bottom, y_under):
+        along_z(SET_BOSS_FACE_X, y_side, boss_lo, boss_hi)
+        for z_side in (boss_lo, boss_hi):
+            along_x(z_side, y_side, SET_BOSS_FACE_X, -OUTER_X)
     start("OuterCornerBreaks")
     # Per plan corner: the two short flange-underside runs outside the boss
     # barrel and the vertical corner up to the top-rim break, which all meet
@@ -1775,6 +1819,7 @@ def _qualify_machined_faces(adapter) -> None:
     _paint_machined_faces_black precedent). Expectations are the full analytic
     wall/annulus areas; the 5% band absorbs the cross-screw and set-screw tap
     windows that break into the bores (~1% each) and the C1 bore-top breaks.
+    The spot face is the annulus between its O12 and the tap drill.
     """
     faces = resolve_faces(
         adapter.currentModel,
@@ -1785,11 +1830,16 @@ def _qualify_machined_faces(adapter) -> None:
     hub_wall = (
         math.pi * GOOSENECK_BORE_DIA * (HUB_BOSS_DROP + 2.0 * HALF_H - BORE_CHAMFER)
     )
+    spot_face = math.pi / 4.0 * (
+        HUB_SET_SPOT_DIA**2 - TAP_DRILL_MM[SET_SCREW_THREAD] ** 2
+    )
     for key, face in faces.items():
         if key.startswith("cap_seat"):
             expected = cap_seat
         elif key == "hub_bore":
             expected = hub_wall
+        elif key == "hub_set_spot_face":
+            expected = spot_face
         else:
             expected = socket_wall
         area = float(face.GetArea()) * 1e6
@@ -2242,51 +2292,81 @@ async def build(adapter) -> dict[str, str]:
         adapter, "hub gussets", volume + v_gus_extra, 0.01 * v_gus_extra + 30.0
     )
 
-    # 8. Set-screw cast pocket on the hub rib (east outer face, -X).
-    pocket_plane = check(
-        "create_plane set pocket",
+    # 8. Set-screw boss on the hub rib (east outer face, -X): cast proud of
+    #    the rib from the underside to the flange underside, then spot-faced
+    #    1.0 deep. One Right-plane offset at the cast face x -219 carries both
+    #    sketches; the boss extrudes toward +X (the gusset plane's default)
+    #    back to the rib face, and the spot face cuts toward +X like the old
+    #    rib-face pocket.
+    boss_plane = check(
+        "create_plane set boss",
         await adapter.create_plane(
             CreatePlaneParameters(
-                mode="offset", base_plane="Right Plane", offset=-OUTER_X
+                mode="offset", base_plane="Right Plane", offset=SET_BOSS_FACE_X
             )
         ),
     )
-    pocket = SketchDims()
-    check(
-        "create_sketch set pocket",
-        await adapter.create_sketch(getattr(pocket_plane, "name", pocket_plane)),
-    )
-    ref_planes.append(str(getattr(pocket_plane, "name", pocket_plane)))
-    half_p = SET_POCKET / 2.0
+    boss_plane_name = getattr(boss_plane, "name", boss_plane)
+    ref_planes.append(str(boss_plane_name))
+    set_boss = SketchDims()
+    check("create_sketch set boss", await adapter.create_sketch(boss_plane_name))
+    half_w = HUB_SET_BOSS_W / 2.0
     # Negative-offset plane: sketch x = -(model Z) (negative-offset plane mirror -- see the module docstring).
-    pk_pts = [
-        (-(GOOSENECK_Z - half_p), -half_p),
-        (-(GOOSENECK_Z + half_p), -half_p),
-        (-(GOOSENECK_Z + half_p), half_p),
-        (-(GOOSENECK_Z - half_p), half_p),
+    # The chain starts on the top edge, so SetBossWidth's points are the top
+    # corners and the hub side view stands it over the rail, its extension
+    # lines clear of the boss face and the set tap.
+    sb_pts = [
+        (-(GOOSENECK_Z - half_w), FLANGE_BOT_Y),
+        (-(GOOSENECK_Z + half_w), FLANGE_BOT_Y),
+        (-(GOOSENECK_Z + half_w), -HALF_H),
+        (-(GOOSENECK_Z - half_w), -HALF_H),
     ]
-    pk_lines = await add_line_chain(adapter, pk_pts)
+    sb_lines = await add_line_chain(adapter, sb_pts)
     await define_rectilinear_chain(
         adapter,
-        pk_lines,
-        pk_pts,
-        label="set pocket",
-        dims=pocket,
-        names=["PocketRun", "PocketRise", "PocketOffZ", "PocketOffY"],
+        sb_lines,
+        sb_pts,
+        label="set boss",
+        dims=set_boss,
+        names=["SetBossWidth", "SetBossHeight", "SetBossOffZ", "SetBossOffY"],
     )
-    await ensure_fully_defined(adapter, "set pocket sketch")
-    check("exit_sketch set pocket", await adapter.exit_sketch())
-    name_last_feature(adapter, "SetPocketProfile")
-    pocket.apply(adapter, "SetPocketProfile")
+    await ensure_fully_defined(adapter, "set boss sketch")
+    check("exit_sketch set boss", await adapter.exit_sketch())
+    name_last_feature(adapter, "SetBossProfile")
+    set_boss.apply(adapter, "SetBossProfile")
+    boss_proud = -SET_BOSS_FACE_X - OUTER_X  # 4.9
     check(
-        "cut set pocket",
+        "extrude set boss",
+        await adapter.create_extrusion(ExtrusionParameters(depth=boss_proud)),
+    )
+    name_last_feature(adapter, "SetBoss")
+    v_set_boss = HUB_SET_BOSS_W * (FLANGE_BOT_Y + HALF_H) * boss_proud
+    volume = await volume_check(adapter, "set boss", volume + v_set_boss, 20.0)
+    spot = SketchDims()
+    check("create_sketch set spot face", await adapter.create_sketch(boss_plane_name))
+    await define_circle(
+        adapter,
+        -GOOSENECK_Z,
+        0.0,
+        HUB_SET_SPOT_DIA / 2.0,
+        "set-screw spot face",
+        dims=spot,
+        names=("SetSpotZ", None, "SetSpotDia"),
+    )
+    await ensure_fully_defined(adapter, "set spot face sketch")
+    check("exit_sketch set spot face", await adapter.exit_sketch())
+    name_last_feature(adapter, "SetSpotProfile")
+    spot.apply(adapter, "SetSpotProfile")
+    spot_depth = SET_SPOT_FACE_X - SET_BOSS_FACE_X  # 1.0
+    check(
+        "cut set spot face",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=SET_POCKET_DEPTH, reverse_direction=True)
+            ExtrusionParameters(depth=spot_depth, reverse_direction=True)
         ),
     )
-    name_last_feature(adapter, "SetScrewPocket")
-    v_pocket = SET_POCKET * SET_POCKET * SET_POCKET_DEPTH
-    volume = await volume_check(adapter, "set pocket", volume - v_pocket, 20.0)
+    name_last_feature(adapter, "SetSpotFace")
+    v_spot = math.pi * (HUB_SET_SPOT_DIA / 2.0) ** 2 * spot_depth
+    volume = await volume_check(adapter, "set spot face", volume - v_spot, 5.0)
 
     # 9. Side-screw counterbores: O9 x 6.8 from the 134.9 cut plane to the
     #    |z|=128.1 floor (6.4 below the boss crown), deep enough that the
@@ -2681,7 +2761,7 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter,
         SET_TAP_SPEC,
-        [[-(OUTER_X - SET_POCKET_DEPTH), 0.0, GOOSENECK_Z]],
+        [[SET_SPOT_FACE_X, 0.0, GOOSENECK_Z]],
         (-1.0, 0.0, 0.0),
         "gooseneck set-screw tap",
         name="GooseneckTap",
@@ -2901,6 +2981,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Manufacturing Notes B": DRAWING_NOTES_B,
+            "Manufacturing Notes C": DRAWING_NOTES_C,
         },
     )
     # The print opens on two octant pictorials (front-top-left, front-bottom-

@@ -485,6 +485,7 @@ def test_c2_breaks_split_into_connected_chains_in_build_order() -> None:
         "CrossbarBreaks",
         "WestWindowBreaks",
         "HubRailBreaks",
+        "HubSetBossBreaks",
         "OuterCornerBreaks",
         "BossRimBreaks",
     ]
@@ -529,7 +530,7 @@ def test_hub_boss_chord_stays_inside_the_web_at_the_rib_sides() -> None:
 
 def test_external_edge_breaks_select_distinct_edges_and_skip_the_noted_ones() -> None:
     points = _external_break_points()
-    assert len(points) == 75
+    assert len(points) == 83
     assert len({tuple(round(value, 6) for value in point) for point in points}) == len(
         points
     )
@@ -1373,8 +1374,8 @@ def test_b_outer_arrow_keeps_off_the_window_width() -> None:
 def test_section_cuts_cross_the_same_stock() -> None:
     """The moved ends keep what each removed section shows: B cuts the
     rail's plain T between the junction land and the corner boss, E runs
-    from outside the left rail past the crossbar T, D from outside the hub
-    rail past its inner face, each at its own station."""
+    from outside the left rail past the crossbar T, D from outside the
+    set-screw boss past the hub rail's inner face, each at its own station."""
     ends = drawing.section_cut_ends()
     (bx, b_outer), (bx_inner, b_inner) = ends["B"]
     assert bx == bx_inner and part.LAND_X1 < bx < part.COLUMN_X - part.BOSS_DIA / 2.0
@@ -1384,7 +1385,7 @@ def test_section_cuts_cross_the_same_stock() -> None:
     assert e_inner > part.BAR_X1 and e_outer < -drawing.PLAN_HALF_X
     (d_outer, dz), (d_inner, dz_inner) = ends["D"]
     assert dz == dz_inner == part.GOOSENECK_Z
-    assert d_outer < -part.OUTER_X and -part.INNER_X < d_inner < part.BAR_X0
+    assert d_outer < part.SET_BOSS_FACE_X and -part.INNER_X < d_inner < part.BAR_X0
 
 
 # Each removed section's profile ink on b49e1 (mm, x only): B-B's T, E-E's
@@ -1408,6 +1409,317 @@ def test_section_profiles_pin_where_b49e1_printed_them() -> None:
     d0, d1 = _B49E1_PROFILES["D-D"]
     assert d1 - d0 == pytest.approx(part.RAIL_W_SIDE, abs=0.05)
     assert drawing.HUB_SECTION_PROFILE_X * 1000.0 == pytest.approx((d0 + d1) / 2.0, abs=0.01)
+
+
+# --- The set-screw boss (user ruling 2026-10-12, Q5) ------------------------
+
+
+def test_hub_set_screw_keeps_one_and_a_half_diameters_of_full_thread() -> None:
+    """The set tap starts from a spot face 21.0 (.X) from the bore axis on a
+    boss cast onto the hub pad, and keeps >= 1.5D of full thread at the
+    printed worst case (the ch_pivot_bracket_spec idiom)."""
+    terms = spec.SET_SCREW_THREAD_TERMS
+    assert list(terms) == [
+        "spot face from bore axis at its minimum",
+        "bore radius at its maximum",
+        "bore sag across the thread",
+        "one-pitch entry chamfer",
+    ]
+    assert terms["spot face from bore axis at its minimum"] == pytest.approx(20.2)
+    assert all(v < 0.0 for k, v in terms.items() if k != "spot face from bore axis at its minimum")
+    assert spec.SET_SCREW_FULL_THREAD_MIN == pytest.approx(9.579, abs=1e-3)
+    assert spec.SET_SCREW_FULL_THREAD_NOMINAL == pytest.approx(10.615, abs=1e-3)
+    assert spec.SET_SCREW_MAJOR_DIA == pytest.approx(6.35)
+    assert spec.SET_SCREW_ENGAGEMENT_D >= spec.SET_SCREW_MIN_ENGAGEMENT_D == 1.5
+
+
+def test_set_screw_boss_carries_the_spot_face_proud_of_the_rail() -> None:
+    """The boss face stands 1.0 of stock over the spot face, both outboard
+    of the rail's outer face; the spot clears the 1/4 square head's
+    diagonal (91410A540, Head Wd 1/4 in) and the boss carries the spot
+    plus a C2 and a 1.0 land a side."""
+    assert part.SET_SPOT_FACE_X == part.GOOSENECK_X - spec.HUB_SET_SPOT_FROM_AXIS == -218.0
+    assert part.SET_BOSS_FACE_X == part.GOOSENECK_X - spec.HUB_SET_BOSS_FROM_AXIS == -219.0
+    assert part.SET_BOSS_FACE_X < part.SET_SPOT_FACE_X < -part.OUTER_X
+    assert spec.HUB_SET_SPOT_PLACES == spec.DRAWING_REFERENCE_PRECISION[
+        "set-screw spot face from bore axis"
+    ] == 1
+    assert spec.HUB_SET_SPOT_DIA > 6.35 * math.sqrt(2.0)
+    assert spec.HUB_SET_BOSS_W == spec.HUB_SET_SPOT_DIA + 2.0 * (part.EDGE_CHAMFER + 1.0)
+    assert spec.HUB_SET_BOSS_W < part.HUB_RIB_W
+
+
+def test_set_screw_pocket_is_retired_for_the_boss() -> None:
+    sources = [
+        Path(module.__file__).read_text(encoding="utf-8") for module in (spec, part, drawing)
+    ]
+    for retired in ("SET_POCKET", "_hub_pocket_section", "PocketRise", "POCKET_RISE", "POCKET RIM"):
+        assert not any(retired in source for source in sources), retired
+    assert "hub_section = _hub_boss_section(adapter, hub_top)" in sources[2]
+    assert drawing.HUB_LEFT_CALLOUTS == {
+        "SetBossWidth": "BOSS WIDTH\nCENTRED ON SET TAP",
+        "SetSpotDia": "SPOT FACE",
+    }
+    # Rule 6: short callouts that state the feature, not the process.
+    for text in drawing.HUB_LEFT_CALLOUTS.values():
+        assert len(text.splitlines()) <= 4
+        assert not {"CAST", "MILL", "MACHINE"} & set(text.replace("\n", " ").split())
+
+
+# Sheet-5 ink as the 40d9d030e and run-6 renders print it: a dimension row
+# stands on a 5.55 mm pitch with 3.6 mm glyphs, so an n-row block is
+# n x 5.55 - 1.95 tall about its text point; the widest rows on the sheet
+# advance 2.82 mm a character (SQ POCKET, 25.4 for nine); an offset value's
+# underline runs 1.0 under its block and 0.1 past each side; an extension
+# line overshoots its dimension line 1.03; a bent leader's native shoulder
+# is 6.35 (HANGER_SLOT_FRAME_SHOULDER's).
+_ROW_PITCH = 0.00555
+_ROW_SLACK = 0.00195
+_ROW_CHAR = 0.00282
+_UNDERLINE_DROP = 0.001
+_UNDERLINE_PAST = 0.0001
+_EXTENSION_OVERSHOOT = 0.00103
+_BENT_SHOULDER = 0.00635
+# D-D's tap axis (rail mid-height) prints at y 211.8 mm; its caption,
+# SECTION D-D over SCALE 1 : 1, printed 307.3..352.6 x 163.3..178.0 mm about
+# HUB_SECTION_CAPTION_XY (run 6).
+_DD_AXIS_Y = 0.2118
+_DD_CAPTION_EXTENT = (0.0227, 0.0147, 0.0226, 0.0)
+# A finish symbol's ink from its point: "Ra 3.2" ends 14.8 right of it and
+# tops out 6.8 over it (the hub bore symbol on the 40d9d030e render).
+_FINISH_INK = (0.0, 0.0, 0.0148, 0.0068)
+# The hub side view's tap centre prints at (146.5, 95.9) mm.  The unchanged
+# tap callout elbows 30.0 left of and 5.6 under its text point, its two rows
+# printing -28.3..+28.0 x -5.0..+4.4 about it; HUB LOCATION printed
+# 107.4..140.8 x 139.9..143.5 (run 6).
+_HUB_LEFT_TAP = (0.1465, 0.0959)
+_TAP_CALLOUT_ELBOW = (-0.0300, -0.0056)
+_TAP_CALLOUT_EXTENT = (0.0283, 0.0050, 0.0280, 0.0044)
+_HUB_LOCATION_NOTE = (0.1074, 0.1399, 0.1408, 0.1435)
+
+
+def _dimension_block(xy, rows):
+    """An offset dimension's text block about its text point, underline included."""
+    lines = rows.splitlines()
+    half_w = max(map(len, lines)) * _ROW_CHAR / 2.0 + _UNDERLINE_PAST
+    half_h = (len(lines) * _ROW_PITCH - _ROW_SLACK) / 2.0
+    return (xy[0] - half_w, xy[1] - half_h - _UNDERLINE_DROP, xy[0] + half_w, xy[1] + half_h)
+
+
+def _offset_leader(line_xy, block):
+    """An offset value's leader: from its dimension line's midpoint to the
+    near end of its underline."""
+    from _layout_geometry import Segment
+
+    end_x = block[2] if block[2] < line_xy[0] else block[0]
+    return Segment(line_xy[0], line_xy[1], end_x, block[1])
+
+
+def _dd(x: float, y: float) -> tuple[float, float]:
+    """D-D at 1:1, model X right of the pinned bore axis, model Y up."""
+    return (
+        drawing.HUB_SECTION_PROFILE_X + (x - part.GOOSENECK_X) / 1000.0,
+        _DD_AXIS_Y + y / 1000.0,
+    )
+
+
+def test_hub_boss_section_texts_and_leaders_stand_clear_of_their_ink() -> None:
+    """Q5 (user, 2026-10-12): D-D dimensions the thread length, the 21.0 to
+    the spot face and the boss face's 22.0, and finishes the spot face.  The
+    thread length's text goes out left, the 21.0's right and the 22.0's left
+    under the view, so no leader crosses another dimension's extension line
+    and every text, leader and the finish symbol keep INK_CLEARANCE."""
+    from _layout_geometry import Segment, segment_box_distance
+
+    ink = drawing.INK_CLEARANCE
+    tap_r = part.TAP_DRILL_MM[part.SET_SCREW_THREAD] / 2.0
+    spot_r = spec.HUB_SET_SPOT_DIA / 2.0
+    bore_x = part.GOOSENECK_X - part.GOOSENECK_BORE_DIA / 2.0
+    spot_x, boss_x, axis_x = part.SET_SPOT_FACE_X, part.SET_BOSS_FACE_X, part.GOOSENECK_X
+    chamfer = part.EDGE_CHAMFER
+    # The faces the build picks, each the midpoint of its cut line.
+    spot_point = _dd(spot_x, (tap_r + spot_r) / 2.0)
+    thread_y = drawing.HUB_SET_THREAD_LINE_XY[1]
+    spot_y = drawing.HUB_SET_SPOT_LINE_XY[1]
+    boss_y = drawing.HUB_SET_BOSS_LINE_XY[1]
+    lines = {
+        "thread": Segment(_dd(spot_x, 0.0)[0], thread_y, _dd(bore_x, 0.0)[0], thread_y),
+        "21.0": Segment(_dd(axis_x, 0.0)[0], spot_y, _dd(spot_x, 0.0)[0], spot_y),
+        "22.0": Segment(_dd(axis_x, 0.0)[0], boss_y, _dd(boss_x, 0.0)[0], boss_y),
+    }
+    # Each offset leader leaves its own line's midpoint.
+    for name, xy in {
+        "thread": drawing.HUB_SET_THREAD_LINE_XY,
+        "21.0": drawing.HUB_SET_SPOT_LINE_XY,
+        "22.0": drawing.HUB_SET_BOSS_LINE_XY,
+    }.items():
+        line = lines[name]
+        assert xy[0] == pytest.approx((line.x0 + line.x1) / 2.0, abs=1e-4), name
+    blocks = {
+        "thread": _dimension_block(drawing.HUB_SET_THREAD_OFFSET_XY, "(10.5)\nTHREAD LENGTH"),
+        "21.0": _dimension_block(drawing.HUB_SET_SPOT_OFFSET_XY, "21.0\nSPOT FACE\nFROM BORE AXIS"),
+        "22.0": _dimension_block(drawing.HUB_SET_BOSS_OFFSET_XY, "(22.0)\nBOSS FACE\nFROM BORE AXIS"),
+    }
+    leaders = {
+        "thread": _offset_leader(drawing.HUB_SET_THREAD_LINE_XY, blocks["thread"]),
+        "21.0": _offset_leader(drawing.HUB_SET_SPOT_LINE_XY, blocks["21.0"]),
+        "22.0": _offset_leader(drawing.HUB_SET_BOSS_LINE_XY, blocks["22.0"]),
+    }
+    over = _EXTENSION_OVERSHOOT
+    extensions = {
+        # The spot face's line carries both the thread length and the 21.0.
+        "spot face": ("thread", "21.0", Segment(*_dd(spot_x, spot_r), _dd(spot_x, 0.0)[0], spot_y + over)),
+        "bore wall": ("thread", Segment(*_dd(bore_x, part.HALF_H), _dd(bore_x, 0.0)[0], thread_y + over)),
+        "upper axis": ("21.0", Segment(*_dd(axis_x, part.HALF_H + 2.0), _dd(axis_x, 0.0)[0], spot_y + over)),
+        "boss face": ("22.0", Segment(*_dd(boss_x, -part.HALF_H + chamfer), _dd(boss_x, 0.0)[0], boss_y - over)),
+        "lower axis": (
+            "22.0",
+            Segment(*_dd(axis_x, -part.HALF_H - part.HUB_BOSS_DROP - 2.0), _dd(axis_x, 0.0)[0], boss_y - over),
+        ),
+    }
+    left, bottom = _dd(boss_x, -part.HALF_H - part.HUB_BOSS_DROP)
+    right, top = _dd(-part.INNER_X, part.HALF_H)
+    outline = (left, bottom, right, top)
+    cx, cy = drawing.HUB_SECTION_CAPTION_XY
+    dx0, dy0, dx1, dy1 = _DD_CAPTION_EXTENT
+    caption = (cx - dx0, cy - dy0, cx + dx1, cy + dy1)
+    # The finish symbol stands on the spot's own row, left of the boss; its
+    # leader runs straight in through the spot's open mouth.
+    symbol = (spot_point[0] - drawing.HUB_SPOT_FINISH_REACH, spot_point[1])
+    finish = tuple(value + offset for value, offset in zip(symbol * 2, _FINISH_INK))
+    finish_leader = Segment(*symbol, *spot_point)
+    assert abs(spot_point[1] - _DD_AXIS_Y) * 1000.0 < spot_r
+    assert symbol[0] + drawing.HUB_SPOT_FINISH_TAIL < _dd(boss_x, 0.0)[0]
+    assert _dd(boss_x, 0.0)[0] - finish[2] >= ink
+    frame = drawing.SHEET_FRAME
+    for name, block in blocks.items():
+        assert frame[0] + ink <= block[0] and block[2] <= frame[2] - ink, name
+        assert frame[1] + ink <= block[1] and block[3] <= frame[3] - ink, name
+        assert _box_box_gap(block, outline) >= ink, name
+        assert _box_box_gap(block, caption) >= ink, name
+        assert _box_box_gap(block, finish) >= ink, name
+        for other, other_block in blocks.items():
+            if other != name:
+                assert _box_box_gap(block, other_block) >= ink, (name, other)
+        for other, leader in leaders.items():
+            if other != name:
+                assert segment_box_distance(leader, _layout_box(block)) >= ink, (name, other)
+        for other, line in lines.items():
+            assert segment_box_distance(line, _layout_box(block)) >= ink, (name, other)
+        for other, (*_owners, extension) in extensions.items():
+            assert segment_box_distance(extension, _layout_box(block)) >= ink, (name, other)
+        assert segment_box_distance(finish_leader, _layout_box(block)) >= ink, name
+    for name, leader in leaders.items():
+        for other, other_leader in leaders.items():
+            if other != name:
+                assert _segment_gap(leader, other_leader) >= ink, (name, other)
+        for other, (*owners, extension) in extensions.items():
+            if name not in owners:
+                assert _segment_gap(leader, extension) >= ink, (name, other)
+        for other, line in lines.items():
+            if other != name:
+                assert _segment_gap(leader, line) >= ink, (name, other)
+        assert segment_box_distance(leader, _layout_box(caption)) >= ink, name
+        assert segment_box_distance(leader, _layout_box(finish)) >= ink, name
+    # The 22.0 hangs under the view over the caption: its line, arrowheads
+    # and extension ends all stay an ink clearance above it.
+    assert boss_y - drawing.ARROW_HALF_WIDTH - caption[3] >= ink
+    assert boss_y - over - caption[3] >= ink
+    for name, line in lines.items():
+        assert segment_box_distance(line, _layout_box(finish)) >= ink, name
+    for name, (*_owners, extension) in extensions.items():
+        assert segment_box_distance(extension, _layout_box(finish)) >= ink, name
+
+
+def _layout_box(box):
+    from _layout_geometry import Box
+
+    return Box(*box)
+
+
+def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
+    """Q5: the 1:2 side view sees the boss face on.  The 18.0 width's rows
+    stand straight over it; the tap callout's leader leaves under the right
+    extension line's foot and the Ø12.0 spot face's under the left one, each
+    an ink clearance off, and the spot leader's run over the part stays
+    inside the leader-over-part detour gate."""
+    from _layout_audit import LEADER_DETOUR_PROVISIONAL_M
+    from _layout_geometry import Segment, segment_box_distance
+
+    ink = drawing.INK_CLEARANCE
+    s = drawing.HUB_LEFT_SCALE[0] / drawing.HUB_LEFT_SCALE[1] / 1000.0
+    tap = _HUB_LEFT_TAP
+    half_w = spec.HUB_SET_BOSS_W / 2.0 * s
+    boss_top = tap[1] + part.FLANGE_BOT_Y * s
+    assert (tap[0] - half_w, tap[0] + half_w, boss_top) == pytest.approx((0.1420, 0.1510, 0.1010), abs=1e-4)
+    line_x, line_y = drawing.SET_BOSS_WIDTH_LINE_XY
+    assert line_x == pytest.approx(tap[0])
+    feet = {"left": (tap[0] - half_w, boss_top), "right": (tap[0] + half_w, boss_top)}
+    extensions = {
+        side: Segment(x, y, x, line_y + _EXTENSION_OVERSHOOT) for side, (x, y) in feet.items()
+    }
+    width = _dimension_block(drawing.SET_BOSS_WIDTH_TEXT_XY, "18.0\nBOSS WIDTH\nCENTRED ON SET TAP")
+    width_line = Segment(tap[0] - half_w, line_y, tap[0] + half_w, line_y)
+    # The tap callout: unchanged, its leader dropping from the elbow
+    # through the tap centre to the tap circle.
+    callout_xy = (drawing.HUB_LEFT_CENTER[0] + 0.0844, drawing.HUB_LEFT_CENTER[1] + 0.0356)
+    callout = (
+        callout_xy[0] - _TAP_CALLOUT_EXTENT[0],
+        callout_xy[1] - _TAP_CALLOUT_EXTENT[1],
+        callout_xy[0] + _TAP_CALLOUT_EXTENT[2],
+        callout_xy[1] + _TAP_CALLOUT_EXTENT[3],
+    )
+    elbow = (callout_xy[0] + _TAP_CALLOUT_ELBOW[0], callout_xy[1] + _TAP_CALLOUT_ELBOW[1])
+    tap_r = part.TAP_DRILL_MM[part.SET_SCREW_THREAD] / 2.0 * s
+    run = math.dist(tap, elbow)
+    tap_tip = tuple(c + (e - c) * tap_r / run for c, e in zip(tap, elbow))
+    tap_leader = Segment(*elbow, *tap_tip)
+    # The Ø12.0: a bent leader from its underline's right end, radial from
+    # the shoulder's bend to the spot circle.
+    spot = _dimension_block(drawing.SET_SPOT_DIA_TEXT_XY, "Ø12.0\nSPOT FACE")
+    bend = (spot[2] + _BENT_SHOULDER, spot[1])
+    spot_r = spec.HUB_SET_SPOT_DIA / 2.0 * s
+    run = math.dist(tap, bend)
+    spot_tip = tuple(c + (b - c) * spot_r / run for c, b in zip(tap, bend))
+    spot_leader = Segment(*bend, *spot_tip)
+    spot_shoulder = Segment(spot[2], spot[1], *bend)
+    leaders = {"tap": tap_leader, "spot": spot_leader, "spot shoulder": spot_shoulder}
+    # Each leader passes UNDER its own side's foot, an ink clearance off,
+    # and crosses neither extension line.
+    for side, extension in extensions.items():
+        for name, leader in leaders.items():
+            assert _segment_gap(leader, extension) >= ink, (name, side)
+    for name, x in {"tap": feet["right"][0], "spot": feet["left"][0]}.items():
+        leader = leaders[name]
+        t = (x - leader.x0) / (leader.x1 - leader.x0)
+        assert leader.y0 + t * (leader.y1 - leader.y0) < boss_top, name
+    texts = {"18.0": width, "Ø12.0": spot, "tap callout": callout, "HUB LOCATION": _HUB_LOCATION_NOTE}
+    for name, box in texts.items():
+        for other, other_box in texts.items():
+            if other != name:
+                assert _box_box_gap(box, other_box) >= ink, (name, other)
+        own = {"Ø12.0": {"spot shoulder"}, "tap callout": {"tap"}}.get(name, set())
+        for leader_name, leader in leaders.items():
+            if leader_name not in own:
+                assert segment_box_distance(leader, _layout_box(box)) >= ink, (name, leader_name)
+        if name != "18.0":
+            assert segment_box_distance(width_line, _layout_box(box)) >= ink, name
+            for side, extension in extensions.items():
+                assert segment_box_distance(extension, _layout_box(box)) >= ink, (name, side)
+    # The Ø12.0's rows stand over the left barrel's top, the view's top.
+    view_top = tap[1] + (part.HALF_H + part.BOSS_ABOVE) * s
+    assert spot[1] - view_top >= ink
+    frame = drawing.SHEET_FRAME
+    for name, box in {"18.0": width, "Ø12.0": spot}.items():
+        assert frame[0] + ink <= box[0] and box[2] <= frame[2] - ink, name
+        assert box[3] <= frame[3] - ink, name
+    # Leader over the part: from its rail-top crossing to the spot rim,
+    # against the rim's approach from the view's top.
+    rail_top = tap[1] + part.HALF_H * s
+    t = (rail_top - spot_tip[1]) / (bend[1] - spot_tip[1])
+    crossing = (spot_tip[0] + t * (bend[0] - spot_tip[0]), rail_top)
+    detour = math.dist(crossing, spot_tip) - (view_top - spot_tip[1])
+    assert detour <= LEADER_DETOUR_PROVISIONAL_M, detour
 
 
 class _FakeView:
@@ -2549,7 +2861,7 @@ def test_keeper_facing_note_is_the_part_property_carrying_the_keeper_budget() ->
     ]
     assert len(linked) == 1
     assert ast.unparse(linked[0].args[2]) == "*keeper_facing_note_xy(keeper_callout_xy)"
-    assert _keyword(linked[0], "char_height").id == "KEEPER_FACING_NOTE_HEIGHT"
+    assert _keyword(linked[0], "char_height").id == "FACING_NOTE_HEIGHT"
 
 
 def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> None:
@@ -2588,14 +2900,15 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert margin == pytest.approx(3.58)
     # Faced in place: the rail-top plane stays put.
     assert part.HALF_H - part.FLANGE_BOT_Y == pytest.approx(spec.FLANGE_THICKNESS_MM)
-    # The nine native socket, cap and hub finishes stand unchanged; the
-    # faced rail top's SEAT_UM rides on the linked note B.
+    # The ten native socket, cap, hub-bore and set-screw spot-face finishes
+    # (user ruling 2026-10-12 added the spot face); the faced rail top's
+    # SEAT_UM rides on the linked note B.
     assert [c.key for c in spec.SURFACE_FINISHES] == [
         f"{kind}_{rail}_{end}"
         for rail in ("east", "west")
         for end in ("front", "rear")
         for kind in ("socket", "cap_seat")
-    ] + ["hub_bore"]
+    ] + ["hub_bore", "hub_set_spot_face"]
 
 
 def test_top_frame_drawing_is_six_sheets() -> None:
@@ -2659,6 +2972,110 @@ def test_keeper_facing_note_hangs_under_the_keeper_callout_clear_of_all_ink() ->
         half_width = len(suffix) * 0.002 / 2
         field = (sx - half_width, sy - 0.0051, sx + half_width, sy + 0.0051)
         assert _box_box_gap(note, field) >= ink, label
+
+
+# --- The faced underside plane (user ruling 2026-10-12) ---------------------
+
+
+def test_underside_facing_note_is_the_part_property_carrying_the_seat_finish() -> None:
+    import ast
+
+    # Every face on the underside plane between the bosses, named by the
+    # mating seats that need it; the bosses and hub gussets below the plane
+    # are named out of it.  No flatness zone, no setup method; rule 6's four
+    # rows at most.
+    assert spec.DRAWING_NOTES_C.splitlines() == [
+        "UNDERSIDE PLANE BETWEEN BOSSES",
+        "(MHA-SM-002 KNIFE-MOUNT SEATS):",
+        "Ra 3.2 UM; BOSS BOTTOMS AND",
+        "HUB GUSSETS EXCLUDED.",
+    ]
+    assert _config.parts("sm-knife-mount")["number"] == "MHA-SM-002"
+    tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
+    (notes,) = [
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and [ast.unparse(target) for target in node.targets] == ["DRAWING_NOTES_C"]
+    ]
+    sourced = {
+        value.value.id
+        for value in ast.walk(notes)
+        if isinstance(value, ast.FormattedValue) and isinstance(value.value, ast.Name)
+    }
+    assert sourced == {"SEAT_UM"}
+    builder = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"Manufacturing Notes C": DRAWING_NOTES_C' in builder
+    # The sheet links the property and never retypes it.
+    drawing_tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    strings = [
+        node.value
+        for node in ast.walk(drawing_tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    ]
+    for forbidden in ("UNDERSIDE PLANE", "KNIFE-MOUNT SEATS", "BOSS BOTTOMS", "EXCLUDED"):
+        assert not any(forbidden in value for value in strings), forbidden
+    build = next(
+        node
+        for node in drawing_tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    (properties,) = _named_calls(build, "read_required_properties")
+    assert "Manufacturing Notes C" in ast.literal_eval(properties.args[1])
+    assert "Manufacturing Notes C" in ast.literal_eval(_keyword(properties, "required"))
+    linked = [
+        call
+        for call in _named_calls(drawing_tree, "add_property_linked_note")
+        if ast.literal_eval(call.args[1]) == "Manufacturing Notes C"
+    ]
+    assert len(linked) == 1
+    assert ast.unparse(linked[0].args[2]) == "*UNDERSIDE_FACING_NOTE_XY"
+    assert _keyword(linked[0], "char_height").id == "FACING_NOTE_HEIGHT"
+
+
+def test_underside_facing_note_stands_beside_detail_c_clear_of_all_ink() -> None:
+    x, y = drawing.UNDERSIDE_FACING_NOTE_XY
+    rows = spec.DRAWING_NOTES_C.splitlines()
+    note = (
+        x,
+        y - len(rows) * drawing.KEEPER_TRANSFER_ROW_PITCH,
+        x + max(map(len, rows)) * _FACING_NOTE_CHAR,
+        y,
+    )
+    ink = drawing.INK_CLEARANCE
+    frame = drawing.SHEET_FRAME
+    assert frame[0] + ink <= note[0] < note[2] <= frame[2] - ink
+    assert frame[1] + ink <= note[1] < note[3] <= frame[3] - ink
+    assert _box_box_gap(note, TITLE_BLOCK) >= ink
+    # The underside locator's silhouette.
+    centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
+    plan = (
+        centre[0] - drawing.PLAN_HALF_X * m_per_mm,
+        centre[1] - drawing.PLAN_HALF_Z * m_per_mm,
+        centre[0] + drawing.PLAN_HALF_X * m_per_mm,
+        centre[1] + drawing.PLAN_HALF_Z * m_per_mm,
+    )
+    assert _box_box_gap(note, plan) >= ink
+    # Detail C's circular fence: the parent's fence radius at the detail scale.
+    parent_r = (part.HUB_GUSSET_HALF_OUT + part.HUB_BOSS_DROP) * m_per_mm
+    detail_r = parent_r * (
+        drawing.HUB_DETAIL_SCALE[0] / drawing.HUB_DETAIL_SCALE[1]
+    ) / (drawing.HUB_BOTTOM_SCALE[0] / drawing.HUB_BOTTOM_SCALE[1])
+    cx, cy = drawing.HUB_DETAIL_CENTER
+    nearest = (min(max(cx, note[0]), note[2]), min(max(cy, note[1]), note[3]))
+    assert math.dist(nearest, (cx, cy)) >= detail_r + ink
+    # Printed text on the 40d9d030e render (sheet mm): the DETAIL C / SCALE
+    # 2:1 caption, the Ø30.0 CYLINDRICAL BOSS text, the 7.0 gusset block,
+    # the 70.0 land block, F-F's 6.350 block and the locator's label.
+    for label, box in {
+        "detail caption": (0.2844, 0.0753, 0.3161, 0.0898),
+        "boss diameter": (0.1889, 0.0954, 0.2310, 0.1045),
+        "gusset thickness": (0.3689, 0.2356, 0.4112, 0.2503),
+        "land": (0.1243, 0.1376, 0.1856, 0.1523),
+        "slot depth": (0.1396, 0.0986, 0.1805, 0.1133),
+        "locator label": (0.0604, 0.1115, 0.1461, 0.1200),
+    }.items():
+        assert _box_box_gap(note, box) >= ink, label
 
 
 def test_socket_bore_circle_pick_is_exact_about_the_axis() -> None:

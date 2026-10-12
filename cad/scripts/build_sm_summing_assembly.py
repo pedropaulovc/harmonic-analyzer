@@ -111,8 +111,10 @@ HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 # Y=0, axis +Y), so seating its under-head face on the crossbar's counterbore
 # floor, HANGER_GRIP above the crossbar underside, fixes the screw origin; no
 # washer (its thickness band would break the reach stack).  The screw clamps
-# the knife mount's top seat to the underside.  Each dowel's pressed end (local
-# Y=0, axis +Y) sits on the floor of the knife mount's top-seat hole.
+# the knife mount's top seat to the underside, a faced Ra 3.2 plane (user
+# ruling 2026-10-12) whose 999.7 is the finished face, so the gap is 0 with no
+# bedding allowance.  Each dowel's pressed end (local Y=0, axis +Y) sits on
+# the floor of the knife mount's top-seat hole.
 KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 999.7: clamped, gap 0
 CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT
 HANGER_SEAT_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1029.7
@@ -121,6 +123,8 @@ HANGER_STUD_Y = HANGER_SEAT_Y - hanger_screw.UNDERHEAD_LEN  # 991.6 (thread tip)
 HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y
 # Its print-worst reach (rule 12): the shortest screw in the longest grip,
 # 37.084 - 30.8 = 6.284, and the longest in the shortest, 38.1 - 29.2 = 8.90.
+# The grip prints from the faced underside, which is faced before the
+# counterbore is cut: a later cut would shorten it, eating the tip clearance.
 HANGER_REACH_MIN = hanger_screw.LENGTH_MIN - (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )
@@ -177,7 +181,8 @@ HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATC
 # 0.535 deg; across the deepest .X block (14.8) that walks the bore's far end
 # 0.138 off the ridge line, and the bore's ⊥Ø0.05|B zone adds 0.05:
 # t = 0.188.  The trunnion is judged at its widest, lowest .XXX section
-# (8.21 x 10.138) in the smallest reamed bore (Ø12.00): 6.16 deg.
+# (8.21 x 10.138) in the smallest reamed bore (Ø12.00): 6.16 deg.  The faced
+# seat adds no term: its form tilts the block, it does not yaw the bore.
 KNIFE_DOWEL_SPAN_MIN = knife_mount.PIN_HOLE_SPAN - knife_mount.PIN_HOLE_SPAN_TOL
 KNIFE_MOUNT_YAW_DEG = math.degrees(
     math.atan(_KNIFE_DOWEL_PAIR_SHIFT / KNIFE_DOWEL_SPAN_MIN)
@@ -260,8 +265,8 @@ def _assert_knife_hanger_stack() -> None:
             f"{KNIFE_FREE_ROCK_FLOOR_DEG}"
         )
     # Both parts' dowel stations are the dowel spec's pair, and the crossbar
-    # hole and slot are deep enough for the proud pin (the spec asserts the
-    # print-worst case).
+    # hole and slot, 12.0 deep from the faced underside, are deep enough for
+    # the proud pin (the spec asserts the print-worst case).
     expected_stations = (-knife_dowel.HANGER_OFFSET, knife_dowel.HANGER_OFFSET)
     for owner, stations in (
         ("knife mount", knife_mount.PIN_HOLE_XS),

@@ -7,10 +7,11 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 GEOMETRY defines the frame windows and T-rail section;
 HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
 cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
-holds the hub location, true-axis side view and the removed set-pocket
+holds the hub location, true-axis side view and the removed set-screw boss
 section; UNDERSIDE holds the underside locator, its enlarged native
 detail and the removed knife-hanger section F-F.  The faced keeper-rail top
-is one linked note under the keeper callout on HOLES-SOCKETS.  A group gets
+is one linked note under the keeper callout on HOLES-SOCKETS, the faced
+underside plane one beside the UNDERSIDE detail.  A group gets
 its own sheet rather than a crowded corner of one:
 qualifiers then park clear of cutting lines, centrelines and each other.
 Projected top/front pairs stay aligned; removed and section views carry scales.
@@ -132,7 +133,8 @@ from build_fr_top_frame import (
     REAR_COLUMN_Z,
     RING_HEIGHT,
     ROOT_FILLET_R,
-    SET_POCKET_DEPTH,
+    SET_BOSS_FACE_X,
+    SET_SPOT_FACE_X,
     SET_TAP_SPEC,
     SIDE_TAP_DRILL_DIA,
     SLOT_FLAT,
@@ -166,6 +168,8 @@ from fr_top_frame_spec import (
     HANGER_SLOT_LENGTH_CALLOUT,
     HANGER_SLOT_WIDTH,
     HANGER_SLOT_WIDTH_CALLOUT,
+    HUB_SET_BOSS_FROM_AXIS,
+    HUB_SET_SPOT_FROM_AXIS,
     KEEPER_TAP_CALLOUT_PRECISION,
     PRINTED_LINEAR_BAND_MM,
     SURFACE_FINISHES,
@@ -327,10 +331,10 @@ KEEPER_CALLOUT_EXTENT = (
     _KEEPER_NATIVE_CALLOUT_EXTENT[2] + KEEPER_TRANSFER_EXTRA_WIDTH,
     _KEEPER_NATIVE_CALLOUT_EXTENT[3] + KEEPER_TRANSFER_EXTRA_HEIGHT,
 )
-# The facing note sets at the C2 note block's 3.5 mm height, which renders
+# Both facing notes set at the C2 note block's 3.5 mm height, which renders
 # about 2.6 mm per character on a 5.1 mm row (farm 30394c1da: its
 # 70-character line spans 30 -> 208 mm).
-KEEPER_FACING_NOTE_HEIGHT = 0.0035
+FACING_NOTE_HEIGHT = 0.0035
 # Native SolidWorks centres the four-row RD4 block on its callout point and
 # lands the leader on an underline below the bottom row, 11.15 mm under that
 # point (HOLES-SOCKETS, farm 9e13b1b78 and b51258927: rows 91.7 -> 112.0 mm
@@ -434,15 +438,36 @@ CROSS_TAP_SECTION_NOTE = (
 )
 CROSS_TAP_SECTION_NOTE_XY = (0.040, 0.032)
 
-# Sheet 5: hub location, true-axis side view, removed set-pocket section.
+# Sheet 5: hub location, true-axis side view, removed set-screw boss section.
 HUB_TOP_CENTER = (0.145, 0.200)
 HUB_LEFT_CENTER = (0.145, 0.095)
 HUB_LEFT_SCALE = (1, 2)
 HUB_SECTION_CENTER = (0.330, 0.210)
 HUB_SECTION_SCALE = (1, 1)
 HUB_SECTION_CAPTION_XY = (0.330, 0.178)
-POCKET_DEPTH_TEXT_XY = (0.330, 0.238)
-POCKET_DEPTH_OFFSET_XY = (0.378, 0.242)
+# D-D prints 1:1, the bore axis pinned at x 332.0 mm (HUB_SECTION_PROFILE_X),
+# so the boss face stands at 310.0, the spot face at 311.0 and the bore wall
+# at 323.5; the rail top prints at y 230.1 and the tap axis at 211.8 (the
+# 40d9d030e render).  The thread length nests inside the 21.0 and shares its
+# spot-face extension line: it stands nearer the rail top with its text out
+# LEFT, the 21.0 over it with its text out RIGHT, so neither leader leaves
+# its line across the other's extension lines.  The boss face's 22.0 hangs
+# under the view, its line 3.5 over the caption (178.0), its text out left
+# (test_hub_boss_section_texts_and_leaders_stand_clear_of_their_ink).
+HUB_SET_THREAD_LINE_XY = (0.3172, 0.2365)
+HUB_SET_THREAD_OFFSET_XY = (0.2840, 0.2380)
+HUB_SET_SPOT_LINE_XY = (0.3215, 0.2435)
+HUB_SET_SPOT_OFFSET_XY = (0.3640, 0.2460)
+HUB_SET_BOSS_LINE_XY = (0.3210, 0.1815)
+HUB_SET_BOSS_OFFSET_XY = (0.2810, 0.1880)
+# D-D's spot-face finish symbol stands on the spot face's own row, left of
+# the boss, its leader straight in through the spot's open mouth.  Its
+# "Ra 3.2" ends 14.8 mm right of the symbol point (the hub bore symbol's ink
+# on the 40d9d030e render, same height), so the tail runs 16.0 before the
+# bend and the point sits 19.0 left of the leader's tip on the spot face:
+# the ink stops 4.2 short of the spot face, 3.2 short of the boss face.
+HUB_SPOT_FINISH_TAIL = 0.016
+HUB_SPOT_FINISH_REACH = 0.019
 # In the left window, right of the bore (clears leader-crosses-line Ra 3.2 x
 # RibWidth at x 60): was (0.030, 0.160), its 35 mm tail cut the RibWidth
 # line.  The leader now lands on the bore's lower-right rim (-45 deg on the
@@ -477,6 +502,17 @@ HUB_BOSS_DIA_TEXT_XY = (0.210, 0.100)
 HUB_GUSSET_T_TEXT_XY = (0.300, 0.212)
 HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 LAND_TEXT_OFFSET_XY = (0.155, 0.145)
+# The faced underside plane's linked note C (top-left point).  The bands
+# round the locator are full: between F-F's 6.350 block (top 113.3 mm on
+# farm run 40d9d030e) and the 70.0 block (bottom 137.6) stand 24.3 mm, under
+# the four rows' 20.4 plus two clearances, and right of the plan the Ø30.0
+# leader and detail C's fence leave 41 mm.  So the note takes the open band
+# right of detail C's caption, over the title block: 80.6 x 20.4 mm at the
+# estimated glyph pitch, 11.6 over the title block, 8.5 inside the frame's
+# right edge, 5.7 off the fence (r 76 about the detail centre) and 13.9
+# right of the caption's DETAIL C (316.1 mm), beside the hub boss and
+# gussets it excludes.
+UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
 # #6 SHCS counterbore, its floor above the crossbar underside (the screw's
 # grip, closing RingHeight with the callout's counterbore depth), the round
@@ -758,8 +794,23 @@ SECTION_LETTER_TEXT_GAP = (
 # and every label sits under its own view - centred where the dimension
 # lanes below the view leave room, offset within that band where they do not.
 
-POCKET_RISE_LINE_XY = (0.070, 0.0785)
-POCKET_RISE_TEXT_XY = (0.0422, 0.0785)
+# The hub side view (1:2) sees the set-screw boss face on: the tap centre
+# prints at (146.5, 95.9) mm and the boss's sides at x 142.0 / 151.0.  The
+# 18.0 width stands over the rail, its extension lines up from the boss's
+# top corners (y 101.0) through the flange, its three rows straight over
+# it, 6.2 under the HUB LOCATION note (139.9).  Every leader that leaves the
+# boss passes UNDER those extension lines' feet, so each side holds one: the
+# tap callout's leader keeps the right (2.3 off that foot), and the Ø12.0
+# spot face takes the left, leaving the spot circle at 151 deg 2.3 off the
+# left foot.  Steeper, either would cross an extension line; shallower,
+# either would run along the rail (leader-over-part detour, 10 mm gate: the
+# spot's is 6.0, its 16.0 over the part against 9.9 from the spot's rim to
+# the view's top).  Its two rows land right, 4.8 over the left barrel's top
+# (107.2) and 10.4 left of the width's rows
+# (test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink).
+SET_BOSS_WIDTH_LINE_XY = (0.1465, 0.1150)
+SET_BOSS_WIDTH_TEXT_XY = (0.1465, 0.1264)
+SET_SPOT_DIA_TEXT_XY = (0.0978, 0.1177)
 
 # The first sheet contains only the frame/window and T-rail definition.
 GEOMETRY_TOP_KEEP = {
@@ -824,7 +875,12 @@ HUB_TOP_KEEP = {
     "RibWidth": (0.060, 0.1465),
 }
 HUB_LEFT_KEEP = {
-    "PocketRise": POCKET_RISE_LINE_XY,
+    "SetBossWidth": SET_BOSS_WIDTH_LINE_XY,
+    "SetSpotDia": SET_SPOT_DIA_TEXT_XY,
+}
+HUB_LEFT_CALLOUTS = {
+    "SetBossWidth": "BOSS WIDTH\nCENTRED ON SET TAP",
+    "SetSpotDia": "SPOT FACE",
 }
 HUB_TOP_CALLOUTS = {
     "GnDia": "DRILL THRU\nSAME X AS\nLEFT SOCKETS",
@@ -960,7 +1016,7 @@ def _cut_face_edge(
 
     ``SetDisplayOnlySurfaceCut`` leaves a section showing its cut faces only,
     so every visible line carries the cut plane's own coordinate.  Pinning
-    that axis plus one face level -- a rail top, a boss top, a pocket floor --
+    that axis plus one face level -- a rail top, a boss top, a spot face --
     names the face itself instead of a hand-written station a geometry change
     would silently invalidate.  ``near`` is ``(axis, value, window)`` and
     picks between parallel faces (the front boss rather than the rear); the
@@ -1228,28 +1284,28 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
     return hidden
 
 
-def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
+def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
     """A removed section through the hub rail at the bore/set-tap axis.
 
-    The cutting line runs from outside the hub (-X) rail to just past its
-    inner face, so ``partial=True`` sections that rail alone: the D arrows sit
-    on the hub end of the plan and the view carries the one profile the
-    pocket depth hangs on -- the same treatment as B-B/E-E.  (History: a
-    full-width cut then ``Crop2`` to the hub, whose leftover construction
-    midlines had to be hunted down and whose position had to be re-derived
-    from the cropped outline.)
+    The cutting line runs from outside the set-screw boss to just past the
+    rail's inner face, so ``partial=True`` sections that rail alone: the D
+    arrows sit on the hub end of the plan and the view carries the one
+    profile the spot face and the thread run hang on -- the same treatment as
+    B-B/E-E.  (History: a full-width cut then ``Crop2`` to the hub, whose
+    leftover construction midlines had to be hunted down and whose position
+    had to be re-derived from the cropped outline.)
     """
     line = [
         model_point_in_view(
             adapter, parent_view, (x/1000.0, 0.0, z/1000.0),
-            label="set-pocket section cutting line",
+            label="set-screw boss section cutting line",
         )
         for x, z in section_cut_ends()["D"]
     ]
     view = create_section_view(
         adapter, parent_view, line_start=line[0], line_end=line[1],
         view_xy=HUB_SECTION_CENTER, section_label="D", scale=HUB_SECTION_SCALE,
-        partial=True, label="set-pocket manufacturing section",
+        partial=True, label="set-screw boss manufacturing section",
     )
     _orient_cut_section(adapter, view, (1.0, 0.0, 0.0))
     set_hidden_lines_removed(adapter, view)
@@ -1259,56 +1315,100 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
     outline = tuple(float(value) for value in view.GetOutline())
     position = tuple(float(value) for value in view.Position)
     if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError("set-pocket section has invalid bounds")
+        raise RuntimeError("set-screw boss section has invalid bounds")
     target = [
         position[axis]+HUB_SECTION_CENTER[axis]-(outline[axis]+outline[axis+2])/2
         for axis in range(2)
     ]
     if not view.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to position set-pocket section")
-    rebuild_drawing(adapter, label="_hub_pocket_section")
+        raise RuntimeError("failed to position set-screw boss section")
+    rebuild_drawing(adapter, label="_hub_boss_section")
     outline = tuple(float(value) for value in view.GetOutline())
     center = tuple((outline[axis]+outline[axis+2])/2 for axis in range(2))
     ratio = tuple(float(value) for value in view.ScaleRatio)
     if math.dist(center, HUB_SECTION_CENTER) > 0.0001:
-        raise RuntimeError("set-pocket section centre did not persist")
+        raise RuntimeError("set-screw boss section centre did not persist")
     if not math.isclose(ratio[0]/ratio[1], HUB_SECTION_SCALE[0]/HUB_SECTION_SCALE[1]):
-        raise RuntimeError("set-pocket section scale did not persist")
+        raise RuntimeError("set-screw boss section scale did not persist")
     _pin_section_profile(
         adapter, view, (-COLUMN_X, 0.0, GOOSENECK_Z), HUB_SECTION_PROFILE_X, label="D-D",
     )
-    _add_view_centerlines(
+    axes = _add_view_centerlines(
         adapter, view,
         (
             ((GOOSENECK_X, -HALF_H-HUB_BOSS_DROP-2.0, GOOSENECK_Z),
              (GOOSENECK_X, HALF_H+2.0, GOOSENECK_Z)),
-            ((-OUTER_X-2.0, 0.0, GOOSENECK_Z), (-INNER_X+2.0, 0.0, GOOSENECK_Z)),
+            ((SET_BOSS_FACE_X-2.0, 0.0, GOOSENECK_Z), (-INNER_X+2.0, 0.0, GOOSENECK_Z)),
         ),
     )
-    # The cut plane runs through the pocket centre, so the outer rail face and
-    # the pocket floor both appear in it as lines the pocket walls interrupt --
-    # picked as faces, since their Y extents depend on the cast rim breaks.
-    section_edges = scan_view_edges(view, label="D-D set-pocket section")
-    pocket_face_edge, pocket_face_point = _cut_face_edge(
-        section_edges, fixed={0: -OUTER_X, 2: GOOSENECK_Z},
-        label="set-pocket outer rail face",
+    # The cut plane runs through the tap axis, so the boss face, the spot face
+    # and the bore wall each appear in it as two lines the tap interrupts --
+    # picked as faces, the upper or the lower by ``near``, since their Y
+    # extents depend on the spot and the cast C2 breaks.  The thread length
+    # and the 21.0 stand over the rail top, so they take the upper lines; the
+    # boss face's 22.0 stands under the view and takes the boss face's lower
+    # line, whose extension line then runs clear of the spot's mouth.
+    section_edges = scan_view_edges(view, label="D-D set-screw boss section")
+    upper, lower = (1, HALF_H/2.0, HALF_H/2.0), (1, -HALF_H/2.0, HALF_H/2.0)
+    spot_edge, spot_point = _cut_face_edge(
+        section_edges, fixed={0: SET_SPOT_FACE_X, 2: GOOSENECK_Z}, near=upper,
+        label="set-screw spot face",
     )
-    pocket_floor_edge, pocket_floor_point = _cut_face_edge(
-        section_edges, fixed={0: -OUTER_X+SET_POCKET_DEPTH, 2: GOOSENECK_Z},
-        label="set-pocket floor",
+    bore_edge, bore_point = _cut_face_edge(
+        section_edges, fixed={0: GOOSENECK_X-GOOSENECK_BORE_DIA/2.0, 2: GOOSENECK_Z},
+        near=upper, label="gooseneck bore wall at the set tap",
+    )
+    boss_edge, boss_point = _cut_face_edge(
+        section_edges, fixed={0: SET_BOSS_FACE_X, 2: GOOSENECK_Z}, near=lower,
+        label="set-screw boss face",
+    )
+    # The thread runs from the spot face to the bore wall: a reference, the
+    # 21.0 less the bore's radius.
+    _checked_dimension(
+        adapter, view,
+        p0=spot_point, p1=bore_point,
+        text_xy=HUB_SET_THREAD_LINE_XY, label="set-screw thread length",
+        expected_mm=HUB_SET_SPOT_FROM_AXIS-GOOSENECK_BORE_DIA/2.0,
+        orientation="horizontal", reference=True,
+        entities=(spot_edge, bore_edge),
+        suffix="THREAD LENGTH", offset_text=HUB_SET_THREAD_OFFSET_XY,
     )
     _checked_dimension(
         adapter, view,
-        p0=pocket_face_point, p1=pocket_floor_point,
-        text_xy=POCKET_DEPTH_TEXT_XY, label="set-pocket depth from outer rail face",
-        expected_mm=SET_POCKET_DEPTH, orientation="horizontal",
-        entities=(pocket_face_edge, pocket_floor_edge),
-        suffix="POCKET DEPTH\nFROM OUTER FACE",
-        offset_text=POCKET_DEPTH_OFFSET_XY,
+        p0=(GOOSENECK_X, HALF_H+2.0, GOOSENECK_Z), p1=spot_point,
+        text_xy=HUB_SET_SPOT_LINE_XY, label="set-screw spot face from bore axis",
+        expected_mm=HUB_SET_SPOT_FROM_AXIS, orientation="horizontal",
+        entity_types=("SKETCHSEGMENT", "EDGE"), entities=(axes[0], spot_edge),
+        suffix="SPOT FACE\nFROM BORE AXIS", offset_text=HUB_SET_SPOT_OFFSET_XY,
     )
-    _hide_cosmetic_threads(adapter, view, label="D-D set-pocket section")
+    # The cast boss face is the spot face's stock, 1.0 proud of it: a
+    # reference, so the 21.0 alone locates the face the screw starts from.
+    _checked_dimension(
+        adapter, view,
+        p0=(GOOSENECK_X, -HALF_H-HUB_BOSS_DROP-2.0, GOOSENECK_Z), p1=boss_point,
+        text_xy=HUB_SET_BOSS_LINE_XY, label="set-screw boss face from bore axis",
+        expected_mm=HUB_SET_BOSS_FROM_AXIS, orientation="horizontal", reference=True,
+        entity_types=("SKETCHSEGMENT", "EDGE"), entities=(axes[0], boss_edge),
+        suffix="BOSS FACE\nFROM BORE AXIS", offset_text=HUB_SET_BOSS_OFFSET_XY,
+    )
+    spot_tip = model_point_in_view(
+        adapter, view, tuple(value/1000.0 for value in spot_point),
+        label="set-screw spot face finish leader",
+    )
+    spot_finish = add_surface_finish(
+        adapter,
+        view,
+        symbol_xy=(spot_tip[0]-HUB_SPOT_FINISH_REACH, spot_tip[1]),
+        control=surface_finish_by_key(SURFACE_FINISHES, "hub_set_spot_face"),
+        label="set-screw spot face finish",
+        entity=spot_edge,
+        leader_attach_xy=spot_tip,
+        char_height=0.0025,
+    )
+    _finish_leader_tail(spot_finish, label="set-screw spot face", length=HUB_SPOT_FINISH_TAIL)
+    _hide_cosmetic_threads(adapter, view, label="D-D set-screw boss section")
     _assert_section_display(
-        adapter, view, label="D-D set-pocket section", cut_surface_only=True,
+        adapter, view, label="D-D set-screw boss section", cut_surface_only=True,
         removed=True,
     )
     return view
@@ -1902,6 +2002,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Manufacturing Notes B",
+            "Manufacturing Notes C",
         ),
         required=(
             "Number",
@@ -1910,6 +2011,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Manufacturing Notes B",
+            "Manufacturing Notes C",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -2398,7 +2500,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         "Manufacturing Notes B",
         *keeper_facing_note_xy(keeper_callout_xy),
-        char_height=KEEPER_FACING_NOTE_HEIGHT,
+        char_height=FACING_NOTE_HEIGHT,
     )
     upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
@@ -2752,11 +2854,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Left", *HUB_LEFT_CENTER, scale=HUB_LEFT_SCALE,
     )
     set_hidden_lines_removed(adapter, hub_top)
-    # The set pocket is a recess in the face this view looks at and the set tap
-    # breaks its floor, so both read as visible ink; the dashed sockets at the
-    # rail ends were the only thing hidden lines added here, and sheets 3 and 4
-    # own those.  The re-assertions below are not redundant: creating the D-D
-    # section and picking its faces both put the parent back in its default.
+    # The set-screw boss stands out of the face this view looks at and the set
+    # tap breaks its spot face, so both read as visible ink; the dashed sockets
+    # at the rail ends were the only thing hidden lines added here, and sheets
+    # 3 and 4 own those.  The re-assertions below are not redundant: creating
+    # the D-D section and picking its faces both put the parent back in its
+    # default.
     set_hidden_lines_removed(adapter, detail_left)
     hub_top_dimensions = curate_view_dimensions(
         adapter, hub_top, keep=HUB_TOP_KEEP,
@@ -2770,14 +2873,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*hub_top_dimensions, *hub_left_dimensions],
         {name: "" for name in (*HUB_TOP_KEEP, *HUB_LEFT_KEEP)},
     )
-    set_dimension_callouts(
-        adapter, hub_left_dimensions,
-        {"PocketRise": "SQ POCKET\nOUTER LEFT FACE\nCENTRED ON SET TAP"},
-    )
+    set_dimension_callouts(adapter, hub_left_dimensions, HUB_LEFT_CALLOUTS)
     set_dimension_callouts(adapter, hub_top_dimensions, HUB_TOP_CALLOUTS)
     imported_annotations += [*hub_top_dimensions, *hub_left_dimensions]
     offset_dimension_text(
-        adapter, hub_left_dimensions, {"PocketRise": POCKET_RISE_TEXT_XY},
+        adapter, hub_left_dimensions, {"SetBossWidth": SET_BOSS_WIDTH_TEXT_XY},
     )
     _add_view_centerlines(
         adapter, hub_top,
@@ -2845,7 +2945,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, detail_left)
     detail_left_edges = scan_view_edges(detail_left, label="hub side")
-    tap_x = -(OUTER_X - SET_POCKET_DEPTH)
+    tap_x = SET_SPOT_FACE_X
     tap_radius = TAP_DRILL_MM[SET_TAP_SPEC.size] / 2.0
     rail_top_edge = None
     for item in detail_left_edges.lines:
@@ -2870,12 +2970,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_left,
         edge=set_tap_edge,
-        # Up-right of the tap, not up-left (clears leader-crosses-line 5.11
-        # THRU x PocketRise 16.0): was (0.070, 0.125), whose leader cut the
-        # pocket's y 99.9 extension line.  (0.2294, 0.1306) elbows at (199.4,
+        # Up-right of the tap: the boss width's extension lines leave one
+        # leader per side under their feet, and the spot face's Ø12.0 takes
+        # the left (SET_SPOT_DIA_TEXT_XY).  (0.2294, 0.1306) elbows at (199.4,
         # 125.0) mm and drops at 0.55 through the tap centre (146.5, 95.9),
-        # passing 2.0 mm right of that line's end (149.5, 99.9) and 5.2 mm
-        # over the 18.2 text; the text sits 12.8 mm above the view.
+        # passing 2.3 mm right of the right extension line's foot (151.0,
+        # 101.0) and 5.2 mm over the 18.2 text; the text sits 12.8 mm above
+        # the view.
         callout_xy=(
             HUB_LEFT_CENTER[0] + 0.0844,
             HUB_LEFT_CENTER[1] + 0.0356,
@@ -2936,7 +3037,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _gusset_ramp_angle(adapter, detail_left, detail_left_edges)
     set_hidden_lines_removed(adapter, detail_left)
     left_note = add_note(
-        adapter, "HUB SIDE / REMOVED VIEW SCALE 1:2\nRIB BOTTOMS, GUSSETS, POCKET RIM SHARP",
+        adapter, "HUB SIDE / REMOVED VIEW SCALE 1:2\nRIB BOTTOMS, GUSSETS SHARP",
         *HUB_LEFT_NOTE_XY,
     )
     if (
@@ -2945,13 +3046,8 @@ async def build(adapter: Any) -> dict[str, str]:
         or left_note is None
     ):
         raise RuntimeError("failed to label top-frame holes/sockets sheet")
-    hub_section = _hub_pocket_section(adapter, hub_top)
+    hub_section = _hub_boss_section(adapter, hub_top)
     _position_view_caption(adapter, hub_section, HUB_SECTION_CAPTION_XY)
-    # The one thing left in D-D that is neither a cut face nor a dimension is
-    # the set tap's cosmetic thread, drawn dashed because the tap runs into the
-    # page. It is annotation, not geometry, so no display mode removes it and
-    # nothing in the view measures it -- it says WHERE the tap breaks into the
-    # pocket, and the callout that specifies it is one view up on this sheet.
     if not ddoc.ActivateSheet("UNDERSIDE"):
         raise RuntimeError("failed to activate top-frame underside sheet")
     hub_bottom_parent = place_view(
@@ -2981,6 +3077,14 @@ async def build(adapter: Any) -> dict[str, str]:
         *HUB_BOTTOM_NOTE_XY,
     ) is None:
         raise RuntimeError("failed to label underside locator")
+    # The faced underside plane (user ruling 2026-10-12): the part's own
+    # linked note C, beside the enlarged hub boss and gussets it excludes.
+    add_property_linked_note(
+        adapter,
+        "Manufacturing Notes C",
+        *UNDERSIDE_FACING_NOTE_XY,
+        char_height=FACING_NOTE_HEIGHT,
+    )
     _checked_dimension(
         adapter, hub_bottom_parent,
         # The land ends' outline is the C2 breaks' upper edge.

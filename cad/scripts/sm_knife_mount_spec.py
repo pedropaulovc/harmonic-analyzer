@@ -133,8 +133,10 @@ def free_rock_deg(
 # the bore's .XX size at their band limits, t the ⊥Ø0.05 zone plus the dowel
 # yaw across the deepest .X block -- is
 # ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.16 in
-# the reamed bore), which owns the crossbar's slip terms.  Ø0.05 is also the bedding
-# gap a 0.05 feeler finds under a top seat that rocks on the casting.
+# the reamed bore), which owns the crossbar's slip terms.  The top seat
+# clamps to the frame's faced Ra 3.2 underside plane (MHA-FR-002, user ruling
+# 2026-10-12), so no bedding term enters: seat form tilts the block, it
+# cannot yaw the bore off the dowel line.
 KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 # The bore crown (its upper inner wall) below the top seat: 14.62.
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
