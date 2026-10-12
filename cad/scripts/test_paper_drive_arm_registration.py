@@ -1,10 +1,15 @@
-"""Pure registration receiver/geometry regressions, not operating-domain proof."""
+"""Registration receiver/geometry regressions and the arm files' saved-GTOL
+audit (real builds, seat stubbed), not operating-domain proof."""
 from __future__ import annotations
 
+import asyncio
+import importlib
 import math
 from dataclasses import replace
+from pathlib import Path
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 import pytest
 
 import paper_drive_arm_registration as registration
@@ -13,6 +18,68 @@ import pd_transgear_arm_plate_geometry as plate
 import pd_transgear_arm_spec as arm_spec
 import pd_transgear_arm_plate_spec as plate_spec
 import vn_transgear_arm_plate_locating_pin_spec as pin
+from _test_stubbed_build import keyed_artefacts, offline_adapter, seat_calls, stub_seat
+
+
+def _arm_part_seat(module, seat) -> None:
+    seat._mass.side_effect = [
+        (1.0, [0.0, 0.0, module.THICKNESS / 2.0]),
+        (module.V_PIN + 1.0, [1.0, 0.0, 0.0]),
+        (1.0, [0.0, 0.0, 0.0]),
+    ]
+    seat._open_end_face_sketch.return_value = (module.PIN_HOLE_Z, 0.0, True)
+    seat.name_bore_axis.side_effect = [f"Axis{k}" for k in range(1, 9)]
+
+
+def _plate_part_seat(module, seat) -> None:
+    lowered = (
+        module.V_PLATE * module.THICKNESS_OVER_ARM / 2.0
+        - module.V_LOWER * module.NOTCH_DEPTH / 2.0
+    ) / (module.V_PLATE + module.V_LOWER)
+    seat._mass.side_effect = [
+        (1.0, [0.0, 0.0, module.THICKNESS_OVER_ARM / 2.0]),
+        (1.0, [0.0, 0.0, lowered]),
+    ]
+    seat.name_bore_axis.side_effect = [f"Axis{k}" for k in range(1, 9)]
+    seat._sketch_mapper.side_effect = lambda _a, *, u_axis, v_axis, label: (
+        lambda xyz: (xyz[u_axis], xyz[v_axis])
+    )
+
+
+def _drawing_seat(module, seat) -> None:
+    seat.new_project_drawing.return_value = (MagicMock(), MagicMock())
+
+
+@pytest.mark.parametrize(
+    ("module_name", "export", "key", "prepare"),
+    [
+        ("build_pd_transgear_arm", "save_part_and_images", "part", _arm_part_seat),
+        ("build_pd_transgear_arm_plate", "save_part_and_images", "part", _plate_part_seat),
+        ("draw_pd_transgear_arm", "finalize_drawing", "drawing", _drawing_seat),
+        ("draw_pd_transgear_arm_plate", "finalize_drawing", "drawing", _drawing_seat),
+    ],
+)
+def test_saved_arm_files_are_audited_for_their_projected_gtols(
+    monkeypatch: pytest.MonkeyPatch, module_name, export, key, prepare
+) -> None:
+    # Each arm part and drawing audits the file it SAVED, not the open model:
+    # its own projected-zone controls, read from the path the export returns.
+    module = importlib.import_module(module_name)
+    if hasattr(module, "SOURCE"):
+        monkeypatch.setattr(module, "SOURCE", Path(__file__))
+    if hasattr(module, "hidden_sketches"):
+        monkeypatch.setattr(module, "hidden_sketches", MagicMock())
+    seat = stub_seat(monkeypatch, module)
+    prepare(module, seat)
+    getattr(seat, export).return_value = keyed_artefacts()
+    adapter = offline_adapter()
+    asyncio.run(module.build(adapter))
+    calls = seat_calls(seat, export, "require_saved_projected_gtols")
+    assert [name for name, _args, _kwargs in calls] == [export, "require_saved_projected_gtols"]
+    _name, args, _kwargs = calls[1]
+    assert args[0] is adapter
+    assert args[1] == f"<{key}>"
+    assert args[2] is module.GEOMETRIC_CONTROLS
 
 
 def _readings() -> tuple[registration.RegistrationReading, ...]:
