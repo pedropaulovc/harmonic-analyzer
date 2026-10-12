@@ -88,7 +88,9 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      their own station, BASIC 14.200 from it, datum B front / C rear, with
      the other station's round hole translated, B|C▷ and C|B▷, so the two
      knife mounts' dowel
-     lines stay square to the knife-edge line); summing-lever knife seat and
+     lines stay square to the knife-edge line; the frame holds the slot's
+     width, and a note holds its centre ±0.025 along the slot from the
+     BASIC 14.200); summing-lever knife seat and
      its 20-hole spring pattern (one pattern position frame);
    - **cams** — pinion-cam eccentric-axis position (and any future cam);
    - **channel consistency** — at most one control per channel part

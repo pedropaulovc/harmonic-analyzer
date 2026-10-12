@@ -1877,7 +1877,7 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
     clearance_r = (spec.HANGER_CLEARANCE_DIA + spec.DRILL_OVERSIZE) / 2.0
     slot_half = (spec.HANGER_SLOT_LENGTH + spec.HANGER_SLOT_LENGTH_TOL) / 2.0
     hole_off = spec.HANGER_PIN_X_TOL
-    slot_off = hole_off + spec.HANGER_SLOT_POSITION_TOL / 2.0
+    slot_off = hole_off + spec.HANGER_SLOT_ALONG_TOL
     walls = {
         "round hole | screw hole": (
             spec.HANGER_PIN_X - hole_off - hole_r - clearance_r,
@@ -2453,18 +2453,22 @@ def test_slot_basic_note_completes_both_stations_frames() -> None:
     # Codex review of a3735691 (sheet 6): F-F's bare box located the rear
     # slot only and left the frames' orientation to the B-C line implied.
     # Codex review of 87d93d70: a slot's plain position frame holds only its
-    # width's median plane, leaving the basic along the slot untoleranced.
-    # The note states both stations' basic, the 90 degrees and the zone both
-    # ways, with the values the spec owns -- the zone along the slot is what
-    # the spec's slot-to-screw wall stack charges; the 7.100 names the round
-    # holes it locates.
+    # width's median plane, leaving the basic along the slot untoleranced;
+    # codex review of 0bb6ba81: a note saying the frames' zone held both ways
+    # gave that direction no control.  The note states both stations' basic,
+    # the 90 degrees and the slot centre's tolerance along the slot, with the
+    # values the spec owns -- the half-zone the spec's slot-to-screw wall
+    # stack charges along the slot; the 7.100 names the round holes it
+    # locates.
     note = drawing.SLOT_BASIC_NOTE
-    zone = spec.GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"]
+    zone = float(spec.GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
     assert f"BASIC {spec.HANGER_SLOT_FROM_ROUND:.3f} FROM" in note
     assert "B (FRONT), C (REAR)" in note and "90 DEG TO B-C LINE" in note
-    assert f"{zone} POSITION ALONG AND ACROSS" in note
+    assert note.splitlines()[-1] == spec.HANGER_SLOT_ALONG_CALLOUT == "CENTRE \u00b10.025 ALONG SLOT"
+    assert "POSITION" not in note
+    assert spec.HANGER_SLOT_ALONG_TOL == pytest.approx(zone / 2.0)
     assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(
-        spec.HANGER_PIN_X_TOL + float(zone) / 2.0
+        spec.HANGER_PIN_X_TOL + spec.HANGER_SLOT_ALONG_TOL
     )
     # The 7.100 names the round holes it locates and, codex review of
     # 07527cf4, their transverse station: the screw axis's own Z.

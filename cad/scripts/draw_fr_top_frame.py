@@ -163,11 +163,11 @@ from fr_top_frame_spec import (
     HANGER_PIN_HOLE_DEPTH,
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_X,
+    HANGER_SLOT_ALONG_CALLOUT,
     HANGER_SLOT_FROM_ROUND,
     HANGER_SLOT_FROM_ROUND_PLACES,
     HANGER_SLOT_LENGTH,
     HANGER_SLOT_LENGTH_CALLOUT,
-    HANGER_SLOT_POSITION_TOL,
     HANGER_SLOT_WIDTH,
     HANGER_SLOT_WIDTH_CALLOUT,
     HUB_SET_BOSS_FROM_AXIS,
@@ -517,16 +517,19 @@ UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
 # unstated (codex review of a3735691, sheet 6).  A plain position frame on a
 # slot holds only its width's median plane, which left the basic 14.200
 # along the slot untoleranced and the slot-to-screw-hole wall unbounded
-# (codex review of 87d93d70).  The spec's wall stack already charges the
-# zone along the slot (HANGER_SLOT_STATION_TOL), so the note says it holds
-# both ways.  It takes the band between F-F's 7.100 block (top 113.3 mm)
+# (codex review of 87d93d70); a note claiming the frames' zone held both
+# ways still left it without a control that does (codex review of
+# 0bb6ba81).  The frames keep the width; the note tolerances the slot
+# centre along the slot from its basic 14.200 directly, by the half-zone
+# the spec's wall stack charges there (HANGER_SLOT_STATION_TOL).  It takes
+# the band between F-F's 7.100 block (top 113.3 mm)
 # and the 72.0 block's underline (136.6), left of detail C's fence (r 76
 # about the detail centre); top-left point, rows 4.6 mm apart and 3.6 tall,
 # 2.45 mm a glyph (87d93d70 render).
 SLOT_BASIC_NOTE = (
     f"SLOTS: BASIC {HANGER_SLOT_FROM_ROUND:.{HANGER_SLOT_FROM_ROUND_PLACES}f} FROM\n"
     "B (FRONT), C (REAR), AT\nBASIC 90 DEG TO B-C LINE;\n"
-    f"{HANGER_SLOT_POSITION_TOL:g} POSITION ALONG AND ACROSS"
+    + HANGER_SLOT_ALONG_CALLOUT
 )
 SLOT_BASIC_NOTE_XY = (0.150, 0.1345)
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
