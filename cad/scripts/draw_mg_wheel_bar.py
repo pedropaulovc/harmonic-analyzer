@@ -42,6 +42,7 @@ from _session import run_build
 import _telemetry
 from mg_wheel_bar_spec import (
     AXLE_BORE_X,
+    BAR_DEPTH,
     BAR_LENGTH,
     BAR_SIDE,
     DRAWING_DIMENSIONS,
@@ -78,17 +79,24 @@ FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.030),
     # The bar height off the right end, in the open sheet between the bar and
     # the end view: off the left end its text sat on the border's zone
-    # letter and frame line.
-    "Side": (RIGHT_END + 0.026, FRONT_CENTER[1]),
+    # letter and frame line. The model dimension sits on the left end, so its
+    # extension lines run the bar's whole length; the text stands above the
+    # top one rather than between them.
+    "Side": (RIGHT_END + 0.026, FRONT_CENTER[1] + 0.015),
     # The axle bore's station from the left end, above the bar; its reamed Ø
-    # up and right of the bore, so the leader leaves the circle clear of the
-    # station's extension line, the press lines standing clear of the bar.
+    # up and right of the bore, far enough right that the leader drops onto
+    # the bore past the station's dimension line, the press lines standing
+    # clear of the bar.
     "AxleBoreStation": ((LEFT_END + AXLE_BORE_SHEET_X) / 2.0, FRONT_CENTER[1] + 0.018),
-    "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.025, FRONT_CENTER[1] + 0.042),
+    "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.035, FRONT_CENTER[1] + 0.042),
 }
-# The bar depth (the extrude's banded model dimension) under the end view.
+# The bar depth (the extrude's banded model dimension) under the end view,
+# its text right of the extension lines: the callout is wider than the 9.
 RIGHT_KEEP = {
-    "BarDepth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - BAR_SIDE / 2000.0 - 0.014),
+    "BarDepth": (
+        RIGHT_CENTER[0] + BAR_DEPTH / 2000.0 + 0.034,
+        RIGHT_CENTER[1] - BAR_SIDE / 2000.0 - 0.014,
+    ),
 }
 # Each band states its need: the bore holds the pressed axle, the depth sets
 # where the axle's back end lands, the height's top limit clears the tie wire.
