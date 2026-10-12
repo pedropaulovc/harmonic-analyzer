@@ -178,10 +178,10 @@ def test_the_slot_takes_up_the_dowel_pair_spacing() -> None:
     # Same slip width as the round hole, so the pin keeps its slip across it.
     assert top_frame.HANGER_SLOT_WIDTH == top_frame.HANGER_PIN_HOLE_DIA
     assert top_frame.HANGER_SLOT_WIDTH_BAND == top_frame.HANGER_PIN_HOLE_DIA_BAND
-    # The slot stands a plain .XXX 14.200 from its round hole, so the
-    # crossbar's stations drop out.  Travel either way: 0.13 slot station +
-    # 0.13 knife-mount span + 0.046 round-hole slip; the shortest .XXX slot
-    # holds the largest pin.
+    # The slot stands BASIC 14.200 from its round hole, its centre +-0.13
+    # along the slot, so the crossbar's stations drop out.  Travel either
+    # way: 0.13 slot centre + 0.13 knife-mount span + 0.046 round-hole slip;
+    # the shortest .XXX slot holds the largest pin.
     assert top_frame.HANGER_SLOT_FROM_ROUND == pytest.approx(14.2)
     assert top_frame.HANGER_SLOT_TRAVEL == pytest.approx(0.30623)
     assert top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(3.79508)
@@ -215,6 +215,32 @@ def test_the_crossbar_webs_hold_round_the_hole_and_the_slot() -> None:
     ):
         assert wall >= 2.0
     assert build_fr_top_frame.SLOT_FLOOR_MARGIN == pytest.approx(18.0)
+
+
+def test_the_slot_length_band_is_functional() -> None:
+    # Codex review of 080fda97 asked for a one-place slot length.  The .XXX
+    # band is what keeps both ends of the stack: at the title block's .XX or
+    # .X band the shortest slot must still take the dowel's travel, so the
+    # longest one cuts the wall to the screw clearance hole under rule 12's
+    # 2.0 target.
+    wall_at_longest = (
+        build_fr_top_frame.SLOT_SCREW_WALL
+        + (top_frame.HANGER_SLOT_LENGTH + top_frame.HANGER_SLOT_LENGTH_TOL) / 2.0
+    )
+    walls = {}
+    for places in (1, 2, 3):
+        band = top_frame.PRINTED_LINEAR_BAND_MM[places]
+        shortest_nominal = (
+            math.ceil(
+                round((top_frame.HANGER_SLOT_LENGTH_REQUIRED + band) * 10**places, 6)
+            )
+            / 10**places
+        )
+        walls[places] = wall_at_longest - (shortest_nominal + band) / 2.0
+    assert walls[1] == pytest.approx(1.6065, abs=5e-4)
+    assert walls[2] == pytest.approx(1.8965, abs=5e-4)
+    assert max(walls[1], walls[2]) < 2.0 <= walls[3]
+    assert walls[3] >= build_fr_top_frame.SLOT_SCREW_WALL
 
 
 def test_the_dowel_pattern_frame_is_the_zone_the_stacks_were_derived_on() -> None:

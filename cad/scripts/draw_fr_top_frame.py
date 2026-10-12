@@ -55,6 +55,7 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
+    set_basic_dimension,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -162,6 +163,7 @@ from fr_top_frame_spec import (
     HANGER_PIN_HOLE_DEPTH,
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_X,
+    HANGER_SLOT_ALONG_CALLOUT,
     HANGER_SLOT_FROM_ROUND,
     HANGER_SLOT_FROM_ROUND_PLACES,
     HANGER_SLOT_LENGTH,
@@ -407,7 +409,7 @@ BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
 # A-A's joint note. The near wall between the flush counterbore floor and
 # the socket bore only starts the thread; the far casting wall carries the
 # MHA-VN-027 joint. Rule 12, print-worst: the stock shank, less the most
-# outboard printed floor (16.1 + band) and the largest printed socket radius.
+# outboard printed floor (16.35 + band) and the largest printed socket radius.
 _SOCKET_DIA_PLACES = DRAWING_PRECISION["BoreProfile"]["B0Dia"]
 CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
     CROSS_SCREW_SHANK_LEN
@@ -509,20 +511,25 @@ LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 # right of the caption's DETAIL C (316.1 mm), beside the hub boss and
 # gussets it excludes.
 UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
-# The slot position frames' location, stated for both stations: F-F cuts
-# only the rear slot, so the front slot's station and the frames' 90
-# degrees to the B-C line went unstated (codex review of a3735691, sheet
-# 6).  A slot's plain position frame holds only its width's centre plane,
-# through its round hole's axis at the implied basic zero; along the slot
-# its station from that hole is a plain .XXX 14.200, the dowel's relief
-# needing no tighter one (codex reviews of 0bb6ba81 and 50fe7633).  It takes
+# The slot position frames' basics, stated for both stations: F-F cuts only
+# the rear one, and its bare 14.200 box carries no text (a BASIC keeps none),
+# so the front slot's basic and the frames' 90 degrees to the B-C line went
+# unstated (codex review of a3735691, sheet 6).  A plain position frame on a
+# slot holds only its width's median plane, which left the basic 14.200
+# along the slot untoleranced and the slot-to-screw-hole wall unbounded
+# (codex review of 87d93d70); a note claiming the frames' zone held both
+# ways still left it without a control that does (codex review of
+# 0bb6ba81).  The frames keep the width; the note tolerances the slot
+# centre along the slot from its basic 14.200 directly, by the .XXX band
+# the spec's wall stack charges there (HANGER_SLOT_STATION_TOL).  It takes
 # the band between F-F's 7.100 block (top 113.3 mm)
 # and the 72.0 block's underline (136.6), left of detail C's fence (r 76
 # about the detail centre); top-left point, rows 4.6 mm apart and 3.6 tall,
 # 2.45 mm a glyph (87d93d70 render).
 SLOT_BASIC_NOTE = (
-    f"SLOTS: {HANGER_SLOT_FROM_ROUND:.{HANGER_SLOT_FROM_ROUND_PLACES}f} FROM\n"
-    "B (FRONT), C (REAR), AT\nBASIC 90 DEG TO B-C LINE"
+    f"SLOTS: BASIC {HANGER_SLOT_FROM_ROUND:.{HANGER_SLOT_FROM_ROUND_PLACES}f} FROM\n"
+    "B (FRONT), C (REAR), AT\nBASIC 90 DEG TO B-C LINE;\n"
+    + HANGER_SLOT_ALONG_CALLOUT
 )
 SLOT_BASIC_NOTE_XY = (0.150, 0.1345)
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
@@ -562,8 +569,8 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 # text and the boss's Ø30.0; its rows state the hole stands at the screw's
 # own Z (codex review of 07527cf4: the round holes, datums B and C, had no
 # transverse location).  A row higher, so the two dimension lines never
-# share the hole's extension line at one height, the slot's 14.200 from the
-# round hole, its text on
+# share the hole's extension line at one height, the slot's BASIC 14.200
+# from the round hole (the slot position frames' true location), its box on
 # a short jog up-left, right of the locator's label.  Under the slot, a row
 # below the hole's size so their arrows cannot meet: its length, the text on
 # a jog left of its line, so the leader leaves the underline's right end
@@ -1550,11 +1557,11 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         suffix="2X ROUND HOLE FROM\nSCREW AXIS, SAME Z",
         offset_text=PIN_STATION_OFFSET_XY,
     )
-    # The slot's station along the dowel line from the round hole beside it,
-    # a plain .XXX; bare, the note naming both stations (its above-text did
-    # not print on the 20261010T001553082Z render: layout audit
-    # text-unmatched).
-    _checked_dimension(
+    # The slot's true location for its position frame: BASIC from the round
+    # hole beside it, the bare box like every BASIC on the sheets (a BASIC
+    # keeps no below-text, and its above-text did not print on the
+    # 20261010T001553082Z render: layout audit text-unmatched).
+    slot_station = _checked_dimension(
         adapter, view,
         p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
         text_xy=SLOT_STATION_TEXT_XY, label="dowel slot from dowel hole",
@@ -1563,6 +1570,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         entities=(axes[2], axes[1]),
         offset_text=SLOT_STATION_OFFSET_XY,
     )
+    set_basic_dimension(adapter, slot_station, label="dowel slot from dowel hole")
     # The slot's end walls, where the cut runs through both end radii: the
     # straight run plus one width.
     slot_ends = [

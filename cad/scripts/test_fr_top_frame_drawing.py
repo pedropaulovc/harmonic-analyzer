@@ -130,16 +130,17 @@ def test_cross_screw_head_stays_below_the_counterbore_mouth_at_every_printed_ban
         assert recess == pytest.approx(part.COUNTERBORE_PRINTED_HEAD_RECESS)
 
 
-def test_counterbore_floor_keeps_an_allowance_to_the_cap_recess() -> None:
-    # Codex review of 67d8b2c6 (sheet 4, A-A): at .X the floor's outboard
-    # limit left 1.518 to the cap recess's deepest, widest corner, no
-    # allowance over rule 12's 1.5; .XXX read as over-precision (codex review
-    # of 63d4b5d6).  The floor's station prints .XX: every printed corner
-    # keeps 1.797.
+def test_counterbore_floor_keeps_rule_12_target_to_the_cap_recess() -> None:
+    # Codex reviews of 67d8b2c6 and 080fda97 (sheet 4, A-A): with the floor
+    # at 16.1 its outboard limit left 1.518 (.X) / 1.80 (.XX) to the cap
+    # recess's deepest, widest corner, and .XXX read as over-precision
+    # (63d4b5d6).  Rule 12 fixes it with geometry: the floor stands at 16.35
+    # and prints .XX; every printed corner keeps 2.0.
     floor_places = spec.DRAWING_REFERENCE_PRECISION["counterbore floor from socket axis"]
     axis_places = spec.DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
     seat_places = spec.DRAWING_PRECISION["CounterboreRearProfile"]["CB1Dia"]
     assert floor_places == 2
+    assert TOP_SCREW_SEAT_Z == 128.35
     floor_offset = (
         round(part.COUNTERBORE_FLOOR - abs(part.FRONT_COLUMN_Z), floor_places)
         - spec.PRINTED_LINEAR_BAND_MM[floor_places]
@@ -151,8 +152,10 @@ def test_counterbore_floor_keeps_an_allowance_to_the_cap_recess() -> None:
     ) / 2.0
     ligament = math.hypot(floor_offset - recess_radius, recess_floor - rim)
     assert ligament == pytest.approx(part.COUNTERBORE_PRINTED_CAP_LIGAMENT)
-    assert ligament == pytest.approx(1.797, abs=5e-4)
-    assert ligament >= 1.75
+    assert ligament == pytest.approx(2.040, abs=5e-4)
+    assert ligament >= 2.0
+    assert part.COUNTERBORE_PRINTED_NEAR_WALL >= 2.0
+    assert part.COUNTERBORE_PRINTED_HEAD_RECESS > 0.0
 
 
 def test_cross_tap_ends_stay_in_the_real_boss_and_side_web_union() -> None:
@@ -1864,10 +1867,9 @@ def test_dowel_slot_contract() -> None:
     assert spec.HANGER_SLOT_LENGTH - spec.HANGER_SLOT_LENGTH_TOL > spec.HANGER_SLOT_LENGTH_REQUIRED
     assert spec.HANGER_SLOT_DEPTH == spec.HANGER_PIN_HOLE_DEPTH
     assert part.SLOT_FLAT == pytest.approx(0.96)
-    # The slot stands a plain .XXX 14.200 from its round hole (codex review
-    # of 50fe7633); from the screw axis it carries both .XXX bands.
+    # The slot stands BASIC 14.200 from its round hole, its centre +-0.13
+    # along the slot; from the screw axis it carries both .XXX bands.
     assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(14.2)
-    assert spec.HANGER_SLOT_FROM_ROUND_TOL == spec.PRINTED_LINEAR_BAND_MM[3]
     assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(0.26)
     # Rule 12 walls and floor, print-worst and after drill drift: both meet
     # the 2.0 target.
@@ -1903,7 +1905,7 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
     clearance_r = (spec.HANGER_CLEARANCE_DIA + spec.DRILL_OVERSIZE) / 2.0
     slot_half = (spec.HANGER_SLOT_LENGTH + spec.HANGER_SLOT_LENGTH_TOL) / 2.0
     hole_off = spec.HANGER_PIN_X_TOL
-    slot_off = hole_off + spec.HANGER_SLOT_FROM_ROUND_TOL
+    slot_off = hole_off + spec.HANGER_SLOT_ALONG_TOL
     walls = {
         "round hole | screw hole": (
             spec.HANGER_PIN_X - hole_off - hole_r - clearance_r,
@@ -2470,45 +2472,49 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
     bottom = drawing._hanger_section_xy(part.HANGER_X, -part.HALF_H)[1]
     assert drawing.PIN_STATION_TEXT_XY[1] > top
     assert drawing.HANGER_SECTION_KEEP["HangerPinHoleDia"][1] < bottom
-    # The slot's station row stands above the hole's station row, so the two
+    # The slot's BASIC row stands above the hole's station row, so the two
     # dimension lines never meet on the round hole's extension line.
     assert drawing.SLOT_STATION_TEXT_XY[1] > drawing.PIN_STATION_TEXT_XY[1] + 0.004
 
 
-def test_slot_station_is_a_plain_xxx_from_its_round_hole() -> None:
-    # The slot stands 14.200 from the round hole beside it (datum B front, C
-    # rear), a bare dimension: its above-text did not print
-    # (20261010T001553082Z layout audit, text-unmatched).  A plain .XXX, not
-    # BASIC: the slot frame holds only the width, and the slot's relief
-    # along the dowel line needs no tighter location (codex review of
-    # 50fe7633).
+def test_slot_station_is_basic_from_its_round_hole() -> None:
+    # Machinist review (sheet 6): the slot position frames lacked a basic
+    # location.  The slot now stands BASIC 14.200 from the round hole beside
+    # it (datum B front, C rear), a bare box: its above-text did not print
+    # (20261010T001553082Z layout audit, text-unmatched).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     section = source[source.index("def _hanger_section(") : source.index("def _hub_underside_detail(")]
     assert "2X DOWEL SLOT\\nFROM SCREW AXIS" not in section
     assert "p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z)" in section
     assert "entities=(axes[2], axes[1])" in section
     assert "expected_mm=HANGER_SLOT_FROM_ROUND" in section
-    assert "set_basic_dimension" not in source
+    assert 'set_basic_dimension(adapter, slot_station, label="dowel slot from dowel hole")' in section
     assert "FROM DOWEL HOLE" not in section
     assert 'location="above"' not in section
     assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(spec.HANGER_ROUND_X - spec.HANGER_SLOT_X)
-    assert spec.DRAWING_REFERENCE_PRECISION["dowel slot from dowel hole"] == 3
-    assert spec.HANGER_SLOT_FROM_ROUND_TOL == spec.PRINTED_LINEAR_BAND_MM[3]
 
 
-def test_slot_note_completes_both_stations_frames() -> None:
-    # Codex review of a3735691 (sheet 6): F-F's bare dimension located the
-    # rear slot only and left the frames' orientation to the B-C line
-    # implied.  A slot's plain position frame holds only its width's centre
-    # plane (codex reviews of 87d93d70 and 0bb6ba81): the note puts that plane
-    # through B and C at the basic 90 degrees and gives both stations' .XXX
-    # 14.200 along the slot, with no tolerance of its own there (codex
-    # review of 50fe7633); the 7.100 names the round holes it locates.
+def test_slot_basic_note_completes_both_stations_frames() -> None:
+    # Codex review of a3735691 (sheet 6): F-F's bare box located the rear
+    # slot only and left the frames' orientation to the B-C line implied.
+    # Codex review of 87d93d70: a slot's plain position frame holds only its
+    # width's median plane, leaving the basic along the slot untoleranced;
+    # codex review of 0bb6ba81: a note saying the frames' zone held both ways
+    # gave that direction no control; codex review of 080fda97: the frames
+    # need the basic.  The note states both stations' basic, the 90 degrees
+    # and the slot centre's tolerance along the slot, the title block's .XXX
+    # band the spec's slot-to-screw wall stack charges (+-0.025 read as
+    # over-specification, 50fe7633); the 7.100 names the round holes it
+    # locates.
     note = drawing.SLOT_BASIC_NOTE
-    assert note.startswith(f"SLOTS: {spec.HANGER_SLOT_FROM_ROUND:.3f} FROM\n")
-    assert "B (FRONT), C (REAR)" in note and note.endswith("90 DEG TO B-C LINE")
-    assert "POSITION" not in note and "\u00b1" not in note
-    assert "ALONG" not in note and "BASIC 14" not in note
+    assert f"BASIC {spec.HANGER_SLOT_FROM_ROUND:.3f} FROM" in note
+    assert "B (FRONT), C (REAR)" in note and "90 DEG TO B-C LINE" in note
+    assert note.splitlines()[-1] == spec.HANGER_SLOT_ALONG_CALLOUT == "CENTRE \u00b10.13 ALONG SLOT"
+    assert "POSITION" not in note
+    assert spec.HANGER_SLOT_ALONG_TOL == spec.PRINTED_LINEAR_BAND_MM[3]
+    assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(
+        spec.HANGER_PIN_X_TOL + spec.HANGER_SLOT_ALONG_TOL
+    )
     # The 7.100 names the round holes it locates and, codex review of
     # 07527cf4, their transverse station: the screw axis's own Z.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
