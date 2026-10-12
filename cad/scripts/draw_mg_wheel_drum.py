@@ -77,13 +77,20 @@ DRAWING_PRECISION_BY_NAME = {
 # the O.D. is a donor there and moves onto the side view, right of the ring.
 # The bore's four-line callout stands up and right of the face view; the
 # length's two-line callout hangs under the side view, above the title
-# block, so the two text blocks never share a row.
+# block, so the two text blocks never share a row.  The length's block is
+# wider than the ring (run 14: its widest line printed 66.0 mm, centred on
+# its point), so it stands LEFT of the side view's extension lines, which
+# ran through it when it was centred between them.
+_RECESS_BLOCK_HALF = 0.034
 FRONT_KEEP = {
     "DrumOd": (0.060, 0.090),
     "DrumBore": (0.150, 0.228),
 }
 RIGHT_KEEP = {
-    "DrumLen": (RIGHT_CENTER[0], 0.112),
+    "DrumLen": (
+        RIGHT_CENTER[0] - DRUM_LEN / 2.0 * _S - 0.004 - _RECESS_BLOCK_HALF,
+        0.112,
+    ),
 }
 OD_ON_SIDE = (RIGHT_CENTER[0] + DRUM_LEN / 2.0 * _S + 0.030, RIGHT_CENTER[1])
 # Each band's need prints on its own callout (policy rule 6).
