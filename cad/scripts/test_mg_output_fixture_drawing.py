@@ -268,15 +268,107 @@ def test_end_view_dimensions_stack_above_the_hex_clear_of_the_tap_leader() -> No
     assert shoulder_y < flat_top - 0.004
 
 
+# Calls that add a centre mark; a comment naming one adds nothing.
+_MARK_ADDING_CALLS = frozenset(
+    {"auto_center_marks", "AutoInsertCenterMarks2", "InsertCenterMark3", "InsertCenterMark2"}
+)
+
+
+def _call_name(call: ast.Call) -> str:
+    func = call.func
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return func.id if isinstance(func, ast.Name) else ""
+
+
+def _arg_names(call: ast.Call) -> list[str]:
+    return [arg.id if isinstance(arg, ast.Name) else "" for arg in call.args]
+
+
+def _end_view_mark_calls(tree: ast.AST) -> list[tuple[str, list[str]]]:
+    """Every call that would add a centre mark to the end view: the drawing
+    document's inserts, which mark whatever view is active or selected, and
+    ``auto_center_marks`` handed ``end``."""
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node)
+        if name not in _MARK_ADDING_CALLS:
+            continue
+        args = _arg_names(node)
+        if name == "auto_center_marks" and "end" not in args:
+            continue
+        found.append((name, args))
+    return found
+
+
+def _build_function(tree: ast.Module) -> ast.AsyncFunctionDef:
+    builds = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    ]
+    assert len(builds) == 1
+    return builds[0]
+
+
 def test_end_view_tap_keeps_the_template_centre_mark_alone() -> None:
     # The template marks the tap as the view is placed: AutoInsertCenterMarks2
     # (2026-10-12 farm sheet, DetailItem347/350) and InsertCenterMark3 (run05)
     # each printed a second mark over it.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "auto_center_marks(adapter, end" not in source
-    assert "InsertCenterMark" not in source
-    assert "_prove_tap_centre_mark(adapter, end, tap_drill)" in source
-    assert "edge=tap_drill," in source
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    assert _end_view_mark_calls(tree) == []
+    build = _build_function(tree)
+    proofs = [
+        node
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call) and _call_name(node) == "_prove_tap_centre_mark"
+    ]
+    assert [_arg_names(call) for call in proofs] == [["adapter", "end", "tap_drill"]]
+    callouts = [
+        node
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call) and _call_name(node) == "add_native_hole_callout"
+    ]
+    assert len(callouts) == 1
+    edges = [kw.value for kw in callouts[0].keywords if kw.arg == "edge"]
+    assert len(edges) == 1
+    assert isinstance(edges[0], ast.Name) and edges[0].id == "tap_drill"
+    # The side view's bore still takes its mark (it has no template one).
+    side_marks = [
+        node
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call)
+        and _call_name(node) == "auto_center_marks"
+        and _arg_names(node)[:2] == ["adapter", "side"]
+    ]
+    assert len(side_marks) == 1
+
+
+@pytest.mark.parametrize(
+    ("source", "found"),
+    [
+        (
+            "def f(ddoc):\n    ddoc.InsertCenterMark3(2, False, False)\n",
+            [("InsertCenterMark3", ["", "", ""])],
+        ),
+        (
+            "def f(ddoc):\n    ddoc.AutoInsertCenterMarks2(7, 11, True)\n",
+            [("AutoInsertCenterMarks2", ["", "", ""])],
+        ),
+        (
+            "def f(adapter, end):\n    auto_center_marks(adapter, end, holes=True)\n",
+            [("auto_center_marks", ["adapter", "end"])],
+        ),
+        ("def f(adapter, side):\n    auto_center_marks(adapter, side)\n", []),
+        ("# ddoc.InsertCenterMark3(2, False, False)\n'InsertCenterMark3'\n", []),
+    ],
+)
+def test_end_view_mark_scanner_reads_calls_not_comments(
+    source: str, found: list[tuple[str, list[str]]]
+) -> None:
+    assert _end_view_mark_calls(ast.parse(source)) == found
 
 
 _AXIS_ON_SHEET = (0.262, 0.180)
