@@ -37,9 +37,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 FARM_PROTOCOL_VERSION = 6
 
-TASK_QUEUE_CONTROL = "solidworks-control"  # coordinator and BuildLeaf workflows
+TASK_QUEUE_CONTROL = "solidworks-control"  # coordinator and parked leaf workflows
 TASK_QUEUE_COM = "solidworks-com"  # build_leaf activity tasks
-WORKFLOW_BUILD_LEAF = "BuildLeaf6"
 WORKFLOW_BUILD_FIFO = "BuildFifo6"
 WORKFLOW_BUILD_FIFO_ID = "solidworks-build-fifo-6"
 ACTIVITY_BUILD_LEAF = "build_leaf"

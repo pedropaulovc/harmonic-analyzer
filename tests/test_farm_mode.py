@@ -1635,11 +1635,12 @@ def temporal_boundary(tmp_path, monkeypatch):
     monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
     monkeypatch.delenv("HARMONIC_FARM_REQUESTS", raising=False)
     calls = {"connect": [], "start": [], "submit": [], "handles": [], "queries": []}
+    calls["workflow_type"] = _farm.WORKFLOW_BUILD_FIFO
     outcome = {}
 
     class Handle:
         async def describe(self, **options):
-            return SimpleNamespace(workflow_type=_farm.WORKFLOW_BUILD_FIFO)
+            return SimpleNamespace(workflow_type=calls["workflow_type"])
 
         async def result(self, *, follow_runs):
             assert follow_runs is False, "result must not follow a replacement run"
@@ -1682,6 +1683,29 @@ def temporal_boundary(tmp_path, monkeypatch):
         outcome["result"] = result
 
     return calls, resolve
+
+
+def test_run_leaf_rejects_wrong_type_before_submission_or_request_record(
+    temporal_boundary, tmp_path, monkeypatch
+):
+    calls, resolve = temporal_boundary
+    # A usable protocol-6 result cannot make an old coordinator type safe.
+    resolve(_leaf_result())
+    calls["workflow_type"] = "BuildFifo"
+    requests = tmp_path / "run.requests"
+    requests.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+
+    with pytest.raises(RuntimeError) as failure:
+        _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    message = str(failure.value)
+    assert f"expected workflow type {_farm.WORKFLOW_BUILD_FIFO!r}" in message
+    assert "found 'BuildFifo'" in message
+    assert "coordinated producer/pool/worker cutover" in message
+    assert calls["submit"] == []
+    assert calls["queries"] == []
+    assert list(requests.iterdir()) == []
 
 
 def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
