@@ -764,7 +764,16 @@ def test_groove_root_dia_is_a_doubled_distance_to_the_root_point() -> None:
     assert geom.GROOVE_CENTRE_R - geom.GROOVE_RADIUS == pytest.approx(geom.GROOVE_ROOT_DIA / 2.0)
     helper = (SCRIPTS / "_drawing_dimension_insert.py").read_text(encoding="utf-8")
     assert "15,  # swDimensionType_e.swDiametricLinearDimension" in helper
-    assert set(drawing._DOUBLED_DISTANCE_TYPES) == {14, 15}
+    # swDimensionType_e: the sheet's import read the part's diametric linear
+    # dimension back as swDiameterDimension (6) with Diametric True (retry10,
+    # farm 20261012T170144152Z); the authoring type (15) is the other doubled
+    # distance.  Neither the single-distance radial linear (14) nor a plain
+    # linear is one.
+    assert drawing._DOUBLED_DISTANCE_TYPES == {
+        6: "swDiameterDimension",
+        15: "swDiametricLinearDimension",
+    }
+    assert drawing.GROOVE_ROOT_VALUE_SLOP_MM == 1e-5
 
 
 def test_groove_root_dia_is_proved_after_the_side_view_settles() -> None:
@@ -838,12 +847,26 @@ def test_groove_root_ink_off_the_groove_fails(case: str, problem: str) -> None:
     assert found is not None and problem in found
 
 
-class _RootDisplay:
-    """IDisplayDimension: Type2 and Diametric are properties."""
+class _RootDimension:
+    """IDimension: SystemValue is metres."""
 
-    def __init__(self, kind: int, diametric: bool) -> None:
+    def __init__(self, value_mm: float) -> None:
+        self.SystemValue = value_mm / 1000.0
+
+
+class _RootDisplay:
+    """IDisplayDimension: Type2, Diametric and DisplayAsLinear are properties;
+    GetDimension2 is a method taking the dimension index."""
+
+    def __init__(self, kind: int, diametric: bool, value_mm: float) -> None:
         self.Type2 = kind
         self.Diametric = diametric
+        self.DisplayAsLinear = False
+        self.dimension = _RootDimension(value_mm)
+
+    def GetDimension2(self, index: int) -> _RootDimension:
+        assert index == 0
+        return self.dimension
 
 
 class _RootAnnotation:
@@ -857,7 +880,11 @@ class _RootAnnotation:
 
 
 def _prove_root(
-    monkeypatch: pytest.MonkeyPatch, kind: int, diametric: bool, segments: list
+    monkeypatch: pytest.MonkeyPatch,
+    kind: int,
+    diametric: bool,
+    segments: list,
+    value_mm: float = geom.GROOVE_ROOT_DIA,
 ) -> list[str]:
     bound: list[str] = []
 
@@ -865,7 +892,7 @@ def _prove_root(
         bound.append(interface)
         return obj
 
-    annotation = _RootAnnotation(_RootDisplay(kind, diametric))
+    annotation = _RootAnnotation(_RootDisplay(kind, diametric, value_mm))
     monkeypatch.setattr(drawing, "_early_bound", early_bound)
     monkeypatch.setattr(
         drawing, "dimension_segments", lambda read: segments if read is annotation else []
@@ -874,15 +901,20 @@ def _prove_root(
     return bound
 
 
-@pytest.mark.parametrize("kind", [14, 15])
+@pytest.mark.parametrize("kind", [6, 15])
 def test_groove_root_proof_passes_a_nested_doubled_distance(
     monkeypatch: pytest.MonkeyPatch, kind: int
 ) -> None:
+    # Type 6 is retry10's native readback; the type, then the model value,
+    # then the ink are read, in that order.
     bound = _prove_root(monkeypatch, kind, True, _nested_root_ink())
-    assert bound == ["IAnnotation", "IDisplayDimension"]
+    assert bound == ["IAnnotation", "IDisplayDimension", "IDimension"]
 
 
-@pytest.mark.parametrize(("kind", "diametric"), [(2, True), (11, True), (15, False), (14, False)])
+@pytest.mark.parametrize(
+    ("kind", "diametric"),
+    [(2, True), (11, True), (12, True), (5, True), (14, True), (6, False), (15, False)],
+)
 def test_groove_root_proof_refuses_a_plain_or_single_distance(
     monkeypatch: pytest.MonkeyPatch, kind: int, diametric: bool
 ) -> None:
@@ -890,9 +922,26 @@ def test_groove_root_proof_refuses_a_plain_or_single_distance(
         _prove_root(monkeypatch, kind, diametric, _nested_root_ink())
 
 
+@pytest.mark.parametrize(
+    "value_mm",
+    [
+        geom.GROOVE_ROOT_DIA / 2.0,  # the single distance, axis to root
+        geom.GROOVE_RADIUS,  # the groove's radius
+        geom.SPIGOT_DIA,  # the other turned Ø
+        geom.GROOVE_ROOT_DIA + 2e-5,  # just outside the import's exactness
+    ],
+)
+def test_groove_root_proof_refuses_another_value(
+    monkeypatch: pytest.MonkeyPatch, value_mm: float
+) -> None:
+    # A circle's Ø reads the same type pair, so the model value is read too.
+    with pytest.raises(RuntimeError, match="not the groove root Ø"):
+        _prove_root(monkeypatch, 6, True, _nested_root_ink(), value_mm)
+
+
 def test_groove_root_proof_refuses_retry09s_ink(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(RuntimeError, match="does not print across the groove"):
-        _prove_root(monkeypatch, 15, True, _RETRY09_ROOT_INK)
+        _prove_root(monkeypatch, 6, True, _RETRY09_ROOT_INK)
 
 
 def test_bore_callout_reads_over_the_hex_between_its_witnesses() -> None:

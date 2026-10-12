@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_mg_magnifying_lever as part
 import draw_mg_magnifying_lever as drawing
 import mg_magnifying_lever_spec
@@ -450,11 +452,14 @@ def test_view_scales_are_explicit() -> None:
     assert "End View Note" not in Path(part.__file__).read_text(encoding="utf-8")
 
 
-def test_od_finish_is_the_parts_native_symbol_on_the_silhouette() -> None:
+def test_od_finish_is_the_parts_native_symbol_on_the_od_face() -> None:
     """Retry09 review: the Ra note becomes the part-owned finish control
-    (the clamp block slides on the OD), projected with the audited helper on
-    the cylinder's silhouette; the capsule still carries no datum, frame or
-    edge dimension."""
+    (the clamp block slides on the OD), projected with the audited helper;
+    the capsule still carries no datum, frame or edge dimension.  Source-644
+    native leaf: the silhouette pick's re-read type-46 attachment failed the
+    owning-face IsSame proof, so the symbol attaches to the controlled model
+    FACE, which IsSame proves directly, and lands its leader on the top
+    outline."""
     from _gtol_cylinder import CylinderFace
     from _surface_finish import MACHINED_UM
 
@@ -466,23 +471,264 @@ def test_od_finish_is_the_parts_native_symbol_on_the_silhouette() -> None:
     sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
     compact = "".join(sheet_source.split())
     assert 'control=surface_finish_by_key(SURFACE_FINISHES,"rod_od")' in compact
-    assert 'entity_type="SILHOUETTE"' in sheet_source
+    assert 'entity_type="SILHOUETTE"' not in sheet_source
     assert "roughness_ra=" not in sheet_source
     assert sheet_source.count("add_surface_finish(") == 1
     assert sheet_source.count("add_datum_feature(") == 0
     assert sheet_source.count("add_feature_control_frame(") == 0
     assert sheet_source.count("add_edge_dimension(") == 0
-    # The pick is on the top silhouette inside the clamp's travel: past the
-    # west dome, short of the press zone.
-    pick_x, pick_y = drawing.FINISH_PICK
-    west_tangent_x = (
-        drawing.FRONT_CENTER[0]
-        - drawing.ROD_LENGTH / 2000.0
-        + mg_magnifying_lever_spec.ROD_DIA / 2000.0
+    assert not hasattr(drawing, "FINISH_PICK")
+    # The landing is on the top outline inside the clamp's travel: past the
+    # west dome's tangent, short of the press zone, in part X.
+    station_x, outline_y, plane_z = drawing.FINISH_LANDING_MODEL
+    assert station_x == drawing.FINISH_STATION_MM / 1000.0
+    assert outline_y == mg_magnifying_lever_spec.ROD_DIA / 2000.0
+    assert plane_z == 0.0
+    west_tangent = mg_magnifying_lever_spec.ROD_DIA / 2.0
+    press_zone_start = drawing.ROD_LENGTH - drawing.PRESS_ZONE_LENGTH
+    assert west_tangent < drawing.FINISH_STATION_MM < press_zone_start
+    # On the 1:1 front view centred on the rod it projects under the symbol,
+    # which stands above the rod.
+    sheet_x = drawing.FRONT_CENTER[0] + (
+        drawing.FINISH_STATION_MM - drawing.ROD_LENGTH / 2.0
+    ) * drawing.SHEET_SCALE[0] / 1000.0
+    assert sheet_x == pytest.approx(drawing.FINISH_SYMBOL[0])
+    assert drawing.FINISH_SYMBOL[1] > drawing._ROD_TOP_Y
+
+
+def test_od_finish_attaches_the_resolved_face_at_its_landing() -> None:
+    """The build hands add_surface_finish the resolved face and its
+    projected landing -- never a coordinate hit-test or a silhouette."""
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
     )
-    assert pick_y == drawing._ROD_TOP_Y
-    assert west_tangent_x < pick_x < drawing._PRESS_ZONE_START_X
-    assert drawing.FINISH_SYMBOL[1] > pick_y
+    calls = [
+        node for node in ast.walk(build)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    (finish,) = [node for node in calls if node.func.id == "add_surface_finish"]
+    (pick,) = [node for node in calls if node.func.id == "_rod_od_finish_pick"]
+    assert [ast.unparse(arg) for arg in pick.args] == ["adapter", "front"]
+    assert [ast.unparse(arg) for arg in finish.args] == ["adapter", "front"]
+    assigned = next(
+        node for node in ast.walk(build)
+        if isinstance(node, ast.Assign) and node.value is pick
+    )
+    (target,) = assigned.targets
+    assert [element.id for element in target.elts] == ["od_face", "od_landing"]
+    keywords = {kw.arg: ast.unparse(kw.value) for kw in finish.keywords}
+    assert keywords["entity"] == "od_face"
+    assert keywords["leader_attach_xy"] == "od_landing"
+    assert keywords["entity_type"] == "'FACE'"
+    assert keywords["symbol_xy"] == "FINISH_SYMBOL"
+    assert not {"edge_xy", "edge_entity", "roughness_ra"} & set(keywords)
+
+
+class _View:
+    def __init__(self, document: object) -> None:
+        self.ReferencedDocument = document
+
+
+def test_od_finish_pick_resolves_the_part_control_on_the_referenced_part(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The face is the part PMI's own ``rod_od`` spec, resolved (exactly one
+    match) on the part the front view references; the landing is the model
+    top-outline point projected through that view."""
+    from _gtol_cylinder import CylinderFace
+
+    part_document, od_face, landing = object(), object(), (0.065, 0.153)
+    adapter, view = object(), _View(part_document)
+    seen: dict[str, tuple[object, ...]] = {}
+
+    def resolve(document: object, requests: dict[str, object]) -> dict[str, object]:
+        seen["resolve"] = (document, requests)
+        return {"rod_od": od_face}
+
+    def project(
+        adapter_: object, view_: object, xyz: tuple[float, ...], *, label: str
+    ) -> tuple[float, float]:
+        seen["project"] = (adapter_, view_, xyz, label)
+        return landing
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "resolve_faces", resolve)
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+
+    assert drawing._rod_od_finish_pick(adapter, view) == (od_face, landing)
+    document, requests = seen["resolve"]
+    assert document is part_document
+    assert requests == {"rod_od": CylinderFace(mg_magnifying_lever_spec.ROD_DIA)}
+    adapter_, view_, xyz, label = seen["project"]
+    assert adapter_ is adapter and view_ is view
+    assert xyz == pytest.approx((0.0325, 0.003, 0.0))
+    assert label == "lever rod OD finish landing"
+
+
+def test_od_finish_pick_fails_closed_when_the_face_does_not_resolve(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A spec matching zero or several faces (a split or missing OD) stops
+    the sheet before anything is selected or projected."""
+
+    def resolve(document: object, requests: dict[str, object]) -> dict[str, object]:
+        raise RuntimeError("rod_od: face spec matched 2 faces")
+
+    def project(*_args: object, **_kwargs: object) -> tuple[float, float]:
+        raise AssertionError("projected a landing for an unresolved face")
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "resolve_faces", resolve)
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    with pytest.raises(RuntimeError, match="matched 2 faces"):
+        drawing._rod_od_finish_pick(object(), _View(object()))
+
+
+class _Annotation:
+    """The ``IAnnotation`` readbacks the attachment proofs send."""
+
+    def __init__(
+        self,
+        entities: tuple[object, ...],
+        types: tuple[int, ...],
+        *,
+        leaders: int = 1,
+        dangling: bool = False,
+        tip: tuple[float, float] = (0.0, 0.0),
+    ) -> None:
+        self.entities, self.types = entities, types
+        self.leaders, self.dangling, self.tip = leaders, dangling, tip
+
+    def GetAttachedEntities3(self) -> tuple[object, ...]:  # noqa: N802
+        return self.entities
+
+    def GetAttachedEntityCount3(self) -> int:  # noqa: N802
+        return len(self.entities)
+
+    def GetAttachedEntityTypes(self) -> tuple[int, ...]:  # noqa: N802
+        return self.types
+
+    def GetLeaderCount(self) -> int:  # noqa: N802
+        return self.leaders
+
+    def IsDangling(self) -> bool:  # noqa: N802
+        return self.dangling
+
+    def GetLeaderPointsAtIndex(self, index: int) -> tuple[float, ...]:  # noqa: N802
+        assert index == 0
+        return (drawing.FINISH_SYMBOL[0], drawing.FINISH_SYMBOL[1], 0.0, *self.tip, 0.0)
+
+
+class _Silhouette:
+    """An ``ISilhouetteEdge``: identified only through its owning face."""
+
+    def __init__(self, face: object) -> None:
+        self.face = face
+
+    def GetFace(self) -> object:  # noqa: N802
+        return self.face
+
+
+class _App:
+    def IsSame(self, left: object, right: object) -> int:  # noqa: N802
+        return int(left is right)
+
+
+class _Adapter:
+    swApp = _App()
+
+
+_LANDING = (0.065, 0.153)
+
+
+def _prove(annotation: _Annotation, entity: object, entity_type: str) -> None:
+    import _drawing_attachment
+
+    label = "lever rod OD finish"
+    _drawing_attachment._assert_attached_to(
+        _Adapter(), annotation, entity, entity_type=entity_type,
+        what="surface-finish symbol", label=label,
+    )
+    _drawing_attachment._assert_leader_lands(
+        annotation, _LANDING, what="surface-finish symbol", label=label
+    )
+
+
+def test_od_finish_proof_reproduces_the_native_silhouette_miss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Source-644: one live, non-dangling type-46 attachment whose owning
+    face is not IsSame the picked silhouette's.  That is no proof of the
+    land, and the guard must keep refusing it word for word."""
+    import _drawing_attachment
+
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    picked, reread = _Silhouette(object()), _Silhouette(object())
+    with pytest.raises(RuntimeError) as info:
+        _prove(_Annotation((reread,), (46,), tip=_LANDING), picked, "SILHOUETTE")
+    assert str(info.value) == (
+        "surface-finish symbol lost its silhouette attachment (lever rod OD "
+        "finish): entities=1, count=1, types=(46,), same_entity=False, "
+        "dangling=False, leaders=1"
+    )
+
+
+def test_od_finish_proof_accepts_only_the_resolved_face_at_its_landing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import _drawing_attachment
+
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    od_face = object()
+    _prove(_Annotation((od_face,), (2,), tip=_LANDING), od_face, "FACE")
+
+
+@pytest.mark.parametrize(
+    ("attached", "types", "options", "expected"),
+    (
+        # A silhouette is not the face, even one OF the face: no type-46
+        # attachment passes the FACE proof.
+        ("od-silhouette", (46,), {}, "types=(46,)"),
+        # The neighbouring dome's sphere, or any other face.
+        ("dome", (2,), {}, "same_entity=False"),
+        ("od", (2,), {"dangling": True}, "dangling=True"),
+        ("od", (2,), {"leaders": 0}, "leaders=0"),
+        (None, (), {}, "entities=0"),
+        # The right face, landed on the bottom flank (one Ø down).
+        ("od", (2,), {"tip": (_LANDING[0], _LANDING[1] - 0.006)}, "attachment moved"),
+        # The right face, landed at another station or in another view.
+        ("od", (2,), {"tip": (_LANDING[0] + 0.090, _LANDING[1])}, "attachment moved"),
+    ),
+    ids=(
+        "silhouette", "wrong-face", "dangling", "no-leader", "detached",
+        "bottom-flank", "wrong-station",
+    ),
+)
+def test_od_finish_proof_rejects_wrong_entity_geometry_or_landing(
+    monkeypatch: pytest.MonkeyPatch,
+    attached: str | None,
+    types: tuple[int, ...],
+    options: dict[str, object],
+    expected: str,
+) -> None:
+    import _drawing_attachment
+
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    od_face = object()
+    entities = {
+        "od": (od_face,),
+        "od-silhouette": (_Silhouette(od_face),),
+        "dome": (object(),),
+        None: (),
+    }[attached]
+    annotation = _Annotation(entities, types, **{"tip": _LANDING, **options})
+    with pytest.raises(RuntimeError, match=r"\(lever rod OD finish\)") as info:
+        _prove(annotation, od_face, "FACE")
+    assert expected in str(info.value)
 
 
 def test_part_stamps_make_critical_properties() -> None:

@@ -10,9 +10,9 @@ cold-drawn band at mid-length) and ``PressZone`` (the cylinder the bracket
 collar grips -- its banded start back from the east tip, its length to the
 dome tangent as a reference, and its banded diameter, tied to the MHA-MG-001
 bore it enters).  The OD's finish is the part's native symbol on the rod's
-silhouette.  The rod axis is local +X, so the FRONT view is the long side
-elevation; an end view of a plain round would show nothing the Ø does not, so
-there is none.
+one Ø6 cylinder face.  The rod axis is local +X, so the FRONT view is the
+long side elevation; an end view of a plain round would show nothing the Ø
+does not, so there is none.
 
 Run with SolidWorks open::
 
@@ -44,8 +44,10 @@ from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dim
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_face_resolve import resolve_faces
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -120,10 +122,39 @@ REFERENCE_CALLOUTS = {
     "PressZoneStart": "PRESS ZONE START",
     "PressZoneDia": PRESS_ZONE_DIA_CALLOUT,
 }
-# The OD finish symbol: picked on the rod's top silhouette in the clamp
-# block's travel, standing above it, left of the stock diameter.
-FINISH_PICK = (FRONT_CENTER[0] - 0.050, _ROD_TOP_Y)
+# The OD finish: the part-owned ``rod_od`` control's ONE Ø6 cylinder, resolved
+# on the part the front view references and attached as that model FACE; its
+# leader lands on the rod's top outline in the clamp block's travel, past the
+# west dome and short of the press zone, and the symbol stands above it, left
+# of the stock diameter.  Not a SILHOUETTE pick: on the source-644 native leaf
+# the inserted symbol re-read one live type-46 attachment whose
+# ISilhouetteEdge::GetFace failed IsSame against the picked silhouette's
+# (same_entity=False, dangling=False), so nothing proved which surface it sat
+# on.  ISldWorks::IsSame proves a model face itself, and the 1 mm leader
+# landing pins the flank and station (draw_dt_pinion_arbor's journal finishes).
+FINISH_STATION_MM = ROD_LENGTH / 2.0 - 50.0  # part X, from the west dome tip
+FINISH_LANDING_MODEL = (FINISH_STATION_MM / 1000.0, ROD_DIA / 2000.0, 0.0)
 FINISH_SYMBOL = (FRONT_CENTER[0] - 0.050, FRONT_CENTER[1] + 0.020)
+
+
+def _rod_od_finish_pick(adapter: Any, view: Any) -> tuple[Any, tuple[float, float]]:
+    """The OD finish's target: ``(controlled face, sheet landing)``.
+
+    The face is the one the part's own Ra PMI names (``SURFACE_FINISHES``'
+    ``rod_od`` spec), resolved on the view's referenced part with the
+    exactly-one-match contract the part build's PMI pass used; the landing is
+    the model point on the top outline at ``FINISH_STATION_MM``, projected
+    through the view's current transform.
+    """
+    control = surface_finish_by_key(SURFACE_FINISHES, "rod_od")
+    document = _early_bound(
+        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    face = resolve_faces(document, {control.key: control.face})[control.key]
+    landing = model_point_in_view(
+        adapter, view, FINISH_LANDING_MODEL, label="lever rod OD finish landing"
+    )
+    return face, landing
 
 
 def _set_radial_reference(adapter: Any, annotation: Any, *, label: str) -> None:
@@ -226,15 +257,17 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"expected one lever {name} reference dimension")
         set_reference_dimension(adapter, matches[0], label=f"lever {name}")
     # The clamp block slides on the OD: the part's own finish control, on the
-    # cylinder's silhouette (the capsule has no model edge along it).
+    # cylinder's model face (the capsule has no model edge along it).
+    od_face, od_landing = _rod_od_finish_pick(adapter, front)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=FINISH_PICK,
+        entity=od_face,
+        leader_attach_xy=od_landing,
         symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "rod_od"),
         label="lever rod OD finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
         char_height=0.0025,
     )
 

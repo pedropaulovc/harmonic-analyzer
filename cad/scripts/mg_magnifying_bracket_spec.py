@@ -42,10 +42,16 @@ from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
 # collar length with its band (COLLAR_LENGTH_BAND: the press contact is the
 # collar's length less the lever's dome), to the front view.  The blanked
 # ArmSection witness (Right plane) imports to the same side view: the arm's
-# thickness, its lower face from the bore axis (controlling) and from the
-# flange's hole-datum face (reference), the flange's mounting face and the
-# arm's end from the bore axis; its last closing dimension (the flange above
-# the arm) stays unmarked. ---
+# lower face from the bore axis (controlling), the flange's mounting face
+# from the bore axis and the arm's end past that face -- the ONE toleranced
+# chain along Z (mreview10 blocker 2); its thickness and offset copies and
+# its closing dimension (the flange above the arm) stay unmarked.  The
+# blanked ArmFootprint witness (Front plane) imports to the BOTTOM view,
+# where the arm's end face prints face-on inside the flange's outline: the
+# arm's thickness and its lower face from the flange's hole-datum edge (both
+# controlling: the arm face is the machinist's measurable datum for the
+# holes' row, mreview10 blocker 1), toleranced where the footprint is seen,
+# not edge-on. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarBore"},
     "Collar": {"CollarLen"},
@@ -53,9 +59,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FlangeProfile": {"FlangeWidth", "FlangeDepth"},
     "Flange": {"FlangeHeight"},
     "MountingCoordinates": {"MountingX0", "MountingX1", "MountingY0"},
-    "ArmSection": {
-        "ArmThickness", "ArmBelowAxis", "ArmOffset", "SeatToAxis", "ArmEndFromAxis",
-    },
+    "ArmSection": {"ArmBelowAxis", "SeatToAxis", "ArmPastSeat"},
+    "ArmFootprint": {"FootprintThickness", "FootprintOffset"},
 }
 
 # Wizard callout precision is applied in the build through observed native
@@ -66,14 +71,14 @@ DRAWING_PRECISION = {
     "ArmProfile": {"ArmWidth": 2},
     "FlangeProfile": {"FlangeWidth": 2, "FlangeDepth": 3},
     "Flange": {"FlangeHeight": 2},
-    "ArmSection": {
-        "ArmThickness": 2,
-        "ArmBelowAxis": 2,
-        "ArmOffset": 2,
-        "SeatToAxis": 2,
-        "ArmEndFromAxis": 2,
-    },
+    "ArmSection": {"ArmBelowAxis": 2, "SeatToAxis": 2, "ArmPastSeat": 2},
+    "ArmFootprint": {"FootprintThickness": 2, "FootprintOffset": 2},
 }
+# The one SHEET-derived dimension: the arm's end from the bore axis, printed
+# in parentheses as the read-only sum SeatToAxis + ArmPastSeat (58.30).  A
+# reference's places are still specification, so the sheet passes them
+# through SetPrecision3 only from here (drawing-simplicity-policy rule 2).
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"arm end from bore axis": 2}
 # The collar's length band, like the bore's, is read by the build straight
 # from mg_lever_press_fit_geom (COLLAR_LENGTH_BAND) onto the extrude's CollarLen.
 DRAWING_POSITION_BAND = POSITION_BAND

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import build_mg_magnifying_bracket as part
@@ -26,19 +27,34 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     marked = set().union(*mg_magnifying_bracket_spec.DRAWING_DIMENSIONS.values())
     kept = (
         set(drawing.FRONT_KEEP) | set(drawing.BOTTOM_KEEP) | set(drawing.BOTTOM_HOLE_KEEP)
+        | set(drawing.BOTTOM_FOOTPRINT_KEEP)
         | set(drawing.SIDE_KEEP) | set(drawing.SIDE_SECTION_KEEP)
     )
     assert kept == marked
     # The arm's depth (54.30 from a start buried inside the collar) is not
-    # marked: the arm's end is located from the bore axis instead (mreview09
-    # blocker 3, the collar located twice from different origins).
+    # marked, nor the arm's end from the bore axis as a model dimension: the
+    # bore axis has ONE toleranced chain along Z -- the mounting face from
+    # the axis, the arm's end past that face -- and the sheet prints their
+    # sum as its one reference dimension (mreview09 blocker 3, mreview10
+    # blocker 2).  The arm's thickness and its offset from the flange's
+    # hole-datum edge print ONCE, in the bottom view from the ArmFootprint
+    # witness (where the arm's end face is seen face-on), so the section's
+    # own copies of the same two values (ArmThickness, ArmOffset, which
+    # define that sketch) stay unmarked: no duplicate controls.
     assert marked == {
         "CollarOd", "CollarBore", "CollarLen",
         "ArmWidth", "FlangeWidth", "FlangeDepth", "FlangeHeight",
         "MountingX0", "MountingX1", "MountingY0",
-        "ArmThickness", "ArmBelowAxis", "ArmOffset", "SeatToAxis", "ArmEndFromAxis",
+        "ArmBelowAxis", "SeatToAxis", "ArmPastSeat",
+        "FootprintThickness", "FootprintOffset",
     }
-    assert "ArmDepth" not in marked
+    assert "ArmThickness" not in marked and "ArmOffset" not in marked
+    assert "ArmDepth" not in marked and "ArmEndFromAxis" not in marked
+    # The one sheet-derived dimension's places live beside the model's, and
+    # the drawing reads them through the spec, never a literal.
+    assert drawing.DRAWING_REFERENCE_PRECISION is mg_magnifying_bracket_spec.DRAWING_REFERENCE_PRECISION
+    assert set(mg_magnifying_bracket_spec.DRAWING_REFERENCE_PRECISION) == {drawing.ARM_END_REFERENCE}
+    assert not set(mg_magnifying_bracket_spec.DRAWING_REFERENCE_PRECISION) & marked
     # Every marked dimension prints at a spec'd precision: the mounting
     # coordinates take theirs in _mounting_coordinate_dimensions (two places,
     # with the position band), the rest from DRAWING_PRECISION.
@@ -170,22 +186,13 @@ def test_collar_bore_keeps_the_templates_one_center_mark(monkeypatch) -> None:
     }
     assert "auto_center_marks" not in imported
     assert drawing._CENTER_MARK_ANNOTATION == 13
-    assert "_prove_collar_centre_mark(adapter, side)" in source
+    assert "_prove_collar_centre_mark(adapter, side, bore_axis)" in source
+    assert "bore_axis = _collar_axis(adapter, side, _collar_bore_rim(side_edges))" in source
     assert "curate_hidden_dimensions(" in source
     assert "add_native_hole_callout(" in source
 
     right = object()
     axis = (0.26615, 0.180)
-
-    def rim(view):
-        assert view is right
-        # ViewEdge.circle: centre and radius in mm, on the near end face.
-        return SimpleNamespace(circle=(5.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.993))
-
-    def project(adapter, view, xyz, *, label):
-        assert view is right
-        assert xyz == (0.005, 0.0, 0.0)
-        return axis
 
     def mark(centre, reach=0.005493):
         lines = [
@@ -200,49 +207,91 @@ def test_collar_bore_keeps_the_templates_one_center_mark(monkeypatch) -> None:
         GetAnnotationsByType=lambda kind: list(marks) if kind == 13 else []
     )
     successes = []
-    monkeypatch.setattr(drawing, "_collar_bore_rim", rim)
-    monkeypatch.setattr(drawing, "model_point_in_view", project)
     monkeypatch.setattr(
         drawing, "_early_bound", lambda obj, interface: view_api if interface == "IView" else obj
     )
     monkeypatch.setattr(drawing._telemetry, "success", lambda message, **fields: successes.append(message))
 
     with pytest.raises(RuntimeError, match="0 centre marks"):
-        drawing._prove_collar_centre_mark(object(), right)
+        drawing._prove_collar_centre_mark(object(), right, axis)
     marks[:] = [mark(axis), mark(axis)]
     with pytest.raises(RuntimeError, match="2 centre marks"):
-        drawing._prove_collar_centre_mark(object(), right)
+        drawing._prove_collar_centre_mark(object(), right, axis)
     assert len(marks) == 2
     marks[:] = [mark((axis[0] + 0.001, axis[1]))]
     with pytest.raises(RuntimeError, match="off the bore axis"):
-        drawing._prove_collar_centre_mark(object(), right)
+        drawing._prove_collar_centre_mark(object(), right, axis)
     marks[:] = [mark(axis)]
-    drawing._prove_collar_centre_mark(object(), right)
+    drawing._prove_collar_centre_mark(object(), right, axis)
     assert successes and "one centre mark" in successes[-1]
 
 
-def test_collar_bore_rim_is_picked_on_the_near_end_face(monkeypatch) -> None:
+def test_collar_axis_is_the_rims_centre_projected_to_the_sheet(monkeypatch) -> None:
     from types import SimpleNamespace
+    right = object()
+    rim = SimpleNamespace(circle=(5.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.993))
+
+    def project(adapter, view, xyz, *, label):
+        assert view is right
+        assert xyz == (0.005, 0.0, 0.0)
+        assert label == "collar bore axis"
+        return (0.228, 0.20615)
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    assert drawing._collar_axis(object(), right, rim) == (0.228, 0.20615)
+    assert successes and "one centre mark" in successes[-1]
+
+
+def test_collar_rims_and_arm_end_are_picked_on_the_near_end_face() -> None:
+    """One edge sweep of the side view serves the bore rim (the centre mark's
+    and both proofs' axis), the OD rim (the sheet reference's anchor) and
+    the arm's end edge (its other pick): *Right looks from +X, so the
+    visible rims lie on the face at +COLLAR_HALF_LEN and the arm's end edge
+    nearest the viewer at +ARM_HALF_X."""
+    from types import SimpleNamespace
+    import pytest
     import mg_lever_press_fit_geom as press
     import mg_magnifying_lever_geom as lever
-    right = object()
     calls = []
 
     def circle_at(center, radius, *, axis, label):
-        calls.append((center, radius, axis))
+        calls.append((center, radius, axis, label))
         return SimpleNamespace(edge=object(), circle=(*center, *axis, radius))
 
-    def scan(view, *, label):
-        assert view is right
-        return SimpleNamespace(circle_at=circle_at)
+    lines = {}
 
-    monkeypatch.setattr(drawing, "scan_view_edges", scan)
-    drawing._collar_bore_rim(right)
-    # *Right looks from +X: the face at +COLLAR_HALF_LEN carries the visible
-    # rims, and the bore (not the OD) is the circle the mark belongs to.
-    assert calls == [((lever.COLLAR_HALF_LEN, 0.0, 0.0), press.COLLAR_BORE_DIA / 2.0, (1.0, 0.0, 0.0))]
+    def exact_line_through(point, *, label):
+        calls.append((point, label))
+        start, end = lines[point]
+        return SimpleNamespace(
+            edge=object(), line=(start, end),
+            length_mm=sum((a - b) ** 2 for a, b in zip(start, end)) ** 0.5,
+        )
+
+    edges = SimpleNamespace(circle_at=circle_at, exact_line_through=exact_line_through)
+    drawing._collar_bore_rim(edges)
+    drawing._collar_od_rim(edges)
+    midpoint = (part.ARM_HALF_X, (part.ARM_Y[0] + part.ARM_Y[1]) / 2.0, part.ARM_Z[1])
+    lines[midpoint] = ((5.0, -3.0, 58.3), (5.0, 4.5, 58.3))
+    drawing._arm_end_edge(edges)
+    assert calls == [
+        ((lever.COLLAR_HALF_LEN, 0.0, 0.0), press.COLLAR_BORE_DIA / 2.0, (1.0, 0.0, 0.0), "bracket collar bore rim"),
+        ((lever.COLLAR_HALF_LEN, 0.0, 0.0), part.COLLAR_OD / 2.0, (1.0, 0.0, 0.0), "bracket collar OD rim"),
+        ((5.0, 0.75, 58.3), "bracket arm end edge"),
+    ]
     assert drawing.COLLAR_HALF_LEN is lever.COLLAR_HALF_LEN
     assert drawing.COLLAR_BORE_DIA is press.COLLAR_BORE_DIA
+    assert drawing.COLLAR_OD == 12.0 and part.COLLAR_OD == 12.0
+    # The pick is proven to be the end face's edge: the far (-X) edge, a
+    # side edge through the corner, or a short edge all refuse.
+    for wrong in (
+        ((-5.0, -3.0, 58.3), (-5.0, 4.5, 58.3)),
+        ((5.0, 0.75, 4.0), (5.0, 0.75, 58.3)),
+        ((5.0, -3.0, 58.3), (5.0, 4.0, 58.3)),
+    ):
+        lines[midpoint] = wrong
+        with pytest.raises(RuntimeError, match="not the end face's edge"):
+            drawing._arm_end_edge(edges)
 
 
 def test_mounting_pattern_consumes_joint_contract() -> None:
@@ -336,53 +385,86 @@ def test_counterbore_callout_rides_the_aligned_bottom_view() -> None:
     assert 'process="' not in source
     assert "process=COUNTERBORE_PROCESS" in source
     assert drawing.COUNTERBORE_PROCESS.startswith("DRILL / COUNTERBORE")
-    assert "FAR SIDE" in drawing.COUNTERBORE_PROCESS
-    assert "\n" not in drawing.COUNTERBORE_PROCESS  # one row: measured geometry
+    # mreview10 clarity: "FAR SIDE" named no face.  The entry face is named
+    # against the one the view looks at (the mounting face, named on the
+    # 55.19), on two process rows of their own; the trailing break puts the
+    # native counterbore row under them (compose_hole_callout_prefix).
+    assert "FAR SIDE" not in drawing.COUNTERBORE_PROCESS
+    assert drawing.COUNTERBORE_PROCESS.endswith("\n")
+    rows = drawing.COUNTERBORE_PROCESS.rstrip("\n").split("\n")
+    assert rows == ["DRILL / COUNTERBORE FROM", "FACE OPPOSITE MOUNTING FACE"]
+    assert "MOUNTING FACE" in drawing.SECTION_CALLOUTS["SeatToAxis"]
     assert "edge=rims[1].edge" in source  # the east hole, nearer the block
     assert '"MountingCoordinates": ("MountingX0", "MountingX1", "MountingY0")' in source
     assert "keep=BOTTOM_HOLE_KEEP" in source
-    # The callout block (retry09, requested (337, 78) mm): the lower,
-    # prefixed counterbore row 117.9 mm wide, centred on the requested x,
-    # its baseline 7.3 mm under the requested y, the elbow 1.5 mm before its
-    # end nearer the hole; the leader runs from that elbow through the hole's
-    # centre.  "FAR SIDE" adds about 23 mm to the row.
+    # The callout block (retry09, requested (337, 78) mm, two rows): rows
+    # centred on the requested x, the block centred 1 mm under the requested
+    # y, the elbow 1.5 mm before the lowest row's end nearer the hole, the
+    # leader from that elbow to the hole.  Four rows now: the thru row (43.8
+    # mm measured), the two process rows (at most ~2.62 mm a character) and
+    # the bare native counterbore row (retry09's prefixed row was 117.9 mm;
+    # its bare width is taken anywhere from 66 to 72 mm).
     import magnifying_bracket_joint_layout as joint
-    assert "callout_xy=(0.212, 0.087)" in source
-    callout_x, callout_y = 0.212, 0.087
-    half_row = (0.1179 + 0.023) / 2.0
+    assert "callout_xy=(0.212, 0.086)" in source
+    callout_x, callout_y = 0.212, 0.086
+    pitch, text, char = 0.00556, 0.0035, 0.00262
+    block = 3 * pitch + text
+    bottom = callout_y - 0.001 - block / 2.0
+    top = bottom + block
+    widths = [0.0438, len(rows[0]) * char, len(rows[1]) * char]  # top down, above the lowest
+    assert max(widths) < 0.0708
     hole = (
         drawing.BOTTOM_CENTER[0] + 0.019 + joint.BRACKET_HOLE_POINTS[1][0] / 1000.0,
         drawing.BOTTOM_CENTER[1] + joint.BRACKET_HOLE_POINTS[1][1] / 1000.0,
     )
     assert abs(hole[0] - 0.1087) < 1e-9 and abs(hole[1] - 0.110) < 1e-9
-    elbow = (callout_x - half_row - 0.0015, callout_y - 0.0073)
-    row_top = callout_y + 0.0053  # the thru row's box top
-    # The block clears the isometric's outline (x 294.7 mm), the iso note
-    # (x 315 mm on), the title block (y 66 mm) and the notes' top row (y 69.5
-    # mm) by a text height and more, and sits under the flange height's
-    # outside-arrow tail (x 148 mm, down to y 97.25 mm).
-    assert callout_x + half_row < 0.2947 - 0.0035
-    assert callout_y - 0.0073 > 0.0695 + 0.0035
-    assert row_top < 0.09725 - 0.0035
-    # The leader climbs from the elbow (below-right of the hole) through the
-    # hole: at the 17.70's line (y 81 mm, to x 115.1 mm) and the 4.00's (y 89
-    # mm, to x 101.4 mm) it is right of both line ends by a text height.
-    dx, dy = hole[0] - elbow[0], hole[1] - elbow[1]
-    assert dx < 0.0 < dy
-
-    def leader_x(y: float) -> float:
-        return elbow[0] + dx * (y - elbow[1]) / dy
-
+    # The block clears the notes' top row (y 69.5 mm) and the isometric's
+    # outline (x 294.7 mm) by a text height and more, stays right of the
+    # offset's hung row at its widest (x 162.2 mm) and the flange height's
+    # column (x 166 mm) and under the thickness' lower tail (y 100.65 mm).
+    offset_x, offset_y = drawing.BOTTOM_FOOTPRINT_KEEP["FootprintOffset"]
+    height_x = drawing.BOTTOM_KEEP["FlangeHeight"][0]
+    thickness_x = drawing.BOTTOM_FOOTPRINT_KEEP["FootprintThickness"][0]
+    assert bottom > 0.0695 + text
+    assert callout_x - 0.036 > offset_x + 0.0122 + text
+    assert callout_x - 0.036 > height_x + 2 * text
+    assert callout_x + 0.036 < 0.2947 - text
+    arm_face = drawing.BOTTOM_CENTER[1] + part.ARM_Y[0] / 1000.0
+    assert top + text < arm_face - 0.00635
+    assert offset_x < thickness_x < callout_x + 0.036
     x1_line = drawing.BOTTOM_HOLE_KEEP["MountingX1"][1] - 0.00278
     x0_line = drawing.BOTTOM_HOLE_KEEP["MountingX0"][1] - 0.00278
-    assert leader_x(x1_line) > hole[0] + 0.0064 + 0.0035
-    assert leader_x(x0_line) > drawing.BOTTOM_CENTER[0] + 0.019 - 0.039 + 0.0064 + 0.0035
-    # It leaves the flange through its lower face (y 103.65 mm) between the
-    # hole's own witness (x 108.7 mm) and the flange height's witnesses
-    # (x 140 mm on), and ends left of that dimension's column (x 148 mm).
     lower_face = drawing.BOTTOM_CENTER[1] + part.FLANGE_Y[0] / 1000.0
-    assert hole[0] + 0.002 < leader_x(lower_face) < 0.140 - 0.002
-    assert elbow[0] < 0.148 - 0.002
+    for cbore_width in (0.066, 0.069, 0.072):
+        elbow = (callout_x - cbore_width / 2.0 - 0.0015, bottom)
+        dx, dy = hole[0] - elbow[0], hole[1] - elbow[1]
+        assert dx < 0.0 < dy
+
+        def leader_x(y: float) -> float:
+            return elbow[0] + dx * (y - elbow[1]) / dy
+
+        def leader_y(x: float) -> float:
+            return elbow[1] + dy * (x - elbow[0]) / dx
+
+        # The leader climbs left faster than any row above the lowest widens
+        # past it, so it runs under none of its own rows: at each upper row's
+        # baseline it is a text height left of that row's near end.
+        for step, width in enumerate(reversed(widths), start=1):
+            assert leader_x(bottom + step * pitch) < callout_x - width / 2.0 - text
+        # At the 17.70's line (y 81 mm, to x 115.1 mm) and the 4.00's (y 89
+        # mm, to x 101.4 mm) it is right of both line ends by a text height;
+        # it crosses the offset's column (x 150 mm) under that dimension's
+        # run (its foot, the hung row's shoulder, at y 97.5 mm) and reaches
+        # the row's height a text height left of the row's widest reach.
+        offset_shoulder = offset_y - 0.00278
+        assert leader_x(x1_line) > hole[0] + 0.0064 + text
+        assert leader_x(x0_line) > drawing.BOTTOM_CENTER[0] + 0.019 - 0.039 + 0.0064 + text
+        assert leader_y(offset_x) < offset_shoulder - 0.002
+        assert leader_x(offset_shoulder) < offset_x - 0.0122 - text
+        # It leaves the flange through its lower face (y 103.65 mm) between
+        # the hole's own witness (x 108.7 mm) and the east stack's witnesses
+        # (x 140 mm on).
+        assert hole[0] + 0.002 < leader_x(lower_face) < 0.140 - 0.002
 
 
 def test_coordinates_and_hole_dimensions_are_owned_by_model() -> None:
@@ -513,10 +595,11 @@ def test_projection_refuses_unapplied_native_mutators(monkeypatch) -> None:
 
 
 def test_arm_section_is_native_and_locates_the_bore_axis() -> None:
-    """The arm's thickness and its position across the flange print from a
-    blanked ArmSection witness on the Right plane (sketch (u, v) -> model
-    (-Z, Y)), not from a note; the bore axis is located from the seat face.
-    Offline source contract only: the native import still wants farm proof."""
+    """The arm's lower face from the bore axis and the axis' chain along Z
+    print from a blanked ArmSection witness on the Right plane (sketch (u, v)
+    -> model (-Z, Y)), not from a note; the bore axis is located from the
+    seat face.  Offline source contract only: the native import still wants
+    farm proof."""
     import pytest
     import magnifying_bracket_joint_layout as joint
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -553,40 +636,110 @@ def test_arm_section_is_native_and_locates_the_bore_axis() -> None:
     assert """section.record("ArmBelowAxis", '-"ArmY0"')""" in source
     assert """section.record("ArmOffset", '"ArmY0" - "FlangeY0"')""" in source
     assert """section.record("SeatToAxis", '"FlangeZ1"')""" in source
-    # The arm's end from the bore axis is the sketch's horizontal_distance
-    # from the end face's lower corner to the origin: marked now, in place of
-    # the top view's 54.30 from the arm's buried start (mreview09 blocker 3).
-    assert 'f"{end}.start", "origin", "horizontal_distance"' in source
-    assert """section.record("ArmEndFromAxis", '"ArmZ1"')""" in source
+    # The bore axis has ONE toleranced chain along Z (mreview10 blocker 2):
+    # the seat face from the origin (SeatToAxis), then the arm's end past the
+    # seat piece's hole-datum corner (ArmPastSeat); the arm's end from the
+    # axis is no model dimension any more -- the sheet prints it as the
+    # chain's parenthesised sum.
+    assert 'f"{end}.start", f"{below}.start", "horizontal_distance"' in source
+    assert "ARM_Z[1] - FLANGE_Z[1]" in source
+    assert """section.record("ArmPastSeat", '"ArmZ1" - "FlangeZ1"')""" in source
+    assert 'f"{end}.start", "origin", "horizontal_distance"' not in source
+    assert "ArmEndFromAxis" not in source
     assert 'f"{above}.end", "origin", "horizontal_distance"' in source
     assert 'name_last_feature(adapter, "ArmSection")' in source
-    assert 'blank_reference_sketches(adapter, ("ArmSection",))' in source
-    section = {"ArmThickness", "ArmBelowAxis", "ArmOffset", "SeatToAxis", "ArmEndFromAxis"}
+    assert 'blank_reference_sketches(adapter, ("ArmSection", "ArmFootprint"))' in source
+    # The sketch's thickness and offset dimensions define it but print in
+    # the bottom view from ArmFootprint (retry11: no duplicate controls), so
+    # the section marks three: the 3.00 and the Z chain.
+    section = {"ArmBelowAxis", "SeatToAxis", "ArmPastSeat"}
     assert mg_magnifying_bracket_spec.DRAWING_DIMENSIONS["ArmSection"] == section
     assert part.DRAWING_PRECISION["ArmSection"] == {name: 2 for name in section}
     assert "FlangeAboveArm" not in section  # the closing dimension stays unmarked
     assert drawing.SIDE_SECTION_KEEP.keys() == section
     assert "keep=SIDE_SECTION_KEEP" in drawing_source
     # Every import is targeted (the entire-model fallback warned on four
-    # views): front, bottom, side and the side's section; the mounting
-    # coordinates import by their own feature map.
-    assert drawing_source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 4
+    # views): front, bottom, side, the side's section and the bottom's
+    # footprint; the mounting coordinates import by their own feature map.
+    assert drawing_source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 5
     assert "keep={}" not in drawing_source
     assert "set_dimension_callouts(adapter, section_annotations, SECTION_CALLOUTS)" in drawing_source
-    # ArmOffset is a LINEAR reference: the plural helper's "(<MOD-DIAM>"
-    # prefix printed it as "(Ø3.35)" on retry08.
+    # Every model dimension of the section is toleranced (mreview10 blocker
+    # 1: the arm's offset from the flange's hole-datum edge was reference,
+    # leaving nothing toleranced between the arm and a flange edge); no
+    # model dimension is parenthesised and the plural helper's "(<MOD-DIAM>"
+    # prefix (retry08's "(Ø3.35)") is not used at all.
+    assert "SECTION_REFERENCE" not in drawing_source
     assert "set_reference_dimensions(" not in drawing_source
-    assert "for name in SECTION_REFERENCE:" in drawing_source
-    assert 'set_reference_dimension(adapter, matches[0], label=f"arm section {name}")' in drawing_source
-    assert drawing.SECTION_REFERENCE == ("ArmOffset",)
-    assert drawing.SECTION_CALLOUTS["ArmThickness"] == "ARM THICKNESS"
-    assert "BORE AXIS" in drawing.SECTION_CALLOUTS["ArmBelowAxis"]
-    # One datum chain for the bore axis (blocker 3): the flange's mounting
-    # face, named as the plate sees it, and the arm's end, both FROM the axis.
+    assert drawing_source.count("set_reference_dimension(") == 1  # the sheet reference only
+    assert "set_reference_dimension(adapter, annotation, label=ARM_END_REFERENCE)" in drawing_source
+    # The arm face is named (blocker 1: "3.00 FROM BORE AXIS" named no far
+    # end): the arm face from the axis.
+    assert drawing.SECTION_CALLOUTS["ArmBelowAxis"] == "ARM FROM BORE AXIS"
+    # The mounting face is named as the plate sees it, FROM the axis; the
+    # 3.11 past it reads by its witnesses between the two named faces.
     assert drawing.SECTION_CALLOUTS["SeatToAxis"] == "MOUNTING FACE\nTO BORE AXIS"
-    assert drawing.SECTION_CALLOUTS["ArmEndFromAxis"] == "ARM END\nFROM BORE AXIS"
+    assert "ArmPastSeat" not in drawing.SECTION_CALLOUTS
     assert "SEAT FACE" not in "".join(drawing.SECTION_CALLOUTS.values())
-    assert "ArmOffset" not in drawing.SECTION_CALLOUTS
+    assert drawing.SECTION_CALLOUTS.keys() == section - {"ArmPastSeat"}
+    # A one-row callout across the arm: its two-row block hung on the right
+    # must fit under the arm's end.
+    assert "\n" not in drawing.SECTION_CALLOUTS["ArmBelowAxis"]
+    assert len(drawing.SECTION_CALLOUTS["ArmBelowAxis"]) <= 18
+
+
+def test_arm_footprint_controls_the_arm_in_the_bottom_view() -> None:
+    """The arm's thickness and its lower face from the flange's hole-datum
+    edge print as native, toleranced dimensions in the BOTTOM view -- where
+    the arm's end face is drawn face-on inside the flange -- from a blanked
+    ArmFootprint witness on the Front plane (sketch (u, v) -> model (X, Y)),
+    once on the sheet (the ArmSection's copies of both are unmarked).
+    Offline source contract only: the native import still wants farm proof."""
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # Both lines lie on the flange's east end, the one edge the arm's +X face
+    # shares, so the shown sketch prints nothing the view does not draw.
+    assert part.ARM_HALF_X == part.FLANGE_X[1]
+    assert "if ARM_HALF_X != FLANGE_X[1]:" in source
+    assert 'await adapter.create_sketch("Front")' in source
+    assert "end_x = FLANGE_X[1]" in source
+    assert "await adapter.add_line(end_x, FLANGE_Y[0], end_x, ARM_Y[0])" in source
+    assert "await adapter.add_line(end_x, ARM_Y[0], end_x, ARM_Y[1])" in source
+    assert 'f"{gap}.end", f"{block}.start", "coincident"' in source
+    # The hole-datum corner anchors the sketch to the origin (two dimensions,
+    # both driven, unmarked), then each piece's far end is pinned over its
+    # start (vertical_points and ONE vertical dim, the section's ArmThickness
+    # pattern): four dimensions, recorded in creation order.
+    assert 'f"{gap}.start", end_x, FLANGE_Y[0], "arm footprint hole-datum corner"' in source
+    assert """footprint.record("FootprintCornerX", '"FlangeX1"')""" in source
+    assert """footprint.record("FootprintCornerY", '-"FlangeY0"')""" in source
+    assert (
+        'adapter, f"{gap}.start", f"{gap}.end",\n'
+        '        0.0, ARM_Y[0] - FLANGE_Y[0], "arm footprint FootprintOffset",'
+    ) in source
+    assert """footprint.record("FootprintOffset", '"ArmY0" - "FlangeY0"')""" in source
+    assert (
+        'adapter, f"{block}.start", f"{block}.end",\n'
+        '        0.0, ARM_Y[1] - ARM_Y[0], "arm footprint FootprintThickness",'
+    ) in source
+    assert """footprint.record("FootprintThickness", '"ArmY1" - "ArmY0"')""" in source
+    assert source.count("footprint.record(") == 4
+    assert 'await ensure_fully_defined(adapter, "arm footprint sketch")' in source
+    assert 'name_last_feature(adapter, "ArmFootprint")' in source
+    assert 'drive_jobs += footprint.apply(adapter, "ArmFootprint")' in source
+    footprint = {"FootprintThickness", "FootprintOffset"}
+    assert mg_magnifying_bracket_spec.DRAWING_DIMENSIONS["ArmFootprint"] == footprint
+    assert part.DRAWING_PRECISION["ArmFootprint"] == {name: 2 for name in footprint}
+    marked = set().union(*mg_magnifying_bracket_spec.DRAWING_DIMENSIONS.values())
+    assert not {"FootprintCornerX", "FootprintCornerY"} & marked  # the anchor stays unmarked
+    assert drawing.BOTTOM_FOOTPRINT_KEEP.keys() == footprint
+    assert "keep=BOTTOM_FOOTPRINT_KEEP" in drawing_source
+    assert 'view_label="bottom arm footprint"' in drawing_source
+    # No callout: the face-on footprint names its own edges, and a hung row
+    # of words could print on either hand into the neighbouring column.
+    assert not footprint & set(drawing.SECTION_CALLOUTS)
+    assert "BOTTOM_CALLOUTS" not in drawing_source
+    assert "FOOTPRINT_CALLOUTS" not in drawing_source
 
 
 # The projected side view's frame (sheet mm): x = 228 - Y, y = 206.15 - Z.
@@ -599,13 +752,17 @@ def _side_mm(name: str, keep: dict) -> tuple[float, float]:
 
 
 def test_side_view_section_hangs_clear_under_the_arm_end() -> None:
-    """mreview09 blocker 2 / clarity: the 3.00, (3.35) and 7.50 read ON their
-    own dimension lines.  Turned into projection the arm's section dimensions
-    across the arm are HORIZONTAL, so they obey retry09's horizontal rule:
-    rows centred on the requested x, the lowest row's bottom on the line
-    (2.78 mm under the requested y for a lone row, 5.56 mm for two), the line
-    running from the rows' far end through both witnesses to an outside-arrow
-    tail 6.4 mm past the far one.  The witnesses drop from the arm's end."""
+    """mreview09 blocker 2 / clarity, retry10's two under-arm crossings: the
+    3.00 reads ON its own dimension line and no line runs over another's
+    witness.  Retry10 stacked it with the 3.35 and the 7.50, whose outside
+    tails crossed the next witness down; those two now control the arm in
+    the bottom view (test_bottom_view_east_stack_stands_clear) and the 3.00
+    stands alone under the arm.  Turned into projection it is HORIZONTAL,
+    so it obeys retry09's horizontal rule: rows centred on the requested x,
+    the lowest row's bottom on the line (5.56 mm under the requested y for
+    two rows), the line running from the rows' far end through both
+    witnesses and, with OUTSIDE arrows, on to a tail 6.4 mm past the far
+    witness.  The witnesses drop from the arm's end."""
     arm_x = (SIDE_OX - part.ARM_Y[1], SIDE_OX - part.ARM_Y[0])
     flange_x = (SIDE_OX - part.FLANGE_Y[1], SIDE_OX - part.FLANGE_Y[0])
     arm_end = SIDE_OY - part.ARM_Z[1]
@@ -613,84 +770,128 @@ def test_side_view_section_hangs_clear_under_the_arm_end() -> None:
     assert (round(arm_x[0], 2), round(arm_x[1], 2)) == (223.5, 231.0)
     assert (round(flange_x[0], 2), round(flange_x[1], 2)) == (221.65, 234.35)
     assert round(arm_end, 2) == 147.85 and round(face, 2) == 150.96
-    text, pitch, lone, tail, iso_left = 3.5, 5.56, 2.78, 6.4, 294.7
+    text, pitch, tail, iso_left = 3.5, 5.56, 6.4, 294.7
     keep = drawing.SIDE_SECTION_KEEP
-    offset_x, offset_y = _side_mm("ArmOffset", keep)
+    assert set(keep) == {"SeatToAxis", "ArmPastSeat", "ArmBelowAxis"}
     below_x, below_y = _side_mm("ArmBelowAxis", keep)
-    thick_x, thick_y = _side_mm("ArmThickness", keep)
-    offset_line, below_line, thick_line = offset_y - lone, below_y - pitch, thick_y - pitch
-    # Nested from the arm's end: the reference offset (x 231..234.35) nearest,
-    # then the lower face from the axis (x 228..231), then the thickness
-    # (x 223.5..231), 8 mm apart.
-    assert arm_end - text > offset_line + text  # the "(3.35)" row under the end's witness
-    assert abs(offset_line - below_line - 8.0) < 0.05 and abs(below_line - thick_line - 8.0) < 0.05
-    # "(3.35)" (15.1 mm) hangs right of the flange's end; its box top stays a
-    # text height under the arm end's witness (y 147.85 mm, running right).
-    offset_row = (offset_x - 7.55, offset_x + 7.55)
-    assert offset_row[0] > flange_x[1] + text
-    assert offset_line + text < arm_end - text
-    # "3.00" (9.1 mm) and "FROM BORE AXIS" (37.8 mm) hang right of the flange
-    # too: the value row beside the "(3.35)" row with a text height of air,
-    # the callout row a text height under that row's bottom, and the offset's
-    # line (to the "(3.35)" row's far end) ends short of the value row.
-    value_row = (below_x - 4.55, below_x + 4.55)
-    callout_row = (below_x - 18.9, below_x + 18.9)
-    assert value_row[0] > offset_row[1] + text
-    assert offset_line - (below_line + text) >= text
-    assert callout_row[0] > flange_x[1] + text
-    assert callout_row[1] < iso_left - text
-    assert offset_row[1] < value_row[0] - text
-    # "7.50 / ARM THICKNESS" (36.5 mm) hangs left of the arm, its rows clear
-    # of its own witness (x 223.5 mm) and a text height under the 3.00's line
-    # (whose left tail, x 221.6 mm, that witness crosses: advisory).
-    thick_row = (thick_x - 18.25, thick_x + 18.25)
-    assert thick_row[1] < arm_x[0] - text
-    assert below_line - (thick_line + text) >= text
-    assert SIDE_OX - tail < arm_x[0]  # the 3.00's tail reaches past the witness
-    # The offset's left tail (6.4 mm past x 231) ends right of the thickness'
-    # witness at x 223.5 mm: no crossing (a geometric fact of the part).
-    assert arm_x[1] - tail > arm_x[0]
-    # Nothing under the arm's end at these x but the counterbore callout,
-    # whose thru row's top is y 92.3 mm.
-    assert thick_line > 92.3 + text
+    below_line = below_y - pitch
+    # Its 3 mm span (x 228..231) fits no two 3.556 mm arrowheads inside, so
+    # the arrows stand OUTSIDE (retry11: no inside-arrowhead overlap), forced
+    # so the proven ink is the drawn ink; the left tail ends in air at x
+    # 221.6 mm, under the flange (y 150.96 mm on) and right of the 3.11's
+    # column.
+    assert drawing.SECTION_ARROW_SIDES == {"ArmBelowAxis": 1}
+    assert drawing._ARROWS_INSIDE == 0 and drawing._ARROWS_OUTSIDE == 1
+    tail_end = arm_x[1] - 3.0 - tail
+    assert round(tail_end, 2) == 221.6
+    assert arm_x[1] + tail < iso_left
+    # A two-row block (callout on the line, value 5.56 mm up, 9.06 mm tall)
+    # hung RIGHT, under nothing (the flange ends at y 150.96 mm, the arm at
+    # 147.85 mm): its rows a 2 mm arrow clearance and more right of the
+    # 3.11's far witness (the flange's corner, x 234.35 mm) and a text height
+    # left of the isometric's outline at the widest letter pitch retry09/10
+    # measured (2.85 mm a character); the block's top a text height under
+    # the arm end's witness (y 147.85 mm, the reference's).
+    half_row = 18 * 2.85 / 2.0  # "ARM FROM BORE AXIS"
+    assert below_x - half_row > flange_x[1] + 2.0
+    assert below_x + half_row < iso_left - text
+    assert below_line + pitch + text + text <= arm_end
+    # The line runs left through both witnesses to its tail over no foreign
+    # ink: the 3.11's column (x 212 mm) and the mounting face's (x 198 mm)
+    # stand a text height and more left of the tail's end, and the 3.11's
+    # hung row (9.1 mm wide on either hand of its column, sitting on its
+    # shoulder 2.78 mm under the requested y) stays a text height over the
+    # line and a 2 mm arrow clearance left of the left arrowhead.
+    past_x, past_y = _side_mm("ArmPastSeat", keep)
+    past_row_right, past_row_bottom = past_x + 9.1, past_y - 2.78
+    assert past_x + text < tail_end
+    assert past_row_bottom > below_line + text
+    assert arm_x[1] - 3.0 - 3.556 > past_row_right + 2.0
+    # Nothing under the arm's end at these x but the counterbore callout's
+    # four-row block, whose top is ~y 95.1 mm.
+    assert below_line > 95.1 + text
 
 
-def test_side_view_axis_stations_read_in_span_either_side_of_the_part() -> None:
-    """The mounting face (55.19) and the arm's end (58.30) are VERTICAL
-    in-span dimensions from the bore axis: their text (three rows each)
-    prints centred on the column, breaking the line, so each column stands
-    clear of the part by half its widest row plus a text height, on the side
-    its corner is on (the seat corner at Y +6.35 is the flange's LEFT end in
-    the turned view, the arm end's corner at Y -3 is on its right)."""
+def test_side_view_axis_chain_reads_once_with_its_sum_as_reference() -> None:
+    """mreview10 blocker 2: ONE toleranced chain from the mounting face to
+    the bore axis.  The 55.19 (mounting face, VERTICAL in-span on the left)
+    and the 3.11 past it (ArmPastSeat, hung below its 3.11 mm span, left of
+    the arm) are the model's; the arm's end from the axis is the sheet's one
+    reference dimension, parenthesised, in-span on the right where retry10's
+    model dimension stood, and the arithmetic closes exactly."""
+    import pytest
     flange_x = (SIDE_OX - part.FLANGE_Y[1], SIDE_OX - part.FLANGE_Y[0])
+    arm_x = (SIDE_OX - part.ARM_Y[1], SIDE_OX - part.ARM_Y[0])
     arm_end = SIDE_OY - part.ARM_Z[1]
     face = SIDE_OY - part.FLANGE_Z[1]
-    text = 3.5
+    text, lone, tail = 3.5, 2.78, 6.4
+    assert part.ARM_Z[1] - part.FLANGE_Z[1] == pytest.approx(3.11)
+    assert part.FLANGE_Z[1] + (part.ARM_Z[1] - part.FLANGE_Z[1]) == pytest.approx(58.30)
+    assert round(part.FLANGE_Z[1], 2) + round(part.ARM_Z[1] - part.FLANGE_Z[1], 2) == pytest.approx(58.30)
     seat_x, seat_y = _side_mm("SeatToAxis", drawing.SIDE_SECTION_KEEP)
-    end_x, end_y = _side_mm("ArmEndFromAxis", drawing.SIDE_SECTION_KEEP)
+    past_x, past_y = _side_mm("ArmPastSeat", drawing.SIDE_SECTION_KEEP)
+    end_x, end_y = drawing.ARM_END_REFERENCE_XY[0] * 1000.0, drawing.ARM_END_REFERENCE_XY[1] * 1000.0
     assert seat_x + 18.5 < flange_x[0] - text  # "MOUNTING FACE" ~37 mm
     assert end_x - 18.9 > flange_x[1] + text  # "FROM BORE AXIS" 37.8 mm
     assert face < seat_y < SIDE_OY and arm_end < end_y < SIDE_OY
-    # Each block (14.6 mm tall, centred 1 mm under the requested y) keeps a
-    # text height from the hung rows under the arm's end and from the
-    # diameter rows over the collar; the arm end's column ends at its witness
-    # (y 147.85 mm), a text height and more over the "(3.35)" row's top.
-    offset_top = _side_mm("ArmOffset", drawing.SIDE_SECTION_KEEP)[1] - 2.78 + text
-    assert end_y - 1.03 - 7.31 > offset_top + text
-    assert arm_end > offset_top + text
+    # The 3.11's column stands between the mounting face's column and the
+    # arm, its lone row (9.1 mm) on a shoulder 2.78 mm under the requested y
+    # clear of the 3.00's tail on either hand (test_side_view_section_hangs_
+    # clear_under_the_arm_end), under its own witness (the arm's end); its
+    # tail ends in air under the mounting face's rows.
+    assert seat_x + text < past_x < arm_x[0] - 9.1 - 2.0
+    shoulder = past_y - lone
+    assert shoulder + 1.7 + 2.0 < arm_end
+    assert face + tail < seat_y - 1.03 - 7.31 - text
+    # The reference block (14.6 mm tall, centred 1 mm under the requested y)
+    # keeps a text height from the 3.00's rows under the arm's end; its
+    # column ends at its witness (y 147.85 mm), which the 3.00's own witness
+    # crosses (extension over extension), a text height and more over the
+    # 3.00's value row.
+    below_top = _side_mm("ArmBelowAxis", drawing.SIDE_SECTION_KEEP)[1] + text
+    assert end_y - 1.03 - 7.31 > below_top + text
+    assert arm_end > below_top + text
     od_rows_bottom = _side_mm("CollarOd", drawing.SIDE_KEEP)[1] - 5.6
     assert seat_y - 1.03 + 7.31 < od_rows_bottom - text
+    # The reference is a pure sheet dimension: linear, re-anchored to the OD
+    # rim's centre, proven on its two named entities to measure ARM_Z[1],
+    # parenthesised, its places the spec's, its callout read back.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert drawing.ARM_END_REFERENCE == "arm end from bore axis"
+    assert mg_magnifying_bracket_spec.DRAWING_REFERENCE_PRECISION == {"arm end from bore axis": 2}
+    assert drawing.DRAWING_REFERENCE_PRECISION is mg_magnifying_bracket_spec.DRAWING_REFERENCE_PRECISION
+    assert drawing._LINEAR_DIMENSION_TYPES == (2, 12)
+    assert 'orientation="vertical"' in source
+    assert "entities=(rim.edge, end.edge)" in source
+    assert "set_arc_endpoints_to_center(adapter, dimension, label=ARM_END_REFERENCE)" in source
+    assert "expected_mm=ARM_Z[1]" in source
+    assert 'DRAWING_REFERENCE_PRECISION["arm end from bore axis"], -1, -1, -1' in source
+    assert "display.GetPrimaryPrecision2" in source
+    assert drawing.ARM_END_REFERENCE_CALLOUT == "ARM END\nFROM BORE AXIS"
+    assert "_set_callout_below(display, ARM_END_REFERENCE_CALLOUT, ARM_END_REFERENCE)" in source
+    assert "SetText(4, text)" in source and "GetText(4)" in source
+    # The sum is proven on the ink too: the reference joins the section set
+    # for the crossing proof and the diameter proof after one rebuild.
+    assert "section[ARM_END_REFERENCE] = _arm_end_reference(adapter, side, side_edges)" in source
+    assert 'rebuild_drawing(adapter, label="side view annotations")' in source
+    assert '_assert_dimensions_clear(section, SECTION_AXES, label="side arm section")' in source
+    assert drawing.SECTION_AXES == {
+        "ArmBelowAxis": "x",
+        "SeatToAxis": "y", "ArmPastSeat": "y", "arm end from bore axis": "y",
+    }
 
 
 def test_side_view_diameters_read_above_the_collar_clear_of_the_axis_witnesses() -> None:
-    """Clarity: the bore callout's leader crossed the 55.19's witnesses.
-    Both diameters now read ABOVE the collar, their leaders running steeply
-    down to the centre; a line through the centre meets the axis witnesses
-    (y 206.15 mm, starting 1 mm either side of the origin) only at the
-    origin, between their ends.  Block geometry is retry09's: rows centred
-    on the requested x, the value row's bottom at the requested y, callout
-    rows 5.6 mm apart under it (the first 4.5 mm under a toleranced value),
-    the elbow 1.6 mm past the lowest row's near end on its baseline."""
+    """retry10's two collar crossings: each diameter line ran through the
+    centre to the far rim and crossed the mounting face's axis witness.
+    Both diameters now take the near-side single-arrow style (one arrow on
+    the rim nearest the text, no line through the centre) and read ABOVE
+    the collar, their leaders running steeply down to the near rim, which
+    is above the axis witnesses (y 206.15 mm).  Block geometry is retry09's:
+    rows centred on the requested x, the value row's bottom at the requested
+    y, callout rows 5.6 mm apart under it (the first 4.5 mm under a
+    toleranced value), the elbow 1.6 mm past the lowest row's near end on
+    its baseline."""
     text = 3.5
     collar_top = SIDE_OY + part.COLLAR_OD / 2.0
     od_x, od_y = _side_mm("CollarOd", drawing.SIDE_KEEP)
@@ -706,14 +907,31 @@ def test_side_view_diameters_read_above_the_collar_clear_of_the_axis_witnesses()
     assert od_rows[1] + text < bore_rows[0]
     assert od_elbow[0] < SIDE_OX < bore_elbow[0]
     assert od_elbow[1] > SIDE_OY and bore_elbow[1] > SIDE_OY
-    # Steep leaders: more drop than run from each elbow to the centre.
-    assert abs(od_elbow[0] - SIDE_OX) < od_elbow[1] - SIDE_OY
-    assert abs(bore_elbow[0] - SIDE_OX) < bore_elbow[1] - SIDE_OY
+    # Steep leaders: more drop than run from each elbow to the centre, so
+    # each lands on the upper half of its rim, over the axis witnesses.
+    import math
+    for elbow, radius in ((od_elbow, part.COLLAR_OD / 2.0), (bore_elbow, part.COLLAR_BORE_DIA / 2.0)):
+        dx, dy = SIDE_OX - elbow[0], SIDE_OY - elbow[1]
+        assert abs(dx) < -dy
+        reach = math.hypot(dx, dy)
+        landing_y = elbow[1] + dy * (reach - radius) / reach
+        assert landing_y > SIDE_OY + 1.0
     # The OD rows stay right of the front view's collar-length rows (to
     # x 175.8 mm, retry09) and the bore's banded value row under the sheet's
     # top margin.
     assert od_rows[0] > 175.8 + text
     assert bore_y + 1.0 + text + 4.5 < 250.0
+    # The style and its proof: both imported diameters take the near-side
+    # style before the section import, and after the rebuild their ink is
+    # read back against both axis witnesses (one group per witness: the two
+    # are collinear, and a collinear overlap counts as a crossing).
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "diameters = _near_side_collar_diameters(adapter, side_annotations)" in source
+    assert 'set_near_side_diameter(annotation, f"collar {name}")' in source
+    assert "_prove_collar_diameters_clear(" in source
+    assert '{name: section[name] for name in ("SeatToAxis", ARM_END_REFERENCE)}' in source
+    assert drawing._OD_LANDING == (0.8, 1.2) and drawing._BORE_LANDING == (0.5, 1.5)
+    assert drawing._RIM_KEEP_OUT == 0.8
 
 
 def test_collar_length_reads_banded_on_its_own_feature() -> None:
@@ -765,11 +983,15 @@ def test_arm_width_hangs_below_the_arm_end_between_the_aligned_views() -> None:
     assert (y - ROW_PITCH) + ROW_BOX[0] > bottom_top + TEXT_HEIGHT
     # A text height of air to every line beside the block: the flange depth's
     # column (x 89 mm) and the flange width's witness (x 91 mm) on the left;
-    # nothing hangs right of the arm now (the 54.30 is gone), and the side
-    # view's thickness rows (x 181.75 mm on) are far right.
+    # nothing hangs right of the arm now (the 54.30 is gone), the side view's
+    # rows start at x 179.5 mm, and the bottom view's flange height row (14.2
+    # mm wide, on either hand of its column at x 166 mm) stays right of the
+    # block and a text height under its lowest line (y 132.4 mm).
     assert left > drawing.FRONT_KEEP["FlangeDepth"][0] + TEXT_HEIGHT
     assert left > 0.091 + TEXT_HEIGHT
-    assert right + TEXT_HEIGHT < drawing.SIDE_SECTION_KEEP["ArmThickness"][0] - 0.01825
+    height_x, height_y = drawing.BOTTOM_KEEP["FlangeHeight"]
+    assert right + TEXT_HEIGHT < height_x - 0.0142
+    assert height_y - LONE_ROW_DROP + TEXT_HEIGHT + TEXT_HEIGHT < y - ROW_PITCH
 
 
 def test_flange_depth_block_clears_the_flange_width_block() -> None:
@@ -835,6 +1057,134 @@ def test_mounting_coordinates_hang_clear_on_the_bottom_view() -> None:
     assert x1_x + x1_row / 2.0 < flange_west - 0.002
     assert x0_x == x1_x
     assert 0.095 + 0.0064 < 0.1087
+
+
+def test_bottom_view_east_stack_stands_clear() -> None:
+    """Retry11 (Main): the arm's thickness and its lower face from the
+    flange's hole-datum edge control the arm in the BOTTOM view, where its
+    end face is drawn face-on inside the flange (x = 134 + X, y = 110 + Y;
+    the flange's east end x 139 mm, its faces y 103.65 / 116.35 mm, the
+    arm's y 107 / 114.5 mm), beside the flange's height: three VERTICAL
+    dimensions in columns east of the flange, every one with OUTSIDE
+    arrows.  A vertical dimension with outside arrows draws NO line between
+    its witnesses (retry10 ink: the in-span 12.70 and the hung 6.35 printed
+    their witnesses, 6.35 mm outside tails and, hung, the run to the
+    shoulder), so a foreign witness may cross its empty span; only a tail,
+    a run or a shoulder can be crossed, and only foreign text within 2 mm
+    of a witness is reported.  A lone row hung off a vertical span sits ON a
+    shoulder 2.78 mm under the requested y, beside the column on whichever
+    hand SolidWorks takes (the 6.35: left), so every row is kept clear on
+    both hands; in-span text prints centred on the column, its box 0.9 mm
+    over the requested y's 2.78 mm drop (the 12.70, retry10)."""
+    origin_x, origin_y = drawing.BOTTOM_CENTER[0] + 0.019, drawing.BOTTOM_CENTER[1]
+    east = origin_x + part.FLANGE_X[1] / 1000.0
+    lower_face, top = (origin_y + y / 1000.0 for y in part.FLANGE_Y)
+    arm_lower, arm_upper = (origin_y + y / 1000.0 for y in part.ARM_Y)
+    assert (round(east, 3), round(lower_face, 5), round(top, 5)) == (0.139, 0.10365, 0.11635)
+    assert (round(arm_lower, 3), round(arm_upper, 4)) == (0.107, 0.1145)
+    tail, arrowhead, clearance, overrun = 0.00635, 0.003556, 0.002, 0.001
+    offset_x, offset_y = drawing.BOTTOM_FOOTPRINT_KEEP["FootprintOffset"]
+    height_x, height_y = drawing.BOTTOM_KEEP["FlangeHeight"]
+    thick_x, thick_y = drawing.BOTTOM_FOOTPRINT_KEEP["FootprintThickness"]
+    names = {"FlangeHeight", "FootprintOffset", "FootprintThickness"}
+    assert drawing.BOTTOM_ARROW_SIDES == {name: drawing._ARROWS_OUTSIDE for name in names}
+    assert drawing.BOTTOM_AXES == {name: "y" for name in names}
+    # Columns east of the flange's corner witnesses (x 140 mm on), the
+    # offset innermost, the thickness OUTERMOST: its tails cross the
+    # hole-datum face's and the top's levels (y 100.65..107 and 114.5..
+    # 120.85 mm), so every other witness (ending 1 mm past its column) must
+    # stop a 2 mm clearance short of its column; the other two hang their
+    # rows outside their spans, so the thickness' witnesses cross only
+    # their empty spans.
+    assert east + overrun + clearance < offset_x < height_x < thick_x
+    assert height_x + overrun + clearance < thick_x
+    assert offset_x + overrun + clearance < height_x
+    # The offset (3.35, witnesses y 103.65 and 107 mm) hangs BELOW: its row
+    # (12.2 mm) on a shoulder a 2 mm clearance under the hole-datum
+    # witnesses, its run from the shoulder up to the lower witness, its
+    # upper tail short of the thickness' upper witness (y 114.5 mm).
+    offset_row = 0.0122
+    offset_shoulder = offset_y - LONE_ROW_DROP
+    assert offset_shoulder + TEXT_HEIGHT < lower_face - clearance
+    assert arm_lower + tail < arm_upper
+    # The flange height (12.70, witnesses y 103.65 -- over the offset's,
+    # collinear -- and 116.35 mm) hangs ABOVE: its row (14.2 mm) on a
+    # shoulder a 2 mm clearance over the thickness' upper witness and past
+    # its own upper arrowhead, its run from the top witness up to the
+    # shoulder; its lower tail (to y 97.3 mm, under the offset's row level)
+    # stands a 2 mm arrow clearance right of that row on its right hand.
+    height_row = 0.0142
+    height_shoulder = height_y - LONE_ROW_DROP
+    assert height_shoulder > arm_upper + clearance
+    assert height_shoulder > top + arrowhead
+    assert lower_face - tail < offset_shoulder + TEXT_HEIGHT
+    assert height_x - (offset_x + offset_row) > clearance
+    # The thickness (7.50, witnesses y 107 and 114.5 mm) reads IN-SPAN,
+    # centred on the column: its box (12.2 mm, 3.5 mm tall) 2 mm inside
+    # both its own witnesses (not reported: the audit's near-text findings
+    # are for foreign witnesses), a 2 mm clearance from the flange height's
+    # witness ends (x 167 mm, 1.9 mm left of the box and 3.85 mm under or
+    # 5.35 mm over it) and under its row; its tails end short of that row
+    # by a 2 mm clearance.
+    thick_row = 0.0122
+    thick_box = (thick_y - LONE_ROW_DROP, thick_y - LONE_ROW_DROP + TEXT_HEIGHT)
+    assert abs((thick_box[0] + thick_box[1]) / 2.0 - (arm_lower + arm_upper) / 2.0) < 1e-6
+    assert thick_box[0] - arm_lower > 0.0019 and arm_upper - thick_box[1] > 0.0019
+    box_left = thick_x - thick_row / 2.0
+    witness_end = height_x + overrun
+    assert box_left > witness_end
+    assert math.hypot(box_left - witness_end, top - thick_box[1]) > clearance
+    assert math.hypot(box_left - witness_end, thick_box[0] - lower_face) > clearance
+    assert thick_box[1] + clearance < height_shoulder
+    assert arm_upper + tail + clearance < height_shoulder
+    # Every row on either hand stays left of the counterbore callout's block
+    # (x 174 mm on, y <= 95.1 mm) or over it, and under the front view's
+    # arm width line (y 132.4 mm) by a text height.
+    assert offset_shoulder > 0.0951 + clearance
+    assert thick_x + thick_row / 2.0 < 0.212 + 0.036
+    assert height_shoulder + TEXT_HEIGHT + TEXT_HEIGHT < drawing.FRONT_KEEP["ArmWidth"][1] - ROW_PITCH
+    # The import, arrow sides and proof ride the rebuilt bottom view.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "bottom_annotations = curate_view_dimensions(" in source
+    assert "east_annotations = [*bottom_annotations, *footprint_annotations]" in source
+    assert '_set_arrow_sides(adapter, east_annotations, BOTTOM_ARROW_SIDES, label="bottom view")' in source
+    assert 'rebuild_drawing(adapter, label="bottom view annotations")' in source
+    assert '_assert_dimensions_clear(east, BOTTOM_AXES, label="bottom view east stack")' in source
+
+
+def test_bottom_view_caption_names_the_mounting_face_above_the_view() -> None:
+    """Retry11 (Main): the bottom view is captioned for its direction.  The
+    caption hangs ABOVE the view's measured outline (top y 121.9 mm, retry10),
+    centred on it (x 85.4..144.6 mm): below the view the holes' X witnesses
+    (x 91, 95, 108.7 mm down to y 80 mm) and the counterbore leader cross
+    every row wide enough for the words.  Its top stays a text height under
+    the arm width's witness ends (y 131.4 mm) and its right end a text
+    height and more left of the flange height's left-hand row (x 151.8 mm);
+    the build proves the clearance on the rebuilt arm width ink."""
+    assert drawing.BOTTOM_CAPTION == "VIEW ON MOUNTING FACE"
+    outline = (0.0854, 0.0981, 0.1446, 0.121938)
+    bottom = outline[3] + drawing.BOTTOM_CAPTION_GAP_M
+    top = bottom + TEXT_HEIGHT
+    centre = (outline[0] + outline[2]) / 2.0
+    half = len(drawing.BOTTOM_CAPTION) * 0.00285 / 2.0
+    arm_width_line = drawing.FRONT_KEEP["ArmWidth"][1] - ROW_PITCH
+    assert drawing.BOTTOM_CAPTION_GAP_M >= 0.0015
+    assert top + TEXT_HEIGHT < arm_width_line - 0.001
+    height_x = drawing.BOTTOM_KEEP["FlangeHeight"][0]
+    assert centre + half + TEXT_HEIGHT < height_x - 0.0142
+    assert centre - half > 0.0127 + TEXT_HEIGHT  # the inner border
+    # The first drop lands near the target; the note is then settled on the
+    # measured outline and extent (bottom centre), within CAPTION_SETTLE_M.
+    assert abs(drawing.BOTTOM_CAPTION_XY[1] - bottom) < 0.006
+    assert abs(drawing.BOTTOM_CAPTION_XY[0] - (centre - half)) < 0.006
+    assert drawing.CAPTION_SETTLE_M == 0.0006
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_place_bottom_caption(adapter, bottom, front_annotations)" in source
+    assert "outline[3] + BOTTOM_CAPTION_GAP_M" in source
+    assert "target[1] - extent[1]" in source
+    assert 'dimension_name(adapter, annotation) == "ArmWidth"' in source
+    assert "min(front_ink) - extent[4] < TEXT_HEIGHT_M" in source
+    assert "sheet.SetScale(*SHEET_SCALE, False, False)" in source
 
 
 def test_native_counterbore_dimensions_keep_names_and_route_annotations(monkeypatch) -> None:
@@ -974,3 +1324,284 @@ def test_final_forced_volume_guard_follows_annotations_before_publication() -> N
         ]
         assert calls, mutation
         assert all(node.lineno < rebuild.lineno for node in calls), mutation
+
+
+def _mm(*points: tuple[float, float]) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """Sheet-mm polyline corners -> a list of metre segments."""
+    scaled = [(x / 1000.0, y / 1000.0) for x, y in points]
+    return [(scaled[i], scaled[i + 1]) for i in range(len(scaled) - 1)]
+
+
+def test_section_crossings_reports_retry10_and_clears_both_stacks() -> None:
+    """The pure crossing rule on measured ink (retry10 native audit,
+    20261012T164103041Z): the 3.35's outside-arrow tail (x 231 -> 225 mm)
+    ran over the 3.00's x 228 mm witness and the 3.00's tail (228 -> 222 mm)
+    over the 7.50's x 223.5 mm witness; a line through a witness collinear
+    with one of its own (x 231 mm, shared by all three) is exempt.  On the
+    side view's new stack (the 3.00 alone under the arm, the chain's
+    columns clear) and the bottom view's east stack (no span ink: a
+    vertical dimension with outside arrows draws witnesses, tails and, hung,
+    the run and shoulder) it reports nothing."""
+    retry10_axes = {"ArmOffset": "x", "ArmBelowAxis": "x", "ArmThickness": "x"}
+    retry10 = {
+        "ArmOffset": _mm((262.0, 142.5), (231.0, 142.5), (225.0, 142.5))
+        + _mm((231.0, 150.0), (231.0, 141.5)) + _mm((234.35, 150.0), (234.35, 141.5)),
+        "ArmBelowAxis": _mm((262.0, 134.5), (228.0, 134.5), (222.0, 134.5))
+        + _mm((228.0, 147.0), (228.0, 133.5)) + _mm((231.0, 147.0), (231.0, 133.5)),
+        "ArmThickness": _mm((182.0, 126.5), (231.0, 126.5), (237.0, 126.5))
+        + _mm((223.5, 147.0), (223.5, 125.5)) + _mm((231.0, 147.0), (231.0, 125.5)),
+    }
+    assert drawing._section_crossings(retry10, retry10_axes) == [
+        ("ArmOffset", "ArmBelowAxis"),
+        ("ArmBelowAxis", "ArmThickness"),
+    ]
+    side = {
+        "ArmBelowAxis": _mm((238.4, 134.44), (228.0, 134.44), (221.6, 134.44))
+        + _mm((228.0, 146.85), (228.0, 133.44)) + _mm((231.0, 146.85), (231.0, 133.44)),
+        "SeatToAxis": _mm((198.0, 206.15), (198.0, 185.0)) + _mm((198.0, 170.0), (198.0, 150.96))
+        + _mm((227.0, 206.15), (197.0, 206.15)) + _mm((220.65, 150.96), (197.0, 150.96)),
+        "ArmPastSeat": _mm((212.0, 157.36), (212.0, 138.72), (207.45, 138.72))
+        + _mm((230.0, 147.85), (211.0, 147.85)) + _mm((233.35, 150.96), (211.0, 150.96)),
+        drawing.ARM_END_REFERENCE: _mm((259.0, 147.85), (259.0, 170.5))
+        + _mm((259.0, 185.1), (259.0, 206.15))
+        + _mm((229.0, 206.15), (260.0, 206.15)) + _mm((232.0, 147.85), (260.0, 147.85)),
+    }
+    assert drawing._section_crossings(side, drawing.SECTION_AXES) == []
+    # The bottom view's east stack as designed (BOTTOM_KEEP, BOTTOM_FOOTPRINT_
+    # KEEP): the offset hung below on its right hand, the flange height hung
+    # above on its left hand, the thickness in-span; the thickness' witnesses
+    # cross the two empty spans and the collinear hole-datum witnesses meet.
+    bottom = {
+        "FootprintOffset": _mm((140.0, 103.65), (151.0, 103.65)) + _mm((140.0, 107.0), (151.0, 107.0))
+        + _mm((150.0, 103.65), (150.0, 97.52), (162.2, 97.52)) + _mm((150.0, 107.0), (150.0, 113.35)),
+        "FlangeHeight": _mm((140.0, 103.65), (167.0, 103.65)) + _mm((140.0, 116.35), (167.0, 116.35))
+        + _mm((166.0, 116.35), (166.0, 123.52), (151.8, 123.52)) + _mm((166.0, 103.65), (166.0, 97.3)),
+        "FootprintThickness": _mm((140.0, 107.0), (176.0, 107.0)) + _mm((140.0, 114.5), (176.0, 114.5))
+        + _mm((175.0, 107.0), (175.0, 100.65)) + _mm((175.0, 114.5), (175.0, 120.85)),
+    }
+    assert drawing._section_crossings(bottom, drawing.BOTTOM_AXES) == []
+    # What the proof guards: had the flange height drawn its span, the
+    # thickness' witnesses would cross it; and the exemption is by the
+    # owner's OWN witness only -- the offset's run meets the flange height's
+    # hole-datum witness collinear with its own (exempt), but crosses one
+    # 0.65 mm lower, inside the run.
+    spanned = dict(bottom)
+    spanned["FlangeHeight"] = bottom["FlangeHeight"] + _mm((166.0, 103.65), (166.0, 116.35))
+    assert drawing._section_crossings(spanned, drawing.BOTTOM_AXES) == [
+        ("FlangeHeight", "FootprintThickness"),
+    ]
+    lowered = dict(bottom)
+    lowered["FlangeHeight"] = _mm((140.0, 103.0), (167.0, 103.0)) + bottom["FlangeHeight"][1:]
+    assert drawing._section_crossings(lowered, drawing.BOTTOM_AXES) == [
+        ("FootprintOffset", "FlangeHeight"),
+    ]
+    # Line over line counts both ways; a slanted stroke is named as such.
+    lines = {"A": _mm((0.0, 10.0), (20.0, 10.0)), "B": _mm((10.0, 10.0), (30.0, 10.0))}
+    assert drawing._section_crossings(lines, {"A": "x", "B": "x"}) == [("A", "B"), ("B", "A")]
+    assert drawing._section_crossings({"A": _mm((0.0, 0.0), (1.0, 1.0))}, {"A": "x"}) == [("A", "slanted")]
+    assert drawing._stroke_axis(((0.0, 0.0), (0.0, 0.0))) == ""
+
+
+def test_assert_dimensions_clear_reads_the_rebuilt_ink(monkeypatch) -> None:
+    import pytest
+    ink = {
+        "FlangeHeight": _mm((140.0, 103.65), (167.0, 103.65)) + _mm((140.0, 116.35), (167.0, 116.35))
+        + _mm((166.0, 116.35), (166.0, 123.52), (151.8, 123.52)) + _mm((166.0, 103.65), (166.0, 97.3)),
+        "FootprintThickness": _mm((140.0, 107.0), (176.0, 107.0)) + _mm((140.0, 114.5), (176.0, 114.5))
+        + _mm((175.0, 107.0), (175.0, 100.65)) + _mm((175.0, 114.5), (175.0, 120.85)),
+    }
+    axes = {"FlangeHeight": "y", "FootprintThickness": "y"}
+    events, successes = [], []
+    monkeypatch.setattr(drawing, "dimension_segments", lambda annotation: ink[annotation])
+    monkeypatch.setattr(drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
+    monkeypatch.setattr(drawing._telemetry, "success", lambda message, **fields: successes.append(message))
+    drawing._assert_dimensions_clear({name: name for name in ink}, axes, label="bottom view east stack")
+    assert events[-1][0] == "drawing.dimensions_clear" and events[-1][1]["crossings"] == "[]"
+    assert events[-1][1]["label"] == "bottom view east stack"
+    assert successes and successes[-1].startswith("bottom view east stack: no dimension line over a foreign witness")
+    ink["FlangeHeight"] = ink["FlangeHeight"] + _mm((166.0, 103.65), (166.0, 116.35))
+    with pytest.raises(
+        RuntimeError,
+        match=r"bottom view east stack dimension lines run over witnesses: \[\('FlangeHeight', 'FootprintThickness'\)\]",
+    ):
+        drawing._assert_dimensions_clear({name: name for name in ink}, axes, label="bottom view east stack")
+    ink["FootprintThickness"] = []
+    with pytest.raises(RuntimeError, match=r"bottom view east stack dimensions draw no lines: \['FootprintThickness'\]"):
+        drawing._assert_dimensions_clear({name: name for name in ink}, axes, label="bottom view east stack")
+
+
+def test_set_arrow_sides_reads_each_side_back(monkeypatch) -> None:
+    from types import SimpleNamespace
+    import pytest
+
+    class Stubborn:
+        @property
+        def ArrowSide(self) -> int:
+            return 0
+
+        @ArrowSide.setter
+        def ArrowSide(self, value: int) -> None:
+            pass
+
+    displays = {
+        "FlangeHeight": SimpleNamespace(ArrowSide=0),
+        "FootprintOffset": SimpleNamespace(ArrowSide=0),
+        "FootprintThickness": SimpleNamespace(ArrowSide=0),
+        "MountingY0": SimpleNamespace(ArrowSide=0),
+    }
+    annotations = [
+        SimpleNamespace(name=name, GetSpecificAnnotation=lambda d=display: d)
+        for name, display in displays.items()
+    ]
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, annotation: annotation.name)
+    drawing._set_arrow_sides(object(), annotations, drawing.BOTTOM_ARROW_SIDES, label="bottom view")
+    assert {name: d.ArrowSide for name, d in displays.items()} == {
+        "FlangeHeight": 1, "FootprintOffset": 1, "FootprintThickness": 1, "MountingY0": 0,
+    }
+    displays["FlangeHeight"] = Stubborn()
+    annotations[0] = SimpleNamespace(name="FlangeHeight", GetSpecificAnnotation=lambda: displays["FlangeHeight"])
+    with pytest.raises(RuntimeError, match="bottom view FlangeHeight did not keep its arrows on side 1"):
+        drawing._set_arrow_sides(object(), annotations, drawing.BOTTOM_ARROW_SIDES, label="bottom view")
+    with pytest.raises(RuntimeError, match=r"no arm section dimension to set arrow sides: \['ArmPastSeat'\]"):
+        drawing._set_arrow_sides(
+            object(), annotations[1:], {"FootprintOffset": 1, "ArmPastSeat": 1}, label="arm section"
+        )
+
+
+def test_near_side_collar_diameters_style_both_and_prove_against_each_station(monkeypatch) -> None:
+    import pytest
+    from types import SimpleNamespace
+    styled = []
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "set_near_side_diameter", lambda annotation, label: styled.append(label))
+    od, bore = SimpleNamespace(name="CollarOd"), SimpleNamespace(name="CollarBore")
+    assert drawing._near_side_collar_diameters(object(), [od, bore]) == {"CollarOd": od, "CollarBore": bore}
+    assert styled == ["collar CollarOd", "collar CollarBore"]
+    with pytest.raises(RuntimeError, match=r"not imported to the side view: \['CollarBore'\]"):
+        drawing._near_side_collar_diameters(object(), [od])
+    # One assert_leaders_clear group per axis station (the two witnesses are
+    # collinear along y 206.15 mm, and a collinear overlap counts as a
+    # crossing), each with both diameters, the crank drive gear's bands and
+    # a centre-to-far-edge band for the station.
+    ink = {
+        "CollarOd": _mm((218.05, 219.05), (224.3, 210.9)),
+        "CollarBore": _mm((240.05, 219.05), (230.0, 208.3)),
+        "SeatToAxis": _mm((227.0, 206.15), (197.0, 206.15)),
+        "arm end from bore axis": _mm((229.0, 206.15), (260.0, 206.15)),
+    }
+    groups = []
+    monkeypatch.setattr(drawing, "dimension_segments", lambda annotation: ink[annotation])
+    monkeypatch.setattr(
+        drawing, "assert_leaders_clear", lambda g, *, centre, keep_out, lands_within, label: groups.append(
+            (sorted(g), centre, keep_out, lands_within, label)
+        )
+    )
+    axis = (0.228, 0.20615)
+    drawing._prove_collar_diameters_clear(
+        {"CollarOd": "CollarOd", "CollarBore": "CollarBore"},
+        {"SeatToAxis": "SeatToAxis", "arm end from bore axis": "arm end from bore axis"},
+        axis=axis,
+    )
+    od_r, bore_r = part.COLLAR_OD / 2000.0, drawing.COLLAR_BORE_DIA / 2000.0
+    expected_keep_out = {"CollarOd": 0.8 * od_r, "CollarBore": 0.8 * bore_r}
+    expected_lands = {"CollarOd": (0.8 * od_r, 1.2 * od_r), "CollarBore": (0.5 * bore_r, 1.5 * bore_r)}
+    assert groups == [
+        (
+            ["CollarBore", "CollarOd", "SeatToAxis"], axis, expected_keep_out,
+            {**expected_lands, "SeatToAxis": (0.0, od_r + 0.002)},
+            "collar diameters against SeatToAxis",
+        ),
+        (
+            ["CollarBore", "CollarOd", "arm end from bore axis"], axis, expected_keep_out,
+            {**expected_lands, "arm end from bore axis": (0.0, od_r + 0.002)},
+            "collar diameters against arm end from bore axis",
+        ),
+    ]
+
+
+def test_arm_end_reference_is_a_proven_linear_sheet_dimension(monkeypatch) -> None:
+    """The one drawing-native dimension: entity picks (OD rim, arm end
+    edge), linear by Type2, the rim's end on its centre, measured on those
+    entities, THEN parenthesised, its places looked up in the spec and read
+    back, its callout read back.  Any step's refusal is loud."""
+    from types import SimpleNamespace
+    import pytest
+
+    rim, end = SimpleNamespace(edge=object()), SimpleNamespace(edge=object())
+    calls: list = []
+    annotation = object()
+
+    class Display:
+        Type2 = 2
+
+        def __init__(self) -> None:
+            self.precision = 3
+            self.text = {}
+
+        def GetAnnotation(self):
+            return annotation
+
+        def SetPrecision3(self, primary, dual, tol_primary, tol_dual):
+            calls.append(("precision", primary, dual, tol_primary, tol_dual))
+            self.precision = primary
+            return True
+
+        def GetPrimaryPrecision2(self):
+            return self.precision
+
+        def SetText(self, kind, text):
+            calls.append(("text", kind, text))
+            self.text[kind] = text + "\r"
+
+        def GetText(self, kind):
+            return self.text.get(kind)
+
+    display = Display()
+    adapter = SimpleNamespace(_attempt=lambda fn: fn())
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, "_collar_od_rim", lambda edges: rim)
+    monkeypatch.setattr(drawing, "_arm_end_edge", lambda edges: end)
+
+    def add(adapter_, view, **kwargs):
+        calls.append(("add", view, kwargs))
+        return display
+
+    monkeypatch.setattr(drawing, "add_edge_dimension", add)
+    monkeypatch.setattr(
+        drawing, "set_arc_endpoints_to_center", lambda a, d, *, label: calls.append(("arc", d, label))
+    )
+    monkeypatch.setattr(
+        drawing, "assert_dimension_measures",
+        lambda a, d, *, expected_mm, label, entities: calls.append(("measures", d, expected_mm, label, entities)),
+    )
+    monkeypatch.setattr(
+        drawing, "set_reference_dimension", lambda a, ann, *, label: calls.append(("reference", ann, label))
+    )
+    side, edges = object(), object()
+    assert drawing._arm_end_reference(adapter, side, edges) is annotation
+    label = drawing.ARM_END_REFERENCE
+    assert [c[0] for c in calls] == ["add", "arc", "measures", "reference", "precision", "text"]
+    add_call = calls[0]
+    assert add_call[1] is side
+    assert add_call[2]["entities"] == (rim.edge, end.edge)
+    assert add_call[2]["orientation"] == "vertical" and add_call[2]["label"] == label
+    assert add_call[2]["text_xy"] == drawing.ARM_END_REFERENCE_XY
+    assert calls[1] == ("arc", display, label)
+    assert calls[2] == ("measures", display, part.ARM_Z[1], label, (rim.edge, end.edge))
+    assert calls[3] == ("reference", annotation, label)
+    assert calls[4] == ("precision", 2, -1, -1, -1)
+    assert calls[5] == ("text", 4, "ARM END\nFROM BORE AXIS")
+    # Refusals: a diametric readback, places that did not take, a callout
+    # that did not persist.
+    display.Type2 = 14
+    with pytest.raises(RuntimeError, match="expected a linear dimension, got type 14"):
+        drawing._arm_end_reference(adapter, side, edges)
+    display.Type2 = 12
+    display.GetPrimaryPrecision2 = lambda: 3
+    with pytest.raises(RuntimeError, match="prints 3 decimal places, not 2"):
+        drawing._arm_end_reference(adapter, side, edges)
+    display.GetPrimaryPrecision2 = lambda: 2
+    display.GetText = lambda kind: "ARM END"
+    with pytest.raises(RuntimeError, match="callout-below text did not persist"):
+        drawing._arm_end_reference(adapter, side, edges)

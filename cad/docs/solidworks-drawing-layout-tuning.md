@@ -356,6 +356,14 @@ its edge. A pointer note (`add_leader_note`) has no attachment to lose (0 -> 0
 on the same run) and keeps the call. Where the pick and the landing differ,
 the leader may end on the PICK (pinion_bracket pivot finish, 4.6 mm off), so
 pick the edge at the landing point.
+The owning-face proof can also refuse a seemingly attached silhouette:
+the magnifying lever's capsule OD on retry10 (source `644308e47`, launcher
+`20261012T164103041Z`) read one type-46 entity, one leader and not dangling,
+but its attached silhouette's face failed `IsSame` against the picked one.
+Keep that refusal. Resolve the part-owned finish-control face on the view's
+`ReferencedDocument` and attach as a FACE with the pre-insertion selection
+point (`draw_dt_pinion_arbor`, `draw_mg_magnifying_lever`): `IsSame` proves
+the actual cylinder and the 1 mm landing readback still pins its flank.
 
 **j. A fresh detail view whose readbacks lag its ink.**
 Right after `CreateDetailViewAt4` + rebuild, `IView::GetOutline` is centred
@@ -495,8 +503,11 @@ machinist read the Ø as an axial length. Nest it instead: the root Ø's line
 standing across the groove root to root, the spigot's Ø9 a pitch outboard
 (20 mm), their texts staggered 5 mm either side of the axis so each breaks only
 its own line, and prove the INK, not the glyph: `IDisplayDimension::Type2` is
-14 or 15 (`swRadialLinearDimension` / `swDiametricLinearDimension`),
-`Diametric` True, and the measured strokes put an extension line from each
+6 or 15 (`swDiameterDimension`, as retry10's drawing import reports, or
+the authoring `swDiametricLinearDimension`), `Diametric` is True, and
+`IDimension::SystemValue` equals the root diameter, not its radius or some
+other circle's diameter. Type14 is the single-distance radial linear form
+and is refused. The measured strokes must put an extension line from each
 root (starting 1 mm off it) out to the dimension line at the requested x
 (`draw_mg_output_fixture._prove_groove_root_diameter`).
 
@@ -533,7 +544,7 @@ the blind machinist read a different part (mreview09 blocker 1); the `*Back`
 view under it, mirrored about the flange, carried the counterbore callout and
 the hole coordinates and read as a duplicate "not a projection of anything
 above it". The same sheet located the bore axis twice from two origins — the
-arm's 54.30 from its buried start in the top view and the mounting face's
+arm's 54.30 from its buried start in the top view and the actual seat's
 55.19 from the axis in the side view (blocker 3).
 Do: turn the view by a MEASURED angle, not an assumed one: project a model
 axis before and after `IView::Angle` (`model_point_in_view` on the origin and
@@ -547,10 +558,12 @@ face on the ALIGNED view that shows it (`*Front` under `*Top`): the
 counterbores open on the face that view cannot see, so the hole callout
 attaches to the THROUGH rims on the visible face (`ViewEdge.circle_at` at
 `SIDE_PLATE_Z[1]`, radius `CLEARANCE_DIA / 2`) and names the entry side in its
-process prefix (`DRILL / COUNTERBORE FAR SIDE`); whether `AddHoleCallout2` on
+process prefix (`DRILL / COUNTERBORE FROM` / `FACE OPPOSITE MOUNTING FACE`);
+whether `AddHoleCallout2` on
 the through rim resolves the Hole Wizard feature is native evidence, not an
-assumption. Give one axis ONE datum chain: every station reads from the bore
-axis (`MOUNTING FACE TO BORE AXIS` 55.19, `ARM END FROM BORE AXIS` 58.30),
+assumption. Give one axis ONE controlling chain from the actual flange seat,
+not an inner step merely labelled "mounting face". Other face-to-axis values
+are REF, with sufficient precision that their printed step sums consistently,
 and the dimension from the buried start is unmarked. The collar's OD, with no
 band of its own, inherits the title block's `.XX` ±0.51. The named OD print
 corners in `mg_lever_press_fit_geom` are conservative independently: strength
@@ -560,6 +573,27 @@ contact, the latter needs 2.8446 kN; the shared note rounds that upward to
 **2.9 kN MAX**. `test_mg_fixture_installation` checks both corners and the
 ceiling independently. A safe low-OD stress corner does not justify using
 the nominal OD to cap force, nor an unnecessary second OD band.
+For the bracket the actual seat is local Z55.1875877804, not the arm's
+Z58.3 end: the flange's 3.175 stock thickness is a different distance.
+The controlling chain is 55.19 seat-to-axis plus 3.11 arm-past-seat;
+58.30 is the sum, printed as a genuine drawing-native linear REF picked
+on the collar rim's arc centre and the arm end. Identify the mounting plane
+from the installed joint, rather than guessing it from a step's outline.
+The arm's 3.11 extension lies beside the lever across a 5.55 mm X gap.
+
+Put the junction's 7.50 width and 3.35 edge location on the bottom view,
+where its footprint is visible, without a second controlling copy in the
+side view. Short inside-arrow spans can overlap their arrowheads even after
+the witness crossings disappear. Instead distribute the controls between
+views and stack outside-arrow dimensions by their rebuilt ink: here the
+3.35 hangs below at x150, the 12.70 above at x166, and the 7.50 is outermost
+at x175. A full diametric chord always passes the bore-axis witness at the
+centre; use the genuine near-side single-arrow style
+(`set_near_side_diameter`) and prove the rebuilt leaders clear of each
+station witness separately. The view-direction caption belongs above the
+bottom outline where neither mounting witnesses nor the hole leader crosses
+it; centre it on `IView::GetOutline` and prove clearance to the neighbouring
+view's printed dimension ink.
 
 ## The sheet-split rule
 

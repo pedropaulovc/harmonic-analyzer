@@ -14,14 +14,18 @@ installation notes) by the config-free mg_lever_press_fit_geom, which the
 lever print and this one share.
 
 ``ArmSection`` (blanked, on the Right plane): the arm's section in the
-profile the RIGHT view prints -- its thickness, its lower face from the bore
-axis and from the flange's hole-datum face, and the seat face from the bore
-axis -- as native dimensions (machinist review: the thickness was a note and
-nothing located the bore axis). Its three construction lines lie on the arm's
-end face and the seat face's visible edge pieces, so the sketch, shown in
-that view to import its dimensions, prints nothing the model does not
-already draw but the bore axis: a centerline from the collar's centre to the
-arm's end station, the axis extended for dimensioning.
+profile the RIGHT view prints -- its lower face from the bore axis, the seat
+face from the bore axis and the arm's end past that face -- as native
+dimensions (machinist review: nothing located the bore axis). Its three
+construction lines lie on the arm's end face and the seat face's visible
+edge pieces, so the sketch, shown in that view to import its dimensions,
+prints nothing the model does not already draw but the bore axis: a
+centerline from the collar's centre to the arm's end station, the axis
+extended for dimensioning.  ``ArmFootprint`` (blanked, on the Front plane):
+the arm's end face as the BOTTOM view draws it, face-on inside the flange's
+outline -- its thickness and its lower face from the flange's hole-datum
+face as native dimensions, on the flange's east end the arm's +X face
+shares.
 
 Run (SolidWorks already open)::
 
@@ -393,9 +397,9 @@ async def build(adapter) -> dict[str, str]:
 
     # 4. Arm section witness (ArmSection, blanked; Right plane, sketch (u, v)
     # -> model (-Z, Y)): the RIGHT view shows the arm in profile between the
-    # flange's seat face and the collar, and policy rule 2 wants its 7.5 and
-    # its station across the flange as native dimensions (machinist review:
-    # the thickness was a note, and nothing located the bore axis). Three
+    # flange's seat face and the collar, and policy rule 2 wants the arm's
+    # station along Z and its lower face from the bore axis as native
+    # dimensions (machinist review: nothing located the bore axis). Three
     # construction lines, each on an edge the view already draws: the arm's
     # end face (its full thickness, past the seat face) and the seat face's
     # two visible pieces -- below the arm, from the flange's lower (hole-datum)
@@ -408,10 +412,15 @@ async def build(adapter) -> dict[str, str]:
     # collar's centre. The dimensions the print keeps all take the arm's END
     # corners, so their extension lines run away from the part instead of
     # along the arm's faces. Six dimensions in creation order: the thickness
-    # (ArmThickness), the arm's lower face from the bore axis (ArmBelowAxis)
-    # and the arm end from the axis (unmarked), the arm's lower face from the
-    # hole-datum flange face (ArmOffset, printed in parentheses as reference),
-    # the flange above the arm (unmarked) and the seat face from the bore axis
+    # (ArmThickness, unmarked: the print controls it in the bottom view, from
+    # ArmFootprint below), the arm's lower face from the bore axis
+    # (ArmBelowAxis), the arm's end past the seat face (ArmPastSeat: the
+    # arm's end corner to the seat piece's hole-datum corner, so the bore
+    # axis has ONE toleranced chain along Z -- SeatToAxis, then this -- and
+    # the sheet prints the arm's end from the axis as its parenthesised sum,
+    # mreview10 blocker 2), the arm's lower face from the hole-datum flange
+    # face (ArmOffset, unmarked: controlled in the bottom view too), the
+    # flange above the arm (unmarked) and the seat face from the bore axis
     # (SeatToAxis, the flange's top corner to the origin).
     section = SketchDims()
     check("create_sketch arm section", await adapter.create_sketch("Right"))
@@ -459,10 +468,10 @@ async def build(adapter) -> dict[str, str]:
     )
     section.record("ArmBelowAxis", '-"ArmY0"')
     await dimension_between(
-        adapter, f"{end}.start", "origin", "horizontal_distance",
-        ARM_Z[1], "arm section ArmEndFromAxis",
+        adapter, f"{end}.start", f"{below}.start", "horizontal_distance",
+        ARM_Z[1] - FLANGE_Z[1], "arm section ArmPastSeat",
     )
-    section.record("ArmEndFromAxis", '"ArmZ1"')
+    section.record("ArmPastSeat", '"ArmZ1" - "FlangeZ1"')
     # Each seat piece's arm-side corner sits on the arm face it was drawn at:
     # below.end on the arm's LOWER face (end.start), above.start on its upper
     # face (end.end).  Pairing same-named corners (below.end with end.end)
@@ -509,6 +518,70 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch arm section", await adapter.exit_sketch())
     name_last_feature(adapter, "ArmSection")
     drive_jobs += section.apply(adapter, "ArmSection")
+
+    # 5. Arm footprint witness (ArmFootprint, blanked; Front plane, sketch
+    # (u, v) -> model (X, Y)): the BOTTOM view looks at the mounting face and
+    # draws the arm's end face face-on, a rectangle inside the flange's
+    # outline, so the arm's thickness across the flange and its lower face
+    # from the flange's lower (hole-datum) face are controlled THERE, where
+    # the footprint is seen (mreview10 blocker 1 wanted the arm tied to a
+    # flange edge by a toleranced dimension; the side view's edge-on stack
+    # of the same two values crowded the arm's end, Main's retry11 ruling).
+    # Two construction lines on the flange's east end, X = FLANGE_X[1], which
+    # the arm's +X face shares (ARM_HALF_X == FLANGE_X[1]), so both lie on
+    # the one edge the view draws there: the hole-datum face up to the arm's
+    # lower face, and the arm's full thickness.  Their dimensions take the
+    # flange's and the arm's east corners, so the extension lines run east,
+    # away from the part.  Four dimensions in creation order: the corner's
+    # anchor (FootprintCornerX, FootprintCornerY), the arm's lower face from
+    # the hole-datum face (FootprintOffset) and the thickness
+    # (FootprintThickness), every one driven by the globals so an edited
+    # flange or arm moves the witness with the body.
+    if ARM_HALF_X != FLANGE_X[1]:
+        raise RuntimeError(
+            "the arm footprint witness lies on the flange's east end, which the "
+            f"arm's +X face must share: ARM_HALF_X {ARM_HALF_X} != FLANGE_X[1] {FLANGE_X[1]}"
+        )
+    footprint = SketchDims()
+    check("create_sketch arm footprint", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    end_x = FLANGE_X[1]
+    gap = check(
+        "arm footprint hole-datum face to the arm",
+        await adapter.add_line(end_x, FLANGE_Y[0], end_x, ARM_Y[0]),
+    )
+    block = check(
+        "arm footprint arm thickness",
+        await adapter.add_line(end_x, ARM_Y[0], end_x, ARM_Y[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (gap, block):
+        _make_construction(adapter, line)
+    check(
+        "arm footprint pieces meet on the arm's lower face",
+        await adapter.add_sketch_constraint(f"{gap}.end", f"{block}.start", "coincident"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{gap}.start", end_x, FLANGE_Y[0], "arm footprint hole-datum corner"
+    )
+    footprint.record("FootprintCornerX", '"FlangeX1"')
+    footprint.record("FootprintCornerY", '-"FlangeY0"')
+    # Each piece's far end is pinned over its start (an alignment relation
+    # and one vertical dim, as the section's ArmThickness is).
+    await anchor_point_to_point(
+        adapter, f"{gap}.start", f"{gap}.end",
+        0.0, ARM_Y[0] - FLANGE_Y[0], "arm footprint FootprintOffset",
+    )
+    footprint.record("FootprintOffset", '"ArmY0" - "FlangeY0"')
+    await anchor_point_to_point(
+        adapter, f"{block}.start", f"{block}.end",
+        0.0, ARM_Y[1] - ARM_Y[0], "arm footprint FootprintThickness",
+    )
+    footprint.record("FootprintThickness", '"ArmY1" - "ArmY0"')
+    await ensure_fully_defined(adapter, "arm footprint sketch")
+    check("exit_sketch arm footprint", await adapter.exit_sketch())
+    name_last_feature(adapter, "ArmFootprint")
+    drive_jobs += footprint.apply(adapter, "ArmFootprint")
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -559,7 +632,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    blank_reference_sketches(adapter, ("ArmSection",))
+    blank_reference_sketches(adapter, ("ArmSection", "ArmFootprint"))
     # Annotation changes must preserve the cut holes through the final rebuild,
     # not merely at the earlier, pre-annotation equation check.
     await force_rebuild(adapter)

@@ -190,14 +190,27 @@ SIDE_KEEP = {
 # point (build_mg_output_fixture._groove_profile: AddSpecificDimension
 # swDiametricLinearDimension, Diametric proven on the part), so the sheet
 # reads it as a diameter only while its dimension line stands across the
-# groove, root to root.  Diametric toggles a doubled distance between the
-# radial-linear and diametric-linear types; no seat has yet shown which
-# Type2 a diametric one reports, so the proof takes either with Diametric
-# set, and logs which.
+# groove, root to root.  What the sheet's import reads back, by the SDK
+# (IDisplayDimension.Type2, swDimensionType_e; IDisplayDimension.Diametric
+# "toggles between radial and diameter" and "between radial linear and
+# diametric linear" display dimensions, True for "the diameter/doubled
+# distance"): retry10 read the imported GrooveRootDia as swDiameterDimension
+# (6) with Diametric True (farm 20261012T170144152Z), the diameter family's
+# type, the way the obsolete GetType folds radial and diametric into one.
+# The proof takes that or the authoring type itself, swDiametricLinearDimension
+# (15, "doubled distance linear dimension"), with Diametric set: a plain
+# linear (2, 11, 12), the groove's radius (5), a single-distance radial
+# linear (14) or any doubled type shown single (Diametric False) fails.
+# The type pair alone cannot tell the root Ø from a circle's Ø, which reads
+# the same, so the proof also reads the model dimension's value, the
+# doubled distance itself, then the ink root to root.
 _DOUBLED_DISTANCE_TYPES = {
-    14: "swRadialLinearDimension",
+    6: "swDiameterDimension",
     15: "swDiametricLinearDimension",
 }
+# IDimension.SystemValue is metres; the import keeps the model's value exactly
+# (_ms_drawing_contract, _drawing_edge_dimensions: 1e-5 mm).
+GROOVE_ROOT_VALUE_SLOP_MM = 1e-5
 GROOVE_ROOT_SHEET_YS = (
     _side_y(-GROOVE_ROOT_DIA / 2.0),
     _side_y(GROOVE_ROOT_DIA / 2.0),
@@ -410,8 +423,9 @@ def _groove_root_ink_problem(segments: list[Segment], line_x: float) -> str | No
 
 
 def _prove_groove_root_diameter(annotation: Any) -> None:
-    """Prove the sheet's groove root Ø is the part's doubled distance and
-    prints across the groove, root to root."""
+    """Prove the sheet's groove root Ø is the part's doubled distance, by
+    type, by value and by ink: a diameter-family display dimension shown
+    doubled, measuring the root Ø, printed across the groove, root to root."""
     display = _early_bound(
         _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
         "IDisplayDimension",
@@ -422,6 +436,13 @@ def _prove_groove_root_diameter(annotation: Any) -> None:
             f"GrooveRootDia is dimension type {kind}, Diametric {diametric}: not "
             "the part's doubled distance from the groove's axis to its root"
         )
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue)) * 1000.0
+    if abs(measured_mm - GROOVE_ROOT_DIA) > GROOVE_ROOT_VALUE_SLOP_MM:
+        raise RuntimeError(
+            f"GrooveRootDia measures {measured_mm:g} mm, not the groove root Ø "
+            f"{GROOVE_ROOT_DIA:g} mm: a single distance or another dimension"
+        )
     line_x = SIDE_KEEP["GrooveRootDia"][0]
     segments = dimension_segments(annotation)
     problem = _groove_root_ink_problem(segments, line_x)
@@ -429,6 +450,7 @@ def _prove_groove_root_diameter(annotation: Any) -> None:
         raise RuntimeError(f"GrooveRootDia does not print across the groove: {problem}")
     _telemetry.success(
         f"groove root Ø is {_DOUBLED_DISTANCE_TYPES[kind]} ({kind}), Diametric, "
+        f"DisplayAsLinear {bool(display.DisplayAsLinear)}, {measured_mm:g} mm, "
         f"{len(segments)} strokes standing root to root at x {line_x * 1000:.2f} mm"
     )
 
