@@ -445,7 +445,9 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "top bore mouth chamfer": 1,
     "opposed counterbore floor separation": 1,
     "cross screw axis from boss top": 1,
-    "counterbore floor from socket axis": 1,
+    # .XXX: at .X the floor's outboard limit left 1.518 to the cap recess,
+    # under rule 12's 2.0 (codex review of 67d8b2c6, sheet 4); at .XXX 2.17.
+    "counterbore floor from socket axis": 3,
     # Sheet 5, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
     # cropped set-screw boss section D-D (spot face, boss face, thread run).
     "hub from left front socket": 1,

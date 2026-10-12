@@ -733,7 +733,7 @@ COUNTERBORE_MIN_FLOOR_OFFSET = (
 )
 COUNTERBORE_PRINTED_HEAD_RECESS = math.sqrt(
     COUNTERBORE_MIN_BOSS_RADIUS**2 - COUNTERBORE_MAX_RADIUS**2
-) - (COUNTERBORE_MAX_FLOOR_OFFSET + CROSS_SCREW_HEAD_H)  # 0.078
+) - (COUNTERBORE_MAX_FLOOR_OFFSET + CROSS_SCREW_HEAD_H)  # 0.748
 COUNTERBORE_PRINTED_HEAD_CLEARANCE = (
     COUNTERBORE_MIN_RADIUS - CROSS_SCREW_HEAD_DIA / 2.0
 )  # 0.125 radial
@@ -755,11 +755,12 @@ COUNTERBORE_PRINTED_NEAR_WALL = (
         + PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["BoreProfile"]["B0Dia"]]
     )
     / 2.0
-)  # 2.15
+)  # 2.82
 # Cap recess to counterbore ligament: the recess's deepest, widest printed
 # corner against the counterbore's outboard-most floor rim, with the tap
-# axis at the high end of its .X station below the boss top. 1.518 sits
-# under the 2.0 target, over the 1.5 floor (nominal 3.05).
+# axis at the high end of its .X station below the boss top.  The floor's
+# station prints .XXX so this meets rule 12's 2.0 target: 2.167 (1.518 at
+# .X, codex review of 67d8b2c6; nominal 3.05).
 _AXIS_PLACES = DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
 COUNTERBORE_PRINTED_CAP_LIGAMENT = math.hypot(
     COUNTERBORE_MIN_FLOOR_OFFSET
@@ -767,9 +768,9 @@ COUNTERBORE_PRINTED_CAP_LIGAMENT = math.hypot(
     (CAP_RECESS_FLOOR_Y - CAP_RECESS_DEPTH_BAND[0])
     - (PRINTED_LINEAR_BAND_MM[_AXIS_PLACES] + COUNTERBORE_MAX_RADIUS),
 )
-if min(COUNTERBORE_PRINTED_NEAR_WALL, COUNTERBORE_PRINTED_CAP_LIGAMENT) < 1.5:
+if min(COUNTERBORE_PRINTED_NEAR_WALL, COUNTERBORE_PRINTED_CAP_LIGAMENT) < 2.0:
     raise AssertionError(
-        "top cross-screw counterbore leaves under 1.5 mm to the bore or cap recess"
+        "top cross-screw counterbore leaves under 2.0 mm to the bore or cap recess"
     )
 SIDE_TAP_THREAD_MAJOR_DIA = THREAD_MAJOR_MM[SIDE_TAP_SPEC.size]
 SIDE_TAP_THREAD_END_Z = COUNTERBORE_FLOOR - CASTING_FULL_THREAD_DEPTH
