@@ -163,6 +163,7 @@ from fr_top_frame_spec import (
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_X,
     HANGER_SLOT_FROM_ROUND,
+    HANGER_SLOT_FROM_ROUND_PLACES,
     HANGER_SLOT_LENGTH,
     HANGER_SLOT_LENGTH_CALLOUT,
     HANGER_SLOT_WIDTH,
@@ -504,6 +505,18 @@ LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 # right of the caption's DETAIL C (316.1 mm), beside the hub boss and
 # gussets it excludes.
 UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
+# The slot position frames' basics, stated for both stations: F-F cuts only
+# the rear one, and its bare 12.700 box carries no text (a BASIC keeps none),
+# so the front slot's basic and the frames' 90 degrees to the B-C line went
+# unstated (codex review of a3735691, sheet 6).  The note takes the band
+# between F-F's 6.350 block (top 113.3 mm) and the 70.0 block's underline
+# (136.6), left of detail C's fence (r 76 about the detail centre: x 236.7
+# at y 132); top-left point, rows 5.56 mm apart, 2.87 mm a glyph.
+SLOT_BASIC_NOTE = (
+    f"SLOTS: BASIC {HANGER_SLOT_FROM_ROUND:.{HANGER_SLOT_FROM_ROUND_PLACES}f} FROM\n"
+    "B (FRONT), C (REAR), AT\nBASIC 90 DEG TO B-C LINE"
+)
+SLOT_BASIC_NOTE_XY = (0.150, 0.1325)
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
 # #6 SHCS counterbore, its floor above the crossbar underside (the screw's
 # grip, closing RingHeight with the callout's counterbore depth), the round
@@ -1511,7 +1524,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         expected_mm=HANGER_PIN_X, orientation="horizontal",
         entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
         entities=(axes[0], axes[1]),
-        suffix="2X DOWEL HOLE\nFROM SCREW AXIS",
+        suffix="2X ROUND HOLE\nFROM SCREW AXIS",
         offset_text=PIN_STATION_OFFSET_XY,
     )
     # The slot's true location for its position frame: BASIC from the round
@@ -3051,6 +3064,8 @@ async def build(adapter: Any) -> dict[str, str]:
         *HUB_BOTTOM_NOTE_XY,
     ) is None:
         raise RuntimeError("failed to label underside locator")
+    if add_note(adapter, SLOT_BASIC_NOTE, *SLOT_BASIC_NOTE_XY) is None:
+        raise RuntimeError("failed to state the dowel slots' basic location")
     # The faced underside plane (user ruling 2026-10-12): the part's own
     # linked note C, beside the enlarged hub boss and gussets it excludes.
     add_property_linked_note(
