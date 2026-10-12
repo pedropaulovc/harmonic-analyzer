@@ -32,7 +32,9 @@ from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import format_findings
 from diagnostics.drawing_layout_audit import audit_document
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name, place_view, remove_notes_matching, view_name,
+)
 
 SPEC = DRAWINGS_BY_NAME["vn_cone_tip_collar"]
 PART_STEM = SPEC.artifact_stem
@@ -78,6 +80,10 @@ TAP_NOTE_XY = (TAP_CENTER[0] - 0.030, TAP_CENTER[1] + 0.025)
 BORE_CENTER = (0.300, 0.110)
 BORE_KEEP = {"BoreDia": (BORE_CENTER[0] + 0.035, BORE_CENTER[1] + 0.032)}
 BORE_NOTE_XY = (BORE_CENTER[0] - 0.025, BORE_CENTER[1] - 0.026)
+# SolidWorks' own descriptive Hole Wizard note ("... Tapped Hole"), pinned to
+# a view that imports from the tapped feature. The through tap's hole callout
+# already states the thread (draw_sm_knife_mount's TAPPED_HOLE_NOTE).
+TAPPED_HOLE_NOTE = "Tapped Hole"
 
 
 def bore_crop_radius_m() -> float:
@@ -263,6 +269,14 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=tap_rim,
         callout_xy=TAP_CALLOUT_XY, label="custom collar through set screw tap",
     )
+    # The first single-sheet render (8087fd13c) counted 16 annotations for
+    # the 15 this recipe places. The extra, note DetailItem348, boxed
+    # [211.6,140.7]..[268.3,154.0] mm with its leader, sat across
+    # CollarWidth's extension line and CollarDia's dimension line. It is the
+    # one unplaced note, so it is deleted rather than moved, and
+    # finalize_drawing then proves that no tapped-hole note is left.
+    removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
+    _telemetry.info(f"removed {removed} automatic tapped-hole note(s)")
     rebuild_drawing(adapter, label="collar layout audit")
     findings = audit_document(adapter)
     if findings:
@@ -270,6 +284,8 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter, OUTPUTS, pdf_title="Cone Tip Collar Manufacturing Drawing",
         scale=SHEET_SCALE, layout=SPEC.layout,
+        redundant_note_substrings=(TAPPED_HOLE_NOTE,),
+        expected_redundant_notes=0,
     )
 
 
