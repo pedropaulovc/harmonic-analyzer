@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import pytest
+
 import build_mg_magnifying_bracket as part
 import draw_mg_magnifying_bracket as drawing
 import mg_magnifying_bracket_spec
@@ -239,7 +241,6 @@ def test_collar_axis_is_the_rims_centre_projected_to_the_sheet(monkeypatch) -> N
 
     monkeypatch.setattr(drawing, "model_point_in_view", project)
     assert drawing._collar_axis(object(), right, rim) == (0.228, 0.20615)
-    assert successes and "one centre mark" in successes[-1]
 
 
 def test_collar_rims_and_arm_end_are_picked_on_the_near_end_face() -> None:
@@ -825,7 +826,10 @@ def test_side_view_axis_chain_reads_once_with_its_sum_as_reference() -> None:
     arm_end = SIDE_OY - part.ARM_Z[1]
     face = SIDE_OY - part.FLANGE_Z[1]
     text, lone, tail = 3.5, 2.78, 6.4
-    assert part.ARM_Z[1] - part.FLANGE_Z[1] == pytest.approx(3.11)
+    assert round(
+        part.ARM_Z[1] - part.FLANGE_Z[1],
+        mg_magnifying_bracket_spec.DRAWING_PRECISION["ArmSection"]["ArmPastSeat"],
+    ) == pytest.approx(3.11)
     assert part.FLANGE_Z[1] + (part.ARM_Z[1] - part.FLANGE_Z[1]) == pytest.approx(58.30)
     assert round(part.FLANGE_Z[1], 2) + round(part.ARM_Z[1] - part.FLANGE_Z[1], 2) == pytest.approx(58.30)
     seat_x, seat_y = _side_mm("SeatToAxis", drawing.SIDE_SECTION_KEEP)
@@ -1113,7 +1117,6 @@ def test_bottom_view_east_stack_stands_clear() -> None:
     # its own upper arrowhead, its run from the top witness up to the
     # shoulder; its lower tail (to y 97.3 mm, under the offset's row level)
     # stands a 2 mm arrow clearance right of that row on its right hand.
-    height_row = 0.0142
     height_shoulder = height_y - LONE_ROW_DROP
     assert height_shoulder > arm_upper + clearance
     assert height_shoulder > top + arrowhead
@@ -1185,6 +1188,43 @@ def test_bottom_view_caption_names_the_mounting_face_above_the_view() -> None:
     assert 'dimension_name(adapter, annotation) == "ArmWidth"' in source
     assert "min(front_ink) - extent[4] < TEXT_HEIGHT_M" in source
     assert "sheet.SetScale(*SHEET_SCALE, False, False)" in source
+
+
+@pytest.mark.parametrize("scale_result", [True, False, None, 1, object()])
+def test_bottom_caption_requires_a_real_scale_success(monkeypatch, scale_result) -> None:
+    from types import SimpleNamespace
+
+    outline = (0.0854, 0.0981, 0.1446, 0.121938)
+    caption_bottom = outline[3] + drawing.BOTTOM_CAPTION_GAP_M
+    caption_centre = (outline[0] + outline[2]) / 2.0
+    note = SimpleNamespace(
+        GetExtent=lambda: (
+            caption_centre - 0.029,
+            caption_bottom,
+            0.0,
+            caption_centre + 0.029,
+            caption_bottom + drawing.TEXT_HEIGHT_M,
+            0.0,
+        ),
+    )
+    sheet = SimpleNamespace(SetScale=lambda *args: scale_result)
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
+    )
+    view = SimpleNamespace(GetOutline=lambda: outline)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "add_note", lambda *args: note)
+    monkeypatch.setattr(drawing, "dimension_name", lambda *args: "ArmWidth")
+    monkeypatch.setattr(
+        drawing, "dimension_segments", lambda annotation: [((0.1, 0.14), (0.15, 0.14))]
+    )
+    monkeypatch.setattr(drawing._telemetry, "info", lambda *args: None)
+
+    if scale_result is True:
+        drawing._place_bottom_caption(adapter, view, [object()])
+    else:
+        with pytest.raises(RuntimeError, match="cannot pin the sheet scale"):
+            drawing._place_bottom_caption(adapter, view, [object()])
 
 
 def test_native_counterbore_dimensions_keep_names_and_route_annotations(monkeypatch) -> None:

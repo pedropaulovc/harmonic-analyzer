@@ -713,7 +713,7 @@ def _place_bottom_caption(adapter: Any, view: Any, front_annotations: Sequence[A
     sheet = _early_bound(
         _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
     )
-    if not sheet.SetScale(*SHEET_SCALE, False, False):
+    if sheet.SetScale(*SHEET_SCALE, False, False) is not True:
         raise RuntimeError("cannot pin the sheet scale before the bottom view caption")
     outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
     target = ((outline[0] + outline[2]) / 2.0, outline[3] + BOTTOM_CAPTION_GAP_M)
