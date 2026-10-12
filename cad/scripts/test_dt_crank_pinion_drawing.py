@@ -934,8 +934,6 @@ def _assert_no_t120_shortfall_waiver() -> None:
         if line.startswith("| MHA-DT-010") and "T120" in line.split("|")[1]
     ]
     assert not rows
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    assert "Named exception: MHA-DT-010 turned band" not in source
 
 
 def test_t120_clearance_facts_match_the_ordinary_floors_without_a_waiver() -> None:

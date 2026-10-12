@@ -930,8 +930,8 @@ def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
     """U31: the 16T:64T mesh closes on the bore spacing, so the print states it.
 
     User ruling 2026-09-28: fixed centres, no drop and no fit-up bushing; the
-    printed spacing band is one of crank_mesh_stack's terms, and its
-    import-time assert is the never-bind check.
+    printed spacing band is one of crank_mesh_stack's terms, and its standard
+    check's worst-corner backlash > 0 is the never-bind check.
     """
     import crank_mesh_stack
 
