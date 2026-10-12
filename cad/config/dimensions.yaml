@@ -468,9 +468,9 @@ sections:
         - scaled
         - med
       - - Gear outer diameter
-        - '64.44 mm blank; pitch diameter 63.5 mm; tooth-tip MIN/MAX 64.42..64.44 mm'
+        - '64.44 mm blank; pitch diameter 63.5 mm; tooth-tip MIN/MAX 64.34..64.44 mm'
         - '2.537008'
-        - 'Current dt_cylinder_gear_spec uses finite #2 stock form, 55T reference, for the 120T 48DP PA20 gear. dimensions.yaml records nominal support Ø64.543186357 and depth-corner cap Ø64.442207170, paying the retained +0.05/0 plunge band and three-place rounding before selecting the two-place 64.44 blank; the contact-critical tip band is +0/−0.02. Nominal root-envelope MIN/MAX Ø62.175233433 / 62.177083333 and cutter plunge 1.131458333 mm are finite-tool geometry, not an actual-N circular root or contact certificate. Earlier support-only blank 64.54 and ideal-N tip 64.558333333333 (2.541667 in) are historical. Historical p.25 photo scaling against the back-view brackets gave 62.2 mm / 2.449 in (user, 2026-06-18, low confidence) and formerly anchored DP49.82; that observation is preserved, not asserted equal to the inch blank. Boston Y48120 is only a pitch/count tooth-rim candidate, not an actual-flank equivalent or the native custom cam composite.'
+        - 'Current dt_cylinder_gear_spec uses finite #2 stock form, 55T reference, for the 120T 48DP PA20 gear. dimensions.yaml records nominal support Ø64.543186357 and depth-corner cap Ø64.442207170, paying the retained +0.05/0 plunge band and three-place rounding before selecting the two-place 64.44 blank; the standard tip band is +0/−0.10. Nominal root-envelope MIN/MAX Ø62.175233433 / 62.177083333 and cutter plunge 1.131458333 mm are finite-tool geometry, not an actual-N circular root or contact certificate. Earlier support-only blank 64.54 and ideal-N tip 64.558333333333 (2.541667 in) are historical. Historical p.25 photo scaling against the back-view brackets gave 62.2 mm / 2.449 in (user, 2026-06-18, low confidence) and formerly anchored DP49.82; that observation is preserved, not asserted equal to the inch blank. Boston Y48120 is only a pitch/count tooth-rim candidate, not an actual-flank equivalent or the native custom cam composite.'
         - derived from selected finite stock form; historical scale retained
         - med current nominal geometry; low historical scale
       - - Cam diameter (integral cam per gear)
@@ -1957,9 +1957,9 @@ sections:
         - derived from selected spec
         - med
       - - Outer diameter
-        - '17.63 mm blank; tooth-tip MIN/MAX 17.61..17.63 mm'
+        - '17.63 mm blank; tooth-tip MIN/MAX 17.53..17.63 mm'
         - '0.694094'
-        - 'dt_alignment_pinion_spec uses finite #4 stock form, 26T reference, for the 32T 48DP PA20 pinion. dimensions.yaml records nominal support Ø17.979877682; span-corner support Ø17.636633356 pays retained +0/−0.100 tangent-span inspection before selecting the two-place 17.63 blank, with contact-critical tip band +0/−0.02. Nominal root-envelope MIN/MAX Ø15.607797572 / 15.610416667, cutter plunge 1.009791667 and three-tooth tangent span 4.141050236 mm (printed span 4.0411..4.1411) are source geometry, not a loaded-contact certificate. Earlier support-only blank 17.97, ideal-N tip 17.991666666667 / 0.708333 in and circular root 15.610416666667 are historical reference values.'
+        - 'dt_alignment_pinion_spec uses finite #4 stock form, 26T reference, for the 32T 48DP PA20 pinion. dimensions.yaml records nominal support Ø17.979877682; span-corner support Ø17.636633356 pays retained +0/−0.100 tangent-span inspection before selecting the two-place 17.63 blank, with standard tip band +0/−0.10. Nominal root-envelope MIN/MAX Ø15.607797572 / 15.610416667, cutter plunge 1.009791667 and three-tooth tangent span 4.141050236 mm (printed span 4.0411..4.1411) are source geometry, not a loaded-contact certificate. Earlier support-only blank 17.97, ideal-N tip 17.991666666667 / 0.708333 in and circular root 15.610416666667 are historical reference values.'
         - derived from selected finite stock form
         - med current nominal geometry; qualification separate
       - - Drum length
