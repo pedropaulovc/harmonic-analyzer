@@ -3774,6 +3774,12 @@ def task_prechips():
                 SCRIPTS_DIR / f"{module}.py"
                 for module in _process_plans.shop_spec_modules()
             ]
+            for spec in specs:
+                if not spec.is_file():
+                    raise _process_plans.PlanBindError(
+                        f"missing CAD fixture spec: {spec.resolve()}; "
+                        "add the spec file or correct the inventory cad stem"
+                    )
         except _process_plans.PlanBindError as exc:
             specs = []
             diagnostic = str(exc)

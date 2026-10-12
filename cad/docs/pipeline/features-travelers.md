@@ -131,6 +131,15 @@ same constants as the SolidWorks fixture in the fixture frame.
 `cad/out/travelers/_shop/`, inserting those primitives and removing the HA-only
 `cad` key. Tracked shop files and plans are never rewritten by binding.
 
+Task-graph loading validates that every inventory CAD fixture's
+`<fixture-stem>_spec.py` exists as a file. Malformed inventory and missing fixture
+specs are captured as bad-input diagnostics on the enrolled `prechips:<stem>`
+tasks, rather than aborting graph construction; build, gallery, check and part
+tasks remain available. Selecting an affected traveler fails with its task label,
+inventory path and captured diagnostic (including the missing spec path), without
+bundle dependencies, geometry export, kernel launch or a success stamp. Add the
+missing spec file or correct the inventory's `cad` stem before retrying.
+
 ## Strict local travelers and enrollment
 
 `_process_plans.TRAVELER_STEMS` is the enrollment authority for the

@@ -3432,11 +3432,11 @@ def synthetic_prechips_task(tmp_path, monkeypatch):
     for name in _process_plans.SHOP_FILES:
         (shop / name).write_text("version = 1\n")
     (shop / "inventory.toml").write_text(
-        '[fixtures.test]\ncad = "ch_rocker_arm_tl_test"\n'
+        '[fixtures.test]\ncad = "ch_rocker_arm_tl_vise_stop"\n'
     )
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", root)
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", (stem,))
-    spec = dodo.SCRIPTS_DIR / "ch_rocker_arm_tl_test_spec.py"
+    spec = dodo.SCRIPTS_DIR / "ch_rocker_arm_tl_vise_stop_spec.py"
     helper = dodo.SCRIPTS_DIR / "_synthetic_fixture_dimensions.py"
     original = dodo._executed_closure
 
@@ -3651,6 +3651,60 @@ def test_prechips_malformed_inventory_fails_only_its_recorded_action(
         action(*args)
     assert str(source.resolve()) in str(raised.value)
     assert f"prechips:{stem}" in str(raised.value)
+    assert not (dodo.REPORTS / f"prechips-{stem}.ok").exists()
+    assert synthetic_prechips_kernel["discoveries"] == 0
+    assert synthetic_prechips_kernel["queries"] == []
+
+
+def test_prechips_missing_fixture_spec_fails_only_its_recorded_action(
+    synthetic_prechips_task, synthetic_prechips_kernel, tmp_path, monkeypatch,
+):
+    from doit.loader import load_tasks
+
+    dodo, plans, exporter, stem, _, _, _ = synthetic_prechips_task
+    monkeypatch.setattr(dodo, "REPORTS", tmp_path / "reports")
+    source = plans.shop_paths()[0]
+    missing_stem = "ch_rocker_arm_tl_nonexistent_inventory_fixture"
+    missing_spec = dodo.SCRIPTS_DIR / f"{missing_stem}_spec.py"
+    assert not missing_spec.exists()
+    source.write_text(
+        f'[fixtures.test]\ncad = "{missing_stem}"\n', encoding="utf-8",
+    )
+
+    def refuse_launch(*args, **kwargs):
+        pytest.fail("bad inventory must not launch geometry or traveler work")
+
+    monkeypatch.setattr(dodo, "_run", refuse_launch)
+    loaded = load_tasks(dict(vars(dodo)), allow_delayed=True)
+    names = {task.name for task in loaded}
+    assert {f"prechips:{stem}", "build", "gallery", "check:math"} <= names
+    assert any(task.name.startswith("part:") for task in loaded)
+    definition = next(dodo.task_prechips())
+    assert str(source.resolve()) in definition["file_dep"]
+    assert not {
+        str(path.resolve()) for path in exporter.bundle_paths(stem, dodo.CAD_OUT)
+    } & set(definition["file_dep"])
+    assert definition["task_dep"] == []
+    assert definition["uptodate"] == [False]
+    action, args = definition["actions"][0]
+    assert action is dodo._fail_prechips_inventory
+    assert "missing CAD fixture spec" in args[2]
+    assert str(missing_spec.resolve()) in args[2]
+    assert "correct the inventory cad stem" in args[2]
+
+    # Repairing the inventory cannot erase the action's captured diagnostic.
+    source.write_text("version = 1\n", encoding="utf-8")
+
+    def refuse_reload():
+        pytest.fail("the recorded inventory failure must not parse again")
+
+    monkeypatch.setattr(plans, "shop_spec_modules", refuse_reload)
+    with pytest.raises(RuntimeError, match="missing CAD fixture spec") as raised:
+        action(*args)
+    message = str(raised.value)
+    assert f"prechips:{stem}" in message
+    assert str(source.resolve()) in message
+    assert str(missing_spec.resolve()) in message
     assert not (dodo.REPORTS / f"prechips-{stem}.ok").exists()
     assert synthetic_prechips_kernel["discoveries"] == 0
     assert synthetic_prechips_kernel["queries"] == []
