@@ -383,6 +383,32 @@ exports and travelers](cad/docs/pipeline/features-travelers.md).
   `next_revision` after a successful publish; the release agent MUST merge that
   generated-only follow-up before the next release.
 
+### Release notes
+
+Every release MUST describe what changed since the previous published release.
+Use [v37's release notes](https://github.com/pedropaulovc/harmonic-analyzer/releases/tag/v37)
+as the editorial pattern:
+
+- Open with a short account of the main changes and their effect on someone
+  making, assembling or using the machine.
+- Group descriptions by subsystem, with smaller headings where useful. Link
+  the relevant PRs or issues and explain the actual geometry, drawing, fit-up,
+  manufacturing or user-visible change. A commit-title dump is not sufficient.
+- Include known issues and release-shaping decisions when applicable. Verify
+  their state against the released source and current issue evidence; do not
+  copy old release limitations or describe a pending fix as shipped.
+- Put build, checking and other shipped project changes after the CAD changes.
+  Keep the generated bundle inventory, changed-parts images, provenance and
+  logs below the authored descriptions under `## Bundle`.
+
+Draft from the exact previous-tag-to-release-tag diff and merged PRs, checking
+dimensions against the released CAD configuration. Run the humanizer skill on
+the prose. The publisher's generated asset notes are only the bundle appendix:
+the release agent MUST install the authored notes with `gh release edit vNN
+--notes-file <file>` and read back the published body before reporting completion.
+Preserve the asset URLs and provenance when editing an already published release;
+do not retag, rebuild or re-upload unchanged artifacts to correct its prose.
+
 ## `.farm-sources.json` — submodules the farm does not acquire
 
 Each leaf names one committed `HEAD`. The worker initializes its own disposable
