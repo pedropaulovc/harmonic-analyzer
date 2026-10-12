@@ -484,48 +484,101 @@ def test_exact_finite_drum_tilt_keeps_full_shadow_and_manufactured_caps(normal):
 def test_collar_air_shares_the_assembly_post_face_and_tip_tap_bands():
     import build_dt_drive_train_assembly as bdt
 
+    # The assembly books the post band symmetrically; the collar air books it
+    # less the screw clearance the pushed post takes up (MHA-DT-000 step 3).
     axial = air.AXIAL_TERMS_MM
     assert sum(axial[name] for name in (
         "post platform tap station", "post screw clearance", "post counterbore pattern",
         "post cone boss length",
-    )) == pytest.approx(bdt.POST_BOSS_FACE_AXIAL_BAND_MM)
+    )) + air.POST_SCREW_CLEARANCE_TAKEN_UP_MM == pytest.approx(bdt.POST_BOSS_FACE_AXIAL_BAND_MM)
     tip = air.TIP_END_TERMS_MM
     assert sum(tip[name] for name in (
         "tip platform hold-down station", "tip hold-down screw clearance", "tip block foot tap station",
     )) == pytest.approx(bdt.TIP_TAP_LATERAL_BAND_MM)
 
 
-def test_collar_air_books_the_shaft_tip_across_the_backed_off_cup():
-    from cone_shaft_land_bands import TERMINAL_FINISHED_DIA_LIMITS_MM, TERMINAL_FLAT_OFFSET_MIN_MM
-    from cone_stack_end_play import SHAFT_END_PLAY
+def test_collar_air_gains_the_pushed_posts_axial_clearance(monkeypatch):
+    import draw_dt_drive_train_assembly as sheet
 
-    capture = air.TIP_END_TERMS_MM["shaft tip in the backed-off cup"]
-    assert "shaft tip in the backed-off cup" in air.IN_SERVICE_CLEARANCES
-    r, o, e = TERMINAL_FINISHED_DIA_LIMITS_MM[1] / 2.0, TERMINAL_FLAT_OFFSET_MIN_MM, SHAFT_END_PLAY[1]
-    # Toward the round the 45 deg wall gives exactly the end play; toward the
-    # D-flat the corners meet the wall circle r + e, which gives more.
-    assert capture > e
-    assert r * r + 2.0 * o * capture + capture * capture == pytest.approx((r + e) ** 2)
+    assert "HOLD MHA-DT-005 PUSHED TOWARD MHA-DT-021 ALONG THE SHAFT" in " ".join(
+        sheet.CONE_CRANK_STEPS.split())
+    taken = air.POST_SCREW_CLEARANCE_TAKEN_UP_MM
+    assert taken > 0.0 and air.AXIAL_TERMS_MM["post screw clearance"] == pytest.approx(0.0)
+    # Only the along-shaft share goes; the across and tilt shares stay.
+    assert air.POST_END_TERMS_MM["post screw clearance"] == pytest.approx(taken)
+    pushed = {(r["tier"], r["drum_tier"], r["angle_deg"]): r for r in air.full_sweep_proof()}
+    monkeypatch.setitem(air.AXIAL_TERMS_MM, "post screw clearance", taken)
+    loose = {(r["tier"], r["drum_tier"], r["angle_deg"]): r for r in air.full_sweep_proof()}
+    for key in (k for k in pushed if k[0] == "nose"):
+        along = abs(air.collar_pose_frame(key[2])[1][2])
+        assert pushed[key]["air_mm"] - loose[key]["air_mm"] == pytest.approx(taken * along)
 
+
+
+def test_collar_air_bounds_the_released_tip_by_the_post_journal_not_the_vendor_cup():
+    post, shaft = air.post, air.shaft
+
+    name = "shaft swing in the post journal off the cup"
+    release = air.TIP_END_TERMS_MM[name]
+    assert name in air.IN_SERVICE_CLEARANCES
+    c = max(shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)
+    engaged = (post.CONE_BOSS_LENGTH - printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
+               - 2.0 * shaft.THRUST_EDGE_BREAK_MAX)
+    span = shaft.T006_TIP_STATION - air.cone_line.POST_STATION
+    # Seated at one side of the journal, released to the other.
+    assert release == pytest.approx(2.0 * c * span / engaged)
+    # B18.6.2 bounds no cup depth or wall angle: the nominal 90 deg vendor cup
+    # over the 0.25 end play would have booked less.
+    assert release > 0.5
 
 
 def test_collar_air_books_each_printed_source_once():
-    terms = air.closure_terms_mm(air.TIERS[0], air.DRUM_TIERS[0], 0.0)
-    assert set(terms) == {
+    common = {
         *air.AXIAL_TERMS_MM, *air.POST_END_TERMS_MM, *air.TIP_END_TERMS_MM,
         *air.SWING_TERMS_MM, "T120 set of the swing",
-        "collar tier axial limit", "collar tier radial limit",
         "collar float on the journal", "collar cock on the journal",
         *(f"bank {name}" for name in air.bank.DATUM_CHAIN_STACK),
         "drum tier limits", "G19 cock in its running fit",
     }
-    assert all(value >= 0.0 for value in terms.values())
-    assert air.IN_SERVICE_CLEARANCES <= set(terms)
+    for tier in air.TIERS:
+        terms = air.closure_terms_mm(tier, air.DRUM_TIERS[0], 0.0)
+        assert set(terms) == common | set(tier.limits)
+        assert set(terms) <= air.IN_SERVICE_CLEARANCES | air.INDEPENDENT_TOLERANCES
+        assert all(value >= 0.0 for value in terms.values())
     # One post mounting error enters once: along the shaft, plus across it,
     # plus the face tilt it gives the shaft line.
+    terms = air.closure_terms_mm(air.TIERS[0], air.DRUM_TIERS[0], 0.0)
     along = abs(air.collar_pose_frame(0.0)[1][2])
     for name in ("post platform tap station", "post screw clearance", "post counterbore pattern"):
         assert terms[name] > air.AXIAL_TERMS_MM[name] * along
+
+
+def test_collar_air_splits_the_stock_screw_limits_into_their_sources():
+    screw = air.TIERS[2]
+    # The sources add up to the composite tier limits.
+    assert sum(a for a, _ in screw.limits.values()) == pytest.approx(-screw.south_lower_mm)
+    assert sum(r for _, r in screw.limits.values()) == pytest.approx(screw.radius_upper_mm)
+    # The thread rock and the collar's float are clearances, booked once
+    # each; the float joins the collar's own float on the journal.
+    rock, float_ = screw.limits["set screw rock in its thread"], screw.limits["collar float on the journal"]
+    assert rock[0] > 0.0 and rock[1] > 0.0 and float_[1] > 0.0
+    assert {"set screw rock in its thread", "collar float on the journal"} <= air.IN_SERVICE_CLEARANCES
+    assert not set(screw.limits) & {"collar tier axial limit", "collar tier radial limit"}
+    nose_terms = air.closure_terms_mm(air.TIERS[0], air.DRUM_TIERS[0], 0.0)
+    screw_terms = air.closure_terms_mm(screw, air.DRUM_TIERS[0], 0.0)
+    across = math.sqrt(1.0 - air.collar_pose_frame(0.0)[1][2] ** 2)
+    assert screw_terms["collar float on the journal"] == pytest.approx(
+        nose_terms["collar float on the journal"] + float_[1] * across)
+    stack = air.AirStack("screw", "tooth_face", 0.0, 10.0, screw_terms, 0.0)
+    assert "set screw rock in its thread" in stack.clearances
+
+
+def test_collar_air_refuses_an_unclassified_source(monkeypatch):
+    monkeypatch.setitem(air.AXIAL_TERMS_MM, "shim nobody classified", 0.01)
+    with pytest.raises(ValueError, match="unclassified source.*shim nobody classified"):
+        air.closure_terms_mm(air.TIERS[0], air.DRUM_TIERS[0], 0.0)
+    with pytest.raises(ValueError, match="unclassified source"):
+        air.AirStack("t", "d", 0.0, 10.0, {"collar feeler set": 1.0, "mystery": 1.0}, 0.0)
 
 
 def test_collar_air_adds_clearances_and_rss_only_the_tolerances(monkeypatch):
@@ -537,19 +590,22 @@ def test_collar_air_adds_clearances_and_rss_only_the_tolerances(monkeypatch):
     for row in rows:
         closure = row["closure_mm"]
         assert row["air_mm"] == pytest.approx(row["nominal_mm"] - sum(closure.values()))
-        assert set(closure) == {*air.IN_SERVICE_CLEARANCES, "RSS of the printed tolerances",
-                                "continuous p1 interval arc"}
-    stack = air.AirStack("t", "d", 0.0, 10.0, {"tip cup in its thread": 1.0, "a": 3.0, "b": 4.0}, 0.5)
+        fixed = {"RSS of the printed tolerances", "continuous p1 interval arc"}
+        assert fixed <= set(closure)
+        assert set(closure) - fixed <= air.IN_SERVICE_CLEARANCES
+        assert ("set screw rock in its thread" in closure) == (row["tier"] == "screw")
+    stack = air.AirStack("t", "d", 0.0, 10.0, {"tip cup in its thread": 1.0, "collar feeler set": 3.0,
+                                               "collar nose length": 4.0}, 0.5)
     assert stack.statistical_mm == pytest.approx(10.0 - 1.0 - 5.0 - 0.5)
     assert stack.arithmetic_mm == pytest.approx(10.0 - 8.0 - 0.5)
-    monkeypatch.setattr(air, "closure_terms_mm", lambda *_args: {"small": 0.01})
+    monkeypatch.setattr(air, "closure_terms_mm", lambda *_args: {"collar feeler set": 0.01})
     rows = air.full_sweep_proof(intervals=20)
     assert {row["method"] for row in rows} == {"arithmetic"}
     assert all(row["air_mm"] == row["arithmetic_mm"] for row in rows)
 
 
 def test_collar_air_refuses_when_the_booked_air_closes(monkeypatch):
-    monkeypatch.setattr(air, "closure_terms_mm", lambda *_args: {"large": 100.0})
+    monkeypatch.setattr(air, "closure_terms_mm", lambda *_args: {"collar feeler set": 100.0})
     with pytest.raises(ValueError, match="can reach G19"):
         air.full_sweep_proof(intervals=4)
 
