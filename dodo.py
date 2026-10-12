@@ -1393,7 +1393,7 @@ _CHECK_NAMES = (
     "partiso",
     "inert",
     "budget",
-    # Threaded-joint retention (drawing-simplicity-policy rule 9). Audit-only
+    # Threaded-joint retention (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)). Audit-only
     # while joint_retention.ENFORCEMENT is AUDIT: it reports, never fails.
     "joint_retention",
     "traveler_ch_rocker_arm",
@@ -3171,7 +3171,7 @@ def task_check():
         SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",
         # The rod fork / peened MHA-CH-010 pin joint's worst-case budget.
         SCRIPTS_DIR / "test_ch_rod_pivot_fit.py",
-        # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
+        # The blind machinist-review runner (cad/docs/drawing-guidelines.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
         SCRIPTS_DIR / "test_machinist_review.py",
@@ -3207,11 +3207,14 @@ def task_check():
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
     # the offline machinist-review contract.
     machinist_review_contract_deps = [
+        # The reviewer prompt is the shared guideline plus the kind's
+        # reviewer instructions (machinist_review.load_prompt).
+        SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_part.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_assembly.md",
         SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
-        # test_printed_text_rulings reads the Named exceptions table: a new or
-        # removed row must rerun its tagged-emitter check.
+        # test_dt_cone_pivot_post_drawing reads the policy's GD&T allowlist;
+        # allowlist edits must rerun its frame-ownership contract.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
     # test_adapter_feature_resolution exercises the vendored adapter, which

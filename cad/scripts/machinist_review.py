@@ -3,8 +3,10 @@ r"""Blind senior-machinist review of rendered drawing packages via Claude.
 The review the fleet is gated on (``cad/docs/drawing-simplicity-policy.md``):
 each drawing package is rendered or copied into a neutral temp directory and
 handed to ``claude -p --model claude-fable-5-1 --effort medium`` (or
-``codex exec --model gpt-6-astra`` at low reasoning) with NO repo context under
-the calibrated prompt in ``cad/scripts/prompts/``. ``--reviewer`` is mandatory
+``codex exec --model gpt-6-astra`` at low reasoning) with NO repo context. The
+prompt is the shared standard ``cad/docs/drawing-guidelines.md`` followed by the
+reviewer instructions for the package kind in ``cad/scripts/prompts/``.
+``--reviewer`` is mandatory
 and MUST name a different model family from the agent that authored or last
 edited the drawing script: a Claude-driven session (Fable, Opus, Sonnet)
 reviews with ``--reviewer codex``, a Codex/GPT-driven session with
@@ -16,11 +18,10 @@ provenance are written under ``cad/out/reports/machinist-review/``.
 Why the prompt is calibrated the way it is: the earlier ad-hoc reviews asked a
 "senior machinist" to hunt for MISSING tolerances / datums / finishes and were
 rewarded for gaps, so the fleet grew inspection-package GD&T on hand-crank
-parts.  The prompt now reads the title block as the general spec, scores
-over-specification as a defect, and encodes the shop-practice rules from
-Harvey (*Machine Shop Trade Secrets*, ch. 9) and Lipton (*Metalworking Sink or
-Swim*, ch. 2-3): decimal places carry tolerance, GD&T only where a ± cannot
-say it, hidden lines on, one origin, drill vs ream, few specific notes.
+parts. Authors and reviewers now share one standard, distilled from Harvey
+(*Machine Shop Trade Secrets*, ch. 9) and Lipton (*Metalworking Sink or Swim*,
+ch. 2-3): the title block is the general spec and over-specification is a
+defect as much as a missing dimension.
 
 Isolation is enforced by Claude's restricted mode in a neutral temp directory:
 nothing in the invocation references the repo, every page is copied as a
@@ -69,6 +70,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
 
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
+GUIDELINES_FILE = CAD_ROOT / "docs" / "drawing-guidelines.md"
 PROMPT_FILES = {
     "part": PROMPTS_DIR / "machinist_review_part.md",
     "assembly": PROMPTS_DIR / "machinist_review_assembly.md",
@@ -148,7 +150,10 @@ def all_packages() -> list[ReviewPackage]:
 
 
 def load_prompt(kind: str) -> str:
-    return PROMPT_FILES[kind].read_text(encoding="utf-8")
+    """The shared drawing guidelines followed by the kind's reviewer instructions."""
+    guidelines = GUIDELINES_FILE.read_text(encoding="utf-8").rstrip()
+    reviewer = PROMPT_FILES[kind].read_text(encoding="utf-8")
+    return f"{guidelines}\n\n{reviewer}"
 
 
 def load_schema() -> dict[str, Any]:
