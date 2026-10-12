@@ -87,11 +87,15 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.706, abs=1e-3)
     assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.088, abs=1e-3)
     # TIE 2 breaks into the bore at mid-width: its ligament ends at the
-    # rim-bore rounds, R0.80 printed at .XXX (R0.93 at most), no model band.
+    # rim-bore rounds, R0.80 printed at .XXX (R0.93 at most), no model band,
+    # on a rim 8.0 wide at .X (7.2 at least).
     assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.095, abs=1e-3)
     assert geom.CAST_ROUND_R == 0.80
     assert not hasattr(geom, "CAST_ROUND_BAND")
-    assert spec.DRAWING_REFERENCE_PRECISION == {"rim bore round": 3}
+    assert spec.DRAWING_REFERENCE_PRECISION == {
+        "rim bore round": 3,
+        "rim axial width": 1,
+    }
     assert "RimRounds" not in spec.DRAWING_DIMENSIONS
     # At 4:30 (-45) the worst printed casting leaves TIE 2 about a 1.2 wall.
     assert geom.TIE2_CLOCK_DEG == -43.0
@@ -156,10 +160,17 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     assert "REAMED" not in notes
     # Each fit prints on its own diameter, stating what its band holds.
     assert "PRESS FIT" not in notes and "RUNS ON" not in notes
-    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"].endswith("0.033-0.053 CLEARANCE")
-    assert drawing.DIMENSION_CALLOUTS["SpigotDia"].endswith("0.005-0.034\nINTERFERENCE")
+    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"].endswith(
+        "0.033-0.053\nDIAMETRAL CLEARANCE"
+    )
+    assert drawing.DIMENSION_CALLOUTS["SpigotDia"].endswith(
+        "0.005-0.034\nDIAMETRAL\nINTERFERENCE"
+    )
+    assert drawing.ROUND_CALLOUT.endswith("\nHOLDS TIE 2 WALL")
     assert drawing.CALLOUTS_ABOVE["HubLength"] == "LOCKNUT ON FULL THREAD"
     assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "DRUM NOT PROUD"
+    assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "WEB & RIM CENTER"
+    assert drawing.DIMENSION_CALLOUTS["RimOuterDiaDim"].startswith("HOLDS PEN WIRE")
     assert "DO NOT" not in notes and "RELEASE" not in notes
     assert "GRAY-IRON" not in notes and "BLACK" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes

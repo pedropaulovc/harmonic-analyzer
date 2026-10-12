@@ -74,7 +74,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Decimal places per marked dimension (drawing-simplicity rule 2): the cast
 # shapes at one place, the turned and drilled sizes at two, the press-fit
-# spigot and the reamed bore at three.
+# spigot and the reamed bore at three.  The rim's OD keeps two: at .X its
+# Ø99.2 floor leaves the groove 0.75 deep under the 0.8 pen wire
+# (GROOVE_DEPTH_MIN), so its callout says what the band holds.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RimProfile": {"RimOuterDiaDim": 2, "RimInnerDiaDim": 1},
     "SpokeProfile": {"SpokeRootWidth": 1, "SpokeTipWidth": 1},
@@ -93,10 +95,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Tie1Profile": {"Tie1Y": 2, "Tie1HoleDia": 2},
     "Tie2Profile": {"Tie2HoleDia": 2, "Tie2Angle": 0},
 }
-# Places of the sheet-added rim-bore round (policy rule 2: the spec owns
-# them, the sheet only passes them through): three, so the title block's
-# .XXX row bounds it (R0.67-0.93 for TIE2_FACE_WALL).
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"rim bore round": 3}
+# Places of the sheet-added dimensions (policy rule 2: the spec owns them,
+# the sheet only passes them through).  The rim-bore round takes three, so
+# the title block's .XXX row bounds it (R0.67-0.93 for TIE2_FACE_WALL); the
+# rim's axial width one, its .X row the coarsest the walls admit.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    "rim bore round": 3,
+    "rim axial width": 1,
+}
 
 # Rule 6: the notes say only what no callout can.  The spigot's press fit and
 # the bore's running fit print on their own diameter callouts.
@@ -137,8 +143,9 @@ _ROOT = _printed(SPOKE_ROOT_WIDTH, "SpokeRootWidth")
 _TIP = _printed(SPOKE_TIP_WIDTH, "SpokeTipWidth")
 _HUB_FILLET = _printed(HUB_FILLET_R, "HubFilletR")
 _RIM_FILLET = _printed(RIM_FILLET_R, "RimFilletR")
-# The rim's axial width is a sheet dimension; the coarsest row bounds it.
-_RIM_AXIAL_MIN = RIM_AXIAL - printed_band_mm(1)
+_RIM_AXIAL_MIN = RIM_AXIAL - printed_band_mm(
+    DRAWING_REFERENCE_PRECISION["rim axial width"]
+)
 _CAST_ROUND_MAX = CAST_ROUND_R + printed_band_mm(
     DRAWING_REFERENCE_PRECISION["rim bore round"]
 )
