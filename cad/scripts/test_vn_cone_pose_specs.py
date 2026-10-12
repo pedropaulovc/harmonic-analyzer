@@ -147,7 +147,65 @@ def test_native_recipes_load_the_vendor_scalars(
     spec = _pure_spec(spec_name)
     for name, expected in scalars.items():
         assert getattr(spec, name) == pytest.approx(expected, rel=0.0, abs=1e-12)
-    assert spec_name in _loaded_roots(recipe_name)
+    shared = _perturbed_recipe_values(spec_name, recipe_name)
+    assert set(scalars) & set(shared), "the recipe reads none of the harvested scalars"
+    for name, (used, authority) in shared.items():
+        assert used == authority, f"{recipe_name} holds its own {name}"
+
+
+# Every public number of the supplier spec is moved before the native recipe
+# is imported, in a fresh interpreter; each one the recipe holds must follow.
+_PERTURBED_VALUES = """
+import importlib, json, numbers, sys
+spec = importlib.import_module(sys.argv[1])
+moved = {}
+for name, value in list(vars(spec).items()):
+    if name.isupper() and isinstance(value, numbers.Real) and not isinstance(value, bool):
+        moved[name] = value + (1 if isinstance(value, int) else 0.5)
+        setattr(spec, name, moved[name])
+recipe = importlib.import_module(sys.argv[2])
+print(json.dumps({n: [getattr(recipe, n), v] for n, v in moved.items() if hasattr(recipe, n)}))
+"""
+
+
+def _perturbed_recipe_values(spec_name: str, recipe_name: str) -> dict[str, list[float]]:
+    result = subprocess.run(
+        [sys.executable, "-c", _PERTURBED_VALUES, spec_name, recipe_name],
+        cwd=SCRIPTS, capture_output=True, text=True, check=True,
+    )
+    return json.loads(result.stdout.splitlines()[-1])
+
+
+_RECORDED_CUP = """
+import asyncio, contextlib, json, sys
+from unittest.mock import AsyncMock, MagicMock
+import _mcmaster_94025a164 as spec
+spec.SS_TIP_R += 0.5
+import _sketch
+import diagnostics.diag_build_94025A164 as recipe
+chains = []
+async def add_line_chain(_adapter, points, close=True):
+    chains.append(points)
+_sketch.add_line_chain = add_line_chain
+for name in ("check", "name_last_feature", "insert_helix", "offset_plane", "thread_sweep_cut_modern"):
+    setattr(recipe, name, MagicMock())
+recipe.no_sketch_inference = lambda _adapter: contextlib.nullcontext()
+recipe.volume_check = AsyncMock(side_effect=lambda _a, _l, expected, _t: expected)
+recipe.bodies = lambda _adapter: [object()]
+asyncio.run(recipe.build_94025A164(AsyncMock(currentSketchManager=MagicMock())))
+print(json.dumps({"tip": spec.SS_TIP_R, "half": spec.SS_HALF, "profile": chains[0]}))
+"""
+
+
+def test_the_native_cup_recipe_draws_the_spec_tip_radius() -> None:
+    """The real 94025A164 recipe, with recording doubles and a moved SS_TIP_R:
+    its revolve profile's cup rim lands on the moved value."""
+    result = subprocess.run(
+        [sys.executable, "-c", _RECORDED_CUP], cwd=SCRIPTS,
+        capture_output=True, text=True, check=True,
+    )
+    recorded = json.loads(result.stdout.splitlines()[-1])
+    assert [recorded["tip"], -recorded["half"]] in recorded["profile"]
 
 
 def test_same_sku_fillister_row_has_one_pure_authority() -> None:

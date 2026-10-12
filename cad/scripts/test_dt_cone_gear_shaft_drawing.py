@@ -105,6 +105,22 @@ def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
     assert "TerminalTorqueEdge" not in drawing.D_SECTION_KEEP
 
 
+def test_the_build_leaves_the_terminal_torque_corners_sharp(monkeypatch):
+    """Run the real part build with recording doubles: no chamfer is authored
+    by any route (adapter, helper or raw COM chain), and the one edge
+    rounding, the step-root fillet, picks no edge inside the terminal land."""
+    adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
+    operations = [str(c[0]) for c in adapter.mock_calls] + [
+        f"{name}.{c[0]}" for name, stub in stubs.items() for c in stub.mock_calls
+    ]
+    assert not [op for op in operations if "chamfer" in op.lower()]
+    fillets = adapter.add_fillet.await_args_list
+    assert fillets, "the step-root fillet is the positive control"
+    start, tip = sorted(part.SECTION_ENDS[-2:])
+    picks = [pick for call in fillets for pick in call.args[1]]
+    assert all(not start < pick[2] <= tip for pick in picks), picks
+
+
 def test_only_the_terminal_d_section_prints_the_torque_corner_limit(monkeypatch):
     """Run the real section loop with its native steps recorded: the limit
     rides above the terminal flat's own across-flat, once, through the
