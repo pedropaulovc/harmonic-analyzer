@@ -34,7 +34,6 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_gdt import add_datum_feature
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
@@ -43,12 +42,12 @@ from _session import run_build
 import _telemetry
 from mg_wheel_bar_spec import (
     AXLE_BORE_X,
-    BAR_DEPTH,
     BAR_LENGTH,
     BAR_SIDE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
 )
+from mg_wheel_group import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX, BAR_PRESS
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_bar"]
@@ -65,7 +64,9 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 FRONT_CENTER = (0.155, 0.175)
-RIGHT_CENTER = (0.320, 0.175)
+# The end view stands far enough right that the height's callout runs
+# between it and the bar end.
+RIGHT_CENTER = (0.340, 0.175)
 ISO_CENTER = (0.320, 0.095)
 
 _HALF_LEN = BAR_LENGTH * SHEET_SCALE[0] / 2000.0
@@ -78,25 +79,35 @@ FRONT_KEEP = {
     # The bar height off the right end, in the open sheet between the bar and
     # the end view: off the left end its text sat on the border's zone
     # letter and frame line.
-    "Side": (RIGHT_END + 0.020, FRONT_CENTER[1]),
+    "Side": (RIGHT_END + 0.026, FRONT_CENTER[1]),
     # The axle bore's station from the left end, above the bar; its reamed Ø
     # up and right of the bore, so the leader leaves the circle clear of the
-    # station's extension line.
+    # station's extension line, the press lines standing clear of the bar.
     "AxleBoreStation": ((LEFT_END + AXLE_BORE_SHEET_X) / 2.0, FRONT_CENTER[1] + 0.018),
-    "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.020, FRONT_CENTER[1] + 0.032),
+    "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.025, FRONT_CENTER[1] + 0.042),
 }
 # The bar depth (the extrude's banded model dimension) under the end view.
 RIGHT_KEEP = {
     "BarDepth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - BAR_SIDE / 2000.0 - 0.014),
 }
-DIMENSION_CALLOUTS = {"AxleBoreDia": "THRU - REAM"}
+# Each band states its need: the bore holds the pressed axle, the depth sets
+# where the axle's back end lands, the height's top limit clears the tie wire.
+DIMENSION_CALLOUTS = {
+    "AxleBoreDia": (
+        "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\n"
+        f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} INTERFERENCE"
+    ),
+    "BarDepth": (
+        "MG-WHEEL-AXLE BACK END\n"
+        f"{BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK"
+    ),
+    "Side": "CLEARS WHEEL TIE",
+}
 DRAWING_PRECISION_BY_NAME = {
     name: places
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
-
-RIGHT_HALF_Z = BAR_DEPTH * SHEET_SCALE[0] / 2000.0
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -144,10 +155,10 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     set_hidden_lines_removed(adapter, iso)
-    # Front carries the hole circles; the end view shows the transverse bores
-    # dashed (blind review round 1: an empty end rectangle hid them).
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    # Front carries the hole circles; the end view's hidden bores only repeat
+    # the THRU callouts, so it is drawn hidden-lines-removed.
+    set_hidden_lines_visible(adapter, front)
+    set_hidden_lines_removed(adapter, right)
 
     annotations = [
         *curate_view_dimensions(
@@ -175,17 +186,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # marks above; their small clearance diameters + X-stations from the left
     # end are not dependable associative-callout picks at this 1:1 scale, so
     # they ride the notes (spec DRAWING_NOTES lists the sizes + stations).
-
-    # Datum A = the bar back face (seats on the clamp arc); tagged on the right
-    # view's back edge.
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] + RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        symbol_xy=(RIGHT_CENTER[0] + RIGHT_HALF_Z + 0.016, RIGHT_CENTER[1]),
-        datum="A",
-        label="bar back seat face",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.125)
     # x <= 0.235 keeps the ~55 mm label fully left of the title-block keep-out

@@ -25,6 +25,7 @@ from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
     PEN_HANGER_HOLE_DIA,
     PEN_HANGER_HOLE_SPEC,
     PEN_HANGER_MIN_END_WALL,
+    PEN_HANGER_STATION_PLACES,
     PEN_HANGER_STATION_TOL,
     SCREW_HOLE_X,
 )
@@ -46,9 +47,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Bar": {"BarDepth"},
     "AxleBoreProfile": {"AxleBoreDia", "AxleBoreStation"},
 }
+# The length and the height print .X; the depth, the bore station .XX; the
+# reamed bore .XXX.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BarProfile": {"Length": 1, "Side": 1},
     "Bar": {"BarDepth": 2},
-    "AxleBoreProfile": {"AxleBoreDia": 4, "AxleBoreStation": 2},
+    "AxleBoreProfile": {"AxleBoreDia": 3, "AxleBoreStation": 2},
 }
 
 # The small clearance-hole circles are not dependable associative-callout
@@ -59,11 +63,11 @@ DRAWING_NOTES = "\n".join(
         "ALL BORES THRU ON THE MID-HEIGHT CENTRELINE "
         f"+/-{AXLE_BORE_POSITION_TOL:.2f}, SQUARE TO THE BACK FACE.",
         f"2X {CLAMP_HOLE_SPEC.size} {CLAMP_HOLE_SPEC.fit.upper()} CLEARANCE "
-        f"Ø{CLAMP_HOLE_DIA:.3f} DRILL THRU FOR COLUMN-CLAMP SCREWS (MHA-SH-002).",
+        f"Ø{CLAMP_HOLE_DIA:.2f} DRILL THRU FOR COLUMN-CLAMP SCREWS (MHA-SH-002).",
         f"1X {PEN_HANGER_HOLE_SPEC.size} {PEN_HANGER_HOLE_SPEC.fit.upper()} "
-        f"CLEARANCE Ø{PEN_HANGER_HOLE_DIA:.3f} DRILL THRU FOR THE PEN-HANGER SCREW.",
-        f"HOLE STATIONS FROM THE LEFT END: HANGER {SCREW_HOLE_X - _LEFT_END:.1f} "
-        f"+/-{PEN_HANGER_STATION_TOL:.2f}; CLAMPS "
+        f"CLEARANCE Ø{PEN_HANGER_HOLE_DIA:.2f} DRILL THRU FOR THE PEN-HANGER SCREW.",
+        "HOLE STATIONS FROM THE LEFT END: HANGER "
+        f"{SCREW_HOLE_X - _LEFT_END:.{PEN_HANGER_STATION_PLACES}f}; CLAMPS "
         f"{CLAMP_HOLE_X[0] - _LEFT_END:.1f} AND {CLAMP_HOLE_X[1] - _LEFT_END:.1f}.",
     )
 )

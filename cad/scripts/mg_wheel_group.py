@@ -176,11 +176,11 @@ for _label, _left in (
 TAIL_ENVELOPE_R = 1.5 * _lever.WIRE_DIA + _wheel.TIE_POSITION_TOL
 BAR_BAND_HALF = (
     (_bar.BAR_SIDE + _bar.BAR_SIDE_BAND[0]) / 2.0 + _bar.AXLE_BORE_POSITION_TOL
-)  # 5.15: the bar's far face from the bore at its worst
+)  # 5.10: the bar's far face from the bore at its worst
 TAIL_BAR_CLEARANCE = (
     _wheel.TIE1_R * math.cos(math.radians(max(CW_MAX_DEG, CCW_MAX_DEG)))
     - TAIL_ENVELOPE_R
     - BAR_BAND_HALF
-)  # 0.103
+)  # 0.153
 if TAIL_BAR_CLEARANCE <= 0.0:
     raise AssertionError(f"TIE 1 tail reaches the wheel bar: {TAIL_BAR_CLEARANCE:.3f}")

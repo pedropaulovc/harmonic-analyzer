@@ -25,10 +25,9 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     marked = set().union(*mg_wheel_bar_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
-    assert (drawing.BAR_LENGTH, drawing.BAR_SIDE, drawing.BAR_DEPTH) == (
+    assert (drawing.BAR_LENGTH, drawing.BAR_SIDE) == (
         mg_wheel_bar_spec.BAR_LENGTH,
         mg_wheel_bar_spec.BAR_SIDE,
-        mg_wheel_bar_spec.BAR_DEPTH,
     )
 
 
@@ -61,7 +60,7 @@ def test_hanger_clearance_preserves_a_tolerance_safe_end_ligament() -> None:
         - geom.PEN_HANGER_STATION_TOL
         - part.PEN_HANGER_HOLE_DIA_TOL / 2.0
     )
-    assert minimum_wall == pytest.approx(2.614)
+    assert minimum_wall == pytest.approx(2.154)
     assert minimum_wall >= geom.PEN_HANGER_MIN_END_WALL
 
     # The former station passed a >0 guard with only 0.214 mm of material.
@@ -78,7 +77,7 @@ def test_bores_are_note_based_with_center_marks() -> None:
     # 1:1, so there is no per-hole callout / location dim; the notes carry the
     # sizes + X-stations and the front-view centre marks locate them.
     assert source.count("add_native_hole_callout(") == 0
-    assert source.count("add_datum_feature(") == 1
+    assert source.count("add_datum_feature(") == 0  # no control references one
     assert source.count("add_edge_dimension(") == 0  # the depth is native
     assert "auto_center_marks(" in source
     # The station note is computed from the geom constants, never duplicated.
@@ -107,12 +106,17 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
         "AxleBoreDia",
         "AxleBoreStation",
     }
-    assert set(drawing.DRAWING_PRECISION_BY_NAME) == {
-        "AxleBoreDia",
-        "AxleBoreStation",
-        "BarDepth",
+    assert drawing.DRAWING_PRECISION_BY_NAME == {
+        "Length": 1,
+        "Side": 1,
+        "AxleBoreDia": 3,
+        "AxleBoreStation": 2,
+        "BarDepth": 2,
     }
-    assert drawing.DIMENSION_CALLOUTS == {"AxleBoreDia": "THRU - REAM"}
+    assert drawing.DIMENSION_CALLOUTS["AxleBoreDia"] == (
+        "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\n0.010-0.030 INTERFERENCE"
+    )
+    assert drawing.DIMENSION_CALLOUTS["BarDepth"].endswith("0.10 PROUD TO 0.30 SUNK")
     assert model_toleranced_dimensions(part) == {
         ("BarProfile", "Side"): "*deviations(BAR_SIDE_BAND)",
         ("Bar", "BarDepth"): "*deviations(BAR_DEPTH_BAND)",

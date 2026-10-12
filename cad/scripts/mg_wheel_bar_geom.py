@@ -10,6 +10,7 @@ it imports geometry from, so the drawing contract must NOT live here.
 
 from __future__ import annotations
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import printed_band_mm
 
 
 # --- bar section + length (DIMENSIONS.md ch21; M6.8 ch30 8-view pass) ----------
@@ -38,7 +39,10 @@ AXLE_BORE_DIA = round(0.1865 * 25.4, 6)  # 4.7371
 AXLE_BORE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed
 # The bore's printed station off the mid-height centreline (bar note 1).
 AXLE_BORE_POSITION_TOL = 0.10
-BAR_SIDE_BAND = (0.10, -0.10)
+# The height is bright square stock as supplied (cold-drawn h11 is 0/-0.09):
+# minus-only, because its top limit sets the TIE 1 tail clearance
+# (mg_wheel_group) and its bottom the axle-bore wall below.
+BAR_SIDE_BAND = (0.0, -0.5)
 # Printed depth band: the pin's back end sits within it of the back face.
 BAR_DEPTH_BAND = (0.10, -0.10)
 AXLE_BORE_MIN_WALL = 2.0  # drawing-simplicity rule 12 target, worst case
@@ -48,7 +52,7 @@ AXLE_BORE_WALL = (
     (BAR_SIDE + BAR_SIDE_BAND[1]) / 2.0
     - AXLE_BORE_POSITION_TOL
     - (AXLE_BORE_DIA + AXLE_BORE_BAND[0]) / 2.0
-)  # 2.476
+)  # 2.276
 if AXLE_BORE_WALL < AXLE_BORE_MIN_WALL:
     raise AssertionError(f"wheel-bar axle-bore wall {AXLE_BORE_WALL:.3f} < 2.0")
 
@@ -63,7 +67,9 @@ CLAMP_HOLE_DIA = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
 # The station is dimensioned directly from the finished end, so the overall
 # length tolerance does not enter this stack.
 PEN_HANGER_MIN_END_WALL = 2.0
-PEN_HANGER_STATION_TOL = 0.05
+# The hanger station prints .XX: the title block's row holds the end wall.
+PEN_HANGER_STATION_PLACES = 2
+PEN_HANGER_STATION_TOL = printed_band_mm(PEN_HANGER_STATION_PLACES)
 
 
 def require_hanger_end_wall(
