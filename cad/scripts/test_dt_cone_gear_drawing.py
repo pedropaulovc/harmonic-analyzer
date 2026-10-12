@@ -462,7 +462,7 @@ _THICKNESS_TEXT_HALF_WIDTH = 0.0325
 # ~5.5 mm round an uncropped view (T084 front [54.8, 99.8, 155.2, 200.2]
 # about a 44.66 mm half tip circle) and 10.1-10.75 mm past a bore view's crop
 # circle (T006-T024 and T030+ sheets; 11.3 is taken as the pad), inside the
-# sheet format's 12.7 mm zone band (_drawing_common.sheet_drawable_region;
+# sheet format's 12.7 mm zone band (_drawing_sheet_region.sheet_drawable_region;
 # farm run 20260929T061328212Z at 70d2e52).
 _FRONT_OUTLINE_PAD = 0.0056
 _CROPPED_OUTLINE_PAD = 0.0113

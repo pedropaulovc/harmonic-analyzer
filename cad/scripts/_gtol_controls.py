@@ -6,7 +6,7 @@ A ``<part>_spec.py`` describes its geometric controls as rows of
 :class:`GeometricControl` / :class:`PartDatum`; the PART build authors them as
 plain model annotations (``_part_pmi.author_part_pmi``) and the DRAWING
 projects the same typed rows onto native sheet annotations
-(``_drawing_common.project_part_pmi``) instead of typing frozen
+(``_drawing_gdt.project_part_pmi``) instead of typing frozen
 ``tolerance="..."`` strings per sheet.  Like the fit-deviation vocabulary /
 ``_surface_finish`` this module carries NO COM and imports nothing from
 either tier, so ``check:partiso`` stays clean.

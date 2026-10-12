@@ -17,7 +17,7 @@ by the sheet's own view):
 * every view's outline and orientation;
 * section lines (``IDrSection`` line, arrows, label origins, text height) and
   detail circles (``IView::GetDetailCircleInfo2``);
-* tables, boxed from anchor + row/column spans (as ``_drawing_common`` does);
+* tables, boxed from anchor + row/column spans (as ``_drawing_layout_collect`` does);
 * the sheet size, zone margins and title-block keep-out;
 * the sheet's page of the exported PDF (``_pdf_ink``): every text object with
   its tight glyph box, and every black stroke with its width and dash. The

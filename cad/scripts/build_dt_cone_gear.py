@@ -92,16 +92,10 @@ import sys
 from typing import Any
 
 import _config
-from _drawing_marks import (
-    _named_dimension,
-    add_angular_reference_dimension,
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_angular_tolerance,
-)
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_dimension_insert import add_angular_reference_dimension
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_angular_tolerance
 from _fit_deviations import deviations
 from _simplified_part import assert_simplified_configurations, derive_simplified_on_saved_part
 from _grouped_bom_properties import apply_grouped_bom_properties

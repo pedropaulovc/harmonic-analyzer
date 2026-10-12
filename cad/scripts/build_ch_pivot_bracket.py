@@ -75,7 +75,7 @@ from _sketch import (
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _configuration_material import require_material_in_every_configuration
-from _drawing_marks import set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder

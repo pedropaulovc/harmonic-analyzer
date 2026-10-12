@@ -5,16 +5,19 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+import solidworks_mcp.adapters
 
 import _config
-import _drawing_common as common
+import _drawing_attachment
+import _drawing_edge_dimensions
+from _drawing_edge_dimensions import assert_dimension_measures
+from _drawing_edges import ViewEdge, ViewEdges
+from _hole_spec import blind_cut_dia_mm
 import build_sm_summing_lever as lever_build
 import draw_sm_summing_lever as drawing
+from dt_cone_pivot_post_installation import SUMMING_Z
 import rocker_bank_layout
 import sm_summing_lever_spec
-from _drawing_common import ViewEdge, ViewEdges, assert_dimension_measures
-from _hole_spec import blind_cut_dia_mm
-from dt_cone_pivot_post_installation import SUMMING_Z
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
@@ -104,9 +107,10 @@ def _dimension(mm: float, attached: tuple[object, ...]):
 
 @pytest.fixture
 def identity(monkeypatch):
-    monkeypatch.setattr(common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        common._sw_type_info, "early_bound_or_flag", lambda value, *_args: value
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda value, *_args: value
     )
     return SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
 

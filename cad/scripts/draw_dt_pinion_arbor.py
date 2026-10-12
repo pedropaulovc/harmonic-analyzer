@@ -7,36 +7,49 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    delete_view,
+    dimension_name,
+    iter_views,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound, _read_member
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
-    view_name,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _layout_geometry import audit_sheet, format_findings
+from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+from _layout_geometry import audit_sheet, format_findings
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
+from diagnostics.drawing_layout_audit import collect_document
 from dt_pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
 from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
@@ -57,16 +70,6 @@ from dt_pinion_arbor_spec import (
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    delete_view,
-    iter_views,
-    place_view,
-)
-from diagnostics.drawing_layout_audit import collect_document
 
 SPEC = DRAWINGS_BY_NAME["dt_pinion_arbor"]
 PART_STEM = SPEC.artifact_stem

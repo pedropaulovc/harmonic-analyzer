@@ -6,36 +6,36 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import place_view
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_edge_dimension,
-    assert_imported_precision,
-    create_section_view,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_reference_dimension
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
 from _section_axis import create_section_axis_centerline, position_section_caption
+from _session import run_build
+import _telemetry
 from ch_rocker_arm_tl_diamond_pin_spec import (
-    DRAWING_REFERENCE_PRECISION,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     LAND_HEIGHT,
     OVERALL_LENGTH,
 )
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_diamond_pin"]
 PART_STEM = SPEC.artifact_stem

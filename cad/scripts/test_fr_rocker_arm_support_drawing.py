@@ -8,18 +8,19 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-import _config
-import _drawing_common
+import solidworks_mcp.adapters
 
-import draw_fr_rocker_arm_support as drawing
-import build_fr_rocker_arm_support as support
+import _config
+import _drawing_sections
 import build_fr_frame_assembly as frame
+import build_fr_rocker_arm_support as support
 import build_vn_lag_screw as stock_screw
-import vn_lag_screw_spec as screw
+import draw_fr_rocker_arm_support as drawing
+import fr_rocker_arm_support_drawing_spec as drawing_spec
 import fr_rocker_arm_support_section_spec as section
 import fr_rocker_arm_support_spec as placement
-import fr_rocker_arm_support_drawing_spec as drawing_spec
 import rocker_bracket_seat_layout as seats
+import vn_lag_screw_spec as screw
 
 
 def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
@@ -310,11 +311,11 @@ def _section_doubles(
         swApp=SimpleNamespace(GetMathUtility=lambda: math_utility),
         _get_attr_or_call=lambda obj, name: _member(obj, name),
     )
-    monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _: obj)
-    monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Front")
-    monkeypatch.setattr(_drawing_common, "double_array", tuple)
+    monkeypatch.setattr(_drawing_sections, "_early_bound", lambda obj, _: obj)
+    monkeypatch.setattr(_drawing_sections, "view_name", lambda *_: "Front")
+    monkeypatch.setattr(_drawing_sections, "double_array", tuple)
     monkeypatch.setattr(
-        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
     return SimpleNamespace(
         adapter=adapter,
@@ -345,7 +346,7 @@ def test_section_cut_uses_parent_sketch_coordinates(
     not be silently reset by a drawing recipe.
     """
     doubles = _section_doubles(monkeypatch, scale, add_to_db=seat_add_to_db)
-    result = _drawing_common.create_section_view(
+    result = _drawing_sections.create_section_view(
         doubles.adapter,
         doubles.parent,
         line_start=doubles.start,
@@ -384,7 +385,7 @@ def test_section_cut_restores_the_seat_when_the_line_fails(
     boom = RuntimeError("CreateLine exploded")
     doubles = _section_doubles(monkeypatch, 1.0, add_to_db=seat_add_to_db, raises=boom)
     with pytest.raises(RuntimeError, match="CreateLine exploded"):
-        _drawing_common.create_section_view(
+        _drawing_sections.create_section_view(
             doubles.adapter,
             doubles.parent,
             line_start=doubles.start,
@@ -414,7 +415,7 @@ def test_section_cut_refuses_a_cutting_line_inference_moved(monkeypatch, moved) 
         monkeypatch, 1.0, snap=(0.0, 0.000674, 0.0), snap_at=moved
     )
     with pytest.raises(RuntimeError, match=rf"{moved} point sits 0\.674 mm"):
-        _drawing_common.create_section_view(
+        _drawing_sections.create_section_view(
             doubles.adapter,
             doubles.parent,
             line_start=doubles.start,

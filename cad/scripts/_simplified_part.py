@@ -13,7 +13,7 @@ suppressed. The parent keeps them, before and after: part drawings, renders,
 STL and every gate keep reading ``P``. Assemblies add ``Default Simplified``
 and point each component at its ``<referenced> Simplified`` child
 (``_assembly``), and every assembly-drawing view at 1:2 or smaller that inks
-edges references it (``_drawing_common``), exploded, BOM-bearing and
+edges references it (``_drawing_view_configuration``), exploded, BOM-bearing and
 ballooned views included; each drawing keeps one designated full-detail view.
 
 A part simplifies every configuration unless its builder names the placeable

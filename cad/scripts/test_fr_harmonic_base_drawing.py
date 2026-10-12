@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import replace
+import math
 
 import pytest
 
-import _drawing_common
+import _drawing_hole_callout
 import build_fr_harmonic_base as part
-import dt_cone_swing_platform_geometry as platform
-import dt_cone_pivot_post_installation
 import cone_line
-import fr_harmonic_base_spec
+import dt_cone_pivot_post_installation
 from dt_cone_pivot_post_installation import (
     MECHANISM_X_SHIFT,
     MECHANISM_Z_SHIFT,
 )
+import dt_cone_swing_platform_geometry as platform
+import fr_harmonic_base_spec
 from vn_cone_lock_knob_spec import HEAD_DIA as KNOB_HEAD_DIA
 from vn_swing_stop_screw_spec import CONTACT_DIA as STOP_CONTACT_DIA
 
@@ -1219,7 +1219,7 @@ def test_base_callout_prefix_is_the_shared_helpers(
 
     native = "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>"
     process = getattr(sheet, process_name)
-    assert _drawing_common.compose_hole_callout_prefix(process, native) == (
+    assert _drawing_hole_callout.compose_hole_callout_prefix(process, native) == (
         expected_process_rows + native
     )
 

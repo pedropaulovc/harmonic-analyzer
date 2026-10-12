@@ -42,14 +42,10 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _drawing_marks import (
-    add_diametric_linear_dimension,
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_dimension_insert import add_diametric_linear_dimension
+from _drawing_precision import apply_drawing_precision
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _configuration_material import require_material_in_every_configuration
 from _grouped_bom_properties import apply_grouped_bom_properties
 from solidworks_mcp.adapters.com_variant import bstr_array

@@ -99,7 +99,7 @@ def main():
                         "annotations": [],
                     }
                     row["views"].append(view_row)
-                    from _drawing_common import dimension_name
+                    from solidworks_mcp.adapters.solidworks.drawing import dimension_name
                     for raw_annotation in view.GetAnnotations() or ():
                         annotation = _early_bound(raw_annotation, "IAnnotation")
                         annotation_type = int(annotation.GetType())

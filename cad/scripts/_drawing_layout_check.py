@@ -7,7 +7,7 @@ unreadable because a note landed on a view or a schedule overhangs the border.
 
 This module is deliberately SolidWorks-free: it operates on plain
 ``(xmin, ymin, xmax, ymax)`` boxes in sheet meters so the collision/containment
-logic is unit-testable without a COM seat.  ``_drawing_common.check_drawing_layout``
+logic is unit-testable without a COM seat.  ``_drawing_layout_collect.check_drawing_layout``
 supplies the boxes from live ``IView.GetOutline`` / ``INote.GetExtent`` /
 ``ITableAnnotation`` calls and raises on any finding, right before the drawing
 is saved.

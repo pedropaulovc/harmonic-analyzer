@@ -27,29 +27,19 @@ from typing import Any
 import _telemetry
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    ViewEdges,
-    _select_view_entity,
-    add_edge_dimension,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_dimension_measures,
-    assert_imported_precision,
-    create_section_view,
-    curate_view_dimensions,
     finalize_drawing,
-    model_points_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    scan_view_edges,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import ViewEdges, scan_view_edges
+from _drawing_finish import add_surface_finish
 from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
@@ -57,10 +47,17 @@ from _drawing_leaders import (
     section_line_segments,
     set_near_side_diameter,
 )
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_selection import _select_view_entity
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _layout_geometry import Box, estimate_text_box
+from _paths import CAD_ROOT
 from _section_axis import position_section_caption
+from _session import run_build
 from _surface_finish import surface_finish_by_key
 from mg_magnifying_wheel_geom import (
     HUB_BACK_Z,

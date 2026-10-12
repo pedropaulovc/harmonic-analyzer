@@ -44,7 +44,7 @@ feature: the model is fine. Only the plane's tilt is wrong.
 ## Which side is wrong: the drawing's AUTHORING path (not its expected value)
 
 `GOOSENECK_Z` is right and must not change; the model is right. The defect is
-in `_drawing_common.create_section_view`, which authored the cutting line with
+in `_drawing_sections.create_section_view`, which authored the cutting line with
 a bare
 
     segment = sketch_manager.CreateLine(*points[0], *points[1])

@@ -24,26 +24,27 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import place_view
+
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
+from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    add_view_centerline,
-    assert_imported_precision,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from pd_transgear_pin_spec import (
     DIA,
     DRAWING_DIMENSIONS,
@@ -58,7 +59,6 @@ from pd_transgear_pin_spec import (
     LENGTH,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_pin"]
 PART_STEM = SPEC.artifact_stem

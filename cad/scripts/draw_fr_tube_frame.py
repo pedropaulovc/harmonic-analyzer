@@ -2,8 +2,9 @@ r"""Create the curated machinist drawing for the tube-frame column.
 
 The SLDPRT remains authoritative. This recipe supplies the regular open tube's
 orthographic views, diameter/cut-length/cross-hole dimensions, and manufacturing
-notes; shared sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The tube axis runs along +Y, so the length view is the ``*Front`` orientation
 and the chamfered end view is ``*Top``, aligned above it in third-angle
@@ -21,38 +22,38 @@ import argparse
 import sys
 from typing import Any
 
-
-import _telemetry
-from _check import check
-from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
-from _drawing_common import (
-    DrawingOutputs,
-    add_property_linked_note,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
-    finalize_drawing,
-    model_point_in_view,
-    new_project_drawing,
-    property_link,
-    read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    set_reference_dimension,
-    stamp_drawing_summary,
-    visible_view_entities,
-)
-from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
+    dimension_name,
     place_view,
     view_name,
 )
+
+from _check import check
+from _com import _early_bound
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    stamp_drawing_summary,
+)
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edges import visible_view_entities
+from _drawing_notes import add_property_linked_note, property_link
+from _drawing_projection import model_point_in_view
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from fr_tube_frame_spec import (
     COLUMN_LENGTH,
     CROSS_HOLE_DIAMETER,

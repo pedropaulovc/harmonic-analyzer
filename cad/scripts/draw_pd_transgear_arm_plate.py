@@ -25,28 +25,32 @@ import argparse
 import sys
 from typing import Any
 
-import _drawing_hidden_sketches as hidden_sketches
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
+
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    create_section_view,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_finish import add_surface_finish
+import _drawing_hidden_sketches as hidden_sketches
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from pd_transgear_arm_plate_geometry import (
     BORE_DIA,
     BOSS_FACE_Z,
@@ -56,6 +60,7 @@ from pd_transgear_arm_plate_geometry import (
     FRONT_FACE_Z,
     HUB_FACE_Z,
     KINK,
+    KINK_RIGHT,
     NOTCH_LEFT,
     NOTCH_RIGHT,
     REAR_FACE_Z,
@@ -74,10 +79,6 @@ from pd_transgear_arm_plate_spec import (
     SCREW_HOLE_CALLOUT,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
 
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_arm_plate"]
@@ -92,19 +93,20 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# The plate is 56 x 32 in plan and 29 deep: at 2:1 the plan, the back view
+# The plate is 56 x 38 in plan and 29 deep: at 2:1 the plan, the back view
 # and section A-A stand side by side above the title block (x > 0.216 below
-# y 0.066), the isometric in the upper right.  The section stands far enough
-# right that its hub Ø clears the back view's notch height, and the
-# isometric's caption starts right of the section's over-arm wall and ends
-# inside the border (x 0.419).
+# y 0.066).  The section stands far enough right that its hub Ø clears the
+# back view's notch height and its boss Ø ends inside the border (x 0.419),
+# which leaves no room beside it for the isometric: that goes in the empty
+# lower left, under the plan, its caption on its right ending short of the
+# title block.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 PLAN_CENTER = (0.080, 0.165)
-BACK_CENTER = (0.206, PLAN_CENTER[1])
-SECTION_CENTER = (0.326, PLAN_CENTER[1])
-ISO_CENTER = (0.390, 0.225)
-ISO_NOTE_XY = (0.353, 0.180)
+BACK_CENTER = (0.218, PLAN_CENTER[1])
+SECTION_CENTER = (0.343, PLAN_CENTER[1])
+ISO_CENTER = (0.055, 0.050)
+ISO_NOTE_XY = (0.095, 0.050)
 
 _TOP = TOP_LEFT[1]  # the plate's highest point (the top edge's -X corner)
 _SECTION_TOP = arm_upper_edge_y(0.0)
@@ -128,9 +130,11 @@ PLAN_ROWS = tuple(_SECTION_TOP + 8.0 + 5.0 * row for row in range(3))
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ScrewHoleX2": (SCREW_HOLES[1][0] / 2.0, PLAN_ROWS[0], _Z_PLAN),
     "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, PLAN_ROWS[1], _Z_PLAN),
-    "Width": ((EDGE_MINUS_X + EDGE_PLUS_X) / 2.0, PLAN_ROWS[2], _Z_PLAN),
+    "EdgeLeftX": (EDGE_MINUS_X / 2.0, PLAN_ROWS[2], _Z_PLAN),
+    "EdgeRightX": (EDGE_PLUS_X / 2.0, PLAN_ROWS[2], _Z_PLAN),
     "KinkY": (EDGE_MINUS_X - 5.0, KINK[1] / 2.0, _Z_PLAN),
     "TopLeftY": (EDGE_MINUS_X - 11.0, TOP_LEFT[1] / 2.0, _Z_PLAN),
+    "KinkRightY": (EDGE_PLUS_X + 5.0, KINK_RIGHT[1] / 2.0, _Z_PLAN),
     "ScrewHoleY": (EDGE_PLUS_X + 9.5, SCREW_HOLES[0][1] / 2.0, _Z_PLAN),
     "TopRightY": (EDGE_PLUS_X + 19.0, TOP_RIGHT[1] / 2.0, _Z_PLAN),
     "EndR": (0.7071 * END_R + 6.0, -0.7071 * END_R - 6.0, _Z_PLAN),
