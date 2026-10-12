@@ -7,6 +7,7 @@ from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
 import pytest
@@ -44,10 +45,48 @@ def frozen_baseline(tmp_path: Path, case) -> Path:
     return baseline
 
 
+def _sheet_call(
+    reviewer: str, tool: str, arguments: dict[str, Any], call_id: str,
+    image: bytes, *, ok: bool = True, image_result: bool = True,
+) -> list[dict[str, Any]]:
+    encoded = base64.b64encode(image).decode("ascii")
+    if reviewer == "claude":
+        content = [{
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/png", "data": encoded},
+        }] if image_result else [{"type": "text", "text": "No image."}]
+        return [
+            {"type": "assistant", "message": {"content": [{
+                "type": "tool_use", "id": call_id, "name": f"mcp__sheets__{tool}",
+                "input": arguments,
+            }]}},
+            {"type": "user", "message": {"content": [{
+                "type": "tool_result", "tool_use_id": call_id,
+                "content": content, "is_error": not ok,
+            }]}},
+        ]
+    item = {
+        "id": call_id, "type": "mcp_tool_call", "server": "sheets",
+        "tool": tool, "arguments": arguments, "status": "in_progress",
+        "result": None, "error": None,
+    }
+    content = [{
+        "type": "image", "data": encoded, "mimeType": "image/png",
+    }] if image_result else [{"type": "text", "text": "No image."}]
+    return [
+        {"type": "item.started", "item": item},
+        {"type": "item.completed", "item": {
+            **item, "status": "completed" if ok else "failed",
+            "result": {"content": content, "isError": not ok},
+            "error": None if ok else {"message": "View failed."},
+        }},
+    ]
+
+
 @pytest.fixture
 def provider(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     state: dict[str, Any] = {
-        "calls": [], "mode": "valid", "relative_reads": False,
+        "calls": [], "mode": "valid", "crops": [],
         "verdict": {
             "verdict": "FIX", "summary": "Fit is justified; a hole remains unlocated.",
             "blockers": [{"where": "front view", "issue": "Hole location is absent.",
@@ -58,35 +97,66 @@ def provider(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def fake_run(command: list[str], **kwargs: Any):
         cwd = Path(kwargs["cwd"])
-        images = sorted(cwd.glob("sheet-*.png"))
+        reviewer = "codex" if "exec" in command else "claude"
+        if reviewer == "codex":
+            server_args = json.loads(next(
+                argument.split("=", 1)[1] for argument in command
+                if argument.startswith("mcp_servers.sheets.args=")
+            ))
+        else:
+            config = json.loads(Path(command[command.index("--mcp-config") + 1]).read_text(encoding="utf-8"))
+            server_args = config["mcpServers"]["sheets"]["args"]
+        assert server_args[0] == str(mr.SHEETS_SERVER)
+        sources = [Path(source) for source in server_args[1:]]
+        assert all(source.is_absolute() and not source.is_relative_to(cwd) for source in sources)
+        images = [source.read_bytes() for source in sources]
         state["calls"].append({
             "command": command, "prompt": kwargs["input"], "cwd": cwd,
             "files": {path.name for path in cwd.iterdir()},
-            "images": [path.read_bytes() for path in images],
+            "sources": sources, "images": images,
         })
         verdict = deepcopy(state["verdict"])
         if state["mode"] == "invalid_schema":
             del verdict["blockers"]
         text = "not JSON" if state["mode"] == "malformed" else json.dumps(verdict)
-        if "exec" in command:
+        events = []
+        if reviewer == "codex":
+            events.append({"type": "thread.started", "thread_id": f"session-{len(state['calls'])}"})
+        else:
+            events.append({
+                "type": "system", "subtype": "init",
+                "session_id": command[command.index("--session-id") + 1],
+            })
+        if state["mode"] != "missing_view":
+            for sheet, image in enumerate(images, start=1):
+                events.extend(_sheet_call(
+                    reviewer, "view_sheet", {"sheet": sheet}, f"view_{sheet}", image,
+                    ok=state["mode"] != "failed_view",
+                    image_result=state["mode"] != "text_view",
+                ))
+        for index, crop in enumerate(state["crops"]):
+            events.extend(_sheet_call(reviewer, "crop", crop, f"crop_{index}", images[0]))
+        if reviewer == "codex":
             Path(command[command.index("-o") + 1]).write_text(text, encoding="utf-8")
-            events = [{"type": "item.completed", "item": {
-                "id": "item_0", "type": "agent_message", "text": text,
+            events.extend([{"type": "item.completed", "item": {
+                "id": "answer", "type": "agent_message", "text": text,
             }}, {"type": "turn.completed", "usage": {
                 "input_tokens": 10, "cached_input_tokens": 0, "output_tokens": 10,
-            }}]
+            }}])
         else:
-            events = [{"type": "assistant", "message": {"content": [{
-                "type": "tool_use", "id": f"read_{index}", "name": "Read",
-                "input": {"file_path": image.name if state["relative_reads"] else str(image)},
-            }]}} for index, image in enumerate(images)]
             events.append({"type": "result", "subtype": "success", "is_error": False,
                            "result": text})
         if state["mode"] == "unblind":
-            events.insert(0, {"type": "item.completed", "item": {
-                "id": "command_0", "type": "command_execution", "command": "pwd",
-                "aggregated_output": str(cwd), "exit_code": 0, "status": "completed",
-            }})
+            if reviewer == "codex":
+                events.insert(0, {"type": "item.completed", "item": {
+                    "id": "command_0", "type": "command_execution", "command": "pwd",
+                    "aggregated_output": str(cwd), "exit_code": 0, "status": "completed",
+                }})
+            else:
+                events.insert(0, {"type": "assistant", "message": {"content": [{
+                    "type": "tool_use", "id": "read_0", "name": "Read",
+                    "input": {"file_path": str(sources[0])},
+                }]}})
         return mr.subprocess.CompletedProcess(
             command, 0, stdout="\n".join(json.dumps(event) for event in events), stderr="",
         )
@@ -102,6 +172,27 @@ def _identity(case, *, prompt: str = "Rubric A", reviewer: str = "codex", model:
         manifest, [package], {"baseline": prompt.encode(), "candidate": b"Rubric B"},
         reviewer=reviewer, model=model, effort="low", retries=0, timeout_s=30,
     )
+
+
+def _preserve_report(result, directory: Path, report: dict[str, Any]) -> None:
+    report_path = directory / result["report"]
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    result["report_sha256"] = mr._sha256(report_path)
+    result["review"] = report
+    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
+
+
+def _preserve_events(result, directory: Path, events: list[dict[str, Any]]) -> None:
+    events_path = directory / result["events"]
+    events_path.write_text("\n".join(json.dumps(row) for row in events), encoding="utf-8")
+    result["events_sha256"] = mr._sha256(events_path)
+    for invocation in result["review"]["extra"]["evidence"]["attempts"]:
+        if invocation["stdout_file"] is not None:
+            Path(invocation["stdout_file"]).write_text("\n".join(
+                json.dumps(row["event"]) for row in events
+                if row["attempt"] == invocation["attempt"]
+            ), encoding="utf-8")
+    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
 
 
 def test_main_rejects_changed_selected_frozen_baseline_before_provider_execution(
@@ -189,19 +280,31 @@ def test_override_reaches_model_and_hash_without_losing_package_context(
     assert candidate_input.replace("Rubric B", "", 1) == assembly_input
     assert reviews[2]["prompt_sha256"] != reviews[3]["prompt_sha256"]
     for call in provider["calls"]:
-        assert call["files"] == {"sheet-1.png", "schema.json"}
+        assert call["files"] == (
+            {"schema.json", "mcp.json"} if reviewer == "claude" else {"schema.json"}
+        )
+        assert call["sources"] == list(part.sources)
         assert call["images"] == [part.sources[0].read_bytes()]
         assert call["cwd"] != part.sources[0].parent
         assert str(part.sources[0]) not in call["prompt"]
         assert part.name not in call["prompt"]
-        assert all(str(part.sources[0]) not in argument for argument in call["command"])
+        assert "-i" not in call["command"]
+        if reviewer == "codex":
+            args = json.loads(next(
+                argument.split("=", 1)[1] for argument in call["command"]
+                if argument.startswith("mcp_servers.sheets.args=")
+            ))
+            assert args[1:] == [str(source.resolve()) for source in part.sources]
+        else:
+            assert call["command"][call["command"].index("--allowedTools") + 1] == (
+                "mcp__sheets__view_sheet,mcp__sheets__crop"
+            )
 
 
 @pytest.mark.parametrize("reviewer", ["codex", "claude"])
 def test_matching_fix_evidence_resumes_without_model_execution(
     tmp_path: Path, case, provider, reviewer: str,
 ) -> None:
-    provider["relative_reads"] = True
     identity = _identity(case, reviewer=reviewer)
     directory = tmp_path / "run"
     first = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
@@ -215,12 +318,13 @@ def test_matching_fix_evidence_resumes_without_model_execution(
     assert summary["counts"]["baseline"] == {"pass": 0, "fail": 0, "unassessed": 1, "invalid": 0}
 
 
-@pytest.mark.parametrize("change", ["prompt", "image", "model"])
+@pytest.mark.parametrize("change", ["prompt", "image", "model", "sheets_server"])
 def test_changed_identity_executes_fresh_model_without_overwriting_old_evidence(
-    tmp_path: Path, case, provider, change: str,
+    tmp_path: Path, case, provider, change: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     directory = tmp_path / "run"
-    first = evaluation.run_case(_identity(case), "baseline", case[1], "Rubric A", directory)
+    old_identity = _identity(case)
+    first = evaluation.run_case(old_identity, "baseline", case[1], "Rubric A", directory)
     assert first["error"] is None
     old_report = (directory / first["report"]).read_bytes()
     prompt, model = "Rubric A", "model-a"
@@ -229,8 +333,14 @@ def test_changed_identity_executes_fresh_model_without_overwriting_old_evidence(
     elif change == "image":
         case[1].sources[0].write_bytes(case[1].sources[0].read_bytes() + b"changed")
         case[0]["cases"][0]["sha256"] = mr._sha256(case[1].sources[0])
-    else:
+    elif change == "model":
         model = "model-b"
+    else:
+        original_sha256 = mr._sha256
+        monkeypatch.setattr(mr, "_sha256", lambda path: (
+            hashlib.sha256(b"changed sheet-server rendering").hexdigest()
+            if Path(path) == mr.SHEETS_SERVER else original_sha256(path)
+        ))
     identity = _identity(case, prompt=prompt, model=model)
     fresh = evaluation.run_case(identity, "baseline", case[1], prompt, directory)
     assert fresh["error"] is None
@@ -243,18 +353,24 @@ def test_changed_identity_executes_fresh_model_without_overwriting_old_evidence(
         assert "Rubric A" not in provider["calls"][-1]["prompt"]
     elif change == "image":
         assert provider["calls"][-1]["images"] != provider["calls"][0]["images"]
-    else:
+    elif change == "model":
         command = provider["calls"][-1]["command"]
         assert command[command.index("-m") + 1] == model
+    else:
+        assert identity["sheets_server_sha256"] != old_identity["sheets_server_sha256"]
+        assert identity["sheets_server_sha256"] == mr._sha256(mr.SHEETS_SERVER)
     assert evaluation.run_case(identity, "baseline", case[1], prompt, directory) == fresh
     assert len(provider["calls"]) == 2
 
 
-@pytest.mark.parametrize("mode", ["malformed", "invalid_schema", "unblind"])
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+@pytest.mark.parametrize("mode", [
+    "malformed", "invalid_schema", "unblind", "missing_view", "failed_view", "text_view",
+])
 def test_invalid_model_evidence_is_not_scored_or_resumed(
-    tmp_path: Path, case, provider, mode: str,
+    tmp_path: Path, case, provider, mode: str, reviewer: str,
 ) -> None:
-    identity = _identity(case)
+    identity = _identity(case, reviewer=reviewer)
     directory = tmp_path / "run"
     provider["mode"] = mode
     invalid = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
@@ -365,25 +481,25 @@ def test_stale_or_invalid_human_assessments_are_rejected(
         evaluation.aggregate(identity, [result], assessments)
 
 
-def test_foreign_neutral_directory_read_cannot_redefine_recorded_allowlist(
-    tmp_path: Path, case, provider,
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_foreign_sheet_cannot_redefine_recorded_allowlist(
+    tmp_path: Path, case, provider, reviewer: str,
 ) -> None:
-    identity = _identity(case, reviewer="claude")
+    identity = _identity(case, reviewer=reviewer)
     directory = tmp_path / "run"
     result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
     assert result["error"] is None
     events_path = directory / result["events"]
     events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
-    foreign_image = tmp_path / "machrev-foreign" / "sheet-1.png"
     for row in events:
         for node in mr._walk(row):
-            if isinstance(node, dict) and node.get("name") == "Read":
-                node["input"]["file_path"] = str(foreign_image)
-    events_path.write_text("\n".join(json.dumps(row) for row in events), encoding="utf-8")
-    result["events_sha256"] = mr._sha256(events_path)
-    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
+            if isinstance(node, dict) and node.get("name") == "mcp__sheets__view_sheet":
+                node["input"]["sheet"] = 2
+            elif isinstance(node, dict) and node.get("type") == "mcp_tool_call":
+                node["arguments"]["sheet"] = 2
+    _preserve_events(result, directory, events)
     assert result["review"]["blind"] is True
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="authorized sheet inspection"):
         evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
     fresh = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
     assert fresh["error"] is None
@@ -483,11 +599,13 @@ def test_provenance_content_must_match_identity_not_just_report_hash(
         evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
 
 
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
 @pytest.mark.parametrize("failure", ["launch", "timeout", "nonzero_exit", "invalid_verdict"])
 def test_complete_retry_evidence_resumes_after_provider_failure(
     tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch, failure: str,
+    reviewer: str,
 ) -> None:
-    identity = _identity(case)
+    identity = _identity(case, reviewer=reviewer)
     identity["retries"] = 1
     directory = tmp_path / "run"
     provider_run = mr.subprocess.run
@@ -528,14 +646,15 @@ def test_complete_retry_evidence_resumes_after_provider_failure(
     assert calls == 2
 
 
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
 @pytest.mark.parametrize("damage", [
     "unknown_field", "outcome", "exit_code", "stdout_events", "missing_stderr",
-    "artifact_escape", "omitted_artifact",
+    "artifact_escape", "omitted_artifact", "session_id", "resume_command",
 ])
 def test_retry_provenance_rejects_damage_despite_matching_report_hash(
-    tmp_path: Path, case, provider, damage: str,
+    tmp_path: Path, case, provider, damage: str, reviewer: str,
 ) -> None:
-    identity = _identity(case)
+    identity = _identity(case, reviewer=reviewer)
     directory = tmp_path / "run"
     result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
     assert result["error"] is None
@@ -555,12 +674,609 @@ def test_retry_provenance_rejects_damage_despite_matching_report_hash(
         Path(invocation["stderr_file"]).unlink()
     elif damage == "artifact_escape":
         outside = tmp_path / "outside.json"
-        outside.write_bytes(Path(invocation["artifacts"][0]).read_bytes())
-        invocation["artifacts"][0] = str(outside)
-    else:
+        outside.write_bytes((Path(invocation["retained_cwd"]) / "schema.json").read_bytes())
+        invocation["artifacts"] = [str(outside)]
+    elif damage == "omitted_artifact":
+        (Path(invocation["retained_cwd"]) / "unlisted.json").write_text("{}", encoding="utf-8")
         invocation["artifacts"] = []
+    elif damage == "session_id":
+        invocation["session_id"] = None
+    else:
+        invocation["resume_command"] = "codex resume forged-session"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     result["report_sha256"] = mr._sha256(report_path)
     result["review"] = report
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_mcp_provenance_preserves_sources_actual_argv_and_exact_replay(
+    tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch, reviewer: str,
+) -> None:
+    def reject_text_grader(*args, **kwargs):
+        raise AssertionError("The sheets evaluator must not use the text-only grader gate.")
+
+    monkeypatch.setattr(mr, "count_codex_tool_events", reject_text_grader)
+    provider["crops"] = [{"sheet": 1, "x1": 10, "y1": 20, "x2": 300, "y2": 400}]
+    frozen_bytes = case[1].sources[0].read_bytes()
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    invocation = review.extra["evidence"]["attempts"][0]
+    cwd = Path(invocation["cwd"])
+    retained = Path(invocation["retained_cwd"])
+    assert not cwd.exists()
+    assert cwd == provider["calls"][0]["cwd"]
+    assert retained == (directory / result["report"]).parent / f"{case[1].name}.attempts" / cwd.name
+    assert invocation["sources"] == [str(source.resolve()) for source in case[1].sources]
+    assert invocation["command"] == provider["calls"][0]["command"]
+    assert invocation["rerun_command"] == [
+        argument.replace(str(cwd), str(retained)) for argument in invocation["command"]
+    ]
+    assert invocation["stdout_file"] == str(retained / "stdout.txt")
+    assert invocation["stderr_file"] == str(retained / "stderr.txt")
+    assert (retained / "schema.json").read_bytes() == (
+        review.extra["evidence"]["schema"].encode("utf-8")
+    )
+    expected_files = {"schema.json", "stdout.txt", "stderr.txt"}
+    if reviewer == "claude":
+        expected_files.add("mcp.json")
+        assert json.loads((retained / "mcp.json").read_text(encoding="utf-8")) == {
+            "mcpServers": {"sheets": {
+                "command": sys.executable,
+                "args": [str(mr.SHEETS_SERVER), *(str(source.resolve()) for source in case[1].sources)],
+            }},
+        }
+        assert invocation["artifacts"] == []
+        assert invocation["command"][invocation["command"].index("--mcp-config") + 1] == str(cwd / "mcp.json")
+    else:
+        expected_files.add("verdict.json")
+        assert invocation["artifacts"] == [str(retained / "verdict.json")]
+        assert invocation["command"][invocation["command"].index("-C") + 1] == str(cwd)
+        assert invocation["rerun_command"][invocation["rerun_command"].index("-C") + 1] == str(retained)
+    assert {path.name for path in retained.iterdir()} == expected_files
+    assert not (retained / "artifacts").exists()
+    assert not list(retained.glob("*.png"))
+    assert case[1].sources[0].read_bytes() == frozen_bytes
+    assert review.source_sha256 == [case[0]["cases"][0]["sha256"]]
+    assert review.extra["sheets_viewed"] == [1]
+    assert review.extra["inspection_proven"] is True
+    assert review.extra["crop_calls"] == 1
+    assert review.extra["crops"] == [{"sheet": 1, "rect": [10, 20, 300, 400]}]
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    assert len(provider["calls"]) == 1
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_original_frozen_source_digest_is_revalidated_without_model_execution(
+    tmp_path: Path, case, provider, reviewer: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    source = case[1].sources[0]
+    source.write_bytes(source.read_bytes() + b"tampered frozen source")
+    with pytest.raises(ValueError, match="source changed"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    fresh = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert fresh["error"] is not None
+    assert len(provider["calls"]) == 1
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+@pytest.mark.parametrize("damage", ["missing", "foreign", "relative", "duplicate", "report_sources"])
+def test_source_allowlist_cannot_be_redefined_by_preserved_report(
+    tmp_path: Path, case, provider, reviewer: str, damage: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    invocation = report["extra"]["evidence"]["attempts"][0]
+    if damage == "missing":
+        invocation["sources"] = []
+    elif damage == "foreign":
+        foreign = tmp_path / "foreign.png"
+        foreign.write_bytes(case[1].sources[0].read_bytes())
+        invocation["sources"] = [str(foreign)]
+    elif damage == "relative":
+        invocation["sources"] = [case[1].sources[0].name]
+    elif damage == "duplicate":
+        invocation["sources"] *= 2
+    else:
+        report["sources"] = [str(Path(invocation["retained_cwd"]) / "sheet-1.png")]
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="allowlist|inputs/settings"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+@pytest.mark.parametrize("damage", [
+    "cwd_relative", "cwd_retained", "retained_missing", "retained_relative", "retained_escape",
+    "rerun_missing", "rerun_original", "rerun_source", "actual_replay",
+])
+def test_actual_and_retained_paths_cannot_be_conflated_or_redirected(
+    tmp_path: Path, case, provider, reviewer: str, damage: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    invocation = report["extra"]["evidence"]["attempts"][0]
+    if damage == "cwd_relative":
+        invocation["cwd"] = Path(invocation["cwd"]).name
+    elif damage == "cwd_retained":
+        invocation["cwd"] = invocation["retained_cwd"]
+    elif damage == "retained_missing":
+        invocation["retained_cwd"] = None
+    elif damage == "retained_relative":
+        invocation["retained_cwd"] = Path(invocation["retained_cwd"]).name
+    elif damage == "retained_escape":
+        invocation["retained_cwd"] = str(tmp_path / "machrev-foreign")
+    elif damage == "rerun_missing":
+        invocation["rerun_command"] = None
+    elif damage == "rerun_original":
+        invocation["rerun_command"] = invocation["command"]
+    elif damage == "rerun_source":
+        invocation["rerun_command"].append(str(tmp_path / "foreign.png"))
+    else:
+        invocation["command"] = invocation["rerun_command"]
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+@pytest.mark.parametrize("damage", [
+    "schema_missing", "schema_content", "materialized_sheet", "unexpected_directory",
+    "artifact_subdir", "extra_artifact", "stream_escape", "stream_relative",
+])
+def test_retained_workdir_requires_exact_direct_file_inventory(
+    tmp_path: Path, case, provider, reviewer: str, damage: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    invocation = report["extra"]["evidence"]["attempts"][0]
+    retained = Path(invocation["retained_cwd"])
+    if damage == "schema_missing":
+        (retained / "schema.json").unlink()
+    elif damage == "schema_content":
+        with (retained / "schema.json").open("ab") as stream:
+            stream.write(b"\n")
+    elif damage == "materialized_sheet":
+        image = retained / "sheet-1.png"
+        image.write_bytes(case[1].sources[0].read_bytes())
+        invocation["artifacts"].append(str(image))
+    elif damage == "unexpected_directory":
+        (retained / "unexpected").mkdir()
+    elif damage == "artifact_subdir":
+        nested = retained / "artifacts"
+        nested.mkdir()
+        output = nested / "verdict.json"
+        output.write_text(json.dumps(report["verdict"]), encoding="utf-8")
+        invocation["artifacts"] = [str(output)]
+    elif damage == "extra_artifact":
+        output = retained / "unrelated.json"
+        output.write_text("{}", encoding="utf-8")
+        invocation["artifacts"].append(str(output))
+    elif damage == "stream_escape":
+        outside = tmp_path / "stdout.txt"
+        outside.write_bytes(Path(invocation["stdout_file"]).read_bytes())
+        invocation["stdout_file"] = str(outside)
+    else:
+        invocation["stdout_file"] = "stdout.txt"
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("damage", [
+    "missing", "server", "command", "script", "source", "source_order", "extra_setting",
+])
+def test_claude_mcp_config_must_match_exact_authorized_server_and_sources(
+    tmp_path: Path, case, provider, damage: str,
+) -> None:
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    invocation = result["review"]["extra"]["evidence"]["attempts"][0]
+    config_path = Path(invocation["retained_cwd"]) / "mcp.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    server = config["mcpServers"]["sheets"]
+    if damage == "missing":
+        config_path.unlink()
+    else:
+        if damage == "server":
+            config["mcpServers"]["files"] = deepcopy(server)
+        elif damage == "command":
+            server["command"] = "foreign-python"
+        elif damage == "script":
+            server["args"][0] = str(tmp_path / "foreign-server.py")
+        elif damage == "source":
+            server["args"][1] = str(tmp_path / "foreign.png")
+        elif damage == "source_order":
+            server["args"].reverse()
+        else:
+            server["env"] = {"ALLOW_FILES": "1"}
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+    with pytest.raises(ValueError, match="MCP configuration"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("damage", ["source", "server", "legacy_image"])
+def test_codex_mcp_argv_cannot_be_redirected_even_with_matching_replay(
+    tmp_path: Path, case, provider, damage: str,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    invocation = report["extra"]["evidence"]["attempts"][0]
+    command = invocation["command"]
+    if damage == "legacy_image":
+        command.extend(["-i", str(case[1].sources[0])])
+    else:
+        index = next(index for index, argument in enumerate(command) if argument.startswith("mcp_servers.sheets.args="))
+        args = json.loads(command[index].split("=", 1)[1])
+        args[1 if damage == "source" else 0] = str(tmp_path / "foreign.png")
+        command[index] = f"mcp_servers.sheets.args={json.dumps(args)}"
+    invocation["rerun_command"] = [
+        argument.replace(invocation["cwd"], invocation["retained_cwd"]) for argument in command
+    ]
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="command permissions/settings"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+@pytest.mark.parametrize("damage", [
+    "legacy_read", "foreign_server", "unknown_tool", "string_sheet", "bool_sheet",
+    "extra_argument", "failed_view", "text_result", "missing_result", "crop_only",
+])
+def test_recomputed_mcp_evidence_rejects_forged_blind_review(
+    tmp_path: Path, case, provider, reviewer: str, damage: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    events_path = directory / result["events"]
+    events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
+    for node in mr._walk(events):
+        if not isinstance(node, dict):
+            continue
+        claude_call = node.get("name") == "mcp__sheets__view_sheet"
+        codex_call = node.get("type") == "mcp_tool_call"
+        if claude_call or codex_call:
+            arguments = node["input" if claude_call else "arguments"]
+            if damage == "legacy_read":
+                if claude_call:
+                    node["name"] = "Read"
+                    node["input"] = {"file_path": str(case[1].sources[0])}
+                else:
+                    node["type"] = "tool_use"
+                    node["name"] = "Read"
+            elif damage == "foreign_server":
+                if claude_call:
+                    node["name"] = "mcp__files__view_sheet"
+                else:
+                    node["server"] = "files"
+            elif damage == "unknown_tool":
+                node["name" if claude_call else "tool"] = (
+                    "mcp__sheets__list_files" if claude_call else "list_files"
+                )
+            elif damage == "string_sheet":
+                arguments["sheet"] = "1"
+            elif damage == "bool_sheet":
+                arguments["sheet"] = True
+            elif damage == "extra_argument":
+                arguments["path"] = str(case[1].sources[0])
+            elif damage == "crop_only":
+                node["name" if claude_call else "tool"] = (
+                    "mcp__sheets__crop" if claude_call else "crop"
+                )
+                arguments.update({"x1": 10, "y1": 20, "x2": 300, "y2": 400})
+        if node.get("type") == "tool_result":
+            if damage == "failed_view":
+                node["is_error"] = True
+            elif damage == "text_result":
+                node["content"] = [{"type": "text", "text": "No image."}]
+            elif damage == "missing_result":
+                node["type"] = "text"
+        elif node.get("type") == "mcp_tool_call" and node.get("status") == "completed":
+            if damage == "failed_view":
+                node["result"]["isError"] = True
+            elif damage == "text_result":
+                node["result"]["content"] = [{"type": "text", "text": "No image."}]
+            elif damage == "missing_result":
+                node["result"] = None
+    _preserve_events(result, directory, events)
+    assert result["review"]["blind"] is True
+    with pytest.raises(ValueError, match="authorized sheet inspection"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+def test_claude_successful_image_result_must_match_the_view_call_id(
+    tmp_path: Path, case, provider,
+) -> None:
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    events = [json.loads(line) for line in (directory / result["events"]).read_text(encoding="utf-8").splitlines()]
+    for node in mr._walk(events):
+        if isinstance(node, dict) and node.get("type") == "tool_result":
+            node["tool_use_id"] = "foreign-view"
+    _preserve_events(result, directory, events)
+    with pytest.raises(ValueError, match="authorized sheet inspection"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+@pytest.mark.parametrize(("field", "value"), [
+    ("sheets_viewed", []), ("sheets_viewed", [True]),
+    ("inspection_proven", False), ("inspection_proven", 1),
+    ("crop_calls", 1), ("crop_calls", False),
+    ("crops", [{"sheet": 1, "rect": [10, 20, 300, 400]}]),
+])
+def test_recorded_inspection_fields_must_match_recomputed_evidence(
+    tmp_path: Path, case, provider, reviewer: str, field: str, value: Any,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    report["extra"][field] = value
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="recorded sheet inspection"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_crop_history_counts_reused_call_ids_once_per_attempt(
+    tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch, reviewer: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    identity["retries"] = 1
+    directory = tmp_path / "run"
+    provider_run = mr.subprocess.run
+    calls = 0
+
+    def retrying_run(command, **kwargs):
+        nonlocal calls
+        calls += 1
+        provider["crops"] = [{"sheet": 1, "x1": calls * 10, "y1": 20, "x2": 300, "y2": 400}]
+        process = provider_run(command, **kwargs)
+        if calls == 1:
+            process.returncode = 17
+        return process
+
+    monkeypatch.setattr(mr.subprocess, "run", retrying_run)
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    assert review.extra["crop_calls"] == 2
+    assert review.extra["crops"] == [
+        {"sheet": 1, "rect": [10, 20, 300, 400]},
+        {"sheet": 1, "rect": [20, 20, 300, 400]},
+    ]
+    assert review.extra["sheets_viewed"] == [1]
+    assert review.extra["inspection_proven"] is True
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    assert calls == 2
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+@pytest.mark.parametrize("damage", ["unauthorized_retry", "missing_final_view"])
+def test_final_attempt_cannot_launder_failed_attempt_tools_or_earlier_views(
+    tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch,
+    reviewer: str, damage: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    identity["retries"] = 1
+    directory = tmp_path / "run"
+    provider_run = mr.subprocess.run
+    calls = 0
+
+    def retrying_run(command, **kwargs):
+        nonlocal calls
+        calls += 1
+        provider["mode"] = (
+            "unblind" if damage == "unauthorized_retry" and calls == 1
+            else "missing_view" if damage == "missing_final_view" and calls == 2
+            else "valid"
+        )
+        process = provider_run(command, **kwargs)
+        if calls == 1:
+            process.returncode = 17
+        return process
+
+    monkeypatch.setattr(mr.subprocess, "run", retrying_run)
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is not None
+    report = deepcopy(result["review"])
+    report["blind"] = True
+    report["tool_events"] = 0
+    report["extra"]["sheets_viewed"] = [1]
+    report["extra"]["inspection_proven"] = True
+    result["error"] = None
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="authorized sheet inspection"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_every_frozen_png_requires_its_own_successful_view(
+    tmp_path: Path, case, provider, reviewer: str,
+) -> None:
+    second = tmp_path / "frozen-second.png"
+    second.write_bytes(case[1].sources[0].read_bytes())
+    package = mr.ReviewPackage(case[1].name, "assembly", (*case[1].sources, second))
+    identity = _identity((case[0], package), reviewer=reviewer)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", package, "Rubric A", directory)
+    assert result["error"] is None
+    assert result["review"]["sheet_count"] == 2
+    assert result["review"]["extra"]["sheets_viewed"] == [1, 2]
+    events = [json.loads(line) for line in (directory / result["events"]).read_text(encoding="utf-8").splitlines()]
+    for node in mr._walk(events):
+        if not isinstance(node, dict):
+            continue
+        if node.get("name") == "mcp__sheets__view_sheet":
+            node["input"]["sheet"] = 1
+        elif node.get("type") == "mcp_tool_call":
+            node["arguments"]["sheet"] = 1
+    _preserve_events(result, directory, events)
+    with pytest.raises(ValueError, match="authorized sheet inspection"):
+        evaluation.validate_evidence(result, identity, "baseline", package, directory)
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+def test_pre_invocation_failure_has_no_fabricated_command_or_streams(
+    tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch, reviewer: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    identity["retries"] = 1
+    builder_name = f"build_{reviewer}_command"
+    builder = getattr(mr, builder_name)
+    calls = 0
+
+    def failing_builder(**kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("Could not prepare invocation.")
+        return builder(**kwargs)
+
+    monkeypatch.setattr(mr, builder_name, failing_builder)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    failed = result["review"]["extra"]["evidence"]["attempts"][0]
+    assert failed["command"] is None
+    assert failed["rerun_command"] is None
+    assert failed["stdout_file"] is None
+    assert failed["stderr_file"] is None
+    assert failed["artifacts"] == []
+    assert len(provider["calls"]) == 1
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+
+
+@pytest.mark.parametrize("field", ["report", "events"])
+def test_checkpoint_file_paths_cannot_escape_the_case_directory(
+    tmp_path: Path, case, provider, field: str,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    outside = tmp_path / f"foreign-{field}.json"
+    outside.write_bytes((directory / result[field]).read_bytes())
+    result[field] = str(outside)
+    result[f"{field}_sha256"] = mr._sha256(outside)
+    with pytest.raises(ValueError, match="escapes case directory"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+def test_codex_event_only_verdict_is_valid_without_inventing_an_output_artifact(
+    tmp_path: Path, case, provider,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    invocation = report["extra"]["evidence"]["attempts"][0]
+    (Path(invocation["retained_cwd"]) / "verdict.json").unlink()
+    invocation["artifacts"] = []
+    _preserve_report(result, directory, report)
+    evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    assert len(provider["calls"]) == 1
+
+
+@pytest.mark.parametrize("damage", ["output", "events"])
+def test_codex_retained_output_and_event_verdict_must_both_match_report(
+    tmp_path: Path, case, provider, damage: str,
+) -> None:
+    identity = _identity(case)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    forged = deepcopy(result["review"]["verdict"])
+    forged["summary"] = "A different answer."
+    if damage == "output":
+        invocation = result["review"]["extra"]["evidence"]["attempts"][0]
+        (Path(invocation["retained_cwd"]) / "verdict.json").write_text(json.dumps(forged), encoding="utf-8")
+    else:
+        events = [json.loads(line) for line in (directory / result["events"]).read_text(encoding="utf-8").splitlines()]
+        for node in mr._walk(events):
+            if isinstance(node, dict) and node.get("type") == "agent_message":
+                node["text"] = json.dumps(forged)
+        _preserve_events(result, directory, events)
+    with pytest.raises(ValueError, match="Codex.*verdict"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+@pytest.mark.parametrize("damage", ["cwd", "session", "outcome", "attempt_index"])
+def test_retry_invocations_cannot_reuse_or_relabel_provenance(
+    tmp_path: Path, case, provider, monkeypatch: pytest.MonkeyPatch,
+    reviewer: str, damage: str,
+) -> None:
+    identity = _identity(case, reviewer=reviewer)
+    identity["retries"] = 1
+    provider_run = mr.subprocess.run
+    calls = 0
+
+    def retrying_run(command, **kwargs):
+        nonlocal calls
+        calls += 1
+        process = provider_run(command, **kwargs)
+        if calls == 1:
+            process.returncode = 17
+        return process
+
+    monkeypatch.setattr(mr.subprocess, "run", retrying_run)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    failed, succeeded = report["extra"]["evidence"]["attempts"]
+    if damage == "cwd":
+        succeeded["cwd"] = failed["cwd"]
+        succeeded["retained_cwd"] = failed["retained_cwd"]
+    elif damage == "session":
+        original_session = succeeded["session_id"]
+        succeeded["session_id"] = failed["session_id"]
+        succeeded["resume_command"] = mr._resume_command(reviewer, failed["session_id"])
+        if reviewer == "claude":
+            succeeded["command"] = [
+                argument.replace(original_session, failed["session_id"])
+                for argument in succeeded["command"]
+            ]
+            succeeded["rerun_command"] = [
+                argument.replace(original_session, failed["session_id"])
+                for argument in succeeded["rerun_command"]
+            ]
+    elif damage == "outcome":
+        failed["outcome"] = "succeeded"
+        failed["error"] = None
+        failed["exit_code"] = 0
+    else:
+        succeeded["attempt"] = 1
+    _preserve_report(result, directory, report)
     with pytest.raises(ValueError):
         evaluation.validate_evidence(result, identity, "baseline", case[1], directory)

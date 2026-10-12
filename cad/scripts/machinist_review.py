@@ -1,19 +1,20 @@
-r"""Blind senior-machinist review of rendered drawing packages via Claude.
+r"""Blind senior-machinist review of drawing packages via Claude or Codex.
 
 The review the fleet is gated on (``cad/docs/drawing-simplicity-policy.md``):
-each drawing package is rendered or copied into a neutral temp directory and
-handed to ``claude -p --model claude-fable-5-1 --effort medium`` (or
-``codex exec --model gpt-6-astra`` at low reasoning) with NO repo context. The
-prompt is the shared standard ``cad/docs/drawing-guidelines.md`` followed by the
-reviewer instructions for the package kind in ``cad/scripts/prompts/``.
+each package is handed to an isolated CLI in a neutral attempt directory.
+A private stdio MCP server supplies grayscale whole-sheet views fitting
+1976×1280 pixels (about 118 dpi on 11×17 sheets) and vector-PDF region crops.
+The cached prompt prefix is the shared drawing standard followed by the kind's
+reviewer instructions; package-specific instructions come last.
 ``--reviewer`` is mandatory
 and MUST name a different model family from the agent that authored or last
 edited the drawing script: a Claude-driven session (Fable, Opus, Sonnet)
 reviews with ``--reviewer codex``, a Codex/GPT-driven session with
-``--reviewer claude``. A same-family verdict is not the gate, even a ``SHIP``. Registry part and assembly
-PDFs are split into full-resolution page images and every page is supplied
-to one reviewer invocation. The schema-validated verdict and its
-provenance are written under ``cad/out/reports/machinist-review/``.
+``--reviewer claude``. A same-family verdict is not the gate, even a ``SHIP``.
+PDF pages and PNG inputs are supplied in sheet order through ``view_sheet``;
+``crop`` confirms fine details, with 8× magnification and 40 calls per attempt.
+The schema-validated verdict and provenance are written under
+``cad/out/reports/machinist-review/``.
 
 Why the prompt is calibrated the way it is: the earlier ad-hoc reviews asked a
 "senior machinist" to hunt for MISSING tolerances / datums / finishes and were
@@ -23,17 +24,17 @@ parts. Authors and reviewers now share one standard, distilled from Harvey
 ch. 2-3): the title block is the general spec and over-specification is a
 defect as much as a missing dimension.
 
-Isolation is enforced by Claude's restricted mode in a neutral temp directory:
-nothing in the invocation references the repo, every page is copied as a
-``sheet-N.png``, safe mode disables project/user customizations, MCP is disabled,
-and Read is the only available tool. The event stream is scanned so any tool
-use beyond reading the copied package images flags the review as non-blind.
-Blindness is enforced by those tool restrictions and the neutral workdir, not
-by ephemerality: each attempt's session transcript is kept under the CLI's own
-home instead of discarded, on a fresh session id per attempt so it never loads
-prior context. The verdict JSON's attempt records name the session id and a
-ready-to-run resume command (``claude --resume <id>`` / ``codex resume <id>``)
-so a completed review's reasoning can be reopened offline.
+Claude disables built-in tools and user/project customizations; Codex ignores
+user configuration/rules and disables configurable shell, image and web tools.
+Only the private ``sheets`` MCP server is configured. Attempt directories hold
+the schema, Claude's MCP configuration and outputs, never sheet PNGs. The event
+stream rejects any other tool, and proves every sheet was viewed successfully
+in the verdict-producing attempt. Crop coordinates, token/cache usage and first
+Claude-turn cache usage are retained with the verdict.
+Blindness does not depend on ephemerality: fresh sessions never load prior
+context, and both the CLI transcript and attempt directory are retained. Attempt
+records include the session id and a ready-to-run ``claude --resume <id>`` or
+``codex resume <id>`` command so completed reasoning can be reopened offline.
 
 Usage (SolidWorks-free; PDFs in ``cad/out/pdf`` or ``--pdf-dir``)::
 
@@ -56,7 +57,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -69,6 +69,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
+from machinist_review_sheets_mcp import PDFIUM_LOCK as _PDFIUM_LOCK, SheetStore  # noqa: E402
 
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 GUIDELINES_FILE = CAD_ROOT / "docs" / "drawing-guidelines.md"
@@ -90,13 +91,27 @@ DEFAULT_EFFORTS = {
 REVIEWERS = tuple(DEFAULT_MODELS)
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
-# PDFium's native API is process-global and not thread-safe.  Hold this only while
-# opening/counting/rendering/closing PDFs; Codex review subprocesses remain parallel.
-_PDFIUM_LOCK = threading.Lock()
-
-
-# Event/item types that indicate tool or command activity. Claude permits only
-# Read(sheet.png) and StructuredOutput; Codex permits none of these.
+# Tool descriptors and isolation settings are static across packages, so neither
+# source paths nor sheet counts disturb the model's cached tool/prompt prefix.
+SHEETS_SERVER = SCRIPTS_DIR / "machinist_review_sheets_mcp.py"
+CLAUDE_ISOLATION_SETTINGS = {
+    "disableAllHooks": True,
+    "autoMemoryEnabled": False,
+    "claudeMdExcludes": ["**"],
+    "disableBundledSkills": True,
+    "syncClaudeAiPlugins": False,
+    "syncClaudeAiSkills": False,
+    "enabledPlugins": {
+        "cc-plugin-agents-md@builtin": False,
+        "cc-plugin-telemetry@builtin": False,
+        "cc-plugin-plugin-authoring@builtin": False,
+    },
+    "env": {
+        "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1",
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS": "1",
+    },
+}
 _TOOL_EVENT_MARKERS = (
     "command_execution",
     "function_call",
@@ -107,6 +122,10 @@ _TOOL_EVENT_MARKERS = (
     "local_shell",
     "web_search",
     "file_change",
+    "shell",
+    "view_image",
+    "image_view",
+    "apply_patch",
 )
 
 
@@ -177,25 +196,10 @@ def _package_for_pngs(paths: Sequence[Path], kind: str) -> ReviewPackage:
     )
 
 
-def _pdf_page_count(path: Path) -> int:
-    import pypdfium2 as pdfium
-
-    with _PDFIUM_LOCK:
-        document = pdfium.PdfDocument(str(path))
-        try:
-            page_count = len(document)
-        finally:
-            document.close()
-    if page_count < 1:
-        raise ValueError(f"PDF has no sheets: {path}")
-    return page_count
-
-
 def _sheet_count(package: ReviewPackage) -> int:
-    return sum(
-        _pdf_page_count(source) if source.suffix.casefold() == ".pdf" else 1
-        for source in package.sources
-    )
+    # The harness and MCP server share source expansion and rendering definitions.
+    with SheetStore(package.sources) as sheets:
+        return sheets.sheet_count
 
 
 def _validate_package(package: ReviewPackage) -> int:
@@ -212,34 +216,6 @@ def _validate_package(package: ReviewPackage) -> int:
     sheet_count = _sheet_count(package)
     return sheet_count
 
-
-def _materialize_images(package: ReviewPackage, workdir: Path) -> list[Path]:
-    import pypdfium2 as pdfium
-
-    images: list[Path] = []
-    for source in package.sources:
-        if source.suffix.casefold() != ".pdf":
-            image = workdir / f"sheet-{len(images) + 1}.png"
-            shutil.copyfile(source, image)
-            images.append(image)
-            continue
-        with _PDFIUM_LOCK:
-            document = pdfium.PdfDocument(str(source))
-            try:
-                for page_index in range(len(document)):
-                    page = document[page_index]
-                    try:
-                        rendered = page.render(scale=300.0 / 72.0).to_pil()
-                        image = workdir / f"sheet-{len(images) + 1}.png"
-                        rendered.save(image, dpi=(300, 300))
-                        images.append(image)
-                    finally:
-                        page.close()
-            finally:
-                document.close()
-    return images
-
-
 def _review_prompt(
     package: ReviewPackage,
     sheet_count: int,
@@ -251,25 +227,19 @@ def _review_prompt(
     prompt += (
         "\n\nPACKAGE INPUT\n"
         f"Sheet count: {sheet_count}.\n"
-        "Return one verdict for the package as a whole.\n"
+        f"Call view_sheet for sheets 1..{sheet_count} in order before judging.\n"
     )
     if sheet_count > 1:
         prompt += (
             "Compare every sheet against every other sheet before accepting SHIP.\n"
         )
-    if reviewer == "claude":
-        prompt = (
-            f"Use the Read tool to inspect every copied sheet-1.png through "
-            f"sheet-{sheet_count}.png in order. Do not read any other file. "
-            "Then perform this blind review.\n\n" + prompt
-        )
-    return prompt
+    return prompt + "Return one verdict for the package as a whole.\n"
 
 
 def build_claude_command(
     *,
     workdir: Path,
-    images: Sequence[Path],
+    mcp_config: Path,
     schema: Path,
     model: str,
     effort: str,
@@ -278,12 +248,8 @@ def build_claude_command(
     schema_content: str | None = None,
 ) -> list[str]:
     """Return the exact isolated ``claude -p`` argv for one package."""
-    if (
-        schema.parent != workdir
-        or not images
-        or any(image.parent != workdir for image in images)
-    ):
-        raise ValueError("review inputs must be inside the neutral workdir")
+    if schema.parent != workdir or mcp_config.parent != workdir:
+        raise ValueError("review configuration must be inside the neutral workdir")
     schema_json = json.dumps(
         json.loads(
             schema.read_text(encoding="utf-8")
@@ -307,11 +273,17 @@ def build_claude_command(
         "--json-schema",
         schema_json,
         "--tools",
-        "Read",
+        "",
         "--allowedTools",
-        *(f"Read({image.name})" for image in images),
+        "mcp__sheets__view_sheet,mcp__sheets__crop",
         "--restricted",
-        "--safe-mode",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+        "--settings",
+        json.dumps(CLAUDE_ISOLATION_SETTINGS, separators=(",", ":")),
+        "--mcp-config",
+        str(mcp_config),
         "--session-id",
         session_id,
         "--permission-mode",
@@ -326,7 +298,7 @@ def build_claude_command(
 def build_codex_command(
     *,
     workdir: Path,
-    images: Sequence[Path],
+    sources: Sequence[Path],
     schema: Path,
     output: Path,
     model: str,
@@ -334,8 +306,8 @@ def build_codex_command(
     codex: str = "codex",
 ) -> list[str]:
     """Return the exact isolated ``codex exec`` argv for one package."""
-    if not images or any(path.parent != workdir for path in (*images, schema, output)):
-        raise ValueError("review inputs and output must be inside the neutral workdir")
+    if not sources or any(path.parent != workdir for path in (schema, output)):
+        raise ValueError("review configuration and output must be inside the neutral workdir")
     command = [
         codex,
         "exec",
@@ -351,8 +323,27 @@ def build_codex_command(
         "-c",
         f"model_reasoning_effort={effort}",
     ]
-    for image in images:
-        command.extend(("-i", str(image)))
+    overrides = {
+        "approval_policy": "never",
+        "features.shell_tool": False,
+        "features.apply_patch_freeform": False,
+        # This disables the freeform variant, not every model's patch tool.
+        # The event gate rejects any residual builtin call, including patches.
+        "features.view_image": False,
+        "features.tool_search": False,
+        "features.tool_search_always_defer_mcp_tools": False,
+        "agents.enabled": False,
+        "features.multi_agent_v2": False,
+        "web_search": "disabled",
+        "mcp_servers.sheets.command": sys.executable,
+        "mcp_servers.sheets.args": [str(SHEETS_SERVER), *(str(p.resolve()) for p in sources)],
+        # "auto" still requests approval for unannotated MCP tools in exec.
+        # "approve" is Codex's explicit automatic-approval policy.
+        "mcp_servers.sheets.default_tools_approval_mode": "approve",
+        "mcp_servers.sheets.enabled_tools": ["view_sheet", "crop"],
+    }
+    for key, value in overrides.items():
+        command.extend(("-c", f"{key}={json.dumps(value)}"))
     command.extend(
         (
             "--output-schema",
@@ -376,66 +367,172 @@ def _walk(obj: Any) -> Iterable[Any]:
             yield from _walk(value)
 
 
-def _claude_event_evidence(
-    events: Sequence[dict[str, Any]], *, allowed_images: Sequence[Path]
-) -> tuple[int, set[Path]]:
-    """Return unauthorized-event count and copied package images read."""
-    allowed = {path.resolve() for path in allowed_images}
-    workdirs = {path.parent for path in allowed}
-    unauthorized = 0
-    reads: set[Path] = set()
-    for event in events:
-        event_unauthorized = False
-        for node in _walk(event):
-            if not isinstance(node, dict):
-                continue
-            kind = str(node.get("type", "")).lower()
-            name = str(node.get("name", "")).lower()
-            if kind == "tool_use" and name == "structuredoutput":
-                continue
-            if kind == "tool_use" and name == "read":
-                tool_input = node.get("input")
-                raw_path = (
-                    tool_input.get("file_path")
-                    if isinstance(tool_input, dict)
-                    else None
+def _tool_nodes(obj: Any) -> Iterable[dict[str, Any]]:
+    """Find calls, not command-like fields inside their arguments or results."""
+    if isinstance(obj, dict):
+        kind = str(obj.get("type", "")).lower()
+        if (
+            obj.get("command")
+            or any(marker in kind for marker in _TOOL_EVENT_MARKERS)
+            or kind.endswith("_call")
+        ):
+            yield obj
+            return
+        for value in obj.values():
+            yield from _tool_nodes(value)
+    elif isinstance(obj, list):
+        for value in obj:
+            yield from _tool_nodes(value)
+
+
+def evaluate_sheet_evidence(
+    events: Sequence[dict[str, Any]], *, reviewer: str, sheet_count: int
+) -> dict[str, Any]:
+    """Fail closed on tools other than bounded sheet inspection.
+
+    Codex announces the same call at start and completion; count it once.
+    A view proves inspection only when its successful result contains an image.
+    Attempt tags keep repeated tool ids in separate attempts distinct.
+    """
+    if reviewer not in REVIEWERS:
+        raise ValueError(f"unknown reviewer {reviewer!r}")
+    image_results: set[tuple[int, str]] = set()
+    for row in events:
+        attempt = row.get("attempt", 0)
+        for node in _walk(row.get("event", row)):
+            if (
+                isinstance(node, dict)
+                and node.get("type") == "tool_result"
+                and not node.get("is_error")
+                and any(
+                    isinstance(part, dict) and part.get("type") == "image"
+                    for part in (node.get("content") or [])
                 )
-                if raw_path:
-                    candidates = (
-                        [Path(str(raw_path))]
-                        if Path(str(raw_path)).is_absolute()
-                        else [workdir / str(raw_path) for workdir in workdirs]
-                    )
-                    match = next(
-                        (
-                            candidate.resolve()
-                            for candidate in candidates
-                            if candidate.resolve() in allowed
-                        ),
-                        None,
-                    )
-                    if match is not None:
-                        reads.add(match)
-                        continue
-                event_unauthorized = True
-                continue
-            if ("command" in node and node.get("command")) or any(
-                marker in kind for marker in _TOOL_EVENT_MARKERS
             ):
-                event_unauthorized = True
-        unauthorized += int(event_unauthorized)
-    return unauthorized, reads
+                image_results.add((attempt, str(node.get("tool_use_id", ""))))
 
-
-def count_tool_events(
-    events: Sequence[dict[str, Any]], *, allowed_images: Sequence[Path] = ()
-) -> int:
-    return _claude_event_evidence(events, allowed_images=allowed_images)[0]
+    unauthorized: set[tuple[Any, ...]] = set()
+    crop_ids: set[tuple[Any, ...]] = set()
+    views: set[int] = set()
+    crops: list[dict[str, Any]] = []
+    for event_index, row in enumerate(events):
+        attempt = row.get("attempt", 0)
+        event = row.get("event", row)
+        nodes = _tool_nodes(event)
+        if (
+            reviewer == "codex"
+            and isinstance(event, dict)
+            and event.get("type") in {"item.started", "item.updated", "item.completed"}
+            and isinstance(event.get("item"), dict)
+        ):
+            item = event["item"]
+            # Tool items such as todo_list have no "tool"/"call" marker.
+            # Only these explicit non-tool item kinds may bypass the allowlist.
+            nodes = () if item.get("type") in {"agent_message", "reasoning", "error"} else (item,)
+        for node_index, node in enumerate(nodes):
+            kind = str(node.get("type", "")).lower()
+            identity = (
+                (attempt, kind, str(node["id"]))
+                if node.get("id")
+                else (attempt, event_index, node_index)
+            )
+            tool = None
+            arguments = None
+            successful = False
+            if reviewer == "claude" and kind == "tool_use":
+                name = node.get("name")
+                if name == "StructuredOutput":
+                    continue
+                if name in {"mcp__sheets__view_sheet", "mcp__sheets__crop"}:
+                    tool = str(name).removeprefix("mcp__sheets__")
+                    arguments = node.get("input")
+                    successful = (attempt, str(node.get("id", ""))) in image_results
+            elif (
+                reviewer == "codex"
+                and kind == "mcp_tool_call"
+                and node.get("server") == "sheets"
+                and node.get("tool") in {"view_sheet", "crop"}
+            ):
+                tool = node["tool"]
+                arguments = node.get("arguments")
+                result = node.get("result")
+                successful = (
+                    node.get("status") == "completed"
+                    and not node.get("error")
+                    and isinstance(result, dict)
+                    and not result.get("isError")
+                    and any(
+                        isinstance(part, dict) and part.get("type") == "image"
+                        for part in (result.get("content") or [])
+                    )
+                )
+            keys = {"sheet"} if tool == "view_sheet" else {"sheet", "x1", "y1", "x2", "y2"}
+            valid = (
+                tool is not None
+                and isinstance(arguments, dict)
+                and set(arguments) == keys
+                and all(type(value) is int for value in arguments.values())
+                and 1 <= arguments["sheet"] <= sheet_count
+            )
+            if not valid:
+                unauthorized.add(identity)
+                continue
+            sheet = arguments["sheet"]
+            if tool == "view_sheet" and successful:
+                views.add(sheet)
+            elif tool == "crop" and identity not in crop_ids:
+                crop_ids.add(identity)
+                crops.append({
+                    "sheet": sheet,
+                    "rect": [arguments[key] for key in ("x1", "y1", "x2", "y2")],
+                })
+    return {
+        "tool_events": len(unauthorized),
+        "sheets_viewed": sorted(views),
+        "crop_calls": len(crop_ids),
+        "crops": crops,
+        "inspection_proven": sheet_count > 0 and views == set(range(1, sheet_count + 1)),
+    }
 
 
 def count_codex_tool_events(events: Sequence[dict[str, Any]]) -> int:
-    """Count every Codex tool or command event; blind reviews permit none."""
-    return _claude_event_evidence(events, allowed_images=())[0]
+    """The benchmark's text-only grader permits no sheet or other tools."""
+    return evaluate_sheet_evidence(events, reviewer="codex", sheet_count=0)["tool_events"]
+
+
+def _usage(events: Sequence[dict[str, Any]], reviewer: str) -> dict[str, Any]:
+    """Retain CLI usage, including the first Claude assistant-turn cache split."""
+    rows = [row.get("event", row) for row in events]
+    if reviewer == "codex":
+        keys = ("input_tokens", "cached_input_tokens", "output_tokens")
+        return {
+            key: sum(
+                (row.get("usage") or {}).get(key, 0)
+                for row in rows if row.get("type") == "turn.completed"
+            )
+            for key in keys
+        }
+    keys = (
+        "input_tokens", "cache_creation_input_tokens",
+        "cache_read_input_tokens", "output_tokens",
+    )
+    results = [row for row in rows if row.get("type") == "result"]
+    usage = {
+        key: sum((row.get("usage") or {}).get(key, 0) for row in results)
+        for key in keys
+    }
+    usage["total_cost_usd"] = sum(row.get("total_cost_usd", 0) for row in results)
+    usage["num_turns"] = sum(row.get("num_turns", 0) for row in results)
+    first = next(
+        ((row.get("message") or {}).get("usage") or {}
+         for row in rows if row.get("type") == "assistant"),
+        {},
+    )
+    usage["first_turn"] = {
+        key: first.get(key, 0)
+        for key in ("cache_read_input_tokens", "cache_creation_input_tokens")
+    }
+    return usage
 
 
 def validate_verdict(value: Any) -> dict[str, Any]:
@@ -623,8 +720,6 @@ def review_package(
     error: str | None = None
     verdict: dict[str, Any] | None = None
     events: list[dict[str, Any]] = []
-    allowed_images: list[Path] = []
-    verdict_images: list[Path] = []
     success_events: list[dict[str, Any]] = []
     attempt_records: list[dict[str, Any]] = []
     attempts = 0
@@ -641,7 +736,9 @@ def review_package(
             "attempt": attempts,
             "reviewer": reviewer,
             "cwd": str(workdir),
-            "images": [],
+            "sources": [str(source.resolve()) for source in package.sources],
+            "retained_cwd": None,
+            "rerun_command": None,
             "command": None,
             "outcome": "failed",
             "error": None,
@@ -654,21 +751,23 @@ def review_package(
         }
         attempt_records.append(attempt_record)
         try:
-            images = _materialize_images(package, workdir)
-            attempt_record["images"] = [str(image) for image in images]
-            allowed_images.extend(images)
-            if len(images) != sheet_count:
-                raise RuntimeError(
-                    f"{package.name}: materialized {len(images)} sheets, "
-                    f"expected {sheet_count}"
-                )
+            mcp_config = workdir / "mcp.json"
+            if reviewer == "claude":
+                mcp_config.write_text(json.dumps({
+                    "mcpServers": {
+                        "sheets": {
+                            "command": sys.executable,
+                            "args": [str(SHEETS_SERVER), *(str(p.resolve()) for p in package.sources)],
+                        },
+                    },
+                }), encoding="utf-8")
             schema = workdir / "schema.json"
             schema.write_bytes(schema_bytes)
             output = workdir / "verdict.json"
             cmd = (
                 build_claude_command(
                     workdir=workdir,
-                    images=images,
+                    mcp_config=mcp_config,
                     schema=schema,
                     model=model,
                     effort=effort,
@@ -678,7 +777,7 @@ def review_package(
                 if reviewer == "claude"
                 else build_codex_command(
                     workdir=workdir,
-                    images=images,
+                    sources=package.sources,
                     schema=schema,
                     output=output,
                     model=model,
@@ -722,7 +821,6 @@ def review_package(
                 if reviewer == "claude"
                 else extract_codex_verdict(output, attempt_events)
             )
-            verdict_images = list(images)
             success_events = list(attempt_events)
             error = None
             attempt_record["outcome"] = "succeeded"
@@ -748,7 +846,14 @@ def review_package(
             attempt_record["resume_command"] = _resume_command(reviewer, session_id)
             events.extend(_tag_events(attempts, attempt_events))
             retained_dir = report_dir / f"{package.name}.attempts" / workdir.name
-            retained_dir.mkdir(parents=True, exist_ok=True)
+            retained_dir.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(workdir), str(retained_dir))
+            attempt_record["retained_cwd"] = str(retained_dir)
+            if attempt_record["command"]:
+                attempt_record["rerun_command"] = [
+                    argument.replace(str(workdir), str(retained_dir))
+                    for argument in attempt_record["command"]
+                ]
             for stream, content in (("stdout", stdout), ("stderr", stderr)):
                 if content is not None:
                     path = retained_dir / f"{stream}.txt"
@@ -758,36 +863,26 @@ def review_package(
                         else content.encode("utf-8")
                     )
                     attempt_record[f"{stream}_file"] = str(path)
-            # Inputs are already identified by the source hashes, image paths,
-            # and retained schema. Move generated artifacts rather than copying
-            # the entire workdir (and every drawing image) on each retry.
-            inputs = {Path(image) for image in attempt_record["images"]}
-            inputs.add(workdir / "schema.json")
-            for artifact in sorted(workdir.iterdir()):
-                if artifact in inputs:
-                    continue
-                artifact_dir = retained_dir / "artifacts"
-                artifact_dir.mkdir(exist_ok=True)
-                retained = artifact_dir / artifact.name
-                shutil.move(str(artifact), str(retained))
-                attempt_record["artifacts"].append(str(retained))
-            shutil.rmtree(workdir, ignore_errors=True)
+            inputs = {"schema.json", "mcp.json", "stdout.txt", "stderr.txt"}
+            attempt_record["artifacts"] = [
+                str(artifact) for artifact in sorted(retained_dir.iterdir())
+                if artifact.name not in inputs
+            ]
 
     _write_events(events_path, events)
-    if reviewer == "claude":
-        tool_events, _ = _claude_event_evidence(events, allowed_images=allowed_images)
-        _, read_images = _claude_event_evidence(
-            success_events, allowed_images=verdict_images
-        )
-        inspection_proven = bool(verdict_images) and set(verdict_images) == read_images
-        extra = {
-            "image_read_events": len(read_images),
-            "images_read": sorted(path.name for path in read_images),
-        }
-    else:
-        tool_events = count_codex_tool_events(events)
-        inspection_proven = True
-        extra = {}
+    evidence = evaluate_sheet_evidence(events, reviewer=reviewer, sheet_count=sheet_count)
+    successful = evaluate_sheet_evidence(
+        success_events, reviewer=reviewer, sheet_count=sheet_count
+    )
+    tool_events = evidence["tool_events"]
+    inspection_proven = successful["inspection_proven"]
+    extra = {
+        "sheets_viewed": successful["sheets_viewed"],
+        "inspection_proven": inspection_proven,
+        "crop_calls": evidence["crop_calls"],
+        "crops": evidence["crops"],
+        "usage": _usage(events, reviewer),
+    }
     extra["evidence"] = {
         "effective_prompt": prompt,
         "schema": schema_bytes.decode("utf-8"),
@@ -831,13 +926,22 @@ def write_review(review: Review, report_dir: Path) -> None:
 
 def render_markdown(review: Review) -> str:
     source_hashes = ", ".join(value[:12] for value in review.source_sha256)
+    usage = review.extra.get("usage") or {}
+    if review.reviewer == "claude":
+        cached = usage.get("cache_read_input_tokens", 0)
+        total = cached + usage.get("input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
+    else:
+        cached = usage.get("cached_input_tokens", 0)
+        total = usage.get("input_tokens", 0)
+    cache_share = cached / total if total else 0.0
     lines = [
         f"# {review.name} — {'PASS' if review.passed else 'FAIL'}",
         "",
         f"- kind: {review.kind}",
         f"- sheets: {review.sheet_count}",
         f"- reviewed: {review.reviewed_at} by {review.reviewer}/{review.model} "
-        f"({review.effort}), {review.duration_s}s, attempts {review.attempts}",
+        f"({review.effort}), {review.duration_s}s, attempts {review.attempts}, "
+        f"crops {review.extra.get('crop_calls', 0)}, cache-read {cache_share:.1%}",
         f"- blind: {review.blind} (tool events: {review.tool_events})",
         f"- source sha256: {source_hashes}  prompt sha256: {review.prompt_sha256[:12]}",
     ]

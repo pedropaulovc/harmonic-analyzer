@@ -14,15 +14,18 @@ an empty category for absence claims), or /summary. No keyword scoring is used.
 Only pass/fail are human outcomes. Invalid evidence is an infrastructure failure;
 unassessed evidence and targeted failures remain usable experiment outcomes.
 
-Each invocation resumes matching valid results automatically. Inputs, engine and
-schema hashes, model, effort, timeout and retry settings define the run identity.
+Each invocation resumes matching valid results automatically. Inputs plus harness,
+evaluator, schema and sheet-server hashes, model, effort, timeout and retry settings
+define the run identity.
 Use a separate report directory for an independent repeat of identical inputs.
 Concurrent invocations must not share a report directory. Each completed case is
 checkpointed atomically; interrupted/invalid cases rerun without overwriting old
 attempt artifacts. stdout contains only aggregate JSON; telemetry uses stderr.
 The run's inputs/ directory preserves raw baseline.txt, candidate.txt and
 schema.json bytes. Each report's extra.evidence preserves the exact effective
-prompt, schema text and authorized image paths/argv for every provider attempt.
+prompt, schema text, authorized MCP source paths and actual/replay argv for every
+provider attempt. Frozen PNGs stay outside the neutral workdirs; retained MCP
+configuration and process/output files live directly in each retained workdir.
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ import json
 import math
 from pathlib import Path
 import re
+import sys
 import tempfile
 from typing import Any, Sequence
 
@@ -134,6 +138,7 @@ def make_identity(
         "manifest": manifest,
         "engine_sha256": mr._sha256(Path(mr.__file__)),
         "evaluator_sha256": mr._sha256(Path(__file__)),
+        "sheets_server_sha256": mr._sha256(mr.SHEETS_SERVER),
         "schema_sha256": mr._sha256(mr.SCHEMA_FILE),
         "reviewer": reviewer, "model": model, "effort": effort,
         "retries": retries, "timeout_s": timeout_s,
@@ -141,7 +146,7 @@ def make_identity(
             version: {"raw_sha256": hashlib.sha256(raw).hexdigest(),
                       "effective_sha256": {
                           package.name: hashlib.sha256(mr._review_prompt(
-                              package, 1, reviewer=reviewer,
+                              package, len(package.sources), reviewer=reviewer,
                               prompt_text=raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n"),
                           ).encode("utf-8")).hexdigest()
                           for package in packages}}
@@ -171,13 +176,17 @@ def validate_evidence(
     if result.get("review") != asdict(review):
         raise ValueError("checkpoint review differs from preserved report")
     mr.validate_verdict(review.verdict)
+    sources = [source.resolve() for source in package.sources]
+    if [mr._sha256(source) for source in sources] != identity["images"][package.name]:
+        raise ValueError("source changed after run identity was computed")
     expected = {
-        "name": package.name, "kind": package.kind, "sheet_count": 1,
+        "name": package.name, "kind": package.kind, "sheet_count": len(sources),
+        "sources": [str(source) for source in sources],
         "source_sha256": identity["images"][package.name],
         "prompt_sha256": identity["prompts"][version]["effective_sha256"][package.name],
         "reviewer": identity["reviewer"], "model": identity["model"], "effort": identity["effort"],
     }
-    if any(getattr(review, key) != value for key, value in expected.items()):
+    if type(review.sheet_count) is not int or any(getattr(review, key) != value for key, value in expected.items()):
         raise ValueError("report inputs/settings mismatch")
     if review.error is not None or review.blind is not True or type(review.tool_events) is not int or review.tool_events != 0:
         raise ValueError("report lacks valid blind evidence")
@@ -192,6 +201,8 @@ def validate_evidence(
         for row in events
     ):
         raise ValueError("missing or malformed retry event history")
+    if not isinstance(review.extra, dict):
+        raise ValueError("missing preserved invocation evidence")
     evidence = review.extra.get("evidence")
     if not isinstance(evidence, dict):
         raise ValueError("missing preserved invocation evidence")
@@ -206,25 +217,49 @@ def validate_evidence(
     if not isinstance(attempts, list) or len(attempts) != review.attempts:
         raise ValueError("incomplete invocation history")
     workdirs: set[Path] = set()
+    sessions: set[str] = set()
     for number, invocation in enumerate(attempts, start=1):
         if not isinstance(invocation, dict) or set(invocation) != {
-            "attempt", "reviewer", "cwd", "images", "command", "outcome", "error",
+            "attempt", "reviewer", "cwd", "sources", "command", "outcome", "error",
             "exit_code", "session_id", "resume_command", "stdout_file", "stderr_file",
-            "artifacts",
+            "artifacts", "retained_cwd", "rerun_command",
         } or type(invocation["attempt"]) is not int or invocation["attempt"] != number:
             raise ValueError("invalid invocation record")
+        session_id = invocation["session_id"]
         if (
             invocation["reviewer"] != review.reviewer
-            or (invocation["session_id"] is not None and not isinstance(invocation["session_id"], str))
-            or invocation["resume_command"] != mr._resume_command(review.reviewer, invocation["session_id"])
+            or (session_id is not None and (not isinstance(session_id, str) or not session_id))
+            or invocation["resume_command"] != mr._resume_command(review.reviewer, session_id)
+            or (session_id is not None and session_id in sessions)
         ):
             raise ValueError("invalid session provenance")
+        if session_id is not None:
+            sessions.add(session_id)
         if not isinstance(invocation["cwd"], str):
             raise ValueError("missing invocation workdir")
         cwd = Path(invocation["cwd"])
-        if not cwd.is_absolute() or cwd in workdirs:
+        if (
+            not cwd.is_absolute() or cwd.resolve() in workdirs
+            or not cwd.name.startswith("machrev-") or cwd.exists()
+        ):
             raise ValueError("invalid or reused neutral workdir")
-        workdirs.add(cwd)
+        workdirs.add(cwd.resolve())
+        retained_dir = report_path.parent / f"{package.name}.attempts" / cwd.name
+        retained_cwd = invocation["retained_cwd"]
+        if not isinstance(retained_cwd, str):
+            raise ValueError("missing retained workdir")
+        retained = Path(retained_cwd)
+        if (
+            not retained.is_absolute() or retained != retained_dir
+            or not retained.resolve().is_relative_to(report_path.parent.resolve())
+            or not retained.is_dir()
+        ):
+            raise ValueError("missing or misplaced retained workdir")
+        if invocation["sources"] != [str(source) for source in sources] or any(
+            source.is_relative_to(cwd.resolve()) or source.is_relative_to(retained.resolve())
+            for source in sources
+        ):
+            raise ValueError("invocation source allowlist differs from package")
         outcome, error, exit_code = invocation["outcome"], invocation["error"], invocation["exit_code"]
         if exit_code is not None and type(exit_code) is not int:
             raise ValueError("invalid invocation exit code")
@@ -237,13 +272,34 @@ def validate_evidence(
             or (outcome == "timed_out" and exit_code is not None)
         ):
             raise ValueError("invalid failed invocation outcome")
-        image_paths = invocation["images"]
-        if not isinstance(image_paths, list) or any(not isinstance(path, str) for path in image_paths):
-            raise ValueError("invalid authorized image paths")
-        images = [Path(path) for path in image_paths]
         command = invocation["command"]
         attempt_events = [row["event"] for row in events if row["attempt"] == number]
-        retained_dir = report_path.parent / f"{package.name}.attempts" / cwd.name
+        if review.reviewer == "codex" and session_id != mr._codex_session_id(attempt_events):
+            raise ValueError("session differs from retry event history")
+        input_names: set[str] = set()
+        schema = retained / "schema.json"
+        if schema.exists():
+            if not schema.is_file() or schema.resolve().parent != retained.resolve() or mr._sha256(schema) != identity["schema_sha256"]:
+                raise ValueError("retained schema hash/path mismatch")
+            input_names.add(schema.name)
+        elif command is not None:
+            raise ValueError("missing retained schema")
+        config = retained / "mcp.json"
+        if config.exists():
+            if (
+                review.reviewer != "claude" or not config.is_file()
+                or config.resolve().parent != retained.resolve()
+                or json.loads(config.read_text(encoding="utf-8")) != {
+                    "mcpServers": {"sheets": {
+                        "command": sys.executable,
+                        "args": [str(mr.SHEETS_SERVER), *(str(source) for source in sources)],
+                    }},
+                }
+            ):
+                raise ValueError("retained MCP configuration mismatch")
+            input_names.add(config.name)
+        elif command is not None and review.reviewer == "claude":
+            raise ValueError("missing retained MCP configuration")
         for stream in ("stdout", "stderr"):
             recorded_path = invocation[f"{stream}_file"]
             if recorded_path is None:
@@ -253,8 +309,12 @@ def validate_evidence(
             if not isinstance(recorded_path, str):
                 raise ValueError("invalid retained process stream path")
             path = Path(recorded_path)
-            if path.resolve() != (retained_dir / f"{stream}.txt").resolve() or not path.is_file():
+            if (
+                not path.is_absolute() or path != retained / f"{stream}.txt"
+                or path.resolve().parent != retained.resolve() or not path.is_file()
+            ):
                 raise ValueError("missing or misplaced retained process stream")
+            input_names.add(path.name)
             if stream == "stdout" and mr._parse_events(
                 path.read_bytes().decode("utf-8", errors="replace")
             ) != attempt_events:
@@ -262,67 +322,79 @@ def validate_evidence(
         artifacts = invocation["artifacts"]
         if not isinstance(artifacts, list) or any(not isinstance(path, str) for path in artifacts):
             raise ValueError("invalid retained artifact paths")
-        artifact_dir = retained_dir / "artifacts"
-        artifact_paths = [Path(path).resolve() for path in artifacts]
+        artifact_paths = [Path(path) for path in artifacts]
         if len(set(artifact_paths)) != len(artifact_paths) or any(
-            path.parent != artifact_dir.resolve() or not path.exists() for path in artifact_paths
+            not path.is_absolute() or path.parent != retained
+            or path.resolve().parent != retained.resolve() or not path.is_file()
+            or review.reviewer != "codex" or path.name != "verdict.json"
+            for path in artifact_paths
         ):
             raise ValueError("missing or misplaced retained artifact")
-        if set(artifact_paths) != (
-            {path.resolve() for path in artifact_dir.iterdir()} if artifact_dir.exists() else set()
-        ):
+        if {path.name for path in retained.iterdir()} != input_names | {
+            path.name for path in artifact_paths
+        }:
             raise ValueError("incomplete retained artifact inventory")
         if command is None:
             if (
                 attempt_events or number == review.attempts or outcome != "failed"
-                or exit_code is not None
+                or exit_code is not None or invocation["rerun_command"] is not None
                 or invocation["stdout_file"] is not None or invocation["stderr_file"] is not None
+                or artifacts
             ):
                 raise ValueError("events without a recorded provider invocation")
             continue
-        if images != [cwd / "sheet-1.png"]:
-            raise ValueError("invocation image allowlist differs from package")
         if not isinstance(command, list) or not command or any(not isinstance(arg, str) for arg in command):
             raise ValueError("invalid invocation command")
+        if review.reviewer == "claude" and session_id is None:
+            raise ValueError("missing Claude invocation session")
         expected_command = (
             mr.build_claude_command(
-                workdir=cwd, images=images, schema=cwd / "schema.json",
+                workdir=cwd, mcp_config=cwd / "mcp.json", schema=cwd / "schema.json",
                 model=review.model, effort=review.effort,
-                session_id=invocation["session_id"] or "", claude=command[0],
+                session_id=session_id or "", claude=command[0],
                 schema_content=evidence["schema"],
             )
             if review.reviewer == "claude"
             else mr.build_codex_command(
-                workdir=cwd, images=images, schema=cwd / "schema.json",
+                workdir=cwd, sources=sources, schema=cwd / "schema.json",
                 output=cwd / "verdict.json", model=review.model,
                 effort=review.effort, codex=command[0],
             )
         )
         if command != expected_command:
             raise ValueError("invocation command permissions/settings mismatch")
-        if review.reviewer == "claude":
-            unauthorized, inspected = mr._claude_event_evidence(
-                attempt_events, allowed_images=images
-            )
-            if unauthorized or (number == review.attempts and inspected != {image.resolve() for image in images}):
-                raise ValueError("event history does not prove an authorized blind image review")
+        if invocation["rerun_command"] != [
+            argument.replace(str(cwd), str(retained)) for argument in command
+        ]:
+            raise ValueError("replay command differs from retained invocation")
     successful = [row["event"] for row in events if row["attempt"] == review.attempts]
-    if identity["reviewer"] == "codex":
-        if mr.count_codex_tool_events(events):
-            raise ValueError("unauthorized tool activity")
-        # Re-extract from the event stream where available; Codex may instead
-        # have written only its schema-validated output file in the neutral cwd.
-        if not successful:
-            raise ValueError("missing successful attempt events")
+    all_inspection = mr.evaluate_sheet_evidence(
+        events, reviewer=review.reviewer, sheet_count=review.sheet_count
+    )
+    final_inspection = mr.evaluate_sheet_evidence(
+        successful, reviewer=review.reviewer, sheet_count=review.sheet_count
+    )
+    if all_inspection["tool_events"] or not final_inspection["inspection_proven"]:
+        raise ValueError("event history does not prove authorized sheet inspection")
+    expected_inspection = {
+        "sheets_viewed": final_inspection["sheets_viewed"],
+        "inspection_proven": final_inspection["inspection_proven"],
+        "crop_calls": all_inspection["crop_calls"],
+        "crops": all_inspection["crops"],
+    }
+    if _digest({field: review.extra.get(field) for field in expected_inspection}) != _digest(expected_inspection):
+        raise ValueError("recorded sheet inspection differs from event history")
+    if review.reviewer == "codex":
+        output = Path(attempts[-1]["retained_cwd"]) / "verdict.json"
+        if mr.extract_codex_verdict(output, successful) != review.verdict:
+            raise ValueError("report differs from retained Codex verdict")
         if any(
             isinstance(node, dict) and node.get("type") == "agent_message"
             for node in mr._walk(successful)
-        ) and mr.extract_codex_verdict(directory, successful) != review.verdict:
+        ) and mr.extract_codex_verdict(output.parent, successful) != review.verdict:
             raise ValueError("report differs from successful Codex event verdict")
-    else:
-        # Only the engine's pre-invocation allowlists above authorize Read paths.
-        if mr.extract_claude_verdict(successful) != review.verdict:
-            raise ValueError("report differs from successful Claude event verdict")
+    elif mr.extract_claude_verdict(successful) != review.verdict:
+        raise ValueError("report differs from successful Claude event verdict")
     return review
 
 

@@ -6,10 +6,9 @@ attached sheet images) and nothing else: no CAD model, no project context, no
 one to ask. Judge it exactly as you would at the bench, against the drawing
 guidelines above. Cite the rule a finding breaks by number and title.
 
-The attached images ARE the sheets, already rendered at full resolution;
-inspect every one directly with the Read tool. Do not open any other file,
-run commands, or fetch anything. A review that reaches beyond the supplied
-sheet images is discarded.
+The sheets are available only through `view_sheet` and `crop`; inspect every
+sheet in order. Do not open files, run commands, or fetch anything. A review
+that reaches beyond these sheet tools is discarded.
 
 HOW TO REVIEW
 1. Read each title block first. Anything it covers is not missing (rule 2).
@@ -21,8 +20,9 @@ HOW TO REVIEW
    corners and access (rules 16–18). A likely geometry defect is a blocker even
    when the print depicts it faithfully. Say that the source decision must be
    reconciled and why (rule 21); never invent the missing value.
-5. Before you report a crossing, an overprint, a leader landing, a missing
-   line or a contradiction, zoom into that region of the image and confirm it.
+5. Sheet views arrive at about 118 dpi. Before reporting a crossing, overprint,
+   leader landing, symbol, hidden-vs-solid line, small text or contradiction,
+   call `crop` on that region and base the finding on what the crop shows.
    Check every dimension text and callout for overprinting or text placed
    inside the outline (rule 14). Datum triangles on a bore, the all-around
    circle at a profile leader, frame arrowheads and stacked limits are
