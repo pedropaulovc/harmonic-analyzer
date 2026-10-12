@@ -1,17 +1,20 @@
 """Offline contracts for the paper-drive assembly and its drawing (MHA-PD-000)."""
 
 import inspect
+from itertools import product
 import math
 import re
-from itertools import product
 from types import SimpleNamespace
 
 import pytest
 
 import _assembly
+from _assembly_contract import assembly_contract
 import _chain as chain
 import _config
-import _drawing_common
+import _drawing_balloons
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 import build_pd_paper_drive_assembly as assembly
 import draw_pd_paper_drive_assembly as drawing
 import dt_drive_train_steps
@@ -22,10 +25,8 @@ import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
 import pd_rack_pinion_spec as disc
 import pd_transgear_drive_collar_spec as collar
-import transgear_cluster_fit as cluster_fit
 import pd_transgear_front_bushing_spec as front_bushing
 import pd_transgear_feed_pinion_spec as feed_pinion
-import vn_transgear_knob_cup_pin_spec as cup_pin
 import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
 import vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
@@ -33,10 +34,9 @@ import vn_transgear_arm_plate_screw_spec as plate_screw
 import vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_transgear_rear_bushing_spec as rear_bushing
 import pd_transgear_removable_spec as sprocket
+import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
-from _assembly_contract import assembly_contract
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+import vn_transgear_knob_cup_pin_spec as cup_pin
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 # Default-format note text, measured on r743-rocker-fix3's render (leaf
@@ -408,7 +408,7 @@ def test_the_collar_leader_lands_on_its_rear_rim_beside_the_lower_end() -> None:
     assert landing[1] - minus_end[1] == pytest.approx((radius + view_y) / 2.0 / 1000.0)
     largest_scale = max(num / den for num, den in drawing.INNER_SCALE_LADDER)
     end_gap_m = (radius + view_y) * largest_scale / 1000.0
-    assert end_gap_m < _drawing_common._BALLOON_LANDING_TOLERANCE_M / 2.0
+    assert end_gap_m < _drawing_balloons._BALLOON_LANDING_TOLERANCE_M / 2.0
     # Below the axis is away from the feed sleeve: its stud stands above the knob.
     assert assembly.STUD_XY[1] > assembly.KNOB_SHAFT_XY[1]
 
@@ -494,10 +494,10 @@ def _ring_centres(
     ry = (outline[3] - outline[1]) / 2.0 + drawing.BALLOON_MARGIN
     thetas = [math.atan2(y - cy, x - cx) for _item, (x, y) in INNER_RING_180658]
     order = sorted(range(len(thetas)), key=thetas.__getitem__)
-    gap = _drawing_common._min_angular_gap(
-        min(rx, ry), BALLOON_RADIUS, clearance=_drawing_common._BALLOON_CLEARANCE_M
+    gap = _drawing_balloons._min_angular_gap(
+        min(rx, ry), BALLOON_RADIUS, clearance=_drawing_balloons._BALLOON_CLEARANCE_M
     )
-    angles = _drawing_common._push_apart_on_ring(
+    angles = _drawing_balloons._push_apart_on_ring(
         [thetas[index] for index in order], min_gap=gap
     )
     centres = [(0.0, 0.0)] * len(thetas)

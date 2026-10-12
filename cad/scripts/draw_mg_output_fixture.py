@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the output fixture collar.
 
 The SLDPRT remains authoritative.  This recipe supplies only the collar's
-views, diameter/station dimensions, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, diameter/station dimensions, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The output fixture is a small brass collar (Ø10 x 8) that slides the trace's
 vertical placement on the Ø5 output rod: a coaxial Ø5.2 slip bore and a Ø2.26
@@ -21,26 +21,26 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
-from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
-from _drawing_common import (
-    DrawingOutputs,
-    add_property_linked_note,
-    curate_view_dimensions,
-    finalize_drawing,
-    new_project_drawing,
-    read_required_properties,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    stamp_drawing_summary,
-)
-from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
 )
+
+from _check import check
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    stamp_drawing_summary,
+)
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_notes import add_property_linked_note
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 
 
 SPEC = DRAWINGS_BY_NAME["mg_output_fixture"]

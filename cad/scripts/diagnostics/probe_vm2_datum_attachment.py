@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import hashlib
-import importlib
 import json
 import math
 import os
@@ -81,19 +80,41 @@ def main():
         raise RuntimeError("explicit inventoried SolidWorks PID required")
     if os.environ.get("HARMONIC_REMOTE_CACHE_MODE") != "off":
         raise RuntimeError("disable remote cache transfers")
-    from _com import _early_bound
-    import _drawing_common as common
-    from _drawing_registry import DrawingLayout
-    from _gear_drawing_entities import visible_circle_edge
-    from diagnostics._owned_native_session import run_owned_diagnostic
+
     from solidworks_mcp.adapters.com_variant import null_callout
+    from solidworks_mcp.adapters.solidworks.drawing import dimension_name
+
+    from _buildgraph import module_deps_of
+    from _com import _early_bound
+    import _drawing_common
+    from _drawing_registry import DrawingLayout
+    import _drawing_selection
+    from _gear_drawing_entities import visible_circle_edge
     import _telemetry
+    from diagnostics._owned_native_session import run_owned_diagnostic
 
     async def probe(adapter):
         app = adapter.swApp
         if app.GetDocuments() or app.ActiveDoc is not None:
             raise RuntimeError("probe requires an empty inventory; no documents closed")
-        recipe = importlib.import_module(f"draw_{args.part}")
+        if args.part == "dt_pinion_lift_rod":
+            import draw_dt_pinion_lift_rod as recipe
+        else:
+            import draw_pd_rack_pinion as recipe
+        # The preparation recipe and direct probe calls both own implementation
+        # inputs, including the datum's transitive attachment/style helpers.
+        helper_scripts = [
+            Path(recipe.__file__),
+            *(ROOT / "cad/scripts" / name for name in (
+                "_com.py", "_drawing_common.py", "_drawing_gdt.py",
+                "_drawing_selection.py", "_gear_drawing_entities.py",
+            )),
+        ]
+        helper_paths = sorted({
+            path
+            for script in helper_scripts
+            for path in (str(script), *module_deps_of(script))
+        } - {str(Path(recipe.__file__))})
         source = recipe.SOURCE.resolve(strict=True)
         if source.parent != ROOT / "cad/out/sldprt":
             raise RuntimeError("source leaves own checkout")
@@ -108,7 +129,7 @@ def main():
             "adapter": subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "probe_sha256": digest(__file__),
             "recipe_sha256": digest(recipe.__file__),
-            "helper_sha256": digest(common.__file__),
+            "helper_sha256": {path: digest(path) for path in helper_paths},
             "pid": int(app.GetProcessID()), "revision": str(app.RevisionNumber()),
             "started_utc": datetime.now(timezone.utc).isoformat(),
             "status": "running", "scope": "partial diagnostic sheet, not acceptance",
@@ -162,7 +183,7 @@ def main():
                 name = "RodDia" if args.part == "dt_pinion_lift_rod" else "BoreDia"
                 annotations = [_early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()]
                 dimensions = [annotation for annotation in annotations if int(annotation.GetType()) == 4]
-                names = [common.dimension_name(adapter, annotation) for annotation in dimensions]
+                names = [dimension_name(adapter, annotation) for annotation in dimensions]
                 report["dimension_names"] = names
                 matches = [annotation for annotation, actual in zip(dimensions, names) if actual == name]
                 if len(matches) != 1:
@@ -192,7 +213,7 @@ def main():
                         if not dimension.Select3(False, null_callout()):
                             raise RuntimeError("failed native-control dimension selection")
                     else:
-                        common._select_annotation_entity(
+                        _drawing_selection._select_annotation_entity(
                             adapter, view, edge_xy=kwargs.get("edge_xy"),
                             edge_entity=None, entity=kwargs.get("entity"),
                             entity_type="EDGE", label=kwargs["label"],
@@ -244,7 +265,7 @@ def main():
                     if type(code) is not int or code != 0 or not path.is_file():
                         raise RuntimeError(f"diagnostic SaveAs3 rejected: {suffix}: {code!r}")
                     report["exports"][suffix]["sha256"] = digest(path)
-                common.render_pdf_png(
+                _drawing_common.render_pdf_png(
                     output / "partial.pdf",
                     output / "partial.png",
                     layout=DrawingLayout.LANDSCAPE,

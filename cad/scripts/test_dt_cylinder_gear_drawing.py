@@ -595,12 +595,12 @@ def _pattern_bindings(monkeypatch):
     monkeypatch.setattr(
         drawing, "dimension_name", lambda adapter, annotation: "PatternNotchPhase"
     )
-    import _drawing_common
+    import _drawing_dimensions
 
     monkeypatch.setattr(
-        _drawing_common._sw_type_info, "early_bound_or_flag", lambda value, *_names: value
+        _drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda value, *_names: value
     )
-    monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda adapter, label: None)
+    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda adapter, label: None)
     return SimpleNamespace(_attempt=lambda fn, default=None: fn())
 
 

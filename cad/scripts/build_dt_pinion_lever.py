@@ -61,16 +61,18 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
+from _drawing_dimension_insert import add_diametric_linear_dimension
+from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
-    add_diametric_linear_dimension,
-    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+)
+from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
-    set_dimension_prefix,
     set_dimension_symmetric_tolerance,
 )
+from _drawing_prefix import set_dimension_prefix
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties

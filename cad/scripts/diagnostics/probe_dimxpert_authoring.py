@@ -276,7 +276,7 @@ def _stage_datum(model: object, dim_part: object, *, set_length: bool) -> bool:
 
 async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object) -> bool:
     """Author datum + filled gtol, save the scratch part, import onto a sheet."""
-    from _drawing_common import _gtol_frame_xml
+    from _gtol_frame import gtol_frame_xml as _gtol_frame_xml
 
     planes = _faces_of_type(model, 4001)
     cylinders = _faces_of_type(model, 4002)

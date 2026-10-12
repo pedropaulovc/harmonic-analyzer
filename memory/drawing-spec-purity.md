@@ -33,7 +33,7 @@ symbols are the only roughness ink to migrate). A native model tolerance
 re-renders; `SetText` does not. That is the whole argument.
 
 **The mechanism already existed and was used by 2 of ~100 build scripts.**
-`_drawing_marks.set_dimension_{symmetric,bilateral}_tolerance` — read-back
+`_drawing_tolerances.set_dimension_{symmetric,bilateral}_tolerance` — read-back
 verified, `SetValues` in METERS internally — shipped in
 `build_vn_cone_pivot_screw.py` (whose drawing consequently ships
 `DIMENSION_CALLOUTS = {}`) and `build_vn_fillister_screw.py`. Everything else

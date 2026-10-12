@@ -2,13 +2,13 @@
 
 A construction-only reference sketch (a centre, an envelope, a location
 chord) renders in every assembly unless its part blanks it, so a part may
-save such sketches hidden.  The targeted import in ``_drawing_common`` then
+save such sketches hidden.  The targeted import in ``_drawing_dimension_import`` then
 delivers none of their marked dimensions, whatever ``HiddenFeatureDims``
 says (summing lever r17: BossAxialLocation, CylRefDia and
 SummationArcCentreX/Z missing).  This module is the opt-in fix.  A drawing
 whose part hides a dimension-carrying sketch imports its ``curate_view_dimensions``
-and ``part_sketches_shown`` from here instead.  ``_drawing_common`` stays
-untouched: every drawing's cache key depends on it, and this concerns a few.
+and ``part_sketches_shown`` from here instead.  ``_drawing_dimension_import`` stays
+untouched: this opt-in wrapper concerns only drawings with hidden reference sketches.
 
 The measured behaviour this code rests on (summing lever, SolidWorks 2026):
 
@@ -38,7 +38,7 @@ The measured behaviour this code rests on (summing lever, SolidWorks 2026):
   showed the sketch while the detail was created and curated (the detail
   read it Visible=2, children=0), yet the targeted import delivered none of
   its dimensions.  A derived view's items select through its BASE view's
-  qualifier (``_drawing_common._model_item_paths``), and in both drawings
+  qualifier (``_drawing_dimension_import._model_item_paths``), and in both drawings
   that projected base was created while the part hid the sketch.  So the
   r22 claim above is dead under {part shown at the detail's creation, base
   view created hidden, targeted import}.  ``base_view`` adds the variable
@@ -53,16 +53,19 @@ The measured behaviour this code rests on (summing lever, SolidWorks 2026):
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 import contextlib
 import hashlib
-from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-import _drawing_common as _dc
-import _telemetry
-from _com import _early_bound, _read_member
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
+import solidworks_mcp.adapters.solidworks.drawing as _sw_drawing
+
+from _com import _early_bound, _read_member
+import _drawing_common
+import _drawing_dimension_import
+import _telemetry
 
 # swVisibilityState_e
 _VISIBILITY_HIDDEN = 1
@@ -118,7 +121,7 @@ def _show_view_sketches(
 ) -> None:
     """Show ``sketches`` in ONE drawing view (per-view override), for good.
 
-    ``paths`` are ``_drawing_common._model_item_paths``' qualifiers; the first
+    ``paths`` are ``_drawing_dimension_import._model_item_paths``' qualifiers; the first
     that selects wins.
     """
     for sketch in sketches:
@@ -146,13 +149,13 @@ def _show_hidden_owners(
     adapter: Any, view: Any, features: Sequence[str], *, view_label: str
 ) -> list[str]:
     """Detect the view's part-hidden owner sketches and show them in the view."""
-    name = _dc.view_name(adapter, view)
+    name = _sw_drawing.view_name(adapter, view)
     hidden, report = _model_hidden_sketches(view, features)
     _telemetry.info(f"hidden-sketch check {name}: {report}; showing {hidden}")
     if not hidden:
         return []
     orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
-    if _dc.is_pictorial_orientation(orientation):
+    if _drawing_common.is_pictorial_orientation(orientation):
         raise RuntimeError(
             f"{view_label} ({name}): a pictorial view ({orientation}) must never "
             f"show a reference sketch, but it dimensions {hidden}"
@@ -162,7 +165,7 @@ def _show_hidden_owners(
     _show_view_sketches(
         adapter.currentModel,
         hidden,
-        paths=_dc._model_item_paths(adapter, view),
+        paths=_drawing_dimension_import._model_item_paths(adapter, view),
         label=name,
     )
     return hidden
@@ -219,7 +222,7 @@ def curate_view_dimensions(
     view_label: str,
     dimensions_by_feature: Mapping[str, Iterable[str]],
 ) -> list[Any]:
-    """``_drawing_common.curate_view_dimensions``, targeted form, for a view
+    """``_drawing_dimension_import.curate_view_dimensions``, targeted form, for a view
     whose part may hide the sketches that own ``keep``.
 
     Each childless part-hidden owner sketch is shown in this view before the
@@ -231,9 +234,9 @@ def curate_view_dimensions(
     """
     if not keep:
         return []
-    features = _dc._features_owning(dimensions_by_feature, keep, view_label=view_label)
+    features = _drawing_dimension_import._features_owning(dimensions_by_feature, keep, view_label=view_label)
     hidden = _show_hidden_owners(adapter, view, features, view_label=view_label)
-    named = _dc.insert_feature_dimensions(adapter, view, features)
+    named = _drawing_dimension_import.insert_feature_dimensions(adapter, view, features)
     annotations = [annotation for _, annotation in named]
     extra = tuple(sorted({name for name, _ in named if name and name not in keep}))
     unnamed = sum(1 for name, _ in named if not name)
@@ -244,17 +247,17 @@ def curate_view_dimensions(
             f"unnamed={unnamed}; deleting them"
         )
         if unnamed:
-            annotations = _dc.delete_unnamed_imports(adapter, annotations)
-    curated = _dc.curate_dimensions(
+            annotations = _drawing_dimension_import.delete_unnamed_imports(adapter, annotations)
+    curated = _sw_drawing.curate_dimensions(
         adapter, annotations, delete=extra, reposition=dict(keep)
     )
-    names = [_dc.dimension_name(adapter, annotation) for annotation in curated]
+    names = [_sw_drawing.dimension_name(adapter, annotation) for annotation in curated]
     present = set(names)
     missing = sorted(set(keep) - present)
     if missing:
         _warn_undetected_owners(
             view,
-            _dc._features_owning(dimensions_by_feature, missing, view_label=view_label),
+            _drawing_dimension_import._features_owning(dimensions_by_feature, missing, view_label=view_label),
             view_label=view_label,
         )
         raise RuntimeError(
@@ -262,14 +265,14 @@ def curate_view_dimensions(
             f"available={sorted(present)} from features={list(features)}"
         )
     if (
-        _dc._reposition_rerun_reason(
+        _drawing_dimension_import._reposition_rerun_reason(
             adapter, curated, names, keep, deleted=bool(extra)
         )
         != "none"
     ):
-        # See ``_drawing_common.curate_view_dimensions``: a pass that deleted,
+        # See ``_drawing_dimension_import.curate_view_dimensions``: a pass that deleted,
         # or a kept dimension read back off its point, is placed again.
-        curated = _dc.curate_dimensions(adapter, curated, reposition=dict(keep))
+        curated = _sw_drawing.curate_dimensions(adapter, curated, reposition=dict(keep))
     part_shown = [sketch for block in _PART_SHOWN for sketch in block.sketches]
     if hidden or part_shown:
         _assert_dimensions_visible(adapter, curated, hidden, view_label=view_label)
@@ -294,7 +297,7 @@ def curate_view_dimensions(
         block.annotations.extend(
             (view_label, item, annotation)
             for annotation in curated
-            if (item := _dc.dimension_name(adapter, annotation)) in owned
+            if (item := _sw_drawing.dimension_name(adapter, annotation)) in owned
         )
     return curated
 
@@ -303,7 +306,7 @@ def _assert_dimensions_visible(
     adapter: Any, curated: Sequence[Any], hidden: Sequence[str], *, view_label: str
 ) -> None:
     states = {
-        _dc.dimension_name(adapter, annotation): int(
+        _sw_drawing.dimension_name(adapter, annotation): int(
             _read_member(_early_bound(annotation, "IAnnotation"), "Visible")
         )
         for annotation in curated
@@ -357,9 +360,9 @@ def _show_base_view_sketches(
 ) -> None:
     """Show ``sketches`` per view, for good, in the projected view a derived
     view is cut from: the derived view's items select through it."""
-    name = _dc.view_name(adapter, view)
+    name = _sw_drawing.view_name(adapter, view)
     orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
-    if _dc.is_pictorial_orientation(orientation):
+    if _drawing_common.is_pictorial_orientation(orientation):
         raise RuntimeError(
             f"{label}: a pictorial base view {name} ({orientation}) must never "
             f"show a reference sketch, but {list(sketches)} were asked for"
@@ -369,7 +372,7 @@ def _show_base_view_sketches(
     _show_view_sketches(
         adapter.currentModel,
         sketches,
-        paths=_dc._model_item_paths(adapter, view),
+        paths=_drawing_dimension_import._model_item_paths(adapter, view),
         label=name,
     )
     _telemetry.info(f"{label}: sketches {list(sketches)} shown in base view {name}")

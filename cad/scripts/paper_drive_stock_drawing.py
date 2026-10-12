@@ -20,15 +20,13 @@ from typing import Any, NamedTuple
 
 import _telemetry
 from _com import _com_invoke, _early_bound
-from _drawing_common import (
-    _VIEW_ENTITY_EDGE,
-    _assert_leader_lands,
-    _select_view_entity,
-    model_point_in_view,
-    property_link,
-    rebuild_drawing,
-    visible_view_entities,
-)
+from _drawing_attachment import _assert_leader_lands
+from _drawing_balloons import _VIEW_ENTITY_EDGE
+from _drawing_common import rebuild_drawing
+from _drawing_edges import visible_view_entities
+from _drawing_notes import property_link
+from _drawing_projection import model_point_in_view
+from _drawing_selection import _select_view_entity
 from paper_drive_stock_inspection import toothspace_gauge_contact_mm
 from stock_form_cutter import StockFormProfile
 

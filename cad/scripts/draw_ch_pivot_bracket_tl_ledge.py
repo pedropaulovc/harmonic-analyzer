@@ -16,26 +16,31 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_native_hole_callout,
-    add_property_linked_note,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import drill_process
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from ch_pivot_bracket_tl_ledge_spec import (
     CLEARANCE_SPEC,
     DRAWING_DIMENSIONS,
@@ -46,7 +51,6 @@ from ch_pivot_bracket_tl_ledge_spec import (
     LEDGE_HEIGHT,
     LEDGE_WIDTH,
 )
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 SPEC = DRAWINGS_BY_NAME["ch_pivot_bracket_tl_ledge"]
 PART_STEM = SPEC.artifact_stem

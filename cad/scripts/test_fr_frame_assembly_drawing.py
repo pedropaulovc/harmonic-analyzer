@@ -43,7 +43,8 @@ from types import SimpleNamespace  # noqa: E402
 
 import pytest  # noqa: E402
 
-import _drawing_common  # noqa: E402
+import _drawing_projection  # noqa: E402
+import _telemetry  # noqa: E402
 
 GET_MATH_UTILITY = (132, 0, 1, (9, 0), ())
 MODEL_TO_VIEW_TRANSFORM = (221, 0, 2, (9, 0), ())
@@ -116,7 +117,7 @@ class Projection:
 def test_a_batch_projects_every_point_through_one_transform_read() -> None:
     projection = Projection()
     points = [(0.010, 0.020, 0.030), (0.100, 0.0, 0.0), (-0.050, 0.050, 0.0)]
-    sheet = _drawing_common.model_points_in_view(
+    sheet = _drawing_projection.model_points_in_view(
         projection.adapter, projection.view, points, label="batch"
     )
     flat = [value for xy in sheet for value in xy]
@@ -128,7 +129,7 @@ def test_a_batch_projects_every_point_through_one_transform_read() -> None:
 
 def test_one_point_projects_to_the_same_sheet_position_as_a_batch() -> None:
     projection = Projection()
-    assert _drawing_common.model_point_in_view(
+    assert _drawing_projection.model_point_in_view(
         projection.adapter, projection.view, (0.010, 0.020, 0.030), label="one"
     ) == pytest.approx((0.146, 0.102))
 
@@ -136,11 +137,11 @@ def test_one_point_projects_to_the_same_sheet_position_as_a_batch() -> None:
 def test_a_failed_point_names_its_index_identity_and_progress(monkeypatch) -> None:
     recorded = {}
     monkeypatch.setattr(
-        _drawing_common._telemetry, "annotate", lambda **attrs: recorded.update(attrs)
+        _telemetry, "annotate", lambda **attrs: recorded.update(attrs)
     )
     projection = Projection(fail_at=2)
     with pytest.raises(RuntimeError) as failure:
-        _drawing_common.model_points_in_view(
+        _drawing_projection.model_points_in_view(
             projection.adapter,
             projection.view,
             [(0.0, 0.0, 0.0), (0.001, 0.0, 0.0), (0.002, 0.0, 0.0)],

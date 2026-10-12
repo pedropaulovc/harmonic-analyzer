@@ -19,32 +19,39 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
+from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
-    add_property_linked_note,
-    add_surface_finish,
-    add_view_centerline,
-    assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_arc_endpoints_to_max,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_arc_endpoints_to_max,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_finish import add_surface_finish
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_pinion_cam_pin_spec import (
     CAP_RADIUS,
     CAP_SAG,
@@ -55,10 +62,6 @@ from dt_pinion_cam_pin_spec import (
     PIN_DIA_CALLOUT,
     PIN_LEN,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

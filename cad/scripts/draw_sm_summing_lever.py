@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the summing lever.
 
 The SLDPRT remains authoritative.  This recipe supplies only the summing-lever
-views, dimension layout, hole callouts, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, dimension layout, hole callouts, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 A large green cast-iron first-class lever hung on hex knife-edge trunnions (no
 bore): a coefficients plate on the +X arm carrying the 20 channel-spring anchor
@@ -25,42 +25,49 @@ import argparse
 import sys
 from typing import Any
 
-from sm_summing_lever_spec import GEOMETRIC_TOLERANCES_MM
+from solidworks_mcp.adapters.solidworks.drawing import (
+    place_view,
+)
 
-import _telemetry
-from _hole_spec import blind_cut_dia_mm
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
-    ViewEdge,
-    _early_bound,
-    ViewEdges,
-    add_datum_feature,
-    add_edge_dimension,
-    add_feature_control_frame,
-    add_native_hole_callout,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_dimension_measures,
-    curate_view_dimensions,
-    create_blank_drawing_sheets,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    scan_view_edges,
-    set_basic_dimension,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_basic_dimension
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_view_display import set_hidden_lines_removed
+from _hole_spec import blind_cut_dia_mm
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
+from magnifying_bracket_joint_layout import (
+    DRILL_DEPTH,
+    DRILL_DEPTH_BAND,
+    LEVER_HOLE_POINTS,
+    TAP_DRILL_DIA,
+    THREAD_DEPTH,
+    THREAD_DEPTH_BAND,
+)
 from sm_summing_lever_spec import (
     ANCHOR_H,
     ANCHOR_R,
     CHANNEL_PITCH,
     COUNTER_HOLE_SPEC,
+    GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HEX_H,
     HOLE_COUNT,
@@ -74,14 +81,6 @@ from sm_summing_lever_spec import (
     PLATE_W,
     SURFACE_FINISHES,
     TIP_X,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    place_view,
-)
-
-from magnifying_bracket_joint_layout import (
-    LEVER_HOLE_POINTS, TAP_DRILL_DIA, THREAD_DEPTH, DRILL_DEPTH,
-    THREAD_DEPTH_BAND, DRILL_DEPTH_BAND,
 )
 
 SPEC = DRAWINGS_BY_NAME["sm_summing_lever"]

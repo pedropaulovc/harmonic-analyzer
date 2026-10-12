@@ -15,31 +15,38 @@ import sys
 import textwrap
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
-    add_note,
-    add_property_linked_note,
-    assert_imported_precision,
-    curate_view_dimensions,
-    create_section_view,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
-    property_link,
     read_required_properties,
     rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_notes import add_property_linked_note, property_link
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_drive_collar_spec import (
     BODY_SUPPLY_NOTE,
@@ -56,11 +63,6 @@ from pd_transgear_drive_collar_spec import (
     PILOT_LENGTH,
     PIN_CIRCLE_RADIUS,
     PIN_HOLE_CALLOUT,
-)
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_drive_collar"]

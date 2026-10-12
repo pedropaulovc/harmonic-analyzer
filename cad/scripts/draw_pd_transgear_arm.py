@@ -26,39 +26,47 @@ import re
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
+
 import _config
-import _drawing_hidden_sketches as hidden_sketches
-import _telemetry
-import transgear_hanger_joints as joints
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
-    add_native_hole_callout,
-    add_property_linked_note,
-    PmiDrawingPlacement,
-    assert_imported_precision,
-    create_section_view,
     finalize_drawing,
     new_project_drawing,
-    model_point_in_view,
-    project_part_pmi,
     read_required_properties,
     rebuild_drawing,
+    stamp_drawing_summary,
+)
+from _drawing_dimensions import (
+    assert_imported_precision,
     set_arc_endpoints_to_max,
     set_dimension_callouts,
-    set_hidden_lines_removed,
     set_reference_dimension,
     set_reference_dimensions,
-    stamp_drawing_summary,
-    visible_view_entities,
 )
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edges import visible_view_entities
+from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
+import _drawing_hidden_sketches as hidden_sketches
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _native_projected_zone import require_saved_projected_gtols
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _native_projected_zone import require_saved_projected_gtols
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
+from pd_paper_drive_assembly_steps import matched_locator_notes
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
@@ -90,13 +98,7 @@ from pd_transgear_arm_spec import (
     STOCK_TEXT_SUFFIX,
     engagement_line,
 )
-from pd_paper_drive_assembly_steps import matched_locator_notes
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    dimension_name,
-    place_view,
-)
+import transgear_hanger_joints as joints
 
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_arm"]

@@ -24,35 +24,35 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
+from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
-    add_datum_feature,
-    add_feature_control_frame,
-    add_property_linked_note,
-    add_surface_finish,
-    add_view_centerline,
-    assert_imported_precision,
-    dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
     view_name,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_leader_notes import add_attached_note
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_resolve import resolve_faces
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
 from pd_transgear_knob_shaft_spec import (
     CHAMFER_CALLOUT,
@@ -85,8 +85,6 @@ from pd_transgear_knob_shaft_spec import (
     TIP_STATION,
     TIP_Z,
 )
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_knob_shaft"]
 PART_STEM = SPEC.artifact_stem

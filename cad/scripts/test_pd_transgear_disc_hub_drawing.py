@@ -7,36 +7,36 @@ import asyncio
 import importlib.util
 import itertools
 import math
-import re
 from pathlib import Path
+import re
 from types import SimpleNamespace
 
 import pytest
 
 import _appearance
+from _assembly_contract import assembly_contract
 import _bore_axis
 import _check
+import _config
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+import _drawing_edges
+from _drawing_registry import DRAWINGS_BY_NAME
+import _gtol_face
+from _layout_geometry import Box, estimate_text_box
 import _part_properties
 import _part_save
+import _printed_tolerance
 import _rebuild
 import _sketch
 import _sketch_chains
 import _sketch_circle
 import _sketch_rectangle
-import _config
-import _drawing_common
-import _gtol_face
-import _printed_tolerance
 import build_pd_transgear_disc_hub as part
 import draw_pd_transgear_disc_hub as drawing
 import pd_paper_drive_assembly_steps as steps
-import transgear_cluster_fit as cluster_fit
 import pd_transgear_disc_hub_geometry as joint
 import pd_transgear_disc_hub_spec as spec
-from _assembly_contract import assembly_contract
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME
-from _layout_geometry import Box, estimate_text_box
+import transgear_cluster_fit as cluster_fit
 
 WALL_FLOOR = 2.0
 DRILL_PLUS = _config.title_block("drilled_hole")["plus_mm"]
@@ -423,7 +423,7 @@ def test_each_frame_lands_square_on_its_face_clear_of_corners_and_text() -> None
 
 
 def _circle(radius: float, z: float, *, x: float = 0.0, axis_z: float = 1.0):
-    return _drawing_common.ViewEdge(
+    return _drawing_edges.ViewEdge(
         edge=object(),
         line=None,
         circle=(x, 0.0, z, 0.0, 0.0, axis_z, radius),
@@ -444,16 +444,16 @@ def test_face_rim_resolves_exactly_one_circle_on_the_hub_axis() -> None:
         _circle(spec.SCREW_HOLE_DIA / 2.0, 0.0, x=spec.BOLT_CIRCLE_DIA / 2.0),
         _circle(radius + 0.001, 0.0),
     )
-    edges = _drawing_common.ViewEdges(label="edge", edges=(*neighbours, rim))
+    edges = _drawing_edges.ViewEdges(label="edge", edges=(*neighbours, rim))
     assert drawing.face_rim(edges, frame) is rim
-    lone = _drawing_common.ViewEdges(label="edge", edges=neighbours)
+    lone = _drawing_edges.ViewEdges(label="edge", edges=neighbours)
     with pytest.raises(RuntimeError, match=r"matched 0 of 4 circles: .*r 12\.5510 at"):
         drawing.face_rim(lone, frame)
-    split = _drawing_common.ViewEdges(label="edge", edges=(rim, _circle(radius, 0.0)))
+    split = _drawing_edges.ViewEdges(label="edge", edges=(rim, _circle(radius, 0.0)))
     with pytest.raises(RuntimeError, match="matched 2 of 2"):
         drawing.face_rim(split, frame)
     with pytest.raises(RuntimeError, match="matched 0 of 0 circles: none"):
-        drawing.face_rim(_drawing_common.ViewEdges(label="edge", edges=()), frame)
+        drawing.face_rim(_drawing_edges.ViewEdges(label="edge", edges=()), frame)
 
 
 def _surface_face(
@@ -488,7 +488,7 @@ def _cylinder(radius_mm: float):
 
 def _rim_between(*faces):
     edge = SimpleNamespace(GetTwoAdjacentFaces2=lambda: faces)
-    return _drawing_common.ViewEdge(edge=edge, line=None, circle=None, vertices=None)
+    return _drawing_edges.ViewEdge(edge=edge, line=None, circle=None, vertices=None)
 
 
 @pytest.mark.parametrize("plane_first", [False, True])

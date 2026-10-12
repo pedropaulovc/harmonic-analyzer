@@ -35,13 +35,9 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_rectangle import define_centered_rectangle
-from _drawing_marks import (
-    add_diametric_linear_dimension,
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-)
+from _drawing_dimension_insert import add_diametric_linear_dimension
+from _drawing_precision import apply_drawing_precision
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry

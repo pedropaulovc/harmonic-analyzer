@@ -353,7 +353,7 @@ def test_reamed_pin_hole_band_prints_at_the_value_s_places(
     under a value authored at three.  The part build re-sets PinHoleDia's
     tolerance places from the same DRAWING_PRECISION entry as its value's,
     after both the band and the value places are authored."""
-    import _drawing_marks
+    import _drawing_tolerances
     import inspect
 
     from _fit_deviations import deviations
@@ -363,7 +363,7 @@ def test_reamed_pin_hole_band_prints_at_the_value_s_places(
         "PinHoleDia"
     ]
     # The defect: left to the shared setter the band reads +0.01/0.00.
-    assert _drawing_marks._tolerance_places(*deviations(spec.PIN_HOLE_BAND)) == 2
+    assert _drawing_tolerances._tolerance_places(*deviations(spec.PIN_HOLE_BAND)) == 2
     assert value_places == 3
 
     calls: list[tuple[int, int, int, int]] = []

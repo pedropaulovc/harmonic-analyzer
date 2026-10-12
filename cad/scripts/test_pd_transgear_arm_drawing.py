@@ -25,7 +25,7 @@ import transgear_hanger_joints as joints
 import vn_transgear_latch_pin_spec as pin
 import pd_transgear_pin_spec as cluster_pin
 import vn_transgear_pivot_screw_spec as pivot_screw
-from _drawing_common import DRAWING_TEMPLATES
+from _drawing_registry import DRAWING_TEMPLATES
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
