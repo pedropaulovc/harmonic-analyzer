@@ -4,6 +4,7 @@ from itertools import product
 import math
 import re
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -32,6 +33,7 @@ import vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 import vn_transgear_arm_plate_screw_spec as plate_screw
 import vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_transgear_rear_bushing_spec as rear_bushing
+from _test_stubbed_build import stub_seat
 import pd_transgear_removable_spec as sprocket
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
@@ -1719,3 +1721,44 @@ def test_native_rack_readback_rejects_wrong_cut_datum_or_end_overrun(
         assembly._assert_native_rack_operating_pose(
             object(), domain, "actual-rack", "actual-stud"
         )
+
+
+class _DrawnInstance:
+    def __init__(self, name: str) -> None:
+        self.instance = name
+        self.Name = f"pd-paper-drive/{name}@pd-paper-drive"
+        self.Visible = None  # never written: the sheet's default
+
+
+def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(
+        monkeypatch, drawing,
+        keep=("_place_assembled_sheet", "_hide_instances", "_set_instance_visibility"),
+    )
+    seat._early_bound.side_effect = lambda obj, _interface: obj
+    cx = sum(drawing.ISO_RING_LIMITS[0::2]) / 2.0
+    cy = sum(drawing.ISO_RING_LIMITS[1::2]) / 2.0
+    seat._native_outline_at.return_value = (
+        lambda _scale: (cx - 0.001, cy - 0.001, cx + 0.001, cy + 0.001)
+    )
+    names = (drawing.SPARE_INSTANCE, "pd-transgear-removable-1", "pd-platen-rack-1")
+    views: dict[str, tuple[object, list[_DrawnInstance]]] = {}
+
+    def place_view(_adapter, _path, orientation, _x, _y, *, scale):
+        drawn = [_DrawnInstance(name) for name in names]
+        root = SimpleNamespace(GetChildren=lambda: tuple(drawn))
+        views[orientation] = (SimpleNamespace(RootDrawingComponent2=lambda _all: root), drawn)
+        return views[orientation][0]
+
+    seat.place_view.side_effect = place_view
+    iso = drawing._place_assembled_sheet(MagicMock())
+
+    assert set(views) == {"*Front", "*Right", "*Isometric"}
+    for orientation in ("*Front", "*Right"):
+        shown = {drawn.instance: drawn.Visible for drawn in views[orientation][1]}
+        assert shown == {name: name != drawing.SPARE_INSTANCE for name in names}
+    # The returned isometric is the ballooned one, its instances untouched.
+    assert iso is views["*Isometric"][0]
+    assert all(drawn.Visible is None for drawn in views["*Isometric"][1])

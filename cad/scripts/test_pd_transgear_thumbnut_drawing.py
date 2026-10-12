@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import importlib.util
 import math
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,6 +21,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWINGS_BY_NAME
 from _printed_tolerance import printed_band_mm
+from _test_stubbed_build import offline_adapter, stub_seat
 
 # The B landscape template's inner border, left edge (sheet metres).
 SHEET_INNER_LEFT = 0.0127
@@ -715,3 +718,25 @@ def test_native_countersink_control_refuses_unwritten_or_obsolete_geometry(
 ) -> None:
     with pytest.raises(RuntimeError, match=message):
         _apply_countersink_max(monkeypatch, tolerance, diameter=diameter)
+
+
+def test_build_places_the_cone_angle_on_the_section_after_its_callouts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.SLDPRT"
+    source.write_bytes(b"")
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    seat = stub_seat(monkeypatch, drawing)
+    monkeypatch.setattr(drawing, "_assert_native_thread", MagicMock())
+    seat.new_project_drawing.return_value = (MagicMock(), MagicMock())
+    seat.curate_view_dimensions.side_effect = (
+        lambda _adapter, _view, *, view_label, **_kwargs: [f"{view_label} dimension"]
+    )
+    asyncio.run(drawing.build(offline_adapter()))
+
+    (placed,) = seat._place_countersink_angle.call_args_list
+    assert placed.args[1] == ["axial section dimension"]
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    angle = names.index("_place_countersink_angle")
+    callouts = [k for k, name in enumerate(names) if name == "set_dimension_callouts"]
+    assert len(callouts) == 2 and max(callouts) < angle < names.index("finalize_drawing")
