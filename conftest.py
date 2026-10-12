@@ -236,3 +236,36 @@ def _solidworks_autostart_off(monkeypatch):
     logic sets the variable itself and patches the lifecycle calls it reaches.
     """
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+
+
+@pytest.fixture
+def saved_native_bytes():
+    """Build the observed native DisplayLists envelope for parser-backed tests."""
+    import struct
+    import zlib
+
+    def native(*flags):
+        records = []
+        for index, flag in enumerate(flags or (1,)):
+            path = rf"C:\parts\part-{index}.SLDPRT".encode("utf-16le")
+            records.append(
+                b"\xff\xfe\xff"
+                + bytes([len(path) // 2])
+                + path
+                + b"\x00" * 8
+                + struct.pack("<IdI", 6, 1000.0, flag)
+            )
+        data = b"".join(records)
+        compressor = zlib.compressobj(wbits=-15)
+        payload = compressor.compress(data) + compressor.flush()
+        name = b"Contents/DisplayLists"
+        swapped = bytes(((byte << 4) & 0xF0) | (byte >> 4) for byte in name)
+        return (
+            bytes.fromhex("140006000800")
+            + b"\x00" * 4
+            + struct.pack("<4I", zlib.crc32(data), len(payload), len(data), len(name))
+            + swapped
+            + payload
+        )
+
+    return native

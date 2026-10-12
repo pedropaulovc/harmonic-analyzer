@@ -10,6 +10,10 @@ _DISPLAY_LISTS = "Contents/DisplayLists"
 _MAX_DISPLAY_BYTES = 64 * 1024 * 1024
 
 
+class IncompleteSavedDisplayData(RuntimeError):
+    """Supported native records have zero flags; the entire parsed layout is valid."""
+
+
 def _inflate(data: mmap.mmap, start: int, end: int) -> bytes:
     """Bound raw-deflate expansion; require exactly one complete compressed stream."""
     inflater = zlib.decompressobj(-15)
@@ -86,8 +90,8 @@ def _display_streams(data: mmap.mmap):
                 raise ValueError(f"{name} at file offset {offset}: {exc}") from exc
 
 
-def _assert_flags(data: bytes, stream_offset: int) -> None:
-    """Recognize the observed short UTF-16 string form, not arbitrary UTF-16 bytes.
+def _assert_flags(data: bytes, stream_offset: int) -> str | None:
+    """Validate every observed record, returning the first supported zero flag.
 
     The encoded length counts UTF-16 code units (not Python characters). A part
     path's uint32 flag is 20 bytes after its encoded end. Native v37/v40 part
@@ -96,6 +100,7 @@ def _assert_flags(data: bytes, stream_offset: int) -> None:
     """
     cursor = 0
     records = 0
+    incomplete = None
     while (offset := data.find(_STRING_MARKER, cursor)) != -1:
         context = f"DisplayLists at file offset {stream_offset}, string offset {offset}"
         if offset + 4 > len(data):
@@ -129,14 +134,15 @@ def _assert_flags(data: bytes, stream_offset: int) -> None:
         flag = struct.unpack_from("<I", data, end + 20)[0]
         if flag not in (0, 1):
             raise ValueError(f"{context}: unsupported display flag={flag} for {text!r}")
-        if flag == 0:
-            raise ValueError(f"{context}: saved display flag=0 for {text!r}")
+        if flag == 0 and incomplete is None:
+            incomplete = f"{context}: saved display flag=0 for {text!r}"
         records += 1
         cursor = end + 24
     if records == 0:
         raise ValueError(
             f"DisplayLists at file offset {stream_offset}: no recognizable part records"
         )
+    return incomplete
 
 
 def assert_saved_display_data(path: Path) -> None:
@@ -158,16 +164,28 @@ def assert_saved_display_data(path: Path) -> None:
     their nested parts have their own .SLDPRT records in the same display list.
     Nested/overlapping serialized strings and unknown layouts/extended lengths
     are refused. Markers inside stored container payloads are not separate entries.
+    Supported zero flags raise ``IncompleteSavedDisplayData`` only after every
+    stream and record passes structural validation; other failures are not
+    eligible for native regeneration.
     """
     try:
+        incomplete = None
         with path.open("rb") as source:
             with mmap.mmap(source.fileno(), 0, access=mmap.ACCESS_READ) as data:
                 streams = 0
                 for offset, display_data in _display_streams(data):
-                    _assert_flags(display_data, offset)
+                    missing = _assert_flags(display_data, offset)
+                    if incomplete is None:
+                        incomplete = missing
                     streams += 1
                 if streams == 0:
                     raise ValueError("no Contents/DisplayLists streams found")
+        if incomplete is not None:
+            raise IncompleteSavedDisplayData(
+                f"Saved assembly display-data gate failed for {path}: {incomplete}. "
+                "Regenerate and save the assembly with valid display data before "
+                "publishing."
+            )
     except (OSError, ValueError) as exc:
         raise RuntimeError(
             f"Saved assembly display-data gate failed for {path}: {exc}. "

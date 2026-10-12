@@ -101,12 +101,12 @@ def test_new_assembly_save_is_silent_copy_without_references(tmp_path: Path) -> 
 
 @pytest.mark.parametrize("stale_field", ["Title", "Number", "Revision"])
 def test_in_place_save_restamps_stale_metadata_and_forces_the_save(
-    tmp_path: Path, monkeypatch, stale_field
+    tmp_path: Path, monkeypatch, stale_field, saved_native_bytes
 ) -> None:
     import _assembly
 
     sldasm = tmp_path / "fr-frame.SLDASM"
-    sldasm.write_bytes(b"old")
+    sldasm.write_bytes(saved_native_bytes())
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
     monkeypatch.setattr(
         _assembly, "rebuild_if_needed_before_save", lambda *_args: None
@@ -123,7 +123,7 @@ def test_in_place_save_restamps_stale_metadata_and_forces_the_save(
     model.GetSaveFlag = lambda: True
 
     def save3(_options: int, _err: int, _warn: int):
-        sldasm.write_bytes(b"new")
+        sldasm.write_bytes(saved_native_bytes(1, 1))
         import os
 
         stat = sldasm.stat()
@@ -133,25 +133,30 @@ def test_in_place_save_restamps_stale_metadata_and_forces_the_save(
     model.Save3 = save3
 
     assert _assembly.save_assembly_in_place(adapter, "fr-frame", False) is True
-    assert sldasm.read_bytes() == b"new"
+    assert sldasm.read_bytes() == saved_native_bytes(1, 1)
     assert model.summary[0] == "fr-frame"
     assert model.props["Number"] == assembly_contract("fr-frame").number
     assert model.props["Revision"] == _config.release_revision()
 
 
 def test_in_place_save_leaves_current_identity_and_title_untouched(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch, saved_native_bytes
 ) -> None:
     import _assembly
 
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    target = tmp_path / "fr-frame.SLDASM"
+    original = saved_native_bytes()
+    target.write_bytes(original)
     adapter = _Adapter()
     model = adapter.currentModel
     model.props["Revision"] = _config.release_revision()
     model.props["Number"] = assembly_contract("fr-frame").number
     model.summary[0] = "fr-frame"
+    model.Save3 = lambda *_args: pytest.fail("clean complete assembly was saved")
 
     assert _assembly.save_assembly_in_place(adapter, "fr-frame", False) is False
+    assert target.read_bytes() == original
 
 
 def test_copy_source_is_discarded_by_document_title() -> None:
@@ -161,3 +166,69 @@ def test_copy_source_is_discarded_by_document_title() -> None:
 
     assert adapter.swApp.closed == ["Assembly1"]
     assert adapter.currentModel is None
+
+
+@pytest.mark.parametrize(
+    "result",
+    [(False, 0, 0), (True, 8, 0), True, [True, 0, 0], (1, 0, 0), (True, "0", 0)],
+)
+def test_in_place_native_save_failure_never_returns_success(
+    tmp_path, monkeypatch, result, saved_native_bytes
+) -> None:
+    import _assembly
+
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    monkeypatch.setattr(_assembly, "rebuild_if_needed_before_save", lambda *_args: None)
+    adapter = _Adapter()
+    model = adapter.currentModel
+    target = tmp_path / "fr-frame.SLDASM"
+    original = saved_native_bytes()
+    target.write_bytes(original)
+    proof = tmp_path / ".fr-frame.massprops.sha"
+    proof.write_text("stale-proof\n", encoding="utf-8")
+    calls = []
+    model.Save3 = lambda *_args: calls.append(True) or result
+    with pytest.raises(RuntimeError, match="Save3"):
+        _assembly.save_assembly_in_place(adapter, "fr-frame", True)
+    assert calls == [True]
+    assert target.read_bytes() == original
+    assert not proof.exists()
+
+
+def test_native_save_warnings_are_nonfatal_and_logged(monkeypatch) -> None:
+    import _assembly
+
+    adapter = _Adapter()
+    adapter.currentModel.Save3 = lambda *_args: (True, 0, 4)
+    messages = []
+    monkeypatch.setattr(_assembly._telemetry, "info", messages.append)
+    assert _assembly._save_native_assembly(adapter, adapter.currentModel, "fr-frame", 1) == (
+        True, 0, 4
+    )
+    assert any("warnings=4" in message for message in messages)
+
+
+@pytest.mark.parametrize(
+    ("flag", "changed"), [(0, False), (2, False), (2, True)]
+)
+def test_in_place_preflight_refuses_unrepairable_or_unchanged_incomplete_bytes(
+    tmp_path, monkeypatch, saved_native_bytes, flag, changed
+) -> None:
+    import _assembly
+
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    adapter = _Adapter()
+    model = adapter.currentModel
+    model.props["Revision"] = _config.release_revision()
+    model.props["Number"] = assembly_contract("fr-frame").number
+    model.summary[0] = "fr-frame"
+    model.Save3 = lambda *_args: pytest.fail("invalid saved data reached native save")
+    target = tmp_path / "fr-frame.SLDASM"
+    original = saved_native_bytes(flag)
+    target.write_bytes(original)
+    proof = tmp_path / ".fr-frame.massprops.sha"
+    proof.write_text("old-proof\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="display"):
+        _assembly.save_assembly_in_place(adapter, "fr-frame", changed)
+    assert target.read_bytes() == original
+    assert proof.read_text(encoding="utf-8") == "old-proof\n"

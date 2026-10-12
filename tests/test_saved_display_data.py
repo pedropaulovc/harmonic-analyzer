@@ -55,10 +55,14 @@ def _save(tmp_path: Path, data: bytes) -> Path:
     return path
 
 
-def _reject(tmp_path: Path, data: bytes, message: str) -> None:
+def _reject(
+    tmp_path: Path, data: bytes, message: str, *, incomplete: bool = False
+) -> None:
     path = _save(tmp_path, data)
     with pytest.raises(RuntimeError, match=message) as failure:
         gate.assert_saved_display_data(path)
+    expected = gate.IncompleteSavedDisplayData if incomplete else RuntimeError
+    assert type(failure.value) is expected
     assert str(path) in str(failure.value)
     assert "Regenerate and save" in str(failure.value)
     assert path.read_bytes() == data
@@ -90,7 +94,7 @@ def test_legitimate_zero_flag_subassembly_is_excluded(tmp_path):
 
 
 def test_reports_hidden_component_path(tmp_path):
-    _reject(tmp_path, _stream(_record(flag=0)), r"flag=0.*pin\.SLDPRT")
+    _reject(tmp_path, _stream(_record(flag=0)), r"flag=0.*pin\.SLDPRT", incomplete=True)
 
 
 @pytest.mark.parametrize("bad_first", [True, False])
@@ -98,18 +102,18 @@ def test_inspects_every_display_stream_not_just_largest(tmp_path, bad_first):
     good = _stream(_record() * 10)
     bad = _stream(_record(r"C:\parts\hidden.SLDPRT", 0))
     data = bad + good if bad_first else good + bad
-    _reject(tmp_path, data, r"flag=0.*hidden\.SLDPRT")
+    _reject(tmp_path, data, r"flag=0.*hidden\.SLDPRT", incomplete=True)
 
 
 def test_inspects_every_component_record(tmp_path):
     data = _record() + _record(r"C:\parts\other.sldprt", 0)
-    _reject(tmp_path, _stream(data), r"flag=0.*other\.sldprt")
+    _reject(tmp_path, _stream(data), r"flag=0.*other\.sldprt", incomplete=True)
 
 
 @pytest.mark.parametrize("name", [r"C:\部品\轴.SLDPRT", r"C:\parts\gear-🔧.sldprt"])
 def test_unicode_paths_count_utf16_units_not_python_characters(tmp_path, name):
     gate.assert_saved_display_data(_save(tmp_path, _stream(_record(name))))
-    _reject(tmp_path, _stream(_record(name, 0)), "flag=0")
+    _reject(tmp_path, _stream(_record(name, 0)), "flag=0", incomplete=True)
 
 
 @pytest.mark.parametrize(
@@ -277,3 +281,23 @@ def test_unverified_directory_like_data_does_not_hide_damage(tmp_path):
     local = _stream(_record())
     data = b"\x00" * 12 + local + _directory_copy(local, reference=999999)
     _reject(tmp_path, data, "display-data gate failed")
+
+
+@pytest.mark.parametrize("later_stream", [False, True])
+@pytest.mark.parametrize(
+    ("bad", "message"),
+    [
+        (_record("unknown.SLDPRT", 2), "unsupported display flag"),
+        (b"\xff\xfe\xff", "truncated string length"),
+    ],
+)
+def test_zero_does_not_mask_unsupported_or_malformed_later_data(
+    tmp_path, later_stream, bad, message
+):
+    zero = _record(flag=0)
+    data = _stream(zero) + _stream(bad) if later_stream else _stream(zero + bad)
+    _reject(tmp_path, data, message)
+
+
+def test_zero_does_not_mask_a_malformed_later_container(tmp_path):
+    _reject(tmp_path, _stream(_record(flag=0)) + MARKER, "truncated stream header")

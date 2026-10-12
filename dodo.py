@@ -1757,12 +1757,6 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
         outs += _channel_spring_variants()
     if stem == "ha_harmonic_analyzer":
         outs.append(CAD_OUT / "ha-harmonic-analyzer-bom.csv")
-    if stem == "pn_pen":
-        # Temporary native display-data investigation; explicit sibling snapshots
-        # preserve the existing reference layout and ride the admitted pn leaf.
-        from diagnostics.probe_assembly_display_data import OUTPUT_FILENAMES
-
-        outs.extend(sldasm.parent / name for name in OUTPUT_FILENAMES)
     return outs
 
 
@@ -3021,6 +3015,8 @@ def task_check():
         # Builder gates handed to save's final deep rebuild (drive-train) must
         # read AFTER it, cost no second rebuild, and still block the save.
         SCRIPTS_DIR / "test_assembly_save_solved_gates.py",
+        # Persisted display data must fail closed before assembly publication.
+        REPO_ROOT / "tests" / "test_saved_display_data.py",
         # The copied-mate safeguard must keep failing CLOSED: an unreadable
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".

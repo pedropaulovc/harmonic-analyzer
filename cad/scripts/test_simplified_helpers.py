@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import _assembly
+import _saved_display_data
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -308,21 +309,42 @@ def test_a_childs_changed_simplified_geometry_forces_the_assembly_save() -> None
     assert (_sync(sub, paths), _sync(top, paths)) == (0, 0)
 
 
+@pytest.fixture(autouse=True)
+def _isolated_assembly_outputs(tmp_path, monkeypatch):
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+
+
 class FakeAssemblyFile:
-    """A saved ``.SLDASM``: whether each configuration's saved data is stale.
+    """Saved rebuild state and actual parser-readable display bytes."""
 
-    paper-drive (c85a21ec4) reconciled "was 1", read NeedsRebuild2=0 in memory
-    after its EditRebuild3 + Save3, and still opened with NeedsRebuild2=1 for
-    verify:soundness, while the same reconcile held on every build before
-    ``Default Simplified`` existed. The double models that: one stale saved
-    configuration makes the document open dirty, in memory NeedsRebuild2
-    reads only the active configuration, and a plain Save3 writes only the
-    active configuration's data plus the rebuild-save-marked ones'.
-    """
-
-    def __init__(self, stale: dict[str, bool], *, stuck: tuple[str, ...] = ()) -> None:
+    def __init__(
+        self,
+        path,
+        native,
+        stale: dict[str, bool],
+        *,
+        flag: int = 1,
+        cycle_zero: bool = False,
+        stuck: tuple[str, ...] = (),
+        save_result=(True, 0, 0),
+        serialize_flag: int = 1,
+        serialize_dirty: bool = False,
+        active: str = "Default",
+    ) -> None:
+        self.path = path
+        self.native = native
         self.stale = dict(stale)
-        self.stuck = set(stuck)  # saved stale whatever a rebuild does
+        self.stuck = set(stuck)
+        self.cycle_zero = cycle_zero
+        self.save_result = save_result
+        self.serialize_flag = serialize_flag
+        self.serialize_dirty = serialize_dirty
+        self.active = active
+        self.proof = path.parent / ".pd-paper-drive.massprops.sha"
+        self.proof.write_text("old-proof\n", encoding="utf-8")
+        self.events = []
+        self.opens = []
+        path.write_bytes(native(flag))
 
 
 class FakeOpenAssembly:
@@ -332,8 +354,11 @@ class FakeOpenAssembly:
         for name, configuration in self.configurations.items():
             configuration.NeedsRebuild = file.stale[name]
             configuration.AddRebuildSaveMark = False
-        self.configurations["Default"].NeedsRebuild = any(file.stale.values())
-        self.ConfigurationManager = SimpleNamespace(ActiveConfiguration=self.configurations["Default"])
+        self.configurations[file.active].NeedsRebuild = any(file.stale.values())
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=self.configurations[file.active]
+        )
+        self.operations = []
         self.Extension = self
 
     @property
@@ -347,26 +372,43 @@ class FakeOpenAssembly:
         return self.configurations[name]
 
     def ShowConfiguration2(self, name: str) -> bool:
+        self.operations.append(("switch", name))
         if self.ConfigurationManager.ActiveConfiguration.Name == name:
             return False  # SolidWorks refuses the already-active configuration
         self.ConfigurationManager.ActiveConfiguration = self.configurations[name]
         return True
 
     def EditRebuild3(self) -> bool:
+        self.operations.append(("rebuild", self.ConfigurationManager.ActiveConfiguration.Name))
         self.ConfigurationManager.ActiveConfiguration.NeedsRebuild = False
         return True
 
-    def Save3(self, _options: int, _errors: int, _warnings: int) -> bool:
+    def Save3(self, options: int, errors: int, warnings: int):
+        assert (options, errors, warnings) == (1, 0, 0)
         active = self.ConfigurationManager.ActiveConfiguration
+        marked = tuple(
+            name for name, configuration in self.configurations.items()
+            if configuration.AddRebuildSaveMark
+        )
+        self.file.events.append(("save", active.Name, marked, tuple(self.operations)))
+        result = self.file.save_result
+        if result != (True, 0, 0):
+            return result
         for name, configuration in self.configurations.items():
             if configuration is active or configuration.AddRebuildSaveMark:
                 self.file.stale[name] = configuration.NeedsRebuild or name in self.file.stuck
-        return True
+        flag = 0 if marked and self.file.cycle_zero else self.file.serialize_flag
+        self.file.path.write_bytes(self.file.native(flag))
+        if not marked and self.file.serialize_dirty:
+            self.file.stale[active.Name] = True
+        return result
 
 
 def _reconcile(file: FakeAssemblyFile) -> SimpleNamespace:
     async def open_model(_path: str) -> bool:
         adapter.currentModel = FakeOpenAssembly(file)
+        file.opens.append(adapter.currentModel)
+        file.events.append(("open", adapter.currentModel.NeedsRebuild2))
         return True
 
     adapter = SimpleNamespace(
@@ -375,25 +417,133 @@ def _reconcile(file: FakeAssemblyFile) -> SimpleNamespace:
         open_model=open_model,
         _attempt=lambda fn, default=None: fn(),
     )
-    asyncio.run(_assembly.reconcile_saved_rebuild_state(adapter, "pd-paper-drive", "x.SLDASM"))
+    asyncio.run(
+        _assembly.reconcile_saved_rebuild_state(adapter, "pd-paper-drive", file.path)
+    )
     return adapter
 
 
-def test_the_reconciled_assembly_reopens_clean_in_every_configuration() -> None:
-    file = FakeAssemblyFile({"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True})
+def test_the_reconciled_assembly_reopens_clean_in_every_configuration(
+    tmp_path, saved_native_bytes
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True},
+    )
     adapter = _reconcile(file)
     assert file.stale == {"Default": False, SIMPLIFIED_VIEW_CONFIGURATION: False}
     assert FakeOpenAssembly(file).NeedsRebuild2 == 0  # verify:soundness's open
     assert adapter.currentModel.ConfigurationManager.ActiveConfiguration.Name == "Default"
+    _saved_display_data.assert_saved_display_data(file.path)
+    assert [event[0] for event in file.events] == ["open", "save", "open"]
 
 
-def test_a_reconciled_assembly_that_still_opens_dirty_is_refused() -> None:
+def test_a_reconciled_assembly_that_still_opens_dirty_is_refused(
+    tmp_path, saved_native_bytes
+) -> None:
     file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
         {"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True},
         stuck=(SIMPLIFIED_VIEW_CONFIGURATION,),
     )
     with pytest.raises(RuntimeError, match="Default Simplified"):
         _reconcile(file)
+
+
+@pytest.mark.parametrize(
+    ("dirty", "active"),
+    [(False, "Default"), (False, SIMPLIFIED_VIEW_CONFIGURATION), (True, "Default")],
+)
+def test_incomplete_display_is_serialized_on_a_fresh_untouched_open(
+    tmp_path, saved_native_bytes, dirty, active
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": dirty, SIMPLIFIED_VIEW_CONFIGURATION: dirty},
+        flag=1 if dirty else 0, cycle_zero=dirty, active=active,
+    )
+    _reconcile(file)
+    _saved_display_data.assert_saved_display_data(file.path)
+    assert file.stale == {"Default": False, SIMPLIFIED_VIEW_CONFIGURATION: False}
+    saves = [event for event in file.events if event[0] == "save"]
+    assert len(saves) == (2 if dirty else 1)
+    # No configuration switch, rebuild, or rebuild-save mark on the serialization open.
+    assert saves[-1] == ("save", active, (), ())
+    assert file.opens[-1].NeedsRebuild2 == 0
+    assert file.opens[-1].ConfigurationManager.ActiveConfiguration.Name == active
+    assert not file.proof.exists()
+    assert [event[0] for event in file.events] == (
+        ["open", "save", "open", "save", "open"] if dirty
+        else ["open", "save", "open"]
+    )
+
+
+def test_clean_complete_saved_assembly_is_byte_preserving_no_save(
+    tmp_path, saved_native_bytes
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": False, SIMPLIFIED_VIEW_CONFIGURATION: False},
+    )
+    original = file.path.read_bytes()
+    _reconcile(file)
+    assert file.path.read_bytes() == original
+    assert file.events == [("open", 0)]
+    assert file.opens[0].operations == []
+    assert file.proof.read_text(encoding="utf-8") == "old-proof\n"
+
+
+@pytest.mark.parametrize("dirty", [False, True])
+@pytest.mark.parametrize("result", [(False, 0, 0), (True, 8, 0), True])
+def test_native_save_failure_stops_reconcile_before_fresh_success_proof(
+    tmp_path, saved_native_bytes, dirty, result
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": dirty, SIMPLIFIED_VIEW_CONFIGURATION: dirty},
+        flag=0, save_result=result,
+    )
+    original = file.path.read_bytes()
+    with pytest.raises(RuntimeError, match="Save3"):
+        _reconcile(file)
+    assert file.path.read_bytes() == original
+    assert [event[0] for event in file.events] == ["open", "save"]
+    assert not file.proof.exists()
+
+
+@pytest.mark.parametrize("later_stream", [False, True])
+def test_unsupported_data_after_zero_never_opens_or_repairs(
+    tmp_path, saved_native_bytes, later_stream
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes, {"Default": True},
+    )
+    data = (
+        saved_native_bytes(0) + saved_native_bytes(2) if later_stream
+        else saved_native_bytes(0, 2)
+    )
+    file.path.write_bytes(data)
+    with pytest.raises(RuntimeError) as failure:
+        _reconcile(file)
+    assert type(failure.value) is RuntimeError
+    assert file.events == []
+    assert file.path.read_bytes() == data
+
+
+@pytest.mark.parametrize(
+    ("flag", "dirty", "message"),
+    [(0, False, "flag=0"), (1, True, "NeedsRebuild2=1")],
+)
+def test_display_serialization_requires_complete_flags_and_fresh_clean_proof(
+    tmp_path, saved_native_bytes, flag, dirty, message
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes, {"Default": False},
+        flag=0, serialize_flag=flag, serialize_dirty=dirty,
+    )
+    with pytest.raises(RuntimeError, match=message):
+        _reconcile(file)
+    assert len([event for event in file.events if event[0] == "save"]) == 1
 
 
 def _apply(view: FakeView, role: ViewRole = ViewRole.PLAIN) -> tuple[str, FakeDrawing]:

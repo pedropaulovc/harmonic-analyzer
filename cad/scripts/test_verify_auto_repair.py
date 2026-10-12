@@ -237,16 +237,23 @@ def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) ->
         assert_manifest_dof_state(adapter, "ch-channel")
 
 
-def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof(
-    tmp_path, monkeypatch
+@pytest.mark.parametrize(
+    ("flag", "failure"),
+    [(1, "nanometre contact failed"), (0, "flag=0"), (2, "unsupported display flag")],
+)
+def test_unchanged_channel_refresh_refuses_invalid_display_or_contact_and_never_publishes(
+    tmp_path, monkeypatch, saved_native_bytes, flag, failure
 ) -> None:
     import _assembly
 
     assembly_path = tmp_path / "ch-channel.SLDASM"
-    assembly_path.write_bytes(b"byte-stable assembly")
+    original = saved_native_bytes(flag)
+    assembly_path.write_bytes(original)
     proof = tmp_path / ".ch-channel.massprops.sha"
     proof.write_text("same-digest\n", encoding="utf-8")
     saves = []
+    contacts = []
+    renders = []
 
     class Adapter(_Adapter):
         async def open_model(self, _path):
@@ -271,6 +278,7 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
         return "same-digest"
 
     async def images(_adapter, _name, _views):
+        renders.append(True)
         return {}
 
     monkeypatch.setattr(_assembly, "assembly_geometry_digest", digest)
@@ -305,9 +313,10 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
     )
 
     def fail_native_contact(_adapter, _name):
+        contacts.append(True)
         raise RuntimeError("nanometre contact failed")
 
-    with pytest.raises(RuntimeError, match="nanometre contact failed"):
+    with pytest.raises(RuntimeError, match=failure):
         asyncio.run(
             _assembly.refresh_assembly(
                 adapter,
@@ -317,9 +326,12 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
             )
         )
 
-    assert saves == [False]
-    assert assembly_path.read_bytes() == b"byte-stable assembly"
-    assert not proof.exists()
+    assert saves == ([] if flag == 2 else [False])
+    assert contacts == ([True] if flag == 1 else [])
+    assert renders == []
+    assert assembly_path.read_bytes() == original
+    if flag != 2:  # Unsupported preflight refuses before touching the old proof.
+        assert not proof.exists()
 
 
 @pytest.mark.parametrize(
@@ -338,8 +350,10 @@ def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name
 
 @pytest.mark.parametrize("persisted_failure", ["ch-channel", "sm-summing", None])
 def test_auto_repair_saves_every_document_before_persisted_contact_gate(
-    persisted_failure, monkeypatch, tmp_path
+    persisted_failure, monkeypatch, tmp_path, saved_native_bytes
 ) -> None:
+    import _assembly
+
     parent = SimpleNamespace(
         name="ha-harmonic-analyzer",
         persisted=False,
@@ -357,7 +371,7 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     summing = repaired_model("sm-summing")
     events = []
     rendered = {}
-    proof_states_at_reconcile = []
+    proof_states_on_saved_open = []
 
     class Adapter(_Adapter):
         def __init__(self):
@@ -369,10 +383,19 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
 
         async def open_model(self, path):
             events.append(("open", path))
+            if Path(path).stem in proofs:
+                proof_states_on_saved_open.append(
+                    tuple(proof.exists() for proof in proofs.values())
+                )
+                events.append(("saved-open", Path(path).stem))
             self.currentModel = SimpleNamespace(
                 name=Path(path).stem,
                 persisted=True,
                 ForceRebuild3=lambda _top_only: True,
+                Extension=SimpleNamespace(NeedsRebuild2=0),
+                ConfigurationManager=SimpleNamespace(
+                    ActiveConfiguration=SimpleNamespace(Name="Default")
+                ),
             )
             return SimpleNamespace(is_success=True, data=None)
 
@@ -381,7 +404,8 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
 
     adapter = Adapter()
     monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
-    (tmp_path / "ha-harmonic-analyzer.SLDASM").write_bytes(b"parent")
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    (tmp_path / "ha-harmonic-analyzer.SLDASM").write_bytes(saved_native_bytes())
     proofs = {
         name: tmp_path / f".{name}.massprops.sha" for name in ("ch-channel", "sm-summing")
     }
@@ -414,18 +438,11 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
 
     def save(_adapter, name, geometry_changed, *, model):
         events.append(("save", name))
+        (tmp_path / f"{name}.SLDASM").write_bytes(saved_native_bytes())
         return True
 
     monkeypatch.setattr(verify, "save_assembly_in_place", save)
 
-    async def reconcile(_adapter, name, path):
-        proof_states_at_reconcile.append(
-            tuple(proof.exists() for proof in proofs.values())
-        )
-        events.append(("reconcile", name))
-        _adapter.currentModel = SimpleNamespace(name=name, persisted=True)
-
-    monkeypatch.setattr(verify, "reconcile_saved_rebuild_state", reconcile)
 
     def contact(_adapter, name):
         phase = "persisted" if _adapter.currentModel.persisted else "pre-save"
@@ -458,16 +475,13 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
         events.index(("contact-pre-save", name)) for name in ("ch-channel", "sm-summing")
     ]
     save_indices = [events.index(("save", name)) for name in ("ch-channel", "sm-summing")]
-    first_reconcile = next(
-        index for index, event in enumerate(events) if event[0] == "reconcile"
+    first_saved_open = next(
+        index for index, event in enumerate(events) if event[0] == "saved-open"
     )
     assert max(pre_save_indices) < min(save_indices)
-    assert max(save_indices) < first_reconcile
-    assert all(not any(states) for states in proof_states_at_reconcile)
-    assert [event for event in events if event[0] == "reconcile"] == [
-        ("reconcile", "ch-channel"),
-        ("reconcile", "sm-summing"),
-    ]
+    assert max(save_indices) < first_saved_open
+    assert proof_states_on_saved_open
+    assert all(not any(states) for states in proof_states_on_saved_open)
     assert ("contact-persisted", "ch-channel") in events
     assert ("contact-persisted", "sm-summing") in events
     assert all(not proof.exists() for proof in proofs.values())

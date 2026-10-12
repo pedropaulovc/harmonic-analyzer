@@ -104,7 +104,6 @@ from paper_drive_geom import (
     PEN_ROD_X,
     PEN_Z_MID,
 )
-from diagnostics.probe_assembly_display_data import probe_assembly_display_data
 
 ASM_NAME = "pn-pen"
 
@@ -494,11 +493,7 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
-    # Temporary farm-native investigation: run only after the unchanged normal
-    # save/render/reconcile/fingerprint tail; never alter its published assembly.
-    artefacts.update(await probe_assembly_display_data(adapter, artefacts["assembly"]))
-    return artefacts
+    return await save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":

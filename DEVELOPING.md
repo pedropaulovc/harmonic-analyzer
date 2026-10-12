@@ -42,6 +42,71 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
+## Persisted assembly display data
+
+Assembly publication requires both a fresh native rebuild-state proof and a
+strict check of the saved `Contents/DisplayLists` part flags. A clean
+`NeedsRebuild2 == 0` does **not** prove that eDrawings has complete saved previews.
+Full builds and refreshes gate persisted bytes before publication; even an
+unchanged refresh rejects invalid saved bytes instead of certifying a no-save hit.
+`assert_saved_display_data(path)` is strictly read-only.
+
+Reconciliation parses before any native write. Clean, complete assemblies keep
+their bytes unchanged. A supported zero flag permits exactly one fresh-open,
+active-configuration `Save3(1)` serialization, with no configuration switching,
+rebuild or rebuild-save-mark writes, followed by the strict saved-data gate and
+a fresh `NeedsRebuild2 == 0` proof. Dirty assemblies retain their per-configuration
+rebuild/mark/save cycle and fresh clean-state proof; if those saved bytes are
+complete, there is no extra save. Only a fully validated zero-flag result permits
+the same bounded fresh serialization phase. Native saves require the native
+`(bool, int, int)` result tuple: false or errors fail, warnings are logged, and
+there is no generic retry or repair of unsupported formats.
+
+The parser supports only the empirically observed v37/v40 layout, not a
+documented SOLIDWORKS format. It checks every exact display-list stream, compressed
+completion, sizes and CRC32, with a 64 MiB expanded limit per stream, and validates
+recognized `.SLDPRT` records and flags. Legitimate zero `.SLDASM` flags are excluded.
+Missing, malformed, unknown, overlapping or extended-length records fail closed;
+`IncompleteSavedDisplayData` is raised only after **all** streams and records
+validate, so a later malformed record cannot authorize a save. Observed decoys
+and verified directory-copy references delimit inspection; the remaining footer,
+absent configurations and actual rendered visibility are not proven by this gate.
+A tagged part-path string with the same prefix is not distinguishable from a
+component record.
+
+### Pinned native reproduction
+
+The temporary probe and pn-only output declarations were removed from tip.
+Reproduce the historical matrix only from an isolated checkout at
+`f4927b968cb93cb46da933b1d011ebded120cede`, which retains the probe and builder
+hook. Under [the persistent supervisor](#starting-one-under-the-supervisor), use
+the existing `farm-run.ps1` launch shape with `"-Worktree", "<checkpoint checkout>"`,
+`"-PoolHome", "C:/src/solidworks-pool"`, `"-Targets", "assembly:pn_pen"`,
+`"-LeafTimeout", "90"`, `"-DisplayName", "DisplayData - Reproduce pinned pn matrix"`
+and a unique `"-Tag", "display-data-repro"` / supervisor process name. Keep logs
+outside worktrees, retain the recorded run and use the protocol-compatible pool;
+do not invoke the probe locally or transplant its hook into production.
+The observed protocol-6 run was
+`20261012T071150070Z-5c47034df7644314b3136e88072c9fd6`.
+
+In its cached-hanger-twice plus threaded-screw fixture:
+
+- C (`refcfg-c-both-rebuild-copy11`): all three part flags were 1,
+  `NeedsRebuild2 == 1`, and eDrawings hid 0 components.
+- E (`refcfg-e-reconcile-save1`): the **existing** production derived/Default
+  `EditRebuild3` / `AddRebuildSaveMark` / `Save3(1)` sequence left the first unique
+  hanger and screw flags at 0, the duplicate hanger at 1,
+  `NeedsRebuild2 == 0`, and 1 hidden component.
+- F (`refcfg-f-fresh-resave-save1`): freshly opening E and only `Save3(1)`-saving
+  produced all flags 1, `NeedsRebuild2 == 0`, and 0 hidden components, without
+  configuration switching, rebuilding or mark writes.
+
+The original full pn assembly had 8 zero flags across 10 groups and 8 hidden
+components; `normal-resave-inherited` yielded 0 hidden components without adding
+LDR marks. All referenced input hashes stayed unchanged. These are differential
+native-save and eDrawings observations: the internal first-unique-record-specific
+mechanism remains **UNPROVEN**, not an inferred SOLIDWORKS implementation detail.
+
 ## Supervised farm launches
 
 A farm build outlives every agent turn and every harness deadline: a cold
