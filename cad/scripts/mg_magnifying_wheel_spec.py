@@ -25,7 +25,6 @@ from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     BORE_BAND,
     BORE_DIA,
-    CAST_ROUND_BAND,
     CAST_ROUND_R,
     GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
@@ -58,9 +57,9 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The face view carries the rim, bore, spoke, fillet and tie
-# dimensions; SECTION A-A carries the hub profile, the groove, the rim-bore
-# rounds and the spoke thickness.  The rim's axial width is added on the
-# sheet. ---
+# dimensions; SECTION A-A carries the hub profile, the groove and the spoke
+# thickness.  The rim's axial width and the rim-bore round's R are added on
+# the sheet (A-A cannot import a fillet radius whose arc is the cut). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RimProfile": {"RimOuterDiaDim", "RimInnerDiaDim"},
     "SpokeProfile": {"SpokeRootWidth", "SpokeTipWidth"},
@@ -69,7 +68,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDiaDim"},
     "HubFillets": {"HubFilletR"},
     "RimFillets": {"RimFilletR"},
-    "RimRounds": {"CastRoundR"},
     "GrooveProfile": {"GrooveR", "GrooveBottomDia"},
     "Tie1Profile": {"Tie1Y", "Tie1HoleDia"},
     "Tie2Profile": {"Tie2HoleDia", "Tie2Angle"},
@@ -91,11 +89,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BoreProfile": {"BoreDiaDim": 3},
     "HubFillets": {"HubFilletR": 1},
     "RimFillets": {"RimFilletR": 1},
-    "RimRounds": {"CastRoundR": 1},
     "GrooveProfile": {"GrooveR": 2, "GrooveBottomDia": 2},
     "Tie1Profile": {"Tie1Y": 2, "Tie1HoleDia": 2},
     "Tie2Profile": {"Tie2HoleDia": 2, "Tie2Angle": 0},
 }
+# Places of the sheet-added rim-bore round (policy rule 2: the spec owns
+# them, the sheet only passes them through): three, so the title block's
+# .XXX row bounds it (R0.67-0.93 for TIE2_FACE_WALL).
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"rim bore round": 3}
 
 # Rule 6: the notes say only what no callout can.  The spigot's press fit and
 # the bore's running fit print on their own diameter callouts.
@@ -138,6 +139,9 @@ _HUB_FILLET = _printed(HUB_FILLET_R, "HubFilletR")
 _RIM_FILLET = _printed(RIM_FILLET_R, "RimFilletR")
 # The rim's axial width is a sheet dimension; the coarsest row bounds it.
 _RIM_AXIAL_MIN = RIM_AXIAL - printed_band_mm(1)
+_CAST_ROUND_MAX = CAST_ROUND_R + printed_band_mm(
+    DRAWING_REFERENCE_PRECISION["rim bore round"]
+)
 _HUB_DIA = (HUB_DIA + HUB_DIA_BAND[1], HUB_DIA + HUB_DIA_BAND[0])
 _TIE_R_MAX = (TIE_HOLE_DIA + TIE_HOLE_BAND[0]) / 2.0 + TIE_POSITION_TOL
 _SPOKE_PITCH = 360.0 / SPOKE_COUNT
@@ -187,8 +191,8 @@ TIE2_SPOKE_WALL = (
     - _TIE_R_MAX
 )
 # TIE 2 to the rim's side faces: it breaks into the bore at mid-width, where
-# the faces end at the rim-bore rounds' tangent line.
-TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - (CAST_ROUND_R + CAST_ROUND_BAND[0]) - _TIE_R_MAX
+# the faces end at the rim-bore rounds' tangent line (the largest printed R).
+TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - _CAST_ROUND_MAX - _TIE_R_MAX
 # Spigot to bore, and the groove floor to the rim ID.
 SPIGOT_WALL = (SPIGOT_DIA + SPIGOT_BAND[1] - BORE_DIA - BORE_BAND[0]) / 2.0
 GROOVE_FLOOR_WALL = (GROOVE_BOTTOM_DIA + GROOVE_BOTTOM_BAND[1] - _RIM_ID[1]) / 2.0
@@ -198,7 +202,7 @@ WALLS = {
     "tie1_to_hub_fillet": TIE1_FILLET_WALL,  # 2.088
     "tie1_to_bore": TIE1_BORE_WALL,  # 6.870
     "tie2_to_rim_fillet": TIE2_SPOKE_WALL,  # 2.706
-    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.025
+    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.095
     "spigot_to_bore": SPIGOT_WALL,  # 4.856
     "groove_floor": GROOVE_FLOOR_WALL,  # 4.350
 }

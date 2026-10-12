@@ -6,7 +6,8 @@ axis is local +Z, so the FRONT view is the face (rim, spokes, fillets, bore,
 ties) and SECTION A-A, cut on the axis through the model's Right plane, is
 the hub profile, the groove and the axial widths in solid lines (policy rule
 7).  Every size rides the part's marked dimensions; only the rim's axial
-width is added on the sheet.  The bore's and the spigot's mates print on
+width and the rim-bore round's R (on its cut arc) are added on the sheet.
+The bore's and the spigot's mates print on
 their own diameter callouts (rule 6), and each carries the part-owned
 roughness its fit needs (rule 5).
 
@@ -30,6 +31,8 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
+    ViewEdges,
+    _select_view_entity,
     add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
@@ -67,8 +70,10 @@ from mg_magnifying_wheel_geom import (
 )
 from mg_magnifying_wheel_spec import (
     BORE_DIA,
+    CAST_ROUND_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    DRAWING_REFERENCE_PRECISION,
     HUB_DIA,
     HUB_FILLET_R,
     RIM_AXIAL,
@@ -375,11 +380,22 @@ SECTION_KEEP = {
     # the rim's front corner, so the Ø97.6's extension line, which leaves the
     # groove bottom leftward, runs nowhere near its arrow.
     "GrooveR": (SECTION_CENTER[0] + 0.020, SECTION_CENTER[1] + 0.060),
-    # The rim-bore round's callout right, between the spigot's finish and the
-    # groove's R, its shoulder 10 mm under the rim bore: the Ø97.6 holds the
-    # left (run 8 hung it there).
-    "CastRoundR": (SECTION_CENTER[0] + 0.0292, SECTION_CENTER[1] + 0.0413),
 }
+# The rim-bore round's R is a sheet radial on its cut arc: A-A cannot import
+# a fillet radius whose arc IS the cut (round-12 farm leaves: neither the
+# targeted import nor DragModelDimension landed CastRoundR there).  It takes
+# the arc at the rim's front (sheet-right, model -Z) top corner, the circle's
+# centre one R in from the bore and the side face, normal to the cut plane.
+# Its callout stands right, between the spigot's finish and the groove's R,
+# its shoulder 10 mm under the rim bore: the Ø97.6 holds the left.
+_ROUND_ARC_CENTER = (
+    0.0,
+    RIM_INNER_DIA / 2.0 + CAST_ROUND_R,
+    -(RIM_AXIAL / 2.0 - CAST_ROUND_R),
+)
+_CUT_NORMAL = (1.0, 0.0, 0.0)
+ROUND_TEXT_XY = (SECTION_CENTER[0] + 0.0292, SECTION_CENTER[1] + 0.0413)
+ROUND_CALLOUT = "2X RIM BORE EDGES"
 
 
 def _band_mm(low: float, high: float) -> str:
@@ -405,7 +421,6 @@ DIMENSION_CALLOUTS = {
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",
     "RimFilletR": "12X",
-    "CastRoundR": "2X RIM BORE EDGES",
     "Tie1HoleDia": "TIE 1",
     "Tie2HoleDia": "TIE 2",
 }
@@ -670,6 +685,46 @@ def _assert_face_leaders_clear(
     )
 
 
+def _add_round_radius(adapter: Any, section: Any, edges: ViewEdges) -> Any:
+    """Dimension the rim-bore round on its A-A cut arc (the T rail root radius
+    pattern of draw_fr_top_frame) and return its annotation.
+
+    The arc is picked as a native entity from the section's edge scan, so a
+    moved round fails loud in ``circle_at``; the radial must attach to that
+    arc alone and measure the spec's R (``assert_dimension_measures``).  No
+    band is drawn: the spec's three places put it under the title block's
+    .XXX row, which ``TIE2_FACE_WALL`` is proved against.
+    """
+    label = "rim bore round"
+    arc = edges.circle_at(
+        _ROUND_ARC_CENTER, CAST_ROUND_R, axis=_CUT_NORMAL, label=label
+    ).edge
+    draw = adapter.currentModel
+    _select_view_entity(adapter, section, "EDGE", None, label=label, entity=arc)
+    display = draw.AddRadialDimension2(*ROUND_TEXT_XY, 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"failed to dimension the {label}")
+    display = _early_bound(display, "IDisplayDimension")
+    assert_dimension_measures(
+        adapter,
+        display,
+        expected_mm=CAST_ROUND_R,
+        label=label,
+        entities=(arc,),
+        entity_types=("EDGE",),
+    )
+    places = DRAWING_REFERENCE_PRECISION[label]
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != places:
+        raise RuntimeError(f"{label}: {places} decimal places did not persist")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    set_dimension_callouts(
+        adapter, [annotation], {dimension_name(adapter, annotation): ROUND_CALLOUT}
+    )
+    return annotation
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -842,10 +897,15 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=spigot_landing,
         char_height=FINISH_CHAR_HEIGHT,
     )
+    round_radius = _add_round_radius(adapter, section, section_edges)
     rebuild_drawing(adapter, label="wheel dimension layout")
     _assert_text_off_iso(
         adapter,
-        [*annotations, _early_bound(rim_width, "IDisplayDimension").GetAnnotation()],
+        [
+            *annotations,
+            _early_bound(rim_width, "IDisplayDimension").GetAnnotation(),
+            round_radius,
+        ],
         iso,
     )
 
