@@ -237,7 +237,7 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# These ten faces own native finish controls. The right (west) rail top
+# These six faces own native finish controls. The right (west) rail top
 # between its bosses, which seats both MHA-CH-007 keepers, and the underside
 # plane between the bosses, which seats both MHA-SM-002 knife mounts, carry
 # SEAT_UM in the linked facing notes below: each is one plane, so its note
@@ -246,9 +246,9 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 #
 # * The four tube-socket bores take the MHA-FR-003 columns on a match-fitted close
 #   hand-slip; a cast bore wall cannot hold that fit and would score the tube.
-# * The four cap-recess floors are the axial seats the MHA-VN-028 caps land on --
-#   they set the columns' shoulder height, so their roughness is a fit surface,
-#   not cosmetic.
+# * The four cap-recess floors carry no finish: each MHA-VN-028 cap seats on
+#   its tube end (build_fr_frame_assembly asserts it), 1.5 mm above the floor,
+#   so the recess only clears the cap skirt.
 # * The gooseneck bore guides the O16 counter-spring post through the hub and
 #   is pinched by the set screw against it.
 # * The set-screw boss's spot face is the machined face the set tap starts
@@ -256,34 +256,19 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
 # commercial machine finish is what the fit needs. The part authors one native
-# symbol per one of these ten controlled faces; each sheet states it ONCE, and the
+# symbol per one of these six controlled faces; each sheet states it ONCE, and the
 # target text names the family so a single symbol cannot be misread as one
 # instance (harmonic-base FLANGE_PERIMETER_TARGET precedent).
 SOCKET_BORE_TARGET = "TUBE SOCKET BORES, 4X"
-CAP_SEAT_TARGET = "CAP SEAT FLOORS, 4X"
 SURFACE_FINISHES = tuple(
-    control
+    SurfaceFinishControl(
+        f"socket_{rail}_{end}",
+        SEAT_UM,
+        CylinderFace(BORE_DIA, contains_x_mm=x, contains_z_mm=z),
+        production_method=SOCKET_BORE_TARGET,
+    )
     for rail, x in (("east", GOOSENECK_X), ("west", COLUMN_X))
     for end, z in (("front", FRONT_COLUMN_Z), ("rear", REAR_COLUMN_Z))
-    for control in (
-        SurfaceFinishControl(
-            f"socket_{rail}_{end}",
-            SEAT_UM,
-            CylinderFace(BORE_DIA, contains_x_mm=x, contains_z_mm=z),
-            production_method=SOCKET_BORE_TARGET,
-        ),
-        SurfaceFinishControl(
-            f"cap_seat_{rail}_{end}",
-            SEAT_UM,
-            PlanarFace(
-                (0.0, 1.0, 0.0),
-                CAP_RECESS_FLOOR_Y,
-                contains_x_mm=x,
-                contains_z_mm=z,
-            ),
-            production_method=CAP_SEAT_TARGET,
-        ),
-    )
 ) + (
     SurfaceFinishControl(
         "hub_bore",

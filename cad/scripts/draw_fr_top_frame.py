@@ -98,7 +98,6 @@ from build_fr_top_frame import (
     BOSS_BELOW,
     BOSS_DIA,
     CAP_RECESS_DIAMETER,
-    CAP_RECESS_FLOOR_Y,
     COLUMN_X,
     COUNTERBORE_DIA,
     COUNTERBORE_MAX_FLOOR_OFFSET,
@@ -274,26 +273,22 @@ SOCKET_FINISH_SYMBOL_XY = (0.050, 0.090)
 FINISH_LEADER_TAIL = 0.035
 
 # Sheet 4: the cross-tap elevation across the sheet's upper band with
-# section A-A below it, both half size.  A-A carries the cap recess, the
-# cap seat and the 47.3 boss stack, so it gets the sheet's whole lower
-# half instead of a quarter of its right edge.
+# section A-A below it, both half size.  A-A carries the cap recess and the
+# 47.3 boss stack, so it gets the sheet's whole lower half instead of a
+# quarter of its right edge.
 DETAIL_FRONT_SCALE = SHEET_SCALES["CROSS-TAPS"]
 DETAIL_FRONT_CENTER = (0.145, 0.228)
 DETAIL_SECTION_SCALE = (1, 2)
 DETAIL_SECTION_CENTER = (0.290, 0.135)
 DETAIL_SECTION_CAPTION_XY = (0.240, 0.088)
 
-# #946 leader-over-part (layoutcheck's b2 leaf on b49e13940): two leaders ran
-# far over the part to reach their feature, reading as edges of it.
-# - RD4, the 2X keeper tap callout, stood above the upper-right boss and its
-#   leader crossed the boss and bore rings to the front keeper tap: 29.6 mm
-#   over the part, 18.3 mm more than the tap's shortest approach.
-# - The cap seat Ra 3.2 stood below-left of A-A and its leader climbed 24.7
-#   mm through the hatching to the far ledge: 16.6 mm more than the approach.
-# Each now enters by its feature's short side (Main: detour <= ~4 mm; swing's
-# RD2 fix, 4dda16fd5, left 3.8).  Placement is computed from the feature's
-# projected model points at build time; the pure placement functions below
-# are what the offline tests pin.
+# #946 leader-over-part (layoutcheck's b2 leaf on b49e13940): RD4, the 2X
+# keeper tap callout, stood above the upper-right boss and its leader crossed
+# the boss and bore rings to the front keeper tap: 29.6 mm over the part,
+# 18.3 mm more than the tap's shortest approach.  It now enters by the tap's
+# short side (Main: detour <= ~4 mm; swing's RD2 fix, 4dda16fd5, left 3.8).
+# Placement is computed from the tap's projected model points at build time;
+# the pure placement function below is what the offline tests pin.
 #
 # The sheet's frame: ISheet::GetZoneMargin's 12.7 mm inside the ASME B sheet.
 SHEET_FRAME = (0.0127, 0.0127, 0.4191, 0.2667)
@@ -399,10 +394,6 @@ FRONT_KEEPER_Z_TEXT_XY = (
     - (FRONT_COLUMN_Z + KEEPER_TAP_Z_FRONT) / 2.0 * DETAIL_VIEW_SCALE / 1000.0,
 )
 
-# The cap seat symbol's ink right of its leader's bend: "CAP SEAT FLOORS, 4X"
-# and the rule over it end 4.64 mm past the bend (b49e1: bend at x 210.00,
-# text to 214.57, rule to 214.64), rounded outward.
-CAP_SEAT_FINISH_INK_PAST_BEND = 0.0047
 # Keep the boss-height lane 7.45 mm off A-A's rederived Ø45 boss silhouette.
 BOSS_ABOVE_RAIL_LINE_XY = (
     DETAIL_SECTION_CENTER[0] + DETAIL_PLAN_HALF_D + 0.00745,
@@ -889,7 +880,7 @@ HUB_TOP_CALLOUTS = {
 DETAIL_FRONT_KEEP = {"CB1Dia": (0.045, 0.256)}
 DETAIL_SECTION_KEEP = {
     "CapRecessDia": (0.140, 0.170),
-    # The cap-seat depth reads beside its own band, not under it: the column
+    # The recess depth reads beside its own band, not under it: the column
     # below belongs to the 47.3 boss height, whose three-line text is 37 mm
     # wide and has nowhere else to sit on this sheet.
     "CapRecessDepth": (0.386, 0.155),
@@ -901,7 +892,7 @@ DETAIL_CALLOUTS = {
 FRONT_CALLOUTS = {"CB1Dia": "4X COUNTERBORE"}
 SECTION_CALLOUTS = {
     "CapRecessDia": "4X CAP RECESS",
-    "CapRecessDepth": "4X\nCAP SEAT",
+    "CapRecessDepth": "4X\nRECESS",
 }
 
 
@@ -1670,15 +1661,6 @@ def keeper_facing_note_xy(callout: Point) -> Point:
     )
 
 
-def cap_seat_finish_placement(tip: Point, entry: Point) -> Point:
-    """The cap seat symbol's point, its leader running from ``tip`` (the near
-    ledge of the cap seat) back out through ``entry`` (where it crosses the
-    boss's outer face), bent to its tail an ink clearance off that face."""
-    bend_x = entry[0] - CAP_SEAT_FINISH_INK_PAST_BEND - INK_CLEARANCE - ROUND_OUT
-    slope = (entry[1] - tip[1]) / (entry[0] - tip[0])
-    return (bend_x - FINISH_LEADER_TAIL, tip[1] + (bend_x - tip[0]) * slope)
-
-
 def section_cut_ends() -> dict[str, tuple[Point, Point]]:
     """Each removed section's cutting-line (start, end) as plan-model (X, Z) mm.
 
@@ -1791,7 +1773,7 @@ def _model_offset_in_view(
 def _machined_faces(view: Any) -> dict[str, Any]:
     """Resolve every part-owned surface-finish face through ``view``'s model.
 
-    A plan view shows four identical sockets and four identical cap seats,
+    A plan view shows four identical sockets,
     so a coordinate pick cannot say which face a symbol qualifies.  The
     part-owned face specs can: each resolves to exactly one model face, and
     ``add_surface_finish`` then re-checks the selected face against the same
@@ -2376,8 +2358,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # dimensioned from the frame centre any more, and drawn axes would
     # invite reading it as the datum.
     # The title block names no finish grade ("CAST/MACHINED"), so every
-    # surface that must be cut says so on the face: the tube sockets and
-    # their cap seats locate the columns, the hub bore locates the
+    # surface that must be cut says so on the face: the tube sockets
+    # locate the columns, the hub bore locates the
     # gooseneck.  Each symbol carries the part's own control and attaches
     # to the one model face that control names.
     machined_faces = _machined_faces(detail_top)
@@ -2637,17 +2619,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # bracket, so the leader is the width of the gap and crosses nothing; the
     # 4.5 above its upper arrow, where its leader leaves the line's top stub.
     # Neither may drift left of x=378 or the extension lines run under the
-    # text, nor below y=137 or the cap-seat callout's do.
+    # text, nor below y=137 or the recess-depth callout's do.
     #
     # One crossing survives and is accepted: the 47.3, the 4.5 and the 16.30
-    # cap-seat depth all measure FROM the boss top face, so their upper
+    # recess depth all measure FROM the boss top face, so their upper
     # extension lines are collinear at y=146.8 and each runs right to its own
     # dimension line (x=366.5, 377, 387).  The 4.5's leader leaves its line
     # mid-band at y=145.7 -- below that shared face -- so any text it can
     # reach costs one crossing of a line collinear with its own, 0.3 mm from
     # where its own extension line ends.  The layout audit reports it as
     # leader-crosses-leader at (366.2,146.8); the alternatives measured worse
-    # (text over the cut faces, or the cap-seat callout's stub through this
+    # (text over the cut faces, or the recess-depth callout's stub through this
     # text), and no arrangement of three dimensions off one face avoids it.
     _checked_dimension(
         adapter, detail_section,
@@ -2791,48 +2773,14 @@ async def build(adapter: Any) -> dict[str, str]:
         suffix="TAP AXIS BELOW BOSS TOP",
         entities=(upper_boss_edge, front_tap_edge), offset_text=(0.300, 0.229),
     )
-    # #946: the leader lands on the cap seat's near (outboard) ledge and
-    # leaves through the boss's outer face midway between the cross tap's
-    # counterbore and the boss top, as far from both as that face allows.
-    cap_seat_tip = model_point_in_view(
-        adapter,
-        detail_section,
-        (
-            COLUMN_X/1000.0,
-            CAP_RECESS_FLOOR_Y/1000.0,
-            (FRONT_COLUMN_Z-(BORE_DIA+CAP_RECESS_DIAMETER)/4)/1000.0,
-        ),
-        label="cap seat finish leader",
-    )
-    cap_seat_entry = model_point_in_view(
-        adapter,
-        detail_section,
-        (
-            COLUMN_X/1000.0,
-            (COUNTERBORE_DIA/2 + HALF_H + BOSS_ABOVE)/2/1000.0,
-            (FRONT_COLUMN_Z-BOSS_DIA/2)/1000.0,
-        ),
-        label="cap seat finish leader entry",
-    )
-    cap_seat_finish = add_surface_finish(
-        adapter,
-        detail_section,
-        symbol_xy=cap_seat_finish_placement(cap_seat_tip, cap_seat_entry),
-        control=surface_finish_by_key(SURFACE_FINISHES, "cap_seat_west_front"),
-        label="cap seat floor finish",
-        entity_type="FACE",
-        entity=machined_faces["cap_seat_west_front"],
-        leader_attach_xy=cap_seat_tip,
-        char_height=0.0025,
-    )
-    _finish_leader_tail(cap_seat_finish, label="cap seat floor")
     _assert_section_display(
         adapter, detail_section, label="A-A corner section",
         cut_surface_only=False,
     )
     cap_fit_note = add_note(
         adapter,
-        "CAP RECESSES FOR MHA-VN-028 / 9275K141",
+        "CAP RECESSES CLEAR MHA-VN-028 / 9275K141 SKIRTS;\n"
+        "CAPS SEAT ON TUBE ENDS, NOT RECESS FLOORS",
         0.040,
         0.055,
     )

@@ -895,11 +895,11 @@ def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
     assert not kept - set(spec.DRAWING_PRECISION_BY_NAME)
 
 
-# --- #946 leader-over-part: RD4 and the cap seat Ra 3.2 -------------------
+# --- #946 leader-over-part: RD4 -------------------------------------------
 #
 # The sheets are projected here from the model constants, as the build reads
 # them through each view's ModelToViewTransform: the half-size plan (+X right,
-# +Z down the sheet) and section A-A (+Z right, +Y up).  #946's measure: the
+# +Z down the sheet).  #946's measure: the
 # run over the part from the leader's first model-edge crossing to its tip,
 # minus the tip's shortest approach (its distance to the nearest side of the
 # view's outline).  Main's brief is ~4 mm (swing's RD2 fix, 4dda16fd5, 3.8).
@@ -912,11 +912,6 @@ _S = drawing.DETAIL_VIEW_SCALE / 1000.0
 def _plan(x: float, z: float) -> tuple[float, float]:
     cx, cy = drawing.DETAIL_TOP_CENTER
     return (cx + x * _S, cy - z * _S)
-
-
-def _section(z: float, y: float) -> tuple[float, float]:
-    cx, cy = drawing.DETAIL_SECTION_CENTER
-    return (cx + z * _S, cy + y * _S)
 
 
 def _keeper_geometry():
@@ -1037,82 +1032,13 @@ def test_b49e1_keeper_callout_is_what_ran_over_the_boss() -> None:
     assert detour > 0.010
 
 
-def _cap_seat_geometry():
-    tip = _section(
-        part.FRONT_COLUMN_Z - (part.BORE_DIA + part.CAP_RECESS_DIAMETER) / 4.0,
-        part.CAP_RECESS_FLOOR_Y,
-    )
-    face_z = part.FRONT_COLUMN_Z - part.BOSS_DIA / 2.0
-    top = part.HALF_H + part.BOSS_ABOVE
-    entry = _section(face_z, (part.COUNTERBORE_DIA / 2.0 + top) / 2.0)
-    return (
-        tip,
-        entry,
-        _section(face_z, top),
-        _section(face_z, part.COUNTERBORE_DIA / 2.0),
-    )
-
-
-def _section_detour(start, tip):
-    """#946's detour of a leader into A-A's front boss, whose outer face is
-    the section's left edge: it enters through that face or the underside."""
-    face_x, top_y = _section(
-        part.FRONT_COLUMN_Z - part.BOSS_DIA / 2.0, part.HALF_H + part.BOSS_ABOVE
-    )
-    bottom_y = _section(0.0, -part.HALF_H - part.BOSS_BELOW)[1]
-    (x0, y0), (x1, y1) = start, tip
-    entry = None
-    for step in range(20001):
-        t = step / 20000.0
-        x, y = x0 + t * (x1 - x0), y0 + t * (y1 - y0)
-        if x >= face_x and bottom_y <= y <= top_y:
-            entry = (x, y)
-            break
-    approach = min(tip[0] - face_x, top_y - tip[1])
-    over = math.dist(entry, tip)
-    return over, approach, over - approach
-
-
-def test_cap_seat_finish_leader_takes_the_short_way_to_its_ledge() -> None:
-    """#946 / b49e1: the cap seat Ra 3.2 stood below-left of A-A and its
-    leader climbed 24.7 mm through the hatching to the far ledge, 16.6 mm
-    past the approach.  It now lands on the near ledge through the boss's
-    outer face, between the cross tap's counterbore and the boss top."""
-    tip, entry, top, counterbore_top = _cap_seat_geometry()
-    symbol = drawing.cap_seat_finish_placement(tip, entry)
-    bend = (symbol[0] + drawing.FINISH_LEADER_TAIL, symbol[1])
-    # The bend, the entry and the tip are one straight leader.
-    cross = (entry[0] - tip[0]) * (bend[1] - tip[1]) - (entry[1] - tip[1]) * (bend[0] - tip[0])
-    assert cross == pytest.approx(0.0, abs=1e-12)
-    over, approach, detour = _section_detour(bend, tip)
-    assert detour <= LEADER_DETOUR_TARGET, (over, approach, detour)
-    assert counterbore_top[1] < entry[1] < top[1]
-    # The symbol's ink stays off the part.
-    assert bend[0] + drawing.CAP_SEAT_FINISH_INK_PAST_BEND <= entry[0] - drawing.INK_CLEARANCE
-
-
-def test_b49e1_cap_seat_finish_is_what_ran_through_the_hatching() -> None:
-    """b49e1's symbol at (0.175, 0.114) with its leader to the far ledge,
-    (240.625, 138.675) mm on that render, gates by the same measure."""
-    far_ledge = _section(
-        part.FRONT_COLUMN_Z + (part.BORE_DIA + part.CAP_RECESS_DIAMETER) / 4.0,
-        part.CAP_RECESS_FLOOR_Y,
-    )
-    shift = (far_ledge[0] - 0.240625, far_ledge[1] - 0.138675)
-    bend = (0.175 + drawing.FINISH_LEADER_TAIL + shift[0], 0.114 + shift[1])
-    _over, _approach, detour = _section_detour(bend, far_ledge)
-    assert detour > 0.010
-
-
-def test_build_places_both_leaders_from_their_projected_features() -> None:
+def test_build_places_the_keeper_leader_from_its_projected_feature() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
     for placed in (
         "keeper_callout_placement(",
         "callout_xy=keeper_callout_xy,",
         "rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)",
-        "symbol_xy=cap_seat_finish_placement(cap_seat_tip, cap_seat_entry),",
-        "leader_attach_xy=cap_seat_tip,",
     ):
         assert placed in body, placed
 
@@ -2900,14 +2826,12 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert margin == pytest.approx(3.58)
     # Faced in place: the rail-top plane stays put.
     assert part.HALF_H - part.FLANGE_BOT_Y == pytest.approx(spec.FLANGE_THICKNESS_MM)
-    # The ten native socket, cap, hub-bore and set-screw spot-face finishes
-    # (user ruling 2026-10-12 added the spot face); the faced rail top's
-    # SEAT_UM rides on the linked note B.
+    # The six native socket, hub-bore and set-screw spot-face finishes (user
+    # ruling 2026-10-12 added the spot face); the faced rail top's SEAT_UM
+    # rides on the linked note B.  The cap-recess floors carry none: the caps
+    # seat on the tube ends, clear of the floors.
     assert [c.key for c in spec.SURFACE_FINISHES] == [
-        f"{kind}_{rail}_{end}"
-        for rail in ("east", "west")
-        for end in ("front", "rear")
-        for kind in ("socket", "cap_seat")
+        f"socket_{rail}_{end}" for rail in ("east", "west") for end in ("front", "rear")
     ] + ["hub_bore", "hub_set_spot_face"]
 
 

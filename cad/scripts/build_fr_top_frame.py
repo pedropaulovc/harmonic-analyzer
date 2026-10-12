@@ -1826,7 +1826,6 @@ def _qualify_machined_faces(adapter) -> None:
         {control.key: control.face for control in SURFACE_FINISHES},
     )
     socket_wall = math.pi * BORE_DIA * (CAP_RECESS_FLOOR_Y + HALF_H + BOSS_BELOW)
-    cap_seat = math.pi / 4.0 * (CAP_RECESS_DIAMETER**2 - BORE_DIA**2)
     hub_wall = (
         math.pi * GOOSENECK_BORE_DIA * (HUB_BOSS_DROP + 2.0 * HALF_H - BORE_CHAMFER)
     )
@@ -1834,9 +1833,7 @@ def _qualify_machined_faces(adapter) -> None:
         HUB_SET_SPOT_DIA**2 - TAP_DRILL_MM[SET_SCREW_THREAD] ** 2
     )
     for key, face in faces.items():
-        if key.startswith("cap_seat"):
-            expected = cap_seat
-        elif key == "hub_bore":
+        if key == "hub_bore":
             expected = hub_wall
         elif key == "hub_set_spot_face":
             expected = spot_face
