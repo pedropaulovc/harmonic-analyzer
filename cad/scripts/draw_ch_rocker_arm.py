@@ -449,7 +449,8 @@ FRONT_KEEP = {
     "PivotDia": (0.130, 0.148),
     # A radius text box inside this large parent circle still printed a
     # centre-directed line off-sheet, even with the outside-arrow flags.
-    "TopRadius": (0.215, 0.157),
+    # Keep its exterior leader to the right of the pivot-bore finish callout.
+    "TopRadius": (0.235, 0.157),
     "BottomRadius": (0.090, 0.154),
     "TopAbovePivot": (
         _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[0],

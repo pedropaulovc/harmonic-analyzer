@@ -195,6 +195,15 @@ def test_basic_radius_text_positions_are_outside_their_parent_circles() -> None:
     assert math.dist(centre, (0.130, 0.218)) < top_rendered_radius
 
 
+def test_top_radius_text_uses_corridor_right_of_pivot_finish() -> None:
+    """Keep the R800 leader right of the existing pivot-bore finish text."""
+    pivot_x, _pivot_y = drawing._sheet_xy(0.0, drawing._PIVOT_MID_Y)
+    corridor_left = pivot_x + 0.050  # sheet placement clearance, not a tolerance
+    assert drawing.FRONT_KEEP["TopRadius"][0] > corridor_left
+    # Negative control: the first outside-circle placement crossed Ra 1.6.
+    assert 0.215 <= corridor_left
+
+
 class _ProfileDisplay:
     """Model COM property writes, including silently ignored setters."""
 
