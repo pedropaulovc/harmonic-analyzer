@@ -51,6 +51,10 @@ still catches a child that never becomes ready. SIGINT is raised only after the
 fake coordinator has accepted registration (or returned waiting ownership) and
 the main thread has reached the producer's entry wait; cancellation releases
 the pending registration reply through the producer's stop event, not a sleep.
+The active lease-outage test likewise waits for local entry and a failed renewal
+retry before advancing the producer's private monotonic clock past lease expiry.
+It does not spend a half-second test lease on thread startup, and leaves asyncio's
+real timeout clock untouched.
 
 ## Supervised farm launches
 

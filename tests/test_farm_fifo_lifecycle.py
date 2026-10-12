@@ -16,6 +16,7 @@ import textwrap
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import doit.cmd_base as _doit_cmd_base
 import pytest
@@ -764,17 +765,35 @@ def test_close_transport_warning_cannot_mask_prior_ownership_loss(
      "past-deadline", "foreign-build", "waiting", "drained"],
 )
 def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
-    control, start_parent, _guarded_process, fault
+    control, start_parent, _guarded_process, monkeypatch, fault
 ):
     # Gate the first renewal until local execution has actually started.
     control.heartbeat_gate = _AsyncGate()
+    lease_expired = threading.Event()
     if fault == "lease-expiring-outage":
-        control.lease_deadline = _deadline(0.5)
+        # Advance only the producer's clock, not asyncio's timeout clock.
+        # No lease lifetime is spent racing interpreter/thread startup.
+        real_time = _farm.time
+        monkeypatch.setattr(
+            _farm,
+            "time",
+            SimpleNamespace(
+                monotonic=lambda: real_time.monotonic()
+                + (120 if lease_expired.is_set() else 0)
+            ),
+        )
     parent = start_parent()
     _wait(parent.entered, "producer did not enter action")
     _wait(control.heartbeat_gate.entered, "heartbeat did not reach fake boundary")
     if fault == "lease-expiring-outage":
-        control.heartbeat_response = ConnectionError("control unavailable")
+        def outage(_status):
+            # First prove a retry under the acknowledged lease; only then
+            # expire it, while local execution is known to have started.
+            if len(control.calls("heartbeat_build")) >= 2:
+                lease_expired.set()
+            raise ConnectionError("control unavailable")
+
+        control.heartbeat_response = outage
     elif fault == "update-refusal":
         from temporalio.client import WorkflowUpdateFailedError
         from temporalio.exceptions import ApplicationError
