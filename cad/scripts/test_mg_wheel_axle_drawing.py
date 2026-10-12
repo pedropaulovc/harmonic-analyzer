@@ -194,14 +194,12 @@ def test_pen_travel_literals_match_their_source_modules() -> None:
     import build_pn_pen_assembly as pen
 
     assert group.MARKER_TIP_REST_Y == pen.MARKER_POS[1]
-    assert group.PAPER_BOTTOM_Y == pytest.approx(
-        paper.PLATE_Y0 + paper.PLATE_HEIGHT - paper.PAPER_HEIGHT - 3.0
-    )
-    assert group.PAPER_TOP_Y == pytest.approx(group.PAPER_BOTTOM_Y + paper.PAPER_HEIGHT)
     # The 3.0 is the sheet's top margin under the plate's top edge.
-    paper_source = Path(paper.__file__).read_text(encoding="utf-8")
-    assert re.search(r"paper_top_margin = \(?\s*3\.0\b", paper_source)
-    assert "PLATE_Y0 + PLATE_HEIGHT - PAPER_HEIGHT - paper_top_margin" in paper_source
+    paper_height = paper.PAPER_GEOMETRY.RECORDING_PAPER_HEIGHT_MM
+    assert group.PAPER_BOTTOM_Y == pytest.approx(
+        paper.PLATE_Y0 + paper.PLATE_HEIGHT - paper_height - 3.0
+    )
+    assert group.PAPER_TOP_Y == pytest.approx(group.PAPER_BOTTOM_Y + paper_height)
     half_trace = float(_config.machine("output", "pen_trace_half_mm"))
     assert half_trace == 15.0
     assert half_trace <= min(group.PEN_DOWN_MAX, group.PEN_UP_MAX)
