@@ -21,6 +21,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
@@ -52,7 +53,7 @@ from mg_wheel_axle_spec import (
     THREAD_MAJOR,
     TIP_Y,
 )
-from mg_wheel_group import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX, THREAD_LENGTH_CALLOUT
+from mg_wheel_group import THREAD_LENGTH_CALLOUT
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_axle"]
@@ -91,22 +92,23 @@ STEP_X = _sheet_x(STEP_Y)
 THREAD_END_X = _sheet_x(THREAD_END_Y)
 TIP_X = _sheet_x(TIP_Y)
 
-# Rows below the profile (policy rule 7): the shank from the back end, the
-# thread from the gauged step (its functional datum, named on its callout),
-# then the overall as a reference. Each linear dimension's value stands on
-# its line and its callout lines hang under it, so each row drops by the
-# block under the row above plus ~4.4 mm of air (the audit asks 3.57): the
-# thread length's three callout lines push the reference 5.6 mm lower than
-# the thread end's two did (run 16: rows -35 / -58.8 / -74).
-_ROW_Y = (SIDE_CENTER[1] - 0.035, SIDE_CENTER[1] - 0.0588, SIDE_CENTER[1] - 0.0800)
+# Rows below the profile (policy rule 7): the shank and the thread both
+# baseline from the gauged step (the press gauge's face), each with the
+# dimension-origin circle on the step's extension line and named on its
+# callout, then the overall as a reference. Run 18 left the shank's 4-line
+# block (stacked band + two callout lines) 1.82 mm over the thread's stacked
+# band (the audit asks 3.57); the .X shank prints one value line and one
+# callout line, and its row rises 3 mm, which alone clears it.
+_ROW_Y = (SIDE_CENTER[1] - 0.032, SIDE_CENTER[1] - 0.0588, SIDE_CENTER[1] - 0.0800)
 # The thread length spans 32.7 mm of sheet, its ~63 mm callout block wider:
-# the block stands wholly left of the step's extension line (2 mm air), clear
-# of the overall's extension line dropping from the tip on the right.
+# the block stands wholly left of the step's extension line (4 mm air, room
+# for the origin circle there), clear of the overall's extension line
+# dropping from the tip on the right.
 _THREAD_BLOCK_HALF = 0.0317
 # Diameters on the profile.
 SIDE_KEEP = {
     "ShankLength": ((BACK_X + STEP_X) / 2.0, _ROW_Y[0]),
-    "ThreadLength": (STEP_X - 0.002 - _THREAD_BLOCK_HALF, _ROW_Y[1]),
+    "ThreadLength": (STEP_X - 0.004 - _THREAD_BLOCK_HALF, _ROW_Y[1]),
     "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[2]),
     # The shank's dimension line crosses the shank near the step; its text
     # runs left from the line, the fit callout's two lines under it, so the
@@ -131,20 +133,23 @@ THREAD_PICK = (
 )
 THREAD_NOTE_XY = (THREAD_END_X + 0.012, SIDE_CENTER[1] + 0.042)
 # Each band states its need on its own callout (policy rule 2): the pin's
-# press fit with the bar bore's limits read from the bar's geom, the step's
-# station where the back end lands, the thread length's datum, the locknut's
-# full thread and the most thread past it (mg_wheel_group).
+# press fit with the bar bore's limits read from the bar's geom, the thread
+# length's origin, the locknut's full thread and the most thread past it
+# (mg_wheel_group). The .X shank names only its origin.
 DIMENSION_CALLOUTS = {
     "PinDia": (
         "PRESS FIT IN MG-WHEEL-BAR\n"
         f"<MOD-DIAM>{BAR_BORE_LIMITS[0]:.3f}-{BAR_BORE_LIMITS[1]:.3f} REAMED BORE"
     ),
-    "ShankLength": (
-        "PRESSED TO GAUGE: BACK END\n"
-        f"{BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK IN BAR"
-    ),
+    "ShankLength": "FROM SHANK STEP",
     "ThreadLength": THREAD_LENGTH_CALLOUT,
 }
+# ASME Y14.5 dimension origin (swArrowStyle_e): the open circle marks the end
+# a dimension reads from, so both lengths show the step as their origin
+# rather than a chain through it; the other end keeps the closed arrowhead.
+ORIGIN_DIMENSIONS = ("ShankLength", "ThreadLength")
+_ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
+_CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
 # The journal's finish (policy rule 5) lands on the shank's top silhouette
 # between the Ø line and the step, where the wheel runs; the symbol stands
 # just above, left of the thread callout's leader.
@@ -185,6 +190,55 @@ def _shift(
     points: dict[str, tuple[float, float]], dx: float, dy: float
 ) -> dict[str, tuple[float, float]]:
     return {name: (x + dx, y + dy) for name, (x, y) in points.items()}
+
+
+def _arrowheads(annotation: Any, label: str) -> list[tuple[float, int]]:
+    """Each arrowhead's tip x on the sheet and its style.
+
+    ``IDisplayData::GetArrowHeadAtIndex2`` returns tip[3], dir[3], width,
+    height, style, normal[3]; a length dimension carries exactly two.
+    """
+    data = annotation.GetDisplayData()
+    if data is None:
+        raise RuntimeError(f"{label} has no display data")
+    data = _early_bound(data, "IDisplayData")
+    heads = []
+    for index in range(int(data.GetArrowHeadCount() or 0)):
+        values = [float(value) for value in (data.GetArrowHeadAtIndex2(index) or ())]
+        if len(values) < 9:
+            raise RuntimeError(f"{label} arrowhead {index} is incomplete: {values!r}")
+        heads.append((values[0], round(values[8])))
+    if len(heads) != 2:
+        raise RuntimeError(f"{label} has {len(heads)} arrowheads, expected 2")
+    return heads
+
+
+def _set_dimension_origin(
+    adapter: Any, annotation: Any, *, origin_x: float, label: str
+) -> None:
+    """Put the dimension-origin circle on the arrowhead at ``origin_x``.
+
+    Which arrowhead ``SetArrowHeadStyle2``'s first style lands on is the
+    dimension's own order, so the styles are read back from the ink: if the
+    circle came out at the far end, the pair is applied swapped and read
+    again. Either way the sheet is proved, never assumed.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    heads = _arrowheads(annotation, label)
+    near = min(range(2), key=lambda index: abs(heads[index][0] - origin_x))
+    styles = [_CLOSED_ARROWHEAD, _CLOSED_ARROWHEAD]
+    styles[near] = _ORIGIN_ARROWHEAD
+    for attempt in (styles, styles[::-1]):
+        if not display.SetArrowHeadStyle2(False, *attempt):
+            raise RuntimeError(f"failed to set the {label} arrowhead styles")
+        rebuild_drawing(adapter, label=f"{label} dimension origin")
+        heads = _arrowheads(annotation, label)
+        at_origin = min(heads, key=lambda head: abs(head[0] - origin_x))
+        far = max(heads, key=lambda head: abs(head[0] - origin_x))
+        if (at_origin[1], far[1]) == (_ORIGIN_ARROWHEAD, _CLOSED_ARROWHEAD):
+            return
+    raise RuntimeError(f"{label} origin circle is not at the step: {heads!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -250,6 +304,17 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     assert_imported_precision(adapter, side_annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, side_annotations, DIMENSION_CALLOUTS)
+    # Both lengths read from the step: the origin circle on its extension line.
+    for name in ORIGIN_DIMENSIONS:
+        matches = [a for a in side_annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one wheel-axle {name} dimension")
+        _set_dimension_origin(
+            adapter,
+            matches[0],
+            origin_x=spt(STEP_X, 0.0)[0],
+            label=f"wheel axle {name}",
+        )
     # The overall sums the two stations and the dome: a reference.
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [a for a in side_annotations if dimension_name(adapter, a) == name]

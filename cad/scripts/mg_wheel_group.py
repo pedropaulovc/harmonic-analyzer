@@ -48,26 +48,19 @@ if not math.isclose(SPOKE_MID_D, 8.0):
 
 # --- stack corners (the printed and catalogue bands) -----------------------------------
 # The pin is pressed to a gauge from the bar's FRONT face, so the bar's depth
-# is not in the stack; it sets only where the back end lands.
+# is not in the stack; it sets only where the back end lands
+# (mg_wheel_axle_spec.BACK_END_PROUD_MAX / BACK_END_SUNK_MAX).
 _GAUGE = (
     _pin.PRESS_GAUGE - _pin.PRESS_GAUGE_TOL,
     _pin.PRESS_GAUGE + _pin.PRESS_GAUGE_TOL,
-)
-_BAR_DEPTH = (
-    _bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[1],
-    _bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[0],
 )
 _BACK = (_back.THICKNESS_MIN, _back.THICKNESS_MAX)
 _HUB = (
     _wheel.HUB_LEN + _wheel.HUB_LEN_BAND[1],
     _wheel.HUB_LEN + _wheel.HUB_LEN_BAND[0],
 )
-_SHANK = (
-    _pin.SHANK_LEN + _pin.SHANK_LEN_BAND[1],
-    _pin.SHANK_LEN + _pin.SHANK_LEN_BAND[0],
-)
 # Step to thread end: printed from the gauged step itself, so its own band
-# is the whole of it (the shank's band only places the back end).
+# is the whole of it (the shank's tolerance only places the back end).
 _THREAD = (
     _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[1],
     _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[0],
@@ -75,14 +68,6 @@ _THREAD = (
 _FRONT = (_front.THICKNESS_MIN, _front.THICKNESS_MAX)
 _NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 
-# The back end: at most the bar's depth band proud of its back face, at most
-# 0.30 sunk in it.
-BACK_END_PROUD_MAX = _SHANK[1] - _GAUGE[0] - _BAR_DEPTH[0]  # 0.10
-BACK_END_SUNK_MAX = _BAR_DEPTH[1] - (_SHANK[0] - _GAUGE[1])  # 0.30
-if BACK_END_PROUD_MAX > _bar.BAR_DEPTH_BAND[0] + 1e-9:
-    raise AssertionError(f"pin back end {BACK_END_PROUD_MAX:.3f} proud of the bar")
-if BACK_END_SUNK_MAX > 0.30 + 1e-9:
-    raise AssertionError(f"pin back end {BACK_END_SUNK_MAX:.3f} sunk in the bar")
 # (a) The pin's shank-to-thread step stays inside the hub's front face, so the
 # wheel runs on the full shank and the front washer sits on the thread.
 STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - _GAUGE[1]  # 0.687

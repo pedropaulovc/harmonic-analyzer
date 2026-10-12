@@ -48,7 +48,8 @@ from mg_wheel_bar_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
 )
-from mg_wheel_group import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX, BAR_PRESS
+from mg_wheel_axle_spec import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX
+from mg_wheel_group import BAR_PRESS
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_bar"]

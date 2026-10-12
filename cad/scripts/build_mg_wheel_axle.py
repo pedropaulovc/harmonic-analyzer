@@ -69,7 +69,6 @@ from mg_wheel_axle_spec import (
     PIN_LEN,
     PRESS_GAUGE,
     SHANK_LEN,
-    SHANK_LEN_BAND,
     STEP_Y,
     SURFACE_FINISHES,
     THREAD,
@@ -238,9 +237,6 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     set_dimension_symmetric_tolerance(adapter, "PinProfile", "PinDia", PIN_DIA_TOL)
-    set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "ShankLength", *deviations(SHANK_LEN_BAND)
-    )
     set_dimension_bilateral_tolerance(
         adapter, "PinProfile", "ThreadLength", *deviations(THREAD_LEN_BAND)
     )

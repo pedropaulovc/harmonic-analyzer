@@ -116,7 +116,7 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
     assert drawing.DIMENSION_CALLOUTS["AxleBoreDia"] == (
         "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\n0.010-0.030 INTERFERENCE"
     )
-    assert drawing.DIMENSION_CALLOUTS["BarDepth"].endswith("0.10 PROUD TO 0.30 SUNK")
+    assert drawing.DIMENSION_CALLOUTS["BarDepth"].endswith("0.85 PROUD TO 1.05 SUNK")
     assert model_toleranced_dimensions(part) == {
         ("BarProfile", "Side"): "*deviations(BAR_SIDE_BAND)",
         ("Bar", "BarDepth"): "*deviations(BAR_DEPTH_BAND)",

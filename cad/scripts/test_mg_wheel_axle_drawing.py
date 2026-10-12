@@ -80,25 +80,21 @@ def test_pin_is_one_front_plane_revolve() -> None:
 def test_tolerances_are_native_on_the_model() -> None:
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "PinDia"): "PIN_DIA_TOL",
-        ("PinProfile", "ShankLength"): "*deviations(SHANK_LEN_BAND)",
         ("PinProfile", "ThreadLength"): "*deviations(THREAD_LEN_BAND)",
     }
-    assert set(spec.DRAWING_BANDS) == {
-        ("PinProfile", "ShankLength"),
-        ("PinProfile", "ThreadLength"),
-    }
-    # The shank reads from the back end, the thread from the gauged step (the
-    # user's option (c), 2026-10-12); the overall is reference.
-    assert spec.SHANK_LEN_BAND == (0.05, -0.05)
+    assert set(spec.DRAWING_BANDS) == {("PinProfile", "ThreadLength")}
+    # Both lengths read from the gauged step: the shank only places the back
+    # end (.X), the thread holds the locknut (the user's option (c),
+    # 2026-10-12); the overall is reference.
+    assert spec.DRAWING_PRECISION["PinProfile"]["ShankLength"] == 1
     assert spec.THREAD_LEN_BAND == (0.25, -0.25)
     assert spec.REFERENCE_DIMENSIONS == {"PinLength"}
     assert spec.DRAWING_PRECISION["PinProfile"]["PinLength"] == 1
-    assert drawing.DIMENSION_CALLOUTS["ShankLength"].endswith(
-        "0.10 PROUD TO 0.30 SUNK IN BAR"
-    )
+    assert drawing.DIMENSION_CALLOUTS["ShankLength"] == "FROM SHANK STEP"
     assert drawing.DIMENSION_CALLOUTS["ThreadLength"] == (
         "FROM SHANK STEP;\nLOCKNUT ON FULL THREAD,\nEND 2.9 MAX PAST LOCKNUT"
     )
+    assert drawing.ORIGIN_DIMENSIONS == ("ShankLength", "ThreadLength")
     assert group.THREAD_PAST_LOCKNUT_MAX <= group.THREAD_PAST_LOCKNUT_LIMIT == 2.9
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
@@ -133,7 +129,8 @@ def test_thread_callout_and_notes() -> None:
     assert 1 <= len(notes.splitlines()) <= 4
     flat = " ".join(notes.splitlines())
     assert "UNTIL THE SHANK STEP STANDS 19.50 +/-0.05 FROM THE BAR FRONT FACE" in flat
-    assert "(BACK END ~FLUSH)" in notes
+    assert "(BACK END 0.85 PROUD TO 1.05 SUNK);" in notes
+    assert all(len(line) <= 80 for line in notes.splitlines())
     assert "REAMED BORE" not in notes
     assert drawing.DIMENSION_CALLOUTS["PinDia"] == (
         "PRESS FIT IN MG-WHEEL-BAR\n<MOD-DIAM>4.737-4.747 REAMED BORE"
@@ -175,10 +172,10 @@ def test_wheel_group_stack_fits_the_pin() -> None:
     assert group.THREAD_PAST_LOCKNUT_MAX <= group.THREAD_PAST_LOCKNUT_LIMIT == 2.9
     assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(2.8066, abs=1e-3)
     assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.6575, abs=1e-3)
-    # Pressed to the gauge, the back end is within the bar's depth band of
-    # the back face.
-    assert group.BACK_END_PROUD_MAX == pytest.approx(0.10)
-    assert group.BACK_END_SUNK_MAX == pytest.approx(0.30)
+    # Pressed to the gauge, the .X shank lands the back end near the back
+    # face; nothing stands behind it there.
+    assert spec.BACK_END_PROUD_MAX == pytest.approx(0.85)
+    assert spec.BACK_END_SUNK_MAX == pytest.approx(1.05)
     assert group.SPOKE_MID_D == pytest.approx(8.0)
     assert group.WHEEL_MID_Z == -146.9
 
