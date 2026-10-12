@@ -129,7 +129,6 @@ def test_thread_callout_and_notes() -> None:
     assert 1 <= len(notes.splitlines()) <= 4
     flat = " ".join(notes.splitlines())
     assert "UNTIL THE SHANK STEP STANDS 19.50 +/-0.05 FROM THE BAR FRONT FACE" in flat
-    assert "(BACK END 0.85 PROUD TO 1.05 SUNK);" in notes
     assert all(len(line) <= 80 for line in notes.splitlines())
     assert "REAMED BORE" not in notes
     assert drawing.DIMENSION_CALLOUTS["PinDia"] == (

@@ -103,13 +103,15 @@ BAR_BORE_LIMITS = (
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1],
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0],
 )
-# Rule 6: the notes say only the press gauge no view can, and where it leaves
-# the back end.
+# Rule 6: the notes say only the press gauge no view can, and why its band
+# is tight: the gauge's 0.10 is spent inside the thread-end window
+# (mg_wheel_group: full thread under the locknut at the thick-stack corner).
+# The back end's window, now loose, rides the bar's depth callout.
 DRAWING_NOTES = "\n".join(
     (
         "PRESS INTO MG-WHEEL-BAR UNTIL THE SHANK STEP STANDS",
-        f"{PRESS_GAUGE:.2f} +/-{PRESS_GAUGE_TOL:.2f} FROM THE BAR FRONT FACE "
-        f"(BACK END {BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK);",
+        f"{PRESS_GAUGE:.2f} +/-{PRESS_GAUGE_TOL:.2f} FROM THE BAR FRONT FACE, "
+        "SO THE LOCKNUT SITS ON FULL THREAD;",
         "RED LOCTITE 271 OPTIONAL.",
     )
 )
