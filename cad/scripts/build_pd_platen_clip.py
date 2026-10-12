@@ -36,8 +36,15 @@ import _telemetry
 from _appearance import apply_material
 from _check import check
 from _com import _early_bound, _read_member
-from _dimensions import drive_dimension, name_dimensions, set_global
-from _feature_tree import feature_name_by_type, name_last_feature
+from _dimensions import (
+    _dim_value_mm,
+    _display_dimensions,
+    _rename_dimensions,
+    drive_dimension,
+    name_dimensions,
+    set_global,
+)
+from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -120,27 +127,61 @@ MODEL_FEATURES = (
 )
 BOSS_DRIVES = {
     "FlatSheet": ('"SheetT"',),
-    "SpringRail": ('"SpringRailW"',),
     "RoundedSpringEnds": ('"SheetT"',),
 }
-
-# Plan area of the screw rail with its four rounded corners, plus the bridge
-# between the slits' half-round ends.
+# The spring rail's thin extrusion carries three display dimensions, matched
+# by their built value (all distinct): (name, value mm, driving expression).
+SPRING_RAIL_DRIVES = (
+    ("RailWidth", SPRING_RAIL_WIDTH, '"SpringRailW"'),
+    ("StartOffset", SPRING_RAIL_Y0, '"SpringRailY0"'),
+    ("WallT", SHEET_T, '"SheetT"'),
+)
+# Native equation self-test: each knob is flexed, rebuilt, checked against the
+# analytic volume and z span, then restored.  NotchW is how SpringRailY0
+# moves (it is the derived "ScrewRailW" + "NotchW"); widening the slit opens a
+# gap at the bridge unless the spring rail's start offset follows.
+EQUATION_FLEX = (
+    ("SheetT", SHEET_T, 1.0, "sheet_t"),
+    ("NotchW", NOTCH_WIDTH, 0.8, "notch_w"),
+)
 _CORNER_LOSS = (
     (1.0 - math.pi / 4.0) * 2.0 * (SCREW_RAIL_END_RADIUS**2 + SCREW_RAIL_SLIT_RADIUS**2)
 )
-V_FLAT_SHEET = (
-    CLIP_LENGTH * SCREW_RAIL_WIDTH
-    - _CORNER_LOSS
-    + CENTER_BRIDGE_LENGTH * NOTCH_WIDTH
-    - math.pi * SLIT_END_RADIUS**2
-) * SHEET_T
-# A mid-plane thin wall's section area is exactly SHEET_T x path length.
-V_SPRING_RAIL = MID_SURFACE_LENGTH * SHEET_T * SPRING_RAIL_WIDTH
-# Each full end circle overlaps one half-circle of the flat tip run, leaving
-# exactly two outer half-circles of additional material.
-V_ROUNDED_ENDS = math.pi * SPRING_END_RADIUS**2 * SHEET_T
-V_HOLES = 2.0 * math.pi * (HOLE_DIA / 2.0) ** 2 * SHEET_T
+
+
+def clip_volumes(
+    sheet_t: float = SHEET_T, notch_w: float = NOTCH_WIDTH
+) -> tuple[float, float, float, float]:
+    """(flat sheet, spring rail, rounded ends, holes) volumes in mm^3.
+
+    Parametric in the two knobs ``EQUATION_FLEX`` edits: the sheet thickness,
+    and the slit width, which narrows the spring rail and its end rounds.
+    """
+    spring_w = CLIP_WIDTH - SCREW_RAIL_WIDTH - notch_w
+    end_r = spring_w / 2.0
+    # Plan area of the screw rail with its four rounded corners, plus the
+    # bridge between the slits' half-round ends.
+    flat = (
+        CLIP_LENGTH * SCREW_RAIL_WIDTH
+        - _CORNER_LOSS
+        + CENTER_BRIDGE_LENGTH * notch_w
+        - math.pi * (notch_w / 2.0) ** 2
+    ) * sheet_t
+    # A mid-plane thin wall's section area is exactly sheet_t x path length.
+    path = (
+        2.0 * (HOLE_INSET - end_r)
+        + CENTER_BRIDGE_LENGTH
+        + 2.0 * 4.0 * BEND_RADIUS * BEND_ANGLE
+    )
+    spring = path * sheet_t * spring_w
+    # Each full end circle overlaps one half-circle of the flat tip run,
+    # leaving exactly two outer half-circles of additional material.
+    ends = math.pi * end_r**2 * sheet_t
+    holes = 2.0 * math.pi * (HOLE_DIA / 2.0) ** 2 * sheet_t
+    return flat, spring, ends, holes
+
+
+V_FLAT_SHEET, V_SPRING_RAIL, V_ROUNDED_ENDS, V_HOLES = clip_volumes()
 V_FINAL = V_FLAT_SHEET + V_SPRING_RAIL + V_ROUNDED_ENDS - V_HOLES
 
 if not math.isclose(
@@ -503,6 +544,41 @@ def _z_extremes(adapter) -> tuple[float, float]:
     return out[0], out[1]
 
 
+def _check_z_span(adapter, label: str, sheet_t: float) -> None:
+    """One body, platen face at SheetT, bow crests ArchRise outboard of z = 0."""
+    z_min, z_max = _z_extremes(adapter)
+    if abs(z_min + ARCH_RISE) > 0.01 or abs(z_max - sheet_t) > 0.01:
+        raise RuntimeError(
+            f"platen clip {label}: z span {z_min:.4f}..{z_max:.4f}, expected "
+            f"{-ARCH_RISE:g}..{sheet_t:g}"
+        )
+    _telemetry.success(f"platen clip {label}: z span {z_min:.4f}..{z_max:.4f}")
+
+
+def _name_spring_rail_dimensions(adapter) -> list[tuple[str, str]]:
+    """Name the thin extrusion's width, start offset and wall; drive jobs.
+
+    Each SPRING_RAIL_DRIVES value must match exactly one of the feature's own
+    display dimensions, so a parameter SolidWorks does not expose fails the
+    build with the full dimension list instead of staying silently literal.
+    """
+    feature = _feature_by_name(adapter, "SpringRail")
+    dims = list(_display_dimensions(feature, "SpringRail"))
+    values = [abs(_dim_value_mm(idim)) for idim in dims]
+    names: list[str | None] = [None] * len(dims)
+    for name, value, _expr in SPRING_RAIL_DRIVES:
+        hits = [i for i, v in enumerate(values) if abs(v - value) < 1e-6]
+        if len(hits) != 1:
+            raise RuntimeError(
+                f"SpringRail exposes {len(hits)} display dimensions of {name} "
+                f"{value:.6f} mm (need exactly one); its dimensions read "
+                f"{[round(v, 6) for v in values]}"
+            )
+        names[hits[0]] = name
+    _rename_dimensions(dims, "SpringRail", names)
+    return [(f"{name}@SpringRail", expr) for name, _value, expr in SPRING_RAIL_DRIVES]
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -562,20 +638,10 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += path.apply(adapter, "SpringRailPath")
     _thin_extrude_at_offset(adapter, SPRING_RAIL_WIDTH, SPRING_RAIL_Y0, SHEET_T)
     name_last_feature(adapter, "SpringRail")
-    # Depth is the feature's first dimension (as for every boss); the start
-    # offset and wall stay literal, declared by SpringRailY0/SheetT.
-    spring_dims = name_dimensions(adapter, "SpringRail", ["RailWidth"])
-    drive_jobs += list(zip(spring_dims, BOSS_DRIVES["SpringRail"], strict=True))
+    drive_jobs += _name_spring_rail_dimensions(adapter)
     volume += V_SPRING_RAIL
     await volume_check(adapter, "flat sheet and spring rail", volume, 0.005 * volume)
-    # One body, platen face at SheetT, bow crests ArchRise outboard of z = 0.
-    z_min, z_max = _z_extremes(adapter)
-    if abs(z_min + ARCH_RISE) > 0.01 or abs(z_max - SHEET_T) > 0.01:
-        raise RuntimeError(
-            f"platen clip z span {z_min:.4f}..{z_max:.4f}, expected "
-            f"{-ARCH_RISE:g}..{SHEET_T:g}"
-        )
-    _telemetry.success(f"platen clip z span {z_min:.4f}..{z_max:.4f}")
+    _check_z_span(adapter, "spring rail", SHEET_T)
 
     # Full circles overlap the flat tip run of the spring rail by one half
     # each.  Their exposed halves give both free ends a rounded planform.
@@ -652,6 +718,21 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven one-piece clip (equations neutral)", V_FINAL, 0.005 * V_FINAL
     )
+    # Equation self-test (EQUATION_FLEX): a knob that only reshapes part of
+    # the sheet misses the analytic volume, opens a second body or moves the
+    # z span; every knob is restored before the part is saved.
+    for knob, neutral, flexed, knob_arg in EQUATION_FLEX:
+        flat, spring, ends, holes = clip_volumes(**{knob_arg: flexed})
+        expected = flat + spring + ends - holes
+        await set_global(adapter, knob, f"{flexed}mm")
+        await force_rebuild(adapter)
+        await volume_check(adapter, f"{knob} = {flexed} mm", expected, 0.005 * expected)
+        span_t = flexed if knob_arg == "sheet_t" else SHEET_T
+        _check_z_span(adapter, f"{knob} = {flexed} mm", span_t)
+        await set_global(adapter, knob, f"{neutral}mm")
+        await force_rebuild(adapter)
+        await volume_check(adapter, f"{knob} restored", V_FINAL, 0.005 * V_FINAL)
+        _check_z_span(adapter, f"{knob} restored", SHEET_T)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

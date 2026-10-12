@@ -95,6 +95,33 @@ def test_platen_clip_is_one_center_bridged_sheet() -> None:
     assert not hasattr(clip, "SCREW_SEAT_BOSS_H")
 
 
+def test_platen_clip_spring_rail_follows_its_knobs() -> None:
+    # The thin extrusion's width, start offset and wall are all equation-bound;
+    # the build names them by value, so the three values must be distinct.
+    drives = {name: (value, expr) for name, value, expr in clip.SPRING_RAIL_DRIVES}
+    assert drives == {
+        "RailWidth": (clip.SPRING_RAIL_WIDTH, '"SpringRailW"'),
+        "StartOffset": (clip.SPRING_RAIL_Y0, '"SpringRailY0"'),
+        "WallT": (clip.SHEET_T, '"SheetT"'),
+    }
+    values = sorted(value for value, _ in drives.values())
+    assert all(b - a > 0.1 for a, b in zip(values, values[1:]))
+    assert "SpringRail" not in clip.BOSS_DRIVES
+    # The native flex predicts each edited volume analytically and moves it
+    # well past the 0.5 % volume tolerance.
+    neutrals = {"sheet_t": clip.SHEET_T, "notch_w": clip.NOTCH_WIDTH}
+    assert clip.clip_volumes() == clip.clip_volumes(**neutrals)
+    for knob, neutral, flexed, knob_arg in clip.EQUATION_FLEX:
+        assert neutrals[knob_arg] == neutral
+        knobs = {**neutrals, knob_arg: flexed}
+        flat, spring, ends, holes = clip.clip_volumes(**knobs)
+        flexed_volume = flat + spring + ends - holes
+        assert abs(flexed_volume - clip.V_FINAL) > 0.02 * clip.V_FINAL, knob
+        # The end round stays wholly on the flat tip at the flexed slit width.
+        spring_w = clip.CLIP_WIDTH - clip.SCREW_RAIL_WIDTH - knobs["notch_w"]
+        assert spring_w <= clip.HOLE_INSET
+
+
 def test_platen_clip_free_halves_bow_smoothly_and_return_to_sheet_plane() -> None:
     # Three equal tangent arcs per free half (concave, crown, concave): the
     # run and the rise close, so the bow lands back in the sheet plane at the
