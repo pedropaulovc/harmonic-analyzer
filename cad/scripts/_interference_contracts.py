@@ -283,12 +283,12 @@ _FRAME_ALLOWED_PAIRS = {
 # would re-key every assembly for an unrelated fixture station or groove edit.
 # test_mg_fixture_installation pins these triples to their geometry owners.
 # Keep the ruled light-press triple in one place; tests pin it to the band owner.
-_MG_LEVER_PRESS_TRIPLE_MM = (6.0, 5.986, 7.0)
+_MG_LEVER_PRESS_TRIPLE_MM = (6.0, 5.986, 7.003)
 _MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
 
-# Bound the print-worst press annulus over the actual straight cylinder:
-# the last three millimetres of the lever are a hemispherical end, not full
-# diameter engagement. Both diameter maxima/minima are nominal for these bands.
+# Bound the print-worst press annulus over the straight contact:
+# collar length maximum 10.00 minus selected hemisphere radius minimum 2.997.
+# Both diameter maxima/minima are nominal for these bands.
 _MG_LEVER_PRESS_LIMIT = _smooth_annulus_limit_mm3(
     *_MG_LEVER_PRESS_TRIPLE_MM
 )

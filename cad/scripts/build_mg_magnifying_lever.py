@@ -14,24 +14,27 @@ collar near the summing-lever plate) to the summing lever's own ratio --
 the p.46/p.48 insets show the CLAMP sliding, not a 310 rod.
 
 Layout: rod axis along +X from the origin (tip of the pivot-end dome at
-x=0), profile revolved 360 deg about a centerline on the axis.
+x=0), profile revolved 360 deg about a centerline on the axis. The profile
+dimensions the overall length tip to tip (what a caliper picks up), not to the
+far dome centre.
 
-``PressZone`` (blanked, on the Front plane): the STRAIGHT rod the MHA-MG-001
-bracket collar grips -- mg_lever_press_fit_geom.COLLAR_ENGAGEMENT, from the
-collar's inner face to where the east dome starts -- PRESSED in and retained
-with Loctite 638 (user ruling 2026-10-11). The collar's full
-PRESS_ZONE_LENGTH from the dome tip includes that R3 dome, whose shrinking
-diameter is not banded engagement, so the banded zone stops at the dome
-tangent. The rod is modelled at its nominal Ø6 end to end -- the zone is a
-band, not a step -- so no model edge bounds it; a construction witness along
-the rod's top outline over the zone, with the axis under it, carries the
-zone's length and its diameter with the press band natively (policy rule 2:
-the model, not a note, owns it; ch_rod_pivot_pin's ``BlankReference``).
+``PressZone`` (blanked, on the Front plane): the cylinder the MHA-MG-001
+bracket collar grips -- PRESS_ZONE_LENGTH back from the east dome TIP to its
+start, running to the dome tangent (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT,
+the R3 dome's shrinking diameter is not banded engagement) -- PRESSED on and
+retained per the bracket sheet. The rod is modelled at its nominal Ø6 end to
+end -- the zone is a band, not a step -- so no model edge bounds it: a
+centerline on the axis from the zone start to the tip, located from the
+origin by the rod length, and a construction witness along the rod's bottom
+outline from the zone start to the tangent carry the zone's start from the
+tip, its cylinder length and its diameter with the press band natively
+(policy rule 2: the model, not a note, owns it; ch_rod_pivot_pin's
+``BlankReference``).
 
-``RodStock`` (blanked, on the Front plane): the rod's stock diameter, printed
-once at mid-length, away from the press zone (machinist review: the Ø6 was a
-note). The revolve profile cannot carry it -- its top line's height is already
-the dome radius's, so a second diameter over-defines the capsule -- hence a
+``RodStock`` (blanked, on the Front plane): the rod's stock diameter with the
+cold-drawn bar's band, printed once at mid-length, away from the press zone.
+The revolve profile cannot carry it -- its top line's height is already the
+dome radius's, so a second diameter over-defines the capsule -- hence a
 construction witness from the axis to the top outline, doubled off a short
 centerline on the axis, the PressZone idiom. The front view shows both.
 
@@ -52,6 +55,7 @@ from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
+from _part_pmi import author_part_pmi
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -78,6 +82,7 @@ from mg_lever_press_fit_geom import (
     PRESS_ZONE_DIA,
     PRESS_ZONE_DIA_BAND,
     PRESS_ZONE_LENGTH,
+    PRESS_ZONE_LENGTH_BAND,
     ROD_DIA,
 )
 from mg_magnifying_lever_geom import (
@@ -90,8 +95,9 @@ from mg_magnifying_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    END_VIEW_NOTE,
     ISO_VIEW_NOTE,
+    ROD_DIA_BAND,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "mg-magnifying-lever"
@@ -100,8 +106,11 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 R = ROD_DIA / 2.0
 if PRESS_ZONE_DIA != ROD_DIA:
     raise AssertionError("the press zone is the modelled rod, not a step")
-# The banded zone ends where the east dome starts: the straight engagement.
+# The banded zone starts PRESS_ZONE_LENGTH back from the east dome tip and
+# ends where that dome starts: the straight engagement.
 PRESS_ZONE_END = ROD_LENGTH - R
+if ROD_LENGTH - PRESS_ZONE_X[0] != PRESS_ZONE_LENGTH:
+    raise AssertionError("the press zone does not start its length from the tip")
 if PRESS_ZONE_END - PRESS_ZONE_X[0] != COLLAR_ENGAGEMENT:
     raise AssertionError("the press zone witness is not the collar engagement")
 # Where the stock diameter prints: mid-length, under the clamp's travel.
@@ -158,8 +167,10 @@ async def build(adapter) -> dict[str, str]:
     )
     set_sketch_direct_db(adapter, False)
     # 14-unknown half-profile: origin corner anchored, both dome centres
-    # anchored on the axis, ONE radial dim (the left dome's radius is
-    # already forced by its anchored centre + the anchored origin end --
+    # on the axis (the left one dimensioned from the origin corner), the
+    # tip-to-tip length, ONE radial dim on the right dome (it puts that
+    # centre R back from the right tip; the left dome's radius is already
+    # forced by its anchored centre + the anchored origin end --
     # dimensioning it too over-defines), the top edge horizontal with its
     # start vertically aligned over the left centre. The centerline
     # merged into the two axis corners, so it carries no constraints.
@@ -175,18 +186,30 @@ async def build(adapter) -> dict[str, str]:
     )
     # Record each manual display dim into SketchDims as it is created (creation
     # order): the left dome centre is on the axis (x = R, one horizontal dim),
-    # then the right dome centre (x = L - R, one horizontal dim), then the right
-    # dome radius. The origin-corner anchor is a coincident relation (no dim) and
-    # the horizontal / vertical-points constraints carry no dims either -- three
-    # display dims total.
+    # then the overall length between the two tips (the axis line's ends,
+    # merged with the domes' apexes -- build_ch_fulcrum_shaft's idiom), then
+    # the right dome radius. The origin-corner anchor is a coincident relation
+    # (no dim) and the horizontal / horizontal-points / vertical-points
+    # constraints carry no dims either -- three display dims total.
     await anchor_point_to_origin(
         adapter, f"{cap_left}.center", R, 0.0, "left dome centre"
     )
     profile.record("LeftDomeCentre", '"RodDia" / 2')
-    await anchor_point_to_origin(
-        adapter, f"{cap_right}.center", ROD_LENGTH - R, 0.0, "right dome centre"
+    check(
+        "right dome centre on the axis",
+        await adapter.add_sketch_constraint(
+            f"{cap_right}.center", "origin", "horizontal_points"
+        ),
     )
-    profile.record("RightDomeCentre", '"RodLength" - "RodDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{axis_line}.start",
+        f"{axis_line}.end",
+        "horizontal_distance",
+        ROD_LENGTH,
+        "rod OverallLength",
+    )
+    profile.record("OverallLength", '"RodLength"')
     check(
         "right dome radius",
         await adapter.add_sketch_dimension(cap_right, None, "radial", R),
@@ -219,24 +242,26 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
 
     # REFERENCE sketch (blanked before save): the press zone -- see the module
-    # docstring. Witness along the rod's top outline over the straight
-    # engagement (made construction, so the shown sketch prints no outline of
-    # its own), the axis segment under it carrying only relations. Three
-    # display dims, in creation order: the zone length between the witness's
-    # ends, the zone's end station from the origin (the dome tangent;
-    # unmarked, the far dome centre is the profile's), then the diameter to
-    # the witness's start -- doubled off the axis, the way the pivot pins
-    # print theirs.
+    # docstring. A centerline on the axis from the zone start to the east tip,
+    # and a witness along the rod's bottom outline from the zone start to the
+    # dome tangent (made construction, so the shown sketch prints no outline
+    # of its own; on the bottom so the zone's lengths print below the rod
+    # with their extension lines clear of it). Four display dims, in creation
+    # order: the tip station from the origin (unmarked; the profile prints the
+    # overall length), the zone's start back from the tip, the cylinder's
+    # length to the tangent (printed as a reference), then the diameter to the
+    # witness's start -- doubled off the axis, the way the pivot pins print
+    # theirs.
     zone = SketchDims()
     check("create_sketch press zone", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     zone_axis = check(
         "press zone axis",
-        await adapter.add_centerline(PRESS_ZONE_X[0], 0.0, PRESS_ZONE_END, 0.0),
+        await adapter.add_centerline(PRESS_ZONE_X[0], 0.0, ROD_LENGTH, 0.0),
     )
     zone_witness = check(
         "press zone witness",
-        await adapter.add_line(PRESS_ZONE_X[0], R, PRESS_ZONE_END, R),
+        await adapter.add_line(PRESS_ZONE_X[0], -R, PRESS_ZONE_END, -R),
     )
     set_sketch_direct_db(adapter, False)
     _make_construction(adapter, zone_witness)
@@ -251,13 +276,30 @@ async def build(adapter) -> dict[str, str]:
             f"{zone_axis}.start", "origin", "horizontal_points"
         ),
     )
-    for end in ("start", "end"):
-        check(
-            f"press zone axis {end} under the witness {end}",
-            await adapter.add_sketch_constraint(
-                f"{zone_axis}.{end}", f"{zone_witness}.{end}", "vertical_points"
-            ),
-        )
+    check(
+        "press zone witness start over the axis start",
+        await adapter.add_sketch_constraint(
+            f"{zone_axis}.start", f"{zone_witness}.start", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{zone_axis}.end",
+        "origin",
+        "horizontal_distance",
+        ROD_LENGTH,
+        "press zone PressZoneTip",
+    )
+    zone.record("PressZoneTip", '"RodLength"')
+    await dimension_between(
+        adapter,
+        f"{zone_witness}.start",
+        f"{zone_axis}.end",
+        "horizontal_distance",
+        PRESS_ZONE_LENGTH,
+        "press zone PressZoneStart",
+    )
+    zone.record("PressZoneStart", '"CollarLen"')
     await dimension_between(
         adapter,
         f"{zone_witness}.start",
@@ -267,15 +309,6 @@ async def build(adapter) -> dict[str, str]:
         "press zone PressZoneLen",
     )
     zone.record("PressZoneLen", '"CollarLen" - "RodDia" / 2')
-    await dimension_between(
-        adapter,
-        f"{zone_witness}.end",
-        "origin",
-        "horizontal_distance",
-        PRESS_ZONE_END,
-        "press zone PressZoneEnd",
-    )
-    zone.record("PressZoneEnd", '"RodLength" - "RodDia" / 2')
     await add_diametric_linear_dimension(
         adapter,
         zone_axis,
@@ -385,14 +418,22 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: the press zone's diameter carries the
-    # geom's (upper, lower) stock band natively (policy rule 2), places come
-    # from the spec, then mark exactly the print's dimensions (the drawing
-    # recipe imports the marked set and must find every one of these) and
+    # Manufacturing drawing support: the stock diameter carries the cold-drawn
+    # bar's band, the press zone's diameter the geom's tighter (upper, lower)
+    # band and its start from the tip the collar length's axial band, all
+    # natively (policy rule 2), places come from the spec, then mark exactly
+    # the print's dimensions (the drawing recipe imports the marked set and
+    # must find every one of these), author the OD finish on the part, and
     # stamp the make-critical title-block properties. The reference sketches
     # are blanked for the assembly renders; the front view shows them per view.
     set_dimension_bilateral_tolerance(
+        adapter, "RodStock", "RodDia", *deviations(ROD_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
         adapter, "PressZone", "PressZoneDia", *deviations(PRESS_ZONE_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "PressZone", "PressZoneStart", *deviations(PRESS_ZONE_LENGTH_BAND)
     )
     # A diametric linear dimension on a side-view sketch prints no Ø by itself
     # (build_dt_pinion_arbor's journals; the v41 sheet read "6.000 0/-0.008").
@@ -402,12 +443,12 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
             "Iso View Note": ISO_VIEW_NOTE,
         },
     )

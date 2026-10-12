@@ -67,7 +67,7 @@ from mg_magnifying_bracket_spec import (
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
-from mg_lever_press_fit_geom import COLLAR_BORE_BAND, COLLAR_BORE_DIA
+from mg_lever_press_fit_geom import COLLAR_BORE_BAND, COLLAR_BORE_DIA, COLLAR_LENGTH_BAND
 from mg_magnifying_lever_geom import COLLAR_HALF_LEN as LEVER_COLLAR_HALF_LEN
 from magnifying_bracket_joint_layout import (
     BRACKET_HOLE_POINTS,
@@ -532,7 +532,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Native model dimensions own the flange, head-seat and press-seat bands;
     # the print imports the plan dimensions and exposes the stepped holes by
-    # callout. The bore band is mg_lever_press_fit_geom's (upper, lower) contract.
+    # callout. The bore and length bands are mg_lever_press_fit_geom's
+    # (upper, lower) contracts: the press contact is the collar's length less
+    # the lever's dome, so the length's band bounds the installation force.
     native_mounting_names = _resolve_native_mounting_dimensions(adapter)
     await _mounting_coordinate_dimensions(adapter)
     set_dimension_symmetric_tolerance(
@@ -540,6 +542,9 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "CollarProfile", "CollarBore", *deviations(COLLAR_BORE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Collar", "CollarLen", *deviations(COLLAR_LENGTH_BAND)
     )
     _apply_native_mounting_annotations(adapter, native_mounting_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

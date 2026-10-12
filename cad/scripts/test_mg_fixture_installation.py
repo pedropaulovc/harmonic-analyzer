@@ -114,12 +114,14 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
     )
     from _hole_spec import TAP_DRILL_MM
     from _mcmaster_91882a221 import SHANK_DIA
-    from mg_lever_press_fit_geom import COLLAR_BORE_DIA, COLLAR_ENGAGEMENT, PRESS_ZONE_DIA
+    from mg_lever_press_fit_geom import COLLAR_BORE_DIA, COLLAR_ENGAGEMENT_MAX, PRESS_ZONE_DIA
 
     # Shared runtime contracts must stay independent of the pose-bearing owners.
     # Pin the literals here instead of importing those owners into every assembly.
     owned_thread = (SHANK_DIA, TAP_DRILL_MM["#4-40"], fixture.TAP_LENGTH)
-    owned_press = (PRESS_ZONE_DIA, COLLAR_BORE_DIA, COLLAR_ENGAGEMENT)
+    owned_press = (PRESS_ZONE_DIA, COLLAR_BORE_DIA, COLLAR_ENGAGEMENT_MAX)
+    # The nominal cylinder stays 7; the independently pinned print
+    # envelope explicitly budgets the longer 7.003 contact.
     for literal, owned in (
         (_MG_FIXTURE_THREAD_TRIPLE_MM, owned_thread),
         (_MG_LEVER_PRESS_TRIPLE_MM, owned_press),
@@ -128,6 +130,7 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
             math.isclose(a, b, rel_tol=0.0, abs_tol=1e-12)
             for a, b in zip(literal, owned, strict=True)
         )
+    assert _MG_LEVER_PRESS_TRIPLE_MM == pytest.approx((6.0, 5.986, 7.003))
     pairs = allowed_interference_pairs("mg-magnifier")
     top = allowed_interference_pairs("ha-harmonic-analyzer")
     expected = {
@@ -152,19 +155,24 @@ _PRESS_BUDGET_KEYS = {
     "interference_min",
     "interference_max",
     "engagement",
-    "contact_pressure_mpa",
+    "strength_outer_diameter_mm",
+    "strength_contact_pressure_mpa",
     "collar_hoop_mpa",
     "collar_von_mises_mpa",
+    "force_outer_diameter_mm",
+    "contact_pressure_mpa",
     "press_force_min_n",
     "press_force_max_n",
 }
 
 
-def _lame_steel_collar_on_brass_rod(interference: float) -> tuple[float, float, float]:
+def _lame_steel_collar_on_brass_rod(
+    interference: float, outer_diameter: float
+) -> tuple[float, float, float]:
     """Independent oracle: free-axial Lamé, solid Ø6 brass rod (E 97000, nu
-    0.34) in a Ø12 1018 steel collar (E 200000, nu 0.29). Returns the contact
+    0.34) in a 1018 steel collar (E 200000, nu 0.29). Returns the contact
     pressure, the bore hoop stress and the bore von Mises stress, MPa."""
-    d, od = 6.0, 12.0
+    d, od = 6.0, outer_diameter
     ratio = (od**2 + d**2) / (od**2 - d**2)
     pressure = interference / (d * ((1.0 - 0.34) / 97000.0 + (ratio + 0.29) / 200000.0))
     hoop, radial = pressure * ratio, -pressure
@@ -174,6 +182,8 @@ def _lame_steel_collar_on_brass_rod(interference: float) -> tuple[float, float, 
 def test_light_press_budget_is_the_lame_collar_inside_strength() -> None:
     import build_mg_magnifying_bracket as bracket
     import mg_lever_press_fit_geom as press
+    import mg_magnifying_bracket_spec as bracket_spec
+    from _printed_tolerance import printed_band_mm
 
     # The approved LIGHT PRESS and its physics inputs, pinned.
     assert press.PRESS_ZONE_DIA == 6.0
@@ -181,9 +191,21 @@ def test_light_press_budget_is_the_lame_collar_inside_strength() -> None:
     assert press.COLLAR_BORE_DIA == 5.986
     assert press.COLLAR_BORE_BAND == (0.006, 0.0)
     assert press.COLLAR_ENGAGEMENT == 7.0
+    assert press.COLLAR_LENGTH == 10.0
+    assert press.COLLAR_LENGTH_BAND == (0.0, -0.05)
+    assert press.PRESS_ZONE_LENGTH_BAND == (0.0, -0.05)
+    assert press.COLLAR_ENGAGEMENT_MAX == pytest.approx(7.003, abs=1e-12)
     assert press.PRESS_INTERFERENCE_MAX_FN2 == pytest.approx(0.0254)
     assert press.COLLAR_OD == 12.0
     assert bracket.COLLAR_OD == press.COLLAR_OD  # the Lamé section is the modelled collar
+    # CollarOd prints at two places with no native band, so its band is the
+    # title block's inherited .XX row, restated (config-free) by the owner.
+    od_places = bracket_spec.DRAWING_PRECISION["CollarProfile"]["CollarOd"]
+    assert od_places == 2
+    assert press.COLLAR_OD_BAND == (printed_band_mm(od_places), -printed_band_mm(od_places))
+    assert press.COLLAR_OD_BAND == (0.51, -0.51)
+    assert press.COLLAR_OD_MIN == pytest.approx(12.0 - 0.51, abs=1e-12)
+    assert press.COLLAR_OD_MAX == pytest.approx(12.0 + 0.51, abs=1e-12)
     assert (press.ROD_E_MPA, press.ROD_POISSON) == (97000.0, 0.34)
     assert (press.COLLAR_E_MPA, press.COLLAR_POISSON) == (200000.0, 0.29)
     assert press.COLLAR_YIELD_MPA == 370.0
@@ -204,28 +226,49 @@ def test_light_press_budget_is_the_lame_collar_inside_strength() -> None:
     assert budget["interference_max"] == pytest.approx(tightest, abs=1e-12)
     assert budget["interference_min"] == pytest.approx(0.002, abs=1e-12)
     assert budget["interference_max"] == pytest.approx(0.014, abs=1e-12)
-    assert budget["engagement"] == 7.0
+    assert budget["engagement"] == pytest.approx(10.0 - (6.0 - 0.006) / 2.0)
 
-    pressure, hoop, von_mises = _lame_steel_collar_on_brass_rod(tightest)
-    seat_area = math.pi * 6.0 * 7.0
-    assert budget["contact_pressure_mpa"] == pytest.approx(pressure, rel=1e-12)
+    # Independently conservative OD corners, each at the tightest interference:
+    # the thinnest wall for bore stress, the stiffest wall for pressure/force.
+    strength_od, force_od = 12.0 - 0.51, 12.0 + 0.51
+    assert budget["strength_outer_diameter_mm"] == pytest.approx(strength_od, abs=1e-12)
+    assert budget["force_outer_diameter_mm"] == pytest.approx(force_od, abs=1e-12)
+    strength_pressure, hoop, von_mises = _lame_steel_collar_on_brass_rod(tightest, strength_od)
+    pressure, _, _ = _lame_steel_collar_on_brass_rod(tightest, force_od)
+    seat_area = math.pi * 6.0 * (10.0 - (6.0 - 0.006) / 2.0)
+    assert budget["strength_contact_pressure_mpa"] == pytest.approx(strength_pressure, rel=1e-12)
     assert budget["collar_hoop_mpa"] == pytest.approx(hoop, rel=1e-12)
     assert budget["collar_von_mises_mpa"] == pytest.approx(von_mises, rel=1e-12)
+    assert budget["contact_pressure_mpa"] == pytest.approx(pressure, rel=1e-12)
     assert budget["press_force_min_n"] == pytest.approx(0.10 * pressure * seat_area, rel=1e-12)
     assert budget["press_force_max_n"] == pytest.approx(0.15 * pressure * seat_area, rel=1e-12)
     # Hand-worked values, so a shared slip in both formulas still fails.
-    assert budget["contact_pressure_mpa"] == pytest.approx(140.669, abs=1e-3)
-    assert budget["collar_hoop_mpa"] == pytest.approx(234.448, abs=1e-3)
-    assert budget["collar_von_mises_mpa"] == pytest.approx(328.227, abs=1e-3)
-    assert budget["press_force_min_n"] == pytest.approx(1856.08, abs=1e-2)
-    assert budget["press_force_max_n"] == pytest.approx(2784.12, abs=1e-2)
+    assert budget["engagement"] == pytest.approx(7.003, abs=1e-12)
+    assert budget["strength_contact_pressure_mpa"] == pytest.approx(137.227951, abs=1e-6)
+    assert budget["collar_hoop_mpa"] == pytest.approx(240.127370, abs=1e-6)
+    assert budget["collar_von_mises_mpa"] == pytest.approx(330.824502, abs=1e-6)
+    assert budget["contact_pressure_mpa"] == pytest.approx(143.663360, abs=1e-6)
+    assert budget["press_force_min_n"] == pytest.approx(1896.405777, abs=1e-6)
+    assert budget["press_force_max_n"] == pytest.approx(2844.608666, abs=1e-6)
+
+    # Across the whole inherited OD band, no diameter beats either corner:
+    # bore stress peaks at the thinnest wall, contact pressure at the stiffest.
+    sweep = [
+        _lame_steel_collar_on_brass_rod(tightest, strength_od + (force_od - strength_od) * i / 200)
+        for i in range(201)
+    ]
+    assert max(row[2] for row in sweep) == pytest.approx(budget["collar_von_mises_mpa"], rel=1e-12)
+    assert max(row[0] for row in sweep) == pytest.approx(budget["contact_pressure_mpa"], rel=1e-12)
+    assert budget["strength_contact_pressure_mpa"] < budget["contact_pressure_mpa"]
 
     # Every guard holds at the printed fit.
     assert budget["interference_min"] > 0.0
     assert budget["interference_max"] <= 0.0010 * 25.4
     assert budget["collar_von_mises_mpa"] < 0.9 * 370.0
-    assert 0.9 * 370.0 - budget["collar_von_mises_mpa"] == pytest.approx(4.773, abs=1e-3)
+    assert 0.9 * 370.0 - budget["collar_von_mises_mpa"] == pytest.approx(2.175498, abs=1e-6)
     press.check_press_fit_budget(budget)
+    assert press.PRESS_FORCE_MAX_KN == 2.9
+    assert budget["press_force_max_n"] <= 1000.0 * press.PRESS_FORCE_MAX_KN
 
 
 def test_press_guard_rejects_a_fit_that_yields_the_collar() -> None:
@@ -242,9 +285,11 @@ def test_press_guard_rejects_a_fit_that_yields_the_collar() -> None:
     assert heavy["interference_min"] == pytest.approx(0.008, abs=1e-12)
     assert heavy["interference_max"] == pytest.approx(0.024, abs=1e-12)
     assert heavy["interference_max"] <= 0.0010 * 25.4
-    _, _, von_mises = _lame_steel_collar_on_brass_rod(6.000 - 5.976)
+    # Judged at the inherited band's thinnest-wall strength corner, Ø11.49.
+    assert heavy["strength_outer_diameter_mm"] == pytest.approx(12.0 - 0.51, abs=1e-12)
+    _, _, von_mises = _lame_steel_collar_on_brass_rod(6.000 - 5.976, 12.0 - 0.51)
     assert heavy["collar_von_mises_mpa"] == pytest.approx(von_mises, rel=1e-12)
-    assert von_mises == pytest.approx(562.674, abs=1e-3)
+    assert von_mises == pytest.approx(567.128, abs=1e-3)
     assert von_mises >= 0.9 * 370.0
     with pytest.raises(AssertionError, match="yield"):
         press.check_press_fit_budget(heavy)
@@ -267,7 +312,7 @@ def test_press_instruction_rounds_force_up_and_keeps_the_rod_out_of_column_loadi
 
     maximum_kn = press.PRESS_FIT_BUDGET["press_force_max_n"] / 1000.0
     assert maximum_kn <= press.PRESS_FORCE_MAX_KN < maximum_kn + 0.1
-    assert press.PRESS_FORCE_MAX_KN == 2.8
+    assert press.PRESS_FORCE_MAX_KN == 2.9
     lines = press.PRESS_INSTALLATION_NOTES.splitlines()
     assert len(lines) == 3
     assert "COLLAR ONTO LEVER; HOLD ROD NEAR END" in lines[0]

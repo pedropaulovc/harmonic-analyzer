@@ -11,14 +11,15 @@ drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 The bracket is a three-feature fitting: an extruded COLLAR tube (Ø12 OD, 10
 long about local X) whose bore is the PRESS seat for the Ø6 magnifying lever
-(nominal and band from ``mg_lever_press_fit_geom``, the joint's one read
+(nominal and bands from ``mg_lever_press_fit_geom``, the joint's one read
 point), a rectangular ARM cantilevering +Z to the summing plate, and a mounting
-FLANGE that butts the plate's front face.  The two plan rectangles carry the
-auto-importable marked dimensions, including the flange thickness band; the
-collar's end-view circles carry the OD and the banded bore, and its extrude
-the length; the blanked ``ArmSection`` witness carries the arm's section and
-the bore axis's station in the right view.  Native counterbore callouts define
-the through bore and head seat.
+FLANGE whose +Z face butts the plate's front face.  The two plan rectangles
+carry the auto-importable marked dimensions, including the flange thickness
+band; the collar's end-view circles carry the OD and the banded bore, and its
+extrude the banded length; the blanked ``ArmSection`` witness carries the
+arm's section and the bore axis's one datum chain (the mounting face and the
+arm's end, both from the axis) in the side view.  Native counterbore callouts
+define the through bore and head seat.
 """
 
 from __future__ import annotations
@@ -29,26 +30,32 @@ from magnifying_bracket_joint_layout import (
 from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The two extruded PLAN rectangles auto-import to the top view
+# print shows.  The two extruded PLAN rectangles auto-import to the front view
 # exactly like column_clamp_front's BlockProfile; the arm and flange chains are
 # NAME-DISAMBIGUATED in the build (ArmWidth/ArmDepth vs FlangeWidth/FlangeDepth)
-# because a shared bare "Width"/"Depth" would collide in the top view's keep
-# map.  The collar's annulus sketch (Right plane) imports to the RIGHT end view
-# -- the OD and the press-seat bore with its native band -- and the mid-plane
-# extrude's one dimension, the collar length, to the top view.  The blanked
-# ArmSection witness (Right plane) imports to the same end view: the arm's
+# because a shared bare "Width"/"Depth" would collide in the front view's keep
+# map.  The arm's depth (its Z extent from a start buried inside the collar)
+# stays unmarked: the arm's end is located from the bore axis instead
+# (mreview09 blocker 3, two origins for the collar).  The collar's annulus
+# sketch (Right plane) imports to the side view -- the OD and the press-seat
+# bore with its native band -- and the mid-plane extrude's one dimension, the
+# collar length with its band (COLLAR_LENGTH_BAND: the press contact is the
+# collar's length less the lever's dome), to the front view.  The blanked
+# ArmSection witness (Right plane) imports to the same side view: the arm's
 # thickness, its lower face from the bore axis (controlling) and from the
-# flange's hole-datum face (reference), and the seat face from the bore axis;
-# its two closing dimensions (the arm end from the axis, the flange above the
-# arm) stay unmarked. ---
+# flange's hole-datum face (reference), the flange's mounting face and the
+# arm's end from the bore axis; its last closing dimension (the flange above
+# the arm) stays unmarked. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarBore"},
     "Collar": {"CollarLen"},
-    "ArmProfile": {"ArmWidth", "ArmDepth"},
+    "ArmProfile": {"ArmWidth"},
     "FlangeProfile": {"FlangeWidth", "FlangeDepth"},
     "Flange": {"FlangeHeight"},
     "MountingCoordinates": {"MountingX0", "MountingX1", "MountingY0"},
-    "ArmSection": {"ArmThickness", "ArmBelowAxis", "ArmOffset", "SeatToAxis"},
+    "ArmSection": {
+        "ArmThickness", "ArmBelowAxis", "ArmOffset", "SeatToAxis", "ArmEndFromAxis",
+    },
 }
 
 # Wizard callout precision is applied in the build through observed native
@@ -56,7 +63,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION = {
     "CollarProfile": {"CollarOd": 2, "CollarBore": 3},
     "Collar": {"CollarLen": 2},
-    "ArmProfile": {"ArmWidth": 2, "ArmDepth": 2},
+    "ArmProfile": {"ArmWidth": 2},
     "FlangeProfile": {"FlangeWidth": 2, "FlangeDepth": 3},
     "Flange": {"FlangeHeight": 2},
     "ArmSection": {
@@ -64,8 +71,11 @@ DRAWING_PRECISION = {
         "ArmBelowAxis": 2,
         "ArmOffset": 2,
         "SeatToAxis": 2,
+        "ArmEndFromAxis": 2,
     },
 }
+# The collar's length band, like the bore's, is read by the build straight
+# from mg_lever_press_fit_geom (COLLAR_LENGTH_BAND) onto the extrude's CollarLen.
 DRAWING_POSITION_BAND = POSITION_BAND
 
 # True free-text instructions only (policy rule 6): the collar's sizes and the

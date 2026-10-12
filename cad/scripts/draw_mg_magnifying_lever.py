@@ -1,17 +1,18 @@
 r"""Create the curated machinist drawing for the magnifying lever rod.
 
 The rod is a revolved Ø6 x 165 brass capsule with hemispherical ends -- a
-smooth, tangent-continuous body with NO flat face, no end-face circle and no
-selectable silhouette edge, so coordinate picks are unreliable (the dome-tip
-pick fails) and the print rests on the auto-imported profile marks (the far
-dome-centre station and the dome radius R3) plus two blanked reference sketches
-the FRONT view shows and dimensions: ``RodStock`` (the stock Ø6 at mid-length)
-and ``PressZone`` (the straight engagement the bracket collar grips -- its
-length from the dome tangent and its banded diameter, tied to the MHA-MG-001
-bore it enters).  The overall length rides the notes (the note-based path the
-recipe pitfall endorses for un-pickable turned features).  The rod axis is
-local +X, so the FRONT view is the long side elevation and the RIGHT view is
-the circular end.
+smooth, tangent-continuous body with NO flat face and no end-face circle, so
+the print rests on the auto-imported profile marks (the overall length tip to
+tip and the dome radius, a radial reference "(R3.0)": each end is a tangent
+full hemisphere on the selected bar) plus two blanked reference sketches the
+FRONT view shows and dimensions: ``RodStock`` (the stock Ø6 and its
+cold-drawn band at mid-length) and ``PressZone`` (the cylinder the bracket
+collar grips -- its banded start back from the east tip, its length to the
+dome tangent as a reference, and its banded diameter, tied to the MHA-MG-001
+bore it enters).  The OD's finish is the part's native symbol on the rod's
+silhouette.  The rod axis is local +X, so the FRONT view is the long side
+elevation; an end view of a plain round would show nothing the Ø does not, so
+there is none.
 
 Run with SolidWorks open::
 
@@ -25,11 +26,12 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
+    dimension_name,
     place_view,
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -39,18 +41,24 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
-from _drawing_dimensions import set_dimension_callouts
+from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
+from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
+from _surface_finish import surface_finish_by_key
 import _telemetry
-from mg_lever_press_fit_geom import COLLAR_ENGAGEMENT, ROD_DIA
+from mg_lever_press_fit_geom import ROD_DIA
 from mg_magnifying_lever_spec import (
     DRAWING_DIMENSIONS,
     PRESS_ZONE_DIA_CALLOUT,
+    PRESS_ZONE_LENGTH,
+    RADIAL_REFERENCE_DIMENSIONS,
+    REFERENCE_DIMENSIONS,
     ROD_LENGTH,
+    SURFACE_FINISHES,
 )
 
 
@@ -67,50 +75,80 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-END_VIEW_SCALE = 4.0
 FRONT_CENTER = (0.115, 0.150)
-RIGHT_CENTER = (
-    FRONT_CENTER[0] + ROD_LENGTH * SHEET_SCALE[0] / 2000.0 + 0.055,
-    FRONT_CENTER[1],
-)
 ISO_CENTER = (0.350, 0.185)
 ISO_SCALE = (1, 2)
 
-# The two native profile dims the print keeps: the far dome-centre station
-# (below the side view) and the dome radius, above and right of the right dome
-# so its leader climbs steeply, clear of the press zone's extension line at
-# the dome tangent.
+# Sheet stations of the rod's east end, from the model's own constants: the
+# tip, the press zone's start (PRESS_ZONE_LENGTH back from the tip), the dome
+# tangent (one radius back) and the zone cylinder's mid-length; the rod's
+# top outline.
+_ROD_TIP_X = FRONT_CENTER[0] + ROD_LENGTH * SHEET_SCALE[0] / 2000.0
+_PRESS_ZONE_START_X = _ROD_TIP_X - PRESS_ZONE_LENGTH * SHEET_SCALE[0] / 1000.0
+_DOME_TANGENT_X = _ROD_TIP_X - ROD_DIA / 2.0 * SHEET_SCALE[0] / 1000.0
+_PRESS_ZONE_MID_X = (_PRESS_ZONE_START_X + _DOME_TANGENT_X) / 2.0
+_ROD_TOP_Y = FRONT_CENTER[1] + ROD_DIA / 2.0 * SHEET_SCALE[1] / 1000.0
+
+# The two native profile dims the print keeps: the tip-to-tip length below the
+# rod, outermost (its extension lines drop from both tips), and the dome
+# radius reference right of the east tip, its three rows between the zone
+# diameter's dimension line (left) and block (above).
 FRONT_KEEP = {
-    "RightDomeCentre": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.032),
-    "DomeRadius": (RIGHT_CENTER[0] - 0.047, FRONT_CENTER[1] + 0.025),
+    "OverallLength": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.034),
+    "DomeRadius": (_ROD_TIP_X + 0.040, FRONT_CENTER[1] + 0.008),
 }
 # The reference sketches' dims.  The stock diameter above the rod at
-# mid-length.  The press zone at the rod's east (dome-tip) end: the straight
-# engagement's length above the rod, pushed left of the dome-radius leader
-# (the 7 mm span cannot hold its own text, so SolidWorks sets the text outside
-# the extension lines; v41 landed "FROM TIP" under the R3 leader at -0.006);
-# the banded diameter below-right of the tip, its long mate callout running
-# right under the end view, below the isometric caption and above the end-view
-# caption, clear of the far-dome-centre dimension line (x <= 0.195).
-_ROD_TIP_X = FRONT_CENTER[0] + ROD_LENGTH * SHEET_SCALE[0] / 2000.0
-_PRESS_ZONE_MID_X = (
-    _ROD_TIP_X - (ROD_DIA / 2.0 + COLLAR_ENGAGEMENT / 2.0) * SHEET_SCALE[0] / 1000.0
-)
+# mid-length.  The press zone's lengths hang below the rod off the witness on
+# its bottom outline and the tip (layout doc: a horizontal dim's rows centre
+# on the requested x): the cylinder's reference length innermost, its row
+# left of the 7 mm span; the start from the tip outside it, its rows right of
+# the tip.  The banded diameter's dimension line stands inside the zone and
+# its rows hang ABOVE the rod, right of that line: the line rises to the
+# shoulder under the block, never alongside a row of text, and the two-row
+# mate callout stays short of the isometric.
 REFERENCE_KEEP = {
     "RodDia": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.020),
-    "PressZoneLen": (_PRESS_ZONE_MID_X - 0.026, FRONT_CENTER[1] + 0.013),
-    "PressZoneDia": (_ROD_TIP_X + 0.018, FRONT_CENTER[1] - 0.025),
+    "PressZoneLen": (_PRESS_ZONE_START_X - 0.010, FRONT_CENTER[1] - 0.012),
+    "PressZoneStart": (_ROD_TIP_X + 0.024, FRONT_CENTER[1] - 0.024),
+    "PressZoneDia": (_PRESS_ZONE_MID_X, FRONT_CENTER[1] + 0.030),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "DomeRadius": "BOTH ENDS",
-    "RightDomeCentre": "TO FAR DOME CENTRE",
+    "DomeRadius": "BOTH ENDS\nTANGENT HEMISPHERE",
 }
 REFERENCE_CALLOUTS = {
     "RodDia": "STOCK OD",
-    "PressZoneLen": "PRESS ZONE",
+    "PressZoneStart": "PRESS ZONE START",
     "PressZoneDia": PRESS_ZONE_DIA_CALLOUT,
 }
+# The OD finish symbol: picked on the rod's top silhouette in the clamp
+# block's travel, standing above it, left of the stock diameter.
+FINISH_PICK = (FRONT_CENTER[0] - 0.050, _ROD_TOP_Y)
+FINISH_SYMBOL = (FRONT_CENTER[0] - 0.050, FRONT_CENTER[1] + 0.020)
+
+
+def _set_radial_reference(adapter: Any, annotation: Any, *, label: str) -> None:
+    """Print a model radius as the ASME radial reference ``(R3.0)``.
+
+    The radius is read-only: each dome is a full hemisphere tangent to the
+    bar, so the selected press-zone diameter fixes it.  The singular
+    ``set_reference_dimension`` writes a bare ``(`` prefix, which replaces the
+    display's own radius glyph, so whatever prefix it carries is kept behind
+    the ``(``; the readback proves it stuck (draw_ch_pivot_shaft's ``(SR4.1)``
+    idiom, without the spherical S).
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    prefix = "(" + existing
+    display.SetText(1, prefix)
+    display.SetText(2, ")")  # swDimensionTextSuffix
+    applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    _telemetry.info(
+        f"{label}: radial reference prefix {existing!r} -> {applied[0]!r}, "
+        f"suffix {applied[1]!r}"
+    )
+    if applied != (prefix, ")"):
+        raise RuntimeError(f"failed to mark {label} as a radial reference: {applied}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -128,7 +166,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
             "Iso View Note",
         ),
         required=(
@@ -137,7 +174,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
             "Iso View Note",
         ),
     )
@@ -157,16 +193,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, right, iso):
+    for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    for name in sorted(RADIAL_REFERENCE_DIMENSIONS):
+        matches = [a for a in front_annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one lever {name} radial reference")
+        _set_radial_reference(adapter, matches[0], label=f"lever {name}")
     # The part saves PressZone and RodStock blanked (they would print in every
     # assembly render); shown here per view, their dimensions import and stay.
     reference_annotations = curate_hidden_dimensions(
@@ -177,13 +216,29 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, reference_annotations, REFERENCE_CALLOUTS)
-    # The end silhouette is circular; SolidWorks files it under the same
-    # "hole" bit as a bored circle, so a disabled bit makes the API a no-op.
-    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to rod end view")
+    # The zone cylinder's length is the start less the dome radius: a LINEAR
+    # reference. The plural set_reference_dimensions forces a diameter glyph.
+    for name in sorted(REFERENCE_DIMENSIONS):
+        matches = [
+            a for a in reference_annotations if dimension_name(adapter, a) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one lever {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"lever {name}")
+    # The clamp block slides on the OD: the part's own finish control, on the
+    # cylinder's silhouette (the capsule has no model edge along it).
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=FINISH_PICK,
+        symbol_xy=FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "rod_od"),
+        label="lever rod OD finish",
+        entity_type="SILHOUETTE",
+        char_height=0.0025,
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
-    add_property_linked_note(adapter, "End View Note", RIGHT_CENTER[0] - 0.022, 0.100)
     add_property_linked_note(adapter, "Iso View Note", 0.320, 0.140)
 
     return await finalize_drawing(

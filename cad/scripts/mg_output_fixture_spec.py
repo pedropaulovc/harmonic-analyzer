@@ -69,7 +69,8 @@ GROOVE_RADIUS_PLACES = 2
 ROD_BORE_DIA_PLACES = 2
 # The tap's drill and thread depths (native Hole Wizard variables): one place,
 # the general .X.  The drill depth governs; the thread depth is REF -- the
-# note's THREAD ENDS AT ROD BORE governs the thread's extent, not a .X band.
+# callout prints it in parentheses, and the note's THREAD ENDS AT ROD BORE
+# governs the thread's extent, not a .X band.
 TAP_DEPTH_PLACES = 1
 REFERENCE_DIMENSIONS = frozenset({"HexAf"})
 
@@ -224,7 +225,7 @@ if TAP_REACH_NEEDED > PLUG_TAP_USABLE_LENGTH + 1e-9:
     raise AssertionError("MHA-MG-006 plug tap cannot cut full thread through the wall")
 if not FAR_WALL_NEAREST > PLUG_TAP_USABLE_LENGTH:
     raise AssertionError("MHA-MG-006 plug tap reaches the rod bore's far wall")
-# The callout's REF thread depth is the nominal wall on the tap's axis: where
+# The callout's (REF) thread depth is the nominal wall on the tap's axis: where
 # the rod bore ends the thread.
 if abs(TAP_LENGTH - (OVERALL_LENGTH - ROD_STATION - ROD_BORE_DIA / 2.0)) > 1e-9:
     raise AssertionError("MHA-MG-006 thread depth is not the wall on the tap's axis")
@@ -297,9 +298,14 @@ ROD_BORE_CALLOUT = "REAM THRU"
 # Ahead of the native thread row: the tap runs from the spigot face into the
 # bore (no THRU: the tap stops in the bore, short of the far wall).
 TAP_PROCESS = "TAP INTO BORE"
+# The controlling drill depth and the reference thread depth, by their native
+# Hole Wizard variable names: the sheet brackets the thread depth's variable in
+# the callout's own definition, so the printed (10.1) stays the model's.
+TAP_DRILL_DEPTH_VARIABLE = "hw-tapdrldepth"
+TAP_THREAD_DEPTH_VARIABLE = "hw-threaddepth"
 TAP_CALLOUT_PRECISION = {
-    "hw-tapdrldepth": TAP_DEPTH_PLACES,
-    "hw-threaddepth": TAP_DEPTH_PLACES,
+    TAP_DRILL_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
+    TAP_THREAD_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
 }
 STOCK_NOTE = "3/8 HEX BAR, FLATS AS SUPPLIED."
 # Named exception: MHA-MG-006 bore-to-flat wall (drawing-simplicity-policy.md, "Named exceptions").
@@ -308,10 +314,10 @@ BORE_WALL_NOTE = (
     f"ROD BORE CENTRED; BORE TO FLAT WALL {BORE_WALL_STATED_MIN:.2f} MIN."
 )
 # The tap the reach above rests on, and the thread's extent: the rod bore ends
-# it; the native thread depth on the callout is its nominal, REF.
+# it; the callout prints the native thread depth, its nominal, as (REF).
 TAP_TOOL_NOTE = (
     f"{TAP_SPEC.size.lstrip('#')}: PLUG TAP, "
     f"{PLUG_TAP_CHAMFER_THREADS[0]}-{PLUG_TAP_CHAMFER_THREADS[1]} THREAD CHAMFER."
 )
-TAP_EXTENT_NOTE = "THREAD ENDS AT ROD BORE; THREAD DEPTH REF."
+TAP_EXTENT_NOTE = "THREAD ENDS AT ROD BORE."
 DRAWING_NOTES = "\n".join((STOCK_NOTE, BORE_WALL_NOTE, TAP_TOOL_NOTE, TAP_EXTENT_NOTE))

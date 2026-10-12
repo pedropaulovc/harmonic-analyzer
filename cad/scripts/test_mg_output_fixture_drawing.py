@@ -170,7 +170,7 @@ def test_bore_is_centred_and_the_stated_wall_is_the_named_shortfall() -> None:
         "3/8 HEX BAR, FLATS AS SUPPLIED.",
         f"ROD BORE CENTRED; BORE TO FLAT WALL {stated} MIN.",
         "4-40: PLUG TAP, 3-5 THREAD CHAMFER.",
-        "THREAD ENDS AT ROD BORE; THREAD DEPTH REF.",
+        "THREAD ENDS AT ROD BORE.",
     ]
     policy = POLICY.read_text(encoding="utf-8").split("\n## Named exceptions", 1)[1]
     rows = [line for line in policy.splitlines() if line.startswith("| MHA-MG-006")]
@@ -242,18 +242,149 @@ def test_a_plug_tap_reaches_full_thread_through_the_wall_and_stops_short() -> No
     assert spec.TAP_TOOL_NOTE in spec.DRAWING_NOTES.splitlines()
 
 
+def _code_strings(tree: ast.Module) -> list[str]:
+    """Every string literal the module's code holds: docstrings are prose."""
+    docstrings = {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+    }
+    return [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
+    ]
+
+
 def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
     # The native thread depth is the nominal wall on the tap's axis; the
-    # sheet makes it REF, so no .X band (10.1 +/-0.8 would admit 9.3) governs
-    # the thread's extent: the rod bore does.
-    assert spec.TAP_EXTENT_NOTE == "THREAD ENDS AT ROD BORE; THREAD DEPTH REF."
+    # callout brackets it as REF, so no .X band (10.1 +/-0.8 would admit 9.3)
+    # governs the thread's extent: the rod bore does (the note).  Review09:
+    # a bare 10.1 in the callout read as controlling while the note said REF.
+    assert spec.TAP_EXTENT_NOTE == "THREAD ENDS AT ROD BORE."
+    assert "REF" not in spec.DRAWING_NOTES
     assert spec.TAP_EXTENT_NOTE in spec.DRAWING_NOTES.splitlines()
     assert geom.TAP_SPEC.overrides_mm["ThreadDepth"] == geom.TAP_LENGTH
     assert geom.TAP_LENGTH == pytest.approx(geom.SPIGOT_FACE_X - geom.ROD_BORE_DIA / 2.0)
-    # The native depth stays model-owned: no typed replacement on the sheet.
+    assert set(spec.TAP_CALLOUT_PRECISION) == {
+        spec.TAP_DRILL_DEPTH_VARIABLE,
+        spec.TAP_THREAD_DEPTH_VARIABLE,
+    } == {"hw-tapdrldepth", "hw-threaddepth"}
+    # The native depth stays model-owned: the brackets go round the variable
+    # in the definition; no code string types the value.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_hole_callout_precision(" in source
-    assert "(10.1)" not in source and "10.1 REF" not in source
+    printed = (f"{geom.TAP_LENGTH:.1f}", f"{geom.TAP_DRILL_DEPTH:.1f}")
+    assert not [
+        text for text in _code_strings(ast.parse(source)) if any(p in text for p in printed)
+    ]
+
+
+def _build_calls_in_order(names: set[str]) -> list[str]:
+    """The named calls ``build`` makes, in source order."""
+    build = _build_function(ast.parse(Path(drawing.__file__).read_text(encoding="utf-8")))
+    calls = [
+        node
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call) and _call_name(node) in names
+    ]
+    return [_call_name(node) for node in sorted(calls, key=lambda n: (n.lineno, n.col_offset))]
+
+
+def test_the_thread_depth_is_bracketed_between_the_callout_and_its_checks() -> None:
+    # Bracketed before the precision write and the resolved-text proof, so
+    # both run on the definition that prints.
+    assert _build_calls_in_order(
+        {
+            "add_native_hole_callout",
+            "_reference_thread_depth",
+            "set_hole_callout_precision",
+            "_check_tap_callout",
+        }
+    ) == [
+        "add_native_hole_callout",
+        "_reference_thread_depth",
+        "set_hole_callout_precision",
+        "_check_tap_callout",
+    ]
+
+
+# Retry09's definitions, as the resolved parts imply (prefix 5 carries the
+# process and the thread row, callout-above 7 the drill row).
+_RETRY09_DEFINITIONS = {
+    5: "TAP INTO BORE <hw-thread> <HOLE-DEPTH> <hw-threaddepth>",
+    6: "",
+    7: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>",
+    8: "",
+}
+
+
+def test_thread_depth_definition_gains_reference_brackets_only() -> None:
+    updated = drawing.reference_thread_depth_definitions(dict(_RETRY09_DEFINITIONS))
+    assert updated == {
+        5: "TAP INTO BORE <hw-thread> <HOLE-DEPTH> (<hw-threaddepth>)",
+        6: "",
+        7: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>",
+        8: "",
+    }
+
+
+@pytest.mark.parametrize(
+    "definitions",
+    [
+        # Already bracketed: someone else's edit, not the native definition.
+        {**_RETRY09_DEFINITIONS, 5: "TAP INTO BORE <hw-thread> <HOLE-DEPTH> (<hw-threaddepth>)"},
+        # No thread depth to bracket.
+        {**_RETRY09_DEFINITIONS, 5: "TAP INTO BORE <hw-thread>"},
+        # Two thread depths: which one is the reference is a guess.
+        {**_RETRY09_DEFINITIONS, 8: "<hw-threaddepth>"},
+        # The controlling drill depth missing, or bracketed.
+        {**_RETRY09_DEFINITIONS, 7: "<MOD-DIAM><hw-tapdrldia>"},
+        {**_RETRY09_DEFINITIONS, 7: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> (<hw-tapdrldepth>)"},
+    ],
+)
+def test_thread_depth_definition_refuses_anything_but_one_bare_variable(
+    definitions: dict[int, str],
+) -> None:
+    with pytest.raises(RuntimeError, match="expected one bare"):
+        drawing.reference_thread_depth_definitions(definitions)
+
+
+class _CalloutDisplay:
+    """IDisplayDimension.GetText/SetText on a hole callout: definition part d
+    (5-8) is written through part d - 4; ``persist`` False drops the write."""
+
+    def __init__(self, definitions: dict[int, str], *, persist: bool = True) -> None:
+        self.definitions = dict(definitions)
+        self.persist = persist
+        self.writes: list[tuple[int, str]] = []
+
+    def GetText(self, part: int) -> str:
+        return self.definitions[part]
+
+    def SetText(self, part: int, text: str) -> None:
+        self.writes.append((part, text))
+        if self.persist:
+            self.definitions[part + 4] = text
+
+
+def test_reference_thread_depth_writes_one_definition_and_reads_all_back() -> None:
+    display = _CalloutDisplay(_RETRY09_DEFINITIONS)
+    drawing._reference_thread_depth(display)
+    assert display.writes == [
+        (1, "TAP INTO BORE <hw-thread> <HOLE-DEPTH> (<hw-threaddepth>)")
+    ]
+    assert display.definitions[7] == _RETRY09_DEFINITIONS[7]
+
+
+def test_reference_thread_depth_fails_when_the_write_does_not_persist() -> None:
+    with pytest.raises(RuntimeError, match="did not persist as REF"):
+        drawing._reference_thread_depth(_CalloutDisplay(_RETRY09_DEFINITIONS, persist=False))
 
 
 @pytest.mark.parametrize(
@@ -261,14 +392,24 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
     [
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> 10.1",
+                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
                 3: "",
                 4: "",
             },
             True,
         ),
-        # Retry08's native reading (20261012T111849499Z, swmaker000005).
+        # Retry09's native reading (20261012T124257186Z), bracketed.
+        (
+            {
+                1: "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> (10.1)",
+                2: "",
+                3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                4: "",
+            },
+            True,
+        ),
+        # Retry09 as printed: a bare 10.1 reads as controlling (review09).
         (
             {
                 1: "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> 10.1",
@@ -276,7 +417,27 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
                 3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
                 4: "",
             },
-            True,
+            False,
+        ),
+        # The reference stated twice, once bare.
+        (
+            {
+                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1) 10.1",
+                2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
+                3: "",
+                4: "",
+            },
+            False,
+        ),
+        # The controlling drill depth bracketed as if it were REF.
+        (
+            {
+                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
+                2: "<MOD-DIAM>2.26 <HOLE-DEPTH> (12.7)",
+                3: "",
+                4: "",
+            },
+            False,
         ),
         # The old ambiguous callout: THRU on both rows.
         (
@@ -291,7 +452,7 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
         # Two places on the thread depth asks for the .XX band.
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> 10.10",
+                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.10)",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
                 3: "",
                 4: "",
@@ -301,7 +462,7 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
         # The thread without its extent.
         (
             {
-                1: "4-40 UNC-2B <HOLE-DEPTH> 10.1",
+                1: "4-40 UNC-2B <HOLE-DEPTH> (10.1)",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
                 3: "",
                 4: "",
@@ -311,7 +472,7 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
         # The drill row without its depth.
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> 10.1",
+                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
                 2: "<MOD-DIAM>2.26",
                 3: "",
                 4: "",
@@ -321,7 +482,7 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
         # A band on the REF thread depth.
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> 10.1<MOD-PM>0.8",
+                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1)<MOD-PM>0.8",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
                 3: "",
                 4: "",
@@ -366,7 +527,7 @@ def test_final_sheet_census_expects_no_tapped_hole_note_from_the_blind_tap() -> 
     note = drawing.TAPPED_HOLE_NOTE.lower()
     assert note in f"{geom.TAP_SPEC.size} Tapped Hole".lower()
     native_callout = (
-        "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> 10.1\n"
+        "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> (10.1)\n"
         "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7"
     )
     assert note not in native_callout.lower()
@@ -525,15 +686,213 @@ _TEXT_OVER_LINE = 0.0028
 _TEXT_HEIGHT = 0.0035
 
 
-def test_spigot_dia_text_clears_the_overall_length_witness() -> None:
-    # 2026-10-12 farm sheet: the overall length's witness hangs down the
-    # spigot face and ran through the Ø9.00 text centred 12 mm off the face.
+def _dia_text_box(name: str) -> tuple[float, float, float, float]:
+    """(x0, y0, x1, y1) of a turned Ø text centred on its keep: retry09's
+    Ø9.00 broke its line 2.8 mm either side of the keep's y."""
+    x, y = drawing.SIDE_KEEP[name]
+    half = drawing.TURNED_DIA_TEXT_HALF_WIDTH
+    return (x - half, y - _TEXT_OVER_LINE, x + half, y + _TEXT_OVER_LINE)
+
+
+# A dimension arrow's length on the sheet (retry09 audit: 3.556 mm).
+_ARROW = 0.003556
+
+
+def test_turned_diameters_stack_right_of_the_face_smaller_inside() -> None:
+    # Review09 finding 8: the root Ø's text hung under the view, so its line
+    # ran out of the groove into a shoulder that read as an axial length.
     face_x = drawing._side_x(geom.SPIGOT_FACE_X)
-    x, _y = drawing.SIDE_KEEP["SpigotDia"]
-    assert x - drawing.SPIGOT_DIA_TEXT_HALF_WIDTH > face_x + 0.003
+    root_x, root_y = drawing.SIDE_KEEP["GrooveRootDia"]
+    spigot_x, spigot_y = drawing.SIDE_KEEP["SpigotDia"]
+    root_box, spigot_box = _dia_text_box("GrooveRootDia"), _dia_text_box("SpigotDia")
+    # Both clear the overall length's witness down the face; the smaller
+    # stands inside, so its extension lines end short of the larger's line.
+    assert root_box[0] > face_x + 0.003
+    assert face_x < root_x < spigot_x
+    # Each text breaks its own dimension line between the arrows: the root's
+    # inside the groove's roots, the spigot's inside its OD; neither hangs
+    # off the view.
+    low, high = drawing.GROOVE_ROOT_SHEET_YS
+    assert (low, high) == pytest.approx(
+        (drawing._side_y(-geom.GROOVE_ROOT_DIA / 2.0), drawing._side_y(geom.GROOVE_ROOT_DIA / 2.0))
+    )
+    assert low + _ARROW < root_box[1] and root_box[3] < high - _ARROW
+    od_low = drawing._side_y(-geom.SPIGOT_DIA / 2.0)
+    od_high = drawing._side_y(geom.SPIGOT_DIA / 2.0)
+    assert od_low + _ARROW < spigot_box[1] and spigot_box[3] < od_high - _ARROW
+    assert drawing._SIDE_BOTTOM < root_y < drawing._SIDE_TOP
+    # Neither text crosses the other's dimension line, and the two stagger a
+    # text height apart so they never read as one row.
+    assert spigot_box[0] > root_x + 0.003
+    assert root_box[2] < spigot_x - 0.003
+    assert spigot_box[1] - root_box[3] >= _TEXT_HEIGHT
+    # The spigot's text stays clear of the end view's centre-mark stub, 28 mm
+    # left of its axis (retry09 DetailItem347: 234.0 mm).
+    assert spigot_box[2] < drawing.END_CENTER[0] - 0.028 - 0.005
     # The overall length stays under the view, the groove's radius over it.
     assert drawing.SIDE_KEEP["OverallLength"][1] < drawing._SIDE_BOTTOM
     assert drawing.SIDE_KEEP["GrooveRadius"][1] > drawing._SIDE_TOP
+
+
+def _function(tree: ast.Module, name: str) -> ast.AST:
+    (found,) = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name
+    ]
+    return found
+
+
+def test_groove_root_dia_is_a_doubled_distance_to_the_root_point() -> None:
+    # Finding 8 is presentation only: the part already dimensions the root as
+    # a diametric linear dimension from the groove's axis to the root point,
+    # the start of the face-side arc (GROOVE_X, root_v).
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    profile = _function(tree, "_groove_profile")
+    calls = [
+        node
+        for node in ast.walk(profile)
+        if isinstance(node, ast.Call) and _call_name(node) == "add_diametric_linear_dimension"
+    ]
+    assert [ast.unparse(node) for node in calls] == [
+        "add_diametric_linear_dimension(adapter, axis, f'{toward_face}.start', "
+        "(GROOVE_X, -GROOVE_CENTRE_R), 'GrooveRootDia')"
+    ]
+    source = ast.unparse(profile)
+    assert "root_v = GROOVE_CENTRE_R - GROOVE_RADIUS" in source
+    assert "add_arc(GROOVE_X, GROOVE_CENTRE_R, GROOVE_X, root_v, GROOVE_X, crown_v)" in source
+    assert geom.GROOVE_CENTRE_R - geom.GROOVE_RADIUS == pytest.approx(geom.GROOVE_ROOT_DIA / 2.0)
+    helper = (SCRIPTS / "_drawing_dimension_insert.py").read_text(encoding="utf-8")
+    assert "15,  # swDimensionType_e.swDiametricLinearDimension" in helper
+    assert set(drawing._DOUBLED_DISTANCE_TYPES) == {14, 15}
+
+
+def test_groove_root_dia_is_proved_after_the_side_view_settles() -> None:
+    assert _build_calls_in_order(
+        {"curate_view_dimensions", "_check_tap_callout", "_prove_groove_root_diameter"}
+    ) == [
+        "curate_view_dimensions",
+        "curate_view_dimensions",
+        "_check_tap_callout",
+        "_prove_groove_root_diameter",
+    ]
+
+
+def _nested_root_ink() -> list:
+    """The root Ø's ink as SolidWorks draws a nested doubled distance: an
+    extension line from each root, 1 mm off the groove, 1 mm past the line;
+    the line root to root, broken at the text."""
+    line_x, text_y = drawing.SIDE_KEEP["GrooveRootDia"]
+    low, high = drawing.GROOVE_ROOT_SHEET_YS
+    start = drawing._side_x(geom.GROOVE_X) + 0.001
+    return [
+        ((start, low), (line_x + 0.001, low)),
+        ((start, high), (line_x + 0.001, high)),
+        ((line_x, low), (line_x, text_y - _TEXT_OVER_LINE)),
+        ((line_x, high), (line_x, text_y + _TEXT_OVER_LINE)),
+    ]
+
+
+# Retry09's GrooveRootDia ink, verbatim from its layout audit
+# (20261012T124257186Z): degenerate extensions at the roots, the line down
+# the groove, its 20 mm leg out of it and the 30 mm shoulder under the text.
+_RETRY09_ROOT_INK = [
+    ((0.146, 0.166), (0.146, 0.166)),
+    ((0.146, 0.194), (0.146, 0.194)),
+    ((0.1171778, 0.1461451), (0.147, 0.1461451)),
+    ((0.147, 0.1461451), (0.147, 0.166)),
+    ((0.147, 0.166), (0.147, 0.194)),
+]
+
+
+def test_nested_root_ink_reads_across_the_groove() -> None:
+    line_x = drawing.SIDE_KEEP["GrooveRootDia"][0]
+    assert drawing._groove_root_ink_problem(_nested_root_ink(), line_x) is None
+
+
+@pytest.mark.parametrize(
+    ("case", "problem"),
+    [
+        # Retry09's line against its own keep, shoulder aside: the line
+        # leaves the groove.
+        ("retry09-leg", "not root to root"),
+        # Retry09 whole against the nested keep: its shoulder is stray ink.
+        ("retry09", "neither its dimension line"),
+        # A shoulder hung off the nested line.
+        ("shoulder", "neither its dimension line"),
+        ("drop-extension", "no extension line from the root"),
+        ("drop-line", "no dimension line"),
+    ],
+)
+def test_groove_root_ink_off_the_groove_fails(case: str, problem: str) -> None:
+    keep_x, text_y = drawing.SIDE_KEEP["GrooveRootDia"]
+    nested = _nested_root_ink()
+    segments, line_x = {
+        "retry09-leg": ([s for i, s in enumerate(_RETRY09_ROOT_INK) if i != 2], 0.147),
+        "retry09": (_RETRY09_ROOT_INK, keep_x),
+        "shoulder": ([*nested, ((keep_x, text_y), (keep_x + 0.03, text_y))], keep_x),
+        "drop-extension": (nested[1:], keep_x),
+        "drop-line": (nested[:2], keep_x),
+    }[case]
+    found = drawing._groove_root_ink_problem(segments, line_x)
+    assert found is not None and problem in found
+
+
+class _RootDisplay:
+    """IDisplayDimension: Type2 and Diametric are properties."""
+
+    def __init__(self, kind: int, diametric: bool) -> None:
+        self.Type2 = kind
+        self.Diametric = diametric
+
+
+class _RootAnnotation:
+    """IAnnotation.GetSpecificAnnotation: a method returning the display."""
+
+    def __init__(self, display: _RootDisplay) -> None:
+        self.display = display
+
+    def GetSpecificAnnotation(self) -> _RootDisplay:
+        return self.display
+
+
+def _prove_root(
+    monkeypatch: pytest.MonkeyPatch, kind: int, diametric: bool, segments: list
+) -> list[str]:
+    bound: list[str] = []
+
+    def early_bound(obj: object, interface: str) -> object:
+        bound.append(interface)
+        return obj
+
+    annotation = _RootAnnotation(_RootDisplay(kind, diametric))
+    monkeypatch.setattr(drawing, "_early_bound", early_bound)
+    monkeypatch.setattr(
+        drawing, "dimension_segments", lambda read: segments if read is annotation else []
+    )
+    drawing._prove_groove_root_diameter(annotation)
+    return bound
+
+
+@pytest.mark.parametrize("kind", [14, 15])
+def test_groove_root_proof_passes_a_nested_doubled_distance(
+    monkeypatch: pytest.MonkeyPatch, kind: int
+) -> None:
+    bound = _prove_root(monkeypatch, kind, True, _nested_root_ink())
+    assert bound == ["IAnnotation", "IDisplayDimension"]
+
+
+@pytest.mark.parametrize(("kind", "diametric"), [(2, True), (11, True), (15, False), (14, False)])
+def test_groove_root_proof_refuses_a_plain_or_single_distance(
+    monkeypatch: pytest.MonkeyPatch, kind: int, diametric: bool
+) -> None:
+    with pytest.raises(RuntimeError, match="not the part's doubled distance"):
+        _prove_root(monkeypatch, kind, diametric, _nested_root_ink())
+
+
+def test_groove_root_proof_refuses_retry09s_ink(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(RuntimeError, match="does not print across the groove"):
+        _prove_root(monkeypatch, 15, True, _RETRY09_ROOT_INK)
 
 
 def test_bore_callout_reads_over_the_hex_between_its_witnesses() -> None:

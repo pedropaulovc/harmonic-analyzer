@@ -22,14 +22,13 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is mg_magnifying_lever_spec.DRAWING_DIMENSIONS
     marked = set().union(*mg_magnifying_lever_spec.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.REFERENCE_KEEP)
-    )
+    kept = set(drawing.FRONT_KEEP) | set(drawing.REFERENCE_KEEP)
     assert kept == marked
     assert marked == {
-        "RightDomeCentre",
+        "OverallLength",
         "DomeRadius",
         "RodDia",
+        "PressZoneStart",
         "PressZoneLen",
         "PressZoneDia",
     }
@@ -42,6 +41,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert not set(drawing.REFERENCE_KEEP) & set(drawing.FRONT_KEEP)
     assert mg_magnifying_lever_spec.DRAWING_DIMENSIONS["RodStock"] == {"RodDia"}
     assert mg_magnifying_lever_spec.DRAWING_DIMENSIONS["PressZone"] == {
+        "PressZoneStart",
         "PressZoneLen",
         "PressZoneDia",
     }
@@ -56,7 +56,9 @@ def test_stock_diameter_is_a_native_dimension_on_the_side_view() -> None:
     from the blanked RodStock reference sketch (the revolve profile's top line
     is already the dome radius's height, so a second diameter there
     over-defines the capsule), doubled off a short centerline with the Ø
-    prefix the point-form diametric dims need (v41 sheet)."""
+    prefix the point-form diametric dims need (v41 sheet).  Retry09 review:
+    it carries the cold-drawn bar's own h9 band, which contains the press
+    zone's tighter band on the same unstepped cylinder."""
     import mg_lever_press_fit_geom as press
 
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -68,12 +70,24 @@ def test_stock_diameter_is_a_native_dimension_on_the_side_view() -> None:
     assert part.ROD_DIA_STATION == part.ROD_LENGTH / 2.0
     assert part.R == press.ROD_DIA / 2.0
     assert mg_magnifying_lever_spec.DRAWING_PRECISION["RodStock"] == {"RodDia": 2}
+    assert mg_magnifying_lever_spec.ROD_DIA_BAND == (0.0, -0.03)
+    assert part.ROD_DIA_BAND is mg_magnifying_lever_spec.ROD_DIA_BAND
+    body_low, body_high = (
+        press.ROD_DIA + mg_magnifying_lever_spec.ROD_DIA_BAND[1],
+        press.ROD_DIA + mg_magnifying_lever_spec.ROD_DIA_BAND[0],
+    )
+    zone_low, zone_high = (
+        press.PRESS_ZONE_DIA + press.PRESS_ZONE_DIA_BAND[1],
+        press.PRESS_ZONE_DIA + press.PRESS_ZONE_DIA_BAND[0],
+    )
+    assert body_low <= zone_low <= zone_high <= body_high
+    assert '"RodStock", "RodDia", *deviations(ROD_DIA_BAND)' in source
     assert "RodDiaStation" not in set().union(*part.DRAWING_DIMENSIONS.values())
     assert "RodStockAxis" not in set().union(*part.DRAWING_DIMENSIONS.values())
     assert drawing.REFERENCE_CALLOUTS["RodDia"] == "STOCK OD"
-    # The dome radius keeps its native R3; its callout no longer restates the
-    # full radius or the rod diameter (both are dimensions now).
-    assert drawing.DIMENSION_CALLOUTS["DomeRadius"] == "BOTH ENDS"
+    # The dome radius is a reference now; its callout states the shape that
+    # governs it, never the full radius or the rod diameter.
+    assert drawing.DIMENSION_CALLOUTS["DomeRadius"] == "BOTH ENDS\nTANGENT HEMISPHERE"
     assert "FULL R" not in drawing.DIMENSION_CALLOUTS["DomeRadius"]
     assert "Ø6" not in drawing.DIMENSION_CALLOUTS["DomeRadius"]
 
@@ -134,15 +148,25 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     assert budget["interference_nominal"] == pytest.approx(0.014)
     assert budget["interference_min"] == pytest.approx(0.002)
     assert budget["interference_max"] == pytest.approx(0.014)
-    assert budget["engagement"] == press.COLLAR_ENGAGEMENT
+    assert budget["engagement"] == press.COLLAR_ENGAGEMENT_MAX
+    assert budget["engagement"] == pytest.approx(
+        (10.0 + 0.0) - (6.0 - 0.006) / 2.0
+    )
     assert 0.0 < budget["interference_min"] <= budget["interference_max"]
     # ANSI B4.1 FN2 for 0.12..0.24 in: 1.0 thou at the tightest.
     assert press.PRESS_INTERFERENCE_MAX_FN2 == pytest.approx(0.0254)
     assert budget["interference_max"] <= press.PRESS_INTERFERENCE_MAX_FN2
     assert part.PRESS_ZONE_DIA_BAND is press.PRESS_ZONE_DIA_BAND
+    # Main's batch10 ruling: the zone's start from the tip carries the
+    # drawing-free geom's axial band natively, at .XX, never a spec alias.
+    assert part.PRESS_ZONE_LENGTH_BAND is press.PRESS_ZONE_LENGTH_BAND
+    assert not hasattr(mg_magnifying_lever_spec, "PRESS_ZONE_START_BAND")
+    assert not hasattr(mg_magnifying_lever_spec, "PRESS_ZONE_LENGTH_BAND")
     assert part.PRESS_ZONE_X is geom.PRESS_ZONE_X
-    # Review item 6: the banded witness is ONLY the straight engagement, from
-    # the collar's inner face to the dome tangent -- never the R3 dome.
+    # Retry09 review: the zone is located from the rod TIP -- PRESS_ZONE_LENGTH
+    # back to its start -- and runs to the dome tangent, so its banded
+    # cylinder is ONLY the straight engagement, never the R3 dome.
+    assert geom.ROD_LENGTH - part.PRESS_ZONE_X[0] == press.PRESS_ZONE_LENGTH
     assert part.PRESS_ZONE_END == geom.ROD_LENGTH - press.ROD_DIA / 2.0 == 162.0
     assert part.PRESS_ZONE_END - part.PRESS_ZONE_X[0] == press.COLLAR_ENGAGEMENT
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -152,25 +176,140 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     assert 'set_dimension_prefix(adapter, "PressZone", "PressZoneDia", "<MOD-DIAM>")' in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     assert "segment.ConstructionGeometry = True" in source
-    assert "add_line(PRESS_ZONE_X[0], R, PRESS_ZONE_END, R)" in source
+    # The axis runs from the zone start to the tip; the witness rides the
+    # bottom outline from the zone start to the tangent.
+    assert "add_centerline(PRESS_ZONE_X[0], 0.0, ROD_LENGTH, 0.0)" in source
+    assert "add_line(PRESS_ZONE_X[0], -R, PRESS_ZONE_END, -R)" in source
+    assert (
+        'f"{zone_axis}.end",\n        "origin",\n        "horizontal_distance",\n'
+        '        ROD_LENGTH,\n        "press zone PressZoneTip",'
+    ) in source
+    assert (
+        'f"{zone_witness}.start",\n        f"{zone_axis}.end",\n'
+        '        "horizontal_distance",\n        PRESS_ZONE_LENGTH,\n'
+        '        "press zone PressZoneStart",'
+    ) in source
     assert (
         '"horizontal_distance",\n        COLLAR_ENGAGEMENT,\n        "press zone PressZoneLen",'
         in source
     )
+    assert 'zone.record("PressZoneTip", \'"RodLength"\')' in source
+    assert 'zone.record("PressZoneStart", \'"CollarLen"\')' in source
     assert 'zone.record("PressZoneLen", \'"CollarLen" - "RodDia" / 2\')' in source
-    assert 'zone.record("PressZoneEnd", \'"RodLength" - "RodDia" / 2\')' in source
     assert 'zone.record("PressZoneDia", \'"RodDia"\')' in source
+    assert "PressZoneEnd" not in source
     assert 'set_global(adapter, "CollarLen", f"{PRESS_ZONE_LENGTH}mm")' in source
     assert mg_magnifying_lever_spec.DRAWING_PRECISION["PressZone"] == {
-        "PressZoneLen": 2,
+        "PressZoneStart": 2,
+        "PressZoneLen": 1,
         "PressZoneDia": 3,
     }
-    assert "PressZoneEnd" not in set().union(*part.DRAWING_DIMENSIONS.values())
-    # The sheet places the zone's dims by the engagement, not the collar length.
-    assert drawing._PRESS_ZONE_MID_X == pytest.approx(
-        drawing._ROD_TIP_X - (press.ROD_DIA / 2.0 + press.COLLAR_ENGAGEMENT / 2.0) / 1000.0
+    assert (
+        '"PressZone", "PressZoneStart", *deviations(PRESS_ZONE_LENGTH_BAND)' in source
     )
-    assert drawing.REFERENCE_CALLOUTS["PressZoneLen"] == "PRESS ZONE"
+    assert "PressZoneTip" not in set().union(*part.DRAWING_DIMENSIONS.values())
+    # The cylinder's length (start less the dome radius) prints as a LINEAR
+    # reference; the start from the tip is the toleranced value.
+    assert mg_magnifying_lever_spec.REFERENCE_DIMENSIONS == {"PressZoneLen"}
+    sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_reference_dimension(adapter, matches[0]" in sheet_source
+    assert "set_reference_dimensions(" not in sheet_source
+    assert "PressZoneLen" not in drawing.REFERENCE_CALLOUTS
+    assert drawing.REFERENCE_CALLOUTS["PressZoneStart"] == "PRESS ZONE START"
+    # The sheet's stations come from the same constants as the model's.
+    assert drawing._PRESS_ZONE_START_X == pytest.approx(
+        drawing._ROD_TIP_X - press.PRESS_ZONE_LENGTH / 1000.0
+    )
+    assert drawing._DOME_TANGENT_X == pytest.approx(
+        drawing._ROD_TIP_X - press.ROD_DIA / 2000.0
+    )
+    assert drawing._DOME_TANGENT_X - drawing._PRESS_ZONE_START_X == pytest.approx(
+        press.COLLAR_ENGAGEMENT / 1000.0
+    )
+
+
+def test_overall_length_runs_tip_to_tip_on_the_profile() -> None:
+    """Retry09 review: the far dome centre (162.00) cannot be picked up; the
+    profile dimensions the rod between its two dome tips -- the axis line's
+    ends, merged with the apexes (build_ch_fulcrum_shaft's idiom) -- at .X,
+    and the right dome's centre is only placed on the axis, R back from the
+    tip by the radial dim."""
+    import mg_lever_press_fit_geom as press
+
+    assert mg_magnifying_lever_spec.DRAWING_DIMENSIONS["RodProfile"] == {
+        "OverallLength",
+        "DomeRadius",
+    }
+    assert mg_magnifying_lever_spec.DRAWING_PRECISION["RodProfile"] == {
+        "OverallLength": 1,
+        "DomeRadius": 1,
+    }
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert (
+        'f"{axis_line}.start",\n        f"{axis_line}.end",\n'
+        '        "horizontal_distance",\n        ROD_LENGTH,\n'
+        '        "rod OverallLength",'
+    ) in source
+    assert 'profile.record("OverallLength", \'"RodLength"\')' in source
+    assert 'f"{cap_right}.center", "origin", "horizontal_points"' in source
+    assert "RightDomeCentre" not in source
+    assert part.R == press.ROD_DIA / 2.0
+    assert "OverallLength" not in drawing.DIMENSION_CALLOUTS
+    assert "TO FAR DOME CENTRE" not in drawing.DIMENSION_CALLOUTS.values()
+
+
+def test_dome_radius_is_a_radial_reference_of_the_tangent_hemisphere() -> None:
+    """Main's batch10 ruling: each dome is a full hemisphere tangent to the
+    selected bar, so its radius follows the zone diameter (R2.997 at the
+    smallest selected bar) and prints as a radial REFERENCE "(R3.0)": the
+    display's own radius glyph is kept behind the "(" (the singular
+    set_reference_dimension's bare "(" would replace it, the plural one would
+    print a Ø)."""
+    import mg_lever_press_fit_geom as press
+
+    assert mg_magnifying_lever_spec.RADIAL_REFERENCE_DIMENSIONS == {"DomeRadius"}
+    assert not (
+        mg_magnifying_lever_spec.RADIAL_REFERENCE_DIMENSIONS
+        & mg_magnifying_lever_spec.REFERENCE_DIMENSIONS
+    )
+    assert "DomeRadius" in drawing.FRONT_KEEP
+    min_radius = (press.PRESS_ZONE_DIA + press.PRESS_ZONE_DIA_BAND[1]) / 2.0
+    assert f"{min_radius:.1f}" == f"{part.R:.1f}" == "3.0"
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'profile.record("DomeRadius", \'"RodDia" / 2\')' in source
+    sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_set_radial_reference(adapter, matches[0]" in sheet_source
+    assert 'prefix = "(" + existing' in sheet_source
+    assert "for name in sorted(RADIAL_REFERENCE_DIMENSIONS):" in sheet_source
+    assert "<MOD-DIAM>" not in sheet_source
+
+
+def test_press_zone_text_clears_its_lines_and_the_isometric() -> None:
+    """Retry09 review: the zone diameter's rows sat on its own dimension
+    line.  Its line now stands inside the zone and its rows hang above the
+    rod, right of that line (layout doc: rows hang from a shoulder that starts
+    at the line), above the dome radius; the zone's lengths print below the
+    rod off the bottom witness, the reference innermost and left of its span,
+    the start from the tip outside it and right of the tip, the overall length
+    outermost."""
+    rod_bottom_y = drawing.FRONT_CENTER[1] - drawing.ROD_DIA / 2000.0
+    dia_x, dia_y = drawing.REFERENCE_KEEP["PressZoneDia"]
+    assert drawing._PRESS_ZONE_START_X < dia_x < drawing._DOME_TANGENT_X
+    assert dia_y > drawing.FRONT_KEEP["DomeRadius"][1] + 0.015
+    assert drawing.FRONT_KEEP["DomeRadius"][0] > drawing._ROD_TIP_X
+    assert drawing.FRONT_KEEP["DomeRadius"][1] > drawing._ROD_TOP_Y
+    length_x, length_y = drawing.REFERENCE_KEEP["PressZoneLen"]
+    start_x, start_y = drawing.REFERENCE_KEEP["PressZoneStart"]
+    overall_y = drawing.FRONT_KEEP["OverallLength"][1]
+    assert overall_y < start_y < length_y < rod_bottom_y
+    assert length_x < drawing._PRESS_ZONE_START_X
+    assert start_x > drawing._ROD_TIP_X
+    # Two rows, so the mate callout stays short of the isometric.
+    rows = mg_magnifying_lever_spec.PRESS_ZONE_DIA_CALLOUT.split("\n")
+    assert len(rows) == 2
+    assert max(len(row.replace("<MOD-DIAM>", "Ø")) for row in rows) <= 36
+    assert drawing.ISO_CENTER == (0.350, 0.185)
+
 
 
 def test_press_zone_callout_ties_the_zone_to_the_bracket_bore() -> None:
@@ -184,7 +323,7 @@ def test_press_zone_callout_ties_the_zone_to_the_bracket_bore() -> None:
     callout = mg_magnifying_lever_spec.PRESS_ZONE_DIA_CALLOUT
     assert drawing.REFERENCE_CALLOUTS["PressZoneDia"] is callout
     assert callout == (
-        "IN MHA-MG-001<MOD-DIAM>5.986 +0.006/0 BORE: 0.002-0.014 INTERFERENCE"
+        "IN MHA-MG-001<MOD-DIAM>5.986 +0.006/0 BORE:\n0.002-0.014 INTERFERENCE"
     )
     assert f"{press.COLLAR_BORE_DIA:.3f}" in callout
     assert f"{press.PRESS_FIT_BUDGET['interference_min']:.3f}-" in callout
@@ -221,6 +360,7 @@ def test_final_forced_volume_guard_follows_annotations_before_publication() -> N
         "apply_drawing_precision",
         "clear_dimensions_for_drawing",
         "mark_dimensions_for_drawing",
+        "author_part_pmi",
         "apply_drawing_properties",
         "blank_reference_sketches",
     ):
@@ -253,19 +393,26 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     assert "KNIFE_LOCAL_Y," in assembly
 
 
-def test_linked_notes_specify_round_brass_stock_and_the_press() -> None:
+def test_linked_notes_select_the_press_zone_and_say_how_to_press() -> None:
+    """Retry09 review: the stock line, the overall length and the zone's
+    start are native now, and the OD finish is the part's symbol; the notes
+    keep only the zone's selection (lapping cannot enlarge an undersize bar)
+    and the press."""
     import mg_lever_press_fit_geom as press
 
     notes = mg_magnifying_lever_spec.DRAWING_NOTES
-    assert "Ø6 ROUND BAR" in notes
+    assert "ROUND BAR" not in notes and "REF" not in notes
+    assert "STRAIGHT" not in notes and "Ra" not in notes
+    assert "SELECT OR LAP" in notes
+    assert "LAPPING CANNOT ENLARGE UNDERSIZE STOCK" in notes
+    assert "LOWER LIMIT" in notes
     assert "BRASS" not in notes and "C36000" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     # Review item 6: the dome is the native R3 "BOTH ENDS"; no restatement.
     assert "HEMISPHERE" not in notes and "R3" not in notes
     assert "X.XX" not in notes
     assert "LINEAR +/-" not in notes
-    assert f"({part.ROD_LENGTH:g}) REF" in notes
-    assert f"PRESS ZONE START ({press.PRESS_ZONE_LENGTH:g}) FROM TIP REF" in notes
+    assert f"{part.ROD_LENGTH:g}" not in notes
     # The press zone's size and band are native dims; the note says how to
     # hold it, how the collar is pressed on and the fit contract's worst-case
     # force (never typed). The Loctite retention is the bracket sheet's.
@@ -278,6 +425,7 @@ def test_linked_notes_specify_round_brass_stock_and_the_press() -> None:
         press.COLLAR_BORE_BAND[0],
     ):
         assert f"{banned:.3f}" not in notes
+    assert f"{abs(mg_magnifying_lever_spec.ROD_DIA_BAND[1]):.2f}" not in notes
     assert f"{press.PRESS_FORCE_MAX_KN:.1f} kN MAX" in notes
     assert "ROD HELD NEAR ITS END" in notes
     assert len(notes.splitlines()) <= 4
@@ -290,25 +438,51 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source  # the front side view
-    assert "scale=(4, 1)" in source  # the end view
     assert drawing.ISO_SCALE == (1, 2)
     assert "scale=ISO_SCALE" in source
-    assert mg_magnifying_lever_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
     assert mg_magnifying_lever_spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
     assert 'add_property_linked_note(adapter, "Iso View Note"' in source
+    # Retry09 review: the featureless end view is gone, with its scale note.
+    assert '"*Right"' not in source and "End View Note" not in source
+    assert "auto_center_marks" not in source
+    assert not hasattr(drawing, "RIGHT_KEEP") and not hasattr(drawing, "RIGHT_CENTER")
+    assert not hasattr(mg_magnifying_lever_spec, "END_VIEW_NOTE")
+    assert "End View Note" not in Path(part.__file__).read_text(encoding="utf-8")
 
 
-def test_form_and_finish_are_note_based_on_the_unpickable_capsule() -> None:
-    # A smooth hemispherical-ended capsule exposes no selectable edge, so there
-    # are NO coordinate-pick annotations (datum/FCF/Ra/edge dims); the OD
-    # straightness + Ra requirement is carried in the manufacturing note instead.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 0
-    assert source.count("add_feature_control_frame(") == 0
-    assert source.count("add_surface_finish(") == 0
-    assert source.count("add_edge_dimension(") == 0
-    assert "Ra 1.6" in mg_magnifying_lever_spec.DRAWING_NOTES
+def test_od_finish_is_the_parts_native_symbol_on_the_silhouette() -> None:
+    """Retry09 review: the Ra note becomes the part-owned finish control
+    (the clamp block slides on the OD), projected with the audited helper on
+    the cylinder's silhouette; the capsule still carries no datum, frame or
+    edge dimension."""
+    from _gtol_cylinder import CylinderFace
+    from _surface_finish import MACHINED_UM
+
+    (control,) = mg_magnifying_lever_spec.SURFACE_FINISHES
+    assert control.key == "rod_od" and control.roughness_um == MACHINED_UM == 1.6
+    assert control.face == CylinderFace(mg_magnifying_lever_spec.ROD_DIA)
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
+    sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    compact = "".join(sheet_source.split())
+    assert 'control=surface_finish_by_key(SURFACE_FINISHES,"rod_od")' in compact
+    assert 'entity_type="SILHOUETTE"' in sheet_source
+    assert "roughness_ra=" not in sheet_source
+    assert sheet_source.count("add_surface_finish(") == 1
+    assert sheet_source.count("add_datum_feature(") == 0
+    assert sheet_source.count("add_feature_control_frame(") == 0
+    assert sheet_source.count("add_edge_dimension(") == 0
+    # The pick is on the top silhouette inside the clamp's travel: past the
+    # west dome, short of the press zone.
+    pick_x, pick_y = drawing.FINISH_PICK
+    west_tangent_x = (
+        drawing.FRONT_CENTER[0]
+        - drawing.ROD_LENGTH / 2000.0
+        + mg_magnifying_lever_spec.ROD_DIA / 2000.0
+    )
+    assert pick_y == drawing._ROD_TOP_Y
+    assert west_tangent_x < pick_x < drawing._PRESS_ZONE_START_X
+    assert drawing.FINISH_SYMBOL[1] > pick_y
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -323,4 +497,4 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
     # The clamp block still slides along the rod; the tip end is pressed.
     assert config["fit_class"] == "shaft_in_bushing"
-    assert "pressed into the MHA-MG-001 bracket collar" in config["process"]
+    assert "MHA-MG-001" in config["process"]
