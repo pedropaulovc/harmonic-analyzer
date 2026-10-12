@@ -394,20 +394,34 @@ as the editorial pattern:
 - Group descriptions by subsystem, with smaller headings where useful. Link
   the relevant PRs or issues and explain the actual geometry, drawing, fit-up,
   manufacturing or user-visible change. A commit-title dump is not sufficient.
-- Include known issues and release-shaping decisions when applicable. Verify
-  their state against the released source and current issue evidence; do not
-  copy old release limitations or describe a pending fix as shipped.
-- Put build, checking and other shipped project changes after the CAD changes.
-  Keep the generated bundle inventory, changed-parts images, provenance and
-  logs below the authored descriptions under `## Bundle`.
+- Follow the section order where applicable: subsystems, cross-part drawings,
+  build and checks, known issues, decisions that shape this release, also in
+  this release, then the bundle appendix.
+- Recheck prior limitations and issues opened or closed since the previous
+  release against the source being released. Carry forward limitations that
+  still apply; remove those fixed in that commit. An issue closed after the
+  release commit does not prove that its fix shipped.
 
-Draft from the exact previous-tag-to-release-tag diff and merged PRs, checking
-dimensions against the released CAD configuration. Run the humanizer skill on
-the prose. The publisher's generated asset notes are only the bundle appendix:
-the release agent MUST install the authored notes with `gh release edit vNN
---notes-file <file>` and read back the published body before reporting completion.
-Preserve the asset URLs and provenance when editing an already published release;
-do not retag, rebuild or re-upload unchanged artifacts to correct its prose.
+Draft while the build runs, before publication, from
+`<previous published tag>..<release source commit>`, including merged PRs and
+direct commits. Check dimensions against that commit's CAD configuration.
+Run the humanizer skill on the authored prose, preserving numbers, part IDs,
+units, quoted drawing callouts and links.
+
+After successful publication (including a requested draft release), fetch the
+generated body with `gh release view vNN --json body`. Append it verbatim after
+one `## Bundle` heading beneath the authored descriptions. Preserve its counts,
+size, changed-parts list, heading levels, diff images, asset URLs, provenance
+and logs. For an existing release, preserve that appendix rather than regenerate
+it. Write the complete notes to a host-visible file and install them immediately
+with `gh release edit vNN --notes-file <file>`. Read back the body, verify the
+authored descriptions and unchanged appendix, and confirm the tag pins the
+intended source commit before reporting completion.
+
+On `--no-publish` or a failed publish, retain the draft without editing GitHub.
+If the notes update fails after publication, retry only the notes edit. Do not
+rerun the publisher, retag, rebuild or re-upload unchanged artifacts to correct
+prose.
 
 ## `.farm-sources.json` — submodules the farm does not acquire
 
