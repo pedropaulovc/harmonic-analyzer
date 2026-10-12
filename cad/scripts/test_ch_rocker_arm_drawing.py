@@ -2336,19 +2336,134 @@ def test_detail_letter_refuses_a_silently_ignored_void_setter(bound, monkeypatch
         drawing._place_detail_letters(object(), SimpleNamespace(GetDetailCircles=lambda: circles))
 
 
-class _DetailView:
-    """An outline can move while its transform lags until the native barrier."""
-    __slots__ = ("parent", "radius", "defect", "Position", "physical",
-                 "_scale_ratio", "UseParentScale", "UseSheetScale", "events")
+class _DetailTransform:
+    """Nonidentity native sketch transform; inverse maps back to sheet units."""
+    __slots__ = ("scale", "translation", "bad_inverse", "bad_matrix")
 
-    def __init__(self, parent, *, radius=0.0269, defect=None):
-        self.parent, self.radius, self.defect = parent, radius, defect
+    def __init__(self, scale=2.0, translation=(0.013, -0.007, 0.0)):
+        self.scale, self.translation = scale, translation
+        self.bad_inverse = self.bad_matrix = False
+
+    @property
+    def ArrayData(self):
+        return () if self.bad_matrix else (
+            1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+            *self.translation, self.scale, 0.0, 0.0, 0.0,
+        )
+
+    def IInverse(self):
+        if self.bad_inverse:
+            return None
+        return _DetailTransform(1.0 / self.scale, tuple(-v / self.scale for v in self.translation))
+
+    def apply(self, xyz):
+        return tuple(xyz[i] * self.scale + self.translation[i] for i in range(3))
+
+
+class _DetailMathPoint:
+    __slots__ = ("_coordinates",)
+
+    def __init__(self, values):
+        self._coordinates = tuple(values.value)  # VARIANT input, native tuple getter.
+        assert len(self._coordinates) == 3
+
+    @property
+    def ArrayData(self):
+        return self._coordinates
+
+    def MultiplyTransform(self, transform):
+        point = object.__new__(_DetailMathPoint)
+        point._coordinates = transform.apply(self._coordinates)
+        return point
+
+
+class _DetailParent:
+    __slots__ = ("transform", "ScaleRatio", "projection_scale")
+
+    def __init__(self):
+        self.transform = _DetailTransform()
+        self.ScaleRatio = (1.0, 2.0)
+        self.projection_scale = 0.5
+
+    def GetSketch(self):
+        return SimpleNamespace(ModelToSketchTransform=self.transform)
+
+    def UpdateViewDisplayGeometry(self):
+        return None
+
+    def project(self, xyz):
+        return (0.180 + xyz[0] * self.projection_scale,
+                0.175 + xyz[1] * self.projection_scale)
+
+
+class _DetailProfile:
+    __slots__ = ("centre", "radius", "sketch", "complete", "segment_type", "selectable")
+
+    def __init__(self, centre, radius, sketch):
+        self.centre, self.radius, self.sketch = centre, radius, sketch
+        self.complete, self.segment_type, self.selectable = 1, 1, True
+
+    def GetType(self):
+        return self.segment_type
+
+    def IsCircle(self):
+        return self.complete  # Native INT 1/0.
+
+    def GetCenterPoint2(self):
+        if self.centre is None:
+            return None
+        return SimpleNamespace(X=self.centre[0], Y=self.centre[1], Z=self.centre[2])
+
+    def GetRadius(self):
+        return self.radius
+
+    def GetSketch(self):
+        return self.sketch
+
+    def Select4(self, _append, _data):
+        return self.selectable
+
+
+class _DetailCropCircle:
+    __slots__ = ("label", "profiles", "NoOutline", "JaggedOutline", "full", "display")
+
+    def __init__(self, label, profile):
+        self.label, self.profiles = label, (profile,)
+        self.NoOutline, self.JaggedOutline, self.full, self.display = False, False, True, 1
+
+    def GetLabel(self):
+        return self.label
+
+    def GetDisplay(self):
+        return self.display
+
+    def HasFullOutline(self):
+        return self.full
+
+    def GetProfileItems(self):
+        return self.profiles
+
+
+class _DetailView:
+    """Native bbox padding/offset is independent of the persisted crop circle."""
+    __slots__ = ("parent", "radius", "defect", "Position", "physical",
+                 "_scale_ratio", "UseParentScale", "UseSheetScale", "events",
+                 "crop_circle", "padding", "bbox_offset", "model_centre", "notes", "annotations")
+
+    def __init__(self, parent, *, label="D", defect=None, padding=0.01096794, bbox_offset=(0.0, 0.005)):
+        self.parent, self.defect = parent, defect
+        self.model_centre, radius_mm = drawing._detail_fence(label)
+        ratio = drawing.HUB_SCALE if label == "D" else drawing.END_SCALE
+        self.radius = radius_mm / 1000.0 * ratio[0] / ratio[1]
         self.Position = (0.210, 0.110)
         self.physical = self.Position
-        self._scale_ratio = (4.0, 1.0)
+        self._scale_ratio = ratio
         self.UseParentScale = False
         self.UseSheetScale = 0
         self.events = []
+        self.crop_circle = None
+        self.padding, self.bbox_offset = padding, bbox_offset
+        self.notes, self.annotations = [], []
 
     @property
     def ScaleRatio(self):
@@ -2364,9 +2479,26 @@ class _DetailView:
     def GetBaseView(self):
         return object() if self.defect == "parent" else self.parent
 
+    def GetDetail(self):
+        return self.crop_circle
+
+    def GetNotes(self):
+        return tuple(self.notes)
+
+    def GetAnnotations(self):
+        return tuple(self.annotations)
+
+    def project(self, xyz):
+        assert self.events[-1] == "barrier"
+        scale = self._scale_ratio[0] / self._scale_ratio[1]
+        return tuple(self.physical[i] + (xyz[i] - self.model_centre[i]) * scale for i in range(2))
+
     def GetOutline(self):
-        x, y = self.Position
-        return (x - self.radius, y - self.radius, x + self.radius, y + self.radius)
+        if self.defect == "invalid-bbox":
+            return (0.0, 0.0, float("nan"), 1.0)
+        x, y = (self.Position[i] + self.bbox_offset[i] for i in range(2))
+        radius = self.radius + self.padding
+        return (x - radius, y - radius, x + radius, y + radius)
 
     def SetViewPosition(self, xy, _children):
         position = tuple(xy.value)
@@ -2384,25 +2516,26 @@ class _DetailView:
             self.physical = self.Position
 
 
-@pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "fence", "selection", "creation"])
+@pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "fence", "selection", "creation", "source-radius", "source-centre", "profile-radius", "profile-centre", "near-profile-centre", "partial", "missing-profile", "outline-flags", "projection-scale"])
 def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, monkeypatch, defect):
-    parent = SimpleNamespace(
-        GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=object()),
-        UpdateViewDisplayGeometry=lambda: None,
-    )
+    parent = _DetailParent()
+    if defect == "projection-scale":
+        parent.projection_scale = 0.7
     detail = _DetailView(parent, defect=defect)
-    class Point:
-        def __init__(self, values):
-            self.ArrayData = tuple(values.value)
-            assert len(self.ArrayData) == 3
-        def MultiplyTransform(self, _transform):
-            return self
-    circle = SimpleNamespace(Select4=lambda *_a: defect != "selection")
+    created = []
     class Manager:
         __slots__ = ("AddToDB",)
         def __init__(self):
             self.AddToDB = False
-        def CreateCircle(self, *_args):
+        def CreateCircle(self, *args):
+            centre, rim = tuple(args[:3]), tuple(args[3:])
+            circle = _DetailProfile(centre, math.dist(centre, rim), parent.GetSketch())
+            circle.selectable = defect != "selection"
+            if defect == "source-radius":
+                circle.radius *= 1.5
+            elif defect == "source-centre":
+                circle.centre = (centre[0] + 0.01, centre[1], centre[2])
+            created.append(circle)
             return None if defect == "fence" else circle
     class SelectData:
         __slots__ = ("View",)
@@ -2410,6 +2543,21 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
     calls = []
     def create(*args):
         calls.append(args)
+        source = created[0]
+        profile = _DetailProfile(source.centre, source.radius, source.sketch)
+        if defect == "profile-radius":
+            profile.radius *= 1.5
+        elif defect == "profile-centre":
+            profile.centre = (profile.centre[0] + 0.01, profile.centre[1], profile.centre[2])
+        elif defect == "near-profile-centre":
+            profile.centre = (profile.centre[0] + 0.00002, profile.centre[1], profile.centre[2])
+        elif defect == "partial":
+            profile.complete = 0
+        detail.crop_circle = _DetailCropCircle("D", profile)
+        if defect == "missing-profile":
+            detail.crop_circle.profiles = ()
+        elif defect == "outline-flags":
+            detail.crop_circle.full = False
         return None if defect == "creation" else detail
     doc = SimpleNamespace(
         ActivateView=lambda _name: defect != "activation", ClearSelection2=lambda _all: None,
@@ -2419,15 +2567,11 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
     )
     adapter = SimpleNamespace(
         currentModel=doc, swApp=SimpleNamespace(
-            IsSame=_APP.IsSame, GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point),
+            IsSame=_APP.IsSame, GetMathUtility=lambda: SimpleNamespace(CreatePoint=_DetailMathPoint),
         ),
     )
-    def project(_adapter, view, points, **_kwargs):
-        if view is parent:
-            return [(0.18 + p[0] / 2, 0.175 + p[1] / 2) for p in points]
-        assert detail.events[-1] == "barrier"
-        return [detail.physical for _point in points]
-    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "model_points_in_view",
+                        lambda _adapter, view, points, **_kwargs: [view.project(point) for point in points])
     monkeypatch.setattr(drawing, "view_name", lambda *_a: "front")
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_a: None)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
@@ -2439,12 +2583,140 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
         assert detail.Position == pytest.approx(drawing.HUB_CENTER, rel=0.0, abs=1e-12)
         assert detail.physical == pytest.approx(drawing.HUB_CENTER, rel=0.0, abs=1e-12)
         assert tuple(detail.ScaleRatio) == drawing.HUB_SCALE
-        assert detail.events == ["barrier", "move", "barrier"]
+        assert detail.events.count("move") == 1
+        assert detail.events.count("barrier") >= 4
+        assert detail.GetOutline()[3] > drawing.HUB_CENTER[1] + detail.radius
+        assert created[0].radius == pytest.approx(0.006725)  # Nonidentity sketch scale 2.
         assert calls[0][7:] == (1, True, False, False, 5)
     else:
         with pytest.raises(RuntimeError):
             drawing._create_detail(adapter, parent, **kwargs)
     assert manager.AddToDB is False
+
+
+def _native_crop_fixture(monkeypatch, label, *, centre=None, defect=None):
+    """Readback fixture, including persisted geometry and a padded native bbox."""
+    parent = _DetailParent()
+    view = _DetailView(parent, label=label, defect=defect)
+    view.Position = centre or (drawing.HUB_CENTER if label == "D" else drawing.END_CENTER)
+    view.physical = view.Position
+    source_centre, source_radius = drawing._detail_fence(label)
+    xy = parent.project(source_centre)
+    profile = _DetailProfile(
+        parent.transform.apply((*xy, 0.0)),
+        source_radius / 1000.0 * 0.5 * parent.transform.scale,
+        parent.GetSketch(),
+    )
+    view.crop_circle = _DetailCropCircle(label, profile)
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(GetMathUtility=lambda: SimpleNamespace(CreatePoint=_DetailMathPoint)),
+        currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None),
+    )
+    monkeypatch.setattr(drawing, "model_points_in_view",
+                        lambda _adapter, native, points, **_kwargs: [native.project(p) for p in points])
+    return adapter, view
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+def test_crop_reads_persisted_circle_not_padded_or_offset_native_view_bbox(bound, monkeypatch, label):
+    adapter, view = _native_crop_fixture(monkeypatch, label)
+    crop = drawing._detail_crop(adapter, view, label=label)
+    x, y = view.physical
+    assert crop == pytest.approx((x - view.radius, y - view.radius, x + view.radius, y + view.radius))
+    bbox = view.GetOutline()
+    assert bbox[2] - bbox[0] > crop[2] - crop[0] + 0.020
+    assert (bbox[1] + bbox[3]) / 2.0 == pytest.approx(y + 0.005)
+    assert view.crop_circle.profiles[0].GetRadius() != pytest.approx(view.radius)
+    assert view.parent.ScaleRatio == (1.0, 2.0)  # Parent .5, native D 4 / E 2.
+
+
+def test_crop_preserves_actual_native_geometry_within_readback_tolerance(bound, monkeypatch):
+    adapter, view = _native_crop_fixture(monkeypatch, "D")
+    profile = view.crop_circle.profiles[0]
+    profile.centre = (profile.centre[0] + 0.00002, *profile.centre[1:])
+    profile.radius += 0.00002
+    # Inverse sketch scale 2, then detail/parent magnification 8: 80 um on sheet.
+    crop = drawing._detail_crop(adapter, view, label="D")
+    x, y = view.physical[0] + 0.00008, view.physical[1]
+    radius = view.radius + 0.00008
+    assert crop == pytest.approx((x - radius, y - radius, x + radius, y + radius), abs=1e-12)
+    assert (crop[0] + crop[2]) / 2.0 != pytest.approx(view.physical[0], abs=1e-6)
+    assert (crop[2] - crop[0]) / 2.0 != pytest.approx(view.radius, abs=1e-6)
+
+
+@pytest.mark.parametrize("defect", [
+    "radius", "nan-radius", "zero-radius", "centre", "off-sheet-plane", "missing-centre", "partial", "segment",
+    "empty", "missing-items", "multiple", "missing-segment",
+    "missing-circle", "missing-parent", "no-outline", "jagged", "full-outline", "display", "label",
+    "inverse", "matrix", "missing-sketch", "missing-transform", "missing-utility", "parent-scale", "parent-scale-shape", "projection-scale",
+    "detail-scale", "detail-scale-shape", "parent-scale-link", "sheet-scale-link", "invalid-bbox",
+])
+def test_native_crop_refuses_wrong_persisted_geometry_flags_or_coordinate_frame(bound, monkeypatch, defect):
+    adapter, view = _native_crop_fixture(monkeypatch, "D")
+    circle, parent = view.crop_circle, view.parent
+    profile = circle.profiles[0]
+    if defect == "radius":
+        profile.radius *= 1.5
+    elif defect == "nan-radius":
+        profile.radius = float("nan")
+    elif defect == "zero-radius":
+        profile.radius = 0.0
+    elif defect == "centre":
+        profile.centre = (profile.centre[0] + 0.01, *profile.centre[1:])
+    elif defect == "off-sheet-plane":
+        profile.centre = (*profile.centre[:2], 0.01)
+    elif defect == "missing-centre":
+        profile.centre = None
+    elif defect == "partial":
+        profile.complete = 0
+    elif defect == "segment":
+        profile.segment_type = 0
+    elif defect in ("empty", "missing-items", "multiple"):
+        circle.profiles = {"empty": (), "missing-items": None, "multiple": (profile, profile)}[defect]
+    elif defect == "missing-segment":
+        circle.profiles = (None,)
+    elif defect == "missing-circle":
+        view.crop_circle = None
+    elif defect == "missing-parent":
+        view.parent = None
+    elif defect == "no-outline":
+        circle.NoOutline = True
+    elif defect == "jagged":
+        circle.JaggedOutline = True
+    elif defect == "full-outline":
+        circle.full = False
+    elif defect == "display":
+        circle.display = 0
+    elif defect == "label":
+        circle.label = "X"
+    elif defect == "inverse":
+        parent.transform.bad_inverse = True
+    elif defect == "matrix":
+        parent.transform.bad_matrix = True
+    elif defect == "missing-sketch":
+        profile.sketch = None
+    elif defect == "missing-transform":
+        profile.sketch.ModelToSketchTransform = None
+    elif defect == "missing-utility":
+        adapter.swApp.GetMathUtility = lambda: None
+    elif defect == "parent-scale":
+        parent.ScaleRatio = (1.0, 1.0)
+    elif defect == "parent-scale-shape":
+        parent.ScaleRatio = None
+    elif defect == "projection-scale":
+        parent.projection_scale = 0.7
+    elif defect == "detail-scale":
+        view._scale_ratio = (1.0, 2.0)
+    elif defect == "detail-scale-shape":
+        view._scale_ratio = None
+    elif defect == "parent-scale-link":
+        view.UseParentScale = True
+    elif defect == "sheet-scale-link":
+        view.UseSheetScale = 1
+    elif defect == "invalid-bbox":
+        view.defect = "invalid-bbox"
+    with pytest.raises(RuntimeError):
+        drawing._detail_crop(adapter, view, label="D")
 
 
 def _native_sheet(*, top=0.066, scale_retained=True, rule=True):
@@ -2472,11 +2744,9 @@ def test_end_caption_seats_actual_ink_between_crop_and_actual_title_rule(bound, 
     note = _FakeNote((0.30, 0.07), 0.007)
     note.PropertyLinkedText = "$PRPVIEW:DETAIL E SCALE"
     note.annotation.SetPosition2 = note.annotation.SetPosition
-    view = SimpleNamespace(
-        GetNotes=lambda: [note],
-        GetOutline=lambda: (0.300, 0.084, 0.360, 0.136),
-    )
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
+    adapter, view = _native_crop_fixture(monkeypatch, "E")
+    view.Position = view.physical = (0.330, 0.084 + view.radius)
+    view.notes = [note]
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     drawing._seat_detail_caption(adapter, view, _native_sheet(top=top), label="E")
     box = drawing._note_extent(adapter, note)
@@ -2498,11 +2768,9 @@ def test_end_caption_fails_closed_without_real_ink_and_three_mm_air(bound, monke
         note.GetExtent = lambda: None
     elif defect == "missing-position":
         note.annotation.GetPosition = lambda: None
-    view = SimpleNamespace(
-        GetNotes=lambda: [] if defect == "missing" else [note],
-        GetOutline=lambda: (0.300, 0.084, 0.360, 0.136),
-    )
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
+    adapter, view = _native_crop_fixture(monkeypatch, "E")
+    view.Position = view.physical = (0.330, 0.084 + view.radius)
+    view.notes = [] if defect == "missing" else [note]
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     with pytest.raises(RuntimeError):
         drawing._seat_detail_caption(
@@ -2573,13 +2841,14 @@ def test_pin_coordinates_are_native_centred_basic_with_labels_after_boxing(monke
 
 
 @pytest.mark.parametrize("air,passes", [(0.001, True), (0.0009, False)])
-def test_every_front_native_text_row_is_guarded_against_detail_crops(native_profile_clearance, bound, air, passes):
+def test_every_front_native_text_row_is_guarded_against_detail_crops(native_profile_clearance, bound, monkeypatch, air, passes):
     case = native_profile_clearance
     # Native records are historical detector inputs, not a current-coordinate proof.
     case.front.GetAnnotations = lambda: [case.r816]
     case.r816.data.texts = [{"t": "R816", "pos": [0.170, 0.128, 0], "h": 0.0035}]
-    hub = SimpleNamespace(GetOutline=lambda: (0.160, 0.068, 0.200, 0.128 - air))
-    end = SimpleNamespace(GetOutline=lambda: (0.300, 0.080, 0.360, 0.140))
+    case.adapter, hub = _native_crop_fixture(monkeypatch, "D")
+    hub.Position = hub.physical = (0.180, 0.128 - air - hub.radius)
+    _adapter, end = _native_crop_fixture(monkeypatch, "E")
     if passes:
         drawing._require_front_detail_air(case.adapter, case.front, hub, end)
     else:
@@ -2614,6 +2883,16 @@ def test_details_keep_native_scale_source_census_and_unclipped_overall_contract(
     assert not hasattr(drawing, "PIVOT_PICK_ZOOM_HALF")
     assert set(drawing.FRONT_KEEP) == drawing.BASIC_PROFILE_DIMENSIONS
     assert not hasattr(drawing, "_sheet_xy")
+    crop_calls = {"_seat_detail_caption": 1, "_require_ream_clearance": 1, "_require_front_detail_air": 2}
+    for name, count in crop_calls.items():
+        calls = [node for node in ast.walk(definitions[name]) if isinstance(node, ast.Call)]
+        assert sum(isinstance(node.func, ast.Name) and node.func.id == "_detail_crop" for node in calls) == count
+        assert not any(isinstance(node.func, ast.Attribute) and node.func.attr == "GetOutline" for node in calls)
+    crop_attributes = {node.attr for node in ast.walk(definitions["_detail_crop"]) if isinstance(node, ast.Attribute)}
+    assert {"GetDetail", "GetProfileItems", "IInverse", "ArrayData"} <= crop_attributes
+    assert "ModelToViewTransform" not in crop_attributes  # Inverse sketch mapping already returns sheet.
+    circle_attributes = {node.attr for node in ast.walk(definitions["_native_circle_geometry"]) if isinstance(node, ast.Attribute)}
+    assert {"GetType", "GetRadius", "GetCenterPoint2", "IsCircle"} <= circle_attributes
 
 
 @pytest.mark.parametrize("defect", ["basic", "text"])
@@ -2634,13 +2913,10 @@ def test_d_caption_uses_left_of_title_block_space_not_global_title_top(bound, mo
         values[3] = values[0] + 0.035
         return values
     note.GetExtent = narrow_caption
-    view = SimpleNamespace(
-        GetNotes=lambda: [note],
-        GetOutline=lambda: (0.1531, 0.0681, 0.2069, 0.1219),
-    )
+    adapter, view = _native_crop_fixture(monkeypatch, "D")
+    view.notes = [note]
     sheet = _native_sheet()
     sheet.GetZoneMargin = lambda _side: 0.0127
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     drawing._seat_detail_caption(adapter, view, sheet, label="D")
     box = drawing._note_extent(adapter, note)
@@ -2657,11 +2933,10 @@ def test_ream_native_text_clears_actual_detail_and_seated_notes(native_profile_c
     if defect == "invalid-text":
         case.ream.data.texts[0]["h"] = 0.0
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: "PivotDia")
-    crop_left = 0.110 if defect == "crop" else 0.1531
-    hub = SimpleNamespace(
-        GetAnnotations=lambda: [] if defect == "missing" else [case.ream],
-        GetOutline=lambda: (crop_left, 0.0681, 0.2069, 0.1219),
-    )
+    case.adapter, hub = _native_crop_fixture(monkeypatch, "D")
+    if defect == "crop":
+        hub.Position = hub.physical = (0.110 + hub.radius, drawing.HUB_CENTER[1])
+    hub.annotations = [] if defect == "missing" else [case.ream]
     notes = (0.020, 0.016, 0.150, 0.082 if defect == "notes" else 0.070)
     if defect is None:
         drawing._require_ream_clearance(case.adapter, hub, notes)
@@ -2672,13 +2947,13 @@ def test_ream_native_text_clears_actual_detail_and_seated_notes(native_profile_c
 
 
 @pytest.mark.parametrize("defect", ["empty-view", "invalid-crop", "invalid-text"])
-def test_front_detail_text_guard_cannot_pass_missing_native_geometry(native_profile_clearance, bound, defect):
+def test_front_detail_text_guard_cannot_pass_missing_native_geometry(native_profile_clearance, bound, monkeypatch, defect):
     case = native_profile_clearance
     case.front.GetAnnotations = lambda: [] if defect == "empty-view" else [case.r816]
     if defect == "invalid-text":
         case.r816.data.texts[0]["pos"][1] = float("nan")
-    hub = SimpleNamespace(GetOutline=lambda: (0.160, 0.068, 0.200, float("nan") if defect == "invalid-crop" else 0.122))
-    end = SimpleNamespace(GetOutline=lambda: (0.300, 0.080, 0.360, 0.140))
+    case.adapter, hub = _native_crop_fixture(monkeypatch, "D", defect="invalid-bbox" if defect == "invalid-crop" else None)
+    _adapter, end = _native_crop_fixture(monkeypatch, "E")
     with pytest.raises((RuntimeError, ValueError)):
         drawing._require_front_detail_air(case.adapter, case.front, hub, end)
 

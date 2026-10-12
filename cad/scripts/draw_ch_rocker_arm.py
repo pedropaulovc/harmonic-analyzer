@@ -285,11 +285,157 @@ def _project(adapter: Any, view: Any, points: Any, *, label: str) -> list[tuple[
 
 
 def _outline(view: Any, *, label: str) -> tuple[float, float, float, float]:
+    """Native view extent, which is not the detail's bare crop-circle box."""
     outline = tuple(float(v) for v in (_early_bound(view, "IView").GetOutline() or ()))
     if (len(outline) != 4 or not all(math.isfinite(v) for v in outline)
             or outline[0] >= outline[2] or outline[1] >= outline[3]):
         raise RuntimeError(f"{label} has invalid native outline: {outline!r}")
     return outline
+
+
+_DETAIL_GEOMETRY_TOL_M = 0.00005
+
+
+def _detail_fence(label: str) -> tuple[tuple[float, float, float], float]:
+    """Source model point/radius for a cosmetic, recipe-private detail fence."""
+    if label == "D":
+        return (0.0, PIVOT_MID_Y / 1000.0, 0.0), HUB_DIA / 2.0 + PIVOT_HOLE_DIA / 4.0
+    if label != "E":
+        raise RuntimeError(f"unknown rocker detail {label!r}")
+    centre_mm = ((BOT_END_X + ROD_TIP_X) / 2.0, (_BOT_END_Y + TOP_END_Y) / 2.0)
+    radius_mm = max(
+        math.dist(centre_mm, point)
+        for point in ((BOT_END_X, _BOT_END_Y), (ROD_TIP_X, _ROD_TIP_Y),
+                      (TOP_END_X, TOP_END_Y))
+    )
+    radius_mm = max(
+        radius_mm, math.dist(centre_mm, (ROD_HOLE_X, ROD_HOLE_Y)) + _ROD_HOLE_DIA / 2.0,
+    ) + 0.5  # Cosmetic crop air, not a feature dimension.
+    return (centre_mm[0] / 1000.0, centre_mm[1] / 1000.0, 0.0), radius_mm
+
+
+def _view_scale_ratio(view: Any, *, label: str) -> tuple[float, float]:
+    ratio = tuple(float(v) for v in (_early_bound(view, "IView").ScaleRatio or ()))
+    if len(ratio) != 2 or not all(math.isfinite(v) and v > 0.0 for v in ratio):
+        raise RuntimeError(f"{label}: invalid native ScaleRatio={ratio!r}")
+    return ratio
+
+
+def _native_circle_geometry(circle: Any, *, label: str) -> tuple[tuple[float, float, float], float]:
+    segment = _early_bound(circle, "ISketchSegment")
+    if segment is None or int(segment.GetType()) != 1:  # swSketchARC
+        raise RuntimeError(f"{label}: native fence is not a sketch arc")
+    arc = _early_bound(circle, "ISketchArc")
+    if int(arc.IsCircle()) != 1:  # INT 1/0, not VT_BOOL
+        raise RuntimeError(f"{label}: native fence is not a complete circle")
+    point = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    if point is None:
+        raise RuntimeError(f"{label}: native circle has no centre point")
+    centre = (float(point.X), float(point.Y), float(point.Z))
+    radius = float(arc.GetRadius())
+    if not all(math.isfinite(v) for v in (*centre, radius)) or radius <= 0.0:
+        raise RuntimeError(f"{label}: invalid native circle centre={centre}, radius={radius!r}")
+    return centre, radius
+
+
+def _detail_crop(adapter: Any, view: Any, *, label: str) -> tuple[float, float, float, float]:
+    """Read the persisted circle, reversing the exact drawing-sketch mapping.
+
+    GetOutline is a native VIEW bbox (e.g. R10 D was 75.736 mm); it does not
+    promise the 53.8 mm crop circle. No measured/guessed padding is subtracted.
+    """
+    view = _early_bound(view, "IView")
+    bbox = _outline(view, label=f"detail {label} view bbox")
+    _telemetry.info(f"detail {label}: native_view_bbox={bbox} (view extent, not crop)")
+    parent = _early_bound(view.GetBaseView(), "IView")
+    detail_circle = _early_bound(view.GetDetail(), "IDetailCircle")
+    if parent is None or detail_circle is None:
+        raise RuntimeError(f"detail {label}: missing native parent or persisted detail circle")
+    actual_flags = (detail_circle.GetLabel(), int(detail_circle.GetDisplay()),
+                    detail_circle.NoOutline, detail_circle.JaggedOutline, detail_circle.HasFullOutline())
+    if actual_flags != (label, 1, False, False, True):
+        raise RuntimeError(f"detail {label}: actual circle label/display/outline flags={actual_flags!r}, "
+                           f"required={(label, 1, False, False, True)!r}, native_view_bbox={bbox}")
+    profiles = tuple(detail_circle.GetProfileItems() or ())
+    if len(profiles) != 1:
+        raise RuntimeError(f"detail {label}: expected one persisted circle profile, got {len(profiles)}")
+    raw_centre, raw_radius = _native_circle_geometry(profiles[0], label=f"detail {label} persisted profile")
+    sketch = _early_bound(_early_bound(profiles[0], "ISketchSegment").GetSketch(), "ISketch")
+    if sketch is None:
+        raise RuntimeError(f"detail {label}: persisted circle has no native sketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    if transform is None:
+        raise RuntimeError(f"detail {label}: persisted circle has no native sketch transform")
+    matrix = tuple(float(v) for v in (transform.ArrayData or ()))
+    if len(matrix) != 16 or not all(math.isfinite(v) for v in matrix):
+        raise RuntimeError(f"detail {label}: invalid native sketch transform={matrix!r}")
+    inverse = _early_bound(transform.IInverse(), "IMathTransform")
+    if inverse is None:
+        raise RuntimeError(f"detail {label}: native sketch transform cannot be inverted")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    if utility is None:
+        raise RuntimeError(f"detail {label}: missing native math utility for profile readback")
+    sheet_points = []
+    # Creation maps SHEET -> drawing sketch. Its inverse already returns sheet
+    # points; applying parent.ModelToViewTransform here would double-project.
+    for xyz in (raw_centre,
+                (raw_centre[0] + raw_radius, raw_centre[1], raw_centre[2]),
+                (raw_centre[0], raw_centre[1] + raw_radius, raw_centre[2])):
+        point = _early_bound(utility.CreatePoint(double_array(list(xyz))), "IMathPoint")
+        if point is None:
+            raise RuntimeError(f"detail {label}: cannot create native profile point")
+        projected = _early_bound(point.MultiplyTransform(inverse), "IMathPoint")
+        if projected is None:
+            raise RuntimeError(f"detail {label}: cannot reverse native sketch mapping")
+        coordinates = tuple(float(v) for v in (projected.ArrayData or ()))
+        if len(coordinates) != 3 or not all(math.isfinite(v) for v in coordinates):
+            raise RuntimeError(f"detail {label}: invalid inverse-mapped circle point={coordinates!r}")
+        if abs(coordinates[2]) > _DETAIL_GEOMETRY_TOL_M:
+            raise RuntimeError(f"detail {label}: inverse-mapped circle point={coordinates!r}, required_sheet_z=0, "
+                               f"geometry_tolerance_m={_DETAIL_GEOMETRY_TOL_M}, raw_sketch_centre={raw_centre}, "
+                               f"raw_sketch_radius={raw_radius}, sketch_transform={matrix}, native_view_bbox={bbox}")
+        sheet_points.append(coordinates[:2])
+    parent_centre, rim_x, rim_y = sheet_points
+    parent_radius = math.dist(parent_centre, rim_x)
+    radius_y = math.dist(parent_centre, rim_y)
+    centre, radius_mm = _detail_fence(label)
+    parent_ratio = _view_scale_ratio(parent, label=f"detail {label} parent")
+    parent_scale = parent_ratio[0] / parent_ratio[1]
+    expected_parent_radius = radius_mm / 1000.0 * parent_scale
+    expected_parent_centre, projected_rim = _project(
+        adapter, parent, (centre, (centre[0] + radius_mm / 1000.0, centre[1], centre[2])),
+        label=f"detail {label} independent parent fence",
+    )
+    projected_radius = math.dist(expected_parent_centre, projected_rim)
+    context = (f"detail {label}: raw_sketch_centre={raw_centre}, raw_sketch_radius={raw_radius}, "
+               f"sketch_transform={matrix}, inverse_parent_sheet_centre={parent_centre}, "
+               f"required_parent_sheet_centre={expected_parent_centre}, "
+               f"actual_parent_sheet_radius_mm={parent_radius * 1000.0:.6f}, radius_y_mm={radius_y * 1000.0:.6f}, "
+               f"projected_parent_radius_mm={projected_radius * 1000.0:.6f}, "
+               f"required_parent_radius_mm={expected_parent_radius * 1000.0:.6f}, parent_scale={parent_ratio}, "
+               f"geometry_tolerance_mm={_DETAIL_GEOMETRY_TOL_M * 1000.0:.6f}, native_view_bbox={bbox}")
+    _telemetry.info(context)
+    if (math.dist(parent_centre, expected_parent_centre) > _DETAIL_GEOMETRY_TOL_M
+            or abs(parent_radius - expected_parent_radius) > _DETAIL_GEOMETRY_TOL_M
+            or abs(projected_radius - expected_parent_radius) > _DETAIL_GEOMETRY_TOL_M
+            or abs(radius_y - parent_radius) > _DETAIL_GEOMETRY_TOL_M):
+        raise RuntimeError(f"{context}: persisted native circle geometry/frame/parent scale mismatch")
+    ratio = _view_scale_ratio(view, label=f"detail {label}")
+    expected_ratio = {"D": HUB_SCALE, "E": END_SCALE}[label]
+    scale = ratio[0] / ratio[1]
+    if (not math.isclose(scale, expected_ratio[0] / expected_ratio[1], abs_tol=1e-10)
+            or view.UseParentScale is not False or int(view.UseSheetScale) != 0):
+        raise RuntimeError(f"{context}: native detail scale/independence changed: {ratio!r}")
+    (physical,) = _project(adapter, view, (centre,), label=f"detail {label} actual physical centre")
+    magnification = scale / parent_scale
+    crop_centre = tuple(physical[i] + (parent_centre[i] - expected_parent_centre[i]) * magnification
+                        for i in range(2))
+    radius = parent_radius * magnification
+    crop = (crop_centre[0] - radius, crop_centre[1] - radius,
+            crop_centre[0] + radius, crop_centre[1] + radius)
+    _telemetry.info(f"{context}, actual_detail_projected_centre={physical}, native_detail_scale={ratio}, "
+                    f"actual_crop_box={crop}, native_view_bbox={bbox}")
+    return crop
 
 
 def _create_detail(
@@ -306,12 +452,24 @@ def _create_detail(
     rim = (centre[0] + radius_mm / 1000.0, centre[1], centre[2])
     sheet_points = _project(adapter, parent, (centre, rim), label=f"detail {label} fence")
     sketch = _early_bound(parent.GetSketch(), "ISketch")
+    if sketch is None:
+        raise RuntimeError(f"detail {label}: parent has no native drawing sketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    if transform is None or utility is None:
+        raise RuntimeError(f"detail {label}: missing native sketch transform or math utility")
     mapped = []
     for x, y in sheet_points:
         point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        mapped.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
+        if point is None:
+            raise RuntimeError(f"detail {label}: cannot create native fence point")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        if projected is None:
+            raise RuntimeError(f"detail {label}: cannot map native fence point to sketch")
+        coordinates = tuple(float(v) for v in (projected.ArrayData or ()))
+        if len(coordinates) != 3 or not all(math.isfinite(v) for v in coordinates):
+            raise RuntimeError(f"detail {label}: invalid native sketch fence point={coordinates!r}")
+        mapped.append(coordinates)
     manager = _early_bound(draw.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
     manager.AddToDB = True
@@ -321,6 +479,24 @@ def _create_detail(
         manager.AddToDB = previous
     if circle is None:
         raise RuntimeError(f"detail {label}: native fence creation failed")
+    actual_centre, actual_radius = _native_circle_geometry(circle, label=f"detail {label} created fence")
+    asked_radius = math.dist(mapped[0], mapped[1])
+    parent_ratio = _view_scale_ratio(parent, label=f"detail {label} parent")
+    parent_radius = radius_mm / 1000.0 * parent_ratio[0] / parent_ratio[1]
+    projected_radius = math.dist(*sheet_points)
+    if parent_radius <= 0.0 or asked_radius <= 0.0:
+        raise RuntimeError(f"detail {label}: invalid requested native fence radius")
+    tolerance = _DETAIL_GEOMETRY_TOL_M * asked_radius / parent_radius
+    context = (f"detail {label} created fence: requested_sketch_centre={mapped[0]}, "
+               f"actual_sketch_centre={actual_centre}, requested_sketch_radius={asked_radius}, "
+               f"actual_sketch_radius={actual_radius}, geometry_tolerance_sketch_units={tolerance}, "
+               f"projected_parent_sheet_radius={projected_radius}, required_parent_sheet_radius={parent_radius}, "
+               f"native_parent_scale={parent_ratio}")
+    _telemetry.info(context)
+    if (math.dist(actual_centre, mapped[0]) > tolerance
+            or abs(actual_radius - asked_radius) > tolerance
+            or abs(projected_radius - parent_radius) > _DETAIL_GEOMETRY_TOL_M):
+        raise RuntimeError(f"{context}: created native circle geometry or parent projection scale mismatch")
     selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
     data = _early_bound(selection.CreateSelectData(), "ISelectData")
     data.View = parent
@@ -342,30 +518,30 @@ def _create_detail(
     if base is None or int(adapter.swApp.IsSame(base, parent)) != 1:
         raise RuntimeError(f"detail {label}: native parent link is not the front")
     for attempt in range(4):
-        ratio = tuple(float(v) for v in (detail.ScaleRatio or ()))
-        if (len(ratio) != 2 or not all(math.isfinite(v) and v > 0 for v in ratio)
-                or not math.isclose(ratio[0] / ratio[1], scale[0] / scale[1], abs_tol=1e-10)
-                or bool(detail.UseParentScale) or int(detail.UseSheetScale) != 0):
+        ratio = _view_scale_ratio(detail, label=f"detail {label}")
+        if (not math.isclose(ratio[0] / ratio[1], scale[0] / scale[1], abs_tol=1e-10)
+                or detail.UseParentScale is not False or int(detail.UseSheetScale) != 0):
             raise RuntimeError(f"detail {label}: native scale is {ratio}, not {scale}")
-        outline = _outline(detail, label=f"detail {label}")
-        landed = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
+        crop = _detail_crop(adapter, detail, label=label)
+        outline = _outline(detail, label=f"detail {label} view bbox")
+        landed = ((crop[0] + crop[2]) / 2.0, (crop[1] + crop[3]) / 2.0)
         (physical,) = _project(adapter, detail, (centre,), label=f"detail {label} centre {attempt}")
-        _telemetry.info(f"detail {label}: pass={attempt}, outline={outline}, physical_centre={physical}, scale={ratio}")
-        if math.dist(landed, target) <= 0.00005 and math.dist(physical, target) <= 0.0005:
+        _telemetry.info(f"detail {label}: pass={attempt}, native_view_bbox={outline}, actual_crop={crop}, physical_centre={physical}, scale={ratio}")
+        if math.dist(physical, target) <= _DETAIL_GEOMETRY_TOL_M:
+            if math.dist(landed, target) > _DETAIL_GEOMETRY_TOL_M:
+                raise RuntimeError(f"detail {label}: settled physical centre={physical} but actual crop centre={landed}, "
+                                   f"required_centre={target}, tolerance_m={_DETAIL_GEOMETRY_TOL_M}, "
+                                   f"actual_crop={crop}, native_view_bbox={outline}")
             break
         anchor = tuple(float(v) for v in detail.Position)
         if len(anchor) != 2 or not all(math.isfinite(v) for v in anchor):
             raise RuntimeError(f"detail {label}: invalid Position={anchor!r}")
-        if math.dist(landed, target) > 0.00005:
-            move = [anchor[i] + target[i] - landed[i] for i in range(2)]
-            if detail.SetViewPosition(double_array(move), False) is not True:
-                raise RuntimeError(f"detail {label}: native position refused")
+        move = [anchor[i] + target[i] - physical[i] for i in range(2)]
+        if detail.SetViewPosition(double_array(move), False) is not True:
+            raise RuntimeError(f"detail {label}: native position refused")
         rebuild_drawing(adapter, label=f"settle detail {label}")
     else:
-        raise RuntimeError(f"detail {label}: unsettled native crop/physical centre: outline={outline}, projected={physical}, target={target}")
-    diameter = 2.0 * radius_mm / 1000.0 * scale[0] / scale[1]
-    if any(abs(outline[i + 2] - outline[i] - diameter) > 0.001 for i in range(2)):
-        raise RuntimeError(f"detail {label}: full circular crop is not its native scaled diameter: {outline}, diameter={diameter}")
+        raise RuntimeError(f"detail {label}: unsettled native crop/physical centre: view_bbox={outline}, crop={crop}, projected={physical}, target={target}")
     return detail
 
 
@@ -431,7 +607,7 @@ def _seat_detail_caption(adapter: Any, view: Any, sheet: Any, *, label: str) -> 
     if type(linked) is not str or not linked:
         raise RuntimeError(f"detail {label}: caption has no native linked fields")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    crop = _outline(view, label=f"detail {label}")
+    crop = _detail_crop(adapter, view, label=label)
     ceiling = crop[1] - 0.003
     floor = (_title_block_top(adapter, sheet) if label == "E"
              else float(_early_bound(sheet, "ISheet").GetZoneMargin(1))) + 0.003
@@ -1072,7 +1248,7 @@ def _require_ream_clearance(
     if record is None or errors:
         raise RuntimeError(f"detail D: cannot measure native REAM text: {errors!r}")
     geometry = _arc_callout_geometry(record, calibrate_sheet_advance([record]))
-    crop = Box(*_outline(hub, label="detail D"))
+    crop = Box(*_detail_crop(adapter, hub, label="D"))
     notes = Box(*notes_box)
     for box in geometry.text_boxes:
         for label, obstacle in (("D crop", crop), ("seated notes", notes)):
@@ -1099,7 +1275,8 @@ def _require_front_detail_air(adapter: Any, front: Any, hub: Any, end: Any) -> N
     if not records or any(record is None for record in records) or errors:
         raise RuntimeError(f"front/detail text air cannot be measured: {errors!r}")
     advance = calibrate_sheet_advance(records)
-    obstacles = (("D", Box(*_outline(hub, label="D"))), ("E", Box(*_outline(end, label="E"))))
+    obstacles = (("D", Box(*_detail_crop(adapter, hub, label="D"))),
+                 ("E", Box(*_detail_crop(adapter, end, label="E"))))
     for record in records:
         if record.get("visible") in (2, 3) or record.get("type") in (13, 15):
             continue
@@ -1569,23 +1746,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # Import the source radii and top height too: these are the BASIC nominal
     # geometry of the profile zone, not independent radius/height bands.
     _add_rocker_outline_dimensions(adapter, front)
+    hub_centre, hub_radius_mm = _detail_fence("D")
     hub = _create_detail(
-        adapter, front, centre=(0.0, PIVOT_MID_Y / 1000.0, 0.0),
-        radius_mm=HUB_DIA / 2.0 + PIVOT_HOLE_DIA / 4.0,
+        adapter, front, centre=hub_centre, radius_mm=hub_radius_mm,
         target=HUB_CENTER, scale=HUB_SCALE, label="D",
     )
-    end_centre_mm = ((BOT_END_X + ROD_TIP_X) / 2.0, (_BOT_END_Y + TOP_END_Y) / 2.0)
-    end_radius_mm = max(
-        math.dist(end_centre_mm, point)
-        for point in ((BOT_END_X, _BOT_END_Y), (ROD_TIP_X, _ROD_TIP_Y),
-                      (TOP_END_X, TOP_END_Y))
-    )
-    end_radius_mm = max(
-        end_radius_mm, math.dist(end_centre_mm, (ROD_HOLE_X, ROD_HOLE_Y)) + _ROD_HOLE_DIA / 2.0,
-    ) + 0.5  # Cosmetic crop air, not a feature dimension.
+    end_centre, end_radius_mm = _detail_fence("E")
     end = _create_detail(
-        adapter, front, centre=(*[v / 1000.0 for v in end_centre_mm], 0.0),
-        radius_mm=end_radius_mm, target=END_CENTER, scale=END_SCALE, label="E",
+        adapter, front, centre=end_centre, radius_mm=end_radius_mm,
+        target=END_CENTER, scale=END_SCALE, label="E",
     )
     hub_annotations = curate_view_dimensions(
         adapter, hub, keep=HUB_KEEP, view_label="detail D",
