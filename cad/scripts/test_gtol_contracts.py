@@ -89,10 +89,11 @@ def test_frame_signature_rejects_unsupported_range_symbol() -> None:
         )
 
 
-def test_unmodified_frame_keeps_legacy_tolerance_payload() -> None:
+def test_frame_signature_rejects_non_numeric_legacy_payload() -> None:
     xml = gtol_frame_xml("profile_surface", "legacy tolerance text")
-    assert "<PrimaryToleranceValue>legacy tolerance text</PrimaryToleranceValue>" in xml
-    assert gtol_frame_signature(xml).outside_disposition is None
+    # Main's numeric readback contract also applies without a profile modifier.
+    with pytest.raises(ValueError, match="primary tolerance is not numeric"):
+        gtol_frame_signature(xml)
 
 
 @pytest.mark.parametrize("outside", (None, "0", "0.5"))

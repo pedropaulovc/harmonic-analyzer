@@ -307,7 +307,6 @@ def test_printed_profile_controls_are_their_sources() -> None:
     assert (arm_drawing.R_TOP, arm_drawing.R_BOTTOM, arm_drawing.CENTER_Y) == (
         arm.R_TOP, arm.R_BOTTOM, arm.CENTER_Y
     )
-    assert arm_drawing.TOP_EDGE_ABOVE_PIVOT == arm.TOP_EDGE_ABOVE_PIVOT
     assert arm_drawing.TOP_EDGE_BAND is arm.TOP_EDGE_BAND
     assert arm_drawing.ARC_PROFILE_ZONE_MM == f"{arm.TOP_EDGE_BAND[0]:g}"
     assert arm_drawing.ARC_PROFILE_OUTSIDE_MM == {

@@ -890,30 +890,37 @@ def _normalize_detail_circle(
     for owner, expected in ((circle.GetView(), front), (circle.GetDetailView(), view)):
         if owner is None or int(adapter.swApp.IsSame(owner, expected)) != 1:
             raise RuntimeError(f"detail {label}: source-circle ownership changed during font normalization")
-    # Reuse the shared, documented GetDetailCircleInfo2 decoder. Identify this
-    # label by its preserved native position, not enumeration-order assumptions.
+    _telemetry.info(f"detail {label}: native source-circle font normalized: source_height_m={height}, before={before!r}, after={after!r}, label_position={position!r}")
+
+
+def _require_detail_circle_display_heights(front: Any, height: float) -> None:
+    """Prove both native displayed heights after BOTH circles are normalized."""
+    # GetDetailCircleInfo2 textPt is not promised to equal GetLabelPosition.
+    # Every entry must have the same sourced height, so no anchor/order join
+    # is needed. Keep the complete flat-record/arrow validation before decoding.
+    front = _early_bound(front, "IView")
     info = front.GetDetailCircleInfo2()
     if (type(info) not in (tuple, list) or not info or info[0] != 2
             or any(type(value) not in (float, int) or not math.isfinite(value) for value in info)):
-        raise RuntimeError(f"detail {label}: invalid native circle display data={info!r}")
+        raise RuntimeError(f"detail D/E: invalid native circle display data={info!r}")
     index = 1
     for _number in range(2):
         if index + 16 > len(info):
-            raise RuntimeError(f"detail {label}: truncated native circle display data={info!r}")
+            raise RuntimeError(f"detail D/E: truncated native circle display data={info!r}")
         arrows = info[index + 15]
         if arrows < 0 or arrows != int(arrows):
-            raise RuntimeError(f"detail {label}: invalid native circle arrow count={arrows!r}")
+            raise RuntimeError(f"detail D/E: invalid native circle arrow count={arrows!r}")
         index += 16 + int(arrows) * 9
     if index != len(info):
-        raise RuntimeError(f"detail {label}: malformed native circle display data={info!r}")
+        raise RuntimeError(f"detail D/E: malformed native circle display data={info!r}")
     decoded = _detail_circles(info)
-    matches = [entry for entry in decoded if math.dist(entry[3], position) <= 1e-8]
-    if len(decoded) != 2 or len(matches) != 1:
-        raise RuntimeError(f"detail {label}: unavailable/ambiguous native circle display-height readback={decoded!r}")
-    actual = matches[0][4][0]
-    if not math.isfinite(actual) or abs(actual - height) > _NOTE_HEIGHT_READBACK_TOL_M:
-        raise RuntimeError(f"detail {label}: native circle displayed-height mismatch: actual_m={actual}, source_height_m={height}")
-    _telemetry.info(f"detail {label}: native source-circle font normalized: source_height_m={height}, before={before!r}, after={after!r}, displayed_height_m={actual}, label_position={position!r}")
+    if len(decoded) != 2:
+        raise RuntimeError(f"detail D/E: expected exactly two native circle display-height readbacks={decoded!r}")
+    heights = tuple(entry[4][0] for entry in decoded)
+    if any(not math.isfinite(actual) or abs(actual - height) > _NOTE_HEIGHT_READBACK_TOL_M
+           for actual in heights):
+        raise RuntimeError(f"detail D/E: native circle displayed-height mismatch: actual_heights_m={heights!r}, source_height_m={height}")
+    _telemetry.info(f"detail D/E: native source-circle displayed heights verified after both font writes: source_height_m={height}, displayed_heights_m={heights!r}")
 
 
 def _capture_caption_failure(adapter: Any, label: str, exc: Exception) -> None:
@@ -940,6 +947,8 @@ def _normalize_detail_caption_styles(
         for label, view in (("D", hub), ("E", end)):
             _normalize_detail_caption(adapter, view, front, height, label=label)
             _normalize_detail_circle(adapter, front, view, height, label=label)
+        label = "styles"
+        _require_detail_circle_display_heights(front, height)
     except Exception as exc:
         _capture_caption_failure(adapter, label, exc)
         raise

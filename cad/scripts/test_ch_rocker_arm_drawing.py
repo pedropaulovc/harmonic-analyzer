@@ -218,7 +218,7 @@ def test_profile_nominals_are_kept_natively_without_note_only_duplicates() -> No
 def test_basic_radius_text_positions_are_outside_their_parent_circles() -> None:
     """Inside-circle R800 placement retained a centre tail on the native sheet."""
     centre_model_y = (
-        drawing.PIVOT_MID_Y + drawing.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
+        drawing.PIVOT_MID_Y + ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
     )
     centre = _front_xy(0.0, centre_model_y)
     for name, radius in (
@@ -3637,6 +3637,9 @@ class _StyleCircle(_DetailCircle):
     def __init__(self, label, front, view):
         super().__init__(label)
         self.xy = drawing.DETAIL_LETTER_XY[label]
+        # Native textPt and GetLabelPosition need not describe the same anchor.
+        self.display_xy = (self.xy[0] + 0.0007, self.xy[1] - 0.0004)
+        self.arrows = []
         self.front, self.view = front, view
         self.font_height, self.use_doc, self.points = 0.00635, True, True
         self.result = True
@@ -3683,16 +3686,19 @@ def native_caption_style(bound, monkeypatch):
     circles = {label: _StyleCircle(label, front, views[label]) for label in ("D", "E")}
     front.GetDetailCircles = lambda: [circles["E"], circles["D"]]
 
+    display_order, display_reads = ["D", "E"], []
+
     def circle_info():
-        # Deliberately different from GetDetailCircles enumeration. Position,
-        # not unverified array order, binds the independent displayed height.
+        display_reads.append({label: tuple(circle.writes) for label, circle in circles.items()})
         values = [2.0]
-        for label in ("D", "E"):
+        for label in display_order:
             circle = circles[label]
             values.extend([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                *circle.xy, 0, circle.font_height + circle.display_delta, 0,
+                *circle.display_xy, 0, circle.font_height + circle.display_delta, len(circle.arrows),
             ])
+            for arrow in circle.arrows:
+                values.extend(arrow)
         return tuple(values)
 
     front.GetDetailCircleInfo2 = circle_info
@@ -3709,6 +3715,7 @@ def native_caption_style(bound, monkeypatch):
     return SimpleNamespace(
         adapter=adapter, front=front, notes=notes, views=views, circles=circles,
         source=_StyleNote("source", ordinary_height=0.0035), events=events, captures=captures,
+        display_order=display_order, display_reads=display_reads,
     )
 
 
@@ -3719,8 +3726,10 @@ def _normalize_style(case):
 
 
 @pytest.mark.parametrize("height", [0.0035, 0.0042])
-def test_normal_note_native_fragments_drive_both_captions_and_source_circle_fonts(native_caption_style, height):
+@pytest.mark.parametrize("display_order", [("D", "E"), ("E", "D")])
+def test_normal_note_native_fragments_drive_both_captions_and_source_circle_fonts(native_caption_style, height, display_order):
     case = native_caption_style
+    case.display_order[:] = display_order
     for fragment in case.source.data.texts:
         fragment["h"] = height
     _normalize_style(case)
@@ -3735,9 +3744,11 @@ def test_normal_note_native_fragments_drive_both_captions_and_source_circle_font
         assert [fragment["h"] for fragment in note.data.texts] == [height] * 5
         assert circle.writes == [(False, height)]
         assert circle.GetLabel() == label and circle.xy == drawing.DETAIL_LETTER_XY[label]
+        assert math.dist(circle.display_xy, circle.GetLabelPosition()) > 1e-8
         assert circle.font_height == height and circle.GetUseDocTextFormat() is False
         assert view.Position == (drawing.HUB_CENTER if label == "D" else drawing.END_CENTER)
     assert case.events.count("rebuild") == 4 and case.events.count("redraw") == 5
+    assert case.display_reads == [{label: ((False, height),) for label in ("D", "E")}]
     assert case.captures == []
 
 
@@ -3853,24 +3864,14 @@ def test_caption_reset_rejects_lost_fields_heights_fragments_and_native_ownershi
 
 @pytest.mark.parametrize("label", ["D", "E"])
 @pytest.mark.parametrize("defect", [
-    "format-height", "display-height", "label", "position", "owner", "detail-owner",
-    "doc-authority", "point-authority", "missing-info", "truncated-info", "invalid-info",
+    "format-height", "label", "position", "owner", "detail-owner",
+    "doc-authority", "point-authority",
 ])
 def test_source_circle_readbacks_are_independent_and_preserve_native_identity(native_caption_style, label, defect):
     case = native_caption_style
     circle = case.circles[label]
     if defect == "format-height":
         circle.delta = 0.001
-    elif defect == "display-height":
-        circle.display_delta = 0.001
-    elif defect in {"missing-info", "truncated-info", "invalid-info"}:
-        original = case.front.GetDetailCircleInfo2
-        refused_info = (
-            (lambda: None) if defect == "missing-info" else
-            (lambda: original()[:-1]) if defect == "truncated-info" else
-            (lambda: (float("nan"), *original()[1:]))
-        )
-        circle.on_write = lambda: setattr(case.front, "GetDetailCircleInfo2", refused_info)
     else:
         def mutate():
             if defect == "label":
@@ -3889,6 +3890,112 @@ def test_source_circle_readbacks_are_independent_and_preserve_native_identity(na
     with pytest.raises(RuntimeError) as caught:
         _normalize_style(case)
     assert case.captures == [caught.value]
+    assert case.display_reads == []
+
+
+@pytest.mark.parametrize("display_order", [("D", "E"), ("E", "D")])
+def test_native_circle_display_height_batch_needs_no_unique_text_anchor(native_caption_style, display_order):
+    case = native_caption_style
+    case.display_order[:] = display_order
+    case.circles["E"].display_xy = case.circles["D"].display_xy
+    _normalize_style(case)
+    assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
+    assert case.captures == []
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+@pytest.mark.parametrize("delta", [0.0, 0.00000005, 0.0000002])
+def test_native_circle_display_height_batch_uses_existing_height_tolerance(native_caption_style, label, delta):
+    case = native_caption_style
+    case.circles[label].display_delta = delta
+    if delta > drawing._NOTE_HEIGHT_READBACK_TOL_M:
+        with pytest.raises(RuntimeError, match="displayed-height mismatch") as caught:
+            _normalize_style(case)
+        assert case.captures == [caught.value]
+    else:
+        _normalize_style(case)
+        assert case.captures == []
+    assert case.display_reads == [{letter: ((False, 0.0035),) for letter in ("D", "E")}]
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+@pytest.mark.parametrize("delta", [0.001, -0.001, float("nan"), float("inf")])
+def test_native_circle_display_height_mismatch_is_fatal_after_both_writes(native_caption_style, label, delta):
+    case = native_caption_style
+    case.circles[label].display_delta = delta
+    with pytest.raises(RuntimeError, match="displayed-height mismatch|invalid native circle display data") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert case.display_reads == [{letter: ((False, 0.0035),) for letter in ("D", "E")}]
+    assert all(circle.writes == [(False, 0.0035)] for circle in case.circles.values())
+
+
+@pytest.mark.parametrize("defect", [
+    "missing-info", "empty-info", "wrong-count", "nonnumeric-info", "nonfinite-info",
+    "truncated-header", "truncated-arrow", "negative-arrows", "fractional-arrows",
+    "trailing-data",
+])
+def test_native_circle_display_batch_requires_complete_flat_shape_and_arrows(native_caption_style, defect):
+    case = native_caption_style
+    original = case.front.GetDetailCircleInfo2
+
+    def malformed_info():
+        values = list(original())
+        if defect == "missing-info":
+            return None
+        if defect == "empty-info":
+            return ()
+        if defect == "wrong-count":
+            values[0] = 3.0
+        elif defect == "nonnumeric-info":
+            values[1] = "layer"
+        elif defect == "nonfinite-info":
+            values[1] = float("nan")
+        elif defect == "truncated-header":
+            values.pop()
+        elif defect == "truncated-arrow":
+            values[-1] = 1.0
+            values.extend([0.0] * 8)  # A complete native arrow has nine doubles.
+        elif defect == "negative-arrows":
+            values[16] = -1.0
+        elif defect == "fractional-arrows":
+            values[16] = 0.5
+        elif defect == "trailing-data":
+            values.append(0.0)
+        return tuple(values)
+
+    case.front.GetDetailCircleInfo2 = malformed_info
+    with pytest.raises(RuntimeError, match="native circle (display data|arrow count)") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
+
+
+@pytest.mark.parametrize("arrow_counts", [(0, 1), (1, 2), (2, 0)])
+def test_native_circle_display_height_batch_accepts_complete_variable_arrow_records(native_caption_style, arrow_counts):
+    case = native_caption_style
+    arrow = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0005, 0.001, 0.0)
+    for label, count in zip(("D", "E"), arrow_counts, strict=True):
+        case.circles[label].arrows = [arrow] * count
+    _normalize_style(case)
+    assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
+    assert case.captures == []
+
+
+@pytest.mark.parametrize("decoded_count", [0, 1, 3])
+def test_native_circle_display_batch_requires_exactly_two_decoded_entries(native_caption_style, monkeypatch, decoded_count):
+    case = native_caption_style
+    original = drawing._detail_circles
+
+    def incomplete_decoder(info):
+        decoded = original(info)
+        return (decoded + decoded[:1])[:decoded_count]
+
+    monkeypatch.setattr(drawing, "_detail_circles", incomplete_decoder)
+    with pytest.raises(RuntimeError, match="exactly two native circle display-height readbacks") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
 
 
 @pytest.mark.parametrize("delta", [0.0, 0.00000005, 0.0002])
@@ -3906,7 +4013,7 @@ def test_native_font_quantization_is_small_not_a_pixel_or_point_fallback(native_
         assert case.captures == []
 
 
-@pytest.mark.parametrize("phase", ["source", "caption", "circle"])
+@pytest.mark.parametrize("phase", ["source", "caption", "circle", "circle-display-batch"])
 @pytest.mark.parametrize("capture_fails", [False, True])
 def test_style_refusals_preserve_original_exception_and_forensics_before_seat_close(native_caption_style, monkeypatch, phase, capture_fails):
     case = native_caption_style
@@ -3919,8 +4026,10 @@ def test_style_refusals_preserve_original_exception_and_forensics_before_seat_cl
         case.source.annotation.GetDisplayData = refuse
     elif phase == "caption":
         case.notes["D"].annotation.SetTextFormat = refuse
-    else:
+    elif phase == "circle":
         case.circles["D"].GetTextFormat = refuse
+    else:
+        case.front.GetDetailCircleInfo2 = refuse
     def capture(adapter, _label, message, **context):
         events.append("capture")
         assert adapter is case.adapter and message == str(original)
@@ -3938,6 +4047,8 @@ def test_style_refusals_preserve_original_exception_and_forensics_before_seat_cl
     assert caught.value is original
     assert events == ["refusal", "capture", "seat-close"]
     assert bool(warnings) is capture_fails
+    if phase == "circle-display-batch":
+        assert all(circle.writes == [(False, 0.0035)] for circle in case.circles.values())
 
 
 def test_style_normalization_precedes_settled_link_capture_and_both_final_probes():
