@@ -396,8 +396,9 @@ The gate covers every sheet whose rendered output a PR changes, including a
 sheet that changes only because CAD geometry, config or a helper it reads
 changed. A sheet the PR's own drawing script or spec edits must pass as below.
 A sheet changed only indirectly passes when its review adds no gating finding
-beyond a review of `main`'s version of the same sheet by the same reviewer and
-model; the PR records both verdicts and the finding diff.
+beyond a review of `main`'s version of the same sheet run with the same
+reviewer, model, effort and prompt (the report records each); the PR records
+both verdicts and the finding diff.
 Part and assembly packages render every native PDF page at 300 dpi and submit
 all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.

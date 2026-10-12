@@ -155,10 +155,11 @@ not mergeable until ALL THREE hold — no partial credit:
    `cad/scripts/machinist_review.py` verdict on the exact version being
    merged (reviewer family rules: `cad/docs/drawing-simplicity-policy.md`,
    "The gate"). A sheet whose drawing script or spec the PR edits must reach
-   `SHIP` (or `FIX` whose only gating findings match a named exception, cited
-   in the PR). A sheet changed only indirectly passes when its review adds no
-   gating finding beyond a same-reviewer baseline of `main`'s version of that
-   sheet; post both verdicts and the finding diff on the PR.
+   `SHIP` (or `FIX` whose only gating findings are blockers matching a named
+   exception, cited in the PR). A sheet changed only indirectly passes when
+   its review adds no gating finding beyond a baseline review of `main`'s
+   version of that sheet run with the same reviewer, model, effort and prompt;
+   post both verdicts and the finding diff on the PR.
 
 **Stacked PRs share gates 1 and 3.** A successful build at the TOP of a stack
 covers every PR in that stack, and so does the visual inspection of the renders
