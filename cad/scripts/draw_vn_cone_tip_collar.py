@@ -32,9 +32,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import format_findings
 from diagnostics.drawing_layout_audit import audit_document
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    dimension_name, place_view, remove_notes_matching, view_name,
-)
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view, view_name
 
 SPEC = DRAWINGS_BY_NAME["vn_cone_tip_collar"]
 PART_STEM = SPEC.artifact_stem
@@ -80,10 +78,112 @@ TAP_NOTE_XY = (TAP_CENTER[0] - 0.030, TAP_CENTER[1] + 0.025)
 BORE_CENTER = (0.300, 0.110)
 BORE_KEEP = {"BoreDia": (BORE_CENTER[0] + 0.035, BORE_CENTER[1] + 0.032)}
 BORE_NOTE_XY = (BORE_CENTER[0] - 0.025, BORE_CENTER[1] - 0.026)
-# SolidWorks' own descriptive Hole Wizard note ("... Tapped Hole"), pinned to
-# a view that imports from the tapped feature. The through tap's hole callout
-# already states the thread (draw_sm_knife_mount's TAPPED_HOLE_NOTE).
-TAPPED_HOLE_NOTE = "Tapped Hole"
+# swAnnotationType_e
+_NOTE = 6
+# swAnnotationOwnerType: sheet-owned, not the sheet format's template ink
+# (diagnostics.drawing_layout_audit._OWNER_DRAWING_SHEET).
+_OWNER_DRAWING_SHEET = 1
+
+
+def _note_name(annotation: Any) -> str:
+    """A note's drawing-unique annotation name (``DetailItemNNN``)."""
+    name = str(_early_bound(annotation, "IAnnotation").GetName() or "")
+    if not name:
+        raise RuntimeError("collar note has no annotation name")
+    return name
+
+
+def _placed_note(adapter, property_name, x, y) -> str:
+    """Place one property-linked note and return its annotation name."""
+    note = _early_bound(add_property_linked_note(adapter, property_name, x, y), "INote")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"collar note {property_name!r} has no annotation")
+    return _note_name(annotation)
+
+
+def _sheet_notes(adapter) -> dict[str, tuple[str, Any]]:
+    """Every note on the sheet, ``{name: (owner, IAnnotation)}``: each view's,
+    and the sheet's own but not its format's (the layout audit's universe)."""
+    rows = _early_bound(adapter.currentModel, "IDrawingDoc").GetViews()
+    if not rows or len(rows) != 1 or not rows[0]:
+        raise RuntimeError("collar drawing must hold one sheet with its views")
+    sheet_view, *views = (_early_bound(view, "IView") for view in rows[0])
+    notes = {}
+    for owner, view in (("sheet", sheet_view), *((view_name(adapter, v), v) for v in views)):
+        for raw in view.GetAnnotations() or ():
+            annotation = _early_bound(raw, "IAnnotation")
+            if int(annotation.GetType()) != _NOTE:
+                continue
+            if view is sheet_view and int(annotation.OwnerType) != _OWNER_DRAWING_SHEET:
+                continue
+            name = _note_name(annotation)
+            if name in notes:
+                raise RuntimeError(f"collar note {name} listed twice")
+            notes[name] = (owner, annotation)
+    return notes
+
+
+def _note_text(annotation: Any) -> str:
+    return str(_early_bound(annotation.GetSpecificAnnotation(), "INote").GetText() or "")
+
+
+def _delete_unplaced_notes(adapter, placed: frozenset[str]) -> None:
+    """Delete every note this recipe did not place, then read none back.
+
+    The first single-sheet render (8087fd13c) counted 16 annotations for the
+    15 this recipe places. The extra, note DetailItem348, boxed
+    [211.6,140.7]..[268.3,154.0] mm with its leader, sat across CollarWidth's
+    extension line and CollarDia's dimension line. Selected by not being one
+    of ours, not by its text, so no placed note can be taken with it.
+    """
+    draw = adapter.currentModel
+    notes = _sheet_notes(adapter)
+    if not placed <= notes.keys():
+        raise RuntimeError(f"collar sheet lists {sorted(notes)}, not every placed note {sorted(placed)}")
+    stray = {name: found for name, found in notes.items() if name not in placed}
+    for name, (owner, annotation) in stray.items():
+        _telemetry.info(f"collar: deleting unplaced note {name} on {owner}: {_note_text(annotation)!r}")
+        draw.ClearSelection2(True)
+        if not annotation.Select2(False, 0):
+            raise RuntimeError(f"cannot select unplaced collar note {name}")
+        draw.EditDelete()
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="collar unplaced notes")
+    left = sorted(set(_sheet_notes(adapter)) - placed)
+    if left:
+        raise RuntimeError(f"collar unplaced notes survived deletion: {left}")
+
+
+def _assert_settled_annotations(adapter, placed: frozenset[str], callout: str) -> None:
+    """After the last rebuild: exactly the placed notes, and the tap's one
+    native hole callout still stating the through thread. Reads only."""
+    notes = _sheet_notes(adapter)
+    if set(notes) != placed:
+        raise RuntimeError(
+            f"collar notes after the last rebuild: {sorted(notes)}; placed {sorted(placed)}"
+        )
+    rows = _early_bound(adapter.currentModel, "IDrawingDoc").GetViews()
+    found = []
+    for raw_view in rows[0][1:]:
+        view = _early_bound(raw_view, "IView")
+        for raw in view.GetDisplayDimensions() or ():
+            display = _early_bound(raw, "IDisplayDimension")
+            if not display.IsHoleCallout():
+                continue
+            data = _early_bound(display.GetDisplayData(), "IDisplayData")
+            text = " ".join(
+                str(data.GetTextAtIndex(index) or "") for index in range(int(data.GetTextCount()))
+            )
+            name = str(_early_bound(display.GetAnnotation(), "IAnnotation").GetName() or "")
+            found.append((view_name(adapter, view), name, text))
+    # The callout prints the size without ANSI's '#': "2-56 UNC - 2B".
+    thread = spec.SET_SCREW_THREAD.lstrip("#")
+    if (
+        len(found) != 1 or found[0][1] != callout
+        or thread not in found[0][2] or "THRU" not in found[0][2]
+    ):
+        raise RuntimeError(f"collar tap callout {callout} ({thread} THRU) not settled: {found}")
 
 
 def bore_crop_radius_m() -> float:
@@ -199,8 +299,7 @@ def _bore_view(adapter):
     )
     assert_imported_precision(adapter, marks, _precision(BORE_KEEP))
     set_dimension_callouts(adapter, marks, {"BoreDia": "REAM THRU"})
-    add_property_linked_note(adapter, "Bore View Note", *BORE_NOTE_XY)
-    return view
+    return view, _placed_note(adapter, "Bore View Note", *BORE_NOTE_XY)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -258,34 +357,35 @@ async def build(adapter: Any) -> dict[str, str]:
         tap, (spec.FLAT_DISTANCE, spec.TAP_STATION, spec.TAP_DRILL_DIA / 2.0),
         "collar tap outer mouth",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.080)
-    add_property_linked_note(adapter, "Installation Notes", 0.016, 0.048)
-    add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.160)
-    add_property_linked_note(adapter, "Radial Tap View Note", *TAP_NOTE_XY)
-    _bore_view(adapter)
+    placed = {
+        _placed_note(adapter, "Manufacturing Notes", 0.016, 0.080),
+        _placed_note(adapter, "Installation Notes", 0.016, 0.048),
+        _placed_note(adapter, "Isometric View Note", 0.310, 0.160),
+        _placed_note(adapter, "Radial Tap View Note", *TAP_NOTE_XY),
+    }
+    _bore, bore_note = _bore_view(adapter)
+    placed = frozenset(placed | {bore_note})
+    if len(placed) != 5:
+        raise RuntimeError(f"collar notes do not have five distinct names: {sorted(placed)}")
     # In the radial projection the tap mouth is a real circle on the flat.
-    add_native_hole_callout(
+    callout = add_native_hole_callout(
         adapter, tap,
         edge_xy=tap_rim,
         callout_xy=TAP_CALLOUT_XY, label="custom collar through set screw tap",
     )
-    # The first single-sheet render (8087fd13c) counted 16 annotations for
-    # the 15 this recipe places. The extra, note DetailItem348, boxed
-    # [211.6,140.7]..[268.3,154.0] mm with its leader, sat across
-    # CollarWidth's extension line and CollarDia's dimension line. It is the
-    # one unplaced note, so it is deleted rather than moved, and
-    # finalize_drawing then proves that no tapped-hole note is left.
-    removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
-    _telemetry.info(f"removed {removed} automatic tapped-hole note(s)")
-    rebuild_drawing(adapter, label="collar layout audit")
+    callout_name = str(_early_bound(
+        _early_bound(callout, "IDisplayDimension").GetAnnotation(), "IAnnotation",
+    ).GetName() or "")
+    if not callout_name:
+        raise RuntimeError("collar tap callout has no annotation name")
+    _delete_unplaced_notes(adapter, placed)
     findings = audit_document(adapter)
     if findings:
         raise RuntimeError("collar manufacturing layout:\n" + format_findings(findings))
     return await finalize_drawing(
         adapter, OUTPUTS, pdf_title="Cone Tip Collar Manufacturing Drawing",
         scale=SHEET_SCALE, layout=SPEC.layout,
-        redundant_note_substrings=(TAPPED_HOLE_NOTE,),
-        expected_redundant_notes=0,
+        settled_checks=(lambda: _assert_settled_annotations(adapter, placed, callout_name),),
     )
 
 
