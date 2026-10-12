@@ -701,8 +701,21 @@ def review_package(
             stdout, stderr = proc.stdout, proc.stderr
             attempt_events = _parse_events(proc.stdout)
             if proc.returncode != 0:
+                # The claude CLI reports quota and auth failures in its JSON
+                # result event, not on stderr; without it the error is blank.
+                reported = next(
+                    (
+                        str(event["result"])
+                        for event in reversed(attempt_events)
+                        if isinstance(event, dict)
+                        and event.get("is_error")
+                        and event.get("result")
+                    ),
+                    "",
+                )
                 raise RuntimeError(
-                    f"{reviewer} exit {proc.returncode}: {proc.stderr.strip()[-800:]}"
+                    f"{reviewer} exit {proc.returncode}: "
+                    f"{(reported or proc.stderr.strip())[-800:]}"
                 )
             verdict = (
                 extract_claude_verdict(attempt_events)
