@@ -16,7 +16,12 @@ import sys
 from pathlib import Path
 
 import pytest
-from harmonic_solidworks_guard import MARKER, REFUSED_EXIT, launches_solidworks
+from harmonic_solidworks_guard import (
+    MARKER,
+    REFUSED_EXIT,
+    guard_module,
+    launches_solidworks,
+)
 
 # SolidWorks runs only on Windows, and the root conftest guards only there.
 pytestmark = pytest.mark.skipif(
@@ -512,6 +517,46 @@ def test_pywin32_process_creation_is_refused(solidworks_launch_refusals):
             solidworks_launch_refusals,
             lambda attribute=attribute, args=args: getattr(win32api, attribute)(*args),
         )
+
+
+def test_a_tasklist_argv_with_another_executable_is_refused(solidworks_launch_refusals):
+    """Windows starts ``executable``/the application name, not ``args[0]``."""
+    import _winapi
+
+    _expect_blocked(
+        solidworks_launch_refusals,
+        lambda: subprocess.Popen(["tasklist"], executable=MISSING_SOLIDWORKS),
+    )
+    assert _winapi.CreateProcess.__name__ == "guarded_create_process"
+    _expect_blocked(
+        solidworks_launch_refusals,
+        lambda: _winapi.CreateProcess(
+            MISSING_SOLIDWORKS, "tasklist", None, None, False, 0, None, None, None
+        ),
+    )
+    assert launches_solidworks(["tasklist"], r"X:\never-exists\explorer.exe")
+    assert not launches_solidworks(["tasklist"], r"C:\Windows\System32\tasklist.exe")
+
+
+def test_pywin32_logon_process_creation_is_refused():
+    """pywin32 312 lacks these; a build that has them gets them refused."""
+    import types
+
+    class Refused(Exception):
+        pass
+
+    def refuse(route, detail):
+        raise Refused(route)
+
+    def create_process(*args, **kwargs):
+        raise AssertionError("the stand-in ran: not refused")
+
+    module = types.ModuleType("win32process")
+    module.CreateProcessWithLogonW = module.CreateProcessWithTokenW = create_process
+    guard_module("win32process", module, refuse, set())
+    for attribute in ("CreateProcessWithLogonW", "CreateProcessWithTokenW"):
+        with pytest.raises(Refused, match=attribute):
+            getattr(module, attribute)("user", None, "pw", 0, MISSING_SOLIDWORKS)
 
 
 @pytest.mark.parametrize("entry", ["os.spawnv", "os.spawnl", "nt.spawnv"])

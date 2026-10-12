@@ -24,11 +24,14 @@ A refused child records the refusal in the session log :data:`MARKER` names,
 says why on stderr and exits :data:`REFUSED_EXIT` at once, so no caller can
 swallow it.
 
-Not covered, by design: a child started with ``-I``, ``-E`` or ``-S``, or with
-an environment that drops ``PYTHONPATH``, skips ``sitecustomize`` (the parent's
-command-line check still refuses one whose command line names SolidWorks); and
-code a non-Python program runs, beyond its command line: a ``.ps1``/``.cmd``/
-``.vbs`` file, or shell code that assembles a command name at runtime.
+Threat model: accidental launches only. The guard catches repo code and tests
+that start SolidWorks by mistake, through the APIs that code actually uses
+and their obvious neighbours. Deliberate evasion is out of scope: a native
+binary, raw ole32 activation through ctypes (comtypes binds those symbols
+itself at import), a shell verb assembled at runtime, a child started with
+``-I``/``-E``/``-S`` or without ``PYTHONPATH`` (it skips ``sitecustomize``; the
+parent's command-line check still sees its command line), and what a
+``.ps1``/``.cmd``/``.vbs`` file does past its command line.
 """
 
 import ntpath
@@ -159,7 +162,12 @@ LAUNCH_ENTRY_POINTS = {
     "solidworks_mcp.adapters.sw_install": ("launch_via_platform_shortcut",),
     "win32api": ("ShellExecute", "WinExec"),
     "win32com.shell.shell": ("ShellExecuteEx",),
-    "win32process": ("CreateProcessAsUser",),
+    # pywin32 312 has only the first; later builds may add the other two.
+    "win32process": (
+        "CreateProcessAsUser",
+        "CreateProcessWithLogonW",
+        "CreateProcessWithTokenW",
+    ),
     "win32service": (
         "CreateService",
         "StartService",
@@ -173,7 +181,8 @@ PROCESS_CREATORS = {"_winapi": ("CreateProcess",), "win32process": ("CreateProce
 COMMAND_RUNNERS = {"win32pipe": ("popen", "popen2", "popen3", "popen4")}
 # ctypes symbols that start a process or shell-open a document. Resolving one
 # is refused: the call it enables is past every Python-level check. (ole32's
-# COM activators are not here: comtypes binds them itself; it is guarded above.)
+# COM activators are not here: comtypes resolves them at import, and its
+# wrappers are guarded above; raw ole32 calls are deliberate evasion.)
 NATIVE_LAUNCHERS = frozenset(
     {
         "CreateProcessA",
@@ -229,7 +238,10 @@ def launches_solidworks(args, executable=None, shell=False):
     ``shell`` says the command runs under ``cmd /c`` (``os.system``, popen).
     """
     first = program(args)
-    if first in _READ_ONLY_PROGRAMS:
+    # Windows starts ``executable`` when given, whatever ``args[0]`` says.
+    if first in _READ_ONLY_PROGRAMS and (
+        executable is None or program([_text([], executable)]) in _READ_ONLY_PROGRAMS
+    ):
         return False
     text = _text(args, executable)
     if any(marker in text for marker in LAUNCH_MARKERS):

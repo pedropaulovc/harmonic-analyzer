@@ -47,10 +47,14 @@ The guard covers every Python child too: the
 conftest puts `tests/_child_guard` first on `PYTHONPATH` and sets
 `HARMONIC_TEST_FORBID_SOLIDWORKS`, so `python -m doit`, `build.py`, a git diff
 helper or a build script started by a test loads the same refusals through
-`sitecustomize`, exits 97 on one, and fails the test that started it. A child
+`sitecustomize`, exits 97 on one, and fails the test that started it. The
+threat model is accidental launches only: the guard catches repo code and
+tests that start SolidWorks by mistake, through the APIs that code uses and
+their obvious neighbours. Deliberate evasion is out of scope: a native binary,
+raw ole32 activation through ctypes, a shell verb built at runtime, or a child
 run with `-I`, `-E` or `-S`, or with an environment that drops `PYTHONPATH`,
-skips that guard. The vendored `SolidworksMCP-python` tests are excluded
-because they can take the farm's SolidWorks licence.
+which skips the child guard. The vendored `SolidworksMCP-python` tests are
+excluded because they can take the farm's SolidWorks licence.
 
 Reuse source facts only within an unchanged-source scan, or immutable baseline
 bytes for private mutation fixtures. Keep each case's writable checkout, task
