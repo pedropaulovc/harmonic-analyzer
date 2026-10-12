@@ -1933,6 +1933,10 @@ def native_offset(monkeypatch: pytest.MonkeyPatch):
     )
     monkeypatch.setattr(drawing, "add_edge_dimension", create)
     monkeypatch.setattr(
+        drawing, "set_arc_endpoints_to_center",
+        lambda *_a, **_k: pytest.fail("projected hub end rim is not a circular endpoint"),
+    )
+    monkeypatch.setattr(
         _drawing_edge_dimensions, "_is_same_attachment",
         lambda _adapter, actual, wanted, _kind: actual is wanted,
     )
@@ -1948,7 +1952,6 @@ def test_offset_is_the_measured_hub_end_to_strap_face_reference(native_offset) -
     assert display.model.GetToleranceType() == 0
     assert display.precision == 2
     assert display.text[1] == "(" and display.text[2] == ")"
-    assert display.arc_conditions[1] == 1
     assert display.writes == [(1, "("), (2, ")")]
     assert ch_rocker_arm_spec.STRAP_HUB_SYMMETRY == 0.10
 

@@ -188,8 +188,9 @@ frames and no datums.
    offset from the hub end face is a measured, parenthesized REFERENCE at
    normal sheet precision, checked against `(HUB_LENGTH - ARM_THICKNESS) / 2`
    in [`ch_rocker_arm_spec.py`](../scripts/ch_rocker_arm_spec.py); it adds no
-   acceptance band. Native hole callouts carry REAM/DRILL and through condition,
-   replacing the duplicated arc-length, end-shape and hole-process notes.
+   acceptance band. It spans the projected end planes, not a hub-radius endpoint.
+   Native hole callouts carry REAM/DRILL and through condition, replacing the
+   duplicated arc-length, end-shape and hole-process notes.
    Integral hub **length**, not OD, sets channel pitch (the spec's `HUB_LENGTH`
    and the hub-face stack in `build_ch_channel_assembly.py`). The inherited
    strap-to-hub symmetry 0.10, hub coaxiality Ø0.50 and one-setup wording remain

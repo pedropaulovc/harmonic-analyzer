@@ -887,7 +887,9 @@ def _add_strap_offset_dimension(adapter: Any, right: Any) -> Any:
         text_xy=STRAP_OFFSET_TEXT_XY, label="strap offset from hub end",
         orientation="horizontal", entities=(hub.edge, strap.edge),
     )
-    set_arc_endpoints_to_center(adapter, dimension, label="hub end-plane offset origin")
+    # In the right view the end rim projects to a straight, constant-Z line;
+    # it has no drawing circular endpoint to centre. The native X measurement
+    # and attachment readbacks below prove the end-plane offset directly.
     assert_dimension_measures(
         adapter, dimension, expected_mm=(HUB_LENGTH - ARM_THICKNESS) / 2.0,
         label="strap offset from hub end", entities=(hub.edge, strap.edge),
