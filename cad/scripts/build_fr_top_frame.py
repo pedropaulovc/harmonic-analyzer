@@ -498,8 +498,8 @@ if STUD_Z_REAR + HANGER_CBORE_DIA / 2.0 >= INNER_Z + GUSSET:
 # Dowel slip holes and slots (rule 12, print-worst): the largest reamed hole
 # and the longest slot keep a wall to the crossbar's +X / -X face and to the
 # largest drilled screw clearance hole with the round hole's station at its
-# .XXX limit and the slot's at that plus its zone radius off the BASIC 14.200
-# (0.155); their blind floors stay below the counterbore floor, so neither
+# .XXX limit and the slot's at that plus its own .XXX from the round hole
+# (0.26); their blind floors stay below the counterbore floor, so neither
 # meets the screw's bearing face.  The slip holes and slots are cut blind
 # from the faced underside and located from the #6 hole's axis at that face,
 # whichever face the #6 hole was drilled from (sheet 6 dimensions them in
@@ -532,14 +532,14 @@ SLOT_BAR_WALL = (
     (SLOT_X - HANGER_SLOT_STATION_TOL - _SLOT_MAX_HALF_L)
     - BAR_X0
     - HANGER_DRIFT_AT_SLIP_FLOOR
-)  # 2.323
+)  # 2.408
 SLOT_SCREW_WALL = (
     -HANGER_SLOT_X
     - HANGER_SLOT_STATION_TOL
     - _SLOT_MAX_HALF_L
     - _CLEARANCE_MAX_R
     - 2.0 * HANGER_DRIFT_AT_SLIP_FLOOR
-)  # 2.056
+)  # 2.141
 PIN_HOLE_FLOOR_MARGIN = HANGER_GRIP - HANGER_PIN_HOLE_DEPTH  # 18.0
 SLOT_FLOOR_MARGIN = HANGER_GRIP - HANGER_SLOT_DEPTH  # 18.0
 for _label, _value in (

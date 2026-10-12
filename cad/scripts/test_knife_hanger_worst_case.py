@@ -178,20 +178,20 @@ def test_the_slot_takes_up_the_dowel_pair_spacing() -> None:
     # Same slip width as the round hole, so the pin keeps its slip across it.
     assert top_frame.HANGER_SLOT_WIDTH == top_frame.HANGER_PIN_HOLE_DIA
     assert top_frame.HANGER_SLOT_WIDTH_BAND == top_frame.HANGER_PIN_HOLE_DIA_BAND
-    # The slot stands BASIC 14.200 from its round hole, so the crossbar's
-    # stations drop out.  Travel either way: 0.025 slot zone radius + 0.13
-    # knife-mount span + 0.046 round-hole slip; the shortest .XX slot holds
-    # the largest pin.
+    # The slot stands a plain .XXX 14.200 from its round hole, so the
+    # crossbar's stations drop out.  Travel either way: 0.13 slot station +
+    # 0.13 knife-mount span + 0.046 round-hole slip; the shortest .XXX slot
+    # holds the largest pin.
     assert top_frame.HANGER_SLOT_FROM_ROUND == pytest.approx(14.2)
-    assert top_frame.HANGER_SLOT_TRAVEL == pytest.approx(0.20123)
-    assert top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(3.58508)
+    assert top_frame.HANGER_SLOT_TRAVEL == pytest.approx(0.30623)
+    assert top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(3.79508)
     assert (top_frame.HANGER_SLOT_LENGTH, top_frame.HANGER_SLOT_LENGTH_PLACES) == (
         4.20,
-        2,
+        3,
     )
-    assert top_frame.HANGER_SLOT_LENGTH_TOL == 0.51
+    assert top_frame.HANGER_SLOT_LENGTH_TOL == 0.13
     shortest = top_frame.HANGER_SLOT_LENGTH - top_frame.HANGER_SLOT_LENGTH_TOL
-    assert shortest - top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(0.10492)
+    assert shortest - top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(0.27492)
     assert top_frame.HANGER_SLOT_DEPTH == top_frame.HANGER_PIN_HOLE_DEPTH
 
 
@@ -202,11 +202,11 @@ def test_the_crossbar_webs_hold_round_the_hole_and_the_slot() -> None:
     # its depth (both are located at the underside): rule 12's 2.0 holds.
     assert build_fr_top_frame.PIN_HOLE_BAR_WALL == pytest.approx(3.068, abs=5e-4)
     assert build_fr_top_frame.PIN_HOLE_SCREW_WALL == pytest.approx(2.801, abs=5e-4)
-    # The longest .XX slot (4.71) with its station at the round hole's .XXX
-    # limit plus its zone radius (0.155).
-    assert top_frame.HANGER_SLOT_STATION_TOL == pytest.approx(0.155)
-    assert build_fr_top_frame.SLOT_BAR_WALL == pytest.approx(2.323, abs=5e-4)
-    assert build_fr_top_frame.SLOT_SCREW_WALL == pytest.approx(2.056, abs=5e-4)
+    # The longest .XXX slot (4.33) with its station at the round hole's
+    # .XXX limit plus its own .XXX (0.26).
+    assert top_frame.HANGER_SLOT_STATION_TOL == pytest.approx(0.26)
+    assert build_fr_top_frame.SLOT_BAR_WALL == pytest.approx(2.408, abs=5e-4)
+    assert build_fr_top_frame.SLOT_SCREW_WALL == pytest.approx(2.141, abs=5e-4)
     for wall in (
         build_fr_top_frame.PIN_HOLE_BAR_WALL,
         build_fr_top_frame.PIN_HOLE_SCREW_WALL,
@@ -228,7 +228,7 @@ def test_the_dowel_pattern_frame_is_the_zone_the_stacks_were_derived_on() -> Non
     assert knife_mount.PIN_HOLE_HALF_SPAN_TOL == pytest.approx(0.065)
     assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.3766, abs=5e-5)
     assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(6.308, abs=5e-4)
-    assert top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(3.585, abs=5e-4)
+    assert top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(3.795, abs=5e-4)
     # The conversion the ruling corrected: Ø0.23 (half-span 0.115) would
     # have stacked 0.416 against the 0.4065 float of the normal-fit Ø4.318
     # hole the crossbar then drilled.

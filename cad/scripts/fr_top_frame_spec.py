@@ -155,43 +155,42 @@ if HANGER_PIN_SLIP_CLEARANCE_MIN < 0.02 or HANGER_PIN_SLIP_CLEARANCE_MAX > 0.10:
         f"{HANGER_PIN_SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
     )
 # Manufacturing GD&T limits consumed by the part's drawing projection: each
-# slot to the round hole beside it (datum B front, C rear) at the BASIC
-# 14.200 between them, oriented by the other round hole with its location
-# released (translation modifier), so the two mounts' dowel lines stay square
-# to the B-C line.
+# slot's width centre plane to the round hole beside it (datum B front, C
+# rear), through its axis, oriented by the other round hole with its
+# location released (translation modifier), so the two mounts' dowel lines
+# stay square to the B-C line.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {"knife-hanger slot position": "0.05"}
 HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
-# The slot's station from its round hole, BASIC: the frame's zone holds the
-# slot's width (across the dowel line), and the note holds its centre along
-# the slot from the BASIC by the same zone radius (a slot's plain position
-# frame does not reach that direction: codex review of 0bb6ba81).  So the
-# crossbar's .XXX round-hole station never opens the slot-to-hole spacing;
-# from the screw axis it sits at the round hole's .XXX band plus 0.025:
-# 0.155.
-HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 14.200, BASIC
+# The slot's station along the dowel line from its round hole, a plain .XXX
+# (the frame holds only the width): the slot gives the dowel relief along
+# it, so its centre needs no tighter location there (codex review of
+# 50fe7633 flagged a +-0.025 one).  From the screw axis it sits at the round
+# hole's .XXX band plus its own: 0.26.
+HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 14.200
 HANGER_SLOT_FROM_ROUND_PLACES = 3
-HANGER_SLOT_ALONG_TOL = HANGER_SLOT_POSITION_TOL / 2.0  # 0.025
-HANGER_SLOT_ALONG_CALLOUT = f"CENTRE \u00b1{HANGER_SLOT_ALONG_TOL:g} ALONG SLOT"
-HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_ALONG_TOL
+HANGER_SLOT_FROM_ROUND_TOL = _XXX  # 0.13
+HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_FROM_ROUND_TOL
 # The -X dowel's blind slot: the round hole's reamed slip width (so the pin
 # keeps the same 0.0274..0.0925 slip across it), held to the round hole
-# beside it by the position frame and note above, and its length (along X,
-# the dowel line) printed .XX.  The slot takes up the spacing mismatch: its
-# centre's 0.025 along it, the knife mount's .XXX span (0.13) and the round-hole pin
-# across its loosest slip (0.046), either way: 3.183 + 2 x 0.201 = 3.585
-# under the 3.690 shortest.  No longer: each extra 0.01 of length comes out
+# beside it by the position frame above, and its length (along X, the dowel
+# line) printed .XXX.  The slot takes up the spacing mismatch: its station's
+# .XXX (0.13), the knife mount's .XXX span (0.13) and the round-hole pin
+# across its loosest slip (0.046), either way: 3.183 + 2 x 0.306 = 3.795
+# under the 4.070 shortest.  No longer: each extra 0.01 of length comes out
 # of the slot's wall to the screw clearance hole (``build_fr_top_frame``).
 HANGER_SLOT_WIDTH = HANGER_PIN_HOLE_DIA
 HANGER_SLOT_WIDTH_BAND = HANGER_PIN_HOLE_DIA_BAND
 HANGER_SLOT_WIDTH_PLACES = HANGER_PIN_HOLE_DIA_PLACES
 HANGER_SLOT_LENGTH = 4.20
-HANGER_SLOT_LENGTH_PLACES = 2
-HANGER_SLOT_LENGTH_TOL = _XX  # 0.51
+HANGER_SLOT_LENGTH_PLACES = 3
+HANGER_SLOT_LENGTH_TOL = _XXX  # 0.13
 HANGER_SLOT_DEPTH = HANGER_PIN_HOLE_DEPTH
 HANGER_SLOT_TRAVEL = (
-    HANGER_SLOT_ALONG_TOL + KNIFE_DOWEL.SPAN_TOL + HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
-)  # 0.201
-HANGER_SLOT_LENGTH_REQUIRED = KNIFE_DOWEL.DIA_MAX + 2.0 * HANGER_SLOT_TRAVEL  # 3.585
+    HANGER_SLOT_FROM_ROUND_TOL
+    + KNIFE_DOWEL.SPAN_TOL
+    + HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
+)  # 0.306
+HANGER_SLOT_LENGTH_REQUIRED = KNIFE_DOWEL.DIA_MAX + 2.0 * HANGER_SLOT_TRAVEL  # 3.795
 if HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL < HANGER_SLOT_LENGTH_REQUIRED:
     raise AssertionError(
         f"knife-hanger slot {HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL:.3f} long"

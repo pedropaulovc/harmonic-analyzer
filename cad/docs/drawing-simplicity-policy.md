@@ -84,13 +84,13 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      zone bounds both the yaw off the dowel line and the tilt) and its #6-32 hanger tap (Ø0.10 to
      A|B, so the crossbar's Ø4.699 clearance hole still floats round the screw
      — `build_sm_summing_assembly._assert_knife_hanger_stack`); the top
-     frame's two knife-hanger dowel slots (⌖0.05 to the round dowel hole at
-     their own station, BASIC 14.200 from it, datum B front / C rear, with
+     frame's two knife-hanger dowel slots (⌖0.05 on the slot width, its
+     centre plane through the round dowel hole at its own station, datum B
+     front / C rear, with
      the other station's round hole translated, B|C▷ and C|B▷, so the two
      knife mounts' dowel
-     lines stay square to the knife-edge line; the frame holds the slot's
-     width, and a note holds its centre ±0.025 along the slot from the
-     BASIC 14.200); summing-lever knife seat and
+     lines stay square to the knife-edge line; along the slot, a plain .XXX
+     14.200 from that hole); summing-lever knife seat and
      its 20-hole spring pattern (one pattern position frame);
    - **cams** — pinion-cam eccentric-axis position (and any future cam);
    - **channel consistency** — at most one control per channel part
