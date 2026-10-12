@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -221,3 +222,7 @@ def test_installation_note_fits_the_sheet() -> None:
     lines = _config.parts(STEM)["installation_notes"].splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines), lines
+    # The endshake band is a model dimension on MHA-MG-000, not note text.
+    notes = " ".join(lines)
+    assert "ENDSHAKE ON MHA-MG-000" in notes
+    assert not re.search(r"\d+\.\d|\+/-|±|Ø|MAX|MIN| MM\b", notes)
