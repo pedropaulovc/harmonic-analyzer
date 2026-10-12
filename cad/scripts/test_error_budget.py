@@ -220,7 +220,7 @@ def test_loaded_anchor_geometry_sets_pen_gain_and_hole_sensitivity(nom):
 
     expected_gain_per_lever_mm = lift_torque_gain() / total_stiffness
     actual_gain_per_lever_mm = eb.pen_gain(nom, nom.lever_r_built) / (
-        nom.lever_r_built * nom.wheel_ratio
+        eb.wire_moment_arm(nom, nom.lever_r_built) * nom.wheel_ratio
     )
     assert actual_gain_per_lever_mm == pytest.approx(
         expected_gain_per_lever_mm, rel=2e-6
@@ -361,25 +361,39 @@ def test_sparse_pair_is_gated_on_the_jointly_drawn_worst_coefficient(budget, rep
 
 
 def test_magnifier_setup_fits_reference_inputs_to_reachable_stroke(report, nom):
-    """Each reference input uses a reachable lever radius without exceeding the
-    physical pen stroke. Broad inputs scale down at the minimum radius; the
-    sparse pair stays full scale at the built-radius limit."""
+    """Each reference input uses a reachable clamp station without exceeding
+    the physical pen stroke, fitted on the wire moment arm that station
+    realises. Broad inputs beyond the capacity scale down at the minimum
+    station; one that fits runs full scale at the station whose arm fills
+    the stroke; the sparse pair stays full scale at the built-station limit."""
     assert nom.lever_r_min < nom.lever_r_built <= nom.lever_r_max
     mag = report["closed_form"]["mg-magnifier"]
     assert mag["ordinate_capacity_full_scale_bars"] > 0.0
+    regimes = {}
     for name, setup in mag["per_input"].items():
         assert setup["k0_reading_mm"] == pytest.approx(
             nom.pen_half * setup["stroke_fill"], rel=1e-6
         )
         assert 0.0 < setup["stroke_fill"] <= 1.0
         assert nom.lever_r_min <= setup["lever_r"] <= nom.lever_r_built
-        if name == "pair_1_20":
+        assert setup["wire_arm"] == pytest.approx(
+            eb.wire_moment_arm(nom, setup["lever_r"]), abs=1e-9
+        )
+        if setup["lever_r"] == nom.lever_r_min:
+            regimes[name] = "scaled"
+            assert 0.0 < setup["ordinate_scale"] < 1.0
+            assert setup["stroke_fill"] == 1.0
+        elif setup["lever_r"] == nom.lever_r_built:
+            regimes[name] = "short"
             assert setup["ordinate_scale"] == 1.0
-            assert setup["lever_r"] == nom.lever_r_built
             assert setup["k0_reading_mm"] < nom.pen_half
         else:
-            assert 0.0 < setup["ordinate_scale"] < 1.0
-            assert setup["lever_r"] == nom.lever_r_min
+            regimes[name] = "fitted"
+            assert setup["ordinate_scale"] == 1.0
+            assert setup["stroke_fill"] == 1.0
+    assert regimes["pair_1_20"] == "short"
+    assert regimes["all_ones"] == "scaled"
+    assert set(regimes.values()) == {"scaled", "fitted", "short"}
 
     trial = eb.NominalTrial(nom)
     for name, setup in mag["per_input"].items():
@@ -679,27 +693,104 @@ def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
 
 
 def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
-    """Every broad input is scored at the magnifier's minimum pose (clamp
-    against the collar), which build_mg_magnifier_assembly never builds: the
-    report names those inputs, the gate fails on it unless the yaml records
+    """Every broad input is scored at or just above the magnifier's minimum
+    pose (clamp against the collar), which build_mg_magnifier_assembly never
+    builds -- only the as-built station is gated: the report names those
+    inputs with their stations, the gate fails on them unless the yaml records
     the waiver (#748), and the offline wire estimate that rides the waiver
     reproduces mg_lever_wire_geom's own numbers at the as-built pose."""
     import mg_lever_wire_geom
 
     mag = report["closed_form"]["mg-magnifier"]
     assert mag["minimum_pose_cad_gated"] is False
-    assert set(mag["inputs_at_minimum_pose"]) >= {"all_ones", "gaussian_a0p1"}
+    broad = [n for n in budget["reference_inputs"] if n != "pair_1_20"]
+    assert mag["inputs_at_ungated_pose"] == broad
+    for name in broad:
+        assert mag["per_input"][name]["lever_r"] < nom.lever_r_built
+    assert mag["per_input"]["pair_1_20"]["lever_r"] == nom.lever_r_built
     strict = negative(budget, readout={"waive_minimum_pose": False})
     bad = eb.budget_closes(eb.build_report(strict))
-    assert any(b.startswith("magnifier minimum pose is not CAD-gated") for b in bad), (
-        bad
-    )
+    gate = [b for b in bad if b.startswith("magnifier minimum pose is not CAD-gated")]
+    assert len(gate) == 1, bad
+    for name in broad:
+        assert (
+            f"{name} (clamp {mag['per_input'][name]['lever_r']:.0f} mm from the knife)"
+            in gate[0]
+        )
     built = eb._minimum_pose_wire_estimate(
         dataclasses.replace(nom, lever_r_min=nom.lever_r_built)
     )
     assert built["hook_x_mm"] == pytest.approx(mg_lever_wire_geom.HOOK_X)
     assert built["wire_length_mm"] == pytest.approx(mg_lever_wire_geom.WIRE_LEN, abs=1e-3)
+    assert built["wire_arm_mm"] == pytest.approx(mag["wire_arm_built_mm"])
     assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < mg_lever_wire_geom.HOOK_X
+    assert mag["minimum_pose_wire_estimate"]["wire_arm_mm"] == mag["wire_arm_min_mm"]
+
+
+def test_pen_gain_runs_on_the_wire_moment_arm_not_the_clamp_station(nom):
+    """The pen sees the knife axis's perpendicular distance to wire 1, not the
+    clamp's distance from the knife: the hook sits the output fixture's SIGNED
+    groove-tangent offset from the clamp station (toward the knife) and the
+    wire leans toward the wheel. The arm is solved from mg_lever_wire_geom's
+    own run (reproduced at the as-built station), is NOT the clamp radius at
+    either end of the band, grows monotonically across it (so the setup's
+    inverse solve is well posed) and inverts exactly."""
+    import mg_lever_wire_geom
+    import mg_output_fixture_geom
+    import spring_mount_geom
+
+    # the signed offset is the fixture's, and it points at the knife
+    assert nom.hook_offset_x == mg_output_fixture_geom.HOOK_OFFSET_X
+    assert nom.hook_offset_x < 0.0
+    assert eb.KNIFE_AXIS_XY == (spring_mount_geom.KNIFE[0], spring_mount_geom.KNIFE_CONTACT_Y)
+    assert eb.KNIFE_AXIS_XY[0] + nom.lever_r_built + nom.hook_offset_x == pytest.approx(
+        mg_lever_wire_geom.HOOK_X
+    )
+    hook, end = eb.wire_rest_run(nom, nom.lever_r_built)
+    assert tuple(hook) == pytest.approx(mg_lever_wire_geom.WIRE_START)
+    assert tuple(end) == pytest.approx(mg_lever_wire_geom.WIRE_END)
+
+    # the arm at the built station, from the module's own endpoints
+    start, stop = np.array(mg_lever_wire_geom.WIRE_START), np.array(mg_lever_wire_geom.WIRE_END)
+    u = (stop - start) / np.linalg.norm(stop - start)
+    rx = start[0] - eb.KNIFE_AXIS_XY[0]
+    ry = start[1] - eb.KNIFE_AXIS_XY[1]
+    arm_built = abs(rx * u[1] - ry * u[0])
+    assert eb.wire_moment_arm(nom, nom.lever_r_built) == pytest.approx(arm_built)
+    assert eb.pen_gain(nom, nom.lever_r_built) == pytest.approx(
+        eb.pen_gain_per_arm_mm(nom) * arm_built
+    )
+
+    # band endpoints: neither end's arm is its clamp radius -- the hook offset
+    # pulls the minimum well under 66 and the wheel-ward lean more than pays
+    # the offset back at the built station
+    arm_min = eb.wire_moment_arm(nom, nom.lever_r_min)
+    arm_max = eb.wire_moment_arm(nom, nom.lever_r_max)
+    assert arm_min < nom.lever_r_min + nom.hook_offset_x < nom.lever_r_min
+    assert nom.lever_r_built < arm_built < nom.lever_r_built - nom.hook_offset_x
+    assert arm_max > nom.lever_r_max
+    # the offset's sign is load-bearing: at the clamp station (offset 0) the
+    # built arm grows by more than the offset's size
+    at_clamp = eb.wire_moment_arm(
+        dataclasses.replace(nom, hook_offset_x=0.0), nom.lever_r_built
+    )
+    assert at_clamp - arm_built > -nom.hook_offset_x
+    flipped = eb.wire_moment_arm(
+        dataclasses.replace(nom, hook_offset_x=-nom.hook_offset_x), nom.lever_r_min
+    )
+    assert flipped > arm_min
+
+    # monotone over the reachable band, and the inverse solve is exact
+    stations = np.linspace(nom.lever_r_min, nom.lever_r_max, 300)
+    arms = np.array([eb.wire_moment_arm(nom, s) for s in stations])
+    assert np.all(np.diff(arms) > 0.0)
+    assert arms[0] == arm_min and arms[-1] == arm_max
+    for s in (nom.lever_r_min, 0.5 * (nom.lever_r_min + nom.lever_r_built), nom.lever_r_max):
+        assert eb.clamp_radius_for_arm(nom, eb.wire_moment_arm(nom, s)) == pytest.approx(
+            s, abs=1e-9
+        )
+    with pytest.raises(ValueError, match="outside the clamp's band"):
+        eb.clamp_radius_for_arm(nom, 0.5 * arm_min)
 
 
 def test_rod_drive_is_on_the_crank_side(nom):
