@@ -257,6 +257,8 @@ def assert_datum_landing(
     from _drawing_layout_audit import annotation_display
 
     annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError(f"datum landing has no annotation ({label})")
     if annotation.IsDangling():
         raise RuntimeError(f"datum landing is dangling ({label})")
     display, refused = annotation_display(adapter, annotation)

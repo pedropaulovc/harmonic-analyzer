@@ -126,8 +126,16 @@ def add_edge_dimension(
         dimension, status = extension.AddSpecificDimension(
             text_xy[0], text_xy[1], 0.0, 3, 0  # swAngularDimension
         )
-        if dimension is None:
+        if dimension is None or status != 0:
             raise RuntimeError(f"failed to add {label} angular dimension ({status})")
+        model_dimension = _early_bound(
+            _early_bound(dimension, "IDisplayDimension").GetDimension2(0), "IDimension"
+        )
+        if model_dimension is None:
+            raise RuntimeError(f"failed to read {label} angular model dimension")
+        model_dimension.DrivenState = 1  # swDimensionDriven
+        if int(model_dimension.DrivenState) != 1:
+            raise RuntimeError(f"{label} angular dimension did not become driven")
     else:
         raise ValueError(f"unknown dimension orientation {orientation!r}")
     draw.ClearSelection2(True)

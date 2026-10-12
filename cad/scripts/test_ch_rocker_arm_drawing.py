@@ -1223,6 +1223,13 @@ def test_datum_a_attached_to_the_bore_passes(bound: None) -> None:
     drawing._require_datum_on_bore(_APP, _Tag((_BORE,)), _BORE)
 
 
+def test_datum_a_refuses_null_native_annotation(bound: None) -> None:
+    tag = _Tag((_BORE,))
+    tag.annotation = None
+    with pytest.raises(RuntimeError, match="datum A has no native annotation"):
+        drawing._require_datum_on_bore(_APP, tag, _BORE)
+
+
 @pytest.mark.parametrize(
     ("attached", "dangling", "match"),
     [
@@ -1702,7 +1709,7 @@ def test_imported_hub_diameter_cannot_lose_the_model_two_place_size_band(
             _drawing_dimensions.assert_imported_precision(adapter, annotations, precision)
 
 
-@pytest.mark.parametrize("defect", [None, "selection", "landing", "creation"])
+@pytest.mark.parametrize("defect", [None, "selection", "landing", "creation", "status", "missing-model", "driven"])
 def test_native_angular_dimension_keeps_named_entities_and_explicit_pick_points(
     monkeypatch: pytest.MonkeyPatch, defect: str | None,
 ) -> None:
@@ -1711,7 +1718,29 @@ def test_native_angular_dimension_keeps_named_entities_and_explicit_pick_points(
     selected = []
     events = []
     view = object()
-    display = object()
+    class ModelDimension:
+        __slots__ = ("state",)
+
+        def __init__(self):
+            self.state = 0
+
+        @property
+        def DrivenState(self):
+            events.append(("driven-read", self.state))
+            return self.state
+
+        @DrivenState.setter
+        def DrivenState(self, value):
+            assert type(value) is int and value == 1
+            events.append(("driven-set", value))
+            if defect != "driven":
+                self.state = value
+
+    model = ModelDimension()
+    def get_dimension(index):
+        assert type(index) is int and index == 0
+        return None if defect == "missing-model" else model
+    display = SimpleNamespace(GetDimension2=get_dimension)
 
     def select(entity, append, data):
         assert data.View is view
@@ -1728,9 +1757,10 @@ def test_native_angular_dimension_keeps_named_entities_and_explicit_pick_points(
         events.append(("landing", index, mark, x, y, z))
         return defect != "landing"
 
-    def create(x, y, z, kind, options):
-        events.append(("create", x, y, z, kind, options))
-        return (None if defect == "creation" else display), 0
+    def create(x, y, z, kind, error):
+        assert type(error) is int and error == 0
+        events.append(("create", x, y, z, kind, error))
+        return (None if defect == "creation" else display), (1 if defect == "status" else 0)
 
     draw = SimpleNamespace(
         ActivateView=lambda _name: True,
@@ -1755,16 +1785,22 @@ def test_native_angular_dimension_keeps_named_entities_and_explicit_pick_points(
         assert _drawing_edge_dimensions.add_edge_dimension(
             SimpleNamespace(currentModel=draw), view, **kwargs,
         ) is display
-        assert events[-1] == ("create", 0.24, 0.21, 0.0, 3, 0)
+        assert events[4:] == [
+            ("create", 0.24, 0.21, 0.0, 3, 0),
+            ("driven-set", 1), ("driven-read", 1),
+        ]
+        assert model.DrivenState == 1
         assert events[1] == ("landing", 1, -1, 0.22, 0.2, 0.0)
         assert events[3] == ("landing", 2, -1, 0.13, 0.2, 0.0)
     else:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError, match=r"angular dimension \(1\)" if defect == "status" else None):
             _drawing_edge_dimensions.add_edge_dimension(
                 SimpleNamespace(currentModel=draw), view, **kwargs,
             )
-        if defect != "creation":
+        if defect in {"selection", "landing"}:
             assert not any(event[0] == "create" for event in events)
+        if defect in {"creation", "status", "missing-model"}:
+            assert not any(event[0].startswith("driven-") for event in events)
 
 
 @pytest.mark.parametrize("defect", [
@@ -1882,10 +1918,10 @@ class _NativeQuantity:
         if part != self.ignored_text:
             self.text[part] = value
 
-    def SetPrecision3(self, primary, *_rest):
+    def SetPrecision3(self, primary, _dual, _primary_tolerance, _dual_tolerance):
         if not self.ignored_precision:
             self.precision = primary
-        return True
+        return 0  # Native integer status, not VT_BOOL.
 
     def GetPrimaryPrecision2(self):
         return self.precision
@@ -2048,6 +2084,10 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
                 display.model.SystemValue = None
             elif state.defect == "attachment":
                 display.attached = (entities[0], object())
+            elif state.defect == "null-attachment":
+                display.attached = (None, entities[1])
+            elif state.defect == "null-annotation":
+                display.GetAnnotation = lambda: None
             elif state.defect == "basic":
                 display.model.SetToleranceType = lambda _kind: True
             elif state.defect == "text":
@@ -2090,7 +2130,8 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
         label: display.model.SystemValue for label, display in state.displays.items()
     } == pytest.approx(expected)
     width, taper, angle = state.calls
-    assert width["entity_type"] == "VERTEX"
+    assert width["entity_types"] == ("VERTEX", "VERTEX")
+    assert "entity_type" not in width
     assert angle["entities"] == (state.land.edge, state.verticals[0][0])
     assert angle["entity_types"] == ("EDGE", "SKETCHSEGMENT")
     assert taper["entity_types"] == ("EDGE", "VERTEX")
@@ -2338,11 +2379,12 @@ def test_detail_letter_refuses_a_silently_ignored_void_setter(bound, monkeypatch
 
 class _DetailTransform:
     """Nonidentity native sketch transform; inverse maps back to sheet units."""
-    __slots__ = ("scale", "translation", "bad_inverse", "bad_matrix")
+    __slots__ = ("scale", "translation", "bad_inverse", "bad_matrix", "inverse_calls")
 
     def __init__(self, scale=2.0, translation=(0.013, -0.007, 0.0)):
         self.scale, self.translation = scale, translation
         self.bad_inverse = self.bad_matrix = False
+        self.inverse_calls = 0
 
     @property
     def ArrayData(self):
@@ -2351,10 +2393,14 @@ class _DetailTransform:
             *self.translation, self.scale, 0.0, 0.0, 0.0,
         )
 
-    def IInverse(self):
+    def Inverse(self):
+        self.inverse_calls += 1
         if self.bad_inverse:
             return None
         return _DetailTransform(1.0 / self.scale, tuple(-v / self.scale for v in self.translation))
+
+    def IInverse(self):
+        raise AssertionError("R11 IDispatch rejects IInverse; use the automation Inverse method")
 
     def apply(self, xyz):
         return tuple(xyz[i] * self.scale + self.translation[i] for i in range(3))
@@ -2446,7 +2492,7 @@ class _DetailCropCircle:
 
 class _DetailView:
     """Native bbox padding/offset is independent of the persisted crop circle."""
-    __slots__ = ("parent", "radius", "defect", "Position", "physical",
+    __slots__ = ("parent", "radius", "defect", "_position", "physical",
                  "_scale_ratio", "UseParentScale", "UseSheetScale", "events",
                  "crop_circle", "padding", "bbox_offset", "model_centre", "notes", "annotations")
 
@@ -2456,7 +2502,7 @@ class _DetailView:
         ratio = drawing.HUB_SCALE if label == "D" else drawing.END_SCALE
         self.radius = radius_mm / 1000.0 * ratio[0] / ratio[1]
         self.Position = (0.210, 0.110)
-        self.physical = self.Position
+        self.physical = self._position
         self._scale_ratio = ratio
         self.UseParentScale = False
         self.UseSheetScale = 0
@@ -2464,6 +2510,15 @@ class _DetailView:
         self.crop_circle = None
         self.padding, self.bbox_offset = padding, bbox_offset
         self.notes, self.annotations = [], []
+
+    @property
+    def Position(self):
+        return None if self.defect == "missing-position" else self._position
+
+    @Position.setter
+    def Position(self, value):
+        self._position = tuple(value)
+        assert len(self._position) == 2
 
     @property
     def ScaleRatio(self):
@@ -2496,7 +2551,7 @@ class _DetailView:
     def GetOutline(self):
         if self.defect == "invalid-bbox":
             return (0.0, 0.0, float("nan"), 1.0)
-        x, y = (self.Position[i] + self.bbox_offset[i] for i in range(2))
+        x, y = (self._position[i] + self.bbox_offset[i] for i in range(2))
         radius = self.radius + self.padding
         return (x - radius, y - radius, x + radius, y + radius)
 
@@ -2513,10 +2568,10 @@ class _DetailView:
     def UpdateViewDisplayGeometry(self):
         self.events.append("barrier")
         if self.defect != "stale":
-            self.physical = self.Position
+            self.physical = self._position
 
 
-@pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "fence", "selection", "creation", "source-radius", "source-centre", "profile-radius", "profile-centre", "near-profile-centre", "partial", "missing-profile", "outline-flags", "projection-scale"])
+@pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "missing-position", "fence", "selection", "creation", "source-radius", "source-centre", "profile-radius", "profile-centre", "near-profile-centre", "partial", "missing-profile", "outline-flags", "projection-scale"])
 def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, monkeypatch, defect):
     parent = _DetailParent()
     if defect == "projection-scale":
@@ -2587,6 +2642,7 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
         assert detail.events.count("barrier") >= 4
         assert detail.GetOutline()[3] > drawing.HUB_CENTER[1] + detail.radius
         assert created[0].radius == pytest.approx(0.006725)  # Nonidentity sketch scale 2.
+        assert parent.transform.inverse_calls >= 2
         assert calls[0][7:] == (1, True, False, False, 5)
     else:
         with pytest.raises(RuntimeError):
@@ -2617,6 +2673,18 @@ def _native_crop_fixture(monkeypatch, label, *, centre=None, defect=None):
     return adapter, view
 
 
+def test_detail_transform_fake_refuses_native_inverse_but_supports_automation():
+    transform = _DetailTransform()
+    with pytest.raises(AssertionError, match="IDispatch rejects IInverse"):
+        transform.IInverse()
+    inverse = transform.Inverse()
+    assert inverse is not None
+    assert inverse.apply(transform.apply((0.180, 0.175, 0.0))) == pytest.approx((0.180, 0.175, 0.0))
+    assert transform.inverse_calls == 1
+    transform.bad_inverse = True
+    assert transform.Inverse() is None
+
+
 @pytest.mark.parametrize("label", ["D", "E"])
 def test_crop_reads_persisted_circle_not_padded_or_offset_native_view_bbox(bound, monkeypatch, label):
     adapter, view = _native_crop_fixture(monkeypatch, label)
@@ -2628,6 +2696,7 @@ def test_crop_reads_persisted_circle_not_padded_or_offset_native_view_bbox(bound
     assert (bbox[1] + bbox[3]) / 2.0 == pytest.approx(y + 0.005)
     assert view.crop_circle.profiles[0].GetRadius() != pytest.approx(view.radius)
     assert view.parent.ScaleRatio == (1.0, 2.0)  # Parent .5, native D 4 / E 2.
+    assert view.parent.transform.inverse_calls == 1
 
 
 def test_crop_preserves_actual_native_geometry_within_readback_tolerance(bound, monkeypatch):
@@ -2719,13 +2788,13 @@ def test_native_crop_refuses_wrong_persisted_geometry_flags_or_coordinate_frame(
         drawing._detail_crop(adapter, view, label="D")
 
 
-def _native_sheet(*, top=0.066, scale_retained=True, rule=True):
+def _native_sheet(*, top=0.066, scale_retained=True, rule=True, missing_endpoint=None):
     template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
     def line(y):
         return SimpleNamespace(
             GetType=lambda: 0,
-            GetStartPoint2=lambda: SimpleNamespace(X=template.title_block_left_m, Y=y),
-            GetEndPoint2=lambda: SimpleNamespace(X=template.width_m - 0.0127, Y=y),
+            GetStartPoint2=lambda: None if missing_endpoint == "start" else SimpleNamespace(X=template.title_block_left_m, Y=y),
+            GetEndPoint2=lambda: None if missing_endpoint == "end" else SimpleNamespace(X=template.width_m - 0.0127, Y=y),
         )
     state = {"scale": (1.0, 1.0)}
     def set_scale(numerator, denominator, _position, _text):
@@ -2737,6 +2806,12 @@ def _native_sheet(*, top=0.066, scale_retained=True, rule=True):
         GetProperties2=lambda: (0, 0, *state["scale"], 0, 0.4318, 0.2794, 0),
         GetTemplateSketch=lambda: SimpleNamespace(GetSketchSegments=lambda: [line(top), line(top / 2)] if rule else []),
     )
+
+
+@pytest.mark.parametrize("endpoint", ["start", "end"])
+def test_title_block_rule_refuses_null_native_endpoint(bound, endpoint):
+    with pytest.raises(RuntimeError, match="native title-block rule endpoint unavailable"):
+        drawing._title_block_top(SimpleNamespace(), _native_sheet(missing_endpoint=endpoint))
 
 
 @pytest.mark.parametrize("top", [0.066, 0.070])
@@ -2864,6 +2939,106 @@ def test_native_profile_guard_diagnoses_actual_radius_leader_crossing(native_pro
         drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
 
 
+@pytest.mark.parametrize("defect", [None, "activation", "missing-active", "wrong-active", "marks"])
+def test_center_marks_activate_and_read_the_authoritative_native_view(bound, defect):
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    loops = [
+        node for node in ast.walk(build) if isinstance(node, ast.For)
+        and any(
+            isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+            and call.func.id == "auto_center_marks" for call in ast.walk(node)
+        )
+    ]
+    assert len(loops) == 1
+    # Execute the actual local document binding, not a test-injected global:
+    # otherwise a missing binding in build() passes this native-call fake.
+    bindings = [
+        node for node in ast.walk(build) if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "drawing" for target in node.targets)
+        and node.lineno < loops[0].lineno
+    ]
+    assert len(bindings) == 1
+    code = compile(
+        ast.fix_missing_locations(ast.Module(body=[*bindings, *loops], type_ignores=[])),
+        drawing.__file__, "exec",
+    )
+    views = tuple(object() for _ in range(3))
+    names = dict(zip(views, ("front", "D", "E")))
+    events = []
+
+    class NativeDrawing:
+        __slots__ = ("active",)
+
+        def __init__(self):
+            self.active = None
+
+        def ActivateView(self, name):
+            events.append(("activate", name))
+            if defect == "activation":
+                return False
+            self.active = next(view for view in views if names[view] == name)
+            return True
+
+        @property
+        def ActiveDrawingView(self):
+            events.append(("active", self.active))
+            if defect == "missing-active":
+                return None
+            return object() if defect == "wrong-active" else self.active
+
+        @property
+        def IActiveDrawingView(self):
+            pytest.fail("center marks must use the documented Automation ActiveDrawingView")
+
+    native = NativeDrawing()
+
+    def same(actual, expected):
+        assert actual is not None and expected is not None
+        events.append(("same", actual, expected))
+        return 1 if actual is expected else 0
+
+    adapter = SimpleNamespace(currentModel=native, swApp=SimpleNamespace(IsSame=same))
+
+    def marks(actual_adapter, view, *, holes, size):
+        assert actual_adapter is adapter
+        assert view is native.active and holes is True and size == 0.0025
+        events.append(("marks", view))
+        return defect != "marks"
+
+    namespace = dict(
+        adapter=adapter, front=views[0], hub=views[1], end=views[2],
+        _early_bound=drawing._early_bound, view_name=lambda _adapter, view: names[view],
+        auto_center_marks=marks,
+    )
+    if defect is None:
+        exec(code, namespace)
+        assert [event[0] for event in events] == ["activate", "active", "same", "marks"] * 3
+        assert [event[1] for event in events if event[0] == "marks"] == list(views)
+    else:
+        with pytest.raises(RuntimeError):
+            exec(code, namespace)
+        assert len([event for event in events if event[0] == "marks"]) == (1 if defect == "marks" else 0)
+
+
+def test_land_vertical_early_binds_view_and_refuses_null_native_sketch(monkeypatch):
+    raw_view = object()
+    native_view = SimpleNamespace(GetSketch=lambda: None)
+    bindings = []
+    def bind(obj, interface):
+        bindings.append((obj, interface))
+        return native_view if obj is raw_view and interface == "IView" else obj
+    def name(_adapter, view):
+        assert view is native_view
+        return "E"
+    draw = SimpleNamespace(ActivateView=lambda _name: True, ClearSelection2=lambda _all: None)
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(drawing, "view_name", name)
+    with pytest.raises(RuntimeError, match="land-angle detail has no native drawing sketch"):
+        drawing._land_vertical(SimpleNamespace(currentModel=draw), raw_view, [])
+    assert (raw_view, "IView") in bindings
+
+
 def test_details_keep_native_scale_source_census_and_unclipped_overall_contract():
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     definitions = {node.name: node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
@@ -2889,10 +3064,125 @@ def test_details_keep_native_scale_source_census_and_unclipped_overall_contract(
         assert sum(isinstance(node.func, ast.Name) and node.func.id == "_detail_crop" for node in calls) == count
         assert not any(isinstance(node.func, ast.Attribute) and node.func.attr == "GetOutline" for node in calls)
     crop_attributes = {node.attr for node in ast.walk(definitions["_detail_crop"]) if isinstance(node, ast.Attribute)}
-    assert {"GetDetail", "GetProfileItems", "IInverse", "ArrayData"} <= crop_attributes
+    build_attributes = {node.attr for node in ast.walk(definitions["build"]) if isinstance(node, ast.Attribute)}
+    assert "GetText" not in build_attributes  # Hole callouts cannot use resolved text compartments.
+    assert sum(node.func.id == "_require_rod_through_callout" for node in build_calls) == 1
+    through_attributes = {node.attr for node in ast.walk(definitions["_require_rod_through_callout"]) if isinstance(node, ast.Attribute)}
+    assert {"GetDisplayData", "GetTextCount", "GetTextAtIndex"} <= through_attributes
+    assert "GetText" not in through_attributes
+    assert {"GetDetail", "GetProfileItems", "Inverse", "ArrayData"} <= crop_attributes
+    assert "IInverse" not in crop_attributes  # Generated presence does not prove IDispatch support.
     assert "ModelToViewTransform" not in crop_attributes  # Inverse sketch mapping already returns sheet.
     circle_attributes = {node.attr for node in ast.walk(definitions["_native_circle_geometry"]) if isinstance(node, ast.Attribute)}
     assert {"GetType", "GetRadius", "GetCenterPoint2", "IsCircle"} <= circle_attributes
+
+
+def test_datum_landing_refuses_null_native_annotation(monkeypatch):
+    import _drawing_gdt
+
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda obj, *_: obj)
+    tag = SimpleNamespace(GetAnnotation=lambda: None)
+    with pytest.raises(RuntimeError, match="datum landing has no annotation.*rod-side radial land"):
+        _drawing_gdt.assert_datum_landing(
+            object(), tag, expected_xy=(0.21, 0.167), label="rod-side radial land",
+        )
+
+
+def test_land_angle_refuses_null_native_annotation(native_front):
+    state = native_front
+    state.defect_label = "radial land angle to mirror axis"
+    state.defect = "null-annotation"
+    with pytest.raises(RuntimeError, match="land angle has no native annotation"):
+        drawing._add_land_angle(state.adapter, object(), state.land)
+
+
+@pytest.mark.parametrize("missing_index", [0, 1])
+def test_land_angle_refuses_null_native_attachment_before_identity_dispatch(native_front, monkeypatch, missing_index):
+    state = native_front
+    state.defect_label = "radial land angle to mirror axis"
+    state.defect = "null-attachment"
+    original_create = drawing.add_edge_dimension
+    def create(*args, **kwargs):
+        display = original_create(*args, **kwargs)
+        attachments = list(kwargs["entities"])
+        attachments[missing_index] = None
+        display.attached = tuple(attachments)
+        return display
+    def same(actual, expected):
+        if actual is None:
+            pytest.fail("IsSame cannot receive a NULL native attachment")
+        return 1 if actual is expected else 0
+    monkeypatch.setattr(drawing, "add_edge_dimension", create)
+    state.adapter.swApp = SimpleNamespace(IsSame=same)
+    with pytest.raises(RuntimeError, match="exact land and local vertical"):
+        drawing._add_land_angle(state.adapter, object(), state.land)
+
+
+class _RenderedRodText:
+    __slots__ = ("texts", "count", "reads")
+
+    def __init__(self, texts):
+        self.texts, self.count, self.reads = texts, len(texts), []
+
+    def GetTextCount(self):
+        return self.count
+
+    def GetTextAtIndex(self, index):
+        self.reads.append(index)
+        return self.texts[index]
+
+
+class _RenderedRodCallout:
+    __slots__ = ("data",)
+
+    def __init__(self, texts):
+        self.data = _RenderedRodText(texts)
+
+    def GetDisplayData(self):
+        return self.data
+
+    def GetText(self, _part):
+        raise AssertionError("Hole callouts do not support GetText resolved compartments")
+
+
+@pytest.mark.parametrize("texts", [
+    ("#47 DRILL", "native diameter", "THRU"), ("#47 DRILL", "native diameter thru"), ("", "THRU"),
+])
+def test_rod_through_condition_reads_actual_rendered_callout_items(bound, texts):
+    callout = _RenderedRodCallout(texts)
+    drawing._require_rod_through_callout(callout)
+    assert callout.data.reads == list(range(len(texts)))
+    with pytest.raises(AssertionError, match="do not support GetText"):
+        callout.GetText(1)
+
+
+@pytest.mark.parametrize("defect", [
+    "missing-data", "empty", "missing-count", "negative-count", "bool-count", "method-count",
+    "missing-item", "method-item", "no-thru",
+])
+def test_rod_through_condition_cannot_pass_unreadable_or_non_through_native_ink(bound, defect):
+    callout = _RenderedRodCallout(("#47 DRILL", "THRU"))
+    if defect == "missing-data":
+        callout.data = None
+    elif defect == "empty":
+        callout.data.count = 0
+    elif defect == "missing-count":
+        callout.data.count = None
+    elif defect == "negative-count":
+        callout.data.count = -1
+    elif defect == "bool-count":
+        callout.data.count = True
+    elif defect == "method-count":
+        callout.data.count = lambda: 2
+    elif defect == "missing-item":
+        callout.data.texts = ("#47 DRILL", None)
+    elif defect == "method-item":
+        callout.data.texts = ("#47 DRILL", lambda: "THRU")
+    elif defect == "no-thru":
+        callout.data.texts = ("#47 DRILL", "native diameter", "DEPTH")
+        callout.data.count = len(callout.data.texts)
+    with pytest.raises(RuntimeError):
+        drawing._require_rod_through_callout(callout)
 
 
 @pytest.mark.parametrize("defect", ["basic", "text"])

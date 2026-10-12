@@ -369,7 +369,9 @@ def _detail_crop(adapter: Any, view: Any, *, label: str) -> tuple[float, float, 
     matrix = tuple(float(v) for v in (transform.ArrayData or ()))
     if len(matrix) != 16 or not all(math.isfinite(v) for v in matrix):
         raise RuntimeError(f"detail {label}: invalid native sketch transform={matrix!r}")
-    inverse = _early_bound(transform.IInverse(), "IMathTransform")
+    # Use the documented automation method (DISPID 9), not IInverse (DISPID
+    # 10): the R11 native IDispatch call rejected IInverse as write-only.
+    inverse = _early_bound(transform.Inverse(), "IMathTransform")
     if inverse is None:
         raise RuntimeError(f"detail {label}: native sketch transform cannot be inverted")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -533,7 +535,7 @@ def _create_detail(
                                    f"required_centre={target}, tolerance_m={_DETAIL_GEOMETRY_TOL_M}, "
                                    f"actual_crop={crop}, native_view_bbox={outline}")
             break
-        anchor = tuple(float(v) for v in detail.Position)
+        anchor = tuple(float(v) for v in (detail.Position or ()))
         if len(anchor) != 2 or not all(math.isfinite(v) for v in anchor):
             raise RuntimeError(f"detail {label}: invalid Position={anchor!r}")
         move = [anchor[i] + target[i] - physical[i] for i in range(2)]
@@ -582,6 +584,8 @@ def _title_block_top(adapter: Any, sheet: Any) -> float:
         line = _early_bound(raw, "ISketchLine")
         a = _early_bound(line.GetStartPoint2(), "ISketchPoint")
         b = _early_bound(line.GetEndPoint2(), "ISketchPoint")
+        if a is None or b is None:
+            raise RuntimeError("detail E: native title-block rule endpoint unavailable")
         values = (float(a.X), float(a.Y), float(b.X), float(b.Y))
         if not all(math.isfinite(v) for v in values):
             raise RuntimeError("detail E: invalid native title-block rule")
@@ -785,6 +789,8 @@ def _pick_pivot_bore(
 def _require_datum_on_bore(app: Any, tag: Any, bore_edge: Any) -> None:
     """Raise unless datum A is attached to the pivot bore edge alone."""
     annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("datum A has no native annotation")
     attached = tuple(annotation.GetAttachedEntities3() or ())
     if len(attached) != 1 or attached[0] is None:
         raise RuntimeError(
@@ -1057,10 +1063,13 @@ def _land_vertical(adapter: Any, view: Any, points: list[tuple[float, float]]) -
     """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
+    view = _early_bound(view, "IView")
     if not drawing.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate the land-angle detail view")
     draw.ClearSelection2(True)
     sketch = _early_bound(view.GetSketch(), "ISketch")
+    if sketch is None:
+        raise RuntimeError("land-angle detail has no native drawing sketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     mapped = []
@@ -1121,9 +1130,12 @@ def _add_land_angle(adapter: Any, view: Any, land: ViewEdge) -> Any:
     )
     display = _early_bound(display, "IDisplayDimension")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("land angle has no native annotation")
     attached = list(annotation.GetAttachedEntities3() or ())
     if (
         len(attached) != 2
+        or any(actual is None for actual in attached)
         or annotation.IsDangling()
         or not all(
             any(int(adapter.swApp.IsSame(actual, entity)) == 1 for actual in attached)
@@ -1169,7 +1181,7 @@ def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> None:
     width = add_edge_dimension(
         adapter, front, p0=width_xy[0], p1=width_xy[1],
         text_xy=OVERALL_WIDTH_TEXT_XY, label="rocker overall width",
-        orientation="horizontal", entities=vertices, entity_type="VERTEX",
+        orientation="horizontal", entities=vertices, entity_types=("VERTEX", "VERTEX"),
     )
     assert_dimension_measures(
         adapter, width, expected_mm=2.0 * ROD_TIP_X, label="rocker overall width",
@@ -1232,6 +1244,24 @@ def _add_pin_coordinates(adapter: Any, front: Any) -> None:
         display.SetText(4, "PIN AXIS")
         if str(display.GetText(4) or "") != "PIN AXIS":
             raise RuntimeError(f"{label}: native PIN AXIS label did not persist")
+
+
+def _require_rod_through_callout(callout: Any) -> None:
+    """Read actual Hole Wizard ink, not unsupported GetText compartments."""
+    display = _early_bound(callout, "IDisplayDimension")
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    if data is None:
+        raise RuntimeError("detail E rod-pin callout has no native rendered display data")
+    count = data.GetTextCount()
+    if type(count) is not int or count <= 0:
+        raise RuntimeError(f"detail E rod-pin callout has invalid native rendered text count: {count!r}")
+    texts = tuple(data.GetTextAtIndex(index) for index in range(count))
+    if any(type(text) is not str for text in texts):
+        raise RuntimeError(f"detail E rod-pin callout has unreadable native rendered text: {texts!r}")
+    native_text = " ".join(texts)
+    _telemetry.info(f"detail E rod-pin callout: actual_native_rendered_text={native_text!r}, required='THRU'")
+    if "THRU" not in native_text.upper():
+        raise RuntimeError(f"detail E rod-pin callout lost its native through condition: {native_text!r}")
 
 
 def _require_ream_clearance(
@@ -1798,8 +1828,14 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _add_strap_offset_dimension(adapter, right)
 
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     for label, view in (("front", front), ("detail D", hub), ("detail E", end)):
-        if auto_center_marks(adapter, view, holes=True, size=0.0025) is not True:
+        if drawing.ActivateView(view_name(adapter, view)) is not True:
+            raise RuntimeError(f"failed to activate {label} before center marks")
+        active = _early_bound(drawing.ActiveDrawingView, "IView")
+        if active is None or int(adapter.swApp.IsSame(active, view)) != 1:
+            raise RuntimeError(f"no matching active native view for {label} center marks")
+        if auto_center_marks(adapter, active, holes=True, size=0.0025) is not True:
             raise RuntimeError(f"failed to add ASME center marks to {label}")
 
     # E's native wizard-hole callout keeps the source through condition.
@@ -1812,10 +1848,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod-pin hole",
         process=drill_process(ROD_HOLE_SPEC) + "\n",
     )
-    rod_callout = _early_bound(rod_callout, "IDisplayDimension")
-    native_rod_text = " ".join(str(rod_callout.GetText(part) or "") for part in (1, 2, 3, 4))
-    if "THRU" not in native_rod_text.upper():
-        raise RuntimeError(f"detail E rod-pin callout lost its native through condition: {native_rod_text!r}")
+    _require_rod_through_callout(rod_callout)
 
     _add_pin_coordinates(adapter, front)
 
