@@ -417,7 +417,10 @@ def test_neck_detail_fence_holds_every_detail_reference() -> None:
     assert crop == pytest.approx(radius * drawing.DETAIL_SCALE[0] / 1000.0)
     assert center[0] - crop > 0.0254 / 2 and center[1] + crop < 0.2667
     frame_x, frame_top = drawing.NECK_RUNOUT_FRAME
-    assert frame_top - 0.007 > center[1] + crop
+    # The frame's box corner nearest the crop stands clear of the circle.
+    corner_xy = (frame_x + drawing._FRAME_WIDTH, frame_top - drawing._FRAME_HEIGHT)
+    assert corner_xy[0] < center[0]
+    assert math.dist(corner_xy, center) - crop >= 0.002
     assert frame_top < 0.2667 - 0.004
     landing = drawing.NECK_RUNOUT_LANDING
     # The landing is on the straight floor, between the corner tori.
@@ -427,6 +430,35 @@ def test_neck_detail_fence_holds_every_detail_reference() -> None:
     # The Ø's line rises right of the frame's leader, inside the neck.
     dia_x = drawing.DETAIL_KEEP["FrontReliefDia"][0]
     assert landing[0] < dia_x < drawing._detail_xy(-width + corner, 0.0)[0]
+
+
+def test_neck_frame_leader_stays_under_the_relief_dia_text() -> None:
+    # 3f50160d9 full build: the Ø3.950 text hung LEFT of its line, box
+    # [87.8, 256.6]..[104.6, 260.2] mm for a keep at (106.0, 258.5), and the
+    # frame's shoulder (98.2 -> 104.5 at y 258.5) ran 6.35 mm through it
+    # (leader-through-text).  Whichever side the text hangs, the frame's
+    # shoulder and plumb leader now run under it, and the text clears the
+    # frame's box and the border.
+    x, y = drawing.DETAIL_KEEP["FrontReliefDia"]
+    text_w, text_h, short = 0.0168, 0.0036, 0.0014
+    frame_x, frame_top = drawing.NECK_RUNOUT_FRAME
+    shoulder_y = frame_top - drawing._FRAME_HEIGHT / 2.0
+    landing = drawing.NECK_RUNOUT_LANDING
+    assert frame_x + drawing._FRAME_WIDTH + drawing._FRAME_SHOULDER == pytest.approx(
+        landing[0]
+    )
+    # Shoulder and plumb leader run at or under shoulder_y, inside the
+    # frame's row; the text, either side of its line, stands over the row.
+    ymin, ymax = y - text_h / 2.0, y + text_h / 2.0
+    assert max(shoulder_y, landing[1]) < frame_top
+    assert ymin - frame_top >= 0.002
+    assert ymax <= 0.2667 - 0.0015
+    # The old row, frame top 0.262 with the text level with its shoulder,
+    # reproduces the logged crossing under the same model.
+    old_top, old_y = 0.262, 0.2585
+    old_shoulder = old_top - drawing._FRAME_HEIGHT / 2.0
+    assert old_y - text_h / 2.0 < old_shoulder < old_y + text_h / 2.0
+    assert x - short - text_w < landing[0] - drawing._FRAME_SHOULDER / 2.0 < x - short
 
 
 def test_neck_detail_annotations_stay_clear_of_the_side_and_end_views() -> None:
