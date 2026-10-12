@@ -1,30 +1,23 @@
-"""Drive-chain centreline geometry (book ch. 23/30).
+"""Inherited drive-chain VISUAL guide geometry (book ch. 23/30).
 
 The ANSI #25 roller chain loops the two CHAIN-WRAPPED removable sprockets
-(crank shaft T12 -> knob shaft T24; ch. 23: the chain rides the removables'
-teeth -- swapping them is what changes the platen ratio). Every chain-side
+selected for the crank and knob shafts in ``pd_transgear_removable_spec``
+(ch. 23: swapping the removables changes the platen ratio). Every chain-side
 ch30 plate (p002/p005/p006) shows it: a taut run on the pinion-bar side and a
 visibly drooping slack run on the other.
 
-Pure math only -- the roller chain's alternating inner/outer links are
-explicitly placed along this centreline loop (build_paper_drive_assembly
-._insert_roller_chain); the M6.8 rigid-band stand-in and the #13 bead-chain
-stand-in are both retired. Sprocket and chain numbers (pitch, roller, pitch
-and outside diameters, plate width) come from ``transgear_removable_spec``.
+Pure math only. The native connected-linkage visual follows three circular
+arcs and a straight run; its integer component count and continuous arc
+length do not prove a physical, standard-pitch roller-chain cycle. The
+independent ``paper_drive_chain_fit`` solver checks discrete pinned links,
+free sprocket phase, gravity slack and the actual ANSI tooth boundaries.
 
-Geometry (local frame: knob wrap centre at the origin, machine xy
-pre-mirror; crank centre from cone_line X_CRANK / Y_CRANK minus
-build_paper_drive_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
-centreline rides each sprocket's PITCH circle (where a real chain seats -- the
-rollers rest in the tooth seats, the plates STRADDLE the 2.8-wide
-sprocket, and the tips pass between them; only the roller<->tooth seating
-remains as intended contact, whitelisted in
-build_pd_paper_drive_assembly.check_no_interference), the common
-external tangent taut line on the +n side (the support-bar side), and a
-slack arc sagging SAG below the straight external tangent on the -n side,
-tangent-continuous at all four junctions (internal tangency:
-|C - A| = R_slack - WRAP_R_A, |C - B| = R_slack - WRAP_R_B; R_slack is
-solved numerically for the SAG droop).
+Local frame: knob wrap centre at the origin, machine xy pre-mirror. Centres
+come from cone_line and paper_drive_geom; mounted tooth counts, standard
+pitch and the FIXED installed count come from pd_transgear_removable_spec.
+The continuous guide's slack arc is solved inside its internal-tangency
+domain. This preserves the inherited native representation without silently
+selecting a different physical chain or stretching its pitch.
 """
 
 from __future__ import annotations
@@ -32,44 +25,31 @@ from __future__ import annotations
 import math
 
 import pd_transgear_removable_spec as _removable
-from cone_line import X_CRANK, Y_CRANK
+from paper_drive_chain_fit import source_nominal_chain_centres_mm
 
 
 # Chain-wheel centres, machine xy pre-mirror.
-KNOB_CENTRE = (43.7878, 256.8933)  # build_pd_paper_drive_assembly KNOB_SHAFT_XY
-# mirrored: the knob axis K = stud S (0, 266.2007) + the permanent 12T:120T
-# DP38 mesh centre distance 44.766 at machine -168 deg (CONTRACT-paper-drive
-# axis points; the arm plate's bore datum puts it there).
-# The crank chain-wheel rides the fixed post's crank axis. Import its
-# SolidWorks-free frame geometry, never the drive-train assembly: _chain also
-# feeds leaf chain-link parts, which must not depend on _assembly.
-CRANK_CENTRE = (-X_CRANK, Y_CRANK)
-# The chain count and droop below are re-solved from this centre automatically.
+
+_KNOB_SOURCE, _CRANK_SOURCE = source_nominal_chain_centres_mm()
+KNOB_CENTRE = (-_KNOB_SOURCE[0], _KNOB_SOURCE[1])
+# Canonical physical lower axis evaluated at the actual wheel Z; same source
+# as the discrete nominal solver. The inherited guide remains VISUAL only.
+CRANK_CENTRE = (-_CRANK_SOURCE[0], _CRANK_SOURCE[1])
+# The selected physical count stays fixed; only the visual guide's droop changes.
 
 # Mounted removables (ANSI #25, pd_transgear_removable_spec): tip r = OD / 2.
-TIP_R_T24 = _removable.outside_dia(_removable.TEETH["T24"]) / 2.0  # 26.0
-TIP_R_T12 = _removable.outside_dia(_removable.TEETH["T12"]) / 2.0  # 13.75
+KNOB_TIP_R = _removable.outside_dia(_removable.KNOB_TEETH) / 2.0
+CRANK_TIP_R = _removable.outside_dia(_removable.CRANK_TEETH) / 2.0
 # Pitch r = p / (2 sin(180/N)) -- the chain pin centreline rides here.
-PITCH_R_T24 = _removable.pitch_dia(_removable.TEETH["T24"]) / 2.0  # 24.33
-PITCH_R_T12 = _removable.pitch_dia(_removable.TEETH["T12"]) / 2.0  # 12.27
-# The roller chain SEATS on each sprocket: its pin centreline rides the
-# sprocket PITCH circle (the pitch polygon a real chain wraps), so the rollers
-# rest in the tooth seats and the tips poke out past the chain -- "on the
-# base, not the teeth". The plates straddle the wheel (z stack below), but the
-# rollers and the tooth seats share the chain plane; that roller<->tooth
-# contact is intended mesh, whitelisted in
-# build_pd_paper_drive_assembly.check_no_interference (chain-link <->
-# transgear-removable), exactly as link<->link contact already is.
-WRAP_R_A = PITCH_R_T24  # knob T24 pitch circle
-WRAP_R_B = PITCH_R_T12  # crank T12 pitch circle
-SAG_NOMINAL = 14.0  # slack-run droop seed (p006 crop read 18; was trimmed
-# from 18 to clear the cone-pivot-post top, but the ch30 GT re-anchor retired
-# that constraint: the post (now the p1 swing bracket at machine z -113..-87)
-# no longer shares a z corridor with the chain plane (z -155.7). 14 kept
-# conservatively as the seed.
-# The BUILT droop is SAG below: solved off this seed so the loop closes on an
-# integer number of standard-pitch links (a real chain's length is quantised;
-# the sag is the underdefined member that absorbs the slack).
+KNOB_PITCH_R = _removable.pitch_dia(_removable.KNOB_TEETH) / 2.0
+CRANK_PITCH_R = _removable.pitch_dia(_removable.CRANK_TEETH) / 2.0
+# The inherited native chain VISUAL follows the pitch-circle arcs. Its arc
+# length is not a discrete-pitch seating or closure certificate: that proof
+# belongs to paper_drive_chain_fit. The visual and its intentional-contact
+# classification remain unchanged; physical qualification never uses them.
+WRAP_R_A = KNOB_PITCH_R
+WRAP_R_B = CRANK_PITCH_R
+# The continuous guide is a visual representation, not a suspended chain.
 
 # --- centreline geometry (A = knob = origin, B = crank) ----------------------
 BX = CRANK_CENTRE[0] - KNOB_CENTRE[0]
@@ -103,9 +83,9 @@ def _slack_centre(rs: float) -> tuple[float, float]:
         2.0 * D
     )
     q2 = (rs - WRAP_R_A) ** 2 - p * p
-    if q2 < 0.0:
+    if q2 < -1e-8:
         raise ValueError(f"slack radius {rs} too small")
-    q = math.sqrt(q2)
+    q = math.sqrt(max(0.0, q2))
     return UX * p + NX * q, UY * p + NY * q
 
 
@@ -120,12 +100,18 @@ def _ccw(a_from: float, a_to: float) -> float:
 
 
 def _solve_slack_radius(sag: float) -> float:
-    """Slack-arc radius whose droop equals ``sag`` (droop falls with rs)."""
-    lo = max(WRAP_R_A, WRAP_R_B) + D / 2.0  # safely past the q2 > 0 floor
-    while _droop(lo) < sag:  # pragma: no cover - geometry sanity
-        lo *= 0.9
-    hi = 10000.0
-    assert _droop(lo) > sag > _droop(hi)
+    """Visual arc radius within the finite internal-tangency droop domain."""
+    lo = (D + WRAP_R_A + WRAP_R_B) / 2.0
+    maximum = _droop(lo)
+    if not math.isfinite(sag) or not 0.0 < sag <= maximum:
+        raise ValueError(f"visual droop {sag} outside 0..{maximum:.6f}")
+    hi = 2.0 * lo
+    for _ in range(64):
+        if _droop(hi) <= sag:
+            break
+        hi *= 2.0
+    else:
+        raise ValueError("cannot bracket the visual slack radius")
     for _ in range(80):
         mid = 0.5 * (lo + hi)
         if _droop(mid) > sag:
@@ -136,8 +122,14 @@ def _solve_slack_radius(sag: float) -> float:
 
 
 def _loop_length(sag: float) -> float:
-    """Total centreline loop length at slack droop ``sag`` (monotonically
-    increasing: more droop = a longer slack run)."""
+    """Continuous VISUAL guide length, not the sum of physical link chords."""
+    if sag == 0.0:
+        dr = WRAP_R_A - WRAP_R_B
+        return (
+            2.0 * TAUT_LEN
+            + math.pi * (WRAP_R_A + WRAP_R_B)
+            + 2.0 * dr * math.asin(dr / D)
+        )
     rs = _solve_slack_radius(sag)
     cx, cy = _slack_centre(rs)
     gax, gay = _unit(-cx, -cy)
@@ -151,42 +143,30 @@ def _loop_length(sag: float) -> float:
     return WRAP_R_A * span_a + WRAP_R_B * span_b + rs * span_slack + TAUT_LEN
 
 
-# --- integer-link closure -----------------------------------------------------
-# A roller chain has a FIXED standard pitch and closes only on an EVEN link
-# count (inner/outer must alternate back to the seam), so the loop length is
-# QUANTISED: pick the feasible even count nearest the nominal-droop loop, then solve the
-# SAG so the centreline lands EXACTLY on count * pitch. The sag -- not the
-# pitch -- absorbs the slack, exactly like a real chain (move an axle and the
-# droop responds).
-LINK_PITCH = _removable.CHAIN_PITCH  # ANSI #25 pitch (1/4 in), EXACT: the link
-# parts and the chain-pattern spacing carry this standard pitch; closure comes
-# from the sag.
-# Relocating an axle can make the nearest even count shorter than the taut
-# loop. Droop absorbs only positive slack; preserve the standard link pitch.
-LINK_COUNT = max(
-    2 * round(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH)),
-    2 * math.ceil(_loop_length(0.5) / (2.0 * LINK_PITCH)),
-)
+# --- selected-count visual guide ---------------------------------------------
+LINK_PITCH = _removable.CHAIN_PITCH
+LINK_COUNT = _removable.CHAIN_LINK_COUNT
+if type(LINK_COUNT) is not int or LINK_COUNT <= 0 or LINK_COUNT % 2:
+    raise ValueError("the selected ANSI #25 chain count must be a positive even integer")
 CENTRELINE_LEN = LINK_COUNT * LINK_PITCH
-
-# The EVEN count moves the target length by up to one LINK_PITCH (6.35 mm)
-# from the seed loop, and the slack run's length-vs-droop sensitivity falls
-# toward small droops (~0.3..0.9 mm/mm), so the solved sag can land ~10+ mm
-# from the seed (the -168 deg knob axis: 67.03 pitches at the seed -> 68 links,
-# sag 23.6). The bracket spans every droop the internal-tangency construction
-# admits here (feasible past 40; very large droops make the slack arc
-# infeasible: _slack_centre's q2 < 0) while staying above zero droop.
-_LO_SAG, _HI_SAG = 0.5, SAG_NOMINAL + 16.0
-assert _loop_length(_LO_SAG) < CENTRELINE_LEN < _loop_length(_HI_SAG)
+VISUAL_TAUT_LENGTH = _loop_length(0.0)
+VISUAL_MAX_SAG = _droop((D + WRAP_R_A + WRAP_R_B) / 2.0)
+VISUAL_MAX_LENGTH = _loop_length(VISUAL_MAX_SAG)
+if not VISUAL_TAUT_LENGTH < CENTRELINE_LEN < VISUAL_MAX_LENGTH:
+    raise ValueError(
+        f"selected {LINK_COUNT}-link visual guide cannot fit centres "
+        f"{KNOB_CENTRE}, {CRANK_CENTRE}: target {CENTRELINE_LEN:.6f}, "
+        f"continuous guide domain {VISUAL_TAUT_LENGTH:.6f}..{VISUAL_MAX_LENGTH:.6f}; "
+        "this is not a discrete-chain feasibility verdict"
+    )
+_LO_SAG, _HI_SAG = 0.0, VISUAL_MAX_SAG
 for _ in range(80):
     _MID = 0.5 * (_LO_SAG + _HI_SAG)
     if _loop_length(_MID) < CENTRELINE_LEN:
         _LO_SAG = _MID
     else:
         _HI_SAG = _MID
-SAG = 0.5 * (_LO_SAG + _HI_SAG)  # the BUILT droop (solved for LINK_COUNT).
-# The selected even count and sag are derived above while preserving exact
-# standard-pitch closure.
+SAG = 0.5 * (_LO_SAG + _HI_SAG)
 assert abs(_loop_length(SAG) - CENTRELINE_LEN) < 1e-6
 
 SLACK_R = _solve_slack_radius(SAG)

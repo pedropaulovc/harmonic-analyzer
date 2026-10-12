@@ -1,4 +1,5 @@
 pd-rack-pinion:
+  title: Reducer Disc
   number: MHA-PD-006
   material: Brass
   material_specification: C36000 free-machining brass
@@ -6,4 +7,9 @@ pd-rack-pinion:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "gear cutting (hob/shaper); #0-80 taps drilled and tapped at assembly"
+  # Selected stock cutter: Precise/Penn 10-289-482, 48DP PA20 #2 (55–134T).
+  # https://www.penntoolco.com/precise-20-involute-h-s-s-gear-cutter-2-diametrical-pitch-48-cutter-diameter-1-3-4-hole-size-7-8/
+  # StockForm uses the lower-count 55T master; no generated profile-shift model.
+  # Verified cutter body OD 44.45 mm and arbor bore 22.225 mm; grind depth/form
+  # accuracy are unpublished. The 2.25-module master depth is Main's design premise.
+  process: "120T 48DP PA20 teeth cut with stock #2 form cutter (55T master), with radial setting and tooth-span limits from the part specification; indicate the disc to the actual feed running-bore datum before transferring, drilling and tapping the #0-80 holes at assembly; inspect assembled tooth-space runout and the retained matched reducer clock"

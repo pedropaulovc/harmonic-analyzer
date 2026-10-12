@@ -130,6 +130,14 @@ git submodule update --init --recursive
    SolidWorks, which takes the licence farm worker w15 shares. A bare `pytest` or
    `pytest .` at the root skips it (`testpaths`/`norecursedirs` in
    `pyproject.toml`); run it on a farm worker or in its own CI.
+4. Ground recipe calls in the vendored `PyWin32Adapter` implementation, including
+   its inherited mixins and delegated helpers; never infer an adapter method name
+   from a SolidWorks operation. Check that every changed call exists and binds
+   with a cheap source-only AST census against the SDK, without importing
+   recipes or constructing an adapter. The knob-shaft and
+   feed-pinion census is `cad/scripts/test_pd_transgear_adapter_contract.py`;
+   it checks every direct `adapter.<method>(...)` call, not an API allowlist.
+   Offline contracts do not replace final-source native geometry/readback proof.
 
 ## Minimum merge gate (every PR)
 

@@ -9,9 +9,10 @@ Evidence: ch23 p.56 (historic #25 chain and bore/drive-pin interface), p.61
 and video frame f_0215/f_0210; purchased blanks verified 2026-10-08 below.
 
 Machine frame: +Y up, -Z = machine FRONT, +X = operator's left.  Both mounted
-wheels (crank T12, knob T24) occupy the SAME z band: rear face on the shaft's
-seat face at ``SEAT_FACE_Z``, front face at ``BAND_FRONT_Z``, so the chain
-runs in one plane, ``CHAIN_MID_Z``, on both shafts.  Each shaft's seat is a
+wheels, selected by ``CRANK_CONFIG`` and ``KNOB_CONFIG``, occupy the SAME z band:
+rear face on the shaft's seat face at ``SEAT_FACE_Z``, front face at
+``BAND_FRONT_Z``, so the chain runs in one plane, ``CHAIN_MID_Z``, on both shafts.
+Each shaft's seat is a
 flat ``SEAT_SPIGOT_DIA`` face carrying two pressed 3/32 dowels: small enough
 that the #25 chain's plates wrap the T12 clear of it.
 
@@ -61,6 +62,9 @@ ANSI_ROLLER_WIDTH = 0.125 * MM_PER_IN  # 3.175
 ANSI_HALF_WIDTH = 0.185 * MM_PER_IN  # 4.699
 CHAIN_PITCH = 0.25 * MM_PER_IN  # 6.35
 ROLLER_DIA = 3.30  # 0.130 in
+# Catalogue .130 in diameter used for purchased-chain air; the CAD roller
+# remains its existing rounded 3.30 mm visual (PEER 25R table cited above).
+ANSI_ROLLER_DIA = 0.130 * MM_PER_IN
 
 # --- ANSI B29.1 (ACA) standard tooth form --------------------------------------
 # The standard writes its formulas in inches; every one is linear in Dr and its
@@ -182,10 +186,17 @@ def configuration_teeth(configuration: str) -> int:
         ) from None
 
 
+# Mounted selection is independent of the part/drawing's saved configuration.
+# Current configuration data: T12 on the crank, T24 on the knob; T18 stays spare.
 CRANK_CONFIG = "T12"
 KNOB_CONFIG = "T24"
 CRANK_TEETH = configuration_teeth(CRANK_CONFIG)
 KNOB_TEETH = configuration_teeth(KNOB_CONFIG)
+
+# Installed physical chain; changing a mounted wheel does not resize it.
+CHAIN_LINK_COUNT = 68
+if type(CHAIN_LINK_COUNT) is not int or CHAIN_LINK_COUNT <= 0 or CHAIN_LINK_COUNT % 2:
+    raise ValueError("the selected ANSI #25 chain count must be a positive even integer")
 
 # --- manufacturing drawing (one sheet: the T24 views plus one edge view each
 # of T12 and T18; SPROCKET DATA lists all three configurations) --------------

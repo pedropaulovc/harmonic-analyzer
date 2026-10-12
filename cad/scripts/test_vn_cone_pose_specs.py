@@ -23,11 +23,16 @@ PURE_SPECS = (
     "vn_swing_stop_screw_spec",
     "_mcmaster_94025a164",
     "vn_foot_screw_spec",
+    "vn_fillister_screw_spec",
+    "vn_transgear_latch_pin_spec",
 )
 NATIVE_ROOTS = frozenset({
     "diagnostics",
     "_com",
     "_session",
+    "_visibility",
+    "_telemetry",
+    "_watchdog",
     "_holes",
     "_assembly",
     "_drawing_common",
@@ -58,7 +63,7 @@ def _loaded_roots(module_name: str) -> frozenset[str]:
 def _native_roots(module_name: str) -> set[str]:
     return {
         root for root in _loaded_roots(module_name)
-        if root in NATIVE_ROOTS or root.startswith(("build_", "diag_"))
+        if root in NATIVE_ROOTS or root.startswith(("build_", "draw_", "diag_"))
     }
 
 
@@ -71,8 +76,17 @@ def test_pose_vendor_specs_load_no_native_module(module_name: str) -> None:
     assert not _native_roots(module_name)
 
 
-def test_native_load_probe_has_a_real_native_positive_control() -> None:
-    assert "diagnostics" in _native_roots("diagnostics.diag_build_94025A164")
+@pytest.mark.parametrize(
+    "module_name",
+    (
+        "diagnostics.diag_build_94025A164",
+        "diagnostics.diag_build_90114A511",
+        "diagnostics.diag_mcmaster_fillister",
+        "diagnostics.diag_mcmaster_dowel",
+    ),
+)
+def test_native_load_probe_has_a_real_native_positive_control(module_name: str) -> None:
+    assert "diagnostics" in _native_roots(module_name)
 
 
 @pytest.mark.parametrize(

@@ -3071,15 +3071,30 @@ def task_check():
         # The supplied tooth-side cones must match their native sections and
         # the finished-part volume gate in every bought-blank configuration.
         SCRIPTS_DIR / "test_pd_transgear_removable_chamfer.py",
+        # Unchanged ANSI #25 chain: paid wrap/sag/strand-order premise;
+        # the inherited native continuous-arc guide is not a seating certificate.
+        SCRIPTS_DIR / "test_paper_drive_chain_fit.py",
         # The transgear hanger's screwed joints, pivot head play and the latch
         # pin's press, judged at the printed bands (transgear_hanger_joints).
         SCRIPTS_DIR / "test_transgear_hanger_joints.py",
+        # Matched stock-dowel registration and paid loaded plate motion.
+        SCRIPTS_DIR / "test_paper_drive_arm_registration.py",
         # The #6-32 knife hanger's tap web, screw reach and dowel stack at the
         # printed bands, and the retired 1/2-13 tap failing the same web formula.
         SCRIPTS_DIR / "test_knife_hanger_worst_case.py",
         # The paper-drive interference rows re-derived from their owner specs
         # (_interference_contracts writes them as literals).
         SCRIPTS_DIR / "test_pd_paper_drive_interference_contracts.py",
+        # Closed-form AGMA-style gates for the 12T:120T reducer and the feed
+        # pinion on the rack, plus one numeric flank-stepping cross-check.
+        SCRIPTS_DIR / "test_paper_drive_mesh_check.py",
+        # The integral pinion's finite cutter, running fits and retained bearings.
+        SCRIPTS_DIR / "test_pd48_knob_mechanics.py",
+        # Source-only adapter member/signature census; no SDK or native import.
+        SCRIPTS_DIR / "test_pd_transgear_adapter_contract.py",
+        # Finite purchased-rack ends and the complete recording-paper sweep.
+        SCRIPTS_DIR / "test_paper_drive_rack_travel.py",
+        SCRIPTS_DIR / "test_pd_platen_refit.py",
         # The kinematic probe's chain-ratio band separates the 12:24 tooth
         # ratio from the OD and pitch-circle couplings (verify:kinematics).
         SCRIPTS_DIR / "test_kinematic_probe_ratio.py",

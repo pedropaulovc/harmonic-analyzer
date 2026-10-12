@@ -17,8 +17,8 @@ alignment_pinion:                  # ch25 — engages the cylinder-gear set for 
     with finite support 17.636633356 mm; the 120T pays its retained plunge
     band plus print rounding with conservative support cap 64.442207170 mm.
     Plunge and off-centre root envelope follow those cutter-owned profiles.
-    Both OutsideDia dimensions use the shared contact-critical +0/-0.02 mm
-    tip grade at two decimal places: 17.61..17.63 /64.42..64.44 mm; actual
+    Both OutsideDia dimensions use the shared standard +0/-0.10 mm
+    tip grade at two decimal places: 17.53..17.63 /64.34..64.44 mm; actual
     printed limits come from each spec's outside_dia_limits_mm reader.
     Earlier nominal-support-only 17.97/64.54 caps did not pay the retained
     tangent-span/depth corners and are not the chosen whole-process blanks.

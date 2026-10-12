@@ -57,6 +57,24 @@ def _call_names(tree: ast.AST) -> set[str]:
     }
 
 
+def _imported_string(tree: ast.Module, name: str) -> str:
+    """A module-level string constant ``name`` imported from a repo-local module."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or not node.module:
+            continue
+        if not any(alias.name == name and alias.asname is None for alias in node.names):
+            continue
+        for statement in _tree(SCRIPTS / f"{node.module.replace('.', '/')}.py").body:
+            if (
+                isinstance(statement, ast.Assign)
+                and [getattr(target, "id", None) for target in statement.targets] == [name]
+            ):
+                value = ast.literal_eval(statement.value)
+                if isinstance(value, str):
+                    return value
+    raise AssertionError(f"required property {name} is not an imported string constant")
+
+
 def _required(draw: Path) -> set[str]:
     """The properties the drawing refuses to build without."""
     tree = _tree(draw)
@@ -91,7 +109,13 @@ def _required(draw: Path) -> set[str]:
             value = keyword.value
             if isinstance(value, ast.Name):
                 value = assigned[value.id]
-            return set(ast.literal_eval(value))
+            # A drawing may name a property by its spec's constant.
+            return {
+                _imported_string(tree, element.id)
+                if isinstance(element, ast.Name)
+                else ast.literal_eval(element)
+                for element in value.elts
+            }
     raise AssertionError(f"{draw.name}: no required property set found")
 
 
