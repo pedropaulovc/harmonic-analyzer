@@ -12,8 +12,10 @@ d = 0); back end y = BACK_Y (-9), shank to STEP_Y (the gauge), thread to
 THREAD_END_Y, dome to TIP_Y. The assembly mates Axis1 and the Front Plane.
 
 Built as ONE Front-plane revolve (PinProfile -> Pin): every printed diameter
-and length is a named dimension in that sketch, so the drawing inserts them
-as model items (mg_wheel_axle_spec.DRAWING_DIMENSIONS).
+and length is a named dimension in that sketch, the axial ones from the back
+end, so the drawing inserts them as model items
+(mg_wheel_axle_spec.DRAWING_DIMENSIONS). The #4-40 end carries a cosmetic
+thread so the pictorial matches the callout.
 
 Run (SolidWorks already open)::
 
@@ -69,10 +71,12 @@ from mg_wheel_axle_spec import (
     SHANK_LEN,
     SHANK_LEN_BAND,
     STEP_Y,
+    SURFACE_FINISHES,
+    THREAD,
+    THREAD_END,
+    THREAD_END_BAND,
     THREAD_END_Y,
     THREAD_LEN,
-    THREAD_LEN_BAND,
-    SURFACE_FINISHES,
     THREAD_MAJOR,
     TIP_Y,
 )
@@ -88,7 +92,7 @@ V_TOTAL = V_SHANK + V_THREAD + V_DOME
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import AddThreadParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -100,7 +104,7 @@ async def build(adapter) -> dict[str, str]:
         ("PinDia", PIN_DIA),
         ("ShankLength", SHANK_LEN),
         ("ThreadDia", THREAD_MAJOR),
-        ("ThreadLength", THREAD_LEN),
+        ("ThreadEnd", THREAD_END),
         ("DomeHeight", DOME_H),
         ("PressGauge", PRESS_GAUGE),
     ):
@@ -166,11 +170,17 @@ async def build(adapter) -> dict[str, str]:
         "ThreadDia",
     )
     profile.record("ThreadDia", '"ThreadDia"')
-    check(
-        "thread length",
-        await adapter.add_sketch_dimension(thread, None, "linear", THREAD_LEN),
+    # The thread end from the back end's outer corner, like the shank: one
+    # faced end carries every axial station (policy rule 7).
+    await dimension_between(
+        adapter,
+        f"{shank}.start",
+        f"{thread}.end",
+        "vertical_distance",
+        THREAD_END,
+        "thread end",
     )
-    profile.record("ThreadLength", '"ThreadLength"')
+    profile.record("ThreadEnd", '"ThreadEnd"')
     # Overall from the back end's outer corner (where the drawing's extension
     # lines rise).
     await dimension_between(
@@ -181,7 +191,7 @@ async def build(adapter) -> dict[str, str]:
         PIN_LEN,
         "pin length",
     )
-    profile.record("PinLength", '"ShankLength" + "ThreadLength" + "DomeHeight"')
+    profile.record("PinLength", '"ThreadEnd" + "DomeHeight"')
     check(
         "dome radius",
         await adapter.add_sketch_dimension(dome, None, "radial", DOME_R),
@@ -205,9 +215,26 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(
+    driven = await volume_check(
         adapter, "driven pin (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
+
+    # Cosmetic #4-40 from the thread's dome-end edge back to the step, so the
+    # shaded isometric shows the thread the callout names. It cuts nothing.
+    adapter._zoom_to_fit(adapter.currentModel)
+    check(
+        f"cosmetic thread {THREAD}",
+        await adapter.add_thread(
+            AddThreadParameters(
+                edge_point=[THREAD_MAJOR / 2.0, THREAD_END_Y, 0.0],
+                standard="ansi_inch",
+                size=THREAD,
+                end_type="blind",
+                depth=THREAD_LEN,
+            )
+        ),
+    )
+    await volume_check(adapter, "cosmetic thread cuts nothing", driven, 1e-6)
 
     # Named pin axis (local Y through the origin) so the magnifying wheel
     # revolves on it in the mated-DOF assembly (Axis1).
@@ -220,7 +247,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PinProfile", "ShankLength", *deviations(SHANK_LEN_BAND)
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "ThreadLength", *deviations(THREAD_LEN_BAND)
+        adapter, "PinProfile", "ThreadEnd", *deviations(THREAD_END_BAND)
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

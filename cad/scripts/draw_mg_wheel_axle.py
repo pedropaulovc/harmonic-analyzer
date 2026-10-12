@@ -7,7 +7,11 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import place_view, view_outline
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
+    place_view,
+    view_outline,
+)
 
 from _check import check
 from _com import _early_bound
@@ -19,8 +23,12 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_finish import add_surface_finish
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
@@ -36,6 +44,7 @@ from mg_wheel_axle_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_DIA,
+    REFERENCE_DIMENSIONS,
     STEP_Y,
     SURFACE_FINISHES,
     THREAD_CALLOUT,
@@ -43,6 +52,7 @@ from mg_wheel_axle_spec import (
     THREAD_MAJOR,
     TIP_Y,
 )
+from mg_wheel_group import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_axle"]
@@ -58,7 +68,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Every view prints at the sheet scale, so none needs a caption. 4:1 lays the
-# 37.17 pin 149 mm long and its 3/16 shank 19 mm across.
+# 37.2 pin 149 mm long and its 3/16 shank 19 mm across.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -81,14 +91,18 @@ STEP_X = _sheet_x(STEP_Y)
 THREAD_END_X = _sheet_x(THREAD_END_Y)
 TIP_X = _sheet_x(TIP_Y)
 
-# Rows below the profile, 15 mm apart: the shank from the back end chained to
-# the thread from the step (the press gauge's datum), then the overall.
+# Baseline rows below the profile, all from the back end (policy rule 7): the
+# step, the thread end, then the overall as a reference. Each linear
+# dimension's text block (stacked band plus its callout lines) stands above
+# its own line, so each row drops by the block over it: the step's four
+# lines (~16 mm) under the shank, the thread end's three (~12 mm) under the
+# step's line, the one-line reference under that.
 # Diameters on the profile.
-_ROW_Y = (SIDE_CENTER[1] - 0.025, SIDE_CENTER[1] - 0.040)
+_ROW_Y = (SIDE_CENTER[1] - 0.035, SIDE_CENTER[1] - 0.054, SIDE_CENTER[1] - 0.065)
 SIDE_KEEP = {
     "ShankLength": ((BACK_X + STEP_X) / 2.0, _ROW_Y[0]),
-    "ThreadLength": ((STEP_X + THREAD_END_X) / 2.0, _ROW_Y[0]),
-    "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[1]),
+    "ThreadEnd": ((BACK_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
+    "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[2]),
     # The shank's dimension line crosses the shank near the step; its text
     # runs left from the line, the fit callout's two lines under it, so the
     # block stands high enough to keep them off the shank.
@@ -109,13 +123,20 @@ THREAD_PICK = (
     SIDE_CENTER[1] + THREAD_MAJOR / 2.0 * _S / 1000.0,
 )
 THREAD_NOTE_XY = (THREAD_END_X + 0.012, SIDE_CENTER[1] + 0.042)
-# The pin's press fit prints on its own Ø (policy rule 6), the bar bore's
-# limits read from the bar's geom.
+# Each band states its need on its own callout (policy rule 2): the pin's
+# press fit with the bar bore's limits read from the bar's geom, the step's
+# station where the back end lands, the thread end's full thread under the
+# locknut (mg_wheel_group).
 DIMENSION_CALLOUTS = {
     "PinDia": (
         "PRESS FIT IN MG-WHEEL-BAR\n"
         f"<MOD-DIAM>{BAR_BORE_LIMITS[0]:.3f}-{BAR_BORE_LIMITS[1]:.3f} REAMED BORE"
     ),
+    "ShankLength": (
+        "PRESSED TO GAUGE: BACK END\n"
+        f"{BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK IN BAR"
+    ),
+    "ThreadEnd": "LOCKNUT ON FULL THREAD",
 }
 # The journal's finish (policy rule 5) lands on the shank's top silhouette
 # between the Ø line and the step, where the wheel runs; the symbol stands
@@ -136,7 +157,7 @@ def _view_center_delta(
 
     ``place_view`` anchors on the model origin's projection, not the geometry
     box center, so a part that is not origin-symmetric (this pin spans
-    y -8.9..28.27) lands its geometry offset from the requested center. Every
+    y -8.9..28.32) lands its geometry offset from the requested center. Every
     layout constant in this recipe is authored about the intended geometry
     center; shifting by this delta makes the edge picks and text positions
     track wherever SolidWorks actually put the geometry.
@@ -222,6 +243,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     assert_imported_precision(adapter, side_annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, side_annotations, DIMENSION_CALLOUTS)
+    # The overall sums the two stations and the dome: a reference.
+    for name in sorted(REFERENCE_DIMENSIONS):
+        matches = [a for a in side_annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one wheel-axle {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"wheel axle {name}")
     add_view_centerline(
         adapter,
         side,
@@ -252,6 +279,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # x=0.020: a note is left-aligned on its anchor, so the ink starts here,
     # clear of the 12.7 mm zone margin.
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    # The shaded isometric shows the #4-40 the callout names; imported before
+    # finalize's note cleanup, so its label is counted rather than first
+    # appearing at the native save (draw_pn_pen_hanger).
+    thread_seeds, thread_instances = import_cosmetic_threads(adapter, iso)
+    if (thread_seeds, thread_instances) != (1, 1):
+        raise RuntimeError(
+            "wheel-axle isometric cosmetic threads: "
+            f"seeds/instances={(thread_seeds, thread_instances)!r}, expected (1, 1)"
+        )
 
     return await finalize_drawing(
         adapter,

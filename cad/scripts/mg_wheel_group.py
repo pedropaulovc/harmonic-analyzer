@@ -66,17 +66,19 @@ _SHANK = (
     _pin.SHANK_LEN + _pin.SHANK_LEN_BAND[1],
     _pin.SHANK_LEN + _pin.SHANK_LEN_BAND[0],
 )
+# Step to thread end: both stations print from the back end, so their bands
+# add (±0.09).
 _THREAD = (
-    _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[1],
-    _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[0],
+    _pin.THREAD_END + _pin.THREAD_END_BAND[1] - _SHANK[1],
+    _pin.THREAD_END + _pin.THREAD_END_BAND[0] - _SHANK[0],
 )
 _FRONT = (_front.THICKNESS_MIN, _front.THICKNESS_MAX)
 _NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 
 # The back end: at most the bar's depth band proud of its back face, at most
 # 0.30 sunk in it.
-BACK_END_PROUD_MAX = _SHANK[1] - _GAUGE[0] - _BAR_DEPTH[0]  # 0.10
-BACK_END_SUNK_MAX = _BAR_DEPTH[1] - (_SHANK[0] - _GAUGE[1])  # 0.30
+BACK_END_PROUD_MAX = _SHANK[1] - _GAUGE[0] - _BAR_DEPTH[0]  # 0.09
+BACK_END_SUNK_MAX = _BAR_DEPTH[1] - (_SHANK[0] - _GAUGE[1])  # 0.29
 if BACK_END_PROUD_MAX > _bar.BAR_DEPTH_BAND[0] + 1e-9:
     raise AssertionError(f"pin back end {BACK_END_PROUD_MAX:.3f} proud of the bar")
 if BACK_END_SUNK_MAX > 0.30 + 1e-9:
@@ -89,7 +91,7 @@ STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - _GAUGE[1]  # 0.687
 # and the first nut's inner face sits past the die's run-out at the step.
 LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0] - _pin.TIP_INCOMPLETE) - (
     _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
-)  # 0.002
+)  # 0.012
 NUT_RUNOUT_MARGIN = (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
     _GAUGE[1] + _pin.DIE_RUNOUT
 )  # 0.241
@@ -98,8 +100,8 @@ NUT_RUNOUT_MARGIN = (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
 THREAD_PAST_LOCKNUT_LIMIT = 2.5
 THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + _THREAD[1]) - (
     _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]
-)  # 2.407
-THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 1.457
+)  # 2.497
+THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 1.507
 if STEP_INSIDE_HUB <= 0.0:
     raise AssertionError(f"pin step clears the hub front face: {STEP_INSIDE_HUB:.4f}")
 if LOCKNUT_THREAD_MARGIN < 0.0:

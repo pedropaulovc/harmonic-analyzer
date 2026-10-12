@@ -22,11 +22,14 @@ MM_PER_IN = 25.4
 
 PIN_DIA = 0.1875 * MM_PER_IN  # 4.7625, 3/16 drill rod as supplied
 PIN_DIA_TOL = 0.005
-# Back end to the step: 0.10 short of the bar's 9.00 depth, so with the press
-# gauge and the bar's printed depth the back end stands at most the bar's
-# 0.10 band proud of the back face, at most 0.30 sunk (mg_wheel_group).
+# Every axial length reads from the back end (policy rule 7). Back end to the
+# step: 0.10 short of the bar's 9.00 depth, so with the press gauge and the
+# bar's printed depth the back end stands at most 0.09 proud of the bar's back
+# face and at most 0.29 sunk (mg_wheel_group). ±0.04, not ±0.05: the thread
+# from the step is the difference of this and the thread end, and the
+# combined ±0.09 is the most that keeps the past-locknut thread ≤ 2.5.
 SHANK_LEN = 28.4
-SHANK_LEN_BAND = (0.05, -0.05)
+SHANK_LEN_BAND = (0.04, -0.04)
 THREAD = "#4-40"
 THREAD_CALLOUT = "#4-40 UNC"
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]  # 2.845, modelled at the basic major
@@ -36,15 +39,16 @@ THREAD_PITCH = MM_PER_IN / 40.0  # 0.635
 # cuts the last pitch short (the tip-chamfer allowance the filing stud takes).
 DIE_RUNOUT = 1.5 * THREAD_PITCH  # 0.9525
 TIP_INCOMPLETE = THREAD_PITCH  # 0.635
-# Printed step to thread end: the press gauge is taken at the step, so the
-# thread's reach past the nuts reads off this one length. 7.97 is the
-# shortest .XX length whose FULL thread still clears the locknut's outer face
-# at the worst corner (mg_wheel_group).
-THREAD_LEN = 7.97
-THREAD_LEN_BAND = (0.05, -0.05)
-THREAD_END = SHANK_LEN + THREAD_LEN  # 36.37 from the back end
+# Back end to thread end. The press gauge is taken at the step, so the
+# thread's reach past the nuts reads off THREAD_END - SHANK_LEN, banded
+# ±0.09 by the two baselines. 36.42 is the shortest .XX station whose FULL
+# thread still clears the locknut's outer face at the worst corner
+# (mg_wheel_group).
+THREAD_END = 36.42
+THREAD_END_BAND = (0.05, -0.05)
+THREAD_LEN = THREAD_END - SHANK_LEN  # 8.02, step to thread end
 DOME_H = 0.8
-PIN_LEN = THREAD_END + DOME_H  # 37.17
+PIN_LEN = THREAD_END + DOME_H  # 37.22, a reference: the dome sets it
 # The spherical tip through the thread-major edge, DOME_H high.
 DOME_R = ((THREAD_MAJOR / 2.0) ** 2 + DOME_H**2) / (2.0 * DOME_H)  # 1.665
 
@@ -55,29 +59,31 @@ PRESS_GAUGE_TOL = 0.05
 
 STEP_Y = PRESS_GAUGE  # 19.5
 BACK_Y = STEP_Y - SHANK_LEN  # -8.9: 0.10 inside the bar's back face
-THREAD_END_Y = STEP_Y + THREAD_LEN  # 27.47
-TIP_Y = THREAD_END_Y + DOME_H  # 28.27
+THREAD_END_Y = BACK_Y + THREAD_END  # 27.52
+TIP_Y = THREAD_END_Y + DOME_H  # 28.32
 # Full thread runs from the die's runout at the step to one pitch short of
 # the dome.
 FULL_THREAD_START_Y = STEP_Y + DIE_RUNOUT  # 20.4525
-FULL_THREAD_END_Y = THREAD_END_Y - TIP_INCOMPLETE  # 26.835
+FULL_THREAD_END_Y = THREAD_END_Y - TIP_INCOMPLETE  # 26.885
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PinProfile": {"PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"},
+    "PinProfile": {"PinDia", "ShankLength", "ThreadEnd", "PinLength", "DomeR"},
 }
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PinProfile", "ShankLength"): SHANK_LEN_BAND,
-    ("PinProfile", "ThreadLength"): THREAD_LEN_BAND,
+    ("PinProfile", "ThreadEnd"): THREAD_END_BAND,
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
         "PinDia": 4,
         "ShankLength": 2,
-        "ThreadLength": 2,
-        "PinLength": 2,
+        "ThreadEnd": 2,
+        "PinLength": 1,
         "DomeR": 2,
     },
 }
+# The overall is the shank, the thread and the dome summed: a reference.
+REFERENCE_DIMENSIONS = frozenset({"PinLength"})
 
 # The bar's reamed bore the pin presses into, its limits printed to three
 # places on the pin's own Ø callout (policy rule 6; mg_wheel_group.BAR_PRESS
