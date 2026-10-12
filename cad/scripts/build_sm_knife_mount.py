@@ -30,7 +30,7 @@ block rises from below the bore up to the top-frame casting's faced underside
 (999.7), its top seat clamped flush to it: the #6-32 screw threads into a 9.7
 full-thread bottoming tap (drill 10.9) on the bore's vertical centreline, which
 leaves 2.0 of metal over the bore crown at worst case; the two dowels' blind
-flat-bottom reamed holes sit 6.350 either side of the tap axis along X.
+flat-bottom reamed holes sit 7.100 either side of the tap axis along X.
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@sm-summing-lever``) coincident to
@@ -118,7 +118,7 @@ BORE_CY = TOP_CLEAR - R_BORE  # -5.75 (bore top inner wall at local y +TOP_CLEAR
 
 # --- block (bearing body, held to the crossbar) ----------------------------
 SUPPORT_Z_THICK = 14.0  # axial length straddling the trunnion mid (low)
-BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
+BLK_HALF_X = 12.5  # bore wall + flank (25 across: the 14.200 dowel span's webs)
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -14.75
 

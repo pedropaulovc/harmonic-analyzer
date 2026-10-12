@@ -1411,7 +1411,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "socket head (91251A157) seated on the crossbar's #6 counterbore floor, HANGER_GRIP 30.0 above "
-            "the underside (no washer); the screw passes the O4.318 clearance hole and reaches 8.10 nominal "
+            "the underside (no washer); the screw passes the O4.699 clearance hole and reaches 8.10 nominal "
             "(6.284..8.90 worst case, asserted) into the 9.7 full thread of the #6-32 bottoming tap, drawing "
             "the block up against the casting"
         ),

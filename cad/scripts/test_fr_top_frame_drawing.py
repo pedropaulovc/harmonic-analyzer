@@ -344,7 +344,9 @@ def test_counterbore_and_cross_tap_volumes_match_smooth_integrals() -> None:
 def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
     outer, window = part._top_rim_removal()
     assert outer == pytest.approx(2296.176445206839)
-    assert window == pytest.approx(2774.3499756456845)
+    # 2774.35 on the 22-wide crossbar: the 24-wide bar shortens the two
+    # window rims by 4.0 of C2 (2.0 mm^2 a mm).
+    assert window == pytest.approx(2766.3499756456845)
     assert part.WEB_T == 13.0
     root_chord = math.sqrt((part.BOSS_DIA / 2.0) ** 2 - (part.WEB_T / 2.0) ** 2)
     side_run = 2.0 * (abs(part.FRONT_COLUMN_Z) - root_chord)
@@ -510,9 +512,11 @@ def test_c2_chains_leave_no_sliver_between_features(monkeypatch) -> None:
         pytest.approx(math.sqrt(2.0))
     )
     assert part._segment_gap((0, 0, 0), (1, 0, 0), (3, 0, 0), (4, 0, 0)) == 2.0
-    # The nearest two breaks that do not meet stand 4.5 apart (a pocket end);
-    # demanding a land that wide trips the guard.
-    monkeypatch.setattr(part, "C2_SLIVER_MIN", 0.6)
+    # The nearest two breaks that do not meet stand 5.0 apart (the hub rail's
+    # flange-underside run and the set-screw boss's; the pocket ends, 4.5
+    # apart on the 22-wide crossbar, are 5.5 on the 24); demanding a land
+    # that wide trips the guard.
+    monkeypatch.setattr(part, "C2_SLIVER_MIN", 1.1)
     with pytest.raises(AssertionError, match="sliver"):
         part._external_edge_breaks()
 
@@ -1057,13 +1061,14 @@ _SECTION_PLAN = {
 _LETTER_ENDS = ("B-outer", "B-inner", "E-inner", "E-outer", "D-outer", "D-inner")
 # b49e1's cutting-line ends, as the build then typed them, start first.
 _B49E1_BOSS_DIA = 52.2
+_B49E1_BAR_X1 = -4.0  # the 22-wide crossbar's +X face
 _B49E1_CUT_ENDS = {
     "B": (
         (part.COLUMN_X / 2.0, abs(part.FRONT_COLUMN_Z) + _B49E1_BOSS_DIA / 2.0 + 6.0),
         (part.COLUMN_X / 2.0, part.INNER_Z - 6.0),
     ),
     "E": (
-        (part.BAR_X1 + 6.0, drawing.SIDE_SECTION_Z),
+        (_B49E1_BAR_X1 + 6.0, drawing.SIDE_SECTION_Z),
         (-part.COLUMN_X - _B49E1_BOSS_DIA / 2.0 - 6.0, drawing.SIDE_SECTION_Z),
     ),
     "D": (
@@ -1299,8 +1304,10 @@ def test_b_outer_arrow_keeps_off_the_window_width() -> None:
 
 # Sheet-2 ink about the two short plan widths, measured on the ca7edf4d
 # render (sheet m): each width's left arrow tail, the plan's top edge, the
-# 359.8 line, its left extension, the 153.9 line and the front view's top.
-_CROSSBAR_FLANGE_ARROW_TAIL_X = 0.13275
+# 359.8 line, its left extension, the 152.9 line and the front view's top.
+# The crossbar flange's tail is that render's 0.13275 moved with the
+# crossbar's -X face, 1.0 further out since (24.0 wide, was 22.0), at 1:3.
+_CROSSBAR_FLANGE_ARROW_TAIL_X = 0.13275 - 1.0 * _PLAN_S
 _GUSSET_RUN_ARROW_TAIL_X = 0.14009
 _PLAN_TOP_Y = 0.21216
 _WIN_WIDTH_LINE_Y = 0.22772
@@ -1313,7 +1320,7 @@ _FRONT_VIEW_TOP_Y = 0.09666
     ("xy", "lines", "left", "below", "above", "right"),
     (
         (
-            drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY, ("22.0", "CROSSBAR FLANGE"),
+            drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY, ("24.0", "CROSSBAR FLANGE"),
             drawing.SHEET_FRAME[0], _FRONT_VIEW_TOP_Y, _WINDOW_WIDTH_LINE_Y,
             _CROSSBAR_FLANGE_ARROW_TAIL_X,
         ),
@@ -1323,7 +1330,7 @@ _FRONT_VIEW_TOP_Y = 0.09666
             _GUSSET_RUN_ARROW_TAIL_X,
         ),
     ),
-    ids=("crossbar-flange-22.0", "gusset-run-18.0"),
+    ids=("crossbar-flange-24.0", "gusset-run-18.0"),
 )
 def test_short_plan_width_text_parks_clear_of_its_extension_lines(
     xy, lines, left, below, above, right
@@ -1766,7 +1773,8 @@ def test_knife_hanger_is_a_6_shcs_counterbore_on_the_knife_line() -> None:
         "CounterBoreDiameter": spec.HANGER_CBORE_DIA,
         "CounterBoreDepth": spec.HANGER_CBORE_DEPTH,
     }
-    assert spec.HANGER_CLEARANCE_DIA == pytest.approx(4.318)
+    assert spec.HANGER_CLEARANCE_DIA == pytest.approx(4.699)
+    assert spec.HANGER_SCREW_FLOAT == pytest.approx(0.597)
     assert (spec.HANGER_CBORE_DIA, spec.HANGER_CBORE_DEPTH) == (7.0, 6.5)
     # The 1/2 hanger-stud clearance is gone, not aliased.
     assert not hasattr(part, "STUD_HOLE_SPEC") and not hasattr(part, "STUD_HOLE_DIA")
@@ -1778,7 +1786,7 @@ def test_knife_hanger_is_a_6_shcs_counterbore_on_the_knife_line() -> None:
     # Print-worst head checks (rule 12).
     assert spec.HANGER_CBORE_HEAD_CLEARANCE == pytest.approx(0.7496)
     assert spec.HANGER_HEAD_RECESS == pytest.approx(2.4848)
-    assert spec.HANGER_HEAD_BEARING == pytest.approx(0.6612)
+    assert spec.HANGER_HEAD_BEARING == pytest.approx(0.4707)
 
 
 def test_counterbore_floor_is_the_screw_grip_at_one_place() -> None:
@@ -1794,8 +1802,9 @@ def test_counterbore_floor_is_the_screw_grip_at_one_place() -> None:
 
 
 def test_dowel_slip_hole_contract() -> None:
-    assert part.PIN_HOLE_X == pytest.approx(-8.65)
-    assert part.PIN_HOLE_X - part.HANGER_X == spec.HANGER_PIN_X == 6.35
+    assert part.PIN_HOLE_X == pytest.approx(-7.9)
+    assert part.PIN_HOLE_X - part.HANGER_X == pytest.approx(spec.HANGER_PIN_X)
+    assert spec.HANGER_PIN_X == 7.1
     assert spec.HANGER_PIN_X_PLACES == 3
     assert spec.DRAWING_REFERENCE_PRECISION["dowel hole from hanger axis"] == 3
     assert (spec.HANGER_PIN_HOLE_DIA, spec.HANGER_PIN_HOLE_DIA_BAND) == (3.24, (0.03, -0.03))
@@ -1803,9 +1812,10 @@ def test_dowel_slip_hole_contract() -> None:
     assert spec.HANGER_PIN_SLIP_CLEARANCE_MIN == pytest.approx(0.02738)
     assert spec.HANGER_PIN_SLIP_CLEARANCE_MAX == pytest.approx(0.09246)
     assert 0.02 <= spec.HANGER_PIN_SLIP_CLEARANCE_MIN < spec.HANGER_PIN_SLIP_CLEARANCE_MAX <= 0.10
-    # Rule 12 walls and floor, print-worst (the station at its .XXX limit).
-    assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.885)
-    assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.376)
+    # Rule 12 walls and floor, print-worst (the station at its .XXX limit)
+    # and after drill drift (test_hanger_walls_meet_the_target_after_drift).
+    assert part.PIN_HOLE_BAR_WALL == pytest.approx(3.068, abs=5e-4)
+    assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.8015, abs=5e-4)
     assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(18.0)
     assert spec.HANGER_PIN_HOLE_DEPTH < spec.HANGER_GRIP
     # The model owns the size, band and depth; the drawing imports them.
@@ -1818,25 +1828,26 @@ def test_dowel_slip_hole_contract() -> None:
 
 def test_dowel_slot_contract() -> None:
     # The slot stands -X of each screw axis, the round hole +X: the knife
-    # mount's two dowels at +/-6.350.
-    assert part.SLOT_X == pytest.approx(-21.35)
+    # mount's two dowels at +/-7.100.
+    assert part.SLOT_X == pytest.approx(-22.1)
     assert part.SLOT_X - part.HANGER_X == pytest.approx(spec.HANGER_SLOT_X)
-    assert spec.HANGER_SLOT_X == -6.35
+    assert spec.HANGER_SLOT_X == -7.1
     assert spec.HANGER_PIN_XS == (spec.HANGER_SLOT_X, spec.HANGER_ROUND_X)
     # Slip width = the round hole's ream; length .XX; floor = the hole's.
     assert (spec.HANGER_SLOT_WIDTH, spec.HANGER_SLOT_WIDTH_BAND) == (3.24, (0.03, -0.03))
-    assert (spec.HANGER_SLOT_LENGTH, spec.HANGER_SLOT_LENGTH_TOL) == (4.30, 0.51)
+    assert (spec.HANGER_SLOT_LENGTH, spec.HANGER_SLOT_LENGTH_TOL) == (4.20, 0.51)
+    assert spec.HANGER_SLOT_LENGTH - spec.HANGER_SLOT_LENGTH_TOL > spec.HANGER_SLOT_LENGTH_REQUIRED
     assert spec.HANGER_SLOT_DEPTH == spec.HANGER_PIN_HOLE_DEPTH
-    assert part.SLOT_FLAT == pytest.approx(1.06)
-    # The slot stands BASIC 12.700 from its round hole; from the screw axis
+    assert part.SLOT_FLAT == pytest.approx(0.96)
+    # The slot stands BASIC 14.200 from its round hole; from the screw axis
     # it carries the round hole's .XXX band plus its zone radius.
-    assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(12.7)
+    assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(14.2)
     assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(0.155)
-    # Rule 12 walls and floor, print-worst: the screw-side wall under the
-    # 2.0 target, over the 1.5 floor.
-    assert part.SLOT_BAR_WALL == pytest.approx(2.09)
-    assert part.SLOT_SCREW_WALL == pytest.approx(1.581)
-    assert part.SLOT_SCREW_WALL >= 1.5
+    # Rule 12 walls and floor, print-worst and after drill drift: both meet
+    # the 2.0 target.
+    assert part.SLOT_BAR_WALL == pytest.approx(2.323, abs=5e-4)
+    assert part.SLOT_SCREW_WALL == pytest.approx(2.0565, abs=5e-4)
+    assert part.SLOT_SCREW_WALL >= 2.0
     assert part.SLOT_FLOOR_MARGIN == pytest.approx(18.0)
     # The model owns the width and its band (front slot, on the underside
     # locator); F-F derives the station and the length.
@@ -1848,6 +1859,62 @@ def test_dowel_slot_contract() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'for slot_width_name in ("HangerSlotWidth", "HangerSlot1Width"):' in source
     assert 'prefix = "HangerSlot" if station == "Front" else "HangerSlot1"' in source
+
+
+def test_hanger_walls_meet_the_target_after_drift() -> None:
+    """Q7 option C: the #6 holes, the slip holes and the slots are cut from
+    the faced underside in one setup, so each hole's 0.3 deg drift is nil at
+    the seat and largest at the blind floors.  Every wall round a slip hole
+    or slot, at the print-worst bands and the deepest printed floor, less the
+    drift of each hole either side of it, meets rule 12's 2.0 target."""
+    per_mm = math.tan(math.radians(spec.KEEPER_TAP_DRILL_WANDER_DEG))
+    assert spec.DRILL_DRIFT_PER_MM == pytest.approx(per_mm)
+    drift = per_mm * (spec.HANGER_PIN_HOLE_DEPTH + spec.PRINTED_LINEAR_BAND_MM[1])
+    assert part.HANGER_DRIFT_AT_SLIP_FLOOR == pytest.approx(drift)
+    assert drift == pytest.approx(0.0670, abs=1e-4)
+    hole_r = (spec.HANGER_PIN_HOLE_DIA + max(spec.HANGER_PIN_HOLE_DIA_BAND)) / 2.0
+    clearance_r = (spec.HANGER_CLEARANCE_DIA + spec.DRILL_OVERSIZE) / 2.0
+    slot_half = (spec.HANGER_SLOT_LENGTH + spec.HANGER_SLOT_LENGTH_TOL) / 2.0
+    hole_off = spec.HANGER_PIN_X_TOL
+    slot_off = hole_off + spec.HANGER_SLOT_POSITION_TOL / 2.0
+    walls = {
+        "round hole | screw hole": (
+            spec.HANGER_PIN_X - hole_off - hole_r - clearance_r,
+            2.0 * drift,
+            part.PIN_HOLE_SCREW_WALL,
+        ),
+        "round hole | bar +X face": (
+            part.BAR_X1 - (part.PIN_HOLE_X + hole_off) - hole_r,
+            drift,
+            part.PIN_HOLE_BAR_WALL,
+        ),
+        "slot | screw hole": (
+            spec.HANGER_PIN_X - slot_off - slot_half - clearance_r,
+            2.0 * drift,
+            part.SLOT_SCREW_WALL,
+        ),
+        "slot | bar -X face": (
+            part.SLOT_X - slot_off - slot_half - part.BAR_X0,
+            drift,
+            part.SLOT_BAR_WALL,
+        ),
+    }
+    for label, (print_worst, charged, wall) in walls.items():
+        assert wall == pytest.approx(print_worst - charged), label
+        assert wall >= 2.0, label
+    # The pocket walls take the #6 hole's drift from the same underside
+    # entry: at the pocket roof for the hole, at the top face for the
+    # counterbore piloted on it.
+    pocket = part.BAR_POCKET_HOLE_WALLS
+    station = part._POCKET_STATION - part._POCKET_END
+    assert pocket["hanger clearance hole"] == pytest.approx(
+        station - clearance_r - per_mm * (part.RING_HEIGHT - part.FLANGE)
+    )
+    assert pocket["hanger counterbore"] == pytest.approx(
+        station
+        - (spec.HANGER_CBORE_DIA + spec.PRINTED_LINEAR_BAND_MM[2]) / 2.0
+        - per_mm * part.RING_HEIGHT
+    )
 
 
 def test_dowel_slot_sketch_contours_never_cross() -> None:
@@ -2096,10 +2163,11 @@ def test_slot_frames_stand_above_the_plan_clear_of_every_line() -> None:
     layout = _slot_frame_layout()
     # F-F as run 20261009T174542021Z printed it: arrows x 91.33 / 118.67 from
     # the cutting line at y 230.05 mm, each running 12 mm sheet-down, its
-    # letter [-1.2, +1.8] x [-20.25, -14.15] mm about the line's end.
+    # letter [-1.2, +1.8] x [-20.25, -14.15] mm about the line's end.  The
+    # 24-wide crossbar moves each end 1.0 further out (0.33 mm at 1:3).
     cut_y = centre[1] + drawing.HANGER_SECTION_Z * m_per_mm
     arrows = [centre[0] + x * m_per_mm for x in drawing.HANGER_SECTION_CUT_X]
-    assert arrows == pytest.approx([0.09133, 0.11867], abs=5e-5)
+    assert arrows == pytest.approx([0.09100, 0.11900], abs=5e-5)
     assert cut_y == pytest.approx(0.23005, abs=5e-5)
     lines = {"F-F cutting line": Segment(arrows[0], cut_y, arrows[1], cut_y)}
     boxes = {}
@@ -2115,12 +2183,13 @@ def test_slot_frames_stand_above_the_plan_clear_of_every_line() -> None:
         lines[f"138.0 extension {sz:+.0f}"] = Segment(line_x - 0.001, y, pick_x, y)
     tx, ty = drawing.POCKET_LENGTH_OFFSET_XY
     boxes["138.0 text"] = Box(tx - 0.0170, ty - 0.00875, tx + 0.0170, ty + 0.00875)
-    # The land's 70.0: extension lines from y 143.97 to 163.83 mm and its line
-    # at y 145 with 6.35 mm arrow tails outside them (40d9d030e render).
+    # The land's 72.0: extension lines from y 143.97 to 163.83 mm and its line
+    # at y 145 with 6.35 mm arrow tails outside them (40d9d030e render, when
+    # it was 70.0; its ends follow the lands).
     land = [centre[0] + x * m_per_mm for x in (part.LAND_X0, part.LAND_X1)]
-    lines["70.0 line"] = Segment(land[0] - 0.00635, 0.145, land[1] + 0.00635, 0.145)
+    lines["72.0 line"] = Segment(land[0] - 0.00635, 0.145, land[1] + 0.00635, 0.145)
     for x in land:
-        lines[f"70.0 extension {x:.4f}"] = Segment(x, 0.14397, x, 0.16383)
+        lines[f"72.0 extension {x:.4f}"] = Segment(x, 0.14397, x, 0.16383)
     # The slot width's extension lines, from the front slot's flats to its line.
     width_x, width_y = drawing.HANGER_SLOT_WIDTH_TEXT_XY
     half_w = drawing.HANGER_SLOT_WIDTH / 2.0 * m_per_mm
@@ -2284,7 +2353,7 @@ def test_plan_note_centres_the_rail_outlines_on_the_socket_pattern() -> None:
     x, y = drawing.PLAN_CENTRING_NOTE_XY
     # Rule 6: a short note.  Rule 8: clear of the sheet-2 ink round it
     # (4d11a94e render, metres): the frame's left edge, the 269.0 extension
-    # line at y 0.12365, the 153.9 extension line at x 0.08502 and the front
+    # line at y 0.12365, the 152.9 extension line at x 0.08502 and the front
     # view, whose top is y 0.09747.  Characters print 2.87 mm wide ("CROSSBAR
     # FLANGE", 15 of them over 43.1 mm), rows 5.56 mm apart.
     assert len(lines) <= 4
@@ -2357,7 +2426,7 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
 
 def test_slot_station_is_basic_from_its_round_hole() -> None:
     # Machinist review (sheet 6): the slot position frames lacked a basic
-    # location.  The slot now stands BASIC 12.700 from the round hole beside
+    # location.  The slot now stands BASIC 14.200 from the round hole beside
     # it (datum B front, C rear), a bare box: its above-text did not print
     # (20261010T001553082Z layout audit, text-unmatched).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -2379,7 +2448,7 @@ def test_slot_basic_note_completes_both_stations_frames() -> None:
     # width's median plane, leaving the basic along the slot untoleranced.
     # The note states both stations' basic, the 90 degrees and the zone both
     # ways, with the values the spec owns -- the zone along the slot is what
-    # the spec's slot-to-screw wall stack charges; the 6.350 names the round
+    # the spec's slot-to-screw wall stack charges; the 7.100 names the round
     # holes it locates.
     note = drawing.SLOT_BASIC_NOTE
     zone = spec.GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"]
@@ -2392,7 +2461,7 @@ def test_slot_basic_note_completes_both_stations_frames() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'suffix="2X ROUND HOLE\\nFROM SCREW AXIS"' in source
     # Rule 6, and rule 8 against the a3735691 sheet-6 ink (metres): F-F's
-    # 6.350 block top 0.1133, the 70.0 block's underline 0.13663, detail C's
+    # 7.100 block top 0.1133, the 72.0 block's underline 0.13663, detail C's
     # fence (r 0.076 about its centre) at its nearest over the note's rows.
     # Rows print 4.6 mm apart and 3.6 tall, 2.45 mm a glyph (87d93d70).
     lines = note.splitlines()
@@ -2436,6 +2505,39 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
     underside = source[source.index('ddoc.ActivateSheet("UNDERSIDE")') :]
     assert "_hanger_section(adapter, hub_bottom_parent)" in underside
     assert "imported_annotations += hanger_dimensions" in underside
+
+
+def test_hanger_drill_callout_states_the_drilling_direction() -> None:
+    """The wall stack charges the #6 hole's drift from the faced underside,
+    so the sheet-3 callout says the hole is drilled from there; the native
+    size and counterbore rows follow on their own rows (rule 6: four rows at
+    most)."""
+    import ast
+
+    import _drawing_hole_callout
+
+    native = "<hw-hole-dia> THRU ALL\n<hw-cbore-dia> <hw-cbore-depth>"
+    prefixed = _drawing_hole_callout.compose_hole_callout_prefix(
+        drawing.HANGER_DRILL_CALLOUT, native
+    )
+    assert prefixed == "HANGER: DRILL FROM UNDERSIDE\n" + native
+    assert len(prefixed.splitlines()) <= 4
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    (callout,) = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "add_native_hole_callout"
+        and any(
+            keyword.arg == "label"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "2X #6 SHCS hanger counterbores"
+            for keyword in node.keywords
+        )
+    ]
+    process = next(keyword.value for keyword in callout.keywords if keyword.arg == "process")
+    assert isinstance(process, ast.Name) and process.id == "HANGER_DRILL_CALLOUT"
 
 
 def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
@@ -3102,7 +3204,7 @@ def test_underside_facing_note_stands_beside_detail_c_clear_of_all_ink() -> None
     assert math.dist(nearest, (cx, cy)) >= detail_r + ink
     # Printed text on the 40d9d030e render (sheet mm): the DETAIL C / SCALE
     # 2:1 caption, the Ø30.0 CYLINDRICAL BOSS text, the 7.0 gusset block,
-    # the 70.0 land block, F-F's 6.350 block and the locator's label.
+    # the 72.0 land block, F-F's 7.100 block and the locator's label.
     for label, box in {
         "detail caption": (0.2844, 0.0753, 0.3161, 0.0898),
         "boss diameter": (0.1889, 0.0954, 0.2310, 0.1045),

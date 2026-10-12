@@ -24,14 +24,14 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   land on one face wherever fit-up puts them. The nominal rail-top plane
   stays fixed; the B-B top flange thickness (TYP, .X, minimum 7.2) is the
   finished flange under it.
-* Integral crossbar 22 wide at x -26..-4 spanning the window along Z,
+* Integral crossbar 24 wide at x -27..-3 spanning the window along Z,
   flush with BOTH faces at its junctions (the faced underside 999.7 is the
   knife-mount seat plane), with 18 x 18 plan gussets at all four rail
   junctions and, at z 3.088 -/+ 87.06, a #6 SHCS counterbore + dowel slip
   hole per knife mount: the MHA-VN-024 screw drops through the counterbore
   into the mount's tap, the MHA-VN-051 dowel slips into the blind underside
   hole. Over its middle (|z| <= 69, short of the gussets and the
-  knife-mount seats) the bar is a T like the rails: the 22-wide, 8-tall
+  knife-mount seats) the bar is a T like the rails: the 24-wide, 8-tall
   top flange over a 13.0 web centred on the knife line through the
   underside, with R3 roots.
 * Every face on the underside plane 999.7 between the bosses -- rail web
@@ -41,10 +41,14 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   bottoms 6.3 below it and the hub boss and V-gussets 8.0 below stay off
   it. 999.7 is the FINISHED plane: the cut comes out of casting allowance,
   so the model, its bands and every stack read from it unchanged. It is
-  faced before the counterbores and dowel holes are cut: their depths are
-  judged from it, and a later cut would shorten the 30.0 grip and the 12.0
-  slip depth one for one against the 0.01 #6 tip clearance and the 0.596
-  dowel slip margin.
+  faced first, and in the same setup the #6 clearance holes are drilled
+  through from it with the dowel slip holes and slots: the three share the
+  knife-mount seat as their entry face, so the drill's drift is nil where
+  they meet the seat and grows toward the top. The frame is then flipped
+  and each counterbore is cut from the top, piloted on its drilled hole.
+  Their depths are judged from the faced plane, and a later facing cut
+  would shorten the 30.0 grip and the 12.0 slip depth one for one against
+  the 0.01 #6 tip clearance and the 0.596 dowel slip margin.
 * Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 28 wide,
   O17 clearance bore for the O16 counter-spring post, underside boss
   O30 x 8 with twin V-gussets (ch30 p004), a square-sided cast boss under
@@ -171,6 +175,7 @@ from fr_top_frame_spec import (
     HANGER_GRIP,
     HANGER_HOLE_SPEC,
     HANGER_PIN_HOLE_DEPTH,
+    HANGER_PIN_HOLE_DEPTH_PLACES,
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_HOLE_DIA_BAND,
     HANGER_PIN_X_TOL,
@@ -184,6 +189,7 @@ from fr_top_frame_spec import (
     HANGER_SLOT_X,
     KEEPER_TAP_CALLOUT_PRECISION,
     KEEPER_TAP_DRILL_WANDER_DEG,
+    DRILL_DRIFT_PER_MM,
     PRINTED_DRILLED_HOLE_PLUS_MM,
     PRINTED_LINEAR_BAND_MM,
     HANGER_PIN_SLIP_CLEARANCE_MAX,
@@ -265,15 +271,15 @@ OUTER_Z = abs(FRONT_COLUMN_Z) + RAIL_W_FR / 2.0  # 131.0
 INNER_Z = abs(FRONT_COLUMN_Z) - RAIL_W_FR / 2.0  # 93.0
 
 # --- Integral crossbar (old top-crossbar, merged) ---------------------------
-BAR_X0, BAR_X1 = -26.0, -4.0  # 22 wide, centred on KNIFE x = -15
+BAR_X0, BAR_X1 = -27.0, -3.0  # 24 wide, centred on KNIFE x = -15
 GUSSET = 18.0  # plan gusset legs at the four rail junctions
 HEX_Z_MID = 87.06  # knife-mount trunnion mid offset (build_sm_summing_assembly)
 STUD_Z_FRONT = SUMMING_Z - HEX_Z_MID  # -83.972
 STUD_Z_REAR = SUMMING_Z + HEX_Z_MID  # +90.148
-HANGER_X = BAR_X0 + 11.0  # -15.0: the crossbar centreline, KNIFE x
-PIN_HOLE_X = HANGER_X + HANGER_ROUND_X  # -8.65: round dowel slip holes, +X
-SLOT_X = HANGER_X + HANGER_SLOT_X  # -21.35: dowel slots, -X of the screw
-SLOT_FLAT = HANGER_SLOT_LENGTH - HANGER_SLOT_WIDTH  # 1.06: straight run
+HANGER_X = (BAR_X0 + BAR_X1) / 2.0  # -15.0: the crossbar centreline, KNIFE x
+PIN_HOLE_X = HANGER_X + HANGER_ROUND_X  # -7.9: round dowel slip holes, +X
+SLOT_X = HANGER_X + HANGER_SLOT_X  # -22.1: dowel slots, -X of the screw
+SLOT_FLAT = HANGER_SLOT_LENGTH - HANGER_SLOT_WIDTH  # 0.96: straight run
 HANGER_SLOT_AREA = (
     SLOT_FLAT * HANGER_SLOT_WIDTH + math.pi * (HANGER_SLOT_WIDTH / 2.0) ** 2
 )
@@ -428,10 +434,10 @@ WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.5
 WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.5
 WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.5
 WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.5
-LAND_X0 = BAR_X0 - GUSSET - 6.0  # -50; crossbar-junction land pads on the
-LAND_X1 = BAR_X1 + GUSSET + 6.0  # +20; front/rear inner faces (6 margin)
+LAND_X0 = BAR_X0 - GUSSET - 6.0  # -51; crossbar-junction land pads on the
+LAND_X1 = BAR_X1 + GUSSET + 6.0  # +21; front/rear inner faces (6 margin)
 # Crossbar T-section: over the middle of the bar (|z| <= BAR_POCKET_Z) the
-# crossbar keeps its 22-wide, FLANGE-tall top flange and below it thins to a
+# crossbar keeps its 24-wide, FLANGE-tall top flange and below it thins to a
 # WEB_T web centred on the knife line, through the underside. Two flanking
 # pockets cut it out of the full-height bar; they stop 6 short of the gusset
 # legs (z +/-75) so the full-depth ends, which carry every hanger hole, keep
@@ -492,21 +498,47 @@ if STUD_Z_REAR + HANGER_CBORE_DIA / 2.0 >= INNER_Z + GUSSET:
 # Dowel slip holes and slots (rule 12, print-worst): the largest reamed hole
 # and the longest slot keep a wall to the crossbar's +X / -X face and to the
 # largest drilled screw clearance hole with the round hole's station at its
-# .XXX limit and the slot's at that plus its zone radius off the BASIC 12.700
+# .XXX limit and the slot's at that plus its zone radius off the BASIC 14.200
 # (0.155); their blind floors stay below the counterbore floor, so neither
-# meets the screw's bearing face.  The slot's screw-side wall (1.581) sits
-# under the 2.0 target, over the 1.5 floor.
+# meets the screw's bearing face.  The #6 holes, the slip holes and the slots
+# are all cut from the faced underside in one setup, so each one's drift is
+# nil at that face and greatest at the blind floors: every wall is judged at
+# the deepest printed floor, less the drift of each hole on either side of
+# it (the #6 hole's and the slip hole's or slot's, toward each other).  All
+# four meet the 2.0 target.
 _PIN_HOLE_MAX_R = (HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)) / 2.0
 _CLEARANCE_MAX_R = (HANGER_CLEARANCE_DIA + DRILL_OVERSIZE) / 2.0
 _SLOT_MAX_HALF_L = (HANGER_SLOT_LENGTH + HANGER_SLOT_LENGTH_TOL) / 2.0
-PIN_HOLE_BAR_WALL = BAR_X1 - (PIN_HOLE_X + HANGER_PIN_X_TOL) - _PIN_HOLE_MAX_R  # 2.885
+# Holes and slots floor at one height (HANGER_SLOT_DEPTH is the hole's).
+_SLIP_FLOOR_DEPTH_MAX = (
+    HANGER_PIN_HOLE_DEPTH + PRINTED_LINEAR_BAND_MM[HANGER_PIN_HOLE_DEPTH_PLACES]
+)  # 12.8
+HANGER_DRIFT_AT_SLIP_FLOOR = DRILL_DRIFT_PER_MM * _SLIP_FLOOR_DEPTH_MAX  # 0.067
+PIN_HOLE_BAR_WALL = (
+    BAR_X1
+    - (PIN_HOLE_X + HANGER_PIN_X_TOL)
+    - _PIN_HOLE_MAX_R
+    - HANGER_DRIFT_AT_SLIP_FLOOR
+)  # 3.068
 PIN_HOLE_SCREW_WALL = (
-    HANGER_ROUND_X - HANGER_PIN_X_TOL - _PIN_HOLE_MAX_R - _CLEARANCE_MAX_R
-)  # 2.376
-SLOT_BAR_WALL = (SLOT_X - HANGER_SLOT_STATION_TOL - _SLOT_MAX_HALF_L) - BAR_X0  # 2.09
+    HANGER_ROUND_X
+    - HANGER_PIN_X_TOL
+    - _PIN_HOLE_MAX_R
+    - _CLEARANCE_MAX_R
+    - 2.0 * HANGER_DRIFT_AT_SLIP_FLOOR
+)  # 2.801
+SLOT_BAR_WALL = (
+    (SLOT_X - HANGER_SLOT_STATION_TOL - _SLOT_MAX_HALF_L)
+    - BAR_X0
+    - HANGER_DRIFT_AT_SLIP_FLOOR
+)  # 2.323
 SLOT_SCREW_WALL = (
-    -HANGER_SLOT_X - HANGER_SLOT_STATION_TOL - _SLOT_MAX_HALF_L - _CLEARANCE_MAX_R
-)  # 1.581
+    -HANGER_SLOT_X
+    - HANGER_SLOT_STATION_TOL
+    - _SLOT_MAX_HALF_L
+    - _CLEARANCE_MAX_R
+    - 2.0 * HANGER_DRIFT_AT_SLIP_FLOOR
+)  # 2.056
 PIN_HOLE_FLOOR_MARGIN = HANGER_GRIP - HANGER_PIN_HOLE_DEPTH  # 18.0
 SLOT_FLOOR_MARGIN = HANGER_GRIP - HANGER_SLOT_DEPTH  # 18.0
 for _label, _value in (
@@ -514,6 +546,12 @@ for _label, _value in (
     ("hole wall to the screw clearance hole", PIN_HOLE_SCREW_WALL),
     ("slot wall to the crossbar -X face", SLOT_BAR_WALL),
     ("slot wall to the screw clearance hole", SLOT_SCREW_WALL),
+):
+    if _value < 2.0:
+        raise AssertionError(
+            f"knife-mount dowel slip {_label}: {_value:.3f} after drill drift"
+        )
+for _label, _value in (
     ("hole floor below the counterbore floor", PIN_HOLE_FLOOR_MARGIN),
     ("slot floor below the counterbore floor", SLOT_FLOOR_MARGIN),
 ):
@@ -524,31 +562,34 @@ for _label, _value in (
 # keeps its wall in z with the station at its .X band from the socket axis,
 # each pocket end a full band of its printed .X length out (the length's
 # band, then as much again for the pocket's centring), the largest printed
-# hole and the 0.3 deg drill drift over that hole's depth. The counterbore wall is taken in plan although its floor
-# (y +11.75) stands above the pocket roof (y +10.25).
+# hole and the 0.3 deg drill drift from the faced underside, where every
+# hanger hole enters: the #6 hole's at the pocket roof (y +10.25), the
+# counterbore's at the top face, where it is piloted on that hole, and the
+# slip hole's and slot's over their depth. The counterbore wall is taken in
+# plan although its floor (y +11.75) stands above the pocket roof.
 _POCKET_STATION = min(abs(STUD_Z_FRONT), abs(STUD_Z_REAR)) - PRINTED_LINEAR_BAND_MM[1]
 _POCKET_LENGTH_PLACES = DRAWING_REFERENCE_PRECISION["crossbar pocket length"]
 _POCKET_END = (
     round(2.0 * BAR_POCKET_Z, _POCKET_LENGTH_PLACES) / 2.0
     + 2.0 * PRINTED_LINEAR_BAND_MM[_POCKET_LENGTH_PLACES]
 )  # 70.6
-_DRIFT_PER_MM = math.tan(math.radians(KEEPER_TAP_DRILL_WANDER_DEG))
 BAR_POCKET_HOLE_WALLS = {
     "hanger counterbore": _POCKET_STATION
     - (HANGER_CBORE_DIA + PRINTED_LINEAR_BAND_MM[2]) / 2.0
-    - _POCKET_END,  # 8.617
+    - DRILL_DRIFT_PER_MM * RING_HEIGHT
+    - _POCKET_END,  # 8.626
     "hanger clearance hole": _POCKET_STATION
     - _CLEARANCE_MAX_R
-    - _DRIFT_PER_MM * RING_HEIGHT
-    - _POCKET_END,  # 9.972
+    - DRILL_DRIFT_PER_MM * (RING_HEIGHT - FLANGE)
+    - _POCKET_END,  # 10.024
     "dowel slip hole": _POCKET_STATION
     - _PIN_HOLE_MAX_R
-    - _DRIFT_PER_MM * HANGER_PIN_HOLE_DEPTH
-    - _POCKET_END,  # 10.675
+    - DRILL_DRIFT_PER_MM * HANGER_PIN_HOLE_DEPTH
+    - _POCKET_END,  # 10.875
     "dowel slot": _POCKET_STATION
     - (HANGER_SLOT_WIDTH + max(HANGER_SLOT_WIDTH_BAND)) / 2.0
-    - _DRIFT_PER_MM * HANGER_SLOT_DEPTH
-    - _POCKET_END,  # 10.675
+    - DRILL_DRIFT_PER_MM * HANGER_SLOT_DEPTH
+    - _POCKET_END,  # 10.875
 }
 for _label, _value in BAR_POCKET_HOLE_WALLS.items():
     if _value < 2.0:
@@ -566,7 +607,7 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # whole turned through the title-block angle about the round dowel.
 # _external_edge_breaks keeps every finished C2 band 0.5 off both hulls.
 # The front hull overhangs the crossbar's sharp sides short of the gusset
-# legs (the 24-wide block on the 22-wide bar); that overhang is not a break.
+# legs (the 25-wide block on the 24-wide bar); that overhang is not a break.
 def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
     """Counter-clockwise convex hull (monotone chain) of plan points."""
     ordered = sorted(set(points))
@@ -1959,7 +2000,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "web ring", v_web, 0.001 * v_web)
 
     # 2. Crossbar junction lands: full-thickness pads on the front/rear
-    #    inner faces where the crossbar + gussets butt in (x -50..20,
+    #    inner faces where the crossbar + gussets butt in (x -51..21,
     #    z +/-(93..105.5)), full height. Sketch z flipped: (x, y) -> (X, -Z).
     lands = SketchDims()
     check("create_sketch junction lands", await adapter.create_sketch("Top"))

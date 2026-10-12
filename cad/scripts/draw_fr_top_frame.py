@@ -166,6 +166,7 @@ from fr_top_frame_spec import (
     HANGER_SLOT_FROM_ROUND_PLACES,
     HANGER_SLOT_LENGTH,
     HANGER_SLOT_LENGTH_CALLOUT,
+    HANGER_SLOT_POSITION_TOL,
     HANGER_SLOT_WIDTH,
     HANGER_SLOT_WIDTH_CALLOUT,
     HUB_SET_BOSS_FROM_AXIS,
@@ -299,6 +300,12 @@ INK_CLEARANCE = 0.002
 ROUND_OUT = 0.0001
 # The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
 ARROW_HALF_WIDTH = 0.000381
+# The #6 hanger holes are drilled through from the faced underside, in the
+# setup that cuts the dowel slip holes and slots, and each counterbore is
+# then cut from the top, piloted on its hole (build_fr_top_frame's wall
+# stack charges the drift from that entry).  The trailing newline puts the
+# native size and counterbore rows under it: three rows in all.
+HANGER_DRILL_CALLOUT = "HANGER: DRILL FROM UNDERSIDE\n"
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
@@ -495,8 +502,8 @@ HUB_GUSSET_T_TEXT_XY = (0.300, 0.212)
 HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 # The faced underside plane's linked note C (top-left point).  The bands
-# round the locator are full: between F-F's 6.350 block (top 113.3 mm on
-# farm run 40d9d030e) and the 70.0 block (bottom 137.6) stand 24.3 mm, under
+# round the locator are full: between F-F's 7.100 block (top 113.3 mm on
+# farm run 40d9d030e) and the 72.0 block (bottom 137.6) stand 24.3 mm, under
 # the four rows' 20.4 plus two clearances, and right of the plan the Ø30.0
 # leader and detail C's fence leave 41 mm.  So the note takes the open band
 # right of detail C's caption, over the title block: 80.6 x 20.4 mm at the
@@ -506,21 +513,21 @@ LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 # gussets it excludes.
 UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
 # The slot position frames' basics, stated for both stations: F-F cuts only
-# the rear one, and its bare 12.700 box carries no text (a BASIC keeps none),
+# the rear one, and its bare 14.200 box carries no text (a BASIC keeps none),
 # so the front slot's basic and the frames' 90 degrees to the B-C line went
 # unstated (codex review of a3735691, sheet 6).  A plain position frame on a
-# slot holds only its width's median plane, which left the basic 12.700
+# slot holds only its width's median plane, which left the basic 14.200
 # along the slot untoleranced and the slot-to-screw-hole wall unbounded
 # (codex review of 87d93d70).  The spec's wall stack already charges the
 # zone along the slot (HANGER_SLOT_STATION_TOL), so the note says it holds
-# both ways.  It takes the band between F-F's 6.350 block (top 113.3 mm)
-# and the 70.0 block's underline (136.6), left of detail C's fence (r 76
+# both ways.  It takes the band between F-F's 7.100 block (top 113.3 mm)
+# and the 72.0 block's underline (136.6), left of detail C's fence (r 76
 # about the detail centre); top-left point, rows 4.6 mm apart and 3.6 tall,
 # 2.45 mm a glyph (87d93d70 render).
 SLOT_BASIC_NOTE = (
     f"SLOTS: BASIC {HANGER_SLOT_FROM_ROUND:.{HANGER_SLOT_FROM_ROUND_PLACES}f} FROM\n"
     "B (FRONT), C (REAR), AT\nBASIC 90 DEG TO B-C LINE;\n"
-    f"{GEOMETRIC_TOLERANCES_MM['knife-hanger slot position']} POSITION ALONG AND ACROSS"
+    f"{HANGER_SLOT_POSITION_TOL:g} POSITION ALONG AND ACROSS"
 )
 SLOT_BASIC_NOTE_XY = (0.150, 0.1345)
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
@@ -555,10 +562,10 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 # hole walls, its four-line callout parked on a leader in the open band
 # below-right of the section (the dda9a33a8 render printed it across its own
 # extension lines and the underside edge).  Right: the depth the hole and
-# slot share.  Above, between the owned axes: the hole's 6.350 station from
+# slot share.  Above, between the owned axes: the hole's 7.100 station from
 # the screw axis, its text on a jog to the right, clear of the locator's land
 # text; a row higher, so the two dimension lines never share the hole's
-# extension line at one height, the slot's BASIC 12.700 from the round hole
+# extension line at one height, the slot's BASIC 14.200 from the round hole
 # (the slot position frames' true location), its text on a jog to the left,
 # between the counterbore floor's text and the locator's label.  Under the
 # slot, a row below the hole's size so their arrows cannot meet: its length,
@@ -610,7 +617,7 @@ HANGER_SECTION_CAPTION_XY = (0.070, 0.040)
 # dimension line.
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
 HANGER_DATUM_SYMBOL_XY = {"B": (0.136, 0.176), "C": (0.130, 0.257)}
-# Each round hole is 1.06 mm across at 1:3, its rim 1.0 mm (sheet) inside
+# Each round hole is 1.08 mm across at 1:3, its rim 1.1 mm (sheet) inside
 # the crossbar's +X edge, so the rim is hit-tested zoomed onto a 5 mm square
 # (draw_ch_rocker_arm's pivot-bore datum precedent), where the pick aperture
 # is hundredths of a millimetre.
@@ -781,7 +788,8 @@ SECTION_LETTER_EXTENTS = {
     "D": (-0.0024, 0.0158, 0.0028, 0.0221),
 }
 # The two window clear widths print their values on one line across the
-# plan's lower rail.  "183.9" measured on b49e1 about its text point
+# plan's lower rail.  The right one's text ("183.9" on b49e1, now 182.9 in
+# as many glyphs) measured on b49e1 about its text point
 # (left, down, right, up), rounded outward.  Its dimension line runs 2.78 mm
 # under the text point, rounded toward the text so the band under the rail
 # is never overstated.
@@ -848,11 +856,11 @@ GEOMETRY_CALLOUTS = {
     "GussetRunE": "4X 45 DEG GUSSET",
     "RingHeight": "RAIL HEIGHT",
 }
-# Two plan widths are shorter on paper than their own text (at 1:3 the 22.0
-# crossbar flange is 7.3 mm, the 18.0 gusset run 6.0), so text centred on
+# Two plan widths are shorter on paper than their own text (at 1:3 the 24.0
+# crossbar flange is 8.0 mm, the 18.0 gusset run 6.0), so text centred on
 # them stood across their extension lines (codex review of ca7edf4d, sheet
-# 2).  Each parks its text left of its line on a leader: the 22.0's between
-# the 153.9 window line (y 115.2) and the front view (96.7); the 18.0's
+# 2).  Each parks its text left of its line on a leader: the 24.0's between
+# the 152.9 window line (y 115.2) and the front view (96.7); the 18.0's
 # between the plan's top edge (212.2) and the 359.8 line (227.7), right of
 # that line's left extension (x 85.0).  Ink measured on the ca7edf4d render.
 CROSSBAR_FLANGE_TEXT_OFFSET_XY = (0.1085, 0.1080)
@@ -863,7 +871,7 @@ GUSSET_RUN_TEXT_OFFSET_XY = (0.1145, 0.2205)
 # sockets' pattern centre (the model's +/-OuterX, +/-InnerX, ...), but no
 # dimension tied them to the socket axes (codex review of 4d11a94e, sheets
 # 2-3), so a note states it.  It parks in the free corner under the 269.0
-# extension line (y 123.7), left of the 153.9 line (x 85.0) and over the
+# extension line (y 123.7), left of the 152.9 line (x 85.0) and over the
 # front view (top 97.5); ink measured on the 4d11a94e render.
 PLAN_CENTRING_NOTE = "RAIL FLANGE EXTENTS\nAND WINDOWS CENTRED\nON 4X SOCKET PATTERN"
 PLAN_CENTRING_NOTE_XY = (0.016, 0.118)
@@ -2465,7 +2473,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # hole past that row instead of across it (codex round 5).
         callout_xy=(0.262, 0.258),
         label="2X #6 SHCS hanger counterbores",
-        process="HANGER DRILL",
+        process=HANGER_DRILL_CALLOUT,
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
     rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)

@@ -105,10 +105,10 @@ def test_side_by_side_stations_have_counterbore_and_head_bearing() -> None:
         min(joint.SCREW_MACHINE_X) - joint.SCREW_HEAD_DIA / 2.0
         - (KNIFE[0] + knife_mount.BLK_HALF_X)
     )
-    assert head_air == pytest.approx(2.222)
+    assert head_air == pytest.approx(1.722)
     # Receiver stations follow the lever's real free edge: its width band
     # adds a whole-part translation relative to the pivot/knife line.
-    assert head_air - joint.POSITION_BAND - 2.0 * joint.LINEAR_BAND == pytest.approx(1.152)
+    assert head_air - joint.POSITION_BAND - 2.0 * joint.LINEAR_BAND == pytest.approx(0.652)
 
 
 def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:

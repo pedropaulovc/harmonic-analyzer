@@ -15,7 +15,7 @@ west-rail fulcrum-keeper taps.
 
 from __future__ import annotations
 
-from math import sqrt
+from math import radians, sqrt, tan
 
 import _config
 import vn_knife_hanger_stud_spec as HANGER_SCREW
@@ -92,7 +92,9 @@ _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
 # The title block's DRILLED HOLES row: a drilled hole cuts up to this oversize.
 DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
-HANGER_CLEARANCE_DIA = CLEARANCE_MM[("#6", "normal")]  # 4.318
+# The loose #6 fit: its float about the shank carries the dowel pair's
+# spacing mismatch plus the hole's drill drift over the grip (below).
+HANGER_CLEARANCE_DIA = CLEARANCE_MM[("#6", "loose")]  # 4.699
 HANGER_CBORE_DIA = 7.0  # .XX
 HANGER_CBORE_DEPTH = 6.5  # .XX, from the crossbar top
 HANGER_HOLE_SPEC = HoleSpec(
@@ -118,7 +120,7 @@ HANGER_CBORE_HEAD_CLEARANCE = HANGER_CBORE_DIA - _XX - HANGER_SCREW.HEAD_DIA  # 
 HANGER_HEAD_RECESS = HANGER_CBORE_DEPTH - _XX - HANGER_SCREW.HEAD_H  # 2.48
 HANGER_HEAD_BEARING = (
     HANGER_SCREW.HEAD_DIA - (HANGER_CLEARANCE_DIA + DRILL_OVERSIZE)
-) / 2.0  # 0.66
+) / 2.0  # 0.47
 for _label, _value in (
     ("head in counterbore", HANGER_CBORE_HEAD_CLEARANCE),
     ("head recess", HANGER_HEAD_RECESS),
@@ -129,7 +131,7 @@ for _label, _value in (
 # The dowel slip hole: a slip on the pin's catalogue diameter at 0.02..0.10
 # diametral clearance (the dt_pinion_cam_spec slip band), reamed to an
 # explicit +/-0.03 band and printed .XXX: 0.0274..0.0925.
-HANGER_PIN_X = KNIFE_DOWEL.HANGER_OFFSET  # 6.350 either side of the screw axis
+HANGER_PIN_X = KNIFE_DOWEL.HANGER_OFFSET  # 7.100 either side of the screw axis
 # The pair's stations from the screw axis in the dowel spec's order: the -X
 # slot, then the +X round hole.
 HANGER_PIN_XS = (-HANGER_PIN_X, HANGER_PIN_X)
@@ -154,7 +156,7 @@ if HANGER_PIN_SLIP_CLEARANCE_MIN < 0.02 or HANGER_PIN_SLIP_CLEARANCE_MAX > 0.10:
     )
 # Manufacturing GD&T limits consumed by the part's drawing projection: each
 # slot to the round hole beside it (datum B front, C rear) at the BASIC
-# 12.700 between them, oriented by the other round hole with its location
+# 14.200 between them, oriented by the other round hole with its location
 # released (translation modifier), so the two mounts' dowel lines stay square
 # to the B-C line.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {"knife-hanger slot position": "0.05"}
@@ -163,7 +165,7 @@ HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot posi
 # so the crossbar's .XXX round-hole station never opens the slot-to-hole
 # spacing; from the screw axis it sits at the round hole's .XXX band plus
 # the zone radius: 0.155.
-HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 12.700, BASIC
+HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 14.200, BASIC
 HANGER_SLOT_FROM_ROUND_PLACES = 3
 HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_POSITION_TOL / 2.0
 # The -X dowel's blind slot: the round hole's reamed slip width (so the pin
@@ -172,11 +174,12 @@ HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_POSITION_TOL / 2.0
 # line) printed .XX.  The slot takes up the spacing mismatch: its zone
 # radius (0.025), the knife mount's .XXX span (0.13) and the round-hole pin
 # across its loosest slip (0.046), either way: 3.183 + 2 x 0.201 = 3.585
-# under the 3.790 shortest.
+# under the 3.690 shortest.  No longer: each extra 0.01 of length comes out
+# of the slot's wall to the screw clearance hole (``build_fr_top_frame``).
 HANGER_SLOT_WIDTH = HANGER_PIN_HOLE_DIA
 HANGER_SLOT_WIDTH_BAND = HANGER_PIN_HOLE_DIA_BAND
 HANGER_SLOT_WIDTH_PLACES = HANGER_PIN_HOLE_DIA_PLACES
-HANGER_SLOT_LENGTH = 4.30
+HANGER_SLOT_LENGTH = 4.20
 HANGER_SLOT_LENGTH_PLACES = 2
 HANGER_SLOT_LENGTH_TOL = _XX  # 0.51
 HANGER_SLOT_DEPTH = HANGER_PIN_HOLE_DEPTH
@@ -192,10 +195,11 @@ if HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL < HANGER_SLOT_LENGTH_REQUIRED:
         f" at its shortest does not take the dowel's"
         f" {HANGER_SLOT_LENGTH_REQUIRED:.3f} travel"
     )
-# The drilled #6 hole's float about the screw shank: (4.318 - 3.505) / 2.  The
+# The drilled #6 hole's float about the screw shank: (4.699 - 3.505) / 2.  The
 # knife-hanger stack in ``build_sm_summing_assembly`` (which owns the knife
-# mount's tap position term) proves the dowel stations' mismatch stays inside.
-HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0  # 0.41
+# mount's tap position term) proves the dowel stations' mismatch, plus the
+# hole's drift over the grip, stays inside.
+HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0  # 0.597
 # Suffixes on the model's own slip-hole and slot sizes and the depth they
 # share (rules 6 and 7: count, process and purpose; the size and its band
 # print natively): section F-F carries the round holes' size, the depth of
@@ -473,6 +477,10 @@ KEEPER_TAP_CALLOUT_PRECISION = {
 # Rule 12 receiver-wall stack: realistic angular drift through the FULL
 # printed cylindrical pilot depth, without relying on a precision drill jig.
 KEEPER_TAP_DRILL_WANDER_DEG = 0.3
+# The same allowance as a lateral drift per mm drilled from a hole's entry
+# face: the knife-hanger #6 holes, drilled from the faced underside, charge
+# it at the depth each wall is judged (``build_fr_top_frame``).
+DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit.
 # The C2 general break overrides the title block's 0.25 max break on the

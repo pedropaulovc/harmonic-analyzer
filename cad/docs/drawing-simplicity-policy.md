@@ -78,14 +78,14 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    consistency). The allowlist:
    - **knife-edge system** — knife-mount 2X dowel-hole pattern (one position
      frame under its 2X Ø, Ø0.13 to the top seat, datum A, at the BASIC
-     12.700 span, the datum feature symbol B on that frame — the zone
+     14.200 span, the datum feature symbol B on that frame — the zone
      the .XXX span gave, so the screw-float and slot stacks are unchanged),
      bore (⌖Ø0.20 to A|B with ⊥Ø0.05 to B stacked under it: the one Ø
      zone bounds both the yaw off the dowel line and the tilt) and its #6-32 hanger tap (Ø0.10 to
-     A|B, so the crossbar's Ø4.318 clearance hole still floats round the screw
+     A|B, so the crossbar's Ø4.699 clearance hole still floats round the screw
      — `build_sm_summing_assembly._assert_knife_hanger_stack`); the top
      frame's two knife-hanger dowel slots (⌖0.05 to the round dowel hole at
-     their own station, BASIC 12.700 from it, datum B front / C rear, with
+     their own station, BASIC 14.200 from it, datum B front / C rear, with
      the other station's round hole translated, B|C▷ and C|B▷, so the two
      knife mounts' dowel
      lines stay square to the knife-edge line); summing-lever knife seat and
