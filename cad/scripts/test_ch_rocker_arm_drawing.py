@@ -349,7 +349,7 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         ("TopRadius", "BottomRadius"),
         (800.0, 816.0),
         (-110.0, -100.0),
-        ((0.114, 0.228), (0.020, 0.134)),
+        ((0.114, 0.228), (0.020, 0.129)),
         ("0.5", "0"),
     ):
         assert args == (adapter, front)
@@ -372,6 +372,11 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
 
 
 _REAM_ROW = Box(0.1040, 0.1444, 0.1561, 0.1480)
+_R816_ROW = Box(0.0815, 0.1512, 0.1032, 0.1547)
+# R8 native readbacks at the former (20,134) request, not a frame-width guess.
+_R8_LOWER_FRAME_WIDTH_M = 0.047339
+_R8_RIGHT_SHOULDER_M = 0.006350
+_R8_LOWER_LANDING = (0.130000, 0.170752)
 
 
 @pytest.mark.parametrize("junction", [(0.1056, 0.1185), (0.0937, 0.1015)])
@@ -391,13 +396,30 @@ def test_r7_cannot_be_proved_clear_from_a_guessed_left_junction() -> None:
     assert segment_box_distance(observed, _REAM_ROW) == 0.0
 
 
-def test_lower_profile_candidate_predicted_right_junction_clears_ream_row() -> None:
-    """Offline corridor prediction only; R8 must read the actual native route."""
+def test_observed_r8_profile_route_intersects_actual_basic_r816_row() -> None:
+    observed = Segment(0.073689, 0.130500, *_R8_LOWER_LANDING, "leader")
+    target = AnnotationGeometry("BASIC R816", "dim", "front")
+    assert segment_box_distance(observed, _R816_ROW) == 0.0
+    penetration, _span = text_overlap(observed, target, _R816_ROW)
+    assert penetration > 0.0
+    assert segment_box_distance(observed, _REAM_ROW) > drawing.ARC_PROFILE_TEXT_CLEARANCE_M
+
+
+def test_lower_profile_candidate_predicted_native_route_clears_both_callout_rows() -> None:
+    """R8-grounded Y-only prediction; the next native run must prove its route."""
     assert drawing.ARC_PROFILE_TEXT_CLEARANCE_M == 0.001
-    assert drawing.ARC_PROFILE_FRAME_XY["BottomRadius"] == (0.020, 0.134)
+    assert drawing.ARC_PROFILE_FRAME_XY["BottomRadius"] == (0.020, 0.129)
     assert drawing.ARC_PROFILE_PICK_X_MM["BottomRadius"] == -100.0
-    predicted = Segment(0.0737, 0.1305, 0.1300, 0.1708, "leader")
-    assert segment_box_distance(predicted, _REAM_ROW) > drawing.ARC_PROFILE_TEXT_CLEARANCE_M
+    frame_x, frame_y = drawing.ARC_PROFILE_FRAME_XY["BottomRadius"]
+    head = (frame_x + _R8_LOWER_FRAME_WIDTH_M, frame_y - 0.0035)
+    elbow = (head[0] + _R8_RIGHT_SHOULDER_M, head[1])
+    assert head == pytest.approx((0.067339, 0.125500))
+    assert elbow == pytest.approx((0.073689, 0.125500))
+    predicted = (Segment(*head, *elbow, "leader"), Segment(*elbow, *_R8_LOWER_LANDING, "leader"))
+    for box, predicted_gap_mm in ((_REAM_ROW, 1.448), (_R816_ROW, 1.547)):
+        distance = min(segment_box_distance(segment, box) for segment in predicted)
+        assert distance >= drawing.ARC_PROFILE_TEXT_CLEARANCE_M
+        assert distance * 1000.0 == pytest.approx(predicted_gap_mm, abs=0.002)
 
 
 def _native_line(x0, y0, x1, y1):
@@ -456,9 +478,10 @@ class _ClearanceDisplayData:
 class _ClearanceAnnotation:
     OwnerType, Visible, Layer = 0, 1, ""
 
-    def __init__(self, name, position, data, *, leaders=(), kind=5):
+    def __init__(self, name, position, data, *, leaders=(), kind=5, hole_callout=True):
         self.name, self.position, self.data = name, position, data
         self.leaders, self.kind = list(leaders), kind
+        self.hole_callout = hole_callout
 
     def GetName(self):  # noqa: N802
         return self.name
@@ -479,7 +502,7 @@ class _ClearanceAnnotation:
         return self.leaders[index]
 
     def GetSpecificAnnotation(self):  # noqa: N802
-        return SimpleNamespace(IsHoleCallout=lambda: True)
+        return SimpleNamespace(IsHoleCallout=lambda: self.hole_callout)
 
 
 @pytest.fixture
@@ -490,23 +513,25 @@ def native_profile_clearance(monkeypatch):
     logs = []
     monkeypatch.setattr(drawing._telemetry, "info", logs.append)
 
-    def frame(name, xy, points):
+    def frame(name, xy, points, width):
         x, y = xy
-        corners = [(x, y), (x + 0.050, y), (x + 0.050, y - 0.007), (x, y - 0.007)]
+        corners = [(x, y), (x + width, y), (x + width, y - 0.007), (x, y - 0.007)]
         lines = [_native_line(*a, *b) for a, b in zip(corners, corners[1:] + corners[:1])]
         data = _ClearanceDisplayData(
             [{"t": "PROFILE", "pos": [x + 0.001, y - 0.004, 0.0], "h": 0.002}],
             lines,
         )
-        return _ClearanceAnnotation(name, (*xy, 0.0), data, leaders=[points])
+        return _ClearanceAnnotation(name, (*xy, 0.00125), data, leaders=[points])
 
     top = frame(
         "DetailTop", (0.114, 0.228),
-        [0.114, 0.2245, 0, 0.1076, 0.2245, 0, 0.125, 0.184, 0],
+        [0.114, 0.2245, 0.00125, 0.10765, 0.2245, 0.00125, 0.125, 0.179476, 0.000625],
+        width=0.0512,
     )
     bottom = frame(
-        "DetailBottom", (0.020, 0.134),
-        [0.070, 0.1305, 0, 0.0737, 0.1305, 0, 0.130, 0.1708, 0],
+        "DetailBottom", (0.020, 0.129),
+        [0.067339, 0.1255, 0.00125, 0.073689, 0.1255, 0.00125, *_R8_LOWER_LANDING, 0.000625],
+        width=_R8_LOWER_FRAME_WIDTH_M,
     )
     ream = _ClearanceAnnotation(
         "PivotReam", (0.13005, 0.1462, 0),
@@ -516,7 +541,20 @@ def native_profile_clearance(monkeypatch):
         ),
         kind=4,
     )
-    annotations = [top, bottom, ream]
+    # Synthetic native text runs reproduce R8's actual row bbox. Individual
+    # run origins are fake data, not additional observations from the seat.
+    r816 = _ClearanceAnnotation(
+        "BasicR816", (0.0815, 0.1512, 0.00125),
+        _ClearanceDisplayData(
+            [
+                {"t": "R", "pos": [0.0815, 0.1512, 0.00125], "h": 0.0035},
+                {"t": "816.00", "pos": [0.09018, 0.1512, 0.00125], "h": 0.0035},
+            ],
+            [],
+        ),
+        kind=4, hole_callout=False,
+    )
+    annotations = [top, bottom, ream, r816]
     front = SimpleNamespace(GetAnnotations=lambda: annotations)
     profiles = {
         "TopRadius": SimpleNamespace(GetAnnotation=lambda: top),
@@ -524,20 +562,20 @@ def native_profile_clearance(monkeypatch):
     }
     return SimpleNamespace(
         adapter=object(), front=front, profiles=profiles, top=top, bottom=bottom,
-        ream=ream, annotations=annotations, logs=logs,
+        ream=ream, r816=r816, annotations=annotations, logs=logs,
     )
 
 
 def test_native_profile_guard_logs_actual_position_frame_and_leaders(native_profile_clearance):
     case = native_profile_clearance
-    case.bottom.position = (0.021, 0.135, 0.0)  # request != native readback
+    case.bottom.position = (0.021, 0.130, 0.00125)  # request != native readback
     drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
     text = "\n".join(case.logs)
-    assert "requested_frame_mm=(20.0, 134.0)" in text
-    assert "actual_GetPosition_mm=(21.0, 135.0, 0.0)" in text
+    assert "requested_frame_mm=(20.0, 129.0)" in text
+    assert "actual_GetPosition_mm=(21.0, 130.0, 1.25)" in text
     assert "native_frame_ink_bbox_mm=" in text
     assert "native_leader_points_mm=" in text
-    assert "landing_mm=[(130.0, 170.8, 0.0)]" in text
+    assert "landing_mm=[(130.0, 170.752, 0.625)]" in text
     assert "minimum_clearance_mm=" in text
     assert "required_clearance_mm=1.000" in text
     assert "PivotReam" in text
@@ -566,6 +604,32 @@ def test_native_profile_guard_refuses_observed_crossings(
     ):
         assert evidence in message
     assert any("native_frame_ink_bbox_mm=" in log for log in case.logs)
+
+
+def test_native_profile_guard_refuses_r8_basic_radius_crossing(
+    native_profile_clearance, monkeypatch,
+):
+    case = native_profile_clearance
+    monkeypatch.setitem(drawing.ARC_PROFILE_FRAME_XY, "BottomRadius", (0.020, 0.134))
+    case.bottom.position = (0.020, 0.134, 0.00125)
+    case.bottom.leaders = [[
+        0.067339, 0.1305, 0.00125, 0.073689, 0.1305, 0.00125,
+        *_R8_LOWER_LANDING, 0.000625,
+    ]]
+    for line in case.bottom.data.lines:
+        line[5] += 0.005
+        line[8] += 0.005
+    case.bottom.data.texts[0]["pos"][1] += 0.005
+    with pytest.raises(RuntimeError) as exc:
+        drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+    message = str(exc.value)
+    for evidence in (
+        "requested_frame_mm=(20.0, 134.0)", "actual_GetPosition_mm=(20.0, 134.0, 1.25)",
+        "BasicR816", "bbox_mm=[81.5,151.2]..[103.2,154.7]mm",
+        "minimum_clearance_mm=0.000", "penetration_mm=",
+        "native_frame_ink_bbox_mm=[20.0,127.0]..[67.3,134.0]mm",
+    ):
+        assert evidence in message
 
 
 @pytest.mark.parametrize("gap,passes", [(0.001, True), (0.000999, False), (0.001001, True)])
@@ -615,7 +679,7 @@ def test_native_profile_guard_fails_closed(native_profile_clearance, defect):
     elif defect == "refused-leader":
         case.bottom.GetLeaderPointsAtIndex = lambda _index: None
     elif defect == "short-leader":
-        case.bottom.leaders = [[0.02, 0.134, 0, 0.03]]
+        case.bottom.leaders = [[0.02, 0.129, 0, 0.03]]
     elif defect == "nonfinite-leader":
         case.bottom.leaders[0][3] = float("nan")
     elif defect == "zero-segment":
@@ -623,7 +687,7 @@ def test_native_profile_guard_fails_closed(native_profile_clearance, defect):
     elif defect == "missing-position":
         case.bottom.position = None
     elif defect == "invalid-position":
-        case.bottom.position = (float("inf"), 0.134, 0)
+        case.bottom.position = (float("inf"), 0.129, 0)
     elif defect == "missing-frame-lines":
         case.bottom.data.lines = []
     elif defect == "missing-other-text":
@@ -651,7 +715,7 @@ def test_native_profile_guard_fails_closed(native_profile_clearance, defect):
     elif defect == "duplicate-frame-name":
         case.bottom.name = case.top.name
     elif defect == "zero-frame-lines":
-        case.bottom.data.lines = [_native_line(0.020, 0.134, 0.020, 0.134)]
+        case.bottom.data.lines = [_native_line(0.020, 0.129, 0.020, 0.129)]
     with pytest.raises(RuntimeError, match="rocker arc-profile native clearance failed") as exc:
         drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
     assert "BottomRadius" in str(exc.value)
@@ -660,7 +724,7 @@ def test_native_profile_guard_fails_closed(native_profile_clearance, defect):
 
 def test_native_profile_guard_excludes_only_its_own_frame_text(native_profile_clearance):
     case = native_profile_clearance
-    case.bottom.data.texts[0]["pos"] = [0.070, 0.1305, 0]
+    case.bottom.data.texts[0]["pos"] = [0.067339, 0.1255, 0]
     drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
     case.bottom.leaders = [[0.110, 0.224, 0, 0.113, 0.224, 0, 0.130, 0.224, 0]]
     with pytest.raises(RuntimeError, match="DetailTop"):
@@ -670,7 +734,7 @@ def test_native_profile_guard_excludes_only_its_own_frame_text(native_profile_cl
 @pytest.mark.parametrize("read,answer", [
     ("GetName", ""),
     ("GetName", lambda: "method-shaped answer"),
-    ("GetPosition", [0.02, 0.134]),
+    ("GetPosition", [0.02, 0.129]),
     ("GetLeaderCount", -1),
 ])
 def test_native_profile_guard_refuses_invalid_native_scalar_contracts(

@@ -181,7 +181,7 @@ frames and no datums.
    This is a drawing-tolerance cutover; model geometry remains unchanged.
 
    Frame placement is a sheet-layout decision, not part tolerance. The lower
-   frame is requested at (20, 134) sheet mm, keeping its −100 mm model pick
+   frame is requested at (20, 129) sheet mm, keeping its −100 mm model pick
    and the upper frame unchanged. The native bent leader uses `SIDE_SMART`:
    its junction may be on either side, so a requested frame origin or guessed
    frame width does not prove a clear route. After all front-view callouts and
@@ -196,8 +196,15 @@ frames and no datums.
    with the offending callout, box, segment and penetration in sheet mm.
    These boxes reuse the audit's native text positions/heights and row-width
    model; they are not exact exported glyph extents. The final enforced PDF
-   ink audit remains in force. Offline R6/R7 geometry regressions establish
-   the detector, and the new corridor prediction is not native-seat proof.
+   ink audit remains in force. R8 proved that (20, 134) placed the frame
+   exactly as requested: its native width was 47.339 mm and the right-hand
+   shoulder added 6.350 mm; it was not a reanchoring failure. That route
+   cleared the REAM row but crossed the actual BASIC R816 text box at
+   (81.5, 151.2)..(103.2, 154.7) sheet mm. Moving only the lower request
+   5 mm down predicts about 1.448 mm to REAM and 1.547 mm to R816 using
+   those observed boxes, width, shoulder and landing. Offline R6/R7/R8
+   regressions establish the detector and this two-box corridor prediction;
+   the next native run must still prove the changed route and final ink.
 
    The same scoped exception puts the outline on the views: native overall
    width, radial end-land length and angle, and taper-to-lower-arc intersection,

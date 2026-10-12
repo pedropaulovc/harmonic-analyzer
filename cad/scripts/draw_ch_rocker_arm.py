@@ -191,7 +191,7 @@ ARC_PROFILE_OUTSIDE_MM = {
 # would put one of the zones on the wrong side of its basic arc.
 ARC_PROFILE_FRAME_XY = {
     "TopRadius": (0.114, 0.228),
-    "BottomRadius": (0.020, 0.134),
+    "BottomRadius": (0.020, 0.129),
 }
 ARC_PROFILE_PICK_X_MM = {"TopRadius": -110.0, "BottomRadius": -100.0}
 # Sheet-layout clearance, NOT a manufacturing tolerance. SIDE_SMART may put
