@@ -174,6 +174,27 @@ def test_profile_nominals_are_kept_natively_without_note_only_duplicates() -> No
     assert "_add_arc_profiles(adapter, front)" in source
 
 
+def test_basic_radius_text_positions_are_outside_their_parent_circles() -> None:
+    """Inside-circle R800 placement retained a centre tail on the native sheet."""
+    centre_model_y = (
+        drawing._PIVOT_MID_Y + drawing.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
+    )
+    centre = drawing._sheet_xy(0.0, centre_model_y)
+    for name, radius in (
+        ("TopRadius", drawing.R_TOP),
+        ("BottomRadius", drawing.R_BOTTOM),
+    ):
+        rendered_radius = math.dist(
+            centre, drawing._sheet_xy(0.0, centre_model_y + radius)
+        )
+        assert math.dist(centre, drawing.FRONT_KEEP[name]) > rendered_radius
+    # Negative control: the former top label lay inside the same nominal circle.
+    top_rendered_radius = math.dist(
+        centre, drawing._sheet_xy(0.0, centre_model_y + drawing.R_TOP)
+    )
+    assert math.dist(centre, (0.130, 0.218)) < top_rendered_radius
+
+
 class _ProfileDisplay:
     """Model COM property writes, including silently ignored setters."""
 

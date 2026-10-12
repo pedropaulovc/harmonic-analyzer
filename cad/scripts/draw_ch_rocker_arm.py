@@ -447,7 +447,9 @@ def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]
 TOP_ABOVE_PIVOT_TEXT_RISE = 0.022
 FRONT_KEEP = {
     "PivotDia": (0.130, 0.148),
-    "TopRadius": (0.130, 0.218),
+    # A radius text box inside this large parent circle still printed a
+    # centre-directed line off-sheet, even with the outside-arrow flags.
+    "TopRadius": (0.215, 0.157),
     "BottomRadius": (0.090, 0.154),
     "TopAbovePivot": (
         _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[0],
@@ -560,10 +562,10 @@ def _basic_profile_dimensions(adapter: Any, annotations: list[Any]) -> None:
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         set_basic_dimension(adapter, display, label=f"arc-system {name}")
         if name in ARC_PROFILE_OUTSIDE_MM:
-            # Outside arrows with no solid/extended centre leader stop at the
-            # arc (the pinion-arbor and arbor-pedestal radius patterns). A
-            # shortened radius alone still printed an off-sheet jog on this
-            # drawing and crossed the upper profile frame's leader.
+            # Dress exterior radius callouts with the pinion-arbor and
+            # arbor-pedestal leader pattern. The text must also be outside
+            # its parent circle: these flags alone did not remove the centre
+            # line when the R800 text was inside that circle.
             display.ShortenedRadius = False
             display.ArcExtensionLineOrOppositeSide = False
             display.ArrowSide = 1  # swDimArrowsOutside
