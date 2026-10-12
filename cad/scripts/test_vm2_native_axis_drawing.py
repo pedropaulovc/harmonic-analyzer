@@ -13,8 +13,11 @@ import math
 from types import SimpleNamespace
 
 import pytest
+import solidworks_mcp.adapters
 
-import _drawing_common as common
+import _drawing_attachment
+import _drawing_gdt
+import _drawing_selection
 import _native_axis_datum as axis
 
 
@@ -174,13 +177,14 @@ def harness(monkeypatch, tmp_path):
         ReferencedDocument=state.reference, GetDatumTags=lambda: state.tags,
         GetCorrespondingEntity=lambda _edge: edge,
     )
-    monkeypatch.setattr(common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_attachment, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(axis, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        common._sw_type_info, "early_bound_or_flag",
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag",
         lambda value, *_args: value,
     )
-    monkeypatch.setattr(common, "_select_annotation_entity", select)
+    monkeypatch.setattr(_drawing_gdt, "_select_annotation_entity", select)
+    monkeypatch.setattr(_drawing_selection, "_select_annotation_entity", select)
     return state
 
 
@@ -214,17 +218,17 @@ def test_requested_position_bounds_readback_distance(
         edge_xy=(0.105, 0.13527), symbol_xy=requested, datum="C", label=label,
     )
     if persists:
-        tag = common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+        tag = _drawing_gdt.add_datum_feature(harness.adapter, harness.view, **kwargs)
         assert tag is harness.tag
     else:
         with pytest.raises(RuntimeError, match="position did not persist"):
-            common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+            _drawing_gdt.add_datum_feature(harness.adapter, harness.view, **kwargs)
         assert harness.rebuild_calls == 0
     assert harness.annotation.set_calls == [(*requested, 0.0)]
 
 
 def test_requested_default_still_positions_once(harness):
-    tag = common.add_datum_feature(
+    tag = _drawing_gdt.add_datum_feature(
         harness.adapter, harness.view, edge_xy=(0.1, 0.1),
         symbol_xy=(0.2, 0.25), datum="A", label="requested control",
     )
@@ -253,9 +257,9 @@ def test_requested_position_after_forced_shoulder_removal(harness, settled_error
     )
     if settled_error:
         with pytest.raises(RuntimeError, match="position did not persist"):
-            common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+            _drawing_gdt.add_datum_feature(harness.adapter, harness.view, **kwargs)
     else:
-        tag = common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+        tag = _drawing_gdt.add_datum_feature(harness.adapter, harness.view, **kwargs)
         assert tag.GetAnnotation().GetPosition()[:2] == requested
 
 
@@ -269,7 +273,7 @@ def test_requested_position_rejects_failed_settled_move(harness):
 
     harness.annotation.SetPosition2 = move
     with pytest.raises(RuntimeError, match="failed to position datum"):
-        common.add_datum_feature(
+        _drawing_gdt.add_datum_feature(
             harness.adapter, harness.view, edge_xy=(0.085, 0.193175),
             symbol_xy=(0.085, 0.227), datum="A", label="bushing bore axis",
         )
@@ -299,7 +303,7 @@ def test_requested_datum_must_sit_on_the_named_edge(harness, defect, expected):
     with pytest.raises(
         RuntimeError, match=r"datum feature lost its edge attachment \(plate end\)"
     ) as info:
-        common.add_datum_feature(
+        _drawing_gdt.add_datum_feature(
             harness.adapter, harness.view, edge_entity=harness.edge,
             symbol_xy=(0.2, 0.25), datum="B", label="plate end",
         )
@@ -310,7 +314,7 @@ def test_requested_datum_must_sit_on_the_named_edge(harness, defect, expected):
 
 def test_requested_datum_proves_the_named_edge_by_identity(harness):
     harness.equality_calls.clear()
-    tag = common.add_datum_feature(
+    tag = _drawing_gdt.add_datum_feature(
         harness.adapter, harness.view, edge_entity=harness.edge,
         symbol_xy=(0.2, 0.25), datum="B", label="plate end",
     )
@@ -329,7 +333,7 @@ def test_coordinate_datum_must_hit_test_to_the_named_entity(harness):
         match=r"datum A pick resolved to a edge other than the one named "
         r"\(knife-edge pivot axis\)",
     ):
-        common.add_datum_feature(
+        _drawing_gdt.add_datum_feature(
             harness.adapter, harness.view, edge_xy=(0.225, 0.087),
             expected_entity=harness.canonical_edge, symbol_xy=(0.249, 0.075),
             datum="A", label="knife-edge pivot axis",
@@ -341,7 +345,7 @@ def test_coordinate_datum_must_hit_test_to_the_named_entity(harness):
 
 def test_coordinate_datum_hit_testing_the_named_entity_proves_it_after_rebuild(harness):
     harness.equality_calls.clear()
-    tag = common.add_datum_feature(
+    tag = _drawing_gdt.add_datum_feature(
         harness.adapter, harness.view, edge_xy=(0.225, 0.087),
         expected_entity=harness.edge, symbol_xy=(0.249, 0.075),
         datum="A", label="knife-edge pivot axis",
@@ -354,7 +358,7 @@ def test_coordinate_datum_hit_testing_the_named_entity_proves_it_after_rebuild(h
     # hit-test agreed with the name.
     harness.annotation.attached = (harness.canonical_edge,)
     with pytest.raises(RuntimeError, match=r"datum feature lost its edge attachment"):
-        common.add_datum_feature(
+        _drawing_gdt.add_datum_feature(
             harness.adapter, harness.view, edge_xy=(0.225, 0.087),
             expected_entity=harness.edge, symbol_xy=(0.249, 0.075),
             datum="A", label="knife-edge pivot axis",

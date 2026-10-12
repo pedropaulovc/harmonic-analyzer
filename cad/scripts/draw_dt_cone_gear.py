@@ -30,40 +30,44 @@ import math
 import sys
 from typing import Any
 
-import _drawing_hidden_sketches as hidden_sketches
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    curate_dimensions,
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound, _read_member
-from _paths import CAD_ROOT
-from _session import run_build
-from _drawing_leaders import ARROW_TEXT_CLEARANCE
+from _cone_gear_readback import assert_saved_configuration_topology
 from _drawing_common import (
-    _INSERT_DIMS_MARKED,
     DrawingOutputs,
-    add_note,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    check_drawing_layout,
-    create_blank_drawing_sheets,
-    curate_dimensions,
-    delete_unnamed_imports,
-    dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
-    view_name,
-    visible_view_entities,
 )
+from _drawing_dimension_import import _INSERT_DIMS_MARKED, delete_unnamed_imports
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+import _drawing_hidden_sketches as hidden_sketches
+from _drawing_layout_collect import check_drawing_layout
+from _drawing_leaders import ARROW_TEXT_CLEARANCE
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_view_display import set_hidden_lines_removed
 from _layout_audit import arc_segments
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
-from _cone_gear_readback import assert_saved_configuration_topology
+import _telemetry
 from dt_cone_gear_spec import (
     BORE_SURFACE_FINISHES,
     CONFIGURATION_TEETH,
@@ -77,9 +81,6 @@ from dt_cone_gear_spec import (
     outside_dia_mm,
     tooth_thickness_mm,
 )
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_gear"]

@@ -11,41 +11,39 @@ import argparse
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
-import _telemetry
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
-    property_link,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_finish import add_surface_finish
+from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_alignment_pinion_spec import (
     ARBOR_BORE_CALLOUT,
     BORE_DIA,
     DRAWING_PRECISION_BY_NAME,
     SURFACE_FINISHES,
     TEETH,
-)
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

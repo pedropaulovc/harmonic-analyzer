@@ -4,10 +4,10 @@ A frozen point is on an edge of the family's lowest-named shown instance,
 in that part's own millimetres, so view scale, placement and explode
 distance do not move it. The build projects it onto the sheet, hit-tests
 the sheet there and refuses the balloon unless the edge it finds is that
-instance's (``_drawing_common._select_balloon_anchor``).
+instance's (``_drawing_balloons._select_balloon_anchor``).
 
 ``BalloonAnchor()`` walks: it hit-tests the body's extreme points along
-fixed directions (``_drawing_common._walk_points``), ranked by geometry,
+fixed directions (``_drawing_balloons._walk_points``), ranked by geometry,
 and takes the first the hit test gives back to that exact instance, else
 the first so claimed of the points along the edges the view's hidden-line
 pass lists as drawn for that instance; with neither, the sheet fails. The
@@ -27,7 +27,7 @@ the pedestal's top face (run
 
 from __future__ import annotations
 
-from _drawing_common import BalloonAnchor
+from _drawing_balloons import BalloonAnchor
 
 DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
     "cylinder-bank": {

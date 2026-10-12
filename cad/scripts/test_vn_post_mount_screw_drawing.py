@@ -869,7 +869,7 @@ def test_tip_view_raises_when_the_crop_did_not_take(monkeypatch) -> None:
 def test_tip_view_imports_the_break_by_feature(monkeypatch) -> None:
     """Targeted import: only the deburr cutter's profile is selected; the
     entire-model import is never called."""
-    import _drawing_common as dc
+    import _drawing_dimension_import
 
     break_annotation = object()
     calls: list[str] = []
@@ -881,20 +881,20 @@ def test_tip_view_imports_the_break_by_feature(monkeypatch) -> None:
     def entire(adapter, view):
         raise AssertionError("the tip view must not import the entire model")
 
-    monkeypatch.setattr(dc, "insert_feature_dimensions", targeted)
-    monkeypatch.setattr(dc, "insert_marked_dimensions", entire)
+    monkeypatch.setattr(_drawing_dimension_import, "insert_feature_dimensions", targeted)
+    monkeypatch.setattr(_drawing_dimension_import, "insert_marked_dimensions", entire)
     monkeypatch.setattr(
-        dc,
+        _drawing_dimension_import,
         "dimension_name",
         lambda adapter, item: "CutEndBreak" if item is break_annotation else "",
     )
     monkeypatch.setattr(
-        dc,
+        _drawing_dimension_import,
         "curate_dimensions",
         lambda adapter, items, delete=(), reposition=None: list(items),
     )
     # The stub places nothing, so there is no position to read back.
-    monkeypatch.setattr(dc, "_reposition_rerun_reason", lambda *a, **k: "none")
+    monkeypatch.setattr(_drawing_dimension_import, "_reposition_rerun_reason", lambda *a, **k: "none")
     curated = drawing._curate_tip_view(object(), object())
     assert curated == [break_annotation]
     assert calls == ["features:['CutEndDeburrProfile']"]

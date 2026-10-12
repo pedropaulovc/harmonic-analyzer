@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the pen amplification wire.
 
 The SLDPRT remains authoritative.  This recipe supplies only the wire's
-elevation view, its run-length dimension, and the amplification notes; every
-shared sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+elevation view, its run-length dimension, and the amplification notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The wire is a hair-thin Ø0.8 steel run (WIRE 2 of the amplification chain),
 modelled as the straight rest-pose length only.  The sheet magnifies to 2:1 so
@@ -20,22 +20,23 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import place_view
+
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 
 
 SPEC = DRAWINGS_BY_NAME["pn_pen_wire"]

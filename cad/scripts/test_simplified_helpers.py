@@ -8,8 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 import _assembly
-import _simplified_part
-from _drawing_common import (
+from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
     ViewRole,
@@ -19,6 +18,7 @@ from _drawing_common import (
 )
 from _simplified_bom import child_bom_identity
 from _simplified_names import is_simplified, simplified_comment, simplified_name
+import _simplified_part
 
 WIREFRAME, HLV, HLR, SHADED, SHADED_EDGES = 0, 1, 2, 3, 7
 FACETED_WIREFRAME, FACETED_HLV, FACETED_HLR = 4, 5, 6

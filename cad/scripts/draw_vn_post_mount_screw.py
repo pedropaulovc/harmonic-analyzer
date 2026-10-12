@@ -38,34 +38,43 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import math
 import sys
-from dataclasses import dataclass
 from typing import Any
 
-import _drawing_hidden_sketches as hidden_sketches
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound
-from _session import run_build
-import _drawing_common
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    assert_imported_precision,
     finalize_drawing,
     new_project_drawing,
-    dimension_name,
-    model_point_in_view,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
+import _drawing_dimension_import
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+import _drawing_hidden_sketches as hidden_sketches
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import Box, estimate_text_box
+from _session import run_build
 from _stock_trim_drawing import TrimSheet
+import _telemetry
 from vn_post_mount_screw_spec import (
     CUT_END_BREAK_DIMENSION,
     CUT_END_BREAK_MAX_MM,
@@ -80,8 +89,6 @@ from vn_post_mount_screw_spec import (
     HEAD_H_MM,
     THREAD_DIA_MM,
 )
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
 
 SPEC = DRAWINGS_BY_NAME["vn_post_mount_screw"]
 PART_STEM = SPEC.artifact_stem
@@ -318,7 +325,7 @@ def _curate_tip_view(adapter: Any, view: Any) -> list[Any]:
     cutter's CutEndDeburrProfile is selected (source 1), never the entire
     model.  The cropped model view's entire-model import delivered it in
     b6552f13b; the targeted form is the one the Front already uses."""
-    return _drawing_common.curate_view_dimensions(
+    return _drawing_dimension_import.curate_view_dimensions(
         adapter,
         view,
         keep=DETAIL_KEEP,

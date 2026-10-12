@@ -1287,7 +1287,7 @@ def test_detail_a_imports_its_dimensions_by_feature_before_any_other_view() -> N
     features that own them, before the donor's whole-model import can take
     NeckDia or CrossHoleDia (a dimension on the sheet is not imported again,
     memory model-annotations-import-once)."""
-    import _drawing_common as dc
+    import _drawing_dimension_import
 
     assert set(drawing.DETAIL_KEEP) == {
         "HeadLen",
@@ -1296,7 +1296,7 @@ def test_detail_a_imports_its_dimensions_by_feature_before_any_other_view() -> N
         "CrossHoleDia",
         "NeckDia",
     }
-    owners = dc._features_owning(
+    owners = _drawing_dimension_import._features_owning(
         spec.DRAWING_DIMENSIONS, drawing.DETAIL_KEEP, view_label="detail A"
     )
     assert owners == ("CrossHoleProfile", "FrontCapProfile", "Head", "NeckProfile")
@@ -2010,7 +2010,7 @@ def test_a_journal_land_the_model_does_not_carry_fails_loud(monkeypatch) -> None
 
 
 def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypatch) -> None:
-    import _drawing_common
+    import _drawing_edges
 
     face = _ShaftFace(spec.SHAFT_DIA, 0.0, 20.0)
     lower = _Silhouette(face, -1.0)
@@ -2019,13 +2019,13 @@ def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypat
     stub.ends = (stub.ends[0], (0.0, stub.ends[1][1], 0.015))
     view = _ProfileView([lower, stub])
     monkeypatch.setattr(
-        _drawing_common,
+        _drawing_edges,
         "model_points_in_view",
         lambda adapter, v, points, *, label, names=None: [v.sheet(p) for p in points],
     )
     spec_face = spec.SURFACE_FINISHES[0].face.__class__(spec.SHAFT_DIA, contains_z_mm=10.0)
     with pytest.raises(RuntimeError, match=r"2 silhouettes of land's face"):
-        _drawing_common.face_silhouettes_through(
+        _drawing_edges.face_silhouettes_through(
             SimpleNamespace(), view, {"land": (spec_face, view.sheet((0.0, -0.004, 0.010)))},
             label="land",
         )

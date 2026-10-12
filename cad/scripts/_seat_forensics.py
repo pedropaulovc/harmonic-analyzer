@@ -13,7 +13,7 @@ artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
   ``_drawing_common.new_project_drawing`` (read-only), ``package_native``'s
   teardown, the missing-property capture behind
   ``_drawing_common.read_required_properties``, the pick-miss capture behind
-  ``_drawing_common._select_view_entity`` (it always raises), and
+  ``_drawing_selection._select_view_entity`` (it always raises), and
   ``capture_com_failure`` as a terminal failure call (it always raises).
 - No COM mutator runs here except three pinned ones, each after the artefact
   is settled: ``SaveAs3``/``SaveBMP`` of a failing document (only under the

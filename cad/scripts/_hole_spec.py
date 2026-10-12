@@ -2,7 +2,7 @@
 
 This module owns standard-table dimensions and declarative :class:`HoleSpec`
 values. SolidWorks execution stays in ``_holes``; drawing placement stays in
-``_drawing_common``. Part specification modules can therefore own one hole
+``_drawing_hole_callout``. Part specification modules can therefore own one hole
 identity without importing COM or duplicating its diameter and process text.
 """
 

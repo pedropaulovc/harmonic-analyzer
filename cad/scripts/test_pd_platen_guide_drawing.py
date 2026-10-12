@@ -3,29 +3,24 @@
 from __future__ import annotations
 
 from dataclasses import replace
-
+from pathlib import Path
 import subprocess
 import sys
 import zipfile
-from pathlib import Path
 
-import pytest
 from PIL import Image
+import pytest
 
-import cut_release
-import package_native
-import draw_pd_platen_guide as drawing
-import build_pd_platen_guide as guide
-import _drawing_common as drawing_common
-from _drawing_registry import DRAWINGS, DRAWING_TEMPLATES, DrawingLayout
-from _drawing_common import (
-    _contact_preview_grid,
-    _gtol_frame_xml,
-    property_link,
-    render_pdf_png,
-    sanitize_pdf_metadata,
-)
+from _drawing_common import _contact_preview_grid, render_pdf_png, sanitize_pdf_metadata
+from _drawing_notes import property_link
+import _drawing_registry
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS, DrawingLayout
+from _gtol_frame import gtol_frame_xml as _gtol_frame_xml
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
+import build_pd_platen_guide as guide
+import cut_release
+import draw_pd_platen_guide as drawing
+import package_native
 from pd_platen_guide_spec import TAPPED_HOLE_SPEC
 
 
@@ -76,7 +71,7 @@ def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
         resolution=72,
     )
     monkeypatch.setitem(
-        drawing_common.DRAWING_TEMPLATES,
+        _drawing_registry.DRAWING_TEMPLATES,
         DrawingLayout.LANDSCAPE,
         replace(
             DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE],
@@ -114,7 +109,7 @@ def test_portrait_raster_crops_pdfium_width_rounding(
     writer.add_blank_page(width=793, height=1224)
     writer.write(pdf)
     monkeypatch.setitem(
-        drawing_common.DRAWING_TEMPLATES,
+        _drawing_registry.DRAWING_TEMPLATES,
         DrawingLayout.PORTRAIT,
         replace(
             DRAWING_TEMPLATES[DrawingLayout.PORTRAIT],
